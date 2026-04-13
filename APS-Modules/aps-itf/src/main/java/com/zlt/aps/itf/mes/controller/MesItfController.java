@@ -4,6 +4,7 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.autoLogin.loginUtils.annotation.AutoLoginLog;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.itf.mes.service.ICxScheduleResultIssueService;
 import com.zlt.aps.itf.mes.service.ILhScheduleResultIssueService;
@@ -12,6 +13,7 @@ import com.zlt.aps.itf.mes.service.MesBomItfService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
@@ -315,34 +317,34 @@ public class MesItfController {
 
     /**
      * 同步成型在机数据
-     * @param mdmCxMachineOnlineInfo 参数
+     * @param cxMachineOnlineInfo 参数
      * @return 结果
      */
     @ApiOperation("同步成型在机数据")
     @PostMapping("/syncMachineOnlineInfo")
     @AutoLoginLog
-    public AjaxResult syncMachineOnlineInfo(@RequestBody MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo) {
-        String factoryCode = mdmCxMachineOnlineInfo.getFactoryCode();
+    public AjaxResult syncMachineOnlineInfo(@RequestBody CxMachineOnlineInfo cxMachineOnlineInfo) {
+        String factoryCode = cxMachineOnlineInfo.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
-            mdmCxMachineOnlineInfo.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+            cxMachineOnlineInfo.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        return mesItfService.syncMachineOnlineInfo(mdmCxMachineOnlineInfo);
+        return mesItfService.syncMachineOnlineInfo(cxMachineOnlineInfo);
     }
 
     /**
      * 同步硫化在机数据
-     * @param mdmLhMachineOnlineInfo 参数
+     * @param lhMachineOnlineInfo 参数
      * @return 结果
      */
     @ApiOperation("同步硫化在机数据")
     @PostMapping("/syncLhMachineOnlineInfo")
     @AutoLoginLog
-    public AjaxResult syncLhMachineOnlineInfo(@RequestBody MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo) {
-        String factoryCode = mdmLhMachineOnlineInfo.getFactoryCode();
+    public AjaxResult syncLhMachineOnlineInfo(@RequestBody LhMachineOnlineInfo lhMachineOnlineInfo) {
+        String factoryCode = lhMachineOnlineInfo.getFactoryCode();
         if (StringUtils.isBlank(factoryCode)) {
-            mdmLhMachineOnlineInfo.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+            lhMachineOnlineInfo.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        return mesItfService.syncLhMachineOnlineInfo(mdmLhMachineOnlineInfo);
+        return mesItfService.syncLhMachineOnlineInfo(lhMachineOnlineInfo);
     }
 
     /**

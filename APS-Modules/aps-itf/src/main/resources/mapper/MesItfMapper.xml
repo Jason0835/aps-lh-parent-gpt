@@ -132,7 +132,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectCxMachineOnlineSyncList" resultType="com.zlt.aps.mp.api.domain.entity.MdmCxMachineOnlineInfo">
+    <select id="selectCxMachineOnlineSyncList" resultType="com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo">
         SELECT
         ONLINE_DATE,
         CX_CODE,
@@ -150,7 +150,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectLhMachineOnlineSyncList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhMachineOnlineInfo">
+    <select id="selectLhMachineOnlineSyncList" resultType="com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo">
         SELECT
         ONLINE_DATE,
         LH_CODE,
@@ -185,7 +185,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectLhRepairCapsuleList" resultType="com.zlt.aps.itf.vo.LhRepairCapsule">
+    <select id="selectLhRepairCapsuleList" resultType="com.zlt.aps.itf.vo.LhRepairCapsuleVo">
         SELECT
         OBTAIN_TIME,
         LH_CODE,
@@ -197,7 +197,7 @@
         WHERE 1 = 1
     </select>
 
-    <select id="selectMouldCleanPlanList" resultType="com.zlt.aps.itf.vo.MouldCleanPlan">
+    <select id="selectMouldCleanPlanList" resultType="com.zlt.aps.itf.vo.MouldCleanPlanVo">
         SELECT
         LH_CODE,
         OPER_TIME,
@@ -215,7 +215,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectStructureTreadConfigList" resultType="com.zlt.aps.itf.vo.StructureTreadConfig">
+    <select id="selectStructureTreadConfigList" resultType="com.zlt.aps.itf.vo.StructureTreadConfigVo">
         SELECT
         STRUCTURE_CODE,
         TREAD_COUNT,
@@ -230,7 +230,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectMesCxStockList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMesCxStock">
+    <select id="selectMesCxStockList" resultType="com.zlt.aps.cx.api.domain.entity.CxMesStock">
         SELECT
         STOCK_DATE,
         EMBRYO_CODE,
@@ -252,7 +252,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectCxClassShiftFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmCxScheFinishQty">
+    <select id="selectCxClassShiftFinishQtyList" resultType="com.zlt.aps.cx.api.domain.entity.CxScheFinishQty">
         SELECT
         ORDER_NO,
         SCHEDULE_DATE,
@@ -279,7 +279,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectLhClassShiftFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhScheFinishQty">
+    <select id="selectLhClassShiftFinishQtyList" resultType="com.zlt.aps.lh.api.domain.entity.LhScheFinishQty">
         SELECT
         ORDER_NO,
         SCHEDULE_DATE,
@@ -305,7 +305,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectCxScheDayFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmCxScheDayFinishQty">
+    <select id="selectCxScheDayFinishQtyList" resultType="com.zlt.aps.cx.api.domain.entity.CxDayFinishQty">
         SELECT
         FINISH_DATE,
         DAY_FINISH_QTY,
@@ -322,7 +322,7 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
-    <select id="selectLhScheDayFinishQtyList" resultType="com.zlt.aps.mp.api.domain.entity.MdmLhScheDayFinishQty">
+    <select id="selectLhScheDayFinishQtyList" resultType="com.zlt.aps.lh.api.domain.entity.LhDayFinishQty">
         SELECT
         FINISH_DATE,
         DAY_FINISH_QTY,
@@ -387,7 +387,7 @@
         </foreach>
     </insert>
 
-    <select id="selectMoldAlterPlanFinishList" resultType="com.zlt.aps.mp.api.domain.entity.MdmMoldAlterPlanFinish">
+    <select id="selectMoldAlterPlanFinishList" resultType="com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish">
         SELECT
         LH_BATCH_NO,
         ORDER_NO,

@@ -8,6 +8,7 @@ import com.zlt.aps.mp.engine.basedata.assemble.history.CxMachineProductionHistor
 import com.zlt.aps.mp.engine.basedata.assemble.history.GroupPlanProductionHistoryInfo;
 import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.dto.CxMouldDayProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo;
@@ -183,6 +184,42 @@ public class BaseDataContainer implements Serializable {
             return Collections.emptyList();
         }
         return ratioList;
+    }
+
+    /**
+     * 获取Sku当前已排产量
+     *
+     * @param materialDesc Sku物料描述
+     * @return
+     */
+    public Integer getSumProductionQty(String materialDesc) {
+        if (CollectionUtils.isEmpty(mouldInfoMap)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        Integer sumProductionQty = BigDecimal.ZERO.intValue();
+        for (Map.Entry<String, ProductionMouldInfoVo> entry : mouldInfoMap.entrySet()) {
+            ProductionMouldInfoVo productionInfo = entry.getValue();
+            if (null == productionInfo) {
+                continue;
+            }
+            Map<Integer, List<CxMouldDayProductionHelper>> dayProductionInfo = productionInfo.getDayProductionInfo();
+            if (CollectionUtils.isEmpty(dayProductionInfo)) {
+                continue;
+            }
+            for (Map.Entry<Integer, List<CxMouldDayProductionHelper>> dayEntry : dayProductionInfo.entrySet()) {
+                List<CxMouldDayProductionHelper> dayProductionList = dayEntry.getValue();
+                if (CollectionUtils.isEmpty(dayProductionList)) {
+                    continue;
+                }
+                List<CxMouldDayProductionHelper> skuProductionList = dayProductionList.stream().filter(singlePlan -> materialDesc.equals(singlePlan.getMaterialDesc())).collect(Collectors.toList());
+                if (CollectionUtils.isEmpty(skuProductionList)) {
+                    continue;
+                }
+                Integer singleSum = skuProductionList.stream().mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
+                sumProductionQty = sumProductionQty + singleSum;
+            }
+        }
+        return sumProductionQty;
     }
 
     /**

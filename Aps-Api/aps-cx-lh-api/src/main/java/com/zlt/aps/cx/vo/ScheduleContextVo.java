@@ -7,7 +7,8 @@ import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.config.CxStructurePriority;
 import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
-import com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig;
+import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
+import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
@@ -100,7 +101,7 @@ public class ScheduleContextVo {
      * 成型在机信息列表（续作判断）
      * 从T_MDM_CX_MACHINE_ONLINE_INFO获取当前机台正在做的胎胚
      */
-    private List<MdmCxMachineOnlineInfo> onlineInfos;
+    private List<CxMachineOnlineInfo> onlineInfos;
 
     /**
      * 机台在机胎胚映射（快速查询用）
@@ -153,7 +154,7 @@ public class ScheduleContextVo {
      * 结构整车配置列表
      * 用于获取每个结构的整车胎面条数(TREAD_COUNT)
      */
-    private List<MdmStructureTreadConfig> structureTreadConfigs;
+    private List<CxStructureTreadConfig> structureTreadConfigs;
 
     /**
      * 结构整车配置映射（快速查询用）
@@ -164,7 +165,7 @@ public class ScheduleContextVo {
      * 结构班产配置列表（整车条数）
      * 按结构+班次定义的标准产能
      */
-    private List<MdmStructureTreadConfig> structureShiftCapacities;
+    private List<CxStructureTreadConfig> structureShiftCapacities;
 
     /**
      * 结构优先级配置列表
@@ -434,7 +435,7 @@ public class ScheduleContextVo {
     public Map<String, Integer> getStructureTreadCountMap() {
         Map<String, Integer> map = new HashMap<>();
         if (structureShiftCapacities != null) {
-            for (MdmStructureTreadConfig config : structureShiftCapacities) {
+            for (CxStructureTreadConfig config : structureShiftCapacities) {
                 if (config.getStructureCode() != null && config.getTreadCount() != null) {
                     map.put(config.getStructureCode(), config.getTreadCount());
                 }

@@ -9,7 +9,6 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
 import com.zlt.common.utils.PubUtil;
-
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -114,7 +113,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 其余搭配量
      */
     private Integer otherMatchingQty;
-    
+
     /**
      * 搭配开始日期
      */
@@ -162,9 +161,17 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * @param addProductionQty 收尾需撤回的排产量
      */
     public void withdrawProductionQty(Integer addProductionQty) {
+        if (null == addProductionQty || addProductionQty <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
         Integer currentNeedProductionQty = this.productionQty;
         //净需求-先撤回
         this.productionQty = currentNeedProductionQty + addProductionQty;
+        if (this.productionQty > this.originProductionQty) {
+            this.productionQty = this.originProductionQty;
+        }
+        //排产标记还原
+        this.productionFlag = getIsProduction();
         if (this.originHeightProductionQty <= BigDecimal.ZERO.intValue()) {
             return;
         }
@@ -185,6 +192,9 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         Integer addHeightQty = addProductionQty - noHeightProductionQty;
         if (addHeightQty < BigDecimal.ZERO.intValue()) {
             addHeightQty = BigDecimal.ZERO.intValue();
+        }
+        if (addHeightQty >= originHeightQty) {
+            addHeightQty = originHeightQty;
         }
         this.heightProductionQty = addHeightQty;
     }

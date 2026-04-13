@@ -8,7 +8,7 @@ nacos:
   cfg-group: APS_TEST_GROUP
   run-namespace: jytest
   cfg-namespace: jytest
-  
+
 ## Spring
 spring:
   cloud:

@@ -3,6 +3,7 @@ package com.zlt.aps.cx.entity.schedule;
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.domain.ApsBaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -11,6 +12,7 @@ import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 /**
  * 成型排程结果表（单表结构）
@@ -43,7 +45,7 @@ import java.util.Date;
 @EqualsAndHashCode(callSuper = true)
 @TableName("T_CX_SCHEDULE_RESULT")
 @ApiModel(value = "成型排程结果对象", description = "成型排程结果表（单表）")
-public class CxScheduleResult extends ApsBaseEntity {
+public class CxScheduleResult extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -384,4 +386,9 @@ public class CxScheduleResult extends ApsBaseEntity {
     @ApiModelProperty(value = "硫化班产")
     @TableField("LH_CLASS_QTY")
     private BigDecimal lhClassQty;
+
+    // ==================== 非持久化字段 ====================
+    @ApiModelProperty(value = "子表明细列表")
+    @TableField(exist = false)
+    private List<CxScheduleDetail> details;
 }
