@@ -57,14 +57,13 @@ public class LhPrecisionPlanUIController extends BaseController {
 
     private boolean useFileEncrypt = true;
 
-    @RequiresPermissions("schedule:lhPrecisionPlan:view")
+    @RequiresPermissions("lh:lhPrecisionPlan:view")
     @GetMapping()
     public String toIndex() {
         return prefix + "/lhPrecisionPlan";
     }
 
     @ApiOperation("根据条件查询硫化精度计划列表")
-    @RequiresPermissions("schedule:lhPrecisionPlan:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo listLhPrecisionPlan(LhPrecisionPlan entity) {
@@ -95,7 +94,7 @@ public class LhPrecisionPlanUIController extends BaseController {
     }
 
     @ApiOperation("删除硫化精度计划（id不为空）")
-    @RequiresPermissions("schedule:lhPrecisionPlan:remove")
+    @RequiresPermissions("lh:lhPrecisionPlan:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult removeLhPrecisionPlan(String ids) {
@@ -104,7 +103,7 @@ public class LhPrecisionPlanUIController extends BaseController {
     }
 
     @ApiOperation("导出硫化精度计划")
-    @RequiresPermissions("schedule:lhPrecisionPlan:export")
+    @RequiresPermissions("lh:lhPrecisionPlan:export")
     @GetMapping("/export")
     @ResponseBody
     public void export(HttpServletResponse response, LhPrecisionPlan lhPrecisionPlan) throws IOException {
@@ -126,7 +125,7 @@ public class LhPrecisionPlanUIController extends BaseController {
         return AjaxResult.success();
     }
 
-    @RequiresPermissions("schedule:lhPrecisionPlan:import")
+    @RequiresPermissions("lh:lhPrecisionPlan:import")
     @ApiOperation("excel数据导入")
     @PostMapping("/importData")
     @ResponseBody
@@ -146,7 +145,7 @@ public class LhPrecisionPlanUIController extends BaseController {
     }
 
     @ApiOperation("从MES同步数据生成硫化精度初版计划")
-    @RequiresPermissions("schedule:lhPrecisionPlan:sync")
+    @RequiresPermissions("lh:lhPrecisionPlan:sync")
     @PostMapping("/generateFromMes")
     @ResponseBody
     public AjaxResult generateFromMes(@RequestParam("year") Integer year) {
@@ -154,7 +153,7 @@ public class LhPrecisionPlanUIController extends BaseController {
     }
 
     @ApiOperation("自动生成年度硫化精度计划")
-    @RequiresPermissions("schedule:lhPrecisionPlan:generate")
+    @RequiresPermissions("lh:lhPrecisionPlan:generate")
     @PostMapping("/autoGenerateYearly")
     @ResponseBody
     public AjaxResult autoGenerateYearly(@RequestParam("year") Integer year) {
@@ -162,7 +161,7 @@ public class LhPrecisionPlanUIController extends BaseController {
     }
 
     @ApiOperation("执行30天预警检查")
-    @RequiresPermissions("schedule:lhPrecisionPlan:warning")
+    @RequiresPermissions("lh:lhPrecisionPlan:warning")
     @PostMapping("/checkWarning")
     @ResponseBody
     public AjaxResult checkWarning() {

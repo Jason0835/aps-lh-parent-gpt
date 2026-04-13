@@ -69,6 +69,7 @@ public class MdmConstructionInfo extends BaseEntity {
     private String constructionCode;
 
     /** BOM版本(存储版本号) */
+    @ImportExcelValidated(required = true, maxLength = 30)
     @Excel(name = "ui.data.column.mdmConstructionInfo.constructionVersion")
     @ApiModelProperty(value = "BOM版本(存储版本号)", name = "constructionVersion")
     @TableField(value = "CONSTRUCTION_VERSION")
