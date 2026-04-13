@@ -214,7 +214,7 @@ public class CxCapacityAllocationHandler {
         cxMachineInfo.addAllocationPlanInfo(context, addHelper);
         allocationGroupPlan.updateLeftOverNeedAllocationDays(needAllocationDays);
         //20260109 标记分配完成--不能标记分配完成，有可能因提前收尾导致需要在其它机台进行分配 对成型机台进行模拟模具排产
-        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper);
+        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper, new HashSet<>());
         //20260322 剩余时间-有可能因提前收尾，导致时间变化
         Integer leftOver = cxMachineInfo.getRemainCapacity();
         //还有剩余产能，继续挑选下一个分组结构

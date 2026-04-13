@@ -273,16 +273,21 @@ public class DeductMouldScheduler {
         } else {
             //1.3 在收尾日通排产完，则根据规则确定激活机台数
             activeMachines = getActiveMachinesByRule(deductMouldVo, context.getExpectedDays());
-
-            // 动态计算所需机台数 sandy+ 2026.4.13
-            // 在结构未收尾的情况下，不再依赖固定天数，而是根据剩余需求、剩余天数、单台日产量动态决定当日应使用的模具数，逐日降1台，
-            // 即采取提前降模策略，使得计划量可以拉满到结构收尾
-            int remainingDays = deductMouldVo.getDeadline() - context.getCurrentDate();
-            int requiredDailyCapacity = (int) Math.ceil((double) deductMouldVo.getRemainingQty() / remainingDays);
-            int neededMachines = (int) Math.ceil((double) requiredDailyCapacity / deductMouldVo.getDailyOutputPerMachine());
-            activeMachines = Math.min(activeMachines, context.getPreDayMachines());
-            if (activeMachines > neededMachines){
-                activeMachines -= 1;
+            // 若前日机台数 与 激活机台数 相差>=3台，采取均降策略
+            int diffMachines = context.getPreDayMachines() - activeMachines;
+            if (diffMachines >=3 ){
+                activeMachines = (int) Math.ceil((double) context.getPreDayMachines() / 2);
+            }else{
+                // 动态计算所需机台数 sandy+ 2026.4.13
+                // 在结构未收尾的情况下，不再依赖固定天数，而是根据剩余需求、剩余天数、单台日产量动态决定当日应使用的模具数，逐日降1台，
+                // 即采取提前降模策略，使得计划量可以拉满到结构收尾
+                int remainingDays = deductMouldVo.getDeadline() - context.getCurrentDate();
+                int requiredDailyCapacity = (int) Math.ceil((double) deductMouldVo.getRemainingQty() / remainingDays);
+                int neededMachines = (int) Math.ceil((double) requiredDailyCapacity / deductMouldVo.getDailyOutputPerMachine());
+                activeMachines = Math.min(activeMachines, context.getPreDayMachines());
+                if (activeMachines > neededMachines){
+                    activeMachines -= 1;
+                }
             }
         }
 

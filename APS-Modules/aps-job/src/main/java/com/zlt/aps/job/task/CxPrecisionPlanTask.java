@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+
 /**
  * 成型精度计划定时任务
  *
@@ -28,6 +30,13 @@ public class CxPrecisionPlanTask {
         try {
             AjaxResult result = cxPrecisionPlanRemoteService.generatePlansFromMes();
             log.info("定时任务执行结果：{}", result.get("msg"));
+
+            Integer currentYear = LocalDate.now().getYear();
+            AjaxResult result15 = cxPrecisionPlanRemoteService.autoCalculateCxPrecisionPlan15Days(currentYear);
+            log.info("成型精度计划（15天）自动推算结果：{}", result15.get("msg"));
+
+            AjaxResult result60 = cxPrecisionPlanRemoteService.autoCalculateCxPrecisionPlan60Days(currentYear);
+            log.info("成型精度计划（60天）自动推算结果：{}", result60.get("msg"));
         } catch (Exception e) {
             log.error("定时任务执行失败", e);
         }
@@ -43,8 +52,11 @@ public class CxPrecisionPlanTask {
         log.info("定时任务：自动生成{}年度成型精度计划", year);
         try {
             Integer yearInt = Integer.parseInt(year);
-            AjaxResult result = cxPrecisionPlanRemoteService.autoGenerateYearlyPlans(yearInt);
-            log.info("定时任务执行结果：{}", result.get("msg"));
+            AjaxResult result15 = cxPrecisionPlanRemoteService.autoCalculateCxPrecisionPlan15Days(yearInt);
+            log.info("成型精度计划（15天）执行结果：{}", result15.get("msg"));
+
+            AjaxResult result60 = cxPrecisionPlanRemoteService.autoCalculateCxPrecisionPlan60Days(yearInt);
+            log.info("成型精度计划（60天）执行结果：{}", result60.get("msg"));
         } catch (Exception e) {
             log.error("定时任务执行失败", e);
         }
@@ -58,24 +70,6 @@ public class CxPrecisionPlanTask {
         log.info("定时任务：批量更新到期天数");
         try {
             AjaxResult result = cxPrecisionPlanRemoteService.batchUpdateDaysToDue();
-            log.info("定时任务执行结果：{}", result.get("msg"));
-        } catch (Exception e) {
-            log.error("定时任务执行失败", e);
-        }
-    }
-
-    /**
-     * MES回传实际完成时间
-     *
-     * @param mesSourceId MES来源ID
-     * @param actualDate  实际日期
-     */
-    @AutoLoginLog
-    public void updateActualDate(String mesSourceId, String actualDate) {
-        log.info("定时任务：MES回传实际完成时间，mesSourceId={}, actualDate={}", mesSourceId, actualDate);
-        try {
-            Long mesSourceIdLong = Long.parseLong(mesSourceId);
-            AjaxResult result = cxPrecisionPlanRemoteService.updateActualDate(mesSourceIdLong, actualDate);
             log.info("定时任务执行结果：{}", result.get("msg"));
         } catch (Exception e) {
             log.error("定时任务执行失败", e);

@@ -109,4 +109,24 @@ public interface ILhPrecisionPlanRemoteService {
     @PostMapping("/lhPrecisionPlan/updateActualDate")
     AjaxResult updateActualDate(@RequestParam("mesSourceId") Long mesSourceId, 
                                 @RequestParam("actualDate") String actualDate);
+
+    /**
+     * 自动推算硫化精度计划（年度）
+     *
+     * @param year 年度
+     * @return 推算结果
+     */
+    @ApiOperation("自动推算硫化精度计划（年度）")
+    @PostMapping("/lhPrecisionPlan/autoCalculateLh")
+    AjaxResult autoCalculateLhPrecisionPlan(@RequestParam("year") Integer year);
+
+    /**
+     * 根据设备保养计划生成并推算硫化精度计划
+     *
+     * @param maintenancePlanIds 设备保养计划ID列表
+     * @return 生成结果
+     */
+    @ApiOperation("根据设备保养计划生成并推算硫化精度计划")
+    @PostMapping("/lhPrecisionPlan/generateFromMaintenance")
+    AjaxResult generateFromMaintenancePlan(@RequestBody List<Long> maintenancePlanIds);
 }

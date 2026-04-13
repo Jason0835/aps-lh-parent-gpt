@@ -26,8 +26,12 @@ public class GroupTimeExtensionConclusionLogRecorder {
      * @param cxMachineCode 机台信息
      * @return
      */
-    public static String addGroupStartTimeExtensionConclusionLog(Context context, String groupName, String cxMachineCode) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进入延长收尾业务处理 ====",
+    public static String addGroupStartTimeExtensionConclusionLog(Context context, String groupName, String cxMachineCode, boolean isSingleMachine) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进入延长收尾业务处理 ====";
+        if (isSingleMachine) {
+            logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进入单机台延长收尾业务处理 ====";
+        }
+        String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName, cxMachineCode);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();

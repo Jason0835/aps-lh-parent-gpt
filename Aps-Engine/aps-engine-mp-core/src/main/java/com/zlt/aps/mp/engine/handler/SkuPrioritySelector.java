@@ -545,6 +545,7 @@ public class SkuPrioritySelector {
         }
         SkuPriorityInfo info = new SkuPriorityInfo();
         info.setSku(sku);
+
         // 计算聚合指标
         calculateAggregateMetrics(info, plans, productionContext, startDay, endDay);
 
@@ -565,7 +566,8 @@ public class SkuPrioritySelector {
                                                   TbrProductionContext productionContext,
                                                   Integer startDay,
                                                   Integer endDay) {
-
+        //20260413+ 重新计算库销比
+        resetCalculateInventorySalesRatio(info.getSku(), productionContext);
         // 1. 供应链优先标记（只要有一个计划标记为"优先"）
         boolean hasSupplyChainPriority = plans.stream()
                 .anyMatch(SkuPrioritySelector::hasSupplyChainPriority);
@@ -609,6 +611,27 @@ public class SkuPrioritySelector {
         info.setPlans(new ArrayList<>(plans));
     }
 
+    /**
+     * 重新计算库销比
+     *
+     * @param materialDesc      Sku
+     * @param productionContext 排产上下文
+     */
+    private static void resetCalculateInventorySalesRatio(String materialDesc, TbrProductionContext productionContext) {
+        if (StringUtils.isBlank(materialDesc)) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> allSkuPlanList = productionContext.getAllSkuProductionPlan().get(materialDesc);
+        if (CollectionUtils.isEmpty(allSkuPlanList)) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> effectiveList = allSkuPlanList.stream().filter(singlePlan -> YesOrNoEnum.YES.getCode().equals(singlePlan.getIsProduction())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return;
+        }
+        Integer allProductionQty = productionContext.getBaseDataContainer().getSumProductionQty(materialDesc);
+        allSkuPlanList.forEach(singlePlan -> singlePlan.calculateInventorySalesRatio(allProductionQty));
+    }
 
     /**
      * 检查是否有供应链优先标记

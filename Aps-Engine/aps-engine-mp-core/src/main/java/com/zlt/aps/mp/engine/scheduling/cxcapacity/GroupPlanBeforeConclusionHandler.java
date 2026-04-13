@@ -85,7 +85,7 @@ public class GroupPlanBeforeConclusionHandler {
         Set<Integer> deductionDaySet = groupConclusionInfo.getDeductionDaySet();
         Integer deductionDay = groupConclusionInfo.getDeductionDay();
         //收尾机台选择
-        CxMachineBaseInfoVo selectCxMachineInfo = groupPlanConclusionHandler.getConclusionCxMachine(context, groupPlanInfo);
+        CxMachineBaseInfoVo selectCxMachineInfo = groupPlanConclusionHandler.getConclusionCxMachine(context, groupPlanInfo, continueCxMachineAllocation);
         if (null == selectCxMachineInfo) {
             addNoFindBeforeConclusionCxMachineInfoLog(context, groupName);
             return;

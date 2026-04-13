@@ -8,6 +8,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanVo;
 import com.zlt.aps.lh.service.ILhPrecisionPlanService;
+import com.zlt.aps.lh.service.IPrecisionPlanAutoCalculateService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import io.swagger.annotations.Api;
@@ -33,6 +34,9 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
 
     @Autowired
     private ILhPrecisionPlanService lhPrecisionPlanService;
+
+    @Autowired
+    private IPrecisionPlanAutoCalculateService precisionPlanAutoCalculateService;
 
     /**
      * 查询硫化精度计划列表
@@ -212,5 +216,23 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
             log.error("MES回传实际完成时间失败", e);
             return AjaxResult.error("更新失败：" + e.getMessage());
         }
+    }
+
+    /**
+     * 自动推算硫化精度计划（年度）
+     */
+    @ApiOperation("自动推算硫化精度计划（年度）")
+    @PostMapping("/autoCalculateLh")
+    public AjaxResult autoCalculateLhPrecisionPlan(@RequestParam("year") Integer year) {
+        return precisionPlanAutoCalculateService.autoCalculateLhPrecisionPlan(year);
+    }
+
+    /**
+     * 根据设备保养计划生成并推算硫化精度计划
+     */
+    @ApiOperation("根据设备保养计划生成并推算硫化精度计划")
+    @PostMapping("/generateFromMaintenance")
+    public AjaxResult generateFromMaintenancePlan(@RequestBody List<Long> maintenancePlanIds) {
+        return precisionPlanAutoCalculateService.generateFromMaintenancePlanByIds(maintenancePlanIds, "硫化精度");
     }
 }

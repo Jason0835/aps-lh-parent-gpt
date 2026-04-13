@@ -103,6 +103,17 @@ public class CxPrecisionPlan extends BaseEntity implements Serializable {
     @TableField("REMARK")
     private String remark;
 
+    @Excel(name = "ui.data.column.cxPrecisionPlan.cycleDays")
+    @ApiModelProperty(value = "周期天数（15天/60天）")
+    @TableField("CYCLE_DAYS")
+    private Integer cycleDays;
+
+    @Excel(name = "ui.data.column.cxPrecisionPlan.scheduleDate", dateFormat = "yyyy-MM-dd")
+    @ApiModelProperty(value = "排程日期")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @TableField("SCHEDULE_DATE")
+    private Date scheduleDate;
+
     @ApiModelProperty(value = "计划日期开始（搜索用）")
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

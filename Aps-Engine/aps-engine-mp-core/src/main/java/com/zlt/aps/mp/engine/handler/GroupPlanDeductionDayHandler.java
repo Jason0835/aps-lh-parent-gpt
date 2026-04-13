@@ -59,7 +59,6 @@ public class GroupPlanDeductionDayHandler {
         String groupName = groupPlanInfo.getGroupName();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         DeductionDayProductionInfoLogRecorder.addStartGroupDeductionDayCapacityLog(productionContext, groupName, deductionType, cxMachineCode, daysInfo);
-//        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         Integer deductionDayCount = deductionDaySet.size();
         //不可以标记结构分配完成，需等下一轮分配：故而调整为更新分配的天数
         groupPlanInfo.deductionAllocationDays(deductionDayCount);
@@ -67,18 +66,6 @@ public class GroupPlanDeductionDayHandler {
         cxMachineInfo.handlerBeforeConclusion(productionContext, allocationInfo, deductionDaySet, groupPlanInfo);
         //逐日释放：模具排产信息 模具产能占用、模壳、胶囊卡盘、换模次数等
         deductionMouldProductionInfo(productionContext, groupPlanInfo, dayProductionInfoMap, deductionDaySet);
-//        //模具排产信息
-//        Map<String, ProductionMouldInfoVo> allMouldInfoMap = baseDataContainer.getMouldInfoMap();
-//        //日产能限制信息
-//        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
-//        //逐日释放排产信息：模具产能占用、模壳、胶囊卡盘、换模次数等
-//        deductionDaySet.forEach(singleDeductionDay -> {
-//            GroupPlanCxLhCapacityLimitHelper productionDayLimit = dayProductionInfoMap.get(singleDeductionDay);
-//            if (null == productionDayLimit) {
-//                return;
-//            }
-//            clearProductionInfoByDay(productionContext, groupPlanInfo, dayCapacityLimit, productionDayLimit, allMouldInfoMap, singleDeductionDay);
-//        });
         return;
     }
 
@@ -103,21 +90,8 @@ public class GroupPlanDeductionDayHandler {
         String groupName = groupPlanInfo.getGroupName();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         DeductionDayProductionInfoLogRecorder.addStartGroupDeductionDayCapacityLog(productionContext, groupName, deductionType, cxMachineCode, daysInfo);
-//        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         //逐日释放：模具排产信息 模具产能占用、模壳、胶囊卡盘、换模次数等
         deductionMouldProductionInfo(productionContext, groupPlanInfo, dayProductionInfoMap, deductionDaySet);
-//        Map<String, ProductionMouldInfoVo> allMouldInfoMap = baseDataContainer.getMouldInfoMap();
-//        //日产能限制信息
-//        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
-//        //逐日释放排产信息：模具产能占用、模壳、胶囊卡盘、换模次数等
-//        deductionDaySet.forEach(singleDeductionDay -> {
-//            GroupPlanCxLhCapacityLimitHelper productionDayLimit = dayProductionInfoMap.get(singleDeductionDay);
-//            if (null == productionDayLimit) {
-//                return;
-//            }
-//            clearProductionInfoByDay(productionContext, groupPlanInfo, dayCapacityLimit, productionDayLimit, allMouldInfoMap, singleDeductionDay);
-//        });
-//        return;
     }
 
     /**
