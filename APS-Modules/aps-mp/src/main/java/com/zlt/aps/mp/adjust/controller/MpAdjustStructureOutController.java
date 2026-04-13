@@ -3,7 +3,6 @@ package com.zlt.aps.mp.adjust.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustStructureOutEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureOutService;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
 import com.zlt.common.utils.PubUtil;
@@ -60,8 +59,11 @@ public class MpAdjustStructureOutController extends AbstractDocBizController<MpA
     @Override
     public TableDataInfo list(@RequestBody MpAdjustStructureOut queryVO) {
         TableDataInfo tableDataInfo = super.list(queryVO);
-        // 集合逗号分隔字段升序排序
-        CommaFieldSortUtil.sortAndUpdateCommaField(tableDataInfo.getRows(), MpAdjustStructureOut::getScheduledMachines, MpAdjustStructureOut::setScheduledMachines);
+        if (PubUtil.isNotEmpty(tableDataInfo.getRows())) {
+            List<MpAdjustStructureOut> mpAdjustStructureOutList = (List<MpAdjustStructureOut>) tableDataInfo.getRows();
+            // 集合逗号分隔字段升序排序
+            CommaFieldSortUtil.sortAndUpdateCommaField(mpAdjustStructureOutList, MpAdjustStructureOut::getScheduledMachines, MpAdjustStructureOut::setScheduledMachines);
+        }
         return tableDataInfo;
     }
 
