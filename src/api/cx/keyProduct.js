@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 
-export function listCxKeyProduct(query) {
+export function listMoldingParams(query) {
   return request({
     url: '/cx/cxKeyProduct/list',
     method: 'post',
@@ -15,7 +15,7 @@ export function getCxKeyProduct(id) {
   })
 }
 
-export function saveCxKeyProduct(data) {
+export function editMoldingParams(data) {
   return request({
     url: '/cx/cxKeyProduct/save',
     method: 'post',
@@ -23,7 +23,7 @@ export function saveCxKeyProduct(data) {
   })
 }
 
-export function removeCxKeyProduct(ids) {
+export function removeMoldingParams(ids) {
   return request({
     url: '/cx/cxKeyProduct/remove',
     method: 'delete',
