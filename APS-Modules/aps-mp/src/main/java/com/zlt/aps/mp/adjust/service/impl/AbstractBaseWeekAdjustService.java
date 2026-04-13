@@ -2080,6 +2080,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             log.info("更新月度生产计划成功，共更新:{}条记录", monthPlanResult.size());
             // 通过结构名称更新月度生产计划
             updateMonthPlanByStructureName(contextDTO, adjustResultList);
+            // 需按本批更新结果回写月计划上下文，否则后续 insertMonthPlanList、handleMonthPlanStatistics 等逻辑基于旧数据
+            refreshMonthPlanProdFinalListInContext(contextDTO, monthPlanResult);
+
         } catch (Exception e) {
             log.error("更新月度生产计划批量操作异常", e);
             throw new RuntimeException("更新月度生产计划失败", e);
@@ -2087,6 +2090,85 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     }
 
+    /**
+     * 将本次批量更新后的月计划结果回写到上下文中的全量月度生产计划列表。
+     * <p>
+     * {@code queryMonthPlanList} 已把全量月计划放入上下文，{@code updateMonthPlanList} 仅对局部过滤结果做
+     * {@code updateBatch}，若不回写则 {@code insertMonthPlanList}、{@code handleMonthPlanStatistics} 等仍读到旧快照。
+     * 此处按行 {@code set} 替换，保留列表引用，避免影响后续 {@code addAll} 新增行。
+     * </p>
+     * 优先按主键 id 与上下文行对齐；若更新结果中 id 为空则按产品结构+物料编码兜底。
+     * 说明：同一产品结构下同一物料若存在多行（如施工阶段不同），应依赖主键匹配；仅靠结构+物料键可能无法区分多行。
+     *
+     * @param contextDTO      周程调整上下文
+     * @param monthPlanResult 已持久化的月度生产计划更新结果集
+     * @return 无
+     */
+    private void refreshMonthPlanProdFinalListInContext(MpRollAdjustContextDTO contextDTO,
+                                                               List<FactoryMonthPlanFinalAdjustVo> monthPlanResult) {
+        if (PubUtil.isEmpty(monthPlanResult)) {
+            return;
+        }
+        List<FactoryMonthPlanFinalAdjustVo> contextList = contextDTO.getFactoryMonthPlanProdFinalList();
+        if (PubUtil.isEmpty(contextList)) {
+            return;
+        }
+        // 指定初始容量，减少 HashMap 扩容
+        int initialCapacity = Math.max(16, monthPlanResult.size() * 2);
+        // 主键 -> 本批更新后的 VO（正常数据均带 id，优先使用）
+        Map<Long, FactoryMonthPlanFinalAdjustVo> updatedById = new HashMap<>(initialCapacity);
+        // 结构+物料 -> 本批更新后的 VO（仅 id 为空时的兜底；同键多行时 putIfAbsent 保留第一条）
+        Map<String, FactoryMonthPlanFinalAdjustVo> updatedByStructureMaterial = new HashMap<>(initialCapacity);
+        for (FactoryMonthPlanFinalAdjustVo updated : monthPlanResult) {
+            if (updated == null) {
+                continue;
+            }
+            if (Objects.nonNull(updated.getId())) {
+                updatedById.put(updated.getId(), updated);
+            } else {
+                String structureMaterialKey = buildMonthPlanStructureMaterialKey(updated);
+                updatedByStructureMaterial.putIfAbsent(structureMaterialKey, updated);
+            }
+        }
+        if (updatedById.isEmpty() && updatedByStructureMaterial.isEmpty()) {
+            return;
+        }
+        // 遍历上下文全量列表，命中则替换为已更新对象，未命中行保持原引用不变
+        for (int i = 0; i < contextList.size(); i++) {
+            FactoryMonthPlanFinalAdjustVo row = contextList.get(i);
+            if (row == null) {
+                continue;
+            }
+            // 先按主键对齐（唯一、可靠）
+            if (Objects.nonNull(row.getId())) {
+                FactoryMonthPlanFinalAdjustVo replacement = updatedById.get(row.getId());
+                if (replacement != null) {
+                    contextList.set(i, replacement);
+                    continue;
+                }
+            }
+            // id 未命中或为空时，再尝试结构+物料兜底
+            String structureMaterialKey = buildMonthPlanStructureMaterialKey(row);
+            FactoryMonthPlanFinalAdjustVo replacement = updatedByStructureMaterial.get(structureMaterialKey);
+            if (replacement != null) {
+                contextList.set(i, replacement);
+            }
+        }
+    }
+
+    /**
+     * 构建月计划「产品结构 + 物料编码」匹配键，空字段按空串处理。
+     * 分隔符与 {@link BusiConstant.WeekRollAdjust#SPLIT_GROUP_KEY} 一致，便于与分组逻辑风格统一。
+     *
+     * @param vo 月计划 VO
+     * @return 用于 Map 查找的匹配键字符串
+     */
+    private String buildMonthPlanStructureMaterialKey(FactoryMonthPlanFinalAdjustVo vo) {
+        // null 转空串，避免 NPE 且保证键可比较
+        String structureName = Optional.ofNullable(vo.getStructureName()).orElse("");
+        String materialCode = Optional.ofNullable(vo.getMaterialCode()).orElse("");
+        return String.join(BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY, structureName, materialCode);
+    }
 
     /**
      * 通过结构名称更新月度生产计划

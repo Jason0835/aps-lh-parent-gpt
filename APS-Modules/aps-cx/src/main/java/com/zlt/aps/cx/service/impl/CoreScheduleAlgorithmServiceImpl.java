@@ -2,13 +2,16 @@ package com.zlt.aps.cx.service.impl;
 
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.service.engine.*;
+import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -31,6 +36,7 @@ import java.util.stream.Collectors;
  *   <li>{@link TrialTaskProcessor} - 试制任务处理</li>
  *   <li>{@link NewTaskProcessor} - 新增任务处理（含量试约束）</li>
  *   <li>{@link ShiftScheduleService} - 班次精排</li>
+ *   <li>{@link BalancingService} - 班次间生产量均衡</li>
  * </ul>
  *
  * <p>排程主流程：
@@ -58,6 +64,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     private final ShiftScheduleService shiftScheduleService;
     private final ProductionCalculator productionCalculator;
     private final ScheduleDayTypeHelper scheduleDayTypeHelper;
+    private final BalancingService balancingService;
 
     /** 默认排程天数 */
     private static final int DEFAULT_SCHEDULE_DAYS = 3;
@@ -137,6 +144,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // ==================== 合并多天结果：每个机台一条记录，8个班次映射到CLASS1~8 ====================
         List<CxScheduleResult> allResults = buildFinalScheduleResults(context, dayResults, allShiftConfigs);
+
+        // ==================== 构建子表：按"胎胚+整车"维度拆分车次，计算库存可供硫化时长和顺序 ====================
+        List<CxScheduleDetail> allDetails = buildScheduleDetails(context, dayResults, allShiftConfigs);
+        log.debug("子表记录构建完成，共 {} 条", allDetails.size());
 
         log.info("排程算法执行完成，共 {} 天，总机台数: {}", scheduleDays, allResults.size());
         return allResults;
@@ -220,8 +231,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             for (TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
                 // 重建 DailyEmbryoTask 传给 scheduleTaskToShifts
                 CoreScheduleAlgorithmService.DailyEmbryoTask task = new CoreScheduleAlgorithmService.DailyEmbryoTask();
-                task.setMaterialCode(taskAlloc.getEmbryoCode());
-                task.setRelatedMaterialCode(taskAlloc.getMaterialCode());
+                task.setEmbryoCode(taskAlloc.getEmbryoCode());
+                task.setMaterialCode(taskAlloc.getMaterialCode());
                 task.setMaterialDesc(taskAlloc.getMaterialDesc());
                 task.setMainMaterialDesc(taskAlloc.getMainMaterialDesc());
                 task.setStructureName(taskAlloc.getStructureName());
@@ -246,6 +257,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
         log.info("班次排产完成，共 {} 条班次排产记录", shiftProductionResults.size());
 
+
+        // S5.3.7 班次间均衡：同结构下，以硫化机台数最多的胎胚为绑定胎胚，其他胎胚按绑定胎胚的班次比例重新分配
+        // 注意：试制、收尾任务不参与均衡，它们在固定班次独立排产
+        balancingService.balanceShiftQuantities(shiftProductionResults, context);
+        log.info("班次间均衡完成");
+
         // 封装当天排产结果
         DayScheduleResult dayResult = new DayScheduleResult();
         dayResult.setDay(day);
@@ -253,6 +270,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         dayResult.setAllAllocations(allAllocations);
         dayResult.setShiftProductionResults(shiftProductionResults);
         dayResult.setDayShifts(dayShifts);
+
 
         log.info("========== 第 {} 天排程完成 ==========\n", day);
         return dayResult;
@@ -298,10 +316,15 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * 单天排产结果
      */
     public static class DayScheduleResult {
+        /** 排产日（1-31），与scheduleDate的day值相同，用于快速筛选 */
         private int day;
+        /** 排产日期 */
         private LocalDate scheduleDate;
+        /** 该天所有机台的任务分配结果（包含续作/新任务/试制任务分配） */
         private List<MachineAllocationResult> allAllocations;
+        /** 该天所有班次的精排结果（包含班次级别的车数/数量） */
         private List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults;
+        /** 该天的工作班次配置（早/中/夜班的起止时间） */
         private List<CxShiftConfig> dayShifts;
 
         public int getDay() { return day; }
@@ -353,8 +376,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // ==================== 按 机台+胎胚+SAP物料 三维维度汇总班次排量 ====================
         // key: machineCode + "|" + embryoCode + "|" + materialCode
-        // value: classField → quantity
-        Map<String, Map<String, Integer>> taskClassQtyMap = new LinkedHashMap<>();
+        // value: classField → ShiftProductionResult（拍平到CxScheduleResult的8班次列）
+        Map<String, Map<String, ShiftScheduleService.ShiftProductionResult>> taskClassSprMap = new LinkedHashMap<>();
         // key → 总排产量
         Map<String, Integer> taskTotalQtyMap = new LinkedHashMap<>();
         // key → structureName
@@ -378,9 +401,31 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
 
                 String taskKey = machineCode + "|" + embryoCode + "|" + materialCode;
-                taskClassQtyMap.computeIfAbsent(taskKey, k -> new LinkedHashMap<>())
-                        .merge(classField, spr.getQuantity(), Integer::sum);
-                taskTotalQtyMap.merge(taskKey, spr.getQuantity(), Integer::sum);
+                taskClassSprMap.computeIfAbsent(taskKey, k -> new LinkedHashMap<>())
+                        .compute(classField, (k, existing) -> {
+                            if (existing == null) {
+                                return spr;
+                            }
+                            // 合并：排量累加，其他字段保留第一个
+                            ShiftScheduleService.ShiftProductionResult merged = new ShiftScheduleService.ShiftProductionResult();
+                            merged.setMachineCode(existing.getMachineCode());
+                            merged.setEmbryoCode(existing.getEmbryoCode());
+                            merged.setMaterialCode(existing.getMaterialCode());
+                            merged.setMaterialDesc(existing.getMaterialDesc());
+                            merged.setMainMaterialDesc(existing.getMainMaterialDesc());
+                            merged.setStructureName(existing.getStructureName());
+                            merged.setShiftCode(classField);
+                            merged.setQuantity((existing.getQuantity() != null ? existing.getQuantity() : 0)
+                                    + (spr.getQuantity() != null ? spr.getQuantity() : 0));
+                            merged.setTripNo(existing.getTripNo());
+                            merged.setTripCapacity(existing.getTripCapacity());
+                            merged.setStockHours(existing.getStockHours());
+                            merged.setSequence(existing.getSequence());
+                            merged.setPlanStartTime(existing.getPlanStartTime());
+                            merged.setPlanEndTime(existing.getPlanEndTime());
+                            return merged;
+                        });
+                taskTotalQtyMap.merge(taskKey, spr.getQuantity() != null ? spr.getQuantity() : 0, Integer::sum);
                 if (spr.getStructureName() != null) {
                     taskStructureMap.putIfAbsent(taskKey, spr.getStructureName());
                 }
@@ -446,9 +491,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         List<CxScheduleResult> results = new ArrayList<>();
         LocalDate startDate = context.getScheduleDate();
 
-        for (Map.Entry<String, Map<String, Integer>> entry : taskClassQtyMap.entrySet()) {
+        for (Map.Entry<String, Map<String, ShiftScheduleService.ShiftProductionResult>> entry : taskClassSprMap.entrySet()) {
             String taskKey = entry.getKey();
-            Map<String, Integer> classQtyMap = entry.getValue();
+            Map<String, ShiftScheduleService.ShiftProductionResult> classSprMap = entry.getValue();
 
             String[] parts = taskKey.split("\\|", 3);
             String machineCode = parts[0];
@@ -583,7 +628,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
 
             // ---- 映射班次排量到 CLASS1~8 ----
-            for (Map.Entry<String, Integer> classEntry : classQtyMap.entrySet()) {
+            for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
                 setClassFieldValue(result, classEntry.getKey(), classEntry.getValue());
             }
 
@@ -592,44 +637,575 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         log.info("最终排程结果：共 {} 条记录（机台+胎胚+SAP物料维度）", results.size());
         return results;
+
     }
 
     /**
-     * 按 CLASS_FIELD 设置对应的班次计划量
+     * 构建子表记录（CxScheduleDetail）
+     *
+     * <p>子表按"胎胚+整车"维度组织，每个班次的车次作为一条子记录。
+     *
+     * <p>核心公式：
+     * 1. 班次开始前库存 = 期初库存 + 成型上个班次生产的 - 硫化上个班次消耗的
+     * 2. 胎胚预计库存可供硫化时长 = (班次开始前库存 + 该车次累计计划量) / 硫化机数 / 单台模数
+     *
+     * <p>顺位规则：按库存可供硫化时长从小到大排序（库存越低越优先安排）
+     * <p>注意：试制和收尾任务不参与顺位排序
      */
-    private void setClassFieldValue(CxScheduleResult result, String classField, Integer qty) {
-        if (classField == null || qty == null) {
+    private List<CxScheduleDetail> buildScheduleDetails(
+            ScheduleContextVo context,
+            List<DayScheduleResult> dayResults,
+            List<CxShiftConfig> allShiftConfigs) {
+
+        if (dayResults == null || dayResults.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 构建班次配置映射：shiftCode → classField
+        Map<String, String> shiftToClassField = new HashMap<>();
+        // 构建 classField 排序权重
+        Map<String, Integer> classFieldOrder = new HashMap<>();
+        if (allShiftConfigs != null) {
+            int order = 1;
+            for (CxShiftConfig cfg : allShiftConfigs) {
+                shiftToClassField.put(cfg.getShiftCode(), cfg.getClassField());
+                classFieldOrder.putIfAbsent(cfg.getClassField(), order++);
+            }
+        }
+
+        // 构建硫化任务ID → LhScheduleResult 的映射（用于获取硫化班次计划量）
+        Map<Long, LhScheduleResult> lhResultMap = new HashMap<>();
+        if (context.getLhScheduleResults() != null) {
+            for (LhScheduleResult lh : context.getLhScheduleResults()) {
+                if (lh.getId() != null) {
+                    lhResultMap.put(lh.getId(), lh);
+                }
+            }
+        }
+
+        // 按 (embryoCode, materialCode) 追踪每个胎胚的库存递推
+        // embryoKey → { beginStock, cumulativeForming, cumulativeVulcanize, vulcanizeMachineCount, vulcanizeMoldCount, dailyLhCapacity, tripRecords }
+        Map<String, EmbryoTripTracker> embryoTrackers = new LinkedHashMap<>();
+
+        for (DayScheduleResult dayResult : dayResults) {
+            int day = dayResult.getDay();
+
+            for (ShiftScheduleService.ShiftProductionResult spr : dayResult.getShiftProductionResults()) {
+                String embryoCode = spr.getEmbryoCode();
+                String materialCode = spr.getMaterialCode() != null ? spr.getMaterialCode() : "";
+                String embryoKey = embryoCode + "|" + materialCode;
+
+                // 获取或创建追踪器
+                EmbryoTripTracker tracker = embryoTrackers.computeIfAbsent(embryoKey,
+                        k -> new EmbryoTripTracker(embryoCode, materialCode));
+
+                // 获取该任务的硫化参数
+                CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
+                if (task != null) {
+                    if (task.getVulcanizeMachineCount() != null) {
+                        tracker.setVulcanizeMachineCount(task.getVulcanizeMachineCount());
+                    }
+                    if (task.getVulcanizeMoldCount() != null) {
+                        tracker.setVulcanizeMoldCount(task.getVulcanizeMoldCount());
+                    }
+                    if (task.getCurrentStock() != null && tracker.getBeginStock() == null) {
+                        // 期初库存只设置一次
+                        tracker.setBeginStock(task.getCurrentStock());
+                    }
+                    if (task.getHourCapacity() != null && task.getHourCapacity() > 0) {
+                        // 使用任务中已有的小时产能
+                        tracker.setHourlyCapacity(task.getHourCapacity());
+                    } else {
+                        // 计算机台小时产能：小时产能 = 3600 / 成型一条胎的时间(s)
+                        // 成型一条胎的时间(s) = 86400 / (配比 × 日硫化量)
+                        int hourlyCapacity = calculateHourlyCapacity(
+                                spr.getMachineCode(),
+                                materialCode,
+                                task.getStructureName(),
+                                context
+                        );
+                        tracker.setHourlyCapacity(hourlyCapacity);
+                    }
+                }
+
+                // 班次开始前库存 = 期初库存 + 成型累计生产 - 硫化累计消耗
+                int beginStock = tracker.getCurrentStock();
+                int tripCapacity = spr.getTripCapacity() != null ? spr.getTripCapacity() : 12;
+                int planQty = spr.getQuantity() != null ? spr.getQuantity() : 0;
+                int tripCount = (planQty + tripCapacity - 1) / tripCapacity;
+
+                // 获取硫化任务ID，查找对应的硫化班次计划量
+                Long lhId = null;
+                LhScheduleResult lhResult = null;
+                if (spr.getSourceTask() != null) {
+                    lhId = spr.getSourceTask().getLhId();
+                    if (lhId != null) {
+                        lhResult = lhResultMap.get(lhId);
+                    }
+                }
+
+                // 获取该班次的硫化消耗量（从硫化记录获取该班次的计划量）
+                String classField = shiftToClassField.getOrDefault(spr.getShiftCode(), spr.getShiftCode());
+                int vulcanizeClassIndex = getClassIndex(classField);
+                int vulcanizeClassConsumption = lhResult != null
+                        ? getClassPlanQtyByIndex(lhResult, vulcanizeClassIndex) : 0;
+
+                // 生成每个车次记录
+                int cumulativeTripPlan = 0;
+                for (int i = 1; i <= tripCount; i++) {
+                    int tripPlanQty = Math.min(tripCapacity, planQty - (i - 1) * tripCapacity);
+                    cumulativeTripPlan += tripPlanQty;
+
+                    // 胎胚预计库存可供硫化时长 = (当前库存 + 成型累计) / 硫化机数 / 单台模数
+                    // 当前库存 = 期初库存 + 成型累计 - 硫化累计（由tracker内部维护）
+                    int currentStock = tracker.getCurrentStock();
+                    double stockHours = calculateStockHours(
+                            currentStock,
+                            tracker.getCumulativeForming(),
+                            tracker.getCumulativeVulcanize(),
+                            tracker.getVulcanizeMachineCount(),
+                            tracker.getVulcanizeMoldCount()
+                    );
+
+                    // 计算每车的开始/结束时间
+                    // 按每条胎胚成型耗时累积计算
+                    LocalDateTime tripStartTime = null;
+                    LocalDateTime tripEndTime = null;
+                    if (spr.getPlanStartTime() != null && tracker.getHourlyCapacity() > 0) {
+                        LocalDateTime shiftStart = spr.getPlanStartTime();
+                        int hourlyCapacity = tracker.getHourlyCapacity();
+
+                        // 累积已排数量（该车次之前的所有车次计划量之和）
+                        int cumulativeBeforeTrip = 0;
+                        for (int j = 1; j < i; j++) {
+                            cumulativeBeforeTrip += Math.min(tripCapacity, planQty - (j - 1) * tripCapacity);
+                        }
+
+                        // 第i车开始 = 班次开始 + 累积已排数量 / 小时产能
+                        // 第i车结束 = 第i车开始 + 当前车数量 / 小时产能
+                        long minutesBefore = (long) cumulativeBeforeTrip * 60 / hourlyCapacity;
+                        long minutesForTrip = (long) tripPlanQty * 60 / hourlyCapacity;
+
+                        tripStartTime = shiftStart.plusMinutes(minutesBefore);
+                        tripEndTime = shiftStart.plusMinutes(minutesBefore + minutesForTrip);
+                    }
+
+                    TripRecord record = new TripRecord();
+                    record.setEmbryoCode(embryoCode);
+                    record.setMaterialCode(materialCode);
+                    record.setMachineCode(spr.getMachineCode());
+                    record.setDay(day);
+                    record.setShiftCode(spr.getShiftCode());
+                    record.setClassField(classField);
+                    record.setTripNo(i);
+                    record.setTripCapacity(tripCapacity);
+                    record.setPlanQty(tripPlanQty);
+                    record.setStockHours(BigDecimal.valueOf(stockHours).setScale(2, RoundingMode.HALF_UP));
+                    record.setPlanStartTime(tripStartTime);
+                    record.setPlanEndTime(tripEndTime);
+                    record.setIsTrialTask(Boolean.TRUE.equals(spr.getIsTrialTask()));
+                    record.setIsEndingTask(Boolean.TRUE.equals(spr.getIsEndingTask()));
+                    record.setVulcanizeMachineCount(tracker.getVulcanizeMachineCount());
+
+                    tracker.addTrip(record);
+
+                    // 更新追踪器：成型按车次累加，硫化按班次累加（在班次最后一个车次时）
+                    tracker.addFormingProduction(tripPlanQty);
+                    if (i == tripCount && vulcanizeClassConsumption > 0) {
+                        tracker.addVulcanizeConsumption(vulcanizeClassConsumption);
+                    }
+                }
+            }
+        }
+
+        // 对每个胎胚内的车次记录按顺位规则排序并分配顺序号
+        List<CxScheduleDetail> allDetails = new ArrayList<>();
+        for (EmbryoTripTracker tracker : embryoTrackers.values()) {
+            List<TripRecord> allTrips = tracker.getTrips();
+
+            // 过滤普通任务（排除试制、收尾）
+            List<TripRecord> regularTrips = allTrips.stream()
+                    .filter(t -> !t.getIsTrialTask() && !t.getIsEndingTask())
+                    .collect(Collectors.toList());
+
+            // 按班次分组，每组内按 stockHours 排序，各班次独立分配顺序号
+            // 先按班次顺序排，再按 stockHours 排
+            regularTrips.sort((a, b) -> {
+                int classA = classFieldOrder.getOrDefault(a.getClassField(), 99);
+                int classB = classFieldOrder.getOrDefault(b.getClassField(), 99);
+                if (classA != classB) {
+                    return Integer.compare(classA, classB);
+                }
+                return Double.compare(a.getStockHours().doubleValue(), b.getStockHours().doubleValue());
+            });
+
+            // 分配顺序号：每个班次独立累计
+            Map<String, Integer> classSeqMap = new HashMap<>();
+            for (TripRecord trip : regularTrips) {
+                int seq = classSeqMap.merge(trip.getClassField(), 1, Integer::sum);
+                trip.setSequence(seq);
+            }
+
+            // 构建 CxScheduleDetail 记录
+            for (TripRecord trip : allTrips) {
+                CxScheduleDetail detail = new CxScheduleDetail();
+                detail.setEmbryoCode(trip.getEmbryoCode());
+                detail.setMaterialCode(trip.getMaterialCode());
+                detail.setCxMachineCode(trip.getMachineCode());
+                detail.setScheduleDate(context.getScheduleDate().plusDays(trip.getDay()));
+
+                setDetailClassField(detail, trip.getClassField(), trip);
+                allDetails.add(detail);
+            }
+        }
+
+        log.info("子表构建完成：共 {} 条车次记录", allDetails.size());
+        return allDetails;
+    }
+
+    /**
+     * 计算库存可供硫化时长（小时）
+     *
+     * <p>公式：库存可供硫化时长 = (当前库存 + 成型累计计划量) / 硫化机数 / 单台模数
+     *
+     * <p>其中当前库存 = 期初库存 + 成型累计 - 硫化累计
+     *
+     * @param currentStock      当前库存（期初库存 + 成型累计 - 硫化累计）
+     * @param cumulativeForming 成型累计生产量
+     * @param vulcanizeConsumed 硫化累计消耗量
+     * @param vulcanizeMachineCount 硫化机台数
+     * @param vulcanizeMoldCount   单台模数
+     * @return 库存可供硫化时长（小时）
+     */
+    private double calculateStockHours(int currentStock, int cumulativeForming,
+                                       int vulcanizeConsumed,
+                                       int vulcanizeMachineCount, int vulcanizeMoldCount) {
+        if (vulcanizeMachineCount <= 0 || vulcanizeMoldCount <= 0) {
+            return 0;
+        }
+        // 库存可供硫化时长 = (当前库存 + 成型累计) / 硫化机数 / 单台模数
+        return (double) (currentStock + cumulativeForming) / vulcanizeMachineCount / vulcanizeMoldCount;
+    }
+
+    /**
+     * 内部类：胎胚车次追踪器
+     * <p>用于递推计算每个班次开始前的库存
+     */
+    private static class EmbryoTripTracker {
+        private final String embryoCode;
+        private final String materialCode;
+        private Integer beginStock;  // 期初库存（首次设置后不再变）
+        private int currentStock;     // 当前库存（= 期初 + 成型累计 - 硫化累计）
+        private int cumulativeForming;     // 成型累计生产
+        private int cumulativeVulcanize;   // 硫化累计消耗
+        private int vulcanizeMachineCount = 1;
+        private int vulcanizeMoldCount = 1;
+        private int hourlyCapacity = 12;   // 小时产能（条/小时）
+        private final List<TripRecord> trips = new ArrayList<>();
+
+        EmbryoTripTracker(String embryoCode, String materialCode) {
+            this.embryoCode = embryoCode;
+            this.materialCode = materialCode;
+        }
+
+        void setBeginStock(Integer beginStock) {
+            this.beginStock = beginStock;
+            this.currentStock = beginStock;
+        }
+
+        Integer getBeginStock() { return beginStock; }
+        int getVulcanizeMachineCount() { return vulcanizeMachineCount; }
+        void setVulcanizeMachineCount(int count) { this.vulcanizeMachineCount = count; }
+        int getVulcanizeMoldCount() { return vulcanizeMoldCount; }
+        void setVulcanizeMoldCount(int count) { this.vulcanizeMoldCount = count; }
+
+        int getCurrentStock() {
+            return (beginStock != null ? beginStock : 0) + cumulativeForming - cumulativeVulcanize;
+        }
+
+        int getCumulativeForming() { return cumulativeForming; }
+        int getCumulativeVulcanize() { return cumulativeVulcanize; }
+        void addFormingProduction(int qty) { this.cumulativeForming += qty; }
+        void addVulcanizeConsumption(int qty) { this.cumulativeVulcanize += qty; }
+        int getHourlyCapacity() { return hourlyCapacity; }
+        void setHourlyCapacity(int capacity) { this.hourlyCapacity = capacity > 0 ? capacity : 12; }
+        void addTrip(TripRecord trip) { this.trips.add(trip); }
+        List<TripRecord> getTrips() { return trips; }
+    }
+
+    /**
+     * 设置子表记录的车次字段
+     */
+    private void setDetailClassField(CxScheduleDetail detail, String classField, TripRecord trip) {
+        if (classField == null || trip == null) {
             return;
         }
-        BigDecimal qtyDecimal = new BigDecimal(qty);
         switch (classField) {
             case "CLASS1":
-                result.setClass1PlanQty(qtyDecimal);
+                detail.setClass1TripNo(String.valueOf(trip.getTripNo()));
+                detail.setClass1TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
+                detail.setClass1StockHours(trip.getStockHours());
+                detail.setClass1Sequence(trip.getSequence());
+                detail.setClass1PlanStartTime(trip.getPlanStartTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanStartTime()) : null);
+                detail.setClass1PlanEndTime(trip.getPlanEndTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanEndTime()) : null);
                 break;
             case "CLASS2":
-                result.setClass2PlanQty(qtyDecimal);
+                detail.setClass2TripNo(String.valueOf(trip.getTripNo()));
+                detail.setClass2TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
+                detail.setClass2StockHours(trip.getStockHours());
+                detail.setClass2Sequence(trip.getSequence());
+                detail.setClass2PlanStartTime(trip.getPlanStartTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanStartTime()) : null);
+                detail.setClass2PlanEndTime(trip.getPlanEndTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanEndTime()) : null);
                 break;
             case "CLASS3":
-                result.setClass3PlanQty(qtyDecimal);
+                detail.setClass3TripNo(String.valueOf(trip.getTripNo()));
+                detail.setClass3TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
+                detail.setClass3StockHours(trip.getStockHours());
+                detail.setClass3Sequence(trip.getSequence());
+                detail.setClass3PlanStartTime(trip.getPlanStartTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanStartTime()) : null);
+                detail.setClass3PlanEndTime(trip.getPlanEndTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanEndTime()) : null);
                 break;
             case "CLASS4":
-                result.setClass4PlanQty(qtyDecimal);
+                detail.setClass4TripNo(String.valueOf(trip.getTripNo()));
+                detail.setClass4TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
+                detail.setClass4StockHours(trip.getStockHours());
+                detail.setClass4Sequence(trip.getSequence());
                 break;
             case "CLASS5":
-                result.setClass5PlanQty(qtyDecimal);
+                detail.setClass5TripNo(String.valueOf(trip.getTripNo()));
+                detail.setClass5TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
+                detail.setClass5StockHours(trip.getStockHours());
+                detail.setClass5Sequence(trip.getSequence());
                 break;
             case "CLASS6":
-                result.setClass6PlanQty(qtyDecimal);
+                detail.setClass6TripNo(String.valueOf(trip.getTripNo()));
+                detail.setClass6TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
+                detail.setClass6StockHours(trip.getStockHours());
+                detail.setClass6Sequence(trip.getSequence());
                 break;
             case "CLASS7":
-                result.setClass7PlanQty(qtyDecimal);
+                detail.setClass7TripNo(String.valueOf(trip.getTripNo()));
+                detail.setClass7TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
+                detail.setClass7StockHours(trip.getStockHours());
+                detail.setClass7Sequence(trip.getSequence());
                 break;
             case "CLASS8":
-                result.setClass8PlanQty(qtyDecimal);
+                detail.setClass8TripNo(String.valueOf(trip.getTripNo()));
+                detail.setClass8TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
+                detail.setClass8StockHours(trip.getStockHours());
+                detail.setClass8Sequence(trip.getSequence());
                 break;
             default:
                 log.warn("未知的 CLASS_FIELD: {}", classField);
         }
+    }
+
+    /**
+     * 内部类：车次记录（用于计算顺位）
+     */
+    private static class TripRecord {
+        private String embryoCode;
+        private String materialCode;
+        private String machineCode;
+        private int day;
+        private String shiftCode;
+        private String classField;
+        private int tripNo;
+        private int tripCapacity;
+        private int planQty;
+        private BigDecimal stockHours;
+        private LocalDateTime planStartTime;
+        private LocalDateTime planEndTime;
+        private boolean isTrialTask;
+        private boolean isEndingTask;
+        private int vulcanizeMachineCount;
+        private int sequence;
+
+        // getters and setters
+        public String getEmbryoCode() { return embryoCode; }
+        public void setEmbryoCode(String embryoCode) { this.embryoCode = embryoCode; }
+        public String getMaterialCode() { return materialCode; }
+        public void setMaterialCode(String materialCode) { this.materialCode = materialCode; }
+        public String getMachineCode() { return machineCode; }
+        public void setMachineCode(String machineCode) { this.machineCode = machineCode; }
+        public int getDay() { return day; }
+        public void setDay(int day) { this.day = day; }
+        public String getShiftCode() { return shiftCode; }
+        public void setShiftCode(String shiftCode) { this.shiftCode = shiftCode; }
+        public String getClassField() { return classField; }
+        public void setClassField(String classField) { this.classField = classField; }
+        public int getTripNo() { return tripNo; }
+        public void setTripNo(int tripNo) { this.tripNo = tripNo; }
+        public int getTripCapacity() { return tripCapacity; }
+        public void setTripCapacity(int tripCapacity) { this.tripCapacity = tripCapacity; }
+        public int getPlanQty() { return planQty; }
+        public void setPlanQty(int planQty) { this.planQty = planQty; }
+        public BigDecimal getStockHours() { return stockHours; }
+        public void setStockHours(BigDecimal stockHours) { this.stockHours = stockHours; }
+        public LocalDateTime getPlanStartTime() { return planStartTime; }
+        public void setPlanStartTime(LocalDateTime planStartTime) { this.planStartTime = planStartTime; }
+        public LocalDateTime getPlanEndTime() { return planEndTime; }
+        public void setPlanEndTime(LocalDateTime planEndTime) { this.planEndTime = planEndTime; }
+        public boolean getIsTrialTask() { return isTrialTask; }
+        public void setIsTrialTask(boolean isTrialTask) { this.isTrialTask = isTrialTask; }
+        public boolean getIsEndingTask() { return isEndingTask; }
+        public void setIsEndingTask(boolean isEndingTask) { this.isEndingTask = isEndingTask; }
+        public int getVulcanizeMachineCount() { return vulcanizeMachineCount; }
+        public void setVulcanizeMachineCount(int vulcanizeMachineCount) { this.vulcanizeMachineCount = vulcanizeMachineCount; }
+        public int getSequence() { return sequence; }
+        public void setSequence(int sequence) { this.sequence = sequence; }
+    }
+
+    /**
+     * 构建任务Key（用于关联主表记录）
+     */
+    private String buildTaskKey(String machineCode, String embryoCode, String materialCode) {
+        return (machineCode != null ? machineCode : "") + "|"
+                + (embryoCode != null ? embryoCode : "") + "|"
+                + (materialCode != null ? materialCode : "");
+    }
+
+    /**
+     * 按 CLASS_FIELD 设置对应的班次计划量
+     * <p>将 ShiftProductionResult 的计划量字段设置到 CxScheduleResult 的 CLASSn 列：
+     * PLAN_QTY、ANALYSIS（原因分析）
+     *
+     * <p>原因分析标记规则：
+     * <ul>
+     *   <li>试制任务 → "试制"</li>
+     *   <li>收尾任务 → "收尾"</li>
+     *   <li>开产任务 → "开产"</li>
+     *   <li>停产任务 → "停产"</li>
+     *   <li>量试任务 → "量试"</li>
+     *   <li>新增任务 → "新增"</li>
+     *   <li>多个原因可叠加，如 "试制,收尾"</li>
+     * </ul>
+     *
+     * @param result    排程结果记录
+     * @param classField CLASS1~CLASS8 班次字段标识
+     * @param spr       班次排产结果
+     */
+    private void setClassFieldValue(CxScheduleResult result, String classField, ShiftScheduleService.ShiftProductionResult spr) {
+        if (classField == null || spr == null) {
+            return;
+        }
+
+        // 构建原因分析字符串
+        String analysis = buildTaskAnalysis(spr);
+
+        switch (classField) {
+            case "CLASS1":
+                result.setClass1PlanQty(spr.getQuantity() != null ? new BigDecimal(spr.getQuantity()) : null);
+                if (analysis != null) {
+                    result.setClass1Analysis(analysis);
+                }
+                break;
+            case "CLASS2":
+                result.setClass2PlanQty(spr.getQuantity() != null ? new BigDecimal(spr.getQuantity()) : null);
+                if (analysis != null) {
+                    result.setClass2Analysis(analysis);
+                }
+                break;
+            case "CLASS3":
+                result.setClass3PlanQty(spr.getQuantity() != null ? new BigDecimal(spr.getQuantity()) : null);
+                if (analysis != null) {
+                    result.setClass3Analysis(analysis);
+                }
+                break;
+            case "CLASS4":
+                result.setClass4PlanQty(spr.getQuantity() != null ? new BigDecimal(spr.getQuantity()) : null);
+                if (analysis != null) {
+                    result.setClass4Analysis(analysis);
+                }
+                break;
+            case "CLASS5":
+                result.setClass5PlanQty(spr.getQuantity() != null ? new BigDecimal(spr.getQuantity()) : null);
+                if (analysis != null) {
+                    result.setClass5Analysis(analysis);
+                }
+                break;
+            case "CLASS6":
+                result.setClass6PlanQty(spr.getQuantity() != null ? new BigDecimal(spr.getQuantity()) : null);
+                if (analysis != null) {
+                    result.setClass6Analysis(analysis);
+                }
+                break;
+            case "CLASS7":
+                result.setClass7PlanQty(spr.getQuantity() != null ? new BigDecimal(spr.getQuantity()) : null);
+                if (analysis != null) {
+                    result.setClass7Analysis(analysis);
+                }
+                break;
+            case "CLASS8":
+                result.setClass8PlanQty(spr.getQuantity() != null ? new BigDecimal(spr.getQuantity()) : null);
+                if (analysis != null) {
+                    result.setClass8Analysis(analysis);
+                }
+                break;
+            default:
+                log.warn("未知的 CLASS_FIELD: {}", classField);
+        }
+    }
+
+    /**
+     * 构建任务原因分析字符串
+     * <p>根据任务类型组合原因标记，多个原因用逗号分隔
+     */
+    private String buildTaskAnalysis(ShiftScheduleService.ShiftProductionResult spr) {
+        if (spr == null) {
+            return null;
+        }
+
+        List<String> reasons = new ArrayList<>();
+
+        // 从 sourceTask 获取详细任务类型
+        CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
+        if (task != null) {
+            if (Boolean.TRUE.equals(task.getIsTrialTask())) {
+                reasons.add("试制");
+            }
+            if (Boolean.TRUE.equals(task.getIsProductionTrial())) {
+                reasons.add("量试");
+            }
+            if (Boolean.TRUE.equals(task.getIsEndingTask())) {
+                reasons.add("收尾");
+            }
+            if (Boolean.TRUE.equals(task.getIsOpeningDayTask())) {
+                reasons.add("开产");
+            }
+            if (Boolean.TRUE.equals(task.getIsClosingDayTask())) {
+                reasons.add("停产");
+            }
+            if (Boolean.TRUE.equals(task.getIsFirstTask()) && !Boolean.TRUE.equals(task.getIsContinueTask())) {
+                // 新增任务（非续作的首次任务）
+                reasons.add("新增");
+            }
+        }
+
+        // 如果 sourceTask 为空，回退到 ShiftProductionResult 的标记
+        if (task == null) {
+            if (Boolean.TRUE.equals(spr.getIsTrialTask())) {
+                reasons.add("试制");
+            }
+            if (Boolean.TRUE.equals(spr.getIsEndingTask())) {
+                reasons.add("收尾");
+            }
+            if (Boolean.TRUE.equals(spr.getIsContinueTask())) {
+                // 续作任务不标记
+            }
+        }
+
+        if (reasons.isEmpty()) {
+            return null;
+        }
+
+        return String.join(",", reasons);
     }
 
     /**
@@ -770,6 +1346,23 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
+     * 根据班次字段获取班次索引
+     *
+     * @param classField 班次字段（如 "CLASS1"）
+     * @return 班次索引 (1-8)，解析失败返回 0
+     */
+    private int getClassIndex(String classField) {
+        if (classField != null && classField.startsWith("CLASS")) {
+            try {
+                return Integer.parseInt(classField.substring(5));
+            } catch (NumberFormatException e) {
+                log.warn("无法解析班次字段: {}", classField);
+            }
+        }
+        return 0;
+    }
+
+    /**
      * 根据班次索引获取硫化记录的计划量
      *
      * @param lhResult   硫化记录
@@ -820,7 +1413,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // Step 1: 减去每条硫化任务的当天硫化消耗
         for (LhScheduleResult lhResult : lhResults) {
-            if (lhResult.getId() == null) continue;
+            if (lhResult.getId() == null) {
+                continue;
+            }
             String taskKey = String.valueOf(lhResult.getId());
             Integer consumption = vulcanizingConsumptionByLhId.get(lhResult.getId());
             if (consumption != null && consumption > 0) {
@@ -844,7 +1439,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         for (Map.Entry<String, Integer> entry : formingOutputMap.entrySet()) {
             String embryoCode = entry.getKey();
             int formingOutput = entry.getValue();
-            if (formingOutput <= 0) continue;
+            if (formingOutput <= 0) {
+                continue;
+            }
 
             List<LhScheduleResult> relatedTasks = embryoToLhMap.get(embryoCode);
             if (relatedTasks == null || relatedTasks.isEmpty()) {
@@ -963,6 +1560,63 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         materialCode, oldSurplus, consumption, newSurplus);
             }
         }
+    }
+
+    /**
+     * 计算机台小时产能
+     *
+     * <p>参考 ShiftScheduleService.getMachineHourlyCapacity：
+     * <ol>
+     *   <li>从 materialLhCapacityMap 获取该物料的日硫化量</li>
+     *   <li>从 structureLhRatioMap 通过 结构+机型 获取配比 (lhMachineMaxQty)</li>
+     *   <li>成型一条胎的时间(s) = 86400 / (配比 × 日硫化量)</li>
+     *   <li>小时产能 = 3600 / 成型一条胎的时间(s)</li>
+     * </ol>
+     *
+     * @param machineCode   机台编码
+     * @param materialCode  物料编码
+     * @param structureName 结构名称
+     * @param context       排程上下文
+     * @return 小时产能（条/小时）
+     */
+    private int calculateHourlyCapacity(String machineCode, String materialCode,
+                                        String structureName, ScheduleContextVo context) {
+        // 1. 获取日硫化量
+        Integer dailyLhCapacity = null;
+        Map<String, MonthPlanProductLhCapacityVo> lhCapacityMap = context.getMaterialLhCapacityMap();
+        if (lhCapacityMap != null && materialCode != null) {
+            MonthPlanProductLhCapacityVo capacityVo = lhCapacityMap.get(materialCode);
+            if (capacityVo != null) {
+                dailyLhCapacity = capacityVo.getDefaultDayVulcanizationQty();
+            }
+        }
+
+        // 2. 获取配比
+        int ratio = 1;
+        if (context.getStructureLhRatioMap() != null && structureName != null && machineCode != null) {
+            Map<String, String> machineTypeCodeMap = context.getMachineTypeCodeMap();
+            String machineTypeCode = machineTypeCodeMap != null ? machineTypeCodeMap.get(machineCode) : null;
+            if (machineTypeCode != null) {
+                MdmStructureLhRatio lhRatio = context.getStructureLhRatioMap().get(machineTypeCode + "|" + structureName);
+                if (lhRatio != null && lhRatio.getLhMachineMaxQty() != null && lhRatio.getLhMachineMaxQty() > 0) {
+                    ratio = lhRatio.getLhMachineMaxQty();
+                }
+            }
+        }
+
+        if (dailyLhCapacity != null && dailyLhCapacity > 0) {
+            // 3. 成型一条胎的时间(s) = 86400 / (配比 × 日硫化量)
+            BigDecimal timePerTire = BigDecimal.valueOf(86400)
+                    .divide(BigDecimal.valueOf((long) ratio * dailyLhCapacity), 2, RoundingMode.HALF_UP);
+            // 4. 小时产能 = 3600 / 成型一条胎的时间(s)
+            if (timePerTire.compareTo(BigDecimal.ZERO) > 0) {
+                return BigDecimal.valueOf(3600)
+                        .divide(timePerTire, 0, RoundingMode.FLOOR)
+                        .intValue();
+            }
+        }
+
+        return 12; // 默认值
     }
 
     /**

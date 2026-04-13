@@ -11,6 +11,8 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
 import com.zlt.aps.utils.SpringContextSupplierUtil;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
@@ -232,6 +234,10 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 //            monthPlanFinalAdjustVo.setHasSpecialMaterial(hasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
             monthPlanFinalAdjustVo.setHasSpecialMaterial(null);
         }
+
+        // 集合逗号分隔字段升序排序
+        CommaFieldSortUtil.sortAndUpdateCommaField(monthPlanFinalAdjustVoList, FactoryMonthPlanFinalAdjustVo::getCxMachineCode, FactoryMonthPlanFinalAdjustVo::setCxMachineCode);
+
         return getDataTable(monthPlanFinalAdjustVoList);
     }
 
