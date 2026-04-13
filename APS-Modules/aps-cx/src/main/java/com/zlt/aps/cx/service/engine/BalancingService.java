@@ -555,7 +555,7 @@ public class BalancingService {
         }
         
         CoreScheduleAlgorithmService.DailyEmbryoTask task = tasks.get(taskIndex);
-        String embryoCode = task.getMaterialCode();
+        String embryoCode = task.getEmbryoCode();
         
         // 如果当前胎胚还有剩余未分配的硫化机数
         if (remainingCount > 0) {
@@ -849,7 +849,7 @@ public class BalancingService {
         }
         
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
-            String embryoCode = task.getMaterialCode();
+            String embryoCode = task.getEmbryoCode();
             int remainingCount = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
             
             if (remainingCount <= 0) {
@@ -1003,6 +1003,254 @@ public class BalancingService {
             }
         }
         return false;
+    }
+
+    // ==================== 班次间均衡方法 ====================
+
+    /**
+     * 班次间生产量均衡
+     *
+     * <p>目标：使同一结构（structureName）下，各机台同班次的总车数趋于均衡。
+     * 硫化机台数最多的胎胚（绑定胎胚）决定该结构的排产节奏，其他胎胚向其靠拢。
+     *
+     * <p>不参与均衡的任务类型：
+     * <ul>
+     *   <li>试制任务：独立排产，不与其他任务混合</li>
+     *   <li>收尾任务：仅在首/末班生产，不参与班次比例调整</li>
+     * </ul>
+     *
+     * <p>均衡执行步骤：
+     * <ul>
+     *   <li>Step1: 按 structureName 分组</li>
+     *   <li>Step2: 在每个结构组内，按 (machineCode, embryoCode) 分组</li>
+     *   <li>Step3: 在每个 (machine, embryo) 组合内，找硫化机台数最多的胎胚作为绑定胎胚</li>
+     *   <li>Step4: 对每个绑定胎胚执行"排序+循环右移"均衡（例：76,86,76 → 86,76,76）</li>
+     *   <li>Step5: 汇总每个班次的总车数，检查是否均衡（max-min ≤ 1）</li>
+     *   <li>Step6: 若不均衡，执行跨机台调整，按比例分摊差额</li>
+     *   <li>Step7: 更新所有 ShiftProductionResult 的 carsForShift 和 quantity</li>
+     * </ul>
+     *
+     * @param results 排产结果列表（包含所有任务的班次精排结果，会被直接修改）
+     * @param context 排程上下文
+     * @return 均衡后的结果列表（与输入 results 相同引用）
+     */
+    public List<ShiftScheduleService.ShiftProductionResult> balanceShiftQuantities(
+            List<ShiftScheduleService.ShiftProductionResult> results,
+            ScheduleContextVo context) {
+
+        if (results == null || results.isEmpty()) {
+            return results;
+        }
+
+        // Step1: 按 structureName 分组
+        Map<String, List<ShiftScheduleService.ShiftProductionResult>> byStructure = results.stream()
+                .collect(Collectors.groupingBy(r -> {
+                    CoreScheduleAlgorithmService.DailyEmbryoTask task = r.getSourceTask();
+                    return task != null ? task.getStructureName() : r.getStructureName();
+                }));
+
+        for (Map.Entry<String, List<ShiftScheduleService.ShiftProductionResult>> entry : byStructure.entrySet()) {
+            List<ShiftScheduleService.ShiftProductionResult> group = entry.getValue();
+
+            // 过滤出普通任务（排除试制、收尾）
+            List<ShiftScheduleService.ShiftProductionResult> regularTasks = group.stream()
+                    .filter(r -> !Boolean.TRUE.equals(r.getIsTrialTask())
+                            && !Boolean.TRUE.equals(r.getIsEndingTask()))
+                    .collect(Collectors.toList());
+
+            if (regularTasks.size() < 2) {
+                continue;
+            }
+
+            // Step2: 按 machineCode + embryoCode 分组，每组内找绑定胎胚（硫化机台数最多）
+            Map<String, List<ShiftScheduleService.ShiftProductionResult>> byMachineEmbryo = regularTasks.stream()
+                    .collect(Collectors.groupingBy(r -> r.getMachineCode() + "|" + r.getEmbryoCode()));
+
+            // 收集所有绑定胎胚的班次结果
+            List<BindingEmbryoShifts> bindingList = new ArrayList<>();
+
+            for (Map.Entry<String, List<ShiftScheduleService.ShiftProductionResult>> meEntry : byMachineEmbryo.entrySet()) {
+                List<ShiftScheduleService.ShiftProductionResult> meResults = meEntry.getValue();
+
+                // 该 (machine, embryo) 组合内的绑定胎胚：取硫化机台数最多的
+                ShiftScheduleService.ShiftProductionResult binding = meResults.stream()
+                        .max(Comparator.comparingInt(r -> {
+                            CoreScheduleAlgorithmService.DailyEmbryoTask task = r.getSourceTask();
+                            return task != null && task.getVulcanizeMachineCount() != null
+                                    ? task.getVulcanizeMachineCount() : 0;
+                        }))
+                        .orElse(null);
+
+                if (binding == null) {
+                    continue;
+                }
+
+                // 提取该绑定胎胚的三个班次（按班次编码排序，确保顺序固定为夜-早-中）
+                List<ShiftScheduleService.ShiftProductionResult> bindingShifts = meResults.stream()
+                        .filter(r -> r.getEmbryoCode().equals(binding.getEmbryoCode()))
+                        .sorted(Comparator.comparing(ShiftScheduleService.ShiftProductionResult::getShiftCode))
+                        .collect(Collectors.toList());
+
+                if (bindingShifts.size() == 3) {
+                    bindingList.add(new BindingEmbryoShifts(bindingShifts));
+                }
+            }
+
+            if (bindingList.isEmpty()) {
+                continue;
+            }
+
+            // Step3: 对每台绑定胎胚执行排序+循环右移，并汇总各班次总量
+            int[] totalByShift = new int[3]; // 汇总：夜、早、中
+
+            for (BindingEmbryoShifts binding : bindingList) {
+                int[] cars = binding.getCars();
+                int total = cars[0] + cars[1] + cars[2];
+
+                // 均衡：排序后循环右移1位
+                int[] sorted = cars.clone();
+                Arrays.sort(sorted);
+                // sorted = [min, mid, max]
+                // 循环右移：[max, min, mid]
+                int[] balanced = new int[]{sorted[2], sorted[0], sorted[1]};
+
+                binding.applyBalanced(balanced);
+
+                // 汇总
+                for (int i = 0; i < 3; i++) {
+                    totalByShift[i] += balanced[i];
+                }
+            }
+
+            // Step4: 检查汇总后是否均衡（max-min > 1 则需要跨机台调整）
+            int maxShift = Math.max(Math.max(totalByShift[0], totalByShift[1]), totalByShift[2]);
+            int minShift = Math.min(Math.min(totalByShift[0], totalByShift[1]), totalByShift[2]);
+            if (maxShift - minShift > 1) {
+                // 跨机台调整：计算每台绑定胎胚各班次占总班次数的比例，按比例分摊调整量
+                int totalCars = totalByShift[0] + totalByShift[1] + totalByShift[2];
+                if (totalCars > 0) {
+                    // 目标：max-min <= 1 的均衡分布
+                    int base = totalCars / 3;
+                    int remainder = totalCars % 3;
+                    // remainder=0 → [base, base, base]
+                    // remainder=1 → [base+1, base, base] 或 [base, base+1, base]
+                    // remainder=2 → [base+1, base+1, base]
+                    int[] targetTotal = new int[]{base, base, base};
+                    if (remainder == 1) {
+                        targetTotal[1] = base + 1; // 中班多1
+                    } else if (remainder == 2) {
+                        targetTotal[0] = base + 1;
+                        targetTotal[1] = base + 1; // 夜和中多1
+                    }
+
+                    // 计算差额
+                    int[] diff = new int[3];
+                    for (int i = 0; i < 3; i++) {
+                        diff[i] = targetTotal[i] - totalByShift[i];
+                    }
+
+                    // 按各班次差额占总差额的比例，从各绑定胎胚的对应班次中调整
+                    // 正差额表示该班次多了需要减，负差额表示少了需要加
+                    int totalDiff = Math.abs(diff[0]) + Math.abs(diff[1]) + Math.abs(diff[2]);
+                    if (totalDiff > 0) {
+                        for (BindingEmbryoShifts binding : bindingList) {
+                            int[] currentCars = binding.getCars();
+                            int bindingTotal = currentCars[0] + currentCars[1] + currentCars[2];
+
+                            for (int i = 0; i < 3; i++) {
+                                if (diff[i] == 0) {
+                                    continue;
+                                }
+                                // 按该班次差额占总差额的比例分摊调整量
+                                int absDiff = Math.abs(diff[i]);
+                                int adjust = (int) Math.round((double) absDiff / totalDiff * bindingTotal / 3.0);
+                                adjust = Math.max(1, adjust); // 至少调整1车
+
+                                int oldCars = currentCars[i];
+                                if (diff[i] > 0) {
+                                    // 该班次少了，需要加车（从其他班次匀）
+                                    // 找到有多余的班次匀过来
+                                    for (int j = 0; j < 3; j++) {
+                                        if (j == i || currentCars[j] <= binding.getMinCars() + 1) {
+                                            continue;
+                                        }
+                                        int canGive = currentCars[j] - binding.getMinCars() - 1;
+                                        if (canGive > 0) {
+                                            int give = Math.min(canGive, adjust);
+                                            currentCars[j] -= give;
+                                            currentCars[i] += give;
+                                            adjust -= give;
+                                        }
+                                        if (adjust <= 0) {
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    // 该班次多了，需要减车（匀到其他班次）
+                                    int canReduce = currentCars[i] - binding.getMinCars() - 1;
+                                    int reduce = Math.min(canReduce, absDiff);
+                                    currentCars[i] -= reduce;
+                                    // 加到其他班次
+                                    for (int j = 0; j < 3; j++) {
+                                        if (j == i) {
+                                            continue;
+                                        }
+                                        currentCars[j] += reduce / 2;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // 更新结果
+                            binding.updateResults();
+                        }
+                    }
+                }
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * 绑定胎胚三个班次结果的封装，内部记录原始引用，均衡后可直接写回
+     */
+    private static class BindingEmbryoShifts {
+        private final List<ShiftScheduleService.ShiftProductionResult> shifts;
+        private int[] cars = new int[3];
+        private int minCars;
+
+        BindingEmbryoShifts(List<ShiftScheduleService.ShiftProductionResult> shifts) {
+            this.shifts = shifts;
+            this.cars[0] = shifts.get(0).getCarsForShift() != null ? shifts.get(0).getCarsForShift() : 0;
+            this.cars[1] = shifts.get(1).getCarsForShift() != null ? shifts.get(1).getCarsForShift() : 0;
+            this.cars[2] = shifts.get(2).getCarsForShift() != null ? shifts.get(2).getCarsForShift() : 0;
+            this.minCars = Math.min(Math.min(cars[0], cars[1]), cars[2]);
+        }
+
+        int[] getCars() {
+            return cars;
+        }
+
+        int getMinCars() {
+            return minCars;
+        }
+
+        void applyBalanced(int[] balanced) {
+            for (int i = 0; i < 3; i++) {
+                this.cars[i] = balanced[i];
+            }
+            this.minCars = Math.min(Math.min(cars[0], cars[1]), cars[2]);
+        }
+
+        void updateResults() {
+            for (int i = 0; i < 3; i++) {
+                ShiftScheduleService.ShiftProductionResult r = shifts.get(i);
+                int tripCapacity = r.getTripCapacity() != null ? r.getTripCapacity() : 1;
+                r.setCarsForShift(cars[i]);
+                r.setQuantity(cars[i] * tripCapacity);
+            }
+        }
     }
 
     // ==================== 内部类 ====================

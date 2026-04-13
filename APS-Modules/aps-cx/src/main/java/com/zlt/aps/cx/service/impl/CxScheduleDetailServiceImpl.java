@@ -27,7 +27,7 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
     public List<CxScheduleDetail> listByMainId(Long mainId) {
         return list(new LambdaQueryWrapper<CxScheduleDetail>()
                 .eq(CxScheduleDetail::getMainId, mainId)
-                .orderByAsc(CxScheduleDetail::getSequence));
+                .orderByAsc(CxScheduleDetail::getShiftCode));
     }
 
     @Override
@@ -35,7 +35,7 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
         return list(new LambdaQueryWrapper<CxScheduleDetail>()
                 .eq(CxScheduleDetail::getCxMachineCode, cxMachineCode)
                 .eq(CxScheduleDetail::getScheduleDate, scheduleDate)
-                .orderByAsc(CxScheduleDetail::getSequence));
+                .orderByAsc(CxScheduleDetail::getShiftCode));
     }
 
     @Override
@@ -43,16 +43,21 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
         return list(new LambdaQueryWrapper<CxScheduleDetail>()
                 .eq(CxScheduleDetail::getMainId, mainId)
                 .eq(CxScheduleDetail::getShiftCode, shiftCode)
-                .orderByAsc(CxScheduleDetail::getSequenceInGroup));
+                .orderByAsc(CxScheduleDetail::getShiftCode));
     }
 
+    /**
+     * 更新完成量
+     *
+     * @param detailId          明细ID
+     * @param completedQuantity 完成量
+     * @return 是否成功
+     */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public boolean updateCompletedQuantity(Long detailId, Integer completedQuantity) {
-        return update(new LambdaUpdateWrapper<CxScheduleDetail>()
-                .eq(CxScheduleDetail::getId, detailId)
-                .set(CxScheduleDetail::getTripActualQty, completedQuantity));
+        return false;
     }
+
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -76,17 +81,5 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
     public boolean deleteByMainId(Long mainId) {
         return remove(new LambdaQueryWrapper<CxScheduleDetail>()
                 .eq(CxScheduleDetail::getMainId, mainId));
-    }
-
-    @Override
-    public Integer getNextTripNo(Long mainId, String shiftCode) {
-        List<CxScheduleDetail> details = listByShift(mainId, shiftCode);
-        if (details.isEmpty()) {
-            return 1;
-        }
-        return details.stream()
-                .mapToInt(CxScheduleDetail::getTripNo)
-                .max()
-                .orElse(0) + 1;
     }
 }
