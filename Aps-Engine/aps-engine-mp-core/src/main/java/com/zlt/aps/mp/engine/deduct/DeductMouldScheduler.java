@@ -275,7 +275,8 @@ public class DeductMouldScheduler {
             activeMachines = getActiveMachinesByRule(deductMouldVo, context.getExpectedDays());
 
             // 动态计算所需机台数 sandy+ 2026.4.13
-            // 若在结构未收尾的情况下，
+            // 在结构未收尾的情况下，不再依赖固定天数，而是根据剩余需求、剩余天数、单台日产量动态决定当日应使用的模具数，逐日降1台，
+            // 即采取提前降模策略，使得计划量可以拉满到结构收尾
             int remainingDays = deductMouldVo.getDeadline() - context.getCurrentDate();
             int requiredDailyCapacity = (int) Math.ceil((double) deductMouldVo.getRemainingQty() / remainingDays);
             int neededMachines = (int) Math.ceil((double) requiredDailyCapacity / deductMouldVo.getDailyOutputPerMachine());
