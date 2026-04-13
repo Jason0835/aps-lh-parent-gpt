@@ -173,9 +173,9 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
      */
     @ApiOperation("从MES同步数据生成成型精度初版计划")
     @PostMapping("/generateFromMes")
-    public AjaxResult generatePlansFromMes() {
+    public AjaxResult generatePlansFromMes(@RequestParam(value = "year", required = false) Integer year) {
         try {
-            int count = cxPrecisionPlanService.generatePlansFromMes();
+            int count = cxPrecisionPlanService.generatePlansFromMes(year);
             return AjaxResult.success("生成成功", count);
         } catch (Exception e) {
             log.error("从MES同步数据生成成型精度计划失败", e);

@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -233,8 +234,9 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public int generatePlansFromMes() {
-        log.info("开始从MES同步数据生成成型精度初版计划");
+    public int generatePlansFromMes(Integer year) {
+        Integer targetYear = year == null ? LocalDate.now().getYear() : year;
+        log.info("开始从MES同步数据生成{}年度成型精度初版计划", targetYear);
         List<MdmDevMaintenancePlan> mesPlans = mdmDevMaintenancePlanEntityMapper.selectList(
                 new LambdaQueryWrapper<MdmDevMaintenancePlan>()
                         .like(MdmDevMaintenancePlan::getPrecisionType, PRECISION_TYPE_CX)
@@ -253,6 +255,10 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
                 log.debug("MES计划数据不完整：机台={}，计划日={}", machineCode, planDate);
                 continue;
             }
+            LocalDate mesPlanDate = toLocalDateFromUtil(planDate);
+            if (mesPlanDate == null || mesPlanDate.getYear() != targetYear) {
+                continue;
+            }
 
             if (existsByMachineAndDate(machineCode, planDate)) {
                 log.debug("机台{} 日期{} 已存在计划，跳过", machineCode, planDate);
@@ -268,6 +274,13 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
             plan.setLastPrecisionDate(mesPlan.getFirstWashTime());
             plan.setEstimatedHours(DEFAULT_ESTIMATED_HOURS);
             plan.setDueDate(addMonths(planDate, PLAN_INTERVAL_MONTHS));
+            if (plan.getDueDate() != null) {
+                LocalDate today = LocalDate.now();
+                LocalDate dueDate = toLocalDateFromUtil(plan.getDueDate());
+                if (dueDate != null) {
+                    plan.setDaysToDue((int) ChronoUnit.DAYS.between(today, dueDate));
+                }
+            }
 
             // 同步设备名称，保证展示一致
             MdmMoldingMachine machine = findMachine(machineCode, mesPlan.getFactoryCode());
