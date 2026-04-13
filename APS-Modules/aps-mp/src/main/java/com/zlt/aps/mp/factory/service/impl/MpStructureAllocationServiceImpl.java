@@ -8,6 +8,7 @@ import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONValidator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Sets;
@@ -28,7 +29,6 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
-import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.api.enums.AlternativeTypeEnum;
@@ -99,7 +99,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final FactoryMouldingDayResultMapper factoryMouldingDayResultMapper;
     private final LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
     private final DpDemandPlanEntityMapper dpDemandPlanEntityMapper;
-    private final IMpMonthPlanStatisticsService mpMonthPlanStatisticsService;
     private final FactoryMonthPlanProductionFinalResultEntityMapper factoryMonthPlanProductionFinalResultEntityMapper;
     private final ISysDictDataCacheService sysDictDataCacheService;
     private final Map<Long, Map<String, String>> importMachineMapCache = new ConcurrentHashMap<>();
@@ -190,7 +189,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     }
 
     /**
-     * 批量删除结构排产；对手工新增且满足定稿月计划 ADJ 版本条件时，级联物理删除月计划统计与定稿月计划数据。
+     * 批量删除结构排产；对手工新增且满足定稿月计划 ADJ 版本条件时，级联逻辑删除月计划统计与定稿月计划（is_delete=1）。
      *
      * @param ids 主键列表
      * @return 删除条数（与父类语义一致）
@@ -201,13 +200,65 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             return super.removeByIds(ids);
         }
         List<MpStructureAllocation> snapshots = entityMapper.selectBatchIds(ids);
+        assertHandStructureDeletionAllowed(snapshots);
         int removed = super.removeByIds(ids);
         cascadeDeleteRelatedAfterRemoveHandStructure(snapshots);
         return removed;
     }
 
     /**
-     * 删除手工结构排产后，按工厂/年月/排产版本/结构去重并尝试级联清理关联表。
+     * 手工新增的结构：若定稿月计划存在数据且不存在以 ADJ 开头的最新需求版本，则禁止删除。
+     *
+     * @param snapshots 待删除记录的删除前快照
+     */
+    private void assertHandStructureDeletionAllowed(List<MpStructureAllocation> snapshots) {
+        if (CollectionUtils.isEmpty(snapshots)) {
+            return;
+        }
+        Map<String, MpStructureAllocation> groupMap = new LinkedHashMap<>(snapshots.size());
+        for (MpStructureAllocation item : snapshots) {
+            if (item == null || !DataSourceEnum.HAND.getCode().equals(item.getDataSource())) {
+                continue;
+            }
+            String key = buildStructureCascadeGroupKey(item);
+            if (StringUtils.isBlank(key)) {
+                continue;
+            }
+            groupMap.putIfAbsent(key, item);
+        }
+        for (MpStructureAllocation alloc : groupMap.values()) {
+            List<FactoryMonthPlanProductionFinalResult> finalList = listProdFinalNotDeletedForStructure(alloc);
+            if (CollectionUtils.isEmpty(finalList)) {
+                continue;
+            }
+            boolean hasAdjLastVersion = finalList.stream()
+                    .anyMatch(r -> StringUtils.isNotBlank(r.getLastMonthPlanVersion())
+                            && r.getLastMonthPlanVersion().startsWith(LAST_MONTH_PLAN_VERSION_ADJ_PREFIX));
+            if (!hasAdjLastVersion) {
+                throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mpStructureAllocation.cannotDeleteWithMonthPlanData"));
+            }
+        }
+    }
+
+    /**
+     * 按工厂、年、月、排产版本、产品结构查询未逻辑删除的定稿月计划行。
+     *
+     * @param alloc 含五元组的结构排产
+     * @return 定稿月计划列表，无则空列表
+     */
+    private List<FactoryMonthPlanProductionFinalResult> listProdFinalNotDeletedForStructure(MpStructureAllocation alloc) {
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, alloc.getFactoryCode())
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, alloc.getYear())
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, alloc.getMonth())
+                .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, alloc.getProductionVersion())
+                .eq(FactoryMonthPlanProductionFinalResult::getStructureName, alloc.getStructureName())
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, YesOrNoEnum.NO.getValue());
+        return factoryMonthPlanProductionFinalResultEntityMapper.selectList(wrapper);
+    }
+
+    /**
+     * 删除手工结构排产后，按工厂/年月/排产版本/结构去重并尝试级联逻辑删除关联表数据。
      *
      * @param snapshots 删除前快照的结构排产列表
      */
@@ -251,19 +302,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     }
 
     /**
-     * 若定稿月计划存在且 LAST_MONTH_PLAN_VERSION 以 ADJ 开头，则删除月计划统计及定稿月计划对应行。
+     * 若定稿月计划存在且 LAST_MONTH_PLAN_VERSION 以 ADJ 开头，则逻辑删除月计划统计及定稿月计划对应行（is_delete=1）。
      *
      * @param alloc 分组代表的结构排产（含工厂、年月、排产版本、结构）
      */
     private void deleteRelatedMonthPlanIfAdjVersion(MpStructureAllocation alloc) {
-        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, alloc.getFactoryCode())
-                .eq(FactoryMonthPlanProductionFinalResult::getYear, alloc.getYear())
-                .eq(FactoryMonthPlanProductionFinalResult::getMonth, alloc.getMonth())
-                .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, alloc.getProductionVersion())
-                .eq(FactoryMonthPlanProductionFinalResult::getStructureName, alloc.getStructureName())
-                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, YesOrNoEnum.NO.getValue());
-        List<FactoryMonthPlanProductionFinalResult> finalList = factoryMonthPlanProductionFinalResultEntityMapper.selectList(wrapper);
+        List<FactoryMonthPlanProductionFinalResult> finalList = listProdFinalNotDeletedForStructure(alloc);
         if (CollectionUtils.isEmpty(finalList)) {
             return;
         }
@@ -273,20 +317,29 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         if (!needCascade) {
             return;
         }
-        mpMonthPlanStatisticsService.deleteMonthPlanStatisticsByCondition(alloc.getFactoryCode(),
-                String.valueOf(alloc.getYear()), String.valueOf(alloc.getMonth()), alloc.getProductionVersion(),
-                null, Collections.singletonList(alloc.getStructureName()));
-        List<Long> idList = finalList.stream()
-                .map(FactoryMonthPlanProductionFinalResult::getId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(idList)) {
-            return;
-        }
-        baseDao.deleteByIds(FactoryMonthPlanProductionFinalResult.class, idList);
-        log.info("删除结构排产级联清理定稿月计划完成，factoryCode={}, year={}, month={}, productionVersion={}, structureName={}, 删除行数={}",
+        // 月计划统计：逻辑删除
+        LambdaUpdateWrapper<MpMonthPlanStatistics> statUpdate = new LambdaUpdateWrapper<>();
+        statUpdate.eq(MpMonthPlanStatistics::getFactoryCode, alloc.getFactoryCode())
+                .eq(MpMonthPlanStatistics::getYear, alloc.getYear())
+                .eq(MpMonthPlanStatistics::getMonth, alloc.getMonth())
+                .eq(MpMonthPlanStatistics::getProductionVersion, alloc.getProductionVersion())
+                .eq(MpMonthPlanStatistics::getStructureName, alloc.getStructureName())
+                .eq(MpMonthPlanStatistics::getIsDelete, YesOrNoEnum.NO.getValue())
+                .set(MpMonthPlanStatistics::getIsDelete, YesOrNoEnum.YES.getValue());
+        int statRows = mpMonthPlanStatisticsEntityMapper.update(null, statUpdate);
+        // 定稿月计划：逻辑删除（与查询条件一致的全部未删除行）
+        LambdaUpdateWrapper<FactoryMonthPlanProductionFinalResult> finalUpdate = new LambdaUpdateWrapper<>();
+        finalUpdate.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, alloc.getFactoryCode())
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, alloc.getYear())
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, alloc.getMonth())
+                .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, alloc.getProductionVersion())
+                .eq(FactoryMonthPlanProductionFinalResult::getStructureName, alloc.getStructureName())
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, YesOrNoEnum.NO.getValue())
+                .set(FactoryMonthPlanProductionFinalResult::getIsDelete, YesOrNoEnum.YES.getValue());
+        int finalRows = factoryMonthPlanProductionFinalResultEntityMapper.update(null, finalUpdate);
+        log.info("删除结构排产级联逻辑删除完成，factoryCode={}, year={}, month={}, productionVersion={}, structureName={}, 统计表行数={}, 定稿表行数={}",
                 alloc.getFactoryCode(), alloc.getYear(), alloc.getMonth(), alloc.getProductionVersion(),
-                alloc.getStructureName(), idList.size());
+                alloc.getStructureName(), statRows, finalRows);
     }
 
     @Override
