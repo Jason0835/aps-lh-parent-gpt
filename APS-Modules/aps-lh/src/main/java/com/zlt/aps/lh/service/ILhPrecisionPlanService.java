@@ -3,6 +3,7 @@ package com.zlt.aps.lh.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanVo;
+import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
@@ -68,4 +69,12 @@ public interface ILhPrecisionPlanService extends IDocService<LhPrecisionPlan> {
      * @return 是否成功
      */
     boolean updateActualDate(Long mesSourceId, String actualDate);
+
+    /**
+     * 根据设备保养计划生成硫化精度计划
+     *
+     * @param maintenancePlans 设备保养计划列表
+     * @return 生成数量
+     */
+    int generateFromMaintenancePlan(List<MdmDevMaintenancePlan> maintenancePlans);
 }

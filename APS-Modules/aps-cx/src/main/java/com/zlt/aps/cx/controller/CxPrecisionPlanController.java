@@ -8,6 +8,7 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.mapper.CxPrecisionPlanMapper;
+import com.zlt.aps.cx.service.ICxPrecisionPlanAutoCalculateService;
 import com.zlt.aps.cx.service.ICxPrecisionPlanService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -45,6 +46,9 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
 
     @Autowired
     private ICxPrecisionPlanService cxPrecisionPlanService;
+
+    @Autowired
+    private ICxPrecisionPlanAutoCalculateService cxPrecisionPlanAutoCalculateService;
 
     @Resource
     private CxPrecisionPlanMapper cxPrecisionPlanMapper;
@@ -223,5 +227,33 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
             log.error("MES回传实际完成时间失败", e);
             return AjaxResult.error("更新失败：" + e.getMessage());
         }
+    }
+
+    /**
+     * 自动推算成型精度计划（15天周期）
+     */
+    @ApiOperation("自动推算成型精度计划（15天周期）")
+    @PostMapping("/autoCalculateCx15Days")
+    public AjaxResult autoCalculateCxPrecisionPlan15Days(@RequestParam("year") Integer year) {
+        return cxPrecisionPlanAutoCalculateService.autoCalculateCxPrecisionPlan15Days(year);
+    }
+
+    /**
+     * 自动推算成型精度计划（60天周期）
+     */
+    @ApiOperation("自动推算成型精度计划（60天周期）")
+    @PostMapping("/autoCalculateCx60Days")
+    public AjaxResult autoCalculateCxPrecisionPlan60Days(@RequestParam("year") Integer year) {
+        return cxPrecisionPlanAutoCalculateService.autoCalculateCxPrecisionPlan60Days(year);
+    }
+
+    /**
+     * 根据设备保养计划生成并推算成型精度计划
+     */
+    @ApiOperation("根据设备保养计划生成并推算成型精度计划")
+    @PostMapping("/generateFromMaintenance")
+    public AjaxResult generateFromMaintenancePlan(@RequestBody List<Long> maintenancePlanIds,
+                                                   @RequestParam("cycleDays") Integer cycleDays) {
+        return cxPrecisionPlanAutoCalculateService.generateFromMaintenancePlanByIds(maintenancePlanIds, cycleDays);
     }
 }

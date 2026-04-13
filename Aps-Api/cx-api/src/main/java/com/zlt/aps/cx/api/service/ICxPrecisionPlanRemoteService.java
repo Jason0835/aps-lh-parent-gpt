@@ -104,4 +104,36 @@ public interface ICxPrecisionPlanRemoteService {
     @PostMapping("/cxPrecisionPlan/updateActualDate")
     AjaxResult updateActualDate(@RequestParam("mesSourceId") Long mesSourceId,
                                 @RequestParam("actualDate") String actualDate);
+
+    /**
+     * 自动推算成型精度计划（15天周期）
+     *
+     * @param year 年度
+     * @return 推算结果
+     */
+    @ApiOperation("自动推算成型精度计划（15天周期）")
+    @PostMapping("/cxPrecisionPlan/autoCalculateCx15Days")
+    AjaxResult autoCalculateCxPrecisionPlan15Days(@RequestParam("year") Integer year);
+
+    /**
+     * 自动推算成型精度计划（60天周期）
+     *
+     * @param year 年度
+     * @return 推算结果
+     */
+    @ApiOperation("自动推算成型精度计划（60天周期）")
+    @PostMapping("/cxPrecisionPlan/autoCalculateCx60Days")
+    AjaxResult autoCalculateCxPrecisionPlan60Days(@RequestParam("year") Integer year);
+
+    /**
+     * 根据设备保养计划生成并推算成型精度计划
+     *
+     * @param maintenancePlanIds 设备保养计划ID列表
+     * @param cycleDays 周期天数（15/60）
+     * @return 生成结果
+     */
+    @ApiOperation("根据设备保养计划生成并推算成型精度计划")
+    @PostMapping("/cxPrecisionPlan/generateFromMaintenance")
+    AjaxResult generateFromMaintenancePlan(@RequestBody List<Long> maintenancePlanIds, 
+                                           @RequestParam("cycleDays") Integer cycleDays);
 }

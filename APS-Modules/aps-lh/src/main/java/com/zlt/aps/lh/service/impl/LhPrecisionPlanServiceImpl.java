@@ -557,4 +557,68 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
         long count = lhPrecisionPlanMapper.selectCount(queryWrapper);
         return count > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int generateFromMaintenancePlan(List<MdmDevMaintenancePlan> maintenancePlans) {
+        if (CollectionUtils.isEmpty(maintenancePlans)) {
+            log.warn("设备保养计划列表为空");
+            return 0;
+        }
+
+        log.info("开始根据设备保养计划生成硫化精度计划，共{}条", maintenancePlans.size());
+
+        int intervalDays = getIntervalDays();
+        List<LhPrecisionPlan> plansToSave = new ArrayList<>();
+
+        for (MdmDevMaintenancePlan mesPlan : maintenancePlans) {
+            String machineCode = mesPlan.getDevCode();
+            LocalDate actualDate = parseDate(mesPlan.getFirstWashTime());
+
+            if (actualDate == null) {
+                log.warn("机台{}的实际执行时间为空，跳过", machineCode);
+                continue;
+            }
+
+            LocalDate planDate = actualDate.plusDays(intervalDays);
+            int year = planDate.getYear();
+
+            LhPrecisionPlan existingPlan = lhPrecisionPlanMapper.selectByMachineCodeAndYear(machineCode, year);
+            if (existingPlan != null) {
+                log.debug("机台{}在{}年已有计划，跳过", machineCode, year);
+                continue;
+            }
+
+            LhPrecisionPlan plan = new LhPrecisionPlan();
+            plan.setMachineCode(machineCode);
+            plan.setPrecisionType(PRECISION_TYPE_LH);
+            plan.setCompanyCode(mesPlan.getCompanyCode());
+            plan.setFactoryCode(mesPlan.getFactoryCode());
+            plan.setMesSourceId(mesPlan.getId());
+            plan.setDataSource(DATA_SOURCE_MES);
+            plan.setActualDate(actualDate);
+            plan.setLastMaintenanceDate(actualDate);
+            plan.setPlanDate(planDate);
+            plan.setYear(new BigDecimal(year));
+
+            LocalDate today = LocalDate.now();
+            plan.setDaysToDue((int) ChronoUnit.DAYS.between(today, planDate));
+
+            plan.setCompletionStatus(COMPLETION_STATUS_PENDING);
+            plan.setWarningStatus(WARNING_STATUS_NO);
+            plan.setIsWarningSent(WARNING_SENT_NO);
+            plan.setIsDelete(0);
+            plan.setBaseVale(null);
+
+            plansToSave.add(plan);
+            log.info("准备生成硫化精度计划：机台={}, 计划日期={}", machineCode, plan.getPlanDate());
+        }
+
+        if (!plansToSave.isEmpty()) {
+            baseDao.insertBatch(plansToSave);
+            log.info("成功生成{}条硫化精度计划", plansToSave.size());
+        }
+
+        return plansToSave.size();
+    }
 }

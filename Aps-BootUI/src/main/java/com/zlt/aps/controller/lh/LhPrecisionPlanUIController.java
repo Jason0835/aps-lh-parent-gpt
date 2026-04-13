@@ -20,6 +20,7 @@ import com.zlt.mix.common.utils.ImportUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.stereotype.Controller;
@@ -40,6 +41,7 @@ import java.util.List;
  * @author APS Team
  */
 @Api(tags = "硫化精度计划")
+@Slf4j
 @Controller
 @RequestMapping("/schedule/lhPrecisionPlan")
 public class LhPrecisionPlanUIController extends BaseController {
@@ -149,7 +151,17 @@ public class LhPrecisionPlanUIController extends BaseController {
     @PostMapping("/generateFromMes")
     @ResponseBody
     public AjaxResult generateFromMes(@RequestParam("year") Integer year) {
-        return lhPrecisionPlanRemoteService.generatePlansFromMes(year);
+        AjaxResult result = lhPrecisionPlanRemoteService.generatePlansFromMes(year);
+        
+        if (AjaxResult.Type.SUCCESS.equals(result.get(AjaxResult.CODE_TAG))) {
+            try {
+                lhPrecisionPlanRemoteService.autoCalculateLhPrecisionPlan(year + 1);
+            } catch (Exception e) {
+                log.error("自动推算硫化精度计划失败", e);
+            }
+        }
+        
+        return result;
     }
 
     @ApiOperation("自动生成年度硫化精度计划")
@@ -157,7 +169,7 @@ public class LhPrecisionPlanUIController extends BaseController {
     @PostMapping("/autoGenerateYearly")
     @ResponseBody
     public AjaxResult autoGenerateYearly(@RequestParam("year") Integer year) {
-        return lhPrecisionPlanRemoteService.autoGenerateYearlyPlans(year);
+        return lhPrecisionPlanRemoteService.autoCalculateLhPrecisionPlan(year);
     }
 
     @ApiOperation("执行30天预警检查")

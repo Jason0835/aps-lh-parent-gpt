@@ -28,6 +28,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 
@@ -213,5 +214,36 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
         context.setFileBytes(data);
         AjaxResult ajaxResult = cxPrecisionPlanRemoteService.importData(context, updateSupport);
         return ajaxResult;
+    }
+
+    @ApiOperation("从MES同步数据生成成型精度初版计划")
+    @RequiresPermissions("cx:cxPrecisionPlan:sync")
+    @PostMapping("/generateFromMes")
+    @ResponseBody
+    public AjaxResult generateFromMes() {
+        AjaxResult result = cxPrecisionPlanRemoteService.generatePlansFromMes();
+        
+        if (AjaxResult.Type.SUCCESS.equals(result.get(AjaxResult.CODE_TAG))) {
+            try {
+                Integer currentYear = LocalDate.now().getYear();
+                cxPrecisionPlanRemoteService.autoCalculateCxPrecisionPlan15Days(currentYear);
+                cxPrecisionPlanRemoteService.autoCalculateCxPrecisionPlan60Days(currentYear);
+            } catch (Exception e) {
+                log.error("自动推算成型精度计划失败", e);
+            }
+        }
+        
+        return result;
+    }
+
+    @ApiOperation("自动生成年度成型精度计划")
+    @RequiresPermissions("cx:cxPrecisionPlan:generate")
+    @PostMapping("/autoGenerateYearly")
+    @ResponseBody
+    public AjaxResult autoGenerateYearly(@RequestParam("year") Integer year) {
+        AjaxResult result15 = cxPrecisionPlanRemoteService.autoCalculateCxPrecisionPlan15Days(year);
+        AjaxResult result60 = cxPrecisionPlanRemoteService.autoCalculateCxPrecisionPlan60Days(year);
+        
+        return AjaxResult.success("成型精度计划生成完成：15天周期-" + result15.get("msg") + "；60天周期-" + result60.get("msg"));
     }
 }
