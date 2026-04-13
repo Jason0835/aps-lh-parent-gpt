@@ -1,15 +1,17 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 成型机台-分配分组计划信息
@@ -44,6 +46,11 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      */
     private Integer endDay;
 
+    /**
+     * 20260410+ 释放优先级：值越小，越晚释放
+     * 场景：只在同分组分配不同机台使用
+     */
+    private Integer releasePriority;
     /**
      * 续作规格信息
      */
@@ -181,6 +188,39 @@ public class CxMachineAllocationPlanHelper implements Serializable {
     }
 
     /**
+     * 获取真正的收尾日
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    public Integer getRealConclusionDay(Context context) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        if (CollectionUtils.isEmpty(allCxMachineMap)) {
+            return null;
+        }
+        CxMachineBaseInfoVo cxMachineInfo = allCxMachineMap.get(cxMachineCode);
+        if (null == cxMachineInfo) {
+            return null;
+        }
+        Set<Integer> stopDayInfo = Optional.ofNullable(cxMachineInfo.getStopDayInfo()).orElse(Collections.emptySet());
+        if (CollectionUtils.isEmpty(stopDayInfo)) {
+            return endDay;
+        }
+        Integer realConclusionDay = endDay;
+        for (; ; ) {
+            if (realConclusionDay <= startDay) {
+                break;
+            }
+            if (!stopDayInfo.contains(realConclusionDay)) {
+                break;
+            }
+            realConclusionDay = realConclusionDay - BigDecimal.ONE.intValue();
+        }
+        return realConclusionDay;
+    }
+
+    /**
      * 分配的分组名
      *
      * @return
@@ -279,6 +319,15 @@ public class CxMachineAllocationPlanHelper implements Serializable {
             return BigDecimal.ZERO.intValue();
         }
         return productionPlanInfo.getDayMinCapacityByLhRatio(maxRatio);
+    }
+
+    /**
+     * 设置释放优先级
+     *
+     * @param releasePriority
+     */
+    public void setReleasePriority(int releasePriority) {
+        this.releasePriority = releasePriority;
     }
 
 }

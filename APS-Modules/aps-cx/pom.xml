@@ -49,6 +49,11 @@
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-cx-lh-api</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.cx</groupId>
+            <artifactId>aps-cx-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
 
 
         <!-- 操作日志jar -->

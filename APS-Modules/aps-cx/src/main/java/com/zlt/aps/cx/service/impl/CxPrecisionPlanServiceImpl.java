@@ -10,7 +10,7 @@ import com.zlt.aps.cx.mapper.CxPrecisionPlanMapper;
 import com.zlt.aps.cx.mapper.MdmMoldingMachineMapper;
 import com.zlt.aps.cx.service.ICxPrecisionPlanService;
 import com.zlt.aps.maindata.mapper.MdmDevMaintenancePlanEntityMapper;
-import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
+import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.bill.common.service.AbstractDocService;

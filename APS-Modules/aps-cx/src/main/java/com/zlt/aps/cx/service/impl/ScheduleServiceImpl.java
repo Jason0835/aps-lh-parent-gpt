@@ -2,6 +2,8 @@ package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
+import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
+import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
@@ -20,8 +22,8 @@ import com.zlt.aps.cx.service.impl.validation.ScheduleDataValidator;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.vo.ScheduleRequestVo;
-import com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -106,10 +108,10 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final CxStockMapper stockMapper;
     private final CxScheduleResultMapper scheduleResultMapper;
     private final CxParamConfigMapper paramConfigMapper;
-    private final MdmStructureTreadConfigMapper structureShiftCapacityMapper;
+    private final CxStructureTreadConfigMapper structureShiftCapacityMapper;
     private final CxKeyProductMapper keyProductMapper;
     private final LhScheduleResultMapper lhScheduleResultMapper;
-    private final MdmCxMachineOnlineInfoMapper onlineInfoMapper;
+    private final CxMachineOnlineInfoMapper onlineInfoMapper;
     private final CxShiftConfigMapper shiftConfigMapper;
     private final FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
     private final CxMaterialEndingMapper materialEndingMapper;
@@ -373,6 +375,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 new LambdaQueryWrapper<CxShiftConfig>()
                         .eq(CxShiftConfig::getFactoryCode, factoryCode)
                         .eq(CxShiftConfig::getIsActive, ACTIVE_STATUS)
+                        .eq(CxShiftConfig::getIsActive, "0")
                         .orderByAsc(CxShiftConfig::getScheduleDay)
                         .orderByAsc(CxShiftConfig::getDayShiftOrder)
         );
@@ -419,6 +422,16 @@ public class ScheduleServiceImpl implements ScheduleService {
                         .eq(MdmMoldingMachine::getIsDelete, "0"));
         context.setAvailableMachines(machines);
         log.info("加载成型机台 {} 台（已过滤禁用和已删除）", machines.size());
+
+        // 构建机台机型映射
+        Map<String, String> machineTypeCodeMap = new HashMap<>();
+        for (MdmMoldingMachine machine : machines) {
+            if (machine.getCxMachineCode() != null && machine.getCxMachineTypeCode() != null) {
+                machineTypeCodeMap.put(machine.getCxMachineCode(), machine.getCxMachineTypeCode());
+            }
+        }
+        context.setMachineTypeCodeMap(machineTypeCodeMap);
+        log.info("构建机台机型映射，共 {} 条", machineTypeCodeMap.size());
     }
 
     /**
@@ -493,7 +506,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         List<CxStock> stocks = stockMapper.selectList(
                 new LambdaQueryWrapper<CxStock>()
                         .eq(CxStock::getStockDate, stockDate)
-                        .gt(CxStock::getStockNum, 0));
+                        .gt(CxStock::getStockNum, 0)
+                        .eq(CxStock::getIsDelete, "0"));
         context.setStocks(stocks);
         log.info("加载胎胚库存 {} 条 (库存日期: {})", stocks.size(), scheduleDate);
     }
@@ -502,7 +516,7 @@ public class ScheduleServiceImpl implements ScheduleService {
      * 加载成型在机信息
      */
     private void loadOnlineInfos(ScheduleContextVo context, LocalDate scheduleDate) {
-        List<MdmCxMachineOnlineInfo> onlineInfos = onlineInfoMapper.selectByDateRange(
+        List<CxMachineOnlineInfo> onlineInfos = onlineInfoMapper.selectByDateRange(
                 scheduleDate, scheduleDate.minusDays(1));
         context.setOnlineInfos(onlineInfos);
         log.info("加载成型在机信息 {} 条", onlineInfos.size());
@@ -517,7 +531,7 @@ public class ScheduleServiceImpl implements ScheduleService {
      */
     private void buildMachineOnlineEmbryoMap(ScheduleContextVo context) {
         Map<String, Set<String>> machineOnlineEmbryoMap = new HashMap<>();
-        for (MdmCxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
+        for (CxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
             String cxCode = onlineInfo.getCxCode();
             // 组合物料编码和胎胚编码作为唯一键
             String materialCode = onlineInfo.getMesMaterialCode();
@@ -535,7 +549,9 @@ public class ScheduleServiceImpl implements ScheduleService {
      * 加载参数配置
      */
     private void loadParamConfigs(ScheduleContextVo context) {
-        List<CxParamConfig> paramConfigs = paramConfigMapper.selectList(null);
+        List<CxParamConfig> paramConfigs = paramConfigMapper.selectList(
+                new LambdaQueryWrapper<CxParamConfig>()
+                        .eq(CxParamConfig::getIsDelete, "0"));
         log.info("加载参数配置，共 {} 条记录", paramConfigs != null ? paramConfigs.size() : 0);
         if (paramConfigs != null && !paramConfigs.isEmpty()) {
             for (CxParamConfig config : paramConfigs) {
@@ -558,12 +574,14 @@ public class ScheduleServiceImpl implements ScheduleService {
      * 加载结构整车配置
      */
     private void loadStructureShiftCapacities(ScheduleContextVo context) {
-        List<MdmStructureTreadConfig> structureShiftCapacities = structureShiftCapacityMapper.selectList(
-                new LambdaQueryWrapper<MdmStructureTreadConfig>()
-                        .eq(MdmStructureTreadConfig::getIsDelete, "0"));
+        List<CxStructureTreadConfig> structureShiftCapacities = structureShiftCapacityMapper.selectList(
+                new LambdaQueryWrapper<CxStructureTreadConfig>()
+                        .eq(CxStructureTreadConfig::getIsDelete, "0"));
         context.setStructureShiftCapacities(structureShiftCapacities);
         log.info("加载结构班次产能配置 {} 条", structureShiftCapacities.size());
     }
+
+
 
     /**
      * 加载关键产品配置
@@ -571,7 +589,8 @@ public class ScheduleServiceImpl implements ScheduleService {
     private void loadKeyProducts(ScheduleContextVo context) {
         List<CxKeyProduct> keyProducts = keyProductMapper.selectList(
                 new LambdaQueryWrapper<CxKeyProduct>()
-                        .eq(CxKeyProduct::getIsActive, ACTIVE_STATUS));
+                        .eq(CxKeyProduct::getIsActive, ACTIVE_STATUS)
+                        .eq(CxKeyProduct::getIsDelete, "0"));
         context.setKeyProducts(keyProducts);
 
         Set<String> keyProductCodes = new HashSet<>();
@@ -615,14 +634,14 @@ public class ScheduleServiceImpl implements ScheduleService {
      * <p>用于按车分配的计算：需要的车数 = 待排产量 / 胎面整车条数
      */
     private void loadStructureTreadConfigs(ScheduleContextVo context) {
-        List<MdmStructureTreadConfig> treadConfigs = structureShiftCapacityMapper.selectList(
-                new LambdaQueryWrapper<MdmStructureTreadConfig>()
-                        .eq(MdmStructureTreadConfig::getIsDelete, "0"));
+        List<CxStructureTreadConfig> treadConfigs = structureShiftCapacityMapper.selectList(
+                new LambdaQueryWrapper<CxStructureTreadConfig>()
+                        .eq(CxStructureTreadConfig::getIsDelete, "0"));
         context.setStructureTreadConfigs(treadConfigs);
 
         // 构建结构-整车条数映射
         Map<String, Integer> structureTreadCountMap = new HashMap<>();
-        for (MdmStructureTreadConfig config : treadConfigs) {
+        for (CxStructureTreadConfig config : treadConfigs) {
             if (config.getStructureCode() != null && config.getTreadCount() != null) {
                 structureTreadCountMap.put(config.getStructureCode(), config.getTreadCount());
             }
@@ -858,6 +877,8 @@ public class ScheduleServiceImpl implements ScheduleService {
     /**
      * 构建结构硫化配比映射
      *
+     * <p>key = 机型编码 + "|" + 结构名称，兼容同一结构在不同机型上有不同配比的情况
+     *
      * @return 结构硫化配比映射
      */
     private Map<String, MdmStructureLhRatio> buildStructureLhRatioMap() {
@@ -867,11 +888,12 @@ public class ScheduleServiceImpl implements ScheduleService {
             List<MdmStructureLhRatio> ratios = structureLhRatioMapper.selectList(null);
             for (MdmStructureLhRatio ratio : ratios) {
                 String structureName = ratio.getStructureName();
-                if (structureName != null) {
-                    resultMap.put(structureName, ratio);
+                String machineTypeCode = ratio.getCxMachineTypeCode();
+                if (structureName != null && machineTypeCode != null) {
+                    resultMap.put(machineTypeCode + "|" + structureName, ratio);
                 }
             }
-            log.info("从结构硫化配比表构建映射，共 {} 个结构", resultMap.size());
+            log.info("从结构硫化配比表构建映射，共 {} 条（机型+结构维度）", resultMap.size());
 
         } catch (Exception e) {
             log.error("构建结构硫化配比映射失败", e);
@@ -1063,21 +1085,21 @@ public class ScheduleServiceImpl implements ScheduleService {
 
                     for (int i = 0; i < taskDemands.size(); i++) {
                         TaskDemand td = taskDemands.get(i);
-                        int allocatedStock;
+                        int currentStock;
 
                         if (i == taskDemands.size() - 1) {
                             // 最后一个硫化任务分配剩余库存（倒扣）
-                            allocatedStock = totalStock - allocatedTotal;
+                            currentStock = totalStock - allocatedTotal;
                         } else {
                             // 按比例分配
-                            allocatedStock = (int) ((long) totalStock * td.demand / totalDemand);
+                            currentStock = (int) ((long) totalStock * td.demand / totalDemand);
                         }
 
-                        materialStockMap.merge(td.taskKey, allocatedStock, Integer::sum);
-                        allocatedTotal += allocatedStock;
+                        materialStockMap.merge(td.taskKey, currentStock, Integer::sum);
+                        allocatedTotal += currentStock;
 
                         log.debug("胎胚 {} 共用分配：硫化任务 {} 需求 {}，分配库存 {}",
-                                embryoCode, td.taskKey, td.demand, allocatedStock);
+                                embryoCode, td.taskKey, td.demand, currentStock);
                     }
                 }
             }
@@ -1211,20 +1233,13 @@ public class ScheduleServiceImpl implements ScheduleService {
 
                 // 计算延误量（如果成型余量 > 0 且接近收尾日）
                 if (formingRemainder != null && formingRemainder > 0 && daysToEnding >= 0 && daysToEnding <= NEAR_ENDING_DAYS) {
-                    // 日产能估算（简化：假设每天能做100条）
-                    int dailyCapacity = 100;
-                    int remainingDays = Math.max(daysToEnding, 1);
-                    int producibleQty = dailyCapacity * remainingDays;
+                    // 从月计划中累加当前日到收尾日之间各天的计划排产量
+                    int producibleQty = calculateProducibleQty(plans, currentDay, endingDay);
 
                     if (formingRemainder > producibleQty) {
                         int delayQty = formingRemainder - producibleQty;
                         ending.setDelayQuantity(delayQty);
                         ending.setDistributedQuantity(delayQty / CATCH_UP_DAYS);
-
-                        // 如果未来3天满产仍追不上，需要调整月计划
-                        if (delayQty > dailyCapacity * CATCH_UP_DAYS) {
-                            ending.setNeedMonthPlanAdjust(1);
-                        }
                     }
                 }
             } else {
@@ -1327,7 +1342,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 }
             }
 
-            List<MdmCxMachineOnlineInfo> filteredOnlineInfos = context.getOnlineInfos().stream()
+            List<CxMachineOnlineInfo> filteredOnlineInfos = context.getOnlineInfos().stream()
                     .filter(info -> {
                         // 使用物料编码 + 胎胚编码组合键
                         String materialCode = info.getMesMaterialCode();
@@ -1351,7 +1366,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         // 使用物料编码 + 胎胚编码组合键
         if (context.getOnlineInfos() != null) {
             Map<String, Set<String>> machineOnlineEmbryoMap = new HashMap<>();
-            for (MdmCxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
+            for (CxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
                 String cxCode = onlineInfo.getCxCode();
                 String materialCode = onlineInfo.getMesMaterialCode();
                 String embryoSpec = onlineInfo.getEmbryoSpec();
@@ -1404,6 +1419,29 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
 
         return endingDay;
+    }
+
+    /**
+     * 计算从当前日到目标日之间的可生产量
+     *
+     * <p>遍历该物料的所有月计划记录，累加 [fromDay, toDay] 区间内每天的排产量。
+     *
+     * @param plans   该物料的月计划列表
+     * @param fromDay 起始日（含）
+     * @param toDay   截止日（含）
+     * @return 区间内计划排产总量
+     */
+    private int calculateProducibleQty(List<FactoryMonthPlanProductionFinalResult> plans, int fromDay, int toDay) {
+        int total = 0;
+        for (FactoryMonthPlanProductionFinalResult plan : plans) {
+            for (int day = fromDay; day <= toDay; day++) {
+                Integer dayQty = plan.getDayQty(day);
+                if (dayQty != null && dayQty > 0) {
+                    total += dayQty;
+                }
+            }
+        }
+        return total;
     }
 
     /**

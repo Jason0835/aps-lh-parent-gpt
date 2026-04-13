@@ -208,7 +208,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     @ApiOperation("文字示方调整")
     @PostMapping("/adjustTextNo")
     @ResponseBody
-    public AjaxResult adjustTextNo(@RequestBody LhTransferDeskDTO dto) {
+    public AjaxResult adjustTextNo(LhTransferDeskDTO dto) {
         return iLhScheduleResultRemoteService.adjustTextNo(dto);
     }
 

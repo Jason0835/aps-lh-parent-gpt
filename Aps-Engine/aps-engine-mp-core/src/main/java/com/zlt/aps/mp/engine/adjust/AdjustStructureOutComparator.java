@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.adjust;
 
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
@@ -163,6 +164,6 @@ public class AdjustStructureOutComparator implements Comparator<MpAdjustStructur
 
     private boolean isMoldLimit(MpAdjustStructureOut obj) {
         Integer blockQty = obj.getTypeBlockQty();
-        return blockQty != null && blockQty == 2;
+        return blockQty != null && blockQty.equals(FactoryConstant.MOULD_LIMIT_COUNT);
     }
 }

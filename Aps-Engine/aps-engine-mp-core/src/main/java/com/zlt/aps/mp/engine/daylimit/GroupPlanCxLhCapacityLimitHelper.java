@@ -182,6 +182,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
         if (!day.equals(updateInfo.getDay())) {
             return;
         }
+        dayMinLhMachineCount = updateInfo.getDayMinLhMachineCount();
         maxEmbryoCodeCount = updateInfo.getMaxEmbryoCodeCount();
         maxLhMachineCount = updateInfo.getMaxLhMachineCount();
         minLhMachineInfo.putAll(updateInfo.getMinLhMachineInfo());
@@ -247,6 +248,20 @@ public class GroupPlanCxLhCapacityLimitHelper {
             return true;
         }
         return productionMouldSet.size() < minMouldNumber;
+    }
+
+    /**
+     * 判断排产硫化机台数是否低于要求的实单最低硫化机台数
+     * 最低硫化配比使用
+     *
+     * @param usedLhMachines 使用的硫化机台数
+     * @return
+     */
+    public boolean isLowMinLhMachines(int usedLhMachines) {
+        if (CollectionUtils.isEmpty(productionMouldSet)) {
+            return true;
+        }
+        return usedLhMachines < dayMinLhMachineCount;
     }
 
     /**
@@ -880,9 +895,9 @@ public class GroupPlanCxLhCapacityLimitHelper {
         }
         //最低硫化配比
         Set<String> cxMachineCodeSet = initLimitHelper.getCxMachineCodeSet();
-        if(CollectionUtils.isEmpty(cxMachineCodeSet)){
+        if (CollectionUtils.isEmpty(cxMachineCodeSet)) {
             initLimitHelper.dayMinLhMachineCount = lhRatio.getLhMachineMinQty();
-        }else{
+        } else {
             initLimitHelper.dayMinLhMachineCount = initLimitHelper.getMaxLhMachineCount() + lhRatio.getLhMachineMinQty();
         }
         initLimitHelper.getMinLhMachineInfo().put(cxMachineCode, lhRatio.getLhMachineMinQty());

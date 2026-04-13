@@ -52,6 +52,7 @@ import java.util.stream.Collectors;
 public class ProductionCxMachineCalculationHandler {
 
     private final CxAddSkuProductionHandler cxAddSkuProductionHandler;
+
     /**
      * 对在机分组进行在机机台产能分配
      * 通过模拟排产其续作部分来确定
@@ -209,6 +210,7 @@ public class ProductionCxMachineCalculationHandler {
         List<CxMachineAllocationPlanHelper> allocationList = new ArrayList<>();
         productionCxMachineCodeSet.forEach(cxMachineCode -> {
             CxMachineAllocationPlanHelper allocationHelper = buildAllocationProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo, cxMachineCode, groupPlanInfo.getTheoryDays());
+            allocationHelper.setReleasePriority(BigDecimal.ZERO.intValue());
             allocationList.add(allocationHelper);
         });
         return allocationList;
@@ -228,29 +230,30 @@ public class ProductionCxMachineCalculationHandler {
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, CxMachineBaseInfoVo> allCxMachineMap = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        List<CxMachineBaseInfoVo> cxMachineBaseInfoVoList = allCxMachineMap.values().stream().collect(Collectors.toList());
-
+        //获取在产机台信息
         List<CxMachineBaseInfoVo> onlineMachineList = new ArrayList<>();
         List<CxMachineAllocationPlanHelper> allocationList = new ArrayList<>();
         productionCxMachineCodeSet.forEach(cxMachineCode -> {
             CxMachineBaseInfoVo cxMachineInfo = allCxMachineMap.get(cxMachineCode);
-
             onlineMachineList.add(cxMachineInfo);
         });
-
         //设置机台固定信息(优先级、英寸种类数)
         onlineMachineList.stream().forEach(cxMachineInfo -> {
             cxMachineInfo.setFixedPriority(cxMachineInfo.getFixedPriorityValue(groupPlanInfo));
             cxMachineInfo.setFixedProSizeTypes(cxMachineInfo.getAllFixedProSizeTypes());
         });
-
         //根据分配信息，优先释放通用性好的（固定结构优先级差的、固定结构种类数多的） sandy+ 2026.3.26
-        onlineMachineList.sort(Comparator.comparing(CxMachineBaseInfoVo::getFixedPriority,Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(CxMachineBaseInfoVo::getFixedProSizeTypes,Comparator.nullsLast(Comparator.naturalOrder())));
-        onlineMachineList.forEach(cxMachineInfo ->{
+        onlineMachineList.sort(Comparator.comparing(CxMachineBaseInfoVo::getFixedPriority, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(CxMachineBaseInfoVo::getFixedProSizeTypes, Comparator.nullsLast(Comparator.naturalOrder())));
+        //构建分配信息，(20260410+ 并设置释放优先级)
+        int releasePriority = BigDecimal.ZERO.intValue();
+        for (CxMachineBaseInfoVo cxMachineInfo : onlineMachineList) {
             Integer allocationDays = cxMachineInfo.getMaxProductionDays();
-            allocationList.add(buildAllocationProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo, cxMachineInfo.getCxMachineCode(), allocationDays));
-        });
+            CxMachineAllocationPlanHelper allocationPlanHelper = buildAllocationProductionCxMachineResult(context, groupPlanInfo, groupContinueInfo, cxMachineInfo.getCxMachineCode(), allocationDays);
+            allocationPlanHelper.setReleasePriority(releasePriority);
+            releasePriority = releasePriority + BigDecimal.ONE.intValue();
+            allocationList.add(allocationPlanHelper);
+        }
         return allocationList;
     }
 
@@ -299,6 +302,7 @@ public class ProductionCxMachineCalculationHandler {
         Integer productionCount = productionCxMachineCodeSet.size();
         List<ProductGroupCxCapacityInfo> cxCapacityInfoList = groupContinueInfo.getCxCapacityInfoList();
         BigDecimal needCount = groupPlanInfo.getNeedCxCapacityMachineCount();
+        Integer wholeCount = needCount.setScale(BigDecimal.ZERO.intValue(), RoundingMode.DOWN).intValue();
         Integer needWholeCount = needCount.setScale(BigDecimal.ZERO.intValue(), RoundingMode.UP).intValue();
         CxContinueMachineReleaseHelper initReleaseInfo = new CxContinueMachineReleaseHelper(BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue());
         getContinueMachineRelease(context, initReleaseInfo, needWholeCount, productionCount, groupPlanInfo, groupContinueInfo);
@@ -317,7 +321,7 @@ public class ProductionCxMachineCalculationHandler {
             minAllocationDays = BigDecimal.ZERO.intValue();
         } else {
             //至少每台都需要分配最低天数
-            if(null == minAllocationDays){
+            if (null == minAllocationDays) {
                 minAllocationDays = context.getMaxProductionDays();
             }
             Integer sumMinAllocationDays = minAllocationDays * effectiveList.size();
@@ -326,6 +330,8 @@ public class ProductionCxMachineCalculationHandler {
                 leftOverSplitDays = BigDecimal.ZERO.intValue();
             }
         }
+        int releasePriority = BigDecimal.ZERO.intValue();
+        int wholeIndex = BigDecimal.ONE.intValue();
         for (ProductGroupCxCapacityInfo cxCapacityInfo : effectiveList) {
             CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfoMap.get(cxCapacityInfo.getCxMachineCode());
             Integer remainingDays = cxMachineInfo.getRemainingDays() - minAllocationDays;
@@ -334,10 +340,17 @@ public class ProductionCxMachineCalculationHandler {
             if (allocationDay <= BigDecimal.ZERO.intValue()) {
                 break;
             }
+            //20260411+ 保持整月台数
+            if (wholeCount > BigDecimal.ZERO.intValue() && wholeIndex <= wholeCount) {
+                allocationDay = cxMachineInfo.getMaxProductionDays();
+            }
+            wholeIndex = wholeIndex + BigDecimal.ONE.intValue();
             // 更新特殊材料库存
             productionContext.updateSpecialMaterialInfoMap(groupPlanInfo, allocationDay);
             groupPlanInfo.updateLeftOverNeedAllocationDays(allocationDay);
             CxMachineAllocationPlanHelper helper = CxCapacityAllocationHandler.createAllocationPlanHelper(cxMachineInfo, cxCapacityInfo, groupPlanInfo, continueSkuMap, allocationDay, ProductionConstant.MONTH_START_DAY, monthDays);
+            helper.setReleasePriority(releasePriority);
+            releasePriority = releasePriority + BigDecimal.ONE.intValue();
             cxMachineInfo.addAllocationPlanInfo(context, helper);
             allocationList.add(helper);
             leftOverSplitDays = leftOverSplitDays - leftOverAllocationDay;
@@ -451,10 +464,10 @@ public class ProductionCxMachineCalculationHandler {
             return cxCapacityInfoList;
         }
         //根据分配信息，优先释放通用性好的（固定结构优先级差的、固定结构种类数多的），配比大的，成型编号大的 sandy+ 2026.3.26
-        cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getFixedPriority,Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(ProductGroupCxCapacityInfo::getFixedProSizeTypes,Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount,Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode,Comparator.nullsLast(Comparator.reverseOrder())));
+        cxCapacityInfoList.sort(Comparator.comparing(ProductGroupCxCapacityInfo::getFixedPriority, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ProductGroupCxCapacityInfo::getFixedProSizeTypes, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ProductGroupCxCapacityInfo::getMaxLhMachineCount, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ProductGroupCxCapacityInfo::getCxMachineCode, Comparator.nullsLast(Comparator.reverseOrder())));
 
         Integer releaseCount = initReleaseInfo.getReleaseMachineCount();
         if (releaseCount <= BigDecimal.ZERO.intValue()) {

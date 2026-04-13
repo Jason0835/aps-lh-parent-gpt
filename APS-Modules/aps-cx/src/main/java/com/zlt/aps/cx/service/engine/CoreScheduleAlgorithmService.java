@@ -51,9 +51,9 @@ public interface CoreScheduleAlgorithmService {
     @lombok.Data
     class DailyEmbryoTask {
         /** 胎胚编码 */
+        private String embryoCode;
+        /** 物料编码（成品物料编码，用于判断主销产品） */
         private String materialCode;
-        /** 物料编号（成品物料编码，用于判断主销产品） */
-        private String relatedMaterialCode;
         /** 物料描述 */
         private String materialDesc;
         /** 主物料描述（胎胚描述） */
@@ -118,12 +118,11 @@ public interface CoreScheduleAlgorithmService {
         // ==================== S5.2 排程分类与余量计算新增字段 ====================
         /** 硫化任务ID（用于关联 materialStockMap） */
         private Long lhId;
-        /** 分配的胎胚库存（按硫化任务ID分配） */
-        private Integer allocatedStock;
-        /** 待排产量 = (日硫化量 - 库存) × (1 + 损耗率) + 异常平摊 */
+        /** 待排产量 = (日硫化量 - 库存) × (1 + 损耗率) */
         private Integer plannedProduction;
         /** 需要的车数 = 待排产量 / 胎面整车条数 */
         private Integer requiredCars;
+        
 
         // ==================== S5.3 开停产处理新增字段 ====================
         /** 开产班次产能（首班只排6小时） */
@@ -144,8 +143,10 @@ public interface CoreScheduleAlgorithmService {
         private Boolean endingAbandoned;
         /** 舍弃数量 */
         private Integer endingAbandonedQty;
-        /** 多做的库存量（主销产品按整车下时） */
+        /** 最终需要生产的量 */
         private Integer endingExtraInventory;
+        /** 机台小时产能（条/小时） */
+        private Integer hourCapacity;
 
         // ==================== 新增任务排序相关字段 ====================
         /** 月计划优先级 */

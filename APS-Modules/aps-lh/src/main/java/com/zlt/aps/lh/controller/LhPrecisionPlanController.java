@@ -143,9 +143,9 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
      */
     @ApiOperation("从MES同步数据生成硫化精度初版计划")
     @PostMapping("/generateFromMes")
-    public AjaxResult generatePlansFromMes() {
+    public AjaxResult generatePlansFromMes(@RequestParam("year") Integer year) {
         try {
-            int count = lhPrecisionPlanService.generatePlansFromMes();
+            int count = lhPrecisionPlanService.generatePlansFromMes(year);
             return AjaxResult.success("生成成功", count);
         } catch (Exception e) {
             log.error("从MES同步数据生成硫化精度计划失败", e);

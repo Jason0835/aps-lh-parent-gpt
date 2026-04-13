@@ -663,7 +663,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 是否收尾
      */
-    @Excel(name = "ui.data.column.lhScheduleResult.isEnd", dictType = "biz_yes_no")
+    @Excel(name = "ui.data.column.lhScheduleResult.isEnd", dictType = "biz_end_type")
     @ApiModelProperty(value = "是否收尾", name = "isEnd")
     @TableField(value = "IS_END")
     private String isEnd;

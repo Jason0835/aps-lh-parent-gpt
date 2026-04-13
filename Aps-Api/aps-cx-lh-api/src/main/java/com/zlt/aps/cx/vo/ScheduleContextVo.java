@@ -1,16 +1,18 @@
 package com.zlt.aps.cx.vo;
 
-import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
+import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.*;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.config.CxStructurePriority;
+import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
+import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
-import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
-import com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig;
-import com.zlt.aps.mp.api.domain.entity.*;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -87,19 +89,6 @@ public class ScheduleContextVo {
      */
     private List<MdmMoldingMachine> availableMachines;
 
-    /**
-     * 机台结构产能配置列表
-     * 用于获取机台-结构维度的小时产能、班次产能
-     */
-    private List<CxMachineStructureCapacity> machineStructureCapacities;
-
-    /**
-     * 机台结构产能映射（快速查询用）
-     * Key: 机台编码_结构编码
-     * Value: 产能配置
-     */
-    private Map<String, CxMachineStructureCapacity> machineCapacityMap;
-
     // ==================== 任务来源数据 ====================
 
     /**
@@ -112,7 +101,7 @@ public class ScheduleContextVo {
      * 成型在机信息列表（续作判断）
      * 从T_MDM_CX_MACHINE_ONLINE_INFO获取当前机台正在做的胎胚
      */
-    private List<MdmCxMachineOnlineInfo> onlineInfos;
+    private List<CxMachineOnlineInfo> onlineInfos;
 
     /**
      * 机台在机胎胚映射（快速查询用）
@@ -120,6 +109,13 @@ public class ScheduleContextVo {
      * Value: 该机台正在做的胎胚编码集合
      */
     private Map<String, Set<String>> machineOnlineEmbryoMap;
+
+    /**
+     * 机台机型映射（快速查询用）
+     * Key: 机台编码
+     * Value: 机型编码（cxMachineTypeCode）
+     */
+    private Map<String, String> machineTypeCodeMap;
 
     /**
      * 固定机台配置列表
@@ -158,7 +154,7 @@ public class ScheduleContextVo {
      * 结构整车配置列表
      * 用于获取每个结构的整车胎面条数(TREAD_COUNT)
      */
-    private List<MdmStructureTreadConfig> structureTreadConfigs;
+    private List<CxStructureTreadConfig> structureTreadConfigs;
 
     /**
      * 结构整车配置映射（快速查询用）
@@ -169,7 +165,7 @@ public class ScheduleContextVo {
      * 结构班产配置列表（整车条数）
      * 按结构+班次定义的标准产能
      */
-    private List<MdmStructureTreadConfig> structureShiftCapacities;
+    private List<CxStructureTreadConfig> structureShiftCapacities;
 
     /**
      * 结构优先级配置列表
@@ -281,14 +277,6 @@ public class ScheduleContextVo {
     // ==================== 算法可配置参数 ====================
 
     /**
-     * 波浪比例（班次分配比例）
-     * 按夜班:早班:中班顺序配置
-     * 默认 {1, 2, 1} 表示夜班:早班:中班 = 1:2:1
-     * 实际使用时会根据班次顺序重新映射
-     */
-    private int[] waveRatio;
-
-    /**
      * 机台种类上限
      * 默认4种
      */
@@ -384,19 +372,19 @@ public class ScheduleContextVo {
      * 硫化余量(PLAN_SURPLUS_QTY)已由系统计算好（总计划量 - 硫化真实完成量）
      * 用于计算收尾余量：收尾余量 = 硫化余量 - 胎胚库存
      */
-    private List<MdmMonthSurplus> monthSurplusList;
+    private List<com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> monthSurplusList;
 
     /**
      * 月度计划余量映射（物料编码 -> 余量信息）
      * 快速查询用
      */
-    private Map<String, MdmMonthSurplus> monthSurplusMap;
+    private Map<String, com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> monthSurplusMap;
 
     /**
      * SKU排产分类列表
      * 用于判断是否为主销产品（SCHEDULE_TYPE='01'表示主销产品，月均销量>=500条）
      */
-    private List<MdmSkuScheduleCategory> skuScheduleCategories;
+    private List<com.zlt.aps.mp.api.domain.entity.MdmSkuScheduleCategory> skuScheduleCategories;
 
     /**
      * 主销产品编码集合
@@ -447,7 +435,7 @@ public class ScheduleContextVo {
     public Map<String, Integer> getStructureTreadCountMap() {
         Map<String, Integer> map = new HashMap<>();
         if (structureShiftCapacities != null) {
-            for (MdmStructureTreadConfig config : structureShiftCapacities) {
+            for (CxStructureTreadConfig config : structureShiftCapacities) {
                 if (config.getStructureCode() != null && config.getTreadCount() != null) {
                     map.put(config.getStructureCode(), config.getTreadCount());
                 }

@@ -3,7 +3,7 @@ package com.zlt.aps.controller.lh;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.lh.api.service.ILhRepairCapsuleRemoteService;
-import com.zlt.aps.mdm.api.domain.entity.MdmLhRepairCapsule;
+import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +25,7 @@ public class LhRepairCapsuleUIController {
     @RequiresPermissions("lh:lhRepairCapsule:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list( MdmLhRepairCapsule query) {
+    public TableDataInfo list(LhRepairCapsule query) {
         return iLhRepairCapsuleService.list(query);
     }
 

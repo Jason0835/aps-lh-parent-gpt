@@ -33,9 +33,10 @@ public interface ILhPrecisionPlanService extends IDocService<LhPrecisionPlan> {
     /**
      * 从MES同步数据生成硫化精度初版计划
      *
+     * @param year 年份
      * @return 生成数量
      */
-    int generatePlansFromMes();
+    int generatePlansFromMes(Integer year);
 
     /**
      * 自动生成年度硫化精度计划

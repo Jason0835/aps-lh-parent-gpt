@@ -1370,28 +1370,29 @@ public class ProductionPlanGroupInfo {
             GroupPlanCxLhCapacityLimitHelper dayLimit = GroupPlanCxLhCapacityLimitHelper.buildByContinueCxMachineAllocation(context, productionDay, dayConfigurationList);
             dayLimitInfo.put(productionDay, dayLimit);
         });
-        //如果没有
-        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
-            dayProductionLimitInfo = dayLimitInfo;
-            return;
-        }
-        dayLimitInfo.forEach((productionDay, dayLimit) -> {
-            GroupPlanCxLhCapacityLimitHelper old = dayProductionLimitInfo.get(productionDay);
-            if (null == old) {
-                dayProductionLimitInfo.put(productionDay, dayLimit);
-                return;
-            }
-            old.updateInfo(dayLimit);
-        });
-        //如果没有，则需要移除
-        Set<Integer> removeDay = new HashSet<>();
-        dayProductionLimitInfo.forEach((productionDay, dayLimit) -> {
-            if (dayLimitInfo.containsKey(productionDay)) {
-                return;
-            }
-            removeDay.add(productionDay);
-        });
-        dayProductionLimitInfo.keySet().removeIf(new ArrayList<>(removeDay)::contains);
+        dayProductionLimitInfo = dayLimitInfo;
+//        //如果没有
+//        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
+//            dayProductionLimitInfo = dayLimitInfo;
+//            return;
+//        }
+//        dayLimitInfo.forEach((productionDay, dayLimit) -> {
+//            GroupPlanCxLhCapacityLimitHelper old = dayProductionLimitInfo.get(productionDay);
+//            if (null == old) {
+//                dayProductionLimitInfo.put(productionDay, dayLimit);
+//                return;
+//            }
+//            old.updateInfo(dayLimit);
+//        });
+//        //如果没有，则需要移除
+//        Set<Integer> removeDay = new HashSet<>();
+//        dayProductionLimitInfo.forEach((productionDay, dayLimit) -> {
+//            if (dayLimitInfo.containsKey(productionDay)) {
+//                return;
+//            }
+//            removeDay.add(productionDay);
+//        });
+//        dayProductionLimitInfo.keySet().removeIf(new ArrayList<>(removeDay)::contains);
     }
 
     /**

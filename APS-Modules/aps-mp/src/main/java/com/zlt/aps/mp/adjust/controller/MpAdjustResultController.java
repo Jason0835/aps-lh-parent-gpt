@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustResultService;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +22,9 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 
@@ -71,15 +75,39 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
             return;
         }
         List<MpAdjustResult> mpAdjustResultList = (List<MpAdjustResult>) rows;
+
+        // 主花纹的最大型腔数
+        Map<String, Integer> maxMouldCavityQtyMap = new HashMap<>();
+        for (MpAdjustResult adjustResult: mpAdjustResultList) {
+            //记录主花纹的最大型腔数
+            Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(adjustResult.getMainPattern(), 0);
+            maxMouldCavityQtyMap.put(adjustResult.getMainPattern(), Math.max(maxMouldCavityQty, adjustResult.getMouldCavityQty()));
+        }
+        mpAdjustResultList.stream().forEach(s -> { // 设置对应的最大型腔数和最大活块数
+            s.setMaxMouldCavityQty(maxMouldCavityQtyMap.getOrDefault(s.getMainPattern(), 0));
+        });
+
         Collections.sort(mpAdjustResultList, getSortComparator());
+        // 集合逗号分隔字段升序排序
+        CommaFieldSortUtil.sortAndUpdateCommaField(mpAdjustResultList, MpAdjustResult::getCxMachineCode, MpAdjustResult::setCxMachineCode);
+
     }
 
     protected Comparator<MpAdjustResult> getSortComparator() {
         // 一级排序：结构名称升序，空值排最后
-        return Comparator.comparing(MpAdjustResult::getStructureName, Comparator.nullsLast(String::compareTo))
+        return Comparator.comparing(MpAdjustResult::getTbrProSize, Comparator.nullsLast(String::compareTo))
+                .thenComparing(MpAdjustResult::getStructureName,Comparator.nullsLast(String::compareTo))
+                // 最大型腔数
+                .thenComparing(MpAdjustResult::getMaxMouldCavityQty, Comparator.reverseOrder())
+                // 主花纹
+                .thenComparing(MpAdjustResult::getMainPattern, Comparator.nullsLast(String::compareTo))
+                // 活块数
+                .thenComparing(MpAdjustResult::getTypeBlockQty, Comparator.reverseOrder())
+                // 物料描述
+                .thenComparing(MpAdjustResult::getMaterialDesc, Comparator.nullsLast(String::compareTo));
                 // 二级排序：负数排前 -> 正数次之 -> 0（含null）最后，同组内绝对值从大到小
                 // 负数排前，非负数整体在后
-                .thenComparing(vo -> {
+                /*.thenComparing(vo -> {
                     // null统一视为0
                     Integer qty = Optional.ofNullable(vo.getTotalPlanQty()).orElse(0);
                     // 负数返回0，非负数返回1，升序实现负数排前
@@ -95,7 +123,7 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
                 .thenComparing(vo -> {
                     Integer qty = Optional.ofNullable(vo.getTotalPlanQty()).orElse(0);
                     return Math.abs(qty);
-                }, Comparator.reverseOrder());
+                }, Comparator.reverseOrder());*/
 
     }
 
