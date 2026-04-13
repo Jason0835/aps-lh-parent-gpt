@@ -90,7 +90,9 @@ export default {
   },
   computed: {
     title() {
-      return this.$t("ui.data.column.cxPrecisionPlan.modelName");
+      return this.isEdit
+        ? this.$t("common.button.edit")
+        : this.$t("common.button.add");
     },
     columns() {
       return [
@@ -200,8 +202,10 @@ export default {
       } else {
         this.isEdit = false;
         this.form = {
+          factoryCode: "116",
           estimatedHours: 0,
         };
+        this.getMachineList();
       }
     },
     hide() {
@@ -230,7 +234,7 @@ export default {
       const machine = this.machineList.find((item) => item.cxMachineCode === val);
       if (machine) {
         this.$set(this.form, "machineCode", machine.cxMachineCode);
-        this.$set(this.form, "machineName", machine.cxMachineCode);
+        this.$set(this.form, "machineName", machine.machineName || machine.cxMachineCode);
       }
     },
     handlePlanStartTimeChange(val) {

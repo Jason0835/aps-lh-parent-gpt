@@ -62,3 +62,21 @@ export function exportCxPrecisionPlan(query, fileName) {
     responseType: 'blob'
   })
 }
+
+// 从MES同步数据
+export function syncFromMes(year) {
+  return request({
+    url: '/cx/cxPrecisionPlan/generateFromMes',
+    method: 'post',
+    params: { year: year }
+  })
+}
+
+// 自动生成年度计划
+export function autoGeneratePlans(year) {
+  return request({
+    url: '/cx/cxPrecisionPlan/autoGenerateYearly',
+    method: 'post',
+    params: { year: year }
+  })
+}
