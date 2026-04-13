@@ -21,7 +21,7 @@
         <module>aps-engine-tm-core</module>
         <module>aps-engine-cd15-core</module>
         <module>aps-engine-cd90-core</module>
-        <module>aps-engine-cx-core</module>
+<!--        <module>aps-engine-cx-core</module>-->
         <module>aps-engine-gdyy-core</module>
         <module>aps-engine-gsq-core</module>
         <module>aps-engine-nc-core</module>
@@ -29,7 +29,7 @@
         <module>aps-engine-tq-core</module>
         <module>aps-engine-xwyy-core</module>
         <module>aps-engine-tm</module>
-        <module>aps-engine-cx</module>
+<!--        <module>aps-engine-cx</module>-->
         <module>aps-engine-tc</module>
         <module>aps-engine-nc</module>
         <module>aps-engine-cd15</module>
