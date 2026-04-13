@@ -350,15 +350,19 @@ public class SupplementCxMachineDistributionHandler {
         if (refundDay >= realAllocationDays) {
             return null;
         }
-        //前结构延长天数
-        if (refundDay > BigDecimal.ZERO.intValue()) {
-            ProductGroupCxCapacityInfo lhRatioInfo = addPlanGroup.getLhRatioByCxMachine(selectCxMachine);
-            CxMachineAllocationPlanHelper refundAllocation = CxCapacityAllocationHandler.createAllocationPlanHelper(selectCxMachine, lhRatioInfo, addPlanGroup, null, refundDay, startDay, productionContext.getMonthDays());
-            selectCxMachine.updateLastAllocationPlanInfo(productionContext, refundAllocation);
-        }
         realAllocationDays = realAllocationDays - refundDay;
         ProductGroupCxCapacityInfo lhRatioInfo = addPlanGroup.getLhRatioByCxMachine(selectCxMachine);
         CxMachineAllocationPlanHelper addAllocation = CxCapacityAllocationHandler.createAllocationPlanHelper(selectCxMachine, lhRatioInfo, addPlanGroup, null, realAllocationDays, realStartDay, productionContext.getMonthDays());
+        //分配天数小于最短上机天数，又不是在末尾跳过
+        if (addAllocation.getAllocationDay() < groupMinAllocationDays && !productionContext.isProductionEndDay(addAllocation.getEndDay())) {
+            return null;
+        }
+        //前结构延长天数
+        if (refundDay > BigDecimal.ZERO.intValue()) {
+//            ProductGroupCxCapacityInfo lhRatioInfo = addPlanGroup.getLhRatioByCxMachine(selectCxMachine);
+            CxMachineAllocationPlanHelper refundAllocation = CxCapacityAllocationHandler.createAllocationPlanHelper(selectCxMachine, lhRatioInfo, addPlanGroup, null, refundDay, startDay, productionContext.getMonthDays());
+            selectCxMachine.updateLastAllocationPlanInfo(productionContext, refundAllocation);
+        }
         //计划更新剩余天数
         addPlanGroup.updateLeftOverNeedAllocationDays(realAllocationDays);
         //更新成型分配信息
