@@ -2,6 +2,8 @@ package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
+import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
+import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
@@ -20,7 +22,6 @@ import com.zlt.aps.cx.service.impl.validation.ScheduleDataValidator;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.vo.ScheduleRequestVo;
-import com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import lombok.RequiredArgsConstructor;
@@ -107,10 +108,10 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final CxStockMapper stockMapper;
     private final CxScheduleResultMapper scheduleResultMapper;
     private final CxParamConfigMapper paramConfigMapper;
-    private final MdmStructureTreadConfigMapper structureShiftCapacityMapper;
+    private final CxStructureTreadConfigMapper structureShiftCapacityMapper;
     private final CxKeyProductMapper keyProductMapper;
     private final LhScheduleResultMapper lhScheduleResultMapper;
-    private final MdmCxMachineOnlineInfoMapper onlineInfoMapper;
+    private final CxMachineOnlineInfoMapper onlineInfoMapper;
     private final CxShiftConfigMapper shiftConfigMapper;
     private final FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
     private final CxMaterialEndingMapper materialEndingMapper;
@@ -514,7 +515,7 @@ public class ScheduleServiceImpl implements ScheduleService {
      * 加载成型在机信息
      */
     private void loadOnlineInfos(ScheduleContextVo context, LocalDate scheduleDate) {
-        List<MdmCxMachineOnlineInfo> onlineInfos = onlineInfoMapper.selectByDateRange(
+        List<CxMachineOnlineInfo> onlineInfos = onlineInfoMapper.selectByDateRange(
                 scheduleDate, scheduleDate.minusDays(1));
         context.setOnlineInfos(onlineInfos);
         log.info("加载成型在机信息 {} 条", onlineInfos.size());
@@ -529,7 +530,7 @@ public class ScheduleServiceImpl implements ScheduleService {
      */
     private void buildMachineOnlineEmbryoMap(ScheduleContextVo context) {
         Map<String, Set<String>> machineOnlineEmbryoMap = new HashMap<>();
-        for (MdmCxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
+        for (CxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
             String cxCode = onlineInfo.getCxCode();
             // 组合物料编码和胎胚编码作为唯一键
             String materialCode = onlineInfo.getMesMaterialCode();
@@ -572,9 +573,9 @@ public class ScheduleServiceImpl implements ScheduleService {
      * 加载结构整车配置
      */
     private void loadStructureShiftCapacities(ScheduleContextVo context) {
-        List<MdmStructureTreadConfig> structureShiftCapacities = structureShiftCapacityMapper.selectList(
-                new LambdaQueryWrapper<MdmStructureTreadConfig>()
-                        .eq(MdmStructureTreadConfig::getIsDelete, "0"));
+        List<CxStructureTreadConfig> structureShiftCapacities = structureShiftCapacityMapper.selectList(
+                new LambdaQueryWrapper<CxStructureTreadConfig>()
+                        .eq(CxStructureTreadConfig::getIsDelete, "0"));
         context.setStructureShiftCapacities(structureShiftCapacities);
         log.info("加载结构班次产能配置 {} 条", structureShiftCapacities.size());
     }
@@ -632,14 +633,14 @@ public class ScheduleServiceImpl implements ScheduleService {
      * <p>用于按车分配的计算：需要的车数 = 待排产量 / 胎面整车条数
      */
     private void loadStructureTreadConfigs(ScheduleContextVo context) {
-        List<MdmStructureTreadConfig> treadConfigs = structureShiftCapacityMapper.selectList(
-                new LambdaQueryWrapper<MdmStructureTreadConfig>()
-                        .eq(MdmStructureTreadConfig::getIsDelete, "0"));
+        List<CxStructureTreadConfig> treadConfigs = structureShiftCapacityMapper.selectList(
+                new LambdaQueryWrapper<CxStructureTreadConfig>()
+                        .eq(CxStructureTreadConfig::getIsDelete, "0"));
         context.setStructureTreadConfigs(treadConfigs);
 
         // 构建结构-整车条数映射
         Map<String, Integer> structureTreadCountMap = new HashMap<>();
-        for (MdmStructureTreadConfig config : treadConfigs) {
+        for (CxStructureTreadConfig config : treadConfigs) {
             if (config.getStructureCode() != null && config.getTreadCount() != null) {
                 structureTreadCountMap.put(config.getStructureCode(), config.getTreadCount());
             }
@@ -1340,7 +1341,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 }
             }
 
-            List<MdmCxMachineOnlineInfo> filteredOnlineInfos = context.getOnlineInfos().stream()
+            List<CxMachineOnlineInfo> filteredOnlineInfos = context.getOnlineInfos().stream()
                     .filter(info -> {
                         // 使用物料编码 + 胎胚编码组合键
                         String materialCode = info.getMesMaterialCode();
@@ -1364,7 +1365,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         // 使用物料编码 + 胎胚编码组合键
         if (context.getOnlineInfos() != null) {
             Map<String, Set<String>> machineOnlineEmbryoMap = new HashMap<>();
-            for (MdmCxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
+            for (CxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
                 String cxCode = onlineInfo.getCxCode();
                 String materialCode = onlineInfo.getMesMaterialCode();
                 String embryoSpec = onlineInfo.getEmbryoSpec();

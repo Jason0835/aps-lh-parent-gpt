@@ -9,7 +9,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
-import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
+import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.service.IMdmMoldingMachineRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;

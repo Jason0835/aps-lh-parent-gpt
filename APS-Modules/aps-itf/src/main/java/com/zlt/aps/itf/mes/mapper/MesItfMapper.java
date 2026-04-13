@@ -5,6 +5,14 @@ import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.vo.MoldAlterPlanIssue;
 import com.zlt.aps.itf.vo.*;
 import com.zlt.aps.mp.api.domain.entity.*;
+    import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
+import com.zlt.aps.cx.api.domain.entity.CxMesStock;
+import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
+import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -63,18 +71,18 @@ public interface MesItfMapper {
     /**
      * 查询成型在机同步数据
      *
-     * @param mdmCxMachineOnlineInfo 参数
+     * @param cxMachineOnlineInfo 参数
      * @return 列表
      */
-    List<MdmCxMachineOnlineInfo> selectCxMachineOnlineSyncList(MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo);
+    List<CxMachineOnlineInfo> selectCxMachineOnlineSyncList(CxMachineOnlineInfo cxMachineOnlineInfo);
 
     /**
      * 查询硫化在机同步数据
      *
-     * @param mdmLhMachineOnlineInfo 参数
+     * @param lhMachineOnlineInfo 参数
      * @return 列表
      */
-    List<MdmLhMachineOnlineInfo> selectLhMachineOnlineSyncList(MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo);
+    List<LhMachineOnlineInfo> selectLhMachineOnlineSyncList(LhMachineOnlineInfo lhMachineOnlineInfo);
 
     /**
      * 查询设备保养计划同步数据
@@ -90,7 +98,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<LhRepairCapsule> selectLhRepairCapsuleList(AuxReqSyncDataLogs syncDataLogs);
+    List<LhRepairCapsuleVo> selectLhRepairCapsuleList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询模具清洗预警计划同步数据
@@ -98,7 +106,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<MouldCleanPlan> selectMouldCleanPlanList(AuxReqSyncDataLogs syncDataLogs);
+    List<MouldCleanPlanVo> selectMouldCleanPlanList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询结构整车胎面配置同步数据
@@ -106,7 +114,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<StructureTreadConfig> selectStructureTreadConfigList(AuxReqSyncDataLogs syncDataLogs);
+    List<StructureTreadConfigVo> selectStructureTreadConfigList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询生胎库存同步数据
@@ -114,7 +122,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<MdmMesCxStock> selectMesCxStockList(AuxReqSyncDataLogs syncDataLogs);
+    List<CxMesStock> selectMesCxStockList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询胎面库存同步数据
@@ -130,7 +138,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<MdmCxScheFinishQty> selectCxClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+    List<CxScheFinishQty> selectCxClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询硫化排程完成量同步数据
@@ -138,7 +146,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<MdmLhScheFinishQty> selectLhClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+    List<LhScheFinishQty> selectLhClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询成型排程日完成量同步数据
@@ -146,7 +154,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<MdmCxScheDayFinishQty> selectCxScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+    List<CxDayFinishQty> selectCxScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 查询硫化排程日完成量同步数据
@@ -154,7 +162,7 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<MdmLhScheDayFinishQty> selectLhScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
+    List<LhDayFinishQty> selectLhScheDayFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
      * 插入模具交替计划到中间表
@@ -170,5 +178,5 @@ public interface MesItfMapper {
      * @param syncDataLogs 参数
      * @return 列表
      */
-    List<MdmMoldAlterPlanFinish> selectMoldAlterPlanFinishList(AuxReqSyncDataLogs syncDataLogs);
+    List<LhMoldAlterPlanFinish> selectMoldAlterPlanFinishList(AuxReqSyncDataLogs syncDataLogs);
 }

@@ -73,6 +73,10 @@
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_special_material_result
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
     </delete>
 
     <delete id="deletedLastVersionByProductionVersion"

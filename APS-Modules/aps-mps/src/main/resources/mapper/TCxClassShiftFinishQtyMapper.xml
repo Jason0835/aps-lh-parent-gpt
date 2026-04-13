@@ -164,24 +164,24 @@
         IS_DELETE
     </sql>
 
-    <resultMap id="LhMesDayFinishResultMap" type="com.zlt.aps.mps.domain.TMesLhDayFinishQty">
+    <resultMap id="LhMesDayFinishResultMap" type="com.zlt.aps.lh.api.domain.entity.LhDayFinishQty">
         <id property="id" column="ID" jdbcType="DECIMAL"/>
         <result property="finishDate" column="FINISH_DATE" jdbcType="TIMESTAMP"/>
-        <result property="sapCode" column="SAP_CODE" jdbcType="VARCHAR"/>
+        <result property="materialCode" column="MATERIAL_CODE" jdbcType="VARCHAR"/>
         <result property="dayFinishQty" column="DAY_FINISH_QTY" jdbcType="DECIMAL"/>
         <result property="companyCode" column="COMPANY_CODE" jdbcType="VARCHAR"/>
         <result property="factoryCode" column="FACTORY_CODE" jdbcType="VARCHAR"/>
         <result property="remark" column="REMARK" jdbcType="VARCHAR"/>
         <result property="dataVersion" column="DATA_VERSION" jdbcType="VARCHAR"/>
-        <result property="createDate" column="CREATE_DATE" jdbcType="TIMESTAMP"/>
-        <result property="updateDate" column="UPDATE_DATE" jdbcType="TIMESTAMP"/>
+        <result property="createTime" column="CREATE_TIME" jdbcType="TIMESTAMP"/>
+        <result property="updateTime" column="UPDATE_TIME" jdbcType="TIMESTAMP"/>
         <result property="isDelete" column="IS_DELETE" jdbcType="DECIMAL"/>
     </resultMap>
 
-    <resultMap id="LhDayFinishResultMap" type="com.zlt.aps.mps.domain.TLhDayFinishQty">
+    <resultMap id="LhDayFinishResultMap" type="com.zlt.aps.lh.api.domain.entity.LhDayFinishQty">
         <id property="id" column="ID" jdbcType="DECIMAL"/>
         <result property="finishDate" column="FINISH_DATE" jdbcType="TIMESTAMP"/>
-        <result property="sapCode" column="SAP_CODE" jdbcType="VARCHAR"/>
+        <result property="materialCode" column="MATERIAL_CODE" jdbcType="VARCHAR"/>
         <result property="dayFinishQty" column="DAY_FINISH_QTY" jdbcType="DECIMAL"/>
         <result property="companyCode" column="COMPANY_CODE" jdbcType="VARCHAR"/>
         <result property="factoryCode" column="FACTORY_CODE" jdbcType="VARCHAR"/>
@@ -193,10 +193,10 @@
     </resultMap>
 
     <sql id="Lh_Day_Finish_Column_List">
-        ID,FINISH_DATE,SAP_CODE,
-        DAY_FINISH_QTY,COMPANY_CODE,FACTORY_CODE,
-        REMARK,DATA_VERSION,CREATE_DATE,
-        UPDATE_DATE,IS_DELETE
+        ID,FINISH_DATE,MATERIAL_CODE,
+        MES_MATERIAL_CODE,DAY_FINISH_QTY,COMPANY_CODE,FACTORY_CODE,
+        REMARK,DATA_VERSION,CREATE_TIME,
+        UPDATE_TIME,IS_DELETE
     </sql>
 
     <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
@@ -586,50 +586,53 @@
         <foreach collection="list" item="ITEM" separator=" union ">
             select
             #{ITEM.finishDate,jdbcType=DATE} finish_date,
-            #{ITEM.sapCode,jdbcType=VARCHAR} sap_code,
+            #{ITEM.materialCode,jdbcType=VARCHAR} material_code,
+            #{ITEM.mesMaterialCode,jdbcType=VARCHAR} mes_material_code,
             #{ITEM.dayFinishQty,jdbcType=DECIMAL} DAY_FINISH_QTY,
             #{ITEM.companyCode,jdbcType=VARCHAR} COMPANY_CODE,
             #{ITEM.factoryCode,jdbcType=VARCHAR} FACTORY_CODE,
             #{ITEM.dataVersion,jdbcType=VARCHAR} DATA_VERSION,
-            #{ITEM.createDate,jdbcType=DATE} create_date,
-            #{ITEM.updateDate,jdbcType=DATE} update_date,
+            #{ITEM.createTime,jdbcType=DATE} create_time,
+            #{ITEM.updateTime,jdbcType=DATE} update_time,
             #{ITEM.remark,jdbcType=VARCHAR} remark
             from dual
         </foreach>
         ) b ON (
         a.finish_date = b.finish_date
-        and a.sap_code = b.sap_code
+        and a.material_code = b.material_code
         and a.is_delete = '0'
         )
         WHEN MATCHED THEN
         UPDATE SET
         a.DAY_FINISH_QTY = b.DAY_FINISH_QTY,
-        a.update_date = now(),
+        a.update_time = now(),
         a.remark = b.remark
         WHEN NOT MATCHED THEN
         INSERT (
         a.id ,
         a.finish_date,
-        a.sap_code,
+        a.material_code,
+        a.mes_material_code,
         a.DAY_FINISH_QTY ,
         a.COMPANY_CODE ,
         a.FACTORY_CODE ,
         a.DATA_VERSION ,
-        a.create_date ,
-        a.update_date ,
+        a.create_time ,
+        a.update_time ,
         a.remark ,
         a.is_delete
         ) values
         (SEQ_CX_FINISH_QTY.NEXTVAL,
         b.finish_date,
-        b.sap_code,
+        b.material_code,
+        b.mes_material_code,
         b.DAY_FINISH_QTY ,
         b.COMPANY_CODE ,
         b.FACTORY_CODE ,
         b.DATA_VERSION ,
-        b.create_date ,
-        b.update_date ,
-        b.remark,
+        b.create_time ,
+        b.update_time ,
+        b.remark ,
         0
         )
     </update>
@@ -672,13 +675,13 @@
 
     <select id="selectLhDayByFinishDate"
             resultMap="LhDayFinishResultMap">
-        select sap_code, sum(DAY_FINISH_QTY) as DAY_FINISH_QTY
+        select material_code, sum(DAY_FINISH_QTY) as DAY_FINISH_QTY
         from T_LH_DAY_FINISH_QTY
         where 1=1
           and FINISH_DATE BETWEEN to_date(#{finishDate}, 'yyyy-mm' )
             and last_day( to_date(#{finishDate}, 'yyyy-mm' ) )
           and is_delete = '0'
         GROUP BY
-            sap_code
+            material_code
     </select>
 </mapper>

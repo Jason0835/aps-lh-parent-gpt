@@ -14,6 +14,7 @@ import com.zlt.aps.common.engine.service.*;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
 import com.zlt.aps.common.engine.utils.DateUtil;
 import com.zlt.aps.common.engine.utils.GenerageMapKeyUtils;
+import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.mps.common.FinishClassEnum;
 import com.zlt.aps.mps.domain.*;
 import com.zlt.aps.mps.mapper.*;
@@ -189,24 +190,24 @@ public class MesFinishServiceImpl implements MesFinishService {
     // 硫化日完成量回报
     @Override
     public AjaxResult mergeLhDayFinish(String dataVersion) {
-        List<TMesLhDayFinishQty> mesList = finishQtyMapper.getMesLhDayFinishByDataVersion(dataVersion);
+        List<LhDayFinishQty> mesList = finishQtyMapper.getMesLhDayFinishByDataVersion(dataVersion);
         if (CollectionUtil.isEmpty(mesList)) {
             return AjaxResult.error(I18nUtil.getMessage("mes.error.message.data.empty"));
         }
-        List<TLhDayFinishQty> list = new ArrayList<>();
-        for (TMesLhDayFinishQty mes : mesList) {
-            TLhDayFinishQty lh = new TLhDayFinishQty();
+        List<LhDayFinishQty> list = new ArrayList<>();
+        for (LhDayFinishQty mes : mesList) {
+            LhDayFinishQty lh = new LhDayFinishQty();
             BeanUtils.copyProperties(mes, lh);
-            lh.setCreateDate(new Date());
-            lh.setUpdateDate(new Date());
+            lh.setCreateTime(new Date());
+            lh.setUpdateTime(new Date());
             list.add(lh);
         }
         // 合并
         finishQtyMapper.mergeLhDayFinishSql(list);
         Date finishDate = list.get(0).getFinishDate();
         String finishString = DateUtil.formatMonth(finishDate);
-        List<TLhDayFinishQty> finishList = finishQtyMapper.selectLhDayByFinishDate(finishString);
-        Map<String, TLhDayFinishQty> finishMap = CollectionUtil.toMap(finishList, TLhDayFinishQty::getSapCode);
+        List<LhDayFinishQty> finishList = finishQtyMapper.selectLhDayByFinishDate(finishString);
+        Map<String, LhDayFinishQty> finishMap = CollectionUtil.toMap(finishList, LhDayFinishQty::getMaterialCode);
         // 查询旧数据
         String year = DateUtil.getYear(finishDate) + "";
         String month = DateUtil.getMonth(finishDate) + "";
@@ -216,7 +217,7 @@ public class MesFinishServiceImpl implements MesFinishService {
         List<TCxMonthPlanSurplus> oldList = cxMonthPlanSurplusService.getBySapCodeAndYearAndMonth(new ArrayList<>(finishMap.keySet()), year, month);
         if (!CollectionUtil.isEmpty(oldList)) {
             for (TCxMonthPlanSurplus old : oldList) {
-                TLhDayFinishQty lh = finishMap.get(old.getSapCode());
+                LhDayFinishQty lh = finishMap.get(old.getSapCode());
                 old.setMonthFinishQty(lh.getDayFinishQty());
                 old.setMonthRemainQty(getMonthRemainQty(old));
                 old.setUpdateTime(new Date());

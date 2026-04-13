@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhMouldCleanWarnMapper">
+
+    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.lh.api.domain.entity.LhMouldCleanWarn">
+        SELECT
+        ID,
+        LH_CODE,
+        OPER_TIME,
+        FIRST_WASH_TIME,
+        SECOND_WASH_TIME,
+        REMARK,
+        IS_DELETE,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM T_LH_MOULD_CLEAN_WARN
+        WHERE (FACTORY_CODE,LH_CODE) IN
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.factoryCode},#{lhCode})
+        </foreach>
+    </select>
+</mapper>

@@ -7,6 +7,8 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.domain.dto.ValidationResult;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhParams;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.engine.chain.DataValidationChain;
@@ -17,8 +19,6 @@ import com.zlt.aps.lh.service.ILhBaseDataService;
 import com.zlt.aps.lh.service.ILhShiftConfigService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
-import com.zlt.aps.mp.api.domain.entity.MdmLhMachineOnlineInfo;
-import com.zlt.aps.mdm.api.domain.entity.MdmLhRepairCapsule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -167,7 +167,7 @@ public class DataInitHandler extends AbsScheduleStepHandler {
 
             // 初始化在产规格（来自MES在机信息）
             if (context.getMachineOnlineInfoMap().containsKey(machineCode)) {
-                MdmLhMachineOnlineInfo onlineInfo = context.getMachineOnlineInfoMap().get(machineCode);
+                LhMachineOnlineInfo onlineInfo = context.getMachineOnlineInfoMap().get(machineCode);
                 dto.setCurrentMaterialCode(onlineInfo.getMaterialCode());
             }
 
@@ -188,7 +188,7 @@ public class DataInitHandler extends AbsScheduleStepHandler {
 
             // 初始化胶囊使用次数
             if (context.getCapsuleUsageMap().containsKey(machineCode)) {
-                MdmLhRepairCapsule capsule = context.getCapsuleUsageMap().get(machineCode);
+                LhRepairCapsule capsule = context.getCapsuleUsageMap().get(machineCode);
                 dto.setCapsuleUsageCount(capsule.getReplaceCapsuleCount() != null ? capsule.getReplaceCapsuleCount() : 0);
                 dto.setCapsuleUsageCount2(capsule.getReplaceCapsuleCount2() != null ? capsule.getReplaceCapsuleCount2() : 0);
             }

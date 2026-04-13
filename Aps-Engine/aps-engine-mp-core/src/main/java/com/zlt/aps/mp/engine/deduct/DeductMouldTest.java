@@ -14,12 +14,12 @@ public class DeductMouldTest {
         // 创建测试数据
         DeductMouldVo deductMouldVo = new DeductMouldVo();
         deductMouldVo.setMaterialCode("SKU001");
-        deductMouldVo.setTotalQty(464);
+        deductMouldVo.setTotalQty(3140);
         deductMouldVo.setRemainingQty(deductMouldVo.getTotalQty());
-        deductMouldVo.setMachinesAssigned(3);
+        deductMouldVo.setMachinesAssigned(5);
         deductMouldVo.setDailyOutputPerMachine(46);
         deductMouldVo.setStartDate(1);
-        deductMouldVo.setDeadline(7);
+        deductMouldVo.setDeadline(30);
 
         /*Set<Integer> shutDownDaySet = new HashSet<>();
         shutDownDaySet.add(5);
@@ -43,7 +43,7 @@ public class DeductMouldTest {
             System.out.println("---");
 
             // 只显示前7天详细排产
-            if (i >= 6) {
+            if (i >= 31) {
                 System.out.println("... (后续排产省略)");
                 break;
             }

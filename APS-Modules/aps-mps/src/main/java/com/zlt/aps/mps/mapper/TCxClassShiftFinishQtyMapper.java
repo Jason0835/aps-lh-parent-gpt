@@ -1,5 +1,6 @@
 package com.zlt.aps.mps.mapper;
 import java.util.Date;
+import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.mps.domain.TCxClassShiftFinishQty;
 
 import com.zlt.aps.mps.domain.*;
@@ -32,7 +33,7 @@ public interface TCxClassShiftFinishQtyMapper {
 
     List<TMesLhShiftFinishQty> getMesLhFinishByDataVersion(@Param("dataVersion") String dataVersion);
 
-    List<TMesLhDayFinishQty> getMesLhDayFinishByDataVersion(@Param("dataVersion") String dataVersion);
+    List<LhDayFinishQty> getMesLhDayFinishByDataVersion(@Param("dataVersion") String dataVersion);
 
     public void mergeCxFinishSql(List<TCxClassShiftFinishQty> list);
 
@@ -44,11 +45,11 @@ public interface TCxClassShiftFinishQtyMapper {
 
     public void mergeLhFinishSql(List<TLhClassShiftFinishQty> list);
 
-    public void mergeLhDayFinishSql(List<TLhDayFinishQty> list);
+    public void mergeLhDayFinishSql(List<LhDayFinishQty> list);
 
     List<TLhClassShiftFinishQty> selectLhByScheduleDate(@Param("scheduleMonth") String scheduleMonth);
 
-    List<TLhDayFinishQty> selectLhDayByFinishDate(@Param("finishDate") String finishDate);
+    List<LhDayFinishQty> selectLhDayByFinishDate(@Param("finishDate") String finishDate);
 }
 
 
