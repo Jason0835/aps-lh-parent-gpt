@@ -273,8 +273,7 @@ public class MonthPlanNoProductionPlanServiceImpl extends AbstractDocService<Mon
                 "MES_MATERIAL_CODE", "MATERIAL_CODE", "MATERIAL_DESC", "STRUCTURE_NAME", "PRO_SIZE", "PRODUCTION_TYPE",
                 "CONSTRUCTION_STAGE", "MAIN_MATERIAL_DESC", "LOCATION_TYPE", "BRAND", "SPECIFICATIONS", "MAIN_PATTERN",
                 "PATTERN");
-        wrapper.orderBy(true, true, "STRUCTURE_NAME", "SPECIFICATIONS", "MAIN_PATTERN", "PATTERN", "MAIN_MATERIAL_DESC", "PRO_SIZE");
-        wrapper.orderBy(true, false, "UPDATE_TIME");
+        wrapper.orderBy(true, true, "PRO_SIZE", "SPECIFICATIONS", "STRUCTURE_NAME", "MAIN_PATTERN", "PATTERN", "MAIN_MATERIAL_DESC");
         List<MonthPlanNoProductionPlan> dataList = monthPlanNoProductionPlanMapper.selectList(wrapper);
 
         // 加载月计划排产明细
