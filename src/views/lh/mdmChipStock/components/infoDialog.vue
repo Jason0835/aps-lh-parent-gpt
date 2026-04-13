@@ -99,6 +99,7 @@ export default {
           prop: "finishQty",
           label: this.$t("ui.data.column.mdmChipStock.finishQty"),
           type: "number",
+          disabled: true,
         },
         {
           prop: "remark",
@@ -115,6 +116,10 @@ export default {
     async save(params) {
       try {
         this.loading = true;
+
+        if (this.isEdit) {
+          params.finishQty = null;
+        }
 
         const res = await editMdmChipStock(params);
         this.$modal.msgSuccess(res.msg);
