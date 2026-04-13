@@ -15,8 +15,24 @@ import java.util.Date;
 /**
  * 成型排程结果表（单表结构）
  *
- * <p>每条记录代表一个成型机台+胎胚在排程周期内的8班次排产计划。
- * 不再使用主子表结构，所有班次排量直接拍平到 CLASS1~8 字段。
+ * <p>每条记录代表一个成型机台+胎胚+物料编号在排程周期内的8班次排产计划。
+ * 不再使用主子表结构，子表字段拍平到 CLASS1~8 对应的班次列中。
+ *
+ * <p>每个班次包含以下维度（原子表字段）：
+ * <ul>
+ *   <li>PLAN_QTY - 计划数</li>
+ *   <li>TRIP_NO - 车次号</li>
+ *   <li>TRIP_CAPACITY - 本车次容量（整车条数）</li>
+ *   <li>STOCK_HOURS - 库存可供硫化时长</li>
+ *   <li>SEQUENCE - 顺位</li>
+ *   <li>PLAN_START_TIME - 计划开始时间</li>
+ *   <li>PLAN_END_TIME - 计划结束时间</li>
+ *   <li>ANALYSIS_INPUT - 原因分析手工输入</li>
+ *   <li>FINISH_QTY - 完成量</li>
+ *   <li>ANALYSIS - 原因分析</li>
+ *   <li>RECIPE_TYPE - 示方书类型</li>
+ *   <li>RECIPE_NO - 示方书编号</li>
+ * </ul>
  *
  * <p>对应表：T_CX_SCHEDULE_RESULT
  *
@@ -103,6 +119,7 @@ public class CxScheduleResult extends ApsBaseEntity {
     @ApiModelProperty(value = "胎胚代码")
     @TableField("EMBRYO_CODE")
     private String embryoCode;
+
     /**
      * 主物料(胎胚描述)
      */
@@ -131,7 +148,7 @@ public class CxScheduleResult extends ApsBaseEntity {
     @TableField("PRODUCT_NUM")
     private BigDecimal productNum;
 
-    // ========== 一班 ==========
+    // ==================== 一班 ====================
     @ApiModelProperty(value = "一班计划数")
     @TableField("CLASS1_PLAN_QTY")
     private BigDecimal class1PlanQty;
@@ -156,10 +173,12 @@ public class CxScheduleResult extends ApsBaseEntity {
     @TableField("CLASS1_RECIPE_NO")
     private String class1RecipeNo;
 
-    // ========== 二班 ==========
+    // ==================== 二班 ====================
     @ApiModelProperty(value = "二班计划数")
     @TableField("CLASS2_PLAN_QTY")
     private BigDecimal class2PlanQty;
+
+
 
     @ApiModelProperty(value = "二班原因分析手工输入")
     @TableField("CLASS2_ANALYSIS_INPUT")
@@ -181,10 +200,12 @@ public class CxScheduleResult extends ApsBaseEntity {
     @TableField("CLASS2_RECIPE_NO")
     private String class2RecipeNo;
 
-    // ========== 三班 ==========
+    // ==================== 三班 ====================
     @ApiModelProperty(value = "三班计划数")
     @TableField("CLASS3_PLAN_QTY")
     private BigDecimal class3PlanQty;
+
+
 
     @ApiModelProperty(value = "三班原因分析手工输入")
     @TableField("CLASS3_ANALYSIS_INPUT")
@@ -206,10 +227,11 @@ public class CxScheduleResult extends ApsBaseEntity {
     @TableField("CLASS3_RECIPE_NO")
     private String class3RecipeNo;
 
-    // ========== 四班 ==========
+    // ==================== 四班 ====================
     @ApiModelProperty(value = "四班计划数")
     @TableField("CLASS4_PLAN_QTY")
     private BigDecimal class4PlanQty;
+
 
     @ApiModelProperty(value = "四班原因分析手工输入")
     @TableField("CLASS4_ANALYSIS_INPUT")
@@ -231,10 +253,12 @@ public class CxScheduleResult extends ApsBaseEntity {
     @TableField("CLASS4_RECIPE_NO")
     private String class4RecipeNo;
 
-    // ========== 五班 ==========
+    // ==================== 五班 ====================
     @ApiModelProperty(value = "五班计划数")
     @TableField("CLASS5_PLAN_QTY")
     private BigDecimal class5PlanQty;
+
+
 
     @ApiModelProperty(value = "五班原因分析手工输入")
     @TableField("CLASS5_ANALYSIS_INPUT")
@@ -256,10 +280,12 @@ public class CxScheduleResult extends ApsBaseEntity {
     @TableField("CLASS5_RECIPE_NO")
     private String class5RecipeNo;
 
-    // ========== 六班 ==========
+    // ==================== 六班 ====================
     @ApiModelProperty(value = "六班计划数")
     @TableField("CLASS6_PLAN_QTY")
     private BigDecimal class6PlanQty;
+
+
 
     @ApiModelProperty(value = "六班原因分析手工输入")
     @TableField("CLASS6_ANALYSIS_INPUT")
@@ -281,10 +307,11 @@ public class CxScheduleResult extends ApsBaseEntity {
     @TableField("CLASS6_RECIPE_NO")
     private String class6RecipeNo;
 
-    // ========== 七班 ==========
+    // ==================== 七班 ====================
     @ApiModelProperty(value = "七班计划数")
     @TableField("CLASS7_PLAN_QTY")
     private BigDecimal class7PlanQty;
+
 
     @ApiModelProperty(value = "七班原因分析手工输入")
     @TableField("CLASS7_ANALYSIS_INPUT")
@@ -306,10 +333,12 @@ public class CxScheduleResult extends ApsBaseEntity {
     @TableField("CLASS7_RECIPE_NO")
     private String class7RecipeNo;
 
-    // ========== 八班 ==========
+    // ==================== 八班 ====================
     @ApiModelProperty(value = "八班计划数")
     @TableField("CLASS8_PLAN_QTY")
     private BigDecimal class8PlanQty;
+
+
 
     @ApiModelProperty(value = "八班原因分析手工输入")
     @TableField("CLASS8_ANALYSIS_INPUT")
@@ -331,7 +360,7 @@ public class CxScheduleResult extends ApsBaseEntity {
     @TableField("CLASS8_RECIPE_NO")
     private String class8RecipeNo;
 
-    // ========== 其他字段 ==========
+    // ==================== 其他字段 ====================
     @ApiModelProperty(value = "收尾提示标识：0-提示收尾；1-不需要提示")
     @TableField("MARK_CLOSE_OUT_TIP")
     private String markCloseOutTip;
