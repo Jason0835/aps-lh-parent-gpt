@@ -246,38 +246,48 @@ export default {
         {
           label: this.$t("成型机台"),
           prop: "cxMachineCode",
+          align: "center",
         },
         {
           label: this.$t("硫化机台"),
           prop: "lhMachineCode",
+          align: "center",
         },
         {
           label: this.$t("物料编码"),
-          prop: "sapCode",
+          prop: "materialCode",
+          minWidth: 100,
+          align: "center",
         },
         {
           label: this.$t("物料描述"),
-          prop: "specDesc",
+          prop: "materialDesc",
+          minWidth: 350,
         },
         {
           label: this.$t("胎胚描述"),
-          prop: "embryoCodeDesc",
+          prop: "mainMaterialDesc",
+          minWidth: 350,
         },
         {
-          label: this.$t("合计成型余量"),
+          label: this.$t("成型余量"),
           prop: "cxRemainQty",
+          align: "center",
         },
         {
-          label: this.$t("合计硫化余量"),
+          label: this.$t("硫化余量"),
           prop: "lhRemainQty",
+          align: "center",
         },
         {
           label: this.$t("胎胚库存"),
           prop: "totalStock",
+          align: "center",
         },
         {
           label: this.$t("硫化班产"),
           prop: "lhClassQty",
+          align: "center",
         },
         // {
         //   label: this.$t("ui.data.column.scheduleResult.baseInfo"),
@@ -331,17 +341,19 @@ export default {
         {
           label: this.$t("一班"),
           children: [
-            {
-              prop: "class1Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class1Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class1PlanQty",
               label: this.$t("计划"),
+              align: "center",
             },
             {
               prop: "class1FinishQty",
               label: this.$t("实际"),
+              align: "center",
             },
             // {
             //   prop: "class2AvailableLhShift",
@@ -349,11 +361,12 @@ export default {
             // },
             {
               prop: "class1Analysis",
-              label: this.$t("备注"),
+              label: this.$t("原因分析"),
             },
             {
               prop: "class1RecipeType",
               label: this.$t("示方类型"),
+              align: "center",
             },
 
           ],
@@ -361,17 +374,19 @@ export default {
         {
           label: this.$t("二班"),
           children: [
-          {
-              prop: "class2Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class2Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class2PlanQty",
               label: this.$t("计划"),
+              align: "center",
             },
             {
               prop: "class2FinishQty",
               label: this.$t("实际"),
+              align: "center",
             },
             // {
             //   prop: "class2AvailableLhShift",
@@ -379,11 +394,13 @@ export default {
             // },
             {
               prop: "class2Analysis",
-              label: this.$t("备注"),
+              label: this.$t("原因分析"),
+              align: "center",
             },
             {
               prop: "class2RecipeType",
               label: this.$t("示方类型"),
+              align: "center",
             },
 
           ],
@@ -391,17 +408,19 @@ export default {
         {
           label: this.$t("三班"),
           children: [
-          {
-              prop: "class3Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class3Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class3PlanQty",
               label: this.$t("计划"),
+              align: "center",
             },
             {
               prop: "class3FinishQty",
               label: this.$t("实际"),
+              align: "center",
             },
             // {
             //   prop: "class2AvailableLhShift",
@@ -409,11 +428,13 @@ export default {
             // },
             {
               prop: "class3Analysis",
-              label: this.$t("备注"),
+              label: this.$t("原因分析"),
+              align: "center",
             },
             {
               prop: "class3RecipeType",
               label: this.$t("示方类型"),
+              align: "center",
             },
 
           ],
@@ -421,17 +442,19 @@ export default {
         {
           label: this.$t("四班"),
           children: [
-            {
-              prop: "class4Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class4Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class4PlanQty",
               label: this.$t("计划"),
+              align: "center",
             },
             {
               prop: "class4FinishQty",
               label: this.$t("实际"),
+              align: "center",
             },
             // {
             //   prop: "class2AvailableLhShift",
@@ -439,11 +462,13 @@ export default {
             // },
             {
               prop: "class4Analysis",
-              label: this.$t("备注"),
+              label: this.$t("原因分析"),
+              align: "center",
             },
             {
               prop: "class4RecipeType",
               label: this.$t("示方类型"),
+              align: "center",
             },
 
           ],
@@ -451,17 +476,19 @@ export default {
         {
           label: this.$t("五班"),
           children: [
-          {
-              prop: "class5Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class5Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class5PlanQty",
               label: this.$t("计划"),
+              align: "center",
             },
             {
               prop: "class5FinishQty",
               label: this.$t("实际"),
+              align: "center",
             },
             // {
             //   prop: "class2AvailableLhShift",
@@ -469,11 +496,13 @@ export default {
             // },
             {
               prop: "class5Analysis",
-              label: this.$t("备注"),
+              label: this.$t("原因分析"),
+              align: "center",
             },
             {
               prop: "class5RecipeType",
               label: this.$t("示方类型"),
+              align: "center",
             },
 
           ],
@@ -481,17 +510,19 @@ export default {
         {
           label: this.$t("六班"),
           children: [
-          {
-              prop: "class6Sort",
-              label: this.$t("顺序"),
-            },
+          // {
+          //     prop: "class6Sort",
+          //     label: this.$t("顺序"),
+          //   },
             {
               prop: "class6PlanQty",
               label: this.$t("计划"),
+              align: "center",
             },
             {
               prop: "class6FinishQty",
               label: this.$t("实际"),
+              align: "center",
             },
             // {
             //   prop: "class2AvailableLhShift",
@@ -499,11 +530,13 @@ export default {
             // },
             {
               prop: "class6Analysis",
-              label: this.$t("备注"),
+              label: this.$t("原因分析"),
+              align: "center",
             },
             {
               prop: "class6RecipeType",
               label: this.$t("示方类型"),
+              align: "center",
             },
 
           ],
@@ -511,17 +544,19 @@ export default {
         {
           label: this.$t("七班"),
           children: [
-            {
-              prop: "class7Sort",
-              label: this.$t("顺序"),
-            },
+            // {
+            //   prop: "class7Sort",
+            //   label: this.$t("顺序"),
+            // },
             {
               prop: "class7PlanQty",
               label: this.$t("计划"),
+              align: "center",
             },
             {
               prop: "class7FinishQty",
               label: this.$t("实际"),
+              align: "center",
             },
             // {
             //   prop: "class2AvailableLhShift",
@@ -529,11 +564,13 @@ export default {
             // },
             {
               prop: "class7Analysis",
-              label: this.$t("备注"),
+              label: this.$t("原因分析"),
+              align: "center",
             },
             {
               prop: "class7RecipeType",
               label: this.$t("示方类型"),
+              align: "center",
             },
 
           ],
@@ -541,17 +578,19 @@ export default {
         {
           label: this.$t("八班"),
           children: [
-          {
-              prop: "class8Sort",
-              label: this.$t("顺序"),
-            },
+          // {
+          //     prop: "class8Sort",
+          //     label: this.$t("顺序"),
+          //   },
             {
               prop: "class8PlanQty",
               label: this.$t("计划"),
+              align: "center",
             },
             {
               prop: "class8FinishQty",
               label: this.$t("实际"),
+              align: "center",
             },
             // {
             //   prop: "class2AvailableLhShift",
@@ -559,11 +598,13 @@ export default {
             // },
             {
               prop: "class8Analysis",
-              label: this.$t("备注"),
+              label: this.$t("原因分析"),
+              align: "center",
             },
             {
               prop: "class8RecipeType",
               label: this.$t("示方类型"),
+              align: "center",
             },
 
           ],
@@ -1108,18 +1149,18 @@ export default {
             this.$t("ui.data.column.scheduleResult.hasNullLhMachineCode")
           )
             .then(async () => {
-              const res = await publishScheduleResult(params);
-              this.$modal.msgSuccess(res.msg);
-              this.getList();
+                const res = await publishScheduleResult(params);
+                this.$modal.msgSuccess(res.msg);
+                this.getList();
             })
             .catch(() => {
               this.loading = false;
             });
         } else {
-          const res = await publishScheduleResult(params);
-          this.$modal.msgSuccess(res.msg);
+            const res = await publishScheduleResult(params);
+            this.$modal.msgSuccess(res.msg);
 
-          this.getList();
+            this.getList();
         }
       } catch (error) {
         console.error(error);
