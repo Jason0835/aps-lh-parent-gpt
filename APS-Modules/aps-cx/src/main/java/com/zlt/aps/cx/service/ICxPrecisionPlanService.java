@@ -1,7 +1,7 @@
 package com.zlt.aps.cx.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
+import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;

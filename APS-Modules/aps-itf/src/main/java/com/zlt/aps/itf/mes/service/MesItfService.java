@@ -1,8 +1,10 @@
 package com.zlt.aps.itf.mes.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.itf.vo.MesBrandDict;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.*;
 
@@ -141,18 +143,18 @@ public interface MesItfService {
     /**
      * 同步成型在机数据
      *
-     * @param mdmCxMachineOnlineInfo 参数
+     * @param cxMachineOnlineInfo 参数
      * @return 结果
      */
-    AjaxResult syncMachineOnlineInfo(MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo);
+    AjaxResult syncMachineOnlineInfo(CxMachineOnlineInfo cxMachineOnlineInfo);
 
     /**
      * 同步硫化在机数据
      *
-     * @param mdmLhMachineOnlineInfo 参数
+     * @param lhMachineOnlineInfo 参数
      * @return 结果
      */
-    AjaxResult syncLhMachineOnlineInfo(MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo);
+    AjaxResult syncLhMachineOnlineInfo(LhMachineOnlineInfo lhMachineOnlineInfo);
 
     /**
      * 同步设备保养计划

@@ -33,7 +33,18 @@
             <version>1.0.3-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
-
+        <dependency>
+            <groupId>com.zlt.aps.cx</groupId>
+            <artifactId>aps-cx-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.lh</groupId>
+            <artifactId>aps-lh-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
 
     </dependencies>
 </project>

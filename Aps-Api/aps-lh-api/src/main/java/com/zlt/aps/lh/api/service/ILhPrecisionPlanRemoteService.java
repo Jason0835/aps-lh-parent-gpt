@@ -63,11 +63,12 @@ public interface ILhPrecisionPlanRemoteService {
     /**
      * 从MES同步数据生成硫化精度初版计划
      *
+     * @param year 年份
      * @return 生成数量
      */
     @ApiOperation("从MES同步数据生成硫化精度初版计划")
     @PostMapping("/lhPrecisionPlan/generateFromMes")
-    AjaxResult generatePlansFromMes();
+    AjaxResult generatePlansFromMes(@RequestParam("year") Integer year);
 
     /**
      * 自动生成年度硫化精度计划

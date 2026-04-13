@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhMoldAlterPlanFinishMapper">
+
+    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish">
+        SELECT
+            ID,
+            LH_BATCH_NO,
+            ORDER_NO,
+            SCHEDULE_DATE,
+            LH_MACHINE_CODE,
+            LEFT_RIGHT_MOLD,
+            FACTORY_CODE
+        FROM T_LH_MOLD_ALTER_PLAN_FINISH
+        WHERE (LH_BATCH_NO, ORDER_NO, SCHEDULE_DATE, LH_MACHINE_CODE, LEFT_RIGHT_MOLD, FACTORY_CODE) IN
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.lhBatchNo}, #{item.orderNo}, #{item.scheduleDate}, #{item.lhMachineCode}, #{item.leftRightMold}, #{item.factoryCode})
+        </foreach>
+    </select>
+
+</mapper>

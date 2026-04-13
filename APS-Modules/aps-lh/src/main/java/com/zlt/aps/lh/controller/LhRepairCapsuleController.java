@@ -3,9 +3,9 @@ package com.zlt.aps.lh.controller;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.maindata.mapper.MdmLhRepairCapsuleEntityMapper;
-import com.zlt.aps.maindata.service.IMdmLhRepairCapsuleService;
-import com.zlt.aps.mdm.api.domain.entity.MdmLhRepairCapsule;
+import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
+import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
+import com.zlt.aps.lh.service.ILhRepairCapsuleService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -22,42 +22,42 @@ import java.util.List;
 @Api(tags = "APS胶囊已使用次数")
 @RestController
 @RequestMapping("/lhRepairCapsule")
-public class LhRepairCapsuleController extends AbstractDocBizController<MdmLhRepairCapsule> {
+public class LhRepairCapsuleController extends AbstractDocBizController<LhRepairCapsule> {
 
     @Autowired
-    private IMdmLhRepairCapsuleService mdmLhRepairCapsuleService;
+    private ILhRepairCapsuleService lhRepairCapsuleService;
 
     @Resource
-    private MdmLhRepairCapsuleEntityMapper mdmLhRepairCapsuleEntityMapper;
+    private LhRepairCapsuleMapper lhRepairCapsuleMapper;
 
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
-    public TableDataInfo list(@RequestBody MdmLhRepairCapsule queryVO) {
+    public TableDataInfo list(@RequestBody LhRepairCapsule queryVO) {
         return super.list(queryVO);
     }
 
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
-    public MdmLhRepairCapsule getInfo(@PathVariable("billId") Long billId) {
+    public LhRepairCapsule getInfo(@PathVariable("billId") Long billId) {
         return super.getInfo(billId);
     }
 
     @Override
-    protected List<MdmLhRepairCapsule> listExportData(MdmLhRepairCapsule obj) {
-        QueryWrapper<MdmLhRepairCapsule> wrapper = new QueryWrapper<>();
+    protected List<LhRepairCapsule> listExportData(LhRepairCapsule obj) {
+        QueryWrapper<LhRepairCapsule> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return mdmLhRepairCapsuleEntityMapper.selectList(wrapper);
+        return lhRepairCapsuleMapper.selectList(wrapper);
     }
 
     @Override
     protected IDocService getDocService() {
-        return mdmLhRepairCapsuleService;
+        return lhRepairCapsuleService;
     }
 
     @Override
-    protected void builderCondition(QueryWrapper<MdmLhRepairCapsule> queryWrapper, MdmLhRepairCapsule queryVO) {
+    protected void builderCondition(QueryWrapper<LhRepairCapsule> queryWrapper, LhRepairCapsule queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("lhCode")), "LH_CODE", queryVO.getFieldValueByFieldName("lhCode"));

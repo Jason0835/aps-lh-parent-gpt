@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+
 /**
  * 硫化精度计划定时任务
  *
@@ -24,7 +26,8 @@ public class LhPrecisionPlanTask {
     public void generateFromMes() {
         log.info("定时任务：从MES同步数据生成硫化精度计划");
         try {
-            AjaxResult result = lhPrecisionPlanRemoteService.generatePlansFromMes();
+            Integer currentYear = LocalDate.now().getYear();
+            AjaxResult result = lhPrecisionPlanRemoteService.generatePlansFromMes(currentYear);
             log.info("定时任务执行结果：{}", result.get("msg"));
         } catch (Exception e) {
             log.error("定时任务执行失败", e);

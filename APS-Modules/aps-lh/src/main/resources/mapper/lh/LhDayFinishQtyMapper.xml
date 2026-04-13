@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhDayFinishQtyMapper">
+
+    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.lh.api.domain.entity.LhDayFinishQty">
+        SELECT
+            ID,
+            FINISH_DATE,
+            MATERIAL_CODE,
+            FACTORY_CODE
+        FROM T_LH_DAY_FINISH_QTY
+        WHERE (FINISH_DATE, MATERIAL_CODE, FACTORY_CODE) IN
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.finishDate}, #{item.materialCode}, #{item.factoryCode})
+        </foreach>
+    </select>
+
+</mapper>

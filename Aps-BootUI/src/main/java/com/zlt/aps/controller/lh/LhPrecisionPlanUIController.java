@@ -149,8 +149,8 @@ public class LhPrecisionPlanUIController extends BaseController {
     @RequiresPermissions("schedule:lhPrecisionPlan:sync")
     @PostMapping("/generateFromMes")
     @ResponseBody
-    public AjaxResult generateFromMes() {
-        return lhPrecisionPlanRemoteService.generatePlansFromMes();
+    public AjaxResult generateFromMes(@RequestParam("year") Integer year) {
+        return lhPrecisionPlanRemoteService.generatePlansFromMes(year);
     }
 
     @ApiOperation("自动生成年度硫化精度计划")
