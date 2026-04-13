@@ -31,8 +31,8 @@ public class AdjustStructureOrderSorter {
 
         // 1. 全局排序：高优先级个数降序，再模具受限个数降序
         list.sort(Comparator
-                .comparingInt(AdjustStructureOrderVo::getHeightPriorityCount).reversed()
-                .thenComparingInt(AdjustStructureOrderVo::getMouldLimitCount).reversed());
+                .comparing(AdjustStructureOrderVo::getHeightPriorityCount, Comparator.reverseOrder())
+                .thenComparing(AdjustStructureOrderVo::getMouldLimitCount, Comparator.reverseOrder()));
 
         // 2. 分离普通结构和特殊结构（特殊结构已按全局规则排好序）
         List<AdjustStructureOrderVo> normals = new ArrayList<>();
