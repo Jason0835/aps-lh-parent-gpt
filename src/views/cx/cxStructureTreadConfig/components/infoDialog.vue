@@ -29,7 +29,7 @@
 </template>
 
 <script>
-import { saveMdmStructureTreadConfig } from "@/api/cx/mdmStructureTreadConfig";
+import { saveCxStructureTreadConfig } from "@/api/cx/cxStructureTreadConfig";
 
 import infoForm from "@/views/components/infoForm.vue";
 
@@ -78,13 +78,13 @@ export default {
     dialogTitle() {
       return (
         (this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add")) +
-        this.$t("ui.data.column.mdmStructureTreadConfig.modelName")
+        this.$t("ui.data.column.cxStructureTreadConfig.modelName")
       );
     },
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.mdmStructureTreadConfig.factoryCode"),
+          label: this.$t("ui.data.column.cxStructureTreadConfig.factoryCode"),
           prop: "factoryCode",
           span: 24,
           type: "select",
@@ -93,14 +93,14 @@ export default {
           required: true,
         },
         {
-          label: this.$t("ui.data.column.mdmStructureTreadConfig.structureCode"),
+          label: this.$t("ui.data.column.cxStructureTreadConfig.structureCode"),
           prop: "structureCode",
           span: 24,
           required: true,
           maxlength: 50,
         },
         {
-          label: this.$t("ui.data.column.mdmStructureTreadConfig.treadCount"),
+          label: this.$t("ui.data.column.cxStructureTreadConfig.treadCount"),
           prop: "treadCount",
           span: 24,
           type: "number",
@@ -139,7 +139,7 @@ export default {
     async save(payload) {
       try {
         this.loading = true;
-        const res = await saveMdmStructureTreadConfig(payload);
+        const res = await saveCxStructureTreadConfig(payload);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();

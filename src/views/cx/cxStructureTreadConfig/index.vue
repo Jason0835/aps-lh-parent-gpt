@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="mdmStructureTreadConfigTable"
+      tableRef="cxStructureTreadConfigTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -18,19 +18,19 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button type="primary" plain v-hasPermi="['cx:mdmStructureTreadConfig:edit']" @click="handleAdd">
+        <el-button type="primary" plain v-hasPermi="['cx:cxStructureTreadConfig:edit']" @click="handleAdd">
           {{ $t('ui.frame.btn.add') }}
         </el-button>
-        <el-button v-hasPermi="['cx:mdmStructureTreadConfig:edit']" :disabled="selection.length !== 1" @click="handleEdit(selection[0])">
+        <el-button v-hasPermi="['cx:cxStructureTreadConfig:edit']" :disabled="selection.length !== 1" @click="handleEdit(selection[0])">
           {{ $t('ui.frame.btn.update') }}
         </el-button>
-        <el-button type="danger" v-hasPermi="['cx:mdmStructureTreadConfig:remove']" :disabled="selection.length === 0" @click="handleDelete">
+        <el-button type="danger" v-hasPermi="['cx:cxStructureTreadConfig:remove']" :disabled="selection.length === 0" @click="handleDelete">
           {{ $t('ui.frame.btn.delete') }}
         </el-button>
-        <el-button v-hasPermi="['cx:mdmStructureTreadConfig:import']" @click="$refs.uploadRef.handleImport()">
+        <el-button v-hasPermi="['cx:cxStructureTreadConfig:import']" @click="$refs.uploadRef.handleImport()">
           {{ $t('ui.frame.btn.import') }}
         </el-button>
-        <el-button v-hasPermi="['cx:mdmStructureTreadConfig:export']" @click="handleExport">
+        <el-button v-hasPermi="['cx:cxStructureTreadConfig:export']" @click="handleExport">
           {{ $t('ui.frame.btn.export') }}
         </el-button>
       </template>
@@ -38,8 +38,8 @@
     <tlt-upload-form
       ref="uploadRef"
       :updateSupport="true"
-      downloadUrl="/cx/mdmStructureTreadConfig/importTemplate"
-      uploadUrl="/cx/mdmStructureTreadConfig/importData"
+      downloadUrl="/cx/cxStructureTreadConfig/importTemplate"
+      uploadUrl="/cx/cxStructureTreadConfig/importData"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
@@ -50,12 +50,12 @@
 
 <script>
 import { downloadLink } from '@/utils/request'
-import { listMdmStructureTreadConfig, removeMdmStructureTreadConfig, exportMdmStructureTreadConfig } from '@/api/cx/mdmStructureTreadConfig'
+import { listCxStructureTreadConfig, removeCxStructureTreadConfig } from '@/api/cx/cxStructureTreadConfig'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import infoDialog from './components/infoDialog.vue'
 
 export default {
-  name: 'MdmStructureTreadConfig',
+  name: 'CxStructureTreadConfig',
   components: { TltUploadForm, infoDialog },
   dicts: ['biz_factory_name'],
   provide() {
@@ -90,7 +90,7 @@ export default {
       return [
         {
           prop: 'factoryCode',
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.factoryCode'),
+          label: this.$t('ui.data.column.cxStructureTreadConfig.factoryCode'),
           type: 'select',
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
@@ -98,7 +98,7 @@ export default {
         },
         {
           prop: 'structureCode',
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.structureCode'),
+          label: this.$t('ui.data.column.cxStructureTreadConfig.structureCode'),
           placeholder: this.$t('common.rule.input'),
           type: 'input'
         }
@@ -111,7 +111,7 @@ export default {
           prop: 'factoryCode',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.factoryCode'),
+          label: this.$t('ui.data.column.cxStructureTreadConfig.factoryCode'),
           minWidth: 140,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -121,14 +121,14 @@ export default {
           prop: 'structureCode',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.structureCode'),
+          label: this.$t('ui.data.column.cxStructureTreadConfig.structureCode'),
           minWidth: 140
         },
         {
           prop: 'treadCount',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.mdmStructureTreadConfig.treadCount'),
+          label: this.$t('ui.data.column.cxStructureTreadConfig.treadCount'),
           minWidth: 140
         },
         {
@@ -147,7 +147,7 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={['cx:mdmStructureTreadConfig:edit']}
+                  v-hasPermi={['cx:cxStructureTreadConfig:edit']}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
@@ -155,7 +155,7 @@ export default {
                   {this.$t('ui.frame.btn.update')}
                 </el-button>
                 <el-button
-                  v-hasPermi={['cx:mdmStructureTreadConfig:remove']}
+                  v-hasPermi={['cx:cxStructureTreadConfig:remove']}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -180,7 +180,7 @@ export default {
       this.$confirm(this.$t('common.confirm.delete'), { type: 'warning' }).then(() => {
         const ids = row && row.id ? [row.id] : this.selection.map(r => r.id)
         this.loading = true
-        removeMdmStructureTreadConfig(ids)
+        removeCxStructureTreadConfig(ids)
           .then(res => {
             this.$modal.msgSuccess(res.msg)
             this.page.current = 1
@@ -190,7 +190,7 @@ export default {
       })
     },
     handleExport() {
-      downloadLink('/cx/mdmStructureTreadConfig/export', this.formatParams(false))
+      downloadLink('/cx/cxStructureTreadConfig/export', this.formatParams(false))
     },
     handleSearch(data) {
       this.query = data
@@ -237,7 +237,7 @@ export default {
     async getList() {
       try {
         this.loading = true
-        const res = await listMdmStructureTreadConfig(this.formatParams())
+        const res = await listCxStructureTreadConfig(this.formatParams())
         this.data = res.rows || []
         this.page.total = res.total || 0
       } finally {
