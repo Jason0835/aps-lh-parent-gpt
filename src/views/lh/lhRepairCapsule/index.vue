@@ -38,8 +38,12 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: "116",
+      },
+      query: {
+        factoryCode: "116",
+      },
     };
   },
   computed: {
@@ -117,10 +121,7 @@ export default {
           label: this.$t("ui.data.column.lhRepairCapsule.obtainTime"),
           prop: "obtainTime",
           type: "date",
-          dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
-          startPlaceholder: this.$t("common.startTime"),
-          endPlaceholder: this.$t("common.endTime"),
         },
         {
           label: this.$t("ui.data.column.lhRepairCapsule.lhCode"),
@@ -143,9 +144,10 @@ export default {
   methods: {
     handleSearch(data) {
       this.query = data;
-      if (data.obtainTime && data.obtainTime.length === 2) {
-        this.query.obtainTimeBegin = data.obtainTime[0];
-        this.query.obtainTimeEnd = data.obtainTime[1];
+      if (data.obtainTime) {
+        // Backend expects begin/end fields; single-date search maps to that day.
+        this.query.obtainTimeBegin = data.obtainTime;
+        this.query.obtainTimeEnd = data.obtainTime;
         delete this.query.obtainTime;
       } else {
         delete this.query.obtainTimeBegin;
@@ -196,6 +198,12 @@ export default {
     },
   },
   activated() {
+    this.search = {
+      factoryCode: "116",
+    };
+    this.query = {
+      factoryCode: "116",
+    };
     this.getList();
   },
 };

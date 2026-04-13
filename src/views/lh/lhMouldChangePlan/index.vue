@@ -18,12 +18,12 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button
-          type="primary"
-          plain
-          v-hasPermi="['lh:lhMouldChangePlan:edit']"
-          @click="handleAdd"
-        >{{ $t("ui.frame.btn.add") }}</el-button>
+<!--        <el-button-->
+<!--          type="primary"-->
+<!--          plain-->
+<!--          v-hasPermi="['lh:lhMouldChangePlan:edit']"-->
+<!--          @click="handleAdd"-->
+<!--        >{{ $t("ui.frame.btn.add") }}</el-button>-->
         <el-button
           v-hasPermi="['lh:lhMouldChangePlan:edit']"
           @click="handleBatchEdit"
@@ -65,7 +65,7 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule, getMachineList } from "@/api/lh/lhMouldChangePlan";
+import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule } from "@/api/lh/lhMouldChangePlan";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -116,8 +116,6 @@ export default {
         factoryCode: "116",
         scheduleDate: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
       },
-      machineSearchLoading: false,
-      machineSearchOptions: [],
     };
   },
   computed: {
@@ -290,17 +288,6 @@ export default {
         {
           label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineCode"),
           prop: "lhMachineCode",
-          type: "select",
-          dictData: this.machineSearchOptions,
-          props: {
-            label: "machineCode",
-            value: "machineCode",
-          },
-          filterable: true,
-          remote: true,
-          remoteMethod: this.remoteSearchMachineMethod,
-          loading: this.machineSearchLoading,
-          onFocus: this.handleMachineSearchFocus,
         },
         {
           label: this.$t("ui.data.column.lhMouldChangePlan.orderNo"),
@@ -339,25 +326,6 @@ export default {
       const month = String(now.getMonth() + 1).padStart(2, "0");
       const day = String(now.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
-    },
-    async remoteSearchMachineMethod(query) {
-      this.machineSearchLoading = true;
-      try {
-        const res = await getMachineList({
-          machineCode: query || "",
-          pageSize: 10,
-        });
-        this.machineSearchOptions = res.data || res || [];
-      } catch (error) {
-        console.error(error);
-      } finally {
-        this.machineSearchLoading = false;
-      }
-    },
-    handleMachineSearchFocus() {
-      if (this.machineSearchOptions.length === 0) {
-        this.remoteSearchMachineMethod("");
-      }
     },
     handleAdd() {
       if (this.$refs.infoRef) {
