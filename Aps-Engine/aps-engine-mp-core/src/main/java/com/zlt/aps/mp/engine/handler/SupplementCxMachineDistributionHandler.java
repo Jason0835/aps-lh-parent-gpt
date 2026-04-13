@@ -359,7 +359,6 @@ public class SupplementCxMachineDistributionHandler {
         }
         //前结构延长天数
         if (refundDay > BigDecimal.ZERO.intValue()) {
-//            ProductGroupCxCapacityInfo lhRatioInfo = addPlanGroup.getLhRatioByCxMachine(selectCxMachine);
             CxMachineAllocationPlanHelper refundAllocation = CxCapacityAllocationHandler.createAllocationPlanHelper(selectCxMachine, lhRatioInfo, addPlanGroup, null, refundDay, startDay, productionContext.getMonthDays());
             selectCxMachine.updateLastAllocationPlanInfo(productionContext, refundAllocation);
         }
