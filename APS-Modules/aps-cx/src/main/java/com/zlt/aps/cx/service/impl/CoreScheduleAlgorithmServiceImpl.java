@@ -12,7 +12,6 @@ import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -51,7 +50,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmService {
 
     /** taskGroupService 使用 @Lazy 延迟注入，打破循环依赖 */
@@ -66,6 +64,25 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     private final ScheduleDayTypeHelper scheduleDayTypeHelper;
     private final BalancingService balancingService;
 
+    /** 构造函数注入 */
+    @Autowired
+    public CoreScheduleAlgorithmServiceImpl(
+            @Lazy ContinueTaskProcessor continueTaskProcessor,
+            @Lazy TrialTaskProcessor trialTaskProcessor,
+            @Lazy NewTaskProcessor newTaskProcessor,
+            @Lazy ShiftScheduleService shiftScheduleService,
+            @Lazy ProductionCalculator productionCalculator,
+            ScheduleDayTypeHelper scheduleDayTypeHelper,
+            @Lazy BalancingService balancingService) {
+        this.continueTaskProcessor = continueTaskProcessor;
+        this.trialTaskProcessor = trialTaskProcessor;
+        this.newTaskProcessor = newTaskProcessor;
+        this.shiftScheduleService = shiftScheduleService;
+        this.productionCalculator = productionCalculator;
+        this.scheduleDayTypeHelper = scheduleDayTypeHelper;
+        this.balancingService = balancingService;
+    }
+
     /** 默认排程天数 */
     private static final int DEFAULT_SCHEDULE_DAYS = 3;
 
@@ -75,6 +92,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     @Override
     public List<CxScheduleResult> executeSchedule(ScheduleContextVo context) {
         log.info("开始执行排程算法，日期: {}", context.getScheduleDate());
+
+        // 预加载工作日历缓存，避免后续频繁数据库查询
+        LocalDate scheduleDate = context.getScheduleDate();
+        int scheduleDays = context.getScheduleDays() != null ? context.getScheduleDays() : DEFAULT_SCHEDULE_DAYS;
+        if (scheduleDate != null) {
+            scheduleDayTypeHelper.preloadCache(scheduleDate, scheduleDate.plusDays(scheduleDays - 1));
+        }
 
         // 使用 ScheduleServiceImpl.buildScheduleContext 中已加载的班次配置
         List<CxShiftConfig> allShiftConfigs = context.getShiftConfigList();
@@ -88,8 +112,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 .filter(c -> c.getScheduleDay() != null)
                 .collect(Collectors.groupingBy(CxShiftConfig::getScheduleDay));
 
-        // 获取排程天数
-        int scheduleDays = context.getScheduleDays() != null ? context.getScheduleDays() : DEFAULT_SCHEDULE_DAYS;
+        // 获取排程天数（已在前面定义）
+        int days = context.getScheduleDays() != null ? context.getScheduleDays() : DEFAULT_SCHEDULE_DAYS;
 
         // 收集每天的排产结果
         List<DayScheduleResult> dayResults = new ArrayList<>();
@@ -98,7 +122,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         Map<String, Set<String>> dailyMachineOnlineEmbryoMap = null;
 
         // 连续执行多天排程
-        for (int day = 1; day <= scheduleDays; day++) {
+        for (int day = 1; day <= days; day++) {
             List<CxShiftConfig> dayShifts = dayShiftMap.get(day);
             if (CollectionUtils.isEmpty(dayShifts)) {
                 log.warn("第 {} 天没有配置班次，跳过", day);
@@ -147,10 +171,38 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // ==================== 构建子表：按"胎胚+整车"维度拆分车次，计算库存可供硫化时长和顺序 ====================
         List<CxScheduleDetail> allDetails = buildScheduleDetails(context, dayResults, allShiftConfigs);
-        log.debug("子表记录构建完成，共 {} 条", allDetails.size());
+        log.info("子表记录构建完成，共 {} 条", allDetails.size());
+
+        // ==================== 将子表明细关联到主表 ====================
+        associateDetailsToResults(allResults, allDetails);
 
         log.info("排程算法执行完成，共 {} 天，总机台数: {}", scheduleDays, allResults.size());
         return allResults;
+    }
+
+    /**
+     * 将子表明细关联到主表结果
+     * <p>匹配规则：机台编码 + 胎胚代码 一致
+     */
+    private void associateDetailsToResults(List<CxScheduleResult> allResults, List<CxScheduleDetail> allDetails) {
+        if (allDetails.isEmpty()) {
+            return;
+        }
+
+        // 按 机台+胎胚 分组子表
+        Map<String, List<CxScheduleDetail>> detailGroupMap = allDetails.stream()
+                .collect(Collectors.groupingBy(d -> d.getCxMachineCode() + "|" + d.getEmbryoCode()));
+
+        int matched = 0;
+        for (CxScheduleResult result : allResults) {
+            String key = result.getCxMachineCode() + "|" + result.getEmbryoCode();
+            List<CxScheduleDetail> details = detailGroupMap.get(key);
+            if (details != null) {
+                result.setDetails(details);
+                matched += details.size();
+            }
+        }
+        log.info("子表关联主表完成：子表 {} 条，成功关联 {} 条", allDetails.size(), matched);
     }
 
     /**
@@ -237,6 +289,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setMainMaterialDesc(taskAlloc.getMainMaterialDesc());
                 task.setStructureName(taskAlloc.getStructureName());
                 task.setPlannedProduction(taskAlloc.getQuantity());
+                task.setEndingExtraInventory(taskAlloc.getQuantity()); // 用于班次精排判断
                 task.setIsTrialTask(taskAlloc.getIsTrialTask());
                 task.setIsEndingTask(taskAlloc.getIsEndingTask());
                 task.setIsContinueTask(taskAlloc.getIsContinueTask());
@@ -249,6 +302,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 int tripCapacity = productionCalculator.getTripCapacity(taskAlloc.getStructureName(), context);
                 int cars = tripCapacity > 0 ? (int) Math.ceil((double) taskAlloc.getQuantity() / tripCapacity) : 0;
                 task.setRequiredCars(cars);
+
+                // 调试日志
+                log.info("班次精排调试: embryo={}, quantity={}, tripCapacity={}, cars={}, endingExtra={}",
+                        taskAlloc.getEmbryoCode(), taskAlloc.getQuantity(), tripCapacity, cars, task.getEndingExtraInventory());
 
                 List<ShiftScheduleService.ShiftProductionResult> taskShiftResults =
                         shiftScheduleService.scheduleTaskToShifts(task, machineCode, context, dayShifts, scheduleDateForShift);
@@ -833,9 +890,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             regularTrips.sort((a, b) -> {
                 int classA = classFieldOrder.getOrDefault(a.getClassField(), 99);
                 int classB = classFieldOrder.getOrDefault(b.getClassField(), 99);
-                if (classA != classB) {
-                    return Integer.compare(classA, classB);
-                }
+                if (classA != classB) return Integer.compare(classA, classB);
                 return Double.compare(a.getStockHours().doubleValue(), b.getStockHours().doubleValue());
             });
 
@@ -1413,9 +1468,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // Step 1: 减去每条硫化任务的当天硫化消耗
         for (LhScheduleResult lhResult : lhResults) {
-            if (lhResult.getId() == null) {
-                continue;
-            }
+            if (lhResult.getId() == null) continue;
             String taskKey = String.valueOf(lhResult.getId());
             Integer consumption = vulcanizingConsumptionByLhId.get(lhResult.getId());
             if (consumption != null && consumption > 0) {
@@ -1439,9 +1492,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         for (Map.Entry<String, Integer> entry : formingOutputMap.entrySet()) {
             String embryoCode = entry.getKey();
             int formingOutput = entry.getValue();
-            if (formingOutput <= 0) {
-                continue;
-            }
+            if (formingOutput <= 0) continue;
 
             List<LhScheduleResult> relatedTasks = embryoToLhMap.get(embryoCode);
             if (relatedTasks == null || relatedTasks.isEmpty()) {
