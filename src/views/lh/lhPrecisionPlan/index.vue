@@ -19,17 +19,17 @@
     >
       <template slot="header">
         <el-button
+          v-hasPermi="['lh:lhPrecisionPlan:edit']"
+          @click="handleBatchEdit"
+          :disabled="selection.length !== 1"
+          >{{ $t("ui.frame.btn.update") }}</el-button
+        >
+        <el-button
           type="primary"
           plain
           v-hasPermi="['lh:lhPrecisionPlan:sync']"
           @click="handleSyncFromMes"
           >{{ $t("ui.lh.precision.plan.sync.from.mes") }}</el-button
-        >
-        <el-button
-          v-hasPermi="['lh:lhPrecisionPlan:edit']"
-          @click="handleBatchEdit"
-          :disabled="selection.length !== 1"
-          >{{ $t("ui.frame.btn.update") }}</el-button
         >
         <el-button
           type="danger"

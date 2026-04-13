@@ -203,6 +203,20 @@ export default {
           minWidth: 120
         },
         {
+          prop: 'cycleDays',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxPrecisionPlan.cycleDays'),
+          minWidth: 100
+        },
+        {
+          prop: 'scheduleDate',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxPrecisionPlan.scheduleDate'),
+          minWidth: 120
+        },
+        {
           prop: 'remark',
           halign: 'center',
           label: this.$t('ui.common.column.remark'),
