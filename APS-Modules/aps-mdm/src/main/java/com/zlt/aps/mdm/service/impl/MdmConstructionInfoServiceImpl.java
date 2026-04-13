@@ -1,21 +1,28 @@
 package com.zlt.aps.mdm.service.impl;
 
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmConstructionInfo;
+import com.zlt.aps.mdm.api.service.IRemoteImportErrorLogService;
+import com.zlt.aps.mdm.api.service.IRemoteImportLogService;
 import com.zlt.aps.mdm.service.IMdmConstructionInfoService;
+import com.zlt.aps.mdm.utils.RemoteImportExcelUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -34,6 +41,13 @@ import java.util.Map;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstructionInfo>  implements IMdmConstructionInfoService {
+
+    @Autowired
+    private IRemoteImportLogService iRemoteImportLogService;
+
+    @Autowired
+    private IRemoteImportErrorLogService iRemoteImportErrorLogService;
+
     @Override
     protected String getDocTypeCode() {
         return "MDM0124";
@@ -67,5 +81,24 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
         importDocEntity.setMaterialCode(importDocEntity.getSpecCode());
         importDocEntity.setMesMaterialCode(importDocEntity.getSpecCode());
         return result;
+    }
+
+    @Async
+    @Override
+    public void importDataAsync(List<MdmConstructionInfo> list, boolean updateSupport, long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes) {
+        try {
+            RequestContextHolder.setRequestAttributes(attributes, true);
+
+            AjaxResult result = this.importData(list, updateSupport, importLogId);
+            Date endTime = DateUtils.getNowDate();
+            importLog.setRowCount(list.size());
+            importLog.setBeginTime(beginTime);
+            importLog.setEndTime(endTime);
+            importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+            RemoteImportExcelUtils.updateImportLogAndFormatMsg(importLog, result, iRemoteImportLogService);
+            RemoteImportExcelUtils.saveImportErrorLogs(result, iRemoteImportErrorLogService);
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
     }
 }
