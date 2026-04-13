@@ -30,10 +30,7 @@
 
 <script>
 import { mapState } from "vuex";
-
-// import { editCxSpecifyMachine } from "@/api/cx/cxSpecifyMachine";
-import { editProductMoldingLimit } from "@/api/mdm/productMoldingLimit";
-
+import { savePrecisionPlan } from "@/api/lh/precisionPlan";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
@@ -47,45 +44,17 @@ export default {
       editType: null,
       form: {},
       rules: {
-        硫化机台: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        精度类型: [
+        planDate: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
-        计划日期: [
+        actualDate: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "change",
-          },
-        ],
-        实际日期: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "change",
-          },
-        ],
-        lineType: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        jobType: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
@@ -104,44 +73,69 @@ export default {
     columns() {
       return [
         {
-          prop: "硫化机台",
-          label: this.$t("硫化机台"),
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.lhPrecisionPlan.factoryCode"),
           type: "select",
+          dicData: this.parentDict.biz_factory_name,
+          disabled: true,
         },
-
         {
-          prop: "精度类型",
-          label: this.$t("精度类型"),
+          prop: "machineCode",
+          label: this.$t("ui.data.column.lhPrecisionPlan.machineCode"),
+          disabled: true,
+        },
+        {
+          prop: "precisionType",
+          label: this.$t("ui.data.column.lhPrecisionPlan.precisionType"),
           type: "select",
+          dicData: this.parentDict.MACHINE_ACCURACY_TYPE,
+          disabled: true,
         },
         {
-          prop: "计划日期",
-          label: this.$t("计划日期"),
+          prop: "planDate",
+          label: this.$t("ui.data.column.lhPrecisionPlan.planDate"),
           type: "date",
+          disabled: false,
         },
         {
-          prop: "实际日期",
-          label: this.$t("实际日期"),
+          prop: "actualDate",
+          label: this.$t("ui.data.column.lhPrecisionPlan.actualDate"),
           type: "date",
+          disabled: false,
         },
         {
-          prop: "备注",
-          label: this.$t("备注"),
+          prop: "dueDate",
+          label: this.$t("ui.data.column.lhPrecisionPlan.dueDate"),
+          disabled: true,
+        },
+        {
+          prop: "daysToDue",
+          label: this.$t("ui.data.column.lhPrecisionPlan.daysToDue"),
+          disabled: true,
+        },
+        {
+          prop: "dataSource",
+          label: this.$t("ui.data.column.lhPrecisionPlan.dataSource"),
+          type: "select",
+          dicData: this.parentDict.lh_precision_data_source,
+          disabled: true,
+        },
+        {
+          prop: "remark",
+          label: this.$t("ui.data.column.remark"),
+          disabled: false,
         },
       ];
     },
   },
   methods: {
-    // api
     async save(params) {
       try {
         this.loading = true;
-
-        const res = await editProductMoldingLimit(params);
+        const res = await savePrecisionPlan(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
-
         this.loading = false;
       } catch (error) {
         console.log(error);
@@ -149,7 +143,6 @@ export default {
       }
     },
 
-    //utils
     show(data) {
       this.visible = true;
       if (data) {
@@ -166,7 +159,6 @@ export default {
     hide() {
       this.form = {};
       this.$refs.form.triggerResetForm();
-      // this.resetForm("infoForm");
       this.isEdit = false;
       this.visible = false;
     },

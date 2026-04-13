@@ -19,9 +19,12 @@
     >
       <template slot="header">
         <el-button
-          v-hasPermi="['lh:mouldCleanPlan:import']"
-          @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
+          type="primary"
+          plain
+          v-hasPermi="['lh:mouldCleanPlan:edit']"
+          :disabled="selection.length !== 1"
+          @click="handleEdit(selection[0])"
+          >{{ $t("ui.frame.btn.edit") }}</el-button
         >
 
         <el-button
@@ -39,16 +42,6 @@
       </template>
     </page-table>
 
-    <tlt-upload-form
-      ref="tltUpload"
-      :updateSupport="true"
-      downloadUrl="/lh/mouldCleanPlan/importTemplate"
-      uploadUrl="/lh/mouldCleanPlan/importData"
-      @uploadSuccess="getList"
-      labelWidth="0"
-      :columns="importColumns"
-    ></tlt-upload-form>
-
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -63,16 +56,14 @@ import {
   removeMouldCleanPlan,
   syncFromWarn
 } from "@/api/lh/mouldCleanPlan";
-import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 //components
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "MdmMouldCleanPlan",
+  name: "LhMouldCleanPlan",
   components: {
-    infoDialog,
-    TltUploadForm
+    infoDialog
   },
   dicts: ["biz_factory_name", "lh_machine", "MOULD_CLEAN_TYPE"],
   provide() {
@@ -82,22 +73,6 @@ export default {
   },
   data() {
     return {
-      importColumns: [
-        {
-          label: "",
-          prop: "updateSupport",
-          render: (form) => {
-            return (
-              <el-checkbox
-                label={this.$t("common.rule.updateSupport")}
-                v-model={form.updateSupport}
-              >
-                {this.$t("common.rule.updateSupport")}
-              </el-checkbox>
-            );
-          },
-        },
-      ],
       loading: false,
       data: [],
       selection: [],
@@ -139,6 +114,11 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.MOULD_CLEAN_TYPE, value);
           },
+        },
+        {
+          prop: "leftRightMould",
+          label: this.$t("ui.data.column.mouldCleanPlan.leftRightMould"),
+          width: 100
         },
         {
           prop: "remark",
@@ -336,12 +316,18 @@ export default {
     },
   },
   created() {
-    let defaultParams = {};
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const defaultDate = `${year}-${month}-${day}`;
+    
     this.search = {
-      ...defaultParams,
+      cleanTime: [defaultDate, defaultDate]
     };
     this.query = {
-      ...defaultParams,
+      cleanTimeBegin: defaultDate,
+      cleanTimeEnd: defaultDate
     };
     this.getList();
   },

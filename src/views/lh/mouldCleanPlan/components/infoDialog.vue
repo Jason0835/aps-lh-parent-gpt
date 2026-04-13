@@ -89,6 +89,7 @@ export default {
           label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
+          disabled: this.isEdit,
         },
         {
           prop: "lhCode",
@@ -102,6 +103,7 @@ export default {
           filterable: true,
           loading: this.machineLoading,
           onFocus: this.handleMachineFocus,
+          disabled: this.isEdit,
         },
         {
           prop: "cleanTime",
@@ -114,6 +116,7 @@ export default {
           label: this.$t("ui.data.column.mouldCleanPlan.cleanType"),
           type: "select",
           dictData: this.parentDict.type.MOULD_CLEAN_TYPE,
+          disabled: this.isEdit,
         },
         {
           prop: "remark",

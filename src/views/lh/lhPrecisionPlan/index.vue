@@ -21,31 +21,31 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['schedule:lhPrecisionPlan:sync']"
+          v-hasPermi="['lh:lhPrecisionPlan:sync']"
           @click="handleSyncFromMes"
           >{{ $t("ui.lh.precision.plan.sync.from.mes") }}</el-button
         >
         <el-button
-          v-hasPermi="['schedule:lhPrecisionPlan:edit']"
+          v-hasPermi="['lh:lhPrecisionPlan:edit']"
           @click="handleBatchEdit"
           :disabled="selection.length !== 1"
           >{{ $t("ui.frame.btn.update") }}</el-button
         >
         <el-button
           type="danger"
-          v-hasPermi="['schedule:lhPrecisionPlan:remove']"
+          v-hasPermi="['lh:lhPrecisionPlan:remove']"
           :disabled="selection.length == 0"
           @click="handleDeleteAll"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <el-button
-          v-hasPermi="['schedule:lhPrecisionPlan:import']"
+          v-hasPermi="['lh:lhPrecisionPlan:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
         <el-button
           @click="handleExport"
-          v-hasPermi="['schedule:lhPrecisionPlan:export']"
+          v-hasPermi="['lh:lhPrecisionPlan:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
@@ -207,7 +207,7 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["lh:precisionPlan:edit"]}
+                  v-hasPermi={["lh:lhPrecisionPlan:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
@@ -215,7 +215,7 @@ export default {
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["lh:precisionPlan:remove"]}
+                  v-hasPermi={["lh:lhPrecisionPlan:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
