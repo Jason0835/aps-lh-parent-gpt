@@ -2192,7 +2192,7 @@
   "ui.data.column.createBy": "创建人",
   "ui.data.column.createTime": "创建时间",
   "ui.data.column.updateTime": "更新时间",
-  "ui.data.column.lhRepairCapsule.modelName": "APS胶囊已使用次数",
+  "ui.data.column.lhRepairCapsule.modelName": "胶囊已使用次数",
   "ui.data.column.lhRepairCapsule.obtainTime": "获取日期",
   "ui.data.column.lhRepairCapsule.lhCode": "硫化机台",
   "ui.data.column.lhRepairCapsule.materialCode": "物料编码",

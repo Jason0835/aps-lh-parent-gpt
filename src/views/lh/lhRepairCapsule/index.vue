@@ -17,11 +17,18 @@
       :showSummary="false"
       :selectArea="false"
     >
+      <template slot="header">
+        <el-button
+          @click="handleExport"
+          v-hasPermi="['lh:lhRepairCapsule:export']"
+        >{{ $t("ui.frame.btn.export") }}</el-button>
+      </template>
     </page-table>
   </basic-container>
 </template>
 
 <script>
+import { downloadLink } from "@/utils/request";
 import { listLhRepairCapsule } from "@/api/lh/lhRepairCapsule";
 
 export default {
@@ -175,13 +182,18 @@ export default {
     handleSelectionChange(rows) {
       this.selection = rows;
     },
-    formatParams() {
+    handleExport() {
+      downloadLink("/lh/lhRepairCapsule/export", this.formatParams(false));
+    },
+    formatParams(hasPage = true) {
       const params = {
         ...this.query,
         ...this.sort,
-        pageSize: this.page.pageSize,
-        pageNum: this.page.current,
       };
+      if (hasPage) {
+        params.pageSize = this.page.pageSize;
+        params.pageNum = this.page.current;
+      }
       return params;
     },
     async getList() {

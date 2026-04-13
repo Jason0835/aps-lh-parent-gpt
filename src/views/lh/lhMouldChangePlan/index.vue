@@ -18,12 +18,12 @@
       :selectArea="false"
     >
       <template slot="header">
-<!--        <el-button-->
-<!--          type="primary"-->
-<!--          plain-->
-<!--          v-hasPermi="['lh:lhMouldChangePlan:edit']"-->
-<!--          @click="handleAdd"-->
-<!--        >{{ $t("ui.frame.btn.add") }}</el-button>-->
+        <el-button
+          type="primary"
+          plain
+          v-hasPermi="['lh:lhMouldChangePlan:edit']"
+          @click="handleAdd"
+        >{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button
           v-hasPermi="['lh:lhMouldChangePlan:edit']"
           @click="handleBatchEdit"
@@ -47,7 +47,7 @@
            type="success"
            v-hasPermi="['lh:lhMouldChangePlan:issue']"
            @click="handleIssueSchedule"
-           :disabled="selection.length == 0"
+           :disabled="!canIssueSchedule"
          >{{ $t("ui.data.btn.lhMouldChangePlan.issueSchedule") }}</el-button>
        </template>
     </page-table>
@@ -65,7 +65,7 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule } from "@/api/lh/lhMouldChangePlan";
+import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule, issueScheduleByQuery } from "@/api/lh/lhMouldChangePlan";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -318,6 +318,9 @@ export default {
         },
       ];
     },
+    canIssueSchedule() {
+      return (this.selection && this.selection.length > 0) || !!(this.query && this.query.scheduleDate);
+    },
   },
   methods: {
     getTodayDate() {
@@ -421,15 +424,20 @@ export default {
             }
         },
         handleIssueSchedule() {
-            if (!this.selection || this.selection.length === 0) {
-                this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+            const hasSelection = this.selection && this.selection.length > 0;
+            if (!hasSelection && !(this.query && this.query.scheduleDate)) {
+                this.$modal.msgWarning(this.$t("ui.message.param.error"));
                 return;
             }
+
             this.$confirm(this.$t("ui.data.alert.lhMouldChangePlan.issueConfirm"), {
                 type: "warning",
             }).then(() => {
-                const ids = this.selection.map((item) => item.id);
-                issueSchedule(ids).then((res) => {
+                const request = hasSelection
+                  ? issueSchedule(this.selection.map((item) => item.id))
+                  : issueScheduleByQuery({ ...this.query });
+
+                request.then((res) => {
                     this.$modal.msgSuccess(res.msg);
                     this.$set(this.page, "current", 1);
                     this.getList();

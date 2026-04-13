@@ -44,3 +44,11 @@ export function issueSchedule(ids) {
     params: { ids: ids.join(',') }
   })
 }
+
+export function issueScheduleByQuery(query) {
+  return request({
+    url: '/lh/lhMouldChangePlan/issueScheduleByQuery',
+    method: 'post',
+    data: query
+  })
+}
