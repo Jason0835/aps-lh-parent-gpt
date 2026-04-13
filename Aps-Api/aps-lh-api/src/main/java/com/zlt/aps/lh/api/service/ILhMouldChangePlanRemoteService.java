@@ -83,4 +83,11 @@ public interface ILhMouldChangePlanRemoteService {
     @PostMapping("/lhMouldChangePlan/issueSchedule")
     AjaxResult issueSchedule(@RequestBody List<Long> ids);
 
+    /**
+     * 按查询条件排程发布（仅支持单日排程日期）
+     */
+    @ApiOperation("按查询条件排程发布")
+    @PostMapping("/lhMouldChangePlan/issueScheduleByQuery")
+    AjaxResult issueScheduleByQuery(@RequestBody LhMouldChangePlan queryVO);
+
 }
