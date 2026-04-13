@@ -20,20 +20,26 @@ import com.zlt.aps.itf.scm.service.ScmItfService;
 import com.zlt.aps.itf.vo.*;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
-import com.zlt.aps.maindata.mapper.MdmCxScheFinishQtyEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmLhScheFinishQtyEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmCxScheDayFinishQtyEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmLhScheDayFinishQtyEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmMoldAlterPlanFinishEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmProductModelRelationService;
 import com.zlt.aps.maindata.service.IMdmSkuStructureRefService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
-import com.zlt.aps.mdm.api.domain.entity.MdmLhRepairCapsule;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
-import com.zlt.aps.mdm.api.domain.entity.MdmMouldCleanWarn;
-import com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
+import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
+import com.zlt.aps.cx.api.domain.entity.CxMesStock;
+import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
+import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
+import com.zlt.aps.lh.api.domain.entity.LhMouldCleanWarn;
+import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish;
+import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
+import com.zlt.aps.lh.api.service.ILhMesSyncRemoteService;
+
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
@@ -70,16 +76,6 @@ public class MesItfServiceImpl implements MesItfService {
     private MdmMouldShellInfoEntityMapper mouldShellInfoEntityMapper;
 
     @Autowired
-    private MdmCxScheFinishQtyEntityMapper cxScheFinishQtyEntityMapper;
-    @Autowired
-    private MdmLhScheFinishQtyEntityMapper lhScheFinishQtyEntityMapper;
-    @Autowired
-    private MdmCxScheDayFinishQtyEntityMapper cxScheDayFinishQtyEntityMapper;
-    @Autowired
-    private MdmLhScheDayFinishQtyEntityMapper lhScheDayFinishQtyEntityMapper;
-    @Autowired
-    private MdmMoldAlterPlanFinishEntityMapper moldAlterPlanFinishEntityMapper;
-    @Autowired
     private BaseDao baseDao;
     @Autowired
     private IFactoryParamService iFactoryParamService;
@@ -91,13 +87,11 @@ public class MesItfServiceImpl implements MesItfService {
     private MdmDevMaintenancePlanEntityMapper devMaintenancePlanEntityMapper;
 
     @Autowired
-    private MdmLhRepairCapsuleEntityMapper lhRepairCapsuleEntityMapper;
+    private ICxMesSyncRemoteService cxMesSyncRemoteService;
 
     @Autowired
-    private MdmMouldCleanPlanEntityMapper mouldCleanPlanEntityMapper;
+    private ILhMesSyncRemoteService lhMesSyncRemoteService;
 
-    @Autowired
-    private MdmStructureTreadConfigEntityMapper structureTreadConfigEntityMapper;
 
     @Autowired
     private MdmTreadStockEntityMapper treadStockEntityMapper;
@@ -848,74 +842,66 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步成型在机数据
-     * @param mdmCxMachineOnlineInfo 参数
+     * @param cxMachineOnlineInfo 参数
      * @return 结果
      */
     @Override
-    public AjaxResult syncMachineOnlineInfo(MdmCxMachineOnlineInfo mdmCxMachineOnlineInfo) {
+    public AjaxResult syncMachineOnlineInfo(CxMachineOnlineInfo cxMachineOnlineInfo) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<MdmCxMachineOnlineInfo> syncList = mesItfMapper.selectCxMachineOnlineSyncList(mdmCxMachineOnlineInfo);
+        List<CxMachineOnlineInfo> syncList = mesItfMapper.selectCxMachineOnlineSyncList(cxMachineOnlineInfo);
         DynamicDataSourceContextHolder.poll();
 
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
+        if (CollectionUtils.isNotEmpty(syncList)) {
+            cxMesSyncRemoteService.deleteMachineOnlineInfo(cxMachineOnlineInfo.getFactoryCode());
 
-            if (CollectionUtils.isNotEmpty(syncList)) {
-                Map<String, Object> map = new HashMap<>();
-                map.put("FACTORY_CODE", mdmCxMachineOnlineInfo.getFactoryCode());
-                baseDao.deleteByMap(MdmCxMachineOnlineInfo.class, map);
-
-                for (MdmCxMachineOnlineInfo info : syncList) {
-                    info.setCreateBy("MES");
-                    info.setUpdateBy("MES");
-                    info.setCreateTime(DateUtils.getNowDate());
-                    info.setUpdateTime(DateUtils.getNowDate());
-                }
-
-                List<List<MdmCxMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-                for (List<MdmCxMachineOnlineInfo> importList : splitList) {
-                    baseDao.insertBatch(importList);
-                }
+            List<CxMachineOnlineInfo> insertList = new ArrayList<>();
+            for (CxMachineOnlineInfo info : syncList) {
+                CxMachineOnlineInfo entity = new CxMachineOnlineInfo();
+                BeanUtils.copyProperties(info, entity);
+                entity.setCreateBy("MES");
+                entity.setUpdateBy("MES");
+                entity.setCreateTime(DateUtils.getNowDate());
+                entity.setUpdateTime(DateUtils.getNowDate());
+                insertList.add(entity);
             }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+
+            List<List<CxMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(insertList, 1000);
+            for (List<CxMachineOnlineInfo> importList : splitList) {
+                cxMesSyncRemoteService.saveMachineOnlineInfoBatch(importList);
+            }
         }
         return AjaxResult.success();
     }
 
     /**
      * 同步硫化在机数据
-     * @param mdmLhMachineOnlineInfo 参数
+     * @param lhMachineOnlineInfo 参数
      * @return 结果
      */
     @Override
-    public AjaxResult syncLhMachineOnlineInfo(MdmLhMachineOnlineInfo mdmLhMachineOnlineInfo) {
+    public AjaxResult syncLhMachineOnlineInfo(LhMachineOnlineInfo lhMachineOnlineInfo) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<MdmLhMachineOnlineInfo> syncList = mesItfMapper.selectLhMachineOnlineSyncList(mdmLhMachineOnlineInfo);
+        List<LhMachineOnlineInfo> syncList = mesItfMapper.selectLhMachineOnlineSyncList(lhMachineOnlineInfo);
         DynamicDataSourceContextHolder.poll();
 
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
+        if (CollectionUtils.isNotEmpty(syncList)) {
+            lhMesSyncRemoteService.deleteMachineOnlineInfo(lhMachineOnlineInfo.getFactoryCode());
 
-            if (CollectionUtils.isNotEmpty(syncList)) {
-                Map<String, Object> map = new HashMap<>();
-                map.put("FACTORY_CODE", mdmLhMachineOnlineInfo.getFactoryCode());
-                baseDao.deleteByMap(MdmLhMachineOnlineInfo.class, map);
-
-                for (MdmLhMachineOnlineInfo info : syncList) {
-                    info.setCreateBy("MES");
-                    info.setUpdateBy("MES");
-                    info.setCreateTime(DateUtils.getNowDate());
-                    info.setUpdateTime(DateUtils.getNowDate());
-                }
-
-                List<List<MdmLhMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-                for (List<MdmLhMachineOnlineInfo> importList : splitList) {
-                    baseDao.insertBatch(importList);
-                }
+            List<LhMachineOnlineInfo> insertList = new ArrayList<>();
+            for (LhMachineOnlineInfo info : syncList) {
+                LhMachineOnlineInfo entity = new LhMachineOnlineInfo();
+                BeanUtils.copyProperties(info, entity);
+                entity.setCreateBy("MES");
+                entity.setUpdateBy("MES");
+                entity.setCreateTime(DateUtils.getNowDate());
+                entity.setUpdateTime(DateUtils.getNowDate());
+                insertList.add(entity);
             }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+
+            List<List<LhMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(insertList, 1000);
+            for (List<LhMachineOnlineInfo> importList : splitList) {
+                lhMesSyncRemoteService.saveMachineOnlineInfoBatch(importList);
+            }
         }
         return AjaxResult.success();
     }
@@ -1023,10 +1009,10 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncMouldCleanWarn(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<MouldCleanPlan> syncList = mesItfMapper.selectMouldCleanPlanList(syncDataLogs);
+        List<MouldCleanPlanVo> syncList = mesItfMapper.selectMouldCleanPlanList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        Map<String, MouldCleanPlan> groupMap = syncList.stream()
+        Map<String, MouldCleanPlanVo> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getLhCode(),
                         Function.identity(),
@@ -1034,83 +1020,74 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
+        List<LhMouldCleanWarn> insertOrUpdateList = new ArrayList<>();
+        for (MouldCleanPlanVo item : syncList) {
+            LhMouldCleanWarn entity = new LhMouldCleanWarn();
+            entity.setLhCode(item.getLhCode());
+            entity.setFactoryCode(item.getFactoryCode());
+            entity.setCompanyCode(item.getCompanyCode());
+            entity.setDataVersion(item.getDataVersion());
+//            entity.setRemark(item.getRemark());
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
 
-            List<List<MouldCleanPlan>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-            for (List<MouldCleanPlan> saveList : splitList) {
-                List<MdmMouldCleanWarn> existsList = mouldCleanPlanEntityMapper.selectByUniqueKeyList(
-                        saveList.stream().map(item -> {
-                            MdmMouldCleanWarn plan = new MdmMouldCleanWarn();
-                            plan.setLhCode(item.getLhCode());
-                            plan.setFactoryCode(item.getFactoryCode());
-                            return plan;
-                        }).collect(Collectors.toList())
-                );
-
-                Map<String, MdmMouldCleanWarn> existsMap = new HashMap<>(16);
-                if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhCode()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
+            if (StringUtils.isNotBlank(item.getOperTime())) {
+                try {
+                    entity.setOperTime(DateUtils.parseDate(item.getOperTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss"));
+                } catch (Exception e) {
+                    log.error("解析上机时间失败：{}", item.getOperTime(), e);
                 }
-
-                List<MdmMouldCleanWarn> insertOrUpdateList = new ArrayList<>();
-                for (MouldCleanPlan item : saveList) {
-                    MdmMouldCleanWarn entity = new MdmMouldCleanWarn();
-                    entity.setLhCode(item.getLhCode());
-                    entity.setFactoryCode(item.getFactoryCode());
-                    entity.setCompanyCode(item.getCompanyCode());
-                    entity.setDataVersion(item.getDataVersion());
-                    entity.setRemark(item.getRemark());
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-
-                    if (StringUtils.isNotBlank(item.getOperTime())) {
-                        try {
-                            entity.setOperTime(DateUtils.parseDate(item.getOperTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss"));
-                        } catch (Exception e) {
-                            log.error("解析上机时间失败：{}", item.getOperTime(), e);
-                        }
-                    }
-
-                    if (StringUtils.isNotBlank(item.getFirstWashTime())) {
-                        try {
-                            entity.setFirstWashTime(DateUtils.parseDate(item.getFirstWashTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss"));
-                        } catch (Exception e) {
-                            log.error("解析首次清洗时间失败：{}", item.getFirstWashTime(), e);
-                        }
-                    }
-
-                    if (StringUtils.isNotBlank(item.getSecondWashTime())) {
-                        try {
-                            entity.setSecondWashTime(DateUtils.parseDate(item.getSecondWashTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss"));
-                        } catch (Exception e) {
-                            log.error("解析二次清洗时间失败：{}", item.getSecondWashTime(), e);
-                        }
-                    }
-
-                    if (StringUtils.isNotBlank(item.getDelFlag())) {
-                        entity.setIsDelete(Integer.valueOf(item.getDelFlag()));
-                    } else {
-                        entity.setIsDelete(0);
-                    }
-
-                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhCode());
-                    if (existsMap.containsKey(mapKey)) {
-                        MdmMouldCleanWarn existsData = existsMap.get(mapKey);
-                        entity.setId(existsData.getId());
-                    }
-                    insertOrUpdateList.add(entity);
-                }
-
-                baseDao.saveBatch(insertOrUpdateList);
             }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+
+            if (StringUtils.isNotBlank(item.getFirstWashTime())) {
+                try {
+                    entity.setFirstWashTime(DateUtils.parseDate(item.getFirstWashTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss"));
+                } catch (Exception e) {
+                    log.error("解析首次清洗时间失败：{}", item.getFirstWashTime(), e);
+                }
+            }
+
+            if (StringUtils.isNotBlank(item.getSecondWashTime())) {
+                try {
+                    entity.setSecondWashTime(DateUtils.parseDate(item.getSecondWashTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss"));
+                } catch (Exception e) {
+                    log.error("解析二次清洗时间失败：{}", item.getSecondWashTime(), e);
+                }
+            }
+
+            if (StringUtils.isNotBlank(item.getDelFlag())) {
+                entity.setIsDelete(Integer.valueOf(item.getDelFlag()));
+            } else {
+                entity.setIsDelete(0);
+            }
+
+            insertOrUpdateList.add(entity);
+        }
+
+        if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
+            List<LhMouldCleanWarn> existsList = lhMesSyncRemoteService.selectMouldCleanWarnExists(insertOrUpdateList);
+            Map<String, LhMouldCleanWarn> existsMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(existsList)) {
+                existsMap = existsList.stream()
+                        .collect(Collectors.toMap(
+                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhCode()),
+                                Function.identity(),
+                                (v1, v2) -> v1
+                        ));
+            }
+
+            for (LhMouldCleanWarn entity : insertOrUpdateList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhCode());
+                if (existsMap.containsKey(mapKey)) {
+                    LhMouldCleanWarn existsData = existsMap.get(mapKey);
+                    entity.setId(existsData.getId());
+                }
+            }
+
+            List<List<LhMouldCleanWarn>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+            for (List<LhMouldCleanWarn> saveList : splitList) {
+                lhMesSyncRemoteService.saveMouldCleanWarnBatch(saveList);
+            }
         }
         return AjaxResult.success();
     }
@@ -1124,10 +1101,10 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncLhRepairCapsule(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<LhRepairCapsule> syncList = mesItfMapper.selectLhRepairCapsuleList(syncDataLogs);
+        List<LhRepairCapsuleVo> syncList = mesItfMapper.selectLhRepairCapsuleList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        Map<String, LhRepairCapsule> groupMap = syncList.stream()
+        Map<String, LhRepairCapsuleVo> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getLhCode(),
                         Function.identity(),
@@ -1135,50 +1112,39 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
+        if (CollectionUtils.isNotEmpty(syncList)) {
+            lhMesSyncRemoteService.deleteRepairCapsule(syncDataLogs.getFactoryCode());
 
-            if (CollectionUtils.isNotEmpty(syncList)) {
-                Map<String, Object> map = new HashMap<>();
-                map.put("FACTORY_CODE", syncDataLogs.getFactoryCode());
-                baseDao.deleteByMap(MdmLhRepairCapsule.class, map);
+            List<LhRepairCapsule> insertList = new ArrayList<>();
+            for (LhRepairCapsuleVo item : syncList) {
+                LhRepairCapsule entity = new LhRepairCapsule();
+                entity.setLhCode(item.getLhCode());
+                entity.setMaterialCode(item.getMaterialCode());
+                entity.setReplaceCapsuleCount(item.getReplaceCapsuleCount());
+                entity.setReplaceCapsuleCount2(item.getReplaceCapsuleCount2());
+                entity.setBrand(item.getBrand());
+                entity.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+                entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+                entity.setCreateBy("MES");
+                entity.setUpdateBy("MES");
+                entity.setCreateTime(DateUtils.getNowDate());
+                entity.setUpdateTime(DateUtils.getNowDate());
 
-                List<MdmLhRepairCapsule> insertList = new ArrayList<>();
-                for (LhRepairCapsule item : syncList) {
-                    MdmLhRepairCapsule entity = new MdmLhRepairCapsule();
-                    entity.setLhCode(item.getLhCode());
-                    entity.setMaterialCode(item.getMaterialCode());
-                    entity.setReplaceCapsuleCount(item.getReplaceCapsuleCount());
-                    entity.setReplaceCapsuleCount2(item.getReplaceCapsuleCount2());
-                    entity.setBrand(item.getBrand());
-//                    entity.setRemark(item.getRemark());
-//                    entity.setDataVersion(item.getDataVersion());
-                    entity.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-                    entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-                    entity.setIsDelete(0);
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-                    entity.setCreateTime(DateUtils.getNowDate());
-                    entity.setUpdateTime(DateUtils.getNowDate());
-
-                    if (StringUtils.isNotBlank(item.getObtainTime())) {
-                        try {
-                            entity.setObtainTime(DateUtils.parseDate(item.getObtainTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"));
-                        } catch (Exception e) {
-                            log.error("解析获取日期失败：{}", item.getObtainTime(), e);
-                        }
+                if (StringUtils.isNotBlank(item.getObtainTime())) {
+                    try {
+                        entity.setObtainTime(DateUtils.parseDate(item.getObtainTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"));
+                    } catch (Exception e) {
+                        log.error("解析获取日期失败：{}", item.getObtainTime(), e);
                     }
-
-                    insertList.add(entity);
                 }
 
-                List<List<MdmLhRepairCapsule>> splitList = ScmListUtils.getSplitList(insertList, 1000);
-                for (List<MdmLhRepairCapsule> importList : splitList) {
-                    baseDao.insertBatch(importList);
-                }
+                insertList.add(entity);
             }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+
+            List<List<LhRepairCapsule>> splitList = ScmListUtils.getSplitList(insertList, 1000);
+            for (List<LhRepairCapsule> importList : splitList) {
+                lhMesSyncRemoteService.saveRepairCapsuleBatch(importList);
+            }
         }
         return AjaxResult.success();
     }
@@ -1192,10 +1158,10 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncStructureTreadConfig(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<StructureTreadConfig> syncList = mesItfMapper.selectStructureTreadConfigList(syncDataLogs);
+        List<StructureTreadConfigVo> syncList = mesItfMapper.selectStructureTreadConfigList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        Map<String, StructureTreadConfig> groupMap = syncList.stream()
+        Map<String, StructureTreadConfigVo> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getStructureCode(),
                         Function.identity(),
@@ -1203,65 +1169,53 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
+        List<CxStructureTreadConfig> insertOrUpdateList = new ArrayList<>();
+        for (StructureTreadConfigVo item : syncList) {
+            CxStructureTreadConfig entity = new CxStructureTreadConfig();
+            entity.setStructureCode(item.getStructureCode());
+            entity.setTreadCount(item.getTreadCount());
+            entity.setDataVersion(item.getDataVersion());
+            entity.setCompanyCode(item.getCompanyCode());
+            entity.setFactoryCode(item.getFactoryCode());
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
 
-            List<List<StructureTreadConfig>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-            for (List<StructureTreadConfig> saveList : splitList) {
-                List<MdmStructureTreadConfig> existsList = structureTreadConfigEntityMapper.selectByUniqueKeyList(
-                        saveList.stream().map(item -> {
-                            MdmStructureTreadConfig config = new MdmStructureTreadConfig();
-                            config.setStructureCode(item.getStructureCode());
-                            config.setFactoryCode(item.getFactoryCode());
-                            return config;
-                        }).collect(Collectors.toList())
-                );
-
-                Map<String, MdmStructureTreadConfig> existsMap = new HashMap<>(16);
-                if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getStructureCode()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
-                }
-
-                List<MdmStructureTreadConfig> insertOrUpdateList = new ArrayList<>();
-                for (StructureTreadConfig item : saveList) {
-                    MdmStructureTreadConfig entity = new MdmStructureTreadConfig();
-                    entity.setStructureCode(item.getStructureCode());
-                    entity.setTreadCount(item.getTreadCount());
-                    entity.setDataVersion(item.getDataVersion());
-                    entity.setCompanyCode(item.getCompanyCode());
-                    entity.setFactoryCode(item.getFactoryCode());
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-
-                    if (StringUtils.isNotBlank(item.getDelFlag())) {
-                        entity.setIsDelete(Integer.valueOf(item.getDelFlag()));
-                    } else {
-                        entity.setIsDelete(0);
-                    }
-
-                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getStructureCode());
-                    if (existsMap.containsKey(mapKey)) {
-                        MdmStructureTreadConfig existsData = existsMap.get(mapKey);
-                        entity.setId(existsData.getId());
-                    }
-                    insertOrUpdateList.add(entity);
-                }
-
-                baseDao.saveBatch(insertOrUpdateList);
+            if (StringUtils.isNotBlank(item.getDelFlag())) {
+                entity.setIsDelete(Integer.valueOf(item.getDelFlag()));
+            } else {
+                entity.setIsDelete(0);
             }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+
+            insertOrUpdateList.add(entity);
+        }
+
+        if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
+            List<CxStructureTreadConfig> existsList = cxMesSyncRemoteService.selectStructureTreadConfigExists(insertOrUpdateList);
+            Map<String, CxStructureTreadConfig> existsMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(existsList)) {
+                existsMap = existsList.stream()
+                        .collect(Collectors.toMap(
+                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getStructureCode()),
+                                Function.identity(),
+                                (v1, v2) -> v1
+                        ));
+            }
+
+            for (CxStructureTreadConfig entity : insertOrUpdateList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getStructureCode());
+                if (existsMap.containsKey(mapKey)) {
+                    CxStructureTreadConfig existsData = existsMap.get(mapKey);
+                    entity.setId(existsData.getId());
+                }
+            }
+
+            List<List<CxStructureTreadConfig>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+            for (List<CxStructureTreadConfig> saveList : splitList) {
+                cxMesSyncRemoteService.saveStructureTreadConfigBatch(saveList);
+            }
         }
         return AjaxResult.success();
     }
-
-    @Autowired
-    private MdmMesCxStockEntityMapper mesCxStockEntityMapper;
 
     /**
      * 同步生胎库存
@@ -1272,10 +1226,10 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncMesCxStock(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<MdmMesCxStock> syncList = mesItfMapper.selectMesCxStockList(syncDataLogs);
+        List<CxMesStock> syncList = mesItfMapper.selectMesCxStockList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        Map<String, MdmMesCxStock> groupMap = syncList.stream()
+        Map<String, CxMesStock> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getEmbryoCode(),
                         Function.identity(),
@@ -1283,32 +1237,24 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
+        if (CollectionUtils.isNotEmpty(syncList)) {
+            cxMesSyncRemoteService.deleteMesStock(syncDataLogs.getFactoryCode());
 
-            if (CollectionUtils.isNotEmpty(syncList)) {
-                Map<String, Object> map = new HashMap<>();
-                map.put("FACTORY_CODE", syncDataLogs.getFactoryCode());
-                baseDao.deleteByMap(MdmMesCxStock.class, map);
-
-                List<MdmMesCxStock> insertList = new ArrayList<>();
-                for (MdmMesCxStock item : syncList) {
-                    MdmMesCxStock entity = new MdmMesCxStock();
-                    BeanUtils.copyProperties(item, entity);
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-                    entity.setCreateTime(DateUtils.getNowDate());
-                    entity.setUpdateTime(DateUtils.getNowDate());
-                    insertList.add(entity);
-                }
-
-                List<List<MdmMesCxStock>> splitList = ScmListUtils.getSplitList(insertList, 1000);
-                for (List<MdmMesCxStock> importList : splitList) {
-                    baseDao.insertBatch(importList);
-                }
+            List<CxMesStock> insertList = new ArrayList<>();
+            for (CxMesStock item : syncList) {
+                CxMesStock entity = new CxMesStock();
+                BeanUtils.copyProperties(item, entity);
+                entity.setCreateBy("MES");
+                entity.setUpdateBy("MES");
+                entity.setCreateTime(DateUtils.getNowDate());
+                entity.setUpdateTime(DateUtils.getNowDate());
+                insertList.add(entity);
             }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+
+            List<List<CxMesStock>> splitList = ScmListUtils.getSplitList(insertList, 1000);
+            for (List<CxMesStock> importList : splitList) {
+                cxMesSyncRemoteService.saveMesStockBatch(importList);
+            }
         }
         return AjaxResult.success();
     }
@@ -1322,10 +1268,10 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncCxClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<MdmCxScheFinishQty> syncList = mesItfMapper.selectCxClassShiftFinishQtyList(syncDataLogs);
+        List<CxScheFinishQty> syncList = mesItfMapper.selectCxClassShiftFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        Map<String, MdmCxScheFinishQty> groupMap = syncList.stream()
+        Map<String, CxScheFinishQty> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getOrderNo() + "|" + item.getScheduleDate() + "|" + item.getCxMachineCode(),
                         Function.identity(),
@@ -1333,55 +1279,44 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
+        List<CxScheFinishQty> insertOrUpdateList = new ArrayList<>();
+        for (CxScheFinishQty item : syncList) {
+            CxScheFinishQty entity = new CxScheFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
 
-            List<List<MdmCxScheFinishQty>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-            for (List<MdmCxScheFinishQty> saveList : splitList) {
-                List<MdmCxScheFinishQty> existsList = cxScheFinishQtyEntityMapper.selectByUniqueKeyList(
-                        saveList.stream().map(item -> {
-                            MdmCxScheFinishQty qty = new MdmCxScheFinishQty();
-                            qty.setOrderNo(item.getOrderNo());
-                            qty.setScheduleDate(item.getScheduleDate());
-                            qty.setCxMachineCode(item.getCxMachineCode());
-                            qty.setFactoryCode(item.getFactoryCode());
-                            return qty;
-                        }).collect(Collectors.toList())
-                );
-
-                Map<String, MdmCxScheFinishQty> existsMap = new HashMap<>(16);
-                if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getCxMachineCode()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
-                }
-
-                List<MdmCxScheFinishQty> insertOrUpdateList = new ArrayList<>();
-                for (MdmCxScheFinishQty item : saveList) {
-                    MdmCxScheFinishQty entity = new MdmCxScheFinishQty();
-                    BeanUtils.copyProperties(item, entity);
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-
-                    if (entity.getIsDelete() == null) {
-                        entity.setIsDelete(0);
-                    }
-
-                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getCxMachineCode());
-                    if (existsMap.containsKey(mapKey)) {
-                        MdmCxScheFinishQty existsData = existsMap.get(mapKey);
-                        entity.setId(existsData.getId());
-                    }
-                    insertOrUpdateList.add(entity);
-                }
-
-                baseDao.saveBatch(insertOrUpdateList);
+            if (entity.getIsDelete() == null) {
+                entity.setIsDelete(0);
             }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+
+            insertOrUpdateList.add(entity);
+        }
+
+        if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
+            List<CxScheFinishQty> existsList = cxMesSyncRemoteService.selectScheFinishQtyExists(insertOrUpdateList);
+            Map<String, CxScheFinishQty> existsMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(existsList)) {
+                existsMap = existsList.stream()
+                        .collect(Collectors.toMap(
+                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getCxMachineCode()),
+                                Function.identity(),
+                                (v1, v2) -> v1
+                        ));
+            }
+
+            for (CxScheFinishQty entity : insertOrUpdateList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getCxMachineCode());
+                if (existsMap.containsKey(mapKey)) {
+                    CxScheFinishQty existsData = existsMap.get(mapKey);
+                    entity.setId(existsData.getId());
+                }
+            }
+
+            List<List<CxScheFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+            for (List<CxScheFinishQty> saveList : splitList) {
+                cxMesSyncRemoteService.saveScheFinishQtyBatch(saveList);
+            }
         }
         return AjaxResult.success();
     }
@@ -1395,10 +1330,10 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncLhClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<MdmLhScheFinishQty> syncList = mesItfMapper.selectLhClassShiftFinishQtyList(syncDataLogs);
+        List<LhScheFinishQty> syncList = mesItfMapper.selectLhClassShiftFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        Map<String, MdmLhScheFinishQty> groupMap = syncList.stream()
+        Map<String, LhScheFinishQty> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getOrderNo() + "|" + item.getScheduleDate() + "|" + item.getLhMachineCode(),
                         Function.identity(),
@@ -1406,55 +1341,44 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
+        List<LhScheFinishQty> insertOrUpdateList = new ArrayList<>();
+        for (LhScheFinishQty item : syncList) {
+            LhScheFinishQty entity = new LhScheFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
 
-            List<List<MdmLhScheFinishQty>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-            for (List<MdmLhScheFinishQty> saveList : splitList) {
-                List<MdmLhScheFinishQty> existsList = lhScheFinishQtyEntityMapper.selectByUniqueKeyList(
-                        saveList.stream().map(item -> {
-                            MdmLhScheFinishQty qty = new MdmLhScheFinishQty();
-                            qty.setOrderNo(item.getOrderNo());
-                            qty.setScheduleDate(item.getScheduleDate());
-                            qty.setLhMachineCode(item.getLhMachineCode());
-                            qty.setFactoryCode(item.getFactoryCode());
-                            return qty;
-                        }).collect(Collectors.toList())
-                );
-
-                Map<String, MdmLhScheFinishQty> existsMap = new HashMap<>(16);
-                if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
-                }
-
-                List<MdmLhScheFinishQty> insertOrUpdateList = new ArrayList<>();
-                for (MdmLhScheFinishQty item : saveList) {
-                    MdmLhScheFinishQty entity = new MdmLhScheFinishQty();
-                    BeanUtils.copyProperties(item, entity);
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-
-                    if (entity.getIsDelete() == null) {
-                        entity.setIsDelete(0);
-                    }
-
-                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode());
-                    if (existsMap.containsKey(mapKey)) {
-                        MdmLhScheFinishQty existsData = existsMap.get(mapKey);
-                        entity.setId(existsData.getId());
-                    }
-                    insertOrUpdateList.add(entity);
-                }
-
-                baseDao.saveBatch(insertOrUpdateList);
+            if (entity.getIsDelete() == null) {
+                entity.setIsDelete(0);
             }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+
+            insertOrUpdateList.add(entity);
+        }
+
+        if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
+            List<LhScheFinishQty> existsList = lhMesSyncRemoteService.selectScheFinishQtyExists(insertOrUpdateList);
+            Map<String, LhScheFinishQty> existsMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(existsList)) {
+                existsMap = existsList.stream()
+                        .collect(Collectors.toMap(
+                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode()),
+                                Function.identity(),
+                                (v1, v2) -> v1
+                        ));
+            }
+
+            for (LhScheFinishQty entity : insertOrUpdateList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode());
+                if (existsMap.containsKey(mapKey)) {
+                    LhScheFinishQty existsData = existsMap.get(mapKey);
+                    entity.setId(existsData.getId());
+                }
+            }
+
+            List<List<LhScheFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+            for (List<LhScheFinishQty> saveList : splitList) {
+                lhMesSyncRemoteService.saveScheFinishQtyBatch(saveList);
+            }
         }
         return AjaxResult.success();
     }
@@ -1468,10 +1392,10 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncCxScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<MdmCxScheDayFinishQty> syncList = mesItfMapper.selectCxScheDayFinishQtyList(syncDataLogs);
+        List<CxDayFinishQty> syncList = mesItfMapper.selectCxScheDayFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        Map<String, MdmCxScheDayFinishQty> groupMap = syncList.stream()
+        Map<String, CxDayFinishQty> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getFinishDate() + "|" + item.getEmbryoCode() + "|" + item.getBomDataVersion(),
                         Function.identity(),
@@ -1479,55 +1403,44 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
+        List<CxDayFinishQty> insertOrUpdateList = new ArrayList<>();
+        for (CxDayFinishQty item : syncList) {
+            CxDayFinishQty entity = new CxDayFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
 
-            List<List<MdmCxScheDayFinishQty>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-            for (List<MdmCxScheDayFinishQty> saveList : splitList) {
-                List<MdmCxScheDayFinishQty> existsList = cxScheDayFinishQtyEntityMapper.selectByUniqueKeyList(
-                        saveList.stream().map(item -> {
-                            MdmCxScheDayFinishQty qty = new MdmCxScheDayFinishQty();
-                            qty.setFinishDate(item.getFinishDate());
-                            qty.setEmbryoCode(item.getEmbryoCode());
-                            qty.setBomDataVersion(item.getBomDataVersion());
-                            qty.setFactoryCode(item.getFactoryCode());
-                            return qty;
-                        }).collect(Collectors.toList())
-                );
-
-                Map<String, MdmCxScheDayFinishQty> existsMap = new HashMap<>(16);
-                if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getEmbryoCode(), item.getBomDataVersion()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
-                }
-
-                List<MdmCxScheDayFinishQty> insertOrUpdateList = new ArrayList<>();
-                for (MdmCxScheDayFinishQty item : saveList) {
-                    MdmCxScheDayFinishQty entity = new MdmCxScheDayFinishQty();
-                    BeanUtils.copyProperties(item, entity);
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-
-                    if (entity.getIsDelete() == null) {
-                        entity.setIsDelete(0);
-                    }
-
-                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getEmbryoCode(), entity.getBomDataVersion());
-                    if (existsMap.containsKey(mapKey)) {
-                        MdmCxScheDayFinishQty existsData = existsMap.get(mapKey);
-                        entity.setId(existsData.getId());
-                    }
-                    insertOrUpdateList.add(entity);
-                }
-
-                baseDao.saveBatch(insertOrUpdateList);
+            if (entity.getIsDelete() == null) {
+                entity.setIsDelete(0);
             }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+
+            insertOrUpdateList.add(entity);
+        }
+
+        if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
+            List<CxDayFinishQty> existsList = cxMesSyncRemoteService.selectDayFinishQtyExists(insertOrUpdateList);
+            Map<String, CxDayFinishQty> existsMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(existsList)) {
+                existsMap = existsList.stream()
+                        .collect(Collectors.toMap(
+                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getEmbryoCode(), item.getBomDataVersion()),
+                                Function.identity(),
+                                (v1, v2) -> v1
+                        ));
+            }
+
+            for (CxDayFinishQty entity : insertOrUpdateList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getEmbryoCode(), entity.getBomDataVersion());
+                if (existsMap.containsKey(mapKey)) {
+                    CxDayFinishQty existsData = existsMap.get(mapKey);
+                    entity.setId(existsData.getId());
+                }
+            }
+
+            List<List<CxDayFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+            for (List<CxDayFinishQty> saveList : splitList) {
+                cxMesSyncRemoteService.saveDayFinishQtyBatch(saveList);
+            }
         }
         return AjaxResult.success();
     }
@@ -1541,10 +1454,10 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncLhScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<MdmLhScheDayFinishQty> syncList = mesItfMapper.selectLhScheDayFinishQtyList(syncDataLogs);
+        List<LhDayFinishQty> syncList = mesItfMapper.selectLhScheDayFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        Map<String, MdmLhScheDayFinishQty> groupMap = syncList.stream()
+        Map<String, LhDayFinishQty> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getFinishDate() + "|" + item.getMaterialCode() + "|" + item.getMesMaterialCode(),
                         Function.identity(),
@@ -1552,55 +1465,44 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
+        List<LhDayFinishQty> insertOrUpdateList = new ArrayList<>();
+        for (LhDayFinishQty item : syncList) {
+            LhDayFinishQty entity = new LhDayFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
 
-            List<List<MdmLhScheDayFinishQty>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-            for (List<MdmLhScheDayFinishQty> saveList : splitList) {
-                List<MdmLhScheDayFinishQty> existsList = lhScheDayFinishQtyEntityMapper.selectByUniqueKeyList(
-                        saveList.stream().map(item -> {
-                            MdmLhScheDayFinishQty qty = new MdmLhScheDayFinishQty();
-                            qty.setFinishDate(item.getFinishDate());
-                            qty.setMaterialCode(item.getMaterialCode());
-                            qty.setMesMaterialCode(item.getMesMaterialCode());
-                            qty.setFactoryCode(item.getFactoryCode());
-                            return qty;
-                        }).collect(Collectors.toList())
-                );
-
-                Map<String, MdmLhScheDayFinishQty> existsMap = new HashMap<>(16);
-                if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getMaterialCode(), item.getMesMaterialCode()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
-                }
-
-                List<MdmLhScheDayFinishQty> insertOrUpdateList = new ArrayList<>();
-                for (MdmLhScheDayFinishQty item : saveList) {
-                    MdmLhScheDayFinishQty entity = new MdmLhScheDayFinishQty();
-                    BeanUtils.copyProperties(item, entity);
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-
-                    if (entity.getIsDelete() == null) {
-                        entity.setIsDelete(0);
-                    }
-
-                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getMaterialCode(), entity.getMesMaterialCode());
-                    if (existsMap.containsKey(mapKey)) {
-                        MdmLhScheDayFinishQty existsData = existsMap.get(mapKey);
-                        entity.setId(existsData.getId());
-                    }
-                    insertOrUpdateList.add(entity);
-                }
-
-                baseDao.saveBatch(insertOrUpdateList);
+            if (entity.getIsDelete() == null) {
+                entity.setIsDelete(0);
             }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+
+            insertOrUpdateList.add(entity);
+        }
+
+        if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
+            List<LhDayFinishQty> existsList = lhMesSyncRemoteService.selectDayFinishQtyExists(insertOrUpdateList);
+            Map<String, LhDayFinishQty> existsMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(existsList)) {
+                existsMap = existsList.stream()
+                        .collect(Collectors.toMap(
+                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getMaterialCode(), item.getMesMaterialCode()),
+                                Function.identity(),
+                                (v1, v2) -> v1
+                        ));
+            }
+
+            for (LhDayFinishQty entity : insertOrUpdateList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getMaterialCode(), entity.getMesMaterialCode());
+                if (existsMap.containsKey(mapKey)) {
+                    LhDayFinishQty existsData = existsMap.get(mapKey);
+                    entity.setId(existsData.getId());
+                }
+            }
+
+            List<List<LhDayFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+            for (List<LhDayFinishQty> saveList : splitList) {
+                lhMesSyncRemoteService.saveDayFinishQtyBatch(saveList);
+            }
         }
         return AjaxResult.success();
     }
@@ -1646,10 +1548,10 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncMoldAlterPlanFinish(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        List<MdmMoldAlterPlanFinish> syncList = mesItfMapper.selectMoldAlterPlanFinishList(syncDataLogs);
+        List<LhMoldAlterPlanFinish> syncList = mesItfMapper.selectMoldAlterPlanFinishList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        Map<String, MdmMoldAlterPlanFinish> groupMap = syncList.stream()
+        Map<String, LhMoldAlterPlanFinish> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
                         item -> item.getFactoryCode() + "|" + item.getLhBatchNo() + "|" + item.getOrderNo() + "|" + item.getScheduleDate() + "|" + item.getLhMachineCode() + "|" + item.getLeftRightMold(),
                         Function.identity(),
@@ -1657,57 +1559,44 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
+        List<LhMoldAlterPlanFinish> insertOrUpdateList = new ArrayList<>();
+        for (LhMoldAlterPlanFinish item : syncList) {
+            LhMoldAlterPlanFinish entity = new LhMoldAlterPlanFinish();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
 
-            List<List<MdmMoldAlterPlanFinish>> splitList = ScmListUtils.getSplitList(syncList, 1000);
-            for (List<MdmMoldAlterPlanFinish> saveList : splitList) {
-                List<MdmMoldAlterPlanFinish> existsList = moldAlterPlanFinishEntityMapper.selectByUniqueKeyList(
-                        saveList.stream().map(item -> {
-                            MdmMoldAlterPlanFinish finish = new MdmMoldAlterPlanFinish();
-                            finish.setLhBatchNo(item.getLhBatchNo());
-                            finish.setOrderNo(item.getOrderNo());
-                            finish.setScheduleDate(item.getScheduleDate());
-                            finish.setLhMachineCode(item.getLhMachineCode());
-                            finish.setLeftRightMold(item.getLeftRightMold());
-                            finish.setFactoryCode(item.getFactoryCode());
-                            return finish;
-                        }).collect(Collectors.toList())
-                );
-
-                Map<String, MdmMoldAlterPlanFinish> existsMap = new HashMap<>(16);
-                if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhBatchNo(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode(), item.getLeftRightMold()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
-                }
-
-                List<MdmMoldAlterPlanFinish> insertOrUpdateList = new ArrayList<>();
-                for (MdmMoldAlterPlanFinish item : saveList) {
-                    MdmMoldAlterPlanFinish entity = new MdmMoldAlterPlanFinish();
-                    BeanUtils.copyProperties(item, entity);
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-
-                    if (entity.getIsDelete() == null) {
-                        entity.setIsDelete(0);
-                    }
-
-                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhBatchNo(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode(), entity.getLeftRightMold());
-                    if (existsMap.containsKey(mapKey)) {
-                        MdmMoldAlterPlanFinish existsData = existsMap.get(mapKey);
-                        entity.setId(existsData.getId());
-                    }
-                    insertOrUpdateList.add(entity);
-                }
-
-                baseDao.saveBatch(insertOrUpdateList);
+            if (entity.getIsDelete() == null) {
+                entity.setIsDelete(0);
             }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
+
+            insertOrUpdateList.add(entity);
+        }
+
+        if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
+            List<LhMoldAlterPlanFinish> existsList = lhMesSyncRemoteService.selectMoldAlterPlanFinishExists(insertOrUpdateList);
+            Map<String, LhMoldAlterPlanFinish> existsMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(existsList)) {
+                existsMap = existsList.stream()
+                        .collect(Collectors.toMap(
+                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhBatchNo(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode(), item.getLeftRightMold()),
+                                Function.identity(),
+                                (v1, v2) -> v1
+                        ));
+            }
+
+            for (LhMoldAlterPlanFinish entity : insertOrUpdateList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhBatchNo(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode(), entity.getLeftRightMold());
+                if (existsMap.containsKey(mapKey)) {
+                    LhMoldAlterPlanFinish existsData = existsMap.get(mapKey);
+                    entity.setId(existsData.getId());
+                }
+            }
+
+            List<List<LhMoldAlterPlanFinish>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+            for (List<LhMoldAlterPlanFinish> saveList : splitList) {
+                lhMesSyncRemoteService.saveMoldAlterPlanFinishBatch(saveList);
+            }
         }
         return AjaxResult.success();
     }

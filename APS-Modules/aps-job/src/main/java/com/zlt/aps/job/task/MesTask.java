@@ -1,7 +1,9 @@
 package com.zlt.aps.job.task;
 
+import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,7 +58,7 @@ public class MesTask {
      */
     @ApiOperation("同步成型在机数据")
     public void syncMachineOnlineInfo() {
-        iMesItfService.syncMachineOnlineInfo(new MdmCxMachineOnlineInfo());
+        iMesItfService.syncMachineOnlineInfo(new CxMachineOnlineInfo());
     }
 
     /**
@@ -64,7 +66,7 @@ public class MesTask {
      */
     @ApiOperation("同步硫化在机数据")
     public void syncLhMachineOnlineInfo() {
-        iMesItfService.syncLhMachineOnlineInfo(new MdmLhMachineOnlineInfo());
+        iMesItfService.syncLhMachineOnlineInfo(new LhMachineOnlineInfo());
     }
 
     /**

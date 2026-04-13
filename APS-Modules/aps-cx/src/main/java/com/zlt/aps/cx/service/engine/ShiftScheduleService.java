@@ -1,11 +1,11 @@
 package com.zlt.aps.cx.service.engine;
 
+import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
-import com.zlt.aps.mdm.api.domain.entity.MdmStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import lombok.RequiredArgsConstructor;
@@ -1189,7 +1189,7 @@ public class ShiftScheduleService {
      */
     private int getTripCapacity(String structureCode, ScheduleContextVo context) {
         if (context.getStructureShiftCapacities() != null) {
-            for (MdmStructureTreadConfig capacity : context.getStructureShiftCapacities()) {
+            for (CxStructureTreadConfig capacity : context.getStructureShiftCapacities()) {
                 if (capacity.getStructureCode() != null
                         && capacity.getStructureCode().equals(structureCode)) {
                     if (capacity.getTreadCount() != null && capacity.getTreadCount() > 0) {

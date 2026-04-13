@@ -6,7 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
+import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.mapper.CxPrecisionPlanMapper;
 import com.zlt.aps.cx.service.ICxPrecisionPlanService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
