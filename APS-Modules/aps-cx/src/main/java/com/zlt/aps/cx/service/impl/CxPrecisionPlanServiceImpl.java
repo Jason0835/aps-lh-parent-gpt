@@ -508,7 +508,7 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
             CxPrecisionPlan plan = new CxPrecisionPlan();
             plan.setMachineCode(machineCode);
             plan.setFactoryCode(mesPlan.getFactoryCode());
-            plan.setPrecisionType("成型精度");
+//            plan.setPrecisionType("成型精度");
             plan.setCycleDays(cycleDays);
 
             if (operTime != null) {
@@ -550,7 +550,7 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
 
         List<CxPrecisionPlan> lastPlans = cxPrecisionPlanMapper.selectList(
             new LambdaQueryWrapper<CxPrecisionPlan>()
-                .eq(CxPrecisionPlan::getPrecisionType, "成型精度")
+//                .eq(CxPrecisionPlan::getPrecisionType, "成型精度")
                 .eq(CxPrecisionPlan::getCycleDays, cycleDays)
                 .isNotNull(CxPrecisionPlan::getActualDate)
                 .eq(CxPrecisionPlan::getIsDelete, 0)
@@ -586,7 +586,7 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
                     CxPrecisionPlan newPlan = new CxPrecisionPlan();
                     newPlan.setMachineCode(machineCode);
                     newPlan.setFactoryCode(lastPlan.getFactoryCode());
-                    newPlan.setPrecisionType("成型精度");
+//                    newPlan.setPrecisionType("成型精度");
                     newPlan.setCycleDays(cycleDays);
                     newPlan.setPlanDate(Date.from(nextPlanDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
                     newPlan.setScheduleDate(Date.from(nextPlanDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
