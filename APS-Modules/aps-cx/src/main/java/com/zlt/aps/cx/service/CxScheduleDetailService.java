@@ -73,12 +73,4 @@ public interface CxScheduleDetailService extends IService<CxScheduleDetail> {
      */
     boolean deleteByMainId(Long mainId);
 
-    /**
-     * 获取下一个车次号
-     *
-     * @param mainId    主表ID
-     * @param shiftCode 班次编码
-     * @return 车次号
-     */
-    Integer getNextTripNo(Long mainId, String shiftCode);
 }
