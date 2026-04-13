@@ -39,12 +39,14 @@ import {
   getProductEmbryoVersions,
   getCxMachines,
   getBomData,
+  getMachineList
 } from "@/api/cx/cxScheduleResult";
+import materialCodeSelect from "../components/materialCodeSelect.vue";
 
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm },
+  components: { infoForm ,materialCodeSelect},
   inject: ["parentDict"],
   data() {
     return {
@@ -140,7 +142,7 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.cxScheduleResult.factoryCode"),
+          label: this.$t("common.factory"),
           prop: "factoryCode",
           span: 24,
           clearable: false,
@@ -163,41 +165,46 @@ export default {
         //   type: "select",
         //   dictData: this.parentDict.type.TASK_TYPE,
         // },
-        {
-          label: this.$t("ui.data.column.cxScheduleResult.sapCode"),
-          prop: "sapCode",
-          span: 24,
-          maxlength: "20",
-          listeners: {
-            change: this.onEmbryoCodeChange,
-            blur: this.toUpperCase,
-          },
-        },
-        {
-          label: this.$t("ui.data.column.cxScheduleResult.specCode"),
-          prop: "specCode",
-          span: 24,
-          maxlength: "20",
-          listeners: {
-            change: this.onEmbryoCodeChange,
-            blur: this.toUpperCase,
-          },
-        },
+        // {
+        //   label: this.$t("ui.data.column.cxScheduleResult.sapCode"),
+        //   prop: "sapCode",
+        //   span: 24,
+        //   maxlength: "20",
+        //   listeners: {
+        //     change: this.onEmbryoCodeChange,
+        //     blur: this.toUpperCase,
+        //   },
+        // },
+        // {
+        //   label: this.$t("ui.data.column.cxScheduleResult.specCode"),
+        //   prop: "specCode",
+        //   span: 24,
+        //   maxlength: "20",
+        //   listeners: {
+        //     change: this.onEmbryoCodeChange,
+        //     blur: this.toUpperCase,
+        //   },
+        // },
         {
           label: this.$t("ui.data.column.cxScheduleResult.embryoCode"),
           prop: "embryoCode",
           span: 24,
-          listeners: {
-            change: this.onEmbryoCodeChange,
-            blur: this.toUpperCase,
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.embryoCode}
+                v-model={form.embryoCode}
+              />
+            );
           },
+
         },
-        {
-          label: this.$t("ui.data.column.productConstruction.embryoVersion"),
-          prop: "bomDataVersion",
-          span: 24,
-          disabled: true,
-        },
+        // {
+        //   label: this.$t("ui.data.column.productConstruction.embryoVersion"),
+        //   prop: "bomDataVersion",
+        //   span: 24,
+        //   disabled: true,
+        // },
         // {
         //   label: this.$t("ui.data.column.cxScheduleResult.storageLocation"),
         //   prop: "storageLocation",
@@ -216,64 +223,105 @@ export default {
           filterable: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class1PlanQty"),
+          label: this.$t("一班计划"),
           prop: "class1PlanQty",
           span: 24,
           type: "number",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class1AnalysisInput"),
-          prop: "class1AnalysisInput",
+          label: this.$t("一班备注"),
+          prop: "class1Analysis",
           span: 24,
         },
-        {
-          label: this.$t("ui.data.column.scheduleResult.class2PlanQty"),
+
+         {
+          label: this.$t("二班计划"),
           prop: "class2PlanQty",
           span: 24,
           type: "number",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class2AnalysisInput"),
-          prop: "class2AnalysisInput",
+          label: this.$t("二班备注"),
+          prop: "class2Analysis",
           span: 24,
         },
-        {
-          label: this.$t("ui.data.column.scheduleResult.class3PlanQty"),
-          prop: "class4PlanQty",
-          span: 24,
-          type: "number",
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.class3AnalysisInput"),
-          prop: "class4AnalysisInput",
-          span: 24,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.class4PlanQty"),
-          prop: "class5PlanQty",
+         {
+          label: this.$t("三班计划"),
+          prop: "class3PlanQty",
           span: 24,
           type: "number",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class4AnalysisInput"),
-          prop: "class5AnalysisInput",
+          label: this.$t("三班备注"),
+          prop: "class3Analysis",
           span: 24,
         },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.class5PlanQty"),
-        //   prop: "class5AnalysisInput",
-        //   span: 24,
-        //   type: "number",
-        // },
+          {
+            label: this.$t("四班计划"),
+            prop: "class4PlanQty",
+            span: 24,
+            type: "number",
+          },
+          {
+            label: this.$t("四班备注"),
+            prop: "class4Analysis",
+            span: 24,
+          },
+          {
+            label: this.$t("五班计划"),
+            prop: "class5PlanQty",
+            span: 24,
+            type: "number",
+          },
+          {
+            label: this.$t("五班备注"),
+            prop: "class5Analysis",
+            span: 24,
+          },
+            {
+              label: this.$t("六班计划"),
+              prop: "class6PlanQty",
+              span: 24,
+              type: "number",
+            },
+            {
+              label: this.$t("六班备注"),
+              prop: "class6Analysis",
+              span: 24,
+            },
+            {
+              label: this.$t("七班计划"),
+              prop: "class7PlanQty",
+              span: 24,
+              type: "number",
+            },
+            {
+              label: this.$t("七班备注"),
+              prop: "class7Analysis",
+              span: 24,
+            },
+            {
+          label: this.$t("八班计划"),
+          prop: "class8PlanQty",
+          span: 24,
+          type: "number",
+        },
         {
-          label: this.$t("ui.data.column.stock.remark"),
-          prop: "remark",
+          label: this.$t("八班备注"),
+          prop: "class8Analysis",
           span: 24,
         },
       ];
     },
   },
   methods: {
+    async  getMachineList() {
+      try {
+        const res = await getMachineList({});console.log(res);
+      } catch (error) {
+        console.error(error);
+      }
+    },
     // api
     validateBeforeAdd(params) {
       return new Promise((resolve, reject) => {
@@ -349,9 +397,10 @@ export default {
       //   };
       // }
       this.form = {
-        factoryCode: "",
+        factoryCode: "116",
         scheduleDate: moment().add(1, "days").format("yyyy-MM-DD"),
       };
+      this.getMachineList()
     },
     hide() {
       // this.form = {};

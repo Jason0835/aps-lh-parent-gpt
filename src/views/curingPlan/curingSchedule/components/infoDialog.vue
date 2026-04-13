@@ -124,18 +124,18 @@ export default {
             );
           },
         },
-        {
-          label: this.$t("ui.data.column.scheduleResult.sapCode"),
-          prop: "productCode",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.specCode"),
-          prop: "specCode",
-          disabled: true,
-          span: 12,
-        },
+        // {
+        //   label: this.$t("ui.data.column.scheduleResult.sapCode"),
+        //   prop: "productCode",
+        //   disabled: true,
+        //   span: 12,
+        // },
+        // {
+        //   label: this.$t("ui.data.column.scheduleResult.specCode"),
+        //   prop: "specCode",
+        //   disabled: true,
+        //   span: 12,
+        // },
         {
           label: this.$t("ui.data.column.scheduleResult.dailyPlanQty"),
           prop: "dailyPlanQty",
@@ -187,14 +187,14 @@ export default {
             return (
               <div class="line-header">
                 <span>
-                  {this.$t("ui.data.column.scheduleResult.class1.lh")}
+                  {this.$t("一班")}
                 </span>
               </div>
             );
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class1PlanQty.lh"),
+          label: this.$t("一班计划"),
           prop: "class1PlanQty",
           disabled: this.isChangeQty ? this.plan1Disabled : true,
           span: 12,
@@ -221,60 +221,84 @@ export default {
             return (
               <div class="line-header">
                 <span>
-                  {this.$t("ui.data.column.scheduleResult.class2.lh")}
+                  {this.$t("二班")}
                 </span>
               </div>
             );
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class2PlanQty.lh"),
+          label: this.$t("二班计划量"),
           prop: "class2PlanQty",
           disabled: this.isChangeQty ? this.plan2Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class2FinishQty.lh"),
+          label: this.$t("二班完成量"),
           prop: "class2FinishQty",
           disabled: true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class2Analysis.lh"),
+          label: this.$t("二班计备注"),
           prop: "class2Analysis",
           // disabled: true,
           span: 12,
         },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.class2Analysis.lh"),
-        //   prop: "class2AnalysisInput",
-        //   span: 12,
-        // },
         {
           render: () => {
             return (
               <div class="line-header">
                 <span>
-                  {this.$t("ui.data.column.scheduleResult.class4.lh")}
+                  {this.$t("三班")}
                 </span>
               </div>
             );
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class4PlanQty.lh"),
+          label: this.$t("三班计划量"),
+          prop: "class3PlanQty",
+          disabled: this.isChangeQty ? this.plan2Disabled : true,
+          span: 12,
+        },
+        {
+          label: this.$t("三班完成量"),
+          prop: "class3FinishQty",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("三班计备注"),
+          prop: "class3Analysis",
+          // disabled: true,
+          span: 12,
+        },
+        {
+          render: () => {
+            return (
+              <div class="line-header">
+                <span>
+                  {this.$t("四班")}
+                </span>
+              </div>
+            );
+          },
+        },
+        {
+          label: this.$t("四班计划量"),
           prop: "class4PlanQty",
           disabled: this.isChangeQty ? this.plan4Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class4FinishQty.lh"),
+          label: this.$t("四班完成量"),
           prop: "class4FinishQty",
           disabled: true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class4Analysis.lh"),
+          label: this.$t("四班备注"),
           prop: "class4Analysis",
           // disabled: true,
           span: 12,
@@ -289,35 +313,118 @@ export default {
             return (
               <div class="line-header">
                 <span>
-                  {this.$t("ui.data.column.scheduleResult.class5.lh")}
+                  {this.$t("五班")}
                 </span>
               </div>
             );
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class5PlanQty.lh"),
+          label: this.$t("五班计划量"),
           prop: "class5PlanQty",
           disabled: this.isChangeQty ? this.plan5Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class5FinishQty.lh"),
+          label: this.$t("五班完成量"),
           prop: "class5FinishQty",
           disabled: true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class5Analysis.lh"),
+          label: this.$t("五班备注"),
           prop: "class5Analysis",
           // disabled: true,
           span: 12,
         },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.class5Analysis.lh"),
-        //   prop: "class5AnalysisInput",
-        //   span: 12,
-        // },
+        {
+          render: () => {
+            return (
+              <div class="line-header">
+                <span>
+                  {this.$t("六班")}
+                </span>
+              </div>
+            );
+          },
+        },
+        {
+          label: this.$t("六班计划量"),
+          prop: "class6PlanQty",
+          disabled: this.isChangeQty ? this.plan5Disabled : true,
+          span: 12,
+        },
+        {
+          label: this.$t("六班完成量"),
+          prop: "class6FinishQty",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("六班备注"),
+          prop: "class6Analysis",
+          // disabled: true,
+          span: 12,
+        },
+        {
+          render: () => {
+            return (
+              <div class="line-header">
+                <span>
+                  {this.$t("七班")}
+                </span>
+              </div>
+            );
+          },
+        },
+        {
+          label: this.$t("七班计划量"),
+          prop: "class7PlanQty",
+          disabled: this.isChangeQty ? this.plan5Disabled : true,
+          span: 12,
+        },
+        {
+          label: this.$t("七班完成量"),
+          prop: "class7FinishQty",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("七班备注"),
+          prop: "class7Analysis",
+          // disabled: true,
+          span: 12,
+        },
+        {
+          render: () => {
+            return (
+              <div class="line-header">
+                <span>
+                  {this.$t("八班")}
+                </span>
+              </div>
+            );
+          },
+        },
+        {
+          label: this.$t("八班计划量"),
+          prop: "class8PlanQty",
+          disabled: this.isChangeQty ? this.plan5Disabled : true,
+          span: 12,
+        },
+        {
+          label: this.$t("八班完成量"),
+          prop: "class8FinishQty",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("八班备注"),
+          prop: "class8Analysis",
+          // disabled: true,
+          span: 12,
+        },
+
       ];
       return tempColumns;
     },

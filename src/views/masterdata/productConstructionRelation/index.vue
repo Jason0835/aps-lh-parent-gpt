@@ -156,10 +156,15 @@ export default {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
-         {
-          prop: "specCode",
-          label: this.$t("ui.data.column.construction.specCode"),
+        {
+          prop: "constructionVersion",
+          label: this.$t("版本号"),
           width: 180,
+        },
+         {
+          prop: "embryoDesc",
+          label: this.$t("胎胚描述"),
+          width: 300,
         },
         // {
         //   prop: "materialCode",
@@ -305,6 +310,14 @@ export default {
           prop: "factoryCode",
           type:'select',
           dictData: this.dict.type.biz_factory_name,
+        },
+        {
+          prop: "constructionVersion",
+          label: this.$t("版本号"),
+        },
+        {
+          prop: "embryoDesc",
+          label: this.$t("胎胚描述"),
         },
         // {
         //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),

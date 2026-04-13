@@ -65,7 +65,7 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule } from "@/api/lh/lhMouldChangePlan";
+import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule, getMachineList } from "@/api/lh/lhMouldChangePlan";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -108,8 +108,16 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: "116",
+        scheduleDate: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+      },
+      query: {
+        factoryCode: "116",
+        scheduleDate: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+      },
+      machineSearchLoading: false,
+      machineSearchOptions: [],
     };
   },
   computed: {
@@ -269,34 +277,46 @@ export default {
     searchColumns() {
       return [
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
           label: this.$t("ui.data.column.lhMouldChangePlan.lhResultBatchNo"),
           prop: "lhResultBatchNo",
+        },
+        {
+          label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineCode"),
+          prop: "lhMachineCode",
+          type: "select",
+          dictData: this.machineSearchOptions,
+          props: {
+            label: "machineCode",
+            value: "machineCode",
+          },
+          filterable: true,
+          remote: true,
+          remoteMethod: this.remoteSearchMachineMethod,
+          loading: this.machineSearchLoading,
+          onFocus: this.handleMachineSearchFocus,
         },
         {
           label: this.$t("ui.data.column.lhMouldChangePlan.orderNo"),
           prop: "orderNo",
         },
         {
-          label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineCode"),
-          prop: "lhMachineCode",
-        },
-        {
           label: this.$t("ui.data.column.lhMouldChangePlan.planDate"),
           prop: "planDate",
           type: "date",
-          dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
-          startPlaceholder: this.$t("common.startTime"),
-          endPlaceholder: this.$t("common.endTime"),
         },
         {
           label: this.$t("ui.data.column.lhMouldChangePlan.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
-          dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
-          startPlaceholder: this.$t("common.startTime"),
-          endPlaceholder: this.$t("common.endTime"),
         },
         {
           label: this.$t("ui.data.column.lhMouldChangePlan.mouldCode"),
@@ -309,18 +329,36 @@ export default {
           dictData: this.dict.type.IS_RELEASE,
           filterable: true,
         },
-
-        {
-          label: this.$t("ui.data.column.factoryCode"),
-          prop: "factoryCode",
-          type: "select",
-          dictData: this.dict.type.biz_factory_name,
-          filterable: true,
-        },
       ];
     },
   },
   methods: {
+    getTodayDate() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    },
+    async remoteSearchMachineMethod(query) {
+      this.machineSearchLoading = true;
+      try {
+        const res = await getMachineList({
+          machineCode: query || "",
+          pageSize: 10,
+        });
+        this.machineSearchOptions = res.data || res || [];
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.machineSearchLoading = false;
+      }
+    },
+    handleMachineSearchFocus() {
+      if (this.machineSearchOptions.length === 0) {
+        this.remoteSearchMachineMethod("");
+      }
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
@@ -366,22 +404,6 @@ export default {
     },
     handleSearch(data) {
       this.query = data;
-      if (data.planDate && data.planDate.length === 2) {
-        this.query.planDateStart = data.planDate[0];
-        this.query.planDateEnd = data.planDate[1];
-        delete this.query.planDate;
-      } else {
-        delete this.query.planDateStart;
-        delete this.query.planDateEnd;
-      }
-      if (data.scheduleDate && data.scheduleDate.length === 2) {
-        this.query.scheduleDateStart = data.scheduleDate[0];
-        this.query.scheduleDateEnd = data.scheduleDate[1];
-        delete this.query.scheduleDate;
-      } else {
-        delete this.query.scheduleDateStart;
-        delete this.query.scheduleDateEnd;
-      }
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -448,6 +470,15 @@ export default {
         },
     },
     activated() {
+        const today = this.getTodayDate();
+        this.search = {
+            factoryCode: "116",
+            scheduleDate: today,
+        };
+        this.query = {
+            factoryCode: "116",
+            scheduleDate: today,
+        };
         this.getList();
     },
 };

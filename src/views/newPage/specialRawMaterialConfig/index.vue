@@ -154,6 +154,7 @@ export default {
         {
           prop: "materialCode",
           label: this.$t("ui.data.column.masterdata.materialCode"),
+          width: 120,
         },
         {
           prop: "materialName",
@@ -177,12 +178,17 @@ export default {
           label: this.$t("车间库存"),
         },
         {
+          prop: "packageNum",
+          label: this.$t("显示箱数"),
+        },
+        {
           prop: "totalStock",
           label: this.$t("总库存"),
         },
         {
           prop: "stock",
           label: this.$t("ui.data.column.masterdata.stock"),
+          width: 120,
         },
         {
           prop: "unit",
@@ -191,6 +197,7 @@ export default {
         {
           prop: "stockDate",
           label: this.$t("ui.data.defectiveStock.stockDate"),
+          width: 120,
         },
         {
           prop: "remark",

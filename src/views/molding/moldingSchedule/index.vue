@@ -27,12 +27,10 @@
           @click="handleAutoPlan"
           >{{ $t("自动排产") }}</el-button
         >
+        <!-- <el-button v-hasPermi="['cx:cxScheduleResult:add']" type="warning">{{
+          $t("成型机操作工请假")
+        }}</el-button> -->
         <el-button
-          v-hasPermi="['cx:cxScheduleResult:add']"
-          type="warning"
-          >{{ $t("成型机操作工请假") }}</el-button
-        >
-         <el-button
           v-hasPermi="['cx:cxScheduleResult:add']"
           type="warning"
           @click="handleAdd"
@@ -89,7 +87,6 @@
           v-hasPermi="['cx:productConstruction:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
-        
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -137,6 +134,12 @@
       ]"
       :rules="importRules"
     />
+    <tlt-upload
+      ref="tltUpload"
+      downloadUrl="/cx/cxScheduleResult/importTemplate"
+      uploadUrl="/cx/cxScheduleResult/importData"
+      @uploadSuccess="getList"
+    />
     <productStatusEditDialog ref="psEditRef" @success="handelSuccess" />
     <statusDialog ref="statusRef" @success="handelSuccess" />
   </basic-container>
@@ -173,6 +176,7 @@ import changeMachineDialog from "./components/changeMachineDialog.vue";
 import changePlanDialog from "./components/changePlanDialog.vue";
 import releaseStatusDialog from "./components/releaseStatusDialog.vue";
 import statusDialog from "./components/statusDialog.vue";
+import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 export default {
   name: "MoldingSchedule",
@@ -187,6 +191,7 @@ export default {
     TltUploadForm,
     productStatusEditDialog,
     statusDialog,
+    tltUpload
   },
   dicts: [
     "TASK_TYPE",
@@ -239,230 +244,454 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          label: this.$t("ui.data.column.scheduleResult.baseInfo"),
-          visible: true,
+          label: this.$t("成型机台"),
+          prop: "cxMachineCode",
+        },
+        {
+          label: this.$t("硫化机台"),
+          prop: "lhMachineCode",
+        },
+        {
+          label: this.$t("物料编码"),
+          prop: "materialCode",
+        },
+        {
+          label: this.$t("物料描述"),
+          prop: "materialDesc",
+        },
+        {
+          label: this.$t("胎胚描述"),
+          prop: "mainMaterialDesc",
+        },
+        {
+          label: this.$t("合计成型余量"),
+          prop: "cxRemainQty",
+        },
+        {
+          label: this.$t("合计硫化余量"),
+          prop: "lhRemainQty",
+        },
+        {
+          label: this.$t("胎胚库存"),
+          prop: "totalStock",
+        },
+        {
+          label: this.$t("硫化班产"),
+          prop: "lhClassQty",
+        },
+        // {
+        //   label: this.$t("ui.data.column.scheduleResult.baseInfo"),
+        //   visible: true,
+        //   children: [
+        //     {
+        //       label: this.$t("ui.data.column.scheduleResult.isRelease"),
+        //       prop: "isRelease",
+        //       minWidth: 100,
+        //       formatter: (row, column, value, index) => {
+        //         return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
+        //       },
+        //     },
+        //     {
+        //       label: this.$t("批次号"),
+        //       prop: "orderNo",
+        //       width: 160,
+        //     },
+        //     {
+        //       label: this.$t("工单号"),
+        //       prop: "factoryCode",
+        //     },
+        //     {
+        //       label: this.$t("工厂"),
+        //       prop: "factoryCode",
+        //     },
+
+        //     {
+        //       label: this.$t("月度计划"),
+        //       prop: "factoryCode",
+        //     },
+        //     {
+        //       label: this.$t("成型产量"),
+        //       prop: "factoryCode",
+        //     },
+        //     {
+        //       label: this.$t("月计划剩余量"),
+        //       prop: "factoryCode",
+        //     },
+
+        //     {
+        //       label: this.$t("胎胚库存"),
+        //       prop: "factoryCode",
+        //     },
+        //     {
+        //       label: this.$t("单班硫化量"),
+        //       prop: "factoryCode",
+        //     },
+        //   ],
+        // },
+        {
+          label: this.$t("一班"),
           children: [
             {
-            label: this.$t("ui.data.column.scheduleResult.isRelease"),
-            prop: "isRelease",
-            minWidth: 100,
-            formatter: (row, column, value, index) => {
-              return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
-            }
+              prop: "class1Sort",
+              label: this.$t("顺序"),
             },
             {
-              label: this.$t("批次号"),
-              prop: "orderNo",
-              width: 160,
+              prop: "class1PlanQty",
+              label: this.$t("计划"),
             },
             {
-              label: this.$t("工单号"),
-              prop: "factoryCode",
+              prop: "class1FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class1Analysis",
+              label: this.$t("备注"),
             },
             {
-              label: this.$t("工厂"),
-              prop: "factoryCode",
-            },
-            {
-              label: this.$t("成型机台"),
-              prop: "factoryCode",
-            },
-            {
-              label: this.$t("硫化机台"),
-              prop: "factoryCode",
-            },
-            {
-              label: this.$t("物料编码"),
-              prop: "factoryCode",
-            },
-            {
-              label: this.$t("物料描述"),
-              prop: "factoryCode",
-            },
-            {
-              label: this.$t("胎胚描述"),
-              prop: "factoryCode",
-            },
-            {
-              label: this.$t("月度计划"),
-              prop: "factoryCode",
-            },
-            {
-              label: this.$t("成型产量"),
-              prop: "factoryCode",
-            },
-            {
-              label: this.$t("月计划剩余量"),
-              prop: "factoryCode",
+              prop: "class1RecipeType",
+              label: this.$t("示方类型"),
             },
 
-            {
-              label: this.$t("胎胚库存"),
-              prop: "factoryCode",
-            },
-            {
-              label: this.$t("单班硫化量"),
-              prop: "factoryCode",
-            }
           ],
         },
         {
-          label: this.$t("T日"),
+          label: this.$t("二班"),
           children: [
-            {
-              prop: "class2AvailableLhShift",
-              label: this.$t("早班计划量"),
+          {
+              prop: "class2Sort",
+              label: this.$t("顺序"),
             },
             {
-              prop: "class2AvailableLhShift",
-              label: this.$t("早班计划顺位"),
+              prop: "class2PlanQty",
+              label: this.$t("计划"),
             },
             {
-              prop: "class2AvailableLhShift",
-              label: this.$t("早班完成量"),
+              prop: "class2FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class2Analysis",
+              label: this.$t("备注"),
             },
             {
-              prop: "class2AvailableLhShift",
-              label: this.$t("早班原因分析"),
+              prop: "class2RecipeType",
+              label: this.$t("示方类型"),
             },
-            {
-              prop: "class2AvailableLhShift",
-              label: this.$t("中班计划量"),
-            },
-            {
-              prop: "class2AvailableLhShift",
-              label: this.$t("中班计划顺位"),
-            },
-            {
-              prop: "class2AvailableLhShift",
-              label: this.$t("中班完成量"),
-            },
-            {
-              prop: "class2AvailableLhShift",
-              label: this.$t("中班原因分析"),
-            },
-            
+
           ],
         },
         {
-          label: this.$t("T+1日"),
+          label: this.$t("三班"),
           children: [
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("夜班计划量"),
-            },
-           {
-              prop: "class3AvailableLhShift",
-              label: this.$t("夜班计划顺位"),
+          {
+              prop: "class3Sort",
+              label: this.$t("顺序"),
             },
             {
-              prop: "class3AvailableLhShift",
-              label: this.$t("夜班完成量"),
+              prop: "class3PlanQty",
+              label: this.$t("计划"),
             },
             {
-              prop: "class3AvailableLhShift",
-              label: this.$t("夜班原因分析"),
+              prop: "class3FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class3Analysis",
+              label: this.$t("备注"),
             },
             {
-              prop: "class3AvailableLhShift",
-              label: this.$t("早班计划量"),
-            },
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("早班计划顺位"),
-            },
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("早班完成量"),
-            },
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("早班原因分析"),
-            },
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("中班计划量"),
-            },
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("中班计划顺位"),
+              prop: "class3RecipeType",
+              label: this.$t("示方类型"),
             },
 
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("中班完成量"),
-            },
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("中班原因分析"),
-            },
-            
           ],
         },
         {
-          label: this.$t("T+2日"),
+          label: this.$t("四班"),
           children: [
             {
-              prop: "class3AvailableLhShift",
-              label: this.$t("夜班计划量"),
+              prop: "class4Sort",
+              label: this.$t("顺序"),
             },
             {
-              prop: "class3AvailableLhShift",
-              label: this.$t("夜班计划顺位"),
+              prop: "class4PlanQty",
+              label: this.$t("计划"),
             },
             {
-              prop: "class3AvailableLhShift",
-              label: this.$t("夜班完成量"),
+              prop: "class4FinishQty",
+              label: this.$t("实际"),
             },
-{
-              prop: "class3AvailableLhShift",
-              label: this.$t("夜班原因分析"),
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class4Analysis",
+              label: this.$t("备注"),
+            },
+            {
+              prop: "class4RecipeType",
+              label: this.$t("示方类型"),
             },
 
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("早班计划量"),
-            },
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("早班计划顺位"),
-            },
-
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("早班完成量"),
-            },
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("早班原因分析"),
-            },
-
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("中班计划量"),
-            },
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("中班计划顺位"),
-            },
-
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("中班完成量"),
-            },
-            {
-              prop: "class3AvailableLhShift",
-              label: this.$t("中班原因分析"),
-            },
-            
           ],
         },
+        {
+          label: this.$t("五班"),
+          children: [
+          {
+              prop: "class5Sort",
+              label: this.$t("顺序"),
+            },
+            {
+              prop: "class5PlanQty",
+              label: this.$t("计划"),
+            },
+            {
+              prop: "class5FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class5Analysis",
+              label: this.$t("备注"),
+            },
+            {
+              prop: "class5RecipeType",
+              label: this.$t("示方类型"),
+            },
+
+          ],
+        },
+        {
+          label: this.$t("六班"),
+          children: [
+          {
+              prop: "class6Sort",
+              label: this.$t("顺序"),
+            },
+            {
+              prop: "class6PlanQty",
+              label: this.$t("计划"),
+            },
+            {
+              prop: "class6FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class6Analysis",
+              label: this.$t("备注"),
+            },
+            {
+              prop: "class6RecipeType",
+              label: this.$t("示方类型"),
+            },
+
+          ],
+        },
+        {
+          label: this.$t("七班"),
+          children: [
+            {
+              prop: "class7Sort",
+              label: this.$t("顺序"),
+            },
+            {
+              prop: "class7PlanQty",
+              label: this.$t("计划"),
+            },
+            {
+              prop: "class7FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class7Analysis",
+              label: this.$t("备注"),
+            },
+            {
+              prop: "class7RecipeType",
+              label: this.$t("示方类型"),
+            },
+
+          ],
+        },
+        {
+          label: this.$t("八班"),
+          children: [
+          {
+              prop: "class8Sort",
+              label: this.$t("顺序"),
+            },
+            {
+              prop: "class8PlanQty",
+              label: this.$t("计划"),
+            },
+            {
+              prop: "class8FinishQty",
+              label: this.$t("实际"),
+            },
+            // {
+            //   prop: "class2AvailableLhShift",
+            //   label: this.$t("类型"),
+            // },
+            {
+              prop: "class8Analysis",
+              label: this.$t("备注"),
+            },
+            {
+              prop: "class8RecipeType",
+              label: this.$t("示方类型"),
+            },
+
+          ],
+        },
+
+        // {
+        //   label: this.$t("T+1日"),
+        //   children: [
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("夜班计划量"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("夜班计划顺位"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("夜班完成量"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("夜班原因分析"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("早班计划量"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("早班计划顺位"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("早班完成量"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("早班原因分析"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("中班计划量"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("中班计划顺位"),
+        //     },
+
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("中班完成量"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("中班原因分析"),
+        //     },
+        //   ],
+        // },
+        // {
+        //   label: this.$t("T+2日"),
+        //   children: [
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("夜班计划量"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("夜班计划顺位"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("夜班完成量"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("夜班原因分析"),
+        //     },
+
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("早班计划量"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("早班计划顺位"),
+        //     },
+
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("早班完成量"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("早班原因分析"),
+        //     },
+
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("中班计划量"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("中班计划顺位"),
+        //     },
+
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("中班完成量"),
+        //     },
+        //     {
+        //       prop: "class3AvailableLhShift",
+        //       label: this.$t("中班原因分析"),
+        //     },
+        //   ],
+        // },
       ];
 
       return columns;
     },
     searchColumns() {
       return [
+      {
+          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
+          prop: "scheduleDate",
+          type: "date",
+          valueFormat: "yyyy-MM-dd",
+        },
         {
           label: this.$t("ui.data.column.scheduleResult.isRelease"),
           prop: "isRelease",
@@ -636,6 +865,9 @@ export default {
     handleExportUiExcel() {
       downloadLink("/cx/cxScheduleResult/export", this.formatParams(false));
     },
+    handleExport() {
+      downloadLink("/cx/cxScheduleResult/export", this.formatParams(false));
+    },
     handleProducingIssue() {
       this.$confirm(this.$t("ui.biz.alter.producingIssue")).then(async () => {
         try {
@@ -692,12 +924,10 @@ export default {
       downloadLink("/cx/cxScheduleResult/export2", this.formatParams(false));
     },
     async handleParse() {
-      this.$confirm(
-        this.$t("是否解析现场计划")
-      ).then(async () => {
+      this.$confirm(this.$t("是否解析现场计划")).then(async () => {
         try {
           this.loading = true;
-          const res = await parseCxScheduleResult( this.formatParams(false));
+          const res = await parseCxScheduleResult(this.formatParams(false));
           this.$modal.msgSuccess(res.msg);
           this.loading = false;
         } catch (error) {
@@ -899,13 +1129,14 @@ export default {
   },
   created() {
     //设置默认排程时间
-    let date = moment().add(1, "days").format("YYYY-MM-DD");
+    let date =moment().add(1, "days").format("YYYY-MM-DD");
+
     // date = "2023-06-01"; //test
     this.query.scheduleDate = date;
     this.search.scheduleDate = date;
 
-    this.$store.dispatch("molding/getMachineList");
-    this.$store.dispatch("curing/getMachineList");
+    // this.$store.dispatch("molding/getMachineList");
+    // this.$store.dispatch("curing/getMachineList");
   },
   activated() {
     this.getList();

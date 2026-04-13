@@ -998,6 +998,7 @@ export default {
       this.query = {
         ...defaultParams,
       };
+      this.getVersionList(true,false);
     } else {
       const now = new Date();
       // now.setMonth(now.getMonth() + 1);
@@ -1016,9 +1017,10 @@ export default {
       this.query = {
         ...defaultParams,
       };
+      this.getVersionList(true);
     }
 
-    this.getVersionList(true);
+
     // this.getList();
   },
   activated() {},

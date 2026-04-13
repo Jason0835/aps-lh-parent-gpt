@@ -3,7 +3,7 @@ import request from '@/utils/request'
 // 查询基础数据_地区列表
 export function listCxScheduleResult(query) {
   return request({
-    url: 'cx/cxScheduleResult/list',
+    url: '/cx/cxScheduleResult/list',
     method: 'post',
     data: query
   })
@@ -89,11 +89,19 @@ export function validateAdd(query) {
 
 export function cxScheduleResultEdit(query) {
   return request({
-    url: 'cx/cxScheduleResult/edit',
+    url: '/cx/cxScheduleResult/save',
     method: 'post',
     data: query
   })
 }
+export function insertOrder(query) {
+  return request({
+    url: '/cx/cxScheduleResult/adjustQty',
+    method: 'post',
+    data: query
+  })
+}
+
 
 
 
@@ -123,7 +131,7 @@ export function validateChangeMachine(query) {
 }
 export function publishValidate(query) {
   return request({
-    url: 'cx/cxScheduleResult/publishValidate',
+    url: '/cx/cxScheduleResult/issueToMes',
     method: 'post',
     data: query
   })
@@ -238,7 +246,7 @@ export function removeCxScheduleResult(query) {
 
 export function changeMachine(query) {
   return request({
-   url: `cx/cxScheduleResult/changeMachine`,
+   url: `/cx/cxScheduleResult/transferMachine`,
     method: 'post',
     data: query,
     headers: {
@@ -258,3 +266,22 @@ export function parseCxScheduleResult(query) {
   })
 }
 
+
+export function generatePlan(query) {
+  return request({
+   url: `/cx/cxScheduleResult/generate`,
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+  })
+}
+
+export function getMachineList(query) {
+  return request({
+   url: `/monthplan/mdmMoldingMachine/query`,
+    method: 'post',
+    data: query,
+  })
+}

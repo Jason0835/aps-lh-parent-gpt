@@ -52,7 +52,7 @@ export default {
       },
       columns: [
         {
-          label: this.$t("ui.data.column.scheduleResult.factoryCode"),
+          label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
@@ -122,7 +122,7 @@ export default {
       //设置默认值为明天
 
       this.form = {
-        factoryCode: "",
+        factoryCode: "116",
         scheduleTime: moment().add(1, "days").format("yyyy-MM-DD 00:00:00"),
       };
     },
