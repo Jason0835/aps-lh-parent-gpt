@@ -211,7 +211,7 @@ export default {
     },
 
     handleSyncFromWarn() {
-      this.$confirm(this.$t("ui.mould.clean.plan.sync.confirm"), this.$t("common.hint.hint"), {
+      this.$confirm(this.$t("ui.mould.clean.plan.sync.confirm"), {
         confirmButtonText: this.$t("common.button.confirm"),
         cancelButtonText: this.$t("common.button.cancel"),
         type: 'warning'
