@@ -3,16 +3,15 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.enums.SchedulePriorityEnum;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.ISkuPriorityStrategy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -79,8 +78,9 @@ public class DefaultSkuPriorityStrategy implements ISkuPriorityStrategy {
         return Comparator
                 // 顺序1：有发货要求的优先（true=1，false=0，降序）
                 .comparingInt((SkuScheduleDTO s) -> s.isDeliveryLocked() ? 0 : 1)
-                // 顺序2：延误天数越多越优先（降序）
-                .thenComparingInt((SkuScheduleDTO s) -> -s.getDelayDays())
+                // 顺序2：仅已知延误天数参与排序，未知值排后
+                .thenComparingInt((SkuScheduleDTO s) -> s.getDelayDays() >= 0 ? 0 : 1)
+                .thenComparingInt((SkuScheduleDTO s) -> s.getDelayDays() >= 0 ? -s.getDelayDays() : 0)
                 // 顺序3：收尾SKU优先；收尾日越晚（剩余天数越多）的越先上机
                 .thenComparingInt((SkuScheduleDTO s) -> endingJudgmentStrategy.isEnding(context, s) ? 0 : 1)
                 .thenComparingInt((SkuScheduleDTO s) -> -s.getEndingDaysRemaining())

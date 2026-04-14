@@ -1,14 +1,14 @@
 package com.zlt.aps.lh.engine.strategy.impl;
 
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.enums.SkuTagEnum;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import org.springframework.util.CollectionUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
 /**
  * 默认收尾判定策略实现
@@ -33,7 +33,7 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
         if (shiftCapacity > 0) {
             int totalCapacity = shiftCapacity * totalScheduleShifts;
             if (sku.getSurplusQty() <= totalCapacity && sku.getSurplusQty() > 0) {
-                log.debug("SKU[{}]判定为收尾(规则2): 余量{} <= 总产能{}", 
+                log.debug("SKU[{}]判定为收尾(规则2): 余量{} <= 总产能{}",
                         sku.getMaterialCode(), sku.getSurplusQty(), totalCapacity);
                 return true;
             }
@@ -43,7 +43,7 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
         int dailyCapacity = sku.getDailyCapacity();
         int pendingQty = sku.getPendingQty() > 0 ? sku.getPendingQty() : sku.getSurplusQty();
         if (dailyCapacity > 0 && pendingQty < dailyCapacity && pendingQty > 0) {
-            log.debug("SKU[{}]判定为收尾(规则3): 待排量{} < 日产能{}", 
+            log.debug("SKU[{}]判定为收尾(规则3): 待排量{} < 日产能{}",
                     sku.getMaterialCode(), pendingQty, dailyCapacity);
             return true;
         }
@@ -73,7 +73,10 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
         if (shifts < 0) {
             return -1;
         }
-        return shifts / LhScheduleConstant.DEFAULT_SHIFTS_PER_DAY + 1;
+        if (shifts == 0) {
+            return 0;
+        }
+        return (int) Math.ceil((double) shifts / LhScheduleConstant.DEFAULT_SHIFTS_PER_DAY);
     }
 
     /**

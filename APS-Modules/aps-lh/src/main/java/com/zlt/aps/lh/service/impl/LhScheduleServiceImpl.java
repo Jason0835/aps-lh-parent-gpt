@@ -2,19 +2,21 @@ package com.zlt.aps.lh.service.impl;
 
 import cn.hutool.core.date.DateUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
-import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
-import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
-import com.zlt.aps.lh.engine.rule.IScheduleRuleEngine;
+import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
+import com.zlt.aps.lh.component.LhScheduleConfigResolver;
+import com.zlt.aps.lh.component.ScheduleExecutionGuard;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.decorator.IScheduleExecutor;
 import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
+import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleService;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.bill.common.service.AbstractDocService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,7 +41,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     private IScheduleExecutor scheduleExecutor;
 
     @Resource
-    private IScheduleRuleEngine scheduleRuleEngine;
+    private LhScheduleConfigResolver scheduleConfigResolver;
 
     @Resource
     private LhScheduleResultMapper scheduleResultMapper;
@@ -47,11 +49,27 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Resource
     private ScheduleEventPublisher scheduleEventPublisher;
 
+    @Resource
+    private ScheduleExecutionGuard scheduleExecutionGuard;
+
     @Override
     public LhScheduleResponseDTO executeSchedule(LhScheduleRequestDTO request) {
         log.info("接收排程请求, 工厂: {}, 日期: {}", request.getFactoryCode(), request.getScheduleDate());
         LhScheduleContext context = buildContext(request);
-        return scheduleExecutor.execute(context);
+        String lockToken = null;
+        try {
+            lockToken = scheduleExecutionGuard.acquire(context.getFactoryCode(), context.getScheduleTargetDate());
+            return scheduleExecutor.execute(context);
+        } catch (ScheduleException e) {
+            log.warn("排程请求被拒绝, 工厂: {}, 日期: {}, 原因: {}",
+                    context.getFactoryCode(), context.getScheduleTargetDate(), e.getMessage());
+            return LhScheduleResponseDTO.fail(context.getBatchNo(), e.getMessage());
+        } catch (Exception e) {
+            log.error("排程服务入口异常, 工厂: {}, 日期: {}", context.getFactoryCode(), context.getScheduleTargetDate(), e);
+            return LhScheduleResponseDTO.fail(context.getBatchNo(), "排程执行异常: " + e.getMessage());
+        } finally {
+            scheduleExecutionGuard.release(context.getFactoryCode(), context.getScheduleTargetDate(), lockToken);
+        }
     }
 
     @Override
@@ -85,6 +103,13 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         }
     }
 
+    /**
+     * 构建排程上下文
+     * <p>先解析本次排程配置快照，再按 scheduleDays 计算窗口起点 T 日</p>
+     *
+     * @param request 排程请求
+     * @return 排程上下文
+     */
     private LhScheduleContext buildContext(LhScheduleRequestDTO request) {
         LhScheduleContext context = new LhScheduleContext();
         context.setFactoryCode(request.getFactoryCode());
@@ -92,9 +117,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Date target = LhScheduleTimeUtil.clearTime(
                 request.getScheduleDate() != null ? request.getScheduleDate() : new Date());
         context.setScheduleTargetDate(target);
-        int scheduleDays = scheduleRuleEngine.getScheduleDays(request.getFactoryCode());
+        scheduleConfigResolver.resolveAndAttach(context);
+        int scheduleDays = context.getScheduleConfig().getScheduleDays();
         int offsetDays = Math.max(0, scheduleDays - 1);
-        // 引擎使用 T 日 = 目标日 − (连续排程日历跨度 − 1)；与 DataInit 中按参数校正后一致
+        // 引擎使用 T 日 = 目标日 − (连续排程日历跨度 − 1)
         context.setScheduleDate(LhScheduleTimeUtil.addDays(target, -offsetDays));
         return context;
     }

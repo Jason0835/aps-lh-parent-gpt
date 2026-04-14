@@ -1,24 +1,23 @@
 package com.zlt.aps.lh.handler;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
-import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.domain.dto.ValidationResult;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhParams;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
-import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
+import com.zlt.aps.lh.api.enums.MachineStopTypeEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.chain.DataValidationChain;
 import com.zlt.aps.lh.exception.ScheduleDomainExceptionHelper;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
-import com.zlt.aps.lh.mapper.LhParamsMapper;
 import com.zlt.aps.lh.service.ILhBaseDataService;
 import com.zlt.aps.lh.service.ILhShiftConfigService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -46,20 +45,11 @@ public class DataInitHandler extends AbsScheduleStepHandler {
     private ILhBaseDataService baseDataService;
 
     @Resource
-    private LhParamsMapper lhParamsMapper;
-
-    @Resource
     private ILhShiftConfigService lhShiftConfigService;
 
     @Override
     protected void doHandle(LhScheduleContext context) {
-        // S4.2.1 先加载硫化参数
-        loadLhParams(context);
-
-        // 按参数 SCHEDULE_DAYS 校正 T 日（与基础数据时间窗口一致）
-        recomputeScheduleDateFromParams(context);
-
-        // S4.2.1b 解析班次配置（无表数据则用默认模板），并写入上下文
+        // S4.2.1 解析班次配置（无表数据则用默认模板），并写入上下文
         try {
             lhShiftConfigService.resolveAndAttachScheduleShifts(context);
         } catch (IllegalArgumentException e) {
@@ -92,36 +82,6 @@ public class DataInitHandler extends AbsScheduleStepHandler {
 
         log.info("基础数据初始化完成, 机台数量: {}, 月计划SKU数: {}",
                 context.getMachineInfoMap().size(), context.getMonthPlanList().size());
-    }
-
-    /**
-     * 按分厂加载硫化参数到上下文
-     */
-    private void loadLhParams(LhScheduleContext context) {
-        List<LhParams> paramsList = lhParamsMapper.selectList(
-                new LambdaQueryWrapper<LhParams>()
-                        .eq(LhParams::getFactoryCode, context.getFactoryCode())
-                        .eq(LhParams::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
-        if (paramsList != null) {
-            for (LhParams param : paramsList) {
-                if (param.getParamCode() != null && param.getParamValue() != null) {
-                    context.getLhParamsMap().put(param.getParamCode(), param.getParamValue());
-                }
-            }
-        }
-        log.info("硫化参数加载完成, 参数数量: {}", context.getLhParamsMap().size());
-    }
-
-    /**
-     * 根据硫化参数 SCHEDULE_DAYS 与排程目标日重新计算引擎用 T 日
-     *
-     * @param context 排程上下文
-     */
-    private void recomputeScheduleDateFromParams(LhScheduleContext context) {
-        Date target = LhScheduleTimeUtil.clearTime(context.getScheduleTargetDate());
-        int scheduleDays = LhScheduleTimeUtil.getScheduleDays(context);
-        int offsetDays = Math.max(0, scheduleDays - 1);
-        context.setScheduleDate(LhScheduleTimeUtil.addDays(target, -offsetDays));
     }
 
     /**
@@ -169,21 +129,54 @@ public class DataInitHandler extends AbsScheduleStepHandler {
             if (context.getMachineOnlineInfoMap().containsKey(machineCode)) {
                 LhMachineOnlineInfo onlineInfo = context.getMachineOnlineInfoMap().get(machineCode);
                 dto.setCurrentMaterialCode(onlineInfo.getMaterialCode());
+                dto.setCurrentMaterialDesc(onlineInfo.getSpecDesc());
+                MdmMaterialInfo currentMaterial = context.getMaterialInfoMap().get(onlineInfo.getMaterialCode());
+                if (currentMaterial != null) {
+                    dto.setCurrentMaterialDesc(currentMaterial.getMaterialDesc());
+                    dto.setPreviousSpecCode(currentMaterial.getSpecifications());
+                    dto.setPreviousProSize(currentMaterial.getProSize());
+                }
             }
 
-            // 初始化设备停机信息（取最近一条计划停机，beginDate最早的为准）
+            // 初始化设备停机与维修信息（取 beginDate 最早的为准）
             for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
                 if (machineCode.equals(planShut.getMachineCode())) {
-                    dto.setPlanStopStartTime(planShut.getBeginDate());
-                    dto.setPlanStopEndTime(planShut.getEndDate());
-                    dto.setStopType(planShut.getMachineStopType());
-                    break;
+                    if (dto.getPlanStopStartTime() == null
+                            || (planShut.getBeginDate() != null && planShut.getBeginDate().before(dto.getPlanStopStartTime()))) {
+                        dto.setPlanStopStartTime(planShut.getBeginDate());
+                        dto.setPlanStopEndTime(planShut.getEndDate());
+                        dto.setStopType(planShut.getMachineStopType());
+                    }
+                    MachineStopTypeEnum stopTypeEnum = MachineStopTypeEnum.getByCode(planShut.getMachineStopType());
+                    if (stopTypeEnum == MachineStopTypeEnum.PLANNED_REPAIR
+                            || stopTypeEnum == MachineStopTypeEnum.TEMPORARY_FAULT) {
+                        dto.setHasRepairPlan(true);
+                        dto.setRepairPlanTime(earlier(dto.getRepairPlanTime(), planShut.getBeginDate()));
+                    }
                 }
             }
 
             // 初始化保养计划
             if (context.getMaintenancePlanMap().containsKey(machineCode)) {
-                dto.setHasMaintenancePlan(true);
+                Date maintenanceTime = context.getMaintenancePlanMap().get(machineCode).getOperTime();
+                if (maintenanceTime != null) {
+                    dto.setHasMaintenancePlan(true);
+                    dto.setMaintenancePlanTime(maintenanceTime);
+                }
+            }
+
+            // 初始化清洗计划
+            for (com.zlt.aps.lh.api.domain.entity.LhCleaningPlan cleaningPlan : context.getCleaningPlanList()) {
+                if (!machineCode.equals(cleaningPlan.getLhMachineCode())) {
+                    continue;
+                }
+                if (CleaningTypeEnum.DRY_ICE.getCode().equals(cleaningPlan.getPlanType())) {
+                    dto.setHasDryIceCleaning(true);
+                }
+                if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleaningPlan.getPlanType())) {
+                    dto.setHasSandBlastCleaning(true);
+                }
+                dto.setCleaningPlanTime(earlier(dto.getCleaningPlanTime(), cleaningPlan.getPlanTime()));
             }
 
             // 初始化胶囊使用次数
@@ -195,12 +188,67 @@ public class DataInitHandler extends AbsScheduleStepHandler {
 
             // 初始化各班次可用状态（默认全部可用）
             Arrays.fill(dto.getShiftAvailable(), true);
+            dto.setEstimatedEndTime(resolveInitialEstimatedEndTime(context, machineCode));
 
             machineScheduleMap.put(machineCode, dto);
         }
 
         context.setMachineScheduleMap(machineScheduleMap);
+        context.setInitialMachineScheduleMap(copyMachineStateMap(machineScheduleMap));
         log.info("机台排程状态对象封装完成, 机台数量: {}", machineScheduleMap.size());
+    }
+
+    private Date resolveInitialEstimatedEndTime(LhScheduleContext context, String machineCode) {
+        Date latestSpecEndTime = null;
+        for (com.zlt.aps.lh.api.domain.entity.LhScheduleResult result : context.getPreviousScheduleResultList()) {
+            if (!machineCode.equals(result.getLhMachineCode()) || result.getSpecEndTime() == null) {
+                continue;
+            }
+            if (latestSpecEndTime == null || result.getSpecEndTime().after(latestSpecEndTime)) {
+                latestSpecEndTime = result.getSpecEndTime();
+            }
+        }
+        if (latestSpecEndTime != null) {
+            return latestSpecEndTime;
+        }
+        if (context.getMachineOnlineInfoMap().containsKey(machineCode)) {
+            List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
+            if (!shifts.isEmpty() && shifts.get(0).getShiftStartDateTime() != null) {
+                return shifts.get(0).getShiftStartDateTime();
+            }
+        }
+        List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
+        if (!shifts.isEmpty() && shifts.get(0).getShiftStartDateTime() != null) {
+            return shifts.get(0).getShiftStartDateTime();
+        }
+        return context.getScheduleDate();
+    }
+
+    private Map<String, MachineScheduleDTO> copyMachineStateMap(Map<String, MachineScheduleDTO> sourceMap) {
+        Map<String, MachineScheduleDTO> snapshot = new LinkedHashMap<>(sourceMap.size());
+        for (Map.Entry<String, MachineScheduleDTO> entry : sourceMap.entrySet()) {
+            MachineScheduleDTO source = entry.getValue();
+            MachineScheduleDTO copy = new MachineScheduleDTO();
+            copy.setMachineCode(source.getMachineCode());
+            copy.setMachineName(source.getMachineName());
+            copy.setCurrentMaterialCode(source.getCurrentMaterialCode());
+            copy.setCurrentMaterialDesc(source.getCurrentMaterialDesc());
+            copy.setPreviousSpecCode(source.getPreviousSpecCode());
+            copy.setPreviousProSize(source.getPreviousProSize());
+            copy.setEstimatedEndTime(source.getEstimatedEndTime());
+            snapshot.put(entry.getKey(), copy);
+        }
+        return snapshot;
+    }
+
+    private Date earlier(Date current, Date candidate) {
+        if (candidate == null) {
+            return current;
+        }
+        if (current == null || candidate.before(current)) {
+            return candidate;
+        }
+        return current;
     }
 
     @Override

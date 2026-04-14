@@ -3,7 +3,16 @@ package com.zlt.aps.lh.context;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftRuntimeState;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
-import com.zlt.aps.lh.api.domain.entity.*;
+import com.zlt.aps.lh.api.domain.entity.LhCleaningPlan;
+import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleProcessLog;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.entity.LhShiftFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
+import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
@@ -22,6 +31,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 硫化排程上下文
@@ -50,6 +60,8 @@ public class LhScheduleContext {
     private String monthPlanVersion;
     /** 月计划排产版本 */
     private String productionVersion;
+    /** 本次排程配置快照 */
+    private LhScheduleConfig scheduleConfig;
 
     // ========== 硫化参数(从LhParams加载) ==========
 
@@ -97,11 +109,15 @@ public class LhScheduleContext {
     private List<SkuScheduleDTO> continuousSkuList = new ArrayList<>();
     /** 新增SKU列表 */
     private List<SkuScheduleDTO> newSpecSkuList = new ArrayList<>();
+    /** 前一日欠产/超产向当日传导的净值，key=materialCode */
+    private Map<String, Integer> carryForwardQtyMap = new HashMap<>();
 
     // ========== 机台分配状态 ==========
 
     /** 机台排程DTO Map, key=machineCode */
     private Map<String, MachineScheduleDTO> machineScheduleMap = new LinkedHashMap<>();
+    /** 机台初始状态快照，供换模计划和回归校验使用 */
+    private Map<String, MachineScheduleDTO> initialMachineScheduleMap = new LinkedHashMap<>();
     /** 机台剩余产能Map, key=machineCode, value=各班次剩余产能 */
     private Map<String, int[]> machineShiftCapacityMap = new LinkedHashMap<>();
     /** 班次运行态，key=班次索引 1～N（N≤8） */
@@ -157,6 +173,9 @@ public class LhScheduleContext {
      * @return 参数值
      */
     public String getParamValue(String paramCode, String defaultValue) {
+        if (Objects.nonNull(scheduleConfig)) {
+            return scheduleConfig.getParamValue(paramCode, defaultValue);
+        }
         return lhParamsMap.getOrDefault(paramCode, defaultValue);
     }
 
@@ -168,8 +187,11 @@ public class LhScheduleContext {
      * @return 参数值(整数)
      */
     public int getParamIntValue(String paramCode, int defaultValue) {
+        if (Objects.nonNull(scheduleConfig)) {
+            return scheduleConfig.getParamIntValue(paramCode, defaultValue);
+        }
         String value = lhParamsMap.get(paramCode);
-        if (value == null || value.trim().isEmpty()) {
+        if (StringUtils.isEmpty(value)) {
             return defaultValue;
         }
         try {
