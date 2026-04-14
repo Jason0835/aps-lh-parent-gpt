@@ -29,7 +29,8 @@
 </template>
 
 <script>
-import { listMouldCleanWarn, getMachineList } from "@/api/lh/mouldCleanWarn";
+import { listMouldCleanWarn } from "@/api/lh/mouldCleanWarn";
+import { listMachine } from "@/api/lh/machine";
 import { downloadLink } from "@/utils/ruoyi";
 
 export default {
@@ -209,11 +210,11 @@ export default {
     async loadMachineList() {
       this.machineLoading = true;
       try {
-        const res = await getMachineList({
+        const res = await listMachine({
           machineCode: "",
           pageSize: 1000,
         });
-        this.machineOptions = res.data || res || [];
+        this.machineOptions = res.rows || res.data || res || [];
       } catch (error) {
         console.error(error);
       } finally {
