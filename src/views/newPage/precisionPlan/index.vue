@@ -150,6 +150,10 @@ export default {
           prop: "remark",
           label: this.$t("ui.data.column.remark"),
         },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.lhPrecisionPlan.updateTime"),
+        },
       ];
     },
     searchColumns() {

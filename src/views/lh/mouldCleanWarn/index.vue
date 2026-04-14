@@ -92,8 +92,8 @@ export default {
           showOverflowTooltip: true
         },
         {
-          prop: "createTime",
-          label: this.$t("ui.data.column.mouldCleanWarn.createTime"),
+          prop: "updateTime",
+          label: this.$t("ui.data.column.mouldCleanWarn.updateTime"),
         },
       ];
 
@@ -106,13 +106,9 @@ export default {
           prop: "lhCode",
           type: "select",
           dictData: this.machineOptions,
-          props: {
-            label: "machineCode",
-            value: "machineCode",
-          },
+          labelKey: "machineCode",
+          valueKey: "machineCode",
           filterable: true,
-          loading: this.machineLoading,
-          onFocus: this.handleMachineFocus,
         },
         {
           label: this.$t("ui.data.column.mouldCleanWarn.operTime"),

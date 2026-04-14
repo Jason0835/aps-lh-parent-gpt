@@ -125,6 +125,10 @@ export default {
           label: this.$t("ui.data.column.mouldCleanPlan.remark"),
           showOverflowTooltip: true
         },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.mouldCleanPlan.updateTime"),
+        },
 
         {
           align: "center",
