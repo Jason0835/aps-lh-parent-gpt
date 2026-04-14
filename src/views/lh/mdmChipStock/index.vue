@@ -97,8 +97,12 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: "116",
+      },
+      query: {
+        factoryCode: "116",
+      },
     };
   },
   computed: {
@@ -308,6 +312,12 @@ export default {
     },
   },
   activated() {
+    this.search = {
+      factoryCode: "116",
+    };
+    this.query = {
+      factoryCode: "116",
+    };
     this.getList();
   },
 };

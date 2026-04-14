@@ -32,26 +32,22 @@
 import {
   editLhMouldChangePlan,
   getMachineList,
-  getMaterialList,
 } from "@/api/lh/lhMouldChangePlan";
 
 import infoForm from "@/views/components/infoForm.vue";
+import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 
 export default {
-  components: { infoForm },
+  components: { infoForm, materialCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
       loading: false,
       machineLoading: false,
-      beforeMaterialLoading: false,
-      afterMaterialLoading: false,
       visible: false,
       isEdit: false,
       form: {},
       machineOptions: [],
-      beforeMaterialOptions: [],
-      afterMaterialOptions: [],
       rules: {
         factoryCode: [
           {
@@ -69,9 +65,8 @@ export default {
         ],
         orderNo: [
           {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
+            required: false,
+            trigger: "change",
           },
         ],
         planDate: [
@@ -121,6 +116,8 @@ export default {
         {
           prop: "orderNo",
           label: this.$t("ui.data.column.lhMouldChangePlan.orderNo"),
+          disabled: true,
+          placeholder: "系统默认生成",
           maxlength: 64,
         },
         {
@@ -174,19 +171,14 @@ export default {
         {
           prop: "beforeMaterialCode",
           label: this.$t("ui.data.column.lhMouldChangePlan.beforeMaterialCode"),
-          type: "select",
-          dictData: this.beforeMaterialOptions,
-          props: {
-            label: "materialCode",
-            value: "materialCode",
-          },
-          filterable: true,
-          remote: true,
-          remoteMethod: this.remoteBeforeMaterialMethod,
-          loading: this.beforeMaterialLoading,
-          onFocus: this.handleBeforeMaterialFocus,
-          listeners: {
-            change: this.handleBeforeMaterialChange,
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.beforeMaterialCode}
+                v-model={form.beforeMaterialCode}
+                onChange={this.handleBeforeMaterialChange}
+              />
+            );
           },
         },
         {
@@ -205,19 +197,14 @@ export default {
         {
           prop: "afterMaterialCode",
           label: this.$t("ui.data.column.lhMouldChangePlan.afterMaterialCode"),
-          type: "select",
-          dictData: this.afterMaterialOptions,
-          props: {
-            label: "materialCode",
-            value: "materialCode",
-          },
-          filterable: true,
-          remote: true,
-          remoteMethod: this.remoteAfterMaterialMethod,
-          loading: this.afterMaterialLoading,
-          onFocus: this.handleAfterMaterialFocus,
-          listeners: {
-            change: this.handleAfterMaterialChange,
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.afterMaterialCode}
+                v-model={form.afterMaterialCode}
+                onChange={this.handleAfterMaterialChange}
+              />
+            );
           },
         },
         {
@@ -244,6 +231,7 @@ export default {
           type: "select",
           dictData: this.parentDict.type.IS_RELEASE,
           filterable: true,
+          disabled: true,
         },
         {
           prop: "mouldStatus",
@@ -251,6 +239,7 @@ export default {
           type: "select",
           dictData: this.parentDict.type.biz_yes_no,
           filterable: true,
+          disabled: true,
         },
         {
           prop: "remark",
@@ -282,44 +271,6 @@ export default {
         this.remoteMachineMethod("");
       }
     },
-    async remoteBeforeMaterialMethod(query) {
-      this.beforeMaterialLoading = true;
-      try {
-        const res = await getMaterialList({
-          materialCode: query || "",
-          pageSize: 10,
-        });
-        this.beforeMaterialOptions = res || [];
-      } catch (error) {
-        console.log(error);
-      } finally {
-        this.beforeMaterialLoading = false;
-      }
-    },
-    handleBeforeMaterialFocus() {
-      if (this.beforeMaterialOptions.length === 0) {
-        this.remoteBeforeMaterialMethod("");
-      }
-    },
-    async remoteAfterMaterialMethod(query) {
-      this.afterMaterialLoading = true;
-      try {
-        const res = await getMaterialList({
-          materialCode: query || "",
-          pageSize: 10,
-        });
-        this.afterMaterialOptions = res || [];
-      } catch (error) {
-        console.log(error);
-      } finally {
-        this.afterMaterialLoading = false;
-      }
-    },
-    handleAfterMaterialFocus() {
-      if (this.afterMaterialOptions.length === 0) {
-        this.remoteAfterMaterialMethod("");
-      }
-    },
     handleMachineChange(val) {
       if (val) {
         const item = this.machineOptions.find((i) => i.machineCode === val);
@@ -330,22 +281,16 @@ export default {
         this.$set(this.form, "lhMachineName", "");
       }
     },
-    handleBeforeMaterialChange(val) {
+    handleBeforeMaterialChange(val, row) {
       if (val) {
-        const item = this.beforeMaterialOptions.find((i) => i.materialCode === val);
-        if (item) {
-          this.$set(this.form, "beforeMaterialDesc", item.materialDesc || val);
-        }
+        this.$set(this.form, "beforeMaterialDesc", (row && row.materialDesc) || "");
       } else {
         this.$set(this.form, "beforeMaterialDesc", "");
       }
     },
-    handleAfterMaterialChange(val) {
+    handleAfterMaterialChange(val, row) {
       if (val) {
-        const item = this.afterMaterialOptions.find((i) => i.materialCode === val);
-        if (item) {
-          this.$set(this.form, "afterMaterialDesc", item.materialDesc || val);
-        }
+        this.$set(this.form, "afterMaterialDesc", (row && row.materialDesc) || "");
       } else {
         this.$set(this.form, "afterMaterialDesc", "");
       }
@@ -373,6 +318,10 @@ export default {
       if (data) {
         this.isEdit = true;
         this.form = { ...data };
+        if (data.isRelease === "1") {
+          this.$set(this.form, "isRelease", "4");
+          this.$set(this.form, "mouldStatus", "0");
+        }
         if (data.lhMachineCode) {
           this.machineOptions = [
             {
@@ -381,35 +330,19 @@ export default {
             },
           ];
         }
-        if (data.beforeMaterialCode) {
-          this.beforeMaterialOptions = [
-            {
-              materialCode: data.beforeMaterialCode,
-            },
-          ];
-        }
-        if (data.afterMaterialCode) {
-          this.afterMaterialOptions = [
-            {
-              materialCode: data.afterMaterialCode,
-            },
-          ];
-        }
       } else {
         this.isEdit = false;
         this.form = {
           factoryCode: "116",
+          isRelease: "0",
+          mouldStatus: "0",
         };
         this.machineOptions = [];
-        this.beforeMaterialOptions = [];
-        this.afterMaterialOptions = [];
       }
     },
     hide() {
       this.form = {};
       this.machineOptions = [];
-      this.beforeMaterialOptions = [];
-      this.afterMaterialOptions = [];
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;

@@ -35,7 +35,7 @@ import infoForm from "@/views/components/infoForm.vue";
 import structureSelect from "../components/structureSelect.vue";
 import materialCodeSelect from "../components/materialCodeSelect.vue";
 
-import { editMoldingParams } from "@/api/cx/keyPoduct";
+import { editMoldingParams } from "@/api/cx/keyProduct";
 
 export default {
   components: { infoForm,structureSelect,materialCodeSelect },

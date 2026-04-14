@@ -23,40 +23,17 @@
               {{ $t("ui.data.column.scheduleResult.baseInfo") }}
             </h4>
           </el-col>
+
+
           <el-col :span="12">
             <el-form-item
-              :label="$t('ui.data.column.scheduleResult.scheduleDate')"
-              prop="scheduleDate"
+              :label="$t('硫化机台')"
+              prop="lhMachineCode"
             >
-              <el-date-picker
-                class="w100"
-                v-model="form.scheduleDate"
-                type="date"
-                value-format="yyyy-MM-dd"
-                disabled
-              ></el-date-picker>
+              <el-input v-model="form.lhMachineCode" disabled></el-input>
             </el-form-item>
           </el-col>
-          <!-- <el-col :span="12">
-                <el-form-item
-                  :label="$t('ui.data.column.cxScheduleResult.taskType')"
-                  prop="taskType"
-                >
-                  <dict-select
-                    v-model="form.taskType"
-                    :options="parentDict.type.TASK_TYPE"
-                    disabled
-                  />
-                </el-form-item>
-              </el-col> -->
-          <el-col :span="12">
-            <el-form-item
-              :label="$t('ui.data.column.cxScheduleResult.cxMachineCode')"
-              prop="cxMachineCode"
-            >
-              <el-input v-model="form.cxMachineName" disabled></el-input>
-            </el-form-item>
-          </el-col>
+
           <el-col :span="12">
             <el-form-item
               :label="$t('物料编码')"
@@ -65,15 +42,35 @@
               <el-input v-model="form.materialCode" disabled></el-input>
             </el-form-item>
           </el-col>
+          <!-- <el-col :span="12">
+                <el-form-item
+                  :label="$t('ui.data.column.cxScheduleResult.maximumClassQty')"
+                  prop="maximumClassQty"
+                >
+                  <el-input v-model="form.maximumClassQty" disabled></el-input>
+                </el-form-item>
+              </el-col> -->
+          <!-- <el-col :span="12">
+                <el-form-item
+                  :label="
+                    $t('ui.data.column.cxScheduleResult.minimumLhMachineReqQty')
+                  "
+                  prop="minimumLhMachineReqQty"
+                >
+                  <el-input
+                    v-model="form.minimumLhMachineReqQty"
+                    disabled
+                  ></el-input>
+                </el-form-item>
+              </el-col> -->
           <el-col :span="12">
             <el-form-item
               :label="$t('物料描述')"
               prop="materialDesc"
             >
-              <el-input v-model="form.materialDesc" disabled></el-input>
+            <el-input v-model="form.materialDesc" disabled></el-input>
             </el-form-item>
           </el-col>
-
           <el-col :span="12">
             <el-form-item
               :label="$t('胎胚描述')"
@@ -82,6 +79,7 @@
               <el-input v-model="form.mainMaterialDesc" disabled></el-input>
             </el-form-item>
           </el-col>
+
           <el-col :span="12">
             <el-form-item
               :label="$t('合计余量')"
@@ -95,7 +93,7 @@
               :label="$t('胎胚库存')"
               prop="embryoStock"
             >
-              <el-input v-model="form.materialDesc" disabled></el-input>
+              <el-input v-model="form.embryoStock" disabled></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -106,7 +104,69 @@
               <el-input v-model="form.mouldSurplusQty" disabled></el-input>
             </el-form-item>
           </el-col>
+          <!-- <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.cxScheduleResult.sapCode')"
+              prop="sapCode"
+            >
+              <el-input v-model="form.sapCode" disabled></el-input>
+            </el-form-item>
+          </el-col>
 
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.cxScheduleResult.br.dayPlanQty.br')"
+              prop="class3PlannedQty"
+            >
+              <el-input v-model="form.class3PlannedQty" disabled></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.cxScheduleResult.singleShiftLhQty')"
+              prop="singleShiftLhQty"
+            >
+              <el-input v-model="form.singleShiftLhQty" disabled></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.cxScheduleResult.cxMonthFinishQty')"
+              prop="cxMonthFinishQty"
+            >
+              <el-input v-model="form.cxMonthFinishQty" disabled></el-input>
+            </el-form-item>
+          </el-col>
+
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.cxScheduleResult.totalStock')"
+              prop="totalStock"
+            >
+              <el-input v-model="form.totalStock" disabled></el-input>
+            </el-form-item>
+          </el-col>
+
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.scheduleResult.isRelease')"
+              prop="isRelease"
+            >
+              <dict-select
+                v-model="form.storageLocation"
+                :options="parentDict.type.IS_RELEASE"
+                disabled
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.cxScheduleResult.specDimension')"
+              prop="specDimension"
+            >
+              <el-input v-model="form.specDimension" disabled></el-input>
+            </el-form-item>
+          </el-col> -->
           <el-col :span="24">
             <el-form-item :label="$t('ui.common.column.remark')" prop="remark">
               <el-input
@@ -511,9 +571,14 @@ import infoForm from "@/views/components/infoForm.vue";
 
 import {
   validateChangeQty,
-  insertOrder,
+  cxScheduleResultEdit,
   getInfoChangePlan,
 } from "@/api/cx/cxScheduleResult";
+import {
+  changeQty,
+  getScheduleDate,
+} from "@/api/lh/scheduleResult";
+
 
 export default {
   components: { infoForm },
@@ -543,7 +608,7 @@ export default {
         //   },
         // ],
       },
-       dateList:[
+      dateList:[
       {
             "shift": 1,
             "shiftDate": ""
@@ -1005,6 +1070,15 @@ export default {
     },
   },
   methods: {
+    async getDate(date) {
+      try {
+        let res=await getScheduleDate({
+          scheduleDate: date,
+        });
+        console.log(res);
+        this.dateList=res
+      } catch (error) {}
+    },
     // api
     async getInfo(id) {
       try {
@@ -1043,7 +1117,7 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        const res = await insertOrder(params);
+        const res = await changeQty(params);
         this.loading = false;
         this.$modal.msgSuccess(
           this.$t("common.msg.ajax.operation.success")
@@ -1064,6 +1138,7 @@ export default {
         this.form = {
           ...data,
         };
+        this.getDate(data.scheduleDate)
         // this.getInfo(data.id);
 
         if (data.scheduleDate) {

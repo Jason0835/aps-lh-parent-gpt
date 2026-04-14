@@ -62,7 +62,7 @@
 //utils
 import { downloadLink } from "@/utils/request";
 //interface
-import { listMoldingParams, removeMoldingParams } from "@/api/cx/keyPoduct";
+import { listMoldingParams, removeMoldingParams } from "@/api/cx/keyProduct";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 

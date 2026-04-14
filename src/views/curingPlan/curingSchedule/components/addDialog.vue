@@ -92,11 +92,14 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.scheduleResult.factoryCode"),
+          label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           clearable: false,
+          listeners: {
+            change: this.handleScheduleDateChange,
+          },
         },
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
@@ -109,33 +112,32 @@ export default {
             change: this.handleScheduleDateChange,
           },
         },
-        {
-          label: this.$t("ui.data.column.scheduleResult.specCode"),
-          prop: "specCode",
-          listeners: {
-            blur: this.handleSpecCodeChange,
-            clear: this.handleSpecCodeClear,
-          },
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.sapCode"),
-          prop: "productCode",
-          type: "select",
-          dictData: this.sapCodeList,
-          disabled: this.sapCodeList.length == 0,
-          labelKey: "productCode",
-          valueKey: "productCode",
-          listeners: {
-            change: this.handleProductCodeChange,
-          },
-        },
+        // {
+        //   label: this.$t("ui.data.column.scheduleResult.specCode"),
+        //   prop: "specCode",
+        //   listeners: {
+        //     blur: this.handleSpecCodeChange,
+        //     clear: this.handleSpecCodeClear,
+        //   },
+        // },
+        // {
+        //   label: this.$t("ui.data.column.scheduleResult.sapCode"),
+        //   prop: "productCode",
+        //   type: "select",
+        //   dictData: this.sapCodeList,
+        //   disabled: this.sapCodeList.length == 0,
+        //   labelKey: "productCode",
+        //   valueKey: "productCode",
+        //   listeners: {
+        //     change: this.handleProductCodeChange,
+        //   },
+        // },
         {
           label: this.$t("ui.data.column.scheduleResult.lhMachineCode"),
           prop: "lhMachineCode",
           type: "select",
           dictData: this.curingMachines,
-          labelKey: "showLabel",
-          valueKey: "machineCode",
+
           filterable: true,
           disabled: this.curingMachines.length === 0,
         },
@@ -143,63 +145,95 @@ export default {
           label: this.$t("ui.data.column.scheduleResult.leftRightMold"),
           prop: "leftRightMold",
         },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.embryoCode"),
-        //   prop: "embryoCode",
-        //   maxlength: "30",
-        // },
         {
-          label: this.$t("ui.data.column.scheduleResult.class1PlanQty.lh"),
+          label: this.$t("一班计划"),
           prop: "class1PlanQty",
+          span: 24,
           type: "number",
-          min: 0,
-          max: 999999999,
-          precision: 0,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class1Analysis.lh"),
+          label: this.$t("一班备注"),
           prop: "class1Analysis",
-          maxlength: "66",
+          span: 24,
         },
-        {
-          label: this.$t("ui.data.column.scheduleResult.class2PlanQty.lh"),
+
+         {
+          label: this.$t("二班计划"),
           prop: "class2PlanQty",
+          span: 24,
           type: "number",
-          min: 0,
-          max: 999999999,
-          precision: 0,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class2Analysis.lh"),
+          label: this.$t("二班备注"),
           prop: "class2Analysis",
-          maxlength: "66",
+          span: 24,
         },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.class4PlanQty.lh"),
-        //   prop: "class4PlanQty",
-        //   type: "number",
-        //   min: 0,
-        //   max: 999999999,
-        //   precision: 0,
-        // },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.class4Analysis.lh"),
-        //   prop: "class4Analysis",
-        //   maxlength: "66",
-        // },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.class5PlanQty.lh"),
-        //   prop: "class5PlanQty",
-        //   type: "number",
-        //   min: 0,
-        //   max: 999999999,
-        //   precision: 0,
-        // },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.class5Analysis.lh"),
-        //   prop: "class5Analysis",
-        //   maxlength: "66",
-        // },
+         {
+          label: this.$t("三班计划"),
+          prop: "class3PlanQty",
+          span: 24,
+          type: "number",
+        },
+        {
+          label: this.$t("三班备注"),
+          prop: "class3Analysis",
+          span: 24,
+        },
+          {
+            label: this.$t("四班计划"),
+            prop: "class4PlanQty",
+            span: 24,
+            type: "number",
+          },
+          {
+            label: this.$t("四班备注"),
+            prop: "class4Analysis",
+            span: 24,
+          },
+          {
+            label: this.$t("五班计划"),
+            prop: "class5PlanQty",
+            span: 24,
+            type: "number",
+          },
+          {
+            label: this.$t("五班备注"),
+            prop: "class5Analysis",
+            span: 24,
+          },
+            {
+              label: this.$t("六班计划"),
+              prop: "class6PlanQty",
+              span: 24,
+              type: "number",
+            },
+            {
+              label: this.$t("六班备注"),
+              prop: "class6Analysis",
+              span: 24,
+            },
+            {
+              label: this.$t("七班计划"),
+              prop: "class7PlanQty",
+              span: 24,
+              type: "number",
+            },
+            {
+              label: this.$t("七班备注"),
+              prop: "class7Analysis",
+              span: 24,
+            },
+            {
+          label: this.$t("八班计划"),
+          prop: "class8PlanQty",
+          span: 24,
+          type: "number",
+        },
+        {
+          label: this.$t("八班备注"),
+          prop: "class8Analysis",
+          span: 24,
+        },
       ];
     },
   },
@@ -229,9 +263,10 @@ export default {
       let tomorrow = new Date(nowDate);
       tomorrow.setDate(nowDate.getDate() + 1);
       this.form = {
-        factoryCode: "",
+        factoryCode: "116",
         scheduleDate: tomorrow.toISOString().slice(0, 10), // 保留yyyy-MM-dd
       };
+      this.handleScheduleDateChange();
       // if (data) {
       //   this.isEdit = true;
       //   this.form = {
@@ -253,7 +288,7 @@ export default {
       this.handleProductCodeChange();
     },
     async handleSpecCodeChange() {
-      if (!this.form.factoryCode || !this.form.specCode) {
+      if (!this.form.factoryCode ) {
         return;
       }
       this.sapCodeList = [];
@@ -280,9 +315,8 @@ export default {
     async handleProductCodeChange() {
       if (
         !this.form.factoryCode ||
-        !this.form.productCode ||
-        !this.form.scheduleDate ||
-        !this.form.specCode
+
+        !this.form.scheduleDate
       ) {
         return;
       }
@@ -292,15 +326,20 @@ export default {
       try {
         const res = await getScheduleMachineInfo({
           factoryCode: this.form.factoryCode,
-          productCode: this.form.productCode,
+          // productCode: this.form.productCode,
           scheduleTime: this.form.scheduleDate,
-          specCode: this.form.specCode,
+          // specCode: this.form.specCode,
         });
         console.log(res);
-        this.curingMachines = res.map((item) => {
-          item.showLabel = `${item.machineCode}(剩余产能为${item.remainCapacity})`;
-          return item;
-        });
+        let list=[]
+        for(let i=0;i<res.length;i++){
+          list.push({
+            label: res[i].machineCode,
+            value: res[i].machineCode,
+          })
+        }
+        this.curingMachines = list
+        console.log(this.curingMachines);
       } catch (error) {
         console.error(error);
       }

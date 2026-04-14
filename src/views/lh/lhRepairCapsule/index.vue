@@ -17,11 +17,18 @@
       :showSummary="false"
       :selectArea="false"
     >
+      <template slot="header">
+        <el-button
+          @click="handleExport"
+          v-hasPermi="['lh:lhRepairCapsule:export']"
+        >{{ $t("ui.frame.btn.export") }}</el-button>
+      </template>
     </page-table>
   </basic-container>
 </template>
 
 <script>
+import { downloadLink } from "@/utils/request";
 import { listLhRepairCapsule } from "@/api/lh/lhRepairCapsule";
 
 export default {
@@ -38,8 +45,12 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: "116",
+      },
+      query: {
+        factoryCode: "116",
+      },
     };
   },
   computed: {
@@ -117,10 +128,7 @@ export default {
           label: this.$t("ui.data.column.lhRepairCapsule.obtainTime"),
           prop: "obtainTime",
           type: "date",
-          dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
-          startPlaceholder: this.$t("common.startTime"),
-          endPlaceholder: this.$t("common.endTime"),
         },
         {
           label: this.$t("ui.data.column.lhRepairCapsule.lhCode"),
@@ -143,9 +151,10 @@ export default {
   methods: {
     handleSearch(data) {
       this.query = data;
-      if (data.obtainTime && data.obtainTime.length === 2) {
-        this.query.obtainTimeBegin = data.obtainTime[0];
-        this.query.obtainTimeEnd = data.obtainTime[1];
+      if (data.obtainTime) {
+        // Backend expects begin/end fields; single-date search maps to that day.
+        this.query.obtainTimeBegin = data.obtainTime;
+        this.query.obtainTimeEnd = data.obtainTime;
         delete this.query.obtainTime;
       } else {
         delete this.query.obtainTimeBegin;
@@ -173,13 +182,18 @@ export default {
     handleSelectionChange(rows) {
       this.selection = rows;
     },
-    formatParams() {
+    handleExport() {
+      downloadLink("/lh/lhRepairCapsule/export", this.formatParams(false));
+    },
+    formatParams(hasPage = true) {
       const params = {
         ...this.query,
         ...this.sort,
-        pageSize: this.page.pageSize,
-        pageNum: this.page.current,
       };
+      if (hasPage) {
+        params.pageSize = this.page.pageSize;
+        params.pageNum = this.page.current;
+      }
       return params;
     },
     async getList() {
@@ -196,6 +210,12 @@ export default {
     },
   },
   activated() {
+    this.search = {
+      factoryCode: "116",
+    };
+    this.query = {
+      factoryCode: "116",
+    };
     this.getList();
   },
 };

@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="cxPrecisionPlanTable"
+      tableRef="cxPrecisionPlanMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -18,25 +18,45 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button type="primary" plain v-hasPermi="['cx:cxPrecisionPlan:edit']" @click="handleAdd">
-          {{ $t('ui.frame.btn.add') }}
-        </el-button>
-        <el-button v-hasPermi="['cx:cxPrecisionPlan:edit']" :disabled="selection.length !== 1" @click="handleEdit(selection[0])">
+        <el-button
+          v-hasPermi="['cx:cxPrecisionPlan:edit']"
+          :disabled="selection.length !== 1"
+          @click="handleBatchEdit"
+        >
           {{ $t('ui.frame.btn.update') }}
         </el-button>
-        <el-button type="danger" v-hasPermi="['cx:cxPrecisionPlan:remove']" :disabled="selection.length === 0" @click="handleDelete">
+        <el-button
+          type="primary"
+          plain
+          v-hasPermi="['cx:cxPrecisionPlan:sync']"
+          @click="handleSyncFromMes"
+        >
+          {{ $t('ui.lh.precision.plan.sync.from.mes') }}
+        </el-button>
+        <el-button
+          type="danger"
+          v-hasPermi="['cx:cxPrecisionPlan:remove']"
+          :disabled="selection.length === 0"
+          @click="handleDeleteAll"
+        >
           {{ $t('ui.frame.btn.delete') }}
         </el-button>
-        <el-button v-hasPermi="['cx:cxPrecisionPlan:import']" @click="$refs.uploadRef.handleImport()">
+        <el-button
+          v-hasPermi="['cx:cxPrecisionPlan:import']"
+          @click="$refs.tltUpload.handleImport()"
+        >
           {{ $t('ui.frame.btn.import') }}
         </el-button>
-        <el-button v-hasPermi="['cx:cxPrecisionPlan:export']" @click="handleExport">
+        <el-button
+          v-hasPermi="['cx:cxPrecisionPlan:export']"
+          @click="handleExport"
+        >
           {{ $t('ui.frame.btn.export') }}
         </el-button>
       </template>
     </page-table>
     <tlt-upload-form
-      ref="uploadRef"
+      ref="tltUpload"
       :updateSupport="true"
       :downloadUrl="importTemplateUrl"
       :uploadUrl="importUrl"
@@ -44,13 +64,13 @@
       labelWidth="0"
       :columns="importColumns"
     />
-    <info-dialog ref="infoRef" @success="getList" />
+    <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 
 <script>
 import { downloadLink } from '@/utils/request'
-import { listCxPrecisionPlan, removeCxPrecisionPlan } from '@/api/cx/cxPrecisionPlan'
+import { listCxPrecisionPlan, removeCxPrecisionPlan, syncFromMes } from '@/api/cx/cxPrecisionPlan'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import infoDialog from './components/infoDialog.vue'
 
@@ -92,11 +112,10 @@ export default {
       return [
         {
           prop: 'factoryCode',
-          label: this.$t('ui.data.column.cxPrecisionPlan.factoryCode'),
+          label: this.$t('common.factory'),
           type: 'select',
           dictData: this.dict.type.biz_factory_name,
-          filterable: true,
-          clearable: true
+          filterable: true
         },
         {
           prop: 'machineName',
@@ -111,8 +130,7 @@ export default {
           dateType: 'daterange',
           valueFormat: 'yyyy-MM-dd',
           startPlaceholder: this.$t('common.startTime'),
-          endPlaceholder: this.$t('common.endTime'),
-          clearable: true
+          endPlaceholder: this.$t('common.endTime')
         }
       ]
     },
@@ -123,10 +141,10 @@ export default {
           prop: 'factoryCode',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxPrecisionPlan.factoryCode'),
+          label: this.$t('common.factory'),
           minWidth: 100,
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value)
           }
         },
         {
@@ -156,9 +174,9 @@ export default {
           halign: 'center',
           label: this.$t('ui.data.column.cxPrecisionPlan.planShift'),
           minWidth: 80,
-        formatter: (row, column, value) => {
-          return this.selectDictLabel(this.dict.type.class_num_three_plan, value);
-        }
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.class_num_three_plan, value)
+          }
         },
         {
           prop: 'planStartTime',
@@ -203,17 +221,29 @@ export default {
           minWidth: 120
         },
         {
+          prop: 'cycleDays',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxPrecisionPlan.cycleDays'),
+          minWidth: 100
+        },
+        {
+          prop: 'scheduleDate',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxPrecisionPlan.scheduleDate'),
+          minWidth: 120
+        },
+        {
           prop: 'remark',
           halign: 'center',
           label: this.$t('ui.common.column.remark'),
           minWidth: 140
         },
         {
-          prop: 'option',
           align: 'center',
-          halign: 'center',
           label: this.$t('ui.data.btn.option'),
-          minWidth: 130,
+          width: 180,
           render: ({ row }) => {
             return (
               <div>
@@ -241,31 +271,60 @@ export default {
     }
   },
   methods: {
-    handleAdd() {
-      this.$refs.infoRef.show()
-    },
-    handleEdit(row) {
-      if (row) this.$refs.infoRef.show(row)
-    },
-    handleDelete(row) {
-      this.$confirm(this.$t('common.confirm.delete'), { type: 'warning' }).then(() => {
-        const ids = row && row.id ? row.id : this.selection.map(r => r.id).join(',')
+    handleSyncFromMes() {
+      const currentYear = new Date().getFullYear()
+      this.$confirm(this.$t('ui.lh.precision.plan.sync.confirm'), {
+        type: 'warning'
+      }).then(() => {
         this.loading = true
-        removeCxPrecisionPlan(ids)
-          .then(res => {
-            this.$modal.msgSuccess(res.msg)
-            this.page.current = 1
+        syncFromMes(currentYear)
+          .then((res) => {
+            this.$modal.msgSuccess(res.msg || this.$t('common.success'))
             this.getList()
           })
-          .finally(() => (this.loading = false))
+          .catch(() => {
+            this.loading = false
+          })
+      })
+    },
+    handleEdit(row) {
+      if (this.$refs.infoRef) {
+        this.$refs.infoRef.show(row)
+      }
+    },
+    handleBatchEdit() {
+      if (this.selection && this.selection.length === 1) {
+        this.handleEdit(this.selection[0])
+      }
+    },
+    handleDeleteAll() {
+      const ids = this.selection.map(item => item.id).join(',')
+      this.$confirm(this.$t('common.confirm.delete'), {
+        type: 'warning'
+      }).then(() => {
+        removeCxPrecisionPlan(ids).then((data) => {
+          this.$modal.msgSuccess(data.msg || this.$t('common.success'))
+          this.$set(this.page, 'current', 1)
+          this.getList()
+        })
+      })
+    },
+    handleDelete(row) {
+      this.$confirm(this.$t('common.confirm.delete'), {
+        type: 'warning'
+      }).then(() => {
+        removeCxPrecisionPlan(row.id).then((data) => {
+          this.$modal.msgSuccess(data.msg || this.$t('common.success'))
+          this.$set(this.page, 'current', 1)
+          this.getList()
+        })
       })
     },
     handleExport() {
-      downloadLink("/cx/cxPrecisionPlan/export", this.formatParams(false));
+      downloadLink('/cx/cxPrecisionPlan/export', this.formatParams(false))
     },
     handleSearch(data) {
       this.query = { ...data }
-      // 处理计划日期区间
       if (data.planDate && data.planDate.length === 2) {
         this.query.planDateBegin = data.planDate[0]
         this.query.planDateEnd = data.planDate[1]
@@ -274,12 +333,12 @@ export default {
         this.query.planDateEnd = undefined
       }
       delete this.query.planDate
-      this.page.current = 1
+      this.$set(this.page, 'current', 1)
       this.getList()
     },
     handlePageChange(current, pageSize) {
-      this.page.current = current
-      this.page.pageSize = pageSize
+      this.$set(this.page, 'current', current)
+      this.$set(this.page, 'pageSize', pageSize)
       this.getList()
     },
     handleSortChange({ prop, order }) {
@@ -313,12 +372,27 @@ export default {
         const res = await listCxPrecisionPlan(this.formatParams())
         this.data = res.rows || []
         this.page.total = res.total || 0
+      } catch (error) {
+        console.error(error)
       } finally {
         this.loading = false
       }
     }
   },
-  activated() {
+  created() {
+    const today = new Date()
+    const defaultDate = today.toISOString().split('T')[0]
+    const defaultParams = {
+      factoryCode: '116',
+      planDateBegin: defaultDate,
+      planDateEnd: defaultDate
+    }
+    this.search = {
+      ...defaultParams
+    }
+    this.query = {
+      ...defaultParams
+    }
     this.getList()
   }
 }

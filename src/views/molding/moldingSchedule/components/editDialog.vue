@@ -279,7 +279,7 @@ export default {
 
         // ui.data.column.scheduleResult.class1
         {
-          label: this.$t("ui.data.column.scheduleResult.class2"),
+          label: this.$t("早班"),
           type: "title",
         },
         // {
@@ -318,7 +318,7 @@ export default {
 
         //  ui.data.column.scheduleResult.class2
         {
-          label: this.$t("ui.data.column.scheduleResult.class3"),
+          label: this.$t("中班"),
           type: "title",
         },
         // {
@@ -337,17 +337,17 @@ export default {
           type: "number",
           min: 0,
         },
-        {
-          label: this.$t("ui.data.column.scheduleResult.class2ModifySort"),
-          prop: "class2ModifySort",
-          span: 12,
-          // disabled: true,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.class2ModifyQty"),
-          prop: "class2ModifyQty",
-          span: 12,
-        },
+        // {
+        //   label: this.$t("ui.data.column.scheduleResult.class2ModifySort"),
+        //   prop: "class2ModifySort",
+        //   span: 12,
+        //   // disabled: true,
+        // },
+        // {
+        //   label: this.$t("ui.data.column.scheduleResult.class2ModifyQty"),
+        //   prop: "class2ModifyQty",
+        //   span: 12,
+        // },
         {
           label: this.$t("ui.data.column.scheduleResult.finish"),
           prop: "class2FinishQty",
@@ -367,60 +367,45 @@ export default {
           disabled: true,
         },
 
-        // ui.data.column.scheduleResult.class3
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.class3"),
-        //   type: "title",
-        // },
-        // {
-        //   label: this.$t(
-        //     "ui.data.column.cxScheduleResult.class3AvailableLhShift"
-        //   ),
-        //   prop: "class3AvailableLhShift",
-        //   span: 12,
-        //   disabled: true,
-        // },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.plan"),
-        //   prop: "class3PlanQty",
-        //   span: 12,
-        //   disabled: true,
-        //   type: "number",
-        //   min: 0,
-        // },
+        {
+          label: this.$t("晚班"),
+          type: "title",
+        },
 
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.finish"),
-        //   prop: "class3FinishQty",
-        //   span: 12,
-        //   disabled: true,
-        // },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.analysis"),
-        //   prop: "class3AnalysisInput",
-        //   span: 12,
-        //   maxlength: "66",
-        // },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.analySystem"),
-        //   prop: "class3Analysis",
-        //   span: 12,
-        //   disabled: true,
-        // },
+        {
+          label: this.$t("ui.data.column.scheduleResult.plan"),
+          prop: "class3PlanQty",
+          span: 12,
+          disabled: true,
+          type: "number",
+          min: 0,
+        },
+
+        {
+          label: this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class3FinishQty",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.analysis"),
+          prop: "class3AnalysisInput",
+          span: 12,
+          maxlength: "66",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.analySystem"),
+          prop: "class3Analysis",
+          span: 12,
+          disabled: true,
+        },
 
         // ui.data.column.scheduleResult.class4
         {
-          label: this.$t("ui.data.column.scheduleResult.class4"),
+          label: this.$t("早班"),
           type: "title",
         },
-        // {
-        //   label: this.$t(
-        //     "ui.data.column.cxScheduleResult.class4AvailableLhShift"
-        //   ),
-        //   prop: "class4AvailableLhShift",
-        //   span: 12,
-        //   disabled: true,
-        // },
+
         {
           label: this.$t("ui.data.column.scheduleResult.plan"),
           prop: "class4PlanQty",
@@ -450,17 +435,10 @@ export default {
 
         // ui.data.column.scheduleResult.class5
         {
-          label: this.$t("ui.data.column.scheduleResult.class5"),
+          label: this.$t("中班"),
           type: "title",
         },
-        // {
-        //   label: this.$t(
-        //     "ui.data.column.cxScheduleResult.class5AvailableLhShift"
-        //   ),
-        //   prop: "class5AvailableLhShift",
-        //   span: 12,
-        //   disabled: true,
-        // },
+
 
         {
           label: this.$t("ui.data.column.scheduleResult.plan"),
@@ -485,6 +463,103 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.analySystem"),
           prop: "class5Analysis",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("晚班"),
+          type: "title",
+        },
+
+        {
+          label: this.$t("ui.data.column.scheduleResult.plan"),
+          prop: "class6PlanQty",
+          span: 12,
+          disabled: true,
+          type: "number",
+          min: 0,
+        },
+
+        {
+          label: this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class6FinishQty",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.analysis"),
+          prop: "class6AnalysisInput",
+          span: 12,
+          maxlength: "66",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.analySystem"),
+          prop: "class6Analysis",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("早班"),
+          type: "title",
+        },
+
+        {
+          label: this.$t("ui.data.column.scheduleResult.plan"),
+          prop: "class7PlanQty",
+          span: 12,
+          disabled: true,
+          type: "number",
+          min: 0,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class7FinishQty",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.analysis"),
+          prop: "class7AnalysisInput",
+          span: 12,
+          maxlength: "66",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.analySystem"),
+          prop: "class7Analysis",
+          span: 12,
+          disabled: true,
+        },
+
+        // ui.data.column.scheduleResult.class5
+        {
+          label: this.$t("中班"),
+          type: "title",
+        },
+
+
+        {
+          label: this.$t("ui.data.column.scheduleResult.plan"),
+          prop: "class8PlanQty",
+          span: 12,
+          disabled: true,
+          type: "number",
+          min: 0,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class8FinishQty",
+          span: 12,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.analysis"),
+          prop: "class8AnalysisInput",
+          span: 12,
+          maxlength: "66",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.analySystem"),
+          prop: "class8Analysis",
           span: 12,
           disabled: true,
         },

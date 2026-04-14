@@ -47,7 +47,7 @@
            type="success"
            v-hasPermi="['lh:lhMouldChangePlan:issue']"
            @click="handleIssueSchedule"
-           :disabled="selection.length == 0"
+           :disabled="!canIssueSchedule"
          >{{ $t("ui.data.btn.lhMouldChangePlan.issueSchedule") }}</el-button>
        </template>
     </page-table>
@@ -65,7 +65,7 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule } from "@/api/lh/lhMouldChangePlan";
+import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule, issueScheduleByQuery } from "@/api/lh/lhMouldChangePlan";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -108,8 +108,14 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: "116",
+        scheduleDate: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+      },
+      query: {
+        factoryCode: "116",
+        scheduleDate: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+      },
     };
   },
   computed: {
@@ -269,34 +275,35 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.lhMouldChangePlan.lhResultBatchNo"),
-          prop: "lhResultBatchNo",
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
         },
         {
-          label: this.$t("ui.data.column.lhMouldChangePlan.orderNo"),
-          prop: "orderNo",
+          label: this.$t("ui.data.column.lhMouldChangePlan.lhResultBatchNo"),
+          prop: "lhResultBatchNo",
         },
         {
           label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineCode"),
           prop: "lhMachineCode",
         },
         {
+          label: this.$t("ui.data.column.lhMouldChangePlan.orderNo"),
+          prop: "orderNo",
+        },
+        {
           label: this.$t("ui.data.column.lhMouldChangePlan.planDate"),
           prop: "planDate",
           type: "date",
-          dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
-          startPlaceholder: this.$t("common.startTime"),
-          endPlaceholder: this.$t("common.endTime"),
         },
         {
           label: this.$t("ui.data.column.lhMouldChangePlan.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
-          dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
-          startPlaceholder: this.$t("common.startTime"),
-          endPlaceholder: this.$t("common.endTime"),
         },
         {
           label: this.$t("ui.data.column.lhMouldChangePlan.mouldCode"),
@@ -309,18 +316,20 @@ export default {
           dictData: this.dict.type.IS_RELEASE,
           filterable: true,
         },
-
-        {
-          label: this.$t("ui.data.column.factoryCode"),
-          prop: "factoryCode",
-          type: "select",
-          dictData: this.dict.type.biz_factory_name,
-          filterable: true,
-        },
       ];
+    },
+    canIssueSchedule() {
+      return (this.selection && this.selection.length > 0) || !!(this.query && this.query.scheduleDate);
     },
   },
   methods: {
+    getTodayDate() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    },
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
@@ -366,22 +375,6 @@ export default {
     },
     handleSearch(data) {
       this.query = data;
-      if (data.planDate && data.planDate.length === 2) {
-        this.query.planDateStart = data.planDate[0];
-        this.query.planDateEnd = data.planDate[1];
-        delete this.query.planDate;
-      } else {
-        delete this.query.planDateStart;
-        delete this.query.planDateEnd;
-      }
-      if (data.scheduleDate && data.scheduleDate.length === 2) {
-        this.query.scheduleDateStart = data.scheduleDate[0];
-        this.query.scheduleDateEnd = data.scheduleDate[1];
-        delete this.query.scheduleDate;
-      } else {
-        delete this.query.scheduleDateStart;
-        delete this.query.scheduleDateEnd;
-      }
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -431,15 +424,20 @@ export default {
             }
         },
         handleIssueSchedule() {
-            if (!this.selection || this.selection.length === 0) {
-                this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+            const hasSelection = this.selection && this.selection.length > 0;
+            if (!hasSelection && !(this.query && this.query.scheduleDate)) {
+                this.$modal.msgWarning(this.$t("ui.message.param.error"));
                 return;
             }
+
             this.$confirm(this.$t("ui.data.alert.lhMouldChangePlan.issueConfirm"), {
                 type: "warning",
             }).then(() => {
-                const ids = this.selection.map((item) => item.id);
-                issueSchedule(ids).then((res) => {
+                const request = hasSelection
+                  ? issueSchedule(this.selection.map((item) => item.id))
+                  : issueScheduleByQuery({ ...this.query });
+
+                request.then((res) => {
                     this.$modal.msgSuccess(res.msg);
                     this.$set(this.page, "current", 1);
                     this.getList();
@@ -448,6 +446,15 @@ export default {
         },
     },
     activated() {
+        const today = this.getTodayDate();
+        this.search = {
+            factoryCode: "116",
+            scheduleDate: today,
+        };
+        this.query = {
+            factoryCode: "116",
+            scheduleDate: today,
+        };
         this.getList();
     },
 };
