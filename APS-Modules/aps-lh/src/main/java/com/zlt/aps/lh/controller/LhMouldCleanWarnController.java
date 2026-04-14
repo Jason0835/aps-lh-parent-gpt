@@ -87,6 +87,20 @@ public class LhMouldCleanWarnController extends AbstractDocBizController<LhMould
         if (queryVO.getOperTimeEnd() != null) {
             queryWrapper.le("OPER_TIME", DateUtil.endOfDay(DateUtil.parse(queryVO.getOperTimeEnd())));
         }
+
+        if (queryVO.getFirstWashTimeBegin() != null) {
+            queryWrapper.ge("FIRST_WASH_TIME", DateUtil.parse(queryVO.getFirstWashTimeBegin()));
+        }
+        if (queryVO.getFirstWashTimeEnd() != null) {
+            queryWrapper.le("FIRST_WASH_TIME", DateUtil.endOfDay(DateUtil.parse(queryVO.getFirstWashTimeEnd())));
+        }
+
+        if (queryVO.getSecondWashTimeBegin() != null) {
+            queryWrapper.ge("SECOND_WASH_TIME", DateUtil.parse(queryVO.getSecondWashTimeBegin()));
+        }
+        if (queryVO.getSecondWashTimeEnd() != null) {
+            queryWrapper.le("SECOND_WASH_TIME", DateUtil.endOfDay(DateUtil.parse(queryVO.getSecondWashTimeEnd())));
+        }
     }
 
     @Override
