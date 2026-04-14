@@ -42,6 +42,7 @@
 
         <el-button
           type="warning"
+          v-hasPermi="['lh:mouldCleanPlan:warn']"
           @click="handleViewWarn"
           >{{ $t("ui.mould.clean.plan.view.warn") }}</el-button
         >
