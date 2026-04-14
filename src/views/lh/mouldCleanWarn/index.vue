@@ -228,6 +228,7 @@ export default {
   },
   mounted() {
     this.getList();
+    this.loadMachineList();
   },
 };
 </script>
