@@ -229,6 +229,17 @@ export default {
       }
     },
   },
+  created() {
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
+  },
   mounted() {
     this.getList();
     this.loadMachineList();
