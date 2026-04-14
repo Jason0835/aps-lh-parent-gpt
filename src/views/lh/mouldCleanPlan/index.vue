@@ -39,6 +39,12 @@
           @click="handleSyncFromWarn"
           >{{ $t("ui.mould.clean.plan.sync.from.warn") }}</el-button
         >
+
+        <el-button
+          type="warning"
+          @click="handleViewWarn"
+          >{{ $t("ui.mould.clean.plan.view.warn") }}</el-button
+        >
       </template>
     </page-table>
 
@@ -216,6 +222,12 @@ export default {
         } catch (error) {
           console.error(error);
         }
+      });
+    },
+
+    handleViewWarn() {
+      this.$router.push({
+        path: "/lh/mouldCleanWarn",
       });
     },
 

@@ -2212,6 +2212,7 @@
   "ui.data.column.mouldCleanPlan.dataVersion": "版本号",
   "ui.data.column.mouldCleanPlan.leftRightMould": "左右模",
   "ui.mould.clean.plan.sync.from.warn": "从预警同步",
+  "ui.mould.clean.plan.view.warn": "查看预警",
   "ui.mould.clean.plan.sync.confirm": "是否从模具清洗预警同步生成计划？",
   "ui.mould.clean.plan.sync.success": "成功生成{0}条模具清洗计划",
   "ui.data.column.mouldCleanWarn.modelName": "模具清洗预警",
