@@ -71,7 +71,7 @@ export function lhValidateAutoPlan(query) {
  * @param {Object} query
  * @param {string} query.scheduleDate 排程日期
  * @param {string} [query.factoryCode] 工厂编码
- * @returns
+ * @returns {Promise<{ success?: boolean, message?: string, batchNo?: string, msg?: string }>}
  */
 export function autoPlan(query) {
   return request({

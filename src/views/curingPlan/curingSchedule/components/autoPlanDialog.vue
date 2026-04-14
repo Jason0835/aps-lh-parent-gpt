@@ -106,8 +106,18 @@ export default {
         //   this.$modal.msgError(this.$t("ui.biz.alter.CanNotRecreate"));
         // }
         const data = await autoPlan(params);
-        this.$modal.msgSuccess(data.msg);
-        this.$emit("success", params);
+        // 接口返回：{ success, message, batchNo }；兼容旧版 { msg }
+        const tip = data.message || data.msg || "";
+        if (data.success === false) {
+          this.$modal.msgError(
+            tip || this.$t("ui.data.btn.ajax.code.msg")
+          );
+          return;
+        }
+        this.$modal.msgSuccess(
+          tip || this.$t("common.msg.ajax.operation.success")
+        );
+        this.$emit("success", { ...params, batchNo: data.batchNo });
         this.hide();
       } catch (error) {
         console.log(error);
