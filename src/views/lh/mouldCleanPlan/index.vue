@@ -227,9 +227,10 @@ export default {
     },
 
     handleViewWarn() {
-      this.$router.push({
-        path: "/lh/mouldCleanWarn",
+      const routeData = this.$router.resolve({
+        name: "LhMouldCleanWarn",
       });
+      window.open(routeData.href, "_blank");
     },
 
     handleDeleteAll() {
