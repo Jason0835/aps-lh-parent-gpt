@@ -39,7 +39,7 @@ module.exports = {
         // target: `http://192.168.2.24:9066`,
         changeOrigin: true,
         pathRewrite: {
-          ["^" + process.env.VUE_APP_BASE_API]: "",
+          ["^" + process.env.VUE_APP_BASE_API]: "tltaps",
         },
       },
       // ["/lang"]: {
