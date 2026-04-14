@@ -231,18 +231,11 @@ export default {
     },
 
     handleDeleteAll() {
-      let ids = "";
-      for (let i = 0; i < this.selection.length; i++) {
-        if (i == this.selection.length - 1) {
-          ids = ids + this.selection[i].id;
-        } else {
-          ids = ids + this.selection[i].id + ",";
-        }
-      }
+      let ids = this.selection.map(item => item.id).join(",");
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeMouldCleanPlan({ ids }).then((data) => {
+        removeMouldCleanPlan([ids]).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -254,7 +247,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeMouldCleanPlan({ ids }).then((data) => {
+        removeMouldCleanPlan([ids]).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
