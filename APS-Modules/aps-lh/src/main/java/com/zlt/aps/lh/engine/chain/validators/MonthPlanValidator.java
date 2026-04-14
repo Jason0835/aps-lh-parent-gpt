@@ -1,8 +1,8 @@
 package com.zlt.aps.lh.engine.chain.validators;
 
 import com.zlt.aps.lh.api.constant.LhDataValidationGroupConstant;
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.enums.ValidationPolicyEnum;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.chain.IDataValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -20,7 +20,8 @@ public class MonthPlanValidator implements IDataValidator {
     public boolean validate(LhScheduleContext context) {
         if (context.getMonthPlanList() == null || context.getMonthPlanList().isEmpty()) {
             log.warn("月生产计划数据为空, 工厂: {}", context.getFactoryCode());
-            context.addValidationError("[" + getValidatorName() + "] 月生产计划数据为空, 工厂: " + context.getFactoryCode());
+            context.addValidationError("[" + getValidatorName() + "] 月生产计划数据为空, 工厂: "
+                    + context.getFactoryDisplayName());
             return false;
         }
         long invalidCount = context.getMonthPlanList().stream()

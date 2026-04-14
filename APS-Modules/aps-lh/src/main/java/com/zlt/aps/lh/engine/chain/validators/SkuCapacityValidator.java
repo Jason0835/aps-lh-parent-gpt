@@ -1,8 +1,8 @@
 package com.zlt.aps.lh.engine.chain.validators;
 
 import com.zlt.aps.lh.api.constant.LhDataValidationGroupConstant;
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.enums.ValidationPolicyEnum;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.chain.IDataValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -20,7 +20,8 @@ public class SkuCapacityValidator implements IDataValidator {
     public boolean validate(LhScheduleContext context) {
         if (context.getSkuLhCapacityMap() == null || context.getSkuLhCapacityMap().isEmpty()) {
             log.warn("SKU日硫化产能数据为空, 工厂: {}", context.getFactoryCode());
-            context.addValidationError("[" + getValidatorName() + "] SKU日硫化产能数据为空, 工厂: " + context.getFactoryCode());
+            context.addValidationError("[" + getValidatorName() + "] SKU日硫化产能数据为空, 工厂: "
+                    + context.getFactoryDisplayName());
             return false;
         }
         long missingCapacityCount = context.getMonthPlanList().stream()
