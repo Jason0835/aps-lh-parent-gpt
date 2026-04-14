@@ -78,9 +78,9 @@ export function autoPlan(query) {
     url: '/lh/lhScheduleResult/execute',
     method: 'post',
     data: query,
-    // headers: {
-    //   'Content-Type': 'application/json;charset=UTF-8'
-    // },
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
   })
 }
 /**
