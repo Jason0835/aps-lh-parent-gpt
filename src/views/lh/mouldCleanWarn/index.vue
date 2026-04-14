@@ -52,12 +52,8 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {
-        factoryCode: "VN",
-      },
-      query: {
-        factoryCode: "VN",
-      },
+      search: {},
+      query: {},
       machineOptions: [],
       machineLoading: false,
     };
@@ -105,11 +101,11 @@ export default {
     },
     searchColumns() {
       return [
-        {
-          prop: "factoryCode",
+       {
           label: this.$t("common.factory"),
+          prop: "factoryCode",
           type: "select",
-          dicData: this.dict.type.biz_factory_name,
+          dictData: this.dict.type.biz_factory_name,
         },
         {
           label: this.$t("ui.data.column.mouldCleanWarn.lhCode"),
