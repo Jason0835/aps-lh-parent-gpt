@@ -120,6 +120,20 @@ export default {
           dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
         },
+        {
+          label: this.$t("ui.data.column.mouldCleanWarn.firstWashTime"),
+          prop: "firstWashTime",
+          type: "date",
+          dateType: "daterange",
+          valueFormat: "yyyy-MM-dd",
+        },
+        {
+          label: this.$t("ui.data.column.mouldCleanWarn.secondWashTime"),
+          prop: "secondWashTime",
+          type: "date",
+          dateType: "daterange",
+          valueFormat: "yyyy-MM-dd",
+        },
       ];
     },
   },
@@ -130,6 +144,16 @@ export default {
         this.query.operTimeBegin = data.operTime[0];
         this.query.operTimeEnd = data.operTime[1];
         delete this.query.operTime;
+      }
+      if (data.firstWashTime && data.firstWashTime.length === 2) {
+        this.query.firstWashTimeBegin = data.firstWashTime[0];
+        this.query.firstWashTimeEnd = data.firstWashTime[1];
+        delete this.query.firstWashTime;
+      }
+      if (data.secondWashTime && data.secondWashTime.length === 2) {
+        this.query.secondWashTimeBegin = data.secondWashTime[0];
+        this.query.secondWashTimeEnd = data.secondWashTime[1];
+        delete this.query.secondWashTime;
       }
       this.$set(this.page, "current", 1);
       this.getList();
