@@ -2221,7 +2221,7 @@
   "ui.data.column.mouldCleanWarn.firstWashTime": "首次清洗时间",
   "ui.data.column.mouldCleanWarn.secondWashTime": "二次清洗时间",
   "ui.data.column.mouldCleanWarn.remark": "备注",
-  "ui.data.column.mouldCleanWarn.createTime": "创建时间",
+  "ui.data.column.mouldCleanWarn.updateTime": "更新时间",
   "ui.data.column.lhMouldChangePlan.modelName": "模具交替计划",
   "ui.data.column.lhMouldChangePlan.factoryCode": "分厂",
   "ui.data.column.lhMouldChangePlan.lhResultBatchNo": "硫化结果批次号",

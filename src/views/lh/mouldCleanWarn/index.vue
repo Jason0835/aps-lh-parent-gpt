@@ -109,7 +109,7 @@ export default {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           type: "select",
-          dicData: this.dict.biz_factory_name,
+          dicData: this.dict.type.biz_factory_name,
         },
         {
           label: this.$t("ui.data.column.mouldCleanWarn.lhCode"),
