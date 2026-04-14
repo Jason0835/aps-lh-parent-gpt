@@ -298,7 +298,7 @@ export default {
         const res = await getScheduleMachineInfo({
           factoryCode: this.form.factoryCode,
           productCode: this.form.productCode,
-          scheduleTime: this.form.scheduleDate,
+          scheduleDate: this.form.scheduleDate,
           specCode: this.form.specCode,
         });
         console.log(res);
