@@ -938,6 +938,7 @@ public class MesItfServiceImpl implements MesItfService {
             DynamicDataSourceContextHolder.push(DataSource.APS);
 
             List<List<DevMaintenancePlan>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            List<MdmDevMaintenancePlan> insertOrUpdateList = null;
             for (List<DevMaintenancePlan> saveList : splitList) {
                 List<MdmDevMaintenancePlan> existsList = devMaintenancePlanEntityMapper.selectByUniqueKeyList(
                         saveList.stream().map(item -> {
@@ -959,7 +960,7 @@ public class MesItfServiceImpl implements MesItfService {
                             ));
                 }
 
-                List<MdmDevMaintenancePlan> insertOrUpdateList = new ArrayList<>();
+                insertOrUpdateList = new ArrayList<>();
                 for (DevMaintenancePlan item : saveList) {
                     MdmDevMaintenancePlan entity = new MdmDevMaintenancePlan();
                     entity.setDevCode(item.getDevCode());

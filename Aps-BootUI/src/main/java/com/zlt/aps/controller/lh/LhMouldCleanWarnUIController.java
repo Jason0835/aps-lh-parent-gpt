@@ -1,10 +1,13 @@
 package com.zlt.aps.controller.lh;
 
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldCleanWarn;
+import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
 import com.zlt.aps.lh.api.service.ILhMouldCleanWarnRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -33,6 +36,9 @@ public class LhMouldCleanWarnUIController extends BaseUIController<LhMouldCleanW
     @Autowired
     private ILhMouldCleanWarnRemoteService iLhMouldCleanWarnService;
 
+    @Autowired
+    private ILhMachineInfoRemoteService iLhMachineInfoService;
+
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @ResponseBody
@@ -56,5 +62,13 @@ public class LhMouldCleanWarnUIController extends BaseUIController<LhMouldCleanW
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
+    }
+
+    @ApiOperation("获取机台下拉列表")
+    @PostMapping("/getMachineList")
+    @ResponseBody
+    public AjaxResult getMachineList(LhMachineInfo query) {
+        TableDataInfo tableDataInfo = iLhMachineInfoService.list(query);
+        return AjaxResult.success(tableDataInfo.getRows());
     }
 }
