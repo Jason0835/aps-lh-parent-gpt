@@ -73,7 +73,7 @@ export function lhValidateAutoPlan(query) {
  */
 export function autoPlan(query) {
   return request({
-    url: '/lh/lhScheduleResult​/execute',
+    url: '/lh/lhScheduleResult/execute',
     method: 'post',
     data: query,
     // headers: {

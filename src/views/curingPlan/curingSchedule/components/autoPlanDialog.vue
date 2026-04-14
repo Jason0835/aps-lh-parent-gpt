@@ -119,11 +119,10 @@ export default {
     //utils
     show(data) {
       this.visible = true;
-      //设置默认值为明天
-
+      // 与硫化排程管理列表查询条件一致：当前日期 + 2 天
       this.form = {
         factoryCode: "116",
-        scheduleTime: moment().add(1, "days").format("yyyy-MM-DD 00:00:00"),
+        scheduleTime: moment().add(2, "days").format("YYYY-MM-DD 00:00:00"),
       };
     },
     hide() {
