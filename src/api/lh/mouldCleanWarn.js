@@ -23,3 +23,11 @@ export function exportMouldCleanWarn(query) {
     responseType: 'blob'
   })
 }
+
+export function getMachineList(query) {
+  return request({
+    url: '/lh/mouldCleanWarn/getMachineList',
+    method: 'post',
+    data: query
+  })
+}

@@ -29,12 +29,12 @@
 </template>
 
 <script>
-import { listMouldCleanWarn } from "@/api/lh/mouldCleanWarn";
+import { listMouldCleanWarn, getMachineList } from "@/api/lh/mouldCleanWarn";
 import { downloadLink } from "@/utils/ruoyi";
 
 export default {
   name: "LhMouldCleanWarn",
-  dicts: ["biz_factory_name", "lh_machine"],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -53,6 +53,8 @@ export default {
       sort: {},
       search: {},
       query: {},
+      machineOptions: [],
+      machineLoading: false,
     };
   },
   computed: {
@@ -102,8 +104,14 @@ export default {
           label: this.$t("ui.data.column.mouldCleanWarn.lhCode"),
           prop: "lhCode",
           type: "select",
-          dictData: this.dict.type.lh_machine,
+          dictData: this.machineOptions,
+          props: {
+            label: "machineCode",
+            value: "machineCode",
+          },
           filterable: true,
+          loading: this.machineLoading,
+          onFocus: this.handleMachineFocus,
         },
         {
           label: this.$t("ui.data.column.mouldCleanWarn.operTime"),
@@ -172,6 +180,25 @@ export default {
         console.error(error);
       } finally {
         this.loading = false;
+      }
+    },
+    async loadMachineList() {
+      this.machineLoading = true;
+      try {
+        const res = await getMachineList({
+          machineCode: "",
+          pageSize: 1000,
+        });
+        this.machineOptions = res.data || res || [];
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.machineLoading = false;
+      }
+    },
+    handleMachineFocus() {
+      if (this.machineOptions.length === 0) {
+        this.loadMachineList();
       }
     },
   },
