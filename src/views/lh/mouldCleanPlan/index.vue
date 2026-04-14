@@ -63,6 +63,7 @@ import {
   removeMouldCleanPlan,
   syncFromWarn
 } from "@/api/lh/mouldCleanPlan";
+import { listMachine } from "@/api/lh/machine";
 
 //components
 import infoDialog from "./components/infoDialog.vue";
@@ -72,7 +73,7 @@ export default {
   components: {
     infoDialog
   },
-  dicts: ["biz_factory_name", "lh_machine", "MOULD_CLEAN_TYPE"],
+  dicts: ["biz_factory_name", "MOULD_CLEAN_TYPE"],
   provide() {
     return {
       parentDict: this.dict,
@@ -93,6 +94,8 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
+      machineOptions: [],
+      machineLoading: false,
     };
   },
   computed: {
@@ -174,7 +177,9 @@ export default {
           label: this.$t("ui.data.column.mouldCleanPlan.lhCode"),
           prop: "lhCode",
           type: "select",
-          dictData: this.dict.type.lh_machine,
+          dictData: this.machineOptions,
+          labelKey: "machineCode",
+          valueKey: "machineCode",
           filterable: true,
         },
         {
@@ -312,7 +317,6 @@ export default {
     async getList() {
       try {
         this.loading = true;
-
         const data = await listMouldCleanPlan(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
@@ -320,6 +324,20 @@ export default {
         console.error(error);
       } finally {
         this.loading = false;
+      }
+    },
+    async loadMachineList() {
+      this.machineLoading = true;
+      try {
+        const res = await listMachine({
+          machineCode: "",
+          pageSize: 1000,
+        });
+        this.machineOptions = res.rows || res.data || res || [];
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.machineLoading = false;
       }
     },
   },
@@ -338,6 +356,13 @@ export default {
       cleanTimeEnd: defaultDate
     };
     this.getList();
+  },
+  mounted() {
+    this.loadMachineList();
+  },
+  mounted() {
+    this.getList();
+    this.loadMachineList();
   },
   activated() {
     // this.getList();
