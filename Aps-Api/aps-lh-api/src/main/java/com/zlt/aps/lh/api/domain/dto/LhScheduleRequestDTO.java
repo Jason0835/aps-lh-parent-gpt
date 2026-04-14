@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.api.domain.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
 import java.util.Date;
@@ -14,6 +15,7 @@ public class LhScheduleRequestDTO {
 
     /** 分厂编号 */
     private String factoryCode;
+    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
     /** 排程目标日期(默认T+2) */
     private Date scheduleDate;
     /** 月计划需求版本 */
