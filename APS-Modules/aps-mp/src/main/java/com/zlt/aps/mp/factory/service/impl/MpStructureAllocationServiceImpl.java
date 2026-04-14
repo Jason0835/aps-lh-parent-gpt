@@ -200,43 +200,79 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             return super.removeByIds(ids);
         }
         List<MpStructureAllocation> snapshots = entityMapper.selectBatchIds(ids);
-        assertHandStructureDeletionAllowed(snapshots);
+        assertHandStructureDeletionAllowed(snapshots, ids);
         int removed = super.removeByIds(ids);
         cascadeDeleteRelatedAfterRemoveHandStructure(snapshots);
         return removed;
     }
 
     /**
-     * 手工新增的结构：若定稿月计划存在数据且不存在以 ADJ 开头的最新需求版本，则禁止删除。
+     * 删除前校验：同工厂/年/月/排产版本下，除本次待删 ID 外若仍存在非手工（dataSource 非 01）的结构排产则禁止删除。
      *
      * @param snapshots 待删除记录的删除前快照
+     * @param deleteIds 本次待删除的主键列表
      */
-    private void assertHandStructureDeletionAllowed(List<MpStructureAllocation> snapshots) {
-        if (CollectionUtils.isEmpty(snapshots)) {
+    private void assertHandStructureDeletionAllowed(List<MpStructureAllocation> snapshots, List<Long> deleteIds) {
+        if (CollectionUtils.isEmpty(snapshots) || CollectionUtils.isEmpty(deleteIds)) {
             return;
         }
-        Map<String, MpStructureAllocation> groupMap = new LinkedHashMap<>(snapshots.size());
+        Map<String, MpStructureAllocation> versionGroupMap = new LinkedHashMap<>(snapshots.size());
         for (MpStructureAllocation item : snapshots) {
-            if (item == null || !DataSourceEnum.HAND.getCode().equals(item.getDataSource())) {
+            if (item == null) {
                 continue;
             }
-            String key = buildStructureCascadeGroupKey(item);
+            String key = buildVersionScopeKey(item);
             if (StringUtils.isBlank(key)) {
                 continue;
             }
-            groupMap.putIfAbsent(key, item);
+            versionGroupMap.putIfAbsent(key, item);
         }
-        for (MpStructureAllocation alloc : groupMap.values()) {
-            List<FactoryMonthPlanProductionFinalResult> finalList = listProdFinalNotDeletedForStructure(alloc);
-            if (CollectionUtils.isEmpty(finalList)) {
-                continue;
-            }
-            boolean hasAdjLastVersion = finalList.stream()
-                    .anyMatch(r -> StringUtils.isNotBlank(r.getLastMonthPlanVersion())
-                            && r.getLastMonthPlanVersion().startsWith(LAST_MONTH_PLAN_VERSION_ADJ_PREFIX));
-            if (!hasAdjLastVersion) {
-                throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mpStructureAllocation.cannotDeleteWithMonthPlanData"));
-            }
+        for (MpStructureAllocation alloc : versionGroupMap.values()) {
+            assertNoOtherNonHandStructureInSameVersion(alloc.getFactoryCode(), alloc.getYear(), alloc.getMonth(),
+                    alloc.getProductionVersion(), deleteIds);
+        }
+    }
+
+    /**
+     * 构建排产版本范围键：工厂 + 年 + 月 + 排产版本（不含产品结构）。
+     *
+     * @param item 结构排产实体
+     * @return 分组键；必填维度缺失时返回 null
+     */
+    private String buildVersionScopeKey(MpStructureAllocation item) {
+        if (item == null) {
+            return null;
+        }
+        if (StringUtils.isBlank(item.getFactoryCode()) || item.getYear() == null || item.getMonth() == null
+                || StringUtils.isBlank(item.getProductionVersion())) {
+            return null;
+        }
+        return item.getFactoryCode() + ApsConstant.SPLIT_CHAR + item.getYear() + ApsConstant.SPLIT_CHAR
+                + item.getMonth() + ApsConstant.SPLIT_CHAR + item.getProductionVersion();
+    }
+
+    /**
+     * 校验除本次待删 ID 外，同排产版本维度是否仍存在非手工结构排产。
+     *
+     * @param factoryCode      工厂编码
+     * @param year             年
+     * @param month            月
+     * @param productionVersion 排产版本
+     * @param deleteIds        本次待删除的主键列表
+     */
+    private void assertNoOtherNonHandStructureInSameVersion(String factoryCode, Integer year, Integer month,
+                                                            String productionVersion, List<Long> deleteIds) {
+        LambdaQueryWrapper<MpStructureAllocation> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MpStructureAllocation::getFactoryCode, factoryCode)
+                .eq(MpStructureAllocation::getYear, year)
+                .eq(MpStructureAllocation::getMonth, month)
+                .eq(MpStructureAllocation::getProductionVersion, productionVersion)
+                .eq(MpStructureAllocation::getIsDelete, YesOrNoEnum.NO.getValue())
+                .ne(MpStructureAllocation::getDataSource, DataSourceEnum.HAND.getCode())
+                .notIn(MpStructureAllocation::getId, deleteIds);
+        Long count = entityMapper.selectCount(wrapper);
+        if (count != null && count > 0) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.mpStructureAllocation.cannotDeleteWhenNonHandExists"));
         }
     }
 
