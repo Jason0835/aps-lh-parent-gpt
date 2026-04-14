@@ -176,8 +176,7 @@ export default {
             remote={item.remote}
             remote-method={item.remoteMethod}
             loading={item.loading}
-            on={{ ...item.listeners }}
-            onFocus={item.onFocus}
+            on={{ ...item.listeners, ...(item.onFocus && { focus: item.onFocus }) }}
           >
             {item.dictData.map((row) => {
               let value = row[valueKey];
@@ -210,8 +209,7 @@ export default {
             remote={item.remote}
             remote-method={item.remoteMethod}
             loading={item.loading}
-            on={{ ...item.listeners }}
-            onFocus={item.onFocus}
+            on={{ ...item.listeners, ...(item.onFocus && { focus: item.onFocus }) }}
           >
             {item.options.map((row) => {
               let value = row[valueKey];
