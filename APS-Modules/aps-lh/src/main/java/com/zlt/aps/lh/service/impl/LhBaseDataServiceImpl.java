@@ -2,17 +2,39 @@ package com.zlt.aps.lh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
-import com.zlt.aps.lh.api.domain.entity.*;
-import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.api.domain.entity.LhCleaningPlan;
+import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.entity.LhShiftFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
-import com.zlt.aps.lh.mapper.*;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleDomainExceptionHelper;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
+import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
+import com.zlt.aps.lh.mapper.LhCleaningPlanMapper;
+import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
+import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
+import com.zlt.aps.lh.mapper.LhShiftFinishQtyMapper;
+import com.zlt.aps.lh.mapper.LhSpecifyMachineMapper;
+import com.zlt.aps.lh.mapper.MdmDevMaintenancePlanMapper;
+import com.zlt.aps.lh.mapper.MdmDevicePlanShutMapper;
+import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
+import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
+import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
+import com.zlt.aps.lh.mapper.MdmMonthSurplusMapper;
+import com.zlt.aps.lh.mapper.MdmSkuLhCapacityMapper;
+import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
+import com.zlt.aps.lh.mapper.MdmWorkCalendarMapper;
+import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.lh.service.ILhBaseDataService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
@@ -181,7 +203,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      */
     private void loadPreviousScheduleResults(LhScheduleContext context, String factoryCode, Date targetDate) {
         Date previousDate = LhScheduleTimeUtil.addDays(targetDate, -1);
-        List<LhScheduleResult> list = lhScheduleResultMapper.selectPreviousSchedule(previousDate, factoryCode);
+        List<LhScheduleResult> list = lhScheduleResultMapper.selectList(new LambdaQueryWrapper<LhScheduleResult>()
+                .eq(LhScheduleResult::getFactoryCode, factoryCode)
+                .eq(LhScheduleResult::getScheduleDate, previousDate)
+                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         if (list == null || list.isEmpty()) {
             log.info("未找到前日排程数据, 日期: {}", LhScheduleTimeUtil.getDateStr(previousDate));
             context.setPreviousScheduleResultList(new ArrayList<>());
