@@ -35,9 +35,10 @@ public interface ICxPrecisionPlanService extends IDocService<CxPrecisionPlan> {
     /**
      * 从MES同步数据生成成型精度初版计划
      *
+     * @param year 年份（为空时使用当前年）
      * @return 生成数量
      */
-    int generatePlansFromMes();
+    int generatePlansFromMes(Integer year);
 
     /**
      * 自动生成年度成型精度计划

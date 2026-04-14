@@ -28,7 +28,8 @@ public class CxPrecisionPlanTask {
     public void generateFromMes() {
         log.info("定时任务：从MES同步数据生成成型精度计划");
         try {
-            AjaxResult result = cxPrecisionPlanRemoteService.generatePlansFromMes();
+            Integer currentYear = LocalDate.now().getYear();
+            AjaxResult result = cxPrecisionPlanRemoteService.generatePlansFromMes(currentYear);
             log.info("定时任务执行结果：{}", result.get("msg"));
 
             Integer currentYear = LocalDate.now().getYear();

@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -240,6 +241,37 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         if (CollectionUtils.isEmpty(ids)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.param.error"));
         }
+        return lhMouldChangePlanService.issueSchedule(ids);
+    }
+
+    /**
+     * 按查询条件排程发布（仅支持单日排程日期）
+     */
+    @Log(title = "ui.data.column.lhMouldChangePlan.modelName", businessType = BusinessType.PUBLISH)
+    @ApiOperation("按查询条件排程发布")
+    @PostMapping("/issueScheduleByQuery")
+    public AjaxResult issueScheduleByQuery(@RequestBody LhMouldChangePlan queryVO) {
+        if (queryVO == null || PubUtil.isEmpty(queryVO.getScheduleDate())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.param.error"));
+        }
+        // 只允许单日排程日期，不支持区间下发
+        if (PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scheduleDateStart"))
+                || PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scheduleDateEnd"))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.param.error"));
+        }
+
+        // 忽略前端的发布状态筛选，强制下发 未发布/待发布
+        queryVO.setIsRelease(null);
+
+        QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, queryVO);
+        wrapper.in("IS_RELEASE", Arrays.asList(ApsConstant.NO_RELEASE, ApsConstant.WAIT_RELEASING));
+        wrapper.select("ID");
+        List<LhMouldChangePlan> list = lhMouldChangePlanMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(list)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.noData"));
+        }
+        List<Long> ids = list.stream().map(LhMouldChangePlan::getId).collect(Collectors.toList());
         return lhMouldChangePlanService.issueSchedule(ids);
     }
 

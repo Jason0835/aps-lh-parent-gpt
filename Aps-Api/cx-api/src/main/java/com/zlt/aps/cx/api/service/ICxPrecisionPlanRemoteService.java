@@ -81,7 +81,7 @@ public interface ICxPrecisionPlanRemoteService {
      */
     @ApiOperation("从MES同步数据生成成型精度初版计划")
     @PostMapping("/cxPrecisionPlan/generateFromMes")
-    AjaxResult generatePlansFromMes();
+    AjaxResult generatePlansFromMes(@RequestParam(value = "year", required = false) Integer year);
 
     /**
      * 自动生成年度成型精度计划

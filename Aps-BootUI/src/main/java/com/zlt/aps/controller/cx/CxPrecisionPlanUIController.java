@@ -220,20 +220,8 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
     @RequiresPermissions("cx:cxPrecisionPlan:sync")
     @PostMapping("/generateFromMes")
     @ResponseBody
-    public AjaxResult generateFromMes() {
-        AjaxResult result = cxPrecisionPlanRemoteService.generatePlansFromMes();
-        
-        if (AjaxResult.Type.SUCCESS.equals(result.get(AjaxResult.CODE_TAG))) {
-            try {
-                Integer currentYear = LocalDate.now().getYear();
-                cxPrecisionPlanRemoteService.autoCalculateCxPrecisionPlan15Days(currentYear);
-                cxPrecisionPlanRemoteService.autoCalculateCxPrecisionPlan60Days(currentYear);
-            } catch (Exception e) {
-                log.error("自动推算成型精度计划失败", e);
-            }
-        }
-        
-        return result;
+    public AjaxResult generateFromMes(@RequestParam(value = "year", required = false) Integer year) {
+        return cxPrecisionPlanRemoteService.generatePlansFromMes(year);
     }
 
     @ApiOperation("自动生成年度成型精度计划")
@@ -241,9 +229,13 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
     @PostMapping("/autoGenerateYearly")
     @ResponseBody
     public AjaxResult autoGenerateYearly(@RequestParam("year") Integer year) {
-        AjaxResult result15 = cxPrecisionPlanRemoteService.autoCalculateCxPrecisionPlan15Days(year);
-        AjaxResult result60 = cxPrecisionPlanRemoteService.autoCalculateCxPrecisionPlan60Days(year);
-        
-        return AjaxResult.success("成型精度计划生成完成：15天周期-" + result15.get("msg") + "；60天周期-" + result60.get("msg"));
+        return cxPrecisionPlanRemoteService.autoGenerateYearlyPlans(year);
+    }
+
+    @ApiOperation("批量更新到期天数")
+    @PostMapping("/batchUpdateDaysToDue")
+    @ResponseBody
+    public AjaxResult batchUpdateDaysToDue() {
+        return cxPrecisionPlanRemoteService.batchUpdateDaysToDue();
     }
 }
