@@ -240,7 +240,7 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeMouldCleanPlan([ids]).then((data) => {
+        removeMouldCleanPlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -252,7 +252,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeMouldCleanPlan([ids]).then((data) => {
+        removeMouldCleanPlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -355,10 +355,6 @@ export default {
       cleanTimeBegin: defaultDate,
       cleanTimeEnd: defaultDate
     };
-    this.getList();
-  },
-  mounted() {
-    this.loadMachineList();
   },
   mounted() {
     this.getList();
