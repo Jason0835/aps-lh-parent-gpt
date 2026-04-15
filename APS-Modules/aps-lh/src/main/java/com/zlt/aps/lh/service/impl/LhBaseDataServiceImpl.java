@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.entity.LhCleaningPlan;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhShiftFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
@@ -32,8 +34,6 @@ import com.zlt.aps.lh.service.ILhBaseDataService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
-import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
@@ -193,7 +193,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // 16. 加载前日硫化排程结果
         loadPreviousScheduleResults(context, factoryCode, targetDate);
 
-        log.info("基础数据加载完成, 工厂: {}, 目标日: {}, T日: {}", factoryCode, targetDate, scheduleDate);
+        log.info("基础数据加载完成, 工厂: {}, 目标日: {}, T日: {}",
+                factoryCode, LhScheduleTimeUtil.formatDate(targetDate), LhScheduleTimeUtil.formatDate(scheduleDate));
     }
 
     /**
@@ -211,12 +212,12 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 .eq(LhScheduleResult::getScheduleDate, previousDate)
                 .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         if (list == null || list.isEmpty()) {
-            log.info("未找到前日排程数据, 日期: {}", LhScheduleTimeUtil.getDateStr(previousDate));
+            log.info("未找到前日排程数据, 日期: {}", LhScheduleTimeUtil.formatDate(previousDate));
             context.setPreviousScheduleResultList(new ArrayList<>());
             return;
         }
         context.setPreviousScheduleResultList(list);
-        log.info("前日排程基础数据加载完成, 数量: {}, 日期: {}", list.size(), LhScheduleTimeUtil.getDateStr(previousDate));
+        log.info("前日排程基础数据加载完成, 数量: {}, 日期: {}", list.size(), LhScheduleTimeUtil.formatDate(previousDate));
     }
 
     /**

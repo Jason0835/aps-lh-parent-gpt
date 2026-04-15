@@ -70,7 +70,7 @@ public class DataInitHandler extends AbsScheduleStepHandler {
         if (result.isFailed()) {
             log.warn("数据校验未通过，共 {} 条错误，明细: {}", result.getErrors().size(), result.getFormattedErrors());
             ScheduleDomainExceptionHelper.interrupt(context, ScheduleStepEnum.S4_2_DATA_INIT,
-                    ScheduleErrorCode.DATA_INCOMPLETE, result.getSummaryMessage());
+                    ScheduleErrorCode.DATA_INCOMPLETE, result.getSummaryMessage(), result.getErrors());
             return;
         }
 

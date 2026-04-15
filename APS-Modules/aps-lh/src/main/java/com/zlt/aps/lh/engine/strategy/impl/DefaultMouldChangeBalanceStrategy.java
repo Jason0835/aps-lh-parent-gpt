@@ -1,6 +1,4 @@
-/**
- * Copyright (c) 2008, 智立通（厦门）科技有限公司 All rights reserved。
- */
+
 package com.zlt.aps.lh.engine.strategy.impl;
 
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -85,7 +83,8 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             adjustedTime = getNextMorningShiftStart(context, adjustedTime);
         }
 
-        log.warn("换模均衡分配失败，无可用换模班次, 原始时间: {}", endingTime);
+        log.warn("换模均衡分配失败，无可用换模班次, 原始时间: {}",
+                LhScheduleTimeUtil.formatDateTime(endingTime));
         return null;
     }
 
