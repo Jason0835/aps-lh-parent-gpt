@@ -1,7 +1,7 @@
 package com.zlt.aps.lh.engine.chain;
 
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.enums.ValidationPolicyEnum;
+import com.zlt.aps.lh.context.LhScheduleContext;
 
 /**
  * 数据校验器接口(责任链节点)
@@ -19,6 +19,31 @@ public interface IDataValidator {
      * @return true 表示本项校验通过，false 表示未通过
      */
     boolean validate(LhScheduleContext context);
+
+    /**
+     * 获取校验器唯一标识
+     * <p>用于外部配置启停开关，默认根据实现类名生成 lowerCamelCase 标识。</p>
+     *
+     * @return 校验器唯一标识
+     */
+    default String getValidatorKey() {
+        String simpleName = this.getClass().getSimpleName();
+        if (simpleName.length() <= 1) {
+            return simpleName.toLowerCase();
+        }
+        return Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
+    }
+
+    /**
+     * 判断当前校验器在本次上下文中是否启用
+     * <p>默认返回 true，表示由责任链继续执行；实现类可按工厂、排程模式等上下文特征覆写。</p>
+     *
+     * @param context 排程上下文
+     * @return true 表示启用，false 表示跳过当前校验器
+     */
+    default boolean isEnabled(LhScheduleContext context) {
+        return true;
+    }
 
     /**
      * 获取校验器名称
