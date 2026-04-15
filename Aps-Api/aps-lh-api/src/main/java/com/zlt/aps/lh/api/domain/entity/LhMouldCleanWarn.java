@@ -79,4 +79,20 @@ public class LhMouldCleanWarn extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "上机时间结束")
     @TableField(exist = false)
     private String operTimeEnd;
+
+    @ApiModelProperty(value = "首次清洗时间开始")
+    @TableField(exist = false)
+    private String firstWashTimeBegin;
+
+    @ApiModelProperty(value = "首次清洗时间结束")
+    @TableField(exist = false)
+    private String firstWashTimeEnd;
+
+    @ApiModelProperty(value = "二次清洗时间开始")
+    @TableField(exist = false)
+    private String secondWashTimeBegin;
+
+    @ApiModelProperty(value = "二次清洗时间结束")
+    @TableField(exist = false)
+    private String secondWashTimeEnd;
 }

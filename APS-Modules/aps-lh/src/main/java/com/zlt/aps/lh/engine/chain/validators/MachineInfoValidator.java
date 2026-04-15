@@ -1,8 +1,8 @@
 package com.zlt.aps.lh.engine.chain.validators;
 
 import com.zlt.aps.lh.api.constant.LhDataValidationGroupConstant;
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.enums.ValidationPolicyEnum;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.chain.IDataValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -20,7 +20,8 @@ public class MachineInfoValidator implements IDataValidator {
     public boolean validate(LhScheduleContext context) {
         if (context.getMachineInfoMap() == null || context.getMachineInfoMap().isEmpty()) {
             log.warn("硫化机台信息为空, 工厂: {}", context.getFactoryCode());
-            context.addValidationError("[" + getValidatorName() + "] 硫化机台信息为空, 工厂: " + context.getFactoryCode());
+            context.addValidationError("[" + getValidatorName() + "] 硫化机台信息为空, 工厂: "
+                    + context.getFactoryDisplayName());
             return false;
         }
         long enabledCount = context.getMachineInfoMap().values().stream()
@@ -28,7 +29,8 @@ public class MachineInfoValidator implements IDataValidator {
                 .count();
         if (enabledCount == 0) {
             log.warn("无启用状态的硫化机台, 工厂: {}", context.getFactoryCode());
-            context.addValidationError("[" + getValidatorName() + "] 无启用状态的硫化机台, 工厂: " + context.getFactoryCode());
+            context.addValidationError("[" + getValidatorName() + "] 无启用状态的硫化机台, 工厂: "
+                    + context.getFactoryDisplayName());
             return false;
         }
         log.info("硫化机台校验通过, 总数: {}, 启用: {}", context.getMachineInfoMap().size(), enabledCount);

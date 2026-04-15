@@ -3,15 +3,14 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
-import com.zlt.aps.lh.api.constant.LhScheduleConstant;
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
-import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -220,7 +219,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 .min(Comparator.naturalOrder())
                 .orElse(null);
 
-        int toleranceMinutes = LhScheduleConstant.DEFAULT_ENDING_TIME_TOLERANCE_MINUTES;
+        int toleranceMinutes = LhScheduleTimeUtil.getEndingToleranceMinutes(context);
 
         candidates.sort(
                 // 同规格优先

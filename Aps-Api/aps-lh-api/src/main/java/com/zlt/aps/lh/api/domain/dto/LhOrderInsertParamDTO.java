@@ -24,7 +24,7 @@ public class LhOrderInsertParamDTO implements Serializable {
     @ApiModelProperty(value = "排程时间")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @NotNull(message = "排程时间不能为空")
-    private Date scheduleTime;
+    private Date scheduleDate;
 
     @ApiModelProperty(value = "物料编号")
     @NotBlank(message = "物料编号不能为空")

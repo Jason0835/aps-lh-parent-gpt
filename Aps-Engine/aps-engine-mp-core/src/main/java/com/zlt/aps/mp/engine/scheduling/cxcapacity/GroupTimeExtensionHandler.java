@@ -56,7 +56,7 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         }
         Set<String> allocationCxMachineSet = continueCxMachineAllocation.stream().map(CxMachineAllocationPlanHelper::getCxMachineCode).collect(Collectors.toSet());
         String cxMachineCodeInfo = allocationCxMachineSet.stream().collect(Collectors.joining(StringConstant.COMMA));
-        GroupTimeExtensionConclusionLogRecorder.addGroupStartTimeExtensionConclusionLog(context, groupName, cxMachineCodeInfo);
+        GroupTimeExtensionConclusionLogRecorder.addGroupStartTimeExtensionConclusionLog(context, groupName, cxMachineCodeInfo, false);
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, ProductionPlanGroupInfo> allGroupPlanInfo = productionContext.getGroupProductionInfo();
         ProductionPlanGroupInfo groupPlan = allGroupPlanInfo.get(groupName);
@@ -120,7 +120,7 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
             GroupTimeExtensionConclusionLogRecorder.addNoTimeExtensionConclusionHandlerLog(context, groupName, cxMachineCodeInfo);
             return;
         }
-        GroupTimeExtensionConclusionLogRecorder.addGroupStartTimeExtensionConclusionLog(context, groupName, cxMachineCodeInfo);
+        GroupTimeExtensionConclusionLogRecorder.addGroupStartTimeExtensionConclusionLog(context, groupName, cxMachineCodeInfo, true);
         TbrProductionContext productionContext = (TbrProductionContext) context;
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCodeInfo);
         Integer earliestConclusionDay = allocationRange.getEndDay();
@@ -143,14 +143,14 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         }
         handledDayInfo.add(handlerKey);
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo = cxMachineInfo.getDayProductionLimitInfo();
-        //清除排产信息
+        //清除排产信息--模具排产信息
         GroupTimeExtensionConclusionLogRecorder.addTimeExtensionConclusionHandlerStartClearDataLog(context, groupName, cxMachineCodeInfo);
         Set<Integer> deductionDaySet = cxMachineInfo.getAllocationDaySet(allocationRange);
-        groupPlanDeductionDayHandler.deductionDayInfo(context, DeductionDayProductionTypeEnum.TIME_EXTENSION_REST, cxMachineInfo, groupPlan, allocationRange, dayProductionLimitInfo, deductionDaySet);
+        groupPlanDeductionDayHandler.deductionMouldDayInfo(context, DeductionDayProductionTypeEnum.TIME_EXTENSION_REST, cxMachineInfo, groupPlan, allocationRange, dayProductionLimitInfo, deductionDaySet);
         //创建新的收尾天数信息
         timeExtensionOneDayConclusionByNoOnLine(context, groupPlan, allocationRange, nextDay);
         //重新模拟排产
-        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineCodeInfo, allocationRange);
+        cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineCodeInfo, allocationRange, handledDayInfo);
     }
 
     /**
@@ -250,7 +250,7 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
             if (null == cxMachineInfo) {
                 return;
             }
-            log.info(GroupTimeExtensionConclusionLogRecorder.addTimeExtensionConclusionHandlerStartClearDataLog(context, groupName, cxMachineInfo.getCxMachineCode()));
+            GroupTimeExtensionConclusionLogRecorder.addTimeExtensionConclusionHandlerStartClearDataLog(context, groupName, cxMachineInfo.getCxMachineCode());
             Set<Integer> deductionDaySet = cxMachineInfo.getAllocationDaySet(singleAllocationInfo);
             groupPlanDeductionDayHandler.deductionMouldDayInfo(context, DeductionDayProductionTypeEnum.TIME_EXTENSION_REST, cxMachineInfo, groupPlan, singleAllocationInfo, dayProductionLimitInfo, deductionDaySet);
         });

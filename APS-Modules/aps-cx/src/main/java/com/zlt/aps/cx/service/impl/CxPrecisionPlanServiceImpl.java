@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -233,8 +234,9 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public int generatePlansFromMes() {
-        log.info("开始从MES同步数据生成成型精度初版计划");
+    public int generatePlansFromMes(Integer year) {
+        Integer targetYear = year == null ? LocalDate.now().getYear() : year;
+        log.info("开始从MES同步数据生成{}年度成型精度初版计划", targetYear);
         List<MdmDevMaintenancePlan> mesPlans = mdmDevMaintenancePlanEntityMapper.selectList(
                 new LambdaQueryWrapper<MdmDevMaintenancePlan>()
                         .like(MdmDevMaintenancePlan::getPrecisionType, PRECISION_TYPE_CX)
@@ -253,6 +255,10 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
                 log.debug("MES计划数据不完整：机台={}，计划日={}", machineCode, planDate);
                 continue;
             }
+            LocalDate mesPlanDate = toLocalDateFromUtil(planDate);
+            if (mesPlanDate == null || mesPlanDate.getYear() != targetYear) {
+                continue;
+            }
 
             if (existsByMachineAndDate(machineCode, planDate)) {
                 log.debug("机台{} 日期{} 已存在计划，跳过", machineCode, planDate);
@@ -268,6 +274,13 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
             plan.setLastPrecisionDate(mesPlan.getFirstWashTime());
             plan.setEstimatedHours(DEFAULT_ESTIMATED_HOURS);
             plan.setDueDate(addMonths(planDate, PLAN_INTERVAL_MONTHS));
+            if (plan.getDueDate() != null) {
+                LocalDate today = LocalDate.now();
+                LocalDate dueDate = toLocalDateFromUtil(plan.getDueDate());
+                if (dueDate != null) {
+                    plan.setDaysToDue((int) ChronoUnit.DAYS.between(today, dueDate));
+                }
+            }
 
             // 同步设备名称，保证展示一致
             MdmMoldingMachine machine = findMachine(machineCode, mesPlan.getFactoryCode());
@@ -480,6 +493,135 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
                 return null;
             }
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int generateFromMaintenancePlan(List<MdmDevMaintenancePlan> maintenancePlans, Integer cycleDays) {
+        if (CollectionUtils.isEmpty(maintenancePlans)) {
+            log.warn("设备保养计划列表为空");
+            return 0;
+        }
+
+        log.info("开始根据设备保养计划生成成型精度计划，周期={}天，共{}条", cycleDays, maintenancePlans.size());
+
+        List<CxPrecisionPlan> plansToSave = new ArrayList<>();
+
+        for (MdmDevMaintenancePlan mesPlan : maintenancePlans) {
+            String machineCode = mesPlan.getDevCode();
+
+            Date operTime = mesPlan.getOperTime();
+            Date firstWashTime = mesPlan.getFirstWashTime();
+
+            if (firstWashTime == null) {
+                log.warn("机台{}的实际执行时间为空，跳过", machineCode);
+                continue;
+            }
+
+            CxPrecisionPlan plan = new CxPrecisionPlan();
+            plan.setMachineCode(machineCode);
+            plan.setFactoryCode(mesPlan.getFactoryCode());
+//            plan.setPrecisionType("成型精度");
+            plan.setCycleDays(cycleDays);
+
+            if (operTime != null) {
+                plan.setPlanDate(operTime);
+                plan.setScheduleDate(operTime);
+            }
+
+            plan.setActualDate(firstWashTime);
+            plan.setLastPrecisionDate(firstWashTime);
+
+            LocalDate dueDateLocal = firstWashTime.toInstant()
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+                .plusDays(cycleDays);
+            plan.setDueDate(Date.from(dueDateLocal.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+
+            plan.setEstimatedHours(new BigDecimal("4.0"));
+            plan.setIsDelete(0);
+
+            plansToSave.add(plan);
+            log.info("准备生成成型精度计划：机台={}, 周期={}天, 计划日期={}", machineCode, cycleDays, plan.getPlanDate());
+        }
+
+        if (!plansToSave.isEmpty()) {
+            baseDao.insertBatch(plansToSave);
+            log.info("成功生成{}条成型精度计划（周期={}天）", plansToSave.size(), cycleDays);
+        }
+
+        return plansToSave.size();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int autoGenerateByCycle(Integer year, Integer cycleDays) {
+        log.info("开始自动生成{}年度成型精度计划，周期={}天", year, cycleDays);
+
+        LocalDate yearStart = LocalDate.of(year, 1, 1);
+        LocalDate yearEnd = LocalDate.of(year, 12, 31);
+
+        List<CxPrecisionPlan> lastPlans = cxPrecisionPlanMapper.selectList(
+            new LambdaQueryWrapper<CxPrecisionPlan>()
+//                .eq(CxPrecisionPlan::getPrecisionType, "成型精度")
+                .eq(CxPrecisionPlan::getCycleDays, cycleDays)
+                .isNotNull(CxPrecisionPlan::getActualDate)
+                .eq(CxPrecisionPlan::getIsDelete, 0)
+                .orderByDesc(CxPrecisionPlan::getActualDate)
+        );
+
+        if (CollectionUtils.isEmpty(lastPlans)) {
+            log.warn("未查询到周期为{}天的成型精度计划历史数据", cycleDays);
+            return 0;
+        }
+
+        Map<String, CxPrecisionPlan> machinePlanMap = lastPlans.stream()
+            .collect(Collectors.toMap(
+                CxPrecisionPlan::getMachineCode,
+                p -> p,
+                (p1, p2) -> p1
+            ));
+
+        List<CxPrecisionPlan> plansToSave = new ArrayList<>();
+
+        for (Map.Entry<String, CxPrecisionPlan> entry : machinePlanMap.entrySet()) {
+            String machineCode = entry.getKey();
+            CxPrecisionPlan lastPlan = entry.getValue();
+
+            LocalDate lastActualDate = lastPlan.getActualDate().toInstant()
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate();
+
+            LocalDate nextPlanDate = lastActualDate.plusDays(cycleDays);
+
+            while (!nextPlanDate.isAfter(yearEnd)) {
+                if (!nextPlanDate.isBefore(yearStart)) {
+                    CxPrecisionPlan newPlan = new CxPrecisionPlan();
+                    newPlan.setMachineCode(machineCode);
+                    newPlan.setFactoryCode(lastPlan.getFactoryCode());
+//                    newPlan.setPrecisionType("成型精度");
+                    newPlan.setCycleDays(cycleDays);
+                    newPlan.setPlanDate(Date.from(nextPlanDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                    newPlan.setScheduleDate(Date.from(nextPlanDate.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                    newPlan.setDueDate(Date.from(nextPlanDate.plusDays(cycleDays).atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                    newPlan.setLastPrecisionDate(lastPlan.getActualDate());
+                    newPlan.setEstimatedHours(new BigDecimal("4.0"));
+                    newPlan.setIsDelete(0);
+
+                    plansToSave.add(newPlan);
+                    log.info("准备自动生成成型精度计划：机台={}, 周期={}天, 计划日期={}", machineCode, cycleDays, nextPlanDate);
+                }
+
+                nextPlanDate = nextPlanDate.plusDays(cycleDays);
+            }
+        }
+
+        if (!plansToSave.isEmpty()) {
+            baseDao.insertBatch(plansToSave);
+            log.info("成功自动生成{}条成型精度计划（周期={}天）", plansToSave.size(), cycleDays);
+        }
+
+        return plansToSave.size();
     }
 }
 

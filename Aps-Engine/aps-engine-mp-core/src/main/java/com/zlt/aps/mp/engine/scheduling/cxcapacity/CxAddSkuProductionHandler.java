@@ -84,7 +84,7 @@ public class CxAddSkuProductionHandler {
 
         //20260330 分组计划标记分配完成，需要验证是否需要进行分组计划分配延长处理
 //        markTimeExtensionCxMachine(context, continueCxMachineAllocation);
-//        groupTimeExtensionHandler.handlerTimeExtension(this, context, structureName, cxContinueInfo, continueCxMachineAllocation, handledDayInfo);
+        groupTimeExtensionHandler.handlerTimeExtension(this, context, structureName, cxContinueInfo, continueCxMachineAllocation, handledDayInfo);
         //设置收尾机台
         continueCxMachineAllocation.forEach(cxMachineAllocation -> {
             String cxMachineCode = cxMachineAllocation.getCxMachineCode();
@@ -294,13 +294,9 @@ public class CxAddSkuProductionHandler {
         if (!CollectionUtils.isEmpty(markList)) {
             return;
         }
-        List<CxMachineAllocationPlanHelper> effectiveList = continueCxMachineAllocation.stream().filter(single -> single.getEndDay() < context.getProductionEndDay()).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(effectiveList)) {
-            return;
-        }
-        //延长时间最长的，表明最合适，优先保留
-        effectiveList.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getEndDay, Comparator.nullsLast(Comparator.reverseOrder())));
-        effectiveList.get(BigDecimal.ZERO.intValue()).markTimeExtension();
+        //延长优先级最低的，因为其最先释放
+        continueCxMachineAllocation.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getReleasePriority, Comparator.nullsLast(Comparator.reverseOrder())));
+        continueCxMachineAllocation.get(BigDecimal.ZERO.intValue()).markTimeExtension();
         return;
     }
 

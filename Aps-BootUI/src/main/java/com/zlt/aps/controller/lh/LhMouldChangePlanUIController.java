@@ -236,4 +236,15 @@ public class LhMouldChangePlanUIController extends BaseUIController<LhMouldChang
         Long[] arr = Convert.toLongArray(ids);
         return iLhMouldChangePlanService.issueSchedule(Arrays.asList(arr));
     }
+
+    /**
+     * 按查询条件排程发布（仅支持单日排程日期）
+     */
+    @ApiOperation("按查询条件排程发布")
+    @RequiresPermissions("lh:lhMouldChangePlan:issue")
+    @PostMapping("/issueScheduleByQuery")
+    @ResponseBody
+    public AjaxResult issueScheduleByQuery(LhMouldChangePlan lhMouldChangePlan) {
+        return iLhMouldChangePlanService.issueScheduleByQuery(lhMouldChangePlan);
+    }
 }

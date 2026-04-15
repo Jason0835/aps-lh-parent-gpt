@@ -2,18 +2,18 @@ package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
-import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
-import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.cx.mapper.*;
 import com.zlt.aps.cx.service.ConstraintCheckService;
+import com.zlt.aps.cx.service.CxScheduleDetailService;
 import com.zlt.aps.cx.service.HolidayScheduleService;
 import com.zlt.aps.cx.service.ScheduleService;
 import com.zlt.aps.cx.service.engine.CoreScheduleAlgorithmService;
@@ -22,8 +22,10 @@ import com.zlt.aps.cx.service.impl.validation.ScheduleDataValidator;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.vo.ScheduleRequestVo;
+import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
+import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
+import com.zlt.aps.cx.mapper.CxStructureTreadConfigMapper;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -107,6 +109,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     private final CxStockMapper stockMapper;
     private final CxScheduleResultMapper scheduleResultMapper;
+    private final CxScheduleDetailService scheduleDetailService;
     private final CxParamConfigMapper paramConfigMapper;
     private final CxStructureTreadConfigMapper structureShiftCapacityMapper;
     private final CxKeyProductMapper keyProductMapper;
@@ -150,7 +153,15 @@ public class ScheduleServiceImpl implements ScheduleService {
             // 3. 执行核心排程算法(流程图S5.2-S5.5)
             List<CxScheduleResult> scheduleResults = coreScheduleAlgorithmService.executeSchedule(context);
 
-            // 3. 保存排程结果
+            // 3.1 删除该排程日期范围内已有的排程结果（主表+子表），避免重复数据
+            LocalDate startDate = request.getScheduleDate();
+            int days = request.getDays() != null ? request.getDays() : DEFAULT_SCHEDULE_DAYS;
+            for (int d = 0; d < days; d++) {
+                LocalDate date = startDate.plusDays(d);
+                deleteExistingScheduleResults(date);
+            }
+
+            // 3.2 保存排程结果（主表+子表）
             saveScheduleResults(scheduleResults);
 
             // 4. 验证排程结果
@@ -181,10 +192,15 @@ public class ScheduleServiceImpl implements ScheduleService {
             // 2. 执行重排程算法
             List<CxScheduleResult> scheduleResults = coreScheduleAlgorithmService.executeSchedule(context);
 
-            // 3. 删除原有排程结果
-            deleteExistingScheduleResults(request.getScheduleDate());
+            // 3. 删除该排程日期范围内原有排程结果（主表+子表）
+            LocalDate startDate = request.getScheduleDate();
+            int days = request.getDays() != null ? request.getDays() : DEFAULT_SCHEDULE_DAYS;
+            for (int d = 0; d < days; d++) {
+                LocalDate date = startDate.plusDays(d);
+                deleteExistingScheduleResults(date);
+            }
 
-            // 4. 保存新的排程结果
+            // 4. 保存新的排程结果（主表+子表）
             saveScheduleResults(scheduleResults);
 
             log.info("重排程完成，日期：{}，结果数量：{}", request.getScheduleDate(), scheduleResults.size());
@@ -197,13 +213,31 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
-     * 删除指定日期的排程结果
+     * 删除指定日期的排程结果（主表+子表）
      */
     private void deleteExistingScheduleResults(LocalDate scheduleDate) {
-        scheduleResultMapper.delete(
+        // 先查出该日期所有主表记录，获取ID用于删子表
+        List<CxScheduleResult> existingResults = scheduleResultMapper.selectList(
                 new LambdaQueryWrapper<CxScheduleResult>()
                         .eq(CxScheduleResult::getScheduleDate, scheduleDate)
         );
+
+        if (!existingResults.isEmpty()) {
+            // 删除子表：按每个主表ID删除
+            for (CxScheduleResult existing : existingResults) {
+                scheduleDetailService.deleteByMainId(existing.getId());
+            }
+            log.info("删除日期 {} 的子表记录，共 {} 条主表关联", scheduleDate, existingResults.size());
+
+            // 删除主表
+            scheduleResultMapper.delete(
+                    new LambdaQueryWrapper<CxScheduleResult>()
+                            .eq(CxScheduleResult::getScheduleDate, scheduleDate)
+            );
+            log.info("删除日期 {} 的主表记录 {} 条", scheduleDate, existingResults.size());
+        } else {
+            log.info("日期 {} 无历史排程数据，跳过删除", scheduleDate);
+        }
     }
 
     /**
@@ -240,6 +274,8 @@ public class ScheduleServiceImpl implements ScheduleService {
             try {
                 loadLhScheduleResults(context, scheduleDate);
                 log.info("硫化排程结果加载完成");
+                // 从硫化排程结果中提取排产版本
+                extractProductionVersion(context);
             } catch (Exception e) {
                 log.warn("加载硫化排程结果失败，继续执行：{}", e.getMessage());
             }
@@ -375,7 +411,6 @@ public class ScheduleServiceImpl implements ScheduleService {
                 new LambdaQueryWrapper<CxShiftConfig>()
                         .eq(CxShiftConfig::getFactoryCode, factoryCode)
                         .eq(CxShiftConfig::getIsActive, ACTIVE_STATUS)
-                        .eq(CxShiftConfig::getIsActive, "0")
                         .orderByAsc(CxShiftConfig::getScheduleDay)
                         .orderByAsc(CxShiftConfig::getDayShiftOrder)
         );
@@ -455,6 +490,36 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
 
         context.setLhScheduleResults(lhScheduleResults);
+    }
+
+    /**
+     * 从硫化排程结果中提取排产版本
+     * <p>取所有硫化排程结果中不重复的 PRODUCTION_VERSION，通常只有一个版本
+     * <p>用于后续过滤结构排产配置（T_MP_STRUCTURE_ALLOCATION）
+     */
+    private void extractProductionVersion(ScheduleContextVo context) {
+        List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
+        if (lhScheduleResults == null || lhScheduleResults.isEmpty()) {
+            log.info("硫化排程结果为空，无法提取排产版本");
+            return;
+        }
+
+        Set<String> versions = lhScheduleResults.stream()
+                .map(LhScheduleResult::getProductionVersion)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (versions.size() == 1) {
+            String version = versions.iterator().next();
+            context.setProductionVersion(version);
+            log.info("从硫化排程结果提取排产版本: {}", version);
+        } else if (versions.size() > 1) {
+            String version = versions.iterator().next();
+            context.setProductionVersion(version);
+            log.warn("硫化排程结果包含多个排产版本: {}，使用第一个: {}", versions, version);
+        } else {
+            log.warn("硫化排程结果中排产版本均为空");
+        }
     }
 
     /**
@@ -613,6 +678,19 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         // 查询当月的结构排产配置（添加is_delete和工厂过滤）
         List<MpCxCapacityConfiguration> allocations = capacityConfigurationMapper.selectByYearAndMonth(factoryCode, year, month);
+
+        // 按排产版本过滤：只保留与硫化排程相同版本的数据
+        String productionVersion = context.getProductionVersion();
+        if (productionVersion != null && !allocations.isEmpty()) {
+            int before = allocations.size();
+            allocations = allocations.stream()
+                    .filter(a -> productionVersion.equals(a.getProductionVersion()))
+                    .collect(Collectors.toList());
+            log.info("结构排产配置按排产版本 {} 过滤: {} 条 -> {} 条", productionVersion, before, allocations.size());
+        } else {
+            log.warn("排产版本为空，结构排产配置未按版本过滤，共 {} 条", allocations.size());
+        }
+
         context.setStructureAllocations(allocations);
 
         // 按结构分组
@@ -630,7 +708,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     /**
      * 加载结构整车配置
      *
-     * <p>从 t_mdm_structure_tread_config 表获取每个结构的整车胎面条数配置
+     * <p>从 T_CX_STRUCTURE_TREAD_CONFIG 表获取每个结构的整车胎面条数配置
      * <p>用于按车分配的计算：需要的车数 = 待排产量 / 胎面整车条数
      */
     private void loadStructureTreadConfigs(ScheduleContextVo context) {
@@ -792,8 +870,19 @@ public class ScheduleServiceImpl implements ScheduleService {
         for (CxScheduleResult result : results) {
             result.setCreateTime(new Date());
             scheduleResultMapper.insert(result);
+
+            // 保存子表明细
+            List<CxScheduleDetail> details = result.getDetails();
+            if (details != null && !details.isEmpty()) {
+                for (CxScheduleDetail detail : details) {
+                    detail.setMainId(result.getId());
+                    detail.setCreateTime(new Date());
+                }
+                scheduleDetailService.batchSave(details);
+                log.info("机台 {} 保存子表明细 {} 条", result.getCxMachineCode(), details.size());
+            }
         }
-        log.info("保存排程结果 {} 条", results.size());
+        log.info("保存排程结果 {} 条（含子表）", results.size());
     }
 
     /**

@@ -1,9 +1,11 @@
 package com.zlt.aps.lh.engine.strategy.impl;
 
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
-import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ITrialProductionStrategy;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -34,7 +36,7 @@ public class DefaultTrialProductionStrategy implements ITrialProductionStrategy 
         java.util.Calendar cal = java.util.Calendar.getInstance();
         cal.setTime(targetDate);
         if (cal.get(java.util.Calendar.DAY_OF_WEEK) == java.util.Calendar.SUNDAY) {
-            log.debug("周日不安排试制量试, 日期: {}", targetDate);
+            log.debug("周日不安排试制量试, 日期: {}", LhScheduleTimeUtil.formatDate(targetDate));
             return false;
         }
         return true;
@@ -46,7 +48,7 @@ public class DefaultTrialProductionStrategy implements ITrialProductionStrategy 
         if (targetDate == null) {
             return true;
         }
-        int limit = LhScheduleConstant.TRIAL_DAILY_LIMIT;
+        int limit = context.getParamIntValue(LhScheduleParamConstant.TRIAL_DAILY_LIMIT, LhScheduleConstant.TRIAL_DAILY_LIMIT);
         long trialCount = context.getScheduleResultList().stream()
                 .filter(r -> "1".equals(r.getIsTrial()))
                 .filter(r -> isSameDay(r.getScheduleDate(), targetDate))

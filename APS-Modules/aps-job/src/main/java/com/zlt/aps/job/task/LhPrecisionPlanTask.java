@@ -29,6 +29,9 @@ public class LhPrecisionPlanTask {
             Integer currentYear = LocalDate.now().getYear();
             AjaxResult result = lhPrecisionPlanRemoteService.generatePlansFromMes(currentYear);
             log.info("定时任务执行结果：{}", result.get("msg"));
+
+            AjaxResult calculateResult = lhPrecisionPlanRemoteService.autoCalculateLhPrecisionPlan(currentYear + 1);
+            log.info("自动推算结果：{}", calculateResult.get("msg"));
         } catch (Exception e) {
             log.error("定时任务执行失败", e);
         }
@@ -43,7 +46,7 @@ public class LhPrecisionPlanTask {
         log.info("定时任务：自动生成{}年度硫化精度计划", year);
         try {
             Integer yearInt = Integer.parseInt(year);
-            AjaxResult result = lhPrecisionPlanRemoteService.autoGenerateYearlyPlans(yearInt);
+            AjaxResult result = lhPrecisionPlanRemoteService.autoCalculateLhPrecisionPlan(yearInt);
             log.info("定时任务执行结果：{}", result.get("msg"));
         } catch (Exception e) {
             log.error("定时任务执行失败", e);

@@ -31,48 +31,48 @@ public interface ICxStructureTreadConfigRemoteService {
      * 查询列表
      */
     @ApiOperation("查询列表")
-    @PostMapping("/mdmStructureTreadConfig/list")
+    @PostMapping("/cxStructureTreadConfig/list")
     TableDataInfo list(@RequestBody CxStructureTreadConfig queryVO);
 
     /**
      * 保存
      */
     @ApiOperation("保存")
-    @PostMapping("/mdmStructureTreadConfig/save")
+    @PostMapping("/cxStructureTreadConfig/save")
     AjaxResult save(@RequestBody CxStructureTreadConfig cxStructureTreadConfig);
 
     /**
      * 删除
      */
     @ApiOperation("删除")
-    @DeleteMapping("/mdmStructureTreadConfig/remove")
+    @DeleteMapping("/cxStructureTreadConfig/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**
      * 根据ID获取详细信息
      */
     @ApiOperation("根据ID获取详细信息")
-    @GetMapping(value = "/mdmStructureTreadConfig/{id}")
+    @GetMapping(value = "/cxStructureTreadConfig/{id}")
     CxStructureTreadConfig getInfo(@PathVariable("id") Long id);
 
     /**
      * 校验唯一性
      */
     @ApiOperation("校验唯一性")
-    @PostMapping("/mdmStructureTreadConfig/checkUnique")
+    @PostMapping("/cxStructureTreadConfig/checkUnique")
     String checkUnique(@RequestBody CxStructureTreadConfig cxStructureTreadConfig);
 
     /**
      * 导出胎面整车配置列表
      */
     @ApiOperation("导出列表")
-    @PostMapping("/mdmStructureTreadConfig/exportData/{fileName}")
+    @PostMapping("/cxStructureTreadConfig/exportData/{fileName}")
     byte[] exportData(@RequestBody CxStructureTreadConfig queryVO, @PathVariable("fileName") String fileName);
 
     /**
      * 导入胎面整车配置数据
      */
     @ApiOperation("导入数据")
-    @PostMapping("/mdmStructureTreadConfig/importData")
+    @PostMapping("/cxStructureTreadConfig/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 }

@@ -1,14 +1,14 @@
 package com.zlt.aps.cx.vo;
 
-import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
-import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
+import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.entity.*;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.config.CxStructurePriority;
-import com.zlt.aps.mdm.api.domain.entity.CxPrecisionPlan;
+import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
+import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
@@ -405,6 +405,12 @@ public class ScheduleContextVo {
      * 快速查询用
      */
     private Map<String, List<MpCxCapacityConfiguration>> structureAllocationMap;
+
+    /**
+     * 月计划排产版本
+     * 从硫化排程结果中提取，用于过滤结构排产配置
+     */
+    private String productionVersion;
 
     /**
      * 是否强制保留历史任务

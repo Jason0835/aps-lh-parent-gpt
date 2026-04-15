@@ -28,6 +28,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 
@@ -213,5 +214,28 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
         context.setFileBytes(data);
         AjaxResult ajaxResult = cxPrecisionPlanRemoteService.importData(context, updateSupport);
         return ajaxResult;
+    }
+
+    @ApiOperation("从MES同步数据生成成型精度初版计划")
+    @RequiresPermissions("cx:cxPrecisionPlan:sync")
+    @PostMapping("/generateFromMes")
+    @ResponseBody
+    public AjaxResult generateFromMes(@RequestParam(value = "year", required = false) Integer year) {
+        return cxPrecisionPlanRemoteService.generatePlansFromMes(year);
+    }
+
+    @ApiOperation("自动生成年度成型精度计划")
+    @RequiresPermissions("cx:cxPrecisionPlan:generate")
+    @PostMapping("/autoGenerateYearly")
+    @ResponseBody
+    public AjaxResult autoGenerateYearly(@RequestParam("year") Integer year) {
+        return cxPrecisionPlanRemoteService.autoGenerateYearlyPlans(year);
+    }
+
+    @ApiOperation("批量更新到期天数")
+    @PostMapping("/batchUpdateDaysToDue")
+    @ResponseBody
+    public AjaxResult batchUpdateDaysToDue() {
+        return cxPrecisionPlanRemoteService.batchUpdateDaysToDue();
     }
 }

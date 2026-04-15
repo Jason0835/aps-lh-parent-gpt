@@ -3,29 +3,28 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
-import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.domain.dto.ShiftRuntimeState;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.component.OrderNoGenerator;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
-import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.lh.component.OrderNoGenerator;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -474,12 +473,14 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private Map<String, Integer> buildEmbryoStockMap(LhScheduleContext context) {
         Map<String, Integer> stockMap = new HashMap<>();
         for (SkuScheduleDTO sku : context.getContinuousSkuList()) {
-            if (sku.getEmbryoCode() != null) {
+            if (sku.getEmbryoCode() != null && sku.getEmbryoStock() >= 0) {
                 stockMap.put(sku.getEmbryoCode(), sku.getEmbryoStock());
             }
         }
         for (SkuScheduleDTO sku : context.getNewSpecSkuList()) {
-            if (sku.getEmbryoCode() != null && !stockMap.containsKey(sku.getEmbryoCode())) {
+            if (sku.getEmbryoCode() != null
+                    && sku.getEmbryoStock() >= 0
+                    && !stockMap.containsKey(sku.getEmbryoCode())) {
                 stockMap.put(sku.getEmbryoCode(), sku.getEmbryoStock());
             }
         }
@@ -495,7 +496,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return;
         }
         Integer stock = embryoStockMap.get(embryoCode);
-        if (stock == null || stock <= 0) {
+        if (stock == null || stock < 0) {
             return;
         }
         int totalPlan = result.getTotalDailyPlanQty() != null ? result.getTotalDailyPlanQty() : 0;

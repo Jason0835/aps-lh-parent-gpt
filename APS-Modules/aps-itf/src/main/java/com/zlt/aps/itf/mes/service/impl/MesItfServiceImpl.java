@@ -39,6 +39,8 @@ import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish;
 import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
 import com.zlt.aps.lh.api.service.ILhMesSyncRemoteService;
+import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
+import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
 
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.core.dao.basedao.BaseDao;
@@ -91,6 +93,12 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private ILhMesSyncRemoteService lhMesSyncRemoteService;
+
+    @Autowired
+    private ILhPrecisionPlanRemoteService lhPrecisionPlanRemoteService;
+
+    @Autowired
+    private ICxPrecisionPlanRemoteService cxPrecisionPlanRemoteService;
 
 
     @Autowired
@@ -930,6 +938,7 @@ public class MesItfServiceImpl implements MesItfService {
             DynamicDataSourceContextHolder.push(DataSource.APS);
 
             List<List<DevMaintenancePlan>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            List<MdmDevMaintenancePlan> insertOrUpdateList = null;
             for (List<DevMaintenancePlan> saveList : splitList) {
                 List<MdmDevMaintenancePlan> existsList = devMaintenancePlanEntityMapper.selectByUniqueKeyList(
                         saveList.stream().map(item -> {
@@ -951,7 +960,7 @@ public class MesItfServiceImpl implements MesItfService {
                             ));
                 }
 
-                List<MdmDevMaintenancePlan> insertOrUpdateList = new ArrayList<>();
+                insertOrUpdateList = new ArrayList<>();
                 for (DevMaintenancePlan item : saveList) {
                     MdmDevMaintenancePlan entity = new MdmDevMaintenancePlan();
                     entity.setDevCode(item.getDevCode());
@@ -992,6 +1001,50 @@ public class MesItfServiceImpl implements MesItfService {
                 }
 
                 baseDao.saveBatch(insertOrUpdateList);
+            }
+
+            if (!insertOrUpdateList.isEmpty()) {
+                try {
+                    List<Long> lhIds = new ArrayList<>();
+                    List<Long> cx15Ids = new ArrayList<>();
+                    List<Long> cx60Ids = new ArrayList<>();
+
+                    for (MdmDevMaintenancePlan plan : insertOrUpdateList) {
+                        if ("硫化精度".equals(plan.getPrecisionType()) && plan.getId() != null) {
+                            lhIds.add(plan.getId());
+                        } else if ("成型15天".equals(plan.getPrecisionType()) && plan.getId() != null) {
+                            cx15Ids.add(plan.getId());
+                        } else if ("成型60天".equals(plan.getPrecisionType()) && plan.getId() != null) {
+                            cx60Ids.add(plan.getId());
+                        }
+                    }
+
+                    if (!lhIds.isEmpty()) {
+                        try {
+                            lhPrecisionPlanRemoteService.generateFromMaintenancePlan(lhIds);
+                        } catch (Exception e) {
+                            log.error("自动生成并推算硫化精度计划失败", e);
+                        }
+                    }
+
+                    if (!cx15Ids.isEmpty()) {
+                        try {
+                            cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx15Ids, 15);
+                        } catch (Exception e) {
+                            log.error("自动生成并推算成型精度计划（15天）失败", e);
+                        }
+                    }
+
+                    if (!cx60Ids.isEmpty()) {
+                        try {
+                            cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx60Ids, 60);
+                        } catch (Exception e) {
+                            log.error("自动生成并推算成型精度计划（60天）失败", e);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("自动生成并推算精度计划失败", e);
+                }
             }
         } finally {
             DynamicDataSourceContextHolder.poll();

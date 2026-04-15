@@ -1,8 +1,8 @@
 package com.zlt.aps.lh.engine.chain.validators;
 
 import com.zlt.aps.lh.api.constant.LhDataValidationGroupConstant;
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.enums.ValidationPolicyEnum;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.chain.IDataValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -20,7 +20,8 @@ public class WorkCalendarValidator implements IDataValidator {
     public boolean validate(LhScheduleContext context) {
         if (context.getWorkCalendarList() == null || context.getWorkCalendarList().isEmpty()) {
             log.warn("工作日历数据为空, 工厂: {}", context.getFactoryCode());
-            context.addValidationError("[" + getValidatorName() + "] 工作日历数据为空, 工厂: " + context.getFactoryCode());
+            context.addValidationError("[" + getValidatorName() + "] 工作日历数据为空, 工厂: "
+                    + context.getFactoryDisplayName());
             return false;
         }
         long lhCalendarCount = context.getWorkCalendarList().stream()
@@ -28,7 +29,8 @@ public class WorkCalendarValidator implements IDataValidator {
                 .count();
         if (lhCalendarCount == 0) {
             log.warn("工作日历中无硫化工序(02)数据, 工厂: {}", context.getFactoryCode());
-            context.addValidationError("[" + getValidatorName() + "] 工作日历中无硫化工序(02)数据, 工厂: " + context.getFactoryCode());
+            context.addValidationError("[" + getValidatorName() + "] 工作日历中无硫化工序(02)数据, 工厂: "
+                    + context.getFactoryDisplayName());
             return false;
         }
         log.info("工作日历校验通过, 硫化日历记录数: {}", lhCalendarCount);

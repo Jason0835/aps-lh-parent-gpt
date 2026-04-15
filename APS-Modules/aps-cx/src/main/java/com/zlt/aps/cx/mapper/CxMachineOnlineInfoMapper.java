@@ -1,7 +1,7 @@
 package com.zlt.aps.cx.mapper;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
-import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -13,10 +13,9 @@ import java.util.List;
  * 成型在机信息Mapper
  *
  * @author APS Team
- * @since 2026/04/09
  */
 @Mapper
-public interface CxMachineOnlineInfoMapper extends CommBaseMapper<CxMachineOnlineInfo> {
+public interface CxMachineOnlineInfoMapper extends BaseMapper<CxMachineOnlineInfo> {
 
     /**
      * 按日期查询在机信息
@@ -24,7 +23,7 @@ public interface CxMachineOnlineInfoMapper extends CommBaseMapper<CxMachineOnlin
      * @param date 日期
      * @return 在机信息列表
      */
-    @Select("SELECT * FROM T_MDM_CX_MACHINE_ONLINE_INFO WHERE ONLINE_DATE = #{date} AND IS_DELETE = 0")
+    @Select("SELECT * FROM T_CX_MACHINE_ONLINE_INFO WHERE ONLINE_DATE = #{date} AND IS_DELETE = '0'")
     List<CxMachineOnlineInfo> selectByDate(@Param("date") LocalDate date);
 
     /**
@@ -35,10 +34,10 @@ public interface CxMachineOnlineInfoMapper extends CommBaseMapper<CxMachineOnlin
      * @param yesterday 昨天
      * @return 在机信息列表
      */
-    @Select("SELECT * FROM T_MDM_CX_MACHINE_ONLINE_INFO " +
-            "WHERE (ONLINE_DATE = #{today} OR ONLINE_DATE = #{yesterday}) AND IS_DELETE = 0")
+    @Select("SELECT * FROM T_CX_MACHINE_ONLINE_INFO " +
+            "WHERE (ONLINE_DATE = #{today} OR ONLINE_DATE = #{yesterday}) AND IS_DELETE = '0'")
     List<CxMachineOnlineInfo> selectByDateRange(@Param("today") LocalDate today,
-                                                   @Param("yesterday") LocalDate yesterday);
+                                                @Param("yesterday") LocalDate yesterday);
 
     /**
      * 按机台编码查询在机信息
@@ -46,7 +45,7 @@ public interface CxMachineOnlineInfoMapper extends CommBaseMapper<CxMachineOnlin
      * @param cxCode 机台编码
      * @return 在机信息列表
      */
-    @Select("SELECT * FROM T_MDM_CX_MACHINE_ONLINE_INFO WHERE CX_CODE = #{cxCode} AND IS_DELETE = 0 ORDER BY ONLINE_DATE DESC")
+    @Select("SELECT * FROM T_CX_MACHINE_ONLINE_INFO WHERE CX_CODE = #{cxCode} AND IS_DELETE = '0' ORDER BY ONLINE_DATE DESC")
     List<CxMachineOnlineInfo> selectByCxCode(@Param("cxCode") String cxCode);
 
     /**
@@ -54,6 +53,6 @@ public interface CxMachineOnlineInfoMapper extends CommBaseMapper<CxMachineOnlin
      *
      * @return 在机信息列表
      */
-    @Select("SELECT * FROM T_MDM_CX_MACHINE_ONLINE_INFO WHERE IS_DELETE = 0 ORDER BY CX_CODE, ONLINE_DATE DESC")
+    @Select("SELECT * FROM T_CX_MACHINE_ONLINE_INFO WHERE IS_DELETE = '0' ORDER BY CX_CODE, ONLINE_DATE DESC")
     List<CxMachineOnlineInfo> selectAllValid();
 }

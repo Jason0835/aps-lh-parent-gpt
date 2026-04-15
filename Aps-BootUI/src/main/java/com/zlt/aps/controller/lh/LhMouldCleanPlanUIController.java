@@ -53,7 +53,7 @@ public class LhMouldCleanPlanUIController extends BaseUIController<LhMouldCleanP
 
     @ApiOperation("保存")
     @PostMapping("/save")
-    @RequiresPermissions("lh:lhChipStock:edit")
+    @RequiresPermissions("lh:mouldCleanPlan:edit")
     @ResponseBody
     public AjaxResult save(LhMouldCleanPlan lhMouldCleanPlan) {
         return iLhMouldCleanPlanService.save(lhMouldCleanPlan);
@@ -61,14 +61,16 @@ public class LhMouldCleanPlanUIController extends BaseUIController<LhMouldCleanP
 
     @ApiOperation("删除")
     @PostMapping("/remove")
+    @RequiresPermissions("lh:mouldCleanPlan:remove")
     @ResponseBody
-    public AjaxResult remove(String ids) {
+    public AjaxResult remove(@RequestParam String ids) {
         Long[] arr = com.ruoyi.common.text.Convert.toLongArray(ids);
         return iLhMouldCleanPlanService.removeByIds(arr);
     }
 
     @ApiOperation("导出数据")
     @GetMapping("/export")
+    @RequiresPermissions("lh:mouldCleanPlan:export")
     public void export(HttpServletResponse response, LhMouldCleanPlan entity) throws IOException {
         String fileName = I18nUtil.getMessage("ui.data.column.mouldCleanPlan.modelName");
         byte[] excelBytes = iLhMouldCleanPlanService.exportData(entity, fileName);
@@ -113,6 +115,7 @@ public class LhMouldCleanPlanUIController extends BaseUIController<LhMouldCleanP
 
     @ApiOperation("从模具清洗预警同步生成计划")
     @PostMapping("/syncFromWarn")
+    @RequiresPermissions("lh:mouldCleanPlan:sync")
     @ResponseBody
     public AjaxResult syncFromWarn() {
         return iLhMouldCleanPlanService.syncFromWarn();
