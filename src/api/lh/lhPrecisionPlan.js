@@ -31,10 +31,11 @@ export function removeLhPrecisionPlan(ids) {
   })
 }
 
-export function syncFromMes() {
+export function syncFromMes(year) {
   return request({
     url: '/schedule/lhPrecisionPlan/generateFromMes',
-    method: 'post'
+    method: 'post',
+    params: { year: year }
   })
 }
 
