@@ -363,6 +363,11 @@ public class BalancingService {
         
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> sortedTasks = tasks.stream()
                 .sorted((a, b) -> {
+                    // 第零排序：约束量试任务优先（候选机台最少，必须先安排）
+                    boolean aConstrained = a.getConstrainedMachineCode() != null && !a.getConstrainedMachineCode().isEmpty();
+                    boolean bConstrained = b.getConstrainedMachineCode() != null && !b.getConstrainedMachineCode().isEmpty();
+                    if (aConstrained != bConstrained) return aConstrained ? -1 : 1;
+
                     // 第一排序：硫化机台数降序（大任务优先，让胚子21/22先处理）
                     int countA = a.getVulcanizeMachineCount() != null ? a.getVulcanizeMachineCount() : 0;
                     int countB = b.getVulcanizeMachineCount() != null ? b.getVulcanizeMachineCount() : 0;
@@ -444,11 +449,47 @@ public class BalancingService {
                    ? remainingTasks.get(0).getVulcanizeMachineCount() : 0);
         
         dfsAssign(remainingTasks, 0, initialRemainingCount, machineStates, forceKeepHistory,
-                typeDiffThreshold, loadDiffThreshold, searchResult);
+                typeDiffThreshold, loadDiffThreshold, totalDemand, searchResult);
 
         log.info("DFS搜索统计：总搜索次数={}, 剪枝次数={}, 最优分数={}, 最优已分配={}/{}",
                 searchResult.searchCount, searchResult.pruneCount, searchResult.bestScore,
                 searchResult.bestAssignedCount, totalDemand);
+
+        // 输出未被分配的任务（区分正式/量试）
+        if (searchResult.bestAssignedCount < totalDemand) {
+            log.info("检测到分配不足：已分配={}/总需求={}, bestAssignments={}",
+                    searchResult.bestAssignedCount, totalDemand, searchResult.bestAssignments != null ? "存在" : "null");
+            // 统计每个embryoCode的已分配总量
+            Map<String, Integer> assignedQtyMap = new HashMap<>();
+            for (List<EmbryoAssignment> assignments : searchResult.bestAssignments.values()) {
+                for (EmbryoAssignment ea : assignments) {
+                    assignedQtyMap.merge(ea.getEmbryoCode(), ea.getAssignedQty(), Integer::sum);
+                }
+            }
+            // 按 embryoCode 统计原始需求
+            Map<String, Integer> demandQtyMap = new LinkedHashMap<>();
+            for (CoreScheduleAlgorithmService.DailyEmbryoTask t : remainingTasks) {
+                String key = t.getEmbryoCode()
+                        + (t.getIsProductionTrial() != null && t.getIsProductionTrial() ? "(量试)" : "(正式)")
+                        + (t.getConstrainedMachineCode() != null ? "[约束:" + t.getConstrainedMachineCode() + "]" : "");
+                demandQtyMap.merge(key, t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 1, Integer::sum);
+            }
+            // 对比：同embryoCode总需求 vs 总已分配
+            Map<String, Integer> demandByEmbryo = new HashMap<>();
+            for (CoreScheduleAlgorithmService.DailyEmbryoTask t : remainingTasks) {
+                demandByEmbryo.merge(t.getEmbryoCode(), t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 1, Integer::sum);
+            }
+            List<String> shortageItems = new ArrayList<>();
+            for (Map.Entry<String, Integer> e : demandByEmbryo.entrySet()) {
+                int assigned = assignedQtyMap.getOrDefault(e.getKey(), 0);
+                if (assigned < e.getValue()) {
+                    shortageItems.add(e.getKey() + "(" + assigned + "/" + e.getValue() + ")");
+                }
+            }
+            if (!shortageItems.isEmpty()) {
+                log.warn("分配不足的胎胚：{}，各任务明细：{}", shortageItems, demandQtyMap);
+            }
+        }
 
         // Step 8: 构建结果
         BalancingResult result;
@@ -605,6 +646,7 @@ public class BalancingService {
             boolean forceKeepHistory,
             int typeDiffThreshold,
             int loadDiffThreshold,
+            int totalDemand,
             DfsSearchResult searchResult) {
 
         searchResult.searchCount++;
@@ -634,20 +676,23 @@ public class BalancingService {
             return;
         }
 
-        // 【贪心上界剪枝】：如果贪心解的负荷已低于当前负荷下界，剪枝
+        // 【贪心上界剪枝】：只在已找到完整解后才启用均衡剪枝
+        // 满排优先：没找到完整解时不剪枝，确保优先探索满排方案
         // 贪心解的负荷分布：每个机台负荷尽量均衡（最大差距=1）
-        int curMaxLoad = 0;
-        for (MachineState s : machineStates) {
-            if (s.getCurrentLoad() > curMaxLoad) {
-                curMaxLoad = s.getCurrentLoad();
+        if (searchResult.bestAssignedCount >= totalDemand) {
+            int curMaxLoad = 0;
+            for (MachineState s : machineStates) {
+                if (s.getCurrentLoad() > curMaxLoad) {
+                    curMaxLoad = s.getCurrentLoad();
+                }
             }
-        }
-        // 贪心解的负荷下界：(totalAssigned + remainingDemand) / numMachines
-        int greedyLoadLowerBound = (allCurrentLoad + allRemainingDemand) / machineStates.size();
-        // 如果当前最大负荷 > 贪心下界 + 1，剪枝（因为负荷差距必然 > 贪心）
-        if (curMaxLoad > greedyLoadLowerBound + 1) {
-            searchResult.pruneCount++;
-            return;
+            // 贪心解的负荷下界：(totalAssigned + remainingDemand) / numMachines
+            int greedyLoadLowerBound = (allCurrentLoad + allRemainingDemand) / machineStates.size();
+            // 如果当前最大负荷 > 贪心下界 + 1，剪枝（因为负荷差距必然 > 贪心）
+            if (curMaxLoad > greedyLoadLowerBound + 1) {
+                searchResult.pruneCount++;
+                return;
+            }
         }
 
         // 终止条件：所有任务已分配
@@ -691,7 +736,8 @@ public class BalancingService {
             // 找出可以分配的候选机台（只要有剩余容量即可）
             // isFirstCall=true 时打印日志，避免重复噪音
             List<MachineState> candidates = findCandidateMachinesForSplit(
-                    embryoCode, machineStates, forceKeepHistory, searchResult.searchCount == 1);
+                    embryoCode, machineStates, forceKeepHistory, searchResult.searchCount == 1,
+                    task.getConstrainedMachineCode());
             
             if (candidates.isEmpty()) {
                 // 没有可用机台，跳过当前任务，继续处理后续任务（记录部分解）
@@ -710,7 +756,7 @@ public class BalancingService {
                 }
                 // 跳过当前任务，递归处理下一个
                 dfsAssign(tasks, taskIndex + 1, 0, machineStates, forceKeepHistory,
-                        typeDiffThreshold, loadDiffThreshold, searchResult);
+                        typeDiffThreshold, loadDiffThreshold, totalDemand, searchResult);
                 return;
             }
             
@@ -812,10 +858,10 @@ public class BalancingService {
                     // 如果当前胎胚还有剩余，继续分配；否则处理下一个任务
                     if (newRemainingCount > 0) {
                         dfsAssign(tasks, taskIndex, newRemainingCount, machineStates, forceKeepHistory,
-                                typeDiffThreshold, loadDiffThreshold, searchResult);
+                                typeDiffThreshold, loadDiffThreshold, totalDemand, searchResult);
                     } else {
                         dfsAssign(tasks, taskIndex + 1, 0, machineStates, forceKeepHistory,
-                                typeDiffThreshold, loadDiffThreshold, searchResult);
+                                typeDiffThreshold, loadDiffThreshold, totalDemand, searchResult);
                     }
                     
                     // === 回溯 ===
@@ -837,11 +883,11 @@ public class BalancingService {
             if (currentLhCount <= 0) {
                 // 当前任务不需要分配，跳到下一个
                 dfsAssign(tasks, taskIndex + 1, 0, machineStates, forceKeepHistory,
-                        typeDiffThreshold, loadDiffThreshold, searchResult);
+                        typeDiffThreshold, loadDiffThreshold, totalDemand, searchResult);
             } else {
                 // 开始处理当前任务（传入其完整需求量）
                 dfsAssign(tasks, taskIndex, currentLhCount, machineStates, forceKeepHistory,
-                        typeDiffThreshold, loadDiffThreshold, searchResult);
+                        typeDiffThreshold, loadDiffThreshold, totalDemand, searchResult);
             }
         }
     }
@@ -907,11 +953,17 @@ public class BalancingService {
             String embryoCode,
             List<MachineState> machineStates,
             boolean forceKeepHistory,
-            boolean isFirstCall) {
+            boolean isFirstCall,
+            String constrainedMachineCode) {
         
         List<MachineState> candidates = new ArrayList<>();
         
         for (MachineState state : machineStates) {
+            // 约束机台过滤：如果该胎胚有约束机台，只能分配到指定机台
+            if (constrainedMachineCode != null && !constrainedMachineCode.isEmpty()
+                    && !state.getMachineCode().equals(constrainedMachineCode)) {
+                continue;
+            }
             // 容量已满，跳过
             if (state.getCurrentLoad() >= state.getMaxCapacity()) {
                 log.trace("  [-满载] 机台 {}", state.getMachineCode());
@@ -1168,7 +1220,8 @@ public class BalancingService {
                 
                 while (remainingCount > 0) {
                     List<MachineState> candidates = findCandidateMachinesForSplit(
-                            embryoCode, machineStates, forceKeepHistory, true);
+                            embryoCode, machineStates, forceKeepHistory, true,
+                            task.getConstrainedMachineCode());
                     
                     if (candidates.isEmpty()) {
                         if (failedEmbryo == null) {
