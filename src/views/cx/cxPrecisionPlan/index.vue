@@ -77,7 +77,7 @@ import infoDialog from './components/infoDialog.vue'
 export default {
   name: 'CxPrecisionPlan',
   components: { TltUploadForm, infoDialog },
-  dicts: ['biz_factory_name', 'class_num_three_plan'],
+  dicts: ['biz_factory_name', 'MACHINE_ACCURACY_TYPE'],
   provide() {
     return { parentDict: this.dict }
   },
@@ -118,8 +118,8 @@ export default {
           filterable: true
         },
         {
-          prop: 'machineName',
-          label: this.$t('ui.data.column.cxPrecisionPlan.machineName'),
+          prop: 'machineCode',
+          label: this.$t('ui.data.column.cxPrecisionPlan.machineCode'),
           placeholder: this.$t('common.rule.input'),
           type: 'input'
         },
@@ -127,10 +127,17 @@ export default {
           prop: 'planDate',
           label: this.$t('ui.data.column.cxPrecisionPlan.planDate'),
           type: 'date',
-          dateType: 'daterange',
+          dateType: 'date',
           valueFormat: 'yyyy-MM-dd',
-          startPlaceholder: this.$t('common.startTime'),
-          endPlaceholder: this.$t('common.endTime')
+          placeholder: this.$t('common.rule.select')
+        },
+        {
+          prop: 'actualDate',
+          label: this.$t('ui.data.column.cxPrecisionPlan.actualDate'),
+          type: 'date',
+          dateType: 'date',
+          valueFormat: 'yyyy-MM-dd',
+          placeholder: this.$t('common.rule.select')
         }
       ]
     },
@@ -155,84 +162,51 @@ export default {
           minWidth: 100
         },
         {
-          prop: 'machineName',
+          prop: 'precisionType',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxPrecisionPlan.machineName'),
-          minWidth: 140
+          label: this.$t('ui.data.column.cxPrecisionPlan.precisionType'),
+          minWidth: 120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.MACHINE_ACCURACY_TYPE, value)
+          }
         },
         {
           prop: 'planDate',
           align: 'center',
           halign: 'center',
           label: this.$t('ui.data.column.cxPrecisionPlan.planDate'),
-          minWidth: 100
-        },
-        {
-          prop: 'planShift',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.cxPrecisionPlan.planShift'),
-          minWidth: 80,
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.class_num_three_plan, value)
-          }
-        },
-        {
-          prop: 'planStartTime',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.cxPrecisionPlan.planStartTime'),
-          minWidth: 160
-        },
-        {
-          prop: 'planEndTime',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.cxPrecisionPlan.planEndTime'),
-          minWidth: 160
-        },
-        {
-          prop: 'estimatedHours',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.cxPrecisionPlan.estimatedHours'),
-          minWidth: 90
+          minWidth: 110
         },
         {
           prop: 'actualDate',
           align: 'center',
           halign: 'center',
           label: this.$t('ui.data.column.cxPrecisionPlan.actualDate'),
-          minWidth: 120
-        },
-        {
-          prop: 'lastPrecisionDate',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.cxPrecisionPlan.lastPrecisionDate'),
-          minWidth: 120
-        },
-        {
-          prop: 'dueDate',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.cxPrecisionPlan.dueDate'),
-          minWidth: 120
+          minWidth: 110
         },
         {
           prop: 'cycleDays',
           align: 'center',
           halign: 'center',
           label: this.$t('ui.data.column.cxPrecisionPlan.cycleDays'),
+          minWidth: 90,
+          formatter: (row) => this.cycleDaysText(row.precisionType)
+        },
+        {
+          prop: 'daysToDue',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxPrecisionPlan.daysToDue'),
           minWidth: 100
         },
         {
-          prop: 'scheduleDate',
+          prop: 'dataSource',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxPrecisionPlan.scheduleDate'),
-          minWidth: 120
+          label: this.$t('ui.data.column.cxPrecisionPlan.dataSource'),
+          minWidth: 90,
+          formatter: (row) => this.dataSourceText(row.dataSource)
         },
         {
           prop: 'remark',
@@ -271,6 +245,21 @@ export default {
     }
   },
   methods: {
+    cycleDaysText(precisionType) {
+      // Requirement: cycle mapped by precision type -> 15/60 (人天)
+      // Since mapping table isn't provided, infer from dict label if it contains "15" or "60".
+      const label = this.selectDictLabel(this.dict.type.MACHINE_ACCURACY_TYPE || [], precisionType) || ''
+      if (label.includes('15')) return '15'
+      if (label.includes('60')) return '60'
+      return ''
+    },
+    dataSourceText(dataSource) {
+      // UI requirement: 默认“系统”，首次MES同步标记“MES”
+      // Backend: 0=同步(MES), 1=自动生成(系统)
+      if (dataSource === '0' || dataSource === 0) return 'MES'
+      if (dataSource === '1' || dataSource === 1) return '系统'
+      return ''
+    },
     handleSyncFromMes() {
       const currentYear = new Date().getFullYear()
       this.$confirm(this.$t('ui.lh.precision.plan.sync.confirm'), {
@@ -325,14 +314,22 @@ export default {
     },
     handleSearch(data) {
       this.query = { ...data }
-      if (data.planDate && data.planDate.length === 2) {
-        this.query.planDateBegin = data.planDate[0]
-        this.query.planDateEnd = data.planDate[1]
+      if (data.planDate) {
+        this.query.planDateStart = data.planDate
+        this.query.planDateEnd = data.planDate
       } else {
-        this.query.planDateBegin = undefined
+        this.query.planDateStart = undefined
         this.query.planDateEnd = undefined
       }
+      if (data.actualDate) {
+        this.query.actualDateStart = data.actualDate
+        this.query.actualDateEnd = data.actualDate
+      } else {
+        this.query.actualDateStart = undefined
+        this.query.actualDateEnd = undefined
+      }
       delete this.query.planDate
+      delete this.query.actualDate
       this.$set(this.page, 'current', 1)
       this.getList()
     },
@@ -384,7 +381,7 @@ export default {
     const defaultDate = today.toISOString().split('T')[0]
     const defaultParams = {
       factoryCode: '116',
-      planDateBegin: defaultDate,
+      planDateStart: defaultDate,
       planDateEnd: defaultDate
     }
     this.search = {

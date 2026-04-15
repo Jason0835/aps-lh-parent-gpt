@@ -64,13 +64,6 @@ export default {
             trigger: "change",
           },
         ],
-        machineName: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
         planDate: [
           {
             required: true,
@@ -78,11 +71,11 @@ export default {
             trigger: "change",
           },
         ],
-        estimatedHours: [
+        actualDate: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
+            message: this.$t("common.rule.select"),
+            trigger: "change",
           },
         ],
       },
@@ -121,65 +114,39 @@ export default {
           },
         },
         {
-          prop: "machineName",
-          label: this.$t("ui.data.column.cxPrecisionPlan.machineName"),
-          disabled: true,
-          maxlength: 64,
-        },
-        {
           prop: "planDate",
           label: this.$t("ui.data.column.cxPrecisionPlan.planDate"),
           type: "date",
           valueFormat: "yyyy-MM-dd",
-        },
-        {
-          prop: "planShift",
-          label: this.$t("ui.data.column.cxPrecisionPlan.planShift"),
-          type: "select",
-          dictData: this.dict.type.class_num_three_plan,
-          filterable: true,
-        },
-        {
-          prop: "planStartTime",
-          label: this.$t("ui.data.column.cxPrecisionPlan.planStartTime"),
-          type: "date",
-          dateType: "datetime",
-          valueFormat: "yyyy-MM-dd HH:mm:ss",
           listeners: {
-            change: this.handlePlanStartTimeChange,
+            change: this.handlePlanDateChange,
           },
         },
         {
-          prop: "planEndTime",
-          label: this.$t("ui.data.column.cxPrecisionPlan.planEndTime"),
-          type: "date",
-          dateType: "datetime",
-          valueFormat: "yyyy-MM-dd HH:mm:ss",
-          listeners: {
-            change: this.handlePlanEndTimeChange,
-          },
-        },
-        {
-          prop: "estimatedHours",
-          label: this.$t("ui.data.column.cxPrecisionPlan.estimatedHours"),
-          type: "number",
-          min: 0,
-          precision: 1,
-        },
-        {
-          prop: "lastPrecisionDate",
-          label: this.$t("ui.data.column.cxPrecisionPlan.lastPrecisionDate"),
+          prop: "actualDate",
+          label: this.$t("ui.data.column.cxPrecisionPlan.actualDate"),
           type: "date",
           valueFormat: "yyyy-MM-dd",
-          listeners: {
-            change: this.handleLastPrecisionDateChange,
-          },
         },
         {
-          prop: "dueDate",
-          label: this.$t("ui.data.column.cxPrecisionPlan.dueDate"),
-          type: "date",
-          valueFormat: "yyyy-MM-dd",
+          prop: "precisionTypeLabel",
+          label: this.$t("ui.data.column.cxPrecisionPlan.precisionType"),
+          disabled: true,
+        },
+        {
+          prop: "cycleDays",
+          label: this.$t("ui.data.column.cxPrecisionPlan.cycleDays"),
+          disabled: true,
+        },
+        {
+          prop: "daysToDue",
+          label: this.$t("ui.data.column.cxPrecisionPlan.daysToDue"),
+          disabled: true,
+        },
+        {
+          prop: "dataSourceLabel",
+          label: this.$t("ui.data.column.cxPrecisionPlan.dataSource"),
+          disabled: true,
         },
         {
           prop: "remark",
@@ -199,13 +166,14 @@ export default {
         this.isEdit = true;
         this.form = { ...row };
         this.getMachineList();
+        this.refreshDerivedFields();
       } else {
         this.isEdit = false;
         this.form = {
           factoryCode: "116",
-          estimatedHours: 0,
         };
         this.getMachineList();
+        this.refreshDerivedFields();
       }
     },
     hide() {
@@ -234,83 +202,64 @@ export default {
       const machine = this.machineList.find((item) => item.cxMachineCode === val);
       if (machine) {
         this.$set(this.form, "machineCode", machine.cxMachineCode);
-        this.$set(this.form, "machineName", machine.machineName || machine.cxMachineCode);
       }
     },
-    handlePlanStartTimeChange(val) {
-      if (this.form.planDate && val) {
-        const planDate = this.form.planDate.substring(0, 10);
-        const startTime = val.substring(0, 10);
-        if (startTime < planDate) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.startTimeBeforePlanDate"));
-          this.$set(this.form, "planStartTime", "");
-          return;
-        }
-      }
-      this.calculateEstimatedHours();
+    handlePlanDateChange() {
+      this.refreshDerivedFields();
     },
-    handlePlanEndTimeChange(val) {
-      if (this.form.planStartTime && val) {
-        if (val < this.form.planStartTime) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.endTimeBeforeStartTime"));
-          this.$set(this.form, "planEndTime", "");
-          return;
-        }
-      }
-      this.calculateEstimatedHours();
+    refreshDerivedFields() {
+      // precisionType is read-only, provided by backend
+      const pt = this.form.precisionType;
+      this.$set(this.form, "precisionTypeLabel", this.getPrecisionTypeLabel(pt));
+      this.$set(this.form, "cycleDays", this.getCycleDaysByPrecisionType(pt));
+      this.$set(this.form, "dataSourceLabel", this.getDataSourceLabel(this.form.dataSource));
+      this.$set(this.form, "daysToDue", this.calcDaysToDue(this.form.planDate));
     },
-    handleLastPrecisionDateChange(val) {
-      if (this.form.planDate && val) {
-        if (val >= this.form.planDate) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.lastPrecisionDateAfterStartTime"));
-          this.$set(this.form, "lastPrecisionDate", "");
-          return;
-        }
-      }
+    getPrecisionTypeLabel(precisionType) {
+      const list = (this.dict && this.dict.type && this.dict.type.MACHINE_ACCURACY_TYPE) || [];
+      const item =
+        list.find((d) => d.value === precisionType) ||
+        list.find((d) => d.dictValue === precisionType) ||
+        list.find((d) => String(d.value) === String(precisionType)) ||
+        list.find((d) => String(d.dictValue) === String(precisionType));
+      return (item && (item.label || item.dictLabel)) || "";
     },
-    calculateEstimatedHours() {
-      if (this.form.planStartTime && this.form.planEndTime) {
-        const start = new Date(this.form.planStartTime).getTime();
-        const end = new Date(this.form.planEndTime).getTime();
-        const hours = (end - start) / (1000 * 60 * 60);
-        this.$set(this.form, "estimatedHours", Math.round(hours * 10) / 10);
-      } else {
-        this.$set(this.form, "estimatedHours", 0);
+    getCycleDaysByPrecisionType(precisionType) {
+      const label = this.getPrecisionTypeLabel(precisionType);
+      if (label.includes("15")) return "15";
+      if (label.includes("60")) return "60";
+      return "";
+    },
+    getDataSourceLabel(dataSource) {
+      if (dataSource === "0" || dataSource === 0) return "MES";
+      if (dataSource === "1" || dataSource === 1) return "系统";
+      return "";
+    },
+    calcDaysToDue(planDate) {
+      if (!planDate) return "";
+      try {
+        // planDate is yyyy-MM-dd
+        const today = new Date();
+        const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+        const parts = String(planDate).split("-");
+        if (parts.length < 3) return "";
+        const pd = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).getTime();
+        return Math.floor((pd - t0) / (24 * 60 * 60 * 1000));
+      } catch (e) {
+        return "";
       }
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
     },
     async save(payload) {
-      if (payload.planDate && payload.planStartTime) {
-        const planDate = payload.planDate.substring(0, 10);
-        const startTime = payload.planStartTime.substring(0, 10);
-        if (startTime < planDate) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.startTimeBeforePlanDate"));
-          return;
-        }
-      }
+      // Derived display-only fields must not be sent to backend (backend entity doesn't have them)
+      delete payload.precisionTypeLabel;
+      delete payload.dataSourceLabel;
+      delete payload.cycleDays;
 
-      if (payload.planStartTime && payload.planEndTime) {
-        if (payload.planEndTime < payload.planStartTime) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.endTimeBeforeStartTime"));
-          return;
-        }
-      }
-
-      if (payload.planDate && payload.lastPrecisionDate) {
-        if (payload.lastPrecisionDate >= payload.planDate) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.lastPrecisionDateAfterStartTime"));
-          return;
-        }
-      }
-
-      if (payload.planDate && payload.dueDate) {
-        if (payload.dueDate <= payload.planDate) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.dueDateBeforePlanDate"));
-          return;
-        }
-      }
+      // Ensure daysToDue is up-to-date (computed from planDate)
+      payload.daysToDue = this.calcDaysToDue(payload.planDate);
 
       const uniqueRes = await checkCxPrecisionPlanUnique(payload);
       if (uniqueRes === "1") {
