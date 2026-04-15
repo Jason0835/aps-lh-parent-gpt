@@ -5,6 +5,7 @@ import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
@@ -64,7 +65,7 @@ public class LhMouldCleanPlanUIController extends BaseUIController<LhMouldCleanP
     @RequiresPermissions("lh:mouldCleanPlan:remove")
     @ResponseBody
     public AjaxResult remove(@RequestParam String ids) {
-        Long[] arr = com.ruoyi.common.text.Convert.toLongArray(ids);
+        Long[] arr = Convert.toLongArray(ids);
         return iLhMouldCleanPlanService.removeByIds(arr);
     }
 
