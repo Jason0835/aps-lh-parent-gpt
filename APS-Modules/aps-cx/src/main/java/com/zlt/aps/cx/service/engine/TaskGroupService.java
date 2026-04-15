@@ -187,7 +187,7 @@ public class TaskGroupService {
             }
 
             String materialCode = lhResult.getMaterialCode();
-            String embryoCode = lhResult.getMainMaterialDesc();
+              String embryoCode = lhResult.getMainMaterialDesc();
 
             // 判断任务类型
             List<String> continueMachineCodes = findContinueMachines(materialCode, embryoCode, machineOnlineEmbryoMap);

@@ -1,12 +1,12 @@
 package com.zlt.aps.cx.vo;
 
-import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.entity.*;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.config.CxStructurePriority;
+import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
@@ -281,6 +281,12 @@ public class ScheduleContextVo {
      * 默认4种
      */
     private Integer maxTypesPerMachine;
+
+    /**
+     * 机台默认最大硫化机数
+     * 当机台配比配置缺失时的兜底值，默认10
+     */
+    private Integer maxLhMachineQty;
 
     /**
      * 默认整车容量（条）
