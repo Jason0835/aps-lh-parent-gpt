@@ -17,6 +17,7 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
@@ -82,6 +83,8 @@ public class LhScheduleContext {
     private List<MdmDevicePlanShut> devicePlanShutList = new ArrayList<>();
     /** SKU与模具关系Map, key=materialCode */
     private Map<String, List<MdmSkuMouldRel>> skuMouldRelMap = new HashMap<>();
+    /** 模具台账Map, key=mouldCode */
+    private Map<String, MdmModelInfo> modelInfoMap = new HashMap<>();
     /** 硫化机台信息Map, key=machineCode */
     private Map<String, LhMachineInfo> machineInfoMap = new LinkedHashMap<>();
     /** 模具清洗计划列表 */
