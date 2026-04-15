@@ -24,7 +24,7 @@ public interface ILhMouldCleanPlanRemoteService {
     AjaxResult save(@RequestBody LhMouldCleanPlan billVO);
 
     @ApiOperation("删除")
-    @PostMapping("/mouldCleanPlan/remove")
+    @DeleteMapping("/mouldCleanPlan/remove")
     AjaxResult removeByIds(@RequestBody Long[] ids);
 
     @ApiOperation("导出数据")
