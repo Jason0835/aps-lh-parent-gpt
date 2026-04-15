@@ -34,7 +34,8 @@
         >
         
         <el-button
-          type="success"
+          type="primary"
+          plain
           v-hasPermi="['lh:mouldCleanPlan:sync']"
           @click="handleSyncFromWarn"
           >{{ $t("ui.mould.clean.plan.sync.from.warn") }}</el-button
@@ -173,6 +174,12 @@ export default {
     },
     searchColumns() {
       return [
+        {
+          label: this.$t("common.factory"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+        },
         {
           label: this.$t("ui.data.column.mouldCleanPlan.lhCode"),
           prop: "lhCode",
@@ -347,11 +354,13 @@ export default {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     const defaultDate = `${year}-${month}-${day}`;
-    
+
     this.search = {
+      factoryCode: "116",
       cleanTime: [defaultDate, defaultDate]
     };
     this.query = {
+      factoryCode: "116",
       cleanTimeBegin: defaultDate,
       cleanTimeEnd: defaultDate
     };
