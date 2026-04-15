@@ -63,7 +63,7 @@ public class LhMouldCleanPlanUIController extends BaseUIController<LhMouldCleanP
     @PostMapping("/remove")
     @RequiresPermissions("lh:mouldCleanPlan:remove")
     @ResponseBody
-    public AjaxResult remove(@RequestParam String ids) {
+    public AjaxResult remove(String ids) {
         Long[] arr = com.ruoyi.common.text.Convert.toLongArray(ids);
         return iLhMouldCleanPlanService.removeByIds(arr);
     }
