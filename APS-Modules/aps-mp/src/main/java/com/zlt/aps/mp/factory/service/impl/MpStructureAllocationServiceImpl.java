@@ -268,7 +268,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 .eq(MpStructureAllocation::getMonth, month)
                 .eq(MpStructureAllocation::getProductionVersion, productionVersion)
                 .eq(MpStructureAllocation::getIsDelete, YesOrNoEnum.NO.getValue())
-                .ne(MpStructureAllocation::getDataSource, DataSourceEnum.HAND.getCode())
+                .and(innerWrapper -> innerWrapper.ne(MpStructureAllocation::getDataSource, DataSourceEnum.HAND.getCode())
+                        .or()
+                        .isNull(MpStructureAllocation::getDataSource))
                 .notIn(MpStructureAllocation::getId, deleteIds);
         Long count = entityMapper.selectCount(wrapper);
         if (count != null && count > 0) {
