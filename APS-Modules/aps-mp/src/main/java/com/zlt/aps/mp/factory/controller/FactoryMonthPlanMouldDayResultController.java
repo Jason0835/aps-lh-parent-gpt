@@ -15,12 +15,16 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.ApsNumberUtils;
+import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
+import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
+import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.aps.utils.JsonI18nConvertUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -28,10 +32,17 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -61,6 +72,9 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
 
     @Autowired
     private IFactoryMonthPlanMouldDayResultService factoryMonthPlanMouldDayResultService;
+
+    @Autowired
+    private IMpStructureAllocationService mpStructureAllocationService;
 
     @Autowired
     private DpDemandPlanEntityMapper dpDemandPlanEntityMapper;
@@ -185,9 +199,33 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     @Override
     public byte[] exportData(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
+        // 组装月计划导出excel
         Date beginTime = DateUtils.getNowDate();
         List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, false);
-        byte[] resultBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list);
+        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list);
+        
+        // 同时组装结构转产表导出excel
+        MpStructureAllocation factoryMonthPlanMouldDayResult = new MpStructureAllocation();
+        factoryMonthPlanMouldDayResult.setFactoryCode(queryVO.getFactoryCode());
+        factoryMonthPlanMouldDayResult.setYear(queryVO.getYear());
+        factoryMonthPlanMouldDayResult.setMonth(queryVO.getMonth());
+        factoryMonthPlanMouldDayResult.setProductionVersion(queryVO.getProductionVersion());
+        factoryMonthPlanMouldDayResult.setMonthPlanVersion(queryVO.getMonthPlanVersion());
+        MpStructureAllocationExportStatisticsVo vo = mpStructureAllocationService.getExportVo(factoryMonthPlanMouldDayResult);
+        byte[] excelBytes2 = mpStructureAllocationService.getMpStructureAllocationExportByte(vo);
+        
+        // 合并月计划、结构转产表的导出数据
+        byte[] resultBytes;
+        try (ByteArrayInputStream inputStream1 = new ByteArrayInputStream(excelBytes1);
+                ByteArrayInputStream inputStream2 = new ByteArrayInputStream(excelBytes2);
+                XSSFWorkbook targetWorkbook = new XSSFWorkbook(inputStream1);
+                XSSFWorkbook sourceWorkbook = new XSSFWorkbook(inputStream2);
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();) {
+            ExcelUtils.copySheet(sourceWorkbook, 0, targetWorkbook);
+            targetWorkbook.write(outputStream);
+            resultBytes = outputStream.toByteArray();
+        }
+        
         Date endTime = DateUtils.getNowDate();
         ExportLog exportLog = new ExportLog();
         exportLog.setProcedureCode("0");
