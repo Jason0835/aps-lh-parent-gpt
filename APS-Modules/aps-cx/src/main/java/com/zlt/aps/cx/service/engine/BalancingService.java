@@ -349,8 +349,14 @@ public class BalancingService {
             totalCapacity += (maxLh != null ? maxLh : DEFAULT_MAX_LH_MACHINE_QTY);
         }
 
-        log.info("均衡分配计算：总需求（硫化机台数）={}, 总产能（各机台最大硫化机数之和）={}, 机台数={}",
-                totalDemand, totalCapacity, availableMachines.size());
+        // 计算种类数（去重）
+        long totalTypes = tasks.stream()
+                .map(CoreScheduleAlgorithmService.DailyEmbryoTask::getEmbryoCode)
+                .distinct()
+                .count();
+
+        log.info("均衡分配计算：总需求（硫化机台数）={}, 种类数={}, 总产能（各机台最大硫化机数之和）={}, 机台数={}",
+                totalDemand, totalTypes, totalCapacity, availableMachines.size());
 
         // 打印任务需求明细（合并同胚子代码）
         Map<String, Integer> taskDetailMap = new LinkedHashMap<>();
@@ -425,14 +431,10 @@ public class BalancingService {
             reservedHistoryTasks(sortedTasks, machineStates, context);
         }
 
-        // 产能不足检查：如果总产能 < 总需求，直接使用贪心算法
+        // 产能不足提示（DFS仍可处理部分解，无需贪心兜底）
         int effectiveCapacity = totalCapacity;
         if (effectiveCapacity < totalDemand) {
-            log.warn("产能不足（产能={}, 需求={}），跳过DFS直接使用贪心算法", effectiveCapacity, totalDemand);
-            BalancingResult result = greedyAssignFallback(sortedTasks, machineStates, forceKeepHistory,
-                    typeDiffThreshold, loadDiffThreshold);
-            logAllocationResult(result, machineStates);
-            return result;
+            log.warn("产能不足（产能={}, 需求={}），DFS将尝试最优部分解", effectiveCapacity, totalDemand);
         }
 
         // Step 7: DFS + 剪枝搜索最优方案
@@ -520,9 +522,11 @@ public class BalancingService {
                 result = convertDfsResultToBalancingResult(searchResult.bestAssignments, machineStates, sortedTasks);
             }
         } else {
-            log.warn("DFS未找到任何方案，使用贪心算法作为兜底");
-            result = greedyAssignFallback(sortedTasks, machineStates, forceKeepHistory,
-                    typeDiffThreshold, loadDiffThreshold);
+            // DFS未找到任何方案（理论上不应发生，至少第一个任务的分配会形成部分解）
+            log.warn("DFS未找到任何方案，返回空结果");
+            BalancingResult emptyResult = new BalancingResult();
+            emptyResult.setAssignments(new ArrayList<>());
+            result = emptyResult;
         }
 
         logAllocationResult(result, machineStates);
@@ -1197,198 +1201,6 @@ public class BalancingService {
             MachineAssignment assignment = new MachineAssignment();
             assignment.setMachineCode(entry.getKey());
             assignment.setEmbryoAssignments(entry.getValue());
-            result.getAssignments().add(assignment);
-        }
-        
-        return result;
-    }
-
-    /**
-     * 贪心算法兜底方案（支持胎胚拆分 + 迭代贪心重试）
-     */
-    private BalancingResult greedyAssignFallback(
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
-            List<MachineState> machineStates,
-            boolean forceKeepHistory,
-            int typeDiffThreshold,
-            int loadDiffThreshold) {
-
-        log.info("启用贪心算法兜底方案，任务数={}, 机台数={}", tasks.size(), machineStates.size());
-        
-        // 跟踪所有失败过的胚子（这些胚子在后续重试中优先尝试）
-        Set<String> failedEmbryos = new HashSet<>();
-        
-        // 最多重试 N 次贪心
-        int maxRetries = 5;
-        
-        int totalAssigned = 0;
-        int totalRequired = tasks.stream()
-                .mapToInt(t -> t.getVulcanizeMachineCount() != null ? t.getVulcanizeMachineCount() : 0)
-                .sum();
-        
-        for (int retry = 0; retry <= maxRetries; retry++) {
-            // 重置机台状态
-            for (MachineState state : machineStates) {
-                state.setCurrentLoad(0);
-                state.setCurrentTypes(0);
-                state.getAssignedEmbryos().clear();
-            }
-            
-            // 对任务列表重新排序（每次重试使用不同的排序策略）
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> sortedTasks = new ArrayList<>(tasks);
-            if (retry == 0) {
-                // 第一次：按硫化机台数降序（大任务优先，让胚子21/22先处理）
-                sortedTasks.sort((a, b) -> {
-                    int cntA = a.getVulcanizeMachineCount() != null ? a.getVulcanizeMachineCount() : 0;
-                    int cntB = b.getVulcanizeMachineCount() != null ? b.getVulcanizeMachineCount() : 0;
-                    return Integer.compare(cntB, cntA);
-                });
-            } else if (retry == 1) {
-                // 第二次：按硫化机台数升序（小任务优先）
-                sortedTasks.sort((a, b) -> {
-                    int cntA = a.getVulcanizeMachineCount() != null ? a.getVulcanizeMachineCount() : 0;
-                    int cntB = b.getVulcanizeMachineCount() != null ? b.getVulcanizeMachineCount() : 0;
-                    return Integer.compare(cntA, cntB);
-                });
-            } else {
-                // 第三次及之后：把失败的胚子排在前面
-                final Set<String> currentFailed = new HashSet<>(failedEmbryos);
-                sortedTasks.sort((a, b) -> {
-                    String cA = a.getEmbryoCode();
-                    String cB = b.getEmbryoCode();
-                    boolean aFailed = currentFailed.contains(cA);
-                    boolean bFailed = currentFailed.contains(cB);
-                    if (aFailed && !bFailed) return -1;
-                    if (!aFailed && bFailed) return 1;
-                    // 失败胚子之间，按硫化机台数降序
-                    int cntA = a.getVulcanizeMachineCount() != null ? a.getVulcanizeMachineCount() : 0;
-                    int cntB = b.getVulcanizeMachineCount() != null ? b.getVulcanizeMachineCount() : 0;
-                    return Integer.compare(cntB, cntA);
-                });
-            }
-            
-            // 跟踪已完成的胚子
-            Set<String> completedEmbryos = new HashSet<>();
-            String failedEmbryo = null;
-            
-            for (CoreScheduleAlgorithmService.DailyEmbryoTask task : sortedTasks) {
-                String embryoCode = task.getEmbryoCode();
-                
-                if (completedEmbryos.contains(embryoCode)) {
-                    continue;
-                }
-                
-                int remainingCount = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
-                if (remainingCount <= 0) {
-                    completedEmbryos.add(embryoCode);
-                    continue;
-                }
-                
-                while (remainingCount > 0) {
-                    List<MachineState> candidates = findCandidateMachinesForSplit(
-                            embryoCode, machineStates, forceKeepHistory, true,
-                            task.getConstrainedMachineCode());
-                    
-                    if (candidates.isEmpty()) {
-                        if (failedEmbryo == null) {
-                            failedEmbryo = embryoCode;
-                        }
-                        break;
-                    }
-                    
-                    sortCandidatesForDfs(candidates, embryoCode, forceKeepHistory);
-                    
-                    MachineState bestCandidate = null;
-                    int bestAssignQty = 0;
-                    int minLoadAfterAssign = Integer.MAX_VALUE;
-                    
-                    for (MachineState candidate : candidates) {
-                        int maxCanAssign = candidate.getMaxCapacity() - candidate.getCurrentLoad();
-                        if (maxCanAssign <= 0) {
-                            continue;
-                        }
-                        int assignQty = Math.min(remainingCount, maxCanAssign);
-                        int loadAfterAssign = candidate.getCurrentLoad() + assignQty;
-                        if (loadAfterAssign < minLoadAfterAssign) {
-                            minLoadAfterAssign = loadAfterAssign;
-                            bestCandidate = candidate;
-                            bestAssignQty = assignQty;
-                        }
-                        if (assignQty < remainingCount) {
-                            continue;
-                        }
-                    }
-                    
-                    if (bestCandidate == null || bestAssignQty <= 0) {
-                        if (failedEmbryo == null) {
-                            failedEmbryo = embryoCode;
-                        }
-                        break;
-                    }
-                    
-                    MachineState selected = bestCandidate;
-                    int assignQty = bestAssignQty;
-                    
-                    boolean isNewType = !selected.getAssignedEmbryos().stream()
-                            .anyMatch(e -> e.getEmbryoCode().equals(embryoCode));
-                    
-                    selected.getAssignedEmbryos().add(new EmbryoAssignment(embryoCode, task, assignQty));
-                    selected.setCurrentLoad(selected.getCurrentLoad() + assignQty);
-                    if (isNewType) {
-                        selected.setCurrentTypes(selected.getCurrentTypes() + 1);
-                    }
-                    
-                    remainingCount -= assignQty;
-                }
-                
-                if (remainingCount > 0) {
-                    // 当前胚子分配失败，记录并跳出
-                    break;
-                }
-                
-                completedEmbryos.add(embryoCode);
-            }
-            
-            // 检查是否完整
-            totalAssigned = machineStates.stream().mapToInt(MachineState::getCurrentLoad).sum();
-            
-            if (totalAssigned == totalRequired) {
-                log.info("贪心分配完成，找到完整解（重试 {} 次）", retry);
-                return convertToResult(machineStates, tasks);
-            }
-            
-            if (failedEmbryo != null) {
-                failedEmbryos.add(failedEmbryo);
-                log.info("贪心分配不完整（{} / {}），重试 {} 次，已失败胚子: {}", 
-                        totalAssigned, totalRequired, retry, failedEmbryos);
-            } else {
-                log.info("贪心分配不完整（{} / {}），重试 {} 次", 
-                        totalAssigned, totalRequired, retry);
-            }
-        }
-        
-        log.warn("所有贪心重试均未能找到完整解（最优情况 {} / {}），使用最后一次结果", totalAssigned, totalRequired);
-        return convertToResult(machineStates, tasks);
-    }
-
-    /**
-     * 转换为结果对象
-     */
-    private BalancingResult convertToResult(
-            List<MachineState> machineStates,
-            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks) {
-        
-        BalancingResult result = new BalancingResult();
-        result.setAssignments(new ArrayList<>());
-        
-        for (MachineState state : machineStates) {
-            if (state.getAssignedEmbryos().isEmpty()) {
-                continue;
-            }
-            
-            MachineAssignment assignment = new MachineAssignment();
-            assignment.setMachineCode(state.getMachineCode());
-            assignment.setEmbryoAssignments(state.getAssignedEmbryos());
             result.getAssignments().add(assignment);
         }
         
