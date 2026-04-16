@@ -818,4 +818,86 @@ public class ExcelUtils {
         }
         return result.toString();
     }
+    
+    /**
+     * 将源工作簿中的指定Sheet，完整复制到目标工作簿中
+     * @param sourceWorkbook 源工作簿
+     * @param sheetIdex 要复制的Sheet下表下标，0开始
+     * @param targetWorkbook 目标工作簿
+     */
+    public static void copySheet(Workbook sourceWorkbook, int sheetIdex, 
+                                 Workbook targetWorkbook) {
+        // 1. 获取源Sheet
+        Sheet sourceSheet = sourceWorkbook.getSheetAt(sheetIdex);
+        if (sourceSheet == null) {
+            throw new IllegalArgumentException("源工作表不存在: " + sheetIdex);
+        }
+        
+        // 2. 在目标工作簿中创建新Sheet
+        Sheet targetSheet = targetWorkbook.createSheet(sourceSheet.getSheetName());
+        
+        // 3. 复制列宽（这一步能保证排版不错位）
+        for (int i = 0; i <= sourceSheet.getLastRowNum(); i++) {
+            Row sourceRow = sourceSheet.getRow(i);
+            if (sourceRow != null) {
+                targetSheet.setColumnWidth(i, sourceSheet.getColumnWidth(i));
+            }
+        }
+        
+        // 4. 复制行（包含行高、样式和值）
+        for (int i = 0; i <= sourceSheet.getLastRowNum(); i++) {
+            Row sourceRow = sourceSheet.getRow(i);
+            if (sourceRow == null) {
+                // 如果源行为空，目标行也创建空行保持结构一致
+                targetSheet.createRow(i);
+                continue;
+            }
+            
+            Row targetRow = targetSheet.createRow(i);
+            targetRow.setHeight(sourceRow.getHeight());
+            
+            // 复制该行的所有单元格
+            for (int j = 0; j < sourceRow.getLastCellNum(); j++) {
+                Cell sourceCell = sourceRow.getCell(j);
+                if (sourceCell == null) continue;
+                
+                Cell targetCell = targetRow.createCell(j);
+                copyCell(sourceCell, targetCell, sourceWorkbook, targetWorkbook);
+            }
+        }
+        
+        // 5. 复制合并单元格区域
+        for (int i = 0; i < sourceSheet.getNumMergedRegions(); i++) {
+            CellRangeAddress region = sourceSheet.getMergedRegion(i);
+            targetSheet.addMergedRegion(region);
+        }
+    }
+
+    /**
+     * 复制单元格（处理值、样式、公式）
+     */
+    private static void copyCell(Cell sourceCell, Cell targetCell, 
+                                 Workbook sourceWorkbook, Workbook targetWorkbook) {
+        // 复制样式（这里做了简单处理，复杂项目可能需要 clone 样式）
+        CellStyle newStyle = targetWorkbook.createCellStyle();
+        newStyle.cloneStyleFrom(sourceCell.getCellStyle());
+        targetCell.setCellStyle(newStyle);
+        
+        // 复制值/公式
+        switch (sourceCell.getCellType()) {
+            case STRING:
+                targetCell.setCellValue(sourceCell.getStringCellValue());
+                break;
+            case NUMERIC:
+                targetCell.setCellValue(sourceCell.getNumericCellValue());
+                break;
+            case BOOLEAN:
+                targetCell.setCellValue(sourceCell.getBooleanCellValue());
+                break;
+            case FORMULA:
+                targetCell.setCellFormula(sourceCell.getCellFormula());
+                break;
+            default:
+        }
+    }
 }
