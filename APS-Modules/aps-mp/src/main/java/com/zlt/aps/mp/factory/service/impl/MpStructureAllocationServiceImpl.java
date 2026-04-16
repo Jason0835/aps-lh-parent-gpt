@@ -207,7 +207,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     }
 
     /**
-     * 删除前校验：同工厂/年/月/排产版本下，除本次待删 ID 外若仍存在非手工（dataSource 非 01）的结构排产则禁止删除。
+     * 删除前校验：同工厂/年/月/排产版本/产品结构下，除本次待删 ID 外若仍存在非手工（dataSource 非 01）的结构排产则禁止删除。
      *
      * @param snapshots 待删除记录的删除前快照
      * @param deleteIds 本次待删除的主键列表
@@ -221,25 +221,25 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             if (item == null) {
                 continue;
             }
-            String key = buildVersionScopeKey(item);
+            String key = buildVersionAndStructureScopeKey(item);
             if (StringUtils.isBlank(key)) {
                 continue;
             }
             versionGroupMap.putIfAbsent(key, item);
         }
         for (MpStructureAllocation alloc : versionGroupMap.values()) {
-            assertNoOtherNonHandStructureInSameVersion(alloc.getFactoryCode(), alloc.getYear(), alloc.getMonth(),
-                    alloc.getProductionVersion(), deleteIds);
+            assertNoOtherNonHandStructureInSameVersionAndStructure(alloc.getFactoryCode(), alloc.getYear(), alloc.getMonth(),
+                    alloc.getProductionVersion(), alloc.getStructureName(), deleteIds);
         }
     }
 
     /**
-     * 构建排产版本范围键：工厂 + 年 + 月 + 排产版本（不含产品结构）。
+     * 构建排产版本与产品结构范围键：工厂 + 年 + 月 + 排产版本 + 产品结构。
      *
      * @param item 结构排产实体
      * @return 分组键；必填维度缺失时返回 null
      */
-    private String buildVersionScopeKey(MpStructureAllocation item) {
+    private String buildVersionAndStructureScopeKey(MpStructureAllocation item) {
         if (item == null) {
             return null;
         }
@@ -247,27 +247,32 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 || StringUtils.isBlank(item.getProductionVersion())) {
             return null;
         }
+        // 产品结构为空时仍参与分组，与同结构 NULL/空串 的库内数据一致
+        String structurePart = StringUtils.isEmpty(item.getStructureName()) ? "" : item.getStructureName();
         return item.getFactoryCode() + ApsConstant.SPLIT_CHAR + item.getYear() + ApsConstant.SPLIT_CHAR
-                + item.getMonth() + ApsConstant.SPLIT_CHAR + item.getProductionVersion();
+                + item.getMonth() + ApsConstant.SPLIT_CHAR + item.getProductionVersion() + ApsConstant.SPLIT_CHAR
+                + structurePart;
     }
 
     /**
-     * 校验除本次待删 ID 外，同排产版本维度是否仍存在非手工结构排产。
+     * 校验除本次待删 ID 外，同排产版本且同产品结构维度是否仍存在非手工结构排产。
      *
-     * @param factoryCode      工厂编码
-     * @param year             年
-     * @param month            月
+     * @param factoryCode       工厂编码
+     * @param year              年
+     * @param month             月
      * @param productionVersion 排产版本
-     * @param deleteIds        本次待删除的主键列表
+     * @param structureName     产品结构
+     * @param deleteIds         本次待删除的主键列表
      */
-    private void assertNoOtherNonHandStructureInSameVersion(String factoryCode, Integer year, Integer month,
-                                                            String productionVersion, List<Long> deleteIds) {
+    private void assertNoOtherNonHandStructureInSameVersionAndStructure(String factoryCode, Integer year, Integer month,
+            String productionVersion, String structureName, List<Long> deleteIds) {
         LambdaQueryWrapper<MpStructureAllocation> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MpStructureAllocation::getFactoryCode, factoryCode)
                 .eq(MpStructureAllocation::getYear, year)
                 .eq(MpStructureAllocation::getMonth, month)
-                .eq(MpStructureAllocation::getProductionVersion, productionVersion)
-                .eq(MpStructureAllocation::getIsDelete, YesOrNoEnum.NO.getValue())
+                .eq(MpStructureAllocation::getProductionVersion, productionVersion);
+        wrapper.eq(MpStructureAllocation::getStructureName, structureName);
+        wrapper.eq(MpStructureAllocation::getIsDelete, YesOrNoEnum.NO.getValue())
                 .and(innerWrapper -> innerWrapper.ne(MpStructureAllocation::getDataSource, DataSourceEnum.HAND.getCode())
                         .or()
                         .isNull(MpStructureAllocation::getDataSource))
