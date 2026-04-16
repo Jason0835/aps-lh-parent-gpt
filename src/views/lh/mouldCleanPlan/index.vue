@@ -285,9 +285,9 @@ export default {
       this.$set(this.page, "pageSize", pageSize);
       this.getList();
     },
-    handelSuccess() {
-      this.getList();
-    },
+    // handelSuccess() {
+    //   this.getList();
+    // },
     handleSortChange({ column, prop, order }) {
       if (order) {
         this.sort = {
