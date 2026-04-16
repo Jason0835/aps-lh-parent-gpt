@@ -71,7 +71,7 @@ export default {
           prop: 'precisionType',
           label: this.$t('ui.data.column.cxPrecisionPlan.accuracyType'),
           type: 'select',
-          dictData: this.dict.type.MACHINE_ACCURACY_TYPE,
+          dictData: this.dict.type.cx_precision_plan_type,
           filterable: true,
           listeners: { change: this.handlePrecisionTypeChange },
           required: true
@@ -92,8 +92,8 @@ export default {
           required: true
         },
         {
-          prop: 'cycleText',
-          label: 'Cycle',
+          prop: 'precisionCycle',
+          label: this.$t('ui.data.column.cxPrecisionPlan.cycle'),
           type: 'input',
           disabled: true
         },
@@ -103,21 +103,19 @@ export default {
           type: 'input',
           disabled: true
         },
-        {
-          prop: 'scheduleDate',
-          label: 'Schedule Date',
-          type: 'date',
-          valueFormat: 'yyyy-MM-dd',
-          disabled: true
-        },
+        // {
+        //   prop: 'scheduleDate',
+        //   label: this.$t('ui.data.column.cxPrecisionPlan.scheduleDate'),
+        //   type: 'date',
+        //   valueFormat: 'yyyy-MM-dd',
+        //   disabled: true
+        // },
         {
           prop: 'dataSource',
           label: this.$t('ui.data.column.lhPrecisionPlan.dataSource'),
           type: 'select',
-          dictData: [
-            { label: 'System', value: '1' },
-            { label: 'MES', value: '0' }
-          ],
+          dictData: this.dict.type.lh_precision_data_source,
+          disabled: true,
           required: true
         },
         {
@@ -132,7 +130,7 @@ export default {
   },
   methods: {
     getCycleValue(precisionType) {
-      const text = this.selectDictLabel(this.dict.type.MACHINE_ACCURACY_TYPE, precisionType) || precisionType || ''
+      const text = this.selectDictLabel(this.dict.type.cx_precision_plan_type, precisionType) || precisionType || ''
       if (text.includes('60')) {
         return '60'
       }
@@ -152,10 +150,10 @@ export default {
       const now = new Date()
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const startOfTarget = new Date(target.getFullYear(), target.getMonth(), target.getDate())
-      return String(Math.floor((startOfTarget.getTime() - startOfToday.getTime()) / 86400000))
+      return String(Math.floor((startOfToday.getTime() - startOfTarget.getTime()) / 86400000))
     },
     fillCalculatedFields() {
-      this.$set(this.form, 'cycleText', this.getCycleValue(this.form.precisionType))
+      this.$set(this.form, 'precisionCycle', this.getCycleValue(this.form.precisionType))
       this.$set(this.form, 'daysToDue', this.getDaysToDueValue(this.form.planDate))
     },
     show(row) {
@@ -200,7 +198,7 @@ export default {
       this.$set(this.form, 'daysToDue', this.getDaysToDueValue(this.form.planDate))
     },
     handlePrecisionTypeChange() {
-      this.$set(this.form, 'cycleText', this.getCycleValue(this.form.precisionType))
+      this.$set(this.form, 'precisionCycle', this.getCycleValue(this.form.precisionType))
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save)
@@ -208,7 +206,7 @@ export default {
     async save(payload) {
       payload.dataSource = payload.dataSource || '1'
       payload.daysToDue = this.getDaysToDueValue(payload.planDate)
-      delete payload.cycleText
+      delete payload.precisionCycle
       delete payload.scheduleDate
       const uniqueRes = await checkCxPrecisionPlanUnique(payload)
       if (uniqueRes === '1') {

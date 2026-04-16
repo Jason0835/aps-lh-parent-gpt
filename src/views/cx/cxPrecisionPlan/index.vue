@@ -60,14 +60,14 @@
 
 <script>
 import { downloadLink } from '@/utils/request'
-import { listCxMachineInfo, listCxPrecisionPlan, removeCxPrecisionPlan, syncFromMes } from '@/api/cx/cxPrecisionPlan'
+import { listCxPrecisionPlan, removeCxPrecisionPlan, syncFromMes } from '@/api/cx/cxPrecisionPlan'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import infoDialog from './components/infoDialog.vue'
 
 export default {
   name: 'CxPrecisionPlan',
   components: { TltUploadForm, infoDialog },
-  dicts: ['biz_factory_name', 'MACHINE_ACCURACY_TYPE', 'lh_precision_data_source'],
+  dicts: ['biz_factory_name', 'cx_precision_plan_type', 'lh_precision_data_source'],
   provide() {
     return { parentDict: this.dict }
   },
@@ -93,7 +93,6 @@ export default {
       sort: {},
       search: {},
       query: {},
-      machineOptions: [],
       importUrl: '/cx/cxPrecisionPlan/importData',
       importTemplateUrl: '/cx/cxPrecisionPlan/importTemplate'
     }
@@ -111,13 +110,13 @@ export default {
         {
           prop: 'precisionType',
           label: this.$t('ui.data.column.cxPrecisionPlan.accuracyType'),
-          formatter: (row, column, value) => this.selectDictLabel(this.dict.type.MACHINE_ACCURACY_TYPE, value)
+          formatter: (row, column, value) => this.selectDictLabel(this.dict.type.cx_precision_plan_type, value)
         },
         { prop: 'planDate', label: this.$t('ui.data.column.cxPrecisionPlan.planDate') },
         { prop: 'actualDate', label: this.$t('ui.data.column.cxPrecisionPlan.actualDate') },
         {
           prop: 'cycle',
-          label: 'Cycle',
+          label: this.$t('ui.data.column.cxPrecisionPlan.cycle'),
           formatter: (row) => this.getCycleValue(row.precisionType)
         },
         {
@@ -128,7 +127,7 @@ export default {
         {
           prop: 'dataSource',
           label: this.$t('ui.data.column.lhPrecisionPlan.dataSource'),
-          formatter: (row, column, value) => this.getDataSourceLabel(value)
+          formatter: (row, column, value) => this.selectDictLabel(this.dict.type.lh_precision_data_source, value)
         },
         { prop: 'remark', label: this.$t('ui.common.column.remark') },
         {
@@ -167,25 +166,18 @@ export default {
           label: this.$t('common.factory'),
           type: 'select',
           dictData: this.dict.type.biz_factory_name,
-          filterable: true,
-          listeners: {
-            change: (value) => this.getMachineOptions(value)
-          }
+          filterable: true
         },
         {
           prop: 'machineCode',
           label: this.$t('ui.data.column.cxPrecisionPlan.machineCode'),
-          type: 'select',
-          dictData: this.machineOptions,
-          labelKey: 'machineCode',
-          valueKey: 'machineCode',
-          filterable: true
+          type: 'input'
         },
         {
           prop: 'precisionType',
           label: this.$t('ui.data.column.cxPrecisionPlan.accuracyType'),
           type: 'select',
-          dictData: this.dict.type.MACHINE_ACCURACY_TYPE,
+          dictData: this.dict.type.cx_precision_plan_type,
           filterable: true
         },
         {
@@ -207,7 +199,7 @@ export default {
   },
   methods: {
     getCycleValue(precisionType) {
-      const text = this.selectDictLabel(this.dict.type.MACHINE_ACCURACY_TYPE, precisionType) || precisionType || ''
+      const text = this.selectDictLabel(this.dict.type.cx_precision_plan_type, precisionType) || precisionType || ''
       if (text.includes('60')) {
         return '60'
       }
@@ -227,26 +219,7 @@ export default {
       const now = new Date()
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const startOfTarget = new Date(target.getFullYear(), target.getMonth(), target.getDate())
-      return Math.floor((startOfTarget.getTime() - startOfToday.getTime()) / 86400000)
-    },
-    getDataSourceLabel(value) {
-      return String(value) === '0' ? 'MES' : 'System'
-    },
-    async getMachineOptions(factoryCode) {
-      try {
-        const data = await listCxMachineInfo(factoryCode ? { factoryCode } : {})
-        const list = Array.isArray(data) ? data : []
-        const map = new Map()
-        list.forEach((item) => {
-          if (item && item.machineCode) {
-            map.set(item.machineCode, { machineCode: item.machineCode })
-          }
-        })
-        this.machineOptions = Array.from(map.values())
-      } catch (error) {
-        this.machineOptions = []
-        console.error(error)
-      }
+      return Math.floor((startOfToday.getTime() - startOfTarget.getTime()) / 86400000)
     },
     handleSyncFromMes() {
       const currentYear = new Date().getFullYear()
@@ -354,16 +327,11 @@ export default {
     }
   },
   created() {
-    const today = new Date()
-    const defaultDate = today.toISOString().split('T')[0]
     const defaultParams = {
-      factoryCode: '116',
-      planDateStart: defaultDate,
-      planDateEnd: defaultDate
+      factoryCode: '116'
     }
     this.search = { ...defaultParams }
     this.query = { ...defaultParams }
-    this.getMachineOptions(defaultParams.factoryCode)
     this.getList()
   }
 }
