@@ -355,14 +355,16 @@ export default {
     const day = String(today.getDate()).padStart(2, '0');
     const defaultDate = `${year}-${month}-${day}`;
 
-    this.search = {
-      factoryCode: "116",
-      cleanTime: [defaultDate, defaultDate]
-    };
-    this.query = {
+    let defaultParams = {
       factoryCode: "116",
       cleanTimeBegin: defaultDate,
       cleanTimeEnd: defaultDate
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
     };
   },
   mounted() {
