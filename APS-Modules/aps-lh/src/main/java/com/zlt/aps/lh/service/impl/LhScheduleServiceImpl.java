@@ -23,6 +23,7 @@ import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.bill.common.service.AbstractDocService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -125,6 +126,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         LhScheduleContext context = new LhScheduleContext();
         String factoryCode = request.getFactoryCode();
         context.setFactoryCode(factoryCode);
+        context.setOperator(StringUtils.isNotEmpty(request.getOperator()) ? request.getOperator().trim() : request.getOperator());
         // 工厂名称来源于工厂枚举：116=越南，117=泰国
         context.setFactoryName(FactoryCodeEnum.getFactoryNameByCode(factoryCode));
         // 请求日期为排程目标日
