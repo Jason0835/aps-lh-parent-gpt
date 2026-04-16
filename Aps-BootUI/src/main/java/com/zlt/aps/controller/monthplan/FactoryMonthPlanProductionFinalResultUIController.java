@@ -78,6 +78,17 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
 
 
     /**
+     * 修改或新增
+     */
+    @ApiOperation("修改或新增")
+    @PostMapping("/save")
+    @ResponseBody
+    public AjaxResult save(FactoryMonthPlanProductionFinalResult factoryMonthPlanProductionFinalResult) {
+        return iFactoryMonthPlanProductionFinalResultService.save(factoryMonthPlanProductionFinalResult);
+    }
+
+
+    /**
      * 校验工厂月生产计划-最终排产计划定稿唯一性
      */
     @ApiOperation("校验唯一性")

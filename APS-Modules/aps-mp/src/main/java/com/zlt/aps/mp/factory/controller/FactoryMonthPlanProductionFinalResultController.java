@@ -241,6 +241,19 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         return getDataTable(monthPlanFinalAdjustVoList);
     }
 
+
+    /**
+     * 保存
+     */
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal){
+        return super.save(factoryMonthPlanProdFinal);
+    }
+
+
+
     /**
      * 判断是否特殊材料
      * @param targetEmbryoCode 目标胚胎编码
