@@ -218,10 +218,11 @@
           :prop="item.prop"
           :label="item.label"
           :width="item.width"
+          :min-width="item.minWidth"
           :fixed="item.fixed ? true : false"
         >
-          <template v-slot="scope" v-if="item.prop == 'isLockSchedule'">
-            <div>
+          <template v-slot="scope" v-if="item.prop == 'isLockSchedule' || item.editable">
+            <div v-if="item.prop == 'isLockSchedule'">
               <el-select
                 v-if="showConfirmResult && scope.row.id"
                 v-model="scope.row.isLockSchedule"
@@ -239,6 +240,16 @@
                 selectDictLabel(dict.type.biz_yes_no, scope.row.isLockSchedule)
               }}</span>
             </div>
+            <div v-else-if="item.editable && scope.row.id">
+              <el-input
+                :value="scope.row[item.prop] || ''"
+                size="mini"
+                @input="scope.row[item.prop] = $event.replace(/[^\d]/g, '')"
+                @focus="onDayEditFocus(scope.row, item.prop)"
+                @blur="handleOutResultDayEdit(scope.row, item.prop)"
+              />
+            </div>
+            <span v-else>{{ scope.row[item.prop] || '' }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -307,6 +318,7 @@ import {
   outGetStayDay,
   logList,
   versionLog,
+  updateSkuScheduleItems,
 } from "@/api/monthplan/adjustStructure";
 
 //components
@@ -340,6 +352,7 @@ export default {
   data() {
     return {
       subDayNum: 0,
+      dayEditOriginalValue: null,
       loadText: "正在加载中...",
       //结构外调整结果列表
       outResultData: [],
@@ -1229,6 +1242,7 @@ export default {
           prop: `day${i + 1}`,
           minWidth: "80px",
           type: "number",
+          editable: true,
         });
       }
       return list;
@@ -1271,6 +1285,32 @@ export default {
         .catch((err) => {
           console.log(err);
         });
+    },
+
+    //记录编辑前的原始值
+    onDayEditFocus(row, prop) {
+      this.dayEditOriginalValue = row[prop];
+    },
+
+    //将日期列的值归一化：null/undefined/''/'0'/0 都视为空
+    normalizeDayValue(val) {
+      if (val == null || val === '' || val === 0 || val === '0') return '';
+      return String(val);
+    },
+
+    //修改结构每日计划量
+    async handleOutResultDayEdit(row, prop) {
+      if (!row.id) return;
+      const oldVal = this.normalizeDayValue(this.dayEditOriginalValue);
+      const newVal = this.normalizeDayValue(row[prop]);
+      if (newVal === oldVal) return;
+      try {
+        await updateSkuScheduleItems(row);
+        this.$modal.msgSuccess("更新成功");
+        this.getOutResultList(row.productionVersion, row.version);
+      } catch (err) {
+        console.log(err);
+      }
     },
 
     //单结构调整提交
