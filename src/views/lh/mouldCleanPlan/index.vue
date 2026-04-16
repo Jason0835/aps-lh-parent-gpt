@@ -369,9 +369,6 @@ export default {
     this.getList();
     this.loadMachineList();
   },
-  activated() {
-    // this.getList();
-  },
 };
 </script>
 
