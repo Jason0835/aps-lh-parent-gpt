@@ -239,7 +239,7 @@ export default {
     },
 
     handleViewWarn() {
-      this.$router.push({ path: "/lhMouldCleanWarn" });
+      this.$router.push({ name: "LhMouldCleanWarn" });
     },
 
     handleDeleteAll() {
