@@ -97,7 +97,6 @@ export default {
       importRules: {},
       machineOptions: [],
       machineLoading: false,
-      isInitialized: false,
     };
   },
   computed: {
@@ -365,36 +364,25 @@ export default {
     },
   },
   created() {
-    if (!this.isInitialized) {
-      console.log('=== 模具清洗计划 created 执行 ===');
-      let defaultParams = {
-        factoryCode: "116",
-      };
-      this.search = {
-        ...defaultParams,
-      };
-      this.query = {
-        ...defaultParams,
-      };
-      this.isInitialized = true;
-    }
+    console.log('=== 模具清洗计划 created 执行 ===');
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
   },
   mounted() {
-    if (!this.isInitialized) {
-      console.log('=== 模具清洗计划 mounted 执行 ===');
-      this.getList();
-      this.loadMachineList();
-    }
+    console.log('=== 模具清洗计划 mounted 执行 ===');
+    this.getList();
+    this.loadMachineList();
   },
   activated() {
-    if (this.isInitialized) {
-      this.getList();
-      this.loadMachineList();
-    } else {
-      this.isInitialized = true;
-      this.getList();
-      this.loadMachineList();
-    }
+    console.log('=== 模具清洗计划 activated 执行 ===');
+    this.getList();
   },
 };
 </script>
