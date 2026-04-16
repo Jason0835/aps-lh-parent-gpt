@@ -239,7 +239,7 @@ export default {
     },
 
     handleViewWarn() {
-      this.$tab.openPage("模具清洗预警", "lhMouldCleanWarn");
+      this.$router.push({ path: "/lhMouldCleanWarn" });
     },
 
     handleDeleteAll() {
