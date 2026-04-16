@@ -349,16 +349,8 @@ export default {
     },
   },
   created() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const defaultDate = `${year}-${month}-${day}`;
-
     let defaultParams = {
       factoryCode: "116",
-      cleanTimeBegin: defaultDate,
-      cleanTimeEnd: defaultDate
     };
     this.search = {
       ...defaultParams,
