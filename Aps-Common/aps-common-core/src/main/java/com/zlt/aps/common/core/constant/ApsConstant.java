@@ -418,6 +418,11 @@ public class ApsConstant {
      * 销售优先级：7-储备；
      */
     public static final String SAL_PRIORITY_STOCK = "7";
+    
+    /**
+     * 物料类型：特殊材料
+     */
+    public static final String BIZ_RAWMATERIAL_TYPE_SPECIAL = "02";
 
     /**
      * 发货模式：02-整单发货
