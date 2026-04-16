@@ -305,7 +305,12 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/lh/mouldCleanPlan/export", this.formatParams(false));
+      const params = this.getExportParams();
+      console.log('=== 导出参数 ===');
+      console.log('查询条件:', this.query);
+      console.log('排序条件:', this.sort);
+      console.log('完整导出参数:', params);
+      downloadLink("/lh/mouldCleanPlan/export", params);
     },
 
     formatParams(hasPage = true) {
@@ -319,6 +324,16 @@ export default {
         params.pageNum = this.page.current;
       }
 
+      return params;
+    },
+    getExportParams() {
+      const params = {
+        ...this.query,
+      };
+      if (this.sort && this.sort.orderByColumn) {
+        params.orderByColumn = this.sort.orderByColumn;
+        params.isAsc = this.sort.isAsc;
+      }
       return params;
     },
     // api
