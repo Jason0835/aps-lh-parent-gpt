@@ -73,6 +73,12 @@ public class CxContinueProductionHandler {
             cxContinueSkuInfo.setMouldNumber(selectMouldList.size());
             //1、降膜排产
             DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(continueSkuDeadLineDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
+            //20260414+ 周期结构调整排产量
+            Integer planDemandQty = CycleGroupCalculateHandler.getSingleSkuMaxQty(context, cxContinueSkuInfo, groupPlanInfo);
+            if (null != planDemandQty) {
+                deductMould.setTotalQty(planDemandQty);
+                deductMould.setRemainingQty(planDemandQty);
+            }
             List<DailyScheduleVo> resultList = DeductMouldScheduler.scheduleProduction(deductMould);
             //分配结果
             if (CollectionUtils.isEmpty(resultList)) {

@@ -1094,15 +1094,17 @@ public class ProductionPlanGroupInfo {
             if (!shareMouldMaterialDescSet.contains(groupPlan.getMaterialDesc())) {
                 return;
             }
-            //20260326 不是测算阶段，共用模具都算续作
-            if (ProductionStageEnum.CALCULATION_STAGE != productionStage) {
-                sameEmbryoCodeAndMouldList.add(groupPlan);
-                return;
-            }
-            //测算阶段-同生胎
-            if (groupPlan.isSameEmbryoCode(continueProductInfoHelper)) {
-                sameEmbryoCodeAndMouldList.add(groupPlan);
-            }
+            //20260414+ 共用模具都算续作，不再区分排产阶段
+            sameEmbryoCodeAndMouldList.add(groupPlan);
+//            //20260326 不是测算阶段，共用模具都算续作
+//            if (ProductionStageEnum.CALCULATION_STAGE != productionStage) {
+//                sameEmbryoCodeAndMouldList.add(groupPlan);
+//                return;
+//            }
+//            //测算阶段-同生胎
+//            if (groupPlan.isSameEmbryoCode(continueProductInfoHelper)) {
+//                sameEmbryoCodeAndMouldList.add(groupPlan);
+//            }
         });
         return sameEmbryoCodeAndMouldList;
     }

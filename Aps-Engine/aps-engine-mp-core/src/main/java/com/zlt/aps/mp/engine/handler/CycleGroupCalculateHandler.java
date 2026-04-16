@@ -6,6 +6,7 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
@@ -44,7 +45,7 @@ public class CycleGroupCalculateHandler {
         if (CollectionUtils.isEmpty(allSkuPlanList)) {
             return false;
         }
-        List<MonthPlanProductionRequirePlanVo> allSkuRequirePlanList = allSkuPlanList.stream().filter(single -> !YesOrNoEnum.NO.getCode().equals(single.getProductionFlag())).collect(Collectors.toList());
+        List<MonthPlanProductionRequirePlanVo> allSkuRequirePlanList = allSkuPlanList.stream().filter(single -> !YesOrNoEnum.NO.getCode().equals(single.getIsProduction())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(allSkuPlanList)) {
             return false;
         }
@@ -76,48 +77,108 @@ public class CycleGroupCalculateHandler {
     }
 
     /**
+     * 获取续作Sku最大可排产量
+     * 周期结构 ： 实单量 + 最大可排产周期量
+     * 非周期结构：直接
+     *
+     * @param context            排产上下文
+     * @param continueSkuInfo    续作Sku信息
+     * @param productionPlanInfo 分组计划
+     * @return
+     */
+    public static Integer getSingleSkuMaxQty(Context context, CxContinueSkuInfoHelper continueSkuInfo, ProductionPlanGroupInfo productionPlanInfo) {
+        if (null == productionPlanInfo || null == continueSkuInfo) {
+            return null;
+        }
+        List<MonthPlanProductionRequirePlanVo> allSkuPlanList = productionPlanInfo.getGroupPlanData();
+        if (CollectionUtils.isEmpty(allSkuPlanList)) {
+            return null;
+        }
+        List<MonthPlanProductionRequirePlanVo> allSkuRequirePlanList = allSkuPlanList.stream().filter(single -> !YesOrNoEnum.NO.getCode().equals(single.getIsProduction())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(allSkuPlanList)) {
+            return null;
+        }
+        String structureType = allSkuRequirePlanList.get(BigDecimal.ZERO.intValue()).getStructureType();
+        //非周期结构
+        if (!ProductionGroupTypeEnum.CYCLE.getGroupType().equals(structureType)) {
+            return continueSkuInfo.getPlanDemandQty();
+        }
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo = productionPlanInfo.getDayProductionLimitInfo();
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
+            return continueSkuInfo.getPlanDemandQty();
+        }
+        Integer maxCycleQty = productionPlanInfo.getMaxCycleQty();
+        Map<String, Integer> skuCycleProductionQtyMap = Maps.newHashMap();
+        Set<String> needProductionSkuInfoSet = allSkuRequirePlanList.stream().map(MonthPlanProductionRequirePlanVo::getMaterialDesc).collect(Collectors.toSet());
+        needProductionSkuInfoSet.forEach(materialDesc -> skuCycleProductionQtyMap.put(materialDesc, getSkuCycleProductionQty(context, dayProductionLimitInfo, allSkuRequirePlanList, materialDesc)));
+        Integer sumProductionCycleQty = BigDecimal.ZERO.intValue();
+        if (!CollectionUtils.isEmpty(skuCycleProductionQtyMap)) {
+            sumProductionCycleQty = skuCycleProductionQtyMap.values().stream().mapToInt(Integer::intValue).sum();
+        }
+        Integer leftOverCycleQty = maxCycleQty - sumProductionCycleQty;
+        if (leftOverCycleQty <= BigDecimal.ZERO.intValue()) {
+            leftOverCycleQty = BigDecimal.ZERO.intValue();
+        }
+        Integer sumActualQuantity = getCycleActualQuantity(context, allSkuPlanList, continueSkuInfo.getMaterialDesc());
+        Integer planCycleQty = continueSkuInfo.getPlanDemandQty() - sumActualQuantity;
+        if (planCycleQty <= BigDecimal.ZERO.intValue()) {
+            planCycleQty = BigDecimal.ZERO.intValue();
+        }
+        return sumActualQuantity + Math.min(planCycleQty, leftOverCycleQty);
+    }
+
+    /**
      * 从日排产信息中获取某个Sku的周期排产量
      *
+     * @param context                排产上下文
      * @param dayProductionLimitInfo 日排产信息集合
      * @param allSkuPlanList         所有可排产Sku量
      * @param materialDesc           sku
      * @return
      */
     private static Integer getSkuCycleProductionQty(Context context, Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo, List<MonthPlanProductionRequirePlanVo> allSkuPlanList, String materialDesc) {
-        if (CollectionUtils.isEmpty(allSkuPlanList) || StringUtils.isBlank(materialDesc)) {
-            return BigDecimal.ZERO.intValue();
-        }
-        List<MonthPlanProductionRequirePlanVo> skuPlanList = allSkuPlanList.stream().filter(single -> {
-            if (YesOrNoEnum.NO.getCode().equals(single.getProductionFlag())) {
-                return false;
-            }
-            if (!materialDesc.equals(single.getMaterialDesc())) {
-                return false;
-            }
-            return true;
-        }).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(skuPlanList)) {
-            return BigDecimal.ZERO.intValue();
-        }
         if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
             return BigDecimal.ZERO.intValue();
         }
+        Integer sumActualQuantity = getCycleActualQuantity(context, allSkuPlanList, materialDesc);
+        if (null == sumActualQuantity) {
+            return BigDecimal.ZERO.intValue();
+        }
+
+//        if (CollectionUtils.isEmpty(allSkuPlanList) || StringUtils.isBlank(materialDesc)) {
+//            return BigDecimal.ZERO.intValue();
+//        }
+//        List<MonthPlanProductionRequirePlanVo> skuPlanList = allSkuPlanList.stream().filter(single -> {
+//            if (YesOrNoEnum.NO.getCode().equals(single.getIsProduction())) {
+//                return false;
+//            }
+//            if (!materialDesc.equals(single.getMaterialDesc())) {
+//                return false;
+//            }
+//            return true;
+//        }).collect(Collectors.toList());
+//        if (CollectionUtils.isEmpty(skuPlanList)) {
+//            return BigDecimal.ZERO.intValue();
+//        }
+//        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
+//            return BigDecimal.ZERO.intValue();
+//        }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String isWriteLog = Optional.ofNullable(productionContext.getBaseDataContainer().getParamConfiguration().getIsWriteCycleLog()).orElse("N");
-        //实单量 奇数+3 偶数+2
-        Integer minQty = skuPlanList.get(BigDecimal.ZERO.intValue()).getMinProductionQty();
-        Integer sumActualQuantity = skuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
-        if (sumActualQuantity > BigDecimal.ZERO.intValue()) {
-            if ((sumActualQuantity & BigDecimal.ONE.intValue()) != BigDecimal.ZERO.intValue()) {
-                sumActualQuantity = sumActualQuantity + ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
-            } else {
-                sumActualQuantity = sumActualQuantity + ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
-            }
-        }
-        if (sumActualQuantity < minQty) {
-            sumActualQuantity = minQty;
-        }
-        String groupName = skuPlanList.get(BigDecimal.ZERO.intValue()).getStructureName();
+//        //实单量 奇数+3 偶数+2
+//        Integer minQty = skuPlanList.get(BigDecimal.ZERO.intValue()).getMinProductionQty();
+//        Integer sumActualQuantity = skuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
+//        if (sumActualQuantity > BigDecimal.ZERO.intValue()) {
+//            if ((sumActualQuantity & BigDecimal.ONE.intValue()) != BigDecimal.ZERO.intValue()) {
+//                sumActualQuantity = sumActualQuantity + ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
+//            } else {
+//                sumActualQuantity = sumActualQuantity + ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
+//            }
+//        }
+//        if (sumActualQuantity < minQty) {
+//            sumActualQuantity = minQty;
+//        }
+        String groupName = allSkuPlanList.get(BigDecimal.ZERO.intValue()).getStructureName();
         Map<Integer, Integer> dayProductionQtyMap = new HashMap<>();
         dayProductionLimitInfo.forEach((productionDay, dayLimitInfo) -> {
             Map<String, SkuDayProductionInfoHelper> productionSkuQtyInfo = dayLimitInfo.getProductionSkuQtyInfo();
@@ -149,5 +210,44 @@ public class CycleGroupCalculateHandler {
         return sumProductionQty - sumActualQuantity;
     }
 
+    /**
+     * 获取周期结构某个Sku的实单量
+     *
+     * @param context        排产上下文
+     * @param allSkuPlanList 分组计划所有计划
+     * @param materialDesc   某个Sku
+     * @return
+     */
+    private static Integer getCycleActualQuantity(Context context, List<MonthPlanProductionRequirePlanVo> allSkuPlanList, String materialDesc) {
+        if (CollectionUtils.isEmpty(allSkuPlanList) || StringUtils.isBlank(materialDesc)) {
+            return null;
+        }
+        List<MonthPlanProductionRequirePlanVo> skuPlanList = allSkuPlanList.stream().filter(single -> {
+            if (YesOrNoEnum.NO.getCode().equals(single.getIsProduction())) {
+                return false;
+            }
+            if (!materialDesc.equals(single.getMaterialDesc())) {
+                return false;
+            }
+            return true;
+        }).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(skuPlanList)) {
+            return null;
+        }
+        //实单量 奇数+3 偶数+2
+        Integer minQty = skuPlanList.get(BigDecimal.ZERO.intValue()).getMinProductionQty();
+        Integer sumActualQuantity = skuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
+        if (sumActualQuantity > BigDecimal.ZERO.intValue()) {
+            if ((sumActualQuantity & BigDecimal.ONE.intValue()) != BigDecimal.ZERO.intValue()) {
+                sumActualQuantity = sumActualQuantity + ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
+            } else {
+                sumActualQuantity = sumActualQuantity + ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
+            }
+        }
+        if (sumActualQuantity < minQty) {
+            sumActualQuantity = minQty;
+        }
+        return sumActualQuantity;
+    }
 
 }
