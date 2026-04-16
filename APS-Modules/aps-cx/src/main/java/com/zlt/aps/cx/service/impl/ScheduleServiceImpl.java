@@ -26,7 +26,6 @@ import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.mapper.CxStructureTreadConfigMapper;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -606,7 +605,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         for (CxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
             String cxCode = onlineInfo.getCxCode();
             // 组合物料编码和胎胚编码作为唯一键
-            String materialCode = onlineInfo.getMesMaterialCode();
+            String materialCode = onlineInfo.getMaterialCode();
             String embryoSpec = onlineInfo.getEmbryoSpec();
             String combinedKey = materialCode + "|" + embryoSpec;
             if (cxCode != null && combinedKey != null && !combinedKey.equals("|")) {
