@@ -36,7 +36,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
-@Api(tags = "CX precision plan")
+@Api(tags = "成型精度计划")
 @Controller
 @RequestMapping("/cx/cxPrecisionPlan")
 public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPlan> {
@@ -67,7 +67,7 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
         return prefix + "/edit";
     }
 
-    @ApiOperation("Query machine dropdown")
+    @ApiOperation("查询机台下拉")
     @PostMapping("/getMachineList")
     @ResponseBody
     public AjaxResult getMachineList(@RequestBody(required = false) CxMachineInfo query) {
@@ -89,7 +89,7 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
         return AjaxResult.success(machineCodeList);
     }
 
-    @ApiOperation("Query list")
+    @ApiOperation("查询列表")
     @RequiresPermissions("cx:cxPrecisionPlan:list")
     @PostMapping("/list")
     @ResponseBody
@@ -97,7 +97,7 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
         return cxPrecisionPlanRemoteService.list(cxPrecisionPlan);
     }
 
-    @ApiOperation("Save plan")
+    @ApiOperation("保存单据")
     @RequiresPermissions("cx:cxPrecisionPlan:edit")
     @PostMapping("/save")
     @ResponseBody
@@ -108,7 +108,7 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
         return cxPrecisionPlanRemoteService.save(cxPrecisionPlan);
     }
 
-    @ApiOperation("Delete plans")
+    @ApiOperation("删除单据")
     @RequiresPermissions("cx:cxPrecisionPlan:remove")
     @PostMapping("/remove")
     @ResponseBody
@@ -117,7 +117,7 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
         return cxPrecisionPlanRemoteService.removeByIds(Arrays.asList(arr));
     }
 
-    @ApiOperation("Check unique")
+    @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
     public String checkUnique(CxPrecisionPlan entity) {
@@ -139,7 +139,7 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
         return I18nUtil.getMessage("ui.data.column.cxPrecisionPlan.modelName");
     }
 
-    @ApiOperation("Download import template")
+    @ApiOperation("下载导入模板")
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
@@ -148,7 +148,7 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
         return AjaxResult.success();
     }
 
-    @ApiOperation("Export data")
+    @ApiOperation("导出数据")
     @GetMapping({"/export"})
     @ResponseBody
     @Override
@@ -163,7 +163,7 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
 
     @PostMapping({"/importData"})
     @ResponseBody
-    @ApiOperation("Import data")
+    @ApiOperation("导入数据")
     @Override
     public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
@@ -176,7 +176,7 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
         return cxPrecisionPlanRemoteService.importData(context, updateSupport);
     }
 
-    @ApiOperation("Generate from MES")
+    @ApiOperation("从MES同步生成计划")
     @RequiresPermissions("cx:cxPrecisionPlan:sync")
     @PostMapping("/generateFromMes")
     @ResponseBody
@@ -184,7 +184,7 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
         return cxPrecisionPlanRemoteService.generatePlansFromMes(year);
     }
 
-    @ApiOperation("Auto generate yearly")
+    @ApiOperation("自动生成年计划")
     @RequiresPermissions("cx:cxPrecisionPlan:generate")
     @PostMapping("/autoGenerateYearly")
     @ResponseBody
@@ -192,7 +192,7 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
         return cxPrecisionPlanRemoteService.autoGenerateYearlyPlans(year);
     }
 
-    @ApiOperation("Batch update days to due")
+    @ApiOperation("批量更新到期天数")
     @PostMapping("/batchUpdateDaysToDue")
     @ResponseBody
     public AjaxResult batchUpdateDaysToDue() {

@@ -313,7 +313,8 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
 
         CxPrecisionPlan plan = new CxPrecisionPlan();
         plan.setMachineCode(machineCode);
-        plan.setPrecisionType(PRECISION_TYPE_CX);
+        plan.setPrecisionType(extractNumberFromPrecisionType(mesPlan.getPrecisionType()));
+        plan.setPrecisionCycle(extractNumberFromPrecisionType(mesPlan.getPrecisionType()));
         plan.setCompanyCode(mesPlan.getCompanyCode());
         plan.setFactoryCode(mesPlan.getFactoryCode());
         plan.setMesSourceId(mesPlan.getId());
@@ -335,6 +336,16 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         return plan;
     }
 
+    /**
+     * 从精度类型中提取数字作为周期。
+     * 例如："15天精度" -> "15", "60天精度" -> "60"
+     */
+    private String extractNumberFromPrecisionType(String precisionType) {
+        if (!StringUtils.hasText(precisionType)) {
+            return null;
+        }
+        return precisionType.replaceAll("[^0-9]", "");
+    }
     /**
      * 获取计划间隔天数。
      */
