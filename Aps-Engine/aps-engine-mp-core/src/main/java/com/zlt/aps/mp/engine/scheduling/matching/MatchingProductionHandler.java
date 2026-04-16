@@ -251,16 +251,14 @@ public class MatchingProductionHandler {
             // 处理特殊材料
             Integer allcateMaxDay = groupInfo.getDayProductionLimitInfo().keySet().stream().max(Integer::compareTo).orElse(0);
             Integer allcateMinDay = groupInfo.getDayProductionLimitInfo().keySet().stream().min(Integer::compareTo).orElse(0);
-            if (!isActualOrder && allcateMaxDay > allcateMinDay) {
-                productionContext.updateSpecialMaterialInfoMap(groupInfo, allcateMaxDay - allcateMinDay);
-                Integer productionQty = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
-                productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, productionQty); // 占用
-                Integer reserveQty = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getConventionReserveQty).sum();
-                Integer remainQty = productionContext.getSpecialMaterialBatchRemainQty(groupInfo, reserveQty, false); // 剩余量
-                if (reserveQty < remainQty) { // 如果储备量少于剩余量，则需要补够剩余量，优先补到有富余产能，且搭配量最打的规格上
-                    Integer unAllocateQty = remainQty - reserveQty;
-                    MonthPlanProductionRequirePlanVo plan = productionPlanList.stream().max(Comparator.comparing(MonthPlanProductionRequirePlanVo::getConventionReserveQty)).orElse(null);
-                    plan.setConventionReserveQty(unAllocateQty);
+            if (allcateMaxDay > allcateMinDay) {
+//                productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, productionQty); // 占用
+                Integer productionQty = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum(); // 已排产量
+                Integer remainQty = productionContext.getSpecialMaterialBatchRemainQty(groupInfo, productionQty, false); // 剩余量
+                if (productionQty < remainQty) { // 如果储备量少于剩余量，则需要补够剩余量，优先补到有富余产能，且搭配量最大的规格上
+                    Integer unAllocateQty = remainQty - productionQty;
+                    MonthPlanProductionRequirePlanVo plan = productionPlanList.stream().max(Comparator.comparing(MonthPlanProductionRequirePlanVo::getProductionQty)).orElse(null);
+                    plan.setProductionQty(unAllocateQty);
                 }
             }
             // 统计那些SKU已排产
@@ -510,6 +508,7 @@ public class MatchingProductionHandler {
                         productionQty = productionQty > totalProductionQty ? productionQty - totalProductionQty : 0;
                         limitHelper.setPlanQty(limitHelper.getPlanQty() + totalProductionQty);
                         if (totalProductionQty > 0) {
+                            productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, productionQty); // 更新特殊材料占用
                             String mainPattern = CollectionUtils.firstElement(productionPlanList).getMainPattern(); // 主花纹
                             groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern); // 重新计算统计产能
                             this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
@@ -1210,6 +1209,7 @@ public class MatchingProductionHandler {
                         ContinueTypeEnum.NO_CONTINUE);
                 Integer realProductionQty = lhProductionQtyHelper.getRealSumProductionQty() - realSumProductionQty;
                 if (realProductionQty > 0) {
+                    productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, productionQty); // 更新特殊材料占用
                     Set<String> useMouldSet = newDoubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).distinct().collect(Collectors.toSet());
                     String scheduleLogName = productionContext.getIsActualOrder()? "实单补量": "搭配排产";
                     this.addTempLog(productionContext, String.format("结构:%s,【%s】,%s日,规格:%s,新增模具%s,排产量:%s", structureName, scheduleLogName, usedBeginDate, materialDesc, useMouldSet, realProductionQty));

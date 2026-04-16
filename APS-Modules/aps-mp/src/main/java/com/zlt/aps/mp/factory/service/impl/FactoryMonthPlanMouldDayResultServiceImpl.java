@@ -1,5 +1,29 @@
 package com.zlt.aps.mp.factory.service.impl;
 
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONValidator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -7,49 +31,42 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
+import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
+import com.zlt.aps.maindata.mapper.RawSpecialMaterialStockEntityMapper;
+import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
+import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialStock;
 import com.zlt.aps.mp.api.domain.entity.SpecialMaterialResult;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.common.utils.PubUtil;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanSpecialMaterialInfoMapper;
 import com.zlt.aps.mp.engine.mapper.MpStructureAllocationMapper;
-import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.mp.enums.MonthPlanExportDataTypeEnum;
 import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.SpecialMaterialResultEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
+import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
-
-import java.io.InputStream;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import org.springframework.transaction.annotation.Transactional;
-import com.zlt.bill.common.service.AbstractDocService;
-import com.ruoyi.common.exception.ServiceException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -78,9 +95,16 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     private MoldCavityInsertMaxValueCalculatorImpl moldCavityInsertMaxValueCalculator;
     @Autowired
     private SpecialMaterialResultEntityMapper specialMaterialResultEntityMapper;
+    @Autowired
+    protected RawSpecialMaterialRecordEntityMapper rawSpecialMaterialRecordMapper;
+    @Autowired
+    private RawSpecialMaterialStockEntityMapper rawSpecialMaterialStockEntityMapper;
 
     @Autowired
     private ISysDictDataCacheService sysDictDataCacheService;
+    @Autowired
+    private IFactoryParamService factoryParamService;
+    
     /**
      * 日计划字段名称
      */
@@ -482,39 +506,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             excelDataList.add(listData);
         }
         
-        // 加载特殊材料排产结果
-        LambdaQueryWrapper<SpecialMaterialResult> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(SpecialMaterialResult::getFactoryCode, queryResult.getFactoryCode());
-        queryWrapper.eq(SpecialMaterialResult::getProductionVersion, queryResult.getProductionVersion());
-        List<SpecialMaterialResult> specialMaterialResultList = specialMaterialResultEntityMapper.selectList(queryWrapper);
-        List<Map<String, Object>> listData = new ArrayList<>();
-        Map<String, List<SpecialMaterialResult>> specialMaterialResultMap = specialMaterialResultList.stream().collect(Collectors.groupingBy(SpecialMaterialResult::getMaterialDesc));
-        int seq = 1;
-        for (Entry<String, List<SpecialMaterialResult>> entry: specialMaterialResultMap.entrySet()) {
-            String materiDesc = entry.getKey();
-            Map<String, Object> listDataMap = new HashMap<>(1);
-            String format = "%s%s：%s";
-            String itemFormat = "%s批%s米";
-            String seqStr = String.valueOf((char)(seq + 9311));
-            StringBuilder builder = new StringBuilder();
-            for (SpecialMaterialResult result: entry.getValue()) {
-                Long totalQty = result.getTotalQty();
-                Long standardlenLong = result.getStandardLength();
-                Long oriStandardlenLong = result.getOriStandardLength();
-                Integer batchNum = BigDecimalUtils.div(totalQty, standardlenLong, 2).setScale(0, RoundingMode.UP).intValue();
-                String itemStr = String.format(itemFormat, batchNum, oriStandardlenLong);
-                if (builder.length() > 0) {
-                    builder.append(" + ");
-                }
-                builder.append(itemStr);
-            }
-            String resultStr = String.format(format, seqStr, materiDesc, builder);
-            listDataMap.put("specialMaterialResult", resultStr);
-            listData.add(listDataMap);
-            seq ++;
-        }
-        excelDataList.add(listData);
-        tableMap.put("specialMaterialResult", "说明：本次排产特殊材料用量汇总：");
+        // 构建特殊材料排产结果
+        this.buildSpecialMaterialInfo(queryResult, tableMap, excelDataList);
 
         // 将单元格样式放入context
         if (PubUtil.isNotEmpty(cellStyleList)) {
@@ -522,6 +515,107 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         }
         // 3.5、写到文件
         return ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
+    }
+
+    /**
+     * 构建特殊材料排产结果
+     * 
+     * @param queryResult
+     * @param tableMap
+     * @param excelDataList
+     */
+    private void buildSpecialMaterialInfo(FactoryMonthPlanMouldDayResult queryResult, Map<String, Object> tableMap,
+                                          List<List<Map<String, Object>>> excelDataList) {
+        // 1、加载特殊材料列表
+        List<RawSpecialMaterialRecord> recordList = null;
+        // 1.1、仅加载参数有配置的特殊材料清单
+        List<String> paramCodeList = Collections.singletonList(MonthPlanEnums.SPECIAL_MATERIAL_CODE.getCode());
+        List<FactoryParam> specialMaterialParam = factoryParamService.getFactoryParamByCondition(queryResult.getFactoryCode(),
+                queryResult.getProductTypeCode(), paramCodeList); 
+        if (CollectionUtils.isNotEmpty(specialMaterialParam)) {
+            String paramValue = specialMaterialParam.get(0).getParamValue();
+            if (StringUtils.isEmpty(paramValue)) {
+                paramValue = specialMaterialParam.get(0).getDefauleValue();
+            }
+            if (StringUtils.isNotEmpty(paramValue)) {
+                // 1.2、加载出来的特殊材料过滤掉未在参数配置的特殊材料
+                String specialMaterialCodes = paramValue;
+                LambdaQueryWrapper<RawSpecialMaterialRecord> recordQueryWrapper = new LambdaQueryWrapper<>();
+                recordQueryWrapper.eq(RawSpecialMaterialRecord::getFactoryCode, queryResult.getFactoryCode());
+                recordQueryWrapper.eq(RawSpecialMaterialRecord::getMaterialType,
+                        ApsConstant.BIZ_RAWMATERIAL_TYPE_SPECIAL);
+                recordList = rawSpecialMaterialRecordMapper.selectList(recordQueryWrapper).stream()
+                        .filter(r -> specialMaterialCodes.contains(r.getMaterialCode())).collect(Collectors.toList());
+            }
+        }
+        
+        // 2、加载特殊材料库存记录
+        // 2.1、需要取排产年月上一个月份库存
+        Date yearMonth = DateUtils.parseDate(queryResult.getYear() + "-" + queryResult.getMonth() + "-" + 1);
+        Date lastYearMonth = DateUtils.addMonths(yearMonth, -1);
+        Integer queryYear = DateUtils.getYear(lastYearMonth);
+        Integer queryMonth = DateUtils.getMonth(lastYearMonth);
+        LambdaQueryWrapper<RawSpecialMaterialStock> stockQueryWrapper = new LambdaQueryWrapper<>();
+        stockQueryWrapper.eq(RawSpecialMaterialStock::getFactoryCode, queryResult.getFactoryCode());
+        stockQueryWrapper.eq(RawSpecialMaterialStock::getYear, queryYear);
+        stockQueryWrapper.eq(RawSpecialMaterialStock::getMonth, queryMonth);
+        Map<String, List<RawSpecialMaterialStock>> stockMap = rawSpecialMaterialStockEntityMapper
+                .selectList(stockQueryWrapper).stream()
+                .collect(Collectors.groupingBy(RawSpecialMaterialStock::getMaterialCode));
+
+        // 3、加载特殊材料排产结果
+        LambdaQueryWrapper<SpecialMaterialResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(SpecialMaterialResult::getFactoryCode, queryResult.getFactoryCode());
+        queryWrapper.eq(SpecialMaterialResult::getProductionVersion, queryResult.getProductionVersion());
+        List<SpecialMaterialResult> specialMaterialResultList = specialMaterialResultEntityMapper.selectList(queryWrapper);
+        Map<String, List<SpecialMaterialResult>> specialMaterialResultMap = specialMaterialResultList.stream().collect(Collectors.groupingBy(SpecialMaterialResult::getMaterialDesc));
+        List<Map<String, Object>> listData = new ArrayList<>();
+        int seq = 1;
+        
+        // 4、构建特殊材料使用列表
+        for (RawSpecialMaterialRecord record: recordList) {
+            String materiDesc = record.getMaterialDesc();
+            List<SpecialMaterialResult> specialMaterialResult = specialMaterialResultMap.get(materiDesc);
+            Map<String, Object> listDataMap = new HashMap<>(1);
+            String format = "%s%s: %s";
+            String itemFormat = I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.export.special.item");
+            String seqStr = String.valueOf((char)(seq + 9311)); // 序号转换成带圈的样式
+            StringBuilder builder = new StringBuilder();
+            // 4.1、如果有特殊材料的排产记录，以排产记录为准
+            if (CollectionUtils.isNotEmpty(specialMaterialResult)) {
+                for (SpecialMaterialResult result: specialMaterialResult) {
+                    Long totalQty = result.getTotalQty();
+                    Long standardlenLong = result.getStandardLength();
+                    Long oriStandardlenLong = result.getOriStandardLength();
+                    Integer batchNum = BigDecimalUtils.div(totalQty, standardlenLong, 2).setScale(0, RoundingMode.UP).intValue();
+                    String itemStr = String.format(itemFormat, batchNum, oriStandardlenLong);
+                    if (builder.length() > 0) {
+                        builder.append(" + ");
+                    }
+                    builder.append(itemStr);
+                }
+            } else { 
+                // 4.2、如果没有特殊材料的排产记录，则根据库存记录构建
+                List<RawSpecialMaterialStock> stockList = stockMap.get(record.getMaterialCode());
+                if (CollectionUtils.isNotEmpty(stockList)) {
+                    for (RawSpecialMaterialStock stock: stockList) {
+                        Integer oriStandardlenLong = stock.getStandardLength();
+                        Integer batchNum = 0;
+                        String itemStr = String.format(itemFormat, batchNum, oriStandardlenLong);
+                        if (builder.length() > 0) {
+                            builder.append(" + ");
+                        }
+                        builder.append(itemStr);
+                    }
+                }
+            }
+            String resultStr = String.format(format, seqStr, materiDesc, builder); // 拼接展示文本：①ABS391：3批1000米 + 2批2000米
+            listDataMap.put("specialMaterialResult", resultStr);
+            listData.add(listDataMap);
+            seq ++;
+        }
+        excelDataList.add(listData);
+        tableMap.put("specialMaterialResult", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.export.special.title"));
     }
 
     /**
