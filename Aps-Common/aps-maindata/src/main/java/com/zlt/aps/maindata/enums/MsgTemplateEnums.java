@@ -25,6 +25,12 @@ public enum MsgTemplateEnums {
      * SKU原余量小于调整次日至锁定截止日的计划量提醒
      */
     MP_SKU_REMAIN_QTY_NO_FULL("MP_SKU_REMAIN_QTY_NO_FULL", "SKU原余量小于调整次日至锁定截止日的计划量提醒"),
+
+    /**
+     * 结构内调整减量提前收尾
+     */
+    MP_STRUCTURE_ADJUST_PRE_CLOSE("MP_STRUCTURE_ADJUST_PRE_CLOSE", "结构内调整减量提前收尾"),
+
     /**
      * 产量预测生成成功通知
      */

@@ -257,14 +257,12 @@ public class MpWeekRollAdjustController extends BaseController {
 
         //初始工作日历
         contextDTO.setWorkCalendarMap(mpAdjustStructureInService.getWorkCalendarMap(contextDTO));
+        //周期结构最低硫化机台数
+        contextDTO.setCycleStructureMinLhMachinesMap(mpAdjustStructureInService.getCycleStructureMinMachinesMap(contextDTO));
         //初始型腔与活块数量
         contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO));
         //初始消息模板
-        MsgTemplate msgTemplate = templateRemoteService.getTemplateInfo(MsgTemplateEnums.MP_SKU_REMAIN_QTY_NO_FULL.getCode());
-        if (msgTemplate != null){
-            contextDTO.setMsgTemplateWithRemainQtyNoFull(msgTemplate.getContent());
-        }
-        contextDTO.setMsgRemainQtyNoFull(new StringBuilder());
+        initMsgTemplate(contextDTO);
         //初始调整过程日志
         contextDTO.setAdjustProcLogList(new ArrayList<>());
         //初始工厂名称
@@ -281,6 +279,25 @@ public class MpWeekRollAdjustController extends BaseController {
         // 加载搭配排产的必要基础数据
         matchingAdjuestProductionHandler.initAdjustContextDTO(contextDTO);
         return contextDTO;
+    }
+
+    /**
+     * 初始消息模板
+     * @param contextDTO
+     */
+    private void initMsgTemplate(MpRollAdjustContextDTO contextDTO) {
+        //1. SKU原余量小于调整次日至锁定截止日的计划量提醒
+        MsgTemplate msgTemplate = templateRemoteService.getTemplateInfo(MsgTemplateEnums.MP_SKU_REMAIN_QTY_NO_FULL.getCode());
+        if (msgTemplate != null){
+            contextDTO.setMsgTemplateWithRemainQtyNoFull(msgTemplate.getContent());
+        }
+        contextDTO.setMsgRemainQtyNoFull(new StringBuilder());
+        //2. 结构内调整减量提前收尾
+        msgTemplate = templateRemoteService.getTemplateInfo(MsgTemplateEnums.MP_STRUCTURE_ADJUST_PRE_CLOSE.getCode());
+        if (msgTemplate != null){
+            contextDTO.setMsgTemplateWithStructureAdjustPreClose(msgTemplate.getContent());
+        }
+        contextDTO.setMsgStructureAdjustPreClose(new StringBuilder());
     }
 
     /**

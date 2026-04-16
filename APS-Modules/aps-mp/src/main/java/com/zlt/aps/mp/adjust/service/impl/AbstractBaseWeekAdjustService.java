@@ -497,7 +497,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         saveMonthPlanStatisticsResult(contextDTO,YesOrNoEnum.YES.getCode());
         //6、发送消息
         if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgRemainQtyNoFull().toString())){
+            //发送 SKU原余量小于调整次日至锁定截止日的计划量提醒
             sendMsgRemainQtyNoFull(contextDTO);
+        }
+        if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgStructureAdjustPreClose().toString())){
+            //发送 结构内调整减量提前收尾
+            sendMsgStructAdjustPreClose(contextDTO);
         }
     }
 
@@ -523,6 +528,34 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 MsgTemplateEnums.MP_SKU_REMAIN_QTY_NO_FULL.getCode(),
                 MsgTypeEnums.NOTICE.getCode(),
                 contextDTO.getMsgRemainQtyNoFull().toString(),
+                null,
+                null,
+                context
+        );
+    }
+
+    /**
+     * 发送 结构内调整减量提前收尾
+     * @param contextDTO
+     */
+    private void sendMsgStructAdjustPreClose(MpRollAdjustContextDTO contextDTO) {
+        // 构建完整上下文
+        MessageContext context = messageServiceAdapter.buildMessageContext(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                SecurityUtils.getUsername(),
+                null
+        );
+
+        // 发送消息
+        messageServiceAdapter.sendBatchMessage(
+                MsgTemplateEnums.MP_STRUCTURE_ADJUST_PRE_CLOSE.getCode(),
+                MsgTypeEnums.NOTICE.getCode(),
+                contextDTO.getMsgStructureAdjustPreClose().toString(),
                 null,
                 null,
                 context

@@ -198,6 +198,10 @@ public enum MonthPlanEnums {
      */
     TRIAL_SKU_SUNDAY_IS_PRODUCTION("SYS0206005", "试制、量试SKU在周日是否允许排产"),
     /**
+     * SYS0206007 结构内调整减量，提前收尾可搭配排产的天数
+     */
+    STRUCTURE_ADJUST_PRE_CLOSE_DAY("SYS0206007", "结构内调整减量，提前收尾可搭配排产的天数"),
+    /**
      * SYS0205001 单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产
      */
     DEDUCT_MOULD_MIN_LH_MACHINE_COUNT("SYS0205001", "单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产"),
