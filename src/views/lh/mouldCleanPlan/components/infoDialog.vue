@@ -151,9 +151,16 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        console.log('保存参数:', params);
-        console.log('是否包含id:', params.id);
-        const res = await editMouldCleanPlan(params);
+        const saveParams = { ...params };
+        console.log('=== 保存参数完整信息 ===');
+        console.log('保存参数:', JSON.stringify(saveParams));
+        console.log('是否编辑模式:', this.isEdit);
+        console.log('ID值:', saveParams.id, '类型:', typeof saveParams.id);
+        if (this.isEdit && !saveParams.id) {
+          this.$modal.msgError('编辑模式下缺少ID，无法保存');
+          return;
+        }
+        const res = await editMouldCleanPlan(saveParams);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -169,9 +176,11 @@ export default {
       this.machineOptions = [];
       if (data) {
         this.isEdit = true;
-        console.log('编辑数据:', data);
-        console.log('数据id:', data.id);
+        console.log('=== 编辑模式 ===');
+        console.log('原始数据:', JSON.stringify(data));
+        console.log('原始数据ID:', data.id, '类型:', typeof data.id);
         this.form = { ...data };
+        console.log('复制后form ID:', this.form.id, '类型:', typeof this.form.id);
         if (data.lhCode) {
           this.machineOptions = [
             {
@@ -181,6 +190,7 @@ export default {
           ];
         }
       } else {
+        this.isEdit = false;
         this.form = {};
       }
     },
