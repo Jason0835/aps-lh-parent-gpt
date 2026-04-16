@@ -20,7 +20,8 @@ export function editMouldCleanPlan(query) {
   return request({
     url: '/lh/mouldCleanPlan/save',
     method: 'post',
-    data: query
+    data: query,
+    headers: { 'Content-Type': 'application/json;charset=UTF-8' }
   })
 }
 
