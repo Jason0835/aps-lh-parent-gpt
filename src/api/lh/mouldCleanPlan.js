@@ -17,7 +17,17 @@ export function removeMouldCleanPlan(ids) {
 }
 
 export function editMouldCleanPlan(query) {
-  return request.send('/lh/mouldCleanPlan/save', query)
+  return request({
+    url: '/lh/mouldCleanPlan/save',
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+    transformRequest: [(data) => {
+      return JSON.stringify(data)
+    }]
+  })
 }
 
 export function getMachineList(query) {

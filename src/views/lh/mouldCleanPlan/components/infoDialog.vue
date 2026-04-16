@@ -151,7 +151,8 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-
+        console.log('保存参数:', params);
+        console.log('是否包含id:', params.id);
         const res = await editMouldCleanPlan(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
@@ -168,6 +169,8 @@ export default {
       this.machineOptions = [];
       if (data) {
         this.isEdit = true;
+        console.log('编辑数据:', data);
+        console.log('数据id:', data.id);
         this.form = { ...data };
         if (data.lhCode) {
           this.machineOptions = [
