@@ -118,6 +118,7 @@ export default {
       sort: {},
       search: {},
       query: {},
+      yearList: [],
     };
   },
   computed: {
@@ -233,6 +234,13 @@ export default {
     searchColumns() {
       return [
         {
+          label: this.$t("ui.lh.precision.plan.year"),
+          prop: "year",
+          type: "select",
+          dicData: this.yearList,
+          value: new Date().getFullYear().toString(),
+        },
+        {
           label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
@@ -273,13 +281,26 @@ export default {
     },
   },
   methods: {
+    initYearList() {
+      const currentYear = new Date().getFullYear();
+      const years = [];
+      for (let i = currentYear - 2; i <= currentYear + 2; i++) {
+        years.push({
+          label: i.toString(),
+          value: i.toString(),
+        });
+      }
+      this.yearList = years;
+    },
     handleSyncFromMes() {
-      this.$confirm(this.$t("ui.lh.precision.plan.sync.confirm"), {
+      const year = this.query.year || new Date().getFullYear().toString();
+      this.$confirm(this.$t("ui.lh.precision.plan.sync.confirm", [year]), {
         type: "warning",
       }).then(() => {
         this.loading = true;
-        syncFromMes().then((res) => {
+        syncFromMes(year).then((res) => {
           this.$modal.msgSuccess(res.msg || this.$t("common.success"));
+          this.$set(this.page, "current", 1);
           this.getList();
         }).catch(() => {
           this.loading = false;
@@ -412,6 +433,10 @@ export default {
     },
   },
   created() {
+    this.initYearList();
+    if (!this.query.year) {
+      this.$set(this.query, 'year', new Date().getFullYear().toString());
+    }
     const today = new Date();
     const defaultDate = today.toISOString().split('T')[0];
     let defaultParams = {
@@ -423,6 +448,7 @@ export default {
       ...defaultParams,
     };
     this.query = {
+      ...this.query,
       ...defaultParams,
     };
     this.getList();

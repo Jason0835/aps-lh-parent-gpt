@@ -18,11 +18,11 @@ export function editCuringParams(query) {
     },
   })
 }
-export function removeCuringParams(query) {
+export function removeCuringParams(ids) {
   return request({
     url: '/lh/lhParams/remove',
     method: 'post',
-    data: query
+    params: { ids: ids }
   })
 }
 

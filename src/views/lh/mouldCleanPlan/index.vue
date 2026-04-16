@@ -34,10 +34,18 @@
         >
         
         <el-button
-          type="success"
+          type="primary"
+          plain
           v-hasPermi="['lh:mouldCleanPlan:sync']"
           @click="handleSyncFromWarn"
           >{{ $t("ui.mould.clean.plan.sync.from.warn") }}</el-button
+        >
+
+        <el-button
+          type="warning"
+          v-hasPermi="['lh:mouldCleanPlan:warn']"
+          @click="handleViewWarn"
+          >{{ $t("ui.mould.clean.plan.view.warn") }}</el-button
         >
       </template>
     </page-table>
@@ -56,6 +64,7 @@ import {
   removeMouldCleanPlan,
   syncFromWarn
 } from "@/api/lh/mouldCleanPlan";
+import { listMachine } from "@/api/lh/machine";
 
 //components
 import infoDialog from "./components/infoDialog.vue";
@@ -65,7 +74,7 @@ export default {
   components: {
     infoDialog
   },
-  dicts: ["biz_factory_name", "lh_machine", "MOULD_CLEAN_TYPE"],
+  dicts: ["biz_factory_name", "MOULD_CLEAN_TYPE"],
   provide() {
     return {
       parentDict: this.dict,
@@ -86,6 +95,8 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
+      machineOptions: [],
+      machineLoading: false,
     };
   },
   computed: {
@@ -125,6 +136,10 @@ export default {
           label: this.$t("ui.data.column.mouldCleanPlan.remark"),
           showOverflowTooltip: true
         },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.mouldCleanPlan.updateTime"),
+        },
 
         {
           align: "center",
@@ -160,10 +175,18 @@ export default {
     searchColumns() {
       return [
         {
+          label: this.$t("common.factory"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+        },
+        {
           label: this.$t("ui.data.column.mouldCleanPlan.lhCode"),
           prop: "lhCode",
           type: "select",
-          dictData: this.dict.type.lh_machine,
+          dictData: this.machineOptions,
+          labelKey: "machineCode",
+          valueKey: "machineCode",
           filterable: true,
         },
         {
@@ -200,7 +223,7 @@ export default {
     },
 
     handleSyncFromWarn() {
-      this.$confirm(this.$t("ui.mould.clean.plan.sync.confirm"), this.$t("common.hint.hint"), {
+      this.$confirm(this.$t("ui.mould.clean.plan.sync.confirm"), {
         confirmButtonText: this.$t("common.button.confirm"),
         cancelButtonText: this.$t("common.button.cancel"),
         type: 'warning'
@@ -215,19 +238,16 @@ export default {
       });
     },
 
+    handleViewWarn() {
+      this.$router.push({ name: "LhMouldCleanWarn" });
+    },
+
     handleDeleteAll() {
-      let ids = "";
-      for (let i = 0; i < this.selection.length; i++) {
-        if (i == this.selection.length - 1) {
-          ids = ids + this.selection[i].id;
-        } else {
-          ids = ids + this.selection[i].id + ",";
-        }
-      }
+      let ids = this.selection.map(item => item.id).join(",");
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeMouldCleanPlan({ ids }).then((data) => {
+        removeMouldCleanPlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -239,7 +259,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeMouldCleanPlan({ ids }).then((data) => {
+        removeMouldCleanPlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -304,7 +324,6 @@ export default {
     async getList() {
       try {
         this.loading = true;
-
         const data = await listMouldCleanPlan(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
@@ -314,25 +333,35 @@ export default {
         this.loading = false;
       }
     },
+    async loadMachineList() {
+      this.machineLoading = true;
+      try {
+        const res = await listMachine({
+          machineCode: "",
+          pageSize: 1000,
+        });
+        this.machineOptions = res.rows || res.data || res || [];
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.machineLoading = false;
+      }
+    },
   },
   created() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const defaultDate = `${year}-${month}-${day}`;
-    
+    let defaultParams = {
+      factoryCode: "116",
+    };
     this.search = {
-      cleanTime: [defaultDate, defaultDate]
+      ...defaultParams,
     };
     this.query = {
-      cleanTimeBegin: defaultDate,
-      cleanTimeEnd: defaultDate
+      ...defaultParams,
     };
-    this.getList();
   },
-  activated() {
-    // this.getList();
+  mounted() {
+    this.getList();
+    this.loadMachineList();
   },
 };
 </script>

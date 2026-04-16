@@ -30,11 +30,12 @@
 
 <script>
 import { listMouldCleanWarn } from "@/api/lh/mouldCleanWarn";
+import { listMachine } from "@/api/lh/machine";
 import { downloadLink } from "@/utils/ruoyi";
 
 export default {
   name: "LhMouldCleanWarn",
-  dicts: ["biz_factory_name", "lh_machine"],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -53,6 +54,8 @@ export default {
       sort: {},
       search: {},
       query: {},
+      machineOptions: [],
+      machineLoading: false,
     };
   },
   computed: {
@@ -89,8 +92,8 @@ export default {
           showOverflowTooltip: true
         },
         {
-          prop: "createTime",
-          label: this.$t("ui.data.column.mouldCleanWarn.createTime"),
+          prop: "updateTime",
+          label: this.$t("ui.data.column.mouldCleanWarn.updateTime"),
         },
       ];
 
@@ -98,16 +101,38 @@ export default {
     },
     searchColumns() {
       return [
+       {
+          label: this.$t("common.factory"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+        },
         {
           label: this.$t("ui.data.column.mouldCleanWarn.lhCode"),
           prop: "lhCode",
           type: "select",
-          dictData: this.dict.type.lh_machine,
+          dictData: this.machineOptions,
+          labelKey: "machineCode",
+          valueKey: "machineCode",
           filterable: true,
         },
         {
           label: this.$t("ui.data.column.mouldCleanWarn.operTime"),
           prop: "operTime",
+          type: "date",
+          dateType: "daterange",
+          valueFormat: "yyyy-MM-dd",
+        },
+        {
+          label: this.$t("ui.data.column.mouldCleanWarn.firstWashTime"),
+          prop: "firstWashTime",
+          type: "date",
+          dateType: "daterange",
+          valueFormat: "yyyy-MM-dd",
+        },
+        {
+          label: this.$t("ui.data.column.mouldCleanWarn.secondWashTime"),
+          prop: "secondWashTime",
           type: "date",
           dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
@@ -122,6 +147,16 @@ export default {
         this.query.operTimeBegin = data.operTime[0];
         this.query.operTimeEnd = data.operTime[1];
         delete this.query.operTime;
+      }
+      if (data.firstWashTime && data.firstWashTime.length === 2) {
+        this.query.firstWashTimeBegin = data.firstWashTime[0];
+        this.query.firstWashTimeEnd = data.firstWashTime[1];
+        delete this.query.firstWashTime;
+      }
+      if (data.secondWashTime && data.secondWashTime.length === 2) {
+        this.query.secondWashTimeBegin = data.secondWashTime[0];
+        this.query.secondWashTimeEnd = data.secondWashTime[1];
+        delete this.query.secondWashTime;
       }
       this.$set(this.page, "current", 1);
       this.getList();
@@ -174,9 +209,40 @@ export default {
         this.loading = false;
       }
     },
+    async loadMachineList() {
+      this.machineLoading = true;
+      try {
+        const res = await listMachine({
+          machineCode: "",
+          pageSize: 1000,
+        });
+        this.machineOptions = res.rows || res.data || res || [];
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.machineLoading = false;
+      }
+    },
+    handleMachineFocus() {
+      if (this.machineOptions.length === 0) {
+        this.loadMachineList();
+      }
+    },
+  },
+  created() {
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
   },
   mounted() {
     this.getList();
+    this.loadMachineList();
   },
 };
 </script>

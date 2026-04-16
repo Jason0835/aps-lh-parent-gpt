@@ -67,23 +67,26 @@ export function lhValidateAutoPlan(query) {
 }
 
 /**
- * 硫化自动排程
- * @param {*} query
- * @returns
+ * 硫化自动排程（/execute）
+ * @param {Object} query
+ * @param {string} query.scheduleDate 排程日期
+ * @param {string} [query.factoryCode] 工厂编码
+ * @returns {Promise<{ success?: boolean, message?: string, batchNo?: string, msg?: string }>}
  */
 export function autoPlan(query) {
   return request({
-    url: '/lh/lhScheduleResult​/execute',
+    url: '/lh/lhScheduleResult/execute',
     method: 'post',
     data: query,
-    // headers: {
-    //   'Content-Type': 'application/json;charset=UTF-8'
-    // },
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
   })
 }
 /**
- * 硫化自动排程
- * @param {*} query
+ * 硫化插单（/insertOrder）
+ * @param {Object} query
+ * @param {string} query.scheduleDate 排程日期
  * @returns
  */
 export function insertOrder(query) {
@@ -261,6 +264,11 @@ export function getBatchNo(query) {
   })
 }
 
+/**
+ * 插单/排程相关：按工厂与排程日期等查询可用硫化机台
+ * @param {Object} query
+ * @param {string} query.scheduleDate 排程日期
+ */
 export function getScheduleMachineInfo(query) {
   return request({
     url: '/lh/lhScheduleResult/getScheduleMachineInfo',

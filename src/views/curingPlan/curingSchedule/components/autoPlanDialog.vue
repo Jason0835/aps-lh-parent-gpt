@@ -42,7 +42,7 @@ export default {
       isEdit: false,
       form: {},
       rules: {
-        scheduleTime: [
+        scheduleDate: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -59,7 +59,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
-          prop: "scheduleTime",
+          prop: "scheduleDate",
           type: "date",
           dateType: "date",
           valueFormat: "yyyy-MM-dd 00:00:00",
@@ -106,8 +106,18 @@ export default {
         //   this.$modal.msgError(this.$t("ui.biz.alter.CanNotRecreate"));
         // }
         const data = await autoPlan(params);
-        this.$modal.msgSuccess(data.msg);
-        this.$emit("success", params);
+        // 接口返回：{ success, message, batchNo }；兼容旧版 { msg }
+        const tip = data.message || data.msg || "";
+        if (data.success === false) {
+          this.$modal.msgError(
+            tip || this.$t("ui.data.btn.ajax.code.msg")
+          );
+          return;
+        }
+        this.$modal.msgSuccess(
+          tip || this.$t("common.msg.ajax.operation.success")
+        );
+        this.$emit("success", { ...params, batchNo: data.batchNo });
         this.hide();
       } catch (error) {
         console.log(error);
@@ -119,11 +129,10 @@ export default {
     //utils
     show(data) {
       this.visible = true;
-      //设置默认值为明天
-
+      // 与硫化排程管理列表查询条件一致：当前日期 + 2 天
       this.form = {
         factoryCode: "116",
-        scheduleTime: moment().add(1, "days").format("yyyy-MM-DD 00:00:00"),
+        scheduleDate: moment().add(2, "days").format("YYYY-MM-DD 00:00:00"),
       };
     },
     hide() {

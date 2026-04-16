@@ -190,7 +190,7 @@ export default {
       }).then(() => {
         const ids = row.id;
         this.loading = true;
-        removeCuringParams({ ids })
+        removeCuringParams(ids)
           .then((data) => {
             this.$modal.msgSuccess(data.msg);
             this.$set(this.page, "current", 1);
