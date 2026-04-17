@@ -68,6 +68,7 @@ public class LhMouldCleanWarnController extends AbstractDocBizController<LhMould
     protected List<LhMouldCleanWarn> listExportData(LhMouldCleanWarn obj) {
         QueryWrapper<LhMouldCleanWarn> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + getOrderBy());
         return lhMouldCleanWarnMapper.selectList(wrapper);
     }
 

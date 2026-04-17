@@ -57,7 +57,7 @@ public class LhMouldCleanPlanController extends AbstractDocBizController<LhMould
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
-    public AjaxResult save(@RequestBody LhMouldCleanPlan billVO){
+    public AjaxResult save(@RequestBody LhMouldCleanPlan billVO) {
         if (StringUtil.isBlank(billVO.getFactoryCode())) {
             billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
@@ -69,7 +69,7 @@ public class LhMouldCleanPlanController extends AbstractDocBizController<LhMould
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
-    public AjaxResult removeByIds(@RequestBody List<Long> ids){
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
     }
 
@@ -78,7 +78,7 @@ public class LhMouldCleanPlanController extends AbstractDocBizController<LhMould
     @PostMapping("/importData")
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
-        return super.importData(importContext,updateSupport);
+        return super.importData(importContext, updateSupport);
     }
 
     public AjaxResult doImportData(List list, boolean updateSupport, long importLogId) {
@@ -111,6 +111,7 @@ public class LhMouldCleanPlanController extends AbstractDocBizController<LhMould
     protected List<LhMouldCleanPlan> listExportData(LhMouldCleanPlan obj) {
         QueryWrapper<LhMouldCleanPlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + getOrderBy());
         return lhMouldCleanPlanMapper.selectList(wrapper);
     }
 
@@ -141,6 +142,6 @@ public class LhMouldCleanPlanController extends AbstractDocBizController<LhMould
 
     @Override
     protected String getOrderBy() {
-        return "LH_CODE asc, CLEAN_TIME desc, id desc";
+        return "UPDATE_TIME desc,LH_CODE asc";
     }
 }
