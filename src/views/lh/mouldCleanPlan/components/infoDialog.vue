@@ -249,3 +249,9 @@ export default {
 };
 </script>
 
+<style lang="scss" scoped>
+::v-deep .el-textarea__inner {
+  font-family: Helvetica Neue, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+}
+</style>
+

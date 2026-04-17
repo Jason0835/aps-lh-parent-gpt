@@ -87,6 +87,7 @@ export default {
               <materialCodeSelect
                 key={form.embryoCode}
                 v-model={form.embryoCode}
+                structureName={form.structureName}
                 onChange={this.handleEmbryoCodeChange}
               />
             );
