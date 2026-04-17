@@ -314,7 +314,7 @@ public class DayCapacityLimitHelper implements Serializable {
             }
         }
         skuInfo.deductionProductionQty(usedMouldSet, productionQty, lossQty);
-        log.info(DayLimitLogRecorder.addDeductionDayProductionInfoLog(context, productionDay, mouldCodeInfo, materialDesc, realProductionQty, productionQty, lossQty, sumProductionCapacityQty));
+        DayLimitLogRecorder.addDeductionDayProductionInfoLog(context, productionDay, mouldCodeInfo, materialDesc, realProductionQty, productionQty, lossQty, sumProductionCapacityQty);
         if (skuInfo.getLossQty() == BigDecimal.ZERO.intValue() && skuInfo.getProductionQty() == BigDecimal.ZERO.intValue()) {
             skuProductionInfo.remove(materialDesc);
         }
