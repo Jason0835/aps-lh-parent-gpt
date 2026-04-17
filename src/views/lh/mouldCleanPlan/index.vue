@@ -37,6 +37,8 @@
           type="primary"
           plain
           v-hasPermi="['lh:mouldCleanPlan:sync']"
+          :loading="syncLoading"
+          :disabled="syncLoading"
           @click="handleSyncFromWarn"
           >{{ $t("ui.mould.clean.plan.sync.from.warn") }}</el-button
         >
@@ -97,6 +99,7 @@ export default {
       importRules: {},
       machineOptions: [],
       machineLoading: false,
+      syncLoading: false,
     };
   },
   computed: {
@@ -229,11 +232,14 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
+          this.syncLoading = true;
           const res = await syncFromWarn();
           this.$modal.msgSuccess(res.msg);
           this.getList();
         } catch (error) {
           console.error(error);
+        } finally {
+          this.syncLoading = false;
         }
       });
     },

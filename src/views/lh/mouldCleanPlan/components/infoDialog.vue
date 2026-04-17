@@ -79,7 +79,7 @@ export default {
   computed: {
     title: function () {
       return this.isEdit
-        ? this.$t("common.button.edit")
+        ? "编辑"
         : this.$t("common.button.add");
     },
     columns() {
@@ -123,6 +123,7 @@ export default {
           prop: "remark",
           label: this.$t("ui.data.column.mouldCleanPlan.remark"),
           type: "textarea",
+          rows: 3,
           maxlength: 360,
           showWordLimit: true,
         },
@@ -219,3 +220,10 @@ export default {
   },
 };
 </script>
+
+<style lang="scss" scoped>
+::v-deep .el-textarea__inner {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+</style>
+
