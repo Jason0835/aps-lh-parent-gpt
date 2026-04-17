@@ -187,7 +187,7 @@ public class GroupPlanBeforeConclusionHandler {
         }
         Integer minAllocationDays = groupPlanInfo.getMinAllocationDays(productionContext);
         //20260119 如果提前收尾导致整个分配段不排产，则需要更新deductionDaySet的集合
-        if (!isProductionCxMachineAllocation && (realAllocationDayBeforeConclusion < minAllocationDays)) {
+        if (isProductionCxMachineAllocation && (realAllocationDayBeforeConclusion < minAllocationDays)) {
             //20260323 更新提前收尾信息 因还有可能后续持续分配到不同时间段，导致此次收尾不能直接标记不排产
             updateBeforeConclusionForAllocation(beforeConclusionInfo, cxMachineInfo, allocationInfo);
             beforeConclusionDay = beforeConclusionInfo.getBeforeConclusionDay();
