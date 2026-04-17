@@ -19,6 +19,8 @@ import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
+import com.zlt.aps.mp.engine.domain.vo.CycleStructureMinLhMachineQtyVo;
+import com.zlt.aps.mp.engine.service.DpRequireDataService;
 import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmStructureLhRatioEntityMapper;
@@ -55,6 +57,7 @@ import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.ruoyi.common.exception.ServiceException;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StopWatch;
 
 /**
@@ -108,7 +111,8 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
     @Autowired
     private DataManager dataManager;
 
-
+    @Autowired
+    private DpRequireDataService dpRequireDataService;
 
     @Override
     protected String getDocTypeCode() {
@@ -263,12 +267,14 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         paramCodeList.add(MonthPlanEnums.MAX_BOOST_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
         paramCodeList.add(MonthPlanEnums.WEEK_ROLL_ADJUST_DATE.getCode());
+        paramCodeList.add(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode());
         paramCodeList.add(MonthPlanEnums.MATCHING_BOOST_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode());
         paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
         paramCodeList.add(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
         paramCodeList.add(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_PRODUCTION_QTY.getCode());
+        paramCodeList.add(MonthPlanEnums.STRUCTURE_ADJUST_PRE_CLOSE_DAY.getCode());
         return productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
     }
 
@@ -371,6 +377,22 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
                     return m.get(0);
                 })));
         return workCalendarMap;
+    }
+
+    @Override
+    public Map<String, Integer> getCycleStructureMinMachinesMap(MpRollAdjustContextDTO contextDTO) {
+        Context context = new Context();
+        context.setFactoryCode(contextDTO.getFactoryCode());
+        context.setYear(contextDTO.getMpYear());
+        context.setMonth(contextDTO.getMpMonth());
+        List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = dpRequireDataService.getCycleLhRatioInfo(context);
+        Map<String, Integer> cycleStructureMinLhRatioMap = new HashMap<>();
+        if (!CollectionUtils.isEmpty(cycleStructureMinLhRatioList)) {
+            cycleStructureMinLhRatioList.forEach(cycleStructureMinLhRatio -> {
+                cycleStructureMinLhRatioMap.put(cycleStructureMinLhRatio.getStructureName(), null == cycleStructureMinLhRatio.getMonthMinLhMachineQty() ? cycleStructureMinLhRatio.getMinLhMachineQty() : cycleStructureMinLhRatio.getMonthMinLhMachineQty());
+            });
+        }
+        return cycleStructureMinLhRatioMap;
     }
 
     @Override

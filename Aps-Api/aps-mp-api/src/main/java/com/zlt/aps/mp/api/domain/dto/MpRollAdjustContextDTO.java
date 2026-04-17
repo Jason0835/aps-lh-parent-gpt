@@ -123,6 +123,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "SKU原余量未满的消息模板")
     private String msgTemplateWithRemainQtyNoFull;
 
+    @ApiModelProperty(value = "结构内调整减量提前收尾")
+    private String msgTemplateWithStructureAdjustPreClose;
+
     @ApiModelProperty(value = "结构内调整记录")
     private List<MpAdjustStructureIn> mpAdjustStructureInList;
 
@@ -204,6 +207,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "SKU原余量未满消息")
     private StringBuilder msgRemainQtyNoFull;
 
+    @ApiModelProperty(value = "结构内调整减量提前收尾")
+    private StringBuilder msgStructureAdjustPreClose;
+
     @ApiModelProperty(value = "调整明细列表")
     private List<MpAdjustDetailVo> adjustDetailList;
 
@@ -221,6 +227,9 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "工作日历")
     private Map<Integer, MdmWorkCalendar> workCalendarMap;
+
+    @ApiModelProperty(value = "周期结构最低硫化机台数")
+    private Map<String, Integer> cycleStructureMinLhMachinesMap;
 
     @ApiModelProperty(value = "型腔与活块Map")
     private Map<Integer, DailyMouldAvailabilityResult> cavity2BlockMap;

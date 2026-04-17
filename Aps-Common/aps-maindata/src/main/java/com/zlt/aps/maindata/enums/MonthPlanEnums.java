@@ -198,6 +198,10 @@ public enum MonthPlanEnums {
      */
     TRIAL_SKU_SUNDAY_IS_PRODUCTION("SYS0206005", "试制、量试SKU在周日是否允许排产"),
     /**
+     * SYS0206007 结构内调整减量，提前收尾可搭配排产的天数
+     */
+    STRUCTURE_ADJUST_PRE_CLOSE_DAY("SYS0206007", "结构内调整减量，提前收尾可搭配排产的天数"),
+    /**
      * SYS0205001 单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产
      */
     DEDUCT_MOULD_MIN_LH_MACHINE_COUNT("SYS0205001", "单位：台，续作Sku排产硫化机台数超过该值时，需要考虑降膜排产"),
@@ -256,7 +260,11 @@ public enum MonthPlanEnums {
     /**
      * SYS0209005 参与排产的特殊原材料编码，多个以,分隔
      */
-    SPECIAL_MATERIAL_CODE("SYS0209005", "参与排产的特殊原材料编码，多个以,分隔");
+    SPECIAL_MATERIAL_CODE("SYS0209005", "参与排产的特殊原材料编码，多个以,分隔"),
+    /**
+     * SYS0209006 正式排产，结构优先级重新排序日
+     */
+    FORMAL_RESET_SORT_DAY("SYS0209006","正式排产，结构优先级重新排序日");
 
     private final String code;
     private final String name;

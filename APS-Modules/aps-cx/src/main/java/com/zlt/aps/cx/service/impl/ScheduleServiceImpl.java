@@ -1462,7 +1462,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             List<CxMachineOnlineInfo> filteredOnlineInfos = context.getOnlineInfos().stream()
                     .filter(info -> {
                         // 使用物料编码 + 胎胚编码组合键
-                        String materialCode = info.getMesMaterialCode();
+                        String materialCode = info.getMaterialCode();
                         String embryoSpec = info.getEmbryoSpec();
                         String combinedKey = materialCode + "|" + embryoSpec;
                         // 如果组合键在已收尾集合中，则过滤掉
@@ -1485,7 +1485,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             Map<String, Set<String>> machineOnlineEmbryoMap = new HashMap<>();
             for (CxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
                 String cxCode = onlineInfo.getCxCode();
-                String materialCode = onlineInfo.getMesMaterialCode();
+                String materialCode = onlineInfo.getMaterialCode();
                 String embryoSpec = onlineInfo.getEmbryoSpec();
                 String combinedKey = materialCode + "|" + embryoSpec;
                 if (cxCode != null && combinedKey != null && !combinedKey.equals("|")) {
