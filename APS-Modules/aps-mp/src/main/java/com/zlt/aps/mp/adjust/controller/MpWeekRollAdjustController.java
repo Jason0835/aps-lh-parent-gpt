@@ -146,6 +146,9 @@ public class MpWeekRollAdjustController extends BaseController {
                     String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
             // 排序 按英寸->结构->最大型腔数->主花纹->活块数->物料描述
             sortAdjustResultList(contextDTO.getAdjustResultList());
+            if (StringUtil.isEmptyWithTrim(contextDTO.getMsgStructureAdjustPreClose().toString())){
+                return AjaxResult.success(contextDTO.getMsgStructureAdjustPreClose().toString(),contextDTO.getAdjustResultList());
+            }
             return AjaxResult.success(contextDTO.getAdjustResultList());
         }finally {
             redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
