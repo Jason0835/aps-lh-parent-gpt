@@ -17,6 +17,7 @@ import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
+import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
@@ -303,6 +304,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         result.setBatchNo(context.getBatchNo());
         result.setLhMachineCode(machine.getMachineCode());
         result.setLhMachineName(machine.getMachineName());
+        result.setLeftRightMould(LeftRightMouldUtil.resolveLeftRightMould(result.getLeftRightMould(), machine.getMachineCode()));
         result.setMaterialCode(sku.getMaterialCode());
         result.setMaterialDesc(sku.getMaterialDesc());
         result.setSpecCode(sku.getSpecCode());
