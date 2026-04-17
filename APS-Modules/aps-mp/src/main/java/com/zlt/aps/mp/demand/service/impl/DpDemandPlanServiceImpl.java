@@ -1013,8 +1013,15 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         setQuantityStatistics(mergedPlan, groupPlans, minProductionQty,orderQtyMap);
         // 设置月均销量
         setAverageSaleQty(mergedPlan,monthlySaleQty);
+        // 设置是否参与排产
+        setIsSchedule(groupPlans, mergedPlan);
 
         return mergedPlan;
+    }
+
+    private void setIsSchedule(List<DpDemandPlan> groupPlans, DpDemandPlan mergedPlan) {
+        String isSchedule = groupPlans.stream().anyMatch(p -> YesOrNoEnum.YES.getCode().equals(p.getIsSchedule()))? YesOrNoEnum.YES.getCode(): YesOrNoEnum.NO.getCode();
+        mergedPlan.setIsSchedule(isSchedule);
     }
 
     private void setIsAlternateMaterial(DpDemandPlan mergedPlan, List<DpDemandPlan> groupPlans) {
@@ -1278,7 +1285,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                         Collectors.collectingAndThen(Collectors.toList(),
                                 list -> list.stream().collect(Collectors.groupingBy(finishedProductStock -> this
                                         .getWeekYearCompareKey(finishedProductStock.getWeekYear()) // 第二层分组：重构后的年周号，把年份放前面，周次放后面，方便比较
-                                        , TreeMap::new, Collectors.toList()))))); // 使用treeMap分组，年周号作为key，可以快速找到年周号最接近的库存数据
+                                        , TreeMap::new, Collectors.toList()))))); // 使用treeMap分组，年周号作为key，可以快速找到与年周号要求最接近的库存数据
 
         // 2、遍历未扫描订单列表，依次扣减库存
         for (MdmOutbountOrdersNotScan notScanOrder : notScanOrderList) {
@@ -1287,16 +1294,17 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             Integer noscanAmount = BigDecimalUtils.valueOf(notScanOrder.getNoscanAmount()).intValue(); // 未扫描数量
             // 2.1、取出物料各年周号的库存列表
             TreeMap<String, List<MdmProductStock>> stockYearWeekGroupMap = stockGroupMap.get(sapCode);
-            // 2.2、按年周号由低到高依次依次冲减，一个年周号的库存不够则继续取更新年周号的库存，直到
+            // 2.2、按年周号由低到高依次依次冲减，一个年周号的库存不够则继续取更新年周号的库存，直到库存耗尽
             while (noscanAmount > 0 && !CollectionUtils.isEmpty(stockYearWeekGroupMap)) {
-                // 2.2.1、取最订单年周要求接近且最小的库存年周号
+                // 2.2.1、取大于且最接近订单年周要求的库存数据
                 String stockWeekYear = stockYearWeekGroupMap.ceilingKey(dot);
-                if (StringUtils.isEmpty(stockWeekYear)) {
+                if (StringUtils.isEmpty(stockWeekYear)) { // 没有符合条件的要求
                     break;
                 }
                 // 2.2.2、根据年周号取出库存列表
                 List<MdmProductStock> stockList = stockYearWeekGroupMap.get(stockWeekYear);
                 if (CollectionUtils.isEmpty(stockList)) {
+                    stockYearWeekGroupMap.remove(stockWeekYear);
                     continue;
                 }
                 // 2.3.3、内层循环，依次冲减未扫描数量，直到库存耗尽或者冲减完毕，每一笔耗尽的库存记录需要从列表中删除
