@@ -1,7 +1,10 @@
 package com.zlt.aps.cx.service.impl;
 
+import cn.hutool.core.collection.ListUtil;
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -12,8 +15,11 @@ import com.zlt.aps.cx.mapper.CxPrecisionPlanMapper;
 import com.zlt.aps.cx.service.ICxPrecisionPlanService;
 import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.maindata.mapper.MdmDevMaintenancePlanEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMoldingMachineEntityMapper;
 import com.zlt.aps.maindata.utils.MessageServiceUtils;
 import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
+
+import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -28,15 +34,8 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -82,6 +81,9 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
     @Autowired
     private RedisService redisService;
 
+    @Autowired
+    private MdmMoldingMachineEntityMapper mdmMoldingMachineEntityMapper;
+
     @Override
     protected String getDocTypeCode() {
         return "CX_PRECISION_PLAN";
@@ -105,32 +107,24 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
      */
     private void calculateDaysToDue(CxPrecisionPlan entity) {
         if (entity.getPlanDate() != null) {
-            LocalDate today = LocalDate.now();
-            int daysToDue = (int) ChronoUnit.DAYS.between(today, entity.getPlanDate());
+            Long daysToDue = DateUtil.betweenDay(DateUtil.date(), entity.getPlanDate(), true);
             entity.setDaysToDue(daysToDue);
             if (entity.getYear() == null) {
-                entity.setYear(new BigDecimal(entity.getPlanDate().getYear()));
+                entity.setYear(new BigDecimal(DateUtil.year(entity.getPlanDate())));
             }
         }
     }
 
     @Override
     public String checkUnique(CxPrecisionPlan entity) {
-        if (entity == null || StringUtil.isBlank(entity.getMachineCode()) || entity.getPlanDate() == null) {
+        if (entity == null || StringUtil.isBlank(entity.getMachineCode()) || entity.getPlanDate() == null
+            || StringUtil.isBlank(entity.getPrecisionType())) {
             return UserConstants.UNIQUE;
         }
 
-        QueryWrapper<CxPrecisionPlan> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("MACHINE_CODE", entity.getMachineCode());
-        queryWrapper.eq("PLAN_DATE", entity.getPlanDate());
-        queryWrapper.eq("IS_DELETE", 0);
-
-        if (entity.getId() != null) {
-            queryWrapper.ne("ID", entity.getId());
-        }
-
-        long count = cxPrecisionPlanMapper.selectCount(queryWrapper);
-        return count > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
+        CxPrecisionPlan existEntity = selectExistingPlan(entity.getMachineCode(), entity.getPrecisionType(),
+            entity.getPlanDate(), entity.getId());
+        return existEntity != null ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
     }
 
     @Override
@@ -144,12 +138,14 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         List<CxPrecisionPlan> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
+        Map<String, MdmMoldingMachine> machineMap = buildMachineMap(list);
 
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             CxPrecisionPlan docEntity = list.get(i);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
-            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated);
+            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
+                "machineCode", "precisionType", "planDate");
             if (PubUtil.isNotEmpty(validated)) {
                 failureNum++;
                 docEntity.setId(-999L);
@@ -171,6 +167,13 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
                     errorNum, String.format(message, errorNum), importErrorLogs);
                 continue;
             }
+            if (!machineMap.containsKey(docEntity.getMachineCode())) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.data.alert.cxPrecisionPlan.machineNotExist");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                    errorNum, String.format(message, errorNum), importErrorLogs);
+                continue;
+            }
 
             if (docEntity.getPlanDate() == null) {
                 failureNum++;
@@ -180,37 +183,18 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
                 continue;
             }
 
-            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
-                docEntity.setIsDelete(0);
-                if (StringUtil.isBlank(docEntity.getCompletionStatus())) {
-                    docEntity.setCompletionStatus(COMPLETION_STATUS_PENDING);
-                }
-                if (StringUtil.isBlank(docEntity.getWarningStatus())) {
-                    docEntity.setWarningStatus(WARNING_STATUS_NO);
-                }
-                if (StringUtil.isBlank(docEntity.getIsWarningSent())) {
-                    docEntity.setIsWarningSent(WARNING_SENT_NO);
-                }
-                if (StringUtil.isBlank(docEntity.getDataSource())) {
-                    docEntity.setDataSource(DATA_SOURCE_MES);
-                }
-                calculateDaysToDue(docEntity);
+            CxPrecisionPlan existEntity = selectExistingPlan(docEntity.getMachineCode(), docEntity.getPrecisionType(),
+                docEntity.getPlanDate(), null);
+            if (existEntity == null) {
+                initImportEntity(docEntity);
                 importList.add(docEntity);
                 successNum++;
             } else {
                 if (updateSupport) {
-                    QueryWrapper<CxPrecisionPlan> queryWrapper = new QueryWrapper<>();
-                    queryWrapper.eq("MACHINE_CODE", docEntity.getMachineCode());
-                    queryWrapper.eq("PLAN_DATE", docEntity.getPlanDate());
-                    queryWrapper.eq("IS_DELETE", 0);
-                    CxPrecisionPlan existEntity = cxPrecisionPlanMapper.selectOne(queryWrapper);
-                    if (existEntity != null) {
-                        docEntity.setId(existEntity.getId());
-                        docEntity.setIsDelete(0);
-                        calculateDaysToDue(docEntity);
-                        importList.add(docEntity);
-                        successNum++;
-                    }
+                    docEntity.setId(existEntity.getId());
+                    initImportEntity(docEntity);
+                    importList.add(docEntity);
+                    successNum++;
                 } else {
                     failureNum++;
                     ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
@@ -237,13 +221,74 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum + "," + failureNum);
     }
 
+    /**
+     * 按机台编码、精度类型、计划日期查询已存在的精度计划。
+     */
+    private CxPrecisionPlan selectExistingPlan(String machineCode, String precisionType, Date planDate, Long excludeId) {
+        if (StringUtil.isBlank(machineCode) || StringUtil.isBlank(precisionType) || planDate == null) {
+            return null;
+        }
+        QueryWrapper<CxPrecisionPlan> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("MACHINE_CODE", machineCode);
+        queryWrapper.eq("PRECISION_TYPE", precisionType);
+        queryWrapper.eq("PLAN_DATE", DateUtil.beginOfDay(planDate));
+        queryWrapper.eq("IS_DELETE", 0);
+        if (excludeId != null) {
+            queryWrapper.ne("ID", excludeId);
+        }
+        queryWrapper.last("limit 1");
+        return cxPrecisionPlanMapper.selectOne(queryWrapper);
+    }
+
+    /**
+     * 初始化导入数据的默认值，保持导入新增与覆盖时的字段一致性。
+     */
+    private void initImportEntity(CxPrecisionPlan docEntity) {
+        docEntity.setPlanDate(DateUtil.beginOfDay(docEntity.getPlanDate()));
+        docEntity.setIsDelete(0);
+        if (StringUtil.isBlank(docEntity.getCompletionStatus())) {
+            docEntity.setCompletionStatus(COMPLETION_STATUS_PENDING);
+        }
+        if (StringUtil.isBlank(docEntity.getWarningStatus())) {
+            docEntity.setWarningStatus(WARNING_STATUS_NO);
+        }
+        if (StringUtil.isBlank(docEntity.getIsWarningSent())) {
+            docEntity.setIsWarningSent(WARNING_SENT_NO);
+        }
+        if (StringUtil.isBlank(docEntity.getDataSource())) {
+            docEntity.setDataSource(DATA_SOURCE_MES);
+        }
+        calculateDaysToDue(docEntity);
+    }
+
+    /**
+     * 批量查询导入数据涉及的机台主数据，避免逐行访问数据库。
+     */
+    private Map<String, MdmMoldingMachine> buildMachineMap(List<CxPrecisionPlan> list) {
+
+        List<String>  machineCodes = list.stream().map(CxPrecisionPlan::getMachineCode)
+                .distinct()
+                .collect(Collectors.toList());
+        List<List<String>> machineCodeList = ListUtil.partition(machineCodes, 1000);
+        LambdaUpdateWrapper<MdmMoldingMachine> queryWrapper = new LambdaUpdateWrapper<>();
+        queryWrapper.and(i ->{
+            for(List<String> newList: machineCodeList){
+                i.or().in(MdmMoldingMachine::getCxMachineCode, newList);
+            }
+        });
+        List<MdmMoldingMachine> machineList = mdmMoldingMachineEntityMapper.selectList(queryWrapper);
+        Map<String, MdmMoldingMachine> machineMap = machineList.stream()
+                .collect(Collectors.toMap(MdmMoldingMachine::getCxMachineCode, i -> i));
+        return machineMap;
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     /**
      * 从 MES 数据生成年度成型精度计划（带分布式锁）。
      */
     public int generatePlansFromMes(Integer year) {
-        Integer targetYear = year == null ? LocalDate.now().getYear() : year;
+        Integer targetYear = year == null ? DateUtil.thisYear() : year;
         String lockKey = "generate:cx:precision:plan:" + targetYear;
         if (redisService.getCacheObject(lockKey) != null) {
             throw new RuntimeException(I18nUtil.getMessage("ui.lh.precisionPlan.generate.in.progress"));
@@ -253,9 +298,23 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
             redisService.setCacheObject(lockKey, "1");
             log.info("开始从MES同步数据生成{}年度成型精度计划", targetYear);
 
+            // 查询历史同步时间，用于增量同步
+            LambdaQueryWrapper<CxPrecisionPlan> syncWrapper = new LambdaQueryWrapper<>();
+            syncWrapper.isNotNull(CxPrecisionPlan::getSyncTime)
+                .eq(CxPrecisionPlan::getDataSource, DATA_SOURCE_AUTO)
+                .eq(CxPrecisionPlan::getIsDelete, 0)
+                .orderByDesc(CxPrecisionPlan::getSyncTime)
+                .last("limit 1");
+            CxPrecisionPlan latestPlan = cxPrecisionPlanMapper.selectOne(syncWrapper);
+            Date lastSyncTime = latestPlan != null ? latestPlan.getSyncTime() : null;
+
             LambdaQueryWrapper<MdmDevMaintenancePlan> wrapper = new LambdaQueryWrapper<>();
             wrapper.like(MdmDevMaintenancePlan::getPrecisionType, PRECISION_TYPE_CX)
                 .eq(MdmDevMaintenancePlan::getIsDelete, 0);
+            // 增量同步：只查询updateTime大于等于lastSyncTime的数据（避免漏同步同一时刻的记录）
+            if (lastSyncTime != null) {
+                wrapper.ge(MdmDevMaintenancePlan::getUpdateTime, lastSyncTime);
+            }
 
             List<MdmDevMaintenancePlan> mesPlans = mdmDevMaintenancePlanEntityMapper.selectList(wrapper);
             if (CollectionUtils.isEmpty(mesPlans)) {
@@ -263,50 +322,101 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
                 return 0;
             }
 
-            QueryWrapper<CxPrecisionPlan> deleteWrapper = new QueryWrapper<>();
-            deleteWrapper.eq("YEAR", targetYear)
-                .eq("DATA_SOURCE", DATA_SOURCE_AUTO)
-                .eq("IS_DELETE", 0);
-            cxPrecisionPlanMapper.delete(deleteWrapper);
+            // 按机台增量处理：先锁定本次变更涉及的机台，再查询每个机台最新的一条MES记录，避免“旧记录被更新”导致计划回退
+            Set<String> machineCodes = new HashSet<>();
+            for (MdmDevMaintenancePlan mesPlan : mesPlans) {
+                if (StringUtils.hasText(mesPlan.getDevCode())) {
+                    machineCodes.add(mesPlan.getDevCode());
+                }
+            }
 
             Map<String, MdmDevMaintenancePlan> latestMesPlanMap = new HashMap<>();
-            for (MdmDevMaintenancePlan mesPlan : mesPlans) {
-                String machineCode = mesPlan.getDevCode();
-                LocalDate actualDate = parseDate(mesPlan.getFirstWashTime());
-                if (!StringUtils.hasText(machineCode) || actualDate == null) {
-                    continue;
-                }
-                MdmDevMaintenancePlan exist = latestMesPlanMap.get(machineCode);
-                LocalDate existDate = exist == null ? null : parseDate(exist.getFirstWashTime());
-                if (existDate == null || actualDate.isAfter(existDate)) {
-                    latestMesPlanMap.put(machineCode, mesPlan);
+            for (String machineCode : machineCodes) {
+                LambdaQueryWrapper<MdmDevMaintenancePlan> latestWrapper = new LambdaQueryWrapper<>();
+                latestWrapper.eq(MdmDevMaintenancePlan::getDevCode, machineCode)
+                    .like(MdmDevMaintenancePlan::getPrecisionType, PRECISION_TYPE_CX)
+                    .eq(MdmDevMaintenancePlan::getIsDelete, 0)
+                    .isNotNull(MdmDevMaintenancePlan::getFirstWashTime)
+                    .orderByDesc(MdmDevMaintenancePlan::getFirstWashTime)
+                    .orderByDesc(MdmDevMaintenancePlan::getUpdateTime)
+                    .last("limit 1");
+                MdmDevMaintenancePlan latest = mdmDevMaintenancePlanEntityMapper.selectOne(latestWrapper);
+                if (latest != null && StringUtils.hasText(latest.getDevCode())) {
+                    latestMesPlanMap.put(latest.getDevCode(), latest);
                 }
             }
 
-            int intervalDays = getIntervalDays();
-            List<CxPrecisionPlan> plansToSave = new ArrayList<>();
+            int affected = 0;
             for (Map.Entry<String, MdmDevMaintenancePlan> entry : latestMesPlanMap.entrySet()) {
-                CxPrecisionPlan plan = createPlanFromMes(entry.getKey(), entry.getValue(), targetYear, intervalDays);
+                CxPrecisionPlan plan = createPlanFromMes(entry.getKey(), entry.getValue(), targetYear);
                 if (plan != null) {
-                    plansToSave.add(plan);
+                    affected += upsertByMesSourceId(plan);
                 }
             }
 
-            if (!plansToSave.isEmpty()) {
-                baseDao.insertBatch(plansToSave);
-            }
-
-            return plansToSave.size();
+            return affected;
         } finally {
             redisService.deleteObject(lockKey);
         }
     }
 
     /**
+     * 按MES来源ID增量同步：mesSourceId 对应 {@link MdmDevMaintenancePlan} 的 id，有则更新，无则新增。
+     */
+    private int upsertByMesSourceId(CxPrecisionPlan plan) {
+        if (plan.getMesSourceId() == null) {
+            return 0;
+        }
+        LambdaQueryWrapper<CxPrecisionPlan> existWrapper = new LambdaQueryWrapper<>();
+        existWrapper.eq(CxPrecisionPlan::getMesSourceId, plan.getMesSourceId());
+        List<CxPrecisionPlan> existList = cxPrecisionPlanMapper.selectList(existWrapper);
+        if (PubUtil.isEmpty(existList)) {
+            cxPrecisionPlanMapper.insert(plan);
+            return 1;
+        }
+        for (CxPrecisionPlan cxPrecisionPlan : existList) {
+            applyMesFields(cxPrecisionPlan, plan);
+            cxPrecisionPlanMapper.updateById(cxPrecisionPlan);
+        }
+        return 1;
+    }
+
+    /**
+     * 仅更新从MES同步得到的字段，避免覆盖用户维护的完成/预警等状态。
+     */
+    private void applyMesFields(CxPrecisionPlan target, CxPrecisionPlan source) {
+        target.setMachineCode(source.getMachineCode());
+        target.setPrecisionType(source.getPrecisionType());
+        target.setPrecisionCycle(source.getPrecisionCycle());
+        target.setCompanyCode(source.getCompanyCode());
+        target.setFactoryCode(source.getFactoryCode());
+        target.setMesSourceId(source.getMesSourceId());
+        target.setDataSource(source.getDataSource());
+        target.setSyncTime(source.getSyncTime());
+        target.setActualDate(source.getActualDate());
+        target.setLastMaintenanceDate(source.getLastMaintenanceDate());
+        target.setPlanDate(source.getPlanDate());
+        target.setDueDate(source.getDueDate());
+        target.setYear(source.getYear());
+        target.setDaysToDue(source.getDaysToDue());
+        target.setIsDelete(0);
+
+        if (StringUtil.isBlank(target.getCompletionStatus())) {
+            target.setCompletionStatus(COMPLETION_STATUS_PENDING);
+        }
+        if (StringUtil.isBlank(target.getWarningStatus())) {
+            target.setWarningStatus(WARNING_STATUS_NO);
+        }
+        if (StringUtil.isBlank(target.getIsWarningSent())) {
+            target.setIsWarningSent(WARNING_SENT_NO);
+        }
+    }
+
+    /**
      * 将 MES 记录转换为成型精度计划实体。
      */
-    private CxPrecisionPlan createPlanFromMes(String machineCode, MdmDevMaintenancePlan mesPlan, Integer year, int intervalDays) {
-        LocalDate actualDate = parseDate(mesPlan.getFirstWashTime());
+    private CxPrecisionPlan createPlanFromMes(String machineCode, MdmDevMaintenancePlan mesPlan, Integer year) {
+        Date actualDate = parseDate(mesPlan.getFirstWashTime());
         if (actualDate == null) {
             return null;
         }
@@ -319,14 +429,19 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         plan.setFactoryCode(mesPlan.getFactoryCode());
         plan.setMesSourceId(mesPlan.getId());
         plan.setDataSource(DATA_SOURCE_AUTO);
+        plan.setSyncTime(mesPlan.getUpdateTime());
         plan.setActualDate(actualDate);
         plan.setLastMaintenanceDate(actualDate);
 
-        LocalDate planDate = actualDate.plusDays(intervalDays);
+        Integer cycleDays = safeParseInt(plan.getPrecisionCycle());
+        if (cycleDays == null) {
+            return null;
+        }
+        Date planDate = DateUtil.offsetDay(actualDate, cycleDays);
         plan.setPlanDate(planDate);
         plan.setDueDate(planDate);
         plan.setYear(new BigDecimal(year));
-        plan.setDaysToDue((int) ChronoUnit.DAYS.between(LocalDate.now(), planDate));
+        plan.setDaysToDue(DateUtil.betweenDay(DateUtil.date(), planDate, true));
 
         plan.setCompletionStatus(COMPLETION_STATUS_PENDING);
         plan.setWarningStatus(WARNING_STATUS_NO);
@@ -416,7 +531,7 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
      * 基于上一条计划生成新的年度计划。
      */
     private CxPrecisionPlan createYearlyPlan(String machineCode, CxPrecisionPlan lastPlan, Integer year, int intervalDays) {
-        LocalDate lastActualDate = lastPlan.getActualDate();
+        Date lastActualDate = lastPlan.getActualDate();
         if (lastActualDate == null) {
             return null;
         }
@@ -428,12 +543,12 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         plan.setFactoryCode(lastPlan.getFactoryCode());
         plan.setCompanyCode(lastPlan.getCompanyCode());
 
-        LocalDate planDate = lastActualDate.plusDays(intervalDays);
+        Date planDate = DateUtil.offsetDay(lastActualDate, intervalDays);
         plan.setPlanDate(planDate);
         plan.setDueDate(planDate);
         plan.setYear(new BigDecimal(year));
         plan.setLastMaintenanceDate(lastActualDate);
-        plan.setDaysToDue((int) ChronoUnit.DAYS.between(LocalDate.now(), planDate));
+        plan.setDaysToDue(DateUtil.betweenDay(DateUtil.date(), planDate, true));
 
         plan.setCompletionStatus(COMPLETION_STATUS_PENDING);
         plan.setWarningStatus(WARNING_STATUS_NO);
@@ -454,7 +569,7 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
             return 0;
         }
 
-        LocalDate now = LocalDate.now();
+        Date now = DateUtil.beginOfDay(DateUtil.date());
         for (CxPrecisionPlan plan : plans) {
             plan.setBaseVale(plan.getId());
             plan.setWarningStatus(WARNING_STATUS_YES);
@@ -493,7 +608,7 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
             return false;
         }
 
-        LocalDate actualDateParsed = parseDate(actualDate);
+        Date actualDateParsed = parseDate(actualDate);
         if (actualDateParsed == null) {
             return false;
         }
@@ -501,27 +616,29 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         plan.setBaseVale(plan.getId());
         plan.setActualDate(actualDateParsed);
         plan.setCompletionStatus(COMPLETION_STATUS_COMPLETED);
-        plan.setDueDate(actualDateParsed.plusYears(1));
+        plan.setDueDate(DateUtil.offsetYear(actualDateParsed, 1));
 
         int result = cxPrecisionPlanMapper.updateById(plan);
         return result > 0;
     }
 
+
+
     /**
      * 解析字符串日期（支持 yyyy/MM/dd 与 yyyy-MM-dd）。
      */
-    private LocalDate parseDate(String dateStr) {
+    private Date parseDate(String dateStr) {
         if (!StringUtils.hasText(dateStr)) {
             return null;
         }
 
         try {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
-            return LocalDate.parse(dateStr, formatter);
+            Date parsed = DateUtil.parse(dateStr, "yyyy/MM/dd");
+            return DateUtil.beginOfDay(parsed);
         } catch (Exception e) {
             try {
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                return LocalDate.parse(dateStr, formatter);
+                Date parsed = DateUtil.parse(dateStr, "yyyy-MM-dd");
+                return DateUtil.beginOfDay(parsed);
             } catch (Exception ex) {
                 log.warn("解析日期失败: {}", dateStr, ex);
                 return null;
@@ -532,12 +649,12 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
     /**
      * 解析 Date 为 LocalDate。
      */
-    private LocalDate parseDate(Date date) {
+    private Date parseDate(Date date) {
         if (date == null) {
             return null;
         }
         try {
-            return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            return DateUtil.beginOfDay(date);
         } catch (Exception e) {
             log.warn("解析Date失败: {}", date, e);
             return null;
@@ -550,13 +667,24 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
     private void sendWarning(CxPrecisionPlan plan) {
         try {
             String templateCode = MsgTemplateEnums.LH_PRECISION_PLAN_WARNING.getCode();
-            String planDateStr = plan.getPlanDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String planDateStr = plan.getPlanDate() == null ? "" : DateUtil.format(plan.getPlanDate(), "yyyy-MM-dd");
             messageServiceUtils.sendWarning(templateCode, (String) null,
                 plan.getMachineCode(),
                 planDateStr,
                 plan.getDaysToDue());
         } catch (Exception e) {
             log.error("发送成型精度预警失败: machineCode={}, planDate={}", plan.getMachineCode(), plan.getPlanDate(), e);
+        }
+    }
+
+    private Integer safeParseInt(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (Exception e) {
+            return null;
         }
     }
 }

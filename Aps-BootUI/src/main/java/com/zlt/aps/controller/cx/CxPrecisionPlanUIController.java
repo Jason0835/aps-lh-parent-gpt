@@ -70,23 +70,23 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
     @ApiOperation("查询机台下拉")
     @PostMapping("/getMachineList")
     @ResponseBody
-    public AjaxResult getMachineList(@RequestBody(required = false) CxMachineInfo query) {
+    public AjaxResult getMachineList( CxMachineInfo query) {
         CxMachineInfo machineQuery = query == null ? new CxMachineInfo() : query;
-        List<CxMachineInfo> machineInfos = cxMachineInfoService.list2(machineQuery);
-        if (machineInfos == null || machineInfos.isEmpty()) {
-            return AjaxResult.success();
-        }
-
-        List<Map<String, String>> machineCodeList = machineInfos.stream()
-            .filter(machineInfo -> machineInfo != null && machineInfo.getMachineCode() != null)
-            .map(machineInfo -> {
-                Map<String, String> map = new HashMap<>(1);
-                map.put("machineCode", machineInfo.getMachineCode());
-                return map;
-            })
-            .distinct()
-            .collect(Collectors.toList());
-        return AjaxResult.success(machineCodeList);
+//        List<CxMachineInfo> machineInfos = cxPrecisionPlanRemoteService.list2(machineQuery);
+//        if (machineInfos == null || machineInfos.isEmpty()) {
+//            return AjaxResult.success();
+//        }
+//
+//        List<Map<String, String>> machineCodeList = machineInfos.stream()
+//            .filter(machineInfo -> machineInfo != null && machineInfo.getMachineCode() != null)
+//            .map(machineInfo -> {
+//                Map<String, String> map = new HashMap<>(1);
+//                map.put("machineCode", machineInfo.getMachineCode());
+//                return map;
+//            })
+//            .distinct()
+//            .collect(Collectors.toList());
+        return AjaxResult.success();
     }
 
     @ApiOperation("查询列表")
