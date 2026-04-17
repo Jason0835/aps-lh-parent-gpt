@@ -13,76 +13,36 @@
       @search="handleSearch"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
-      @selection-change="handleSelectionChange"
       :showSummary="false"
       :selectArea="false"
     >
       <template slot="header">
-        <el-button type="primary" plain v-hasPermi="['cx:cxMachineOnlineInfo:edit']" @click="handleAdd">
-          {{ $t('ui.frame.btn.add') }}
-        </el-button>
-        <el-button v-hasPermi="['cx:cxMachineOnlineInfo:edit']" :disabled="selection.length !== 1" @click="handleEdit(selection[0])">
-          {{ $t('ui.frame.btn.update') }}
-        </el-button>
-        <el-button type="danger" v-hasPermi="['cx:cxMachineOnlineInfo:remove']" :disabled="selection.length === 0" @click="handleDelete">
-          {{ $t('ui.frame.btn.delete') }}
-        </el-button>
-        <el-button v-hasPermi="['cx:cxMachineOnlineInfo:import']" @click="$refs.uploadRef.handleImport()">
-          {{ $t('ui.frame.btn.import') }}
-        </el-button>
         <el-button v-hasPermi="['cx:cxMachineOnlineInfo:export']" @click="handleExport">
           {{ $t('ui.frame.btn.export') }}
         </el-button>
       </template>
     </page-table>
-    <tlt-upload-form
-      ref="uploadRef"
-      :updateSupport="true"
-      downloadUrl="/cx/cxMachineOnlineInfo/importTemplate"
-      uploadUrl="/cx/cxMachineOnlineInfo/importData"
-      @uploadSuccess="getList"
-      labelWidth="0"
-      :columns="importColumns"
-    />
-    <info-dialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 
 <script>
 import { downloadLink } from '@/utils/request'
-import { listCxMachineOnlineInfo, removeCxMachineOnlineInfo } from '@/api/cx/cxMachineOnlineInfo'
-import TltUploadForm from '@/views/components/tltUploadForm.vue'
-import infoDialog from './components/infoDialog.vue'
+import { listCxMachineOnlineInfo } from '@/api/cx/cxMachineOnlineInfo'
 
 export default {
   name: 'CxMachineOnlineInfo',
-  components: { TltUploadForm, infoDialog },
   dicts: ['biz_factory_name'],
   provide() {
     return { parentDict: this.dict }
   },
   data() {
     return {
-      importColumns: [
-        {
-          label: '',
-          prop: 'updateSupport',
-          render: (form) => {
-            return (
-              <el-checkbox label={this.$t('common.rule.updateSupport')} v-model={form.updateSupport}>
-                {this.$t('common.rule.updateSupport')}
-              </el-checkbox>
-            )
-          }
-        }
-      ],
       loading: false,
       data: [],
-      selection: [],
       page: { current: 1, pageSize: 20, total: 0 },
       sort: {},
-      search: {},
-      query: {}
+      search: { factoryCode: '116' },
+      query: { factoryCode: '116' }
     }
   },
   computed: {
@@ -112,7 +72,6 @@ export default {
     },
     columns() {
       return [
-        { type: 'selection', fixed: 'left' },
         {
           prop: 'factoryCode',
           align: 'center',
@@ -163,64 +122,23 @@ export default {
           label: this.$t('ui.data.column.cxMachineOnlineInfo.embryoSpec'),
           minWidth: 180
         },
+        // {
+        //   prop: 'remark',
+        //   halign: 'center',
+        //   label: this.$t('ui.common.column.remark'),
+        //   minWidth: 160
+        // },
         {
-          prop: 'remark',
-          halign: 'center',
-          label: this.$t('ui.common.column.remark'),
-          minWidth: 160
-        },
-        {
-          prop: 'option',
+          prop: 'updateTime',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.btn.option'),
-          minWidth: 150,
-          render: ({ row }) => {
-            return (
-              <div>
-                <el-button
-                  v-hasPermi={['cx:cxMachineOnlineInfo:edit']}
-                  class='minus'
-                  type='success'
-                  onClick={() => this.handleEdit(row)}
-                >
-                  {this.$t('ui.frame.btn.update')}
-                </el-button>
-                <el-button
-                  v-hasPermi={['cx:cxMachineOnlineInfo:remove']}
-                  class='minus'
-                  type='danger'
-                  onClick={() => this.handleDelete(row)}
-                >
-                  {this.$t('ui.frame.btn.delete')}
-                </el-button>
-              </div>
-            )
-          }
+          label: this.$t('ui.data.column.updateTime'),
+          minWidth: 160
         }
       ]
     }
   },
   methods: {
-    handleAdd() {
-      this.$refs.infoRef.show()
-    },
-    handleEdit(row) {
-      if (row) this.$refs.infoRef.show(row)
-    },
-    handleDelete(row) {
-      this.$confirm(this.$t('common.confirm.delete'), { type: 'warning' }).then(() => {
-        const ids = row && row.id ? [row.id] : this.selection.map(r => r.id)
-        this.loading = true
-        removeCxMachineOnlineInfo(ids)
-          .then(res => {
-            this.$modal.msgSuccess(res.msg)
-            this.page.current = 1
-            this.getList()
-          })
-          .finally(() => (this.loading = false))
-      })
-    },
     handleExport() {
       downloadLink('/cx/cxMachineOnlineInfo/export', this.formatParams(false))
     },
@@ -244,9 +162,6 @@ export default {
         this.sort = {}
       }
       this.getList()
-    },
-    handleSelectionChange(rows) {
-      this.selection = rows
     },
     formatParams(hasPage = true) {
       const params = {
