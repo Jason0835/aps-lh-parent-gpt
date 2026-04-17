@@ -21,6 +21,9 @@ import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.service.IBatchMpMonthPlanStatisticsService;
+import com.zlt.aps.mp.adjust.service.IBatchMpAdjustMaterialLogService;
+import com.zlt.aps.mp.adjust.service.IBatchMpAdjustResultService;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
@@ -143,7 +146,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     protected IMpAdjustResultService mpAdjustResultService;
 
     @Autowired
+    protected IBatchMpAdjustResultService batchMpAdjustResultService;
+
+    @Autowired
     protected IMpAdjustMaterialLogService mpAdjustMaterialLogService;
+
+    @Autowired
+    protected IBatchMpAdjustMaterialLogService batchMpAdjustMaterialLogService;
 
     @Autowired
     protected IMpAdjustStructureLogService mpAdjustLogService;
@@ -156,6 +165,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected IMpMonthPlanStatisticsService mpMonthPlanStatisticsService;
+
+    @Autowired
+    protected IBatchMpMonthPlanStatisticsService batchMpMonthPlanStatisticsService;
 
     @Autowired
     protected BaseDao baseDao;
@@ -736,7 +748,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 去重月计划统计结果
         //monthPlanStatisticsList = distinctMonthPlanStatistics(monthPlanStatisticsList);
         // 保存月计划统计结果
-        baseDao.insertBatch(monthPlanStatisticsList);
+        //baseDao.insertBatch(monthPlanStatisticsList);
+        batchMpMonthPlanStatisticsService.insertBatchData(monthPlanStatisticsList);
         log.info("保存月计划统计结果成功，共新增:{}条记录", monthPlanStatisticsList.size());
     }
 
@@ -792,7 +805,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             handleZeroToNull(mpAdjustResult);
             mpAdjustResultList.add(mpAdjustResult);
         }
-        baseDao.insertBatch(mpAdjustResultList);
+        //baseDao.insertBatch(mpAdjustResultList);
+        batchMpAdjustResultService.insertBatchData(mpAdjustResultList);
         contextDTO.setAdjustResultList(mpAdjustResultList);
     }
 
@@ -820,7 +834,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             mpMaterialLog.setAdjustDetail(finalAdjustVo.getAdjustDetail().toString());
             mpMaterialLogList.add(mpMaterialLog);
         }
-        baseDao.insertBatch(mpMaterialLogList);
+        //baseDao.insertBatch(mpMaterialLogList);
+        batchMpAdjustMaterialLogService.insertBatchData(mpMaterialLogList);
     }
 
     /**

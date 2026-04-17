@@ -4,25 +4,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.mp.adjust.mapper.MpAdjustMaterialLogEntityMapper">
 
-    <insert id="insertBatch" parameterType="java.util.List">
-        INSERT INTO T_MP_ADJUST_MATERIAL_LOG (
-            FACTORY_CODE, YEAR, MONTH, PRODUCTION_VERSION, ADJ_VERSION,
-            ADJUST_TYPE, STRUCTURE_NAME, MATERIAL_CODE, MATERIAL_DESC,
-            HAS_SPECIAL_MATERIAL, ADJUST_DETAIL,
-            CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, REMARK, IS_DELETE
-        ) VALUES
-        <foreach collection="list" item="item" separator=",">
-            (
-                #{item.factoryCode}, #{item.year}, #{item.month},
-                #{item.productionVersion}, #{item.adjVersion},
-                #{item.adjustType}, #{item.structureName}, #{item.materialCode},
-                #{item.materialDesc}, #{item.hasSpecialMaterial}, #{item.adjustDetail},
-                #{item.createBy}, #{item.createTime}, #{item.updateBy}, #{item.updateTime},
-                #{item.remark}, #{item.isDelete}
-            )
-        </foreach>
-    </insert>
-
     <select id="getVersionList" resultType="com.zlt.aps.mp.api.domain.entity.MpAdjustMaterialLog">
         SELECT
         ADJ_VERSION
