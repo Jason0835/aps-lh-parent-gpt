@@ -45,7 +45,7 @@ public interface ICxKeyProductRemoteService {
      * 删除
      */
     @ApiOperation("删除")
-    @DeleteMapping("/cxKeyProduct/remove")
+    @PostMapping("/cxKeyProduct/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**

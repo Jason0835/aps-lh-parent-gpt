@@ -67,7 +67,7 @@ public class CxKeyProductController extends AbstractDocBizController<CxKeyProduc
      */
     @Log(title = "ui.data.column.cxKeyProduct.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
-    @DeleteMapping("/remove")
+    @PostMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
