@@ -52,7 +52,17 @@
       downloadUrl="/cx/cxKeyProduct/importTemplate"
       uploadUrl="/cx/cxKeyProduct/importData"
       @uploadSuccess="getList"
-    />
+    >
+      <template slot="tip">
+        <div style="color: #F56C6C; margin-top: 8px; font-size: 12px; line-height: 1.6;">
+          <div><strong>⚠️ 导入注意事项：</strong></div>
+          <div>1、<strong>必填项</strong>：胎胚编码、结构名称、是否启用</div>
+          <div>2、<strong>唯一键</strong>：胎胚编码 + 结构名称（组合唯一，不能重复）</div>
+          <div>3、若胎胚描述为空或与导入的胎胚编码不一致时，将按物料表的关联关系自动写入胎胚描述</div>
+          <div>4、<strong>Excel列顺序</strong>：胎胚编码 | 胎胚描述 | 结构名称 | 是否启用</div>
+        </div>
+      </template>
+    </tlt-upload>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -83,7 +93,24 @@ export default {
   data() {
     return {
       searchColumns: [
-
+        {
+          label: this.$t("结构"),
+          prop: "structureName",
+        },
+        {
+          label: this.$t("胎胚代码"),
+          prop: "embryoCode",
+        },
+        {
+          label: this.$t("胎胚描述"),
+          prop: "embryoDesc",
+        },
+        {
+          label: this.$t("是否启用"),
+          prop: "isActive",
+          type: "select",
+          dictData: this.dict.type.biz_yes_no,
+        },
       ],
       loading: false,
       data: [],
@@ -128,6 +155,12 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
+        },
+        {
+          prop: "updateTime",
+          align: "center",
+          label: this.$t("ui.data.column.updateTime"),
+          minWidth: 160,
         },
 
         {
@@ -267,11 +300,14 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listMoldingParams(this.formatParams());
-        this.data = data.rows;
-        this.page.total = data.total;
+        const res = await listMoldingParams(this.formatParams());
+        const data = res?.data ?? res;
+        this.data = Array.isArray(data?.rows) ? data.rows : (Array.isArray(data) ? data : []);
+        this.page.total = data?.total ?? 0;
       } catch (error) {
         console.error(error);
+        this.data = [];
+        this.page.total = 0;
       } finally {
         this.loading = false;
       }

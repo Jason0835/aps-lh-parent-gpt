@@ -31,7 +31,7 @@
 <script>
 import { listMouldCleanWarn } from "@/api/lh/mouldCleanWarn";
 import { listMachine } from "@/api/lh/machine";
-import { downloadLink } from "@/utils/ruoyi";
+import { downloadLink } from "@/utils/request";
 
 export default {
   name: "LhMouldCleanWarn",

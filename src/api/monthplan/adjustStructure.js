@@ -217,3 +217,12 @@ export function versionLog(query) {
     data: query
   })
 }
+
+//更新结构每日计划量
+export function updateSkuScheduleItems(query) {
+  return request({
+    url: '/monthplan/factoryMonthPlanFinalResult/save',
+    method: 'post',
+    data: query
+  })
+}

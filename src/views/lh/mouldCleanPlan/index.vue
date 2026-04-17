@@ -37,6 +37,8 @@
           type="primary"
           plain
           v-hasPermi="['lh:mouldCleanPlan:sync']"
+          :loading="syncLoading"
+          :disabled="syncLoading"
           @click="handleSyncFromWarn"
           >{{ $t("ui.mould.clean.plan.sync.from.warn") }}</el-button
         >
@@ -97,6 +99,7 @@ export default {
       importRules: {},
       machineOptions: [],
       machineLoading: false,
+      syncLoading: false,
     };
   },
   computed: {
@@ -229,11 +232,14 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
+          this.syncLoading = true;
           const res = await syncFromWarn();
           this.$modal.msgSuccess(res.msg);
           this.getList();
         } catch (error) {
           console.error(error);
+        } finally {
+          this.syncLoading = false;
         }
       });
     },
@@ -304,7 +310,12 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/lh/mouldCleanPlan/export", this.formatParams(false));
+      const params = this.getExportParams();
+      console.log('=== 导出参数 ===');
+      console.log('查询条件:', this.query);
+      console.log('排序条件:', this.sort);
+      console.log('完整导出参数:', params);
+      downloadLink("/lh/mouldCleanPlan/export", params);
     },
 
     formatParams(hasPage = true) {
@@ -318,6 +329,16 @@ export default {
         params.pageNum = this.page.current;
       }
 
+      return params;
+    },
+    getExportParams() {
+      const params = {
+        ...this.query,
+      };
+      if (this.sort && this.sort.orderByColumn) {
+        params.orderByColumn = this.sort.orderByColumn;
+        params.isAsc = this.sort.isAsc;
+      }
       return params;
     },
     // api
@@ -349,6 +370,7 @@ export default {
     },
   },
   created() {
+    console.log('=== 模具清洗计划 created 执行 ===');
     let defaultParams = {
       factoryCode: "116",
     };
@@ -360,8 +382,13 @@ export default {
     };
   },
   mounted() {
+    console.log('=== 模具清洗计划 mounted 执行 ===');
     this.getList();
     this.loadMachineList();
+  },
+  activated() {
+    console.log('=== 模具清洗计划 activated 执行 ===');
+    this.getList();
   },
 };
 </script>
