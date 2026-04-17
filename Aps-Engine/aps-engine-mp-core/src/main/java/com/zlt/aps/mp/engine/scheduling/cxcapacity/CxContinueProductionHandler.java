@@ -286,7 +286,7 @@ public class CxContinueProductionHandler {
      * @return
      */
     private static ContinueSkuNextSkuInfo getNextSku(TbrProductionContext productionContext, EarliestConclusionLhGroupHelper lhGroup, ProductionPlanGroupInfo productionPlanInfo, ProductionStageEnum productionStage, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> matchList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
-        String selectedMaterialDesc = SkuPrioritySelector.getHighestPrioritySku(productionContext, productionStage, productionPlanInfo, lhGroup, continueType, matchList, excludeSkuSet, startDay, endDay);
+        String selectedMaterialDesc = SkuPrioritySelector.getHighestPrioritySku(productionContext, productionStage, null, productionPlanInfo, lhGroup, continueType, matchList, excludeSkuSet, startDay, endDay);
 //        String selectedMaterialDesc = ContinueSkuPrioritySelector.getHeightPrioritySku(productionStage, matchList, excludeSkuSet);
         String groupName = productionPlanInfo.getGroupName();
         if (StringUtils.isBlank(selectedMaterialDesc)) {

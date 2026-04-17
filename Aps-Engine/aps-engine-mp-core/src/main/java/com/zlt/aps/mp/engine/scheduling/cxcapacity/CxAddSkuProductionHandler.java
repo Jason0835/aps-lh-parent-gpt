@@ -130,7 +130,7 @@ public class CxAddSkuProductionHandler {
         BeforeSkuProductionInfo beforeSkuInfo = lhGroup.getBeforeSkuInfo();
         //获取优先级最高的Sku信息
 //        String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList);
-        String materialDesc = SkuPrioritySelector.getHighestPrioritySku(context, productionStage, groupPlanInfo, lhGroup, ContinueTypeEnum.NO_CONTINUE, leftOverHasProductionList, new HashSet<>(), startDay, endDay);
+        String materialDesc = SkuPrioritySelector.getHighestPrioritySku(context, productionStage, formalRound, groupPlanInfo, lhGroup, ContinueTypeEnum.NO_CONTINUE, leftOverHasProductionList, new HashSet<>(), startDay, endDay);
         TbrMouldProductionLogRecorder.addContinueGroupLhGroupFindSkuLog(context, groupName, onLineMachineInfo, materialDesc);
         if (StringUtils.isBlank(materialDesc)) {
             //20260113 剔除需要排除的收尾时间点
