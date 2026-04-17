@@ -10,6 +10,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -49,6 +50,7 @@ public class LhMouldCleanWarnUIController extends BaseUIController<LhMouldCleanW
 
     @ApiOperation("导出数据")
     @GetMapping("/export")
+    @RequiresPermissions("lh:mouldCleanWarn:export")
     public void export(HttpServletResponse response, LhMouldCleanWarn entity) throws IOException {
         String fileName = I18nUtil.getMessage("ui.data.column.mouldCleanWarn.modelName");
         byte[] excelBytes = iLhMouldCleanWarnService.exportData(entity, fileName);
