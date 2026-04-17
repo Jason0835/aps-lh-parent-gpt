@@ -431,12 +431,13 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
     /**
      * 获取续作机台的结构信息
+     *
      * @param cxContinueInfoMap
-     * @return Map<成型机台，续作结构>
+     * @return Map<成型机台 ， 续作结构>
      */
-    protected Map<String,String> getContinueStructureMap(Map<String, CxContinueInfoHelper> cxContinueInfoMap){
-        Map<String,String> machineStructureMap = new HashMap<>();
-        if (PubUtil.isEmpty(cxContinueInfoMap)){
+    protected Map<String, String> getContinueStructureMap(Map<String, CxContinueInfoHelper> cxContinueInfoMap) {
+        Map<String, String> machineStructureMap = new HashMap<>();
+        if (PubUtil.isEmpty(cxContinueInfoMap)) {
             return machineStructureMap;
         }
         // 从续作信息中解析出成型机台对应的续作结构
@@ -444,8 +445,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         for (Map.Entry<String, CxContinueInfoHelper> entry : cxContinueInfoMap.entrySet()) {
             cxContinueInfoHelper = entry.getValue();
             Set<String> cxMachineCodeSet = cxContinueInfoHelper.getCxMachineCodeSet();
-            for (String machineCode:cxMachineCodeSet){
-                machineStructureMap.put(machineCode,entry.getKey());
+            for (String machineCode : cxMachineCodeSet) {
+                machineStructureMap.put(machineCode, entry.getKey());
             }
         }
         return machineStructureMap;
@@ -498,6 +499,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode());
         paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
         paramCodeList.add(MonthPlanEnums.SPECIAL_MATERIAL_CODE.getCode());
+        paramCodeList.add(MonthPlanEnums.FORMAL_RESET_SORT_DAY.getCode());
         //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
         if (CollectionUtils.isEmpty(paramConfigurationMap)) {
@@ -574,6 +576,13 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             configuration.setSpecialMaterialCodeSet(Collections.emptySet());
         } else {
             configuration.setSpecialMaterialCodeSet(Stream.of(specialMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet()));
+        }
+        //20260416+ 结构重新排产日
+        Object resetSortDayValue = paramConfigurationMap.get(MonthPlanEnums.FORMAL_RESET_SORT_DAY.getCode());
+        if (null != resetSortDayValue && ((Integer) resetSortDayValue >= ProductionConstant.MONTH_START_DAY) && ((Integer) resetSortDayValue <= productionContext.getMonthDays())) {
+            configuration.setFormalFirstHalfDay((Integer) resetSortDayValue);
+        }else{
+            configuration.setFormalFirstHalfDay(productionContext.getMonthDays());
         }
         return configuration;
     }

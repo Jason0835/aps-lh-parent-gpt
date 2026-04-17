@@ -8,7 +8,9 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
+import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
 import com.zlt.aps.mp.engine.handler.SkuMouldSelector;
 import com.zlt.aps.mp.engine.handler.SkuProductionCounter;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldFormalProductionLogRecorder;
@@ -40,6 +42,8 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final CxAddSkuProductionHandler cxAddSkuProductionHandler;
 
+    private final GroupPlanPrioritySelector groupPlanPrioritySelector;
+
     /**
      * 正式排产，对结构按已经分配好的机台产能进行排产
      * 先在机结构，其次新增结构
@@ -69,39 +73,117 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
         log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupLog(productionContext));
         //续作部分排产 1、续作Sku 2、续作Sku同规格同花纹高优先级量 3、续作Sku同生胎共模具高优先级量
         productionContinue(cxAddSkuProductionHandler, ProductionStageEnum.FORMAL_STAGE, productionContext, allContinueInfo, allGroupPlanInfo);
-        //4、在机机构新增Sku排产
+
+//        //4、一次性排产完毕
+//        reachGroupLhMachines(productionContext, FormalRoundEnum.DISPOSABLE_LH_MACHINE, allGroupPlanInfo, allContinueInfo);
+
+        //4、满足实单最低硫化机台数排产
+        reachGroupLhMachines(productionContext, FormalRoundEnum.ACTUAL_MIN_LH_MACHINE, allGroupPlanInfo, allContinueInfo);
+
+        //5、按结构优先级，前段排产
+        List<ProductionPlanGroupInfo> groupSortList = groupPlanPrioritySelector.sortGroupByFormalProduction(allGroupPlanInfo);
+        if (!CollectionUtils.isEmpty(groupSortList)) {
+            groupSortList.forEach(groupPlan -> productionGroupAddSku(productionContext, allGroupPlanInfo, groupPlan, FormalRoundEnum.FIRST_HALF_PRIORITY, ""));
+        }
+        //6、按结构优先级、后段排产--新的排序
+        List<ProductionPlanGroupInfo> newGroupSortList = groupPlanPrioritySelector.sortGroupByFormalProduction(allGroupPlanInfo);
+        if (!CollectionUtils.isEmpty(newGroupSortList)) {
+            newGroupSortList.forEach(groupPlan -> productionGroupAddSku(productionContext, allGroupPlanInfo, groupPlan, FormalRoundEnum.LATTER_HALF_PRIORITY, ""));
+        }
+    }
+
+    /**
+     * 排产结果后，设置未排原因
+     *
+     * @param productionContext 排产上下文
+     * @param allGroupPlanInfo  所有分组计划
+     * @param sumProductionMap  计划排产量
+     */
+    public void setNoProductionReasonAfterResult(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, Map<Long, Integer> sumProductionMap) {
+        //Sku排产限制情况
+        Map<String, List<MouldProductionLimitTypeEnum>> skuProductionLimitInfo = productionContext.getSkuProductionLimitInfo();
+        allGroupPlanInfo.forEach((structureName, groupPlan) -> {
+            if (CollectionUtils.isEmpty(groupPlan.getAllocationCxMachineCodeSet())) {
+                return;
+            }
+            List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlan.getGroupPlanData();
+            if (CollectionUtils.isEmpty(groupPlanData)) {
+                return;
+            }
+            groupPlanData.forEach(singlePlan -> {
+                if (singlePlan.getOriginProductionQty() <= BigDecimal.ZERO.intValue()) {
+                    return;
+                }
+                if (YesOrNoEnum.NO.getCode().equals(singlePlan.getIsProduction())) {
+                    return;
+                }
+                Integer realProductionQty = sumProductionMap.getOrDefault(singlePlan.getMonthPlanId(), BigDecimal.ZERO.intValue());
+                Integer diffValue = singlePlan.getFactProdReqQty() - realProductionQty;
+                if (diffValue <= BigDecimal.ZERO.intValue()) {
+                    return;
+                }
+                boolean hasMouldCapacity = SkuMouldSelector.hasMouldCapacity(productionContext, singlePlan.getMaterialDesc());
+                MonthPlanNoProductionReasonEnum defaultReason;
+                if (hasMouldCapacity) {
+                    defaultReason = MonthPlanNoProductionReasonEnum.NO_ENOUGH_CX_MACHINE_CAPACITY;
+                } else {
+                    defaultReason = MonthPlanNoProductionReasonEnum.NO_ENOUGH_MOULD_CAPACITY;
+                }
+                List<MouldProductionLimitTypeEnum> limitInfoList = skuProductionLimitInfo.get(singlePlan.getMaterialDesc());
+                //20260208 部分未排及不排判断
+                MonthPlanNoProductionReasonEnum generalNoProductionReason = MonthPlanNoProductionReasonEnum.GENERAL_NO_PRODUCTION_REASON;
+                if (realProductionQty > BigDecimal.ZERO.intValue()) {
+                    generalNoProductionReason = MonthPlanNoProductionReasonEnum.GENERAL_PART_NO_PRODUCTION_REASON;
+                }
+                String noProductionReason = NoProductionReasonUtils.getNoProductionReasonByLimit(generalNoProductionReason, limitInfoList, defaultReason);
+                singlePlan.singleAddNoProductionReason(noProductionReason);
+            });
+        });
+    }
+    /**
+     * @param context          排产上下文
+     * @param round            轮次
+     * @param allGroupPlanInfo 所有分组计划
+     * @param allContinueInfo  在机分组计划
+     */
+    private void reachGroupLhMachines(Context context, FormalRoundEnum round, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, Map<String, CxContinueInfoHelper> allContinueInfo) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        //1、在机机构新增Sku排产
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
             ProductionPlanGroupInfo groupPlan = allGroupPlanInfo.get(structureName);
             if (null == groupPlan) {
                 return;
             }
-            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupAddSkuLog(productionContext, structureName));
-            // 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
-            cxAddSkuProductionHandler.setRemainLhMachineCount(context, allGroupPlanInfo, structureName);
-            //4.1 初始日产能限制信息，用于统计使用
-            groupPlan.initMpDailyCapacityLimit(context);
-            //4.2 SKU排产
-            cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, ProductionStageEnum.FORMAL_STAGE, groupPlan, new HashSet<>());
-            //4.3 重新计算统计产能
-            groupPlan.reCalcMpDailyCapacityLimit(context);
+            productionGroupAddSku(productionContext, allGroupPlanInfo, groupPlan, round, "在机");
+
+//            TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupAddSkuLog(productionContext, structureName, round);
+//            // 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
+//            cxAddSkuProductionHandler.setRemainLhMachineCount(context, allGroupPlanInfo, structureName);
+//            //4.1 初始日产能限制信息，用于统计使用
+//            groupPlan.initMpDailyCapacityLimit(context);
+//            //4.2 SKU排产
+//            cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, ProductionStageEnum.FORMAL_STAGE, round, groupPlan, new HashSet<>());
+//            //4.3 重新计算统计产能
+//            groupPlan.reCalcMpDailyCapacityLimit(context);
         });
-        //5、非在机结构，新增规格排产
+        //2、非在机结构，新增规格排产
         allGroupPlanInfo.forEach((structureName, groupPlan) -> {
             if (allContinueInfo.containsKey(structureName)) {
                 return;
             }
-            log.info(TbrMouldFormalProductionLogRecorder.addProductionAddGroupSingleGroupLog(context, structureName));
-            // 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
-            cxAddSkuProductionHandler.setRemainLhMachineCount(context, allGroupPlanInfo, structureName);
-            //5.1 初始日产能限制信息，用于统计使用
-            groupPlan.initMpDailyCapacityLimit(context);
-            //5.2 SKU排产
-            cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, ProductionStageEnum.FORMAL_STAGE, groupPlan, new HashSet<>());
-            //5.3 重新计算统计产能
-            groupPlan.reCalcMpDailyCapacityLimit(context);
+            productionGroupAddSku(productionContext, allGroupPlanInfo, groupPlan, round, "新增");
+
+//            log.info(TbrMouldFormalProductionLogRecorder.addProductionAddGroupSingleGroupLog(context, structureName, round));
+//            // 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
+//            cxAddSkuProductionHandler.setRemainLhMachineCount(context, allGroupPlanInfo, structureName);
+//            //5.1 初始日产能限制信息，用于统计使用
+//            groupPlan.initMpDailyCapacityLimit(context);
+//            //5.2 SKU排产
+//            cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, ProductionStageEnum.FORMAL_STAGE, round, groupPlan, new HashSet<>());
+//            //5.3 重新计算统计产能
+//            groupPlan.reCalcMpDailyCapacityLimit(context);
         });
     }
-
 
     /**
      * 获取其他结构已使用的硫化机台数
@@ -161,52 +243,25 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
     }
 
     /**
-     * 排产结果后，设置未排原因
+     * 对分组计划进行新增Sku排产
      *
-     * @param productionContext 排产上下文
-     * @param allGroupPlanInfo  所有分组计划
-     * @param sumProductionMap  计划排产量
+     * @param context          排产上下文
+     * @param allGroupPlanInfo 所有分组计划
+     * @param groupPlan        当前排产的分组计划
+     * @param round            轮次
+     * @param desc             说明
      */
-    public void setNoProductionReasonAfterResult(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, Map<Long, Integer> sumProductionMap) {
-        //Sku排产限制情况
-        Map<String, List<MouldProductionLimitTypeEnum>> skuProductionLimitInfo = productionContext.getSkuProductionLimitInfo();
-        allGroupPlanInfo.forEach((structureName, groupPlan) -> {
-            if (CollectionUtils.isEmpty(groupPlan.getAllocationCxMachineCodeSet())) {
-                return;
-            }
-            List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlan.getGroupPlanData();
-            if (CollectionUtils.isEmpty(groupPlanData)) {
-                return;
-            }
-            groupPlanData.forEach(singlePlan -> {
-                if (singlePlan.getOriginProductionQty() <= BigDecimal.ZERO.intValue()) {
-                    return;
-                }
-                if (YesOrNoEnum.NO.getCode().equals(singlePlan.getIsProduction())) {
-                    return;
-                }
-                Integer realProductionQty = sumProductionMap.getOrDefault(singlePlan.getMonthPlanId(), BigDecimal.ZERO.intValue());
-                Integer diffValue = singlePlan.getFactProdReqQty() - realProductionQty;
-                if (diffValue <= BigDecimal.ZERO.intValue()) {
-                    return;
-                }
-                boolean hasMouldCapacity = SkuMouldSelector.hasMouldCapacity(productionContext, singlePlan.getMaterialDesc());
-                MonthPlanNoProductionReasonEnum defaultReason;
-                if (hasMouldCapacity) {
-                    defaultReason = MonthPlanNoProductionReasonEnum.NO_ENOUGH_CX_MACHINE_CAPACITY;
-                } else {
-                    defaultReason = MonthPlanNoProductionReasonEnum.NO_ENOUGH_MOULD_CAPACITY;
-                }
-                List<MouldProductionLimitTypeEnum> limitInfoList = skuProductionLimitInfo.get(singlePlan.getMaterialDesc());
-                //20260208 部分未排及不排判断
-                MonthPlanNoProductionReasonEnum generalNoProductionReason = MonthPlanNoProductionReasonEnum.GENERAL_NO_PRODUCTION_REASON;
-                if (realProductionQty > BigDecimal.ZERO.intValue()) {
-                    generalNoProductionReason = MonthPlanNoProductionReasonEnum.GENERAL_PART_NO_PRODUCTION_REASON;
-                }
-                String noProductionReason = NoProductionReasonUtils.getNoProductionReasonByLimit(generalNoProductionReason, limitInfoList, defaultReason);
-                singlePlan.singleAddNoProductionReason(noProductionReason);
-            });
-        });
+    private void productionGroupAddSku(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, ProductionPlanGroupInfo groupPlan, FormalRoundEnum round, String desc) {
+        String structureName = groupPlan.getGroupName();
+        TbrMouldFormalProductionLogRecorder.addProductionSingleGroupAddSkuLog(context, structureName, round, desc);
+        // 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
+        cxAddSkuProductionHandler.setRemainLhMachineCount(context, allGroupPlanInfo, structureName);
+        //4.1 初始日产能限制信息，用于统计使用
+        groupPlan.initMpDailyCapacityLimit(context);
+        //4.2 SKU排产
+        cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(context, ProductionStageEnum.FORMAL_STAGE, round, groupPlan, new HashSet<>());
+        //4.3 重新计算统计产能
+        groupPlan.reCalcMpDailyCapacityLimit(context);
     }
 
 }

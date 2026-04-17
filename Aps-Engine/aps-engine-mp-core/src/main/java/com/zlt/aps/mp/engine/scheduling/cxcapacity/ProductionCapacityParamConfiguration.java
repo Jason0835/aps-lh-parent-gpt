@@ -184,4 +184,8 @@ public class ProductionCapacityParamConfiguration {
      * 参与Sku排产竞争的优先级高的Sku列表个数
      */
     private Integer heightPrioritySkuPreCount;
+    /**
+     * 正式排产优先级排产分段日
+     */
+    private Integer formalFirstHalfDay;
 }

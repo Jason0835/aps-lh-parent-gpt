@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.google.common.collect.Lists;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
@@ -88,6 +89,40 @@ public class GroupPlanPrioritySelector {
             return getHeightPriorityGroupBySpecialMaterial(productionContext, excludeGroupPlan);
         }
         return selected;
+    }
+
+    /**
+     * 对需排产的分组计划，按优先级排序
+     * 结构优先 -> 高优先级量Sku个数多的优先 -> 需求量多的优先
+     *
+     * @param allGroupPlanInfo 所有分组计划
+     * @return
+     */
+    public List<ProductionPlanGroupInfo> sortGroupByFormalProduction(Map<String, ProductionPlanGroupInfo> allGroupPlanInfo) {
+        if (CollectionUtils.isEmpty(allGroupPlanInfo)) {
+            return Collections.emptyList();
+        }
+        List<ProductionPlanGroupInfo> effectiveList = Lists.newArrayList();
+        allGroupPlanInfo.forEach((structureName, groupPlan) -> {
+            List<MonthPlanProductionRequirePlanVo> groupPlanList = groupPlan.getGroupPlanData();
+            if (CollectionUtils.isEmpty(groupPlanList)) {
+                return;
+            }
+            List<MonthPlanProductionRequirePlanVo> effectiveGroupPlanList = groupPlanList.stream().filter(singlePlan -> singlePlan.hasProduction()).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(effectiveGroupPlanList)) {
+                return;
+            }
+            effectiveList.add(groupPlan);
+        });
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return Collections.emptyList();
+        }
+        //结构优先优先->高优先级量Sku个数多的优先->需求量多优先
+        Comparator sort = Comparator.comparing(ProductionPlanGroupInfo::isStructurePriority, Comparator.reverseOrder())
+                .thenComparing(ProductionPlanGroupInfo::getHeightPriorityCount, Comparator.reverseOrder())
+                .thenComparing(ProductionPlanGroupInfo::getAllDemandQty, Comparator.reverseOrder());
+        effectiveList.sort(sort);
+        return effectiveList;
     }
 
     /**

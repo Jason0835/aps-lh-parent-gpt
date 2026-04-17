@@ -45,11 +45,13 @@ public class OnLineGroupOnLineMachineHandler {
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
             productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SKU);
         });
-        //2、接着进行同规格同花纹的续作高优先级部分进行排产
+        //2、todo 不同结构共用模具-分配比例调整
+
+        //3、接着进行同规格同花纹的续作高优先级部分进行排产
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
             productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN);
         });
-        //3、接着进行共生胎，同模具的续作高优级部分进行排产
+        //4、接着进行共生胎，同模具的续作高优级部分进行排产
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
             productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD);
         });

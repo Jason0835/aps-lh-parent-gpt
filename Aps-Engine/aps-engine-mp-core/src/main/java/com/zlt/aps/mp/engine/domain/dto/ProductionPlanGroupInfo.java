@@ -15,6 +15,7 @@ import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
+import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.handler.ConclusionLhMachineHandler;
 import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
@@ -717,10 +718,11 @@ public class ProductionPlanGroupInfo {
      * 获取结构下，最早收尾的硫化信息
      *
      * @param context     排产上下文
+     * @param round       轮次
      * @param excludeDays 排除的收尾时间点
      * @return
      */
-    public EarliestConclusionLhGroupHelper getEarliestConclusionLhInfo(Context context, Set<Integer> excludeDays) {
+    public EarliestConclusionLhGroupHelper getEarliestConclusionLhInfo(Context context, FormalRoundEnum round, Set<Integer> excludeDays) {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
             return null;
         }
@@ -731,7 +733,7 @@ public class ProductionPlanGroupInfo {
             GroupPlanCxLhCapacityLimitHelper previousDayLimit = getPreviousDayInfo(dayLimit);
             //后一日排产情况
             GroupPlanCxLhCapacityLimitHelper nexDayLimit = getNextDayInfo(dayLimit);
-            return !dayLimit.isReachLimitByMouldNumber(context, previousDayLimit, nexDayLimit);
+            return !dayLimit.isReachLimitByMouldNumber(context, round, previousDayLimit, nexDayLimit);
         }).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasAddSkuList)) {
             return null;
@@ -1119,6 +1121,24 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 是否结构优先
+     * 只要有1个结构优先就是结构优先
+     * 1 结构优先 0 不是结构优先
+     *
+     * @return
+     */
+    public Integer isStructurePriority() {
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        boolean isStructurePriority = groupPlanData.stream().anyMatch(singlePlan -> YesOrNoEnum.YES.getCode().equals(singlePlan.getStructurePriority()));
+        if (isStructurePriority) {
+            return BigDecimal.ONE.intValue();
+        }
+        return BigDecimal.ZERO.intValue();
+    }
+
+    /**
      * 获取剩余排产中高优先级的SKU个数
      *
      * @return
@@ -1373,28 +1393,6 @@ public class ProductionPlanGroupInfo {
             dayLimitInfo.put(productionDay, dayLimit);
         });
         dayProductionLimitInfo = dayLimitInfo;
-//        //如果没有
-//        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
-//            dayProductionLimitInfo = dayLimitInfo;
-//            return;
-//        }
-//        dayLimitInfo.forEach((productionDay, dayLimit) -> {
-//            GroupPlanCxLhCapacityLimitHelper old = dayProductionLimitInfo.get(productionDay);
-//            if (null == old) {
-//                dayProductionLimitInfo.put(productionDay, dayLimit);
-//                return;
-//            }
-//            old.updateInfo(dayLimit);
-//        });
-//        //如果没有，则需要移除
-//        Set<Integer> removeDay = new HashSet<>();
-//        dayProductionLimitInfo.forEach((productionDay, dayLimit) -> {
-//            if (dayLimitInfo.containsKey(productionDay)) {
-//                return;
-//            }
-//            removeDay.add(productionDay);
-//        });
-//        dayProductionLimitInfo.keySet().removeIf(new ArrayList<>(removeDay)::contains);
     }
 
     /**

@@ -134,7 +134,7 @@ public class CxContinueProductionHandler {
         Set<String> cxMachineCodeInfo = continueSkuMap.values().stream().collect(Collectors.toList()).get(BigDecimal.ZERO.intValue()).getOnLineCxMachineSet();
         String onLineMachineInfo = String.join(StringConstant.COMMA, cxMachineCodeInfo);
         //取得最早收尾的续作硫化组 getEarliestConclusionLhInfoByContinueSku
-        EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfo(context, excludeDaySet);
+        EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfo(context, null, excludeDaySet);
         if (null == earliestConclusionLhGroup) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueSkuNoLhGroupLog(context, productionStage, groupName, onLineMachineInfo, continueType));
