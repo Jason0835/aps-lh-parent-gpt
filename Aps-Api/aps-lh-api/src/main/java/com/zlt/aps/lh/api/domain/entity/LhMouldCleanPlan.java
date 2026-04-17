@@ -54,7 +54,7 @@ public class LhMouldCleanPlan extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "清洗时间")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    @Excel(name = "ui.data.column.mouldCleanPlan.cleanTime", width = 30, dateFormat = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.mouldCleanPlan.cleanTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ImportExcelValidated(required = true)
     @TableField(value = "CLEAN_TIME")
     private Date cleanTime;

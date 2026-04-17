@@ -111,6 +111,7 @@ public class LhMouldCleanPlanController extends AbstractDocBizController<LhMould
     protected List<LhMouldCleanPlan> listExportData(LhMouldCleanPlan obj) {
         QueryWrapper<LhMouldCleanPlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + getOrderBy());
         return lhMouldCleanPlanMapper.selectList(wrapper);
     }
 
