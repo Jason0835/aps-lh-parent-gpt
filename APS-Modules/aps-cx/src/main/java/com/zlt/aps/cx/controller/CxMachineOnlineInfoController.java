@@ -6,7 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common4ui.constant.UserConstants;
+
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.cx.mapper.CxMachineOnlineInfoMapper;
 import com.zlt.aps.cx.service.ICxMachineOnlineInfoService;
@@ -67,11 +67,11 @@ public class CxMachineOnlineInfoController extends AbstractDocBizController<CxMa
         return super.removeByIds(ids);
     }
 
-    @ApiOperation("\u6821\u9A8C\u552F\u4E00\u6027")
-    @PostMapping("/checkUnique")
-    public String checkUnique(@RequestBody CxMachineOnlineInfo entity) {
-        return UserConstants.UNIQUE;
-    }
+//    @ApiOperation("\u6821\u9A8C\u552F\u4E00\u6027")
+//    @PostMapping("/checkUnique")
+//    public String checkUnique(@RequestBody CxMachineOnlineInfo entity) {
+//        return UserConstants.UNIQUE;
+//    }
 
     @Log(title = "ui.data.column.cxMachineOnlineInfo.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")

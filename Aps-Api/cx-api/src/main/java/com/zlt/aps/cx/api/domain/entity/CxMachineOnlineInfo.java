@@ -2,12 +2,14 @@ package com.zlt.aps.cx.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
 import java.util.Date;
@@ -31,7 +33,10 @@ public class CxMachineOnlineInfo extends BaseEntity implements Serializable {
     private String factoryCode;
 
     @ApiModelProperty(value = "日期", name = "onlineDate")
-    @Excel(name = "ui.data.column.cxMachineOnlineInfo.onlineDate")
+    @Excel(name = "ui.data.column.cxMachineOnlineInfo.onlineDate",dateFormat = "yyyy-MM-dd")
+    @JsonFormat(
+            pattern = "yyyy-MM-dd"
+    )
     @TableField(value = "ONLINE_DATE")
     private Date onlineDate;
 
@@ -46,22 +51,22 @@ public class CxMachineOnlineInfo extends BaseEntity implements Serializable {
     private String materialCode;
 
     @ApiModelProperty(value = "在机物料编码（MES）", name = "mesMaterialCode")
-    @Excel(name = "ui.data.column.cxMachineOnlineInfo.mesMaterialCode")
+    @Excel(name = "ui.data.column.cxMachineOnlineInfo.mesMaterialCode",width = 20)
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
 
     @ApiModelProperty(value = "在机物料描述", name = "specDesc")
-    @Excel(name = "ui.data.column.cxMachineOnlineInfo.specDesc")
+    @Excel(name = "ui.data.column.cxMachineOnlineInfo.specDesc",width = 50)
     @TableField(value = "SPEC_DESC")
     private String specDesc;
 
     @ApiModelProperty(value = "在机胎胚描述", name = "embryoSpec")
-    @Excel(name = "ui.data.column.cxMachineOnlineInfo.embryoSpec")
+    @Excel(name = "ui.data.column.cxMachineOnlineInfo.embryoSpec",width = 50)
     @TableField(value = "EMBRYO_SPEC")
     private String embryoSpec;
 
     @ApiModelProperty(value = "版本号", name = "dataVersion")
-    @Excel(name = "ui.data.column.cxMachineOnlineInfo.dataVersion")
+//    @Excel(name = "ui.data.column.cxMachineOnlineInfo.dataVersion")
     @TableField(value = "DATA_VERSION")
     private String dataVersion;
 
