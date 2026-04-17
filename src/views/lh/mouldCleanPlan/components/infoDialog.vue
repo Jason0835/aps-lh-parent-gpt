@@ -160,7 +160,7 @@ export default {
           cleanTime: params.cleanTime,
           cleanType: params.cleanType,
           leftRightMould: params.leftRightMould,
-          remark: params.remark,
+          remark: encodeURIComponent(params.remark),
           dataSource: params.dataSource,
           dataVersion: params.dataVersion
         };

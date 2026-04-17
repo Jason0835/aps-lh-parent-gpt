@@ -2211,7 +2211,7 @@
   "ui.data.column.mouldCleanPlan.operTime": "上机时间",
   "ui.data.column.mouldCleanPlan.firstWashTime": "首次清洗时间",
   "ui.data.column.mouldCleanPlan.secondWashTime": "二次清洗时间",
-  "ui.data.column.mouldCleanPlan.cleanTime": "清洗日期",
+  "ui.data.column.mouldCleanPlan.cleanTime": "清洗时间",
   "ui.data.column.mouldCleanPlan.cleanType": "清洗类型",
   "ui.data.column.mouldCleanPlan.dataSource": "数据来源",
   "ui.data.column.mouldCleanPlan.remark": "备注",
