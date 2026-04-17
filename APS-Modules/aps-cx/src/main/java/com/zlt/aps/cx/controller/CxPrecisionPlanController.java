@@ -1,15 +1,17 @@
 package com.zlt.aps.cx.controller;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.cx.api.domain.entity.CxMachineInfo;
 import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.mapper.CxPrecisionPlanMapper;
-import com.zlt.aps.cx.service.ICxPrecisionPlanAutoCalculateService;
 import com.zlt.aps.cx.service.ICxPrecisionPlanService;
+import com.zlt.aps.lh.api.domain.entity.LhChipStock;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -22,22 +24,9 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
-/**
- * Copyright (c) 2022, All rights reserved。
- * 文件名称：CxPrecisionPlanController.java
- * 描    述：成型精度计划管理 控制层类
- *
- * @author APS Team
- * @version 1.0
- * <p>
- * 修改记录：
- * 修改时间：...
- * 修 改 人：...
- * 修改内容：...
- * @date 2026-04-03
- */
 @Slf4j
 @Api(tags = "成型精度计划管理")
 @RestController
@@ -47,25 +36,27 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
     @Autowired
     private ICxPrecisionPlanService cxPrecisionPlanService;
 
-    @Autowired
-    private ICxPrecisionPlanAutoCalculateService cxPrecisionPlanAutoCalculateService;
-
     @Resource
     private CxPrecisionPlanMapper cxPrecisionPlanMapper;
 
-    /**
-     * 查询成型精度计划列表
-     */
+
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody CxPrecisionPlan queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableDataInfo =  super.list(queryVO);
+        List<CxPrecisionPlan> list = (List<CxPrecisionPlan>) tableDataInfo.getRows();
+        formateCxPrecisionPlanList(list);
+        return tableDataInfo;
     }
 
-    /**
-     * 保存
-     */
+    private void formateCxPrecisionPlanList(List<CxPrecisionPlan> list) {
+        for (CxPrecisionPlan cxPrecisionPlan : list) {
+            Long diffDay = DateUtil.betweenDay(DateUtil.date(), cxPrecisionPlan.getPlanDate(), true);
+            cxPrecisionPlan.setDaysToDue(diffDay);
+        }
+    }
+
     @Log(title = "ui.data.column.cxPrecisionPlan.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("保存")
     @PostMapping("/save")
@@ -74,9 +65,6 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
         return super.save(entity);
     }
 
-    /**
-     * 删除成型精度计划
-     */
     @Log(title = "ui.data.column.cxPrecisionPlan.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
     @DeleteMapping("/remove")
@@ -85,24 +73,18 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
         return super.removeByIds(ids);
     }
 
-    /**
-     * 获取成型精度计划详细信息
-     */
-    @ApiOperation("获取详细信息")
+    @ApiOperation("获取详情信息")
     @GetMapping(value = "/{billId}")
     @Override
     public CxPrecisionPlan getInfo(@PathVariable("billId") Long billId) {
-        return super.getInfo(billId);
+        CxPrecisionPlan plan = super.getInfo(billId);
+        if(plan != null){
+            formateCxPrecisionPlanList(Collections.singletonList(plan));
+        }
+        return plan;
+
     }
 
-
-    /**
-     * 根据集合导入成型库存数据
-     *
-     * @param importContext 导入上下文
-     * @param updateSupport 已存在记录是否更新
-     * @return 结果
-     */
     @Log(title = "ui.data.column.cxStock.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
@@ -111,9 +93,6 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
         return super.importData(importContext, updateSupport);
     }
 
-    /**
-     * 导出来型精度计划列表
-     */
     @Log(title = "ui.data.column.cxPrecisionPlan.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
@@ -123,9 +102,6 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
         return super.exportData(queryVO, fileName, response);
     }
 
-    /**
-     * 校验唯一性
-     */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     public String checkUnique(@RequestBody CxPrecisionPlan entity) {
@@ -136,7 +112,9 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
     protected List<CxPrecisionPlan> listExportData(CxPrecisionPlan obj) {
         QueryWrapper<CxPrecisionPlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return cxPrecisionPlanMapper.selectList(wrapper);
+        List<CxPrecisionPlan> planList = cxPrecisionPlanMapper.selectList(wrapper);
+        formateCxPrecisionPlanList(planList);
+        return planList;
     }
 
     @Override
@@ -146,16 +124,27 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
 
     @Override
     protected void builderCondition(QueryWrapper<CxPrecisionPlan> queryWrapper, CxPrecisionPlan queryVO) {
-        // 工厂编码精确查询
+        queryWrapper.eq("IS_DELETE", 0);
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
-        // 机台名称模糊查询
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMachineName()), "MACHINE_NAME", queryVO.getMachineName());
-        // 计划日期区间查询
-        if (PubUtil.isNotEmpty(queryVO.getPlanDateBegin()) && PubUtil.isNotEmpty(queryVO.getPlanDateEnd())) {
-            queryWrapper.between("PLAN_DATE", queryVO.getPlanDateBegin(), queryVO.getPlanDateEnd());
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getPrecisionType()), "PRECISION_TYPE", queryVO.getPrecisionType());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getCompletionStatus()), "COMPLETION_STATUS", queryVO.getCompletionStatus());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getWarningStatus()), "WARNING_STATUS", queryVO.getWarningStatus());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getDataSource()), "DATA_SOURCE", queryVO.getDataSource());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getCompanyCode()), "COMPANY_CODE", queryVO.getCompanyCode());
+
+        if (queryVO.getPlanDateStart() != null) {
+            queryWrapper.ge("PLAN_DATE", queryVO.getPlanDateStart());
         }
-        // 其他精确查询条件
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
+        if (queryVO.getPlanDateEnd() != null) {
+            queryWrapper.le("PLAN_DATE", queryVO.getPlanDateEnd());
+        }
+        if (queryVO.getActualDateStart() != null) {
+            queryWrapper.ge("ACTUAL_DATE", queryVO.getActualDateStart());
+        }
+        if (queryVO.getActualDateEnd() != null) {
+            queryWrapper.le("ACTUAL_DATE", queryVO.getActualDateEnd());
+        }
     }
 
     @Override
@@ -165,12 +154,9 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
 
     @Override
     protected String getOrderBy() {
-        return "plan_date desc, factory_code asc, machine_code asc";
+        return "PLAN_DATE desc, ID desc";
     }
 
-    /**
-     * 从MES同步数据生成成型精度初版计划
-     */
     @ApiOperation("从MES同步数据生成成型精度初版计划")
     @PostMapping("/generateFromMes")
     public AjaxResult generatePlansFromMes(@RequestParam(value = "year", required = false) Integer year) {
@@ -183,9 +169,6 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
         }
     }
 
-    /**
-     * 自动生成年度成型精度计划
-     */
     @ApiOperation("自动生成年度成型精度计划")
     @PostMapping("/autoGenerateYearly")
     public AjaxResult autoGenerateYearlyPlans(@RequestParam("year") Integer year) {
@@ -198,9 +181,18 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
         }
     }
 
-    /**
-     * 批量更新到期天数
-     */
+    @ApiOperation("执行30天预警检查")
+    @PostMapping("/checkWarning")
+    public AjaxResult checkWarning() {
+        try {
+            int count = cxPrecisionPlanService.checkWarning();
+            return AjaxResult.success("预警检查完成", count);
+        } catch (Exception e) {
+            log.error("执行30天预警检查失败", e);
+            return AjaxResult.error("预警检查失败：" + e.getMessage());
+        }
+    }
+
     @ApiOperation("批量更新到期天数")
     @PostMapping("/batchUpdateDaysToDue")
     public AjaxResult batchUpdateDaysToDue() {
@@ -213,9 +205,6 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
         }
     }
 
-    /**
-     * MES回传实际完成时间
-     */
     @ApiOperation("MES回传实际完成时间")
     @PostMapping("/updateActualDate")
     public AjaxResult updateActualDate(@RequestParam("mesSourceId") Long mesSourceId,
@@ -229,31 +218,4 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
         }
     }
 
-    /**
-     * 自动推算成型精度计划（15天周期）
-     */
-    @ApiOperation("自动推算成型精度计划（15天周期）")
-    @PostMapping("/autoCalculateCx15Days")
-    public AjaxResult autoCalculateCxPrecisionPlan15Days(@RequestParam("year") Integer year) {
-        return cxPrecisionPlanAutoCalculateService.autoCalculateCxPrecisionPlan15Days(year);
-    }
-
-    /**
-     * 自动推算成型精度计划（60天周期）
-     */
-    @ApiOperation("自动推算成型精度计划（60天周期）")
-    @PostMapping("/autoCalculateCx60Days")
-    public AjaxResult autoCalculateCxPrecisionPlan60Days(@RequestParam("year") Integer year) {
-        return cxPrecisionPlanAutoCalculateService.autoCalculateCxPrecisionPlan60Days(year);
-    }
-
-    /**
-     * 根据设备保养计划生成并推算成型精度计划
-     */
-    @ApiOperation("根据设备保养计划生成并推算成型精度计划")
-    @PostMapping("/generateFromMaintenance")
-    public AjaxResult generateFromMaintenancePlan(@RequestBody List<Long> maintenancePlanIds,
-                                                   @RequestParam("cycleDays") Integer cycleDays) {
-        return cxPrecisionPlanAutoCalculateService.generateFromMaintenancePlanByIds(maintenancePlanIds, cycleDays);
-    }
 }
