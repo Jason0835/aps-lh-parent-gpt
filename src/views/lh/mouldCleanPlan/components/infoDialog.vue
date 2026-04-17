@@ -221,9 +221,3 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
-::v-deep .el-textarea__inner {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-}
-</style>
-
