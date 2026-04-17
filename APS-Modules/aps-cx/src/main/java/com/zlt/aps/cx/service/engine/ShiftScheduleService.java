@@ -1095,6 +1095,11 @@ public class ShiftScheduleService {
 
     /**
      * 计算班次精度计划扣减产能
+     * 
+     * 根据精度计划的 precisionCycle（15/60分钟）和 completionStatus 判断：
+     * - 未完成（completionStatus=0）的精度计划才扣减产能
+     * - 精度计划不区分班次，当天有未完成计划即影响全天产能
+     * - 按 precisionCycle 计算扣减时长
      */
     private int calculateShiftPrecisionDeduction(
             String machineCode,
@@ -1108,11 +1113,27 @@ public class ShiftScheduleService {
 
         for (CxPrecisionPlan plan : context.getPrecisionPlans()) {
             if (machineCode.equals(plan.getMachineCode())) {
-                if (shiftConfig.getShiftCode().equals(plan.getPlanShift())) {
-                    int precisionHours = plan.getEstimatedHours() != null
-                            ? plan.getEstimatedHours().intValue() : DEFAULT_PRECISION_HOURS;
-                    return precisionHours * hourlyCapacity;
+                // 只扣减未完成的精度计划（completionStatus=0）
+                if ("1".equals(plan.getCompletionStatus())) {
+                    continue;
                 }
+                
+                // 根据 precisionCycle 计算扣减时长
+                // precisionCycle: 15=15分钟, 60=60分钟
+                int precisionMinutes = 60; // 默认60分钟
+                if ("15".equals(plan.getPrecisionCycle())) {
+                    precisionMinutes = 15;
+                } else if ("60".equals(plan.getPrecisionCycle())) {
+                    precisionMinutes = 60;
+                }
+                
+                // 精度时长(小时) × 机台小时产能
+                int precisionHours = (int) Math.ceil(precisionMinutes / 60.0);
+                // 至少扣减4小时（精度校验标准时长）
+                if (precisionHours < 4) {
+                    precisionHours = 4;
+                }
+                return precisionHours * hourlyCapacity;
             }
         }
 
