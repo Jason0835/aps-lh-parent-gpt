@@ -45,6 +45,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -227,78 +229,134 @@ public class MpWeekRollAdjustController extends BaseController {
         MpRollAdjustContextDTO contextDTO = BeanUtil.copyProperties(weekRollAdjustDTO, MpRollAdjustContextDTO.class);
         return contextDTO;
     }
-        /**
-         * 构建自动调整上下文对象
-         * @param weekRollAdjustDTO
-         * @return
-         */
+
+    /**
+     * 构建自动调整上下文对象（并行优化版）
+     * <p>将互不依赖的数据查询拆分为三个阶段：
+     * <ul>
+     *   <li>阶段1（串行）：initVersion，获取 productionVersion/productType 供后续查询使用</li>
+     *   <li>阶段2（并行）：11个独立查询同时发起，等待全部完成</li>
+     *   <li>阶段3（串行）：依赖阶段2结果的后续初始化</li>
+     * </ul>
+     * </p>
+     * @param weekRollAdjustDTO 请求参数
+     * @param weekAdjustStrategy 周程滚动调整策略
+     * @return 上下文对象
+     */
     private MpRollAdjustContextDTO buildAutoAdjustContext(MpWeekRollAdjustDTO weekRollAdjustDTO, IMpWeekAdjustService weekAdjustStrategy) {
+        Date startTime = new Date();
+        log.debug(String.format("自动调整初始化,开始时间:%s", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, startTime)));
         MpRollAdjustContextDTO contextDTO = BeanUtil.copyProperties(weekRollAdjustDTO, MpRollAdjustContextDTO.class);
-        //1.初始定稿版本信息
+
+        // ===== 阶段1（串行）：初始定稿版本信息，后续查询依赖 productionVersion / productType =====
         weekAdjustStrategy.initVersion(contextDTO);
-        //2.月计划定稿数据空检查
-        if (PubUtil.isEmpty(contextDTO.getFactoryProductionVersionList())){
+        if (PubUtil.isEmpty(contextDTO.getFactoryProductionVersionList())) {
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecordNotFound"),
-                    contextDTO.getMpYear(),contextDTO.getMpMonth()));
+                    contextDTO.getMpYear(), contextDTO.getMpMonth()));
         }
         MpFactoryProductionVersion firstVersion = contextDTO.getFactoryProductionVersionList().get(0);
         contextDTO.setMonthPlanVersion(firstVersion.getMonthPlanVersion());
         contextDTO.setProductType(firstVersion.getProductTypeCode());
         contextDTO.setProductionVersion(firstVersion.getProductionVersion());
 
-        contextDTO.setFactoryMonthPlanProdFinalList(mpAdjustStructureInService.selectMpFinalList(contextDTO));
+        // ===== 阶段2（并行）：各独立查询并发执行，互不依赖 =====
+        // 2.1 月定稿数据
+        CompletableFuture<Void> finalListFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setFactoryMonthPlanProdFinalList(mpAdjustStructureInService.selectMpFinalList(contextDTO)));
+        // 2.2 结构转产列表
+        CompletableFuture<Void> structureAllocationFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setStructureAllocationList(mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO)));
+        // 2.3 周程滚动参数
+        CompletableFuture<Void> paramMapFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), contextDTO.getProductType())));
+        // 2.4 结构硫化配比
+        CompletableFuture<Void> structureLhRatioFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setStructureLhRatio(mpAdjustStructureInService.getStructureLhRatio(contextDTO)));
+        // 2.5 工作日历
+        CompletableFuture<Void> workCalendarFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setWorkCalendarMap(mpAdjustStructureInService.getWorkCalendarMap(contextDTO)));
+        // 2.6 周期结构最低硫化机台数
+        CompletableFuture<Void> cycleStructureMinFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setCycleStructureMinLhMachinesMap(mpAdjustStructureInService.getCycleStructureMinMachinesMap(contextDTO)));
+        // 2.7 型腔与活块数量
+        CompletableFuture<Void> cavityBlockFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO)));
+        // 2.8 总硫化机台数
+        CompletableFuture<Void> lhMachineCountFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setTotalLhMachines(mpAdjustStructureInService.getLhMachineCount(contextDTO)));
+        // 2.9 结构统计
+        CompletableFuture<Void> structureStatisticFuture = CompletableFuture.runAsync(
+                () -> contextDTO.setStructureStatisticMap(mpAdjustStructureInService.loadMpMonthPlanStatistics(contextDTO)));
+        // 2.10 消息模板（内部含2个远程调用，也并行处理）
+        CompletableFuture<Void> msgTemplateFuture = CompletableFuture.runAsync(
+                () -> initMsgTemplate(contextDTO));
+        // 2.11 工厂名称
+        CompletableFuture<Void> factoryNameFuture = CompletableFuture.runAsync(() -> {
+            List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
+            String factoryName = dictDataList.stream()
+                    .filter(dictData -> dictData.getDictValue().equals(contextDTO.getFactoryCode()))
+                    .findFirst().get().getDictLabel();
+            contextDTO.setFactoryName(factoryName);
+        });
 
-        contextDTO.setStructureAllocationList(mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO));
-        contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(),contextDTO.getProductType()));
-        //设置调整日
+        try {
+            CompletableFuture.allOf(
+                    finalListFuture, structureAllocationFuture, paramMapFuture,
+                    structureLhRatioFuture, workCalendarFuture, cycleStructureMinFuture,
+                    cavityBlockFuture, lhMachineCountFuture, structureStatisticFuture,
+                    msgTemplateFuture, factoryNameFuture
+            ).join();
+            log.debug("自动调整初始化,并行数据查询全部完成");
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause();
+            log.error("自动调整初始化,并行数据查询失败! 原因:{}", cause.getMessage(), cause);
+            if (cause instanceof BusinessException) {
+                throw (BusinessException) cause;
+            }
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.initDataFailure"), cause);
+        }
+
+        // ===== 阶段3（串行）：依赖阶段2结果的后续初始化 =====
+        // 设置调整日（依赖 paramMap）
         setAdjustDate(contextDTO);
         contextDTO.setVersion(weekRollAdjustDTO.getVersion());
         contextDTO.setAdjustType(weekRollAdjustDTO.getAdjustType());
-        
-        //结构硫化配比
-        contextDTO.setStructureLhRatio(mpAdjustStructureInService.getStructureLhRatio(contextDTO));
-
-        //初始工作日历
-        contextDTO.setWorkCalendarMap(mpAdjustStructureInService.getWorkCalendarMap(contextDTO));
-        //周期结构最低硫化机台数
-        contextDTO.setCycleStructureMinLhMachinesMap(mpAdjustStructureInService.getCycleStructureMinMachinesMap(contextDTO));
-        //初始型腔与活块数量
-        contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO));
-        //初始消息模板
-        initMsgTemplate(contextDTO);
-        //初始调整过程日志
+        // 初始调整过程日志
         contextDTO.setAdjustProcLogList(new ArrayList<>());
-        //初始工厂名称
-        List<SysDictData> dictDataList = iSysDictDataCacheService.getType("biz_factory_name");
-        String factoryName = dictDataList.stream().filter(dictData -> dictData.getDictValue().equals(contextDTO.getFactoryCode())).findFirst().get().getDictLabel();
-        contextDTO.setFactoryName(factoryName);
-        //初始总的硫化机台数
-        contextDTO.setTotalLhMachines(mpAdjustStructureInService.getLhMachineCount(contextDTO));
-        //设置OEM配置集合
+        // 设置OEM配置集合（依赖 paramMap）
         initOemParam(contextDTO);
-        //设置结构统计
-        contextDTO.setStructureStatisticMap(mpAdjustStructureInService.loadMpMonthPlanStatistics(contextDTO));
-
-        // 加载搭配排产的必要基础数据
+        // 加载搭配排产的必要基础数据（依赖以上所有数据）
         matchingAdjuestProductionHandler.initAdjustContextDTO(contextDTO);
+        Date endTime = new Date();
+        log.debug(String.format("自动调整初始化,结束时间:%s,总耗时:%s毫秒", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, endTime), DateUtils.getDiffMillTime(startTime, endTime)));
         return contextDTO;
     }
 
     /**
-     * 初始消息模板
+     * 初始消息模板（并行获取两个远程模板）
      * @param contextDTO
      */
     private void initMsgTemplate(MpRollAdjustContextDTO contextDTO) {
+        // 并行获取两个消息模板
+        CompletableFuture<MsgTemplate> remainQtyFuture = CompletableFuture.supplyAsync(
+                () -> templateRemoteService.getTemplateInfo(MsgTemplateEnums.MP_SKU_REMAIN_QTY_NO_FULL.getCode()));
+        CompletableFuture<MsgTemplate> preCloseFuture = CompletableFuture.supplyAsync(
+                () -> templateRemoteService.getTemplateInfo(MsgTemplateEnums.MP_STRUCTURE_ADJUST_PRE_CLOSE.getCode()));
+        try {
+            CompletableFuture.allOf(remainQtyFuture, preCloseFuture).join();
+        } catch (CompletionException e) {
+            log.warn("消息模板获取失败，将使用空模板继续执行. 原因:{}", e.getCause().getMessage());
+        }
         //1. SKU原余量小于调整次日至锁定截止日的计划量提醒
-        MsgTemplate msgTemplate = templateRemoteService.getTemplateInfo(MsgTemplateEnums.MP_SKU_REMAIN_QTY_NO_FULL.getCode());
-        if (msgTemplate != null){
-            contextDTO.setMsgTemplateWithRemainQtyNoFull(msgTemplate.getContent());
+        MsgTemplate remainQtyTemplate = remainQtyFuture.getNow(null);
+        if (remainQtyTemplate != null) {
+            contextDTO.setMsgTemplateWithRemainQtyNoFull(remainQtyTemplate.getContent());
         }
         contextDTO.setMsgRemainQtyNoFull(new StringBuilder());
         //2. 结构内调整减量提前收尾
-        msgTemplate = templateRemoteService.getTemplateInfo(MsgTemplateEnums.MP_STRUCTURE_ADJUST_PRE_CLOSE.getCode());
-        if (msgTemplate != null){
-            contextDTO.setMsgTemplateWithStructureAdjustPreClose(msgTemplate.getContent());
+        MsgTemplate preCloseTemplate = preCloseFuture.getNow(null);
+        if (preCloseTemplate != null) {
+            contextDTO.setMsgTemplateWithStructureAdjustPreClose(preCloseTemplate.getContent());
         }
         contextDTO.setMsgStructureAdjustPreClose(new StringBuilder());
     }

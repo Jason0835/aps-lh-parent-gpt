@@ -5,6 +5,26 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 <mapper namespace="com.zlt.aps.mp.adjust.mapper.MpAdjustStructureInEntityMapper">
 
 
+    <update id="updateActualAdjustQtyBatch">
+        UPDATE T_MP_ADJUST_STRUCTURE_IN
+        SET ACTUAL_ADJUST_QTY = CASE
+            <foreach collection="materialStageMap" item="qty" index="key">
+                WHEN MATERIAL_CODE = SUBSTRING_INDEX(#{key}, '|', 1)
+                     AND CONSTRUCTION_STAGE = SUBSTRING_INDEX(#{key}, '|', -1)
+                THEN #{qty}
+            </foreach>
+            ELSE ACTUAL_ADJUST_QTY
+        END
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND YEAR = #{year}
+          AND MONTH = #{month}
+          AND VERSION = #{version}
+          AND (MATERIAL_CODE, CONSTRUCTION_STAGE) IN
+        <foreach collection="materialStageMap" index="key" item="qty" open="(" separator="," close=")">
+            (SUBSTRING_INDEX(#{key}, '|', 1), SUBSTRING_INDEX(#{key}, '|', -1))
+        </foreach>
+    </update>
+
     <select id="getVersionList" resultType="com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn">
         SELECT DISTINCT
         VERSION

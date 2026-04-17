@@ -3,8 +3,10 @@ package com.zlt.aps.mp.adjust.mapper;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -29,5 +31,19 @@ public interface MpAdjustStructureInEntityMapper extends CommBaseMapper<MpAdjust
      */
     List<MpAdjustStructureIn> getVersionList(MpAdjustStructureIn queryVO);
 
+    /**
+     * 按物料编码+施工阶段批量更新实际调整量（无需先查询，直接按条件 UPDATE）
+     *
+     * @param factoryCode        工厂编号
+     * @param year               年份
+     * @param month              月份
+     * @param version            调整版本
+     * @param materialStageMap   "物料编码|施工阶段" -> 实际调整量 映射
+     */
+    void updateActualAdjustQtyBatch(@Param("factoryCode") String factoryCode,
+                                    @Param("year") Integer year,
+                                    @Param("month") Integer month,
+                                    @Param("version") String version,
+                                    @Param("materialStageMap") Map<String, Integer> materialStageMap);
 
 }

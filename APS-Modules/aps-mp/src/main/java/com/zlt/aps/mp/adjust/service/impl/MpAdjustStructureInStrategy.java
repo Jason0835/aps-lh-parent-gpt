@@ -325,32 +325,28 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
      */
     @Override
     protected void backfillRealAdjustResult(MpRollAdjustContextDTO contextDTO) {
-        // 重新获取调整记录，避免过程中浅拷贝导致数据被更新
-        List<MpAdjustStructureIn> mpAdjustStructureInList = mpAdjustStructureInService.selectMpAdjustStructureInList(contextDTO);
-        if (PubUtil.isEmpty(mpAdjustStructureInList)){
-            return;
-        }
         List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = contextDTO.getSaveMpProdFinalList();
         if (PubUtil.isEmpty(mpFinalAdjustList)){
             return;
         }
-        Map<String, FactoryMonthPlanFinalAdjustVo> mpFinalAdjustMap = mpFinalAdjustList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
-                Collectors.collectingAndThen(Collectors.toList(),m-> {
-                    return m.get(0);
-                })));
-        //更新实际调整量
-        FactoryMonthPlanFinalAdjustVo mpFinalVo;
-        for (MpAdjustStructureIn structureIn:mpAdjustStructureInList){
-            // 实际调整默认：0
-            if (structureIn.getActualAdjustQty() == null) {
-                structureIn.setActualAdjustQty(0);
-            }
-            mpFinalVo = mpFinalAdjustMap.get(structureIn.getMaterialCode());
-            if (mpFinalVo != null){
-                structureIn.setActualAdjustQty(Convert.toInt(mpFinalVo.getActualAdjustQty(), 0));
-            }
+        // 构建 "materialCode|constructionStage" -> actualAdjustQty 映射，直接执行 UPDATE，无需先查询
+        Map<String, Integer> materialStageMap = mpFinalAdjustList.stream()
+                .filter(item -> item.getMaterialCode() != null && item.getConstructionStage() != null)
+                .collect(Collectors.toMap(
+                        item -> item.getMaterialCode() + "|" + item.getConstructionStage(),
+                        item -> Convert.toInt(item.getActualAdjustQty(), 0),
+                        (existing, replacement) -> existing
+                ));
+        if (materialStageMap.isEmpty()) {
+            return;
         }
-        baseDao.updateBatch(mpAdjustStructureInList);
+        mpAdjustStructureInEntityMapper.updateActualAdjustQtyBatch(
+                contextDTO.getFactoryCode(),
+                contextDTO.getMpYear(),
+                contextDTO.getMpMonth(),
+                contextDTO.getVersion(),
+                materialStageMap
+        );
     }
 
 
