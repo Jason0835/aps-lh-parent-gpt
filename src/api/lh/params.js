@@ -12,7 +12,7 @@ export function editCuringParams(query) {
   return request({
     url: '/lh/lhParams/save',
     method: 'post',
-    params: query
+    data: query
   })
 }
 export function removeCuringParams(ids) {
