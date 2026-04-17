@@ -260,7 +260,11 @@ public enum MonthPlanEnums {
     /**
      * SYS0209005 参与排产的特殊原材料编码，多个以,分隔
      */
-    SPECIAL_MATERIAL_CODE("SYS0209005", "参与排产的特殊原材料编码，多个以,分隔");
+    SPECIAL_MATERIAL_CODE("SYS0209005", "参与排产的特殊原材料编码，多个以,分隔"),
+    /**
+     * SYS0209006 正式排产，结构优先级重新排序日
+     */
+    FORMAL_RESET_SORT_DAY("SYS0209006","正式排产，结构优先级重新排序日");
 
     private final String code;
     private final String name;
