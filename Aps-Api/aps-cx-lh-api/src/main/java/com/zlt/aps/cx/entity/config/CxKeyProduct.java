@@ -1,15 +1,18 @@
 package com.zlt.aps.cx.entity.config;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.aps.common.core.annotation.ImportValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.Date;
 
 /**
  * 关键产品配置实体
@@ -25,6 +28,12 @@ public class CxKeyProduct extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
+    @Excel(name = "ui.data.column.cxKeyProduct.structureName")
+    @ApiModelProperty(value = "结构名称")
+    @TableField("STRUCTURE_NAME")
+    @ImportValidated(maxLength = 100)
+    private String structureName;
+
     @Excel(name = "ui.data.column.cxKeyProduct.embryoCode")
     @ApiModelProperty(value = "胎胚编码")
     @TableField("EMBRYO_CODE")
@@ -37,14 +46,15 @@ public class CxKeyProduct extends BaseEntity {
     @ImportValidated(maxLength = 100)
     private String embryoDesc;
 
-    @Excel(name = "ui.data.column.cxKeyProduct.structureName")
-    @ApiModelProperty(value = "结构名称")
-    @TableField("STRUCTURE_NAME")
-    @ImportValidated(maxLength = 100)
-    private String structureName;
-
     @Excel(name = "ui.data.column.cxKeyProduct.isActive", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否启用：0-禁用 1-启用")
     @TableField("IS_ACTIVE")
     private Integer isActive;
+
+    @ApiModelProperty(value = "更新时间")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @Excel(name = "ui.data.column.cxKeyProduct.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @TableField(value = "UPDATE_TIME")
+    private Date updateTime;
 }
