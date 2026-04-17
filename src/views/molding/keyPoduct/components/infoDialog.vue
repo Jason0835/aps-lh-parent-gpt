@@ -62,20 +62,6 @@ export default {
             trigger: "blur",
           },
         ],
-        closeOutRangeMaximum: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
-        rangeValue: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
       },
       columns: [
       {
