@@ -26,8 +26,8 @@ export function editMoldingParams(data) {
 export function removeMoldingParams(ids) {
   return request({
     url: '/cx/cxKeyProduct/remove',
-    method: 'delete',
-    data: ids
+    method: 'post',
+    params: { ids: ids }
   })
 }
 
