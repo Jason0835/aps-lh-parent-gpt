@@ -173,7 +173,7 @@ export default {
         };
         const checkRes = await checkUniqueCxKeyProduct(checkData);
         if (checkRes.data && checkRes.data.exist) {
-          this.$modal.msgError("结构加胎胚代码已存在");
+          this.$modal.msgError(this.$t("ui.data.alert.cxKeyProduct.notUnique"));
           return;
         }
         this.save(params);

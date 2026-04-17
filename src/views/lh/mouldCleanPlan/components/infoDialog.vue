@@ -150,6 +150,29 @@ export default {
         this.loadMachineList();
       }
     },
+    // 对备注中的特殊字符进行编码，避免后端 URLDecoder/HTML 转义解析失败
+    encodeRemark(remark) {
+      if (!remark) return remark;
+      // 将特殊字符替换为占位符，避免后端转义
+      return remark
+        .replace(/%/g, '__PERCENT__')
+        .replace(/&/g, '__AMP__')
+        .replace(/</g, '__LT__')
+        .replace(/>/g, '__GT__')
+        .replace(/"/g, '__QUOT__')
+        .replace(/'/g, '__APOS__');
+    },
+    // 解码备注中的占位符
+    decodeRemark(remark) {
+      if (!remark) return remark;
+      return remark
+        .replace(/__PERCENT__/g, '%')
+        .replace(/__AMP__/g, '&')
+        .replace(/__LT__/g, '<')
+        .replace(/__GT__/g, '>')
+        .replace(/__QUOT__/g, '"')
+        .replace(/__APOS__/g, "'");
+    },
     async save(params) {
       try {
         this.loading = true;
@@ -161,7 +184,7 @@ export default {
           cleanTime: params.cleanTime,
           cleanType: params.cleanType,
           leftRightMould: params.leftRightMould,
-          remark: encodeURIComponent(params.remark),
+          remark: this.encodeRemark(params.remark),
           dataSource: params.dataSource,
           dataVersion: params.dataVersion
         };
@@ -192,7 +215,12 @@ export default {
         console.log('=== 编辑模式 ===');
         console.log('原始数据:', JSON.stringify(data));
         console.log('原始数据ID:', data.id, '类型:', typeof data.id);
-        this.form = { ...data };
+        // 解码备注中的占位符
+        const decodedData = {
+          ...data,
+          remark: this.decodeRemark(data.remark)
+        };
+        this.form = decodedData;
         console.log('复制后form ID:', this.form.id, '类型:', typeof this.form.id);
         if (data.lhCode) {
           this.machineOptions = [

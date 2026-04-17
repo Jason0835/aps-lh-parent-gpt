@@ -137,7 +137,18 @@ export default {
         {
           prop: "remark",
           label: this.$t("ui.data.column.mouldCleanPlan.remark"),
-          showOverflowTooltip: true
+          showOverflowTooltip: true,
+          formatter: (row, column, value) => {
+            // 解码后端返回的占位符
+            if (!value) return value;
+            return value
+              .replace(/__PERCENT__/g, '%')
+              .replace(/__AMP__/g, '&')
+              .replace(/__LT__/g, '<')
+              .replace(/__GT__/g, '>')
+              .replace(/__QUOT__/g, '"')
+              .replace(/__APOS__/g, "'");
+          }
         },
         {
           prop: "updateTime",
