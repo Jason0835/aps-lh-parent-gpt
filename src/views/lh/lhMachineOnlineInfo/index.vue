@@ -1,24 +1,24 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="cxMachineOnlineInfoTable"
-      :calcHeight="true"
       v-loading="loading"
+      table-ref="lhMachineOnlineInfoTable"
+      :calc-height="true"
       :columns="columns"
-      :searchColumns="searchColumns"
+      :search-columns="searchColumns"
       :data="data"
       :page="page"
       :search="search"
+      :show-summary="false"
+      :select-area="false"
       @refresh="getList"
       @search="handleSearch"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
-      :showSummary="false"
-      :selectArea="false"
     >
       <template slot="header">
-        <el-button v-hasPermi="['cx:cxMachineOnlineInfo:export']" @click="handleExport">
-          {{ $t('ui.frame.btn.export') }}
+        <el-button v-hasPermi="['lh:lhMachineOnlineInfo:export']" @click="handleExport">
+          {{ $t("ui.frame.btn.export") }}
         </el-button>
       </template>
     </page-table>
@@ -26,57 +26,43 @@
 </template>
 
 <script>
+import { listLhMachineOnlineInfo } from '@/api/lh/lhMachineOnlineInfo'
 import { downloadLink } from '@/utils/request'
-import { listCxMachineOnlineInfo } from '@/api/cx/cxMachineOnlineInfo'
 
 export default {
-  name: 'CxMachineOnlineInfo',
+  name: 'LhMachineOnlineInfo',
   dicts: ['biz_factory_name'],
   provide() {
-    return { parentDict: this.dict }
+    return {
+      parentDict: this.dict
+    }
   },
   data() {
     return {
       loading: false,
       data: [],
-      page: { current: 1, pageSize: 20, total: 0 },
+      page: {
+        current: 1,
+        pageSize: 20,
+        total: 0
+      },
       sort: {},
-      search: { factoryCode: '116' },
-      query: { factoryCode: '116' }
+      search: {
+        factoryCode: '116'
+      },
+      query: {
+        factoryCode: '116'
+      }
     }
   },
   computed: {
-    searchColumns() {
-      return [
-        {
-          prop: 'factoryCode',
-          label: this.$t('ui.data.column.cxMachineOnlineInfo.factoryCode'),
-          type: 'select',
-          dictData: this.dict.type.biz_factory_name,
-          filterable: true,
-          clearable: true
-        },
-        {
-          prop: 'cxCode',
-          label: this.$t('ui.data.column.cxMachineOnlineInfo.cxCode'),
-          placeholder: this.$t('common.rule.input'),
-          type: 'input'
-        },
-        {
-          prop: 'onlineDate',
-          label: this.$t('ui.data.column.cxMachineOnlineInfo.onlineDate'),
-          type: 'date',
-          valueFormat: 'yyyy-MM-dd'
-        }
-      ]
-    },
     columns() {
       return [
         {
           prop: 'factoryCode',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxMachineOnlineInfo.factoryCode'),
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.factoryCode'),
           minWidth: 140,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value)
@@ -86,48 +72,44 @@ export default {
           prop: 'onlineDate',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxMachineOnlineInfo.onlineDate'),
-          minWidth: 100
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.onlineDate'),
+          minWidth: 140
         },
         {
-          prop: 'cxCode',
+          prop: 'lhCode',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxMachineOnlineInfo.cxCode'),
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.lhCode'),
           minWidth: 140
         },
         {
           prop: 'materialCode',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxMachineOnlineInfo.materialCode'),
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.materialCode'),
           minWidth: 160
         },
         {
           prop: 'mesMaterialCode',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxMachineOnlineInfo.mesMaterialCode'),
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.mesMaterialCode'),
           minWidth: 160
         },
         {
           prop: 'specDesc',
+          align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxMachineOnlineInfo.specDesc'),
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.specDesc'),
           minWidth: 180
         },
         {
-          prop: 'embryoSpec',
+          prop: 'lrMolds',
+          align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxMachineOnlineInfo.embryoSpec'),
-          minWidth: 180
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.lrMolds'),
+          minWidth: 160
         },
-        // {
-        //   prop: 'remark',
-        //   halign: 'center',
-        //   label: this.$t('ui.common.column.remark'),
-        //   minWidth: 160
-        // },
         {
           prop: 'updateTime',
           align: 'center',
@@ -136,20 +118,42 @@ export default {
           minWidth: 160
         }
       ]
+    },
+    searchColumns() {
+      return [
+        {
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.factoryCode'),
+          prop: 'factoryCode',
+          type: 'select',
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true
+        },
+        {
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.lhCode'),
+          prop: 'lhCode',
+          type: 'input'
+        },
+        {
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.onlineDate'),
+          prop: 'onlineDate',
+          type: 'date',
+          valueFormat: 'yyyy-MM-dd'
+        }
+      ]
     }
   },
+  mounted() {
+    this.getList()
+  },
   methods: {
-    handleExport() {
-      downloadLink('/cx/cxMachineOnlineInfo/export', this.formatParams(false))
-    },
     handleSearch(data) {
-      this.query = data
-      this.page.current = 1
+      this.query = { ...data }
+      this.$set(this.page, 'current', 1)
       this.getList()
     },
     handlePageChange(current, pageSize) {
-      this.page.current = current
-      this.page.pageSize = pageSize
+      this.$set(this.page, 'current', current)
+      this.$set(this.page, 'pageSize', pageSize)
       this.getList()
     },
     handleSortChange({ prop, order }) {
@@ -163,33 +167,38 @@ export default {
       }
       this.getList()
     },
+    handleExport() {
+      downloadLink('/lh/lhMachineOnlineInfo/export', this.formatParams(false))
+    },
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
         ...this.sort
       }
+
       if (hasPage) {
-        params.pageNum = this.page.current
         params.pageSize = this.page.pageSize
+        params.pageNum = this.page.current
       }
+
       return params
     },
     async getList() {
       try {
         this.loading = true
-        const res = await listCxMachineOnlineInfo(this.formatParams())
+        const params = this.formatParams()
+        const res = await listLhMachineOnlineInfo(params)
         this.data = res.rows || []
         this.page.total = res.total || 0
+      } catch (error) {
+        console.error(error)
       } finally {
         this.loading = false
       }
     }
-  },
-  activated() {
-    this.getList()
   }
 }
 </script>
 
-<style scoped>
-</style>
+<style lang="scss" scoped></style>
+
