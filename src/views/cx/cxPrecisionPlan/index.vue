@@ -122,13 +122,17 @@ export default {
         {
           prop: 'daysToDue',
           label: this.$t('ui.data.column.cxPrecisionPlan.dueDate'),
-          formatter: (row) => this.getDaysToDueValue(row.planDate)
+        },
+        {
+          prop: 'scheduleDate',
+          label: this.$t('ui.data.column.cxPrecisionPlan.scheduleDate')
         },
         {
           prop: 'dataSource',
           label: this.$t('ui.data.column.lhPrecisionPlan.dataSource'),
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.lh_precision_data_source, value)
         },
+
         { prop: 'remark', label: this.$t('ui.common.column.remark') },
         {
           align: 'center',

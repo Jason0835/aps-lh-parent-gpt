@@ -49,7 +49,7 @@ export function getMachineList(data) {
 
 export function listCxMachineInfo(data) {
   return request({
-    url: '/cx/machine/list2',
+    url: '/cx/cxPrecisionPlan/getMachineList',
     method: 'post',
     data
   })

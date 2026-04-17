@@ -61,11 +61,8 @@ export default {
         {
           prop: 'machineCode',
           label: this.$t('ui.data.column.cxPrecisionPlan.machineCode'),
-          type: 'select',
-          dictData: this.machineList,
-          props: { label: 'machineCode', value: 'machineCode' },
-          filterable: true,
-          required: true
+          type: 'input',
+          disabled: true
         },
         {
           prop: 'precisionType',
@@ -206,8 +203,7 @@ export default {
     async save(payload) {
       payload.dataSource = payload.dataSource || '1'
       payload.daysToDue = this.getDaysToDueValue(payload.planDate)
-      delete payload.precisionCycle
-      delete payload.scheduleDate
+      payload.precisionCycle = this.getCycleValue(payload.precisionType)
       const uniqueRes = await checkCxPrecisionPlanUnique(payload)
       if (uniqueRes === '1') {
         this.$modal.msgError(this.$t('ui.data.alert.cxPrecisionPlan.notUnique'))
