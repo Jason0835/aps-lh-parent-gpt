@@ -2052,6 +2052,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 //            }
             adjustDetail = adjustDetail == null ? new MpAdjustDetailVo() : adjustDetail;
 
+            // 如果是试制量试则跳过，不更新月计划
+            if (ConstructionStageEnum.MEASUREMENT.getStage().equals(adjustDetail.getConstructionStage()) ||
+                    ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(adjustDetail.getConstructionStage())) {
+                continue;
+            }
+
             // 更新1日至31日计划量
             for (int i = 1; i <= BusiConstant.WeekRollAdjust.MAX_DAY_OF_MONTH; i++) {
                 String dayFieldName = BusiConstant.WeekRollAdjust.FIELD_PREFIX_DAY + i;
@@ -3256,6 +3262,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         // 有月度生产计划时，赋值关联字段
         adjustDetailVo.setIsSkuAdd(ApsConstant.FALSE);
+        // 试制量试都设置为新增SKU
+        if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
+            adjustDetailVo.setIsSkuAdd(ApsConstant.TRUE);
+        }
         adjustDetailVo.setMesMaterialCode(monthPlan.getMesMaterialCode());
         adjustDetailVo.setMaterialDesc(monthPlan.getMaterialDesc());
         adjustDetailVo.setProductTypeCode(monthPlan.getProductTypeCode());
@@ -3939,8 +3949,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 continue;
             }
             String materialCode = adjust.getMaterialCode();
-            // 计算：day1~targetDay的累计值
-            Integer totalScheduledQty = calculateQty(planGroupMap, materialCode, maxDayOfMonth);
+            Integer totalScheduledQty = 0;
+            if (ApsConstant.FALSE.equals(adjust.getIsTrial())) {
+                // 计算：day1~targetDay的累计值
+                totalScheduledQty = calculateQty(planGroupMap, materialCode, maxDayOfMonth);
+            }
             // 获取已生产量（空值按0处理）
             List<MpMonthPlanMonitor> monthPlanMonitorList = MapUtils.getObject(monitorGroupMap, materialCode, new ArrayList<>());
             Integer productionQty = Convert.toInt(monthPlanMonitorList.stream()
