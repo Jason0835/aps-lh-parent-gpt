@@ -1439,29 +1439,28 @@ public class ScheduleServiceImpl implements ScheduleService {
         // 2. 过滤在机信息
         int originalOnlineCount = context.getOnlineInfos() != null ? context.getOnlineInfos().size() : 0;
         if (context.getOnlineInfos() != null) {
-            // 需要先将物料编码转换为胎胚编码
-            Map<String, String> materialToEmbryoMap = new HashMap<>();
+            // 构建已收尾的组合键集合：物料编码 + 胎胚描述
+            // 在机信息的key格式是：物料编码|胎胚描述，需要保持一致
+            Map<String, String> materialToEmbryoDescMap = new HashMap<>();
             if (context.getMaterials() != null) {
                 for (MdmMaterialInfo material : context.getMaterials()) {
-                    if (material.getMaterialCode() != null && material.getEmbryoCode() != null) {
-                        materialToEmbryoMap.put(material.getMaterialCode(), material.getEmbryoCode());
+                    if (material.getMaterialCode() != null && material.getEmbryoDesc() != null) {
+                        materialToEmbryoDescMap.put(material.getMaterialCode(), material.getEmbryoDesc());
                     }
                 }
             }
 
-            // 构建已收尾的组合键集合：物料编码 + 胎胚编码
-            // 用于过滤在机信息
             Set<String> completedKeys = new HashSet<>();
             for (String materialCode : completedMaterialCodes) {
-                String embryoCode = materialToEmbryoMap.get(materialCode);
-                if (materialCode != null && embryoCode != null) {
-                    completedKeys.add(materialCode + "|" + embryoCode);
+                String embryoDesc = materialToEmbryoDescMap.get(materialCode);
+                if (materialCode != null && embryoDesc != null) {
+                    completedKeys.add(materialCode + "|" + embryoDesc);
                 }
             }
 
             List<CxMachineOnlineInfo> filteredOnlineInfos = context.getOnlineInfos().stream()
                     .filter(info -> {
-                        // 使用物料编码 + 胎胚编码组合键
+                        // 使用物料编码 + 胎胚描述组合键（与completedKeys保持一致）
                         String materialCode = info.getMaterialCode();
                         String embryoSpec = info.getEmbryoSpec();
                         String combinedKey = materialCode + "|" + embryoSpec;
@@ -1480,16 +1479,26 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
 
         // 3. 重新构建机台在机胎胚映射（使用过滤后的在机信息）
-        // 使用物料编码 + 胎胚编码组合键
+        // machineOnlineEmbryoMap 存储格式：cxCode -> Set(物料编码|胎胚编码)
         if (context.getOnlineInfos() != null) {
+            // 先构建 materialCode -> embryoCode 的映射（用于在机信息）
+            Map<String, String> materialToEmbryoCodeMap = new HashMap<>();
+            if (context.getMaterials() != null) {
+                for (MdmMaterialInfo material : context.getMaterials()) {
+                    if (material.getMaterialCode() != null && material.getEmbryoCode() != null) {
+                        materialToEmbryoCodeMap.put(material.getMaterialCode(), material.getEmbryoCode());
+                    }
+                }
+            }
+
             Map<String, Set<String>> machineOnlineEmbryoMap = new HashMap<>();
             for (CxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
                 String cxCode = onlineInfo.getCxCode();
                 String materialCode = onlineInfo.getMaterialCode();
-                String embryoSpec = onlineInfo.getEmbryoSpec();
-                String combinedKey = materialCode + "|" + embryoSpec;
+                String embryoCode = materialToEmbryoCodeMap.get(materialCode);
+                String combinedKey = materialCode + "|" + embryoCode;
                 if (cxCode != null && combinedKey != null && !combinedKey.equals("|")) {
-                    machineOnlineEmbryoMap.computeIfAbsent(cxCode, k -> new HashSet<>()).add(combinedKey);
+                    machineOnlineEmbryoMap.computeIfAbsent(cxCode, k -> new HashSet<>()).add(embryoCode);
                 }
             }
             context.setMachineOnlineEmbryoMap(machineOnlineEmbryoMap);

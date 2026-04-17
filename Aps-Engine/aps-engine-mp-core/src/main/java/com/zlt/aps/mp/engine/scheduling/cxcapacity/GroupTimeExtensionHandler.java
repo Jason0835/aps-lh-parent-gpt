@@ -82,6 +82,7 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         String handlerKey = earliestConclusion.getTimeExtensionDayInfo(nextDay);
         if (handledDayInfo.contains(handlerKey)) {
             GroupTimeExtensionConclusionLogRecorder.addNoTimeExtensionConclusionHandlerLog(context, groupName, cxMachineCodeInfo);
+            timeExtensionOneDayConclusion(context, groupPlan, earliestConclusion, nextDay);
             return;
         }
         handledDayInfo.add(handlerKey);
@@ -139,6 +140,7 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         String handlerKey = allocationRange.getTimeExtensionDayInfo(nextDay);
         if (handledDayInfo.contains(handlerKey)) {
             GroupTimeExtensionConclusionLogRecorder.addNoTimeExtensionConclusionHandlerLog(context, groupName, cxMachineCodeInfo);
+            timeExtensionOneDayConclusionByNoOnLine(context, groupPlan, allocationRange, nextDay);
             return;
         }
         handledDayInfo.add(handlerKey);
