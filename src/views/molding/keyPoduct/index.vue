@@ -83,7 +83,24 @@ export default {
   data() {
     return {
       searchColumns: [
-
+        {
+          label: this.$t("结构"),
+          prop: "structureName",
+        },
+        {
+          label: this.$t("胎胚代码"),
+          prop: "embryoCode",
+        },
+        {
+          label: this.$t("胎胚描述"),
+          prop: "embryoDesc",
+        },
+        {
+          label: this.$t("是否启用"),
+          prop: "isActive",
+          type: "select",
+          dictData: this.dict.type.biz_yes_no,
+        },
       ],
       loading: false,
       data: [],
