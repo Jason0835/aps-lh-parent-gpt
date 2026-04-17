@@ -146,6 +146,12 @@ export default {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
         },
+        {
+          prop: "updateTime",
+          align: "center",
+          label: this.$t("ui.data.column.updateTime"),
+          minWidth: 160,
+        },
 
         {
           align: "center",
