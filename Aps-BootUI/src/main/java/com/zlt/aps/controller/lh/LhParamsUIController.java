@@ -7,7 +7,6 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.lh.api.domain.entity.LhParams;
 import com.zlt.aps.lh.api.service.ILhParamsRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -54,9 +53,6 @@ public class LhParamsUIController extends BaseUIController<LhParams> {
     @RequiresPermissions("lh:lhParams:edit")
     @ResponseBody
     public AjaxResult save(LhParams lhParams) {
-        if (lhParams.getFactoryCode() == null || lhParams.getFactoryCode().trim().isEmpty()) {
-            lhParams.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-        }
         return iLhParamsService.save(lhParams);
     }
 
