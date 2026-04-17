@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.GroupCapacityProductionLimitHelper;
@@ -256,6 +257,40 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
             Set<Integer> deductionDaySet = cxMachineInfo.getAllocationDaySet(singleAllocationInfo);
             groupPlanDeductionDayHandler.deductionMouldDayInfo(context, DeductionDayProductionTypeEnum.TIME_EXTENSION_REST, cxMachineInfo, groupPlan, singleAllocationInfo, dayProductionLimitInfo, deductionDaySet);
         });
+    }
+
+    /**
+     * 当nextDay已经处理过时，则取在此之前的最后一个日为其收尾日
+     *
+     * @param context
+     * @param groupPlan
+     * @param earliestConclusion
+     * @param handledDayInfo
+     * @param nextDay
+     */
+    private void handlerTimeExtensionDay(Context context, ProductionPlanGroupInfo groupPlan, CxMachineAllocationPlanHelper earliestConclusion, Set<String> handledDayInfo, Integer nextDay) {
+        String handlerKey = earliestConclusion.getTimeExtensionDayInfo(nextDay);
+        if (!handledDayInfo.contains(handlerKey)) {
+            return;
+        }
+        Integer earliestConclusionDay = earliestConclusion.getEndDay();
+        String prefix = earliestConclusion.getTimeExtensionPrefix();
+        Set<Integer> effectiveDaySet = Sets.newHashSet();
+        handledDayInfo.forEach(singleDay -> {
+            if (!singleDay.startsWith(prefix)) {
+                return;
+            }
+            Integer day = Integer.valueOf(singleDay.replaceAll(prefix, ""));
+            if (day < nextDay && day > earliestConclusionDay) {
+                effectiveDaySet.add(day);
+            }
+        });
+        if (CollectionUtils.isEmpty(effectiveDaySet)) {
+            return;
+        }
+        List<Integer> timeExtensionDayList = new ArrayList<>(effectiveDaySet);
+        timeExtensionDayList.sort(Comparator.comparing(Integer::intValue));
+        timeExtensionDayList.forEach(timeExtensionDay -> timeExtensionOneDayConclusion(context, groupPlan, earliestConclusion, timeExtensionDay));
     }
 
     /**
