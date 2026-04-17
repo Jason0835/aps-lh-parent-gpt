@@ -1106,15 +1106,15 @@ public class ShiftScheduleService {
             return 0;
         }
 
-        for (CxPrecisionPlan plan : context.getPrecisionPlans()) {
-            if (machineCode.equals(plan.getMachineCode())) {
-                if (shiftConfig.getShiftCode().equals(plan.getPlanShift())) {
-                    int precisionHours = plan.getEstimatedHours() != null
-                            ? plan.getEstimatedHours().intValue() : DEFAULT_PRECISION_HOURS;
-                    return precisionHours * hourlyCapacity;
-                }
-            }
-        }
+//        for (CxPrecisionPlan plan : context.getPrecisionPlans()) {
+//            if (machineCode.equals(plan.getMachineCode())) {
+//                if (shiftConfig.getShiftCode().equals(plan.getPlanShift())) {
+//                    int precisionHours = plan.getEstimatedHours() != null
+//                            ? plan.getEstimatedHours().intValue() : DEFAULT_PRECISION_HOURS;
+//                    return precisionHours * hourlyCapacity;
+//                }
+//            }
+//        }
 
         return 0;
     }
