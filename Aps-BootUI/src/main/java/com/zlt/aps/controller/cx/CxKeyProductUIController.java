@@ -82,7 +82,6 @@ public class CxKeyProductUIController extends BaseUIController<CxKeyProduct> {
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("cx:cxKeyProduct:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(CxKeyProduct cxKeyProduct) {
