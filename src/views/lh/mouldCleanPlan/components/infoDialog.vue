@@ -109,7 +109,8 @@ export default {
           prop: "cleanTime",
           label: this.$t("ui.data.column.mouldCleanPlan.cleanTime"),
           type: "date",
-          valueFormat: "yyyy-MM-dd",
+          dateType: "datetime",
+          valueFormat: "yyyy-MM-dd HH:mm:ss",
         },
         {
           prop: "cleanType",
@@ -151,7 +152,18 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        const saveParams = { ...params };
+        const saveParams = {
+          id: params.id,
+          factoryCode: params.factoryCode,
+          companyCode: params.companyCode,
+          lhCode: params.lhCode,
+          cleanTime: params.cleanTime,
+          cleanType: params.cleanType,
+          leftRightMould: params.leftRightMould,
+          remark: params.remark,
+          dataSource: params.dataSource,
+          dataVersion: params.dataVersion
+        };
         console.log('=== 保存参数完整信息 ===');
         console.log('保存参数:', JSON.stringify(saveParams));
         console.log('是否编辑模式:', this.isEdit);
