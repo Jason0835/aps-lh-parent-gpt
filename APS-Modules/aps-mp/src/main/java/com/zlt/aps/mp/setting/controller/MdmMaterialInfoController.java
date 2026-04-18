@@ -438,6 +438,7 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("qualityStateCode")), "QUALITY_STATE_CODE", queryVO.getFieldValueByFieldName("qualityStateCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("embryoCode")), "EMBRYO_CODE", queryVO.getFieldValueByFieldName("embryoCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("embryoDesc")), "EMBRYO_DESC", queryVO.getFieldValueByFieldName("embryoDesc"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
 
         boolean isTireTypeNullData = PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isTireTypeNullData"));
         queryWrapper.apply(isTireTypeNullData && ApsConstant.APS_STRING_1.equals(queryVO.getIsTireTypeNullData()), " TIRE_TYPE IS NULL OR TIRE_TYPE = ''  ");
