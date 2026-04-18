@@ -522,6 +522,37 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加 开始分组挑选机台日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，开始进行分组挑选合适成型机台分配产能====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addStartGroupSelectedCxMachineLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，开始进行分组挑选合适成型机台分配产能====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 开始高优级分组挑选机台日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，分组：%s 进行挑选合型机台，进行分配产能====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addHighestGroupSelectedCxMachineLog(Context context, String groupName) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，分组：%s 进行挑选合型机台，进行分配产能====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加没有获取到下一个优先级分组数据日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有获取到下一组优先级的分组计划====
      *
@@ -532,6 +563,37 @@ public class TbrProductionGroupLogRecorder {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，没有获取到下一组优先级的分组计划====", context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.NO_NEXT_ADD_GROUP_PLAN, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 需要挑选机台产能分配的分组计划 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，进行分组计划挑选机台：%s====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addNeedSelectedCxMachineGroupLog(Context context, String needSelectedGroupInfo) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，进行分组计划挑选机台：%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                needSelectedGroupInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 获取非特殊原材料结构最高优先级结构 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，获取下一最高优先级(非特殊原材料)结构====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addSelectedHighestNoSpecialMaterialGroupLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，获取下一最高优先级(非特殊原材料)结构====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_SELECTED_CX_MACHINE, logContent);
         return logContent;
     }
 

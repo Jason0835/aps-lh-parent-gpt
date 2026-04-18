@@ -248,6 +248,8 @@ public class CxCapacityAllocationHandler {
         if (CollectionUtils.isEmpty(leftOverGroupList)) {
             return null;
         }
+        String leftOverGroupInfo = leftOverGroupList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.joining(StringConstant.COMMA));
+        TbrProductionGroupLogRecorder.addNeedSelectedCxMachineGroupLog(context, leftOverGroupInfo);
         List<ProductionPlanGroupInfo> needProductionGroupList = leftOverGroupList.stream().filter(groupPlan -> groupPlan.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(needProductionGroupList)) {
             return null;
@@ -263,6 +265,7 @@ public class CxCapacityAllocationHandler {
         if (null != selected) {
             return selected;
         }
+        TbrProductionGroupLogRecorder.addSelectedHighestNoSpecialMaterialGroupLog(context);
         return groupPlanPrioritySelector.getHeightPriorityGroup(productionContext, excludeGroupPlan);
     }
 
@@ -279,8 +282,9 @@ public class CxCapacityAllocationHandler {
             return null;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        //获取分组及零度零度供料架
         String structureName = addNewGroupPlan.getGroupName();
+        TbrProductionGroupLogRecorder.addHighestGroupSelectedCxMachineLog(productionContext, structureName);
+        //获取分组及零度零度供料架
         String isZeroRack = addNewGroupPlan.getIsZero();
         //挑选机台
         List<CxMachineBaseInfoVo> enableCxMachineList = GroupPlanCxMachineSelector.getEnableBaseCxMachineList(context, addNewGroupPlan);
