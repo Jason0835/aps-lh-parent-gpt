@@ -7,6 +7,7 @@ import com.zlt.aps.mp.engine.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
+import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.SkuNeedProductionInfo;
@@ -36,6 +37,7 @@ public class SkuPrioritySelector {
      *
      * @param context         排产上下文
      * @param productionStage 排产阶段
+     * @param formalRound     轮次
      * @param groupPlanInfo   分组计划
      * @param lhGroup         收尾硫化组
      * @param continueType    类型(续作同规格同花纹、同模具)
@@ -45,7 +47,7 @@ public class SkuPrioritySelector {
      * @param endDay          结束排产日
      * @return
      */
-    public static String getHighestPrioritySku(Context context, ProductionStageEnum productionStage, ProductionPlanGroupInfo groupPlanInfo, EarliestConclusionLhGroupHelper lhGroup, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> allSkuList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
+    public static String getHighestPrioritySku(Context context, ProductionStageEnum productionStage, FormalRoundEnum formalRound, ProductionPlanGroupInfo groupPlanInfo, EarliestConclusionLhGroupHelper lhGroup, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> allSkuList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
         List<MonthPlanProductionRequirePlanVo> effectiveSkuList = getEffectiveSkuList(allSkuList, excludeSkuSet);
         if (CollectionUtils.isEmpty(effectiveSkuList)) {
             return StringUtils.EMPTY;
@@ -80,11 +82,13 @@ public class SkuPrioritySelector {
         if (CollectionUtils.isEmpty(selectedSkuPriorityList)) {
             return StringUtils.EMPTY;
         }
-        //可覆盖--挑选可排产量多的
-        List<ProductionSkuPriorityVo> coveredList = selectedSkuPriorityList.stream().filter(single -> single.isCovered()).collect(Collectors.toList());
-        if (!CollectionUtils.isEmpty(coveredList)) {
-            coveredList.sort(Comparator.comparing(ProductionSkuPriorityVo::getNeedDays, Comparator.reverseOrder()));
-            return coveredList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
+        //最低实单硫化机台
+        if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE == formalRound) {
+            return getCoveredMostSku(selectedSkuPriorityList);
+        }
+        String coveredResult = getCoveredMostSku(selectedSkuPriorityList);
+        if(!StringUtils.EMPTY.equals(coveredResult)){
+            return coveredResult;
         }
         //不可覆盖，挑选剩余量最少的
         selectedSkuPriorityList.sort(Comparator.comparing(ProductionSkuPriorityVo::getDiffValueByNoCovered));
@@ -202,6 +206,25 @@ public class SkuPrioritySelector {
             return Collections.emptyList();
         }
         return effectiveSkuList;
+    }
+
+    /**
+     * 挑选可覆盖且能排产最多的Sku
+     *
+     * @param selectedSkuPriorityList 高优先级Sku列表
+     * @return
+     */
+    private static String getCoveredMostSku(List<ProductionSkuPriorityVo> selectedSkuPriorityList) {
+        if (CollectionUtils.isEmpty(selectedSkuPriorityList)) {
+            return StringUtils.EMPTY;
+        }
+        //可覆盖--挑选可排产量多的
+        List<ProductionSkuPriorityVo> coveredList = selectedSkuPriorityList.stream().filter(single -> single.isCovered()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(coveredList)) {
+            return StringUtils.EMPTY;
+        }
+        coveredList.sort(Comparator.comparing(ProductionSkuPriorityVo::getNeedDays, Comparator.reverseOrder()));
+        return coveredList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
     }
 
     /**

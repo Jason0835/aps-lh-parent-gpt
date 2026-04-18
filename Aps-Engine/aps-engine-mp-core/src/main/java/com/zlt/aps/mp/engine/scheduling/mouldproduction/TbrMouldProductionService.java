@@ -140,6 +140,8 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderInitGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        // 设置成型机台续作结构 sandy+ 2026.3.19
+        productionContext.setContinueStructureMap(getContinueStructureMap(cxContinueInfoMap));
         //6、对续作结构进行在产成型机台分配(测算在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
         List<CxMachineAllocationPlanHelper> continueAllocationList = productionCxMachineCalculationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
@@ -363,6 +365,9 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
             Set<String> allocationSet = groupAllocationList.stream().map(MpStructureAllocation::getCxMachineCode).collect(Collectors.toSet());
             groupProductionInfo.setAllocationCxMachineCodeSet(allocationSet);
             groupProductionInfo.buildDayProductionLimitInfoByStructureAllocation(context, groupAllocationList);
+
+            //将产能限制Map 置空
+            groupProductionInfo.setDailyCapacityLimitVoMap(null);
         });
     }
 

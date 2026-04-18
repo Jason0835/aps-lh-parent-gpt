@@ -154,7 +154,7 @@ public class TbrMouldProductionLogRecorder {
 
     /**
      * 增加在机结构对在产机台排产没有找到可排产硫化分组日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有找到待待硫化组====
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 没有找到可排产硫化组====
      *
      * @param context           排程上下文
      * @param groupName         分组名-结构
@@ -162,7 +162,7 @@ public class TbrMouldProductionLogRecorder {
      * @return
      */
     public static String addContinueGroupContinueCxMachineNoLhGroupLog(Context context, String groupName, String onLineMachineInfo) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 没有找到待待硫化组====";
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 没有找到可排产硫化组====";
         String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_NO_LH_GROUP, logContent);

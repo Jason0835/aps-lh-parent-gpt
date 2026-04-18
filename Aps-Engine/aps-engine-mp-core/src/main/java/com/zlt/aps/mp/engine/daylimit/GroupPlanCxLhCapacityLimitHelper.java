@@ -930,14 +930,14 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * @param singleCxMachineAllocation 某条转产配置
      */
     private static void updateBaseLimitInfo(Context context, GroupPlanCxLhCapacityLimitHelper initLimitHelper, CxMachineBaseInfoVo cxMachineInfo, MpStructureAllocation singleCxMachineAllocation) {
-        Integer productionDay = initLimitHelper.getDay();
-        String cxMachineCode = cxMachineInfo.getCxMachineCode();
         if (null == cxMachineInfo) {
             return;
         }
+        Integer productionDay = initLimitHelper.getDay();
         if (cxMachineInfo.getStopDayInfo().contains(productionDay)) {
             return;
         }
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
         //理论不可重复
         if (initLimitHelper.getCxMachineCodeSet().contains(cxMachineCode)) {
             return;

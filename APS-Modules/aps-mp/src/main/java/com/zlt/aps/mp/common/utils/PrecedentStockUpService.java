@@ -13,6 +13,7 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.MdmOutbountOrdersNotScanEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmCycleSchStruConfService;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
@@ -23,6 +24,7 @@ import com.zlt.aps.maindata.service.IMpOverdueSkuService;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmOutbountOrdersNotScan;
 import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
 import com.zlt.aps.mp.api.domain.entity.MpMonthlySaleQty;
 import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
@@ -82,6 +84,8 @@ public class PrecedentStockUpService {
   private final IMpMonthlySaleQtyService monthlySaleQtyService;
   // 成品库存
   private final IMdmProductStockService mdmProductStockService;
+  // 未扫描订单
+  private final MdmOutbountOrdersNotScanEntityMapper mdmOutbountOrdersNotScanEntityMapper;
   // 销售订单
   private final ISalesOrderPoolService salesOrderPoolService;
   // 定稿的月度排产计划
@@ -291,6 +295,10 @@ public class PrecedentStockUpService {
                   supplyOrderPool.getFactoryCode(), skus),
               "成品库存");
 
+      CompletableFuture<List<MdmOutbountOrdersNotScan>> notScanFuture =
+          executeAsync(() -> this.fetchOrdersNotScan(supplyOrderPool.getFactoryCode()),
+              "未扫描订单");
+
       CompletableFuture<List<SalesOrderPool>> salesOrderFuture =
           executeAsync(() -> salesOrderPoolService.findCurrentSalesOrderPool(
                   supplyOrderPool.getFactoryCode(), skus),
@@ -310,6 +318,8 @@ public class PrecedentStockUpService {
               List<MpMonthlySaleQty> monthlySaleQties =  monthlySaleQtyFuture.get();
               List<MdmMaterialInfo> materials = materialsFuture.get();
               List<MdmProductStock> productStocks = stocksFuture.get();
+              List<MdmOutbountOrdersNotScan> notScanOrderList = notScanFuture.get();
+              mdmProductStockService.reduceInventoryByNotScanOrder(productStocks, notScanOrderList); // 禅道21781、库存优先扣减未扫描订单量
               List<SalesOrderPool> salesOrderPools = salesOrderFuture.get();
               Map<String,Integer> structureFrequency = calculateStructureFrequencyFuture.get();
               Map<String, MpMonthlySaleQty> sku2AverageSaleQty = sku2AverageSaleQty(monthlySaleQties);
@@ -332,6 +342,15 @@ public class PrecedentStockUpService {
       log.error("准备计算数据失败", e);
       throw new BusinessException("准备计算数据失败: " + e.getMessage(), e);
     }
+  }
+  
+  /**
+   * 获取未扫描库存订单量
+   */
+  private List<MdmOutbountOrdersNotScan> fetchOrdersNotScan(String factoryCode) {
+      LambdaQueryWrapper<MdmOutbountOrdersNotScan> queryWrapper = new LambdaQueryWrapper<>();
+      queryWrapper.eq(MdmOutbountOrdersNotScan::getFactoryCode, factoryCode);
+      return mdmOutbountOrdersNotScanEntityMapper.selectList(queryWrapper);
   }
 
   private Map<String, Integer> calculateStockWithoutOrder(List<MdmProductStock> finishedProductStocks, List<SalesOrderPool> salesOrderPools) {

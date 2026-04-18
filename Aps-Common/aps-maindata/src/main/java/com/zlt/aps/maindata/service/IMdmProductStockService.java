@@ -1,5 +1,6 @@
 package com.zlt.aps.maindata.service;
 
+import com.zlt.aps.mp.api.domain.entity.MdmOutbountOrdersNotScan;
 import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
 import com.zlt.bill.common.service.IDocService;
 
@@ -43,4 +44,12 @@ public interface IMdmProductStockService extends IDocService<MdmProductStock> {
      * @return
      */
     List<MdmProductStock> findCurrentFinishStock(String factoryCode, Set<String> skus);
+    
+    /**
+     * 库存冲减未扫描订单
+     * 
+     * @param finishedProductStocks 成品库存列表
+     * @param notScanOrderList      未扫描订单列表
+     */
+    void reduceInventoryByNotScanOrder(List<MdmProductStock> finishedProductStocks, List<MdmOutbountOrdersNotScan> notScanOrderList);
 }

@@ -329,6 +329,30 @@ public class BalancingService {
             Map<String, Integer> machineMaxEmbryoTypesMap,
             boolean forceKeepHistory,
             ScheduleContextVo context) {
+        // 续作均衡场景：无续作预扣
+        return balanceEmbryosToMachinesWithMachineCapacity(
+                tasks, availableMachines, machineHistoryMap,
+                machineMaxLhMap, machineMaxEmbryoTypesMap,
+                forceKeepHistory, context,
+                null, null);
+    }
+
+    /**
+     * 均衡分配胎胚到机台（含续作预扣）
+     *
+     * @param continueLoadMap 续作已占容量（机台编码 → 已占硫化机数），可为null
+     * @param continueTypeMap 续作已占种类（机台编码 → 已占胎胚编码集合），可为null
+     */
+    public BalancingResult balanceEmbryosToMachinesWithMachineCapacity(
+            List<CoreScheduleAlgorithmService.DailyEmbryoTask> tasks,
+            List<MpCxCapacityConfiguration> availableMachines,
+            Map<String, Set<String>> machineHistoryMap,
+            Map<String, Integer> machineMaxLhMap,
+            Map<String, Integer> machineMaxEmbryoTypesMap,
+            boolean forceKeepHistory,
+            ScheduleContextVo context,
+            Map<String, Integer> continueLoadMap,
+            Map<String, Set<String>> continueTypeMap) {
 
         // Step 1: 获取均衡阈值配置
         int typeDiffThreshold = getTypeDiffThreshold(context);
@@ -437,8 +461,25 @@ public class BalancingService {
             Set<String> historyEmbryos = machineHistoryMap.get(config.getCxMachineCode());
             state.setHistoryEmbryos(historyEmbryos != null ? historyEmbryos : new HashSet<>());
 
-            log.info("  初始化机台 {}: maxCapacity={}, maxTypes={}, 历史胎胚={}",
-                    config.getCxMachineCode(), state.getMaxCapacity(), state.getMaxTypes(), state.getHistoryEmbryos());
+            // 预扣续作已占的容量和种类槽
+            int preLoad = (continueLoadMap != null) ? continueLoadMap.getOrDefault(config.getCxMachineCode(), 0) : 0;
+            Set<String> preTypes = (continueTypeMap != null) ? continueTypeMap.getOrDefault(config.getCxMachineCode(), Collections.emptySet()) : Collections.emptySet();
+            if (preLoad > 0 || !preTypes.isEmpty()) {
+                state.setCurrentLoad(preLoad);
+                state.setCurrentTypes(preTypes.size());
+                // 将续作已占种类加入 historyEmbryos（DFS排序偏好）
+                state.getHistoryEmbryos().addAll(preTypes);
+                // 将续作预扣的胚胎加入 assignedEmbryos（用于日志打印和结果追踪）
+                for (String embryoCode : preTypes) {
+                    state.getAssignedEmbryos().add(new EmbryoAssignment(embryoCode, null, 1));
+                }
+                log.info("  初始化机台 {}: maxCapacity={}, maxTypes={}, 续作预扣容量={}, 续作预扣种类={}, 历史胎胚={}",
+                        config.getCxMachineCode(), state.getMaxCapacity(), state.getMaxTypes(),
+                        preLoad, preTypes, state.getHistoryEmbryos());
+            } else {
+                log.info("  初始化机台 {}: maxCapacity={}, maxTypes={}, 历史胎胚={}",
+                        config.getCxMachineCode(), state.getMaxCapacity(), state.getMaxTypes(), state.getHistoryEmbryos());
+            }
 
             machineStates.add(state);
         }
@@ -538,11 +579,18 @@ public class BalancingService {
                 result = convertDfsResultToBalancingResult(searchResult.bestAssignments, searchResult.bestMachineCodes, machineStates, sortedTasks);
             }
         } else {
-            // DFS未找到任何方案（理论上不应发生，至少第一个任务的分配会形成部分解）
-            log.warn("DFS未找到任何方案，返回空结果");
-            BalancingResult emptyResult = new BalancingResult();
-            emptyResult.setAssignments(new ArrayList<>());
-            result = emptyResult;
+            // DFS未找到任何方案，检查 machineStates 是否有保底预留的分配
+            boolean hasReservedAssignments = machineStates.stream()
+                    .anyMatch(s -> !s.getAssignedEmbryos().isEmpty());
+            if (hasReservedAssignments) {
+                log.info("DFS无剩余任务，但存在保底预留分配，收集预留结果");
+                result = buildResultFromMachineStates(machineStates);
+            } else {
+                log.warn("DFS未找到任何方案，返回空结果");
+                BalancingResult emptyResult = new BalancingResult();
+                emptyResult.setAssignments(new ArrayList<>());
+                result = emptyResult;
+            }
         }
 
         logAllocationResult(result, machineStates, remainingTasks);
@@ -589,13 +637,6 @@ public class BalancingService {
         
         log.info("开始保底预留历史任务...");
         
-        // 构建胎胚编码 -> 任务 的映射
-        Map<String, CoreScheduleAlgorithmService.DailyEmbryoTask> taskMap = tasks.stream()
-                .collect(Collectors.toMap(
-                        CoreScheduleAlgorithmService.DailyEmbryoTask::getMaterialCode,
-                        t -> t,
-                        (a, b) -> a));
-        
         int totalReserved = 0;
         
         for (MachineState state : machineStates) {
@@ -605,20 +646,28 @@ public class BalancingService {
             }
             
             for (String embryoCode : historyEmbryos) {
-                CoreScheduleAlgorithmService.DailyEmbryoTask task = taskMap.get(embryoCode);
-                if (task == null) {
+                // 直接遍历 tasks 列表按 embryoCode 匹配，避免 Map 去2重丢失多机台同胚胎的预留
+                CoreScheduleAlgorithmService.DailyEmbryoTask matchedTask = null;
+                for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+                    if (embryoCode.equals(task.getEmbryoCode())) {
+                        int remainingDemand = task.getVulcanizeMachineCount() != null
+                                ? task.getVulcanizeMachineCount() : 0;
+                        if (remainingDemand > 0) {
+                            matchedTask = task;
+                            break;
+                        }
+                    }
+                }
+                
+                if (matchedTask == null) {
                     continue;
                 }
                 
-                int remainingDemand = task.getVulcanizeMachineCount() != null 
-                        ? task.getVulcanizeMachineCount() : 0;
-                
-                if (remainingDemand <= 0) {
-                    continue;
-                }
+                int remainingDemand = matchedTask.getVulcanizeMachineCount() != null
+                        ? matchedTask.getVulcanizeMachineCount() : 0;
                 
                 if (state.getCurrentLoad() >= state.getMaxCapacity()) {
-                    log.warn("机台 {} 容量已满，无法保底预留胎胚 {}", 
+                    log.warn("机台 {} 容量已满，无法保底预留胎胚 {}",
                             state.getMachineCode(), embryoCode);
                     continue;
                 }
@@ -635,14 +684,14 @@ public class BalancingService {
                 // 保底预留1个硫化机台数
                 int reservedCount = 1;
                 
-                state.getAssignedEmbryos().add(new EmbryoAssignment(embryoCode, task, reservedCount));
+                state.getAssignedEmbryos().add(new EmbryoAssignment(embryoCode, matchedTask, reservedCount));
                 state.setCurrentLoad(state.getCurrentLoad() + reservedCount);
                 state.setCurrentTypes(state.getCurrentTypes() + 1);
                 
-                task.setVulcanizeMachineCount(remainingDemand - reservedCount);
+                matchedTask.setVulcanizeMachineCount(remainingDemand - reservedCount);
                 
                 totalReserved++;
-                log.debug("机台 {} 保底预留胎胚 {} 共 {} 个硫化机", 
+                log.info("机台 {} 保底预留胎胚 {} 共 {} 个硫化机",
                         state.getMachineCode(), embryoCode, reservedCount);
             }
         }
@@ -1322,6 +1371,25 @@ public class BalancingService {
     }
 
     /**
+     * 从 machineStates 构建分配结果（保底预留后 DFS 无剩余任务的场景）
+     */
+    private BalancingResult buildResultFromMachineStates(List<MachineState> machineStates) {
+        BalancingResult result = new BalancingResult();
+        result.setAssignments(new ArrayList<>());
+
+        for (MachineState state : machineStates) {
+            if (state.getAssignedEmbryos().isEmpty()) {
+                continue;
+            }
+            MachineAssignment assignment = new MachineAssignment();
+            assignment.setMachineCode(state.getMachineCode());
+            assignment.setEmbryoAssignments(new ArrayList<>(state.getAssignedEmbryos()));
+            result.getAssignments().add(assignment);
+        }
+        return result;
+    }
+
+    /**
      * 记录分配结果日志
      */
     private void logAllocationResult(BalancingResult result, List<MachineState> machineStates,
@@ -1334,17 +1402,46 @@ public class BalancingService {
         // 统计已分配的胎胚数量
         Map<String, Integer> assignedQtyMap = new LinkedHashMap<>();
         
+        // 构建 machineStates 的预扣映射（机台编码 → 预扣信息）
+        Map<String, MachineState> stateMap = new LinkedHashMap<>();
+        for (MachineState state : machineStates) {
+            stateMap.put(state.getMachineCode(), state);
+        }
+        
         for (MachineAssignment assignment : result.getAssignments()) {
-            // 合并相同胚子代码的条目
+            String machineCode = assignment.getMachineCode();
+            
+            // 合并相同胚子代码的条目（DFS分配的）
             Map<String, Integer> embryoQtyMap = new LinkedHashMap<>();
             for (EmbryoAssignment e : assignment.getEmbryoAssignments()) {
                 embryoQtyMap.merge(e.getEmbryoCode(), e.getAssignedQty(), Integer::sum);
                 assignedQtyMap.merge(e.getEmbryoCode(), e.getAssignedQty(), Integer::sum);
             }
+            
+            // 加入续作预扣信息
+            MachineState state = stateMap.get(machineCode);
+            int preLoad = 0;
+            if (state != null && state.getCurrentLoad() > 0) {
+                // 预扣的种类可能和DFS分配的种类有重叠，需要区分
+                Set<String> dfsEmbryos = new HashSet<>(embryoQtyMap.keySet());
+                for (EmbryoAssignment e : state.getAssignedEmbryos()) {
+                    if (!dfsEmbryos.contains(e.getEmbryoCode())) {
+                        embryoQtyMap.merge(e.getEmbryoCode(), e.getAssignedQty(), Integer::sum);
+                    }
+                    assignedQtyMap.merge(e.getEmbryoCode(), e.getAssignedQty(), Integer::sum);
+                    preLoad += e.getAssignedQty();
+                }
+            }
+            
             List<String> embryos = embryoQtyMap.entrySet().stream()
                     .map(e -> e.getKey() + "(" + e.getValue() + ")")
                     .collect(Collectors.toList());
-            log.info("  机台 {}: {}", assignment.getMachineCode(), embryos);
+            
+            if (preLoad > 0) {
+                log.info("  机台 {}: {} (含续作预留{})", machineCode, embryos, preLoad);
+            } else {
+                log.info("  机台 {}: {}", machineCode, embryos);
+            }
             
             // 从 result 中计算均衡指标
             int load = assignment.getEmbryoAssignments().stream()
@@ -1356,6 +1453,22 @@ public class BalancingService {
             minLoad = Math.min(minLoad, load);
             maxTypes = Math.max(maxTypes, types);
             minTypes = Math.min(minTypes, types);
+        }
+        
+        // 也打印 machineStates 中有预扣但没有 DFS 分配的机台
+        for (MachineState state : machineStates) {
+            if (!state.getAssignedEmbryos().isEmpty() && 
+                result.getAssignments().stream().noneMatch(a -> a.getMachineCode().equals(state.getMachineCode()))) {
+                Map<String, Integer> preEmbryoMap = new LinkedHashMap<>();
+                for (EmbryoAssignment e : state.getAssignedEmbryos()) {
+                    preEmbryoMap.merge(e.getEmbryoCode(), e.getAssignedQty(), Integer::sum);
+                    assignedQtyMap.merge(e.getEmbryoCode(), e.getAssignedQty(), Integer::sum);
+                }
+                List<String> embryos = preEmbryoMap.entrySet().stream()
+                        .map(e -> e.getKey() + "(" + e.getValue() + ")")
+                        .collect(Collectors.toList());
+                log.info("  机台 {}: {} (仅续作预留)", state.getMachineCode(), embryos);
+            }
         }
         
         // 如果没有分配结果，避免打印错误指标
