@@ -12,6 +12,7 @@ import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
 import com.zlt.aps.mp.engine.handler.SupplementCxMachineDistributionHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
+import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -162,6 +163,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
      * @param excludeGroupPlan             不再参与的分组
      */
     private void addNewGroupPlanHandler(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, Set<String> excludeGroupPlan) {
+        TbrProductionGroupLogRecorder.addStartGroupSelectedCxMachineLog(context);
         ProductionPlanGroupInfo addNewGroupPlan = cxCapacityAllocationHandler.getInsertNewGroupPlan(context, estimateGroupCxAllocationMap, excludeGroupPlan);
         if (null == addNewGroupPlan) {
             //记录日志

@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.deduct;
 
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -275,8 +276,8 @@ public class DeductMouldScheduler {
             activeMachines = getActiveMachinesByRule(deductMouldVo, context.getExpectedDays());
             // 若前日机台数 与 激活机台数 相差>=3台，采取均降策略
             int diffMachines = context.getPreDayMachines() - activeMachines;
-            if (diffMachines >=3 ){
-                activeMachines = (int) Math.ceil((double) context.getPreDayMachines() / 2);
+            if (diffMachines >= FactoryConstant.FRONT_ACTIVE_DIFF_MACHINES){
+                activeMachines = (int) Math.ceil((double) context.getPreDayMachines() / FactoryConstant.AVG_VALUE);
             }else{
                 // 动态计算所需机台数 sandy+ 2026.4.13
                 // 在结构未收尾的情况下，不再依赖固定天数，而是根据剩余需求、剩余天数、单台日产量动态决定当日应使用的模具数，逐日降1台，
@@ -292,11 +293,11 @@ public class DeductMouldScheduler {
         }
 
         //2、在收尾日倒数第2天 且前日机台数大于3台，优化激活台数
-        if (context.getPreDayMachines() >= 3
+        if (context.getPreDayMachines() >= FactoryConstant.FRONT_MACHINES_THRESHOLD
                 && (context.getCurrentDate() + 1) == context.getDeadLineDate()) {
             //在保障全部收尾的情况下，采取均分策略
-            int avgMachines = (int) Math.ceil((double) context.getPreDayMachines() / 2);
-            int dailyCapacity = 2 * avgMachines * deductMouldVo.getDailyOutputPerMachine();
+            int avgMachines = (int) Math.ceil((double) context.getPreDayMachines() / FactoryConstant.AVG_VALUE);
+            int dailyCapacity = FactoryConstant.AVG_VALUE * avgMachines * deductMouldVo.getDailyOutputPerMachine();
             if (deductMouldVo.getRemainingQty() <= dailyCapacity) {
                 activeMachines = avgMachines;
             }
