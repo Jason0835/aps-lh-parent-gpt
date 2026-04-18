@@ -944,8 +944,9 @@ public class MpWeekRollAdjustEngine {
      */
     private void deductMouldProduction(MpRollAdjustContextDTO contextDTO, int iDay, FactoryMonthPlanFinalAdjustVo prodFinal) {
         String dayField = FactoryConstant.DAY_FIELD+iDay;
+        int dayVulcanizationQty = getDayVulcanizationQty(prodFinal);
         if (prodFinal.getFieldValueByFieldName(dayField) == null ||
-                (Integer) prodFinal.getFieldValueByFieldName(dayField) == 0){
+                (Integer) prodFinal.getFieldValueByFieldName(dayField) ==0){
             //往前推1天
             iDay -= 1;
             if (iDay <= contextDTO.getLockEndDay()){
@@ -959,9 +960,21 @@ public class MpWeekRollAdjustEngine {
                 return;
             }
         }
-        int dayQty = (Integer) prodFinal.getFieldValueByFieldName(dayField);
+        Integer dayQty = (Integer) prodFinal.getFieldValueByFieldName(dayField);
+        if (dayQty < dayVulcanizationQty){
+            //若降模的日计划量小于日硫化量，则观察前日的计划量是否大于2倍的日硫化量，若大于，则累在一起减模，防止减模次日与减模日偏差太大
+            //往前推1天
+            int iPreDay = iDay - 1;
+            if (iPreDay > contextDTO.getLockEndDay()){
+                String preDayField = FactoryConstant.DAY_FIELD+iPreDay;
+                if (prodFinal.getFieldValueByFieldName(preDayField) != null &&
+                        (Integer) prodFinal.getFieldValueByFieldName(preDayField) > FactoryConstant.FRONT_REAR_DIFF_MACHINES * dayVulcanizationQty){
+                    dayQty += (Integer) prodFinal.getFieldValueByFieldName(preDayField);
+                    iDay -= 1;
+                }
+            }
+        }
         //1、根据计划量测算硫化机台数,有余数加1；
-        int dayVulcanizationQty = getDayVulcanizationQty(prodFinal);
         int machines = dayQty / dayVulcanizationQty;
         machines += dayQty % dayVulcanizationQty > 0 ? 1:0;
 
