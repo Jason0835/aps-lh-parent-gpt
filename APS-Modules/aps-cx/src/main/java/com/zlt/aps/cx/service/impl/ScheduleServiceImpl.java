@@ -34,6 +34,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -80,6 +81,15 @@ public class ScheduleServiceImpl implements ScheduleService {
     /** 参数编码：机台默认最大硫化机数 */
     private static final String PARAM_CODE_MAX_LH_MACHINE_QTY = "MAX_LH_MACHINE_QTY";
 
+    /** 参数编码：硫化机停锅时间（停产日硫化停止时刻，HH:mm格式） */
+    private static final String PARAM_CODE_VULCANIZING_STOP_TIME = "VULCANIZING_STOP_TIME";
+
+    /** 参数编码：硫化开模时间（开产日硫化开始时刻，HH:mm格式） */
+    private static final String PARAM_CODE_VULCANIZING_OPEN_TIME = "VULCANIZING_OPEN_TIME";
+
+    /** 参数编码：预留消化时间（小时，成型停机早于硫化停锅的时长） */
+    private static final String PARAM_CODE_RESERVED_DIGEST_HOURS = "RESERVED_DIGEST_HOURS";
+
     /** 默认损耗率 */
     private static final BigDecimal DEFAULT_LOSS_RATE = new BigDecimal("0.02");
 
@@ -125,6 +135,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
     private final CxMaterialEndingMapper materialEndingMapper;
     private final MpCxCapacityConfigurationMapper capacityConfigurationMapper;
+    private final MdmWorkCalendarMapper workCalendarMapper;
 
     // ==================== 公共方法 ====================
 
@@ -661,6 +672,31 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("解析机台默认最大硫化机数配置失败: {}", maxLhConfig.getParamValue());
             }
         }
+
+        // 加载硫化机停锅时间（停产日硫化停止时刻，HH:mm格式）
+        CxParamConfig vulcanizingStopTimeConfig = paramConfigMap.get(PARAM_CODE_VULCANIZING_STOP_TIME);
+        if (vulcanizingStopTimeConfig != null && vulcanizingStopTimeConfig.getParamValue() != null) {
+            context.setVulcanizingStopTimeStr(vulcanizingStopTimeConfig.getParamValue());
+            log.info("硫化机停锅时间配置：{}", vulcanizingStopTimeConfig.getParamValue());
+        }
+
+        // 加载硫化开模时间（开产日硫化开始时刻，HH:mm格式）
+        CxParamConfig vulcanizingOpenTimeConfig = paramConfigMap.get(PARAM_CODE_VULCANIZING_OPEN_TIME);
+        if (vulcanizingOpenTimeConfig != null && vulcanizingOpenTimeConfig.getParamValue() != null) {
+            context.setVulcanizingOpenTimeStr(vulcanizingOpenTimeConfig.getParamValue());
+            log.info("硫化开模时间配置：{}", vulcanizingOpenTimeConfig.getParamValue());
+        }
+
+        // 加载预留消化时间（小时）
+        CxParamConfig reservedDigestConfig = paramConfigMap.get(PARAM_CODE_RESERVED_DIGEST_HOURS);
+        if (reservedDigestConfig != null && reservedDigestConfig.getParamValue() != null) {
+            try {
+                context.setReservedDigestHours(Integer.parseInt(reservedDigestConfig.getParamValue()));
+                log.info("预留消化时间配置：{}小时", reservedDigestConfig.getParamValue());
+            } catch (NumberFormatException e) {
+                log.warn("解析预留消化时间配置失败: {}", reservedDigestConfig.getParamValue());
+            }
+        }
     }
 
     /**
@@ -799,7 +835,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                 context.getStocks(),
                 context.getLhScheduleResults(),
                 currentDayShifts,
-                formingRemainderMap);
+                formingRemainderMap,
+                context.getScheduleDate());
         context.setFormingRemainderMap(formingRemainderMap);
         context.setMaterialStockMap(materialStockMap);
         log.info("计算成型余量映射 {} 条，物料库存分配 {} 条", formingRemainderMap.size(), materialStockMap.size());
@@ -1056,14 +1093,15 @@ public class ScheduleServiceImpl implements ScheduleService {
             List<CxStock> stocks,
             List<LhScheduleResult> lhScheduleResults,
             List<CxShiftConfig> dayShifts,
-            Map<String, Integer> formingRemainderMap) {
+            Map<String, Integer> formingRemainderMap,
+            LocalDate scheduleDate) {
 
         // 用于返回的物料库存映射
         Map<String, Integer> materialStockMap = new HashMap<>();
 
         try {
             // 按硫化任务维度分配库存，共用胎胚按硫化任务需求比例分配
-            materialStockMap = allocateStockByMaterialRatio(stocks, lhScheduleResults, dayShifts);
+            materialStockMap = allocateStockByMaterialRatio(stocks, lhScheduleResults, dayShifts, scheduleDate);
             log.debug("按硫化任务维度分配胎胚库存 {} 条", materialStockMap.size());
 
             // 计算成型余量
@@ -1095,19 +1133,90 @@ public class ScheduleServiceImpl implements ScheduleService {
      * @param dayShifts  当前天班次配置
      * @return 对应班次的硫化计划量
      */
-    private int getShiftPlanQtyFromLhResult(LhScheduleResult lhResult, List<CxShiftConfig> dayShifts) {
+    private int getShiftPlanQtyFromLhResult(LhScheduleResult lhResult, List<CxShiftConfig> dayShifts,
+                                            LocalDate scheduleDate) {
+        return getShiftPlanQtyWithShiftName(lhResult, dayShifts, scheduleDate).planQty;
+    }
+
+    /**
+     * 从硫化记录中获取第一个非停产班次的计划量和班次名称
+     * 按天遍历，遇到停产班次跳过，遇到停产天也跳过
+     */
+    private ShiftPlanResult getShiftPlanQtyWithShiftName(LhScheduleResult lhResult, List<CxShiftConfig> dayShifts,
+                                                         LocalDate scheduleDate) {
+        List<MdmWorkCalendar> workCalendarList = workCalendarMapper.selectList(null);
+        return getShiftPlanQtyWithShiftName(lhResult, dayShifts, scheduleDate, workCalendarList);
+    }
+
+    /**
+     * 从硫化记录中获取第一个非停产班次的计划量和班次名称
+     * 按天遍历，遇到停产班次跳过，遇到停产天也跳过
+     */
+    private ShiftPlanResult getShiftPlanQtyWithShiftName(LhScheduleResult lhResult, List<CxShiftConfig> dayShifts,
+                                                         LocalDate scheduleDate, List<MdmWorkCalendar> workCalendarList) {
+        int defaultQty = lhResult.getDailyPlanQty() != null ? lhResult.getDailyPlanQty() : 0;
         if (dayShifts == null || dayShifts.isEmpty()) {
-            return lhResult.getDailyPlanQty() != null ? lhResult.getDailyPlanQty() : 0;
+            return new ShiftPlanResult(defaultQty, "未知");
         }
 
-        for (CxShiftConfig shiftConfig : dayShifts) {
-            String classField = shiftConfig.getClassField();
-            if (classField != null && classField.startsWith("CLASS")) {
+        // 排程起始日期
+        LocalDate scheduleStartDate = scheduleDate;
+
+        // 构建 日期→WorkCalendar 映射
+        Map<LocalDate, MdmWorkCalendar> calendarMap = new HashMap<>();
+        if (workCalendarList != null) {
+            for (MdmWorkCalendar cal : workCalendarList) {
+                if (cal.getCalendarTime() != null) {
+                    LocalDate calDate = cal.getCalendarTime().toInstant()
+                            .atZone(ZoneId.systemDefault()).toLocalDate();
+                    calendarMap.put(calDate, cal);
+                }
+            }
+        }
+
+        // 按天遍历，找到第一个非停产班次
+        int scheduleDays = dayShifts.stream()
+                .mapToInt(s -> s.getScheduleDay() != null ? s.getScheduleDay() : 1)
+                .max().orElse(1);
+
+        for (int day = 1; day <= scheduleDays; day++) {
+            // 计算该天的日期
+            LocalDate currentDate = scheduleStartDate.plusDays(day - 1);
+
+            // 获取该天的班次配置
+            final int currentDay = day;
+            List<CxShiftConfig> dayConfigs = dayShifts.stream()
+                    .filter(s -> s.getScheduleDay() != null && s.getScheduleDay() == currentDay)
+                    .collect(Collectors.toList());
+
+            if (dayConfigs.isEmpty()) continue;
+
+            // 获取该天的日历信息
+            MdmWorkCalendar calendar = calendarMap.get(currentDate);
+
+            // 如果整天停产（dayFlag=0 或 三个班次全部停产），跳到下一天
+            if (calendar != null && isFullDayStopped(calendar)) {
+                log.debug("日期 {} 整天停产，跳过", currentDate);
+                continue;
+            }
+
+            for (CxShiftConfig shiftConfig : dayConfigs) {
+                String classField = shiftConfig.getClassField();
+                if (classField == null || !classField.startsWith("CLASS")) continue;
+
+                // 检查该班次是否停产
+                if (calendar != null && isShiftStopped(calendar, shiftConfig)) {
+                    log.debug("日期 {} 班次 {} 停产，跳过", currentDate, classField);
+                    continue;
+                }
+
                 try {
                     int classIndex = Integer.parseInt(classField.substring(5));
                     Integer planQty = getClassPlanQtyByIndex(lhResult, classIndex);
                     if (planQty != null && planQty > 0) {
-                        return planQty;
+                        String shiftName = shiftConfig.getShiftCode() != null
+                                ? shiftConfig.getShiftCode() : classField;
+                        return new ShiftPlanResult(planQty, shiftName);
                     }
                 } catch (NumberFormatException e) {
                     log.warn("无法解析班次字段: {}", classField);
@@ -1115,7 +1224,36 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
         }
 
-        return lhResult.getDailyPlanQty() != null ? lhResult.getDailyPlanQty() : 0;
+        return new ShiftPlanResult(defaultQty, "日计划");
+    }
+
+    /**
+     * 判断班次是否停产
+     */
+    private boolean isShiftStopped(MdmWorkCalendar calendar, CxShiftConfig shiftConfig) {
+        Integer shiftOrder = shiftConfig.getDayShiftOrder();
+        if (shiftOrder == null) return false;
+
+        switch (shiftOrder) {
+            case 1: return "0".equals(calendar.getOneShiftFlag());
+            case 2: return "0".equals(calendar.getTwoShiftFlag());
+            case 3: return "0".equals(calendar.getThreeShiftFlag());
+            default: return false;
+        }
+    }
+
+    /**
+     * 判断是否整天停产（dayFlag=0 或 三个班次全部停产）
+     */
+    private boolean isFullDayStopped(MdmWorkCalendar calendar) {
+        if ("0".equals(calendar.getDayFlag())) {
+            return true;
+        }
+        // 三个班次全部停产也视为整天停产
+        boolean shift1Stopped = "0".equals(calendar.getOneShiftFlag());
+        boolean shift2Stopped = "0".equals(calendar.getTwoShiftFlag());
+        boolean shift3Stopped = "0".equals(calendar.getThreeShiftFlag());
+        return shift1Stopped && shift2Stopped && shift3Stopped;
     }
 
     /**
@@ -1144,7 +1282,8 @@ public class ScheduleServiceImpl implements ScheduleService {
     private Map<String, Integer> allocateStockByMaterialRatio(
             List<CxStock> stocks,
             List<LhScheduleResult> lhScheduleResults,
-            List<CxShiftConfig> dayShifts) {
+            List<CxShiftConfig> dayShifts,
+            LocalDate scheduleDate) {
 
         Map<String, Integer> materialStockMap = new HashMap<>();
 
@@ -1184,9 +1323,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                 int totalDemand = 0;
                 List<TaskDemand> taskDemands = new ArrayList<>();
                 for (LhScheduleResult lh : relatedTasks) {
-                    int demand = getShiftPlanQtyFromLhResult(lh, dayShifts);
-                    taskDemands.add(new TaskDemand(lh.getId(), demand));
-                    totalDemand += demand;
+                    ShiftPlanResult shiftResult = getShiftPlanQtyWithShiftName(lh, dayShifts, scheduleDate);
+                    taskDemands.add(new TaskDemand(lh.getId(), shiftResult.planQty, lh.getMaterialCode(), shiftResult.shiftName));
+                    totalDemand += shiftResult.planQty;
                 }
 
                 if (totalDemand == 0) {
@@ -1215,8 +1354,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                         materialStockMap.merge(td.taskKey, currentStock, Integer::sum);
                         allocatedTotal += currentStock;
 
-                        log.debug("胎胚 {} 共用分配：硫化任务 {} 需求 {}，分配库存 {}",
-                                embryoCode, td.taskKey, td.demand, currentStock);
+                        log.debug("物料编码 {}，胎胚 {} 共用分配：硫化任务 {} 需求（{}班） {}，分配库存 {}",
+                                td.materialCode, embryoCode, td.taskKey, td.shiftName, td.demand, currentStock);
                     }
                 }
             }
@@ -1231,10 +1370,27 @@ public class ScheduleServiceImpl implements ScheduleService {
     private static class TaskDemand {
         String taskKey;    // 硫化任务唯一键：lhId
         int demand;
+        String materialCode;  // 物料编码
+        String shiftName;     // 班次名称
 
-        TaskDemand(Long lhId, int demand) {
+        TaskDemand(Long lhId, int demand, String materialCode, String shiftName) {
             this.taskKey = String.valueOf(lhId);
             this.demand = demand;
+            this.materialCode = materialCode;
+            this.shiftName = shiftName;
+        }
+    }
+
+    /**
+     * 班次计划量查询结果
+     */
+    private static class ShiftPlanResult {
+        int planQty;
+        String shiftName;
+
+        ShiftPlanResult(int planQty, String shiftName) {
+            this.planQty = planQty;
+            this.shiftName = shiftName;
         }
     }
 
