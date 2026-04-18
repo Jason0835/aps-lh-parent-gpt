@@ -7,6 +7,9 @@ import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
 import com.zlt.aps.mp.engine.enums.TbrRequireLogType;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 /**
  * TBR排产日志工具类型
  *
@@ -16,18 +19,21 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class TbrProductionLogUtils {
 
+    private static final DateTimeFormatter YYYY_MM_DD_HH_MM_SS = DateTimeFormatter.ofPattern(DateUtils.YYYY_MM_DD_HH_MM_SS);
+
     /**
      * 日志记录器中加入排产日志信息
      *
      * @param context            排产上下文
      * @param productionPlanInfo 排产计划信息
      * @param logType            排产环节类型
+     * @param detailContent      明细内容
      */
     public static void addProductionLog(Context context, ProductionPlanLogDto productionPlanInfo, TbrMouldProductionLogType logType, String detailContent) {
         if (null == productionPlanInfo) {
             return;
         }
-        String date = DateUtils.dateTimeNow(DateUtils.YYYY_MM_DD_HH_MM_SS);
+        String date = YYYY_MM_DD_HH_MM_SS.format(LocalDateTime.now());
         String logContent;
         if (null == productionPlanInfo.getProductionPlanId()) {
             logContent = String.format("%s -阶段：%s ： %s", date, logType.getDesc(), detailContent);
@@ -43,12 +49,13 @@ public class TbrProductionLogUtils {
      * @param context            排产上下文
      * @param productionPlanInfo 排产计划信息
      * @param logType            排产环节类型
+     * @param detailContent      明细内容
      */
     public static void addProductionLog(Context context, ProductionPlanLogDto productionPlanInfo, TbrRequireLogType logType, String detailContent) {
         if (null == productionPlanInfo) {
             return;
         }
-        String date = DateUtils.dateTimeNow(DateUtils.YYYY_MM_DD_HH_MM_SS);
+        String date = YYYY_MM_DD_HH_MM_SS.format(LocalDateTime.now());
         String logContent;
         if (null == productionPlanInfo.getProductionPlanId()) {
             logContent = String.format("%s -阶段：%s ： %s", date, logType.getDesc(), detailContent);

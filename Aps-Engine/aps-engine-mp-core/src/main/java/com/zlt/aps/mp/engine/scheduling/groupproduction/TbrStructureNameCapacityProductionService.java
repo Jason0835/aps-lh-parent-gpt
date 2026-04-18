@@ -8,6 +8,7 @@ import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpMouldUsedStatusLog;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
+import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.fixed.GroupFixedInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
@@ -55,6 +56,8 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
 
     private final GroupFixedInfoHandler groupFixedInfoHandler;
 
+    private final ContinueGroupInfoHandler continueGroupInfoHandler;
+
     private final SimulateProductionHandler simulateProductionHandler;
 
     private final CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
@@ -66,6 +69,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
     public TbrStructureNameCapacityProductionService(ProductionMdmDataService dataService,
                                                      DpRequireDataService dpRequireDataService,
                                                      GroupFixedInfoHandler groupFixedInfoHandler,
+                                                     ContinueGroupInfoHandler continueGroupInfoHandler,
                                                      ProductionHistoryHandler productionHistoryHandler,
                                                      SimulateProductionHandler simulateProductionHandler,
                                                      MonthProductionDataService monthProductionDataService,
@@ -74,6 +78,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
                                                      AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler) {
         super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
         this.groupFixedInfoHandler = groupFixedInfoHandler;
+        this.continueGroupInfoHandler = continueGroupInfoHandler;
         this.simulateProductionHandler = simulateProductionHandler;
         this.calculateStructureCxMachineNumber = calculateStructureCxMachineNumber;
         this.productionCxMachineCalculationHandler = productionCxMachineCalculationHandler;
@@ -123,10 +128,8 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderInitGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
-        // 设置成型机台续作结构 sandy+ 2026.3.19
-        productionContext.setContinueStructureMap(getContinueStructureMap(cxContinueInfoMap));
-        // 结构特殊材料排产
-//        cxSpecialMaterialScheduleHandler.specialMaterialSchedule(productionContext);
+        //20260418+ 续作信息构建调整
+        continueGroupInfoHandler.buildContinueGroupInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //6、对续作结构进行在产成型机台分配(测算在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
         List<CxMachineAllocationPlanHelper> continueAllocationList = productionCxMachineCalculationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);

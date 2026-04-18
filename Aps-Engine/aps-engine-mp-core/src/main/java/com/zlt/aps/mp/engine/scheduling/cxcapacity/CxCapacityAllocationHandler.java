@@ -248,12 +248,12 @@ public class CxCapacityAllocationHandler {
         if (CollectionUtils.isEmpty(leftOverGroupList)) {
             return null;
         }
-        String leftOverGroupInfo = leftOverGroupList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.joining(StringConstant.COMMA));
-        TbrProductionGroupLogRecorder.addNeedSelectedCxMachineGroupLog(context, leftOverGroupInfo);
         List<ProductionPlanGroupInfo> needProductionGroupList = leftOverGroupList.stream().filter(groupPlan -> groupPlan.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(needProductionGroupList)) {
             return null;
         }
+        String leftOverGroupInfo = needProductionGroupList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.joining(StringConstant.COMMA));
+        TbrProductionGroupLogRecorder.addNeedSelectedCxMachineGroupLog(context, leftOverGroupInfo);
         TbrProductionContext productionContext = (TbrProductionContext) context;
         // 如果有在机的特殊结构，则优先取出特殊结构
         boolean onLineCxMachineProductionSpecialStructure = productionContext.getBaseDataContainer().getCxMachineBaseInfo().values().stream().anyMatch(machine -> this.hasSpecialStructure(machine));

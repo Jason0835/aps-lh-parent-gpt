@@ -11,7 +11,6 @@ import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.SpecialMaterialInfoVo;
-import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.mp.engine.handler.SkuProductionCounter;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -82,8 +81,12 @@ public class TbrProductionContext extends Context {
     /**
      * 机台续作结构Map, continueStructureMap <机台，续作结构>
      */
-    private Map<String,String> continueStructureMap;
-
+    private Map<String, String> continueStructureMap;
+    /**
+     * 20260418+ 续作结构信息
+     * key=结构名：value=结构计划信息
+     */
+    Map<String, ProductionPlanGroupInfo> continueGroupMap;
     /**
      * 模具排产限制信息记录
      * key=物料描述 ： value=限制原因集合
@@ -106,6 +109,7 @@ public class TbrProductionContext extends Context {
      * 是否实单补量，用于搭配排产中部分逻辑的判断，逻辑进入实单排产和搭配排产时会进行切换
      */
     private Boolean isActualOrder;
+
     /**
      * 加入收尾，方向匹配结构集合
      *
@@ -393,12 +397,12 @@ public class TbrProductionContext extends Context {
      *
      * @return
      */
-    public Set<Integer> getOemBrandCapacityLimitRange(TbrProductionContext productionContext,MonthPlanProductionRequirePlanVo addSkuInfo) {
+    public Set<Integer> getOemBrandCapacityLimitRange(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo addSkuInfo) {
         DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
         if (null == dayCapacityLimit) {
             return Collections.emptySet();
         }
-        Set<Integer> hasDayCapacitySet = dayCapacityLimit.getEnableOemBrandProductionRange(productionContext,addSkuInfo);
+        Set<Integer> hasDayCapacitySet = dayCapacityLimit.getEnableOemBrandProductionRange(productionContext, addSkuInfo);
         if (CollectionUtils.isEmpty(hasDayCapacitySet)) {
             return Collections.emptySet();
         }
@@ -712,7 +716,7 @@ public class TbrProductionContext extends Context {
      *
      * @param groupInfo     结构
      * @param productionQty 预计生产量
-     * @param isNewRoll       库存不足预计生产量的情况下，是否新开一卷
+     * @param isNewRoll     库存不足预计生产量的情况下，是否新开一卷
      * @return
      */
     public Integer getSpecialMaterialBatchRemainQty(ProductionPlanGroupInfo groupInfo, Integer productionQty, boolean isNewRoll) {

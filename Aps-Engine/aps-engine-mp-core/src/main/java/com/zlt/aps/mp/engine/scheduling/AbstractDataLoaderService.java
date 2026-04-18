@@ -19,7 +19,6 @@ import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
-import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -29,7 +28,6 @@ import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
 import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.mp.engine.utils.MouldRelationDeduplicator;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
-import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -430,29 +428,6 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
     }
 
     /**
-     * 获取续作机台的结构信息
-     *
-     * @param cxContinueInfoMap
-     * @return Map<成型机台 ， 续作结构>
-     */
-    protected Map<String, String> getContinueStructureMap(Map<String, CxContinueInfoHelper> cxContinueInfoMap) {
-        Map<String, String> machineStructureMap = new HashMap<>();
-        if (PubUtil.isEmpty(cxContinueInfoMap)) {
-            return machineStructureMap;
-        }
-        // 从续作信息中解析出成型机台对应的续作结构
-        CxContinueInfoHelper cxContinueInfoHelper;
-        for (Map.Entry<String, CxContinueInfoHelper> entry : cxContinueInfoMap.entrySet()) {
-            cxContinueInfoHelper = entry.getValue();
-            Set<String> cxMachineCodeSet = cxContinueInfoHelper.getCxMachineCodeSet();
-            for (String machineCode : cxMachineCodeSet) {
-                machineStructureMap.put(machineCode, entry.getKey());
-            }
-        }
-        return machineStructureMap;
-    }
-
-    /**
      * 2.1.1：获取初始化业务的参数设定
      *
      * @param productionContext
@@ -581,7 +556,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         Object resetSortDayValue = paramConfigurationMap.get(MonthPlanEnums.FORMAL_RESET_SORT_DAY.getCode());
         if (null != resetSortDayValue && ((Integer) resetSortDayValue >= ProductionConstant.MONTH_START_DAY) && ((Integer) resetSortDayValue <= productionContext.getMonthDays())) {
             configuration.setFormalFirstHalfDay((Integer) resetSortDayValue);
-        }else{
+        } else {
             configuration.setFormalFirstHalfDay(productionContext.getMonthDays());
         }
         return configuration;

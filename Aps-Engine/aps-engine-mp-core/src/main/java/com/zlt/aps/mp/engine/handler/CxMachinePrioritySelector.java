@@ -202,7 +202,7 @@ public class CxMachinePrioritySelector {
         //4、断面宽差值±10 断面宽差值范围参数
         Integer diffValue = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
         //设置是否同规格，同英寸,断面宽
-        fixedPriorityList.forEach(cxMachineInfo -> cxMachineInfo.setSameInfoByCurrentGroupPlan(needProductionPlan, diffValue));
+        fixedPriorityList.forEach(cxMachineInfo -> cxMachineInfo.setSameInfoByCurrentGroupPlan(context, needProductionPlan, diffValue));
     }
 
 }

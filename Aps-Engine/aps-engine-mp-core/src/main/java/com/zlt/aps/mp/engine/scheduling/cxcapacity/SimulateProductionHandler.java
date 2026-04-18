@@ -12,7 +12,6 @@ import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
 import com.zlt.aps.mp.engine.handler.SupplementCxMachineDistributionHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
-import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -57,8 +56,6 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final SpecialMaterialScheduleHandler specialMaterialScheduleHandler;
 
-    private final GroupPlanBeforeConclusionHandler groupPlanBeforeConclusionHandler;
-
     private final SupplementCxMachineDistributionHandler supplementCxMachineDistributionHandler;
 
     /**
@@ -75,20 +72,22 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //1、模拟排产前的数据处理
         beforeSimulateProductionHandler(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         log.info(TbrSimulateProductionLogRecorder.addResetDataFinishLog(productionContext));
-        //1、在机结构对在产成型机台进行模拟模具排产
+        //2、在机结构对在产成型机台进行模拟模具排产
         mouldProductionByContinueGroup(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
-        //2、对在产机台-收尾成型机台，反向匹配待排结构
+        //3、对在产机台-收尾成型机台，反向匹配待排结构
         cxCapacityAllocationHandler.reverseMachineAllocation(productionContext, allGroupPlanMap);
-        //3、对还需排产结构，获取优先级最高的结构--结构新增
+        //4、对结构重新标记分配完成情况--还需分配量>最小上机时间的结构，重新标记没有分配完成
+        resetFlagAllocationFinish(productionContext, allGroupPlanMap);
+        //5、对还需排产结构，获取优先级最高的结构--结构新增
         addNewGroupPlanHandler(productionContext, allGroupPlanMap, new HashSet<>());
-        //4、对成型剩余不满足最短上机天数的机台进行分配结构处理
+        //6、对成型剩余不满足最短上机天数的机台进行分配结构处理
         supplementCxMachineDistributionHandler.handlerTailCapacity(productionContext, allGroupPlanMap);
     }
 
     /**
-     * 在模拟排产前的处理
-     * 1、对测算在产机台收尾点的续作部分排产清除
-     * 2、根据在产机台分配结果，构建分组计划的在产机台排产限制信息
+     * 1、在模拟排产前的处理
+     * 1.1、对测算在产机台收尾点的续作部分排产清除
+     * 1.2、根据在产机台分配结果，构建分组计划的在产机台排产限制信息
      *
      * @param context                排产上下文
      * @param allGroupPlanMap        所有分组计划
@@ -116,12 +115,12 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
     }
 
     /**
-     * 1、对在机结构进行Sku的模具排产
-     * 1.1、先对在机结构的续作部分进行模拟模具排产
-     * 1.1.1、续作Sku模拟模具排产
-     * 1.1.2、与续作Sku同规格同花纹的其它Sku模拟模具排产
-     * 1.1.3、与续作Sku同生胎共用模具的其它Sku模拟模具排产
-     * 1.2、再对在机结构的新增Sku，按Sku的优先级进行模拟模具排产
+     * 2、对在机结构进行Sku的模具排产
+     * 2.1、先对在机结构的续作部分进行模拟模具排产
+     * 2.1.1、续作Sku模拟模具排产
+     * 2.1.2、与续作Sku同规格同花纹的其它Sku模拟模具排产
+     * 2.1.3、与续作Sku同生胎共用模具的其它Sku模拟模具排产
+     * 2.2、再对在机结构的新增Sku，按Sku的优先级进行模拟模具排产
      *
      * @param context                排产上下文
      * @param allGroupPlanMap        所有分组排产计划
@@ -156,15 +155,39 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
     }
 
     /**
-     * 2、对还需排产的结构，获取优先级最高的结构进行机台匹配排产
+     * 4、重新标记分配完成标记
+     * 剩余需求量>最小上机时间的结构，置为分配没完成
      *
-     * @param context                      排产上下文
-     * @param estimateGroupCxAllocationMap 分组计划需求量
-     * @param excludeGroupPlan             不再参与的分组
+     * @param context     排产上下文
+     * @param allGroupMap 所有分组计划信息
      */
-    private void addNewGroupPlanHandler(Context context, Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap, Set<String> excludeGroupPlan) {
+    private void resetFlagAllocationFinish(Context context, Map<String, ProductionPlanGroupInfo> allGroupMap) {
+        if (CollectionUtils.isEmpty(allGroupMap)) {
+            return;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        allGroupMap.forEach((groupName, groupPlanInfo) -> {
+            Integer realLeftOverDays = groupPlanInfo.getBoostReplenishmentQuota();
+            if (realLeftOverDays <= BigDecimal.ZERO.intValue()) {
+                return;
+            }
+            if (!groupPlanInfo.isNextAllocation(realLeftOverDays, productionContext)) {
+                return;
+            }
+            groupPlanInfo.setIsAllocationFinish(YesOrNoEnum.NO.getValue());
+        });
+    }
+
+    /**
+     * 5、对还需排产的结构，获取优先级最高的结构进行机台匹配排产
+     *
+     * @param context          排产上下文
+     * @param allGroupPlanMap  分组计划需求量
+     * @param excludeGroupPlan 不再参与的分组
+     */
+    private void addNewGroupPlanHandler(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, Set<String> excludeGroupPlan) {
         TbrProductionGroupLogRecorder.addStartGroupSelectedCxMachineLog(context);
-        ProductionPlanGroupInfo addNewGroupPlan = cxCapacityAllocationHandler.getInsertNewGroupPlan(context, estimateGroupCxAllocationMap, excludeGroupPlan);
+        ProductionPlanGroupInfo addNewGroupPlan = cxCapacityAllocationHandler.getInsertNewGroupPlan(context, allGroupPlanMap, excludeGroupPlan);
         if (null == addNewGroupPlan) {
             //记录日志
             log.info(TbrProductionGroupLogRecorder.addNoGetAddGroupPlanLog(context));
@@ -181,7 +204,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
                 log.info(TbrProductionGroupLogRecorder.addGroupLeftOverNoReachMinAllocationDayLog(productionContext, groupName, true, leftOverDays, minAllocationDays));
             }
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap, new HashSet<>());
+            addNewGroupPlanHandler(context, allGroupPlanMap, new HashSet<>());
             return;
         }
         //对挑选出的结构，匹配还有排产量的成型机台
@@ -192,7 +215,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             //20260109 标记分配完成--没有找到合适，说明后面也找不到
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             //下一新增结构
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap, new HashSet<>());
+            addNewGroupPlanHandler(context, allGroupPlanMap, new HashSet<>());
             return;
         }
         Set<Integer> hasProductionDaySet = selectedCxMachine.getSelectedProductionDaySet();
@@ -207,7 +230,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             //20260109 标记分配完成--没有找到合适，说明后面也找不到
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             //下一新增结构
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap, new HashSet<>());
+            addNewGroupPlanHandler(context, allGroupPlanMap, new HashSet<>());
             return;
         }
         ProductGroupCxCapacityInfo lhRatioInfo = addNewGroupPlan.getLhRatioByCxMachine(selectedCxMachine);
@@ -224,7 +247,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             //标记分配完成--没有找到合适，说明后面也找不到
             addNewGroupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             //下一新增结构
-            addNewGroupPlanHandler(context, estimateGroupCxAllocationMap, new HashSet<>());
+            addNewGroupPlanHandler(context, allGroupPlanMap, new HashSet<>());
             return;
         }
         needAllocationDays = Math.max(needAllocationDays, confirmNeedAllocationDays);
@@ -249,10 +272,13 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         boolean isProductionByCxMachine = !originLeftOverByCxMachine.equals(leftOver);
         //有排产：机台反向匹配分组计划
         if (isProductionByCxMachine && leftOver > BigDecimal.ZERO.intValue()) {
-            cxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, estimateGroupCxAllocationMap, selectedCxMachine, new HashSet<>());
+            cxCapacityAllocationHandler.selectedGroupPlanByCxMachine(context, allGroupPlanMap, selectedCxMachine, new HashSet<>());
         }
         //下一新增结构
-        addNewGroupPlanHandler(context, estimateGroupCxAllocationMap, excludeGroupPlan);
+        if (isProductionByCxMachine) {
+            resetFlagAllocationFinish(context, allGroupPlanMap);
+        }
+        addNewGroupPlanHandler(context, allGroupPlanMap, excludeGroupPlan);
     }
 
 }

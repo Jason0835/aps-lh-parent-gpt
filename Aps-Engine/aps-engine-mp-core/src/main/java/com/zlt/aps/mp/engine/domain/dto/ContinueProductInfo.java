@@ -40,16 +40,23 @@ public class ContinueProductInfo implements Serializable {
      * 物料描述
      */
     private String materialDesc;
-
     /**
      * 英寸
      */
     private String proSize;
-
+    /**
+     * 是否零度材料
+     */
+    private String isZeroRack;
     /**
      * 胎胚号
      */
     private String embryoCode;
+
+    /**
+     * 主胎胚描述
+     */
+    private String mainMaterialDesc;
 
     /**
      * 规格

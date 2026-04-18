@@ -8,6 +8,7 @@ import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.fixed.GroupFixedInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
@@ -67,6 +68,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     private final ISysDictDataCacheService iSysDictDataCacheService;
 
+    private final ContinueGroupInfoHandler continueGroupInfoHandler;
+
     private final SimulateProductionHandler simulateProductionHandler;
 
     private final WarningInformationHandler warningInformationHandler;
@@ -85,26 +88,12 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     private final MatchingProductionHandler matchingProductionHandler;
 
-    public TbrCxCapacityAllocationService(ProductionMdmDataService dataService,
-                                          DpRequireDataService dpRequireDataService,
-                                          GroupFixedInfoHandler groupFixedInfoHandler,
-                                          MonthProductionDataService monthProductionDataService,
-                                          FormalProductionHandler formalProductionHandler,
-                                          ISysDictDataCacheService iSysDictDataCacheService,
-                                          ProductionHistoryHandler productionHistoryHandler,
-                                          SimulateProductionHandler simulateProductionHandler,
-                                          WarningInformationHandler warningInformationHandler,
-                                          ClearProductionInfoHandler clearProductionInfoHandler,
-                                          InitNoProductionRecordHandler initNoProductionRecordHandler,
-                                          DayProductionStatisticsHandler dayProductionStatisticsHandler,
-                                          CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
-                                          ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
-                                          AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler,
-                                          MatchingProductionHandler matchingProductionHandler) {
+    public TbrCxCapacityAllocationService(ProductionMdmDataService dataService, DpRequireDataService dpRequireDataService, GroupFixedInfoHandler groupFixedInfoHandler, MonthProductionDataService monthProductionDataService, FormalProductionHandler formalProductionHandler, ISysDictDataCacheService iSysDictDataCacheService, ContinueGroupInfoHandler continueGroupInfoHandler, ProductionHistoryHandler productionHistoryHandler, SimulateProductionHandler simulateProductionHandler, WarningInformationHandler warningInformationHandler, ClearProductionInfoHandler clearProductionInfoHandler, InitNoProductionRecordHandler initNoProductionRecordHandler, DayProductionStatisticsHandler dayProductionStatisticsHandler, CalculateStructureCxMachineNumber calculateStructureCxMachineNumber, ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler, AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler, MatchingProductionHandler matchingProductionHandler) {
         super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
         this.groupFixedInfoHandler = groupFixedInfoHandler;
         this.formalProductionHandler = formalProductionHandler;
         this.iSysDictDataCacheService = iSysDictDataCacheService;
+        this.continueGroupInfoHandler = continueGroupInfoHandler;
         this.simulateProductionHandler = simulateProductionHandler;
         this.warningInformationHandler = warningInformationHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
@@ -180,8 +169,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //汇总续作Sku信息
         statisticsGroupContinueInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderInitGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
-        // 设置成型机台续作结构 sandy+ 2026.3.19
-        productionContext.setContinueStructureMap(getContinueStructureMap(cxContinueInfoMap));
+        //20260418+ 续作信息构建调整
+        continueGroupInfoHandler.buildContinueGroupInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //6、对续作结构进行在产成型机台分配(测算在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
         List<CxMachineAllocationPlanHelper> continueAllocationList = productionCxMachineCalculationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);

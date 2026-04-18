@@ -538,13 +538,13 @@ public class TbrProductionGroupLogRecorder {
 
     /**
      * 增加 开始高优级分组挑选机台日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，分组：%s 进行挑选合型机台，进行分配产能====
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，分组：%s 进行挑选合适机台，进行分配产能====
      *
      * @param context 排程上下文
      * @return
      */
     public static String addHighestGroupSelectedCxMachineLog(Context context, String groupName) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，分组：%s 进行挑选合型机台，进行分配产能====",
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，分组：%s 进行挑选合适机台，进行分配产能====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
