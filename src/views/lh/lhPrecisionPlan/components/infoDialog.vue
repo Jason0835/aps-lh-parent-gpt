@@ -47,6 +47,7 @@ export default {
       yearList: [],
       rules: {
         factoryCode: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
+        year: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
         machineCode: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
         precisionType: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
         planDate: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
