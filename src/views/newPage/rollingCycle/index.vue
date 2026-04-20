@@ -254,7 +254,6 @@
         </el-table-column>
       </el-table>
       <div
-        v-if="showConfirmResult"
         style="
           display: flex;
           flex-direction: row;
