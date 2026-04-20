@@ -30,7 +30,7 @@ public class LhMouldCleanWarn extends BaseEntity implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "厂别")
-    @Excel(name = "ui.data.column.mouldCleanWarn.factoryCode")
+    @Excel(name = "ui.data.column.mouldCleanWarn.factoryCode", dictType = "biz_factory_name")
     @ImportExcelValidated(required = true)
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
