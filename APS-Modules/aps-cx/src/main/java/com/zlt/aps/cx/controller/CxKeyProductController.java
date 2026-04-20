@@ -152,6 +152,8 @@ public class CxKeyProductController extends AbstractDocBizController<CxKeyProduc
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getEmbryoCode()), "EMBRYO_CODE", queryVO.getEmbryoCode());
         // 结构名称模糊查询
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getStructureName()), "STRUCTURE_NAME", queryVO.getStructureName());
+        // 胎胚描述模糊查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getEmbryoDesc()), "EMBRYO_DESC", queryVO.getEmbryoDesc());
         // 是否启用精确查询
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getIsActive()), "IS_ACTIVE", queryVO.getIsActive());
     }
