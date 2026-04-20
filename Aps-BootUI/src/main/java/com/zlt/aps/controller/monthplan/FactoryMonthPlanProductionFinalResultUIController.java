@@ -157,7 +157,7 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
 
     @ApiOperation("导出SKU排产明细")
     @RequiresPermissions("monthplan:factoryMonthPlanFinalResult:export")
-    @GetMapping({"/export"})
+    @GetMapping({"/exportSkuScheduleItems"})
     @ResponseBody
     public void exportSkuScheduleItems(HttpServletResponse response, FactoryMonthPlanProductionFinalResult entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
