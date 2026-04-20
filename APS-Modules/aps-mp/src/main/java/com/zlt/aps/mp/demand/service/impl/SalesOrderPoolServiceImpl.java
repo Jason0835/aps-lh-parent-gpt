@@ -213,13 +213,18 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
         Map<String, String> areaMap = dpAreaList.stream()
                 .collect(Collectors.toMap(DpArea::getAreaCode, DpArea::getAreaNameI18n));
         // 校验是否有没有录入优先级的数据
-        List<String> notPriorityAreaList = syncResultList.stream()
-                .filter(s -> StringUtils.isEmpty(s.getSalPriority()) && s.getEmployeeDept() != null)
-                .map(s -> {
-                    String areaCode = String.valueOf(s.getEmployeeDept());
-                    return areaMap.getOrDefault(areaCode, areaCode);
-                }) // 先从备注获取名称
-                .distinct().collect(Collectors.toList());
+        Map<Long, List<SyncPlanedNotShipResultVo>> syncResultMap = syncResultList.stream()
+                .filter(s -> null != s.getEmployeeDept())
+                .collect(Collectors.groupingBy(SyncPlanedNotShipResultVo::getEmployeeDept));
+        List<String> notPriorityAreaList = new ArrayList<>();
+        for (Entry<Long, List<SyncPlanedNotShipResultVo>> entity: syncResultMap.entrySet()) {
+            List<SyncPlanedNotShipResultVo> resultList = entity.getValue();
+            if (resultList.stream().anyMatch(s -> StringUtils.isNotEmpty(s.getSalPriority()))) {
+                continue; // 21843 有任意一个优先级已经维护上，则这个区域就不再提示
+            }
+            String areaCode = String.valueOf(entity.getKey());
+            notPriorityAreaList.add(areaMap.getOrDefault(areaCode, areaCode));
+        }
 
         // 拼接警告信息
         StringBuilder warnMsg = new StringBuilder();

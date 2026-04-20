@@ -19,6 +19,8 @@ import com.ruoyi.common.exception.CustomException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.utils.ExcelConfigHolder;
+
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileItemFactory;
@@ -36,6 +38,7 @@ import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDataValidation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 
 import javax.servlet.http.HttpServletResponse;
@@ -61,7 +64,7 @@ public class ExcelUtil<T> {
 
     public static final String XLSX_FILE = ".xlsx";
     public static final String XLS_FILE = ".xls";
-
+    
     /**
      * Excel sheet最大行数，默认65536
      */
@@ -673,7 +676,7 @@ public class ExcelUtil<T> {
             response.setHeader("Content-Disposition", "attachment;filename=" + downloadFileName + fileType);
             response.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
         } catch (Throwable e) {
-            RuntimeException ex = new RuntimeException("excel下载没有浏览器系统支持解析的语言");
+            RuntimeException ex = new RuntimeException("excel下载没有浏览器系统支持解析的语言", e);
             log.error(ex.getMessage(), ex);
             throw ex;
         }
@@ -911,7 +914,7 @@ public class ExcelUtil<T> {
             return wb;
         } catch (Exception e) {
             String errorMsg = StringUtils.format(I18nUtil.getMessage("common.error.util.export.excel.exception"), e.getMessage());
-            log.error(errorMsg);
+            log.error(errorMsg, e);
         } finally {
             return wb;
         }
@@ -948,8 +951,8 @@ public class ExcelUtil<T> {
         style.setBorderBottom(BorderStyle.THIN);
         style.setBottomBorderColor(IndexedColors.GREY_50_PERCENT.getIndex());
         Font dataFont = wb.createFont();
-        dataFont.setFontName("Arial");
-        dataFont.setFontHeightInPoints((short) 10);
+        dataFont.setFontName(ExcelConfigHolder.FONT_NAME);
+        dataFont.setFontHeightInPoints(ExcelConfigHolder.FONT_HEIGHT_IN_POINTS);
         style.setFont(dataFont);
         styles.put(Constants.DATA, style);
 
@@ -957,11 +960,11 @@ public class ExcelUtil<T> {
         style.cloneStyleFrom(styles.get(Constants.DATA));
         style.setAlignment(HorizontalAlignment.CENTER);
         style.setVerticalAlignment(VerticalAlignment.CENTER);
-        style.setFillForegroundColor(IndexedColors.GREY_50_PERCENT.getIndex());
+        style.setFillForegroundColor(ExcelConfigHolder.HEAD_GROUND_COLOR);
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
         Font headerFont = wb.createFont();
-        headerFont.setFontName("Arial");
-        headerFont.setFontHeightInPoints((short) 10);
+        headerFont.setFontName(ExcelConfigHolder.FONT_NAME);
+        headerFont.setFontHeightInPoints(ExcelConfigHolder.FONT_HEIGHT_IN_POINTS);
         headerFont.setBold(true);
         headerFont.setColor(IndexedColors.WHITE.getIndex());
         style.setFont(headerFont);
@@ -971,8 +974,8 @@ public class ExcelUtil<T> {
         style.setAlignment(HorizontalAlignment.CENTER);
         style.setVerticalAlignment(VerticalAlignment.CENTER);
         Font totalFont = wb.createFont();
-        totalFont.setFontName("Arial");
-        totalFont.setFontHeightInPoints((short) 10);
+        totalFont.setFontName(ExcelConfigHolder.FONT_NAME);
+        totalFont.setFontHeightInPoints(ExcelConfigHolder.FONT_HEIGHT_IN_POINTS);
         style.setFont(totalFont);
         styles.put("total", style);
 

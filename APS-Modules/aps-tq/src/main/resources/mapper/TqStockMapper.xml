@@ -12,7 +12,7 @@
         <result property="modifyNum" column="modify_num"/>
         <result property="badNum" column="bad_num"/>
         <result property="remark" column="remark"/>
-        <result property="delFlag" column="del_flag"/>
+        <result property="delFlag" column="IS_DELETE"/>
         <result property="createBy" column="create_by"/>
         <result property="createTime" column="create_time"/>
         <result property="updateBy" column="update_by"/>
@@ -20,12 +20,12 @@
     </resultMap>
 
     <sql id="selectStockVo">
-        select id, stock_date, material_code, stock_num, modify_num, bad_num, remark, del_flag, create_by, create_time, update_by, update_time from t_tq_stock
+        select id, stock_date, material_code, stock_num, modify_num, bad_num, remark, IS_DELETE, create_by, create_time, update_by, update_time from t_tq_stock
     </sql>
 
     <select id="selectStockList" parameterType="com.zlt.aps.tq.api.domain.entity.TqStock" resultMap="StockResult">
         <include refid="selectStockVo"/>
-        where del_flag='0'
+        where IS_DELETE='0'
         <if test="startTime != null and startTime !='' ">
             and stock_date  <![CDATA[  >=  ]]> STR_TO_DATE(#{startTime},'%Y-%m-%d')
         </if>
@@ -45,7 +45,7 @@
 
     <select id="checkStockListUnic" parameterType="com.zlt.aps.tq.api.domain.entity.TqStock" resultMap="StockResult">
         <include refid="selectStockVo"/>
-        where del_flag='0'
+        where IS_DELETE='0'
         <if test="id != null and id !='' ">
             and id != #{id}
         </if>
@@ -73,7 +73,7 @@
             <if test="modifyNum != null">modify_num,</if>
             <if test="badNum != null">bad_num,</if>
             <if test="remark != null">remark,</if>
-            <if test="delFlag != null">del_flag,</if>
+            <if test="delFlag != null">IS_DELETE,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
             <if test="updateBy != null">update_by,</if>
@@ -104,7 +104,7 @@
             modify_num = #{modifyNum,jdbcType=DECIMAL},
             bad_num = #{badNum,jdbcType=DECIMAL},
             <if test="remark != null">remark = #{remark},</if>
-            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="delFlag != null">IS_DELETE = #{delFlag},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
@@ -114,7 +114,7 @@
     </update>
 
     <delete id="deleteStockByIds" parameterType="String">
-        update t_tq_stock set del_flag = NULL where id in
+        update t_tq_stock set IS_DELETE = '1' where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
@@ -122,7 +122,7 @@
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO t_tq_stock (
-        stock_date, material_code, stock_num, modify_num, bad_num, create_by, create_time, remark, del_flag
+        stock_date, material_code, stock_num, modify_num, bad_num, create_by, create_time, remark, IS_DELETE
         )
         VALUES
         <foreach collection="list" item="STOCK" separator=",">

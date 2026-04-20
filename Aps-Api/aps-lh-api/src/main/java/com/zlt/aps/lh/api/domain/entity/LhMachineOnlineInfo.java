@@ -2,10 +2,12 @@ package com.zlt.aps.lh.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
 import java.util.Date;
@@ -18,36 +20,44 @@ import java.util.Date;
  */
 @ApiModel(value = "硫化在机信息表", description = "硫化在机信息表")
 @Data
+@EqualsAndHashCode(callSuper = true)
 @TableName(value = "T_LH_MACHINE_ONLINE_INFO")
 public class LhMachineOnlineInfo extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "日期", name = "onlineDate")
+    @Excel(name = "ui.data.column.lhMachineOnlineInfo.onlineDate")
     @TableField(value = "ONLINE_DATE")
     private Date onlineDate;
 
     @ApiModelProperty(value = "硫化机台", name = "lhCode")
+    @Excel(name = "ui.data.column.lhMachineOnlineInfo.lhCode")
     @TableField(value = "LH_CODE")
     private String lhCode;
 
     @ApiModelProperty(value = "在机物料编码（NC）", name = "materialCode")
+    @Excel(name = "ui.data.column.lhMachineOnlineInfo.materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
     @ApiModelProperty(value = "在机物料编码（MES）", name = "mesMaterialCode")
+    @Excel(name = "ui.data.column.lhMachineOnlineInfo.mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
 
     @ApiModelProperty(value = "在机物料描述", name = "specDesc")
+    @Excel(name = "ui.data.column.lhMachineOnlineInfo.specDesc")
     @TableField(value = "SPEC_DESC")
     private String specDesc;
 
     @ApiModelProperty(value = "左右模", name = "lrMolds")
+    @Excel(name = "ui.data.column.lhMachineOnlineInfo.lrMolds")
     @TableField(value = "LR_MOLDS")
     private String lrMolds;
 
     @ApiModelProperty(value = "版本号", name = "dataVersion")
+    @Excel(name = "ui.data.column.lhMachineOnlineInfo.dataVersion")
     @TableField(value = "DATA_VERSION")
     private String dataVersion;
 
@@ -56,7 +66,8 @@ public class LhMachineOnlineInfo extends BaseEntity implements Serializable {
     private String companyCode;
 
     @ApiModelProperty(value = "厂别", name = "factoryCode")
+    @Excel(name = "ui.data.column.lhMachineOnlineInfo.factoryCode", dictType = "biz_factory_name")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
-
 }
+

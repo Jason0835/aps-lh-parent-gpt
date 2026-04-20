@@ -155,6 +155,19 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
         response.flushBuffer();
     }
 
+    @ApiOperation("导出SKU排产明细")
+    @RequiresPermissions("monthplan:factoryMonthPlanFinalResult:export")
+    @GetMapping({"/export"})
+    @ResponseBody
+    public void exportSkuScheduleItems(HttpServletResponse response, FactoryMonthPlanProductionFinalResult entity) throws IOException {
+        String fileName = this.getExportTemplateFileName();
+        byte[] excelBytes = iFactoryMonthPlanProductionFinalResultService.exportSkuScheduleItems(entity, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
+    }
+
     /**
      * 查询版本列表
      */

@@ -4,6 +4,7 @@ import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
@@ -15,12 +16,14 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -64,13 +67,35 @@ public class CxKeyProductController extends AbstractDocBizController<CxKeyProduc
 
     /**
      * 删除关键产品配置
+     * 重写父类方法，修复MyBatis Plus deleteBatchIds空指针异常
      */
     @Log(title = "ui.data.column.cxKeyProduct.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
     @PostMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
-        return super.removeByIds(ids);
+        // 空值校验：防止MyBatis Plus deleteBatchIds空指针异常
+        if (CollectionUtils.isEmpty(ids)) {
+            log.warn("删除关键产品配置时ID列表为空，跳过删除操作");
+            return AjaxResult.success(I18nUtil.getMessage("ui.message.delete.success"));
+        }
+        
+        // 过滤掉null值
+        List<Long> validIds = new ArrayList<>();
+        for (Long id : ids) {
+            if (id != null) {
+                validIds.add(id);
+            }
+        }
+        
+        if (validIds.isEmpty()) {
+            log.warn("删除关键产品配置时没有有效的ID，跳过删除操作");
+            return AjaxResult.success(I18nUtil.getMessage("ui.message.delete.success"));
+        }
+        
+        // 直接调用MyBatis Plus的deleteBatchIds，绕过AbstractDocService
+        int result = cxKeyProductMapper.deleteBatchIds(validIds);
+        return result > 0 ? AjaxResult.success() : AjaxResult.error();
     }
 
     /**
@@ -127,6 +152,8 @@ public class CxKeyProductController extends AbstractDocBizController<CxKeyProduc
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getEmbryoCode()), "EMBRYO_CODE", queryVO.getEmbryoCode());
         // 结构名称模糊查询
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getStructureName()), "STRUCTURE_NAME", queryVO.getStructureName());
+        // 胎胚描述模糊查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getEmbryoDesc()), "EMBRYO_DESC", queryVO.getEmbryoDesc());
         // 是否启用精确查询
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getIsActive()), "IS_ACTIVE", queryVO.getIsActive());
     }

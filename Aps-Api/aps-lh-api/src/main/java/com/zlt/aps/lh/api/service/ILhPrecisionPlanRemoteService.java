@@ -4,6 +4,8 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
+import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanExportVO;
+import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanImportVO;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
@@ -51,14 +53,14 @@ public interface ILhPrecisionPlanRemoteService {
      */
     @ApiOperation("导出硫化精度计划列表")
     @PostMapping("/lhPrecisionPlan/exportData")
-    List<LhPrecisionPlan> exportData(@RequestBody LhPrecisionPlan lhPrecisionPlan);
+    List<LhPrecisionPlanExportVO> exportData(@RequestBody LhPrecisionPlan lhPrecisionPlan);
 
     /**
      * 导入硫化精度计划数据
      */
     @ApiOperation("导入硫化精度计划数据")
     @PostMapping("/lhPrecisionPlan/importDataFeign")
-    AjaxResult importData(@RequestBody List<LhPrecisionPlan> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
+    AjaxResult importData(@RequestBody List<LhPrecisionPlanImportVO> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 
     /**
      * 从MES同步数据生成硫化精度初版计划
@@ -129,4 +131,14 @@ public interface ILhPrecisionPlanRemoteService {
     @ApiOperation("根据设备保养计划生成并推算硫化精度计划")
     @PostMapping("/lhPrecisionPlan/generateFromMaintenance")
     AjaxResult generateFromMaintenancePlan(@RequestBody List<Long> maintenancePlanIds);
+
+    /**
+     * 校验唯一性
+     *
+     * @param lhPrecisionPlan 硫化精度计划实体
+     * @return 校验结果
+     */
+    @ApiOperation("校验唯一性")
+    @PostMapping("/lhPrecisionPlan/checkUnique")
+    String checkUnique(@RequestBody LhPrecisionPlan lhPrecisionPlan);
 }

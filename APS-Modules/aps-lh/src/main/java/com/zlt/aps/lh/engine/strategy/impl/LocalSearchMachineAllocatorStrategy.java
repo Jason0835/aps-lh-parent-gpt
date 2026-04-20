@@ -3,6 +3,9 @@
  */
 package com.zlt.aps.lh.engine.strategy.impl;
 
+import com.zlt.aps.lh.api.constant.LhScheduleConstant;
+import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
@@ -260,7 +263,7 @@ public class LocalSearchMachineAllocatorStrategy {
         }
         String machineCode = machine.getMachineCode();
         // 按“机台准备 -> 换模 -> 首检 -> 产能估算”的顺序串行预占资源
-        Date machineEndTime = resolveMachineEndTime(machine, virtualMachineEndTimeMap);
+        Date machineEndTime = resolveMachineEndTime(context, machine, shifts, virtualMachineEndTimeMap);
         Date machineReadyTime = capacityCalculate.calculateStartTime(context, machineCode, machineEndTime);
         Date mouldChangeStartTime = mouldChangeBalance.allocateMouldChange(context, machineReadyTime);
         if (mouldChangeStartTime == null) {
@@ -274,7 +277,8 @@ public class LocalSearchMachineAllocatorStrategy {
             mouldChangeBalance.rollbackMouldChange(context, mouldChangeStartTime);
             return null;
         }
-        Date productionStartTime = LhScheduleTimeUtil.addHours(inspectionTime, LhScheduleTimeUtil.getFirstInspectionHours(context));
+        // 业务口径：换模总时长已包含首检时长，局部搜索与主流程保持一致，不再额外 +FIRST_INSPECTION_HOURS
+        Date productionStartTime = inspectionTime;
         LocalSearchCapacityEstimate capacityEstimate = estimateCapacity(
                 context, sku, machine, productionStartTime, shifts);
         if (capacityEstimate.getTotalQty() <= 0 || capacityEstimate.getSpecEndTime() == null) {
@@ -333,6 +337,12 @@ public class LocalSearchMachineAllocatorStrategy {
         if (lhTimeSeconds <= 0 || remainingQty <= 0) {
             return LocalSearchCapacityEstimate.empty();
         }
+        List<MachineCleaningWindowDTO> cleaningWindowList = CollectionUtils.isEmpty(machine.getCleaningWindowList())
+                ? new ArrayList<>() : machine.getCleaningWindowList();
+        int dryIceLossQty = context.getParamIntValue(
+                LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY);
+        int dryIceDurationHours = context.getParamIntValue(
+                LhScheduleParamConstant.DRY_ICE_DURATION_HOURS, LhScheduleConstant.DRY_ICE_DURATION_HOURS);
 
         Date cursorStartTime = productionStartTime;
         Date specEndTime = null;
@@ -357,8 +367,18 @@ public class LocalSearchMachineAllocatorStrategy {
             }
 
             // 统一按班产主口径或回退公式估算残班/整班计划量。
-            int shiftMaxQty = ShiftCapacityResolverUtil.resolveShiftCapacity(
-                    shift, effectiveStartTime, shiftCapacity, lhTimeSeconds, mouldQty);
+            int shiftMaxQty = ShiftCapacityResolverUtil.resolveShiftCapacityWithDowntime(
+                    context.getDevicePlanShutList(),
+                    cleaningWindowList,
+                    machine.getMachineCode(),
+                    effectiveStartTime,
+                    shift.getShiftEndDateTime(),
+                    shiftCapacity,
+                    lhTimeSeconds,
+                    mouldQty,
+                    ShiftCapacityResolverUtil.resolveShiftDurationSeconds(shift),
+                    dryIceLossQty,
+                    dryIceDurationHours);
             if (shiftMaxQty <= 0) {
                 continue;
             }
@@ -369,8 +389,14 @@ public class LocalSearchMachineAllocatorStrategy {
             }
             totalQty += allocationQty;
             remainingQty -= allocationQty;
-            long productionSeconds = (long) Math.ceil((double) allocationQty / mouldQty) * lhTimeSeconds;
-            specEndTime = new Date(effectiveStartTime.getTime() + productionSeconds * 1000L);
+            specEndTime = ShiftCapacityResolverUtil.resolveShiftPlanEndTime(
+                    context.getDevicePlanShutList(),
+                    cleaningWindowList,
+                    machine.getMachineCode(),
+                    effectiveStartTime,
+                    shift.getShiftEndDateTime(),
+                    allocationQty,
+                    shiftMaxQty);
             // 当前班次结束后再推进到下一班次，避免跨班次重叠计算
             cursorStartTime = shift.getShiftEndDateTime();
         }
@@ -389,13 +415,22 @@ public class LocalSearchMachineAllocatorStrategy {
      * @param virtualMachineEndTimeMap 虚拟机台结束时间
      * @return 机台结束时间
      */
-    private Date resolveMachineEndTime(MachineScheduleDTO machine, Map<String, Date> virtualMachineEndTimeMap) {
+    private Date resolveMachineEndTime(LhScheduleContext context,
+                                       MachineScheduleDTO machine,
+                                       List<LhShiftConfigVO> shifts,
+                                       Map<String, Date> virtualMachineEndTimeMap) {
         Date virtualEndTime = virtualMachineEndTimeMap.get(machine.getMachineCode());
         if (virtualEndTime != null) {
             return virtualEndTime;
         }
         if (machine.getEstimatedEndTime() != null) {
             return machine.getEstimatedEndTime();
+        }
+        if (!CollectionUtils.isEmpty(shifts) && shifts.get(0).getShiftStartDateTime() != null) {
+            return shifts.get(0).getShiftStartDateTime();
+        }
+        if (context != null && context.getScheduleDate() != null) {
+            return context.getScheduleDate();
         }
         return new Date();
     }

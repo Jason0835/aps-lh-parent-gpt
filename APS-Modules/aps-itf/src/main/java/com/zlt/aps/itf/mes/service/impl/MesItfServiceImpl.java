@@ -1027,21 +1027,21 @@ public class MesItfServiceImpl implements MesItfService {
                         }
                     }
 
-                    if (!cx15Ids.isEmpty()) {
-                        try {
-                            cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx15Ids, 15);
-                        } catch (Exception e) {
-                            log.error("自动生成并推算成型精度计划（15天）失败", e);
-                        }
-                    }
-
-                    if (!cx60Ids.isEmpty()) {
-                        try {
-                            cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx60Ids, 60);
-                        } catch (Exception e) {
-                            log.error("自动生成并推算成型精度计划（60天）失败", e);
-                        }
-                    }
+//                    if (!cx15Ids.isEmpty()) {
+//                        try {
+//                            cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx15Ids, 15);
+//                        } catch (Exception e) {
+//                            log.error("自动生成并推算成型精度计划（15天）失败", e);
+//                        }
+//                    }
+//
+//                    if (!cx60Ids.isEmpty()) {
+//                        try {
+//                            cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx60Ids, 60);
+//                        } catch (Exception e) {
+//                            log.error("自动生成并推算成型精度计划（60天）失败", e);
+//                        }
+//                    }
                 } catch (Exception e) {
                     log.error("自动生成并推算精度计划失败", e);
                 }

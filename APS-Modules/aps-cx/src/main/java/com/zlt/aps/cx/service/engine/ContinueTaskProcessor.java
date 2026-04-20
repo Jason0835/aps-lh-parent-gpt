@@ -2,16 +2,21 @@ package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
+
 import com.zlt.aps.cx.service.engine.ScheduleDayTypeHelper.DayFlagInfo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+import java.math.BigDecimal;
+import java.sql.Date;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -105,16 +110,33 @@ public class ContinueTaskProcessor {
             String machineCode = historyEntry.getKey();
             Set<String> historyEmbryos = historyEntry.getValue();
 
+            // 跳过无效数据
+            if (machineCode == null || historyEmbryos == null || historyEmbryos.isEmpty()) {
+                continue;
+            }
+
             for (String embryoCode : historyEmbryos) {
+                // 跳过 null 胎胚编码
+                if (embryoCode == null) {
+                    continue;
+                }
+                
                 // 在续作任务列表中找到 demand > 0 的任务
                 CoreScheduleAlgorithmService.DailyEmbryoTask matchedTask = null;
                 for (CoreScheduleAlgorithmService.DailyEmbryoTask task : continueTasks) {
-                    if (embryoCode.equals(task.getEmbryoCode())) {
-                        int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
-                        if (demand > 0) {
-                            matchedTask = task;
-                            break;
-                        }
+                    // 跳过 null 任务
+                    if (task == null) {
+                        continue;
+                    }
+                    String taskEmbryoCode = task.getEmbryoCode();
+                    // 跳过 null 胎胚编码比较
+                    if (taskEmbryoCode == null || !embryoCode.equals(taskEmbryoCode)) {
+                        continue;
+                    }
+                    int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
+                    if (demand > 0) {
+                        matchedTask = task;
+                        break;
                     }
                 }
 

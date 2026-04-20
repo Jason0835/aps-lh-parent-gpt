@@ -2,6 +2,7 @@ package com.zlt.aps.lh.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
+import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanVo;
 import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import com.zlt.bill.common.service.IDocService;
@@ -77,4 +78,14 @@ public interface ILhPrecisionPlanService extends IDocService<LhPrecisionPlan> {
      * @return 生成数量
      */
     int generateFromMaintenancePlan(List<MdmDevMaintenancePlan> maintenancePlans);
+
+    /**
+     * 导入硫化精度计划数据
+     *
+     * @param list 导入数据列表
+     * @param updateSupport 是否更新支持
+     * @param importLogId 导入日志ID
+     * @return 导入结果
+     */
+    AjaxResult importDataFeign(List<LhPrecisionPlanImportVO> list, boolean updateSupport, Long importLogId);
 }

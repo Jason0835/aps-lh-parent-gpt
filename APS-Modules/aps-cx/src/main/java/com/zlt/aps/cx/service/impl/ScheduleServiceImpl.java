@@ -300,7 +300,15 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载硫化排程结果失败，继续执行：{}", e.getMessage());
             }
 
-            // 5. 根据硫化排程结果获取物料信息
+            // 5. 获取成型在机信息（需要在获取物料信息之前，以便补充物料来源）
+            try {
+                loadOnlineInfos(context, scheduleStartDate);
+                log.info("成型在机信息加载完成");
+            } catch (Exception e) {
+                log.warn("加载成型在机信息失败，继续执行：{}", e.getMessage());
+            }
+
+            // 6. 根据硫化排程结果和成型在机信息获取物料信息
             try {
                 loadMaterials(context);
                 log.info("物料信息加载完成");
@@ -308,20 +316,12 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载物料信息失败，继续执行：{}", e.getMessage());
             }
 
-            // 6. 获取胎胚库存信息（根据排产起始日期获取早上6点的库存）
+            // 7. 获取胎胚库存信息（根据排产起始日期获取早上6点的库存）
             try {
                 loadStocks(context, scheduleStartDate);
                 log.info("胎胚库存信息加载完成");
             } catch (Exception e) {
                 log.warn("加载胎胚库存信息失败，继续执行：{}", e.getMessage());
-            }
-
-            // 7. 获取成型在机信息
-            try {
-                loadOnlineInfos(context, scheduleStartDate);
-                log.info("成型在机信息加载完成");
-            } catch (Exception e) {
-                log.warn("加载成型在机信息失败，继续执行：{}", e.getMessage());
             }
 
             // 8. 构建机台在机胎胚映射（后续会根据成型余量过滤）
@@ -544,36 +544,59 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     /**
      * 加载物料信息
+     *
+     * <p>物料来源包括两部分：
+     * 1. 硫化排程结果的物料
+     * 2. 成型在机信息的物料（可能存在没有硫化任务但存在在机信息的物料）
      */
     private void loadMaterials(ScheduleContextVo context) {
         List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
+        List<CxMachineOnlineInfo> onlineInfos = context.getOnlineInfos();
 
-        if (lhScheduleResults == null || lhScheduleResults.isEmpty()) {
-            log.info("硫化排程结果为空，加载物料信息 0 条");
+        // 合并硫化任务物料和成型在机物料
+        Set<String> materialCodes = new HashSet<>();
+
+        // 1. 从硫化排程结果提取物料编码
+        if (lhScheduleResults != null && !lhScheduleResults.isEmpty()) {
+            Set<String> lhMaterialCodes = lhScheduleResults.stream()
+                    .map(LhScheduleResult::getMaterialCode)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            materialCodes.addAll(lhMaterialCodes);
+            log.debug("从硫化排程结果提取到 {} 个不重复的外胎代码", lhMaterialCodes.size());
+        }
+
+        // 2. 从成型在机信息提取物料编码
+        if (onlineInfos != null && !onlineInfos.isEmpty()) {
+            Set<String> onlineMaterialCodes = onlineInfos.stream()
+                    .map(CxMachineOnlineInfo::getMaterialCode)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            int newCodes = 0;
+            for (String code : onlineMaterialCodes) {
+                if (materialCodes.add(code)) {
+                    newCodes++;
+                }
+            }
+            log.debug("从成型在机信息提取到 {} 个不重复的外胎代码，其中 {} 个是新增的",
+                    onlineMaterialCodes.size(), newCodes);
+        }
+
+        if (materialCodes.isEmpty()) {
+            log.info("硫化排程结果和成型在机信息均为空，加载物料信息 0 条");
             context.setMaterials(new ArrayList<>());
             return;
         }
 
-        Set<String> materialCodes = lhScheduleResults.stream()
-                .map(LhScheduleResult::getMaterialCode)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        log.info("合并后共有 {} 个不重复的外胎代码（硫化任务 + 成型在机）", materialCodes.size());
 
-        log.debug("从硫化排程结果提取到 {} 个不重复的外胎代码", materialCodes.size());
+        // 查询物料详情
+        List<MdmMaterialInfo> materials = materialInfoMapper.selectList(
+                new LambdaQueryWrapper<MdmMaterialInfo>()
+                        .in(MdmMaterialInfo::getMaterialCode, materialCodes)
+                        .eq(MdmMaterialInfo::getIsDelete, "0"));
+        log.info("加载物料信息 {} 条", materials.size());
 
-        List<MdmMaterialInfo> materials;
-        if (!materialCodes.isEmpty()) {
-            // 使用 embryoCode 查询物料信息（一个物料对应一个胎胚），只查询未删除的数据
-            materials = materialInfoMapper.selectList(
-                    new LambdaQueryWrapper<MdmMaterialInfo>()
-                            .in(MdmMaterialInfo::getMaterialCode, materialCodes)
-                            .eq(MdmMaterialInfo::getIsDelete, "0"));
-            log.info("根据硫化排程结果加载物料信息 {} 条，涉及 {} 个外胎", materials.size(), materialCodes.size());
-        } else {
-            materials = new ArrayList<>();
-            log.warn("硫化排程结果中包含 {} 条记录，但没有有效的外胎代码 (materialCodes 均为 null)，加载物料信息 0 条",
-                    lhScheduleResults.size());
-        }
         context.setMaterials(materials);
     }
 

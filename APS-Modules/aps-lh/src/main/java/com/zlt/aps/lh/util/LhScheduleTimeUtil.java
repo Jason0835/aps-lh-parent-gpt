@@ -240,6 +240,19 @@ public final class LhScheduleTimeUtil {
     }
 
     /**
+     * 获取换活字块总耗时（小时）
+     *
+     * @param context 排程上下文
+     * @return 换活字块总耗时（小时）
+     */
+    public static int getTypeBlockChangeTotalHours(LhScheduleContext context) {
+        if (Objects.isNull(context) || Objects.isNull(context.getScheduleConfig())) {
+            return LhScheduleConstant.TYPE_BLOCK_CHANGE_TOTAL_HOURS;
+        }
+        return context.getScheduleConfig().getTypeBlockChangeTotalHours();
+    }
+
+    /**
      * 获取首检时间（小时）
      *
      * @param context 排程上下文
@@ -486,6 +499,22 @@ public final class LhScheduleTimeUtil {
         cal.setTime(time);
         int hour = cal.get(Calendar.HOUR_OF_DAY);
         return hour >= afternoonHour && hour < nightHour;
+    }
+
+    /**
+     * 判断指定时间是否在夜班时段
+     *
+     * @param context 排程上下文
+     * @param time    时间点
+     * @return true-夜班时段
+     */
+    public static boolean isNightShift(LhScheduleContext context, Date time) {
+        int nightHour = getNightStartHour(context);
+        int morningHour = getMorningStartHour(context);
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(time);
+        int hour = cal.get(Calendar.HOUR_OF_DAY);
+        return hour >= nightHour || hour < morningHour;
     }
 
     /**
