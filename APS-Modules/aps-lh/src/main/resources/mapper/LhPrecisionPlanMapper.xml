@@ -91,7 +91,7 @@
                 AND CREATE_TIME &lt;= #{createTimeEnd}
             </if>
         </where>
-        order by PLAN_DATE asc, MACHINE_CODE asc
+        order by UPDATE_TIME desc, MACHINE_CODE asc
     </select>
 
     <select id="selectByMachineCodeAndYear" resultMap="LhPrecisionPlanResult">

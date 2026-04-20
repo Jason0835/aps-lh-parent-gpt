@@ -163,7 +163,7 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
 
     @Override
     protected String getOrderBy() {
-        return "PLAN_DATE desc, ID desc";
+        return "UPDATE_TIME desc, MACHINE_CODE asc";
     }
 
     @Override
