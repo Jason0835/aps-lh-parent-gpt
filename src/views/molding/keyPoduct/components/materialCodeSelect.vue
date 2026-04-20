@@ -78,8 +78,8 @@ export default {
       query: {},
       showValue: "",
       loading: false,
-      valueProp: "materialCode",
-      labelProp: "materialCode",
+      valueProp: "embryoCode",
+      labelProp: "embryoCode",
       data: [],
 
       allSelectData: [],
@@ -97,6 +97,10 @@ export default {
         {
           label: this.$t("ui.data.colume.wms.unused.productCode"),
           prop: "materialCode",
+        },
+        {
+          label: this.$t("ui.data.rubberMaterial.embryoCode"),
+          prop: "embryoCode",
         },
       ];
     },
