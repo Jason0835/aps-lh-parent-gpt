@@ -2348,7 +2348,7 @@
   "ui.lh.precision.plan.plan.date": "计划日期",
   "ui.lh.precision.plan.actual.date": "实际日期",
   "ui.lh.precision.plan.due.date": "到期日期",
-  "ui.lh.precision.plan.days.to.due": "剩余天数",
+  "ui.lh.precision.plan.days.to.due": "到期日",
   "ui.lh.precision.plan.last.maintenance.date": "上次保养日期",
   "ui.lh.precision.plan.completion.status": "完成状态",
   "ui.lh.precision.plan.year": "计划年度",

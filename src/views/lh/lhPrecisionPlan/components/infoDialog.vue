@@ -164,7 +164,7 @@
               style="width: 100%"
             >
               <el-option
-                v-for="item in parentDict.type.lh_data_source"
+                v-for="item in parentDict.type.lh_precision_data_source"
                 :key="item.value"
                 :label="item.label"
                 :value="item.value"

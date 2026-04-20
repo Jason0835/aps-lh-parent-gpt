@@ -83,7 +83,7 @@ export default {
     infoDialog,
     TltUploadForm
   },
-  dicts: ["biz_factory_name", "lh_machine", "lh_precision_type", "lh_completion_status", "lh_warning_status", "lh_data_source"],
+  dicts: ["biz_factory_name", "lh_machine", "lh_precision_type", "lh_completion_status", "lh_warning_status", "lh_precision_data_source"],
   provide() {
     return {
       parentDict: this.dict,
@@ -133,6 +133,10 @@ export default {
           },
         },
         {
+          prop: "year",
+          label: this.$t("ui.lh.precision.plan.year"),
+        },
+        {
           prop: "machineCode",
           label: this.$t("ui.lh.precision.plan.machine.code"),
           formatter: (row, column, value) => {
@@ -155,50 +159,24 @@ export default {
           label: this.$t("ui.lh.precision.plan.actual.date"),
         },
         {
-          prop: "dueDate",
-          label: this.$t("ui.lh.precision.plan.due.date"),
-        },
-        {
           prop: "daysToDue",
           label: this.$t("ui.lh.precision.plan.days.to.due"),
-        },
-        {
-          prop: "lastMaintenanceDate",
-          label: this.$t("ui.lh.precision.plan.last.maintenance.date"),
-        },
-        {
-          prop: "completionStatus",
-          label: this.$t("ui.lh.precision.plan.completion.status"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.lh_completion_status, value);
-          },
-        },
-        {
-          prop: "year",
-          label: this.$t("ui.lh.precision.plan.year"),
-        },
-        {
-          prop: "warningStatus",
-          label: this.$t("ui.lh.precision.plan.warning.status"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.lh_warning_status, value);
-          },
-        },
-        {
-          prop: "warningDate",
-          label: this.$t("ui.lh.precision.plan.warning.date"),
         },
         {
           prop: "dataSource",
           label: this.$t("ui.lh.precision.plan.data.source"),
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.lh_data_source, value);
+            return this.selectDictLabel(this.dict.type.lh_precision_data_source, value);
           },
         },
         {
           prop: "updateTime",
           width: 180,
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
+        },
+        {
+          prop: "remark",
+          label: this.$t("ui.data.column.remark"),
         },
         {
           align: "center",
