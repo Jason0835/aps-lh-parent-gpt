@@ -2,277 +2,214 @@
   <el-dialog
     :title="title"
     :visible="visible"
-    width="600px"
+    width="700px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
     :append-to-body="true"
   >
-    <el-form
+    <info-form
+      class="form-item-height"
       ref="form"
-      :model="form"
+      :form="form"
       :rules="rules"
+      :columns="columns"
       label-position="right"
-      label-width="120px"
+      label-width="140px"
       v-loading="loading"
-    >
-      <el-row>
-        <el-col :span="24">
-          <el-form-item :label="$t('common.factory')" prop="factoryCode">
-            <el-select
-              v-model="form.factoryCode"
-              :placeholder="$t('common.rule.select')"
-              clearable
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in parentDict.type.biz_factory_name"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.lh.precision.plan.machine.code')" prop="machineCode">
-            <el-select
-              v-model="form.machineCode"
-              :placeholder="$t('common.rule.select')"
-              filterable
-              clearable
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in parentDict.type.lh_machine"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.lh.precision.plan.precision.type')" prop="precisionType">
-            <el-select
-              v-model="form.precisionType"
-              :placeholder="$t('common.rule.select')"
-              clearable
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in parentDict.type.lh_precision_type"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.lh.precision.plan.plan.date')" prop="planDate">
-            <el-date-picker
-              v-model="form.planDate"
-              type="date"
-              :placeholder="$t('common.rule.select')"
-              value-format="yyyy-MM-dd"
-              style="width: 100%"
-              clearable
-              popper-class="el-popper"
-              editable
-            >
-            </el-date-picker>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.lh.precision.plan.actual.date')" prop="actualDate">
-            <el-date-picker
-              v-model="form.actualDate"
-              type="date"
-              :placeholder="$t('common.rule.select')"
-              value-format="yyyy-MM-dd"
-              style="width: 100%"
-              clearable
-              popper-class="el-popper"
-              editable
-            >
-            </el-date-picker>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.lh.precision.plan.due.date')" prop="dueDate">
-            <el-date-picker
-              v-model="form.dueDate"
-              type="date"
-              :placeholder="$t('common.rule.select')"
-              value-format="yyyy-MM-dd"
-              style="width: 100%"
-              clearable
-              popper-class="el-popper"
-              editable
-            >
-            </el-date-picker>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.lh.precision.plan.last.maintenance.date')" prop="lastMaintenanceDate">
-            <el-date-picker
-              v-model="form.lastMaintenanceDate"
-              type="date"
-              :placeholder="$t('common.rule.select')"
-              value-format="yyyy-MM-dd"
-              style="width: 100%"
-              clearable
-              popper-class="el-popper"
-              editable
-            >
-            </el-date-picker>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.lh.precision.plan.completion.status')" prop="completionStatus">
-            <el-select
-              v-model="form.completionStatus"
-              :placeholder="$t('common.rule.select')"
-              clearable
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in parentDict.type.lh_completion_status"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.lh.precision.plan.year')" prop="year">
-            <el-input
-              v-model="form.year"
-              :placeholder="$t('common.rule.input')"
-              clearable
-            />
-          </el-form-item>
-        </el-col>
-        <el-col :span="24">
-          <el-form-item :label="$t('ui.lh.precision.plan.data.source')" prop="dataSource">
-            <el-select
-              v-model="form.dataSource"
-              :placeholder="$t('common.rule.select')"
-              clearable
-              style="width: 100%"
-            >
-              <el-option
-                v-for="item in parentDict.type.lh_precision_data_source"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-      </el-row>
-    </el-form>
+    />
     <template slot="footer">
-      <el-button @click="hide">{{ $t("common.button.cancel") }}</el-button>
-      <el-button type="primary" :loading="loading" @click="handleConfirm">{{
-        $t("common.button.confirm")
-      }}</el-button>
+      <el-button @click="hide">{{ $t('common.button.cancel') }}</el-button>
+      <el-button type="primary" :loading="loading" @click="handleConfirm">
+        {{ $t('common.button.confirm') }}
+      </el-button>
     </template>
   </el-dialog>
 </template>
 
 <script>
-import { saveLhPrecisionPlan } from "@/api/lh/lhPrecisionPlan";
+import { checkLhPrecisionPlanUnique, saveLhPrecisionPlan } from '@/api/lh/lhPrecisionPlan'
+import { listMachine } from '@/api/lh/machine'
+import infoForm from '@/views/components/infoForm.vue'
 
 export default {
-  inject: ["parentDict"],
+  name: 'InfoDialog',
+  components: { infoForm },
+  inject: ['parentDict'],
   data() {
     return {
-      loading: false,
       visible: false,
+      loading: false,
       isEdit: false,
+      dict: this.parentDict,
       form: {},
+      machineList: [],
+      yearList: [],
       rules: {
-        factoryCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        machineCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        precisionType: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        planDate: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-      },
-    };
+        factoryCode: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
+        machineCode: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
+        precisionType: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
+        planDate: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
+        actualDate: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
+        dataSource: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }]
+      }
+    }
   },
   computed: {
-    title: function () {
-      return this.isEdit
-        ? this.$t("common.button.edit")
-        : this.$t("common.button.add");
+    title() {
+      return this.isEdit ? this.$t('common.button.edit') : this.$t('common.button.add')
     },
+    columns() {
+      return [
+        {
+          prop: 'factoryCode',
+          label: this.$t('common.factory'),
+          type: 'select',
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+          required: true
+        },
+        {
+          prop: 'year',
+          label: this.$t('ui.lh.precision.plan.year'),
+          type: 'select',
+          dictData: this.yearList,
+          props: {
+            label: 'label',
+            value: 'value'
+          },
+          required: true
+        },
+        {
+          prop: 'machineCode',
+          label: this.$t('ui.lh.precision.plan.machine.code'),
+          type: 'select',
+          dictData: this.machineList,
+          filterable: true,
+          required: true
+        },
+        {
+          prop: 'precisionType',
+          label: this.$t('ui.lh.precision.plan.precision.type'),
+          type: 'select',
+          dictData: this.dict.type.lh_precision_type,
+          filterable: true,
+          disabled: true,
+          required: true
+        },
+        {
+          prop: 'planDate',
+          label: this.$t('ui.lh.precision.plan.plan.date'),
+          type: 'date',
+          valueFormat: 'yyyy-MM-dd',
+          required: true
+        },
+        {
+          prop: 'actualDate',
+          label: this.$t('ui.lh.precision.plan.actual.date'),
+          type: 'date',
+          valueFormat: 'yyyy-MM-dd',
+          required: true
+        },
+        {
+          prop: 'dataSource',
+          label: this.$t('ui.lh.precision.plan.data.source'),
+          type: 'select',
+          dictData: this.dict.type.lh_precision_data_source,
+          disabled: true,
+          required: true
+        },
+        {
+          prop: 'remark',
+          label: this.$t('ui.common.column.remark'),
+          type: 'textarea',
+          rows: 3,
+          maxlength: 300
+        }
+      ]
+    }
   },
   methods: {
-    async save() {
-      try {
-        this.loading = true;
-        const res = await saveLhPrecisionPlan(this.form);
-        this.$modal.msgSuccess(res.msg || this.$t("common.success"));
-        this.$emit("success");
-        this.hide();
-      } catch (error) {
-        console.log(error);
-      } finally {
-        this.loading = false;
+    initYearList() {
+      const currentYear = new Date().getFullYear()
+      const years = []
+      for (let i = currentYear - 2; i <= currentYear + 2; i++) {
+        years.push({
+          label: i.toString(),
+          value: i.toString()
+        })
       }
+      this.yearList = years
     },
-    show(data) {
-      this.visible = true;
-      if (data) {
-        this.isEdit = true;
-        this.form = { ...data };
+    show(row) {
+      this.visible = true
+      this.machineList = []
+      this.initYearList()
+      if (row) {
+        this.isEdit = true
+        this.form = { ...row }
       } else {
-        this.form = {
-          factoryCode: "116",
-        };
+        this.isEdit = false
+        this.form = { factoryCode: '116', dataSource: '1' }
       }
+      if (!this.form.dataSource) {
+        this.form.dataSource = '1'
+      }
+      this.getMachineList()
     },
     hide() {
-      this.form = {};
-      if (this.$refs.form) {
-        this.$refs.form.resetFields();
+      this.visible = false
+      this.form = {}
+      this.machineList = []
+      this.$refs.form && this.$refs.form.triggerResetForm()
+    },
+    async getMachineList() {
+      try {
+        const res = await listMachine(this.form.factoryCode ? { factoryCode: this.form.factoryCode } : {})
+        const list = res.rows || []
+        const map = new Map()
+        // 如果是编辑模式，先将当前选中的硫化机加入列表
+        if (this.isEdit && this.form.machineCode) {
+          map.set(this.form.machineCode, {
+            label: this.form.machineCode,
+            value: this.form.machineCode
+          })
+        }
+        // 再将接口返回的硫化机加入列表
+        list.forEach((item) => {
+          if (item && item.machineCode) {
+            map.set(item.machineCode, {
+              label: item.machineCode,
+              value: item.machineCode
+            })
+          }
+        })
+        this.machineList = Array.from(map.values())
+      } catch (e) {
+        this.machineList = []
+        console.error(e)
       }
-      this.isEdit = false;
-      this.visible = false;
     },
     handleConfirm() {
-      this.$refs.form.validate((valid) => {
-        if (valid) {
-          this.save();
-        }
-      });
+      this.$refs.form.triggerConfirm(this.save)
     },
-  },
-};
+    async save(payload) {
+      payload.dataSource = payload.dataSource || '1'
+      const uniqueRes = await checkLhPrecisionPlanUnique(payload)
+      if (uniqueRes === '1') {
+        this.$modal.msgError(this.$t('ui.data.alert.lhPrecisionPlan.notUnique'))
+        return
+      }
+      try {
+        this.loading = true
+        const res = await saveLhPrecisionPlan(payload)
+        this.$modal.msgSuccess(res.msg || this.$t('common.success'))
+        this.$emit('success')
+        this.hide()
+      } finally {
+        this.loading = false
+      }
+    }
+  }
+}
 </script>

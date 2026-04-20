@@ -2,7 +2,7 @@ import request from '@/utils/request'
 
 export function listLhPrecisionPlan(query) {
   return request({
-    url: '/schedule/lhPrecisionPlan/list',
+    url: '/lh/lhPrecisionPlan/list',
     method: 'post',
     data: query
   })
@@ -10,14 +10,14 @@ export function listLhPrecisionPlan(query) {
 
 export function getLhPrecisionPlan(id) {
   return request({
-    url: '/schedule/lhPrecisionPlan/' + id,
+    url: '/lh/lhPrecisionPlan/' + id,
     method: 'get'
   })
 }
 
 export function saveLhPrecisionPlan(data) {
   return request({
-    url: '/schedule/lhPrecisionPlan/save',
+    url: '/lh/lhPrecisionPlan/save',
     method: 'post',
     data: data
   })
@@ -25,7 +25,7 @@ export function saveLhPrecisionPlan(data) {
 
 export function removeLhPrecisionPlan(ids) {
   return request({
-    url: '/schedule/lhPrecisionPlan/remove',
+    url: '/lh/lhPrecisionPlan/remove',
     method: 'post',
     params: { ids: ids }
   })
@@ -33,7 +33,7 @@ export function removeLhPrecisionPlan(ids) {
 
 export function syncFromMes(year) {
   return request({
-    url: '/schedule/lhPrecisionPlan/generateFromMes',
+    url: '/lh/lhPrecisionPlan/generateFromMes',
     method: 'post',
     params: { year: year }
   })
@@ -41,7 +41,7 @@ export function syncFromMes(year) {
 
 export function autoGeneratePlans(year) {
   return request({
-    url: '/schedule/lhPrecisionPlan/autoGenerateYearly',
+    url: '/lh/lhPrecisionPlan/autoGenerateYearly',
     method: 'post',
     params: { year: year }
   })
@@ -49,16 +49,32 @@ export function autoGeneratePlans(year) {
 
 export function checkWarning() {
   return request({
-    url: '/schedule/lhPrecisionPlan/checkWarning',
+    url: '/lh/lhPrecisionPlan/checkWarning',
     method: 'post'
   })
 }
 
 export function exportLhPrecisionPlan(query) {
   return request({
-    url: '/schedule/lhPrecisionPlan/export',
+    url: '/lh/lhPrecisionPlan/export',
     method: 'get',
     params: query,
     responseType: 'blob'
+  })
+}
+
+export function checkLhPrecisionPlanUnique(data) {
+  return request({
+    url: '/lh/lhPrecisionPlan/checkUnique',
+    method: 'post',
+    data
+  })
+}
+
+export function listLhMachineInfo(data) {
+  return request({
+    url: '/lh/lhPrecisionPlan/getMachineList',
+    method: 'post',
+    data
   })
 }

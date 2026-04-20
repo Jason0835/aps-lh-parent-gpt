@@ -53,12 +53,12 @@
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-      downloadUrl="/schedule/lhPrecisionPlan/importTemplate"
-      uploadUrl="/schedule/lhPrecisionPlan/importData"
+      :downloadUrl="importTemplateUrl"
+      :uploadUrl="importUrl"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
-    ></tlt-upload-form>
+    />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -72,14 +72,13 @@ import {
   autoGeneratePlans,
   checkWarning
 } from "@/api/lh/lhPrecisionPlan";
+import { listMachine } from "@/api/lh/machine";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "LhPrecisionPlan",
   components: {
-    tltUpload,
     infoDialog,
     TltUploadForm
   },
@@ -119,7 +118,13 @@ export default {
       search: {},
       query: {},
       yearList: [],
+      machineList: [],
+      importUrl: '/lh/lhPrecisionPlan/importData',
+      importTemplateUrl: '/lh/lhPrecisionPlan/importTemplate'
     };
+  },
+  mounted() {
+    this.getMachineList();
   },
   computed: {
     columns() {
@@ -161,6 +166,9 @@ export default {
         {
           prop: "daysToDue",
           label: this.$t("ui.lh.precision.plan.days.to.due"),
+          formatter: (row, column, value) => {
+            return value < 0 ? 0 : value;
+          },
         },
         {
           prop: "dataSource",
@@ -172,7 +180,7 @@ export default {
         {
           prop: "updateTime",
           width: 180,
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.lh.precision.plan.updateTime"),
         },
         {
           prop: "remark",
@@ -215,7 +223,7 @@ export default {
           label: this.$t("ui.lh.precision.plan.year"),
           prop: "year",
           type: "select",
-          dicData: this.yearList,
+          dictData: this.yearList,
           value: new Date().getFullYear().toString(),
         },
         {
@@ -228,14 +236,8 @@ export default {
           label: this.$t("ui.lh.precision.plan.machine.code"),
           prop: "machineCode",
           type: "select",
-          dictData: this.dict.type.lh_machine,
+          dictData: this.machineList,
           filterable: true,
-        },
-        {
-          label: this.$t("ui.lh.precision.plan.precision.type"),
-          prop: "precisionType",
-          type: "select",
-          dictData: this.dict.type.lh_precision_type,
         },
         {
           label: this.$t("ui.lh.precision.plan.plan.date"),
@@ -259,6 +261,19 @@ export default {
     },
   },
   methods: {
+    getDaysToDueValue(planDate) {
+      if (!planDate) {
+        return ''
+      }
+      const target = new Date(planDate)
+      if (Number.isNaN(target.getTime())) {
+        return ''
+      }
+      const now = new Date()
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const startOfTarget = new Date(target.getFullYear(), target.getMonth(), target.getDate())
+      return Math.floor((startOfToday.getTime() - startOfTarget.getTime()) / 86400000)
+    },
     initYearList() {
       const currentYear = new Date().getFullYear();
       const years = [];
@@ -269,6 +284,26 @@ export default {
         });
       }
       this.yearList = years;
+    },
+    async getMachineList() {
+      try {
+        const res = await listMachine({});
+        const list = res.rows || [];
+        const map = new Map();
+        list.forEach((item) => {
+          if (item && item.machineCode) {
+            // 转换为 dictData 格式：包含 label 和 value
+            map.set(item.machineCode, {
+              label: item.machineCode,
+              value: item.machineCode
+            });
+          }
+        });
+        this.machineList = Array.from(map.values());
+      } catch (e) {
+        this.machineList = [];
+        console.error(e);
+      }
     },
     handleSyncFromMes() {
       const year = this.query.year || new Date().getFullYear().toString();
@@ -319,11 +354,11 @@ export default {
       }
     },
     handleDeleteAll() {
-      let ids = this.selection.map(item => item.id).join(",");
+      const ids = this.selection.map(item => item.id).join(',')
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeLhPrecisionPlan([ids]).then((data) => {
+        removeLhPrecisionPlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg || this.$t("common.success"));
           this.$set(this.page, "current", 1);
           this.getList();
@@ -334,7 +369,7 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeLhPrecisionPlan([row.id]).then((data) => {
+        removeLhPrecisionPlan(row.id).then((data) => {
           this.$modal.msgSuccess(data.msg || this.$t("common.success"));
           this.$set(this.page, "current", 1);
           this.getList();
@@ -382,7 +417,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/lh/precisionPlan/export", this.formatParams(false));
+      downloadLink('/lh/lhPrecisionPlan/export', this.formatParams(false));
     },
     formatParams(hasPage = true) {
       const params = {
@@ -412,23 +447,11 @@ export default {
   },
   created() {
     this.initYearList();
-    if (!this.query.year) {
-      this.$set(this.query, 'year', new Date().getFullYear().toString());
+    const defaultParams = {
+      factoryCode: '116'
     }
-    const today = new Date();
-    const defaultDate = today.toISOString().split('T')[0];
-    let defaultParams = {
-      factoryCode: "116",
-      planDateStart: defaultDate,
-      planDateEnd: defaultDate,
-    };
-    this.search = {
-      ...defaultParams,
-    };
-    this.query = {
-      ...this.query,
-      ...defaultParams,
-    };
+    this.search = { ...defaultParams }
+    this.query = { ...defaultParams }
     this.getList();
   },
 };
