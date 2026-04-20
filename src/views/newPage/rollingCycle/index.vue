@@ -201,6 +201,19 @@
           >
             {{ this.$t("common.button.confirm") }}</el-button
           >
+		  
+		  <el-button
+            @click="handleExport"
+            v-hasPermi="['monthplan:factoryMonthPlanFinalResult:export']"
+            >{{ $t("ui.frame.btn.export") }}</el-button
+          >
+		  
+          <el-button
+            v-hasPermi="['monthplan:factoryMonthPlanFinalResult:import']"
+            @click="$refs.tltUpload.handleImport()"
+            >{{ $t("ui.frame.btn.import") }}</el-button
+          >
+		  
         </div>
       </template>
     </page-table>
@@ -277,8 +290,8 @@
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/mdm/productMoldingLimit/importTemplate"
-      uploadUrl="/mdm/productMoldingLimit/importData"
+      downloadUrl=""
+      uploadUrl="/monthplan/factoryMonthPlanFinalResult/importSkuScheduleItems"
       @uploadSuccess="getList"
     />
     <infoDialog ref="infoRef" @success="getList" />
@@ -2234,7 +2247,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/mdm/productMoldingLimit/export", this.formatParams(false));
+      downloadLink("/monthplan/factoryMonthPlanFinalResult/exportSkuScheduleItems", this.formatParams(false));
     },
 
     formatParams() {
