@@ -2,6 +2,7 @@ package com.zlt.aps.mp.api.domain.deduct;
 
 import lombok.Data;
 
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -102,5 +103,11 @@ public class DeductMouldVo {
      * 首日延迟，默认true
      */
     private boolean firstDayDelay = true;
+
+    /**
+     * 日最大的机台限制
+     * Map<日期, 最大机台数>
+     */
+    private Map<Integer,Integer> dayMaxMachinesLimitMap;
 
 }
