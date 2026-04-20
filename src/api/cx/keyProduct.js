@@ -24,10 +24,15 @@ export function editMoldingParams(data) {
 }
 
 export function removeMoldingParams(ids) {
+  // 将逗号分隔的字符串转换为数组
+  let idList = ids;
+  if (typeof ids === 'string') {
+    idList = ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+  }
   return request({
     url: '/cx/cxKeyProduct/remove',
     method: 'post',
-    params: { ids: ids }
+    data: idList
   })
 }
 
