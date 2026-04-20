@@ -8,7 +8,6 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.springframework.stereotype.Component;
 
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -168,8 +167,8 @@ public class HtmlDecodeAspect {
         }
         try {
             input = URLDecoder.decode(input, StandardCharsets.UTF_8.toString());
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
+        } catch (Exception e) {
+            log.debug("URL解码失败，使用原文: {}", e.getMessage());
         }
         StringBuilder sb = new StringBuilder(input.length());
         for (int i = 0; i < input.length(); i++) {
