@@ -1,44 +1,50 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper
-PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.lh.mapper.LhPrecisionPlanMapper">
 
     <resultMap type="com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan" id="LhPrecisionPlanResult">
-        <id     property="id"                   column="ID"                     />
-        <result property="machineCode"          column="MACHINE_CODE"           />
-        <result property="precisionType"        column="PRECISION_TYPE"         />
-        <result property="planDate"             column="PLAN_DATE"              />
-        <result property="actualDate"           column="ACTUAL_DATE"            />
-        <result property="dueDate"              column="DUE_DATE"               />
-        <result property="daysToDue"            column="DAYS_TO_DUE"            />
-        <result property="lastMaintenanceDate"  column="LAST_MAINTENANCE_DATE"  />
-        <result property="completionStatus"     column="COMPLETION_STATUS"      />
-        <result property="year"                 column="YEAR"                   />
-        <result property="warningStatus"        column="WARNING_STATUS"         />
-        <result property="warningDate"          column="WARNING_DATE"           />
-        <result property="isWarningSent"        column="IS_WARNING_SENT"        />
-        <result property="dataSource"           column="DATA_SOURCE"            />
-        <result property="mesSourceId"          column="MES_SOURCE_ID"          />
-        <result property="companyCode"          column="COMPANY_CODE"           />
-        <result property="factoryCode"          column="FACTORY_CODE"           />
-        <result property="createBy"             column="CREATE_BY"              />
-        <result property="createTime"           column="CREATE_TIME"            />
-        <result property="updateBy"             column="UPDATE_BY"              />
-        <result property="updateTime"           column="UPDATE_TIME"            />
-        <result property="isDelete"             column="IS_DELETE"              />
-        <result property="remark"               column="REMARK"                 />
+        <id property="id" column="ID"/>
+        <result property="machineCode" column="MACHINE_CODE"/>
+        <result property="precisionType" column="PRECISION_TYPE"/>
+        <result property="planDate" column="PLAN_DATE"/>
+        <result property="actualDate" column="ACTUAL_DATE"/>
+        <result property="dueDate" column="DUE_DATE"/>
+        <result property="daysToDue" column="DAYS_TO_DUE"/>
+        <result property="lastMaintenanceDate" column="LAST_MAINTENANCE_DATE"/>
+        <result property="completionStatus" column="COMPLETION_STATUS"/>
+        <result property="year" column="YEAR"/>
+        <result property="warningStatus" column="WARNING_STATUS"/>
+        <result property="warningDate" column="WARNING_DATE"/>
+        <result property="isWarningSent" column="IS_WARNING_SENT"/>
+        <result property="dataSource" column="DATA_SOURCE"/>
+        <result property="mesSourceId" column="MES_SOURCE_ID"/>
+        <result property="companyCode" column="COMPANY_CODE"/>
+        <result property="factoryCode" column="FACTORY_CODE"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="isDelete" column="IS_DELETE"/>
+        <result property="remark" column="REMARK"/>
     </resultMap>
 
     <sql id="selectLhPrecisionPlanVo">
-        select ID, MACHINE_CODE, PRECISION_TYPE, PLAN_DATE, ACTUAL_DATE, DUE_DATE, DAYS_TO_DUE,
-               LAST_MAINTENANCE_DATE, COMPLETION_STATUS, YEAR, WARNING_STATUS, WARNING_DATE, IS_WARNING_SENT,
-               DATA_SOURCE, MES_SOURCE_ID, COMPANY_CODE, FACTORY_CODE, CREATE_BY, CREATE_TIME, UPDATE_BY,
-               UPDATE_TIME, IS_DELETE, REMARK
+        select ID,
+               MACHINE_CODE,
+               PRECISION_TYPE,
+               PLAN_DATE,
+               ACTUAL_DATE,
+               DUE_DATE,
+               DAYS_TO_DUE,
+               LAST_MAINTENANCE_DATE,
+               COMPLETION_STATUS, YEAR, WARNING_STATUS, WARNING_DATE, IS_WARNING_SENT, DATA_SOURCE, MES_SOURCE_ID, COMPANY_CODE, FACTORY_CODE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE, REMARK
         from T_LH_PRECISION_PLAN
     </sql>
 
-    <select id="selectLhPrecisionPlanList" parameterType="com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanVo" resultMap="LhPrecisionPlanResult">
+    <select id="selectLhPrecisionPlanList" parameterType="com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanVo"
+            resultMap="LhPrecisionPlanResult">
         <include refid="selectLhPrecisionPlanVo"/>
         <where>
             IS_DELETE = 0
@@ -91,18 +97,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectByMachineCodeAndYear" resultMap="LhPrecisionPlanResult">
         <include refid="selectLhPrecisionPlanVo"/>
         where MACHINE_CODE = #{machineCode}
-          and YEAR = #{year}
-          and IS_DELETE = 0
+        and YEAR = #{year}
+        and IS_DELETE = 0
         limit 1
     </select>
 
     <select id="selectLastCompletedPlan" resultMap="LhPrecisionPlanResult">
         <include refid="selectLhPrecisionPlanVo"/>
         where MACHINE_CODE = #{machineCode}
-          and YEAR = #{year}
-          and COMPLETION_STATUS = '1'
-          and ACTUAL_DATE is not null
-          and IS_DELETE = 0
+        and YEAR = #{year}
+        and COMPLETION_STATUS = '1'
+        and ACTUAL_DATE is not null
+        and IS_DELETE = 0
         order by ACTUAL_DATE desc
         limit 1
     </select>
@@ -110,10 +116,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectPendingWarningPlans" resultMap="LhPrecisionPlanResult">
         <include refid="selectLhPrecisionPlanVo"/>
         where COMPLETION_STATUS = '0'
-          and DAYS_TO_DUE &lt;= #{daysToDue}
-          and DAYS_TO_DUE &gt; 0
-          and WARNING_STATUS = '0'
-          and IS_DELETE = 0
+        and DAYS_TO_DUE &lt;= #{daysToDue}
+        and DAYS_TO_DUE &gt; 0
+        and WARNING_STATUS = '0'
+        and IS_DELETE = 0
         order by DAYS_TO_DUE asc
     </select>
 
