@@ -48,6 +48,7 @@ export default {
       isEdit: false,
       form: {},
       machineOptions: [],
+      machinePageSize: 100,
       rules: {
         factoryCode: [
           {
@@ -163,9 +164,10 @@ export default {
     async remoteMachineMethod(query) {
       this.machineLoading = true;
       try {
+        const machineCode = (query || "").trim();
         const res = await getLhMachineList({
-          machineCode: query || "",
-          pageSize: 10,
+          machineCode,
+          pageSize: this.machinePageSize,
         });
         this.machineOptions = res.data || res || [];
       } catch (error) {
