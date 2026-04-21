@@ -14,11 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 任务分组服务 — 成型排程 S5.2 阶段
@@ -164,7 +160,7 @@ public class TaskGroupService {
             log.warn("硫化排程结果为空，无法分组任务");
             return result;
         }
-        log.info("任务分组开始：共 {} 条硫化记录", lhScheduleResults.size());
+        log.info("【任务分组】收到 {} 条硫化记录", lhScheduleResults.size());
 
         // 构建基础映射
         Map<String, MdmMaterialInfo> materialMap = buildMaterialMap(context);
@@ -174,12 +170,33 @@ public class TaskGroupService {
             machineOnlineEmbryoMap = new HashMap<>();
         }
 
+        // 获取当前班次的排量（每个班次只处理自己班次有排量的任务）
+        final int currentClassIndex = getCurrentClassIndex(dayShifts);
+        
         // 直接遍历每条硫化记录，为每条记录创建独立的任务
         int skippedNullEmbryo = 0;
         int skippedNullTask = 0;
         for (LhScheduleResult lhResult : lhScheduleResults) {
             if (lhResult.getEmbryoCode() == null) {
                 skippedNullEmbryo++;
+                continue;
+            }
+            
+            // 每个班次只处理自己班次有排量的任务
+            // 如果当前班次没有排量（为null或<=0），则跳过该任务（不创建任务）
+            if (currentClassIndex > 0) {
+                Integer classPlanQty = getClassPlanQtyByIndex(lhResult, currentClassIndex);
+                if (classPlanQty == null || classPlanQty <= 0) {
+                    skippedNullTask++;
+                    continue;
+                }
+            }
+
+            // 判断成型余量，如果成型余量 < 0，说明已经超产，跳过该任务
+            Integer formingRemainder = getFormingRemainder(lhResult.getEmbryoCode(), context);
+            if (formingRemainder != null && formingRemainder < 0) {
+                log.debug("胎胚 {} 成型余量={} < 0，已超产，跳过该任务", lhResult.getEmbryoCode(), formingRemainder);
+                skippedNullTask++;
                 continue;
             }
 
@@ -191,7 +208,7 @@ public class TaskGroupService {
             }
 
             String materialCode = lhResult.getMaterialCode();
-              String embryoCode = lhResult.getEmbryoCode();
+            String embryoCode = lhResult.getEmbryoCode();
 
             // 判断任务类型
             List<String> continueMachineCodes = findContinueMachines(materialCode, embryoCode, machineOnlineEmbryoMap);
@@ -237,7 +254,7 @@ public class TaskGroupService {
             }
         }
 
-        log.info("任务分组完成：续作 {} 个，试制 {} 个，新增 {} 个，跳过无效胚胎 {} 个，跳过空任务 {} 个",
+        log.info("【任务分组结果】续作:{}个 | 试制:{}个 | 新增:{}个 | 跳过无效胚胎:{}个 | 跳过空任务:{}个",
                 result.getContinueTasks().size(),
                 result.getTrialTasks().size(),
                 result.getNewTasks().size(),
@@ -403,6 +420,52 @@ public class TaskGroupService {
     // ==================== 私有方法 ====================
 
     /**
+     * 获取成型余量
+     *
+     * <p>从 context 的 formingRemainderMap 中获取，如果没有则根据硫化余量和库存计算。
+     *
+     * @param embryoCode 胎胚编码
+     * @param context    排程上下文
+     * @return 成型余量，无法计算时返回 null
+     */
+    private Integer getFormingRemainder(String embryoCode, ScheduleContextVo context) {
+        if (embryoCode == null) {
+            return null;
+        }
+
+        // 优先从预计算的映射中获取
+        Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
+        if (formingRemainderMap != null && formingRemainderMap.containsKey(embryoCode)) {
+            return formingRemainderMap.get(embryoCode);
+        }
+
+        // 兜底：根据硫化余量和库存计算
+        Integer vulcanizeSurplusQty = null;
+        if (context.getMonthSurplusMap() != null) {
+            MdmMonthSurplus monthSurplus = context.getMonthSurplusMap().get(embryoCode);
+            if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
+                vulcanizeSurplusQty = monthSurplus.getPlanSurplusQty().intValue();
+            }
+        }
+
+        if (vulcanizeSurplusQty != null) {
+            // 成型余量 = 硫化余量 - 胎胚库存
+            int currentStock = 0;
+            if (context.getStocks() != null) {
+                for (CxStock stock : context.getStocks()) {
+                    if (embryoCode.equals(stock.getEmbryoCode())) {
+                        currentStock = stock.getStockNum() != null ? stock.getStockNum() : 0;
+                        break;
+                    }
+                }
+            }
+            return vulcanizeSurplusQty - currentStock;
+        }
+
+        return null;
+    }
+
+    /**
      * 构建物料映射（双索引：materialCode + embryoCode）
      *
      * @param context 排程上下文
@@ -499,12 +562,30 @@ public class TaskGroupService {
                 embryoCode, vulcanizeDemand, currentStock);
 
         // 获取物料信息
+        // 重要：优先使用 lhResult 中的 materialCode，因为同一个 embryoCode 可能对应多个不同的物料
+        String materialCodeFromLh = lhResult.getMaterialCode();
         MdmMaterialInfo material = materialMap.get(embryoCode);
-        if (material == null) {
-            log.debug("buildSingleTask：物料信息为空，embryoCode={}", embryoCode);
+        
+        // 如果 lhResult 中有 materialCode，优先使用；否则从 materialMap 中获取
+        String finalMaterialCode = materialCodeFromLh;
+        String materialDesc = null;
+        String mainMaterialDesc = null;
+        String structureNameFromMaterial = null;
+        
+        if (finalMaterialCode == null && material != null) {
+            // lhResult 中没有 materialCode，从 materialMap 中获取
+            finalMaterialCode = material.getMaterialCode();
+            materialDesc = material.getMaterialDesc();
+            mainMaterialDesc = material.getEmbryoDesc();
+            structureNameFromMaterial = material.getStructureName();
+        } else if (material != null) {
+            // lhResult 中有 materialCode，但保留 material 的其他信息（如描述）
+            materialDesc = material.getMaterialDesc();
+            mainMaterialDesc = material.getEmbryoDesc();
+            structureNameFromMaterial = material.getStructureName();
         }
-
-        String structureName = material != null ? material.getStructureName() : lhResult.getStructureName();
+        
+        String structureName = structureNameFromMaterial != null ? structureNameFromMaterial : lhResult.getStructureName();
 
         // 构建任务
         CoreScheduleAlgorithmService.DailyEmbryoTask task = new CoreScheduleAlgorithmService.DailyEmbryoTask();
@@ -513,17 +594,21 @@ public class TaskGroupService {
         task.setVulcanizeDemand(vulcanizeDemand);
         task.setCurrentStock(currentStock);
         task.setProductionVersion(lhResult.getProductionVersion());
-
-        if (material != null) {
-            task.setMaterialDesc(material.getMaterialDesc());
-            task.setMainMaterialDesc(material.getEmbryoDesc());
-            task.setStructureName(material.getStructureName());
-            task.setMaterialCode(material.getMaterialCode());
+        task.setMaterialCode(finalMaterialCode);  // 直接使用 lhResult 或 materialMap 中的 materialCode
+        
+        if (materialDesc != null) {
+            task.setMaterialDesc(materialDesc);
         } else {
-            task.setMaterialDesc(embryoCode);
-            task.setMainMaterialDesc(embryoCode);
-            task.setStructureName(structureName);
+            task.setMaterialDesc(finalMaterialCode != null ? finalMaterialCode : embryoCode);
         }
+        
+        if (mainMaterialDesc != null) {
+            task.setMainMaterialDesc(mainMaterialDesc);
+        } else {
+            task.setMainMaterialDesc(embryoCode);
+        }
+        
+        task.setStructureName(structureName);
 
         task.setDemandQuantity(vulcanizeDemand);
         task.setAssignedQuantity(0);
@@ -571,6 +656,32 @@ public class TaskGroupService {
                 } catch (NumberFormatException e) {
                     log.warn("无法解析班次字段: {}", classField);
                 }
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * 获取当前班次对应的硫化班次索引
+     *
+     * <p>从 dayShifts 中获取当前班次的 classField，然后提取班次索引。
+     * 例如：CLASS1 -> 1, CLASS2 -> 2, CLASS3 -> 3
+     *
+     * @param dayShifts 当前班次配置列表
+     * @return 班次索引 (1-8)，如果没有有效的班次配置则返回 0
+     */
+    private int getCurrentClassIndex(List<CxShiftConfig> dayShifts) {
+        if (dayShifts == null || dayShifts.isEmpty()) {
+            return 0;
+        }
+        // 获取第一个班次的 classField
+        CxShiftConfig shiftConfig = dayShifts.get(0);
+        String classField = shiftConfig.getClassField();
+        if (classField != null && classField.startsWith("CLASS")) {
+            try {
+                return Integer.parseInt(classField.replace("CLASS", ""));
+            } catch (NumberFormatException e) {
+                log.warn("无法解析班次字段: {}", classField);
             }
         }
         return 0;

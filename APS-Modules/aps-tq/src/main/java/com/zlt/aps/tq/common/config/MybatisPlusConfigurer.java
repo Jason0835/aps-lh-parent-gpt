@@ -5,8 +5,8 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-//@Configuration
-//@MapperScan("com.zlt.**.mapper")
+@Configuration
+@MapperScan("com.zlt.**.mapper")
 public class MybatisPlusConfigurer {
 
     /**
@@ -21,5 +21,3 @@ public class MybatisPlusConfigurer {
         return new OracleKeyGenerator();
     }
 }
-
-

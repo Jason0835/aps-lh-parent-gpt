@@ -352,6 +352,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     /**
      * 模具使用变化信息如2-4-2,或是2-4或是2
      */
+    @Excel(name = "ui.data.column.factoryMonthPlanMouldDayResult.mouldChangeInfo")
     @ApiModelProperty(value = "模具使用变化信息如2-4-2,或是2-4或是2", name = "mouldChangeInfo")
     @TableField(value = "MOULD_CHANGE_INFO")
     private String mouldChangeInfo;

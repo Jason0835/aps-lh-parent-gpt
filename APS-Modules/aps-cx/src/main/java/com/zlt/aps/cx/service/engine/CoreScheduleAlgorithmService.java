@@ -1,6 +1,5 @@
 package com.zlt.aps.cx.service.engine;
 
-import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 
@@ -8,7 +7,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * 核心排程算法服务接口

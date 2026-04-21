@@ -31,6 +31,17 @@ public class SyncDataLogsController {
     private SyncDataLogsService syncDataLogsService;
 
     /**
+     * 获取数据版本
+     *
+     * @param syncKey 同步标识
+     * @return 数据版本号
+     */
+    @GetMapping("/getDataVersion/{syncKey}")
+    public String getDataVersion(@PathVariable("syncKey") String syncKey) {
+        return syncDataLogsService.getDataVersion(syncKey);
+    }
+
+    /**
      * 获取同步日志的反馈状态
      *
      * @param dataVersion 数据版本
