@@ -70,6 +70,13 @@ export default {
             trigger: "change",
           },
         ],
+        jobType: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
       },
     };
   },
@@ -96,9 +103,15 @@ export default {
               <materialCodeSelect
                 key={form.specCode}
                 v-model={form.specCode}
+                onChange={this.handleSpecCodeChange}
               />
             );
           },
+        },
+        {
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.lhSpecifyMachine.materialDesc"),
+          disabled: true,
         },
         {
           prop: "machineCode",
@@ -166,6 +179,10 @@ export default {
         this.remoteMachineMethod("");
       }
     },
+    handleSpecCodeChange(value, row) {
+      this.$set(this.form, "specCode", value);
+      this.$set(this.form, "materialDesc", (row && row.materialDesc) || "");
+    },
     show(data) {
       this.visible = true;
       if (data) {
@@ -182,6 +199,7 @@ export default {
       } else {
         this.form = {
           factoryCode: "116",
+          materialDesc: "",
         };
         this.machineOptions = [];
       }

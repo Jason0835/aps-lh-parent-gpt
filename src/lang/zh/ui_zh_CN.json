@@ -2189,6 +2189,7 @@
   "ui.data.column.scheduleAdjust.isConfirm": "是否确认",
   "ui.data.column.lhSpecifyMachine.modelName": "硫化机规格机台关系",
   "ui.data.column.lhSpecifyMachine.specCode": "物料编码",
+  "ui.data.column.lhSpecifyMachine.materialDesc": "物料描述",
   "ui.data.column.lhSpecifyMachine.machineCode": "机台编号",
   "ui.data.column.lhSpecifyMachine.lineType": "线路类型",
   "ui.data.column.lhSpecifyMachine.jobType": "作业类型",
