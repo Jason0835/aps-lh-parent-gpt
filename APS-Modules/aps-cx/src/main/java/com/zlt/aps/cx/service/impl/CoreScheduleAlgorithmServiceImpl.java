@@ -130,6 +130,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // 按班次逐个执行排程
         int shiftIndex = 0;
+        int totalShifts = sortedShiftConfigs.size();
         for (CxShiftConfig shiftConfig : sortedShiftConfigs) {
             int day = shiftConfig.getScheduleDay();
             LocalDate currentScheduleDate = context.getScheduleDate()
@@ -149,8 +150,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
 
             shiftIndex++;
-            log.info("===== 执行第 {} 个班次排程，天={}, 日期={}, 班次={}, classField={} =====",
-                    shiftIndex, day, currentScheduleDate, shiftConfig.getShiftCode(), shiftConfig.getClassField());
+            // 获取历史胎胚数量用于日志
+            int historyCount = machineOnlineEmbryoMap != null ? machineOnlineEmbryoMap.values().stream().mapToInt(Collection::size).sum() : 0;
+            log.info("【班次开始】#{}/{} | 日期:{} | 班次:{} | 历史胎胚数量:{}",
+                    shiftIndex, totalShifts, currentScheduleDate, shiftConfig.getShiftCode(), historyCount);
 
             // 设置当前班次的上下文
             List<CxShiftConfig> singleShiftList = Collections.singletonList(shiftConfig);
@@ -167,6 +170,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             // 更新机台在产状态
             machineOnlineEmbryoMap = updateMachineOnlineStatus(
                     shiftResult.getAllAllocations(), machineOnlineEmbryoMap);
+
+            // 将更新后的机台在产状态存回 context，供下一个班次使用
+            context.setMachineOnlineEmbryoMap(new HashMap<>(machineOnlineEmbryoMap));
 
             // 更新库存和硫化余量，供下一个班次排程使用
             updateContextForNextShift(context, shiftResult.getAllAllocations(), singleShiftList);
@@ -283,6 +289,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         for (MachineAllocationResult allocation : allAllocations) {
             String machineCode = allocation.getMachineCode();
+            log.info("========== 对{}机台进行班次排量 ==========", machineCode);
             for (TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
                 CoreScheduleAlgorithmService.DailyEmbryoTask task = new CoreScheduleAlgorithmService.DailyEmbryoTask();
                 task.setEmbryoCode(taskAlloc.getEmbryoCode());
@@ -300,25 +307,39 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setPriority(taskAlloc.getPriority());
                 task.setLhId(taskAlloc.getLhId());
 
+                // 计算需要的车数
                 int tripCapacity = productionCalculator.getTripCapacity(taskAlloc.getStructureName(), context);
                 int cars = tripCapacity > 0 ? (int) Math.ceil((double) taskAlloc.getQuantity() / tripCapacity) : 0;
                 task.setRequiredCars(cars);
 
-                log.info("班次精排: embryoCode={}, materialDesc={}, structureName={}, " +
-                                "quantity(均衡分配量)={}, tripCapacity(每车条数)={}, cars(车数)={}, " +
-                                "endingExtraInventory(待排产量)={}, vulcanizeMachineCount(硫化机台数)={}, " +
-                                "isContinueTask={}, isTrialTask={}",
-                        taskAlloc.getEmbryoCode(), taskAlloc.getMaterialDesc(), taskAlloc.getStructureName(),
-                        taskAlloc.getQuantity(), tripCapacity, cars, task.getEndingExtraInventory(),
-                        task.getVulcanizeMachineCount(),
-                        task.getIsContinueTask(), task.getIsTrialTask());
+                // 打印精排任务日志
+                String taskType;
+                if (Boolean.TRUE.equals(taskAlloc.getIsContinueTask())) {
+                    taskType = "续作任务";
+                } else if (Boolean.TRUE.equals(taskAlloc.getIsTrialTask())) {
+                    taskType = "试制任务";
+                } else {
+                    taskType = "新增任务";
+                }
+                log.info("  【{}】物料编码:{} | 物料描述:{} | 胎胚:{} | 主物料:{} | 规格:{} | 数量:{}条 | 需{}车(每车{}条) | 库存可撑:{}h | 硫化机:{}台",
+                        taskType,
+                        taskAlloc.getMaterialCode(),
+                        taskAlloc.getMaterialDesc(),
+                        taskAlloc.getEmbryoCode(),
+                        taskAlloc.getMainMaterialDesc(),
+                        taskAlloc.getStructureName(),
+                        taskAlloc.getQuantity(),
+                        cars,
+                        tripCapacity,
+                        String.format("%.1f", taskAlloc.getStockHours()),
+                        task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0);
 
                 List<ShiftScheduleService.ShiftProductionResult> taskShiftResults =
                         shiftScheduleService.scheduleTaskToShifts(task, machineCode, context, singleShiftList, scheduleDateForShift);
                 shiftProductionResults.addAll(taskShiftResults);
             }
         }
-        log.info("班次排产完成，共 {} 条班次排产记录", shiftProductionResults.size());
+        log.info("【班次完成】共分配 {} 条排产记录", shiftProductionResults.size());
 
         // 注意：按班次排程时不需要跨班次均衡（balanceShiftQuantities），
         // 因为每个班次独立 DFS 均衡，量已经按单班次需求分配
@@ -342,26 +363,55 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             List<MachineAllocationResult> allocations,
             Map<String, Set<String>> currentMachineOnlineMap) {
 
+        // 首先复制当前状态
         Map<String, Set<String>> newMap = new HashMap<>();
         for (Map.Entry<String, Set<String>> entry : currentMachineOnlineMap.entrySet()) {
             newMap.put(entry.getKey(), new HashSet<>(entry.getValue()));
         }
 
+        // 遍历 allocations，将每个机台的所有胚胎添加到 newMap 中（合并续作+新增分配）
+        // 注意：这里不是覆盖，而是合并（取并集）
         for (MachineAllocationResult allocation : allocations) {
             String machineCode = allocation.getMachineCode();
-            Set<String> embryos = new HashSet<>();
+            Set<String> existingEmbryos = newMap.get(machineCode);
+            if (existingEmbryos == null) {
+                existingEmbryos = new HashSet<>();
+                newMap.put(machineCode, existingEmbryos);
+            }
             for (TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
                 if (taskAlloc.getEmbryoCode() != null) {
-                    embryos.add(taskAlloc.getEmbryoCode());
+                    existingEmbryos.add(taskAlloc.getEmbryoCode());
                 }
-            }
-            if (!embryos.isEmpty()) {
-                newMap.put(machineCode, embryos);
             }
         }
 
-        log.debug("更新机台在产状态完成，共 {} 台机台", newMap.size());
+        log.debug("更新机台在产状态完成，共 {} 台机台: {}", newMap.size(), formatMachineEmbryoMap(newMap));
         return newMap;
+    }
+
+    /**
+     * 格式化机台胚胎映射用于日志输出
+     */
+    private String formatMachineEmbryoMap(Map<String, Set<String>> map) {
+        if (map == null || map.isEmpty()) {
+            return "{}";
+        }
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<String, Set<String>> entry : map.entrySet()) {
+            if (!first) sb.append(", ");
+            sb.append(entry.getKey()).append("=[");
+            boolean firstEmbryo = true;
+            for (String embryo : entry.getValue()) {
+                if (!firstEmbryo) sb.append(",");
+                sb.append(embryo);
+                firstEmbryo = false;
+            }
+            sb.append("]");
+            first = false;
+        }
+        sb.append("}");
+        return sb.toString();
     }
 
     /**
@@ -1426,7 +1476,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // Step 1: 减去每条硫化任务的当天硫化消耗
         for (LhScheduleResult lhResult : lhResults) {
-            if (lhResult.getId() == null) continue;
+            if (lhResult.getId() == null) {
+                continue;
+            }
             String taskKey = String.valueOf(lhResult.getId());
             Integer consumption = vulcanizingConsumptionByLhId.get(lhResult.getId());
             if (consumption != null && consumption > 0) {
@@ -1450,7 +1502,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         for (Map.Entry<String, Integer> entry : formingOutputMap.entrySet()) {
             String embryoCode = entry.getKey();
             int formingOutput = entry.getValue();
-            if (formingOutput <= 0) continue;
+            if (formingOutput <= 0) {
+                continue;
+            }
 
             List<LhScheduleResult> relatedTasks = embryoToLhMap.get(embryoCode);
             if (relatedTasks == null || relatedTasks.isEmpty()) {
