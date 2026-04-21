@@ -75,7 +75,9 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("ui.data.column.lhSpecifyMachine.modelName");
+      return this.isEdit
+        ? this.$t("common.button.edit")
+        : this.$t("common.button.add");
     },
     columns() {
       return [

@@ -71,7 +71,7 @@ export default {
   },
   computed: {
     title() {
-      return this.$t("ui.data.column.cxStock.modelName");
+      return this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add");
     },
     columns() {
       return [
