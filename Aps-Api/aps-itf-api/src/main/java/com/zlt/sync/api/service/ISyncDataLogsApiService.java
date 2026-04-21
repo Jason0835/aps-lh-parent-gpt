@@ -3,7 +3,6 @@ package com.zlt.sync.api.service;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.zlt.aps.itf.vo.SyncDataLogs;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 
@@ -20,7 +19,7 @@ public interface ISyncDataLogsApiService {
 	 * @param syncKey
 	 * @return
 	 */
-	@GetMapping("/getDataVersion/{syncKey}")
+    @PostMapping("/syncDataLogs/getDataVersion/{syncKey}")
 	String getDataVersion(@PathVariable("syncKey") String syncKey);
 
     /**
@@ -29,7 +28,7 @@ public interface ISyncDataLogsApiService {
      * @param dataVersion 数据版本
      * @return 结果
      */
-    @PostMapping("/getSyncDataResult/{dataVersion}")
+    @PostMapping("/syncDataLogs/getSyncDataResult/{dataVersion}")
     public SyncDataLogs getSyncDataResult(@PathVariable("dataVersion") String dataVersion);
 
     /**
@@ -38,7 +37,7 @@ public interface ISyncDataLogsApiService {
      * @param dataVersion 数据版本
      * @return 结果
      */
-    @PostMapping("/getReqDataResult/{dataVersion}")
+    @PostMapping("/syncDataLogs/getReqDataResult/{dataVersion}")
     public SyncDataLogs getReqDataResult(@PathVariable("dataVersion") String dataVersion);
 
     /**
@@ -48,6 +47,6 @@ public interface ISyncDataLogsApiService {
      * @param publishIds 待发布记录ID
      * @return 结果
      */
-    @PostMapping("/getReqDataResult/{lockKey}/{publishIds}")
+    @PostMapping("/syncDataLogs/getReqDataResult/{lockKey}/{publishIds}")
     public boolean checkPublishLocking(@PathVariable("lockKey") String lockKey, @PathVariable("publishIds") Long[] publishIds);
 }
