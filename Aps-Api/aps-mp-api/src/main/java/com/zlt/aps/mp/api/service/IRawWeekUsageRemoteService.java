@@ -82,13 +82,18 @@ public interface IRawWeekUsageRemoteService {
     @ApiOperation("按照月份生成周维度原材料用量记录")
     public AjaxResult generateByMonth(@RequestParam("factoryCode") String factoryCode,
                                       @RequestParam("year") Integer year,
-                                      @RequestParam("month") Integer month) ;
+                                      @RequestParam("version") String version,
+                                      @RequestParam("month") Integer month
+    ) ;
+
+
 
     @PostMapping("/rawWeekUsage/generate-by-week")
     @ApiOperation("按照周维度份生成周维度原材料用量记录")
     public AjaxResult generateByWeek(@RequestParam("factoryCode") String factoryCode,
                                      @RequestParam("year") Integer year,
                                      @RequestParam("month") Integer month,
+                                     @RequestParam("version") String version,
                                      @RequestParam("week") Integer week) ;
 
     @GetMapping("/rawWeekUsage/statistics")
