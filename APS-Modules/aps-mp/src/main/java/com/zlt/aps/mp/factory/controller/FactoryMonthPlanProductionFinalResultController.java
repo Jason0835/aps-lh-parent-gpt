@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.factory.controller;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.bean.copier.CopyOptions;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
@@ -14,10 +15,29 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.constant.StringConstant;
+import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.service.IBatchMpMonthPlanStatisticsService;
+import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
+import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
+import com.zlt.aps.mp.adjust.service.impl.AbstractBaseWeekAdjustService;
+import com.zlt.aps.mp.adjust.service.impl.MpAdjustStructureOutStrategy;
+import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
+import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
+import com.zlt.aps.mp.common.utils.StringUtil;
+import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
+import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.mp.engine.check.DayTotalCapacityChecker;
+import com.zlt.aps.mp.engine.check.OemTotalCapacityChecker;
 import com.zlt.aps.utils.SpringContextSupplierUtil;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
@@ -36,6 +56,7 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.BeanUtils;
@@ -48,12 +69,18 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -89,6 +116,18 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 
     @Autowired
     private IExportLogService iExportLogService;
+
+    @Autowired
+    protected IMpAdjustStructureInService mpAdjustStructureInService;
+
+    @Autowired
+    protected IMpMonthPlanStatisticsService mpMonthPlanStatisticsService;
+
+    @Autowired
+    protected IBatchMpMonthPlanStatisticsService batchMpMonthPlanStatisticsService;
+
+    @Autowired
+    protected MpAdjustStructureOutStrategy mpAdjustStructureOutStrategy;
 
     /**
      * 查询工厂月度生产计划-最终排产计划定稿
@@ -306,9 +345,180 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal){
+        // 重新计算和校验
+        recalculateAndCheck(factoryMonthPlanProdFinal);
         return super.save(factoryMonthPlanProdFinal);
     }
 
+
+    /**
+     * 重新计算和校验
+     * @param factoryMonthPlanProdFinal
+     */
+    private void recalculateAndCheck(FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal) {
+        // 构建上下文
+        MpRollAdjustContextDTO contextDTO = new MpRollAdjustContextDTO();
+        contextDTO.setFactoryCode(factoryMonthPlanProdFinal.getFactoryCode());
+        contextDTO.setStructureName(factoryMonthPlanProdFinal.getStructureName());
+        contextDTO.setMpYear(factoryMonthPlanProdFinal.getYear());
+        contextDTO.setMpMonth(factoryMonthPlanProdFinal.getMonth());
+        contextDTO.setProductionVersion(factoryMonthPlanProdFinal.getProductionVersion());
+        contextDTO.setMonthPlanVersion(factoryMonthPlanProdFinal.getMonthPlanVersion());
+
+        // 结构名称
+        String structureNameParam = contextDTO.getStructureName();
+
+        // 获取产品品类
+        String productType = factoryMonthPlanProdFinal.getProductTypeCode();
+
+        // 设置周程滚动参数
+        contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), productType));
+        // 设置工作日历
+        contextDTO.setWorkCalendarMap(mpAdjustStructureInService.getWorkCalendarMap(contextDTO));
+
+        // 设置月计划结构转产表-单结构
+        List<MpStructureAllocation> structureAllocationList = mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO);
+        List<MpStructureAllocation> oneStructureAllocationList = structureAllocationList.stream()
+                .filter(vo -> StringUtils.isEmpty(structureNameParam) || structureNameParam.equals(vo.getStructureName()))
+                .collect(Collectors.toList());
+        contextDTO.setOneStructureAllocationList(oneStructureAllocationList);
+        // 设置总的硫化机台数
+        contextDTO.setTotalLhMachines(mpAdjustStructureInService.getLhMachineCount(contextDTO));
+        // 设置OEM配置集合
+        mpAdjustStructureOutStrategy.initOemParam(contextDTO);
+        // 设置结构统计
+        contextDTO.setStructureStatisticMap(mpAdjustStructureInService.loadMpMonthPlanStatistics(contextDTO));
+        // 收集结构名称列表
+        Set<String> structureNameSet = oneStructureAllocationList.stream()
+                .map(MpStructureAllocation::getStructureName)
+                .collect(Collectors.toSet());
+        // 收集月计划列表
+        List<FactoryMonthPlanFinalAdjustVo> monthPLanList = new ArrayList<>();
+        FactoryMonthPlanFinalAdjustVo mpFinalVo = new FactoryMonthPlanFinalAdjustVo();
+        BeanUtils.copyProperties(factoryMonthPlanProdFinal, mpFinalVo);
+        monthPLanList.add(mpFinalVo);
+        // 月计划统计结果列表
+        List<MpMonthPlanStatistics> monthPlanStatisticsList = new ArrayList<>();
+        try {
+
+            for (String structureName : structureNameSet) {
+                contextDTO.setStructureName(structureName);
+
+                List<MpStructureAllocation> targetStructureAllocationList = oneStructureAllocationList.stream()
+                        .filter(vo -> structureName.equals(vo.getStructureName()))
+                        .collect(Collectors.toList());
+
+                List<FactoryMonthPlanFinalAdjustVo> targetMonthPLanList = monthPLanList.stream()
+                        .filter(vo -> structureName.equals(vo.getStructureName()))
+                        .collect(Collectors.toList());
+
+                contextDTO.setOneStructureAllocationList(targetStructureAllocationList);
+
+
+                // 初始锁定日
+                contextDTO.setLockEndDay(mpAdjustStructureOutStrategy.getLockEndDay(contextDTO));
+                // 初始化每日型腔/活块数量
+                contextDTO.setCavity2BlockMap(mpAdjustStructureInService.getCavityAndBlockQtyMap(contextDTO));
+                // 初始结构开始日\收尾日
+                mpAdjustStructureOutStrategy.initStructureStartAndEndDay(contextDTO);
+
+                // 初始化日产信息
+                MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
+                Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO);
+                weekRollAdjustEngine.initDayProductionInfo(contextDTO, dailyCapacityLimitVoMap);
+                // 设置日产能限制Map
+                contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
+
+                // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
+                MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+                mpAdjustStructureOutStrategy.reCalcAdjustDailyCapacityLimit(contextDTO, targetMonthPLanList, adjustDailyCapacityLimitObj);
+
+                int structureDeadLine = contextDTO.getStructureDeadLine();
+                int newOnLineDay = contextDTO.getLockEndDay() + 1;
+
+                for (int m = newOnLineDay; m <= structureDeadLine; m++){
+                    // 计算产能限制
+                    adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(targetMonthPLanList,m, dailyCapacityLimitVoMap.get(m), contextDTO.getParamMap(), mpFinalVo.getMainPattern());
+                    // 获取当日型腔数量（主花纹模具相关校验使用，型腔/2 为机台数）
+                    int cavityQty = getNewCavityQty(contextDTO, mpFinalVo, m);
+                    // 检查：当前每日硫化机台数、当前每日胎胚种类数 符合性
+                    if (!adjustDailyCapacityLimitObj.preCheckCapacitySatisfy(dailyCapacityLimitVoMap.get(m))) {
+                        throw new BusinessException(I18nUtil.getMessage("ui.data.alert.factoryMonthPlanFinalResult.save.dailyLhOrEmbryoTypeNotSatisfy"));
+                    }
+                    // 主花纹向下模具数量（型腔/2 转成机台数）符合性
+                    if (!preCheckMouldSatisfy(dailyCapacityLimitVoMap.get(m), cavityQty)) {
+                        throw new BusinessException(I18nUtil.getMessage("ui.data.alert.factoryMonthPlanFinalResult.save.mainPatternMouldMachineNotSatisfy"));
+                    }
+                    // 检查总产能限制（允许上下波动）
+                    if (!checkTotalCapacityLimit(contextDTO, m, mpFinalVo, dailyCapacityLimitVoMap.get(m), targetMonthPLanList)) {
+                        throw new BusinessException(I18nUtil.getMessage("ui.data.alert.factoryMonthPlanFinalResult.save.totalCapacityLimitNotSatisfy"));
+                    }
+                }
+
+                // 构建月计划统计结果
+                MpMonthPlanStatistics monthPlanStatistics = mpAdjustStructureOutStrategy.buildMonthPlanStatistics(contextDTO, targetMonthPLanList, YesOrNoEnum.NO.getCode());
+                if (Objects.nonNull(monthPlanStatistics)) {
+                    monthPlanStatisticsList.add(monthPlanStatistics);
+                }
+            }
+
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+            throw e;
+        }
+        contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
+        // 保存月计划统计结果
+        mpAdjustStructureOutStrategy.saveMonthPlanStatisticsResult(contextDTO, null);
+    }
+
+
+    /**
+     * 获取新的型腔数量
+     * @param contextDTO 周程滚动上下文
+     * @param mpFinalVo 定稿Vo
+     * @param iDay 当前天
+     * @return 型腔数量
+     */
+    private int getNewCavityQty(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo,int iDay){
+        DailyMouldAvailabilityResult cavity2BlockVo = contextDTO.getCavity2BlockMap().get(iDay);
+        if (cavity2BlockVo != null && cavity2BlockVo.getCavityResults() != null){
+            Integer cavityQty = cavity2BlockVo.getCavityResults().get(mpFinalVo.getStructureName()+mpFinalVo.getMainPattern());
+            return cavityQty != null ? cavityQty:mpFinalVo.getMouldCavityQty();
+        }
+        return mpFinalVo.getMouldCavityQty();
+    }
+
+    /**
+     * 预检查 模具满足情况
+     *
+     * @param dailyCapacityLimitVo 产能限制Vo
+     * @param cavityQty 型腔数
+     * @return true-满足，false-不满足
+     */
+    private boolean preCheckMouldSatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo,int cavityQty){
+        //型腔台数
+        int patternCount = cavityQty /2;
+        //主花纹向下所有SKU的模具数量 <= 主花纹.型腔数量
+        return dailyCapacityLimitVo.getPatternUsedLhMachines() < patternCount;
+    }
+
+    /**
+     * 检查总产能限制
+     * @param contextDTO 周程滚动上下文
+     * @param checkDay 检查日
+     * @return true-符合总产能，false-不符合总产能
+     */
+    private boolean checkTotalCapacityLimit(MpRollAdjustContextDTO contextDTO,Integer checkDay,FactoryMonthPlanFinalAdjustVo mpFinalVo,MpDailyCapacityLimitVo limitVo,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
+        DayTotalCapacityChecker dayTotalCapacityChecker = new DayTotalCapacityChecker(mpProdFinalList,limitVo.getRemainMaxDayProductionQty(),checkDay);
+        boolean bCheck = dayTotalCapacityChecker.doCheck();
+        String hint = bCheck ? "满足":"不满足,退出！";
+        if (bCheck && YesOrNoEnum.YES.getCode().equals(mpFinalVo.getOemFlag())){
+            //继续 检查OEM的限制情况
+            OemTotalCapacityChecker oemTotalCapacityChecker = new OemTotalCapacityChecker(mpProdFinalList,limitVo.getRemainOemQty());
+            bCheck = oemTotalCapacityChecker.doCheck();
+        }
+        return bCheck;
+    }
 
 
     /**
