@@ -175,8 +175,13 @@ export default {
             disabled={item.disabled}
             remote={item.remote}
             remote-method={item.remoteMethod}
+            popper-class={item.popperClass}
             loading={item.loading}
-            on={{ ...item.listeners, ...(item.onFocus && { focus: item.onFocus }) }}
+            on={{
+              ...item.listeners,
+              ...(item.onFocus && { focus: item.onFocus }),
+              ...(item.onVisibleChange && { "visible-change": item.onVisibleChange }),
+            }}
           >
             {item.dictData.map((row) => {
               let value = row[valueKey];
@@ -208,8 +213,13 @@ export default {
             disabled={item.disabled}
             remote={item.remote}
             remote-method={item.remoteMethod}
+            popper-class={item.popperClass}
             loading={item.loading}
-            on={{ ...item.listeners, ...(item.onFocus && { focus: item.onFocus }) }}
+            on={{
+              ...item.listeners,
+              ...(item.onFocus && { focus: item.onFocus }),
+              ...(item.onVisibleChange && { "visible-change": item.onVisibleChange }),
+            }}
           >
             {item.options.map((row) => {
               let value = row[valueKey];

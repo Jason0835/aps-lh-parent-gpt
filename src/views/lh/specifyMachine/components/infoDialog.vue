@@ -49,6 +49,10 @@ export default {
       form: {},
       machineOptions: [],
       machinePageSize: 100,
+      machinePageNum: 1,
+      machineHasMore: true,
+      machineQuery: "",
+      machineScrollWrap: null,
       rules: {
         factoryCode: [
           {
@@ -80,6 +84,9 @@ export default {
         ],
       },
     };
+  },
+  beforeDestroy() {
+    this.unbindMachineScroll();
   },
   computed: {
     title: function () {
@@ -128,6 +135,8 @@ export default {
           remoteMethod: this.remoteMachineMethod,
           loading: this.machineLoading,
           onFocus: this.handleMachineFocus,
+          onVisibleChange: this.handleMachineDropdownVisibleChange,
+          popperClass: "lh-specify-machine-select-dropdown",
         },
         {
           prop: "jobType",
@@ -161,25 +170,88 @@ export default {
         this.loading = false;
       }
     },
-    async remoteMachineMethod(query) {
+    async queryMachineList(append = false) {
       this.machineLoading = true;
       try {
-        const machineCode = (query || "").trim();
         const res = await getLhMachineList({
-          machineCode,
+          machineCode: this.machineQuery,
+          pageNum: this.machinePageNum,
           pageSize: this.machinePageSize,
         });
-        this.machineOptions = res.data || res || [];
+        const currentList = res.data || res || [];
+        if (append) {
+          const optionMap = new Map();
+          [...this.machineOptions, ...currentList].forEach((item) => {
+            optionMap.set(item.machineCode, item);
+          });
+          this.machineOptions = Array.from(optionMap.values());
+        } else {
+          this.machineOptions = currentList;
+        }
+        this.machineHasMore = currentList.length >= this.machinePageSize;
       } catch (error) {
         console.log(error);
       } finally {
         this.machineLoading = false;
       }
     },
-    handleMachineFocus() {
-      if (this.machineOptions.length === 0) {
-        this.remoteMachineMethod("");
+    async remoteMachineMethod(query) {
+      this.machineQuery = (query || "").trim();
+      this.machinePageNum = 1;
+      this.machineHasMore = true;
+      await this.queryMachineList(false);
+    },
+    async loadMoreMachineList() {
+      if (this.machineLoading || !this.machineHasMore) {
+        return;
       }
+      this.machinePageNum += 1;
+      await this.queryMachineList(true);
+    },
+    handleMachineScroll(event) {
+      if (this.machineLoading || !this.machineHasMore) {
+        return;
+      }
+      const wrap = event.target;
+      const reachedBottom =
+        wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 20;
+      if (reachedBottom) {
+        this.loadMoreMachineList();
+      }
+    },
+    bindMachineScroll() {
+      this.$nextTick(() => {
+        const wrap = document.querySelector(
+          ".lh-specify-machine-select-dropdown .el-select-dropdown__wrap"
+        );
+        if (!wrap) {
+          return;
+        }
+        this.unbindMachineScroll();
+        this.machineScrollWrap = wrap;
+        this.machineScrollWrap.addEventListener(
+          "scroll",
+          this.handleMachineScroll,
+          { passive: true }
+        );
+      });
+    },
+    unbindMachineScroll() {
+      if (!this.machineScrollWrap) {
+        return;
+      }
+      this.machineScrollWrap.removeEventListener("scroll", this.handleMachineScroll);
+      this.machineScrollWrap = null;
+    },
+    handleMachineDropdownVisibleChange(visible) {
+      if (visible) {
+        this.bindMachineScroll();
+        return;
+      }
+      this.unbindMachineScroll();
+    },
+    handleMachineFocus() {
+      this.remoteMachineMethod(this.machineQuery || "");
     },
     handleSpecCodeChange(value, row) {
       this.$set(this.form, "specCode", value);
@@ -205,10 +277,17 @@ export default {
         };
         this.machineOptions = [];
       }
+      this.machinePageNum = 1;
+      this.machineHasMore = true;
+      this.machineQuery = "";
     },
     hide() {
+      this.unbindMachineScroll();
       this.form = {};
       this.machineOptions = [];
+      this.machinePageNum = 1;
+      this.machineHasMore = true;
+      this.machineQuery = "";
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
