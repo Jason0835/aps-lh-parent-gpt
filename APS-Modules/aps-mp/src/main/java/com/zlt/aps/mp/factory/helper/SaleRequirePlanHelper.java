@@ -81,11 +81,18 @@ public class SaleRequirePlanHelper {
             long totalCapacity = areaCapacities.stream().filter(item -> null != item.getCapacityAllocation())
                     .mapToLong(item -> item.getCapacityAllocation().longValue())
                     .sum();
-            long totalDemand = sortedOrders.stream().mapToLong(DpOrderOffsetDetail::getProduceQtyDue).sum();
+            long totalDemand = sortedOrders.stream()
+                    .filter(order -> !ApsConstant.SAL_PRIORITY_POSTPONE.equals(order.getScmPriority())) // 暂缓订单不参与区域产能的运算
+                    .mapToLong(DpOrderOffsetDetail::getProduceQtyDue).sum();
             if(totalDemand > totalCapacity) {
                 processDemandHighPriorityExcludingLast(sortedOrders, totalDemand - totalCapacity);
             }else {
-                sortedOrders.forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
+                sortedOrders.forEach(order -> {
+                    if (ApsConstant.SAL_PRIORITY_POSTPONE.equals(order.getScmPriority())) { // 暂缓订单不参与区域产能的运算
+                        return;
+                    }
+                    order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT);
+                });
             }
             result.addAll(transformAllocationsToDemandPlans(createCondition,sortedOrders));
         });
@@ -113,13 +120,17 @@ public class SaleRequirePlanHelper {
         List<DpOrderOffsetDetail> midPriorityOrders = Lists.newArrayList();
         // 从后向前遍历
         for (int i = size - 1; i >= 0; i--) {
-            log.info("index:{},accumulatedDemand:{},produceQtyDue:{},overAreaCapacityValue:{}", i, accumulatedDemand,sortedOrders.get(i).getProduceQtyDue(),overAreaCapacityValue);
-            if(accumulatedDemand + sortedOrders.get(i).getProduceQtyDue() > overAreaCapacityValue) {
-                highPriorityOrders.add(sortedOrders.get(i));
-            }else{
-                midPriorityOrders.add(sortedOrders.get(i));
+            DpOrderOffsetDetail detail = sortedOrders.get(i);
+            if (ApsConstant.SAL_PRIORITY_POSTPONE.equals(detail.getScmPriority())) {
+                continue; // 暂缓订单不参与区域产能的运算
             }
-            accumulatedDemand += sortedOrders.get(i).getProduceQtyDue();
+            log.info("index:{},accumulatedDemand:{},produceQtyDue:{},overAreaCapacityValue:{}", i, accumulatedDemand,detail.getProduceQtyDue(),overAreaCapacityValue);
+            if(accumulatedDemand + detail.getProduceQtyDue() > overAreaCapacityValue) {
+                highPriorityOrders.add(detail);
+            }else{
+                midPriorityOrders.add(detail);
+            }
+            accumulatedDemand += detail.getProduceQtyDue();
         }
         if(!CollectionUtils.isEmpty(highPriorityOrders)) {
             highPriorityOrders.forEach(order -> order.setScmPriority(ApsConstant.SAL_PRIORITY_HIGHT));
