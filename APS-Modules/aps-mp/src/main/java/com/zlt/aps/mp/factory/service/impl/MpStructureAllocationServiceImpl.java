@@ -8,8 +8,8 @@ import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONValidator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Sets;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
@@ -2034,7 +2034,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private void setBeginDayAndEndDay(FactoryMonthPlanMouldDayResult item) {
         for (int i = 1; i <= 31; i++) {
             Object fieldValue = ReflectUtils.getFieldValue(item, "day" + i);
-            if (ObjUtil.isNotNull(fieldValue)) {
+            if (ObjUtil.isNotNull(fieldValue) && Integer.parseInt(fieldValue.toString()) > 0) {
                 if (item.getBeginDay() == null) {
                     item.setBeginDay(i);
                 }

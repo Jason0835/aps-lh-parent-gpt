@@ -19,6 +19,7 @@ public interface ISyncDataLogsApiService {
 	 * @param syncKey
 	 * @return
 	 */
+    @PostMapping("/syncDataLogs/getDataVersion/{syncKey}")
 	String getDataVersion(@PathVariable("syncKey") String syncKey);
 
     /**
@@ -27,7 +28,7 @@ public interface ISyncDataLogsApiService {
      * @param dataVersion 数据版本
      * @return 结果
      */
-    @PostMapping("/getSyncDataResult/{dataVersion}")
+    @PostMapping("/syncDataLogs/getSyncDataResult/{dataVersion}")
     public SyncDataLogs getSyncDataResult(@PathVariable("dataVersion") String dataVersion);
 
     /**
@@ -36,7 +37,7 @@ public interface ISyncDataLogsApiService {
      * @param dataVersion 数据版本
      * @return 结果
      */
-    @PostMapping("/getReqDataResult/{dataVersion}")
+    @PostMapping("/syncDataLogs/getReqDataResult/{dataVersion}")
     public SyncDataLogs getReqDataResult(@PathVariable("dataVersion") String dataVersion);
 
     /**
@@ -46,6 +47,6 @@ public interface ISyncDataLogsApiService {
      * @param publishIds 待发布记录ID
      * @return 结果
      */
-    @PostMapping("/getReqDataResult/{lockKey}/{publishIds}")
+    @PostMapping("/syncDataLogs/getReqDataResult/{lockKey}/{publishIds}")
     public boolean checkPublishLocking(@PathVariable("lockKey") String lockKey, @PathVariable("publishIds") Long[] publishIds);
 }

@@ -6,6 +6,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.RedisLock;
 import com.zlt.aps.itf.vo.SyncDataLogs;
 import com.zlt.sync.mapper.SyncDataLogsMapper;
+import com.zlt.sync.handle.SyncDataHandle;
 import com.zlt.sync.service.SyncDataLogsService;
 import com.zlt.sync.utils.DateUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,9 @@ public class SyncDataLogsServiceImpl implements SyncDataLogsService {
 	private SyncDataLogsMapper syncDataLogsMapper;
 
 	@Autowired
+	private SyncDataHandle syncDataHandle;
+
+	@Autowired
 	private RedisTemplate redisTemplate;
 	/**
 	 * 反馈超时时间（秒）
@@ -46,6 +50,17 @@ public class SyncDataLogsServiceImpl implements SyncDataLogsService {
      */
     @Value("${syncdata.publish.checkSyncResult:0}")
     private String checkSyncResult;
+
+	/**
+	 * 获取数据版本
+	 *
+	 * @param syncKey 同步标识
+	 * @return 数据版本号
+	 */
+	@Override
+	public String getDataVersion(String syncKey) {
+		return syncDataHandle.getDataVersion(syncKey);
+	}
 
 	/**
 	 * 获取同步日志的反馈状态

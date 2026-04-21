@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.core.utils.PageUtils;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -58,7 +59,12 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody LhPrecisionPlan queryVO) {
-        return super.list(queryVO);
+        QueryWrapper<LhPrecisionPlan> queryWrapper = new QueryWrapper<>();
+        this.builderCondition(queryWrapper, queryVO);
+        PageUtils.startPage(true, "UPDATE_TIME desc, MACHINE_CODE asc");
+        List<LhPrecisionPlan> list = lhPrecisionPlanMapper.selectList(queryWrapper);
+        PageUtils.clearPage();
+        return getDataTable(list);
     }
 
     /**
@@ -177,6 +183,7 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
     @Override
     protected void builderCondition(QueryWrapper<LhPrecisionPlan> queryWrapper, LhPrecisionPlan queryVO) {
         queryWrapper.eq("IS_DELETE", 0);
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getYear()), "YEAR", queryVO.getYear());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMachineCode()), "MACHINE_CODE", queryVO.getMachineCode());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getPrecisionType()), "PRECISION_TYPE", queryVO.getPrecisionType());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getCompletionStatus()), "COMPLETION_STATUS", queryVO.getCompletionStatus());

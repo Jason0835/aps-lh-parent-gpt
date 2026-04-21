@@ -62,19 +62,33 @@ public class LhMouldCleanPlanServiceImpl extends AbstractDocService<LhMouldClean
 
         try {
             redisService.setCacheObject(lockKey, "1");
+            log.info("开始从模具清洗预警同步数据");
 
             List<LhMouldCleanWarn> warnList = lhMouldCleanWarnMapper.selectList(null);
             if (warnList == null || warnList.isEmpty()) {
+                log.info("模具清洗预警数据为空");
                 return 0;
             }
 
             Map<String, List<LhMouldCleanWarn>> machineMap = new HashMap<>();
             for (LhMouldCleanWarn warn : warnList) {
                 String machineCode = extractMachineCode(warn.getLhCode());
-                machineMap.computeIfAbsent(machineCode, k -> new ArrayList<>()).add(warn);
+                if (machineCode != null) {
+                    machineMap.computeIfAbsent(machineCode, k -> new ArrayList<>()).add(warn);
+                }
             }
 
             int cleanDays = getCleanDays();
+            Date now = new Date();
+
+            Set<String> syncMachineCodes = machineMap.keySet();
+
+            QueryWrapper<LhMouldCleanPlan> deleteWrapper = new QueryWrapper<>();
+            deleteWrapper.in("LH_CODE", syncMachineCodes);
+            deleteWrapper.eq("DATA_SOURCE", "1");
+            deleteWrapper.eq("IS_DELETE", 0);
+            lhMouldCleanPlanMapper.delete(deleteWrapper);
+            log.info("已删除{}台机台的旧模具清洗计划数据", syncMachineCodes.size());
 
             List<LhMouldCleanPlan> planList = new ArrayList<>();
             for (Map.Entry<String, List<LhMouldCleanWarn>> entry : machineMap.entrySet()) {
@@ -85,45 +99,17 @@ public class LhMouldCleanPlanServiceImpl extends AbstractDocService<LhMouldClean
                 planList.addAll(plans);
             }
 
-            Set<String> planKeys = new HashSet<>();
             for (LhMouldCleanPlan plan : planList) {
-                String key = plan.getLhCode() + "_" + plan.getLeftRightMould();
-                planKeys.add(key);
+                plan.setCreateBy("SYSTEM");
+                plan.setCreateTime(now);
+                plan.setUpdateBy("SYSTEM");
+                plan.setUpdateTime(now);
+                plan.setIsDelete(0);
             }
 
-            QueryWrapper<LhMouldCleanPlan> existWrapper = new QueryWrapper<>();
-            existWrapper.isNotNull("LH_CODE");
-            List<LhMouldCleanPlan> existingList = lhMouldCleanPlanMapper.selectList(existWrapper);
-
-            Map<String, LhMouldCleanPlan> existingMap = new HashMap<>();
-            for (LhMouldCleanPlan existing : existingList) {
-                String key = existing.getLhCode() + "_" + existing.getLeftRightMould();
-                existingMap.put(key, existing);
-            }
-
-            List<LhMouldCleanPlan> insertList = new ArrayList<>();
-            List<LhMouldCleanPlan> updateList = new ArrayList<>();
-
-            for (LhMouldCleanPlan plan : planList) {
-                String key = plan.getLhCode() + "_" + plan.getLeftRightMould();
-                LhMouldCleanPlan existing = existingMap.get(key);
-                if (existing != null) {
-                    plan.setId(existing.getId());
-                    plan.setUpdateBy("SYSTEM");
-                    plan.setUpdateTime(new Date());
-                    updateList.add(plan);
-                } else {
-                    plan.setCreateBy("SYSTEM");
-                    plan.setCreateTime(new Date());
-                    insertList.add(plan);
-                }
-            }
-
-            if (!insertList.isEmpty()) {
-                baseDao.insertBatch(insertList);
-            }
-            if (!updateList.isEmpty()) {
-                baseDao.updateBatch(updateList);
+            if (!planList.isEmpty()) {
+                baseDao.insertBatch(planList);
+                log.info("成功同步{}条模具清洗计划数据", planList.size());
             }
 
             return planList.size();
