@@ -35,7 +35,7 @@ public class RawWarningConfig extends BaseEntity {
      * 原材料编码
      */
     @Excel(name = "原材料编码")
-    @ImportExcelValidated(required = true, maxLength = 10)
+    @ImportExcelValidated(maxLength = 20)
     @ApiModelProperty(value = "原材料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
@@ -44,7 +44,7 @@ public class RawWarningConfig extends BaseEntity {
      * 原材料名称
      */
     @Excel(name = "原材料名称")
-    @ImportExcelValidated(required = true, maxLength = 100)
+    @ImportExcelValidated(maxLength = 100)
     @ApiModelProperty(value = "原材料名称", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
