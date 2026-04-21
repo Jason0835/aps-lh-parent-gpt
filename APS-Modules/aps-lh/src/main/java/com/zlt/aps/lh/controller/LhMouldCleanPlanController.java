@@ -112,7 +112,21 @@ public class LhMouldCleanPlanController extends AbstractDocBizController<LhMould
         QueryWrapper<LhMouldCleanPlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
         wrapper.last("ORDER BY " + getOrderBy());
-        return lhMouldCleanPlanMapper.selectList(wrapper);
+        List<LhMouldCleanPlan> list = lhMouldCleanPlanMapper.selectList(wrapper);
+        for (LhMouldCleanPlan plan : list) {
+            plan.setRemark(decodeRemark(plan.getRemark()));
+        }
+        return list;
+    }
+
+    private String decodeRemark(String remark) {
+        if (remark == null) return null;
+        return remark.replace("__PERCENT__", "%")
+                     .replace("__AMP__", "&")
+                     .replace("__LT__", "<")
+                     .replace("__GT__", ">")
+                     .replace("__QUOT__", "\"")
+                     .replace("__APOS__", "'");
     }
 
     @Override

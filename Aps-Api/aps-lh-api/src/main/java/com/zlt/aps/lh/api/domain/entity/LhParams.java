@@ -2,13 +2,16 @@ package com.zlt.aps.lh.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
+import java.util.Date;
 
 @ApiModel(value = "硫化参数信息对象", description = "硫化参数信息对象 ")
 @Data
@@ -64,6 +67,18 @@ public class LhParams extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "参数值根据正则表达式校验是失败后的错误提示", name = "errorTips")
     @TableField(value = "ERROR_TIPS")
     private String errorTips;
+
+    @ApiModelProperty(value = "修改人")
+    @Excel(name = "ui.data.column.lhParams.updateBy")
+    @TableField(value = "UPDATE_BY")
+    private String updateBy;
+
+    @ApiModelProperty(value = "修改时间")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @Excel(name = "ui.data.column.lhParams.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @TableField(value = "UPDATE_TIME")
+    private Date updateTime;
 
 
 }

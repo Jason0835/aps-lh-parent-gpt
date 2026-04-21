@@ -8,8 +8,8 @@
             select sm.*, m.machine_code, m.machine_name
             from T_TQ_SPECIFY_MACHINE sm
             left join T_TQ_MACHINE_INFO m on sm.machine_id = m.id
-            where sm.DEL_FLAG = 0
-            and m.DEL_FLAG = 0
+            where sm.IS_DELETE = '0'
+            and m.IS_DELETE = '0'
             <if test="beadCode != null and beadCode != ''">
                 and INSTR(sm.BEAD_CODE, #{beadCode}) > 0
             </if>
@@ -33,7 +33,7 @@
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO T_TQ_SPECIFY_MACHINE (
-        bead_code, machine_id, line_type, job_type, create_by, create_time, remark, del_flag
+        bead_code, machine_id, line_type, job_type, create_by, create_time, remark, IS_DELETE
         )
         VALUES
         <foreach collection="list" item="SpecifyMachine" separator=",">
@@ -57,6 +57,6 @@
     </insert>
 
     <update id="deleteAllSpecifyMachine">
-        update T_TQ_SPECIFY_MACHINE set del_flag = NULL where del_flag = '0'
+        update T_TQ_SPECIFY_MACHINE set IS_DELETE = '1' where IS_DELETE = '0'
     </update>
 </mapper>
