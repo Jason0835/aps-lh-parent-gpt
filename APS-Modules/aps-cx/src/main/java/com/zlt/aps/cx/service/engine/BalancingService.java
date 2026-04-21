@@ -9,17 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -157,6 +147,28 @@ public class BalancingService {
                     task.getEmbryoCode(), task.getMaterialCode(),
                     task.getVulcanizeMachineCount(), task.getStructureName());
         }
+        
+        // 统计同胎胚不同物料的分布情况（关键诊断日志）
+        Map<String, Map<String, Integer>> embryoMaterialStats = new LinkedHashMap<>();
+        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+            String embryoCode = task.getEmbryoCode();
+            String materialCode = task.getMaterialCode() != null ? task.getMaterialCode() : "未知";
+            int count = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
+            embryoMaterialStats.computeIfAbsent(embryoCode, k -> new HashMap<>())
+                    .merge(materialCode, count, Integer::sum);
+        }
+        
+        log.info("====== 胎胚物料分布统计 ======");
+        for (Map.Entry<String, Map<String, Integer>> entry : embryoMaterialStats.entrySet()) {
+            String embryoCode = entry.getKey();
+            Map<String, Integer> materialCounts = entry.getValue();
+            List<String> details = materialCounts.entrySet().stream()
+                    .map(e -> e.getKey() + "(" + e.getValue() + "台)")
+                    .collect(Collectors.toList());
+            int totalCount = materialCounts.values().stream().mapToInt(Integer::intValue).sum();
+            log.info("  【胎胚 {}】共{}台，物料分布：{}", embryoCode, totalCount, details);
+        }
+        log.info("================================");
 
         // 转换为配置格式
         List<MpCxCapacityConfiguration> configs = availableMachines.stream()
@@ -375,6 +387,38 @@ public class BalancingService {
             Map<String, Integer> continueLoadMap,
             Map<String, Set<String>> continueTypeMap) {
 
+        log.info("====== 均衡分配(含续作预扣)开始 ======");
+        log.info("任务数={}, 可用机台数={}", tasks.size(), availableMachines.size());
+        
+        // 打印每个胎胚任务详情（关键诊断）
+        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+            log.info("  胎胚任务: embryoCode={}, materialCode={}, vulcanizeMachineCount={}",
+                    task.getEmbryoCode(), task.getMaterialCode(),
+                    task.getVulcanizeMachineCount());
+        }
+        
+        // 统计同胎胚不同物料的分布情况（关键诊断日志）
+        Map<String, Map<String, Integer>> embryoMaterialStats = new LinkedHashMap<>();
+        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : tasks) {
+            String embryoCode = task.getEmbryoCode();
+            String materialCode = task.getMaterialCode() != null ? task.getMaterialCode() : "未知";
+            int count = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
+            embryoMaterialStats.computeIfAbsent(embryoCode, k -> new HashMap<>())
+                    .merge(materialCode, count, Integer::sum);
+        }
+        
+        log.info("====== 胎胚物料分布统计 ======");
+        for (Map.Entry<String, Map<String, Integer>> entry : embryoMaterialStats.entrySet()) {
+            String embryoCode = entry.getKey();
+            Map<String, Integer> materialCounts = entry.getValue();
+            List<String> details = materialCounts.entrySet().stream()
+                    .map(e -> e.getKey() + "(" + e.getValue() + "台)")
+                    .collect(Collectors.toList());
+            int totalCount = materialCounts.values().stream().mapToInt(Integer::intValue).sum();
+            log.info("  【胎胚 {}】共{}台，物料分布：{}", embryoCode, totalCount, details);
+        }
+        log.info("================================");
+
         // Step 1: 获取均衡阈值配置
         int typeDiffThreshold = getTypeDiffThreshold(context);
         int loadDiffThreshold = getLoadDiffThreshold(context);
@@ -494,11 +538,11 @@ public class BalancingService {
                 for (String embryoCode : preTypes) {
                     state.getAssignedEmbryos().add(new EmbryoAssignment(embryoCode, null, 1));
                 }
-                log.info("  初始化机台 {}: maxCapacity={}, maxTypes={}, 续作预扣容量={}, 续作预扣种类={}, 历史胎胚={}",
+                log.info("  【初始化机台】{}: 剩余容量={}台, 剩余种类={}种, 历史胎胚={}",
                         config.getCxMachineCode(), state.getMaxCapacity(), state.getMaxTypes(),
                         preLoad, preTypes, state.getHistoryEmbryos());
             } else {
-                log.info("  初始化机台 {}: maxCapacity={}, maxTypes={}, 历史胎胚={}",
+                log.info("  【初始化机台】{}: 剩余容量={}台, 剩余种类={}种, 历史胎胚={}",
                         config.getCxMachineCode(), state.getMaxCapacity(), state.getMaxTypes(), state.getHistoryEmbryos());
             }
 
@@ -1425,7 +1469,7 @@ public class BalancingService {
      */
     private void logAllocationResult(BalancingResult result, List<MachineState> machineStates,
                                      List<CoreScheduleAlgorithmService.DailyEmbryoTask> originalTasks) {
-        log.info("均衡分配结果：");
+        log.info("【均衡分配结果】");
         
         int maxLoad = 0, minLoad = Integer.MAX_VALUE;
         int maxTypes = 0, minTypes = Integer.MAX_VALUE;
@@ -1469,9 +1513,9 @@ public class BalancingService {
                     .collect(Collectors.toList());
             
             if (preLoad > 0) {
-                log.info("  机台 {}: {} (含续作预留{})", machineCode, embryos, preLoad);
+                log.info("    分配->机台{}: {} (含续作预留{})", machineCode, embryos, preLoad);
             } else {
-                log.info("  机台 {}: {}", machineCode, embryos);
+                log.info("    分配->机台{}: {}", machineCode, embryos);
             }
             
             // 从 result 中计算均衡指标
@@ -1498,7 +1542,7 @@ public class BalancingService {
                 List<String> embryos = preEmbryoMap.entrySet().stream()
                         .map(e -> e.getKey() + "(" + e.getValue() + ")")
                         .collect(Collectors.toList());
-                log.info("  机台 {}: {} (仅续作预留)", state.getMachineCode(), embryos);
+                log.info("    续作->机台{}: {} (仅续作预留)", state.getMachineCode(), embryos);
             }
         }
         
@@ -1506,7 +1550,7 @@ public class BalancingService {
         if (minLoad == Integer.MAX_VALUE) {
             log.info("均衡指标：无有效分配");
         } else {
-            log.info("均衡指标：负荷差距={}, 种类差距={}", 
+            log.info("【均衡指标】机台负荷差距={}台, 胎胚种类差距={}种", 
                     maxLoad - minLoad, maxTypes - minTypes);
         }
         
@@ -1525,7 +1569,7 @@ public class BalancingService {
                 }
             }
             if (!unassignedItems.isEmpty()) {
-                log.warn("未排上的胎胚：{}", unassignedItems);
+                log.warn("【未排上】胎胚: {}", unassignedItems);
             }
         }
     }

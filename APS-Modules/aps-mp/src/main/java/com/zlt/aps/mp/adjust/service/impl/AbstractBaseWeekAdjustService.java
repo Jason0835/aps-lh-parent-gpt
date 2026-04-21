@@ -587,7 +587,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO 周程滚动上下文
      * @param mpProdFinalList 定稿记录列表
      */
-    protected void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj) {
+    public void reCalcAdjustDailyCapacityLimit(MpRollAdjustContextDTO contextDTO, List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj) {
 
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
         for (int i = contextDTO.getStructureStartDay(); i<= contextDTO.getStructureDeadLine(); i++){
@@ -603,7 +603,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param mpProdFinalList  月计划定稿列表
      * @return 统计结果列表
      */
-    protected MpMonthPlanStatistics buildMonthPlanStatistics(MpRollAdjustContextDTO contextDTO,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,String tempFlag) {
+    public MpMonthPlanStatistics buildMonthPlanStatistics(MpRollAdjustContextDTO contextDTO,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList,String tempFlag) {
 
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = contextDTO.getDailyCapacityLimitVoMap();
         List<MpStructureAllocation> oneStructureAllocationList = contextDTO.getOneStructureAllocationList();
@@ -731,7 +731,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 保存月计划统计结果
      * @param contextDTO
      */
-    private void saveMonthPlanStatisticsResult(MpRollAdjustContextDTO contextDTO, String tempFlag){
+    public void saveMonthPlanStatisticsResult(MpRollAdjustContextDTO contextDTO, String tempFlag){
         List<MpMonthPlanStatistics> monthPlanStatisticsList = contextDTO.getMonthPlanStatisticsList();
         if (PubUtil.isEmpty(monthPlanStatisticsList)){
             return;
@@ -4266,7 +4266,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 初始锁定日
      * @param contextDTO 周程滚动调整上下文对象
      */
-    protected Integer getLockEndDay(MpRollAdjustContextDTO contextDTO){
+    public Integer getLockEndDay(MpRollAdjustContextDTO contextDTO){
         return mpAdjustStructureInService.getLockEndDay(contextDTO);
     }
 
