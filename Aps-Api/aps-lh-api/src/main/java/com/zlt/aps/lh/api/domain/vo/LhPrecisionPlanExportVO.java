@@ -2,6 +2,7 @@ package com.zlt.aps.lh.api.domain.vo;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -19,7 +20,7 @@ import java.util.Date;
  */
 @Data
 @ApiModel(value = "硫化精度计划导出VO", description = "硫化精度计划导出数据")
-public class LhPrecisionPlanExportVO implements Serializable {
+public class LhPrecisionPlanExportVO extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
