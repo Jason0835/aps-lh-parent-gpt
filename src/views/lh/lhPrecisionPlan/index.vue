@@ -185,6 +185,17 @@ export default {
         {
           prop: "remark",
           label: this.$t("ui.data.column.remark"),
+          showOverflowTooltip: true,
+          formatter: (row, column, value) => {
+            if (!value) return value;
+            return value
+              .replace(/__PERCENT__/g, '%')
+              .replace(/__AMP__/g, '&')
+              .replace(/__LT__/g, '<')
+              .replace(/__GT__/g, '>')
+              .replace(/__QUOT__/g, '"')
+              .replace(/__APOS__/g, "'");
+          }
         },
         {
           align: "center",

@@ -246,6 +246,8 @@
   "ui.data.column.lhParams.paramName": "参数名称",
   "ui.data.column.lhParams.paramValue": "参数值",
   "ui.data.column.lhParams.remark": "备注",
+  "ui.data.column.lhParams.updateBy": "修改人",
+  "ui.data.column.lhParams.updateTime": "修改时间",
   "ui.data.column.gsq.params.modelName": "钢丝圈参数信息",
   "ui.data.column.gdyy.params.modelName": "钢带压延参数信息",
   "ui.data.column.tq.params.modelName": "胎圈参数信息",

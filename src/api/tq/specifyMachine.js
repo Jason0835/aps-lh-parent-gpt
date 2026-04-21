@@ -1,10 +1,5 @@
-import request from '@/utils/request'
+import request, { downloadLink } from '@/utils/request'
 
-/**
- * 成型定点机台管理列表
- * @param {Object} query
- * @returns
- */
 export function listSpecifyMachine(query) {
   return request({
     url: 'tq/specifyMachine/list',
@@ -12,11 +7,13 @@ export function listSpecifyMachine(query) {
     data: query
   })
 }
-/**
- * 编辑
- * @param {Object} query
- * @returns
- */
+export function addSpecifyMachine(query) {
+  return request({
+    url: 'tq/specifyMachine/save',
+    method: 'post',
+    data: query
+  })
+}
 export function editSpecifyMachine(query) {
   return request({
     url: 'tq/specifyMachine/save',
@@ -37,4 +34,7 @@ export function removeAllSpecifyMachine(query) {
     method: 'post',
     data: query
   })
+}
+export function exportData(query) {
+  return downloadLink("/tq/specifyMachine/export", query);
 }

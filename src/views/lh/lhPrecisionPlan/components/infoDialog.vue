@@ -148,7 +148,11 @@ export default {
       this.initYearList()
       if (row) {
         this.isEdit = true
-        this.form = { ...row }
+        const decodedRow = {
+          ...row,
+          remark: this.decodeRemark(row.remark)
+        }
+        this.form = decodedRow
       } else {
         this.isEdit = false
         this.form = { factoryCode: '116', dataSource: '1' }
@@ -194,6 +198,29 @@ export default {
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save)
     },
+    // 对备注中的特殊字符进行编码，避免后端 URLDecoder/HTML 转义解析失败
+    encodeRemark(remark) {
+      if (!remark) return remark;
+      // 将特殊字符替换为占位符，避免后端转义
+      return remark
+        .replace(/%/g, '__PERCENT__')
+        .replace(/&/g, '__AMP__')
+        .replace(/</g, '__LT__')
+        .replace(/>/g, '__GT__')
+        .replace(/"/g, '__QUOT__')
+        .replace(/'/g, '__APOS__');
+    },
+    // 解码备注中的占位符
+    decodeRemark(remark) {
+      if (!remark) return remark;
+      return remark
+        .replace(/__PERCENT__/g, '%')
+        .replace(/__AMP__/g, '&')
+        .replace(/__LT__/g, '<')
+        .replace(/__GT__/g, '>')
+        .replace(/__QUOT__/g, '"')
+        .replace(/__APOS__/g, "'");
+    },
     async save(payload) {
       payload.dataSource = payload.dataSource || '1'
       const uniqueRes = await checkLhPrecisionPlanUnique(payload)
@@ -203,7 +230,20 @@ export default {
       }
       try {
         this.loading = true
-        const res = await saveLhPrecisionPlan(payload)
+        const saveParams = {
+          id: payload.id,
+          factoryCode: payload.factoryCode,
+          companyCode: payload.companyCode,
+          year: payload.year,
+          machineCode: payload.machineCode,
+          precisionType: payload.precisionType,
+          planDate: payload.planDate,
+          actualDate: payload.actualDate,
+          remark: this.encodeRemark(payload.remark),
+          dataSource: payload.dataSource,
+          dataVersion: payload.dataVersion
+        }
+        const res = await saveLhPrecisionPlan(saveParams)
         this.$modal.msgSuccess(res.msg || this.$t('common.success'))
         this.$emit('success')
         this.hide()

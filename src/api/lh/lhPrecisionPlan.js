@@ -19,7 +19,7 @@ export function saveLhPrecisionPlan(data) {
   return request({
     url: '/lh/lhPrecisionPlan/save',
     method: 'post',
-    data: data
+    params: data
   })
 }
 
