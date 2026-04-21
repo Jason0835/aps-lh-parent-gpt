@@ -1890,7 +1890,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 newStock.setOverTimeStock(0);
                 newStock.setBadNum(0);
                 newStock.setModifyNum(0);
-                newStock.setIsDelete("0");
+                newStock.setIsDelete(0);
 
                 // 设置库存日期（使用当前排程日期）
                 LocalDate scheduleDate = context.getCurrentScheduleDate();
