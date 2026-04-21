@@ -3,6 +3,7 @@ package com.zlt.sync.api.service;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.zlt.aps.itf.vo.SyncDataLogs;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 
@@ -19,6 +20,7 @@ public interface ISyncDataLogsApiService {
 	 * @param syncKey
 	 * @return
 	 */
+	@GetMapping("/getDataVersion/{syncKey}")
 	String getDataVersion(@PathVariable("syncKey") String syncKey);
 
     /**
