@@ -57,10 +57,9 @@ public class CxContinueProductionHandler {
         //续作Sku轮询排产
         String groupName = groupPlanInfo.getGroupName();
         continueSkuInfoMap.forEach((materialDesc, cxContinueSkuInfo) -> {
-            //log.info();
             TbrMouldProductionLogRecorder.addContinueSkuStartMouldLog(context, groupName, materialDesc);
             if (!cxContinueSkuInfo.hasProduction()) {
-                log.info(TbrMouldProductionLogRecorder.addContinueSkuNoProductionQtyLog(context, groupName, materialDesc));
+                TbrMouldProductionLogRecorder.addContinueSkuNoProductionQtyLog(context, groupName, materialDesc);
                 return;
             }
             Integer maxDayQty = cxContinueSkuInfo.getMaxDaySingleLhMachineQty();
@@ -73,21 +72,16 @@ public class CxContinueProductionHandler {
             cxContinueSkuInfo.setMouldNumber(selectMouldList.size());
             //1、降膜排产
             DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(continueSkuDeadLineDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
-            //20260414+ 周期结构调整排产量
-            Integer planDemandQty = CycleGroupCalculateHandler.getSingleSkuMaxQty(context, cxContinueSkuInfo, groupPlanInfo);
-            if (null != planDemandQty) {
-                deductMould.setTotalQty(planDemandQty);
-                deductMould.setRemainingQty(planDemandQty);
-            }
+            //20260421+ 降膜排产信息调整
+            setDeductInfo(context, groupPlanInfo, deductMould, cxContinueSkuInfo);
             List<DailyScheduleVo> resultList = DeductMouldScheduler.scheduleProduction(deductMould);
             //分配结果
             if (CollectionUtils.isEmpty(resultList)) {
                 //记录日志
-                log.info(TbrMouldProductionLogRecorder.addContinueSkuNoProductionResultLog(context, groupName, materialDesc));
+                TbrMouldProductionLogRecorder.addContinueSkuNoProductionResultLog(context, groupName, materialDesc);
                 return;
             }
             String mouldInfo = selectMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.joining(StringConstant.COMMA));
-            //log.info();
             TbrMouldProductionLogRecorder.addContinueSkuMouldProductionByMouldLog(context, groupName, materialDesc, mouldInfo);
             //2、将排产结果，逐日分配到模具上，按排产日由小到大排序
             resultList.sort(Comparator.comparing(DailyScheduleVo::getScheduleDate));
@@ -273,6 +267,54 @@ public class CxContinueProductionHandler {
     }
 
     /**
+     * 续作-降膜排产信息设置
+     * 1、周期结构-Sku排产量调整
+     * 2、不同分组-强制降膜信息
+     *
+     * @param context           排产上下文
+     * @param groupPlanInfo     分组计划
+     * @param deductMould       降膜信息对象
+     * @param cxContinueSkuInfo 续作Sku信息
+     */
+    private static void setDeductInfo(Context context, ProductionPlanGroupInfo groupPlanInfo, DeductMouldVo deductMould, CxContinueSkuInfoHelper cxContinueSkuInfo) {
+        //20260414+ 周期结构调整排产量
+        Integer planDemandQty = CycleGroupCalculateHandler.getSingleSkuMaxQty(context, cxContinueSkuInfo, groupPlanInfo);
+        if (null != planDemandQty) {
+            deductMould.setTotalQty(planDemandQty);
+            deductMould.setRemainingQty(planDemandQty);
+        }
+        //20260421+ 不同分组-模具分配比例调整-强制降膜信息
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, Map<Integer, Integer>> forceDeductSkuMap = productionContext.getForceDeductSkuMap();
+        if (CollectionUtils.isEmpty(forceDeductSkuMap)) {
+            deductMould.setDayMaxMachinesLimitMap(null);
+            return;
+        }
+        String materialDesc = cxContinueSkuInfo.getMaterialDesc();
+        if (StringUtils.isBlank(materialDesc)) {
+            deductMould.setDayMaxMachinesLimitMap(null);
+            return;
+        }
+        Map<Integer, Integer> dayDeductMap = forceDeductSkuMap.get(materialDesc);
+        if (CollectionUtils.isEmpty(dayDeductMap)) {
+            deductMould.setDayMaxMachinesLimitMap(null);
+            return;
+        }
+        Integer maxMouldNumber = cxContinueSkuInfo.getMouldNumber();
+        Map<Integer, Integer> dayMaxMachinesLimitMap = new HashMap<>();
+        dayDeductMap.forEach((deductDay, deductMoldNumber) -> {
+            Integer dayMaxMoldNumber = maxMouldNumber - deductMoldNumber;
+            Integer dayMaxLimitLhMachines = dayMaxMoldNumber / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+            dayMaxMachinesLimitMap.put(deductDay, dayMaxLimitLhMachines);
+        });
+        if (CollectionUtils.isEmpty(dayMaxMachinesLimitMap)) {
+            deductMould.setDayMaxMachinesLimitMap(null);
+            return;
+        }
+        deductMould.setDayMaxMachinesLimitMap(dayMaxMachinesLimitMap);
+    }
+
+    /**
      * 获取下一个排产Sku
      *
      * @param productionContext 排产上下文
@@ -286,8 +328,8 @@ public class CxContinueProductionHandler {
      * @return
      */
     private static ContinueSkuNextSkuInfo getNextSku(TbrProductionContext productionContext, EarliestConclusionLhGroupHelper lhGroup, ProductionPlanGroupInfo productionPlanInfo, ProductionStageEnum productionStage, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> matchList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
+        //改用Top3列表，不再单个优先级：ContinueSkuPrioritySelector.getHeightPrioritySku(productionStage, matchList, excludeSkuSet);
         String selectedMaterialDesc = SkuPrioritySelector.getHighestPrioritySku(productionContext, productionStage, null, productionPlanInfo, lhGroup, continueType, matchList, excludeSkuSet, startDay, endDay);
-//        String selectedMaterialDesc = ContinueSkuPrioritySelector.getHeightPrioritySku(productionStage, matchList, excludeSkuSet);
         String groupName = productionPlanInfo.getGroupName();
         if (StringUtils.isBlank(selectedMaterialDesc)) {
             //todo 记录日志

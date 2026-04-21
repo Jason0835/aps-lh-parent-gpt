@@ -161,6 +161,17 @@ public class SkuDayProductionInfoHelper implements Serializable {
     }
 
     /**
+     * 获取分组+主花纹Key
+     * 分组名|*|主花纹
+     *
+     * @return
+     */
+    public String getGroupMainPatternKey() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, groupName, mainPattern);
+    }
+
+    /**
      * 增加排产量
      *
      * @param productionQty 需要增加的排产量

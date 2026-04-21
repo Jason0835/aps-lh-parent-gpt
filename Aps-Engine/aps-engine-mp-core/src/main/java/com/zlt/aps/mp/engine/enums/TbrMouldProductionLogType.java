@@ -324,6 +324,10 @@ public enum TbrMouldProductionLogType {
      */
     SIMULATE_MOULD_PRODUCTION("30-01", "分组计划模拟模具排产"),
     /**
+     * 30-01-91 模具分配比例调整
+     */
+    SIMULATE_MOULD_RATIO_PRODUCTION("30-01-91", "模具分配比例调整"),
+    /**
      * 30-01-01 非在机结构模具排产没有排产计划数据
      */
     GROUP_MOULD_NO_PLAN_DATA_CX_MACHINE("30-01-01", "非在机结构模具排产没有排产计划数据"),
@@ -403,6 +407,10 @@ public enum TbrMouldProductionLogType {
      * 40-02 分组计划正式开始模具排产数据重置完成
      */
     FORMAL_MOULD_RESET_DATA_FINISH("40-02", "分组计划正式开始模具排产数据重置完成"),
+    /**
+     * 40-02-91 分组计划模拟模具排产
+     */
+    FORMAL_MOULD_PRODUCTION("40-02-91", "分组计划正式模具排产"),
     /**
      * 40-03 分组计划正式开始模具排产数据为空
      */

@@ -475,6 +475,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
         paramCodeList.add(MonthPlanEnums.SPECIAL_MATERIAL_CODE.getCode());
         paramCodeList.add(MonthPlanEnums.FORMAL_RESET_SORT_DAY.getCode());
+        paramCodeList.add(MonthPlanEnums.MOLD_ALLOCATION_RATIO_CYCLE.getCode());
+
         //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
         if (CollectionUtils.isEmpty(paramConfigurationMap)) {
@@ -558,6 +560,11 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             configuration.setFormalFirstHalfDay((Integer) resetSortDayValue);
         } else {
             configuration.setFormalFirstHalfDay(productionContext.getMonthDays());
+        }
+        //20260420+ 不同结构模具分配比例调整周期
+        Object adjustCycleDayValue = paramConfigurationMap.get(MonthPlanEnums.MOLD_ALLOCATION_RATIO_CYCLE.getCode());
+        if (null != adjustCycleDayValue) {
+            configuration.setMoldAllocationRatioCycle((Integer) adjustCycleDayValue);
         }
         return configuration;
     }
