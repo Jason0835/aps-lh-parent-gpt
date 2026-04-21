@@ -18,6 +18,8 @@ public final class ScheduleDomainExceptionHelper {
 
     /** 错误明细在 message 中的最大展示条数 */
     private static final int MAX_DETAIL_DISPLAY_COUNT = 10;
+    /** 展示文案换行符（避免在前端纯文本组件中显示 HTML 标签） */
+    private static final String MESSAGE_LINE_BREAK = "\n";
 
     private ScheduleDomainExceptionHelper() {
     }
@@ -70,20 +72,20 @@ public final class ScheduleDomainExceptionHelper {
         int displayCount = Math.min(totalCount, MAX_DETAIL_DISPLAY_COUNT);
         StringBuilder messageBuilder = new StringBuilder(summary.length() + 128 + totalCount * 16);
         messageBuilder.append(summary)
-                .append('\n')
-                .append('\n')
+                .append(MESSAGE_LINE_BREAK)
+                .append(MESSAGE_LINE_BREAK)
                 .append("错误明细（共")
                 .append(totalCount)
                 .append("条）：");
 
         for (int index = 0; index < displayCount; index++) {
-            messageBuilder.append('\n')
+            messageBuilder.append(MESSAGE_LINE_BREAK)
                     .append(index + 1)
                     .append(". ")
                     .append(cleanedDetails.get(index));
         }
         if (totalCount > displayCount) {
-            messageBuilder.append('\n')
+            messageBuilder.append(MESSAGE_LINE_BREAK)
                     .append("... 其余")
                     .append(totalCount - displayCount)
                     .append("条请查看明细列表");

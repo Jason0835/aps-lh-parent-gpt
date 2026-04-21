@@ -40,7 +40,7 @@ public interface ILhParamsRemoteService {
      */
     @ApiOperation("保存")
     @PostMapping("/lhParams/save")
-    AjaxResult save(@RequestBody LhParams lhParams);
+    AjaxResult save(LhParams lhParams);
 
 
     /**

@@ -22,6 +22,27 @@ public class FactoryConstant {
      * 模具受限的个数
      */
     public final static Integer MOULD_LIMIT_COUNT = 2;
+
+    /**
+     * 前后日差异机台数
+     */
+    public final static Integer FRONT_REAR_DIFF_MACHINES = 2;
+
+    /**
+     * 均值
+     */
+    public final static Integer AVG_VALUE = 2;
+
+    /**
+     * 前日与激活机台数的差异
+     */
+    public final static Integer FRONT_ACTIVE_DIFF_MACHINES = 3;
+
+    /**
+     * 前日机台数阀值
+     */
+    public final static Integer FRONT_MACHINES_THRESHOLD = 3;
+
     /**
      * 小时对应的秒数 3600秒
      */

@@ -868,15 +868,15 @@ public class CxMachineBaseInfoVo implements Serializable {
     /**
      * 设置成型机与当前加入的分组排产计划是否同规格、同花纹、同英寸、断面宽等信息
      *
+     * @param context      排产上下文
      * @param addGroupPlan 即将要加入的分组计划
      * @param diffValue    断面宽差值范围
      */
-    public void setSameInfoByCurrentGroupPlan(ProductionPlanGroupInfo addGroupPlan, Integer diffValue) {
+    public void setSameInfoByCurrentGroupPlan(Context context, ProductionPlanGroupInfo addGroupPlan, Integer diffValue) {
         //没有排产信息，默认匹配
         if (CollectionUtils.isEmpty(allocationList)) {
-            sameSpecifications = YesOrNoEnum.YES.getCode();
-            sameProSize = YesOrNoEnum.YES.getCode();
-            sectionWidthCondition = YesOrNoEnum.YES.getCode();
+            TbrProductionContext productionContext = (TbrProductionContext) context;
+            setSameInfoByContinueGroup(productionContext, addGroupPlan, diffValue);
             return;
         }
         //取得最后一个分配的分组结构计划
@@ -888,21 +888,7 @@ public class CxMachineBaseInfoVo implements Serializable {
             return;
         }
         List<MonthPlanProductionRequirePlanVo> realProductionPlanList = lastHelper.getRealProductionPlanList();
-        String sameSpecifications = YesOrNoEnum.NO.getCode();
-        if (addGroupPlan.hasSameSpecifications(realProductionPlanList)) {
-            sameSpecifications = YesOrNoEnum.YES.getCode();
-        }
-        this.sameSpecifications = sameSpecifications;
-        String sameProSize = YesOrNoEnum.NO.getCode();
-        if (addGroupPlan.hasSameProSize(realProductionPlanList)) {
-            sameProSize = YesOrNoEnum.YES.getCode();
-        }
-        this.sameProSize = sameProSize;
-        String sectionWidthCondition = YesOrNoEnum.NO.getCode();
-        if (addGroupPlan.hasSectionWidthCondition(realProductionPlanList, diffValue)) {
-            sectionWidthCondition = YesOrNoEnum.YES.getCode();
-        }
-        this.sectionWidthCondition = sectionWidthCondition;
+        setSameInfoByBeforeGroup(addGroupPlan, diffValue, realProductionPlanList);
     }
 
     /**
@@ -1263,6 +1249,64 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         //分组名是否相同
         return !beforeAllocation.getAllocationGroup().equals(changeGroupName);
+    }
+
+    /**
+     * 根据机台的续作信息，设置
+     * 同规格、同英寸、断面宽
+     *
+     * @param productionContext 排产上下文
+     * @param addGroupPlan      新增分配分组
+     * @param diffValue         断面宽差值
+     */
+    private void setSameInfoByContinueGroup(TbrProductionContext productionContext, ProductionPlanGroupInfo addGroupPlan, Integer diffValue) {
+        sameSpecifications = YesOrNoEnum.YES.getCode();
+        sameProSize = YesOrNoEnum.YES.getCode();
+        sectionWidthCondition = YesOrNoEnum.YES.getCode();
+        Map<String, String> cxMachineContinueInfoMap = productionContext.getContinueStructureMap();
+        if (CollectionUtils.isEmpty(cxMachineContinueInfoMap)) {
+            return;
+        }
+        String groupName = cxMachineContinueInfoMap.get(cxMachineCode);
+        if (StringUtils.isBlank(groupName)) {
+            return;
+        }
+        Map<String, ProductionPlanGroupInfo> continueGroupMap = productionContext.getContinueGroupMap();
+        if (CollectionUtils.isEmpty(continueGroupMap)) {
+            return;
+        }
+        ProductionPlanGroupInfo continueGroupInfo = continueGroupMap.get(groupName);
+        if (null == continueGroupInfo) {
+            return;
+        }
+        List<MonthPlanProductionRequirePlanVo> continuePlanInfoList = continueGroupInfo.getGroupPlanData();
+        setSameInfoByBeforeGroup(addGroupPlan, diffValue, continuePlanInfoList);
+    }
+
+    /**
+     * 根据前结构信息，设置
+     * 同规格、同英寸、断面宽信息
+     *
+     * @param addGroupPlan        当前新加入的分组
+     * @param diffValue           断面宽差值
+     * @param beforeGroupPlanList 前分组信息
+     */
+    private void setSameInfoByBeforeGroup(ProductionPlanGroupInfo addGroupPlan, Integer diffValue, List<MonthPlanProductionRequirePlanVo> beforeGroupPlanList) {
+        String sameSpecifications = YesOrNoEnum.NO.getCode();
+        if (addGroupPlan.hasSameSpecifications(beforeGroupPlanList)) {
+            sameSpecifications = YesOrNoEnum.YES.getCode();
+        }
+        this.sameSpecifications = sameSpecifications;
+        String sameProSize = YesOrNoEnum.NO.getCode();
+        if (addGroupPlan.hasSameProSize(beforeGroupPlanList)) {
+            sameProSize = YesOrNoEnum.YES.getCode();
+        }
+        this.sameProSize = sameProSize;
+        String sectionWidthCondition = YesOrNoEnum.NO.getCode();
+        if (addGroupPlan.hasSectionWidthCondition(beforeGroupPlanList, diffValue)) {
+            sectionWidthCondition = YesOrNoEnum.YES.getCode();
+        }
+        this.sectionWidthCondition = sectionWidthCondition;
     }
 
 }

@@ -2,7 +2,6 @@ package com.zlt.aps.mp.adjust.service;
 
 
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
@@ -81,6 +80,13 @@ public interface IMpAdjustStructureInService  extends IDocService<MpAdjustStruct
      * @param contextDTO
      */
     Map<Integer, MdmWorkCalendar> getWorkCalendarMap(MpRollAdjustContextDTO contextDTO);
+
+    /**
+     * 获取周期结构最低硫化机台数
+     * @param contextDTO
+     */
+    Map<String, Integer> getCycleStructureMinMachinesMap(MpRollAdjustContextDTO contextDTO);
+
 
     /**
      * 获取每日型腔/活块数量

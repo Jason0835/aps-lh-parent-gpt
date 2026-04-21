@@ -10,6 +10,14 @@ import com.zlt.aps.itf.vo.SyncDataLogs;
  */
 public interface SyncDataLogsService {
 	/**
+	 * 获取数据版本
+	 *
+	 * @param syncKey 同步标识
+	 * @return 数据版本号
+	 */
+	String getDataVersion(String syncKey);
+
+	/**
 	 * 获取同步日志的反馈状态
 	 *
 	 * @param dataVersion 数据版本

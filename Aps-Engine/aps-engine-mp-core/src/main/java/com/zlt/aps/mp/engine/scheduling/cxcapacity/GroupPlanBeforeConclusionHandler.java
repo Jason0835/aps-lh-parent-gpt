@@ -163,21 +163,21 @@ public class GroupPlanBeforeConclusionHandler {
      * 3、分配信息更新调整分配信息
      * 4、是否需要清除排产信息？
      *
-     * @param productionContext    排产上下文
-     * @param minLhMachineCount    最低硫化配比
-     * @param beforeConclusionInfo 提前收尾信息对象
-     * @param groupPlanInfo        分组计划
-     * @param cxMachineInfo        成型机台
-     * @param allocationInfo       成型机台分配详情
-     * @param isSingleMachine      是否单机台
+     * @param productionContext               排产上下文
+     * @param minLhMachineCount               最低硫化配比
+     * @param beforeConclusionInfo            提前收尾信息对象
+     * @param groupPlanInfo                   分组计划
+     * @param cxMachineInfo                   成型机台
+     * @param allocationInfo                  成型机台分配详情
+     * @param isProductionCxMachineAllocation 是否在产机台分配阶段
      */
-    private void updateInfoByBeforeConclusion(TbrProductionContext productionContext, Integer minLhMachineCount, BeforeConclusionInfoHelper beforeConclusionInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo, boolean isSingleMachine) {
+    private void updateInfoByBeforeConclusion(TbrProductionContext productionContext, Integer minLhMachineCount, BeforeConclusionInfoHelper beforeConclusionInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo, boolean isProductionCxMachineAllocation) {
         //重新计算(分组)分配的天数: 需要排产天数 - 还需排产天数 - 收尾天数
         Integer deductionDay = beforeConclusionInfo.getDeductionDay();
         Integer beforeConclusionDay = beforeConclusionInfo.getBeforeConclusionDay();
         Set<Integer> deductionDaySet = beforeConclusionInfo.getDeductionDaySet();
         Integer realAllocationDayBeforeConclusion;
-        if (!isSingleMachine) {
+        if (!isProductionCxMachineAllocation) {
             Integer leftOverNeedAllocationDays = groupPlanInfo.getLeftOverNeedAllocationDays();
             Integer theoryDays = groupPlanInfo.getTheoryDays();
             realAllocationDayBeforeConclusion = theoryDays - leftOverNeedAllocationDays - deductionDay;
@@ -187,7 +187,7 @@ public class GroupPlanBeforeConclusionHandler {
         }
         Integer minAllocationDays = groupPlanInfo.getMinAllocationDays(productionContext);
         //20260119 如果提前收尾导致整个分配段不排产，则需要更新deductionDaySet的集合
-        if (realAllocationDayBeforeConclusion < minAllocationDays) {
+        if (isProductionCxMachineAllocation && (realAllocationDayBeforeConclusion < minAllocationDays)) {
             //20260323 更新提前收尾信息 因还有可能后续持续分配到不同时间段，导致此次收尾不能直接标记不排产
             updateBeforeConclusionForAllocation(beforeConclusionInfo, cxMachineInfo, allocationInfo);
             beforeConclusionDay = beforeConclusionInfo.getBeforeConclusionDay();
@@ -201,7 +201,7 @@ public class GroupPlanBeforeConclusionHandler {
         }
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionInfoMap;
         //已排产的模具信息
-        if (isSingleMachine) {
+        if (isProductionCxMachineAllocation) {
             dayProductionInfoMap = cxMachineInfo.getDayProductionLimitInfo();
         } else {
             dayProductionInfoMap = groupPlanInfo.getDayProductionLimitInfo();

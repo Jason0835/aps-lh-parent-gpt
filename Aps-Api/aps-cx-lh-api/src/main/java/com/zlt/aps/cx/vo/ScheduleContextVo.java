@@ -1,12 +1,12 @@
 package com.zlt.aps.cx.vo;
 
-import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.entity.*;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.config.CxStructurePriority;
+import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
@@ -35,6 +35,12 @@ public class ScheduleContextVo {
      * 排程日期
      */
     private LocalDate scheduleDate;
+
+    /**
+     * 班次序号（1=一班, 2=二班, 3=三班）
+     * 用于按班次级别判断开产/停产
+     */
+    private Integer shiftOrder;
 
     /**
      * 工厂编号
@@ -283,6 +289,12 @@ public class ScheduleContextVo {
     private Integer maxTypesPerMachine;
 
     /**
+     * 机台默认最大硫化机数
+     * 当机台配比配置缺失时的兜底值，默认10
+     */
+    private Integer maxLhMachineQty;
+
+    /**
      * 默认整车容量（条）
      * 当结构班产配置中没有该结构时使用
      */
@@ -364,6 +376,21 @@ public class ScheduleContextVo {
      * 过剩库存需要消耗的量
      */
     private Map<String, Integer> excessStockToConsume;
+
+    /**
+     * 硫化机停锅时间（停产日硫化停止时刻，HH:mm格式字符串，如 "08:00"）
+     */
+    private String vulcanizingStopTimeStr;
+
+    /**
+     * 硫化开模时间（开产日硫化开始时刻，HH:mm格式字符串，如 "08:00"）
+     */
+    private String vulcanizingOpenTimeStr;
+
+    /**
+     * H15开头机台最大胎胚种类数（未配置则按配比默认值，配置后覆盖配比值）
+     */
+    private Integer h15MaxEmbryoTypes;
 
     // ==================== 收尾相关数据 ====================
 

@@ -72,6 +72,14 @@ public interface IFactoryMonthPlanProductionFinalResultRemoteService {
     @PostMapping("/factoryMonthPlanFinalResult/exportData/{fileName}")
     byte[] exportData(@RequestBody FactoryMonthPlanProductionFinalResult queryVO, @PathVariable("fileName") String fileName);
 
+    
+    /**
+     * 导出SKU排产明细列表
+     */
+    @ApiOperation("导出SKU排产明细")
+    @PostMapping("/factoryMonthPlanFinalResult/exportSkuScheduleItems/{fileName}")
+    byte[] exportSkuScheduleItems(@RequestBody FactoryMonthPlanProductionFinalResult queryVO, @PathVariable("fileName") String fileName);
+    
     /**
      * 导入工厂月生产计划-最终排产计划定稿数据
      */

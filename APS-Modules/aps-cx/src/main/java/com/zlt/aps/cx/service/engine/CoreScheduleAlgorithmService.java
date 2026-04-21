@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.service.engine;
 
+import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 
@@ -7,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 核心排程算法服务接口
@@ -88,6 +90,8 @@ public interface CoreScheduleAlgorithmService {
         private Boolean isContinueTask;
         /** 是否量试任务（施工阶段为02-量试） */
         private Boolean isProductionTrial;
+        /** 量试约束机台编码（量试任务只能分配到该机台，来自试制分配结果） */
+        private String constrainedMachineCode;
         /** 续作机台列表 */
         private List<String> continueMachineCodes;
         /** 硫化需求量（来自硫化排程） */
@@ -139,6 +143,18 @@ public interface CoreScheduleAlgorithmService {
         private Boolean isLastEndingBatch;
         /** 班次分配结果（班次编码 -> 计划量） */
         private Map<String, Integer> shiftAllocation;
+
+        // ==================== 停产反推封顶新增字段 ====================
+        /** 停锅班次序号（dayShiftOrder，根据硫化机停锅时间和班次时间计算） */
+        private Integer closingShiftOrder;
+        /** 停产反推总量（从成型停机到硫化停锅期间需要消耗的胎胚总量） */
+        private Integer closingRequiredStock;
+
+        // ==================== 开产提前一班新增字段 ====================
+        /** 硫化开产班次序号（dayShiftOrder，根据硫化开模时间和班次时间计算） */
+        private Integer lhOpeningShiftOrder;
+        /** 成型开产班次序号（= 硫化开产班次 - 1，提前一个班次） */
+        private Integer formingOpeningShiftOrder;
 
         // ==================== 收尾处理新增字段 ====================
         /** 收尾是否被舍弃（非主销产品余量<=2条） */
@@ -192,6 +208,8 @@ public interface CoreScheduleAlgorithmService {
         private String structureName;
         /** 计划数量 */
         private Integer quantity;
+        /** 硫化机台数 */
+        private Integer vulcanizeMachineCount;
         /** 优先级 */
         private Integer priority;
         /** 库存可供时长（小时） */

@@ -200,9 +200,9 @@
     <select id="selectMouldCleanPlanList" resultType="com.zlt.aps.itf.vo.MouldCleanPlanVo">
         SELECT
         LH_CODE,
-        OPER_TIME,
-        FIRST_WASH_TIME,
-        SECOND_WASH_TIME,
+        CONVERT(VARCHAR, OPER_TIME, 120) AS OPER_TIME,
+        CONVERT(VARCHAR, FIRST_WASH_TIME, 120) AS FIRST_WASH_TIME,
+        CONVERT(VARCHAR, SECOND_WASH_TIME, 120) AS SECOND_WASH_TIME,
         REMARK,
         DEL_FLAG,
         DATA_VERSION,

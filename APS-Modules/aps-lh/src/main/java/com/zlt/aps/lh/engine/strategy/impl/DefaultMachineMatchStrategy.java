@@ -10,9 +10,12 @@ import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.MachineStatusUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -33,9 +36,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
-
-    /** 机台启用状态 */
-    private static final String STATUS_ENABLED = "0";
 
     /** 定点机台不可作业标记 */
     private static final String JOB_TYPE_FORBIDDEN = "1";
@@ -63,7 +63,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 continue;
             }
             // 过滤禁用状态
-            if (!STATUS_ENABLED.equals(machine.getStatus())) {
+            if (!MachineStatusUtil.isEnabled(machine.getStatus())) {
                 continue;
             }
             // 寸口范围匹配
@@ -71,7 +71,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 continue;
             }
             // 检查模具与机台兼容性（模数不超过机台最大模台数）
-            if (!isMouldCompatible(skuMouldCodes, machine, occupiedMouldCodes)) {
+            if (!isMouldCompatible(sku, skuMouldCodes, machine, occupiedMouldCodes)) {
                 continue;
             }
             candidates.add(machine);
@@ -85,11 +85,24 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     @Override
-    public MachineScheduleDTO selectBestMachine(List<MachineScheduleDTO> candidates, SkuScheduleDTO sku) {
-        if (candidates == null || candidates.isEmpty()) {
+    public MachineScheduleDTO selectBestMachine(LhScheduleContext context,
+                                                SkuScheduleDTO sku,
+                                                List<MachineScheduleDTO> candidates,
+                                                Set<String> excludedMachineCodes) {
+        if (CollectionUtils.isEmpty(candidates)) {
             return null;
         }
-        return candidates.get(0);
+        for (MachineScheduleDTO candidate : candidates) {
+            if (candidate == null) {
+                continue;
+            }
+            String machineCode = candidate.getMachineCode();
+            if (CollectionUtils.isEmpty(excludedMachineCodes) || StringUtils.isEmpty(machineCode)
+                    || !excludedMachineCodes.contains(machineCode)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     /**
@@ -140,17 +153,13 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
     }
 
     /**
-     * 检查模具是否与机台兼容（模数不超限且模具未被占用）
+     * 检查模具是否与机台兼容（仅校验模具未被占用）。
      */
-    private boolean isMouldCompatible(List<String> skuMouldCodes, MachineScheduleDTO machine, Set<String> occupiedMouldCodes) {
+    private boolean isMouldCompatible(SkuScheduleDTO sku, List<String> skuMouldCodes, MachineScheduleDTO machine, Set<String> occupiedMouldCodes) {
         if (skuMouldCodes.isEmpty()) {
             return true;
         }
-        // 模数不能超过机台最大模台数
-        if (skuMouldCodes.size() > machine.getMaxMoldNum()) {
-            return false;
-        }
-        // 检查模具是否已被占用（共用模冲突）
+        // 当前 mouldQty 的业务语义是“选机后的机台模台数”，此处不再拿 SKU 预置模数拦截候选机台。
         for (String mouldCode : skuMouldCodes) {
             if (occupiedMouldCodes.contains(mouldCode)) {
                 return false;

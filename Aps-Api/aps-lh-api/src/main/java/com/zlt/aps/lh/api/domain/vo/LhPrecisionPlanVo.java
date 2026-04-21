@@ -8,8 +8,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Date;
 
 /**
  * 硫化精度计划查询VO
@@ -37,41 +37,41 @@ public class LhPrecisionPlanVo implements Serializable {
     @ApiModelProperty(value = "计划日期-开始")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
-    private LocalDate planDateStart;
+    private Date planDateStart;
 
     @ApiModelProperty(value = "计划日期-结束")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
-    private LocalDate planDateEnd;
+    private Date planDateEnd;
 
     @ApiModelProperty(value = "实际执行日期-开始")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
-    private LocalDate actualDateStart;
+    private Date actualDateStart;
 
     @ApiModelProperty(value = "实际执行日期-结束")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
-    private LocalDate actualDateEnd;
+    private Date actualDateEnd;
 
     @ApiModelProperty(value = "计划日期")
     @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate planDate;
+    private Date planDate;
 
     @ApiModelProperty(value = "实际执行日期")
     @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate actualDate;
+    private Date actualDate;
 
     @ApiModelProperty(value = "到期日期")
     @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate dueDate;
+    private Date dueDate;
 
     @ApiModelProperty(value = "距离到期日剩余天数")
     private Integer daysToDue;
 
     @ApiModelProperty(value = "上次保养日期")
     @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate lastMaintenanceDate;
+    private Date lastMaintenanceDate;
 
     @ApiModelProperty(value = "完成情况：0-未完成，1-已完成")
     private String completionStatus;
@@ -84,7 +84,7 @@ public class LhPrecisionPlanVo implements Serializable {
 
     @ApiModelProperty(value = "预警触发日期")
     @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate warningDate;
+    private Date warningDate;
 
     @ApiModelProperty(value = "是否已发送预警：0-未发送，1-已发送")
     private String isWarningSent;

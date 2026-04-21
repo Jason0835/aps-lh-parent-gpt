@@ -9,6 +9,7 @@ import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.Data;
 import lombok.Getter;
@@ -312,13 +313,19 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * 先挑选还有硫化组的，胎胚种类数也没超的
      *
      * @param context              排产上下文
+     * @param round                轮次
      * @param previousDayLimitInfo 前一日的限制情况
      * @param nextDayLimitInfo     后一日的限制情况
      * @return
      */
-    public boolean isReachLimitByMouldNumber(Context context, GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
+    public boolean isReachLimitByMouldNumber(Context context, FormalRoundEnum round, GroupPlanCxLhCapacityLimitHelper previousDayLimitInfo, GroupPlanCxLhCapacityLimitHelper nextDayLimitInfo) {
+        //20260416+ 实单最低硫化机台数轮次以实单最低硫化机台数来计算
+        Integer theoryMaxLhMachineCount = maxLhMachineCount;
+        if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE == round) {
+            theoryMaxLhMachineCount = dayMinLhMachineCount;
+        }
         //实际的最大硫化机台数 = min(初始的最大硫化机台数,结构剩余可用的最大硫化机台数 sandy+ 2026.03.22
-        Integer realMaxLhMachineCount = maxLhMachineCount > remainMaxLhMachineCount ? remainMaxLhMachineCount : maxLhMachineCount;
+        Integer realMaxLhMachineCount = theoryMaxLhMachineCount > remainMaxLhMachineCount ? remainMaxLhMachineCount : theoryMaxLhMachineCount;
         //按模具数
         Integer currentLhMachineCount = getProductionLhMachineCountByMouldNumber();
         //如果前日没有排产信息，则表示结构排产首日
@@ -893,7 +900,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
         if (null == lhRatio) {
             return;
         }
-        //最低硫化配比
+        //实单最低硫化配比
         Set<String> cxMachineCodeSet = initLimitHelper.getCxMachineCodeSet();
         if (CollectionUtils.isEmpty(cxMachineCodeSet)) {
             initLimitHelper.dayMinLhMachineCount = lhRatio.getLhMachineMinQty();
@@ -923,14 +930,14 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * @param singleCxMachineAllocation 某条转产配置
      */
     private static void updateBaseLimitInfo(Context context, GroupPlanCxLhCapacityLimitHelper initLimitHelper, CxMachineBaseInfoVo cxMachineInfo, MpStructureAllocation singleCxMachineAllocation) {
-        Integer productionDay = initLimitHelper.getDay();
-        String cxMachineCode = cxMachineInfo.getCxMachineCode();
         if (null == cxMachineInfo) {
             return;
         }
+        Integer productionDay = initLimitHelper.getDay();
         if (cxMachineInfo.getStopDayInfo().contains(productionDay)) {
             return;
         }
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
         //理论不可重复
         if (initLimitHelper.getCxMachineCodeSet().contains(cxMachineCode)) {
             return;
@@ -938,8 +945,17 @@ public class GroupPlanCxLhCapacityLimitHelper {
         if (!singleCxMachineAllocation.hasRange(productionDay)) {
             return;
         }
+        //20260416+ 实单最低硫化配比
+        Integer minLhMachine = singleCxMachineAllocation.getMinLhMachineCount();
+        Set<String> cxMachineCodeSet = initLimitHelper.getCxMachineCodeSet();
+        if (CollectionUtils.isEmpty(cxMachineCodeSet)) {
+            initLimitHelper.dayMinLhMachineCount = minLhMachine;
+        } else {
+            initLimitHelper.dayMinLhMachineCount = initLimitHelper.getMaxLhMachineCount() + minLhMachine;
+        }
         initLimitHelper.getCxMachineCodeSet().add(cxMachineCode);
-
+        //最低硫化配比存储
+        initLimitHelper.getMinLhMachineInfo().put(cxMachineCode, singleCxMachineAllocation.getMinLhMachineCount());
         //最大硫化配比
         Integer maxLhMachineCount = initLimitHelper.getMaxLhMachineCount();
         Integer singleCxMachineCount = singleCxMachineAllocation.getMaxLhMachineCount();
@@ -956,8 +972,6 @@ public class GroupPlanCxLhCapacityLimitHelper {
         }
         maxLhMachineCount = maxLhMachineCount + singleCxMachineCount;
         initLimitHelper.maxLhMachineCount = maxLhMachineCount;
-        //最低硫化配比
-        initLimitHelper.getMinLhMachineInfo().put(cxMachineCode, singleCxMachineAllocation.getMinLhMachineCount());
         //最大胎胚种类数
         Integer maxEmbryoCodeCount = initLimitHelper.getMaxEmbryoCodeCount();
         maxEmbryoCodeCount = maxEmbryoCodeCount + singleCxMachineAllocation.getMaxEmbryoCodeCount();

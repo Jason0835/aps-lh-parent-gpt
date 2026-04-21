@@ -101,6 +101,8 @@ public class LhScheduleConfigResolver {
                 LhScheduleConstant.MOULD_CHANGE_OTHER_HOURS);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.MOULD_CHANGE_TOTAL_HOURS,
                 LhScheduleConstant.MOULD_CHANGE_TOTAL_HOURS);
+        putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.TYPE_BLOCK_CHANGE_TOTAL_HOURS,
+                LhScheduleConstant.TYPE_BLOCK_CHANGE_TOTAL_HOURS);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.FIRST_INSPECTION_HOURS,
                 LhScheduleConstant.FIRST_INSPECTION_HOURS);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.MAX_FIRST_INSPECTION_PER_SHIFT,
@@ -126,8 +128,18 @@ public class LhScheduleConfigResolver {
 
         // 排程窗口与设备约束参数
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SCHEDULE_DAYS, LhScheduleConstant.SCHEDULE_DAYS, 1);
+        putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.MACHINE_ONLINE_LOOKBACK_DAYS,
+                LhScheduleConstant.MACHINE_ONLINE_LOOKBACK_DAYS, 1);
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.MACHINE_STOP_TIMEOUT_HOURS,
                 LhScheduleConstant.MACHINE_STOP_TIMEOUT_HOURS);
+        putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.ENABLE_LOCAL_SEARCH,
+                LhScheduleConstant.ENABLE_LOCAL_SEARCH);
+        putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.LOCAL_SEARCH_MACHINE_THRESHOLD,
+                LhScheduleConstant.LOCAL_SEARCH_MACHINE_THRESHOLD, 1);
+        putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.LOCAL_SEARCH_DEPTH,
+                LhScheduleConstant.LOCAL_SEARCH_DEPTH, 1);
+        putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.LOCAL_SEARCH_TIME_BUDGET_MS,
+                LhScheduleConstant.LOCAL_SEARCH_TIME_BUDGET_MS, 1);
 
         // 开停产与试制策略参数
         putIntValue(resolvedParamMap, lhParamsMap, LhScheduleParamConstant.SHUTDOWN_DAY_MINUS_3_RATE,

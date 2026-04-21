@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.CxPrecisionPlanMapper">
+
+    <select id="selectPendingWarningPlans" resultType="com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan">
+        select *
+        from T_CX_PRECISION_PLAN
+        where COMPLETION_STATUS = '0'
+          and DAYS_TO_DUE &lt;= #{daysToDue}
+          and DAYS_TO_DUE &gt; 0
+          and WARNING_STATUS = '0'
+          and IS_DELETE = 0
+        order by DAYS_TO_DUE asc
+    </select>
+
+    <update id="batchUpdateDaysToDue">
+        update T_CX_PRECISION_PLAN
+        set DAYS_TO_DUE = DATEDIFF(PLAN_DATE, CURDATE())
+        where IS_DELETE = 0
+          and COMPLETION_STATUS = '0'
+    </update>
+
+</mapper>

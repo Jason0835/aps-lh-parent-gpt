@@ -944,8 +944,9 @@ public class MpWeekRollAdjustEngine {
      */
     private void deductMouldProduction(MpRollAdjustContextDTO contextDTO, int iDay, FactoryMonthPlanFinalAdjustVo prodFinal) {
         String dayField = FactoryConstant.DAY_FIELD+iDay;
+        int dayVulcanizationQty = getDayVulcanizationQty(prodFinal);
         if (prodFinal.getFieldValueByFieldName(dayField) == null ||
-                (Integer) prodFinal.getFieldValueByFieldName(dayField) == 0){
+                (Integer) prodFinal.getFieldValueByFieldName(dayField) ==0){
             //往前推1天
             iDay -= 1;
             if (iDay <= contextDTO.getLockEndDay()){
@@ -959,9 +960,21 @@ public class MpWeekRollAdjustEngine {
                 return;
             }
         }
-        int dayQty = (Integer) prodFinal.getFieldValueByFieldName(dayField);
+        Integer dayQty = (Integer) prodFinal.getFieldValueByFieldName(dayField);
+        if (dayQty < dayVulcanizationQty){
+            //若降模的日计划量小于日硫化量，则观察前日的计划量是否大于2倍的日硫化量，若大于，则累在一起减模，防止减模次日与减模日偏差太大
+            //往前推1天
+            int iPreDay = iDay - 1;
+            if (iPreDay > contextDTO.getLockEndDay()){
+                String preDayField = FactoryConstant.DAY_FIELD+iPreDay;
+                if (prodFinal.getFieldValueByFieldName(preDayField) != null &&
+                        (Integer) prodFinal.getFieldValueByFieldName(preDayField) > FactoryConstant.FRONT_REAR_DIFF_MACHINES * dayVulcanizationQty){
+                    dayQty += (Integer) prodFinal.getFieldValueByFieldName(preDayField);
+                    iDay -= 1;
+                }
+            }
+        }
         //1、根据计划量测算硫化机台数,有余数加1；
-        int dayVulcanizationQty = getDayVulcanizationQty(prodFinal);
         int machines = dayQty / dayVulcanizationQty;
         machines += dayQty % dayVulcanizationQty > 0 ? 1:0;
 
@@ -2287,6 +2300,51 @@ public class MpWeekRollAdjustEngine {
             otherMachines = addMouldArr[0];
         }
         return (fullMachines+otherMachines)*2;
+    }
+
+    /**
+     * 检查结构提前收尾
+     * @param contextDTO 周程滚动上下文
+     */
+    public boolean checkStructurePreClose(MpRollAdjustContextDTO contextDTO) {
+
+        boolean noExecuteMatchFlag = false;
+        //1.获取最低硫化机台数
+        Integer minLhMachines = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode());
+        if (contextDTO.getCycleStructureMinLhMachinesMap().get(contextDTO.getStructureName()) != null ){
+            //若是周期，按周期的最低硫化机台数
+            minLhMachines = contextDTO.getCycleStructureMinLhMachinesMap().get(contextDTO.getStructureName());
+        }
+        //2.可执行搭配排产的提前收尾天数
+        Integer preCloseDayParam = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.STRUCTURE_ADJUST_PRE_CLOSE_DAY.getCode());
+
+        int minPreCloseDay = 0;
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = contextDTO.getDailyCapacityLimitVoMap();
+        for (int i = contextDTO.getStructureDeadLine(); i>= contextDTO.getStructureStartDay(); i--){
+            if (dailyCapacityLimitVoMap.get(i) == null){
+                continue;
+            }
+            if (dailyCapacityLimitVoMap.get(i).getUsedLhMachines() < minLhMachines){
+                minPreCloseDay = i;
+            }
+        }
+
+        if (minPreCloseDay > 0){
+            //可提前收尾的天数 = 结构收尾日 - （使用硫化机台数 < 最低硫化机台数时的天）
+            int diffPreCloseDays = contextDTO.getStructureDeadLine() - minPreCloseDay + 1;
+            if (diffPreCloseDays > preCloseDayParam){
+                //若可提前收尾的天数 > 可执行搭配的收尾天数（参数），则不执行搭配
+                noExecuteMatchFlag = true;
+            }
+            //若硫化机台数小于最低硫化机台数，表示可提前收尾，提示消息
+            if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgTemplateWithStructureAdjustPreClose())){
+                String executeMatchFlag = noExecuteMatchFlag ? "否" : "是";
+                String strHint = buildMessageContent(contextDTO.getMsgTemplateWithStructureAdjustPreClose(),new String[]{contextDTO.getFactoryName(),String.valueOf(contextDTO.getMpYear()),
+                        String.valueOf(contextDTO.getMpMonth()),contextDTO.getVersion(),contextDTO.getStructureName(),String.valueOf(diffPreCloseDays),executeMatchFlag});
+                contextDTO.getMsgStructureAdjustPreClose().append(strHint).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+            }
+        }
+        return noExecuteMatchFlag;
     }
 
     /**

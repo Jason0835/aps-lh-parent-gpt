@@ -142,6 +142,10 @@ public class LhScheduleConfig {
         return getParamIntValue(LhScheduleParamConstant.MOULD_CHANGE_TOTAL_HOURS, LhScheduleConstant.MOULD_CHANGE_TOTAL_HOURS);
     }
 
+    public int getTypeBlockChangeTotalHours() {
+        return getParamIntValue(LhScheduleParamConstant.TYPE_BLOCK_CHANGE_TOTAL_HOURS, LhScheduleConstant.TYPE_BLOCK_CHANGE_TOTAL_HOURS);
+    }
+
     public int getFirstInspectionHours() {
         return getParamIntValue(LhScheduleParamConstant.FIRST_INSPECTION_HOURS, LhScheduleConstant.FIRST_INSPECTION_HOURS);
     }
@@ -207,5 +211,24 @@ public class LhScheduleConfig {
 
     public int getTrialDailyLimit() {
         return getParamIntValue(LhScheduleParamConstant.TRIAL_DAILY_LIMIT, LhScheduleConstant.TRIAL_DAILY_LIMIT);
+    }
+
+    public boolean isLocalSearchEnabled() {
+        return getParamIntValue(LhScheduleParamConstant.ENABLE_LOCAL_SEARCH, LhScheduleConstant.ENABLE_LOCAL_SEARCH) == 1;
+    }
+
+    public int getLocalSearchMachineThreshold() {
+        return Math.max(1, getParamIntValue(LhScheduleParamConstant.LOCAL_SEARCH_MACHINE_THRESHOLD,
+                LhScheduleConstant.LOCAL_SEARCH_MACHINE_THRESHOLD));
+    }
+
+    public int getLocalSearchDepth() {
+        return Math.max(1, getParamIntValue(LhScheduleParamConstant.LOCAL_SEARCH_DEPTH,
+                LhScheduleConstant.LOCAL_SEARCH_DEPTH));
+    }
+
+    public int getLocalSearchTimeBudgetMs() {
+        return Math.max(1, getParamIntValue(LhScheduleParamConstant.LOCAL_SEARCH_TIME_BUDGET_MS,
+                LhScheduleConstant.LOCAL_SEARCH_TIME_BUDGET_MS));
     }
 }

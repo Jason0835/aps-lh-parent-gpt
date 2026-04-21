@@ -15,7 +15,7 @@
         <result property="openMachineClass" column="open_machine_class"/>
         <result property="status" column="status"/>
         <result property="remark" column="remark"/>
-        <result property="delFlag" column="del_flag"/>
+        <result property="delFlag" column="IS_DELETE"/>
         <result property="createBy" column="create_by"/>
         <result property="createTime" column="create_time"/>
         <result property="updateBy" column="update_by"/>
@@ -23,14 +23,14 @@
     </resultMap>
 
     <sql id="selectMachineInfoVo">
-        select id, machine_code, machine_name, efficiency, tooling_info, quata, class_shift, open_machine_class, status, remark, del_flag, create_by, create_time, update_by, update_time from t_tq_machine_info
+        select id, machine_code, machine_name, efficiency, tooling_info, quata, class_shift, open_machine_class, status, remark, IS_DELETE, create_by, create_time, update_by, update_time from t_tq_machine_info
     </sql>
 
     <select id="selectMachineInfoList" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineInfo"
             resultMap="MachineInfoResult">
         <include refid="selectMachineInfoVo"/>
         <where>
-            del_flag ='0'
+            IS_DELETE ='0'
             <if test="machineCode != null  and machineCode != ''">and INSTR(machine_code, #{machineCode}) > 0</if>
             <if test="machineName != null  and machineName != ''">and machine_name like concat(concat('%',#{machineName}), '%')</if>
             <if test="status != null  and status != ''">and status = #{status}</if>
@@ -47,7 +47,7 @@
             resultMap="MachineInfoResult">
         <include refid="selectMachineInfoVo"/>
         <where>
-            del_flag ='0'
+            IS_DELETE ='0'
             <if test="id != null  and id != ''">and id != #{id}</if>
             <if test="machineCode != null  and machineCode != ''">and machine_code = #{machineCode}</if>
             <if test="machineName != null  and machineName != ''">and machine_name = #{machineName}</if>
@@ -58,7 +58,7 @@
             resultMap="MachineInfoResult">
         <include refid="selectMachineInfoVo"/>
         <where>
-            del_flag ='0'
+            IS_DELETE ='0'
             <if test="machineCode != null  and machineCode != ''">and machine_code != #{machineCode}</if>
             <if test="machineName != null  and machineName != ''">and machine_name = #{machineName}</if>
         </where>
@@ -83,7 +83,7 @@
             <if test="openMachineClass != null">open_machine_class,</if>
             <if test="status != null">status,</if>
             <if test="remark != null">remark,</if>
-            <if test="delFlag != null">del_flag,</if>
+            <if test="delFlag != null">IS_DELETE,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
             <if test="updateBy != null">update_by,</if>
@@ -119,7 +119,7 @@
             open_machine_class = #{openMachineClass,jdbcType=VARCHAR},
             status = #{status,jdbcType=VARCHAR},
             remark = #{remark,jdbcType=VARCHAR},
-            <if test="delFlag != null">del_flag = #{delFlag,jdbcType=VARCHAR},</if>
+            <if test="delFlag != null">IS_DELETE = #{delFlag,jdbcType=VARCHAR},</if>
             <if test="createBy != null">create_by = #{createBy,jdbcType=VARCHAR},</if>
             <if test="createTime != null">create_time = #{createTime,jdbcType=DATE},</if>
             <if test="updateBy != null">update_by = #{updateBy,jdbcType=VARCHAR},</if>
@@ -129,7 +129,7 @@
     </update>
 
     <delete id="deleteMachineInfoByIds" parameterType="String">
-        UPDATE t_tq_machine_info SET del_flag = NULL where id in
+        UPDATE t_tq_machine_info SET IS_DELETE = '1' where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>
@@ -165,7 +165,7 @@
         <if test="id == 3">
             select a.ID,a.MACHINE_CODE,a.MACHINE_NAME
             from t_tq_machine_info a
-            where a.DEL_FLAG='0' and a.STATUS='0'
+            where a.IS_DELETE='0' and a.STATUS='0'
             and a.ID not in (
             select MACHINE_ID
             from T_TQ_SPECIFY_MACHINE
@@ -182,7 +182,7 @@
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO t_tq_machine_info (
-        machine_code, machine_name, efficiency, tooling_info, quata, class_shift, open_machine_class, status, create_by, create_time, remark, del_flag
+        machine_code, machine_name, efficiency, tooling_info, quata, class_shift, open_machine_class, status, create_by, create_time, remark, IS_DELETE
         )
         VALUES
         <foreach collection="list" item="MACHINE" separator=",">

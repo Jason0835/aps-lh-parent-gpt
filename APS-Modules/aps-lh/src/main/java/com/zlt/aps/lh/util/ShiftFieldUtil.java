@@ -97,6 +97,36 @@ public final class ShiftFieldUtil {
         return toInteger(BeanUtil.getProperty(result, propertyPrefix(shiftIndex) + "FinishQty"));
     }
 
+    /**
+     * 设置班次原因分析。
+     *
+     * @param result 排程结果
+     * @param shiftIndex 班次索引
+     * @param analysis 原因分析
+     */
+    public static void setShiftAnalysis(LhScheduleResult result, int shiftIndex, String analysis) {
+        if (!isValidIndex(shiftIndex)) {
+            log.warn("未知班次索引: {}", shiftIndex);
+            return;
+        }
+        BeanUtil.setProperty(result, propertyPrefix(shiftIndex) + "Analysis", analysis);
+    }
+
+    /**
+     * 获取班次原因分析。
+     *
+     * @param result 排程结果
+     * @param shiftIndex 班次索引
+     * @return 班次原因分析
+     */
+    public static String getShiftAnalysis(LhScheduleResult result, int shiftIndex) {
+        if (!isValidIndex(shiftIndex)) {
+            return null;
+        }
+        Object value = BeanUtil.getProperty(result, propertyPrefix(shiftIndex) + "Analysis");
+        return value == null ? null : String.valueOf(value);
+    }
+
     private static Integer toInteger(Object v) {
         if (v == null) {
             return null;
@@ -125,6 +155,29 @@ public final class ShiftFieldUtil {
             total += (q != null ? q : 0);
         }
         return total;
+    }
+
+    /**
+     * 汇总当前结果行 8 个班次的计划量。
+     *
+     * @param result 排程结果
+     * @return 当前结果行实际排产量
+     */
+    public static int resolveScheduledQty(LhScheduleResult result) {
+        return sumPlanQty(result, LhScheduleConstant.MAX_SHIFT_SLOT_COUNT);
+    }
+
+    /**
+     * 同步结果行的日计划量字段。
+     * <p>当前业务口径下，{@code DAILY_PLAN_QTY} 表示 8 班班次计划量之和。</p>
+     *
+     * @param result 排程结果
+     */
+    public static void syncDailyPlanQty(LhScheduleResult result) {
+        if (result == null) {
+            return;
+        }
+        result.setDailyPlanQty(resolveScheduledQty(result));
     }
 
     private static boolean isValidIndex(int shiftIndex) {

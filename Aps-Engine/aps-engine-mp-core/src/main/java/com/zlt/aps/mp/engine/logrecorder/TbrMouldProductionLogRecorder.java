@@ -7,6 +7,7 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
+import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
 import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
@@ -153,7 +154,7 @@ public class TbrMouldProductionLogRecorder {
 
     /**
      * 增加在机结构对在产机台排产没有找到可排产硫化分组日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 没有找到待待硫化组====
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 没有找到可排产硫化组====
      *
      * @param context           排程上下文
      * @param groupName         分组名-结构
@@ -161,7 +162,7 @@ public class TbrMouldProductionLogRecorder {
      * @return
      */
     public static String addContinueGroupContinueCxMachineNoLhGroupLog(Context context, String groupName, String onLineMachineInfo) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 没有找到待待硫化组====";
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 在产机台: %s 没有找到可排产硫化组====";
         String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_NO_LH_GROUP, logContent);
@@ -188,7 +189,7 @@ public class TbrMouldProductionLogRecorder {
     }
 
     /**
-     * 增加获取结构排产硫化组排产日访问日志信息记录
+     * 增加获取结构排产硫化组排产日范围日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 获取到排产日范围：%s~%s====
      *
      * @param context           排程上下文
@@ -201,6 +202,28 @@ public class TbrMouldProductionLogRecorder {
     public static String addGroupFindLhMachineRangeLog(Context context, String groupName, String onLineMachineInfo, Integer startDay, Integer endDay) {
         String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 获取到排产日范围：%s~%s====";
         String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo, startDay, endDay);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_FIND_LH_MACHINE_RANGE, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加获取结构排产硫化组排产范围超出排产分段日日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 获取到排产日范围：%s~%s超出%s日%s====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 在产机台信息
+     * @param startDay          开始日
+     * @param endDay            结束日
+     * @param round             轮次
+     * @param halfEndDay        分段日
+     * @return
+     */
+    public static String addGroupEndByHalfEndDayLog(Context context, String groupName, String onLineMachineInfo, Integer startDay, Integer endDay, FormalRoundEnum round, Integer halfEndDay) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 获取到排产日范围：%s~%s超出%s 分段日：%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, startDay, endDay, round.getRoundDesc(), halfEndDay);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_FIND_LH_MACHINE_RANGE, logContent);
         return logContent;

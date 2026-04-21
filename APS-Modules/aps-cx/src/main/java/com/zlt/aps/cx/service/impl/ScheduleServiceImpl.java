@@ -34,6 +34,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -73,6 +74,24 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     /** 参数编码：损耗率 */
     private static final String PARAM_CODE_LOSS_RATE = "LOSS_RATE";
+
+    /** 参数编码：机台种类上限 */
+    private static final String PARAM_CODE_MAX_TYPES_PER_MACHINE = "MAX_TYPES_PER_MACHINE";
+
+    /** 参数编码：机台默认最大硫化机数 */
+    private static final String PARAM_CODE_MAX_LH_MACHINE_QTY = "MAX_LH_MACHINE_QTY";
+
+    /** 参数编码：硫化机停锅时间（停产日硫化停止时刻，HH:mm格式） */
+    private static final String PARAM_CODE_VULCANIZING_STOP_TIME = "VULCANIZING_STOP_TIME";
+
+    /** 参数编码：硫化开模时间（开产日硫化开始时刻，HH:mm格式） */
+    private static final String PARAM_CODE_VULCANIZING_OPEN_TIME = "VULCANIZING_OPEN_TIME";
+
+    /** 参数编码：预留消化时间（小时，成型停机早于硫化停锅的时长） */
+    private static final String PARAM_CODE_RESERVED_DIGEST_HOURS = "RESERVED_DIGEST_HOURS";
+
+    /** 参数编码：H15开头机台最大胎胚种类数（未配置则按配比默认值） */
+    private static final String PARAM_CODE_H15_MAX_EMBRYO_TYPES = "H15_MAX_EMBRYO_TYPES";
 
     /** 默认损耗率 */
     private static final BigDecimal DEFAULT_LOSS_RATE = new BigDecimal("0.02");
@@ -119,6 +138,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
     private final CxMaterialEndingMapper materialEndingMapper;
     private final MpCxCapacityConfigurationMapper capacityConfigurationMapper;
+    private final MdmWorkCalendarMapper workCalendarMapper;
 
     // ==================== 公共方法 ====================
 
@@ -280,7 +300,15 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载硫化排程结果失败，继续执行：{}", e.getMessage());
             }
 
-            // 5. 根据硫化排程结果获取物料信息
+            // 5. 获取成型在机信息（需要在获取物料信息之前，以便补充物料来源）
+            try {
+                loadOnlineInfos(context, scheduleStartDate);
+                log.info("成型在机信息加载完成");
+            } catch (Exception e) {
+                log.warn("加载成型在机信息失败，继续执行：{}", e.getMessage());
+            }
+
+            // 6. 根据硫化排程结果和成型在机信息获取物料信息
             try {
                 loadMaterials(context);
                 log.info("物料信息加载完成");
@@ -288,20 +316,12 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载物料信息失败，继续执行：{}", e.getMessage());
             }
 
-            // 6. 获取胎胚库存信息（根据排产起始日期获取早上6点的库存）
+            // 7. 获取胎胚库存信息（根据排产起始日期获取早上6点的库存）
             try {
                 loadStocks(context, scheduleStartDate);
                 log.info("胎胚库存信息加载完成");
             } catch (Exception e) {
                 log.warn("加载胎胚库存信息失败，继续执行：{}", e.getMessage());
-            }
-
-            // 7. 获取成型在机信息
-            try {
-                loadOnlineInfos(context, scheduleStartDate);
-                log.info("成型在机信息加载完成");
-            } catch (Exception e) {
-                log.warn("加载成型在机信息失败，继续执行：{}", e.getMessage());
             }
 
             // 8. 构建机台在机胎胚映射（后续会根据成型余量过滤）
@@ -524,36 +544,59 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     /**
      * 加载物料信息
+     *
+     * <p>物料来源包括两部分：
+     * 1. 硫化排程结果的物料
+     * 2. 成型在机信息的物料（可能存在没有硫化任务但存在在机信息的物料）
      */
     private void loadMaterials(ScheduleContextVo context) {
         List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
+        List<CxMachineOnlineInfo> onlineInfos = context.getOnlineInfos();
 
-        if (lhScheduleResults == null || lhScheduleResults.isEmpty()) {
-            log.info("硫化排程结果为空，加载物料信息 0 条");
+        // 合并硫化任务物料和成型在机物料
+        Set<String> materialCodes = new HashSet<>();
+
+        // 1. 从硫化排程结果提取物料编码
+        if (lhScheduleResults != null && !lhScheduleResults.isEmpty()) {
+            Set<String> lhMaterialCodes = lhScheduleResults.stream()
+                    .map(LhScheduleResult::getMaterialCode)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            materialCodes.addAll(lhMaterialCodes);
+            log.debug("从硫化排程结果提取到 {} 个不重复的外胎代码", lhMaterialCodes.size());
+        }
+
+        // 2. 从成型在机信息提取物料编码
+        if (onlineInfos != null && !onlineInfos.isEmpty()) {
+            Set<String> onlineMaterialCodes = onlineInfos.stream()
+                    .map(CxMachineOnlineInfo::getMaterialCode)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            int newCodes = 0;
+            for (String code : onlineMaterialCodes) {
+                if (materialCodes.add(code)) {
+                    newCodes++;
+                }
+            }
+            log.debug("从成型在机信息提取到 {} 个不重复的外胎代码，其中 {} 个是新增的",
+                    onlineMaterialCodes.size(), newCodes);
+        }
+
+        if (materialCodes.isEmpty()) {
+            log.info("硫化排程结果和成型在机信息均为空，加载物料信息 0 条");
             context.setMaterials(new ArrayList<>());
             return;
         }
 
-        Set<String> materialCodes = lhScheduleResults.stream()
-                .map(LhScheduleResult::getMaterialCode)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        log.info("合并后共有 {} 个不重复的外胎代码（硫化任务 + 成型在机）", materialCodes.size());
 
-        log.debug("从硫化排程结果提取到 {} 个不重复的外胎代码", materialCodes.size());
+        // 查询物料详情
+        List<MdmMaterialInfo> materials = materialInfoMapper.selectList(
+                new LambdaQueryWrapper<MdmMaterialInfo>()
+                        .in(MdmMaterialInfo::getMaterialCode, materialCodes)
+                        .eq(MdmMaterialInfo::getIsDelete, "0"));
+        log.info("加载物料信息 {} 条", materials.size());
 
-        List<MdmMaterialInfo> materials;
-        if (!materialCodes.isEmpty()) {
-            // 使用 embryoCode 查询物料信息（一个物料对应一个胎胚），只查询未删除的数据
-            materials = materialInfoMapper.selectList(
-                    new LambdaQueryWrapper<MdmMaterialInfo>()
-                            .in(MdmMaterialInfo::getMaterialCode, materialCodes)
-                            .eq(MdmMaterialInfo::getIsDelete, "0"));
-            log.info("根据硫化排程结果加载物料信息 {} 条，涉及 {} 个外胎", materials.size(), materialCodes.size());
-        } else {
-            materials = new ArrayList<>();
-            log.warn("硫化排程结果中包含 {} 条记录，但没有有效的外胎代码 (materialCodes 均为 null)，加载物料信息 0 条",
-                    lhScheduleResults.size());
-        }
         context.setMaterials(materials);
     }
 
@@ -599,7 +642,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         for (CxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
             String cxCode = onlineInfo.getCxCode();
             // 组合物料编码和胎胚编码作为唯一键
-            String materialCode = onlineInfo.getMesMaterialCode();
+            String materialCode = onlineInfo.getMaterialCode();
             String embryoSpec = onlineInfo.getEmbryoSpec();
             String combinedKey = materialCode + "|" + embryoSpec;
             if (cxCode != null && combinedKey != null && !combinedKey.equals("|")) {
@@ -633,6 +676,64 @@ public class ScheduleServiceImpl implements ScheduleService {
                 ? new BigDecimal(lossRateConfig.getParamValue())
                 : DEFAULT_LOSS_RATE;
         context.setLossRate(lossRate);
+
+        // 加载机台种类上限
+        CxParamConfig maxTypesConfig = paramConfigMap.get(PARAM_CODE_MAX_TYPES_PER_MACHINE);
+        if (maxTypesConfig != null && maxTypesConfig.getParamValue() != null) {
+            try {
+                context.setMaxTypesPerMachine(Integer.parseInt(maxTypesConfig.getParamValue()));
+                log.info("机台种类上限配置：{}", maxTypesConfig.getParamValue());
+            } catch (NumberFormatException e) {
+                log.warn("解析机台种类上限配置失败: {}", maxTypesConfig.getParamValue());
+            }
+        }
+
+        // 加载机台默认最大硫化机数
+        CxParamConfig maxLhConfig = paramConfigMap.get(PARAM_CODE_MAX_LH_MACHINE_QTY);
+        if (maxLhConfig != null && maxLhConfig.getParamValue() != null) {
+            try {
+                context.setMaxLhMachineQty(Integer.parseInt(maxLhConfig.getParamValue()));
+                log.info("机台默认最大硫化机数配置：{}", maxLhConfig.getParamValue());
+            } catch (NumberFormatException e) {
+                log.warn("解析机台默认最大硫化机数配置失败: {}", maxLhConfig.getParamValue());
+            }
+        }
+
+        // 加载硫化机停锅时间（停产日硫化停止时刻，HH:mm格式）
+        CxParamConfig vulcanizingStopTimeConfig = paramConfigMap.get(PARAM_CODE_VULCANIZING_STOP_TIME);
+        if (vulcanizingStopTimeConfig != null && vulcanizingStopTimeConfig.getParamValue() != null) {
+            context.setVulcanizingStopTimeStr(vulcanizingStopTimeConfig.getParamValue());
+            log.info("硫化机停锅时间配置：{}", vulcanizingStopTimeConfig.getParamValue());
+        }
+
+        // 加载硫化开模时间（开产日硫化开始时刻，HH:mm格式）
+        CxParamConfig vulcanizingOpenTimeConfig = paramConfigMap.get(PARAM_CODE_VULCANIZING_OPEN_TIME);
+        if (vulcanizingOpenTimeConfig != null && vulcanizingOpenTimeConfig.getParamValue() != null) {
+            context.setVulcanizingOpenTimeStr(vulcanizingOpenTimeConfig.getParamValue());
+            log.info("硫化开模时间配置：{}", vulcanizingOpenTimeConfig.getParamValue());
+        }
+
+        // 加载预留消化时间（小时）
+        CxParamConfig reservedDigestConfig = paramConfigMap.get(PARAM_CODE_RESERVED_DIGEST_HOURS);
+        if (reservedDigestConfig != null && reservedDigestConfig.getParamValue() != null) {
+            try {
+                context.setReservedDigestHours(Integer.parseInt(reservedDigestConfig.getParamValue()));
+                log.info("预留消化时间配置：{}小时", reservedDigestConfig.getParamValue());
+            } catch (NumberFormatException e) {
+                log.warn("解析预留消化时间配置失败: {}", reservedDigestConfig.getParamValue());
+            }
+        }
+
+        // 加载H15开头机台最大胎胚种类数
+        CxParamConfig h15MaxTypesConfig = paramConfigMap.get(PARAM_CODE_H15_MAX_EMBRYO_TYPES);
+        if (h15MaxTypesConfig != null && h15MaxTypesConfig.getParamValue() != null) {
+            try {
+                context.setH15MaxEmbryoTypes(Integer.parseInt(h15MaxTypesConfig.getParamValue()));
+                log.info("H15机台最大胎胚种类数配置：{}", h15MaxTypesConfig.getParamValue());
+            } catch (NumberFormatException e) {
+                log.warn("解析H15机台最大胎胚种类数配置失败: {}", h15MaxTypesConfig.getParamValue());
+            }
+        }
     }
 
     /**
@@ -771,7 +872,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                 context.getStocks(),
                 context.getLhScheduleResults(),
                 currentDayShifts,
-                formingRemainderMap);
+                formingRemainderMap,
+                context.getScheduleDate());
         context.setFormingRemainderMap(formingRemainderMap);
         context.setMaterialStockMap(materialStockMap);
         log.info("计算成型余量映射 {} 条，物料库存分配 {} 条", formingRemainderMap.size(), materialStockMap.size());
@@ -1028,14 +1130,15 @@ public class ScheduleServiceImpl implements ScheduleService {
             List<CxStock> stocks,
             List<LhScheduleResult> lhScheduleResults,
             List<CxShiftConfig> dayShifts,
-            Map<String, Integer> formingRemainderMap) {
+            Map<String, Integer> formingRemainderMap,
+            LocalDate scheduleDate) {
 
         // 用于返回的物料库存映射
         Map<String, Integer> materialStockMap = new HashMap<>();
 
         try {
             // 按硫化任务维度分配库存，共用胎胚按硫化任务需求比例分配
-            materialStockMap = allocateStockByMaterialRatio(stocks, lhScheduleResults, dayShifts);
+            materialStockMap = allocateStockByMaterialRatio(stocks, lhScheduleResults, dayShifts, scheduleDate);
             log.debug("按硫化任务维度分配胎胚库存 {} 条", materialStockMap.size());
 
             // 计算成型余量
@@ -1067,19 +1170,90 @@ public class ScheduleServiceImpl implements ScheduleService {
      * @param dayShifts  当前天班次配置
      * @return 对应班次的硫化计划量
      */
-    private int getShiftPlanQtyFromLhResult(LhScheduleResult lhResult, List<CxShiftConfig> dayShifts) {
+    private int getShiftPlanQtyFromLhResult(LhScheduleResult lhResult, List<CxShiftConfig> dayShifts,
+                                            LocalDate scheduleDate) {
+        return getShiftPlanQtyWithShiftName(lhResult, dayShifts, scheduleDate).planQty;
+    }
+
+    /**
+     * 从硫化记录中获取第一个非停产班次的计划量和班次名称
+     * 按天遍历，遇到停产班次跳过，遇到停产天也跳过
+     */
+    private ShiftPlanResult getShiftPlanQtyWithShiftName(LhScheduleResult lhResult, List<CxShiftConfig> dayShifts,
+                                                         LocalDate scheduleDate) {
+        List<MdmWorkCalendar> workCalendarList = workCalendarMapper.selectList(null);
+        return getShiftPlanQtyWithShiftName(lhResult, dayShifts, scheduleDate, workCalendarList);
+    }
+
+    /**
+     * 从硫化记录中获取第一个非停产班次的计划量和班次名称
+     * 按天遍历，遇到停产班次跳过，遇到停产天也跳过
+     */
+    private ShiftPlanResult getShiftPlanQtyWithShiftName(LhScheduleResult lhResult, List<CxShiftConfig> dayShifts,
+                                                         LocalDate scheduleDate, List<MdmWorkCalendar> workCalendarList) {
+        int defaultQty = lhResult.getDailyPlanQty() != null ? lhResult.getDailyPlanQty() : 0;
         if (dayShifts == null || dayShifts.isEmpty()) {
-            return lhResult.getDailyPlanQty() != null ? lhResult.getDailyPlanQty() : 0;
+            return new ShiftPlanResult(defaultQty, "未知");
         }
 
-        for (CxShiftConfig shiftConfig : dayShifts) {
-            String classField = shiftConfig.getClassField();
-            if (classField != null && classField.startsWith("CLASS")) {
+        // 排程起始日期
+        LocalDate scheduleStartDate = scheduleDate;
+
+        // 构建 日期→WorkCalendar 映射
+        Map<LocalDate, MdmWorkCalendar> calendarMap = new HashMap<>();
+        if (workCalendarList != null) {
+            for (MdmWorkCalendar cal : workCalendarList) {
+                if (cal.getCalendarTime() != null) {
+                    LocalDate calDate = cal.getCalendarTime().toInstant()
+                            .atZone(ZoneId.systemDefault()).toLocalDate();
+                    calendarMap.put(calDate, cal);
+                }
+            }
+        }
+
+        // 按天遍历，找到第一个非停产班次
+        int scheduleDays = dayShifts.stream()
+                .mapToInt(s -> s.getScheduleDay() != null ? s.getScheduleDay() : 1)
+                .max().orElse(1);
+
+        for (int day = 1; day <= scheduleDays; day++) {
+            // 计算该天的日期
+            LocalDate currentDate = scheduleStartDate.plusDays(day - 1);
+
+            // 获取该天的班次配置
+            final int currentDay = day;
+            List<CxShiftConfig> dayConfigs = dayShifts.stream()
+                    .filter(s -> s.getScheduleDay() != null && s.getScheduleDay() == currentDay)
+                    .collect(Collectors.toList());
+
+            if (dayConfigs.isEmpty()) continue;
+
+            // 获取该天的日历信息
+            MdmWorkCalendar calendar = calendarMap.get(currentDate);
+
+            // 如果整天停产（dayFlag=0 或 三个班次全部停产），跳到下一天
+            if (calendar != null && isFullDayStopped(calendar)) {
+                log.debug("日期 {} 整天停产，跳过", currentDate);
+                continue;
+            }
+
+            for (CxShiftConfig shiftConfig : dayConfigs) {
+                String classField = shiftConfig.getClassField();
+                if (classField == null || !classField.startsWith("CLASS")) continue;
+
+                // 检查该班次是否停产
+                if (calendar != null && isShiftStopped(calendar, shiftConfig)) {
+                    log.debug("日期 {} 班次 {} 停产，跳过", currentDate, classField);
+                    continue;
+                }
+
                 try {
                     int classIndex = Integer.parseInt(classField.substring(5));
                     Integer planQty = getClassPlanQtyByIndex(lhResult, classIndex);
                     if (planQty != null && planQty > 0) {
-                        return planQty;
+                        String shiftName = shiftConfig.getShiftCode() != null
+                                ? shiftConfig.getShiftCode() : classField;
+                        return new ShiftPlanResult(planQty, shiftName);
                     }
                 } catch (NumberFormatException e) {
                     log.warn("无法解析班次字段: {}", classField);
@@ -1087,7 +1261,36 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
         }
 
-        return lhResult.getDailyPlanQty() != null ? lhResult.getDailyPlanQty() : 0;
+        return new ShiftPlanResult(defaultQty, "日计划");
+    }
+
+    /**
+     * 判断班次是否停产
+     */
+    private boolean isShiftStopped(MdmWorkCalendar calendar, CxShiftConfig shiftConfig) {
+        Integer shiftOrder = shiftConfig.getDayShiftOrder();
+        if (shiftOrder == null) return false;
+
+        switch (shiftOrder) {
+            case 1: return "0".equals(calendar.getOneShiftFlag());
+            case 2: return "0".equals(calendar.getTwoShiftFlag());
+            case 3: return "0".equals(calendar.getThreeShiftFlag());
+            default: return false;
+        }
+    }
+
+    /**
+     * 判断是否整天停产（dayFlag=0 或 三个班次全部停产）
+     */
+    private boolean isFullDayStopped(MdmWorkCalendar calendar) {
+        if ("0".equals(calendar.getDayFlag())) {
+            return true;
+        }
+        // 三个班次全部停产也视为整天停产
+        boolean shift1Stopped = "0".equals(calendar.getOneShiftFlag());
+        boolean shift2Stopped = "0".equals(calendar.getTwoShiftFlag());
+        boolean shift3Stopped = "0".equals(calendar.getThreeShiftFlag());
+        return shift1Stopped && shift2Stopped && shift3Stopped;
     }
 
     /**
@@ -1116,7 +1319,8 @@ public class ScheduleServiceImpl implements ScheduleService {
     private Map<String, Integer> allocateStockByMaterialRatio(
             List<CxStock> stocks,
             List<LhScheduleResult> lhScheduleResults,
-            List<CxShiftConfig> dayShifts) {
+            List<CxShiftConfig> dayShifts,
+            LocalDate scheduleDate) {
 
         Map<String, Integer> materialStockMap = new HashMap<>();
 
@@ -1156,9 +1360,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                 int totalDemand = 0;
                 List<TaskDemand> taskDemands = new ArrayList<>();
                 for (LhScheduleResult lh : relatedTasks) {
-                    int demand = getShiftPlanQtyFromLhResult(lh, dayShifts);
-                    taskDemands.add(new TaskDemand(lh.getId(), demand));
-                    totalDemand += demand;
+                    ShiftPlanResult shiftResult = getShiftPlanQtyWithShiftName(lh, dayShifts, scheduleDate);
+                    taskDemands.add(new TaskDemand(lh.getId(), shiftResult.planQty, lh.getMaterialCode(), shiftResult.shiftName));
+                    totalDemand += shiftResult.planQty;
                 }
 
                 if (totalDemand == 0) {
@@ -1187,8 +1391,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                         materialStockMap.merge(td.taskKey, currentStock, Integer::sum);
                         allocatedTotal += currentStock;
 
-                        log.debug("胎胚 {} 共用分配：硫化任务 {} 需求 {}，分配库存 {}",
-                                embryoCode, td.taskKey, td.demand, currentStock);
+                        log.debug("物料编码 {}，胎胚 {} 共用分配：硫化任务 {} 需求（{}班） {}，分配库存 {}",
+                                td.materialCode, embryoCode, td.taskKey, td.shiftName, td.demand, currentStock);
                     }
                 }
             }
@@ -1203,10 +1407,27 @@ public class ScheduleServiceImpl implements ScheduleService {
     private static class TaskDemand {
         String taskKey;    // 硫化任务唯一键：lhId
         int demand;
+        String materialCode;  // 物料编码
+        String shiftName;     // 班次名称
 
-        TaskDemand(Long lhId, int demand) {
+        TaskDemand(Long lhId, int demand, String materialCode, String shiftName) {
             this.taskKey = String.valueOf(lhId);
             this.demand = demand;
+            this.materialCode = materialCode;
+            this.shiftName = shiftName;
+        }
+    }
+
+    /**
+     * 班次计划量查询结果
+     */
+    private static class ShiftPlanResult {
+        int planQty;
+        String shiftName;
+
+        ShiftPlanResult(int planQty, String shiftName) {
+            this.planQty = planQty;
+            this.shiftName = shiftName;
         }
     }
 
@@ -1411,30 +1632,29 @@ public class ScheduleServiceImpl implements ScheduleService {
         // 2. 过滤在机信息
         int originalOnlineCount = context.getOnlineInfos() != null ? context.getOnlineInfos().size() : 0;
         if (context.getOnlineInfos() != null) {
-            // 需要先将物料编码转换为胎胚编码
-            Map<String, String> materialToEmbryoMap = new HashMap<>();
+            // 构建已收尾的组合键集合：物料编码 + 胎胚描述
+            // 在机信息的key格式是：物料编码|胎胚描述，需要保持一致
+            Map<String, String> materialToEmbryoDescMap = new HashMap<>();
             if (context.getMaterials() != null) {
                 for (MdmMaterialInfo material : context.getMaterials()) {
-                    if (material.getMaterialCode() != null && material.getEmbryoCode() != null) {
-                        materialToEmbryoMap.put(material.getMaterialCode(), material.getEmbryoCode());
+                    if (material.getMaterialCode() != null && material.getEmbryoDesc() != null) {
+                        materialToEmbryoDescMap.put(material.getMaterialCode(), material.getEmbryoDesc());
                     }
                 }
             }
 
-            // 构建已收尾的组合键集合：物料编码 + 胎胚编码
-            // 用于过滤在机信息
             Set<String> completedKeys = new HashSet<>();
             for (String materialCode : completedMaterialCodes) {
-                String embryoCode = materialToEmbryoMap.get(materialCode);
-                if (materialCode != null && embryoCode != null) {
-                    completedKeys.add(materialCode + "|" + embryoCode);
+                String embryoDesc = materialToEmbryoDescMap.get(materialCode);
+                if (materialCode != null && embryoDesc != null) {
+                    completedKeys.add(materialCode + "|" + embryoDesc);
                 }
             }
 
             List<CxMachineOnlineInfo> filteredOnlineInfos = context.getOnlineInfos().stream()
                     .filter(info -> {
-                        // 使用物料编码 + 胎胚编码组合键
-                        String materialCode = info.getMesMaterialCode();
+                        // 使用物料编码 + 胎胚描述组合键（与completedKeys保持一致）
+                        String materialCode = info.getMaterialCode();
                         String embryoSpec = info.getEmbryoSpec();
                         String combinedKey = materialCode + "|" + embryoSpec;
                         // 如果组合键在已收尾集合中，则过滤掉
@@ -1452,16 +1672,26 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
 
         // 3. 重新构建机台在机胎胚映射（使用过滤后的在机信息）
-        // 使用物料编码 + 胎胚编码组合键
+        // machineOnlineEmbryoMap 存储格式：cxCode -> Set(物料编码|胎胚编码)
         if (context.getOnlineInfos() != null) {
+            // 先构建 materialCode -> embryoCode 的映射（用于在机信息）
+            Map<String, String> materialToEmbryoCodeMap = new HashMap<>();
+            if (context.getMaterials() != null) {
+                for (MdmMaterialInfo material : context.getMaterials()) {
+                    if (material.getMaterialCode() != null && material.getEmbryoCode() != null) {
+                        materialToEmbryoCodeMap.put(material.getMaterialCode(), material.getEmbryoCode());
+                    }
+                }
+            }
+
             Map<String, Set<String>> machineOnlineEmbryoMap = new HashMap<>();
             for (CxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
                 String cxCode = onlineInfo.getCxCode();
-                String materialCode = onlineInfo.getMesMaterialCode();
-                String embryoSpec = onlineInfo.getEmbryoSpec();
-                String combinedKey = materialCode + "|" + embryoSpec;
+                String materialCode = onlineInfo.getMaterialCode();
+                String embryoCode = materialToEmbryoCodeMap.get(materialCode);
+                String combinedKey = materialCode + "|" + embryoCode;
                 if (cxCode != null && combinedKey != null && !combinedKey.equals("|")) {
-                    machineOnlineEmbryoMap.computeIfAbsent(cxCode, k -> new HashSet<>()).add(combinedKey);
+                    machineOnlineEmbryoMap.computeIfAbsent(cxCode, k -> new HashSet<>()).add(embryoCode);
                 }
             }
             context.setMachineOnlineEmbryoMap(machineOnlineEmbryoMap);

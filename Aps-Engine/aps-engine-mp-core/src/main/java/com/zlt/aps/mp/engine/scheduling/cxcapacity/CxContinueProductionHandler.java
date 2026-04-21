@@ -73,6 +73,12 @@ public class CxContinueProductionHandler {
             cxContinueSkuInfo.setMouldNumber(selectMouldList.size());
             //1、降膜排产
             DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(continueSkuDeadLineDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
+            //20260414+ 周期结构调整排产量
+            Integer planDemandQty = CycleGroupCalculateHandler.getSingleSkuMaxQty(context, cxContinueSkuInfo, groupPlanInfo);
+            if (null != planDemandQty) {
+                deductMould.setTotalQty(planDemandQty);
+                deductMould.setRemainingQty(planDemandQty);
+            }
             List<DailyScheduleVo> resultList = DeductMouldScheduler.scheduleProduction(deductMould);
             //分配结果
             if (CollectionUtils.isEmpty(resultList)) {
@@ -128,7 +134,7 @@ public class CxContinueProductionHandler {
         Set<String> cxMachineCodeInfo = continueSkuMap.values().stream().collect(Collectors.toList()).get(BigDecimal.ZERO.intValue()).getOnLineCxMachineSet();
         String onLineMachineInfo = String.join(StringConstant.COMMA, cxMachineCodeInfo);
         //取得最早收尾的续作硫化组 getEarliestConclusionLhInfoByContinueSku
-        EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfo(context, excludeDaySet);
+        EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfo(context, null, excludeDaySet);
         if (null == earliestConclusionLhGroup) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueSkuNoLhGroupLog(context, productionStage, groupName, onLineMachineInfo, continueType));
@@ -280,7 +286,7 @@ public class CxContinueProductionHandler {
      * @return
      */
     private static ContinueSkuNextSkuInfo getNextSku(TbrProductionContext productionContext, EarliestConclusionLhGroupHelper lhGroup, ProductionPlanGroupInfo productionPlanInfo, ProductionStageEnum productionStage, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> matchList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
-        String selectedMaterialDesc = SkuPrioritySelector.getHighestPrioritySku(productionContext, productionStage, productionPlanInfo, lhGroup, continueType, matchList, excludeSkuSet, startDay, endDay);
+        String selectedMaterialDesc = SkuPrioritySelector.getHighestPrioritySku(productionContext, productionStage, null, productionPlanInfo, lhGroup, continueType, matchList, excludeSkuSet, startDay, endDay);
 //        String selectedMaterialDesc = ContinueSkuPrioritySelector.getHeightPrioritySku(productionStage, matchList, excludeSkuSet);
         String groupName = productionPlanInfo.getGroupName();
         if (StringUtils.isBlank(selectedMaterialDesc)) {

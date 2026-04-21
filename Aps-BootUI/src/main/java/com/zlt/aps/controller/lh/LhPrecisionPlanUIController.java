@@ -11,6 +11,8 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
+import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanExportVO;
+import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanImportVO;
 import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import com.zlt.mix.common.core.constant.ZltConstant;
@@ -43,7 +45,7 @@ import java.util.List;
 @Api(tags = "硫化精度计划")
 @Slf4j
 @Controller
-@RequestMapping("/schedule/lhPrecisionPlan")
+@RequestMapping("/lh/lhPrecisionPlan")
 public class LhPrecisionPlanUIController extends BaseController {
 
     @Resource
@@ -110,8 +112,8 @@ public class LhPrecisionPlanUIController extends BaseController {
     @ResponseBody
     public void export(HttpServletResponse response, LhPrecisionPlan lhPrecisionPlan) throws IOException {
         String fileName = I18nUtil.getMessage("ui.lh.precision.plan.model.name");
-        List<LhPrecisionPlan> list = lhPrecisionPlanRemoteService.exportData(lhPrecisionPlan);
-        ExcelUtil<LhPrecisionPlan> util = new ExcelUtil<>(LhPrecisionPlan.class);
+        List<LhPrecisionPlanExportVO> list = lhPrecisionPlanRemoteService.exportData(lhPrecisionPlan);
+        ExcelUtil<LhPrecisionPlanExportVO> util = new ExcelUtil<>(LhPrecisionPlanExportVO.class);
         Workbook workbook = util.exportExcel2(response, list, fileName);
         ExportLog exportLog = ExportUtil.uploadAndExportExcel(response, workbook, fileName, lhPrecisionPlan.toString(), ZltConstant.PROCEDURE_CODE_LH);
         iExportLogService.add(exportLog);
@@ -122,7 +124,7 @@ public class LhPrecisionPlanUIController extends BaseController {
     @ResponseBody
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = I18nUtil.getMessage("ui.lh.precision.plan.model.name");
-        ExcelUtil<LhPrecisionPlan> util = new ExcelUtil<>(LhPrecisionPlan.class);
+        ExcelUtil<LhPrecisionPlanImportVO> util = new ExcelUtil<>(LhPrecisionPlanImportVO.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -138,8 +140,8 @@ public class LhPrecisionPlanUIController extends BaseController {
         importLog = iImportLogService.add(importLog);
 
         InputStream in = new ByteArrayInputStream(data);
-        ExcelUtil<LhPrecisionPlan> util = new ExcelUtil<>(LhPrecisionPlan.class);
-        List<LhPrecisionPlan> list = util.importExcel(in);
+        ExcelUtil<LhPrecisionPlanImportVO> util = new ExcelUtil<>(LhPrecisionPlanImportVO.class);
+        List<LhPrecisionPlanImportVO> list = util.importExcel(in);
         AjaxResult ajaxResult = lhPrecisionPlanRemoteService.importData(list, updateSupport, importLog.getId());
         ImportUtil.updateImportLogAndFormatMsg(importLog, ajaxResult, iImportLogService);
         ImportUtil.saveImportErrorLogs(ajaxResult, iImportErrorLogService);
@@ -185,5 +187,12 @@ public class LhPrecisionPlanUIController extends BaseController {
     @ResponseBody
     public AjaxResult batchUpdateDaysToDue() {
         return lhPrecisionPlanRemoteService.batchUpdateDaysToDue();
+    }
+
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
+    @ResponseBody
+    public String checkUnique(LhPrecisionPlan lhPrecisionPlan) {
+        return lhPrecisionPlanRemoteService.checkUnique(lhPrecisionPlan);
     }
 }

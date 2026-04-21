@@ -82,7 +82,6 @@ public class CxKeyProductUIController extends BaseUIController<CxKeyProduct> {
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("cx:cxKeyProduct:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(CxKeyProduct cxKeyProduct) {
@@ -98,7 +97,7 @@ public class CxKeyProductUIController extends BaseUIController<CxKeyProduct> {
     @ResponseBody
     public AjaxResult save(CxKeyProduct cxKeyProduct) {
         if (UserConstants.NOT_UNIQUE.equals(iCxKeyProductService.checkUnique(cxKeyProduct))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.cxKeyProduct.embryoCodeNotUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.cxKeyProduct.notUnique"));
         }
 
         return iCxKeyProductService.save(cxKeyProduct);

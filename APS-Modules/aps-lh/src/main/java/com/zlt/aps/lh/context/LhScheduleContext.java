@@ -3,10 +3,10 @@ package com.zlt.aps.lh.context;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftRuntimeState;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
-import com.zlt.aps.lh.api.domain.entity.LhCleaningPlan;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleProcessLog;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -14,14 +14,16 @@ import com.zlt.aps.lh.api.domain.entity.LhShiftFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
-import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 
@@ -62,6 +64,8 @@ public class LhScheduleContext {
     private String monthPlanVersion;
     /** 月计划排产版本 */
     private String productionVersion;
+    /** 操作人 */
+    private String operator;
     /** 本次排程配置快照 */
     private LhScheduleConfig scheduleConfig;
 
@@ -74,6 +78,8 @@ public class LhScheduleContext {
 
     /** 月生产计划列表 */
     private List<FactoryMonthPlanProductionFinalResult> monthPlanList = new ArrayList<>();
+    /** 周程滚动调整结果Map, key=materialCode */
+    private Map<String, List<MpAdjustResult>> mpAdjustResultMap = new HashMap<>();
     /** 工作日历列表 */
     private List<MdmWorkCalendar> workCalendarList = new ArrayList<>();
     /** SKU日硫化产能Map, key=materialCode */
@@ -82,14 +88,18 @@ public class LhScheduleContext {
     private List<MdmDevicePlanShut> devicePlanShutList = new ArrayList<>();
     /** SKU与模具关系Map, key=materialCode */
     private Map<String, List<MdmSkuMouldRel>> skuMouldRelMap = new HashMap<>();
+    /** 模具台账Map, key=mouldCode */
+    private Map<String, MdmModelInfo> modelInfoMap = new HashMap<>();
     /** 硫化机台信息Map, key=machineCode */
     private Map<String, LhMachineInfo> machineInfoMap = new LinkedHashMap<>();
     /** 模具清洗计划列表 */
-    private List<LhCleaningPlan> cleaningPlanList = new ArrayList<>();
+    private List<LhMouldCleanPlan> cleaningPlanList = new ArrayList<>();
     /** 月底计划余量Map, key=materialCode */
     private Map<String, MdmMonthSurplus> monthSurplusMap = new HashMap<>();
     /** 各班次完成量Map, key=machineCode+materialCode */
     private Map<String, LhShiftFinishQty> shiftFinishQtyMap = new HashMap<>();
+    /** 月累计完成量Map（截至排程窗口起点 T 日前）, key=materialCode */
+    private Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>();
     /** 物料信息Map, key=materialCode */
     private Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
     /** MES硫化在机信息Map, key=machineCode */

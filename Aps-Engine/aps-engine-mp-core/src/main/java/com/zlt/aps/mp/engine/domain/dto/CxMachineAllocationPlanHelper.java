@@ -1,6 +1,5 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
@@ -266,8 +265,6 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      */
     public void beforeConclusion(Integer conclusionDay, Integer deductionDay) {
         endDay = conclusionDay - BigDecimal.ONE.intValue();
-        String tisFormat = I18nUtil.getMessage("alg.data.groupCapacity.beforeConclusion");
-        remark = String.format(tisFormat, conclusionDay);
         if (allocationDay <= deductionDay) {
             allocationDay = BigDecimal.ZERO.intValue();
             return;
@@ -295,6 +292,16 @@ public class CxMachineAllocationPlanHelper implements Serializable {
             return "";
         }
         return String.format(timeExtensionKeyFormat, getAllocationGroup(), cxMachineCode, timeExtensionEndDay);
+    }
+
+    /**
+     * 获取延长日前缀信息
+     *
+     * @return
+     */
+    public String getTimeExtensionPrefix() {
+        String timeExtensionKeyFormat = "%s|*|%s|*|%s";
+        return String.format(timeExtensionKeyFormat, getAllocationGroup(), cxMachineCode, "");
     }
 
     /**

@@ -19,7 +19,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         FROM T_LH_MOULD_CLEAN_WARN
         WHERE (FACTORY_CODE,LH_CODE) IN
         <foreach collection="list" item="item" open="(" separator="," close=")">
-            (#{item.factoryCode},#{lhCode})
+            (#{item.factoryCode}, #{item.lhCode})
         </foreach>
     </select>
+
 </mapper>

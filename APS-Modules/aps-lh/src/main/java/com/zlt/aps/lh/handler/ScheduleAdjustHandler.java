@@ -5,6 +5,7 @@ import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhShiftFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
@@ -12,10 +13,11 @@ import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
-import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -23,6 +25,7 @@ import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +39,12 @@ import java.util.Map;
 @Slf4j
 @Component
 public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
+
+    /** 无排产目标量未排产提示 */
+    private static final String NO_PLAN_QTY_REASON_TEMPLATE = "物料：%s 没有排产目标量，不进行排产";
+    /** 无窗口计划量但存在余量/正向结转目标量提示 */
+    private static final String TARGET_QTY_ONLY_WARN_TEMPLATE =
+            "物料：%s 当前排程窗口没有计划量，但存在月计划余量/正向结转目标量[%d]，继续排产";
 
     @Resource
     private IEndingJudgmentStrategy endingJudgmentStrategy;
@@ -92,8 +101,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 从月度计划获取T日SKU数据，按产品结构归集，计算硫化余量
      * <p>
-     * 硫化余量 = 月度计划量 - 硫化已完成合格量<br/>
-     * 若月底计划余量表中有数据，优先使用该数据作为余量
+     * 硫化余量 = 月度计划量 - 硫化已完成量
      * </p>
      *
      * @param context 排程上下文
@@ -111,16 +119,24 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         for (FactoryMonthPlanProductionFinalResult plan : monthPlanList) {
             // 计算硫化余量
             SurplusCalculation surplus = calculateSurplusQty(context, plan);
-            // 余量为0说明已完成，跳过
-            if (surplus.getSurplusQty() <= 0) {
-                continue;
-            }
-
             SkuScheduleDTO dto = buildSkuScheduleDTO(context, plan, surplus);
 
             // 产品结构为空，跳过
             if (StringUtils.isEmpty(plan.getStructureName())) {
                 continue;
+            }
+
+            int targetScheduleQty = dto.resolveTargetScheduleQty();
+
+            // 当前无排产目标量时，直接记未排产并跳过。
+            if (targetScheduleQty <= 0) {
+                addNoPlanUnscheduledResult(context, dto);
+                continue;
+            }
+
+            // 排程窗口没有计划量但存在余量/正向结转目标量时，允许继续排产，并给出明确告警。
+            if (dto.getWindowPlanQty() <= 0) {
+                log.warn(String.format(TARGET_QTY_ONLY_WARN_TEMPLATE, dto.getMaterialCode(), targetScheduleQty));
             }
 
             structureSkuMap.computeIfAbsent(plan.getStructureName(), k -> new ArrayList<>()).add(dto);
@@ -134,8 +150,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 计算SKU的硫化余量
      * <p>
-     * 优先使用月底计划余量表（T_MDM_MONTH_SURPLUS）中的数据，按物料编号匹配<br/>
-     * 若无数据，则通过 月度计划总量 - 各班次完成量之和 计算
+     * 统一按 月度计划总量 - 已完成量 计算，不再读取月余量表（T_MDM_MONTH_SURPLUS）
      * </p>
      *
      * @param context 排程上下文
@@ -143,20 +158,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @return 硫化余量
      */
     private SurplusCalculation calculateSurplusQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
-        String materialCode = plan.getMaterialCode();
-
-        // 先从月底计划余量Map中获取（仅按物料编号）
-        if (StringUtils.isNotEmpty(materialCode)) {
-            MdmMonthSurplus monthSurplus = context.getMonthSurplusMap().get(materialCode);
-            if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
-                return new SurplusCalculation(monthSurplus.getPlanSurplusQty().intValue(), true);
-            }
-        }
-
-        // 若无余量数据，用月计划总量减去各班次完成量
+        // 统一按月计划总量减前日已完成量计算余量，不再使用月余量表兜底。
         int totalPlanQty = plan.getTotalQty() != null ? plan.getTotalQty() : 0;
         int finishedQty = calculateFinishedQty(context, plan);
-        return new SurplusCalculation(Math.max(0, totalPlanQty - finishedQty), false);
+        return new SurplusCalculation(Math.max(0, totalPlanQty - finishedQty));
     }
 
     /**
@@ -167,17 +172,20 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @return 已完成量
      */
     private int calculateFinishedQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
-        // 从前日排程结果汇总完成量
+        // 优先使用基础数据阶段按物料汇总好的月累计完成量（截至T-1）。
+        String materialCode = plan.getMaterialCode();
+        if (StringUtils.isNotEmpty(materialCode)) {
+            Integer monthFinishedQty = context.getMaterialMonthFinishedQtyMap().get(materialCode);
+            if (monthFinishedQty != null) {
+                return Math.max(monthFinishedQty, 0);
+            }
+        }
+
+        // 兜底：从前日排程结果汇总完成量，且优先复用实际完成量表。
         int finishedQty = 0;
         for (LhScheduleResult result : context.getPreviousScheduleResultList()) {
-            if (plan.getMaterialCode() != null && plan.getMaterialCode().equals(result.getMaterialCode())) {
-                List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
-                if (CollectionUtils.isEmpty(shifts)) {
-                    shifts = LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate());
-                }
-                for (LhShiftConfigVO s : shifts) {
-                    finishedQty += safeInt(ShiftFieldUtil.getShiftFinishQty(result, s.getShiftIndex()));
-                }
+            if (StringUtils.isNotEmpty(materialCode) && materialCode.equals(result.getMaterialCode())) {
+                finishedQty += resolveActualFinishedQty(context, result);
             }
         }
         return finishedQty;
@@ -188,7 +196,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      *
      * @param context    排程上下文
      * @param plan       月生产计划记录
-     * @param surplusQty 硫化余量
+     * @param surplus 硫化余量
      * @return SKU排程DTO
      */
     private SkuScheduleDTO buildSkuScheduleDTO(LhScheduleContext context,
@@ -208,13 +216,14 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         // 计划量信息
         dto.setMonthPlanQty(plan.getTotalQty() != null ? plan.getTotalQty() : 0);
-        int carryForwardQty = context.getCarryForwardQtyMap().getOrDefault(plan.getMaterialCode(), 0);
-        int adjustedQty = surplus.getSurplusQty();
-        if (surplus.isFromMonthSurplus()) {
-            adjustedQty = Math.max(0, adjustedQty + carryForwardQty);
-        }
-        dto.setSurplusQty(adjustedQty);
-        dto.setPendingQty(adjustedQty);
+        dto.setFinishedQty(Math.max(0, dto.getMonthPlanQty() - surplus.getSurplusQty()));
+        int carryForwardQty = Math.max(0, context.getCarryForwardQtyMap().getOrDefault(plan.getMaterialCode(), 0));
+        int windowPlanQty = MonthPlanDayQtyUtil.resolveWindowPlanQty(
+                plan, context.getScheduleDate(), context.getScheduleTargetDate());
+        dto.setWindowPlanQty(windowPlanQty);
+        dto.setSurplusQty(surplus.getSurplusQty());
+        dto.setPendingQty(windowPlanQty + carryForwardQty);
+        dto.setTargetScheduleQty(resolveTargetScheduleQty(surplus.getSurplusQty(), dto.getPendingQty()));
         dto.setDailyPlanQty(plan.getDayVulcanizationQty() != null ? plan.getDayVulcanizationQty() : 0);
 
         // 产能信息（从SKU日硫化产能Map获取）
@@ -224,11 +233,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             int lhTimeSeconds = plan.getCuringTime() != null ? plan.getCuringTime() : 3600;
             dto.setLhTimeSeconds(lhTimeSeconds);
             dto.setShiftCapacity(capacity.getClassCapacity() != null ? capacity.getClassCapacity() : 0);
-            dto.setMouldQty(1);
         } else {
             // 无产能数据时使用默认值
             dto.setLhTimeSeconds(3600);
-            dto.setMouldQty(1);
         }
 
         // 填充日硫化产能
@@ -236,7 +243,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         // 优先级信息
         dto.setSupplyChainPriority(plan.getProductionType());
-        dto.setDeliveryLocked(isDeliveryLocked(plan));
+        dto.setDeliveryLocked(isDeliveryLocked(context, plan.getMaterialCode()));
+        dto.setDelayDays(resolveDelayDays(context, plan));
+        dto.setHighPriorityPendingQty(safeInt(plan.getHeightProductionQty()));
+        dto.setCycleProductionPendingQty(safeInt(plan.getCycleProductionQty()));
+        dto.setMidPriorityPendingQty(safeInt(plan.getMidProductionQty()));
+        dto.setConventionProductionPendingQty(safeInt(plan.getConventionProductionQty()));
 
         // 施工阶段
         dto.setConstructionStage(plan.getConstructionStage());
@@ -254,6 +266,36 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setSkuTag(SkuTagEnum.NORMAL.getCode());
 
         return dto;
+    }
+
+    /**
+     * 追加“无计划量不排产”的未排结果。
+     *
+     * @param context 排程上下文
+     * @param sku SKU排程DTO
+     */
+    private void addNoPlanUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
+        String reason = String.format(NO_PLAN_QTY_REASON_TEMPLATE, sku.getMaterialCode());
+        log.warn(reason);
+
+        LhUnscheduledResult unscheduled = new LhUnscheduledResult();
+        unscheduled.setFactoryCode(context.getFactoryCode());
+        unscheduled.setBatchNo(context.getBatchNo());
+        unscheduled.setScheduleDate(context.getScheduleTargetDate());
+        unscheduled.setMonthPlanVersion(sku.getMonthPlanVersion());
+        unscheduled.setProductionVersion(sku.getProductionVersion());
+        unscheduled.setMaterialCode(sku.getMaterialCode());
+        unscheduled.setStructureName(sku.getStructureName());
+        unscheduled.setMaterialDesc(sku.getMaterialDesc());
+        unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
+        unscheduled.setSpecCode(sku.getSpecCode());
+        unscheduled.setEmbryoCode(sku.getEmbryoCode());
+        unscheduled.setUnscheduledQty(0);
+        unscheduled.setUnscheduledReason(reason);
+        unscheduled.setMouldQty(sku.getMouldQty());
+        unscheduled.setDataSource("0");
+        unscheduled.setIsDelete(0);
+        context.getUnscheduledResultList().add(unscheduled);
     }
 
     private int resolveActualFinishedQty(LhScheduleContext context, LhScheduleResult result) {
@@ -307,12 +349,45 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 判断SKU是否有交期锁定（周程滚动调整有锁定上机日期）
      *
-     * @param plan 月生产计划记录
+     * @param context 排程上下文
+     * @param materialCode 物料编码
      * @return true-有锁定交期
      */
-    private boolean isDeliveryLocked(FactoryMonthPlanProductionFinalResult plan) {
-        // 若高优先级数量 > 0 或者有发货要求，视为有交期锁定
-        return plan.getHeightQty() != null && plan.getHeightQty() > 0;
+    private boolean isDeliveryLocked(LhScheduleContext context, String materialCode) {
+        if (StringUtils.isEmpty(materialCode)) {
+            return false;
+        }
+        List<MpAdjustResult> adjustResults = context.getMpAdjustResultMap().get(materialCode);
+        if (CollectionUtils.isEmpty(adjustResults)) {
+            return false;
+        }
+        for (MpAdjustResult adjustResult : adjustResults) {
+            if (StringUtils.equals("1", StringUtils.trimToEmpty(adjustResult.getIsLockSchedule()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 计算延迟上机天数。
+     *
+     * @param context 排程上下文
+     * @param plan 月生产计划
+     * @return 延迟天数；无首个计划日时返回 -1
+     */
+    private int resolveDelayDays(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
+        if (context.getScheduleDate() == null) {
+            return -1;
+        }
+        int firstPlannedDay = MonthPlanDayQtyUtil.resolveFirstPlannedDay(plan);
+        if (firstPlannedDay < 0) {
+            return -1;
+        }
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(context.getScheduleDate());
+        int scheduleDayOfMonth = calendar.get(Calendar.DAY_OF_MONTH);
+        return Math.max(scheduleDayOfMonth - firstPlannedDay, 0);
     }
 
     /**
@@ -353,21 +428,22 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private void classifyContinuousAndNewSkus(LhScheduleContext context) {
         List<SkuScheduleDTO> continuousSkuList = new ArrayList<>();
         List<SkuScheduleDTO> newSpecSkuList = new ArrayList<>();
+        Map<String, List<SkuScheduleDTO>> skuByMaterialMap = buildSkuByMaterialMap(context);
+
+        // 先按机台最近MES在机记录反找SKU，命中的SKU按机台顺序消费，避免同一SKU被重复占用。
+        for (Map.Entry<String, LhMachineOnlineInfo> entry : context.getMachineOnlineInfoMap().entrySet()) {
+            assignContinuousSku(entry.getKey(), entry.getValue(), skuByMaterialMap, continuousSkuList);
+        }
 
         for (List<SkuScheduleDTO> skuList : context.getStructureSkuMap().values()) {
             for (SkuScheduleDTO sku : skuList) {
-                // 判断是否为续作：从MES在机信息中查找该SKU是否已在某台机台上生产
-                String continuousMachineCode = findContinuousMachine(context, sku.getMaterialCode());
-                if (StringUtils.isNotEmpty(continuousMachineCode)) {
-                    // 续作SKU：记录所在机台
-                    sku.setScheduleType(ScheduleTypeEnum.CONTINUOUS.getCode());
-                    sku.setContinuousMachineCode(continuousMachineCode);
-                    continuousSkuList.add(sku);
-                } else {
-                    // 新增SKU：需要换模上机
-                    sku.setScheduleType(ScheduleTypeEnum.NEW_SPEC.getCode());
-                    newSpecSkuList.add(sku);
+                if (StringUtils.equals(ScheduleTypeEnum.CONTINUOUS.getCode(), sku.getScheduleType())) {
+                    continue;
                 }
+                // 未命中MES在机记录的SKU按新增规格处理。
+                sku.setScheduleType(ScheduleTypeEnum.NEW_SPEC.getCode());
+                sku.setContinuousMachineCode(null);
+                newSpecSkuList.add(sku);
             }
         }
 
@@ -377,24 +453,51 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 在MES在机信息中查找该SKU是否当前正在某机台上生产
+     * 按物料编码归集待排SKU，保持原有归集顺序供机台依次消费
      *
-     * @param context      排程上下文
-     * @param materialCode 物料编码（SKU）
-     * @return 机台编号，null表示未在产
+     * @param context 排程上下文
+     * @return 物料编码 -> 待匹配SKU列表
      */
-    private String findContinuousMachine(LhScheduleContext context, String materialCode) {
-        if (materialCode == null) {
-            return null;
-        }
-        for (Map.Entry<String, LhMachineOnlineInfo> entry
-                : context.getMachineOnlineInfoMap().entrySet()) {
-            LhMachineOnlineInfo onlineInfo = entry.getValue();
-            if (materialCode.equals(onlineInfo.getMaterialCode())) {
-                return entry.getKey();
+    private Map<String, List<SkuScheduleDTO>> buildSkuByMaterialMap(LhScheduleContext context) {
+        Map<String, List<SkuScheduleDTO>> skuByMaterialMap = new LinkedHashMap<>();
+        for (List<SkuScheduleDTO> skuList : context.getStructureSkuMap().values()) {
+            for (SkuScheduleDTO sku : skuList) {
+                sku.setScheduleType(null);
+                sku.setContinuousMachineCode(null);
+                if (StringUtils.isEmpty(sku.getMaterialCode())) {
+                    continue;
+                }
+                skuByMaterialMap.computeIfAbsent(sku.getMaterialCode(), k -> new ArrayList<>()).add(sku);
             }
         }
-        return null;
+        return skuByMaterialMap;
+    }
+
+    /**
+     * 按机台最近MES在机记录匹配续作SKU
+     *
+     * @param machineCode      机台编码
+     * @param onlineInfo       机台最近MES在机记录
+     * @param skuByMaterialMap 物料编码 -> 待匹配SKU列表
+     * @param continuousSkuList 续作SKU列表
+     */
+    private void assignContinuousSku(String machineCode, LhMachineOnlineInfo onlineInfo,
+                                     Map<String, List<SkuScheduleDTO>> skuByMaterialMap,
+                                     List<SkuScheduleDTO> continuousSkuList) {
+        if (onlineInfo == null
+                || StringUtils.isEmpty(machineCode)
+                || StringUtils.isEmpty(onlineInfo.getMaterialCode())) {
+            return;
+        }
+        List<SkuScheduleDTO> matchedSkuList = skuByMaterialMap.get(onlineInfo.getMaterialCode());
+        if (CollectionUtils.isEmpty(matchedSkuList)) {
+            return;
+        }
+        // 同一物料存在多条SKU时，按归集顺序逐条消费，避免重复占用。
+        SkuScheduleDTO matchedSku = matchedSkuList.remove(0);
+        matchedSku.setScheduleType(ScheduleTypeEnum.CONTINUOUS.getCode());
+        matchedSku.setContinuousMachineCode(machineCode);
+        continuousSkuList.add(matchedSku);
     }
 
     /**
@@ -408,24 +511,30 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
+     * 解析排产目标量。
+     * <p>目标量受月计划余量与窗口待排量双重约束，避免重复累加或跨窗口超排。</p>
+     *
+     * @param surplusQty 月计划余量
+     * @param pendingQty 窗口待排量（窗口计划量 + 正向结转）
+     * @return 排产目标量
+     */
+    private int resolveTargetScheduleQty(int surplusQty, int pendingQty) {
+        return Math.max(0, Math.min(Math.max(surplusQty, 0), Math.max(pendingQty, 0)));
+    }
+
+    /**
      * 余量计算结果。
      */
     private static class SurplusCalculation {
 
         private final int surplusQty;
-        private final boolean fromMonthSurplus;
 
-        private SurplusCalculation(int surplusQty, boolean fromMonthSurplus) {
+        private SurplusCalculation(int surplusQty) {
             this.surplusQty = surplusQty;
-            this.fromMonthSurplus = fromMonthSurplus;
         }
 
         public int getSurplusQty() {
             return surplusQty;
-        }
-
-        public boolean isFromMonthSurplus() {
-            return fromMonthSurplus;
         }
     }
 

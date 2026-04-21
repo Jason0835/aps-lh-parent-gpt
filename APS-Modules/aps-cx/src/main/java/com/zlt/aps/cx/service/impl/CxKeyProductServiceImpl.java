@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,7 +48,7 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
             int errorNum = i + 2;
             CxKeyProduct docEntity = list.get(i);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
-            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated);
+            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated, "embryoCode", "structureName");
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
                 docEntity.setId(-999L);
@@ -66,9 +67,16 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
             // 必填字段校验
             if (StringUtil.isBlank(docEntity.getEmbryoCode())) {
                 failureNum++;
-                String message = I18nUtil.getMessage("ui.data.alert.cxKeyProduct.embryoCodeRequired");
+                String message = String.format(I18nUtil.getMessage("ui.data.alert.cxKeyProduct.embryoCodeRequired"),errorNum);
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                        errorNum, String.format(message, errorNum), importErrorLogs);
+                        errorNum, message, importErrorLogs);
+                continue;
+            }
+            if (StringUtil.isBlank(docEntity.getStructureName())) {
+                failureNum++;
+                String message = String.format(I18nUtil.getMessage("ui.data.alert.cxKeyProduct.embryoCodeRequired"),errorNum);
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, message, importErrorLogs);
                 continue;
             }
 
@@ -80,6 +88,7 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
                 if (updateSupport) {
                     QueryWrapper<CxKeyProduct> queryWrapper = new QueryWrapper<>();
                     queryWrapper.eq("EMBRYO_CODE", docEntity.getEmbryoCode());
+                    queryWrapper.eq("STRUCTURE_NAME", docEntity.getStructureName());
                     CxKeyProduct existEntity = cxKeyProductMapper.selectOne(queryWrapper);
                     if (existEntity != null) {
                         docEntity.setId(existEntity.getId());
@@ -88,8 +97,9 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
                     }
                 } else {
                     failureNum++;
+                    String notUniqueMsg = I18nUtil.getMessage("ui.data.alert.cxKeyProduct.notUnique.withRow");
                     ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
-                            String.format(uniqueMsg, errorNum), importErrorLogs);
+                            notUniqueMsg, importErrorLogs);
                 }
             }
         }
@@ -119,6 +129,7 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
         QueryWrapper<CxKeyProduct> queryWrapper = new QueryWrapper<>();
         queryWrapper.ne(PubUtil.isNotEmpty(entity.getFieldValueByFieldName("id")), "ID", entity.getFieldValueByFieldName("id"));
         queryWrapper.eq("EMBRYO_CODE", entity.getEmbryoCode());
+        queryWrapper.eq("STRUCTURE_NAME", entity.getStructureName());
 
         if (cxKeyProductMapper.selectCount(queryWrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
@@ -129,7 +140,7 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("embryoCode");
+        return Arrays.asList("embryoCode", "structureName");
     }
 
     @Override

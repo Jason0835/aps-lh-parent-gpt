@@ -12,7 +12,7 @@ import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.service.impl.SchedulePersistenceService;
-import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -104,6 +104,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             requireField(result.getBatchNo(), "batchNo", context, result);
             requireField(result.getFactoryCode(), "factoryCode", context, result);
             requireField(result.getLhMachineCode(), "lhMachineCode", context, result);
+            result.setLeftRightMould(LeftRightMouldUtil.resolveLeftRightMould(
+                    result.getLeftRightMould(), result.getLhMachineCode()));
             requireField(result.getMaterialCode(), "materialCode", context, result);
             requireField(result.getScheduleType(), "scheduleType", context, result);
             if (result.getSpecEndTime() == null) {
@@ -126,7 +128,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      */
     private void generateMouldChangePlan(LhScheduleContext context) {
         List<LhScheduleResult> changeResults = context.getScheduleResultList().stream()
-                .filter(r -> "1".equals(r.getIsChangeMould()))
+                .filter(r -> "1".equals(r.getIsChangeMould())
+                        && r.getDailyPlanQty() != null
+                        && r.getDailyPlanQty() > 0)
                 .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode, Comparator.nullsLast(String::compareTo))
                         .thenComparing(this::resolveProductionStartTime, Comparator.nullsLast(Date::compareTo))
                         .thenComparing(LhScheduleResult::getSpecEndTime, Comparator.nullsLast(Date::compareTo)))
@@ -151,21 +155,23 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setPlanOrder(planOrder++);
             plan.setLhMachineCode(result.getLhMachineCode());
             plan.setLhMachineName(result.getLhMachineName());
-            plan.setAfterMaterialCode(result.getMaterialCode());
-            plan.setAfterMaterialDesc(result.getMaterialDesc());
+            plan.setLeftRightMould(LeftRightMouldUtil.resolveLeftRightMould(
+                    result.getLeftRightMould(), result.getLhMachineCode()));
+            plan.setBeforeMaterialCode(state.getPreviousMaterialCode());
+            plan.setBeforeMaterialDesc(state.getPreviousMaterialDesc());
+            plan.setAfterMaterialCode(state.getCurrentMaterialCode());
+            plan.setAfterMaterialDesc(state.getCurrentMaterialDesc());
             plan.setMouldCode(result.getMouldCode());
             plan.setIsRelease("0");
             plan.setMouldStatus("0");
             plan.setIsDelete(0);
-            plan.setBeforeMaterialCode(state.getCurrentMaterialCode());
-            plan.setBeforeMaterialDesc(state.getCurrentMaterialDesc());
             plan.setChangeTime(state.getEstimatedEndTime());
 
             // 判断交替类型
             plan.setChangeMouldType(determineChangeMouldType(result));
             plans.add(plan);
 
-            updateRollingState(context, state, result);
+            updateRollingState(state, result);
         }
 
         log.info("生成模具交替计划完成, 共 {} 条", plans.size());
@@ -306,24 +312,19 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (machine != null) {
             state.setCurrentMaterialCode(machine.getCurrentMaterialCode());
             state.setCurrentMaterialDesc(machine.getCurrentMaterialDesc());
-            state.setPreviousSpecCode(machine.getPreviousSpecCode());
-            state.setPreviousProSize(machine.getPreviousProSize());
+            state.setPreviousMaterialCode(machine.getPreviousMaterialCode());
+            state.setPreviousMaterialDesc(machine.getPreviousMaterialDesc());
             state.setEstimatedEndTime(machine.getEstimatedEndTime());
         }
         return state;
     }
 
-    private void updateRollingState(LhScheduleContext context, RollingMachineState state, LhScheduleResult result) {
+    private void updateRollingState(RollingMachineState state, LhScheduleResult result) {
+        state.setPreviousMaterialCode(state.getCurrentMaterialCode());
+        state.setPreviousMaterialDesc(state.getCurrentMaterialDesc());
         state.setCurrentMaterialCode(result.getMaterialCode());
         state.setCurrentMaterialDesc(result.getMaterialDesc());
         state.setEstimatedEndTime(result.getSpecEndTime());
-        MdmMaterialInfo materialInfo = context.getMaterialInfoMap().get(result.getMaterialCode());
-        if (materialInfo != null) {
-            state.setPreviousSpecCode(materialInfo.getSpecifications());
-            state.setPreviousProSize(materialInfo.getProSize());
-        } else {
-            state.setPreviousSpecCode(result.getSpecCode());
-        }
     }
 
     /**
@@ -333,8 +334,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
         private String currentMaterialCode;
         private String currentMaterialDesc;
-        private String previousSpecCode;
-        private String previousProSize;
+        private String previousMaterialCode;
+        private String previousMaterialDesc;
         private Date estimatedEndTime;
 
         public String getCurrentMaterialCode() {
@@ -353,20 +354,20 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             this.currentMaterialDesc = currentMaterialDesc;
         }
 
-        public String getPreviousSpecCode() {
-            return previousSpecCode;
+        public String getPreviousMaterialCode() {
+            return previousMaterialCode;
         }
 
-        public void setPreviousSpecCode(String previousSpecCode) {
-            this.previousSpecCode = previousSpecCode;
+        public void setPreviousMaterialCode(String previousMaterialCode) {
+            this.previousMaterialCode = previousMaterialCode;
         }
 
-        public String getPreviousProSize() {
-            return previousProSize;
+        public String getPreviousMaterialDesc() {
+            return previousMaterialDesc;
         }
 
-        public void setPreviousProSize(String previousProSize) {
-            this.previousProSize = previousProSize;
+        public void setPreviousMaterialDesc(String previousMaterialDesc) {
+            this.previousMaterialDesc = previousMaterialDesc;
         }
 
         public Date getEstimatedEndTime() {

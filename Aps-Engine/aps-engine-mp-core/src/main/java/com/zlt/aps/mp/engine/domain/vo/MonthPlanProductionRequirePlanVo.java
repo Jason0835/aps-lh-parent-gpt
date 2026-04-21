@@ -125,6 +125,22 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     private Integer matchEndDay;
 
     /**
+     * 根据需求Sku构建虚拟的续作计划对象
+     *
+     * @param continueSkuInfo
+     * @return
+     */
+    public static MonthPlanProductionRequirePlanVo buildVirtualPlanByContinue(CxContinueSkuInfoHelper continueSkuInfo) {
+        if (null == continueSkuInfo) {
+            return null;
+        }
+        MonthPlanProductionRequirePlanVo virtualPlan = new MonthPlanProductionRequirePlanVo();
+        BeanUtils.copyProperties(continueSkuInfo, virtualPlan);
+        virtualPlan.setStructureName(continueSkuInfo.getGroupName());
+        return virtualPlan;
+    }
+
+    /**
      * 初始的排产数据设置
      * 标记初始的排产标记
      * 产能预算的产能需求量

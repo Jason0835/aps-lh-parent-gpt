@@ -78,6 +78,17 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
 
 
     /**
+     * 修改或新增
+     */
+    @ApiOperation("修改或新增")
+    @PostMapping("/save")
+    @ResponseBody
+    public AjaxResult save(FactoryMonthPlanProductionFinalResult factoryMonthPlanProductionFinalResult) {
+        return iFactoryMonthPlanProductionFinalResultService.save(factoryMonthPlanProductionFinalResult);
+    }
+
+
+    /**
      * 校验工厂月生产计划-最终排产计划定稿唯一性
      */
     @ApiOperation("校验唯一性")
@@ -138,6 +149,19 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
     public void export(HttpServletResponse response, FactoryMonthPlanProductionFinalResult entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
         byte[] excelBytes = iFactoryMonthPlanProductionFinalResultService.exportData(entity, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
+    }
+
+    @ApiOperation("导出SKU排产明细")
+    @RequiresPermissions("monthplan:factoryMonthPlanFinalResult:export")
+    @GetMapping({"/exportSkuScheduleItems"})
+    @ResponseBody
+    public void exportSkuScheduleItems(HttpServletResponse response, FactoryMonthPlanProductionFinalResult entity) throws IOException {
+        String fileName = this.getExportTemplateFileName();
+        byte[] excelBytes = iFactoryMonthPlanProductionFinalResultService.exportSkuScheduleItems(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());

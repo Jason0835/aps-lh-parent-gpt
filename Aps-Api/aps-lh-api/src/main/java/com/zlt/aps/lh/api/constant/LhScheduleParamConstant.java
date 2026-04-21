@@ -36,6 +36,8 @@ public final class LhScheduleParamConstant {
     public static final String MOULD_CHANGE_OTHER_HOURS = "MOULD_CHANGE_OTHER_HOURS";
     /** 换模总耗时（小时） */
     public static final String MOULD_CHANGE_TOTAL_HOURS = "MOULD_CHANGE_TOTAL_HOURS";
+    /** 换活字块总耗时（小时） */
+    public static final String TYPE_BLOCK_CHANGE_TOTAL_HOURS = "TYPE_BLOCK_CHANGE_TOTAL_HOURS";
     /** 首检时间（小时） */
     public static final String FIRST_INSPECTION_HOURS = "FIRST_INSPECTION_HOURS";
     /** 每班最大首检次数 */
@@ -78,6 +80,8 @@ public final class LhScheduleParamConstant {
     public static final String CAPSULE_PREHEAT_HOURS = "CAPSULE_PREHEAT_HOURS";
     /** 排程天数 */
     public static final String SCHEDULE_DAYS = "SCHEDULE_DAYS";
+    /** MES在机信息往前追溯天数 */
+    public static final String MACHINE_ONLINE_LOOKBACK_DAYS = "MACHINE_ONLINE_LOOKBACK_DAYS";
     /** 停机超时阈值（小时） */
     public static final String MACHINE_STOP_TIMEOUT_HOURS = "MACHINE_STOP_TIMEOUT_HOURS";
     /** 胶囊预警次数 */
@@ -98,4 +102,12 @@ public final class LhScheduleParamConstant {
     public static final String TRIAL_DAILY_LIMIT = "TRIAL_DAILY_LIMIT";
     /** 模具交替计划天数 */
     public static final String MOULD_CHANGE_PLAN_DAYS = "MOULD_CHANGE_PLAN_DAYS";
+    /** 局部搜索开关（0-关闭，1-开启） */
+    public static final String ENABLE_LOCAL_SEARCH = "ENABLE_LOCAL_SEARCH";
+    /** 局部搜索候选机台阈值（小于该值时启用） */
+    public static final String LOCAL_SEARCH_MACHINE_THRESHOLD = "LOCAL_SEARCH_MACHINE_THRESHOLD";
+    /** 局部搜索深度（包含当前SKU） */
+    public static final String LOCAL_SEARCH_DEPTH = "LOCAL_SEARCH_DEPTH";
+    /** 局部搜索单次耗时预算（毫秒） */
+    public static final String LOCAL_SEARCH_TIME_BUDGET_MS = "LOCAL_SEARCH_TIME_BUDGET_MS";
 }

@@ -30,7 +30,7 @@ public class LhMouldCleanWarn extends BaseEntity implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @ApiModelProperty(value = "厂别")
-    @Excel(name = "ui.data.column.mouldCleanWarn.factoryCode")
+    @Excel(name = "ui.data.column.mouldCleanWarn.factoryCode", dictType = "biz_factory_name")
     @ImportExcelValidated(required = true)
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -48,7 +48,7 @@ public class LhMouldCleanWarn extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "上机时间")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    @Excel(name = "ui.data.column.mouldCleanWarn.operTime", width = 30)
+    @Excel(name = "ui.data.column.mouldCleanWarn.operTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ImportExcelValidated(required = true)
     @TableField(value = "OPER_TIME")
     private Date operTime;
@@ -56,17 +56,29 @@ public class LhMouldCleanWarn extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "首次清洗时间")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    @Excel(name = "ui.data.column.mouldCleanWarn.firstWashTime", width = 30)
+    @Excel(name = "ui.data.column.mouldCleanWarn.firstWashTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @TableField(value = "FIRST_WASH_TIME")
     private Date firstWashTime;
 
     @ApiModelProperty(value = "二次清洗时间")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    @Excel(name = "ui.data.column.mouldCleanWarn.secondWashTime", width = 30)
+    @Excel(name = "ui.data.column.mouldCleanWarn.secondWashTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ImportExcelValidated(required = true)
     @TableField(value = "SECOND_WASH_TIME")
     private Date secondWashTime;
+
+    @ApiModelProperty(value = "备注")
+    @Excel(name = "ui.data.column.mouldCleanWarn.remark", width = 50)
+    @TableField(value = "REMARK")
+    private String remark;
+
+    @ApiModelProperty(value = "更新时间")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @Excel(name = "ui.data.column.mouldCleanWarn.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @TableField(value = "UPDATE_TIME")
+    private Date updateTime;
 
     @ApiModelProperty(value = "版本号")
     @TableField(value = "DATA_VERSION")

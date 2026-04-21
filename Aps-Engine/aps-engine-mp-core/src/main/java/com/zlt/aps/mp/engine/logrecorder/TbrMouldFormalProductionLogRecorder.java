@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.logrecorder;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
+import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
 import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -94,17 +95,20 @@ public class TbrMouldFormalProductionLogRecorder {
     }
 
     /**
-     * 增加分组计划模具正式排产-排产在机结构新增Sku日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，正式开始在机结构 %s 新增Sku 模具排产====
+     * 增加分组计划模具正式排产-排产结构新增Sku日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，正式开始%s结构 %s[%s] 新增Sku模具排产====
      *
-     * @param context   排程上下文
-     * @param groupName 分组名 TBR 结构名
+     * @param context     排程上下文
+     * @param groupName   分组名 TBR 结构名
+     * @param formalRound 轮次
+     * @param text        说明 在机|新增
      * @return
      */
-    public static String addProductionContinueGroupSingleGroupAddSkuLog(Context context, String groupName) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，正式开始在机结构 %s 新增Sku 模具排产====",
+    public static String addProductionSingleGroupAddSkuLog(Context context, String groupName, FormalRoundEnum formalRound, String text) {
+
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，正式开始%s结构 %s[%s] 新增Sku模具排产====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName);
+                text, groupName, formalRound.getRoundDesc());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.FORMAL_MOULD_CONTINUE_GROUP_SINGLE_ADD_GROUP, logContent);
         return logContent;
@@ -169,14 +173,15 @@ public class TbrMouldFormalProductionLogRecorder {
      * 增加分组计划模具正式排产-新增结构排产日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，正式开始新增结构 %s 模具排产====
      *
-     * @param context   排程上下文
-     * @param groupName 分组名 TBR 结构名
+     * @param context     排程上下文
+     * @param groupName   分组名 TBR 结构名
+     * @param formalRound 排产轮次
      * @return
      */
-    public static String addProductionAddGroupSingleGroupLog(Context context, String groupName) {
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，正式开始新增结构 %s 模具排产====",
+    public static String addProductionAddGroupSingleGroupLog(Context context, String groupName, FormalRoundEnum formalRound) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，正式开始新增结构 %s %s 模具排产====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
-                groupName);
+                groupName, formalRound.getRoundDesc());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.FORMAL_MOULD_ADD_GROUP_SINGLE_GROUP, logContent);
         return logContent;

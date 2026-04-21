@@ -2,9 +2,10 @@ package com.zlt.aps.lh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
-import com.zlt.aps.lh.api.domain.entity.LhCleaningPlan;
+import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhShiftFinishQty;
@@ -15,9 +16,9 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleDomainExceptionHelper;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
-import com.zlt.aps.lh.mapper.LhCleaningPlanMapper;
 import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
+import com.zlt.aps.lh.mapper.LhMouldCleanPlanMapper;
 import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhShiftFinishQtyMapper;
@@ -25,21 +26,26 @@ import com.zlt.aps.lh.mapper.LhSpecifyMachineMapper;
 import com.zlt.aps.lh.mapper.MdmDevMaintenancePlanMapper;
 import com.zlt.aps.lh.mapper.MdmDevicePlanShutMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
+import com.zlt.aps.lh.mapper.MdmModelInfoMapper;
 import com.zlt.aps.lh.mapper.MdmMonthSurplusMapper;
 import com.zlt.aps.lh.mapper.MdmSkuLhCapacityMapper;
 import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
 import com.zlt.aps.lh.mapper.MdmWorkCalendarMapper;
+import com.zlt.aps.lh.mapper.MpAdjustResultMapper;
 import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.lh.service.ILhBaseDataService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
+import com.zlt.aps.lh.util.MachineStatusUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -66,20 +72,19 @@ import java.util.Map;
 @Service
 public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
-    /** 机台启用状态，对应字典 sys_enable_disable */
-    private static final String MACHINE_STATUS_ENABLED = "0";
-
     /** 排产版本已定稿（与 MpFactoryProductionVersion.isFinal 一致） */
     private static final String PRODUCTION_VERSION_IS_FINAL = "1";
 
     /** 查询最新排产版本时返回前两条，用于判断是否存在多条数据 */
     private static final String FINAL_PRODUCTION_VERSION_LIMIT_TWO = "LIMIT 2";
-
     @Resource
     private FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
 
     @Resource
     private MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
+
+    @Resource
+    private MpAdjustResultMapper mpAdjustResultMapper;
 
     @Resource
     private MdmWorkCalendarMapper workCalendarMapper;
@@ -94,10 +99,13 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     private MdmSkuMouldRelMapper skuMouldRelMapper;
 
     @Resource
+    private MdmModelInfoMapper mdmModelInfoMapper;
+
+    @Resource
     private LhMachineInfoMapper lhMachineInfoMapper;
 
     @Resource
-    private LhCleaningPlanMapper lhCleaningPlanMapper;
+    private LhMouldCleanPlanMapper lhMouldCleanPlanMapper;
 
     @Resource
     private MdmMonthSurplusMapper monthSurplusMapper;
@@ -150,47 +158,58 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // 2. 加载月生产计划
         loadMonthPlan(context, factoryCode, yearMonth);
 
-        // 3. 加载工作日历
+        // 3. 加载周程滚动调整结果
+        loadAdjustResult(context, factoryCode, year, month);
+
+        // 4. 加载工作日历
         loadWorkCalendar(context, factoryCode, startDate, endDate);
 
-        // 4. 加载SKU日硫化产能
+        // 5. 加载SKU日硫化产能
         loadSkuLhCapacity(context, factoryCode);
 
-        // 5. 加载设备停机计划
+        // 6. 加载设备停机计划
         loadDevicePlanShut(context, factoryCode, startDate, endDate);
 
-        // 6. 加载SKU与模具关系
+        // 7. 加载SKU与模具关系
         loadSkuMouldRel(context, factoryCode);
 
-        // 7. 加载硫化机台信息
+        // 8. 加载模具台账
+        loadModelInfo(context, factoryCode);
+
+        // 9. 加载硫化机台信息
         loadMachineInfo(context, factoryCode);
 
-        // 8. 加载模具清洗计划
+        // 10. 加载模具清洗计划
         loadCleaningPlan(context, factoryCode, startDate, endDate);
 
-        // 9. 加载月底计划余量
+        // 11. 加载月底计划余量
         loadMonthSurplus(context, factoryCode, year, month);
 
-        // 10. 加载各班次完成量
+        // 12. 加载各班次完成量（T日，用于前日欠/超产差值修正）
         loadShiftFinishQty(context, factoryCode, scheduleDate);
 
-        // 11. 加载物料信息
+        // 13. 加载月累计完成量（截至T-1，用于月余量回退口径）
+        loadMaterialMonthFinishedQty(context, factoryCode, scheduleDate);
+
+        // 14. 加载物料信息
         loadMaterialInfo(context, factoryCode);
 
-        // 12. 加载MES硫化在机信息（取T-1日在机信息）
-        Date previousDay = LhScheduleTimeUtil.addDays(startDate, -1);
-        loadMachineOnlineInfo(context, factoryCode, previousDay);
+        // 15. 加载MES硫化在机信息（从 T-1 开始，按配置天数向前追溯最近有数据日期）
+        int machineOnlineLookbackDays = context.getParamIntValue(
+                LhScheduleParamConstant.MACHINE_ONLINE_LOOKBACK_DAYS,
+                LhScheduleConstant.MACHINE_ONLINE_LOOKBACK_DAYS);
+        loadMachineOnlineInfo(context, factoryCode, startDate, machineOnlineLookbackDays);
 
-        // 13. 加载硫化定点机台
+        // 16. 加载硫化定点机台
         loadSpecifyMachine(context, factoryCode);
 
-        // 14. 加载硫化机胶囊已使用次数
+        // 17. 加载硫化机胶囊已使用次数
         loadCapsuleUsage(context, factoryCode);
 
-        // 15. 加载设备保养计划
+        // 18. 加载设备保养计划
         loadMaintenancePlan(context, factoryCode);
 
-        // 16. 加载前日硫化排程结果
+        // 19. 加载前日硫化排程结果
         loadPreviousScheduleResults(context, factoryCode, targetDate);
 
         log.info("基础数据加载完成, 工厂: {}, 目标日: {}, T日: {}",
@@ -319,6 +338,45 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
+     * 加载周程滚动调整结果，按物料编码聚合。
+     *
+     * @param context 排程上下文
+     * @param factoryCode 分厂编号
+     * @param year 年份
+     * @param month 月份
+     */
+    private void loadAdjustResult(LhScheduleContext context, String factoryCode, int year, int month) {
+        String monthPlanVersion = context.getMonthPlanVersion();
+        String productionVersion = context.getProductionVersion();
+        if (StringUtils.isEmpty(monthPlanVersion) || StringUtils.isEmpty(productionVersion)) {
+            context.setMpAdjustResultMap(new HashMap<>(16));
+            log.warn("月计划版本或排产版本为空，跳过周程滚动调整结果加载, 工厂: {}, monthPlanVersion: {}, productionVersion: {}",
+                    factoryCode, monthPlanVersion, productionVersion);
+            return;
+        }
+
+        List<MpAdjustResult> adjustResults = mpAdjustResultMapper.selectList(new LambdaQueryWrapper<MpAdjustResult>()
+                .eq(MpAdjustResult::getFactoryCode, factoryCode)
+                .eq(MpAdjustResult::getYear, year)
+                .eq(MpAdjustResult::getMonth, month)
+                .eq(MpAdjustResult::getMonthPlanVersion, monthPlanVersion)
+                .eq(MpAdjustResult::getProductionVersion, productionVersion)
+                .eq(MpAdjustResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        Map<String, List<MpAdjustResult>> adjustResultMap = new HashMap<>(64);
+        if (!CollectionUtils.isEmpty(adjustResults)) {
+            for (MpAdjustResult adjustResult : adjustResults) {
+                if (StringUtils.isEmpty(adjustResult.getMaterialCode())) {
+                    continue;
+                }
+                adjustResultMap.computeIfAbsent(adjustResult.getMaterialCode(), key -> new ArrayList<>()).add(adjustResult);
+            }
+        }
+        context.setMpAdjustResultMap(adjustResultMap);
+        log.debug("周程滚动调整结果加载完成, 记录数: {}, 物料数: {}",
+                CollectionUtils.isEmpty(adjustResults) ? 0 : adjustResults.size(), adjustResultMap.size());
+    }
+
+    /**
      * 加载工作日历
      *
      * @param context     排程上下文
@@ -404,6 +462,29 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
+     * 加载模具台账，按模具号建立Map
+     *
+     * @param context     排程上下文
+     * @param factoryCode 分厂编号
+     */
+    private void loadModelInfo(LhScheduleContext context, String factoryCode) {
+        List<MdmModelInfo> modelInfoList = mdmModelInfoMapper.selectList(
+                new LambdaQueryWrapper<MdmModelInfo>()
+                        .eq(MdmModelInfo::getFactoryCode, factoryCode)
+                        .eq(MdmModelInfo::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        Map<String, MdmModelInfo> modelInfoMap = new HashMap<>(128);
+        if (!CollectionUtils.isEmpty(modelInfoList)) {
+            for (MdmModelInfo modelInfo : modelInfoList) {
+                if (StringUtils.isNotEmpty(modelInfo.getMouldCode())) {
+                    modelInfoMap.put(modelInfo.getMouldCode(), modelInfo);
+                }
+            }
+        }
+        context.setModelInfoMap(modelInfoMap);
+        log.debug("模具台账加载完成, 模具数量: {}", modelInfoMap.size());
+    }
+
+    /**
      * 加载硫化机台信息，按机台编号建立LinkedHashMap（保持顺序）
      *
      * @param context     排程上下文
@@ -413,7 +494,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         List<LhMachineInfo> list = lhMachineInfoMapper.selectList(
                 new LambdaQueryWrapper<LhMachineInfo>()
                         .eq(LhMachineInfo::getFactoryCode, factoryCode)
-                        .eq(LhMachineInfo::getStatus, MACHINE_STATUS_ENABLED)
+                        .eq(LhMachineInfo::getStatus, MachineStatusUtil.STATUS_ENABLED)
                         .eq(LhMachineInfo::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
                         .orderByAsc(LhMachineInfo::getMachineOrder));
         Map<String, LhMachineInfo> machineInfoMap = new LinkedHashMap<>(32);
@@ -438,18 +519,19 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      */
     private void loadCleaningPlan(LhScheduleContext context, String factoryCode, Date startDate, Date endDate) {
         List<String> machineCodes = new ArrayList<>(context.getMachineInfoMap().keySet());
-        List<LhCleaningPlan> cleaningPlanList;
+        List<LhMouldCleanPlan> cleaningPlanList;
         if (machineCodes.isEmpty()) {
             cleaningPlanList = Collections.emptyList();
         } else {
-            cleaningPlanList = lhCleaningPlanMapper.selectList(
-                    new LambdaQueryWrapper<LhCleaningPlan>()
-                            .in(LhCleaningPlan::getLhMachineCode, machineCodes)
-                            .ge(LhCleaningPlan::getPlanTime, startDate)
-                            .lt(LhCleaningPlan::getPlanTime, endDate)
-                            .and(w -> w.eq(LhCleaningPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+            cleaningPlanList = lhMouldCleanPlanMapper.selectList(
+                    new LambdaQueryWrapper<LhMouldCleanPlan>()
+                            .eq(LhMouldCleanPlan::getFactoryCode, factoryCode)
+                            .in(LhMouldCleanPlan::getLhCode, machineCodes)
+                            .ge(LhMouldCleanPlan::getCleanTime, startDate)
+                            .lt(LhMouldCleanPlan::getCleanTime, endDate)
+                            .and(w -> w.eq(LhMouldCleanPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
                                     .or()
-                                    .isNull(LhCleaningPlan::getIsDelete)));
+                                    .isNull(LhMouldCleanPlan::getIsDelete)));
         }
         context.setCleaningPlanList(cleaningPlanList != null ? cleaningPlanList : context.getCleaningPlanList());
         log.debug("模具清洗计划加载完成, 数量: {}", context.getCleaningPlanList().size());
@@ -508,6 +590,64 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
+     * 加载月累计完成量（截至排程窗口起点T日前），按物料编号建立Map。
+     *
+     * @param context      排程上下文
+     * @param factoryCode  分厂编号
+     * @param scheduleDate 排程窗口起点 T 日
+     */
+    private void loadMaterialMonthFinishedQty(LhScheduleContext context, String factoryCode, Date scheduleDate) {
+        Date tDay = LhScheduleTimeUtil.clearTime(scheduleDate);
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(tDay);
+        calendar.set(Calendar.DAY_OF_MONTH, 1);
+        Date monthStart = LhScheduleTimeUtil.clearTime(calendar.getTime());
+
+        List<LhShiftFinishQty> monthFinishList = lhShiftFinishQtyMapper.selectList(
+                new LambdaQueryWrapper<LhShiftFinishQty>()
+                        .eq(LhShiftFinishQty::getFactoryCode, factoryCode)
+                        .ge(LhShiftFinishQty::getScheduleDate, monthStart)
+                        .lt(LhShiftFinishQty::getScheduleDate, tDay)
+                        .eq(LhShiftFinishQty::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+
+        Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>(64);
+        if (monthFinishList != null) {
+            for (LhShiftFinishQty finishQty : monthFinishList) {
+                if (StringUtils.isEmpty(finishQty.getMaterialCode())) {
+                    continue;
+                }
+                materialMonthFinishedQtyMap.merge(
+                        finishQty.getMaterialCode(),
+                        resolveTotalFinishedQty(finishQty),
+                        Integer::sum);
+            }
+        }
+
+        context.setMaterialMonthFinishedQtyMap(materialMonthFinishedQtyMap);
+        log.debug("月累计完成量加载完成, 数量: {}, 起始日: {}, 截止: {}",
+                materialMonthFinishedQtyMap.size(),
+                LhScheduleTimeUtil.formatDate(monthStart),
+                LhScheduleTimeUtil.formatDate(LhScheduleTimeUtil.addDays(tDay, -1)));
+    }
+
+    /**
+     * 汇总一条班次完成记录的总完成量。
+     *
+     * @param finishQty 班次完成记录
+     * @return 总完成量
+     */
+    private int resolveTotalFinishedQty(LhShiftFinishQty finishQty) {
+        return (finishQty.getClass1FinishQty() != null ? finishQty.getClass1FinishQty() : 0)
+                + (finishQty.getClass2FinishQty() != null ? finishQty.getClass2FinishQty() : 0)
+                + (finishQty.getClass3FinishQty() != null ? finishQty.getClass3FinishQty() : 0)
+                + (finishQty.getClass4FinishQty() != null ? finishQty.getClass4FinishQty() : 0)
+                + (finishQty.getClass5FinishQty() != null ? finishQty.getClass5FinishQty() : 0)
+                + (finishQty.getClass6FinishQty() != null ? finishQty.getClass6FinishQty() : 0)
+                + (finishQty.getClass7FinishQty() != null ? finishQty.getClass7FinishQty() : 0)
+                + (finishQty.getClass8FinishQty() != null ? finishQty.getClass8FinishQty() : 0);
+    }
+
+    /**
      * 加载物料信息，按物料编码建立Map
      *
      * @param context     排程上下文
@@ -531,33 +671,65 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 加载MES硫化在机信息，按机台编号建立Map
+     * 加载MES硫化在机信息，按机台编号建立“追溯窗口内最近记录”Map
      *
-     * @param context     排程上下文
-     * @param factoryCode 分厂编号
-     * @param onlineDate  在机日期（T-1日）
+     * @param context       排程上下文
+     * @param factoryCode   分厂编号
+     * @param scheduleTDay  排程窗口起点 T 日
+     * @param lookbackDays  往前追溯天数（最小 1）
      */
-    private void loadMachineOnlineInfo(LhScheduleContext context, String factoryCode, Date onlineDate) {
-        Date onlineDay = LhScheduleTimeUtil.clearTime(onlineDate);
-        Date onlineDayNext = LhScheduleTimeUtil.addDays(onlineDay, 1);
+    private void loadMachineOnlineInfo(LhScheduleContext context, String factoryCode, Date scheduleTDay, int lookbackDays) {
+        int safeLookbackDays = Math.max(1, lookbackDays);
+        Date tDay = LhScheduleTimeUtil.clearTime(scheduleTDay);
+        Date lookbackStartDay = LhScheduleTimeUtil.addDays(tDay, -safeLookbackDays);
+
+        // 在 [T-lookbackDays, T) 内加载窗口数据，并按机台保留距离T最近的一条记录。
         List<LhMachineOnlineInfo> machineOnlineInfoList = lhMachineOnlineInfoMapper.selectList(
-                new LambdaQueryWrapper<LhMachineOnlineInfo>()
-                        .eq(LhMachineOnlineInfo::getFactoryCode, factoryCode)
-                        .ge(LhMachineOnlineInfo::getOnlineDate, onlineDay)
-                        .lt(LhMachineOnlineInfo::getOnlineDate, onlineDayNext)
-                        .and(w -> w.eq(LhMachineOnlineInfo::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                                .or()
-                                .isNull(LhMachineOnlineInfo::getIsDelete)));
-        Map<String, LhMachineOnlineInfo> machineOnlineInfoMap = new HashMap<>(32);
-        if (machineOnlineInfoList != null) {
-            for (LhMachineOnlineInfo onlineInfo : machineOnlineInfoList) {
-                if (onlineInfo.getLhCode() != null) {
-                    machineOnlineInfoMap.put(onlineInfo.getLhCode(), onlineInfo);
-                }
+                buildMachineOnlineBaseQuery(factoryCode)
+                        .isNotNull(LhMachineOnlineInfo::getOnlineDate)
+                        .ge(LhMachineOnlineInfo::getOnlineDate, lookbackStartDay)
+                        .lt(LhMachineOnlineInfo::getOnlineDate, tDay)
+                        .orderByDesc(LhMachineOnlineInfo::getOnlineDate)
+                        // ONLINE_DATE 为 date 类型；同日多条记录时按更新时间取最近同步版本。
+                        .orderByDesc(LhMachineOnlineInfo::getUpdateTime)
+                        .orderByAsc(LhMachineOnlineInfo::getLhCode));
+        if (CollectionUtils.isEmpty(machineOnlineInfoList)) {
+            context.setMachineOnlineInfoMap(new HashMap<>(16));
+            log.info("MES硫化在机信息未命中, 回溯窗口: [{} ~ {}), 回溯天数: {}, 命中机台: 0",
+                    LhScheduleTimeUtil.formatDate(lookbackStartDay),
+                    LhScheduleTimeUtil.formatDate(tDay),
+                    safeLookbackDays);
+            return;
+        }
+
+        Map<String, LhMachineOnlineInfo> machineOnlineInfoMap = new LinkedHashMap<>(32);
+        for (LhMachineOnlineInfo onlineInfo : machineOnlineInfoList) {
+            if (StringUtils.isEmpty(onlineInfo.getLhCode())) {
+                continue;
             }
+            // 查询结果已按日期倒序排列，首条即为该机台在追溯窗口内距离T最近的记录。
+            machineOnlineInfoMap.putIfAbsent(onlineInfo.getLhCode(), onlineInfo);
         }
         context.setMachineOnlineInfoMap(machineOnlineInfoMap);
-        log.debug("MES硫化在机信息加载完成, 数量: {}", machineOnlineInfoMap.size());
+        log.info("MES硫化在机信息加载完成, 回溯窗口: [{} ~ {}), 回溯天数: {}, 命中机台: {}",
+                LhScheduleTimeUtil.formatDate(lookbackStartDay),
+                LhScheduleTimeUtil.formatDate(tDay),
+                safeLookbackDays,
+                machineOnlineInfoMap.size());
+    }
+
+    /**
+     * 构建 MES 在机信息基础查询条件
+     *
+     * @param factoryCode 分厂编号
+     * @return 查询条件
+     */
+    private LambdaQueryWrapper<LhMachineOnlineInfo> buildMachineOnlineBaseQuery(String factoryCode) {
+        return new LambdaQueryWrapper<LhMachineOnlineInfo>()
+                .eq(LhMachineOnlineInfo::getFactoryCode, factoryCode)
+                .and(w -> w.eq(LhMachineOnlineInfo::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                        .or()
+                        .isNull(LhMachineOnlineInfo::getIsDelete));
     }
 
     /**

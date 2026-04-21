@@ -38,7 +38,10 @@ public class CxContinueSkuInfoHelper implements Serializable {
      * 物料描述
      */
     private String materialDesc;
-
+    /**
+     * 主胎胚描述
+     */
+    private String mainMaterialDesc;
     /**
      * 英寸
      */
@@ -48,7 +51,10 @@ public class CxContinueSkuInfoHelper implements Serializable {
      * 胎胚号
      */
     private String embryoCode;
-
+    /**
+     * 是否零度材料
+     */
+    private String isZeroRack;
     /**
      * 规格
      */
@@ -103,10 +109,12 @@ public class CxContinueSkuInfoHelper implements Serializable {
         MonthPlanProductionRequirePlanVo plan = groupPlanList.get(BigDecimal.ZERO.intValue());
         CxContinueSkuInfoHelper continueSkuInfo = new CxContinueSkuInfoHelper();
         continueSkuInfo.setEmbryoCode(plan.getEmbryoCode());
+        continueSkuInfo.setMainMaterialDesc(plan.getMainMaterialDesc());
         continueSkuInfo.setSpecifications(plan.getSpecifications());
         continueSkuInfo.setPattern(plan.getPattern());
         continueSkuInfo.setMainPattern(plan.getMainPattern());
         continueSkuInfo.setProSize(plan.getProSize());
+        continueSkuInfo.setIsZeroRack(plan.getIsZeroRack());
         continueSkuInfo.setGroupName(plan.getStructureName());
         continueSkuInfo.setDayVulcanizationQty(plan.getDayVulcanizationQty());
         return continueSkuInfo;

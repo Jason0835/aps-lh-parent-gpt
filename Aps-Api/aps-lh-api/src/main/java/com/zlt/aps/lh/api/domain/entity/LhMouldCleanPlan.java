@@ -29,7 +29,7 @@ public class LhMouldCleanPlan extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "厂别")
+    @ApiModelProperty(value = "工厂")
     @Excel(name = "ui.data.column.mouldCleanPlan.factoryCode",dictType = "biz_factory_name")
     @ImportExcelValidated(required = true,dictType = "biz_factory_name")
     @TableField(value = "FACTORY_CODE")
@@ -54,13 +54,12 @@ public class LhMouldCleanPlan extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "清洗时间")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    @Excel(name = "ui.data.column.mouldCleanPlan.cleanTime", width = 30, dateFormat = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.mouldCleanPlan.cleanTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ImportExcelValidated(required = true)
     @TableField(value = "CLEAN_TIME")
     private Date cleanTime;
 
     @ApiModelProperty(value = "数据来源：0-手工录入，1-系统生成")
-    @Excel(name = "ui.data.column.mouldCleanPlan.dataSource",dictType = "DATA_SOURCE")
     @TableField(value = "DATA_SOURCE")
     private String dataSource;
 
@@ -84,4 +83,16 @@ public class LhMouldCleanPlan extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.mouldCleanPlan.leftRightMould")
     @TableField(value = "LEFT_RIGHT_MOULD")
     private String leftRightMould;
+
+    @ApiModelProperty(value = "备注")
+    @Excel(name = "ui.data.column.mouldCleanPlan.remark")
+    @TableField(value = "REMARK")
+    private String remark;
+
+    @ApiModelProperty(value = "更新时间")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @Excel(name = "ui.data.column.mouldCleanPlan.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @TableField(value = "UPDATE_TIME")
+    private Date updateTime;
 }

@@ -180,17 +180,17 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 //2.3.在搭配排产前，重算每日产能限制，包括硫化机台数、胎胚种类数
                 MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
                 reCalcAdjustDailyCapacityLimit(copyContextDTO, oneStructMpFinalList,adjustDailyCapacityLimitObj);
-
-
-                //2.4 执行结构内搭配排产,特殊结构总计划量：contextDTO.getSpecStructureTotalQty()
-                //=========================================================
-                matchingAdjuestProductionHandler.structureAdjuestBoots(copyContextDTO, oneStructMpFinalList); // 补量
-                matchingAdjuestProductionHandler.matchingAdjustProduction(copyContextDTO, oneStructMpFinalList, true); // 搭配
-                //=========================================================
-
-                //2.5.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
-                reCalcAdjustDailyCapacityLimit(copyContextDTO, oneStructMpFinalList,adjustDailyCapacityLimitObj);
-                //2.6.设置模具变化信息
+                //2.4.检查结构是否可提前收尾, 不通过 = 执行搭配排产 通过 = 不执行搭配排产
+                if (!weekRollAdjustEngine.checkStructurePreClose(copyContextDTO)){
+                    //2.5 执行结构内搭配排产,特殊结构总计划量：contextDTO.getSpecStructureTotalQty()
+                    //=========================================================
+                    matchingAdjuestProductionHandler.structureAdjuestBoots(copyContextDTO, oneStructMpFinalList); // 补量
+                    matchingAdjuestProductionHandler.matchingAdjustProduction(copyContextDTO, oneStructMpFinalList, true); // 搭配
+                    //=========================================================
+                    //2.6.在搭配排产后，重算每日产能限制，包括硫化机台数、胎胚种类数
+                    reCalcAdjustDailyCapacityLimit(copyContextDTO, oneStructMpFinalList,adjustDailyCapacityLimitObj);
+                }
+               //2.7.设置模具变化信息
                 for (FactoryMonthPlanFinalAdjustVo mpFinalVo:oneStructMpFinalList){
                     weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj,copyContextDTO.getParamMap(),copyContextDTO.getStructureStartDay(),mpFinalVo,copyContextDTO.getDailyCapacityLimitVoMap());
                 }
@@ -198,11 +198,11 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                 newMpFinalList.addAll(oneStructMpFinalList);
                 newMpLogList.addAll(copyContextDTO.getAdjustProcLogList());
 
-                //2.7 构建月计划统计结果
+                //2.8 构建月计划统计结果
                 MpMonthPlanStatistics monthPlanStatisticsVo = buildMonthPlanStatistics(copyContextDTO, oneStructMpFinalList, YesOrNoEnum.YES.getCode());
                 monthPlanStatisticsResultList.add(monthPlanStatisticsVo);
 
-                //2.7 保存调整日志
+                //2.9 保存调整日志
                 saveMpAdjustLog(copyContextDTO);
 
                 //return currentStructureName;
@@ -325,32 +325,28 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
      */
     @Override
     protected void backfillRealAdjustResult(MpRollAdjustContextDTO contextDTO) {
-        // 重新获取调整记录，避免过程中浅拷贝导致数据被更新
-        List<MpAdjustStructureIn> mpAdjustStructureInList = mpAdjustStructureInService.selectMpAdjustStructureInList(contextDTO);
-        if (PubUtil.isEmpty(mpAdjustStructureInList)){
-            return;
-        }
         List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList = contextDTO.getSaveMpProdFinalList();
         if (PubUtil.isEmpty(mpFinalAdjustList)){
             return;
         }
-        Map<String, FactoryMonthPlanFinalAdjustVo> mpFinalAdjustMap = mpFinalAdjustList.stream().collect(Collectors.groupingBy(item->item.getMaterialCode(),
-                Collectors.collectingAndThen(Collectors.toList(),m-> {
-                    return m.get(0);
-                })));
-        //更新实际调整量
-        FactoryMonthPlanFinalAdjustVo mpFinalVo;
-        for (MpAdjustStructureIn structureIn:mpAdjustStructureInList){
-            // 实际调整默认：0
-            if (structureIn.getActualAdjustQty() == null) {
-                structureIn.setActualAdjustQty(0);
-            }
-            mpFinalVo = mpFinalAdjustMap.get(structureIn.getMaterialCode());
-            if (mpFinalVo != null){
-                structureIn.setActualAdjustQty(Convert.toInt(mpFinalVo.getActualAdjustQty(), 0));
-            }
+        // 构建 "materialCode|constructionStage" -> actualAdjustQty 映射，直接执行 UPDATE，无需先查询
+        Map<String, Integer> materialStageMap = mpFinalAdjustList.stream()
+                .filter(item -> item.getMaterialCode() != null && item.getConstructionStage() != null)
+                .collect(Collectors.toMap(
+                        item -> item.getMaterialCode() + "|" + item.getConstructionStage(),
+                        item -> Convert.toInt(item.getActualAdjustQty(), 0),
+                        (existing, replacement) -> existing
+                ));
+        if (materialStageMap.isEmpty()) {
+            return;
         }
-        baseDao.updateBatch(mpAdjustStructureInList);
+        mpAdjustStructureInEntityMapper.updateActualAdjustQtyBatch(
+                contextDTO.getFactoryCode(),
+                contextDTO.getMpYear(),
+                contextDTO.getMpMonth(),
+                contextDTO.getVersion(),
+                materialStageMap
+        );
     }
 
 

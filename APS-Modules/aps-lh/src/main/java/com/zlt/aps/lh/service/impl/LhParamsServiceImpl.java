@@ -85,13 +85,14 @@ public class LhParamsServiceImpl extends AbstractDocService<LhParams> implements
      */
     @Override
     public LhParams selectOneByParamCode(String paramCode,String factoryCode){
-        if(StringUtils.isBlank(paramCode) || StringUtils.isBlank(factoryCode)){
+        if(StringUtils.isBlank(paramCode)){
             return null;
         }
-        //后续可以通过缓存来获取
         LambdaQueryWrapper<LhParams> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(paramCode != null, LhParams::getParamCode, paramCode);
-        wrapper.eq(factoryCode != null, LhParams::getFactoryCode, factoryCode);
+        wrapper.eq(LhParams::getParamCode, paramCode);
+        if(StringUtils.isNotBlank(factoryCode)){
+            wrapper.eq(LhParams::getFactoryCode, factoryCode);
+        }
         return lhParamsEntityMapper.selectOne(wrapper);
     }
 

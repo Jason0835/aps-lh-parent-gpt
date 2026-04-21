@@ -62,62 +62,54 @@ public class LhMouldCleanPlanServiceImpl extends AbstractDocService<LhMouldClean
 
         try {
             redisService.setCacheObject(lockKey, "1");
+            log.info("开始从模具清洗预警同步数据");
 
             List<LhMouldCleanWarn> warnList = lhMouldCleanWarnMapper.selectList(null);
             if (warnList == null || warnList.isEmpty()) {
+                log.info("模具清洗预警数据为空");
                 return 0;
             }
 
             Map<String, List<LhMouldCleanWarn>> machineMap = new HashMap<>();
             for (LhMouldCleanWarn warn : warnList) {
                 String machineCode = extractMachineCode(warn.getLhCode());
-                machineMap.computeIfAbsent(machineCode, k -> new ArrayList<>()).add(warn);
+                if (machineCode != null) {
+                    machineMap.computeIfAbsent(machineCode, k -> new ArrayList<>()).add(warn);
+                }
             }
 
             int cleanDays = getCleanDays();
+            Date now = new Date();
+
+            Set<String> syncMachineCodes = machineMap.keySet();
+
+            QueryWrapper<LhMouldCleanPlan> deleteWrapper = new QueryWrapper<>();
+            deleteWrapper.in("LH_CODE", syncMachineCodes);
+            deleteWrapper.eq("DATA_SOURCE", "1");
+            deleteWrapper.eq("IS_DELETE", 0);
+            lhMouldCleanPlanMapper.delete(deleteWrapper);
+            log.info("已删除{}台机台的旧模具清洗计划数据", syncMachineCodes.size());
 
             List<LhMouldCleanPlan> planList = new ArrayList<>();
             for (Map.Entry<String, List<LhMouldCleanWarn>> entry : machineMap.entrySet()) {
                 String machineCode = entry.getKey();
                 List<LhMouldCleanWarn> warns = entry.getValue();
 
-                LhMouldCleanPlan plan = buildCleanPlan(machineCode, warns, cleanDays);
-                planList.add(plan);
+                List<LhMouldCleanPlan> plans = buildCleanPlans(machineCode, warns, cleanDays);
+                planList.addAll(plans);
             }
-
-            List<String> machineCodeList = planList.stream()
-                    .map(LhMouldCleanPlan::getLhCode)
-                    .collect(java.util.stream.Collectors.toList());
-
-            QueryWrapper<LhMouldCleanPlan> existWrapper = new QueryWrapper<>();
-            existWrapper.in("LH_CODE", machineCodeList);
-            List<LhMouldCleanPlan> existingList = lhMouldCleanPlanMapper.selectList(existWrapper);
-
-            Map<String, LhMouldCleanPlan> existingMap = existingList.stream()
-                    .collect(java.util.stream.Collectors.toMap(LhMouldCleanPlan::getLhCode, p -> p, (a, b) -> a));
-
-            List<LhMouldCleanPlan> insertList = new ArrayList<>();
-            List<LhMouldCleanPlan> updateList = new ArrayList<>();
 
             for (LhMouldCleanPlan plan : planList) {
-                LhMouldCleanPlan existing = existingMap.get(plan.getLhCode());
-                if (existing != null) {
-                    plan.setId(existing.getId());
-                    plan.setUpdateBy("SYSTEM");
-                    plan.setUpdateTime(new Date());
-                    updateList.add(plan);
-                } else {
-                    plan.setCreateBy("SYSTEM");
-                    plan.setCreateTime(new Date());
-                    insertList.add(plan);
-                }
+                plan.setCreateBy("SYSTEM");
+                plan.setCreateTime(now);
+                plan.setUpdateBy("SYSTEM");
+                plan.setUpdateTime(now);
+                plan.setIsDelete(0);
             }
 
-            if (!insertList.isEmpty()) {
-                baseDao.insertBatch(insertList);
-            }
-            if (!updateList.isEmpty()) {
-                baseDao.updateBatch(updateList);
+            if (!planList.isEmpty()) {
+                baseDao.insertBatch(planList);
+                log.info("成功同步{}条模具清洗计划数据", planList.size());
             }
 
             return planList.size();
@@ -131,16 +123,101 @@ public class LhMouldCleanPlanServiceImpl extends AbstractDocService<LhMouldClean
         return lhCode.replaceAll("\\s+[LR]$", "").trim();
     }
 
-    private LhMouldCleanPlan buildCleanPlan(String machineCode, List<LhMouldCleanWarn> warns, int cleanDays) {
-        LhMouldCleanPlan plan = new LhMouldCleanPlan();
-        plan.setLhCode(machineCode);
-        plan.setDataSource("1");
-        plan.setCreateTime(new Date());
-        plan.setCreateBy("SYSTEM");
+    private List<LhMouldCleanPlan> buildCleanPlans(String machineCode, List<LhMouldCleanWarn> warns, int cleanDays) {
+        List<LhMouldCleanPlan> result = new ArrayList<>();
 
-        String leftRightMould = buildLeftRightMould(warns);
-        plan.setLeftRightMould(leftRightMould);
+        LhMouldCleanWarn leftWarn = null;
+        LhMouldCleanWarn rightWarn = null;
 
+        for (LhMouldCleanWarn warn : warns) {
+            String lhCode = warn.getLhCode();
+            if (lhCode != null) {
+                if (lhCode.endsWith(" L")) {
+                    leftWarn = warn;
+                } else if (lhCode.endsWith(" R")) {
+                    rightWarn = warn;
+                }
+            }
+        }
+
+        if (leftWarn != null && rightWarn != null) {
+            String leftCleanType = determineCleanType(leftWarn);
+            String rightCleanType = determineCleanType(rightWarn);
+
+            if (leftCleanType.equals(rightCleanType)) {
+                LhMouldCleanPlan plan = new LhMouldCleanPlan();
+                plan.setLhCode(machineCode);
+                plan.setDataSource("1");
+                plan.setLeftRightMould("LR");
+                plan.setCleanType(leftCleanType);
+
+                Date leftCleanTime = calculateCleanTime(leftWarn, cleanDays);
+                Date rightCleanTime = calculateCleanTime(rightWarn, cleanDays);
+                Date cleanTime = leftCleanTime.after(rightCleanTime) ? leftCleanTime : rightCleanTime;
+                plan.setCleanTime(cleanTime);
+
+                plan.setFactoryCode(leftWarn.getFactoryCode());
+                plan.setCompanyCode(leftWarn.getCompanyCode());
+
+                result.add(plan);
+            } else {
+                LhMouldCleanPlan leftPlan = new LhMouldCleanPlan();
+                leftPlan.setLhCode(machineCode);
+                leftPlan.setDataSource("1");
+                leftPlan.setLeftRightMould("L");
+                leftPlan.setCleanType(leftCleanType);
+                leftPlan.setCleanTime(calculateCleanTime(leftWarn, cleanDays));
+                leftPlan.setFactoryCode(leftWarn.getFactoryCode());
+                leftPlan.setCompanyCode(leftWarn.getCompanyCode());
+                result.add(leftPlan);
+
+                LhMouldCleanPlan rightPlan = new LhMouldCleanPlan();
+                rightPlan.setLhCode(machineCode);
+                rightPlan.setDataSource("1");
+                rightPlan.setLeftRightMould("R");
+                rightPlan.setCleanType(rightCleanType);
+                rightPlan.setCleanTime(calculateCleanTime(rightWarn, cleanDays));
+                rightPlan.setFactoryCode(rightWarn.getFactoryCode());
+                rightPlan.setCompanyCode(rightWarn.getCompanyCode());
+                result.add(rightPlan);
+            }
+        } else {
+            LhMouldCleanPlan plan = new LhMouldCleanPlan();
+            plan.setLhCode(machineCode);
+            plan.setDataSource("1");
+
+            String leftRightMould = buildLeftRightMould(warns);
+            plan.setLeftRightMould(leftRightMould);
+
+            String cleanType = determineCleanType(warns);
+            plan.setCleanType(cleanType);
+
+            Date cleanTime = calculateCleanTime(warns, cleanDays);
+            plan.setCleanTime(cleanTime);
+
+            if (!warns.isEmpty()) {
+                plan.setFactoryCode(warns.get(0).getFactoryCode());
+                plan.setCompanyCode(warns.get(0).getCompanyCode());
+            }
+
+            result.add(plan);
+        }
+
+        return result;
+    }
+
+    private String determineCleanType(LhMouldCleanWarn warn) {
+        if (warn.getSecondWashTime() != null) {
+            return "02";
+        } else if (warn.getFirstWashTime() != null) {
+            return "01";
+        } else if (warn.getOperTime() != null) {
+            return "01";
+        }
+        return "01";
+    }
+
+    private String determineCleanType(List<LhMouldCleanWarn> warns) {
         Date secondWashTime = null;
         Date firstWashTime = null;
         Date operTime = null;
@@ -163,32 +240,58 @@ public class LhMouldCleanPlanServiceImpl extends AbstractDocService<LhMouldClean
             }
         }
 
-        Date cleanTime = null;
-        String cleanType = null;
+        if (secondWashTime != null) {
+            return "02";
+        } else if (firstWashTime != null) {
+            return "01";
+        } else if (operTime != null) {
+            return "01";
+        }
+        return "01";
+    }
+
+    private Date calculateCleanTime(LhMouldCleanWarn warn, int cleanDays) {
+        if (warn.getSecondWashTime() != null) {
+            return DateUtil.offsetDay(warn.getSecondWashTime(), cleanDays);
+        } else if (warn.getFirstWashTime() != null) {
+            return DateUtil.offsetDay(warn.getFirstWashTime(), cleanDays);
+        } else if (warn.getOperTime() != null) {
+            return DateUtil.offsetDay(warn.getOperTime(), cleanDays);
+        }
+        return DateUtil.offsetDay(new Date(), cleanDays);
+    }
+
+    private Date calculateCleanTime(List<LhMouldCleanWarn> warns, int cleanDays) {
+        Date secondWashTime = null;
+        Date firstWashTime = null;
+        Date operTime = null;
+
+        for (LhMouldCleanWarn warn : warns) {
+            if (warn.getSecondWashTime() != null) {
+                if (secondWashTime == null || warn.getSecondWashTime().after(secondWashTime)) {
+                    secondWashTime = warn.getSecondWashTime();
+                }
+            }
+            if (warn.getFirstWashTime() != null) {
+                if (firstWashTime == null || warn.getFirstWashTime().after(firstWashTime)) {
+                    firstWashTime = warn.getFirstWashTime();
+                }
+            }
+            if (warn.getOperTime() != null) {
+                if (operTime == null || warn.getOperTime().after(operTime)) {
+                    operTime = warn.getOperTime();
+                }
+            }
+        }
 
         if (secondWashTime != null) {
-            cleanType = "02";
-            cleanTime = DateUtil.offsetDay(secondWashTime, cleanDays);
+            return DateUtil.offsetDay(secondWashTime, cleanDays);
         } else if (firstWashTime != null) {
-            cleanType = "01";
-            cleanTime = DateUtil.offsetDay(firstWashTime, cleanDays);
+            return DateUtil.offsetDay(firstWashTime, cleanDays);
         } else if (operTime != null) {
-            cleanType = "01";
-            cleanTime = DateUtil.offsetDay(operTime, cleanDays);
-        } else {
-            cleanType = "01";
-            cleanTime = DateUtil.offsetDay(new Date(), cleanDays);
+            return DateUtil.offsetDay(operTime, cleanDays);
         }
-
-        plan.setCleanType(cleanType);
-        plan.setCleanTime(cleanTime);
-
-        if (!warns.isEmpty()) {
-            plan.setFactoryCode(warns.get(0).getFactoryCode());
-            plan.setCompanyCode(warns.get(0).getCompanyCode());
-        }
-
-        return plan;
+        return DateUtil.offsetDay(new Date(), cleanDays);
     }
 
     private String buildLeftRightMould(List<LhMouldCleanWarn> warns) {

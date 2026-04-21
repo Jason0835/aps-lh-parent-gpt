@@ -1,5 +1,6 @@
 package com.zlt.aps.tq.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.zlt.aps.common.core.annotation.ImportValidated;
@@ -77,9 +78,7 @@ public class TqStock extends ApsBaseEntity {
     @ImportValidated(maxLength = 300)
     private String remark;
 
-    /**
-     * 删除标识：0--正常，1-删除
-     */
+    @TableField("IS_DELETE")
     private String delFlag;
 
 

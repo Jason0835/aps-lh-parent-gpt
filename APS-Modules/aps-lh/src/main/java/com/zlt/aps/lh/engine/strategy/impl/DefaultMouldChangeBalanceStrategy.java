@@ -1,4 +1,6 @@
-
+/**
+ * Copyright (c) 2008, 智立通（厦门）科技有限公司 All rights reserved。
+ */
 package com.zlt.aps.lh.engine.strategy.impl;
 
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -86,6 +88,25 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         log.warn("换模均衡分配失败，无可用换模班次, 原始时间: {}",
                 LhScheduleTimeUtil.formatDateTime(endingTime));
         return null;
+    }
+
+    @Override
+    public void rollbackMouldChange(LhScheduleContext context, Date allocatedTime) {
+        if (context == null || allocatedTime == null) {
+            return;
+        }
+        String dateKey = formatDateKey(allocatedTime);
+        int[] counts = context.getDailyMouldChangeCountMap().get(dateKey);
+        if (counts == null) {
+            return;
+        }
+        if (LhScheduleTimeUtil.isMorningShift(context, allocatedTime) && counts[IDX_MORNING] > 0) {
+            counts[IDX_MORNING]--;
+            return;
+        }
+        if (LhScheduleTimeUtil.isAfternoonShift(context, allocatedTime) && counts[IDX_AFTERNOON] > 0) {
+            counts[IDX_AFTERNOON]--;
+        }
     }
 
     @Override

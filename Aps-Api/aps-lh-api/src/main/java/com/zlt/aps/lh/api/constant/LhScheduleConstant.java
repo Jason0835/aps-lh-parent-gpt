@@ -66,6 +66,9 @@ public final class LhScheduleConstant {
     /** 换模总耗时（小时） */
     public static final int MOULD_CHANGE_TOTAL_HOURS = 8;
 
+    /** 换活字块总耗时（小时） */
+    public static final int TYPE_BLOCK_CHANGE_TOTAL_HOURS = 8;
+
     // ======================== 首检相关 ========================
 
     /** 首检时间（小时） */
@@ -74,8 +77,8 @@ public final class LhScheduleConstant {
     /** 首检数量 */
     public static final int FIRST_INSPECTION_QTY = 2;
 
-    /** 每班最大首检次数 */
-    public static final int MAX_FIRST_INSPECTION_PER_SHIFT = 5;
+    /** 每班最大首检次数（-1 表示不限制） */
+    public static final int MAX_FIRST_INSPECTION_PER_SHIFT = -1;
 
     // ======================== 收尾判定 ========================
 
@@ -191,6 +194,22 @@ public final class LhScheduleConstant {
 
     /** 排程天数（默认值；运行期以硫化参数 SCHEDULE_DAYS 为准） */
     public static final int SCHEDULE_DAYS = 3;
+    /** MES在机信息往前追溯天数默认值（运行期以硫化参数 MACHINE_ONLINE_LOOKBACK_DAYS 为准） */
+    public static final int MACHINE_ONLINE_LOOKBACK_DAYS = 90;
+
+    // ======================== 局部搜索选机 ========================
+
+    /** 局部搜索开关默认值（0-关闭，1-开启） */
+    public static final int ENABLE_LOCAL_SEARCH = 1;
+
+    /** 局部搜索候选机台阈值默认值 */
+    public static final int LOCAL_SEARCH_MACHINE_THRESHOLD = 10;
+
+    /** 局部搜索深度默认值（包含当前SKU） */
+    public static final int LOCAL_SEARCH_DEPTH = 3;
+
+    /** 局部搜索单次耗时预算默认值（毫秒） */
+    public static final int LOCAL_SEARCH_TIME_BUDGET_MS = 50;
 
     /** 排程结果实体班次槽位上限（class1～class8） */
     public static final int MAX_SHIFT_SLOT_COUNT = 8;

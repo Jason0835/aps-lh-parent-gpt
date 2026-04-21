@@ -3,7 +3,12 @@ package com.zlt.aps.mp.factory.controller;
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.PageUtils;
+import com.ruoyi.common.core.utils.ServletUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -20,23 +25,30 @@ import com.zlt.aps.mp.api.domain.dto.FactoryMonthPlanProductionFinalResultParam;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustExportVo;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.ExcelReadUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
+
+import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -74,6 +86,9 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 
     @Autowired
     protected MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
+
+    @Autowired
+    private IExportLogService iExportLogService;
 
     /**
      * 查询工厂月度生产计划-最终排产计划定稿
@@ -164,6 +179,48 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         return super.exportData(queryVO, fileName, response);
     }
 
+    /**
+     * 导出SKU排产明细
+     */
+//    @Log(title = "导出SKU排产明细", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出SKU排产明细")
+    @SuppressWarnings("unchecked")
+    @PostMapping("/exportSkuScheduleItems/{fileName}")
+    public byte[] exportSkuScheduleItems(@RequestBody FactoryMonthPlanProductionFinalResultParam param, @PathVariable("fileName") String fileName,
+                                         HttpServletResponse response) throws IOException {
+        Date beginTime = DateUtils.getNowDate();
+        // 1、加载数据
+        List<FactoryMonthPlanFinalAdjustVo> list = (List<FactoryMonthPlanFinalAdjustVo>)this.listSkuScheduleItems(param).getRows();
+        List<FactoryMonthPlanFinalAdjustExportVo> exportList = list.stream().map(vo -> {
+            FactoryMonthPlanFinalAdjustExportVo exportVo = new FactoryMonthPlanFinalAdjustExportVo();
+            BeanUtils.copyProperties(vo, exportVo);
+            return exportVo;
+        }).collect(Collectors.toList());
+
+        // 2、调用导出实例
+        ExcelUtil<FactoryMonthPlanFinalAdjustExportVo> util = new ExcelUtil<>(FactoryMonthPlanFinalAdjustExportVo.class);
+        Workbook workbook = util.exportExcel2(response, exportList, fileName);
+        byte[] resultBytes =  ExcelReadUtils.writeExcel(workbook);
+        Date endTime = DateUtils.getNowDate();
+//        FileOutputStream fo = new FileOutputStream("test.xlsx");
+//        fo.write(resultBytes);
+
+        // 3、保存导出记录
+        ExportLog exportLog = new ExportLog();
+        exportLog.setProcedureCode("0");
+        exportLog.setExportParams(param.toString());
+        String uri = ServletUtils.getRequest().getRequestURI();
+        exportLog.setFunctionCode(uri.split("/")[1]);
+        exportLog.setFunctionName(fileName);
+        exportLog.setFileName(fileName + ExcelUtil.XLSX_FILE);
+        exportLog.setRowCount(list.size());
+        exportLog.setBeginTime(beginTime);
+        exportLog.setEndTime(endTime);
+        exportLog.setSpendTime(DateUtils.getDiffTime(endTime,beginTime));
+        iExportLogService.add(exportLog);
+        return resultBytes;
+    }
+
     @Override
     protected List<FactoryMonthPlanProductionFinalResult> listExportData(FactoryMonthPlanProductionFinalResult obj) {
         return factoryMonthPlanProductionFinalResultService.getDataList(obj);
@@ -240,6 +297,19 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 
         return getDataTable(monthPlanFinalAdjustVoList);
     }
+
+
+    /**
+     * 保存
+     */
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal){
+        return super.save(factoryMonthPlanProdFinal);
+    }
+
+
 
     /**
      * 判断是否特殊材料
