@@ -23,6 +23,7 @@ import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 
@@ -77,6 +78,8 @@ public class LhScheduleContext {
 
     /** 月生产计划列表 */
     private List<FactoryMonthPlanProductionFinalResult> monthPlanList = new ArrayList<>();
+    /** 周程滚动调整结果Map, key=materialCode */
+    private Map<String, List<MpAdjustResult>> mpAdjustResultMap = new HashMap<>();
     /** 工作日历列表 */
     private List<MdmWorkCalendar> workCalendarList = new ArrayList<>();
     /** SKU日硫化产能Map, key=materialCode */
@@ -95,6 +98,8 @@ public class LhScheduleContext {
     private Map<String, MdmMonthSurplus> monthSurplusMap = new HashMap<>();
     /** 各班次完成量Map, key=machineCode+materialCode */
     private Map<String, LhShiftFinishQty> shiftFinishQtyMap = new HashMap<>();
+    /** 月累计完成量Map（截至排程窗口起点 T 日前）, key=materialCode */
+    private Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>();
     /** 物料信息Map, key=materialCode */
     private Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
     /** MES硫化在机信息Map, key=machineCode */
