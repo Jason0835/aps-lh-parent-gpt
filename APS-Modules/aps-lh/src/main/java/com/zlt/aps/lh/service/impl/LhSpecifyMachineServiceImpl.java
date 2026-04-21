@@ -101,6 +101,7 @@ public class LhSpecifyMachineServiceImpl extends AbstractDocService<LhSpecifyMac
     @Override
     public String[] getQueryFormulas() {
         return new String[]{
+                "materialDesc->getcolvalue(T_MDM_MATERIAL_INFO, MATERIAL_DESC, MATERIAL_CODE, specCode)",
                 "createByName->getcolvaluewithcondition(SYS_USER, nick_name, user_name, createBy, DEL_FLAG='0')"
         };
     }
