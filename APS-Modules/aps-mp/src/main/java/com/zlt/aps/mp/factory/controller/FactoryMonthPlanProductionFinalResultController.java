@@ -16,6 +16,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
@@ -414,7 +415,8 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 
                 contextDTO.setOneStructureAllocationList(targetStructureAllocationList);
 
-
+                // 设置调整日（依赖 paramMap）
+                setAdjustDate(contextDTO);
                 // 初始锁定日
                 contextDTO.setLockEndDay(mpAdjustStructureOutStrategy.getLockEndDay(contextDTO));
                 // 初始化每日型腔/活块数量
@@ -469,6 +471,21 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
         // 保存月计划统计结果
         mpAdjustStructureOutStrategy.saveMonthPlanStatisticsResult(contextDTO, null);
+    }
+
+    /**
+     * 设置调整日
+     * @param contextDTO 周程滚动上下文
+     */
+    private void setAdjustDate(MpRollAdjustContextDTO contextDTO) {
+        String weekRollAdjustDate = (String) contextDTO.getParamMap().get(MonthPlanEnums.WEEK_ROLL_ADJUST_DATE.getCode());
+        Date adjustDate = StringUtil.isEmptyWithTrim(weekRollAdjustDate) ? DateUtils.getNowDate() : DateUtils.parseDate(weekRollAdjustDate);
+        if (contextDTO.getMpMonth() != DateUtils.getMonth(adjustDate)){
+            //若调整月不等于当前月，则将调整日设置1
+            contextDTO.setAdjustDay(FactoryConstant.MONTH_START_DAY);
+        }else{
+            contextDTO.setAdjustDay(DateUtils.getDay(adjustDate));
+        }
     }
 
 
