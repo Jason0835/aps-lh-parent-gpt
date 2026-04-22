@@ -17,11 +17,14 @@ const actions = {
     return new Promise((resolve, reject) => {
       listMdmMoldingMachine()
         .then((res) => {
-          commit("SET_MACHINES", res.rows);
+          commit("SET_MACHINES", res.rows || []);
           resolve(res);
         })
         .catch((error) => {
-          reject(error);
+          console.error("Failed to load molding machines:", error);
+          // 即使API失败也继续，不阻断页面
+          commit("SET_MACHINES", []);
+          resolve({});
         });
     });
   },
