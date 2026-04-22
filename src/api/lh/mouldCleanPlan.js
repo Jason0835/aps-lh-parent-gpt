@@ -8,11 +8,11 @@ export function listMouldCleanPlan(query) {
   })
 }
 
-export function removeMouldCleanPlan(query) {
+export function removeMouldCleanPlan(ids) {
   return request({
     url: '/lh/mouldCleanPlan/remove',
     method: 'post',
-    data: query
+    params: { ids: ids }
   })
 }
 
@@ -20,7 +20,7 @@ export function editMouldCleanPlan(query) {
   return request({
     url: '/lh/mouldCleanPlan/save',
     method: 'post',
-    data: query
+    params: query
   })
 }
 

@@ -34,8 +34,11 @@
         >
         
         <el-button
-          type="success"
+          type="primary"
+          plain
           v-hasPermi="['lh:mouldCleanPlan:sync']"
+          :loading="syncLoading"
+          :disabled="syncLoading"
           @click="handleSyncFromWarn"
           >{{ $t("ui.mould.clean.plan.sync.from.warn") }}</el-button
         >
@@ -63,6 +66,7 @@ import {
   removeMouldCleanPlan,
   syncFromWarn
 } from "@/api/lh/mouldCleanPlan";
+import { listMachine } from "@/api/lh/machine";
 
 //components
 import infoDialog from "./components/infoDialog.vue";
@@ -72,7 +76,7 @@ export default {
   components: {
     infoDialog
   },
-  dicts: ["biz_factory_name", "lh_machine", "MOULD_CLEAN_TYPE"],
+  dicts: ["biz_factory_name", "MOULD_CLEAN_TYPE"],
   provide() {
     return {
       parentDict: this.dict,
@@ -93,6 +97,9 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
+      machineOptions: [],
+      machineLoading: false,
+      syncLoading: false,
     };
   },
   computed: {
@@ -130,7 +137,18 @@ export default {
         {
           prop: "remark",
           label: this.$t("ui.data.column.mouldCleanPlan.remark"),
-          showOverflowTooltip: true
+          showOverflowTooltip: true,
+          formatter: (row, column, value) => {
+            // 解码后端返回的占位符
+            if (!value) return value;
+            return value
+              .replace(/__PERCENT__/g, '%')
+              .replace(/__AMP__/g, '&')
+              .replace(/__LT__/g, '<')
+              .replace(/__GT__/g, '>')
+              .replace(/__QUOT__/g, '"')
+              .replace(/__APOS__/g, "'");
+          }
         },
         {
           prop: "updateTime",
@@ -171,10 +189,18 @@ export default {
     searchColumns() {
       return [
         {
+          label: this.$t("common.factory"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+        },
+        {
           label: this.$t("ui.data.column.mouldCleanPlan.lhCode"),
           prop: "lhCode",
           type: "select",
-          dictData: this.dict.type.lh_machine,
+          dictData: this.machineOptions,
+          labelKey: "machineCode",
+          valueKey: "machineCode",
           filterable: true,
         },
         {
@@ -211,41 +237,34 @@ export default {
     },
 
     handleSyncFromWarn() {
-      this.$confirm(this.$t("ui.mould.clean.plan.sync.confirm"), this.$t("common.hint.hint"), {
+      this.$confirm(this.$t("ui.mould.clean.plan.sync.confirm"), {
         confirmButtonText: this.$t("common.button.confirm"),
         cancelButtonText: this.$t("common.button.cancel"),
         type: 'warning'
       }).then(async () => {
         try {
+          this.syncLoading = true;
           const res = await syncFromWarn();
           this.$modal.msgSuccess(res.msg);
           this.getList();
         } catch (error) {
           console.error(error);
+        } finally {
+          this.syncLoading = false;
         }
       });
     },
 
     handleViewWarn() {
-      const routeData = this.$router.resolve({
-        name: "LhMouldCleanWarn",
-      });
-      window.open(routeData.href, "_blank");
+      this.$router.push({ name: "LhMouldCleanWarn" });
     },
 
     handleDeleteAll() {
-      let ids = "";
-      for (let i = 0; i < this.selection.length; i++) {
-        if (i == this.selection.length - 1) {
-          ids = ids + this.selection[i].id;
-        } else {
-          ids = ids + this.selection[i].id + ",";
-        }
-      }
+      let ids = this.selection.map(item => item.id).join(",");
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeMouldCleanPlan({ ids }).then((data) => {
+        removeMouldCleanPlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -257,7 +276,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeMouldCleanPlan({ ids }).then((data) => {
+        removeMouldCleanPlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -302,7 +321,12 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/lh/mouldCleanPlan/export", this.formatParams(false));
+      const params = this.getExportParams();
+      console.log('=== 导出参数 ===');
+      console.log('查询条件:', this.query);
+      console.log('排序条件:', this.sort);
+      console.log('完整导出参数:', params);
+      downloadLink("/lh/mouldCleanPlan/export", params);
     },
 
     formatParams(hasPage = true) {
@@ -318,11 +342,20 @@ export default {
 
       return params;
     },
+    getExportParams() {
+      const params = {
+        ...this.query,
+      };
+      if (this.sort && this.sort.orderByColumn) {
+        params.orderByColumn = this.sort.orderByColumn;
+        params.isAsc = this.sort.isAsc;
+      }
+      return params;
+    },
     // api
     async getList() {
       try {
         this.loading = true;
-
         const data = await listMouldCleanPlan(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
@@ -332,25 +365,41 @@ export default {
         this.loading = false;
       }
     },
+    async loadMachineList() {
+      this.machineLoading = true;
+      try {
+        const res = await listMachine({
+          machineCode: "",
+          pageSize: 1000,
+        });
+        this.machineOptions = res.rows || res.data || res || [];
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.machineLoading = false;
+      }
+    },
   },
   created() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const defaultDate = `${year}-${month}-${day}`;
-    
+    console.log('=== 模具清洗计划 created 执行 ===');
+    let defaultParams = {
+      factoryCode: "116",
+    };
     this.search = {
-      cleanTime: [defaultDate, defaultDate]
+      ...defaultParams,
     };
     this.query = {
-      cleanTimeBegin: defaultDate,
-      cleanTimeEnd: defaultDate
+      ...defaultParams,
     };
+  },
+  mounted() {
+    console.log('=== 模具清洗计划 mounted 执行 ===');
     this.getList();
+    this.loadMachineList();
   },
   activated() {
-    // this.getList();
+    console.log('=== 模具清洗计划 activated 执行 ===');
+    this.getList();
   },
 };
 </script>

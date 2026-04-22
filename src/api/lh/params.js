@@ -12,17 +12,14 @@ export function editCuringParams(query) {
   return request({
     url: '/lh/lhParams/save',
     method: 'post',
-    data: query,
-    headers: {
-      'Content-Type': 'application/json;charset=UTF-8'
-    },
+    data: query
   })
 }
-export function removeCuringParams(query) {
+export function removeCuringParams(ids) {
   return request({
     url: '/lh/lhParams/remove',
     method: 'post',
-    data: query
+    params: { ids: ids }
   })
 }
 

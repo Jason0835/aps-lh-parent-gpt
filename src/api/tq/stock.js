@@ -1,9 +1,15 @@
 import request from '@/utils/request'
 
-//
 export function listStock(query) {
   return request({
     url: '/tq/stock/list',
+    method: 'post',
+    data: query
+  })
+}
+export function addStock(query) {
+  return request({
+    url: '/tq/stock/add',
     method: 'post',
     data: query
   })
@@ -29,5 +35,3 @@ export function releaseStock(query) {
     data: query
   })
 }
-
-

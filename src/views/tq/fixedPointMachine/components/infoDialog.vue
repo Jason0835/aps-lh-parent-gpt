@@ -2,11 +2,10 @@
   <el-dialog
     :title="title"
     :visible="visible"
-    width="800px"
+    width="600px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
-    :append-to-body="true"
   >
     <info-form
       class="form-item-height"
@@ -15,7 +14,7 @@
       :rules="rules"
       :columns="columns"
       label-position="right"
-      label-width="160px"
+      label-width="150px"
       v-loading="loading"
     >
     </info-form>
@@ -30,8 +29,8 @@
 
 <script>
 import { mapState } from "vuex";
-import { savePrecisionPlan } from "@/api/lh/precisionPlan";
 import infoForm from "@/views/components/infoForm.vue";
+import { addSpecifyMachine, editSpecifyMachine } from "@/api/tq/specifyMachine";
 
 export default {
   components: { infoForm },
@@ -41,21 +40,20 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
-      editType: null,
       form: {},
       rules: {
-        planDate: [
+        beadCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
-            trigger: "change",
+            trigger: "blur",
           },
         ],
-        actualDate: [
+        machineId: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "change",
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
           },
         ],
       },
@@ -63,67 +61,53 @@ export default {
   },
   computed: {
     ...mapState({
-      moldingMachines: (state) => state.molding.machines,
+      machines: (state) => state.bead.machines,
     }),
     title: function () {
-      return this.isEdit
-        ? this.$t("common.button.edit")
-        : this.$t("common.button.add");
+      return (
+        (this.isEdit
+          ? this.$t("common.button.edit")
+          : this.$t("common.button.add")) +
+        this.$t("ui.tq.specifyMachine.column.modalName")
+      );
     },
     columns() {
       return [
         {
-          prop: "factoryCode",
-          label: this.$t("ui.data.column.lhPrecisionPlan.factoryCode"),
+          label: this.$t("ui.tq.specifyMachine.column.beadCode"),
+          prop: "beadCode",
+          span: 24,
+          required: true,
+        },
+        {
+          label: this.$t("ui.specifyMachine.column.machineName"),
+          prop: "machineId",
+          span: 24,
+          required: true,
           type: "select",
-          dicData: this.parentDict.biz_factory_name,
-          disabled: true,
+          dictData: this.machines,
+          valueKey: "id",
+          labelKey: "machineName",
         },
         {
-          prop: "machineCode",
-          label: this.$t("ui.data.column.lhPrecisionPlan.machineCode"),
-          disabled: true,
-        },
-        {
-          prop: "precisionType",
-          label: this.$t("ui.data.column.lhPrecisionPlan.precisionType"),
+          label: this.$t("ui.specifyMachine.column.lineType"),
+          prop: "lineType",
+          span: 24,
           type: "select",
-          dicData: this.parentDict.MACHINE_ACCURACY_TYPE,
-          disabled: true,
+          dictData: this.parentDict.type.LINE_TYPE,
         },
         {
-          prop: "planDate",
-          label: this.$t("ui.data.column.lhPrecisionPlan.planDate"),
-          type: "date",
-          disabled: false,
-        },
-        {
-          prop: "actualDate",
-          label: this.$t("ui.data.column.lhPrecisionPlan.actualDate"),
-          type: "date",
-          disabled: false,
-        },
-        {
-          prop: "dueDate",
-          label: this.$t("ui.data.column.lhPrecisionPlan.dueDate"),
-          disabled: true,
-        },
-        {
-          prop: "daysToDue",
-          label: this.$t("ui.data.column.lhPrecisionPlan.daysToDue"),
-          disabled: true,
-        },
-        {
-          prop: "dataSource",
-          label: this.$t("ui.data.column.lhPrecisionPlan.dataSource"),
+          label: this.$t("ui.specifyMachine.column.jobType"),
+          prop: "jobType",
+          span: 24,
           type: "select",
-          dicData: this.parentDict.lh_precision_data_source,
-          disabled: true,
+          dictData: this.parentDict.type.JOB_TYPE,
         },
         {
+          label: this.$t("ui.common.column.remark"),
           prop: "remark",
-          label: this.$t("ui.data.column.remark"),
-          disabled: false,
+          span: 24,
+          type: "textarea",
         },
       ];
     },
@@ -132,27 +116,27 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        const res = await savePrecisionPlan(params);
+        let res;
+        if (this.isEdit) {
+          res = await editSpecifyMachine(params);
+        } else {
+          res = await addSpecifyMachine(params);
+        }
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
-        this.loading = false;
       } catch (error) {
         console.log(error);
+      } finally {
         this.loading = false;
       }
     },
-
     show(data) {
       this.visible = true;
       if (data) {
         this.isEdit = true;
         this.form = {
           ...data,
-        };
-      } else {
-        this.form = {
-          factoryCode: "",
         };
       }
     },

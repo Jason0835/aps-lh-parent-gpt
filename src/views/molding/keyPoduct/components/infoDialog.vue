@@ -35,7 +35,7 @@ import infoForm from "@/views/components/infoForm.vue";
 import structureSelect from "../components/structureSelect.vue";
 import materialCodeSelect from "../components/materialCodeSelect.vue";
 
-import { editMoldingParams } from "@/api/cx/keyProduct";
+import { editMoldingParams, checkUniqueCxKeyProduct } from "@/api/cx/keyProduct";
 
 export default {
   components: { infoForm,structureSelect,materialCodeSelect },
@@ -59,20 +59,6 @@ export default {
           {
             required: true,
             message: this.$t("common.rule.select"),
-            trigger: "blur",
-          },
-        ],
-        closeOutRangeMaximum: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
-        rangeValue: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
             trigger: "blur",
           },
         ],
@@ -101,6 +87,7 @@ export default {
               <materialCodeSelect
                 key={form.embryoCode}
                 v-model={form.embryoCode}
+                structureName={form.structureName}
                 onChange={this.handleEmbryoCodeChange}
               />
             );
@@ -179,7 +166,19 @@ export default {
       this.visible = false;
     },
     handleConfirm() {
-      this.$refs.form.triggerConfirm(this.save);
+      this.$refs.form.triggerConfirm(async (params) => {
+        const checkData = {
+          structureName: params.structureName,
+          embryoCode: params.embryoCode,
+          id: params.id || null
+        };
+        const checkRes = await checkUniqueCxKeyProduct(checkData);
+        if (checkRes.data && checkRes.data.exist) {
+          this.$modal.msgError(this.$t("ui.data.alert.cxKeyProduct.notUnique"));
+          return;
+        }
+        this.save(params);
+      });
     },
   },
 };

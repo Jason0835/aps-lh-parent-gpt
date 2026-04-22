@@ -141,6 +141,18 @@ export default {
           // sortable: "custom",
         },
         {
+          prop: "updateBy",
+          halign: "center",
+          label: this.$t("ui.data.column.lhParams.updateBy"),
+          minWidth: 100,
+        },
+        {
+          prop: "updateTime",
+          halign: "center",
+          label: this.$t("ui.data.column.lhParams.updateTime"),
+          minWidth: 160,
+        },
+        {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
@@ -190,7 +202,7 @@ export default {
       }).then(() => {
         const ids = row.id;
         this.loading = true;
-        removeCuringParams({ ids })
+        removeCuringParams(ids)
           .then((data) => {
             this.$modal.msgSuccess(data.msg);
             this.$set(this.page, "current", 1);

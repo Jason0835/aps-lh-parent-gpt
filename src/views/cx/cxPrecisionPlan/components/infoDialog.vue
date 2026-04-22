@@ -9,38 +9,32 @@
     :append-to-body="true"
   >
     <info-form
-      class="form-item-height cx-precision-form"
+      class="form-item-height"
       ref="form"
       :form="form"
       :rules="rules"
       :columns="columns"
       label-position="right"
-      label-width="120px"
+      label-width="140px"
       v-loading="loading"
-    >
-    </info-form>
+    />
     <template slot="footer">
-      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
-      <el-button type="primary" :loading="loading" @click="handleConfirm">{{
-        this.$t("common.button.confirm")
-      }}</el-button>
+      <el-button @click="hide">{{ $t('common.button.cancel') }}</el-button>
+      <el-button type="primary" :loading="loading" @click="handleConfirm">
+        {{ $t('common.button.confirm') }}
+      </el-button>
     </template>
   </el-dialog>
 </template>
 
 <script>
-import {
-  checkCxPrecisionPlanUnique,
-  getMachineList,
-  saveCxPrecisionPlan,
-} from "@/api/cx/cxPrecisionPlan";
-
-import infoForm from "@/views/components/infoForm.vue";
+import { checkCxPrecisionPlanUnique, listCxMachineInfo, saveCxPrecisionPlan } from '@/api/cx/cxPrecisionPlan'
+import infoForm from '@/views/components/infoForm.vue'
 
 export default {
-  name: "InfoDialog",
+  name: 'InfoDialog',
   components: { infoForm },
-  inject: ["parentDict"],
+  inject: ['parentDict'],
   data() {
     return {
       visible: false,
@@ -50,290 +44,181 @@ export default {
       form: {},
       machineList: [],
       rules: {
-        factoryCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        machineCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        machineName: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
-        planDate: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        estimatedHours: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
-      },
-    };
+        machineCode: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
+        precisionType: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
+        planDate: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
+        actualDate: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
+        dataSource: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }]
+      }
+    }
   },
   computed: {
     title() {
-      return this.isEdit
-        ? this.$t("common.button.edit")
-        : this.$t("common.button.add");
+      return this.isEdit ? this.$t('common.button.edit') : this.$t('common.button.add')
     },
     columns() {
       return [
         {
-          prop: "factoryCode",
-          label: this.$t("ui.data.column.cxPrecisionPlan.factoryCode"),
-          type: "select",
-          dictData: this.dict.type.biz_factory_name,
-          filterable: true,
-          listeners: {
-            change: this.handleFactoryChange,
-          },
+          prop: 'machineCode',
+          label: this.$t('ui.data.column.cxPrecisionPlan.machineCode'),
+          type: 'input',
+          disabled: true
         },
         {
-          prop: "machineCode",
-          label: this.$t("ui.data.column.cxPrecisionPlan.machineCode"),
-          type: "select",
-          dictData: this.machineList,
-          props: {
-            label: "cxMachineCode",
-            value: "cxMachineCode",
-          },
+          prop: 'precisionType',
+          label: this.$t('ui.data.column.cxPrecisionPlan.accuracyType'),
+          type: 'select',
+          dictData: this.dict.type.cx_precision_plan_type,
           filterable: true,
-          listeners: {
-            change: this.handleMachineChange,
-          },
+          listeners: { change: this.handlePrecisionTypeChange },
+          required: true
         },
         {
-          prop: "machineName",
-          label: this.$t("ui.data.column.cxPrecisionPlan.machineName"),
+          prop: 'planDate',
+          label: this.$t('ui.data.column.cxPrecisionPlan.planDate'),
+          type: 'date',
+          valueFormat: 'yyyy-MM-dd',
+          listeners: { change: this.handlePlanDateChange },
+          required: true
+        },
+        {
+          prop: 'actualDate',
+          label: this.$t('ui.data.column.cxPrecisionPlan.actualDate'),
+          type: 'date',
+          valueFormat: 'yyyy-MM-dd',
+          required: true
+        },
+        {
+          prop: 'precisionCycle',
+          label: this.$t('ui.data.column.cxPrecisionPlan.cycle'),
+          type: 'input',
+          disabled: true
+        },
+        {
+          prop: 'daysToDue',
+          label: this.$t('ui.data.column.cxPrecisionPlan.dueDate'),
+          type: 'input',
+          disabled: true
+        },
+        // {
+        //   prop: 'scheduleDate',
+        //   label: this.$t('ui.data.column.cxPrecisionPlan.scheduleDate'),
+        //   type: 'date',
+        //   valueFormat: 'yyyy-MM-dd',
+        //   disabled: true
+        // },
+        {
+          prop: 'dataSource',
+          label: this.$t('ui.data.column.lhPrecisionPlan.dataSource'),
+          type: 'select',
+          dictData: this.dict.type.lh_precision_data_source,
           disabled: true,
-          maxlength: 64,
+          required: true
         },
         {
-          prop: "planDate",
-          label: this.$t("ui.data.column.cxPrecisionPlan.planDate"),
-          type: "date",
-          valueFormat: "yyyy-MM-dd",
-        },
-        {
-          prop: "planShift",
-          label: this.$t("ui.data.column.cxPrecisionPlan.planShift"),
-          type: "select",
-          dictData: this.dict.type.class_num_three_plan,
-          filterable: true,
-        },
-        {
-          prop: "planStartTime",
-          label: this.$t("ui.data.column.cxPrecisionPlan.planStartTime"),
-          type: "date",
-          dateType: "datetime",
-          valueFormat: "yyyy-MM-dd HH:mm:ss",
-          listeners: {
-            change: this.handlePlanStartTimeChange,
-          },
-        },
-        {
-          prop: "planEndTime",
-          label: this.$t("ui.data.column.cxPrecisionPlan.planEndTime"),
-          type: "date",
-          dateType: "datetime",
-          valueFormat: "yyyy-MM-dd HH:mm:ss",
-          listeners: {
-            change: this.handlePlanEndTimeChange,
-          },
-        },
-        {
-          prop: "estimatedHours",
-          label: this.$t("ui.data.column.cxPrecisionPlan.estimatedHours"),
-          type: "number",
-          min: 0,
-          precision: 1,
-        },
-        {
-          prop: "lastPrecisionDate",
-          label: this.$t("ui.data.column.cxPrecisionPlan.lastPrecisionDate"),
-          type: "date",
-          valueFormat: "yyyy-MM-dd",
-          listeners: {
-            change: this.handleLastPrecisionDateChange,
-          },
-        },
-        {
-          prop: "dueDate",
-          label: this.$t("ui.data.column.cxPrecisionPlan.dueDate"),
-          type: "date",
-          valueFormat: "yyyy-MM-dd",
-        },
-        {
-          prop: "remark",
-          label: this.$t("ui.common.column.remark"),
-          type: "textarea",
+          prop: 'remark',
+          label: this.$t('ui.common.column.remark'),
+          type: 'textarea',
           rows: 3,
-          maxlength: 300,
-        },
-      ];
-    },
+          maxlength: 300
+        }
+      ]
+    }
   },
   methods: {
-    show(row) {
-      this.visible = true;
-      this.machineList = [];
-      if (row) {
-        this.isEdit = true;
-        this.form = { ...row };
-        this.getMachineList();
-      } else {
-        this.isEdit = false;
-        this.form = {
-          factoryCode: "116",
-          estimatedHours: 0,
-        };
-        this.getMachineList();
+    getCycleValue(precisionType) {
+      const text = this.selectDictLabel(this.dict.type.cx_precision_plan_type, precisionType) || precisionType || ''
+      if (text.includes('60')) {
+        return '60'
       }
+      if (text.includes('15')) {
+        return '15'
+      }
+      return ''
+    },
+    getDaysToDueValue(planDate) {
+      if (!planDate) {
+        return ''
+      }
+      const target = new Date(planDate)
+      if (Number.isNaN(target.getTime())) {
+        return ''
+      }
+      const now = new Date()
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const startOfTarget = new Date(target.getFullYear(), target.getMonth(), target.getDate())
+      return String(Math.floor((startOfToday.getTime() - startOfTarget.getTime()) / 86400000))
+    },
+    fillCalculatedFields() {
+      this.$set(this.form, 'precisionCycle', this.getCycleValue(this.form.precisionType))
+      this.$set(this.form, 'daysToDue', this.getDaysToDueValue(this.form.planDate))
+    },
+    show(row) {
+      this.visible = true
+      this.machineList = []
+      if (row) {
+        this.isEdit = true
+        this.form = { ...row }
+      } else {
+        this.isEdit = false
+        this.form = { factoryCode: '116', dataSource: '1' }
+      }
+      if (!this.form.dataSource) {
+        this.form.dataSource = '1'
+      }
+      this.fillCalculatedFields()
+      this.getMachineList()
     },
     hide() {
-      this.visible = false;
-      this.form = {};
-      this.machineList = [];
-      this.$refs.form && this.$refs.form.triggerResetForm();
+      this.visible = false
+      this.form = {}
+      this.machineList = []
+      this.$refs.form && this.$refs.form.triggerResetForm()
     },
     async getMachineList() {
-      if (!this.form.factoryCode) {
-        this.machineList = [];
-        return;
-      }
       try {
-        const res = await getMachineList({ factoryCode: this.form.factoryCode });
-        this.machineList = res || [];
+        const res = await listCxMachineInfo(this.form.factoryCode ? { factoryCode: this.form.factoryCode } : {})
+        const list = Array.isArray(res) ? res : []
+        const map = new Map()
+        list.forEach((item) => {
+          if (item && item.machineCode) {
+            map.set(item.machineCode, { machineCode: item.machineCode })
+          }
+        })
+        this.machineList = Array.from(map.values())
       } catch (e) {
-        console.error(e);
+        this.machineList = []
+        console.error(e)
       }
     },
-    handleFactoryChange() {
-      this.$set(this.form, "machineCode", "");
-      this.getMachineList();
+    handlePlanDateChange() {
+      this.$set(this.form, 'daysToDue', this.getDaysToDueValue(this.form.planDate))
     },
-    handleMachineChange(val) {
-      const machine = this.machineList.find((item) => item.cxMachineCode === val);
-      if (machine) {
-        this.$set(this.form, "machineCode", machine.cxMachineCode);
-        this.$set(this.form, "machineName", machine.machineName || machine.cxMachineCode);
-      }
-    },
-    handlePlanStartTimeChange(val) {
-      if (this.form.planDate && val) {
-        const planDate = this.form.planDate.substring(0, 10);
-        const startTime = val.substring(0, 10);
-        if (startTime < planDate) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.startTimeBeforePlanDate"));
-          this.$set(this.form, "planStartTime", "");
-          return;
-        }
-      }
-      this.calculateEstimatedHours();
-    },
-    handlePlanEndTimeChange(val) {
-      if (this.form.planStartTime && val) {
-        if (val < this.form.planStartTime) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.endTimeBeforeStartTime"));
-          this.$set(this.form, "planEndTime", "");
-          return;
-        }
-      }
-      this.calculateEstimatedHours();
-    },
-    handleLastPrecisionDateChange(val) {
-      if (this.form.planDate && val) {
-        if (val >= this.form.planDate) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.lastPrecisionDateAfterStartTime"));
-          this.$set(this.form, "lastPrecisionDate", "");
-          return;
-        }
-      }
-    },
-    calculateEstimatedHours() {
-      if (this.form.planStartTime && this.form.planEndTime) {
-        const start = new Date(this.form.planStartTime).getTime();
-        const end = new Date(this.form.planEndTime).getTime();
-        const hours = (end - start) / (1000 * 60 * 60);
-        this.$set(this.form, "estimatedHours", Math.round(hours * 10) / 10);
-      } else {
-        this.$set(this.form, "estimatedHours", 0);
-      }
+    handlePrecisionTypeChange() {
+      this.$set(this.form, 'precisionCycle', this.getCycleValue(this.form.precisionType))
     },
     handleConfirm() {
-      this.$refs.form.triggerConfirm(this.save);
+      this.$refs.form.triggerConfirm(this.save)
     },
     async save(payload) {
-      if (payload.planDate && payload.planStartTime) {
-        const planDate = payload.planDate.substring(0, 10);
-        const startTime = payload.planStartTime.substring(0, 10);
-        if (startTime < planDate) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.startTimeBeforePlanDate"));
-          return;
-        }
+      payload.dataSource = payload.dataSource || '1'
+      payload.daysToDue = this.getDaysToDueValue(payload.planDate)
+      payload.precisionCycle = this.getCycleValue(payload.precisionType)
+      const uniqueRes = await checkCxPrecisionPlanUnique(payload)
+      if (uniqueRes === '1') {
+        this.$modal.msgError(this.$t('ui.data.alert.cxPrecisionPlan.notUnique'))
+        return
       }
-
-      if (payload.planStartTime && payload.planEndTime) {
-        if (payload.planEndTime < payload.planStartTime) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.endTimeBeforeStartTime"));
-          return;
-        }
-      }
-
-      if (payload.planDate && payload.lastPrecisionDate) {
-        if (payload.lastPrecisionDate >= payload.planDate) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.lastPrecisionDateAfterStartTime"));
-          return;
-        }
-      }
-
-      if (payload.planDate && payload.dueDate) {
-        if (payload.dueDate <= payload.planDate) {
-          this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.dueDateBeforePlanDate"));
-          return;
-        }
-      }
-
-      const uniqueRes = await checkCxPrecisionPlanUnique(payload);
-      if (uniqueRes === "1") {
-        this.$modal.msgError(this.$t("ui.data.alert.cxPrecisionPlan.notUnique"));
-        return;
-      }
-
       try {
-        this.loading = true;
-        const res = await saveCxPrecisionPlan(payload);
-        this.$modal.msgSuccess(res.msg);
-        this.$emit("success");
-        this.hide();
+        this.loading = true
+        const res = await saveCxPrecisionPlan(payload)
+        this.$modal.msgSuccess(res.msg || this.$t('common.success'))
+        this.$emit('success')
+        this.hide()
       } finally {
-        this.loading = false;
+        this.loading = false
       }
-    },
-  },
-};
-</script>
-
-<style scoped>
-::v-deep .cx-precision-form .el-form-item {
-  margin-bottom: 25px;
+    }
+  }
 }
-</style>
+</script>

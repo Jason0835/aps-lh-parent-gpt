@@ -73,7 +73,11 @@ export default {
       //   },
       // ],
       filterKey: "",
-      page: null,
+      page: {
+        current: 1,
+        pageSize: 10,
+        total: 0,
+      },
       query: {},
       showValue: "",
 

@@ -53,12 +53,12 @@
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-      downloadUrl="/schedule/lhPrecisionPlan/importTemplate"
-      uploadUrl="/schedule/lhPrecisionPlan/importData"
+      :downloadUrl="importTemplateUrl"
+      :uploadUrl="importUrl"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
-    ></tlt-upload-form>
+    />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -72,18 +72,17 @@ import {
   autoGeneratePlans,
   checkWarning
 } from "@/api/lh/lhPrecisionPlan";
+import { listMachine } from "@/api/lh/machine";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "LhPrecisionPlan",
   components: {
-    tltUpload,
     infoDialog,
     TltUploadForm
   },
-  dicts: ["biz_factory_name", "lh_machine", "lh_precision_type", "lh_completion_status", "lh_warning_status", "lh_data_source"],
+  dicts: ["biz_factory_name", "lh_machine", "lh_precision_type", "lh_completion_status", "lh_warning_status", "lh_precision_data_source"],
   provide() {
     return {
       parentDict: this.dict,
@@ -118,7 +117,14 @@ export default {
       sort: {},
       search: {},
       query: {},
+      yearList: [],
+      machineList: [],
+      importUrl: '/lh/lhPrecisionPlan/importData',
+      importTemplateUrl: '/lh/lhPrecisionPlan/importTemplate'
     };
+  },
+  mounted() {
+    this.getMachineList();
   },
   computed: {
     columns() {
@@ -130,6 +136,10 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
+        },
+        {
+          prop: "year",
+          label: this.$t("ui.lh.precision.plan.year"),
         },
         {
           prop: "machineCode",
@@ -154,50 +164,38 @@ export default {
           label: this.$t("ui.lh.precision.plan.actual.date"),
         },
         {
-          prop: "dueDate",
-          label: this.$t("ui.lh.precision.plan.due.date"),
-        },
-        {
           prop: "daysToDue",
           label: this.$t("ui.lh.precision.plan.days.to.due"),
-        },
-        {
-          prop: "lastMaintenanceDate",
-          label: this.$t("ui.lh.precision.plan.last.maintenance.date"),
-        },
-        {
-          prop: "completionStatus",
-          label: this.$t("ui.lh.precision.plan.completion.status"),
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.lh_completion_status, value);
+            return value < 0 ? 0 : value;
           },
-        },
-        {
-          prop: "year",
-          label: this.$t("ui.lh.precision.plan.year"),
-        },
-        {
-          prop: "warningStatus",
-          label: this.$t("ui.lh.precision.plan.warning.status"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.lh_warning_status, value);
-          },
-        },
-        {
-          prop: "warningDate",
-          label: this.$t("ui.lh.precision.plan.warning.date"),
         },
         {
           prop: "dataSource",
           label: this.$t("ui.lh.precision.plan.data.source"),
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.lh_data_source, value);
+            return this.selectDictLabel(this.dict.type.lh_precision_data_source, value);
           },
         },
         {
           prop: "updateTime",
           width: 180,
-          label: this.$t("ui.data.column.scheduleAdjust.updata"),
+          label: this.$t("ui.lh.precision.plan.updateTime"),
+        },
+        {
+          prop: "remark",
+          label: this.$t("ui.data.column.remark"),
+          showOverflowTooltip: true,
+          formatter: (row, column, value) => {
+            if (!value) return value;
+            return value
+              .replace(/__PERCENT__/g, '%')
+              .replace(/__AMP__/g, '&')
+              .replace(/__LT__/g, '<')
+              .replace(/__GT__/g, '>')
+              .replace(/__QUOT__/g, '"')
+              .replace(/__APOS__/g, "'");
+          }
         },
         {
           align: "center",
@@ -233,6 +231,13 @@ export default {
     searchColumns() {
       return [
         {
+          label: this.$t("ui.lh.precision.plan.year"),
+          prop: "year",
+          type: "select",
+          dictData: this.yearList,
+          value: new Date().getFullYear().toString(),
+        },
+        {
           label: this.$t("common.factory"),
           prop: "factoryCode",
           type: "select",
@@ -242,14 +247,8 @@ export default {
           label: this.$t("ui.lh.precision.plan.machine.code"),
           prop: "machineCode",
           type: "select",
-          dictData: this.dict.type.lh_machine,
+          dictData: this.machineList,
           filterable: true,
-        },
-        {
-          label: this.$t("ui.lh.precision.plan.precision.type"),
-          prop: "precisionType",
-          type: "select",
-          dictData: this.dict.type.lh_precision_type,
         },
         {
           label: this.$t("ui.lh.precision.plan.plan.date"),
@@ -273,13 +272,59 @@ export default {
     },
   },
   methods: {
+    getDaysToDueValue(planDate) {
+      if (!planDate) {
+        return ''
+      }
+      const target = new Date(planDate)
+      if (Number.isNaN(target.getTime())) {
+        return ''
+      }
+      const now = new Date()
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const startOfTarget = new Date(target.getFullYear(), target.getMonth(), target.getDate())
+      return Math.floor((startOfToday.getTime() - startOfTarget.getTime()) / 86400000)
+    },
+    initYearList() {
+      const currentYear = new Date().getFullYear();
+      const years = [];
+      for (let i = currentYear - 2; i <= currentYear + 2; i++) {
+        years.push({
+          label: i.toString(),
+          value: i.toString(),
+        });
+      }
+      this.yearList = years;
+    },
+    async getMachineList() {
+      try {
+        const res = await listMachine({});
+        const list = res.rows || [];
+        const map = new Map();
+        list.forEach((item) => {
+          if (item && item.machineCode) {
+            // 转换为 dictData 格式：包含 label 和 value
+            map.set(item.machineCode, {
+              label: item.machineCode,
+              value: item.machineCode
+            });
+          }
+        });
+        this.machineList = Array.from(map.values());
+      } catch (e) {
+        this.machineList = [];
+        console.error(e);
+      }
+    },
     handleSyncFromMes() {
-      this.$confirm(this.$t("ui.lh.precision.plan.sync.confirm"), {
+      const year = this.query.year || new Date().getFullYear().toString();
+      this.$confirm(this.$t("ui.lh.precision.plan.sync.confirm", [year]), {
         type: "warning",
       }).then(() => {
         this.loading = true;
-        syncFromMes().then((res) => {
+        syncFromMes(year).then((res) => {
           this.$modal.msgSuccess(res.msg || this.$t("common.success"));
+          this.$set(this.page, "current", 1);
           this.getList();
         }).catch(() => {
           this.loading = false;
@@ -320,11 +365,11 @@ export default {
       }
     },
     handleDeleteAll() {
-      let ids = this.selection.map(item => item.id).join(",");
+      const ids = this.selection.map(item => item.id).join(',')
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeLhPrecisionPlan([ids]).then((data) => {
+        removeLhPrecisionPlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg || this.$t("common.success"));
           this.$set(this.page, "current", 1);
           this.getList();
@@ -335,7 +380,7 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeLhPrecisionPlan([row.id]).then((data) => {
+        removeLhPrecisionPlan(row.id).then((data) => {
           this.$modal.msgSuccess(data.msg || this.$t("common.success"));
           this.$set(this.page, "current", 1);
           this.getList();
@@ -383,7 +428,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/lh/precisionPlan/export", this.formatParams(false));
+      downloadLink('/lh/lhPrecisionPlan/export', this.formatParams(false));
     },
     formatParams(hasPage = true) {
       const params = {
@@ -412,19 +457,12 @@ export default {
     },
   },
   created() {
-    const today = new Date();
-    const defaultDate = today.toISOString().split('T')[0];
-    let defaultParams = {
-      factoryCode: "116",
-      planDateStart: defaultDate,
-      planDateEnd: defaultDate,
-    };
-    this.search = {
-      ...defaultParams,
-    };
-    this.query = {
-      ...defaultParams,
-    };
+    this.initYearList();
+    const defaultParams = {
+      factoryCode: '116'
+    }
+    this.search = { ...defaultParams }
+    this.query = { ...defaultParams }
     this.getList();
   },
 };
