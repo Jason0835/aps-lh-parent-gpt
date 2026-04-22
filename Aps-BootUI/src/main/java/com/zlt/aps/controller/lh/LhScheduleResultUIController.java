@@ -63,7 +63,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("lh:lhScheduleResult:list")
+//    @RequiresPermissions("lh:lhScheduleResult:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(LhScheduleResult lhScheduleResult) {
@@ -112,7 +112,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
 
 
     @ApiOperation("插单")
-    @RequiresPermissions("lh:lhScheduleResult:insertOrder")
+//    @RequiresPermissions("lh:lhScheduleResult:insertOrder")
     @PostMapping("/insertOrder")
     @ResponseBody
     public AjaxResult insertOrder(@RequestBody LhOrderInsertDTO insertDTO) {
@@ -136,7 +136,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     }
 
     @ApiOperation("硫化自动排程")
-    @RequiresPermissions("lh:lhScheduleResult:autoLhScheduleResult")
+//    @RequiresPermissions("lh:lhScheduleResult:autoLhScheduleResult")
     @PostMapping("/execute")
     @ResponseBody
     public LhScheduleResponseDTO execute(@RequestBody LhScheduleRequestDTO lhScheduleRequestDTO) {
@@ -161,7 +161,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
      * 保存
      */
     @ApiOperation("保存")
-    @RequiresPermissions({"lh:lhScheduleResult:save"})
+//    @RequiresPermissions({"lh:lhScheduleResult:save"})
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult editSave(LhScheduleResult lhScheduleResult) {
@@ -173,7 +173,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
      * 删除
      */
     @ApiOperation("删除")
-    @RequiresPermissions("lh:lhScheduleResult:remove")
+//    @RequiresPermissions("lh:lhScheduleResult:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(String ids) {
@@ -190,7 +190,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     }
 
     @ApiOperation("转机台")
-    @RequiresPermissions("lh:lhScheduleResult:changeMachine")
+//    @RequiresPermissions("lh:lhScheduleResult:changeMachine")
     @PostMapping("/changeMachine")
     @ResponseBody
     public AjaxResult changeMachine(@RequestBody LhTransferDeskDTO dto) {
@@ -198,7 +198,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     }
 
     @ApiOperation("调量")
-    @RequiresPermissions("lh:lhScheduleResult:adjustQuantity")
+//    @RequiresPermissions("lh:lhScheduleResult:adjustQuantity")
     @PostMapping("/adjustQuantity")
     @ResponseBody
     public AjaxResult adjustQuantity(@RequestBody LhScheduleResultUpdateDTO dto) {
@@ -241,7 +241,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
      * 发布排程
      */
     @ApiOperation("发布排程")
-    @RequiresPermissions("lh:scheduleResult:publish")
+//    @RequiresPermissions("lh:scheduleResult:publish")
     @PostMapping("/publish")
     @ResponseBody
     public AjaxResult publish(LhScheduleResult dto) {
