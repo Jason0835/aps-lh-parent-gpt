@@ -140,14 +140,43 @@ public class Context {
         if (stopDays.contains(productionDay)) {
             return false;
         }
+        Integer firstProductionDay = getCycleFirstProductionDay();
+        if (null == firstProductionDay) {
+            return false;
+        }
+        return firstProductionDay.equals(productionDay);
+    }
+
+    /**
+     * 是否为有效排产日
+     *
+     * @param productionDay 排产日信息
+     * @return
+     */
+    public boolean isEffectiveProductionDay(Integer productionDay) {
+        if (null == productionDay) {
+            return false;
+        }
         Set<Integer> productionDaySet = getProductionDay();
         if (CollectionUtils.isEmpty(productionDaySet)) {
             return false;
         }
+        return productionDaySet.contains(productionDay);
+    }
+
+    /**
+     * 获取排产周期的首日排产日
+     *
+     * @return
+     */
+    public Integer getCycleFirstProductionDay() {
+        Set<Integer> productionDaySet = getProductionDay();
+        if (CollectionUtils.isEmpty(productionDaySet)) {
+            return null;
+        }
         List<Integer> productionDayList = new ArrayList<>(productionDaySet);
         productionDayList.sort(Comparator.comparing(Integer::intValue));
-        Integer firstProductionDay = productionDayList.get(BigDecimal.ZERO.intValue());
-        return firstProductionDay.equals(productionDay);
+        return productionDayList.get(BigDecimal.ZERO.intValue());
     }
 
     /**

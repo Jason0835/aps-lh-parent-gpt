@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.zlt.aps.constant.StringConstant;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.GroupCapacityProductionLimitHelper;
 import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
@@ -395,4 +396,8 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         groupPlan.setDailyCapacityLimitVoMap(Maps.newHashMap());
     }
 
+    @Override
+    public void handlerByMoldAllocationAdjust(Context context, ProductionStageEnum productionStage, Map<String, CxContinueInfoHelper> allContinueInfo, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, List<MpStructureAllocation> allAllocationList) {
+
+    }
 }

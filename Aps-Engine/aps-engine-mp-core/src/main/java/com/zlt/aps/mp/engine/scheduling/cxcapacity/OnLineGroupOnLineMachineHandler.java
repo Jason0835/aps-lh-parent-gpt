@@ -1,8 +1,10 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueSkuInfoHelper;
+import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
@@ -13,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -26,7 +29,7 @@ import java.util.Set;
  * @date 20260101
  */
 @Slf4j
-public class OnLineGroupOnLineMachineHandler {
+public abstract class OnLineGroupOnLineMachineHandler {
 
     /**
      * 排产续作部分
@@ -38,15 +41,17 @@ public class OnLineGroupOnLineMachineHandler {
      * @param productionStage           排产阶段
      * @param productionContext         排产上下文
      * @param allContinueInfo           续作Sku信息
+     * @param continueAllocationList    续作分配信息
      * @param allGroupPlanInfo          所有分组计划
+     * @param allAllocationList         结构排产配置信息
      */
-    public void productionContinue(CxAddSkuProductionHandler cxAddSkuProductionHandler, ProductionStageEnum productionStage, TbrProductionContext productionContext, Map<String, CxContinueInfoHelper> allContinueInfo, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo) {
+    public void productionContinue(CxAddSkuProductionHandler cxAddSkuProductionHandler, ProductionStageEnum productionStage, TbrProductionContext productionContext, Map<String, CxContinueInfoHelper> allContinueInfo, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, List<MpStructureAllocation> allAllocationList) {
         //1、续作先排
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
             productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SKU);
         });
-        //2、todo 不同结构共用模具-分配比例调整
-
+        //2、不同结构共用模具-分配比例调整
+        handlerByMoldAllocationAdjust(productionContext, productionStage, allContinueInfo, continueAllocationList, allGroupPlanInfo, allAllocationList);
         //3、接着进行同规格同花纹的续作高优先级部分进行排产
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
             productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN);
@@ -56,6 +61,23 @@ public class OnLineGroupOnLineMachineHandler {
             productionContinueByType(cxAddSkuProductionHandler, productionStage, productionContext, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD);
         });
     }
+
+    /**
+     * 进行模具分配比例调整业务处理
+     * 模拟排产与单独模具重排处理会有差异
+     * 1、主要差异在于续作重排的数据清理动作
+     * 2、构建排产的限制信息
+     * 模拟排产阶段，使用的分配信息为continueAllocationList
+     * 单独模具重排使用的分配信息为allAllocationList
+     *
+     * @param context                排产上下文
+     * @param productionStage        排产阶段
+     * @param allContinueInfo        所有续作信息
+     * @param continueAllocationList 续作在产机台分配信息
+     * @param allGroupPlanInfo       所有分组计划
+     * @param allAllocationList      结构排产分配表
+     */
+    public abstract void handlerByMoldAllocationAdjust(Context context, ProductionStageEnum productionStage, Map<String, CxContinueInfoHelper> allContinueInfo, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, List<MpStructureAllocation> allAllocationList);
 
     /**
      * 单分组，续作重新排产
@@ -87,37 +109,22 @@ public class OnLineGroupOnLineMachineHandler {
      * @param cxContinueInfo            对应的续作信息
      * @param type                      续作类型
      */
-    private void productionContinueByType(CxAddSkuProductionHandler cxAddSkuProductionHandler, ProductionStageEnum productionStage, Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, String groupName, CxContinueInfoHelper cxContinueInfo, ContinueTypeEnum type) {
+    protected void productionContinueByType(CxAddSkuProductionHandler cxAddSkuProductionHandler, ProductionStageEnum productionStage, Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, String groupName, CxContinueInfoHelper cxContinueInfo, ContinueTypeEnum type) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         recordStartProductionLog(productionContext, groupName, productionStage, type);
         ProductionPlanGroupInfo groupPlan = allGroupPlanInfo.get(groupName);
         if (null == groupPlan) {
-            if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
-                log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupNoGroupPlanLog(context, groupName, type));
-            }
-            if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
-                log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupNoGroupPlanLog(context, groupName, type));
-            }
+            recordNoGroupPlanInfoLog(productionContext, groupName, productionStage, type);
             return;
         }
         Set<String> allocationCxMachineCodeSet = groupPlan.getAllocationCxMachineCodeSet();
         if (CollectionUtils.isEmpty(allocationCxMachineCodeSet)) {
-            if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
-                log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupNoAllocationCxMachineLog(context, groupName, type));
-            }
-            if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
-                log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupNoAllocationCxMachineLog(context, groupName, type));
-            }
+            recordNoAllocationCxMachineInfoLog(productionContext, groupName, productionStage, type);
             return;
         }
         Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap = cxContinueInfo.getContinueSkuMouldNumberMap();
         if (CollectionUtils.isEmpty(continueSkuInfoMap)) {
-            if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
-                log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupNoContinueSkuLog(context, groupName, type));
-            }
-            if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
-                log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupNoContinueSkuLog(context, groupName, type));
-            }
+            recordNoContinueSkuInfoLog(productionContext, groupName, productionStage, type);
             return;
         }
         //续作Sku
@@ -140,6 +147,63 @@ public class OnLineGroupOnLineMachineHandler {
     }
 
     /**
+     * 增加 没有分组计划 日志
+     *
+     * @param productionContext 排产上下文
+     * @param structureName     分组名
+     * @param productionStage   阶段
+     * @param continueType      类型
+     */
+    private void recordNoGroupPlanInfoLog(TbrProductionContext productionContext, String structureName, ProductionStageEnum productionStage, ContinueTypeEnum continueType) {
+        if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
+            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupNoGroupPlanLog(productionContext, structureName, continueType));
+            return;
+        }
+        if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
+            log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupNoGroupPlanLog(productionContext, structureName, continueType));
+            return;
+        }
+    }
+
+    /**
+     * 增加 没有分配成型 日志
+     *
+     * @param productionContext 排产上下文
+     * @param structureName     分组名
+     * @param productionStage   阶段
+     * @param continueType      类型
+     */
+    private void recordNoAllocationCxMachineInfoLog(TbrProductionContext productionContext, String structureName, ProductionStageEnum productionStage, ContinueTypeEnum continueType) {
+        if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
+            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupNoAllocationCxMachineLog(productionContext, structureName, continueType));
+            return;
+        }
+        if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
+            log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupNoAllocationCxMachineLog(productionContext, structureName, continueType));
+            return;
+        }
+    }
+
+    /**
+     * 增加 没有续作Sku信息 日志
+     *
+     * @param productionContext 排产上下文
+     * @param structureName     分组名
+     * @param productionStage   阶段
+     * @param continueType      类型
+     */
+    private void recordNoContinueSkuInfoLog(TbrProductionContext productionContext, String structureName, ProductionStageEnum productionStage, ContinueTypeEnum continueType) {
+        if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
+            log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupNoContinueSkuLog(productionContext, structureName, continueType));
+            return;
+        }
+        if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
+            log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupNoContinueSkuLog(productionContext, structureName, continueType));
+            return;
+        }
+    }
+
+    /**
      * 增加开始排产日志
      *
      * @param productionContext 排产上下文
@@ -150,9 +214,11 @@ public class OnLineGroupOnLineMachineHandler {
     private void recordStartProductionLog(TbrProductionContext productionContext, String structureName, ProductionStageEnum productionStage, ContinueTypeEnum continueType) {
         if (ProductionStageEnum.FORMAL_STAGE == productionStage) {
             log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, continueType));
+            return;
         }
         if (ProductionStageEnum.SIMULATE_STAGE == productionStage) {
             log.info(TbrSimulateProductionLogRecorder.addProductionContinueGroupSingleGroupLog(productionContext, structureName, continueType));
+            return;
         }
     }
 }

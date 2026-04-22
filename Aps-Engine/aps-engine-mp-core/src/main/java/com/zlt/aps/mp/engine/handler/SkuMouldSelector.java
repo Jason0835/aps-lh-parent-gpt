@@ -71,13 +71,14 @@ public class SkuMouldSelector {
         if (StringUtils.isBlank(materialDesc) || null == mouldNumber || mouldNumber <= BigDecimal.ZERO.intValue()) {
             return Collections.emptyList();
         }
+        Integer cycleFirstDay = productionContext.getCycleFirstProductionDay();
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         List<MonthPlanProductMouldInfoVo> skuRelationList = baseDataContainer.getSkuMouldRelationMap().get(materialDesc);
         if (CollectionUtils.isEmpty(skuRelationList)) {
             return Collections.emptyList();
         }
         MonthPlanProductionRequirePlanVo productionPlan = productionContext.getAllSkuProductionPlan().get(materialDesc).get(BigDecimal.ZERO.intValue());
-        List<ProductionMouldInfoVo> effectiveList = getEffectiveContinueRelation(baseDataContainer, skuRelationList);
+        List<ProductionMouldInfoVo> effectiveList = getEffectiveContinueRelation(cycleFirstDay, baseDataContainer, skuRelationList);
         String groupName = productionPlan.getStructureName();
         Integer max = effectiveList.size();
         if (max < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
@@ -244,11 +245,12 @@ public class SkuMouldSelector {
      * 根据模具关系获取续作模具关系信息
      * 排除新模具到货计划的模具关系
      *
+     * @param cycleFirstDay     排产周期首日
      * @param baseDataContainer 基础数据配置容器
      * @param skuRelationList   配置的模具关系
      * @return
      */
-    private static List<ProductionMouldInfoVo> getEffectiveContinueRelation(BaseDataContainer baseDataContainer, List<MonthPlanProductMouldInfoVo> skuRelationList) {
+    private static List<ProductionMouldInfoVo> getEffectiveContinueRelation(Integer cycleFirstDay, BaseDataContainer baseDataContainer, List<MonthPlanProductMouldInfoVo> skuRelationList) {
         List<ProductionMouldInfoVo> effectiveList = new ArrayList<>();
         skuRelationList.forEach(skuRelation -> {
             ProductionMouldInfoVo mouldInfo = baseDataContainer.getMouldInfoMap().get(skuRelation.getMouldCode());
@@ -259,11 +261,17 @@ public class SkuMouldSelector {
             if (MouldRelationTypeEnum.SKU_RELATION_CONFIGURATION != mouldInfo.getRelationType()) {
                 return;
             }
-            //续作模具不可有排产信息
-            if (!CollectionUtils.isEmpty(mouldInfo.getDayProductionInfo())) {
+            Map<Integer, List<CxMouldDayProductionHelper>> dayProductionInfo = mouldInfo.getDayProductionInfo();
+            //20260421+ 由原来续作模具不可有排产信息调整为续作模具首日不可有排产信息(因不同分组模具分配比例调整功能引起)
+            if (CollectionUtils.isEmpty(dayProductionInfo)) {
+                effectiveList.add(mouldInfo);
                 return;
             }
-            effectiveList.add(mouldInfo);
+            List<CxMouldDayProductionHelper> firstDayProductionInfo = dayProductionInfo.get(cycleFirstDay);
+            if (CollectionUtils.isEmpty(firstDayProductionInfo)) {
+                effectiveList.add(mouldInfo);
+                return;
+            }
         });
         return effectiveList;
     }

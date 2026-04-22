@@ -188,4 +188,8 @@ public class ProductionCapacityParamConfiguration {
      * 正式排产优先级排产分段日
      */
     private Integer formalFirstHalfDay;
+    /**
+     * 模具分配比例调整周期日
+     */
+    private Integer moldAllocationRatioCycle;
 }

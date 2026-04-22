@@ -264,7 +264,11 @@ public enum MonthPlanEnums {
     /**
      * SYS0209006 正式排产，结构优先级重新排序日
      */
-    FORMAL_RESET_SORT_DAY("SYS0209006","正式排产，结构优先级重新排序日");
+    FORMAL_RESET_SORT_DAY("SYS0209006", "正式排产，结构优先级重新排序日"),
+    /**
+     * SYS0209007 单位：天，跨结构模具分配比例在该值内完成调整
+     */
+    MOLD_ALLOCATION_RATIO_CYCLE("SYS0209007", "单位：天，跨结构模具分配比例在该值内完成调整");
 
     private final String code;
     private final String name;
