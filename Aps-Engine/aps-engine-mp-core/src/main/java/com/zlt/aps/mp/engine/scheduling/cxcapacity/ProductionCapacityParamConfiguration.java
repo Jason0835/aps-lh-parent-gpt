@@ -1,7 +1,14 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
+import com.google.common.collect.Maps;
+import com.zlt.aps.constant.StringConstant;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 
+import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -192,4 +199,60 @@ public class ProductionCapacityParamConfiguration {
      * 模具分配比例调整周期日
      */
     private Integer moldAllocationRatioCycle;
+    /**
+     * 结构硫化成型配比额外增加配置
+     */
+    private String cxLhRatioExtraValue;
+
+    private Map<String, Integer> extraMap;
+
+    /**
+     * 设置额外处理的配比值
+     *
+     * @param cxLhRatioExtraValue
+     */
+    public void setCxLhRatioExtraValue(String cxLhRatioExtraValue) {
+        this.cxLhRatioExtraValue = cxLhRatioExtraValue;
+        this.extraMap = getCxLhRatioExtraConfiguration();
+    }
+
+    /**
+     * 结构-日分配多台成型机时，额外增加的硫化机台数
+     *
+     * @return
+     */
+    private Map<String, Integer> getCxLhRatioExtraConfiguration() {
+        if (StringUtils.isBlank(cxLhRatioExtraValue)) {
+            return Collections.emptyMap();
+        }
+        String[] configurationList = cxLhRatioExtraValue.split(StringConstant.SPLIT_SEMICOLON);
+        if (null == configurationList || configurationList.length < BigDecimal.ONE.intValue()) {
+            return Collections.emptyMap();
+        }
+        Integer bothValue = BigDecimal.ONE.intValue() + BigDecimal.ONE.intValue();
+        Map<String, Integer> extraMap = Maps.newHashMap();
+        for (String singleConfiguration : configurationList) {
+            if (StringUtils.isBlank(singleConfiguration)) {
+                continue;
+            }
+            String[] detailConfigurationList = singleConfiguration.split(StringConstant.COMMA);
+            if (null == detailConfigurationList || detailConfigurationList.length != bothValue) {
+                continue;
+            }
+            String groupName = detailConfigurationList[BigDecimal.ZERO.intValue()];
+            Integer lhMachines;
+            try {
+                lhMachines = Integer.valueOf(detailConfigurationList[BigDecimal.ONE.intValue()]);
+            } catch (NumberFormatException e) {
+                lhMachines = BigDecimal.ZERO.intValue();
+            }
+            if (lhMachines > BigDecimal.ZERO.intValue()) {
+                extraMap.put(groupName, lhMachines);
+            }
+        }
+        if (CollectionUtils.isEmpty(extraMap)) {
+            return Collections.emptyMap();
+        }
+        return extraMap;
+    }
 }
