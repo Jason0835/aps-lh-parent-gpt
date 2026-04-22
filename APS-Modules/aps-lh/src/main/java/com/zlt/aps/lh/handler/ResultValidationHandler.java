@@ -132,7 +132,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                         && r.getDailyPlanQty() != null
                         && r.getDailyPlanQty() > 0)
                 .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode, Comparator.nullsLast(String::compareTo))
-                        .thenComparing(this::resolveProductionStartTime, Comparator.nullsLast(Date::compareTo))
+                        .thenComparing(this::resolvePlannedMouldChangeStartTime, Comparator.nullsLast(Date::compareTo))
                         .thenComparing(LhScheduleResult::getSpecEndTime, Comparator.nullsLast(Date::compareTo)))
                 .collect(Collectors.toList());
         log.info("生成模具交替计划, 换模排程结果数: {}", changeResults.size());
@@ -151,21 +151,24 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setLhResultBatchNo(context.getBatchNo());
             plan.setOrderNo(generateChangePlanOrderNo(context));
             plan.setScheduleDate(context.getScheduleTargetDate());
-            plan.setPlanDate(resolveProductionStartTime(result));
+            // 换模计划优先对齐结果里的真实换模开始时间；没有时再回退旧口径。
+            Date plannedMouldChangeStartTime = resolvePlannedMouldChangeStartTime(result);
+            plan.setPlanDate(plannedMouldChangeStartTime);
             plan.setPlanOrder(planOrder++);
             plan.setLhMachineCode(result.getLhMachineCode());
             plan.setLhMachineName(result.getLhMachineName());
             plan.setLeftRightMould(LeftRightMouldUtil.resolveLeftRightMould(
                     result.getLeftRightMould(), result.getLhMachineCode()));
-            plan.setBeforeMaterialCode(state.getPreviousMaterialCode());
-            plan.setBeforeMaterialDesc(state.getPreviousMaterialDesc());
-            plan.setAfterMaterialCode(state.getCurrentMaterialCode());
-            plan.setAfterMaterialDesc(state.getCurrentMaterialDesc());
+            // 前规格取换模前机台当前在产规格，后规格取本次换模上机规格。
+            plan.setBeforeMaterialCode(state.getCurrentMaterialCode());
+            plan.setBeforeMaterialDesc(state.getCurrentMaterialDesc());
+            plan.setAfterMaterialCode(result.getMaterialCode());
+            plan.setAfterMaterialDesc(result.getMaterialDesc());
             plan.setMouldCode(result.getMouldCode());
             plan.setIsRelease("0");
             plan.setMouldStatus("0");
             plan.setIsDelete(0);
-            plan.setChangeTime(state.getEstimatedEndTime());
+            plan.setChangeTime(resolvePlanChangeTime(result, state));
 
             // 判断交替类型
             plan.setChangeMouldType(determineChangeMouldType(result));
@@ -301,6 +304,23 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             return result.getSpecEndTime();
         }
         return startTimes.stream().min(Date::compareTo).orElse(result.getSpecEndTime());
+    }
+
+    private Date resolvePlannedMouldChangeStartTime(LhScheduleResult result) {
+        if (result == null) {
+            return null;
+        }
+        if (result.getMouldChangeStartTime() != null) {
+            return result.getMouldChangeStartTime();
+        }
+        return resolveProductionStartTime(result);
+    }
+
+    private Date resolvePlanChangeTime(LhScheduleResult result, RollingMachineState state) {
+        if (result != null && result.getMouldChangeStartTime() != null) {
+            return result.getMouldChangeStartTime();
+        }
+        return state != null ? state.getEstimatedEndTime() : null;
     }
 
     private RollingMachineState buildInitialState(LhScheduleContext context, String machineCode) {
