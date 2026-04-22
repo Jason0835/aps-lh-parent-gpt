@@ -298,18 +298,22 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setMainMaterialDesc(taskAlloc.getMainMaterialDesc());
                 task.setStructureName(taskAlloc.getStructureName());
                 task.setPlannedProduction(taskAlloc.getQuantity());
-                task.setEndingExtraInventory(taskAlloc.getQuantity());
+                // 优先使用 endingExtraInventory（实际需生产量），如果没有则用 quantity
+                task.setEndingExtraInventory(taskAlloc.getEndingExtraInventory() != null
+                        ? taskAlloc.getEndingExtraInventory() : taskAlloc.getQuantity());
                 task.setIsTrialTask(taskAlloc.getIsTrialTask());
                 task.setIsEndingTask(taskAlloc.getIsEndingTask());
                 task.setIsContinueTask(taskAlloc.getIsContinueTask());
+                task.setIsLastEndingBatch(taskAlloc.getIsLastEndingBatch());  // 设置是否收尾最后一批
                 task.setIsOpeningDayTask(context.getIsOpeningDay());
                 task.setStockHours(taskAlloc.getStockHours());
                 task.setPriority(taskAlloc.getPriority());
                 task.setLhId(taskAlloc.getLhId());
 
-                // 计算需要的车数
+                // 计算需要的车数（使用实际待排产量）
                 int tripCapacity = productionCalculator.getTripCapacity(taskAlloc.getStructureName(), context);
-                int cars = tripCapacity > 0 ? (int) Math.ceil((double) taskAlloc.getQuantity() / tripCapacity) : 0;
+                int actualQty = taskAlloc.getEndingExtraInventory() != null ? taskAlloc.getEndingExtraInventory() : taskAlloc.getQuantity();
+                int cars = tripCapacity > 0 ? (int) Math.ceil((double) actualQty / tripCapacity) : 0;
                 task.setRequiredCars(cars);
 
                 // 打印精排任务日志
@@ -321,14 +325,14 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 } else {
                     taskType = "新增任务";
                 }
-                log.info("  【{}】物料编码:{} | 物料描述:{} | 胎胚:{} | 主物料:{} | 规格:{} | 数量:{}条 | 需{}车(每车{}条) | 库存可撑:{}h | 硫化机:{}台",
+                log.info("  【{}】物料编码:{} | 物料描述:{} | 胎胚:{} | 主物料:{} | 规格:{} | 待排产量:{}条 | 需{}车(每车{}条) | 库存可撑:{}h | 硫化机:{}台",
                         taskType,
                         taskAlloc.getMaterialCode(),
                         taskAlloc.getMaterialDesc(),
                         taskAlloc.getEmbryoCode(),
                         taskAlloc.getMainMaterialDesc(),
                         taskAlloc.getStructureName(),
-                        taskAlloc.getQuantity(),
+                        actualQty,
                         cars,
                         tripCapacity,
                         String.format("%.1f", taskAlloc.getStockHours()),
@@ -412,13 +416,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
         sb.append("}");
         return sb.toString();
-    }
-
-    /**
-     * 判断是否为停产日
-     */
-    private boolean isStopProductionDay(ScheduleContextVo context, LocalDate date) {
-        return scheduleDayTypeHelper.isStopDay(date);
     }
 
     /**
@@ -1107,15 +1104,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         public void setVulcanizeMachineCount(int vulcanizeMachineCount) { this.vulcanizeMachineCount = vulcanizeMachineCount; }
         public int getSequence() { return sequence; }
         public void setSequence(int sequence) { this.sequence = sequence; }
-    }
-
-    /**
-     * 构建任务Key（用于关联主表记录）
-     */
-    private String buildTaskKey(String machineCode, String embryoCode, String materialCode) {
-        return (machineCode != null ? machineCode : "") + "|"
-                + (embryoCode != null ? embryoCode : "") + "|"
-                + (materialCode != null ? materialCode : "");
     }
 
     /**
@@ -1890,7 +1878,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 newStock.setOverTimeStock(0);
                 newStock.setBadNum(0);
                 newStock.setModifyNum(0);
-                newStock.setIsDelete(0);
+                newStock.setIsDelete("0");
 
                 // 设置库存日期（使用当前排程日期）
                 LocalDate scheduleDate = context.getCurrentScheduleDate();
