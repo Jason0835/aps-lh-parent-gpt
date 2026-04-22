@@ -269,9 +269,11 @@ export default {
       },
       sort: {},
       search: {
+        factoryCode: "116",
         scheduleDate: defaultDate,
       },
       query: {
+        factoryCode: "116",
         scheduleDate: defaultDate,
       },
       selection: [],
@@ -677,10 +679,25 @@ export default {
     searchColumns() {
       return [
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.orderNo"),
+          prop: "orderNo",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.batchNo"),
+          prop: "batchNo",
         },
         {
           label: this.$t("ui.data.column.scheduleResult.isRelease"),
