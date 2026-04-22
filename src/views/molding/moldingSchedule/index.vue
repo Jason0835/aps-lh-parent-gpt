@@ -12,6 +12,7 @@
       :search="search"
       @refresh="getList"
       @search="handleSearch"
+      @reset="handleReset"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
       @selection-change="handleSelectionChange"
@@ -741,23 +742,23 @@ export default {
         },
         {
           label: this.$t("物料编码"),
-          prop: "embryoCode",
+          prop: "materialCode",
         },
         {
           label: this.$t("物料描述"),
-          prop: "embryoCode",
+          prop: "materialDesc",
         },
         {
           label: this.$t("胎胚描述"),
-          prop: "embryoCode",
+          prop: "mainMaterialDesc",
         },
         {
           label: this.$t("ui.data.column.cxScheduleResult.cxMachineCode"),
           prop: "cxMachineCode",
           type: "select",
           dictData: this.moldingMachines,
-          labelKey: "moldingMachineCode",
-          valueKey: "moldingMachineCode",
+          labelKey: "cxMachineCode",
+          valueKey: "cxMachineCode",
           filterable: true,
         },
       ];
@@ -846,7 +847,25 @@ export default {
     handleHistoryQuery() {},
 
     handleSearch(data) {
-      this.query = data;
+      // 过滤掉 null、undefined 和空字符串，但保留 0、false 等有效值
+      const filteredData = {};
+      Object.keys(data).forEach(key => {
+        const value = data[key];
+        if (value !== null && value !== undefined && value !== '') {
+          filteredData[key] = value;
+        }
+      });
+      console.log('Search params:', filteredData);
+      // 完全替换query，不保留旧的条件
+      this.query = filteredData;
+      this.$set(this.page, "current", 1);
+      this.getList();
+    },
+    handleReset() {
+      // 重置查询条件到初始状态
+      const date = moment().add(1, "days").format("YYYY-MM-DD");
+      this.query = { scheduleDate: date };
+      this.search = { scheduleDate: date };
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -1176,8 +1195,16 @@ export default {
     this.query.scheduleDate = date;
     this.search.scheduleDate = date;
 
-    // this.$store.dispatch("molding/getMachineList");
-    // this.$store.dispatch("curing/getMachineList");
+    this.$store.dispatch("molding/getMachineList");
+    this.$store.dispatch("curing/getMachineList");
+  },
+  watch: {
+    moldingMachines() {
+      this.$forceUpdate();
+    },
+    curingMachines() {
+      this.$forceUpdate();
+    },
   },
   activated() {
     this.getList();

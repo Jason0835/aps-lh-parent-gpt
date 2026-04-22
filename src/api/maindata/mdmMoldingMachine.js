@@ -3,7 +3,7 @@ import request, { downloadLink } from '@/utils/request'
 // =
 export function listMdmMoldingMachine(query) {
   return request({
-    url: '/maindata/mdmMoldingMachine/list',
+    url: '/monthplan/mdmMoldingMachine/list',
     method: 'post',
     data: query
   })
