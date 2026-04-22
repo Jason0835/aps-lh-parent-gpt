@@ -75,7 +75,7 @@ export default {
     TltUploadForm,
     infoDialog,
   },
-  dicts: ["biz_factory_name", "biz_yes_no", "CHANGE_MOULD_TYPE", "IS_RELEASE"],
+  dicts: ["biz_factory_name", "biz_yes_no", "CHANGE_MOULD_TYPE", "IS_RELEASE", "CLASS_NUM"],
   provide() {
     return {
       parentDict: this.dict,
@@ -161,6 +161,16 @@ export default {
           minWidth: 140,
         },
         {
+          prop: "classIndex",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhMouldChangePlan.classIndex"),
+          minWidth: 120,
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.CLASS_NUM, value);
+          },
+        },
+        {
           prop: "lhMachineCode",
           align: "center",
           halign: "center",
@@ -197,6 +207,13 @@ export default {
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.CHANGE_MOULD_TYPE, value);
           },
+        },
+        {
+          prop: "changeTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhMouldChangePlan.changeTime"),
+          minWidth: 140,
         },
         {
           prop: "mouldCode",
