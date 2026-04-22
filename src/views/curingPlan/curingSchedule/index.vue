@@ -618,6 +618,11 @@ export default {
           prop: "remark",
           label: this.$t("备注"),
         },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.scheduleResult.updateTime"),
+          minWidth: 160,
+        },
       ];
       return columns;
     },

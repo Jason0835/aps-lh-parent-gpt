@@ -354,6 +354,7 @@
   "ui.data.column.scheduleResult.changeMachine": "转机台",
   "ui.data.column.scheduleResult.factoryCode": "分厂",
   "ui.data.column.scheduleResult.scheduleDate": "排程日期",
+  "ui.data.column.scheduleResult.updateTime": "更新时间",
   "ui.data.column.scheduleResult.workCode": "施工代码",
   "ui.data.column.scheduleResult.baseInfo": "基本信息",
   "ui.data.column.scheduleResult.dayPlan": "早班计划（6:00-14:00）",
