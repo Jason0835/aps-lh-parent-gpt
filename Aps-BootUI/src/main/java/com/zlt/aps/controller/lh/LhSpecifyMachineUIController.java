@@ -10,6 +10,7 @@ import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
+import com.zlt.aps.lh.api.domain.vo.LhSpecifyMachineImportVo;
 import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
 import com.zlt.aps.lh.api.service.ILhSpecifyMachineRemoteService;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
@@ -176,7 +177,7 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<LhSpecifyMachine> util = new ExcelUtil<>(LhSpecifyMachine.class);
+        ExcelUtil<LhSpecifyMachineImportVo> util = new ExcelUtil<>(LhSpecifyMachineImportVo.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
