@@ -346,7 +346,7 @@ public class TaskGroupService {
         Integer remainingFormingRemainder = null;
         if (totalFormingRemainder != null) {
             remainingFormingRemainder = Math.max(0, totalFormingRemainder - usedRemainder);
-            log.debug("物料 {} 总成型余量={}, 已使用={}, 剩余={}",
+            log.debug("物料 {} 总成型余量={}, 已使用={}, 剩余={}", 
                     materialCode, totalFormingRemainder, usedRemainder, remainingFormingRemainder);
         }
 
