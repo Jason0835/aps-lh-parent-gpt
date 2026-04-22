@@ -195,6 +195,7 @@ import {
   getScheduleDate,
   adjustTextNo,
 } from "@/api/lh/scheduleResult";
+import { checkPermi } from "@/utils/permission";
 
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import TltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -622,6 +623,38 @@ export default {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleResult.updateTime"),
           minWidth: 160,
+        },
+        {
+          prop: "rowOperator",
+          label: this.$t("common.option"),
+          width: 150,
+          fixed: "right",
+          render: ({ row }) => {
+            return (
+              <div>
+                {checkPermi(["lh:lhScheduleResult:save"]) ? (
+                  <el-button
+                    type="text"
+                    size="mini"
+                    icon="el-icon-edit"
+                    onClick={() => this.handleEdit(row)}
+                  >
+                    {this.$t("ui.frame.btn.modify")}
+                  </el-button>
+                ) : null}
+                {checkPermi(["lh:lhScheduleResult:remove"]) ? (
+                  <el-button
+                    type="text"
+                    size="mini"
+                    icon="el-icon-delete"
+                    onClick={() => this.handleDelete(row)}
+                  >
+                    {this.$t("ui.frame.btn.delete")}
+                  </el-button>
+                ) : null}
+              </div>
+            );
+          },
         },
       ];
       return columns;
