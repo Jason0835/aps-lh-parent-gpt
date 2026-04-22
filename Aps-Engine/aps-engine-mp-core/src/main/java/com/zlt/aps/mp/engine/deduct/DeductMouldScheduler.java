@@ -283,6 +283,9 @@ public class DeductMouldScheduler {
                 // 在结构未收尾的情况下，不再依赖固定天数，而是根据剩余需求、剩余天数、单台日产量动态决定当日应使用的模具数，逐日降1台，
                 // 即采取提前降模策略，使得计划量可以拉满到结构收尾
                 int remainingDays = deductMouldVo.getDeadline() - context.getCurrentDate();
+                if (deductMouldVo.isFirstDayDelay()){
+                    remainingDays += 1;
+                }
                 int requiredDailyCapacity = (int) Math.ceil((double) deductMouldVo.getRemainingQty() / remainingDays);
                 int neededMachines = (int) Math.ceil((double) requiredDailyCapacity / deductMouldVo.getDailyOutputPerMachine());
                 activeMachines = Math.min(activeMachines, context.getPreDayMachines());
