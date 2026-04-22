@@ -220,7 +220,14 @@ export default {
     ChangeReleaseStatusDialog,
     changePlanDialog,
   },
-  dicts: ["adjust_type", "IS_RELEASE", "biz_factory_name", "biz_end_type",'biz_construction_stage'],
+  dicts: [
+    "adjust_type",
+    "IS_RELEASE",
+    "biz_factory_name",
+    "biz_end_type",
+    "biz_construction_stage",
+    "lh_schedule_type",
+  ],
   provide() {
     return {
       parentDict: this.dict,
@@ -327,6 +334,14 @@ export default {
         {
           label: this.$t("胎胚描述"),
           prop: "mainMaterialDesc",
+        },
+        {
+          prop: "scheduleType",
+          label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.lh_schedule_type, value);
+          },
         },
 
         {
