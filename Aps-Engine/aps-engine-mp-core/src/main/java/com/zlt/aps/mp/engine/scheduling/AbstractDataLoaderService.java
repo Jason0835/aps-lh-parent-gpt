@@ -476,6 +476,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.SPECIAL_MATERIAL_CODE.getCode());
         paramCodeList.add(MonthPlanEnums.FORMAL_RESET_SORT_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.MOLD_ALLOCATION_RATIO_CYCLE.getCode());
+        paramCodeList.add(MonthPlanEnums.CX_LH_RATIO_EXTRA.getCode());
 
         //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
@@ -566,6 +567,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         if (null != adjustCycleDayValue) {
             configuration.setMoldAllocationRatioCycle((Integer) adjustCycleDayValue);
         }
+        //20260422+ 结构成型硫化配比机台额外配置项
+        configuration.setCxLhRatioExtraValue((String) paramConfigurationMap.get(MonthPlanEnums.CX_LH_RATIO_EXTRA.getCode()));
         return configuration;
     }
 

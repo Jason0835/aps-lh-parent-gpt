@@ -307,11 +307,11 @@ public class DeductMouldScheduler {
         activeMachines = Math.min(activeMachines, context.getPreDayMachines());
 
         // 4、若调用方有输入 最大限制机台，且激活台数大于最大限制台数，则激活台数 = 输入的最大限制台
-        Integer limitMaxMachines = 0;
+        Integer limitMaxMachines = -1;
         if (deductMouldVo.getDayMaxMachinesLimitMap() != null && deductMouldVo.getDayMaxMachinesLimitMap().get(context.getCurrentDate()) != null){
             limitMaxMachines =deductMouldVo.getDayMaxMachinesLimitMap().get(context.getCurrentDate());
         }
-        if (limitMaxMachines > 0 && activeMachines > limitMaxMachines){
+        if (limitMaxMachines > -1 && activeMachines > limitMaxMachines){
             activeMachines = limitMaxMachines;
         }
 

@@ -268,7 +268,11 @@ public enum MonthPlanEnums {
     /**
      * SYS0209007 单位：天，跨结构模具分配比例在该值内完成调整
      */
-    MOLD_ALLOCATION_RATIO_CYCLE("SYS0209007", "单位：天，跨结构模具分配比例在该值内完成调整");
+    MOLD_ALLOCATION_RATIO_CYCLE("SYS0209007", "单位：天，跨结构模具分配比例在该值内完成调整"),
+    /**
+     * SYS0209008 结构日分配多台成型机时，需要额外增加的硫化机台数配置
+     */
+    CX_LH_RATIO_EXTRA("SYS0209008","结构日分配多台成型机时，需要额外增加的硫化机台数配置");
 
     private final String code;
     private final String name;
