@@ -431,7 +431,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 	@Override
 	protected void builderCondition(QueryWrapper<CxScheduleResult> queryWrapper, CxScheduleResult queryVO) {
 		// 排程日期查询
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getScheduleDate()), "SCHEDULE_DATE", queryVO.getScheduleDate());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getScheduleDate()), "SCHEDULE_DATE", queryVO.getScheduleDate());
 		// 机台代码模糊查询
 		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getCxMachineCode()), "CX_MACHINE_CODE", queryVO.getCxMachineCode());
 		// 胎胚代码模糊查询
