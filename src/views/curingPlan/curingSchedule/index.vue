@@ -590,7 +590,7 @@ export default {
           ],
         },
         {
-          label: this.$t("中班") + this.dateList[7].shiftDate,
+          label: this.$t("中班") + " " + this.dateList[7].shiftDate,
           children: [
             // {
             //   prop: "class8Sort",
