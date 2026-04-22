@@ -34,8 +34,11 @@
         >
         
         <el-button
-          type="success"
+          type="primary"
+          plain
           v-hasPermi="['lh:mouldCleanPlan:sync']"
+          :loading="syncLoading"
+          :disabled="syncLoading"
           @click="handleSyncFromWarn"
           >{{ $t("ui.mould.clean.plan.sync.from.warn") }}</el-button
         >
@@ -96,6 +99,7 @@ export default {
       importRules: {},
       machineOptions: [],
       machineLoading: false,
+      syncLoading: false,
     };
   },
   computed: {
@@ -133,7 +137,18 @@ export default {
         {
           prop: "remark",
           label: this.$t("ui.data.column.mouldCleanPlan.remark"),
-          showOverflowTooltip: true
+          showOverflowTooltip: true,
+          formatter: (row, column, value) => {
+            // 解码后端返回的占位符
+            if (!value) return value;
+            return value
+              .replace(/__PERCENT__/g, '%')
+              .replace(/__AMP__/g, '&')
+              .replace(/__LT__/g, '<')
+              .replace(/__GT__/g, '>')
+              .replace(/__QUOT__/g, '"')
+              .replace(/__APOS__/g, "'");
+          }
         },
         {
           prop: "updateTime",
@@ -173,6 +188,12 @@ export default {
     },
     searchColumns() {
       return [
+        {
+          label: this.$t("common.factory"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+        },
         {
           label: this.$t("ui.data.column.mouldCleanPlan.lhCode"),
           prop: "lhCode",
@@ -222,17 +243,20 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
+          this.syncLoading = true;
           const res = await syncFromWarn();
           this.$modal.msgSuccess(res.msg);
           this.getList();
         } catch (error) {
           console.error(error);
+        } finally {
+          this.syncLoading = false;
         }
       });
     },
 
     handleViewWarn() {
-      this.$tab.openPage("模具清洗预警", "lhMouldCleanWarn");
+      this.$router.push({ name: "LhMouldCleanWarn" });
     },
 
     handleDeleteAll() {
@@ -297,7 +321,12 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/lh/mouldCleanPlan/export", this.formatParams(false));
+      const params = this.getExportParams();
+      console.log('=== 导出参数 ===');
+      console.log('查询条件:', this.query);
+      console.log('排序条件:', this.sort);
+      console.log('完整导出参数:', params);
+      downloadLink("/lh/mouldCleanPlan/export", params);
     },
 
     formatParams(hasPage = true) {
@@ -311,6 +340,16 @@ export default {
         params.pageNum = this.page.current;
       }
 
+      return params;
+    },
+    getExportParams() {
+      const params = {
+        ...this.query,
+      };
+      if (this.sort && this.sort.orderByColumn) {
+        params.orderByColumn = this.sort.orderByColumn;
+        params.isAsc = this.sort.isAsc;
+      }
       return params;
     },
     // api
@@ -342,26 +381,25 @@ export default {
     },
   },
   created() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const defaultDate = `${year}-${month}-${day}`;
-    
+    console.log('=== 模具清洗计划 created 执行 ===');
+    let defaultParams = {
+      factoryCode: "116",
+    };
     this.search = {
-      cleanTime: [defaultDate, defaultDate]
+      ...defaultParams,
     };
     this.query = {
-      cleanTimeBegin: defaultDate,
-      cleanTimeEnd: defaultDate
+      ...defaultParams,
     };
   },
   mounted() {
+    console.log('=== 模具清洗计划 mounted 执行 ===');
     this.getList();
     this.loadMachineList();
   },
   activated() {
-    // this.getList();
+    console.log('=== 模具清洗计划 activated 执行 ===');
+    this.getList();
   },
 };
 </script>

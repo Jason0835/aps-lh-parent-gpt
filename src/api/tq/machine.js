@@ -1,10 +1,5 @@
 import request,{ downloadLink } from '@/utils/request'
 
-/**
- * 成型机台列表
- * @param {Object} query
- * @returns
- */
 export function listMachine(query) {
   return request({
     url: 'tq/machine/list',
@@ -12,14 +7,23 @@ export function listMachine(query) {
     data: query
   })
 }
-/**
- * 编辑成型机台
- * @param {Object} query
- * @returns
- */
+export function addMachine(query) {
+  return request({
+    url: 'tq/machine/add',
+    method: 'post',
+    data: query
+  })
+}
 export function editMachine(query) {
   return request({
     url: 'tq/machine/edit',
+    method: 'post',
+    data: query
+  })
+}
+export function removeMachine(query) {
+  return request({
+    url: 'tq/machine/remove',
     method: 'post',
     data: query
   })

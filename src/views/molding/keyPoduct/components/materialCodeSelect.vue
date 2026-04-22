@@ -56,6 +56,7 @@ export default {
       default: false,
     },
     oldList: Array | [],
+    structureName: String,
   },
   data() {
     return {
@@ -77,8 +78,8 @@ export default {
       query: {},
       showValue: "",
       loading: false,
-      valueProp: "materialCode",
-      labelProp: "materialCode",
+      valueProp: "embryoCode",
+      labelProp: "embryoCode",
       data: [],
 
       allSelectData: [],
@@ -96,6 +97,10 @@ export default {
         {
           label: this.$t("ui.data.colume.wms.unused.productCode"),
           prop: "materialCode",
+        },
+        {
+          label: this.$t("ui.data.rubberMaterial.embryoCode"),
+          prop: "embryoCode",
         },
       ];
     },
@@ -244,6 +249,7 @@ export default {
         ...this.query,
         // userName: this.filterKey,
         status: 0, //过滤，只显示启用的用户
+        structureName: this.structureName,
       };
     },
     getTitle() {
