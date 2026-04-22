@@ -107,7 +107,9 @@ public class ProductionMdmDataServiceImpl extends AbstractDataService implements
         queryWrapper.eq("FACTORY_CODE", factoryCode);
         queryWrapper.eq("PROC_CODE", ProductionProcessesTypeEnum.MONTH_PLAN.getProcCode());
         queryWrapper.ge("PRODUCTION_DATE", productionStartDate);
-        queryWrapper.lt("PRODUCTION_DATE", DateUtils.addDays(productionEndDate, 1));
+        queryWrapper.le("PRODUCTION_DATE", productionEndDate);
+        //queryWrapper.lt("PRODUCTION_DATE", DateUtils.addDays(productionEndDate, 1));
+
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         List<MdmWorkCalendar> configurationList = mdmWorkCalendarEntityMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(configurationList)) {
