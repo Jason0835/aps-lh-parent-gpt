@@ -9,8 +9,8 @@ import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
-import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.common.utils.StringUtil;
 
 import java.util.HashMap;
 import java.util.List;
@@ -36,6 +36,11 @@ public abstract class AbstractDailyCapacityLimit {
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new HashMap<>();
         MpDailyCapacityLimitVo dailyCapacityLimitVo;
         Integer decLhMachines = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
+        //结构日分配多台成型机时，需要额外增加的硫化机台数配置
+        String cxLhRatioExtra = (String) contextDTO.getParamMap().get(MonthPlanEnums.CX_LH_RATIO_EXTRA.getCode());
+        Map<String,Integer> addStructExtraMap = new HashMap<>();
+        addStructExtraMachines(cxLhRatioExtra, addStructExtraMap);
+        int extraLhMachines = 0;
         for (int i = contextDTO.getStructureStartDay(); i<= FactoryConstant.MONTH_MAX_DAY; i++){
             dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(i);
             if (dailyCapacityLimitVo == null){
@@ -43,10 +48,33 @@ public abstract class AbstractDailyCapacityLimit {
             }
             dailyCapacityLimitVo.setDailyDate(i);
             // 1、设置每日硫化机台总限制数、每日胎胚种类总限制数
-            setMaxLhMachinesWithEmbryoTypes(contextDTO.getOneStructureAllocationList(),i,dailyCapacityLimitVo,decLhMachines);
+            if (addStructExtraMap.get(contextDTO.getStructureName()) != null){
+                extraLhMachines = addStructExtraMap.get(contextDTO.getStructureName());
+            }
+            setMaxLhMachinesWithEmbryoTypes(contextDTO.getOneStructureAllocationList(),i,dailyCapacityLimitVo,decLhMachines,extraLhMachines);
             dailyCapacityLimitVoMap.put(i,dailyCapacityLimitVo);
         }
         return dailyCapacityLimitVoMap;
+    }
+
+    /**
+     * 结构多成型机台时，需要额外增加的硫化机台数配置
+     * @param cxLhRatioExtra 配置参数
+     * @param extraStructMap 额外结构硫化机台数配置
+     */
+    private static void addStructExtraMachines(String cxLhRatioExtra, Map<String, Integer> extraStructMap) {
+        if (StringUtil.isEmptyWithTrim(cxLhRatioExtra)){
+            return;
+        }
+        String[] extraParamArr = cxLhRatioExtra.split(";");
+        if (extraParamArr.length > 0){
+            for (String extraParam : extraParamArr){
+                String[] extraParamArr2 = extraParam.split(",");
+                if (extraParamArr2.length > 1){
+                    extraStructMap.put(extraParamArr2[0], Integer.valueOf(extraParamArr2[1]));
+                }
+            }
+        }
     }
 
     /**
@@ -56,22 +84,28 @@ public abstract class AbstractDailyCapacityLimit {
      * @param dailyCapacityLimitVo 日产能限制Vo
      */
     public void setMaxLhMachinesWithEmbryoTypes(List<MpStructureAllocation> mpStructAllocList, int iDay,
-                                                 MpDailyCapacityLimitVo dailyCapacityLimitVo,int decLhMachines) {
+                                                 MpDailyCapacityLimitVo dailyCapacityLimitVo,int decLhMachines,int extraLhMachines) {
         if(PubUtil.isEmpty(mpStructAllocList)){
             return;
         }
 
         int iMaxLhMachines = 0;
         int iMaxEmbryoTypes = 0;
+        int iCxMachines = 0;
         for (MpStructureAllocation strutAllocVo: mpStructAllocList){
             if (iDay >= strutAllocVo.getBeginDay() && iDay <= strutAllocVo.getEndDay()){
                 iMaxLhMachines += Convert.toInt(strutAllocVo.getMaxLhMachineCount(), 0);
                 iMaxEmbryoTypes += Convert.toInt(strutAllocVo.getMaxEmbryoCodeCount(), 0);
+                iCxMachines += 1;
             }
             if (iDay == strutAllocVo.getBeginDay()){
                 //若当前日 = 结构转产开始日，减 硫化机台数 ,防止切换结构时，换模过多
                 iMaxLhMachines -= (decLhMachines > strutAllocVo.getMaxLhMachineCount() ? strutAllocVo.getMaxLhMachineCount() : decLhMachines);
             }
+        }
+        if (iCxMachines > 1){
+            //若成型机有多台，增加额外的硫化机台数
+            iMaxLhMachines += extraLhMachines;
         }
         dailyCapacityLimitVo.setMaxLhMachines(iMaxLhMachines);
         dailyCapacityLimitVo.setMaxEmbryoTypes(iMaxEmbryoTypes);
