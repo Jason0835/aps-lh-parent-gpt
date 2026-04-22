@@ -14,12 +14,12 @@ public class DeductMouldTest {
         // 创建测试数据
         DeductMouldVo deductMouldVo = new DeductMouldVo();
         deductMouldVo.setMaterialCode("SKU001");
-        deductMouldVo.setTotalQty(3140);
+        deductMouldVo.setTotalQty(2240);
         deductMouldVo.setRemainingQty(deductMouldVo.getTotalQty());
-        deductMouldVo.setMachinesAssigned(5);
-        deductMouldVo.setDailyOutputPerMachine(46);
+        deductMouldVo.setMachinesAssigned(2);
+        deductMouldVo.setDailyOutputPerMachine(48);
         deductMouldVo.setStartDate(1);
-        deductMouldVo.setDeadline(30);
+        deductMouldVo.setDeadline(31);
 
         /*Set<Integer> shutDownDaySet = new HashSet<>();
         shutDownDaySet.add(5);

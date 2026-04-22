@@ -24,6 +24,7 @@ import java.util.Map;
  */
 public interface CoreScheduleAlgorithmService {
 
+
     /**
      * 执行完整排程算法
      *
