@@ -2078,7 +2078,7 @@ public class MatchingProductionHandler {
                     plan.setMidLossQty(requirePlan.getMidQty());
                     plan.setPostponeQty(requirePlan.getPostponeQty());
                 }
-                plan.setConventionProductionQty(matchingQty);
+//                plan.setConventionProductionQty(matchingQty);
                 // 差异
                 plan.setDifferenceQty(oldPlan.getDifferenceQty() > factProdQty? oldPlan.getDifferenceQty() - factProdQty: 0);
                 plan.setMouldCavityQty(oldPlan.getMouldCavityQty());
@@ -2087,7 +2087,7 @@ public class MatchingProductionHandler {
                 plan.setReason(oldPlan.getReason());
                 plan.setId(oldPlan.getId());
             } else {
-                plan.setConventionProductionQty(matchingQty);
+//                plan.setConventionProductionQty(matchingQty);
                 if (plan.getProductionSequence() == null) {
                     productionSequence++;
                     plan.setProductionSequence(productionSequence);

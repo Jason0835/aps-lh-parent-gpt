@@ -836,7 +836,11 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
                 this.heightProductionQty = this.heightProductionQty + remainingQty;
             }
         }
-
+        // 还有剩余的，放到储备
+        if (remainingQty > 0) {
+            conventionProductionQty = remainingQty;
+        }
+        
     }
     
     /**
