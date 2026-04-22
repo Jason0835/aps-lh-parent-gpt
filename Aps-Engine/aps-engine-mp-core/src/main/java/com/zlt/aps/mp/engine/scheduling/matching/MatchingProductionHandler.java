@@ -110,8 +110,8 @@ public class MatchingProductionHandler {
     public void matchingProduction(String productionVersion, TbrProductionContext productionContext) {
         try {
             String config = sysConfigService.selectConfigByKey("monthPlan.skip.matching");
-//            if (!isIgnorSkip && StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
-            if (true) {
+            if (!isIgnorSkip && StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
+//            if (true) {
                 if (productionContext != null) {
                     baseDao.saveBatch(this.buildProductionStatisticsList(productionContext)); // 跳过搭配也要保存统计
                 }
@@ -2079,7 +2079,6 @@ public class MatchingProductionHandler {
                     plan.setPostponeQty(requirePlan.getPostponeQty());
                 }
                 plan.setConventionProductionQty(matchingQty);
-                plan.setTotalQty(oldPlan.getTotalQty() + matchingQty + factProdQty);
                 // 差异
                 plan.setDifferenceQty(oldPlan.getDifferenceQty() > factProdQty? oldPlan.getDifferenceQty() - factProdQty: 0);
                 plan.setMouldCavityQty(oldPlan.getMouldCavityQty());
@@ -2089,7 +2088,6 @@ public class MatchingProductionHandler {
                 plan.setId(oldPlan.getId());
             } else {
                 plan.setConventionProductionQty(matchingQty);
-                plan.setTotalQty(matchingQty + factProdQty);
                 if (plan.getProductionSequence() == null) {
                     productionSequence++;
                     plan.setProductionSequence(productionSequence);
@@ -2098,7 +2096,8 @@ public class MatchingProductionHandler {
                 plan.setFactProdReqQty(0);
                 plan.setReason(null);
             }
-            plan.allocateProductionByPriority();
+            plan.statisticsTotalQty(); // 重新统计汇总值
+            plan.allocateProductionByPriority(); // 按优先级重新分配实际排产量
             plan.setCreateBy(firstPlan.getCreateBy());
             plan.setCreateTime(firstPlan.getCreateTime());
             plan.setUpdateBy(firstPlan.getUpdateBy());

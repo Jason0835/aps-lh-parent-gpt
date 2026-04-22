@@ -40,7 +40,7 @@ public abstract class AbstractDailyCapacityLimit {
         String cxLhRatioExtra = (String) contextDTO.getParamMap().get(MonthPlanEnums.CX_LH_RATIO_EXTRA.getCode());
         Map<String,Integer> addStructExtraMap = new HashMap<>();
         addStructExtraMachines(cxLhRatioExtra, addStructExtraMap);
-        int extraLhMachines = 0;
+        int extraLhMachines;
         for (int i = contextDTO.getStructureStartDay(); i<= FactoryConstant.MONTH_MAX_DAY; i++){
             dailyCapacityLimitVo = dailyCapacityLimitVoMap.get(i);
             if (dailyCapacityLimitVo == null){
@@ -48,6 +48,7 @@ public abstract class AbstractDailyCapacityLimit {
             }
             dailyCapacityLimitVo.setDailyDate(i);
             // 1、设置每日硫化机台总限制数、每日胎胚种类总限制数
+            extraLhMachines = 0;
             if (addStructExtraMap.get(contextDTO.getStructureName()) != null){
                 extraLhMachines = addStructExtraMap.get(contextDTO.getStructureName());
             }
