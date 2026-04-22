@@ -643,15 +643,15 @@ export default {
         },
         {
           label: this.$t("物料编码"),
-          prop: "productCode",
+          prop: "materialCode",
         },
         {
           label: this.$t("物料描述"),
-          prop: "productCode",
+          prop: "materialDesc",
         },
         {
           label: this.$t("胚胎描述"),
-          prop: "productCode",
+          prop: "mainMaterialDesc",
         },
         {
           label: this.$t("ui.data.column.cxScheduleResult.lhMachineCode"),
