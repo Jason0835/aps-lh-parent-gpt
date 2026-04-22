@@ -19,6 +19,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -108,6 +109,13 @@ public class LhMouldChangePlanUIController extends BaseUIController<LhMouldChang
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(LhMouldChangePlan lhMouldChangePlan) {
+        if (lhMouldChangePlan.getId() != null) {
+            LhMouldChangePlan oldData = iLhMouldChangePlanService.getInfo(lhMouldChangePlan.getId());
+            if (oldData != null) {
+                lhMouldChangePlan.setLhResultBatchNo(oldData.getLhResultBatchNo());
+            }
+        }
+
         if (UserConstants.NOT_UNIQUE.equals(iLhMouldChangePlanService.checkUnique(lhMouldChangePlan))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.checkUnique"));
         }
@@ -213,6 +221,8 @@ public class LhMouldChangePlanUIController extends BaseUIController<LhMouldChang
     @PostMapping("/getMachineList")
     @ResponseBody
     public AjaxResult getMachineList(LhMachineInfo query) {
+        query.setMachineCode(StringUtils.trimToEmpty(query.getMachineCode()));
+        query.setMachineName(StringUtils.trimToEmpty(query.getMachineName()));
         TableDataInfo tableDataInfo = iLhMachineInfoService.list(query);
         return AjaxResult.success(tableDataInfo.getRows());
     }
