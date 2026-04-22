@@ -285,3 +285,10 @@ export function getMachineList(query) {
     data: query,
   })
 }
+
+export function listCxScheduleDetailByMainId(mainId) {
+  return request({
+    url: `/cx/cxScheduleDetail/listByMainId/${mainId}`,
+    method: 'get',
+  })
+}

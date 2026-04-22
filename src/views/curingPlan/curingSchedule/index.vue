@@ -195,6 +195,7 @@ import {
   getScheduleDate,
   adjustTextNo,
 } from "@/api/lh/scheduleResult";
+import { checkPermi } from "@/utils/permission";
 
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import TltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -219,7 +220,14 @@ export default {
     ChangeReleaseStatusDialog,
     changePlanDialog,
   },
-  dicts: ["adjust_type", "IS_RELEASE", "biz_factory_name", "biz_end_type",'biz_construction_stage'],
+  dicts: [
+    "adjust_type",
+    "IS_RELEASE",
+    "biz_factory_name",
+    "biz_end_type",
+    "biz_construction_stage",
+    "lh_schedule_type",
+  ],
   provide() {
     return {
       parentDict: this.dict,
@@ -261,9 +269,11 @@ export default {
       },
       sort: {},
       search: {
+        factoryCode: "116",
         scheduleDate: defaultDate,
       },
       query: {
+        factoryCode: "116",
         scheduleDate: defaultDate,
       },
       selection: [],
@@ -326,6 +336,14 @@ export default {
         {
           label: this.$t("胎胚描述"),
           prop: "mainMaterialDesc",
+        },
+        {
+          prop: "scheduleType",
+          label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.lh_schedule_type, value);
+          },
         },
 
         {
@@ -589,7 +607,7 @@ export default {
           ],
         },
         {
-          label: this.$t("中班") + this.dateList[7].shiftDate,
+          label: this.$t("中班") + " " + this.dateList[7].shiftDate,
           children: [
             // {
             //   prop: "class8Sort",
@@ -618,16 +636,68 @@ export default {
           prop: "remark",
           label: this.$t("备注"),
         },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.scheduleResult.updateTime"),
+          minWidth: 160,
+        },
+        {
+          prop: "rowOperator",
+          label: this.$t("common.option"),
+          width: 150,
+          fixed: "right",
+          render: ({ row }) => {
+            return (
+              <div>
+                {checkPermi(["lh:lhScheduleResult:save"]) ? (
+                  <el-button
+                    type="text"
+                    size="mini"
+                    icon="el-icon-edit"
+                    onClick={() => this.handleEdit(row)}
+                  >
+                    {this.$t("ui.frame.btn.modify")}
+                  </el-button>
+                ) : null}
+                {checkPermi(["lh:lhScheduleResult:remove"]) ? (
+                  <el-button
+                    type="text"
+                    size="mini"
+                    icon="el-icon-delete"
+                    onClick={() => this.handleDelete(row)}
+                  >
+                    {this.$t("ui.frame.btn.delete")}
+                  </el-button>
+                ) : null}
+              </div>
+            );
+          },
+        },
       ];
       return columns;
     },
     searchColumns() {
       return [
         {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.orderNo"),
+          prop: "orderNo",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.batchNo"),
+          prop: "batchNo",
         },
         {
           label: this.$t("ui.data.column.scheduleResult.isRelease"),
@@ -643,15 +713,15 @@ export default {
         },
         {
           label: this.$t("物料编码"),
-          prop: "productCode",
+          prop: "materialCode",
         },
         {
           label: this.$t("物料描述"),
-          prop: "productCode",
+          prop: "materialDesc",
         },
         {
           label: this.$t("胚胎描述"),
-          prop: "productCode",
+          prop: "mainMaterialDesc",
         },
         {
           label: this.$t("ui.data.column.cxScheduleResult.lhMachineCode"),
