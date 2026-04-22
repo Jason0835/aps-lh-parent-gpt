@@ -208,7 +208,7 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iLhSpecifyMachineService.importData(context,false);
+        AjaxResult ajaxResult = iLhSpecifyMachineService.importData(context,updateSupport);
         return ajaxResult;
     }
 
