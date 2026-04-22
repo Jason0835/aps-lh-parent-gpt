@@ -33,7 +33,7 @@ ruoyi:
 
 #nacos服务器
 nacos:
-  server-addr: 192.168.10.123:8848
+  server-addr: 127.0.0.1:8848
 
 # 日志配置
 logging:

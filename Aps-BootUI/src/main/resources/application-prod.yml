@@ -18,14 +18,14 @@ ruoyi:
 server-port: 9066
 #nacos服务器
 nacos:
-  server-addr: 10.135.55.216:8848
+  server-addr: 172.21.7.167:8848,172.21.7.168:8848,172.21.7.169:8848
   run-group: APS_PROD_GROUP
   cfg-group: APS_PROD_GROUP
   run-namespace: "prod"
   cfg-namespace: "prod"
 url:
-  preview: http://10.135.55.216:8012
-  current: http://10.135.55.216:9066
+  preview: http://172.21.7.170:8012
+  current: http://172.21.7.170:9066
 #系统标识
 project:
   project-tag: aps
@@ -34,21 +34,20 @@ project:
 # Spring配置
 spring-app-name: aps-bootui
 # 单机配置 addr和port
-redis-addr: 10.135.55.216
-redis-port: 6379
-redis-password: "0234kz9*l"
-redis-database: 1
-redis-sentinel-nodes:
+redis-sentinel-master: mymaster
+redis-sentinel-nodes: 172.21.7.167:26379,172.21.7.168:26379,172.21.7.169:26379
+redis-password: 99hGAKSuM8d
+redis-database: 5
 #redis-password:
-zipkin-addr: "http://10.135.55.216:9411/"
+zipkin-addr: "http://172.21.7.170:9411/"
 
 #是否需要走单点
 shiro-sso-enable: false
 sso:
-  cas-addr: http://10.135.55.216:8899/cas
+  cas-addr: http://172.21.7.170:8899/cas
   #cas-addr: https://casserverpac4j.herokuapp.com
 #网关配置,只用来取验证码，feignClient使用的是注册中心的网关信息。
-gateway-addr: http://10.135.55.216:8080/
+gateway-addr: http://172.21.7.170:8080/
 # 开发环境配置
 server:
   # 服务器的HTTP端口，默认为80
@@ -263,7 +262,7 @@ binder:
 
 #JVM启动参数：java.compile=none
 #fileManage-enable: true
-#fileManage-minio-addr: http://10.135.55.216:9000  #对象存储服务的URL
+#fileManage-minio-addr: http://172.21.7.170:9000  #对象存储服务的URL
 #fileManage-minio-accessKey: uploaduser #Access key账户
 #fileManage-minio-secretKey: uploaduser  #Secret key密码
 #uploadFilePath:
