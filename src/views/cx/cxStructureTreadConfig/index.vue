@@ -193,7 +193,8 @@ export default {
       downloadLink('/cx/cxStructureTreadConfig/export', this.formatParams(false))
     },
     handleSearch(data) {
-      this.query = data
+      this.search = { ...data }
+      this.query = { ...data }
       if (data.stockDateRange && data.stockDateRange.length === 2) {
         this.query.stockDateBegin = data.stockDateRange[0]
         this.query.stockDateEnd = data.stockDateRange[1]

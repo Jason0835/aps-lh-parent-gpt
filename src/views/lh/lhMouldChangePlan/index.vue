@@ -374,7 +374,8 @@ export default {
       }
     },
     handleSearch(data) {
-      this.query = data;
+      this.search = { ...data };
+      this.query = { ...data };
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -447,14 +448,30 @@ export default {
     },
     activated() {
         const today = this.getTodayDate();
-        this.search = {
-            factoryCode: "116",
-            scheduleDate: today,
-        };
-        this.query = {
-            factoryCode: "116",
-            scheduleDate: today,
-        };
+        if (this.search.factoryCode === undefined || this.search.factoryCode === null) {
+            this.search = {
+                ...this.search,
+                factoryCode: "116",
+            };
+        }
+        if (this.search.scheduleDate === undefined || this.search.scheduleDate === null) {
+            this.search = {
+                ...this.search,
+                scheduleDate: today,
+            };
+        }
+        if (this.query.factoryCode === undefined || this.query.factoryCode === null) {
+            this.query = {
+                ...this.query,
+                factoryCode: "116",
+            };
+        }
+        if (this.query.scheduleDate === undefined || this.query.scheduleDate === null) {
+            this.query = {
+                ...this.query,
+                scheduleDate: today,
+            };
+        }
         this.getList();
     },
 };
