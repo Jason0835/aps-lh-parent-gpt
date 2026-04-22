@@ -2074,22 +2074,14 @@ public class MatchingProductionHandler {
             if (oldPlan != null) {
                 MonthPlanProductionRequirePlanVo requirePlan = requireMap.get(oldPlan.getMaterialCode());
                 if (requirePlan != null) {
-                    oldPlan.setHeightQty(requirePlan.getHeightQty());
-                    oldPlan.setMidLossQty(requirePlan.getMidQty());
-                    oldPlan.setPostponeQty(requirePlan.getPostponeQty());
+                    plan.setHeightLossQty(requirePlan.getHeightQty());
+                    plan.setMidLossQty(requirePlan.getMidQty());
+                    plan.setPostponeQty(requirePlan.getPostponeQty());
                 }
                 plan.setConventionProductionQty(matchingQty);
                 plan.setTotalQty(oldPlan.getTotalQty() + matchingQty + factProdQty);
-                Integer temFactProdQty = factProdQty;
-                // 高优先级
-                Integer diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "heightQty", "heightProductionQty");
-                temFactProdQty -= diffQty;
-                // 中优先级
-                diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "midLossQty", "midProductionQty");
-                temFactProdQty -= diffQty;
                 // 差异
                 plan.setDifferenceQty(oldPlan.getDifferenceQty() > factProdQty? oldPlan.getDifferenceQty() - factProdQty: 0);
-                plan.setCycleProductionQty(oldPlan.getCycleProductionQty());
                 plan.setMouldCavityQty(oldPlan.getMouldCavityQty());
                 plan.setTypeBlockQty(oldPlan.getTypeBlockQty());
                 plan.setFactProdReqQty(oldPlan.getFactProdReqQty());
@@ -2098,14 +2090,6 @@ public class MatchingProductionHandler {
             } else {
                 plan.setConventionProductionQty(matchingQty);
                 plan.setTotalQty(matchingQty + factProdQty);
-                Integer temFactProdQty = factProdQty;
-                // 高优先级
-                Integer diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "heightQty", "heightProductionQty");
-                temFactProdQty -= diffQty;
-                // 中优先级
-                diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "midLossQty", "midProductionQty");
-                temFactProdQty -= diffQty;
-                plan.setCycleProductionQty(0);
                 if (plan.getProductionSequence() == null) {
                     productionSequence++;
                     plan.setProductionSequence(productionSequence);
@@ -2114,6 +2098,7 @@ public class MatchingProductionHandler {
                 plan.setFactProdReqQty(0);
                 plan.setReason(null);
             }
+            plan.allocateProductionByPriority();
             plan.setCreateBy(firstPlan.getCreateBy());
             plan.setCreateTime(firstPlan.getCreateTime());
             plan.setUpdateBy(firstPlan.getUpdateBy());
