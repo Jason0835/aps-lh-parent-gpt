@@ -7,6 +7,8 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
 import com.zlt.aps.cx.service.CxScheduleResultService;
@@ -428,13 +430,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
 	@Override
 	protected void builderCondition(QueryWrapper<CxScheduleResult> queryWrapper, CxScheduleResult queryVO) {
-		// 排程日期区间查询（使用 searchValue 传递开始时间，remark 传递结束时间）
-		if (PubUtil.isNotEmpty(queryVO.getSearchValue()) && PubUtil.isNotEmpty(queryVO.getRemark())) {
-            Date beginDay = DateUtil.parse(queryVO.getSearchValue());
-            Date endDay = DateUtil.parse(queryVO.getRemark());
-            endDay = DateUtil.endOfDay(endDay);
-			queryWrapper.between("SCHEDULE_DATE", beginDay, endDay);
-		}
+		// 排程日期查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getScheduleDate()), "SCHEDULE_DATE", queryVO.getScheduleDate());
 		// 机台代码模糊查询
 		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getCxMachineCode()), "CX_MACHINE_CODE", queryVO.getCxMachineCode());
 		// 胎胚代码模糊查询
