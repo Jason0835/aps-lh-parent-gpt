@@ -22,6 +22,7 @@ import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -147,6 +148,15 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     public String getDocTypeCode() {
         return "OUT2046";
     }
+
+
+    @Override
+    protected SysDocType getSysDocType() {
+        SysDocType sysDocType = new SysDocType();
+        sysDocType.setDocTypeCode("OUT2046");
+        return sysDocType;
+    }
+
 
     @Override
     public List<LhScheduleShiftDateVO> listScheduleShiftDates(Date scheduleDate) {
