@@ -110,8 +110,8 @@ public class MatchingProductionHandler {
     public void matchingProduction(String productionVersion, TbrProductionContext productionContext) {
         try {
             String config = sysConfigService.selectConfigByKey("monthPlan.skip.matching");
-//            if (!isIgnorSkip && StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
-            if (true) {
+            if (!isIgnorSkip && StringUtils.isNotBlank(config) && Boolean.parseBoolean(config)) {
+//            if (true) {
                 if (productionContext != null) {
                     baseDao.saveBatch(this.buildProductionStatisticsList(productionContext)); // 跳过搭配也要保存统计
                 }
