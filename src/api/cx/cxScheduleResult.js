@@ -275,6 +275,7 @@ export function generatePlan(query) {
     headers: {
       'Content-Type': 'application/json;charset=UTF-8'
     },
+    _passError: true,
   })
 }
 

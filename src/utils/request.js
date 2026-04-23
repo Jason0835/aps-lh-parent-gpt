@@ -256,6 +256,9 @@ service.interceptors.response.use(
       }
       return Promise.reject('redirect')
     } else if (code === 500) {
+      if (res.config._passError) {
+        return res.data
+      }
       if (res.config.url.indexOf('/monthplan/supplyOrderPool/checkOverdue') != -1) {
         return Promise.reject(msg)
       } else {

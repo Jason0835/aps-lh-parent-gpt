@@ -126,16 +126,82 @@ export default {
     async generate(params){
       this.loading = true;
       try {
-        this.loading = true;
-
-        await generatePlan({
+        const result = await generatePlan({
           ...params,
           day:'3'
         });
         this.loading = false;
-        this.$modal.msgSuccess(result.msg);
-        this.$emit("success");
-        this.hide();
+        if (result.code === 200) {
+          this.$modal.msgSuccess(result.msg);
+          this.$emit("success");
+          this.hide();
+        } else if (result.code === 500) {
+          const errorData = result.data || {};
+          const errors = errorData.errors || [];
+          const warnings = errorData.warnings || [];
+          
+          // 构建标题，包含日期
+          const titleMatch = result.msg.match(/排程失败\[(\d{4}-\d{2}-\d{2})\]:/);
+          const scheduleDate = titleMatch ? titleMatch[1] : '';
+          const summaryMsg = result.msg.replace(/排程失败\[\d{4}-\d{2}-\d{2}\]:/, '').trim();
+          
+          let html = '';
+          
+          // 摘要信息
+          html += '<div style="margin-bottom:16px;padding:10px;background:#fef0f0;border:1px solid #fde2e2;border-radius:4px;">';
+          html += '<div style="color:#F56C6C;font-size:14px;font-weight:bold;">⚠️ 排程失败</div>';
+          if (scheduleDate) {
+            html += '<div style="color:#606266;font-size:13px;margin-top:4px;">排程日期：' + scheduleDate + '</div>';
+          }
+          html += '<div style="color:#909399;font-size:13px;margin-top:4px;">' + summaryMsg + '</div>';
+          html += '</div>';
+          
+          // 错误列表
+          if (errors.length > 0) {
+            html += '<div style="margin-bottom:12px;">';
+            html += '<div style="color:#F56C6C;font-size:13px;font-weight:bold;margin-bottom:8px;display:flex;align-items:center;">';
+            html += '<span style="display:inline-block;width:4px;height:14px;background:#F56C6C;margin-right:6px;border-radius:2px;"></span>';
+            html += '错误 (' + errorData.errorCount + ' 项)</div>';
+            
+            errors.forEach((item, idx) => {
+              html += '<div style="margin-bottom:12px;padding:10px;background:#fef0f0;border-left:3px solid #F56C6C;border-radius:3px;">';
+              html += '<div style="font-weight:bold;color:#303133;font-size:13px;margin-bottom:6px;">' + item.dataItem + '</div>';
+              html += '<div style="color:#F56C6C;font-size:13px;line-height:1.6;margin-bottom:4px;">' + item.message + '</div>';
+              if (item.suggestion) {
+                html += '<div style="color:#909399;font-size:12px;line-height:1.6;"><span style="opacity:0.7;">💡</span> ' + item.suggestion + '</div>';
+              }
+              html += '</div>';
+            });
+            html += '</div>';
+          }
+          
+          // 警告列表
+          if (warnings.length > 0) {
+            if (errors.length > 0) html += '<hr style="border:none;border-top:1px solid #EBEEF5;margin:16px 0;"/>';
+            html += '<div>';
+            html += '<div style="color:#E6A23C;font-size:13px;font-weight:bold;margin-bottom:8px;display:flex;align-items:center;">';
+            html += '<span style="display:inline-block;width:4px;height:14px;background:#E6A23C;margin-right:6px;border-radius:2px;"></span>';
+            html += '警告 (' + errorData.warningCount + ' 项)</div>';
+            
+            warnings.forEach((item, idx) => {
+              html += '<div style="margin-bottom:12px;padding:10px;background:#fdf6ec;border-left:3px solid #E6A23C;border-radius:3px;">';
+              html += '<div style="font-weight:bold;color:#303133;font-size:13px;margin-bottom:6px;">' + item.dataItem + '</div>';
+              html += '<div style="color:#E6A23C;font-size:13px;line-height:1.6;margin-bottom:4px;">' + item.message + '</div>';
+              if (item.suggestion) {
+                html += '<div style="color:#909399;font-size:12px;line-height:1.6;"><span style="opacity:0.7;">💡</span> ' + item.suggestion + '</div>';
+              }
+              html += '</div>';
+            });
+            html += '</div>';
+          }
+          
+          this.$alert(html, '排程失败', {
+            dangerouslyUseHTMLString: true,
+            type: 'error',
+            customClass: 'molding-auto-plan-error',
+            confirmButtonText: '知道了',
+          });
+        }
       } catch (error) {
         console.error(error);
         this.loading = false;
