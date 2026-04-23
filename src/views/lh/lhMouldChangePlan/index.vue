@@ -75,7 +75,7 @@ export default {
     TltUploadForm,
     infoDialog,
   },
-  dicts: ["biz_factory_name", "biz_yes_no", "CHANGE_MOULD_TYPE", "IS_RELEASE"],
+  dicts: ["biz_factory_name", "biz_yes_no", "CHANGE_MOULD_TYPE", "IS_RELEASE", "CLASS_NUM"],
   provide() {
     return {
       parentDict: this.dict,
@@ -161,19 +161,29 @@ export default {
           minWidth: 140,
         },
         {
+          prop: "classIndex",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhMouldChangePlan.classIndex"),
+          minWidth: 120,
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.CLASS_NUM, value);
+          },
+        },
+        {
           prop: "lhMachineCode",
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineCode"),
           minWidth: 140,
         },
-        {
-          prop: "lhMachineName",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineName"),
-          minWidth: 160,
-        },
+        // {
+        //   prop: "lhMachineName",
+        //   align: "center",
+        //   halign: "center",
+        //   label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineName"),
+        //   minWidth: 160,
+        // },
         {
           prop: "beforeMaterialCode",
           align: "center",
@@ -197,6 +207,13 @@ export default {
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.CHANGE_MOULD_TYPE, value);
           },
+        },
+        {
+          prop: "changeTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhMouldChangePlan.changeTime"),
+          minWidth: 140,
         },
         {
           prop: "mouldCode",
@@ -374,7 +391,8 @@ export default {
       }
     },
     handleSearch(data) {
-      this.query = data;
+      this.search = { ...data };
+      this.query = { ...data };
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -447,14 +465,30 @@ export default {
     },
     activated() {
         const today = this.getTodayDate();
-        this.search = {
-            factoryCode: "116",
-            scheduleDate: today,
-        };
-        this.query = {
-            factoryCode: "116",
-            scheduleDate: today,
-        };
+        if (this.search.factoryCode === undefined || this.search.factoryCode === null) {
+            this.search = {
+                ...this.search,
+                factoryCode: "116",
+            };
+        }
+        if (this.search.scheduleDate === undefined || this.search.scheduleDate === null) {
+            this.search = {
+                ...this.search,
+                scheduleDate: today,
+            };
+        }
+        if (this.query.factoryCode === undefined || this.query.factoryCode === null) {
+            this.query = {
+                ...this.query,
+                factoryCode: "116",
+            };
+        }
+        if (this.query.scheduleDate === undefined || this.query.scheduleDate === null) {
+            this.query = {
+                ...this.query,
+                scheduleDate: today,
+            };
+        }
         this.getList();
     },
 };

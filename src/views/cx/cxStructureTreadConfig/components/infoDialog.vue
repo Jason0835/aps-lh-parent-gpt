@@ -76,10 +76,7 @@ export default {
   },
   computed: {
     dialogTitle() {
-      return (
-        (this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add")) +
-        this.$t("ui.data.column.cxStructureTreadConfig.modelName")
-      );
+      return this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add");
     },
     columns() {
       return [

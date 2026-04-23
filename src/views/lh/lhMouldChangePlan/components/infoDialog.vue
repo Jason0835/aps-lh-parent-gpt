@@ -2,7 +2,7 @@
   <el-dialog
     :title="title"
     :visible="visible"
-    width="800px"
+    width="1100px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
@@ -48,6 +48,11 @@ export default {
       isEdit: false,
       form: {},
       machineOptions: [],
+      machinePageSize: 100,
+      machinePageNum: 1,
+      machineHasMore: true,
+      machineQuery: "",
+      machineScrollWrap: null,
       rules: {
         factoryCode: [
           {
@@ -76,6 +81,13 @@ export default {
             trigger: "change",
           },
         ],
+        scheduleDate: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
         lhMachineCode: [
           {
             required: true,
@@ -93,6 +105,9 @@ export default {
       },
     };
   },
+  beforeDestroy() {
+    this.unbindMachineScroll();
+  },
   computed: {
     title: function () {
       return this.isEdit
@@ -100,7 +115,7 @@ export default {
         : this.$t("common.button.add");
     },
     columns() {
-      return [
+      const columns = [
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.factoryCode"),
@@ -111,6 +126,7 @@ export default {
         {
           prop: "lhResultBatchNo",
           label: this.$t("ui.data.column.lhMouldChangePlan.lhResultBatchNo"),
+          disabled: this.isEdit,
           maxlength: 64,
         },
         {
@@ -140,6 +156,13 @@ export default {
           precision: 0,
         },
         {
+          prop: "classIndex",
+          label: this.$t("ui.data.column.lhMouldChangePlan.classIndex"),
+          type: "select",
+          dictData: this.parentDict.type.CLASS_NUM,
+          filterable: true,
+        },
+        {
           prop: "leftRightMould",
           label: this.$t("ui.data.column.lhMouldChangePlan.leftRightMould"),
           maxlength: 32,
@@ -158,15 +181,11 @@ export default {
           remoteMethod: this.remoteMachineMethod,
           loading: this.machineLoading,
           onFocus: this.handleMachineFocus,
+          onVisibleChange: this.handleMachineDropdownVisibleChange,
+          popperClass: "lh-mould-change-machine-select-dropdown",
           listeners: {
             change: this.handleMachineChange,
           },
-        },
-        {
-          prop: "lhMachineName",
-          label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineName"),
-          disabled: true,
-          maxlength: 64,
         },
         {
           prop: "beforeMaterialCode",
@@ -217,8 +236,7 @@ export default {
           prop: "changeTime",
           label: this.$t("ui.data.column.lhMouldChangePlan.changeTime"),
           type: "date",
-          dateType: "datetime",
-          valueFormat: "yyyy-MM-dd HH:mm:ss",
+          valueFormat: "yyyy-MM-dd",
         },
         {
           prop: "mouldCode",
@@ -245,31 +263,100 @@ export default {
           prop: "remark",
           label: this.$t("common.remark"),
           type: "textarea",
+          span: 24,
           rows: 3,
           maxlength: 500,
         },
       ];
+      return columns.map((item) => ({
+        span: 12,
+        ...item,
+      }));
     },
   },
   methods: {
-    async remoteMachineMethod(query) {
+    async queryMachineList(append = false) {
       this.machineLoading = true;
       try {
         const res = await getMachineList({
-          machineCode: query || "",
-          pageSize: 10,
+          machineCode: this.machineQuery,
+          pageNum: this.machinePageNum,
+          pageSize: this.machinePageSize,
         });
-        this.machineOptions = res || [];
+        const currentList = res.data || res || [];
+        if (append) {
+          const optionMap = new Map();
+          [...this.machineOptions, ...currentList].forEach((item) => {
+            optionMap.set(item.machineCode, item);
+          });
+          this.machineOptions = Array.from(optionMap.values());
+        } else {
+          this.machineOptions = currentList;
+        }
+        this.machineHasMore = currentList.length >= this.machinePageSize;
       } catch (error) {
         console.log(error);
       } finally {
         this.machineLoading = false;
       }
     },
-    handleMachineFocus() {
-      if (this.machineOptions.length === 0) {
-        this.remoteMachineMethod("");
+    async remoteMachineMethod(query) {
+      this.machineQuery = (query || "").trim();
+      this.machinePageNum = 1;
+      this.machineHasMore = true;
+      await this.queryMachineList(false);
+    },
+    async loadMoreMachineList() {
+      if (this.machineLoading || !this.machineHasMore) {
+        return;
       }
+      this.machinePageNum += 1;
+      await this.queryMachineList(true);
+    },
+    handleMachineScroll(event) {
+      if (this.machineLoading || !this.machineHasMore) {
+        return;
+      }
+      const wrap = event.target;
+      const reachedBottom =
+        wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 20;
+      if (reachedBottom) {
+        this.loadMoreMachineList();
+      }
+    },
+    bindMachineScroll() {
+      this.$nextTick(() => {
+        const wrap = document.querySelector(
+          ".lh-mould-change-machine-select-dropdown .el-select-dropdown__wrap"
+        );
+        if (!wrap) {
+          return;
+        }
+        this.unbindMachineScroll();
+        this.machineScrollWrap = wrap;
+        this.machineScrollWrap.addEventListener(
+          "scroll",
+          this.handleMachineScroll,
+          { passive: true }
+        );
+      });
+    },
+    unbindMachineScroll() {
+      if (!this.machineScrollWrap) {
+        return;
+      }
+      this.machineScrollWrap.removeEventListener("scroll", this.handleMachineScroll);
+      this.machineScrollWrap = null;
+    },
+    handleMachineDropdownVisibleChange(visible) {
+      if (visible) {
+        this.bindMachineScroll();
+        return;
+      }
+      this.unbindMachineScroll();
+    },
+    handleMachineFocus() {
+      this.remoteMachineMethod(this.machineQuery || "");
     },
     handleMachineChange(val) {
       if (val) {
@@ -339,10 +426,17 @@ export default {
         };
         this.machineOptions = [];
       }
+      this.machinePageNum = 1;
+      this.machineHasMore = true;
+      this.machineQuery = "";
     },
     hide() {
+      this.unbindMachineScroll();
       this.form = {};
       this.machineOptions = [];
+      this.machinePageNum = 1;
+      this.machineHasMore = true;
+      this.machineQuery = "";
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
