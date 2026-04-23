@@ -156,6 +156,9 @@ public class LhSpecifyMachineController extends AbstractDocBizController<LhSpeci
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("lineType")), "LINE_TYPE", queryVO.getFieldValueByFieldName("lineType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("jobType")), "JOB_TYPE", queryVO.getFieldValueByFieldName("jobType"));
+        queryWrapper.apply(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")),
+                "exists (select 1 from T_MDM_MATERIAL_INFO m where m.MATERIAL_CODE = SPEC_CODE and m.MATERIAL_DESC like {0})",
+                "%" + queryVO.getFieldValueByFieldName("materialDesc") + "%");
     }
 
 
