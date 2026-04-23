@@ -102,7 +102,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
 
 
     @ApiOperation("插单查询可用机台列表")
-    @RequiresPermissions("lh:lhScheduleResult:getScheduleMachineInfo")
+//    @RequiresPermissions("lh:lhScheduleResult:getScheduleMachineInfo")
     @PostMapping("/getScheduleMachineInfo")
     @ResponseBody
     public AjaxResult getScheduleMachineInfo(@RequestBody LhOrderInsertParamDTO insertParamDTO) {
