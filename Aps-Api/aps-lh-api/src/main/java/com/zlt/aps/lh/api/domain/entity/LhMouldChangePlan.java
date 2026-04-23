@@ -78,7 +78,7 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     private String lhMachineCode;
 
     @ApiModelProperty(value = "硫化机台名称")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.lhMachineName")
+//    @Excel(name = "ui.data.column.lhMouldChangePlan.lhMachineName")
     @TableField(value = "LH_MACHINE_NAME")
     private String lhMachineName;
 
