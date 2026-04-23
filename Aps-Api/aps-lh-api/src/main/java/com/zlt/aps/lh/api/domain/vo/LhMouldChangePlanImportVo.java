@@ -1,4 +1,4 @@
-package com.zlt.aps.lh.api.domain.entity;
+package com.zlt.aps.lh.api.domain.vo;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -24,7 +24,7 @@ import java.util.Date;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @TableName("t_lh_mould_change_plan")
-public class LhMouldChangePlan extends BaseEntity implements Serializable {
+public class LhMouldChangePlanImportVo extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -34,12 +34,12 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     private String factoryCode;
 
     @ApiModelProperty(value = "硫化结果批次号")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.lhResultBatchNo")
+//    @Excel(name = "ui.data.column.lhMouldChangePlan.lhResultBatchNo")
     @TableField(value = "LH_RESULT_BATCH_NO")
     private String lhResultBatchNo;
 
     @ApiModelProperty(value = "工单号")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.orderNo")
+//    @Excel(name = "ui.data.column.lhMouldChangePlan.orderNo")
     @TableField(value = "ORDER_NO")
     private String orderNo;
 
@@ -88,7 +88,7 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     private String beforeMaterialCode;
 
     @ApiModelProperty(value = "前规格物料描述")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.beforeMaterialDesc")
+//    @Excel(name = "ui.data.column.lhMouldChangePlan.beforeMaterialDesc")
     @TableField(value = "BEFORE_MATERIAL_DESC")
     private String beforeMaterialDesc;
 
@@ -103,7 +103,7 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     private String afterMaterialCode;
 
     @ApiModelProperty(value = "后规格物料描述")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.afterMaterialDesc")
+//    @Excel(name = "ui.data.column.lhMouldChangePlan.afterMaterialDesc")
     @TableField(value = "AFTER_MATERIAL_DESC")
     private String afterMaterialDesc;
 
@@ -120,12 +120,12 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     private String mouldCode;
 
     @ApiModelProperty(value = "是否发布 0-未发布，1-已发布 2-发布失败 3-超时发布 4-待发布")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.isRelease", dictType = "IS_RELEASE")
+//    @Excel(name = "ui.data.column.lhMouldChangePlan.isRelease", dictType = "IS_RELEASE")
     @TableField(value = "IS_RELEASE")
     private String isRelease;
 
     @ApiModelProperty(value = "模具交替完成状态 0-未完成；1-已完成")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.mouldStatus", dictType = "finish_completion")
+//    @Excel(name = "ui.data.column.lhMouldChangePlan.mouldStatus", dictType = "finish_completion")
     @TableField(value = "MOULD_STATUS")
     private String mouldStatus;
 

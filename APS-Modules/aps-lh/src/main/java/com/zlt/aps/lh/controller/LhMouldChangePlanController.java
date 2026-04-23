@@ -90,7 +90,8 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             if (origin != null) {
                 billVO.setOrderNo(origin.getOrderNo());
                 if (ApsConstant.IS_RELEASE.equals(origin.getIsRelease())) {
-                    billVO.setIsRelease(ApsConstant.APS_STRING_4);
+                    // 已发布单据编辑后需要重新进入待发布状态
+                    billVO.setIsRelease(ApsConstant.WAIT_RELEASING);
                     billVO.setMouldStatus(ApsConstant.FALSE);
                 } else {
                     billVO.setIsRelease(origin.getIsRelease());

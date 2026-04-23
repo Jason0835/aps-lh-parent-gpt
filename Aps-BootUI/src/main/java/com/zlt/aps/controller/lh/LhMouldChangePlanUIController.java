@@ -10,6 +10,7 @@ import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanImportVo;
 import com.zlt.aps.lh.api.service.ILhMouldChangePlanRemoteService;
 import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
@@ -182,7 +183,7 @@ public class LhMouldChangePlanUIController extends BaseUIController<LhMouldChang
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<LhMouldChangePlan> util = new ExcelUtil<>(LhMouldChangePlan.class);
+        ExcelUtil<LhMouldChangePlanImportVo> util = new ExcelUtil<>(LhMouldChangePlanImportVo.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }

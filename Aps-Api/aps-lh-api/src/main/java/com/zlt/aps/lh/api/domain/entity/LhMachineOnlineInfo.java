@@ -2,6 +2,7 @@ package com.zlt.aps.lh.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -26,8 +27,9 @@ public class LhMachineOnlineInfo extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "日期", name = "onlineDate")
-    @Excel(name = "ui.data.column.lhMachineOnlineInfo.onlineDate")
+    @ApiModelProperty(value = "上机日期", name = "onlineDate")
+    @Excel(name = "ui.data.column.lhMachineOnlineInfo.onlineDate", dateFormat = "yyyy-MM-dd")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField(value = "ONLINE_DATE")
     private Date onlineDate;
 
@@ -65,7 +67,7 @@ public class LhMachineOnlineInfo extends BaseEntity implements Serializable {
     @TableField(value = "COMPANY_CODE")
     private String companyCode;
 
-    @ApiModelProperty(value = "厂别", name = "factoryCode")
+    @ApiModelProperty(value = "工厂", name = "factoryCode")
     @Excel(name = "ui.data.column.lhMachineOnlineInfo.factoryCode", dictType = "biz_factory_name")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
