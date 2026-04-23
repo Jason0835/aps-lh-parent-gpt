@@ -165,6 +165,7 @@ import {
   removeCxScheduleResult,
   parseCxScheduleResult,
 } from "@/api/cx/cxScheduleResult";
+import { getScheduleDate } from "@/api/lh/scheduleResult";
 //components
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
@@ -237,6 +238,16 @@ export default {
           },
         ],
       },
+      dateList: [
+        { shift: 1, shiftDate: "" },
+        { shift: 2, shiftDate: "" },
+        { shift: 3, shiftDate: "" },
+        { shift: 4, shiftDate: "" },
+        { shift: 5, shiftDate: "" },
+        { shift: 6, shiftDate: "" },
+        { shift: 7, shiftDate: "" },
+        { shift: 8, shiftDate: "" },
+      ],
     };
   },
   computed: {
@@ -343,12 +354,8 @@ export default {
         //   ],
         // },
         {
-          label: this.$t("一班"),
+          label: this.$t("一班") + " " + this.dateList[0].shiftDate,
           children: [
-            // {
-            //   prop: "class1Sort",
-            //   label: this.$t("顺序"),
-            // },
             {
               prop: "class1PlanQty",
               label: this.$t("计划"),
@@ -376,7 +383,7 @@ export default {
           ],
         },
         {
-          label: this.$t("二班"),
+          label: this.$t("二班") + " " + this.dateList[1].shiftDate,
           children: [
             // {
             //   prop: "class2Sort",
@@ -410,7 +417,7 @@ export default {
           ],
         },
         {
-          label: this.$t("三班"),
+          label: this.$t("三班") + " " + this.dateList[2].shiftDate,
           children: [
             // {
             //   prop: "class3Sort",
@@ -444,7 +451,7 @@ export default {
           ],
         },
         {
-          label: this.$t("四班"),
+          label: this.$t("四班") + " " + this.dateList[3].shiftDate,
           children: [
             // {
             //   prop: "class4Sort",
@@ -478,7 +485,7 @@ export default {
           ],
         },
         {
-          label: this.$t("五班"),
+          label: this.$t("五班") + " " + this.dateList[4].shiftDate,
           children: [
             // {
             //   prop: "class5Sort",
@@ -512,7 +519,7 @@ export default {
           ],
         },
         {
-          label: this.$t("六班"),
+          label: this.$t("六班") + " " + this.dateList[5].shiftDate,
           children: [
           // {
           //     prop: "class6Sort",
@@ -546,7 +553,7 @@ export default {
           ],
         },
         {
-          label: this.$t("七班"),
+          label: this.$t("七班") + " " + this.dateList[6].shiftDate,
           children: [
             // {
             //   prop: "class7Sort",
@@ -580,7 +587,7 @@ export default {
           ],
         },
         {
-          label: this.$t("八班"),
+          label: this.$t("八班") + " " + this.dateList[7].shiftDate,
           children: [
           // {
           //     prop: "class8Sort",
@@ -1184,6 +1191,19 @@ export default {
         this.$nextTick(() => {
           this.loading = false;
         });
+        this.getDate();
+      }
+    },
+    async getDate() {
+      try {
+        const res = await getScheduleDate({
+          scheduleDate: this.query.scheduleDate,
+        });
+        if (res && res.length > 0) {
+          this.dateList = res;
+        }
+      } catch (error) {
+        console.error(error);
       }
     },
 
