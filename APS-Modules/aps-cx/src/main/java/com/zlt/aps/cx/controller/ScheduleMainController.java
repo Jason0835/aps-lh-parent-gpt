@@ -141,21 +141,24 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             return AjaxResult.error("排程日期不能为空");
         }
         if (dto.getDays() == null || dto.getDays() < 1) {
-            dto.setDays(3);  // 默认排产3天
+            // 默认排产3天
+            dto.setDays(3);
         }
         // 只需要调用一次executeSchedule，days参数表示排产天数
         ScheduleRequestVo request = new ScheduleRequestVo();
-        request.setScheduleDate(dto.getScheduleDate());  // 最后一天日期
+        // 最后一天日期
+        request.setScheduleDate(dto.getScheduleDate());
         request.setOverwrite(dto.getOverwrite() != null ? dto.getOverwrite() : false);
         request.setFactoryCode(dto.getFactoryCode());
         request.setScheduleType(dto.getScheduleType());
         request.setScheduleMode(dto.getScheduleType());
-        request.setDays(dto.getDays());  // 传递排产天数
+        // 传递排产天数
+        request.setDays(dto.getDays());
         ScheduleService.ScheduleResult result = scheduleService.executeSchedule(request);
         if (result.isSuccess()) {
-            return AjaxResult.success(result);
+            return AjaxResult.success();
         } else {
-// 校验不通过时，构建校验摘要返回前端
+            // 校验不通过时，构建校验摘要返回前端
             ScheduleService.ValidationSummary summary = new ScheduleService.ValidationSummary();
             summary.setErrorCount(result.getValidationErrors() != null ? result.getValidationErrors().size() : 0);
             summary.setWarningCount(result.getValidationWarnings() != null ? result.getValidationWarnings().size() : 0);
