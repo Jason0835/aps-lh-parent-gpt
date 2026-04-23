@@ -82,7 +82,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      */
     @ApiOperation("删除,id不为空")
     @RequiresPermissions("cx:cxScheduleResult:remove")
-    @DeleteMapping("/remove")
+    @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(@RequestParam String ids) {
         Long[] arr = Convert.toLongArray(ids);
