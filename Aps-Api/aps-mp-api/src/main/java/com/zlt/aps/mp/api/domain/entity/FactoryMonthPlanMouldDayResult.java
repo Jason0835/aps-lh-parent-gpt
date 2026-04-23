@@ -812,22 +812,22 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
 
         // 4. 分配暂缓优先级
         if (!NORMAL_PLAN_TYPE.equals(this.planType)  &&   remainingQty > 0 && this.postponeQty != null && this.postponeQty > 0) {
-            this.postponeQty = Math.min(remainingQty, this.postponeQty);
+            this.postponeProductionQty = Math.min(remainingQty, this.postponeQty);
             remainingQty -= this.postponeQty;
             scmPriorities.add(SAL_PRIORITY_POSTPONE);
         }
         // 如果设置了conventionReserveQty，则不超过该值
         if (remainingQty > 0 && this.conventionReserveQty != null && this.conventionReserveQty > 0) {
-            this.conventionReserveQty = Math.min(remainingQty, this.conventionReserveQty);
-            remainingQty -= this.conventionReserveQty;
+            this.conventionProductionQty = Math.min(remainingQty, this.conventionReserveQty);
+            remainingQty -= this.conventionProductionQty;
             scmPriorities.add(SAL_PRIORITY_PRECEDENT_STOCK_UP);
         }
         if(remainingQty > 0 && !CollectionUtils.isEmpty(scmPriorities)) {
             String  scmPriority = scmPriorities.get(scmPriorities.size() - 1);
             if(SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(scmPriority)) {
-                this.conventionReserveQty = (this.conventionReserveQty==null?0:this.conventionReserveQty) + remainingQty;
+                this.conventionProductionQty = (this.conventionProductionQty==null?0:this.conventionProductionQty) + remainingQty;
             }else if(SAL_PRIORITY_POSTPONE.equals(scmPriority)) {
-                this.postponeQty = this.postponeQty + remainingQty;
+                this.postponeProductionQty = this.postponeProductionQty + remainingQty;
             }else if(SAL_PRIORITY_MID.equals(scmPriority)) {
                 this.midProductionQty = this.midProductionQty + remainingQty;
             }else if(SAL_PRIORITY_CYCLE_STOCK_UP.equals(scmPriority)) {
@@ -836,11 +836,6 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
                 this.heightProductionQty = this.heightProductionQty + remainingQty;
             }
         }
-        // 还有剩余的，放到储备
-        if (remainingQty > 0) {
-            conventionProductionQty = remainingQty;
-        }
-        
     }
     
     /**
