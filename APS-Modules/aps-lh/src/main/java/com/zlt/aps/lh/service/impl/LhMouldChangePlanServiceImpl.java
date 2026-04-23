@@ -263,17 +263,13 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
      */
     @Override
     public String checkUnique(LhMouldChangePlan docEntityVO) {
-        // 唯一性判断依据: 根据业务修改
-        QueryWrapper<LhMouldChangePlan> queryWrapper = new QueryWrapper<>();
-        queryWrapper.ne(PubUtil.isNotEmpty(docEntityVO.getFieldValueByFieldName("id")), "ID", docEntityVO.getFieldValueByFieldName("id"));
-        // 校验维度: factoryCode + lhResultBatchNo + orderNo + planDate + lhMachineCode + beforeMaterialCode + afterMaterialCode
-        queryWrapper.eq("FACTORY_CODE", docEntityVO.getFactoryCode());
-        queryWrapper.eq("LH_RESULT_BATCH_NO", docEntityVO.getLhResultBatchNo());
-        queryWrapper.eq("ORDER_NO", docEntityVO.getOrderNo());
-        queryWrapper.eq("PLAN_DATE", docEntityVO.getPlanDate());
-        queryWrapper.eq("LH_MACHINE_CODE", docEntityVO.getLhMachineCode());
-        queryWrapper.eq("BEFORE_MATERIAL_CODE", docEntityVO.getBeforeMaterialCode());
-        queryWrapper.eq("AFTER_MATERIAL_CODE", docEntityVO.getAfterMaterialCode());
+        // 唯一性判断维度：工厂 + 机台编号 + 排程日期
+        LambdaQueryWrapper<LhMouldChangePlan> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.ne(PubUtil.isNotEmpty(docEntityVO.getFieldValueByFieldName("id")),
+                LhMouldChangePlan::getId, docEntityVO.getFieldValueByFieldName("id"));
+        queryWrapper.eq(LhMouldChangePlan::getFactoryCode, docEntityVO.getFactoryCode());
+        queryWrapper.eq(LhMouldChangePlan::getLhMachineCode, docEntityVO.getLhMachineCode());
+        queryWrapper.eq(LhMouldChangePlan::getScheduleDate, docEntityVO.getScheduleDate());
 
         if (lhMouldChangePlanMapper.selectCount(queryWrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
@@ -284,7 +280,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("factoryCode", "lhResultBatchNo", "orderNo", "planDate", "lhMachineCode", "beforeMaterialCode", "afterMaterialCode");
+        return Arrays.asList("factoryCode", "lhMachineCode", "scheduleDate");
     }
 
     /**

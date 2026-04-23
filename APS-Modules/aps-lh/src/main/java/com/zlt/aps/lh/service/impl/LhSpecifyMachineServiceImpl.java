@@ -205,13 +205,34 @@ public class LhSpecifyMachineServiceImpl extends AbstractDocService<LhSpecifyMac
                 continue;
             }
             
-            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)){
+            if (StringUtil.isBlank(docEntity.getFactoryCode())) {
+                docEntity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+            }
+
+            if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
                 docEntity.setRowState(RowStateEnum.ADDED);
-                if (StringUtil.isBlank(docEntity.getFactoryCode())) {
-                    docEntity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-                }
                 importList.add(docEntity);
-            }else {
+            } else if (updateSupport) {
+                LambdaQueryWrapper<LhSpecifyMachine> queryWrapper = new LambdaQueryWrapper<>();
+                queryWrapper.eq(LhSpecifyMachine::getSpecCode, docEntity.getSpecCode());
+                queryWrapper.eq(LhSpecifyMachine::getMachineCode, docEntity.getMachineCode());
+                LhSpecifyMachine exist = lhSpecifyMachineEntityMapper.selectOne(queryWrapper);
+                if (exist == null) {
+                    failureNum++;
+                    ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
+                            String.format(uniqueMsg, errorNum), importErrorLogs);
+                    continue;
+                }
+                // updateSupport=true 时，按 SPEC_CODE+MACHINE_CODE 更新
+                exist.setFactoryCode(docEntity.getFactoryCode());
+                exist.setSpecCode(docEntity.getSpecCode());
+                exist.setMachineCode(docEntity.getMachineCode());
+                exist.setLineType(docEntity.getLineType());
+                exist.setJobType(docEntity.getJobType());
+                exist.setRemark(docEntity.getRemark());
+                lhSpecifyMachineEntityMapper.updateById(exist);
+                successNum++;
+            } else {
                 failureNum++;
                 //数据库已经存在,不允许插入
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId,errorNum,
@@ -219,11 +240,13 @@ public class LhSpecifyMachineServiceImpl extends AbstractDocService<LhSpecifyMac
             }
         }
 
-        if (PubUtil.isEmpty(importList)) {
+        if (PubUtil.isEmpty(importList) && successNum == 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         }
 
-        successNum = baseDao.saveBatch(importList);
+        if (CollectionUtils.isNotEmpty(importList)) {
+            successNum += baseDao.saveBatch(importList);
+        }
 
         //返回提示信息及错误集合
         if (failureNum > 0) {
