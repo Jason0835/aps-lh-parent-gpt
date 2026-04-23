@@ -35,10 +35,12 @@ public class ContinueGroupInfoHandler {
      * @param allCxContinueInfoMap 续作信息
      */
     public void buildContinueGroupInfo(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, Map<String, CxContinueInfoHelper> allCxContinueInfoMap) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         if (CollectionUtils.isEmpty(allCxContinueInfoMap)) {
+            productionContext.setContinueStructureMap(Collections.emptyMap());
+            productionContext.setContinueGroupMap(Collections.emptyMap());
             return;
         }
-        TbrProductionContext productionContext = (TbrProductionContext) context;
         // 设置成型机台续作结构 sandy+ 2026.3.19
         productionContext.setContinueStructureMap(getContinueStructureMap(allCxContinueInfoMap));
         //20260418+ 设置续作结构的分组信息

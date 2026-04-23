@@ -98,7 +98,7 @@ public class LhScheduleContext {
     private Map<String, MdmMonthSurplus> monthSurplusMap = new HashMap<>();
     /** 排程完成量Map, key=machineCode+materialCode */
     private Map<String, LhScheFinishQty> scheFinishQtyMap = new HashMap<>();
-    /** 月累计完成量Map（截至排程窗口起点 T 日前）, key=materialCode */
+    /** 月累计完成量Map（截至目标排产日期含当天）, key=materialCode */
     private Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>();
     /** 物料信息Map, key=materialCode */
     private Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
@@ -170,6 +170,8 @@ public class LhScheduleContext {
     private String currentStep;
     /** 校验错误信息集合 */
     private List<String> validationErrorList = new ArrayList<>();
+    /** 优先级跟踪日志静默深度（局部搜索模拟分支时递增） */
+    private int priorityTraceMuteDepth = 0;
 
     /**
      * 追加一条校验错误信息（空串或 null 将被忽略）
@@ -227,6 +229,32 @@ public class LhScheduleContext {
     public void interruptSchedule(String reason) {
         this.interrupted = true;
         this.interruptReason = reason;
+    }
+
+    /**
+     * 进入优先级跟踪日志静默区间。
+     * <p>用于局部搜索等模拟分支，避免输出非最终决策日志。</p>
+     */
+    public void enterPriorityTraceMuteScope() {
+        priorityTraceMuteDepth++;
+    }
+
+    /**
+     * 退出优先级跟踪日志静默区间。
+     */
+    public void exitPriorityTraceMuteScope() {
+        if (priorityTraceMuteDepth > 0) {
+            priorityTraceMuteDepth--;
+        }
+    }
+
+    /**
+     * 当前是否处于优先级跟踪日志静默区间。
+     *
+     * @return true-静默，false-正常输出
+     */
+    public boolean isPriorityTraceMuted() {
+        return priorityTraceMuteDepth > 0;
     }
 
     /**

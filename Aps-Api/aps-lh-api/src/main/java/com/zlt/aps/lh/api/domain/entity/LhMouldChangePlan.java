@@ -55,6 +55,11 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     @TableField(value = "PLAN_ORDER")
     private Integer planOrder;
 
+    @ApiModelProperty(value = "班次")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.classIndex", dictType = "CLASS_NUM")
+    @TableField(value = "CLASS_INDEX")
+    private String classIndex;
+
     @ApiModelProperty(value = "排程日期")
     @Excel(name = "ui.data.column.lhMouldChangePlan.scheduleDate", dateFormat = "yyyy-MM-dd")
     @TableField(value = "SCHEDULE_DATE")
@@ -103,10 +108,10 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     private String afterMaterialDesc;
 
     @ApiModelProperty(value = "更换时间")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.changeTime", dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.changeTime", dateFormat = "yyyy-MM-dd")
     @TableField(value = "CHANGE_TIME")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     private Date changeTime;
 
     @ApiModelProperty(value = "模具号")
@@ -120,17 +125,18 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     private String isRelease;
 
     @ApiModelProperty(value = "模具交替完成状态 0-未完成；1-已完成")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.mouldStatus",dictType = "biz_yes_no")
+    @Excel(name = "ui.data.column.lhMouldChangePlan.mouldStatus", dictType = "biz_yes_no")
     @TableField(value = "MOULD_STATUS")
     private String mouldStatus;
-
 
     @ApiModelProperty(value = "备注说明字段")
     @Excel(name = "ui.data.column.lhMouldChangePlan.remark", width = 50)
     @TableField(value = "REMARK")
     private String remark;
 
-    // 区间查询参数 - 不映射到数据库
+    /**
+     * 区间查询参数，不映射到数据库字段。
+     */
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -150,5 +156,4 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date scheduleDateEnd;
-
 }

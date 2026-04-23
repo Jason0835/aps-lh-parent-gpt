@@ -2054,14 +2054,14 @@ public class MatchingProductionHandler {
                 .filter(Objects::nonNull).max(Long::compareTo).orElse(0L);
         
         // 合并需求计划
-        Map<String, MonthPlanProductionRequirePlanVo> requireMap = productionContext.getAllProductionPlan().values()
-                .stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMaterialCode,
-                        Function.identity(), (p1, p2) -> {
-                            p1.setHeightLossQty(safeAdd(p1.getHeightLossQty(), p2.getHeightLossQty()));
-                            p1.setMidQty(safeAdd(p1.getMidQty(), p2.getMidQty()));
-                            p1.setPostponeQty(safeAdd(p1.getPostponeQty(), p2.getPostponeQty()));
-                            return p1;
-                        }));
+//        Map<String, MonthPlanProductionRequirePlanVo> requireMap = productionContext.getAllProductionPlan().values()
+//                .stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMaterialCode,
+//                        Function.identity(), (p1, p2) -> {
+//                            p1.setHeightLossQty(safeAdd(p1.getHeightLossQty(), p2.getHeightLossQty()));
+//                            p1.setMidQty(safeAdd(p1.getMidQty(), p2.getMidQty()));
+//                            p1.setPostponeQty(safeAdd(p1.getPostponeQty(), p2.getPostponeQty()));
+//                            return p1;
+//                        }));
         for (FactoryMonthPlanMouldDayResult plan : dayResultList) {
             Integer factProdQty = factProdReqMap.getOrDefault(plan.getMaterialDesc(), 0); // 实单补量
             Integer matchingQty = matchingQtyMap.getOrDefault(plan.getMaterialDesc(), 0); // 搭配补量
@@ -2071,14 +2071,13 @@ public class MatchingProductionHandler {
             FactoryMonthPlanMouldDayResult firstPlan = CollectionUtils.firstElement(resultList);
             // 原有记录有同规格的更新（有ID）；没有的说明是新搭配的规格，需要新增（无ID）
             FactoryMonthPlanMouldDayResult oldPlan = oldPlanMap.get(plan.getMaterialCode());
+//            MonthPlanProductionRequirePlanVo requirePlan = requireMap.get(plan.getMaterialCode());
+//            if (requirePlan != null) {
+//                plan.setHeightLossQty(requirePlan.getHeightQty());
+//                plan.setMidLossQty(requirePlan.getMidQty());
+//                plan.setPostponeQty(requirePlan.getPostponeQty());
+//            }
             if (oldPlan != null) {
-                MonthPlanProductionRequirePlanVo requirePlan = requireMap.get(oldPlan.getMaterialCode());
-                if (requirePlan != null) {
-                    plan.setHeightLossQty(requirePlan.getHeightQty());
-                    plan.setMidLossQty(requirePlan.getMidQty());
-                    plan.setPostponeQty(requirePlan.getPostponeQty());
-                }
-                plan.setConventionProductionQty(matchingQty);
                 // 差异
                 plan.setDifferenceQty(oldPlan.getDifferenceQty() > factProdQty? oldPlan.getDifferenceQty() - factProdQty: 0);
                 plan.setMouldCavityQty(oldPlan.getMouldCavityQty());
@@ -2087,7 +2086,6 @@ public class MatchingProductionHandler {
                 plan.setReason(oldPlan.getReason());
                 plan.setId(oldPlan.getId());
             } else {
-                plan.setConventionProductionQty(matchingQty);
                 if (plan.getProductionSequence() == null) {
                     productionSequence++;
                     plan.setProductionSequence(productionSequence);

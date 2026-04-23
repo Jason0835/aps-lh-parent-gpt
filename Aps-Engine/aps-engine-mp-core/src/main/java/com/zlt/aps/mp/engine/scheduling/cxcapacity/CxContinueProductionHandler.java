@@ -172,8 +172,9 @@ public class CxContinueProductionHandler {
         List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList = matchList.stream().filter(selectedPlan -> selectedPlan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
         //总排产量
         Integer sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(productionStage, selectedProductionPlanList);
+        MonthPlanProductionRequirePlanVo addSkuInfo = selectedProductionPlanList.get(BigDecimal.ZERO.intValue());
         //日硫化量
-        Integer dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getMaxDaySingleLhMachineQty();
+        Integer dayMaxProductionQty = addSkuInfo.getMaxDaySingleLhMachineQty();
         //实际排产量
         Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlanInfo, cxMachineCodeInfo, earliestConclusionLhGroup.transformCxLhGroup(), sumProductionQty, realSumProductionQty, dayMaxProductionQty);
@@ -184,6 +185,10 @@ public class CxContinueProductionHandler {
         if (productionQty <= BigDecimal.ZERO.intValue()) {
             excludeSkuSet.add(selectedMaterialDesc);
         } else {
+            //换模处理
+            if (ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType) {
+                CxLhMouldProductionCalculator.addChangeMouldInfo(productionContext, addSkuInfo, startDay, beforeSkuInfo, selectedMouldList);
+            }
             excludeDaySet = new HashSet<>();
         }
         //迭代下一个硫化组

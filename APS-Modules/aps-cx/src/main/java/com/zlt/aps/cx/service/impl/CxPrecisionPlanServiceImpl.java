@@ -231,7 +231,7 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         QueryWrapper<CxPrecisionPlan> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("MACHINE_CODE", machineCode);
         queryWrapper.eq("PRECISION_TYPE", precisionType);
-        queryWrapper.eq("PLAN_DATE", DateUtil.beginOfDay(planDate));
+        queryWrapper.eq("PLAN_DATE", planDate);
         queryWrapper.eq("IS_DELETE", 0);
         if (excludeId != null) {
             queryWrapper.ne("ID", excludeId);
@@ -244,7 +244,7 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
      * 初始化导入数据的默认值，保持导入新增与覆盖时的字段一致性。
      */
     private void initImportEntity(CxPrecisionPlan docEntity) {
-        docEntity.setPlanDate(DateUtil.beginOfDay(docEntity.getPlanDate()));
+        docEntity.setPlanDate(docEntity.getPlanDate());
         docEntity.setIsDelete(0);
         if (StringUtil.isBlank(docEntity.getCompletionStatus())) {
             docEntity.setCompletionStatus(COMPLETION_STATUS_PENDING);

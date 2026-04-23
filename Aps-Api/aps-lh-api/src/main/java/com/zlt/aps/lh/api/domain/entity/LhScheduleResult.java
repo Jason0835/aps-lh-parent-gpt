@@ -703,7 +703,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 排程类型 01-续作 02-新增
      */
-    @Excel(name = "ui.data.column.lhScheduleResult.scheduleType")
+    @Excel(name = "ui.data.column.lhScheduleResult.scheduleType", dictType = "lh_schedule_type")
     @ApiModelProperty(value = "排程类型 01-续作 02-新增", name = "scheduleType")
     @TableField(value = "SCHEDULE_TYPE")
     private String scheduleType;

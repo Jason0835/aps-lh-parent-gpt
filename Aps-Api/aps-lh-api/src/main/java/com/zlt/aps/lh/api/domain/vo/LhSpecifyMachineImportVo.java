@@ -1,4 +1,4 @@
-package com.zlt.aps.lh.api.domain.entity;
+package com.zlt.aps.lh.api.domain.vo;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -18,7 +18,7 @@ import java.util.Date;
 @ApiModel(value = "硫化定点机台信息对象", description = "硫化定点机台信息对象 ")
 @Data
 @TableName(value = "T_LH_SPECIFY_MACHINE")
-public class LhSpecifyMachine  extends BaseEntity implements Serializable {
+public class LhSpecifyMachineImportVo extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1149060431772573064L;
 
@@ -37,7 +37,7 @@ public class LhSpecifyMachine  extends BaseEntity implements Serializable {
     private String specCode;
 
     /** 物料描述（虚拟字段，不入库） */
-    @Excel(name = "ui.data.column.lhSpecifyMachine.materialDesc",width = 60, align = Excel.Align.LEFT)
+//    @Excel(name = "ui.data.column.lhSpecifyMachine.materialDesc",width = 60, align = Excel.Align.LEFT)
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(exist = false)
     private String materialDesc;
@@ -63,23 +63,7 @@ public class LhSpecifyMachine  extends BaseEntity implements Serializable {
     @TableField(value = "JOB_TYPE")
     private String jobType;
 
-    /** 创建人名称 */
-//    @Excel(name = "ui.data.column.createBy")
-    @ApiModelProperty(value = "创建人", name = "createByName")
-    @TableField(exist = false)
-    private String createByName;
 
-
-
-    @TableField(
-            value = "UPDATE_TIME",
-            fill = FieldFill.INSERT_UPDATE,
-            jdbcType = JdbcType.TIMESTAMP
-    )
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    @ApiModelProperty(value = "更新时间", name = "updateTime")
-    @Excel(name = "ui.data.column.updateTime",dateFormat = "yyyy-MM-dd HH:mm:ss")
-    private Date updateTime;
 
     @ApiModelProperty("备注")
     @Excel(name = "ui.data.column.remark")

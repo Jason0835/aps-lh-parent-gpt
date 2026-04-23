@@ -415,6 +415,27 @@ public class CxLhMouldProductionCalculator {
     }
 
     /**
+     * 换模次数+1处理
+     *
+     * @param productionContext 排产上下文
+     * @param addSkuInfo        排产Sku
+     * @param startDay          换模日
+     * @param beforeSku         前Sku信息
+     * @param doubleMouldList   排产模具
+     */
+    public static void addChangeMouldInfo(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo addSkuInfo, Integer startDay, BeforeSkuProductionInfo beforeSku, List<ProductionMouldInfoVo> doubleMouldList) {
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(productionContext, addSkuInfo, beforeSku, beforeSku);
+        boolean isChangeMould = changeMouldInfo.isChangeMould();
+        if (!isChangeMould) {
+            return;
+        }
+        //需要换模-换模次数处理
+        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        Integer changeMouldDay = startDay;
+        Set<String> mouldCodeSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
+    }
+    /**
      * 判断是否需要结束标记
      * 1、看是否需要重新判断胎胚种类数及配比
      * 2、看是否超出二次上机

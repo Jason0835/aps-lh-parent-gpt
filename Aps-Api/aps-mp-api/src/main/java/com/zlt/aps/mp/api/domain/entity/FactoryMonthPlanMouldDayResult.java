@@ -12,6 +12,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -811,22 +812,22 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
 
         // 4. 分配暂缓优先级
         if (!NORMAL_PLAN_TYPE.equals(this.planType)  &&   remainingQty > 0 && this.postponeQty != null && this.postponeQty > 0) {
-            this.postponeQty = Math.min(remainingQty, this.postponeQty);
+            this.postponeProductionQty = Math.min(remainingQty, this.postponeQty);
             remainingQty -= this.postponeQty;
             scmPriorities.add(SAL_PRIORITY_POSTPONE);
         }
         // 如果设置了conventionReserveQty，则不超过该值
         if (remainingQty > 0 && this.conventionReserveQty != null && this.conventionReserveQty > 0) {
-            this.conventionReserveQty = Math.min(remainingQty, this.conventionReserveQty);
-            remainingQty -= this.conventionReserveQty;
+            this.conventionProductionQty = Math.min(remainingQty, this.conventionReserveQty);
+            remainingQty -= this.conventionProductionQty;
             scmPriorities.add(SAL_PRIORITY_PRECEDENT_STOCK_UP);
         }
         if(remainingQty > 0 && !CollectionUtils.isEmpty(scmPriorities)) {
             String  scmPriority = scmPriorities.get(scmPriorities.size() - 1);
             if(SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(scmPriority)) {
-                this.conventionReserveQty = (this.conventionReserveQty==null?0:this.conventionReserveQty) + remainingQty;
+                this.conventionProductionQty = (this.conventionProductionQty==null?0:this.conventionProductionQty) + remainingQty;
             }else if(SAL_PRIORITY_POSTPONE.equals(scmPriority)) {
-                this.postponeQty = this.postponeQty + remainingQty;
+                this.postponeProductionQty = this.postponeProductionQty + remainingQty;
             }else if(SAL_PRIORITY_MID.equals(scmPriority)) {
                 this.midProductionQty = this.midProductionQty + remainingQty;
             }else if(SAL_PRIORITY_CYCLE_STOCK_UP.equals(scmPriority)) {
@@ -835,8 +836,45 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
                 this.heightProductionQty = this.heightProductionQty + remainingQty;
             }
         }
-
     }
+    
+    /**
+     * 重新统计总排产量
+     */
+    public void statisticsTotalQty() {
+        this.totalQty = Optional.ofNullable(this.day1).orElse(0) +
+                Optional.ofNullable(this.day2).orElse(0) +
+                Optional.ofNullable(this.day3).orElse(0) +
+                Optional.ofNullable(this.day4).orElse(0) +
+                Optional.ofNullable(this.day5).orElse(0) +
+                Optional.ofNullable(this.day6).orElse(0) +
+                Optional.ofNullable(this.day7).orElse(0) +
+                Optional.ofNullable(this.day8).orElse(0) +
+                Optional.ofNullable(this.day9).orElse(0) +
+                Optional.ofNullable(this.day10).orElse(0) +
+                Optional.ofNullable(this.day11).orElse(0) +
+                Optional.ofNullable(this.day12).orElse(0) +
+                Optional.ofNullable(this.day13).orElse(0) +
+                Optional.ofNullable(this.day14).orElse(0) +
+                Optional.ofNullable(this.day15).orElse(0) +
+                Optional.ofNullable(this.day16).orElse(0) +
+                Optional.ofNullable(this.day17).orElse(0) +
+                Optional.ofNullable(this.day18).orElse(0) +
+                Optional.ofNullable(this.day19).orElse(0) +
+                Optional.ofNullable(this.day20).orElse(0) +
+                Optional.ofNullable(this.day21).orElse(0) +
+                Optional.ofNullable(this.day22).orElse(0) +
+                Optional.ofNullable(this.day23).orElse(0) +
+                Optional.ofNullable(this.day24).orElse(0) +
+                Optional.ofNullable(this.day25).orElse(0) +
+                Optional.ofNullable(this.day26).orElse(0) +
+                Optional.ofNullable(this.day27).orElse(0) +
+                Optional.ofNullable(this.day28).orElse(0) +
+                Optional.ofNullable(this.day29).orElse(0) +
+                Optional.ofNullable(this.day30).orElse(0) +
+                Optional.ofNullable(this.day31).orElse(0);
+    }
+    
     /**
      * 分组|*|主花纹
      * TBR 为结构
