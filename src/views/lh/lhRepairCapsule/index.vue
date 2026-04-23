@@ -150,7 +150,6 @@ export default {
   },
   methods: {
     handleSearch(data) {
-      this.search = { ...data };
       this.query = { ...data };
       if (data.obtainTime) {
         // Backend expects begin/end fields; single-date search maps to that day.
@@ -211,18 +210,6 @@ export default {
     },
   },
   activated() {
-    if (this.search.factoryCode === undefined || this.search.factoryCode === null) {
-      this.search = {
-        ...this.search,
-        factoryCode: "116",
-      };
-    }
-    if (this.query.factoryCode === undefined || this.query.factoryCode === null) {
-      this.query = {
-        ...this.query,
-        factoryCode: "116",
-      };
-    }
     this.getList();
   },
 };

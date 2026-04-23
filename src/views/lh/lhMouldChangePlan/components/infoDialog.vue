@@ -2,7 +2,7 @@
   <el-dialog
     :title="title"
     :visible="visible"
-    width="1100px"
+    width="1200px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
@@ -47,6 +47,7 @@ export default {
       visible: false,
       isEdit: false,
       form: {},
+      originalIsRelease: "",
       machineOptions: [],
       machinePageSize: 100,
       machinePageNum: 1,
@@ -79,6 +80,22 @@ export default {
             required: true,
             message: this.$t("common.rule.select"),
             trigger: "change",
+          },
+        ],
+        planOrder: [
+          {
+            validator: (rule, value, callback) => {
+              if (value === undefined || value === null || value === "") {
+                callback();
+                return;
+              }
+              if (String(value).length > 5) {
+                callback(new Error(this.$t("ui.data.alert.lhMouldChangePlan.planOrderMax")));
+                return;
+              }
+              callback();
+            },
+            trigger: ["change", "blur"],
           },
         ],
         scheduleDate: [
@@ -151,9 +168,19 @@ export default {
         {
           prop: "planOrder",
           label: this.$t("ui.data.column.lhMouldChangePlan.planOrder"),
-          type: "number",
-          min: 0,
-          precision: 0,
+          render: (form) => {
+            return (
+              <el-input
+                value={form.planOrder}
+                clearable
+                maxlength={5}
+                placeholder={this.$t("common.rule.input")}
+                onInput={(value) => {
+                  this.handlePlanOrderInput(value);
+                }}
+              />
+            );
+          },
         },
         {
           prop: "classIndex",
@@ -165,7 +192,9 @@ export default {
         {
           prop: "leftRightMould",
           label: this.$t("ui.data.column.lhMouldChangePlan.leftRightMould"),
-          maxlength: 32,
+          type: "select",
+          dictData: this.parentDict.type.lr_molds,
+          filterable: true,
         },
         {
           prop: "lhMachineCode",
@@ -241,7 +270,7 @@ export default {
         {
           prop: "mouldCode",
           label: this.$t("ui.data.column.lhMouldChangePlan.mouldCode"),
-          maxlength: 64,
+          maxlength: 30,
         },
         {
           prop: "isRelease",
@@ -255,8 +284,9 @@ export default {
           prop: "mouldStatus",
           label: this.$t("ui.data.column.lhMouldChangePlan.mouldStatus"),
           type: "select",
-          dictData: this.parentDict.type.biz_yes_no,
+          dictData: this.parentDict.type.finish_completion,
           filterable: true,
+          labelWidth: "150px",
           disabled: true,
         },
         {
@@ -382,11 +412,22 @@ export default {
         this.$set(this.form, "afterMaterialDesc", "");
       }
     },
+    handlePlanOrderInput(val) {
+      const value = (val || "").replace(/\D/g, "").slice(0, 5);
+      this.$set(this.form, "planOrder", value);
+    },
 
     // api
     async save(params) {
       try {
         this.loading = true;
+        if (params.planOrder !== undefined && params.planOrder !== null && params.planOrder !== "") {
+          params.planOrder = Number(params.planOrder);
+        }
+        if (this.isEdit && this.originalIsRelease === "1") {
+          params.isRelease = "5";
+          params.mouldStatus = "0";
+        }
 
         const res = await editLhMouldChangePlan(params);
         this.$modal.msgSuccess(res.msg);
@@ -404,11 +445,8 @@ export default {
       this.visible = true;
       if (data) {
         this.isEdit = true;
+        this.originalIsRelease = data.isRelease || "";
         this.form = { ...data };
-        if (data.isRelease === "1") {
-          this.$set(this.form, "isRelease", "4");
-          this.$set(this.form, "mouldStatus", "0");
-        }
         if (data.lhMachineCode) {
           this.machineOptions = [
             {
@@ -419,6 +457,7 @@ export default {
         }
       } else {
         this.isEdit = false;
+        this.originalIsRelease = "";
         this.form = {
           factoryCode: "116",
           isRelease: "0",
@@ -439,6 +478,7 @@ export default {
       this.machineQuery = "";
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
+      this.originalIsRelease = "";
       this.visible = false;
     },
     handleConfirm() {

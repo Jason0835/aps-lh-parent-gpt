@@ -250,7 +250,6 @@ export default {
     downloadLink('/cx/cxStock/export', this.formatParams(false))
   },
     handleSearch(data) {
-      this.search = { ...data }
       this.query = { ...data }
       if (data.stockDate && data.stockDate.length === 2) {
         this.query.startTime = data.stockDate[0]
