@@ -10,7 +10,6 @@ import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cx.api.domain.entity.CxMachineInfo;
 import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
-import com.zlt.aps.cx.api.domain.vo.CxPrecisionPlanImportVo;
 import com.zlt.aps.cx.api.service.ICxMachineInfoService;
 import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -144,7 +143,7 @@ public class CxPrecisionPlanUIController extends BaseUIController<CxPrecisionPla
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<CxPrecisionPlanImportVo> util = new ExcelUtil<>(CxPrecisionPlanImportVo.class);
+        ExcelUtil<CxPrecisionPlan> util = new ExcelUtil<>(CxPrecisionPlan.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
