@@ -10,7 +10,6 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
 import com.zlt.aps.lh.mapper.LhSpecifyMachineEntityMapper;
 import com.zlt.aps.lh.service.ILhSpecifyMachineService;
-import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -129,9 +128,7 @@ public class LhSpecifyMachineController extends AbstractDocBizController<LhSpeci
     protected List<LhSpecifyMachine> listExportData(LhSpecifyMachine obj) {
         QueryWrapper<LhSpecifyMachine> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        List<LhSpecifyMachine> list = lhSpecifyMachineEntityMapper.selectList(wrapper);
-        AppUtils.formatData(list,getQueryFormulas());
-        return list;
+        return lhSpecifyMachineEntityMapper.selectList(wrapper);
     }
 
     @Override
@@ -152,8 +149,8 @@ public class LhSpecifyMachineController extends AbstractDocBizController<LhSpeci
      */
     @Override
     protected void builderCondition(QueryWrapper<LhSpecifyMachine> queryWrapper, LhSpecifyMachine queryVO) {
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specCode")), "SPEC_CODE", queryVO.getFieldValueByFieldName("specCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("specCode")), "SPEC_CODE", queryVO.getFieldValueByFieldName("specCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("lineType")), "LINE_TYPE", queryVO.getFieldValueByFieldName("lineType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("jobType")), "JOB_TYPE", queryVO.getFieldValueByFieldName("jobType"));
     }
