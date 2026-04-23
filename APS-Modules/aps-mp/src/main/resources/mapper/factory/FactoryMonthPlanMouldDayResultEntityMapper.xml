@@ -110,7 +110,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND m.STRUCTURE_NAME IS NOT NULL 
             AND (QUALITY_STATE_CODE != '2' or QUALITY_STATE_CODE is null or d.FACTORY_CODE = m.FACTORY_CODE)
         <if test="!isAllMaterial">
-            AND m.FACTORY_CODE = r.FACTORY_CODE
+            AND d.FACTORY_CODE = m.FACTORY_CODE
         </if>
 		GROUP BY
 		    MM.MIN_PRO_SIZE,
