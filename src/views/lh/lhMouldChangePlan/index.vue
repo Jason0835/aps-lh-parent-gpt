@@ -177,13 +177,13 @@ export default {
           label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineCode"),
           minWidth: 140,
         },
-        {
-          prop: "lhMachineName",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineName"),
-          minWidth: 160,
-        },
+        // {
+        //   prop: "lhMachineName",
+        //   align: "center",
+        //   halign: "center",
+        //   label: this.$t("ui.data.column.lhMouldChangePlan.lhMachineName"),
+        //   minWidth: 160,
+        // },
         {
           prop: "beforeMaterialCode",
           align: "center",

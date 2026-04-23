@@ -2,7 +2,7 @@
   <el-dialog
     :title="title"
     :visible="visible"
-    width="800px"
+    width="1100px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
@@ -115,7 +115,7 @@ export default {
         : this.$t("common.button.add");
     },
     columns() {
-      return [
+      const columns = [
         {
           prop: "factoryCode",
           label: this.$t("ui.data.column.factoryCode"),
@@ -263,10 +263,15 @@ export default {
           prop: "remark",
           label: this.$t("common.remark"),
           type: "textarea",
+          span: 24,
           rows: 3,
           maxlength: 500,
         },
       ];
+      return columns.map((item) => ({
+        span: 12,
+        ...item,
+      }));
     },
   },
   methods: {
@@ -437,12 +442,6 @@ export default {
       this.visible = false;
     },
     handleConfirm() {
-      if (!this.form.scheduleDate) {
-        this.$modal.msgError(
-          this.$t("ui.data.alert.lhMouldChangePlan.scheduleDateRequired")
-        );
-        return;
-      }
       this.$refs.form.triggerConfirm(this.save);
     },
   },
