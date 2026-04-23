@@ -86,4 +86,14 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
         return remove(new LambdaQueryWrapper<CxScheduleDetail>()
                 .eq(CxScheduleDetail::getMainId, mainId));
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean deleteByMainIds(List<Long> mainIds) {
+        if (mainIds == null || mainIds.isEmpty()) {
+            return true;
+        }
+        return remove(new LambdaQueryWrapper<CxScheduleDetail>()
+                .in(CxScheduleDetail::getMainId, mainIds));
+    }
 }

@@ -181,6 +181,8 @@ public class TaskGroupService {
         
         // 跟踪每个物料已使用的成型余量（用于多任务共享同一物料的场景）
         Map<String, Integer> materialUsedFormingRemainder = new HashMap<>();
+        // 跟踪每个物料已处理的任务列表（用于回溯更新 isLastEndingBatch）
+        Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> materialTasksMap = new HashMap<>();
         
         for (LhScheduleResult lhResult : lhScheduleResults) {
             if (lhResult.getEmbryoCode() == null) {
@@ -249,6 +251,9 @@ public class TaskGroupService {
             task.setContinueMachineCodes(continueMachineCodes);
             task.setIsFirstTask(!isContinueTask && !isTrialTask && !isProductionTrial);
 
+            // 将任务添加到物料任务列表（用于回溯更新）
+            materialTasksMap.computeIfAbsent(materialCode, k -> new ArrayList<>()).add(task);
+
             // S5.2.4 计算收尾属性（传入已使用的成型余量）
             int usedRemainder = materialUsedFormingRemainder.getOrDefault(materialCode, 0);
             calculateEndingInfo(task, context, scheduleDate, usedRemainder);
@@ -257,17 +262,38 @@ public class TaskGroupService {
             calculatePlannedProduction(task, context, scheduleDate);
             // S5.2.6 收尾余量处理
             handleEndingRemainder(task, context);
+            
+            // S5.2.6.1 收尾余量处理后再次检查：如果 handleEndingRemainder 标记了 isLastEndingBatch，需要回溯更新
+            if (Boolean.TRUE.equals(task.getIsLastEndingBatch())) {
+                List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(materialCode);
+                if (allTasksForMaterial != null) {
+                    for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
+                        if (prevTask != task && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
+                            prevTask.setIsLastEndingBatch(true);
+                            log.info("回溯更新 isLastEndingBatch（收尾余量处理）: 物料={}, 胎胚={} → true", materialCode, prevTask.getEmbryoCode());
+                        }
+                    }
+                }
+            }
 
             // 打印收尾任务完整信息（所有字段已填充完毕）
             // 条件：成型余量低于阈值 或 紧急收尾
             Integer endingSurplus = task.getEndingSurplusQty();
             if ((endingSurplus != null && endingSurplus < ENDING_URGENT_FORMING_REMAINDER)
                     || Boolean.TRUE.equals(task.getIsUrgentEnding())) {
-                log.info("成型余量低于阈值的收尾任务：物料={}, 剩余成型余量={}, 阈值={} | 收尾任务={}, 收尾余量={}, 硫化余量={}, 收尾日={}, 距收尾天={}, 紧急收尾={}, 近期收尾={} | 待排产量={}, 需车数={}, 最终需生产量={}",
+                // 获取计算公式所需参数
+                int vulcanizeDmd = task.getVulcanizeDemand() != null ? task.getVulcanizeDemand() : 0;
+                int stock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
+                int netDemand = Math.max(0, vulcanizeDmd - stock);
+                BigDecimal lossRate = context.getLossRate() != null ? context.getLossRate() : BigDecimal.ZERO;
+                int tripCap = getTripCapacity(task.getStructureName(), context);
+                int plannedProd = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
+                log.info("成型余量低于阈值的收尾任务：物料={}, 剩余成型余量={}, 阈值={} | 收尾任务={}, 收尾余量={}, 硫化余量={}, 收尾日={}, 距收尾天={}, 紧急收尾={}, 近期收尾={}, 收尾最后一批={} | 计算公式：(日硫化量{} - 库存{}) × (1 + 损耗率{}) = {} × {} = {} | 整车({})取整后待排产量={}, 需车数={}, 最终需生产量={}",
                         embryoCode, task.getEndingSurplusQty(), ENDING_URGENT_FORMING_REMAINDER,
                         task.getIsEndingTask(), task.getEndingSurplusQty(), task.getVulcanizeSurplusQty(),
-                        task.getEndingDate(), task.getDaysToEnding(), task.getIsUrgentEnding(), task.getIsNearEnding(),
-                        task.getPlannedProduction(), task.getRequiredCars(), task.getEndingExtraInventory());
+                        task.getEndingDate(), task.getDaysToEnding(), task.getIsUrgentEnding(), task.getIsNearEnding(), task.getIsLastEndingBatch(),
+                        vulcanizeDmd, stock, lossRate, netDemand, lossRate.add(BigDecimal.ONE).setScale(4, BigDecimal.ROUND_HALF_UP), plannedProd,
+                        tripCap, task.getPlannedProduction(), task.getRequiredCars(), task.getEndingExtraInventory());
             }
             
             // 更新已使用的成型余量（累加当前任务的 endingExtraInventory）
@@ -1004,6 +1030,7 @@ public class TaskGroupService {
             task.setEndingExtraInventory(0);
             task.setEndingAbandoned(true);
             task.setEndingAbandonedQty(endingSurplusQty);
+            task.setIsLastEndingBatch(true);
             log.info("收尾任务 {} 余量{}条被舍弃（非主销+余量≤2）", task.getEmbryoCode(), endingSurplusQty);
         } else if (!Boolean.TRUE.equals(task.getIsMainProduct())) {
             // 非主销产品 + 收尾余量>2条，按实际量下（不补车）
@@ -1019,7 +1046,7 @@ public class TaskGroupService {
                     task.getEmbryoCode(), endingSurplusQty, task.getPlannedProduction(), endingSurplusQty);
         } else {
             // 主销产品最后一批：不够一车则补足到一车
-            if (endingSurplusQty < tripCapacity) {
+            if (endingSurplusQty > 0 && endingSurplusQty < tripCapacity) {
                 task.setPlannedProduction(tripCapacity);
                 task.setRequiredCars(1);
                 task.setEndingExtraInventory(tripCapacity);

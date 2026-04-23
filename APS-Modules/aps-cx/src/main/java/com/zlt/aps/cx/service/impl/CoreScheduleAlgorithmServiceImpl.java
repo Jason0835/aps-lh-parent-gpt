@@ -307,6 +307,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setEndingExtraInventory(taskAlloc.getEndingExtraInventory() != null
                         ? taskAlloc.getEndingExtraInventory() : taskAlloc.getQuantity());
                 task.setIsTrialTask(taskAlloc.getIsTrialTask());
+                task.setIsProductionTrial(taskAlloc.getIsProductionTrial());
                 task.setIsEndingTask(taskAlloc.getIsEndingTask());
                 task.setIsContinueTask(taskAlloc.getIsContinueTask());
                 task.setIsLastEndingBatch(taskAlloc.getIsLastEndingBatch());  // 设置是否收尾最后一批
@@ -524,8 +525,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                             merged.setTripCapacity(existing.getTripCapacity());
                             merged.setStockHours(existing.getStockHours());
                             merged.setSequence(existing.getSequence());
+                            merged.setSourceTask(existing.getSourceTask());
                             merged.setPlanStartTime(existing.getPlanStartTime());
                             merged.setPlanEndTime(existing.getPlanEndTime());
+                            // 注意：isLastEndingBatch 不在此处合并，每个班次保持独立状态
+                            // merged 对象不会被使用（因为 existing == null 时直接返回 spr）
                             return merged;
                         });
                 taskTotalQtyMap.merge(taskKey, spr.getQuantity() != null ? spr.getQuantity() : 0, Integer::sum);
@@ -693,8 +697,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             // ---- 成型余量 ----
             {
                 Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
-                if (formingRemainderMap != null && embryoCode != null) {
-                    Integer cxRemain = formingRemainderMap.get(embryoCode);
+                if (formingRemainderMap != null && materialCode != null) {
+                    Integer cxRemain = formingRemainderMap.get(materialCode);
                     if (cxRemain != null) {
                         result.setCxRemainQty(new BigDecimal(cxRemain));
                     }
@@ -921,6 +925,20 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         log.info("子表构建完成（按班次）：共 {} 条车次记录", allDetails.size());
+        // 打印前5条验证数据
+        for (int i = 0; i < Math.min(5, allDetails.size()); i++) {
+            CxScheduleDetail d = allDetails.get(i);
+            log.info("子表明细[{}]: 机台={}, 胎胚={}, CLASS1=[TRIP={},PLAN={},HOURS={}], CLASS2=[TRIP={},PLAN={}], CLASS3=[TRIP={},PLAN={}], CLASS4=[TRIP={},PLAN={}], CLASS5=[TRIP={},PLAN={}], CLASS6=[TRIP={},PLAN={}], CLASS7=[TRIP={},PLAN={}], CLASS8=[TRIP={},PLAN={}]",
+                    i, d.getCxMachineCode(), d.getEmbryoCode(),
+                    d.getClass1TripNo(), d.getClass1PlanQty(), d.getClass1StockHours(),
+                    d.getClass2TripNo(), d.getClass2PlanQty(),
+                    d.getClass3TripNo(), d.getClass3PlanQty(),
+                    d.getClass4TripNo(), d.getClass4PlanQty(),
+                    d.getClass5TripNo(), d.getClass5PlanQty(),
+                    d.getClass6TripNo(), d.getClass6PlanQty(),
+                    d.getClass7TripNo(), d.getClass7PlanQty(),
+                    d.getClass8TripNo(), d.getClass8PlanQty());
+        }
         return allDetails;
     }
 
@@ -1003,6 +1021,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
         switch (classField) {
             case "CLASS1":
+                detail.setClass1PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
                 detail.setClass1TripNo(String.valueOf(trip.getTripNo()));
                 detail.setClass1TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass1StockHours(trip.getStockHours());
@@ -1013,6 +1032,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         ? java.sql.Timestamp.valueOf(trip.getPlanEndTime()) : null);
                 break;
             case "CLASS2":
+                detail.setClass2PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
                 detail.setClass2TripNo(String.valueOf(trip.getTripNo()));
                 detail.setClass2TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass2StockHours(trip.getStockHours());
@@ -1023,6 +1043,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         ? java.sql.Timestamp.valueOf(trip.getPlanEndTime()) : null);
                 break;
             case "CLASS3":
+                detail.setClass3PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
                 detail.setClass3TripNo(String.valueOf(trip.getTripNo()));
                 detail.setClass3TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass3StockHours(trip.getStockHours());
@@ -1033,34 +1054,59 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         ? java.sql.Timestamp.valueOf(trip.getPlanEndTime()) : null);
                 break;
             case "CLASS4":
+                detail.setClass4PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
                 detail.setClass4TripNo(String.valueOf(trip.getTripNo()));
                 detail.setClass4TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass4StockHours(trip.getStockHours());
                 detail.setClass4Sequence(trip.getSequence());
+                detail.setClass4PlanStartTime(trip.getPlanStartTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanStartTime()) : null);
+                detail.setClass4PlanEndTime(trip.getPlanEndTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanEndTime()) : null);
                 break;
             case "CLASS5":
+                detail.setClass5PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
                 detail.setClass5TripNo(String.valueOf(trip.getTripNo()));
                 detail.setClass5TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass5StockHours(trip.getStockHours());
                 detail.setClass5Sequence(trip.getSequence());
+                detail.setClass5PlanStartTime(trip.getPlanStartTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanStartTime()) : null);
+                detail.setClass5PlanEndTime(trip.getPlanEndTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanEndTime()) : null);
                 break;
             case "CLASS6":
+                detail.setClass6PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
                 detail.setClass6TripNo(String.valueOf(trip.getTripNo()));
                 detail.setClass6TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass6StockHours(trip.getStockHours());
                 detail.setClass6Sequence(trip.getSequence());
+                detail.setClass6PlanStartTime(trip.getPlanStartTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanStartTime()) : null);
+                detail.setClass6PlanEndTime(trip.getPlanEndTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanEndTime()) : null);
                 break;
             case "CLASS7":
+                detail.setClass7PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
                 detail.setClass7TripNo(String.valueOf(trip.getTripNo()));
                 detail.setClass7TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass7StockHours(trip.getStockHours());
                 detail.setClass7Sequence(trip.getSequence());
+                detail.setClass7PlanStartTime(trip.getPlanStartTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanStartTime()) : null);
+                detail.setClass7PlanEndTime(trip.getPlanEndTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanEndTime()) : null);
                 break;
             case "CLASS8":
+                detail.setClass8PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
                 detail.setClass8TripNo(String.valueOf(trip.getTripNo()));
                 detail.setClass8TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass8StockHours(trip.getStockHours());
                 detail.setClass8Sequence(trip.getSequence());
+                detail.setClass8PlanStartTime(trip.getPlanStartTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanStartTime()) : null);
+                detail.setClass8PlanEndTime(trip.getPlanEndTime() != null
+                        ? java.sql.Timestamp.valueOf(trip.getPlanEndTime()) : null);
                 break;
             default:
                 log.warn("未知的 CLASS_FIELD: {}", classField);
@@ -1261,6 +1307,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // 从 sourceTask 获取详细任务类型
         CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
+        // 调试日志：打印isLastEndingBatch值
+        log.info("buildTaskAnalysis: embryo={}, spr.isLastEndingBatch={}, task.isLastEndingBatch={}",
+                spr.getEmbryoCode(), spr.getIsLastEndingBatch(), task != null ? task.getIsLastEndingBatch() : "task is null");
         if (task != null) {
             if (Boolean.TRUE.equals(task.getIsTrialTask())) {
                 reasons.add("试制");
@@ -1268,7 +1317,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             if (Boolean.TRUE.equals(task.getIsProductionTrial())) {
                 reasons.add("量试");
             }
-            if (Boolean.TRUE.equals(task.getIsLastEndingBatch())) {
+            if (Boolean.TRUE.equals(spr.getIsLastEndingBatch())) {
                 reasons.add("收尾");
             }
             if (Boolean.TRUE.equals(task.getIsOpeningDayTask())) {
@@ -1297,10 +1346,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         if (reasons.isEmpty()) {
+            log.info("buildTaskAnalysis: embryo={}, analysis=null (reasons empty)", spr.getEmbryoCode());
             return null;
         }
 
-        return String.join(",", reasons);
+        String result = String.join(",", reasons);
+        log.info("buildTaskAnalysis: embryo={}, analysis={}", spr.getEmbryoCode(), result);
+        return result;
     }
 
     /**
@@ -1978,28 +2030,68 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return;
         }
 
-        // 构建胎胚编码 → 物料编码的映射
+        // 构建胎胚编码 → 硫化任务列表的映射（一对多：一个胎胚可能对应多个物料/硫化任务）
         List<LhScheduleResult> lhResults = context.getLhScheduleResults();
-        Map<String, String> embryoToMaterialMap = new HashMap<>();
+        Map<String, List<LhScheduleResult>> embryoToLhListMap = new HashMap<>();
         if (lhResults != null) {
             for (LhScheduleResult lh : lhResults) {
                 if (lh.getEmbryoCode() != null && lh.getMaterialCode() != null) {
-                    embryoToMaterialMap.put(lh.getEmbryoCode(), lh.getMaterialCode());
+                    embryoToLhListMap.computeIfAbsent(lh.getEmbryoCode(), k -> new ArrayList<>()).add(lh);
                 }
             }
         }
 
-        // 按物料编码汇总硫化消耗
+        // 按物料编码汇总硫化消耗（按日硫化量比例分配）
         Map<String, Integer> consumptionByMaterial = new HashMap<>();
         for (Map.Entry<String, Integer> entry : vulcanizingConsumptionByEmbryo.entrySet()) {
             String embryoCode = entry.getKey();
             int consumption = entry.getValue();
 
-            String materialCode = embryoToMaterialMap.get(embryoCode);
-            if (materialCode != null) {
-                consumptionByMaterial.merge(materialCode, consumption, Integer::sum);
+            List<LhScheduleResult> lhList = embryoToLhListMap.get(embryoCode);
+            if (lhList != null && !lhList.isEmpty()) {
+                if (lhList.size() == 1) {
+                    // 一对一：直接分配
+                    String materialCode = lhList.get(0).getMaterialCode();
+                    consumptionByMaterial.merge(materialCode, consumption, Integer::sum);
+                } else {
+                    // 一对多：按日硫化量比例分配消耗
+                    int totalDailyQty = 0;
+                    for (LhScheduleResult lh : lhList) {
+                        if (lh.getDailyPlanQty() != null) {
+                            totalDailyQty += lh.getDailyPlanQty();
+                        }
+                    }
+                    if (totalDailyQty > 0) {
+                        int allocated = 0;
+                        for (int i = 0; i < lhList.size(); i++) {
+                            LhScheduleResult lh = lhList.get(i);
+                            int dailyQty = lh.getDailyPlanQty() != null ? lh.getDailyPlanQty() : 0;
+                            int alloc;
+                            if (i == lhList.size() - 1) {
+                                // 最后一个分配剩余量，避免四舍五入误差
+                                alloc = consumption - allocated;
+                            } else {
+                                alloc = consumption * dailyQty / totalDailyQty;
+                            }
+                            if (alloc > 0) {
+                                consumptionByMaterial.merge(lh.getMaterialCode(), alloc, Integer::sum);
+                                allocated += alloc;
+                            }
+                        }
+                        log.debug("【步骤4】胎胚 {} 硫化消耗={}, 按{}个物料按日硫化量比例分配", embryoCode, consumption, lhList.size());
+                    } else {
+                        // 日硫化量都为0，平均分配
+                        int avg = consumption / lhList.size();
+                        int remainder = consumption - avg * lhList.size();
+                        for (int i = 0; i < lhList.size(); i++) {
+                            int alloc = avg + (i < remainder ? 1 : 0);
+                            consumptionByMaterial.merge(lhList.get(i).getMaterialCode(), alloc, Integer::sum);
+                        }
+                        log.debug("【步骤4】胎胚 {} 硫化消耗={}, 日硫化量为0，平均分配给{}个物料", embryoCode, consumption, lhList.size());
+                    }
+                }
             } else {
-                log.warn("【步骤4】胎胚 {} 未找到对应的物料编码", embryoCode);
+                log.warn("【步骤4】胎胚 {} 未找到对应的硫化任务", embryoCode);
             }
         }
 

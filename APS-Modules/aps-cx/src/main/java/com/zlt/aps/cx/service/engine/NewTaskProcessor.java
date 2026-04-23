@@ -250,11 +250,13 @@ public class NewTaskProcessor {
                     taskAlloc.setPriority(task.getPriority());
                     taskAlloc.setStockHours(task.getStockHours());
                     taskAlloc.setIsTrialTask(task.getIsTrialTask());
+                    taskAlloc.setIsProductionTrial(task.getIsProductionTrial());
                     taskAlloc.setIsContinueTask(task.getIsContinueTask());
                     taskAlloc.setIsEndingTask(task.getIsEndingTask());
                     taskAlloc.setEndingSurplusQty(task.getEndingSurplusQty());
                     taskAlloc.setIsMainProduct(task.getIsMainProduct());
                     taskAlloc.setLhId(task.getLhId());
+                    taskAlloc.setIsLastEndingBatch(task.getIsLastEndingBatch());
 
                     result.getTaskAllocations().add(taskAlloc);
                 }
