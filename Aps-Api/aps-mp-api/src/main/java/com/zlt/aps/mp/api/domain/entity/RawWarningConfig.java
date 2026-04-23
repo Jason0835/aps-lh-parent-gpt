@@ -89,6 +89,12 @@ public class RawWarningConfig extends BaseEntity {
     @TableField(value = "WARNING_LEVEL")
     private String warningLevel;
 
+    /**
+     * 通知方式：多个用逗号分隔，email,sms,wechat
+     */
+    @ApiModelProperty(value = "通知方式", name = "notifyTypes")
+    @TableField(value = "NOTIFY_TYPES")
+    private String notifyTypes;
 
     /**
      * 备注
