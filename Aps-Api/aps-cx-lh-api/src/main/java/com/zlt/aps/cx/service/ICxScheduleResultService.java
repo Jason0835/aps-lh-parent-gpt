@@ -102,7 +102,7 @@ public interface ICxScheduleResultService {
     /**
      * 删除（批量，UI标准格式）
      */
-    @DeleteMapping("/cxScheduleResult/removeByIds")
+    @PostMapping("/cxScheduleResult/removeByIds")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**

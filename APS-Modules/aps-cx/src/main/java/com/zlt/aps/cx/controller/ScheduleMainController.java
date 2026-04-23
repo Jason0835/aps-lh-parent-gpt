@@ -95,7 +95,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      */
     @Log(title = "ui.data.column.cxScheduleResult.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
-    @DeleteMapping("/remove")
+    @PostMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
