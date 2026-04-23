@@ -42,6 +42,13 @@ export default {
       isEdit: false,
       form: {},
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
         scheduleDate: [
           {
             required: true,
@@ -56,6 +63,7 @@ export default {
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
+          filterable: true,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
