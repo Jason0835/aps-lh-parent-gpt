@@ -10,7 +10,6 @@ import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
-import com.zlt.aps.lh.api.domain.vo.LhSpecifyMachineImportVo;
 import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
 import com.zlt.aps.lh.api.service.ILhSpecifyMachineRemoteService;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
@@ -20,7 +19,6 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -177,7 +175,7 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<LhSpecifyMachineImportVo> util = new ExcelUtil<>(LhSpecifyMachineImportVo.class);
+        ExcelUtil<LhSpecifyMachine> util = new ExcelUtil<>(LhSpecifyMachine.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -208,7 +206,7 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iLhSpecifyMachineService.importData(context,updateSupport);
+        AjaxResult ajaxResult = iLhSpecifyMachineService.importData(context,false);
         return ajaxResult;
     }
 
@@ -216,8 +214,6 @@ public class LhSpecifyMachineUIController extends BaseUIController<LhSpecifyMach
     @PostMapping("/getMachineList")
     @ResponseBody
     public AjaxResult getMachineList( LhMachineInfo query) {
-        query.setMachineCode(StringUtils.trimToEmpty(query.getMachineCode()));
-        query.setMachineName(StringUtils.trimToEmpty(query.getMachineName()));
         TableDataInfo tableDataInfo = iLhMachineInfoService.list(query);
         return AjaxResult.success(tableDataInfo.getRows());
     }
