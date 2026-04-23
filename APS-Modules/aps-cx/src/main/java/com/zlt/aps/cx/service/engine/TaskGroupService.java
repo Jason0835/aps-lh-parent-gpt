@@ -279,7 +279,7 @@ public class TaskGroupService {
             // S5.2.7 停产特殊处理
             handleOpeningClosingDay(task, context, dayShifts);
             // S5.2.8 试制任务：产量必须是双数，不补整车
-            if (Boolean.TRUE.equals(isTrialTask)) {
+            if (Boolean.TRUE.equals(isTrialTask) || Boolean.TRUE.equals(isProductionTrial)) {
                 Integer pp = task.getPlannedProduction();
                 if (pp != null && pp % 2 != 0) {
                     task.setPlannedProduction(pp - 1);
