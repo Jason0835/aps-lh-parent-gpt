@@ -1,8 +1,10 @@
 package com.zlt.aps.cx.controller;
 
 import cn.hutool.core.date.DateUtil;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
@@ -25,6 +27,7 @@ import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiModelProperty;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -437,8 +440,12 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getScheduleDate()), "SCHEDULE_DATE", queryVO.getScheduleDate());
 		// 机台代码模糊查询
 		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getCxMachineCode()), "CX_MACHINE_CODE", queryVO.getCxMachineCode());
-		// 胎胚代码模糊查询
-		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getEmbryoCode()), "EMBRYO_CODE", queryVO.getEmbryoCode());
+		// 物料代码模糊查询
+		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
+        // 物料代码模糊查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialDesc()), "MATERIAL_DESC", queryVO.getMaterialDesc());
+        // 物料代码模糊查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMainMaterialDesc()), "MAIN_MATERIAL_DESC", queryVO.getMainMaterialDesc());
 		// 订单号精确查询
 		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getOrderNo()), "ORDER_NO", queryVO.getOrderNo());
 		// 生产状态精确查询
@@ -446,6 +453,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 		// 发布状态精确查询
 		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getIsRelease()), "IS_RELEASE", queryVO.getIsRelease());
 	}
+
 
     @Override
     protected String getTypeCode() {
