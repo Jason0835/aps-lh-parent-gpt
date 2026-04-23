@@ -270,6 +270,7 @@ export default {
       downloadLink('/cx/cxPrecisionPlan/export', this.formatParams(false))
     },
     handleSearch(data) {
+      this.search = { ...data }
       this.query = { ...data }
       if (data.planDate && data.planDate.length === 2) {
         this.query.planDateStart = data.planDate[0]

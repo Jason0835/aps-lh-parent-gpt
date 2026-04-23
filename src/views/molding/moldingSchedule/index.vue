@@ -143,6 +143,7 @@
     />
     <productStatusEditDialog ref="psEditRef" @success="handelSuccess" />
     <statusDialog ref="statusRef" @success="handelSuccess" />
+    <detailDialog ref="detailRef" />
   </basic-container>
 </template>
 <script>
@@ -177,6 +178,7 @@ import changeMachineDialog from "./components/changeMachineDialog.vue";
 import changePlanDialog from "./components/changePlanDialog.vue";
 import releaseStatusDialog from "./components/releaseStatusDialog.vue";
 import statusDialog from "./components/statusDialog.vue";
+import detailDialog from "./components/detailDialog.vue";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 export default {
@@ -192,6 +194,7 @@ export default {
     TltUploadForm,
     productStatusEditDialog,
     statusDialog,
+    detailDialog,
     tltUpload
   },
   dicts: [
@@ -723,6 +726,25 @@ export default {
         //   ],
         // },
       ];
+      columns.push({
+        align: "center",
+        width: 120,
+        fixed: "right",
+        label: this.$t("操作"),
+        render: ({ row }) => {
+          return (
+            <el-button
+              type="text"
+              onClick={(event) => {
+                event.stopPropagation();
+                this.handleViewDetail(row);
+              }}
+            >
+              {this.$t("查看车次")}
+            </el-button>
+          );
+        },
+      });
 
       return columns;
     },
@@ -840,6 +862,16 @@ export default {
     handleStatusChange(row) {
       if (this.$refs.statusRef) {
         this.$refs.statusRef.show(row);
+      }
+    },
+    handleViewDetail(row) {
+      const mainId = row && (row.id || row.mainId || row.scheduleMainId);
+      if (!mainId) {
+        this.$modal.msgWarning(this.$t("未获取到主表id"));
+        return;
+      }
+      if (this.$refs.detailRef) {
+        this.$refs.detailRef.show(mainId);
       }
     },
 

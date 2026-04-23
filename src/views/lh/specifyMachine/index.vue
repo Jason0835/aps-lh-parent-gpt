@@ -132,6 +132,13 @@ export default {
           minWidth: 150,
         },
         {
+          prop: "materialDesc",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhSpecifyMachine.materialDesc"),
+          minWidth: 180,
+        },
+        {
           prop: "machineCode",
           align: "center",
           halign: "center",
@@ -164,6 +171,13 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.updateTime"),
           minWidth: 160,
+        },
+        {
+          prop: "remark",
+          halign: "center",
+          label: this.$t("ui.common.column.remark"),
+          sortable: true,
+          minWidth: 100,
         },
         {
           align: "center",
@@ -209,6 +223,10 @@ export default {
         {
           label: this.$t("ui.data.column.lhSpecifyMachine.specCode"),
           prop: "specCode",
+        },
+        {
+          label: this.$t("ui.data.column.lhSpecifyMachine.materialDesc"),
+          prop: "materialDesc",
         },
         {
           label: this.$t("ui.data.column.lhSpecifyMachine.machineCode"),
@@ -258,8 +276,25 @@ export default {
         this.handleEdit(this.selection[0]);
       }
     },
+    handleBatchDelete() {
+      if (!this.selection || this.selection.length === 0) {
+        return;
+      }
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        const ids = this.selection.map((item) => item.id).join(",");
+        removeLhSpecifyMachine({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.selection = [];
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
+      });
+    },
     handleSearch(data) {
-      this.query = data;
+      this.search = { ...data };
+      this.query = { ...data };
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -310,9 +345,18 @@ export default {
     },
   },
   activated() {
-    this.search = {
-      factoryCode: "116",
-    };
+    if (this.search.factoryCode === undefined || this.search.factoryCode === null) {
+      this.search = {
+        ...this.search,
+        factoryCode: "116",
+      };
+    }
+    if (this.query.factoryCode === undefined || this.query.factoryCode === null) {
+      this.query = {
+        ...this.query,
+        factoryCode: "116",
+      };
+    }
     this.getList();
   },
 };

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-dialog
     :title="title"
     :visible="visible"
@@ -77,7 +77,8 @@ export default {
           prop: 'planDate',
           label: this.$t('ui.data.column.cxPrecisionPlan.planDate'),
           type: 'date',
-          valueFormat: 'yyyy-MM-dd',
+          dateType: 'datetime',
+          valueFormat: 'yyyy-MM-dd HH:mm:ss',
           listeners: { change: this.handlePlanDateChange },
           required: true
         },
@@ -86,7 +87,7 @@ export default {
           label: this.$t('ui.data.column.cxPrecisionPlan.actualDate'),
           type: 'date',
           valueFormat: 'yyyy-MM-dd',
-          required: true
+          disabled: true
         },
         {
           prop: 'precisionCycle',
@@ -222,3 +223,4 @@ export default {
   }
 }
 </script>
+
