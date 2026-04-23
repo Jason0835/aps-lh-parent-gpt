@@ -1019,7 +1019,7 @@ public class TaskGroupService {
                     task.getEmbryoCode(), endingSurplusQty, task.getPlannedProduction(), endingSurplusQty);
         } else {
             // 主销产品最后一批：不够一车则补足到一车
-            if (endingExtraInventory > 0 && endingExtraInventory < tripCapacity) {
+            if (endingSurplusQty < tripCapacity) {
                 task.setPlannedProduction(tripCapacity);
                 task.setRequiredCars(1);
                 task.setEndingExtraInventory(tripCapacity);
