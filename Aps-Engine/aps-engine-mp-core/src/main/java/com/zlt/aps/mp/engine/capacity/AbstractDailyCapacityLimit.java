@@ -11,6 +11,7 @@ import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.common.utils.StringUtil;
+import io.swagger.models.auth.In;
 
 import java.util.HashMap;
 import java.util.List;
@@ -302,6 +303,7 @@ public abstract class AbstractDailyCapacityLimit {
             }
             // 日计划量
             dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
+
             if (dailyCapacityLimitVo.isOpenProductionFirstDay()){
                 //若开产首日，将日硫化量等比例减，奇数+1
                 dailyLhQty = getProportionalDeductQty(dailyCapacityLimitVo,dailyLhQty);
@@ -602,6 +604,17 @@ public abstract class AbstractDailyCapacityLimit {
             }
         }else {
             resultArr[0] = 1;
+        }
+        if (mpFinalVo.getFieldValueByFieldName(day1Field) != null){
+            //例子：
+            //108 2
+            //54 118 140 108，对于118换模2次（54+32+32）
+            int prePlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(day1Field);
+            int preMachines = (int)Math.ceil((double) prePlanQty / dailyLhQty);
+            int curMachines = (int)Math.ceil((double) dayPlanQty / dailyLhQty);
+            if (curMachines > preMachines){
+                resultArr[3] = curMachines - preMachines;
+            }
         }
         if (mpFinalVo.getFieldValueByFieldName(day2Field) != null){
             //例子：

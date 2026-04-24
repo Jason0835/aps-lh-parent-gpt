@@ -1393,6 +1393,8 @@ public class ProductionPlanGroupInfo {
             dayLimitInfo.put(productionDay, dayLimit);
         });
         dayProductionLimitInfo = dayLimitInfo;
+        //20260422+ 处理结构需要额外增加硫化机台数
+        extraHandlerDayLimit(context);
     }
 
     /**
@@ -1427,6 +1429,8 @@ public class ProductionPlanGroupInfo {
 
         });
         dayProductionLimitInfo = dayLimitInfo;
+        //20260422+ 处理结构需要额外增加硫化机台数
+        extraHandlerDayLimit(context);
     }
 
     /**
@@ -2489,5 +2493,32 @@ public class ProductionPlanGroupInfo {
         GroupPlanCxLhCapacityLimitHelper selectedDayLimit = hasAddSkuList.get(BigDecimal.ZERO.intValue());
         GroupPlanCxLhCapacityLimitHelper endDayLimit = hasAddSkuList.get(hasAddSkuList.size() - BigDecimal.ONE.intValue());
         return new SelectRangeLhMachineInfo(selectedDayLimit, endDayLimit);
+    }
+
+    /**
+     * 20260422+ 处理结构需要额外增加硫化机台数
+     *
+     * @param context 排产上下文
+     */
+    private void extraHandlerDayLimit(Context context) {
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
+            return;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, Integer> extraMap = productionContext.getBaseDataContainer().getParamConfiguration().getExtraMap();
+        if (CollectionUtils.isEmpty(extraMap) || !extraMap.containsKey(groupName)) {
+            return;
+        }
+        Integer lhMachines = extraMap.get(groupName);
+        if (BigDecimal.ZERO.intValue() == lhMachines) {
+            return;
+        }
+        dayProductionLimitInfo.forEach((day, dayLimitInfo) -> {
+            Set<String> cxMachineCodeSet = dayLimitInfo.getCxMachineCodeSet();
+            if (CollectionUtils.isEmpty(cxMachineCodeSet) || cxMachineCodeSet.size() <= BigDecimal.ONE.intValue()) {
+                return;
+            }
+            dayLimitInfo.addMaxLhMachines(lhMachines);
+        });
     }
 }
