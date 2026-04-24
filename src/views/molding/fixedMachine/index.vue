@@ -581,7 +581,8 @@ export default {
       return params;
     },
     renderHtml(structure) {
-      return structure.replace(/[,，]/g, "<br>");
+      const text = structure === null || structure === undefined ? "" : String(structure);
+      return text.replace(/[,，]/g, "<br>");
     },
     // api
     async getList() {
