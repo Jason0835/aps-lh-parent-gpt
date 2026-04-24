@@ -327,17 +327,26 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         return lhScheduleService.changeMachine(dto);
     }
 
+    /**
+     * 转机台校验
+     */
+    @Log(title = "ui.data.column.lhParams.modelName")
+    @PostMapping("/validateAdjustQuantity")
+    @ApiOperation("硫化排程结果转机台校验")
+    public AjaxResult validateAdjustQuantity(@RequestBody LhScheduleResultUpdateDTO dto) {
+        return lhScheduleService.adjustQuantityPreCheck(dto);
+    }
+
     @Log(title = "ui.data.column.lhParams.modelName")
     @PostMapping("/adjustQuantity")
     @ApiOperation("调量")
     public AjaxResult adjustQuantity(@RequestBody LhScheduleResultUpdateDTO dto) {
-//        ValidateResult validateResult = lhScheduleResultCheckHandle.updateLhScheduleResultCheck(dto);
-//        if (!validateResult.isSuccess()) {
-//            return AjaxResult.error(validateResult.getMsg());
-//        }
-//        //调用调量业务
-//        lhScheduleAdjustService.preAdjustment(dto);
-        return AjaxResult.success();
+        AjaxResult ajaxResult = lhScheduleService.adjustQuantityPreCheck(dto);
+        if (ajaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
+            return ajaxResult;
+        }
+        //调用调量业务
+        return lhScheduleService.adjustQuantity(dto);
     }
 
     /**

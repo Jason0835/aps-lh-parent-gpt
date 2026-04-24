@@ -8,13 +8,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
-import com.zlt.aps.lh.api.domain.dto.LhOrderInsertParamDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleShiftDateQueryDTO;
-import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
+import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
@@ -23,17 +17,9 @@ import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.io.IOUtils;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
@@ -195,6 +181,14 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     @ResponseBody
     public AjaxResult changeMachine(@RequestBody LhTransferDeskDTO dto) {
         return iLhScheduleResultRemoteService.changeMachine(dto);
+    }
+
+    @ApiOperation("硫化排程结果调量校验")
+    //@RequiresPermissions("lh:lhScheduleResult:validateAdjustQuantity")
+    @PostMapping("/validateAdjustQuantity")
+    @ResponseBody
+    public AjaxResult validateAdjustQuantity(@RequestBody LhScheduleResultUpdateDTO dto) {
+        return iLhScheduleResultRemoteService.validateAdjustQuantity(dto);
     }
 
     @ApiOperation("调量")

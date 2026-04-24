@@ -9,6 +9,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
+import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
 import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
@@ -25,6 +26,7 @@ import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -253,5 +255,159 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         scheduleResultMapper.updateById(record);
         return AjaxResult.success("转机台成功");
+    }
+
+    /**
+     * 调量前校验
+     *
+     * @param dto 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult adjustQuantityPreCheck(LhScheduleResultUpdateDTO dto) {
+        if (Objects.isNull(dto) || Objects.isNull(dto.getId())) {
+            return AjaxResult.error("请选择需要调量的排程记录");
+        }
+
+        LhScheduleResult record = scheduleResultMapper.selectById(dto.getId());
+        if (Objects.isNull(record)) {
+            return AjaxResult.error("排程记录不存在或已删除");
+        }
+
+        Date now = new Date();
+        boolean hasAdjustField = false;
+        List<String> errorMessages = new ArrayList<>();
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            Integer adjustPlanQty = getAdjustPlanQty(dto, shiftIndex);
+            if (Objects.isNull(adjustPlanQty)) {
+                continue;
+            }
+            hasAdjustField = true;
+            if (adjustPlanQty < 0) {
+                errorMessages.add(String.format("第%s班计划量不能小于0", shiftIndex));
+            }
+            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(record, shiftIndex);
+            if (Objects.isNull(shiftEndTime)) {
+                errorMessages.add(String.format("第%s班结束时间缺失，禁止调量", shiftIndex));
+            } else if (!now.before(shiftEndTime)) {
+                errorMessages.add(String.format("第%s班已结束，历史班次不可调量", shiftIndex));
+            }
+            Integer finishQty = Optional.ofNullable(ShiftFieldUtil.getShiftFinishQty(record, shiftIndex)).orElse(0);
+            if (adjustPlanQty < finishQty) {
+                errorMessages.add(String.format("第%s班计划量不能小于完成量%s", shiftIndex, finishQty));
+            }
+        }
+
+        if (!hasAdjustField) {
+            errorMessages.add("未检测到可调量的班次计划量字段");
+        }
+        if (CollUtil.isNotEmpty(errorMessages)) {
+            return AjaxResult.error(String.join("；", errorMessages));
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 调量操作
+     *
+     * @param dto 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult adjustQuantity(LhScheduleResultUpdateDTO dto) {
+        AjaxResult preCheck = adjustQuantityPreCheck(dto);
+        if (preCheck.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
+            return preCheck;
+        }
+
+        LhScheduleResult record = scheduleResultMapper.selectById(dto.getId());
+        if (Objects.isNull(record)) {
+            return AjaxResult.error("排程记录不存在或已删除");
+        }
+
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            Integer adjustPlanQty = getAdjustPlanQty(dto, shiftIndex);
+            if (Objects.nonNull(adjustPlanQty)) {
+                setAdjustPlanQty(record, shiftIndex, adjustPlanQty);
+            }
+        }
+
+        // 调量后同步汇总计划量，并回置为未发布状态，确保后续重新发布
+        ShiftFieldUtil.syncDailyPlanQty(record);
+        record.setIsRelease(ApsConstant.APS_STRING_0);
+
+        int updateCount = scheduleResultMapper.updateById(record);
+        if (updateCount <= 0) {
+            return AjaxResult.error("调量失败，请稍后重试");
+        }
+        return AjaxResult.success("调量成功，记录已回置待发布");
+    }
+
+    /**
+     * 获取指定班次的调量计划值。
+     *
+     * @param dto        调量参数
+     * @param shiftIndex 班次索引（1~8）
+     * @return 班次计划量，未传入返回null
+     */
+    private Integer getAdjustPlanQty(LhScheduleResultUpdateDTO dto, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1:
+                return dto.getClass1PlanQty();
+            case 2:
+                return dto.getClass2PlanQty();
+            case 3:
+                return dto.getClass3PlanQty();
+            case 4:
+                return dto.getClass4PlanQty();
+            case 5:
+                return dto.getClass5PlanQty();
+            case 6:
+                return dto.getClass6PlanQty();
+            case 7:
+                return dto.getClass7PlanQty();
+            case 8:
+                return dto.getClass8PlanQty();
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * 设置指定班次计划量。
+     *
+     * @param record     排程结果
+     * @param shiftIndex 班次索引（1~8）
+     * @param planQty    调整后的计划量
+     */
+    private void setAdjustPlanQty(LhScheduleResult record, int shiftIndex, Integer planQty) {
+        switch (shiftIndex) {
+            case 1:
+                record.setClass1PlanQty(planQty);
+                break;
+            case 2:
+                record.setClass2PlanQty(planQty);
+                break;
+            case 3:
+                record.setClass3PlanQty(planQty);
+                break;
+            case 4:
+                record.setClass4PlanQty(planQty);
+                break;
+            case 5:
+                record.setClass5PlanQty(planQty);
+                break;
+            case 6:
+                record.setClass6PlanQty(planQty);
+                break;
+            case 7:
+                record.setClass7PlanQty(planQty);
+                break;
+            case 8:
+                record.setClass8PlanQty(planQty);
+                break;
+            default:
+                break;
+        }
     }
 }

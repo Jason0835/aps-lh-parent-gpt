@@ -3,6 +3,7 @@ package com.zlt.aps.lh.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
+import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
 import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
@@ -56,4 +57,18 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
      * @return 结果
      */
     AjaxResult changeMachine(LhTransferDeskDTO dto);
+
+    /**
+     * 调量前校验
+     * @param dto 参数
+     * @return 结果
+     */
+    AjaxResult adjustQuantityPreCheck(LhScheduleResultUpdateDTO dto);
+
+    /**
+     * 调量操作
+     * @param dto 参数
+     * @return 结果
+     */
+    AjaxResult adjustQuantity(LhScheduleResultUpdateDTO dto);
 }
