@@ -577,6 +577,7 @@ import {
 import {
   changeQty,
   getScheduleDate,
+  validateAdjustQuantity,
 } from "@/api/lh/scheduleResult";
 
 
@@ -1114,9 +1115,16 @@ export default {
       });
     },
 
+    /**
+     * 调量保存前先调用后端校验接口，校验通过后再提交实际保存。
+     * @param {Object} params 调量保存参数
+     * @returns {Promise<void>}
+     * @throws {Error} 当接口调用失败时抛出异常
+     */
     async save(params) {
       try {
         this.loading = true;
+        await validateAdjustQuantity(params);
         const res = await changeQty(params);
         this.loading = false;
         this.$modal.msgSuccess(

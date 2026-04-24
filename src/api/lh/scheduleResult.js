@@ -160,6 +160,22 @@ export function getGantData(query) {
 }
 
 /**
+ * 调量校验
+ * @param {*} query
+ * @returns
+ */
+export function validateAdjustQuantity(query) {
+  return request({
+    url: '/lh/lhScheduleResult/validateAdjustQuantity',
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+  })
+}
+
+/**
  * 调量
  * @param {*} query
  * @returns
