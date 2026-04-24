@@ -62,6 +62,7 @@ public class SummaryDemandPlanService {
       entity.setCycleReserveQty(calculateCycleReserveQty(value));
       entity.setConventionReserveQty(calculateConventionReserveQty(value));
       entity.setIsReachMinProductionQty(entity.getNetQty() >= entity.getMinProductionQty()? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
+      entity.setIsSchedule(value.stream().anyMatch(p -> YesOrNoEnum.YES.getCode().equals(p.getIsSchedule()))? YesOrNoEnum.YES.getCode(): YesOrNoEnum.NO.getCode());
       datas.add(entity);
     });
     datas.sort(Comparator.comparing(DpDemandPlanSum::getMaterialCode));
