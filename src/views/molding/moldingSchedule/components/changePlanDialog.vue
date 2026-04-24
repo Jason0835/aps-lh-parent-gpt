@@ -1017,7 +1017,7 @@ export default {
   },
   methods: {
     isShiftLocked(shift) {
-      return Number(this.form[`class${shift}FinishQty`] || 0) === 0;
+      return Number(this.form[`class${shift}FinishQty`] || 0) !== 0;
     },
     // api
     async getInfo(id) {
