@@ -255,6 +255,15 @@ export function changeMachine(query) {
   })
 }
 
+// 转机台确认提交（占位接口，后续可替换）
+export function submitChangeMachineMock(query) {
+  return request({
+    url: 'cx/cxScheduleResult/submitChangeMachineMock',
+    method: 'post',
+    data: query,
+  })
+}
+
 export function parseCxScheduleResult(query) {
   return request({
    url: `cx/cxScheduleResult/parseCxScheduleResult`,

@@ -54,7 +54,6 @@
         <el-button
           v-hasPermi="['cx:cxScheduleResult:changeMachine']"
           type="primary"
-          :disabled="selection.length != 1"
           @click="handleChangeMachine"
           >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button
         >
@@ -849,8 +848,11 @@ export default {
     // 转机台弹窗
     handleChangeMachine() {
       if (this.$refs.changeMachineRef) {
-        let row = this.selection[0];
-        this.$refs.changeMachineRef.show(row);
+        const row = this.selection[0] || {};
+        this.$refs.changeMachineRef.show({
+          scheduleDate: this.query.scheduleDate,
+          cxMachineCode: row.cxMachineCode || this.query.cxMachineCode || "",
+        });
       }
     },
 
