@@ -477,6 +477,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.FORMAL_RESET_SORT_DAY.getCode());
         paramCodeList.add(MonthPlanEnums.MOLD_ALLOCATION_RATIO_CYCLE.getCode());
         paramCodeList.add(MonthPlanEnums.CX_LH_RATIO_EXTRA.getCode());
+        paramCodeList.add(MonthPlanEnums.MIN_LH_MACHINE_CONTINUE_DAYS.getCode());
 
         //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
@@ -569,6 +570,14 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         }
         //20260422+ 结构成型硫化配比机台额外配置项
         configuration.setCxLhRatioExtraValue((String) paramConfigurationMap.get(MonthPlanEnums.CX_LH_RATIO_EXTRA.getCode()));
+        //20260424+ 结构实单最低硫化机台数最多可连续排产天数
+        Object continueMinLhMachines = paramConfigurationMap.get(MonthPlanEnums.MIN_LH_MACHINE_CONTINUE_DAYS.getCode());
+        if (null == continueMinLhMachines) {
+            configuration.setMinLhMachineContinueDays(productionContext.getMonthDays());
+        } else {
+            configuration.setMinLhMachineContinueDays((Integer) continueMinLhMachines);
+        }
+
         return configuration;
     }
 

@@ -272,7 +272,11 @@ public enum MonthPlanEnums {
     /**
      * SYS0209008 结构日分配多台成型机时，需要额外增加的硫化机台数配置
      */
-    CX_LH_RATIO_EXTRA("SYS0209008","结构日分配多台成型机时，需要额外增加的硫化机台数配置");
+    CX_LH_RATIO_EXTRA("SYS0209008","结构日分配多台成型机时，需要额外增加的硫化机台数配置"),
+    /**
+     * SYS0209009 结构实单最低硫化机台数可连续排产天数，超出则强制收尾
+     */
+    MIN_LH_MACHINE_CONTINUE_DAYS("SYS0209009","结构实单最低硫化机台数可连续排产天数，超出则强制收尾");
 
     private final String code;
     private final String name;
