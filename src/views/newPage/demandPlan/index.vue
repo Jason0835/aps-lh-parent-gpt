@@ -485,6 +485,47 @@ export default {
           },
         },
         {
+          prop: "isSchedule",
+          label: "常规储备是否排产",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
+          width: 120,
+          render: ({ row }) => {
+            return (
+              <div>
+                {this.hasPermission("monthplan:demandPlan:edit") &&
+                  row.conventionReserveQty > 0 && (
+                    <el-select
+                      v-model={row.isSchedule}
+                      onChange={(val) =>
+                        this.handleIsScheduleChange(row, "isSchedule")
+                      }
+                    >
+                      {this.dict.type.biz_yes_no.map((item) => (
+                        <el-option
+                          key={item.value}
+                          label={item.label}
+                          value={item.value}
+                        ></el-option>
+                      ))}
+                    </el-select>
+                  )}
+                {(!this.hasPermission("monthplan:demandPlan:edit") || 
+				  row.conventionReserveQty == null ||
+				  row.conventionReserveQty == 0) && (
+                  <span>
+                    {this.selectDictLabel(
+                      this.dict.type.biz_yes_no,
+                      row.isSchedule
+                    )}
+                  </span>
+                )}
+              </div>
+            );
+          },
+        },
+        {
           prop: "postponeNetQty",
           label: this.$t("ui.data.DemandPlan.postponeNetQty"),
           renderColumnHeader: () => {
@@ -838,6 +879,20 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {});
+    },
+    handleIsScheduleChange(row) {
+      let params = {
+          id: row.id,
+          isSchedule: row.isSchedule,
+        };
+      saveDemandPlan(params)
+        .then((res) => {
+          // this.$modal.msgSuccess(res.msg);
+          this.getList();
+        })
+        .catch((err) => {
+          console.log(err);
+        });
     },
     handlePriorityChange(row, type) {
       let params = {};
