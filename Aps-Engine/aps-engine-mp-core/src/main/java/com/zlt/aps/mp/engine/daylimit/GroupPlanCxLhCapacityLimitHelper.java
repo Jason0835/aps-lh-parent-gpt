@@ -172,6 +172,37 @@ public class GroupPlanCxLhCapacityLimitHelper {
     }
 
     /**
+     * 构建空数据对象实例
+     *
+     * @param day                排产日
+     * @param maxEmbryoCodeCount 最大胎胚种类数
+     * @param maxLhMachineCount  最大硫化机台数
+     * @return
+     */
+    public static GroupPlanCxLhCapacityLimitHelper buildEmptyData(Integer day, Integer maxEmbryoCodeCount, Integer maxLhMachineCount) {
+        if (null == day) {
+            return null;
+        }
+        GroupPlanCxLhCapacityLimitHelper limitHelper = new GroupPlanCxLhCapacityLimitHelper(day, maxEmbryoCodeCount, maxLhMachineCount);
+        return limitHelper;
+    }
+
+    /**
+     * 增加最大硫化机台数
+     *
+     * @param addLhMachines
+     */
+    public void addMaxLhMachines(Integer addLhMachines) {
+        if (null == addLhMachines || addLhMachines <= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        this.maxLhMachineCount = this.maxLhMachineCount + addLhMachines;
+        if (null != this.maxTheoryLhMachineCount) {
+            this.maxTheoryLhMachineCount = this.maxTheoryLhMachineCount + addLhMachines;
+        }
+    }
+
+    /**
      * 更新数据
      * 最大胎胚种类数
      * 最大硫化机台数
@@ -436,22 +467,6 @@ public class GroupPlanCxLhCapacityLimitHelper {
      */
     public Integer getUsedLhMachineCount() {
         return getProductionLhMachineCountByQty();
-    }
-
-    /**
-     * 构建空数据对象实例
-     *
-     * @param day                排产日
-     * @param maxEmbryoCodeCount 最大胎胚种类数
-     * @param maxLhMachineCount  最大硫化机台数
-     * @return
-     */
-    public static GroupPlanCxLhCapacityLimitHelper buildEmptyData(Integer day, Integer maxEmbryoCodeCount, Integer maxLhMachineCount) {
-        if (null == day) {
-            return null;
-        }
-        GroupPlanCxLhCapacityLimitHelper limitHelper = new GroupPlanCxLhCapacityLimitHelper(day, maxEmbryoCodeCount, maxLhMachineCount);
-        return limitHelper;
     }
 
     /**
@@ -966,7 +981,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
                 //若非（1号且续作结构）
                 //若是结构开产首日，将最大成型机数-3 sandy+ 2026.3.19
                 Integer decLhMachines = productionContext.getBaseDataContainer().getParamConfiguration().getDeductionLhMachineCount();
-                decLhMachines = (decLhMachines > singleCxMachineCount) ? singleCxMachineCount : decLhMachines;
+                decLhMachines = (decLhMachines >= singleCxMachineCount) ? BigDecimal.ZERO.intValue() : decLhMachines;
                 singleCxMachineCount -= decLhMachines;
             }
         }

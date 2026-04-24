@@ -311,7 +311,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setIsEndingTask(taskAlloc.getIsEndingTask());
                 task.setIsContinueTask(taskAlloc.getIsContinueTask());
                 task.setIsLastEndingBatch(taskAlloc.getIsLastEndingBatch());  // 设置是否收尾最后一批
-                task.setIsOpeningDayTask(context.getIsOpeningDay());
+                // 使用新逻辑：根据班次级别判断开产/停产/停产前一天
+                int shiftOrder = shiftConfig.getDayShiftOrder() != null ? shiftConfig.getDayShiftOrder() : 1;
+                task.setIsOpeningDayTask(scheduleDayTypeHelper.isOpenStartShift(scheduleDate, shiftOrder));
+                task.setIsClosingDayTask(scheduleDayTypeHelper.isClosedShift(scheduleDate, shiftOrder));
                 task.setStockHours(taskAlloc.getStockHours());
                 task.setPriority(taskAlloc.getPriority());
                 task.setLhId(taskAlloc.getLhId());
@@ -470,7 +473,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         Map<String, Map<String, ShiftScheduleService.ShiftProductionResult>> taskClassSprMap = new LinkedHashMap<>();
         Map<String, Integer> taskTotalQtyMap = new LinkedHashMap<>();
         Map<String, String> taskStructureMap = new LinkedHashMap<>();
-        Map<String, Long> taskLhIdMap = new LinkedHashMap<>();
+        Map<String, List<Long>> taskLhIdListMap = new LinkedHashMap<>();
 
         for (ShiftScheduleResult shiftResult : shiftResults) {
             int day = shiftResult.getDay();
@@ -548,7 +551,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         String materialCode = taskAlloc.getMaterialCode() != null ? taskAlloc.getMaterialCode() : "";
                         String taskKey = allocation.getMachineCode() + "|" + embryoCode + "|" + materialCode;
                         if (taskAlloc.getLhId() != null) {
-                            taskLhIdMap.putIfAbsent(taskKey, taskAlloc.getLhId());
+                            taskLhIdListMap.computeIfAbsent(taskKey, k -> new ArrayList<>()).add(taskAlloc.getLhId());
                         }
                     }
                 }
@@ -648,44 +651,81 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
             }
 
-            // ---- 库存信息 ----
-            Long lhId = taskLhIdMap.get(taskKey);
-            if (lhId != null) {
+            // ---- 库存信息（求和合并多个lhId的库存） ----
+            List<Long> lhIdList = taskLhIdListMap.get(taskKey);
+            int totalStock = 0;
+            if (lhIdList != null && !lhIdList.isEmpty()) {
                 Map<String, Integer> stockMap = context.getMaterialStockMap();
-                if (stockMap != null) {
-                    Integer stock = stockMap.get(String.valueOf(lhId));
-                    result.setTotalStock(stock != null ? new BigDecimal(stock) : BigDecimal.ZERO);
-                } else {
-                    result.setTotalStock(BigDecimal.ZERO);
+                for (Long lhId : lhIdList) {
+                    if (stockMap != null) {
+                        Integer stock = stockMap.get(String.valueOf(lhId));
+                        totalStock += (stock != null ? stock : 0);
+                    }
                 }
-            } else {
-                result.setTotalStock(BigDecimal.ZERO);
+            }
+            result.setTotalStock(new BigDecimal(totalStock));
+
+            // ---- 硫化信息（合并多个硫化任务） ----
+            List<LhScheduleResult> allLhResults = new ArrayList<>();
+            if (lhIdList != null && !lhIdList.isEmpty()) {
+                for (Long lhId : lhIdList) {
+                    LhScheduleResult lh = lhByIdMap.get(lhId);
+                    if (lh != null) {
+                        allLhResults.add(lh);
+                    }
+                }
+            }
+            // 如果没有lhId，尝试按物料查找
+            if (allLhResults.isEmpty() && materialCodeToLhMap != null && materialCode != null) {
+                List<LhScheduleResult> related = materialCodeToLhMap.get(materialCode);
+                if (related != null) {
+                    allLhResults.addAll(related);
+                }
             }
 
-            // ---- 硫化信息 ----
-            LhScheduleResult primaryLh = null;
-            if (lhId != null) {
-                primaryLh = lhByIdMap.get(lhId);
-            }
-            if (primaryLh == null && materialCode != null) {
-                List<LhScheduleResult> relatedLhResults = materialCodeToLhMap.get(materialCode);
-                if (relatedLhResults != null && !relatedLhResults.isEmpty()) {
-                    primaryLh = relatedLhResults.get(0);
-                }
-            }
+            // 第一个硫化任务（用于lhClassQty和lhRemainQty）
+            LhScheduleResult primaryLh = allLhResults.isEmpty() ? null : allLhResults.get(0);
 
-            if (primaryLh != null) {
-                result.setLhMachineCode(primaryLh.getLhMachineCode());
-                result.setLhMachineName(primaryLh.getLhMachineName());
-                result.setLhScheduleIds(primaryLh.getId() != null ? String.valueOf(primaryLh.getId()) : null);
-                if (primaryLh.getMouldQty() != null) {
-                    result.setLhMachineQty(new BigDecimal(primaryLh.getMouldQty()));
+            if (!allLhResults.isEmpty()) {
+                // lhScheduleIds: 逗号分隔合并
+                String lhIds = lhIdList != null ? lhIdList.stream()
+                        .map(String::valueOf)
+                        .collect(Collectors.joining(",")) : null;
+                result.setLhScheduleIds(lhIds);
+
+                // lhMachineCode: 逗号分隔合并
+                String lhMachineCodes = allLhResults.stream()
+                        .map(LhScheduleResult::getLhMachineCode)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .collect(Collectors.joining(","));
+                result.setLhMachineCode(lhMachineCodes);
+
+                // lhMachineName: 逗号分隔合并
+                String lhMachineNames = allLhResults.stream()
+                        .map(LhScheduleResult::getLhMachineName)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .collect(Collectors.joining(","));
+                result.setLhMachineName(lhMachineNames);
+
+                // lhMachineQty: 求和合并
+                int totalLhMachineQty = 0;
+                for (LhScheduleResult lh : allLhResults) {
+                    if (lh.getMouldQty() != null) {
+                        totalLhMachineQty += lh.getMouldQty();
+                    }
                 }
-                if (primaryLh.getSingleMouldShiftQty() != null) {
+                result.setLhMachineQty(new BigDecimal(totalLhMachineQty));
+
+                // lhClassQty: 只取第一个
+                if (primaryLh != null && primaryLh.getSingleMouldShiftQty() != null) {
                     result.setLhClassQty(new BigDecimal(primaryLh.getSingleMouldShiftQty()));
                 }
+
+                // lhRemainQty: 只取第一个
                 Map<String, MdmMonthSurplus> monthSurplusMap = context.getMonthSurplusMap();
-                if (monthSurplusMap != null) {
+                if (monthSurplusMap != null && primaryLh != null) {
                     String surplusKey = materialCode != null ? materialCode : embryoCode;
                     MdmMonthSurplus surplus = monthSurplusMap.get(surplusKey);
                     if (surplus != null && surplus.getPlanSurplusQty() != null) {
@@ -694,8 +734,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
             }
 
-            // ---- 成型余量 ----
-            {
+            // ---- 成型余量（重新计算 = lhRemainQty - totalStock） ----
+            BigDecimal lhRemainQty = result.getLhRemainQty();
+            if (lhRemainQty != null) {
+                result.setCxRemainQty(lhRemainQty.subtract(result.getTotalStock()));
+            } else {
+                // 如果没有lhRemainQty，尝试从formingRemainderMap获取
                 Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
                 if (formingRemainderMap != null && materialCode != null) {
                     Integer cxRemain = formingRemainderMap.get(materialCode);
@@ -723,7 +767,14 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             result.setOrderNo(orderNo);
 
             // ---- 收尾提示 ----
-            if (result.getCxRemainQty() != null && result.getCxRemainQty().compareTo(BigDecimal.ZERO) <= 0) {
+            boolean isUrgentEnding = false;
+            for (ShiftScheduleService.ShiftProductionResult spr : classSprMap.values()) {
+                if (Boolean.TRUE.equals(spr.getSourceTask() != null ? spr.getSourceTask().getIsUrgentEnding() : false)) {
+                    isUrgentEnding = true;
+                    break;
+                }
+            }
+            if (isUrgentEnding || (result.getCxRemainQty() != null && result.getCxRemainQty().compareTo(BigDecimal.ZERO) <= 0)) {
                 result.setMarkCloseOutTip("0");
             } else {
                 result.setMarkCloseOutTip("1");
@@ -1424,7 +1475,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             log.info("  - {}: {} 条", entry.getKey(), entry.getValue());
         }
 
-        // 2. 计算当天硫化消耗（按胎胚编码汇总，根据当天班次CLASS字段获取计划量）
+        // 2. 计算当天硫化消耗
+        // 2.1 按胎胚编码汇总（用于更新CxStock）
         Map<String, Integer> vulcanizingConsumptionByEmbryo = new HashMap<>();
         Map<Long, Integer> vulcanizingConsumptionByLhId = new HashMap<>();
         calculateVulcanizingConsumption(context.getLhScheduleResults(), dayShifts,
@@ -1432,6 +1484,15 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         log.info("【步骤2】硫化消耗汇总（胎胚 → 消耗量）:");
         for (Map.Entry<String, Integer> entry : vulcanizingConsumptionByEmbryo.entrySet()) {
             log.info("  - {}: {} 条", entry.getKey(), entry.getValue());
+        }
+
+        // 2.2 按物料编码汇总（用于更新硫化余量）
+        Map<String, Integer> vulcanizingConsumptionByMaterial = new HashMap<>();
+        calculateVulcanizingConsumptionByMaterial(context.getLhScheduleResults(), dayShifts,
+                vulcanizingConsumptionByMaterial);
+        log.info("【步骤2】硫化消耗汇总（物料 → 消耗量）:");
+        for (Map.Entry<String, Integer> entry : vulcanizingConsumptionByMaterial.entrySet()) {
+            log.info("  - {}: {}", entry.getKey(), entry.getValue());
         }
 
         // 2.5. 先更新 CxStock 实体中的 stockNum（计算新库存 = 原库存 + 成型产出 - 硫化消耗）
@@ -1444,7 +1505,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // 5. 更新 monthSurplusMap（硫化余量 -= 当天硫化消耗）
         log.info("【步骤4】更新硫化余量（monthSurplusMap）...");
-        updateMonthSurplus(context, vulcanizingConsumptionByEmbryo);
+        updateMonthSurplus(context, vulcanizingConsumptionByMaterial);
 
         // 6. 重算 formingRemainderMap（成型余量 = 硫化余量 - 库存）
         log.info("【步骤5】重算成型余量（formingRemainderMap）...");
@@ -1535,6 +1596,36 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 if (lhResult.getId() != null) {
                     vulcanizingConsumptionByLhId.merge(lhResult.getId(), consumption, Integer::sum);
                 }
+            }
+        }
+    }
+
+    /**
+     * 计算当天硫化消耗，按物料编码汇总
+     *
+     * @param lhResults                              硫化排程结果列表
+     * @param dayShifts                              当天班次配置
+     * @param vulcanizingConsumptionByMaterial       输出：物料编码 → 硫化消耗量
+     */
+    private void calculateVulcanizingConsumptionByMaterial(
+            List<LhScheduleResult> lhResults,
+            List<CxShiftConfig> dayShifts,
+            Map<String, Integer> vulcanizingConsumptionByMaterial) {
+
+        if (lhResults == null || dayShifts == null || dayShifts.isEmpty()) {
+            return;
+        }
+
+        for (LhScheduleResult lhResult : lhResults) {
+            String materialCode = lhResult.getMaterialCode();
+            if (materialCode == null) {
+                continue;
+            }
+
+            // 获取当天班次对应的硫化计划量
+            int consumption = getVulcanizingConsumptionForDay(lhResult, dayShifts);
+            if (consumption > 0) {
+                vulcanizingConsumptionByMaterial.merge(materialCode, consumption, Integer::sum);
             }
         }
     }
@@ -2010,14 +2101,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /**
      * 更新 monthSurplusMap（硫化余量 -= 当天硫化消耗）
      *
-     * <p>注意：vulcanizingConsumptionByEmbryo 的 key 是胎胚编码，需要转换为物料编码
-     *
-     * @param context                        排程上下文
-     * @param vulcanizingConsumptionByEmbryo 胎胚编码 → 硫化消耗量
+     * @param context                             排程上下文
+     * @param vulcanizingConsumptionByMaterial    物料编码 → 硫化消耗量
      */
     private void updateMonthSurplus(
             ScheduleContextVo context,
-            Map<String, Integer> vulcanizingConsumptionByEmbryo) {
+            Map<String, Integer> vulcanizingConsumptionByMaterial) {
 
         Map<String, MdmMonthSurplus> monthSurplusMap = context.getMonthSurplusMap();
         if (monthSurplusMap == null || monthSurplusMap.isEmpty()) {
@@ -2025,84 +2114,18 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return;
         }
 
-        if (vulcanizingConsumptionByEmbryo == null || vulcanizingConsumptionByEmbryo.isEmpty()) {
-            log.debug("【步骤4】vulcanizingConsumptionByEmbryo 为空，跳过更新");
+        if (vulcanizingConsumptionByMaterial == null || vulcanizingConsumptionByMaterial.isEmpty()) {
+            log.debug("【步骤4】vulcanizingConsumptionByMaterial 为空，跳过更新");
             return;
         }
 
-        // 构建胎胚编码 → 硫化任务列表的映射（一对多：一个胎胚可能对应多个物料/硫化任务）
-        List<LhScheduleResult> lhResults = context.getLhScheduleResults();
-        Map<String, List<LhScheduleResult>> embryoToLhListMap = new HashMap<>();
-        if (lhResults != null) {
-            for (LhScheduleResult lh : lhResults) {
-                if (lh.getEmbryoCode() != null && lh.getMaterialCode() != null) {
-                    embryoToLhListMap.computeIfAbsent(lh.getEmbryoCode(), k -> new ArrayList<>()).add(lh);
-                }
-            }
-        }
-
-        // 按物料编码汇总硫化消耗（按日硫化量比例分配）
-        Map<String, Integer> consumptionByMaterial = new HashMap<>();
-        for (Map.Entry<String, Integer> entry : vulcanizingConsumptionByEmbryo.entrySet()) {
-            String embryoCode = entry.getKey();
-            int consumption = entry.getValue();
-
-            List<LhScheduleResult> lhList = embryoToLhListMap.get(embryoCode);
-            if (lhList != null && !lhList.isEmpty()) {
-                if (lhList.size() == 1) {
-                    // 一对一：直接分配
-                    String materialCode = lhList.get(0).getMaterialCode();
-                    consumptionByMaterial.merge(materialCode, consumption, Integer::sum);
-                } else {
-                    // 一对多：按日硫化量比例分配消耗
-                    int totalDailyQty = 0;
-                    for (LhScheduleResult lh : lhList) {
-                        if (lh.getDailyPlanQty() != null) {
-                            totalDailyQty += lh.getDailyPlanQty();
-                        }
-                    }
-                    if (totalDailyQty > 0) {
-                        int allocated = 0;
-                        for (int i = 0; i < lhList.size(); i++) {
-                            LhScheduleResult lh = lhList.get(i);
-                            int dailyQty = lh.getDailyPlanQty() != null ? lh.getDailyPlanQty() : 0;
-                            int alloc;
-                            if (i == lhList.size() - 1) {
-                                // 最后一个分配剩余量，避免四舍五入误差
-                                alloc = consumption - allocated;
-                            } else {
-                                alloc = consumption * dailyQty / totalDailyQty;
-                            }
-                            if (alloc > 0) {
-                                consumptionByMaterial.merge(lh.getMaterialCode(), alloc, Integer::sum);
-                                allocated += alloc;
-                            }
-                        }
-                        log.debug("【步骤4】胎胚 {} 硫化消耗={}, 按{}个物料按日硫化量比例分配", embryoCode, consumption, lhList.size());
-                    } else {
-                        // 日硫化量都为0，平均分配
-                        int avg = consumption / lhList.size();
-                        int remainder = consumption - avg * lhList.size();
-                        for (int i = 0; i < lhList.size(); i++) {
-                            int alloc = avg + (i < remainder ? 1 : 0);
-                            consumptionByMaterial.merge(lhList.get(i).getMaterialCode(), alloc, Integer::sum);
-                        }
-                        log.debug("【步骤4】胎胚 {} 硫化消耗={}, 日硫化量为0，平均分配给{}个物料", embryoCode, consumption, lhList.size());
-                    }
-                }
-            } else {
-                log.warn("【步骤4】胎胚 {} 未找到对应的硫化任务", embryoCode);
-            }
-        }
-
-        // 更新硫化余量
+        // 更新硫化余量：每个物料只更新一次
         log.info("【步骤4】硫化消耗按物料汇总详情:");
-        for (Map.Entry<String, Integer> entry : consumptionByMaterial.entrySet()) {
+        for (Map.Entry<String, Integer> entry : vulcanizingConsumptionByMaterial.entrySet()) {
             String materialCode = entry.getKey();
             int consumption = entry.getValue();
-
             MdmMonthSurplus surplus = monthSurplusMap.get(materialCode);
-            if (surplus != null && surplus.getPlanSurplusQty() != null && consumption > 0) {
+            if (surplus != null && surplus.getPlanSurplusQty() != null) {
                 BigDecimal oldSurplus = surplus.getPlanSurplusQty();
                 BigDecimal newSurplus = oldSurplus.subtract(BigDecimal.valueOf(consumption));
                 surplus.setPlanSurplusQty(newSurplus);
