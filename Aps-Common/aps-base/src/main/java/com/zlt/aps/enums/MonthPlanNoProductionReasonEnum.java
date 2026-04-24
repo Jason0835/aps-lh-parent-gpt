@@ -32,10 +32,6 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     NO_STRUCTURE_NAME("MP1203", "没有结构", "alg.data.initCheck.noStructureName"),
     /**
-     * MP1207 没有主花纹
-     */
-    NO_MAIN_PATTERN("MP1207", "没有主花纹", "alg.data.initCheck.noMainPattern"),
-    /**
      * MP1204 没有寸口
      */
     NO_PRO_SIZE("MP1204", "没有寸口", "alg.data.initCheck.noProSize"),
@@ -47,6 +43,14 @@ public enum MonthPlanNoProductionReasonEnum {
      * MP1206 没有日硫化量
      */
     NO_DAY_LH_CAPACITY("MP1206", "没有日硫化量", "alg.data.initCheck.noDayLhCapacity"),
+    /**
+     * MP1207 没有主花纹
+     */
+    NO_MAIN_PATTERN("MP1207", "没有主花纹", "alg.data.initCheck.noMainPattern"),
+    /**
+     * MP1208 质控状态不是投产
+     */
+    STATE_NO_IN_PRODUCTION("MP1208","质控状态不是投产","alg.data.initCheck.qualityStateCode"),
     /**
      * MP1301 没有配置施工关系
      */
