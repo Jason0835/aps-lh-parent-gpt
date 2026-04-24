@@ -11,6 +11,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.lh.service.ILhMachineInfoService;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
@@ -28,6 +29,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -168,6 +170,16 @@ public class LhMachineInfoController extends AbstractDocBizController<LhMachineI
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("quota")), "QUOTA", queryVO.getFieldValueByFieldName("quota"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("openMachineClass")), "OPEN_MACHINE_CLASS", queryVO.getFieldValueByFieldName("openMachineClass"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("status")), "STATUS", queryVO.getFieldValueByFieldName("status"));
+        Map<String, Object> params = queryVO.getParams();
+        if (params != null && params.containsKey("filterNotExistsScheduleResult")) {
+            String existSql = "SELECT 1 FROM t_lh_schedule_result where t_lh_schedule_result.is_delete = 0 AND t_lh_machine_info.machine_code = t_lh_schedule_result.lh_machine_code ";
+            if (ApsConstant.APS_STRING_1.equals(params.get("filterNotExistsScheduleResult"))) {
+                if (params.containsKey("scheduleDate")) {
+                    existSql += "and t_lh_schedule_result.schedule_date = '" + params.get("scheduleDate") + "'";
+                }
+                queryWrapper.notExists(existSql);
+            }
+        }
     }
 
 
