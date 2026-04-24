@@ -75,7 +75,7 @@ export default {
     TltUploadForm,
     infoDialog,
   },
-  dicts: ["biz_factory_name", "biz_yes_no", "CHANGE_MOULD_TYPE", "IS_RELEASE", "CLASS_NUM"],
+  dicts: ["biz_factory_name", "biz_yes_no", "CHANGE_MOULD_TYPE", "IS_RELEASE", "CLASS_NUM", "lr_molds", "finish_completion"],
   provide() {
     return {
       parentDict: this.dict,
@@ -171,6 +171,16 @@ export default {
           },
         },
         {
+          prop: "leftRightMould",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhMouldChangePlan.leftRightMould"),
+          minWidth: 120,
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.lr_molds, value);
+          },
+        },
+        {
           prop: "lhMachineCode",
           align: "center",
           halign: "center",
@@ -239,7 +249,7 @@ export default {
           label: this.$t("ui.data.column.lhMouldChangePlan.mouldStatus"),
           minWidth: 140,
           formatter: (row, column, value, index) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+            return this.selectDictLabel(this.dict.type.finish_completion, value);
           },
         },
 
@@ -391,7 +401,6 @@ export default {
       }
     },
     handleSearch(data) {
-      this.search = { ...data };
       this.query = { ...data };
       this.$set(this.page, "current", 1);
       this.getList();
@@ -464,31 +473,6 @@ export default {
         },
     },
     activated() {
-        const today = this.getTodayDate();
-        if (this.search.factoryCode === undefined || this.search.factoryCode === null) {
-            this.search = {
-                ...this.search,
-                factoryCode: "116",
-            };
-        }
-        if (this.search.scheduleDate === undefined || this.search.scheduleDate === null) {
-            this.search = {
-                ...this.search,
-                scheduleDate: today,
-            };
-        }
-        if (this.query.factoryCode === undefined || this.query.factoryCode === null) {
-            this.query = {
-                ...this.query,
-                factoryCode: "116",
-            };
-        }
-        if (this.query.scheduleDate === undefined || this.query.scheduleDate === null) {
-            this.query = {
-                ...this.query,
-                scheduleDate: today,
-            };
-        }
         this.getList();
     },
 };

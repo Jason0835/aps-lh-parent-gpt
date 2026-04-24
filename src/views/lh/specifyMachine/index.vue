@@ -293,7 +293,6 @@ export default {
       });
     },
     handleSearch(data) {
-      this.search = { ...data };
       this.query = { ...data };
       this.$set(this.page, "current", 1);
       this.getList();
@@ -345,18 +344,6 @@ export default {
     },
   },
   activated() {
-    if (this.search.factoryCode === undefined || this.search.factoryCode === null) {
-      this.search = {
-        ...this.search,
-        factoryCode: "116",
-      };
-    }
-    if (this.query.factoryCode === undefined || this.query.factoryCode === null) {
-      this.query = {
-        ...this.query,
-        factoryCode: "116",
-      };
-    }
     this.getList();
   },
 };
