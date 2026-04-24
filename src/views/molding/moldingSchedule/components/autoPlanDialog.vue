@@ -133,7 +133,7 @@ export default {
         this.loading = false;
         if (result.code === 200) {
           this.$modal.msgSuccess(result.msg);
-          this.$emit("success");
+          this.$emit("success", params.scheduleDate);
           this.hide();
         } else if (result.code === 500) {
           const errorData = result.data || {};
@@ -240,13 +240,13 @@ export default {
               this.loading = false;
             });
         } else if (valid.msg == "2") {
-          let result = await autoPlan(params);
-          this.loading = false;
-          if (result.code == 200) {
-            this.$modal.msgSuccess(result.msg);
-            this.$emit("success");
-            this.hide();
-          }
+           let result = await autoPlan(params);
+           this.loading = false;
+           if (result.code == 200) {
+             this.$modal.msgSuccess(result.msg);
+             this.$emit("success", params.scheduleDate);
+             this.hide();
+           }
         } else if (valid.msg == "3") {
           this.loading = false;
           this.$modal.warning(this.$t("ui.biz.alter.CanNotRecreate"));
@@ -266,23 +266,23 @@ export default {
         if (valid.msg == "1") {
           this.$confirm(this.$t("ui.biz.alter.makeSureRecreate")).then(
             async () => {
-              let result = await lhAutoPlan(params);
-              this.loading = false;
-              if (result.code == 200) {
-                this.$modal.msgSuccess(result.msg);
-                this.$emit("success");
-                this.hide();
-              }
+               let result = await lhAutoPlan(params);
+               this.loading = false;
+               if (result.code == 200) {
+                 this.$modal.msgSuccess(result.msg);
+                 this.$emit("success", params.scheduleDate);
+                 this.hide();
+               }
             }
           );
         } else if (valid.msg == "2") {
-          let result = await lhAutoPlan(params);
-          this.loading = false;
-          if (result.code == 200) {
-            this.$modal.msgSuccess(result.msg);
-            this.$emit("success");
-            this.hide();
-          }
+           let result = await lhAutoPlan(params);
+           this.loading = false;
+           if (result.code == 200) {
+             this.$modal.msgSuccess(result.msg);
+             this.$emit("success", params.scheduleDate);
+             this.hide();
+           }
         } else if (valid.msg == "3") {
           this.$modal.warning(this.$t("ui.biz.alter.CanNotRecreate"));
         }
@@ -300,18 +300,18 @@ export default {
           this.$confirm(
             this.$t("ui.data.column.scheduleResult.modelChangeValidate")
           ).then(async () => {
-            await modelChange(params);
-            this.loading = false;
-            this.$modal.msgSuccess(result.msg);
-            this.$emit("success");
-            this.hide();
+             const result = await modelChange(params);
+             this.loading = false;
+             this.$modal.msgSuccess(result.msg);
+             this.$emit("success", params.scheduleDate);
+             this.hide();
           });
         } else {
-          await modelChange(params);
-          this.loading = false;
-          this.$modal.msgSuccess(result.msg);
-          this.$emit("success");
-          this.hide();
+           const result = await modelChange(params);
+           this.loading = false;
+           this.$modal.msgSuccess(result.msg);
+           this.$emit("success", params.scheduleDate);
+           this.hide();
         }
       } catch (error) {
         console.error(error);
@@ -322,11 +322,11 @@ export default {
       try {
         this.loading = true;
 
-        await modelAdjustPlan(params);
-        this.loading = false;
-        this.$modal.msgSuccess(result.msg);
-        this.$emit("success");
-        this.hide();
+         const result = await modelAdjustPlan(params);
+         this.loading = false;
+         this.$modal.msgSuccess(result.msg);
+         this.$emit("success", params.scheduleDate);
+         this.hide();
       } catch (error) {
         console.error(error);
         this.loading = false;

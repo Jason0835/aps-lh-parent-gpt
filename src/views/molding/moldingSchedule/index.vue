@@ -91,7 +91,7 @@
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <autoPlanDialog ref="autoPlanRef" @success="getList" />
+     <autoPlanDialog ref="autoPlanRef" @success="handleAutoPlanSuccess" />
     <modifyLhMachineQtyDialog ref="qtyRef" @success="getList" />
     <addDialog ref="addRef" @success="getList" />
     <editDialog ref="editRef" @success="getList" />
@@ -258,6 +258,33 @@ export default {
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
+          {
+          label: this.$t("排程日期"),
+          prop: "scheduleDate",
+          align: "center",
+          minWidth: 100,
+        },
+        {
+          label: this.$t("工单号"),
+          prop: "orderNo",
+          align: "center",
+          minWidth: 100,
+        },
+        {
+          label: this.$t("成型批次号"),
+          prop: "cxBatchNo",
+          align: "center",
+          minWidth: 100,
+        },
+        {
+          label: this.$t("是否发布"),
+          prop: "isRelease",
+          align: "center",
+          minWidth: 100,
+          formatter: (row, column, value, index) => {
+            return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
+          },
+        },
         {
           label: this.$t("成型机台"),
           prop: "cxMachineCode",
@@ -934,6 +961,14 @@ export default {
         this.$refs.autoPlanRef.show("", "1");
       }
     },
+    handleAutoPlanSuccess(scheduleDate) {
+      if (scheduleDate) {
+        this.query.scheduleDate = scheduleDate;
+        this.search.scheduleDate = scheduleDate;
+      }
+      this.$set(this.page, "current", 1);
+      this.getList();
+    },
     handleModifyLhMachineQty() {
       if (this.$refs.qtyRef) {
         this.$refs.qtyRef.show();
@@ -1240,8 +1275,8 @@ export default {
     },
   },
   created() {
-    //设置默认排程时间
-    let date =moment().add(1, "days").format("YYYY-MM-DD");
+    //设置默认排程时间为后天
+    let date =moment().add(2, "days").format("YYYY-MM-DD");
 
     // date = "2023-06-01"; //test
     this.query.scheduleDate = date;
@@ -1249,6 +1284,10 @@ export default {
 
     this.$store.dispatch("molding/getMachineList");
     this.$store.dispatch("curing/getMachineList");
+  },
+  mounted() {
+    // 初始化加载列表
+    this.getList();
   },
   watch: {
     moldingMachines() {
