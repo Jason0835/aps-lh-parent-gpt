@@ -61,7 +61,7 @@
           v-hasPermi="['lh:lhScheduleResult:changeMachine']"
           type="primary"
           @click="handleChangeMachine"
-          :disabled="selection.length == 0"
+          :disabled="selection.length !== 1"
           >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button
         >
         <el-button
@@ -790,6 +790,11 @@ export default {
       }
     },
     handleChangeMachine() {
+      // 转机台仅支持单选，未选或多选时直接提示并阻断弹窗打开。
+      if (this.selection.length !== 1) {
+        this.$modal.msgWarning(this.$t("请选择一条需要转机台的数据"));
+        return;
+      }
       if (this.$refs.changeMachineDialogRef) {
         let row = this.selection[0];
         this.$refs.changeMachineDialogRef.show(row);
