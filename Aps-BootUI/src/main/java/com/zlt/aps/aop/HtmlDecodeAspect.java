@@ -111,10 +111,7 @@ public class HtmlDecodeAspect {
         }
 
         if (param instanceof Collection) {
-            for (Object item : (Collection<?>) param) {
-                escapeParamField(item, visited);
-            }
-            return param;
+            return escapeCollection((Collection<?>) param, visited);
         }
 
         if (clazz.isArray()) {
@@ -130,11 +127,7 @@ public class HtmlDecodeAspect {
         }
 
         if (param instanceof Map) {
-            Map<?, ?> map = (Map<?, ?>) param;
-            for (Object value : map.values()) {
-                escapeParamField(value, visited);
-            }
-            return param;
+            return escapeMap((Map<?, ?>) param, visited);
         }
 
         List<Field> fields = getAllFields(clazz);
@@ -228,10 +221,7 @@ public class HtmlDecodeAspect {
         }
 
         if (result instanceof Collection) {
-            for (Object item : (Collection<?>) result) {
-                unescapeResultData(item, visited);
-            }
-            return result;
+            return unescapeCollection((Collection<?>) result, visited);
         }
 
         if (clazz.isArray()) {
@@ -247,11 +237,7 @@ public class HtmlDecodeAspect {
         }
 
         if (result instanceof Map) {
-            Map<?, ?> map = (Map<?, ?>) result;
-            for (Object value : map.values()) {
-                unescapeResultData(value, visited);
-            }
-            return result;
+            return unescapeMap((Map<?, ?>) result, visited);
         }
 
         Field[] fields = clazz.getDeclaredFields();
@@ -315,6 +301,116 @@ public class HtmlDecodeAspect {
             i++;
         }
         return sb.toString();
+    }
+
+    /**
+     * 处理集合内元素的转义。
+     * <p>
+     * 仅在 List 场景下对 String 元素执行回写，避免“计算后未落回容器”。
+     * 其他集合类型（如 Set）保持原有行为，仅递归处理可变对象。
+     *
+     * @param collection 待处理集合
+     * @param visited    循环引用去重集合
+     * @return 处理后的原集合
+     * @throws IllegalAccessException 反射访问异常
+     */
+    @SuppressWarnings("unchecked")
+    private Object escapeCollection(Collection<?> collection, Set<Object> visited) throws IllegalAccessException {
+        if (collection instanceof List) {
+            List<Object> list = (List<Object>) collection;
+            ListIterator<Object> iterator = list.listIterator();
+            while (iterator.hasNext()) {
+                Object item = iterator.next();
+                Object escaped = escapeParamField(item, visited);
+                if (item instanceof String) {
+                    iterator.set(escaped);
+                }
+            }
+            return collection;
+        }
+
+        for (Object item : collection) {
+            escapeParamField(item, visited);
+        }
+        return collection;
+    }
+
+    /**
+     * 处理 Map value 的转义。
+     * <p>
+     * 仅处理 value，不处理 key；当 value 为 String 时，回写转义后的值。
+     *
+     * @param map     待处理 Map
+     * @param visited 循环引用去重集合
+     * @return 处理后的原 Map
+     * @throws IllegalAccessException 反射访问异常
+     */
+    @SuppressWarnings("unchecked")
+    private Object escapeMap(Map<?, ?> map, Set<Object> visited) throws IllegalAccessException {
+        Map<Object, Object> mutableMap = (Map<Object, Object>) map;
+        for (Map.Entry<Object, Object> entry : mutableMap.entrySet()) {
+            Object value = entry.getValue();
+            Object escaped = escapeParamField(value, visited);
+            if (value instanceof String) {
+                entry.setValue(escaped);
+            }
+        }
+        return map;
+    }
+
+    /**
+     * 处理集合内元素的反转义。
+     * <p>
+     * 仅在 List 场景下对 String 元素执行回写，避免“计算后未落回容器”。
+     * 其他集合类型（如 Set）保持原有行为，仅递归处理可变对象。
+     *
+     * @param collection 待处理集合
+     * @param visited    循环引用去重集合
+     * @return 处理后的原集合
+     * @throws IllegalAccessException 反射访问异常
+     */
+    @SuppressWarnings("unchecked")
+    private Object unescapeCollection(Collection<?> collection, Set<Object> visited) throws IllegalAccessException {
+        if (collection instanceof List) {
+            List<Object> list = (List<Object>) collection;
+            ListIterator<Object> iterator = list.listIterator();
+            while (iterator.hasNext()) {
+                Object item = iterator.next();
+                Object unescaped = unescapeResultData(item, visited);
+                if (item instanceof String) {
+                    iterator.set(unescaped);
+                }
+            }
+            return collection;
+        }
+
+        for (Object item : collection) {
+            unescapeResultData(item, visited);
+        }
+        return collection;
+    }
+
+    /**
+     * 处理 Map value 的反转义。
+     * <p>
+     * 仅处理 value，不处理 key；当 value 为 String 时，回写反转义后的值。
+     *
+     * @param map     待处理 Map
+     * @param visited 循环引用去重集合
+     * @return 处理后的原 Map
+     * @throws IllegalAccessException 反射访问异常
+     */
+    @SuppressWarnings("unchecked")
+    private Object unescapeMap(Map<?, ?> map, Set<Object> visited) throws IllegalAccessException {
+        Map<Object, Object> mutableMap = (Map<Object, Object>) map;
+        for (Map.Entry<Object, Object> entry : mutableMap.entrySet()) {
+            Object value = entry.getValue();
+            Object unescaped = unescapeResultData(value, visited);
+            if (value instanceof String) {
+                entry.setValue(unescaped);
+            }
+        }
+        return map;
     }
 
     /**
