@@ -199,11 +199,11 @@ public class ProductionCapacityParamConfiguration {
      * 模具分配比例调整周期日
      */
     private Integer moldAllocationRatioCycle;
+
+    private String cxLhRatioExtraValue;
     /**
      * 结构硫化成型配比额外增加配置
      */
-    private String cxLhRatioExtraValue;
-
     private Map<String, Integer> extraMap;
 
     /**
