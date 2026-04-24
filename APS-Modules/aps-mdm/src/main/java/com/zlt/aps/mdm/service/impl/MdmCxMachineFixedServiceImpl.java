@@ -5,13 +5,13 @@ import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.utils.GenerageMapKeyUtils;
-import com.zlt.aps.mdm.mapper.MdmMaterialInfoEntityMapper;
-import com.zlt.aps.mdm.mapper.MdmMoldingMachineEntityMapper;
-import com.zlt.aps.mdm.service.IMdmCxMachineFixedService;
 import com.zlt.aps.mdm.api.domain.entity.MdmCxMachineFixed;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMoldingMachine;
+import com.zlt.aps.mdm.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.mdm.mapper.MdmMoldingMachineEntityMapper;
+import com.zlt.aps.mdm.service.IMdmCxMachineFixedService;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -112,7 +112,7 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
     }
 
     /**
-     * 校验固定结构1、固定结构2、固定结构3，对比不可作业结构，不可有相同
+     * 校验固定结构1、固定结构2、固定结构3、固定结构4，对比不可作业结构，不可有相同
      *
      * @param docEntityVO 校验对象
      */
@@ -123,6 +123,9 @@ public class MdmCxMachineFixedServiceImpl extends AbstractDocService<MdmCxMachin
         fixedStructureList.addAll(Arrays.stream(fixedStructure2.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList()));
         String fixedStructure3 = StringUtils.defaultIfBlank(docEntityVO.getFixedStructure3(), "");
         fixedStructureList.addAll(Arrays.stream(fixedStructure3.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList()));
+        String fixedStructure4 = StringUtils.defaultIfBlank(docEntityVO.getFixedStructure4(), "");
+        fixedStructureList.addAll(Arrays.stream(fixedStructure4.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList()));
+
         String disableStructure = StringUtils.defaultIfBlank(docEntityVO.getDisableStructure(), "");
         List<String> disableStructureList = Arrays.stream(disableStructure.split(",")).filter(StringUtils::isNotBlank).collect(Collectors.toList());
         if (CollectionUtils.isNotEmpty(fixedStructureList) && CollectionUtils.isNotEmpty(disableStructureList)) {

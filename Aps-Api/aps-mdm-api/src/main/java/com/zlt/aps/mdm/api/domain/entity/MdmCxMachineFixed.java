@@ -82,6 +82,15 @@ public class MdmCxMachineFixed extends BaseEntity {
     private String fixedStructure3;
 
     /**
+     * 固定结构4 多个以,分隔拼接
+     */
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.data.column.mdmCxMachineFixed.fixedStructure4")
+    @ApiModelProperty(value = "固定结构4 多个以,分隔拼接", name = "fixedStructure4")
+    @TableField(value = "FIXED_STRUCTURE4", updateStrategy = FieldStrategy.IGNORED)
+    private String fixedStructure4;
+
+    /**
      * 固定SKU  多个以,分隔拼接
      */
     @ImportExcelValidated(maxLength = 500)
