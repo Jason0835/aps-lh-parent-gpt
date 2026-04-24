@@ -3379,7 +3379,7 @@ public class MatchingProductionHandler {
         logInfo.setMonthPlanVersion(context.getMonthPlanVersion());
         logInfo.setProductionVersion(context.getProductionVersion());
         logInfo.setPlanType(context.getPlanType());
-        logInfo.setWorkNo(context.getOperationWorkNo());
+        logInfo.setWorkNo(context.getProductionVersion());
         logInfo.setLogContent(tempLogContent);
         baseDao.insert(logInfo);
     }
