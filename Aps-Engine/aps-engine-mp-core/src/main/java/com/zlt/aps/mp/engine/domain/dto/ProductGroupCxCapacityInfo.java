@@ -138,6 +138,8 @@ public class ProductGroupCxCapacityInfo implements Serializable {
         fixedPriorityValue = Math.min(fixedPriorityValue, fixedPriorityValue2);
         Integer fixedPriorityValue3 = getFixedStructurePriority(baseInfo.getFixedStructure3(), CxMachineFixedPriorityEnum.FIXED_STRUCTURE_THIRD, structureName).getPriorityValue();
         fixedPriorityValue = Math.min(fixedPriorityValue, fixedPriorityValue3);
+        Integer fixedPriorityValue4 = getFixedStructurePriority(baseInfo.getFixedStructure4(), CxMachineFixedPriorityEnum.FIXED_STRUCTURE_FOUR, structureName).getPriorityValue();
+        fixedPriorityValue = Math.min(fixedPriorityValue, fixedPriorityValue4);
         capacityInfo.setFixedPriority(fixedPriorityValue);
         return capacityInfo;
     }
