@@ -988,6 +988,13 @@
             "user": "增加用户"
           }
         }
+      },
+      "tq": {
+        "specifyMachine": {
+          "column": {
+            "materialCode": "胎圈代码"
+          }
+        }
       }
     },
     "api": {

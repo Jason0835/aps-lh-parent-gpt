@@ -1,104 +1,112 @@
 package com.zlt.aps.tq.controller;
 
-
-import com.ruoyi.common.core.web.controller.BaseController;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.exception.CustomException;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.tq.api.domain.dto.TqMouthPlateDto;
-import com.zlt.aps.tq.entity.TqMouthPlate;
-import com.zlt.aps.tq.service.TqMouthPlateService;
-import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiImplicitParams;
+import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
+import com.zlt.aps.tq.api.domain.entity.TqMouthPlate;
+import com.zlt.aps.tq.api.domain.vo.TqMouthPlateExportVO;
+import com.zlt.aps.tq.mapper.TqMouthPlateMapper;
+import com.zlt.aps.tq.service.ITqMachineInfoService;
+import com.zlt.aps.tq.service.ITqMouthPlateService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
+import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.BeanUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cloud.openfeign.SpringQueryMap;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
-/**
- * <p>
- * 胎圈口型板信息维护 前端控制器
- * </p>
- *
- * @author chen
- * @since 2021-06-08
- */
+@Slf4j
+@Api(tags = "胎圈口型板信息")
 @RestController
-@RequestMapping("/tq/mouthPlate")
-public class TqMouthPlateController extends BaseController {
+@RequestMapping("/tqMouthPlate")
+public class TqMouthPlateController extends AbstractDocBizController<TqMouthPlate> {
 
     @Autowired
-    private TqMouthPlateService tqMouthPlateService;
+    private ITqMouthPlateService tqMouthPlateService;
 
-    /**
-     * 查询胎圈口型板信息维护列表
-     */
+    @Autowired
+    private ITqMachineInfoService tqMachineInfoService;
+
+    @Resource
+    private TqMouthPlateMapper tqMouthPlateMapper;
+
+    @ApiOperation("查询胎圈口型板信息列表")
     @PostMapping("/list")
-    @ApiOperation("查询胎圈口型板信息维护列表")
-    public TableDataInfo list(@RequestBody TqMouthPlateDto dto) {
-        //多表联查指定排序
+    @Override
+    public TableDataInfo list(@RequestBody TqMouthPlate queryVO) {
         startPage();
-        dto.setOrderStr(orderStr());
-        TqMouthPlate mouthPlate = new TqMouthPlate();
-        BeanUtils.copyProperties(dto, mouthPlate);
-        List<TqMouthPlateDto> list = tqMouthPlateService.selectMouthPlateList(mouthPlate);
+        List<TqMouthPlate> list = tqMouthPlateMapper.selectMouthPlateWithMachineInfo(queryVO);
         return getDataTable(list);
     }
 
-    /**
-     * 根据id获取胎圈口型板信息维护详细信息
-     *
-     * @return 查询到的口型板信息
-     */
-    @GetMapping(value = "/{id}")
-    @ApiOperation("获取胎圈口型板信息详细信息")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    public TqMouthPlateDto getInfo(@PathVariable("id") Long id) {
-        TqMouthPlate mouthPlate = tqMouthPlateService.selectMouthPlateById(id);
-        TqMouthPlateDto dto = new TqMouthPlateDto();
-        BeanUtils.copyProperties(mouthPlate, dto);
-        return dto;
+    @Log(title = "胎圈口型板信息", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody TqMouthPlate billVO) {
+        return super.save(billVO);
     }
 
-    /**
-     * 保存胎圈口型板信息维护
-     */
-    @Log(title = "ui.data.column.tq.mouthPlate.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @PostMapping("/edit")
-    @ApiOperation("保存胎圈口型板信息（id为空则新增，id不为空则修改）")
-    public AjaxResult edit(@Validated @RequestBody TqMouthPlateDto dto) {
-        TqMouthPlate mouthPlate = new TqMouthPlate();
-        BeanUtils.copyProperties(dto, mouthPlate);
-        tqMouthPlateService.saveMouthPlate(mouthPlate);
-        return AjaxResult.success();
+    @Log(title = "胎圈口型板信息", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @PostMapping("/delete/{ids}")
+    public AjaxResult deleteByIds(@PathVariable("ids") List<Long> ids) {
+        return super.removeByIds(ids);
     }
 
-    /**
-     * 删除胎圈口型板信息维护
-     */
-    @Log(title = "ui.data.column.tq.mouthPlate.modelName", businessType = BusinessType.DELETE)
-    @PostMapping("/{ids}")
-    @ApiOperation("删除胎圈口型板信息")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "ids", dataType = "Array", value = "id数组", paramType = "query")
-    })
-    public AjaxResult remove(@PathVariable("ids") Long[] ids) {
-        tqMouthPlateService.deleteMouthPlateByIds(ids);
-        return AjaxResult.success();
+    @ApiOperation("获取详细信息")
+    @GetMapping("/{id}")
+    @Override
+    public TqMouthPlate getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
     }
 
+    @Log(title = "胎圈口型板信息", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
+    }
 
-    @Log(title = "ui.data.column.tq.mouthPlate.modelName", businessType = BusinessType.DELETE)
+    @Log(title = "胎圈口型板信息", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody TqMouthPlate queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        List<TqMouthPlateExportVO> list = getExportDataList(queryVO);
+        ExcelUtil<TqMouthPlateExportVO> util = new ExcelUtil<>(TqMouthPlateExportVO.class);
+        org.apache.poi.ss.usermodel.Workbook workbook = util.exportExcelFromList(list, fileName);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        return out.toByteArray();
+    }
+
+    @ApiOperation("校验口型板唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody TqMouthPlate mouthPlate) {
+        return tqMouthPlateService.checkUnique(mouthPlate);
+    }
+
+    @Log(title = "胎圈口型板信息", businessType = BusinessType.DELETE)
     @ApiOperation("删除全部(逻辑删)")
     @PostMapping("/deleteAll")
     public AjaxResult deleteAll() {
@@ -106,28 +114,54 @@ public class TqMouthPlateController extends BaseController {
         return AjaxResult.success();
     }
 
-
-    /**
-     * 导出胎面口型板信息
-     */
-    @Log(title = "ui.data.column.tq.mouthPlate.modelName", businessType = BusinessType.EXPORT)
-    @PostMapping("/exportData")
-    @ApiOperation("导出胎面口型板信息")
-    public List<TqMouthPlateDto> exportData(@RequestBody TqMouthPlateDto dto) {
-        startPage();
-        dto.setOrderStr(orderStr());
-        TqMouthPlate mouthPlate = new TqMouthPlate();
-        BeanUtils.copyProperties(dto, mouthPlate);
-        return tqMouthPlateService.selectMouthPlateList(mouthPlate);
+    @Override
+    protected IDocService getDocService() {
+        return tqMouthPlateService;
     }
 
-    @Log(title = "ui.data.column.tq.mouthPlate.modelName", businessType = BusinessType.IMPORT)
-    @PostMapping("/importData")
-    @ApiOperation("导入胎面口型板信息")
-    public AjaxResult importData(@RequestBody List<TqMouthPlateDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+    @Override
+    protected String getTypeCode() {
+        return "0";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "CREATE_TIME desc";
+    }
+
+    protected List<TqMouthPlateExportVO> getExportDataList(TqMouthPlate obj) {
+        QueryWrapper<TqMouthPlate> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + getOrderBy());
+        List<TqMouthPlate> list = tqMouthPlateMapper.selectList(wrapper);
+
+        // 查询机台信息
+        Map<Long, String> machineMap = new HashMap<>();
+        if (!list.isEmpty()) {
+            List<TqMachineInfo> machineList = tqMachineInfoService.selectMachineInfoList(new TqMachineInfo());
+            machineMap = machineList.stream()
+                    .collect(Collectors.toMap(TqMachineInfo::getId, TqMachineInfo::getMachineName, (v1, v2) -> v1));
         }
-        return tqMouthPlateService.importData(list, updateSupport, importLogId);
+
+        // 转换为VO
+        List<TqMouthPlateExportVO> voList = new ArrayList<>();
+        for (TqMouthPlate plate : list) {
+            TqMouthPlateExportVO vo = new TqMouthPlateExportVO();
+            vo.setMouthPlateCode(plate.getMouthPlateCode());
+            vo.setMachineName(machineMap.getOrDefault(plate.getMachineId(), ""));
+            vo.setStatus(plate.getStatus());
+            vo.setRemark(plate.getRemark());
+            vo.setUpdateTime(plate.getUpdateTime());
+            voList.add(vo);
+        }
+        return voList;
+    }
+
+    @Override
+    protected void builderCondition(QueryWrapper<TqMouthPlate> queryWrapper, TqMouthPlate queryVO) {
+        queryWrapper.eq("IS_DELETE", 0);
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMouthPlateCode()), "MOUTH_PLATE_CODE", queryVO.getMouthPlateCode());
+        queryWrapper.eq(queryVO.getMachineId() != null, "MACHINE_ID", queryVO.getMachineId());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getStatus()), "STATUS", queryVO.getStatus());
     }
 }

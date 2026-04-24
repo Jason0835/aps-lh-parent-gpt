@@ -29,6 +29,8 @@ public class LhScheduleResponseDTO {
     private List<String> logMessages = new ArrayList<>();
     /** 校验错误明细（如基础数据校验未通过时的多条原因） */
     private List<String> validationErrors = new ArrayList<>();
+    /** 校验错误结构化明细（如模具禁用/缺失的详细信息，便于前端分页展示） */
+    private List<MouldValidationErrorDetail> validationErrorDetails = new ArrayList<>();
 
     /**
      * 构建成功响应

@@ -49,4 +49,6 @@ public class LhPrecisionPlanImportVO extends BaseEntity implements Serializable 
     @ImportValidated(maxLength = 300)
     @ApiModelProperty(value = "备注")
     private String remark;
+
+    private Integer rowNum;
 }

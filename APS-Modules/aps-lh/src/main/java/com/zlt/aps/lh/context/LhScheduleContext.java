@@ -3,6 +3,7 @@ package com.zlt.aps.lh.context;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftRuntimeState;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.api.domain.dto.MouldValidationErrorDetail;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
@@ -171,6 +172,8 @@ public class LhScheduleContext {
     private String currentStep;
     /** 校验错误信息集合 */
     private List<String> validationErrorList = new ArrayList<>();
+    /** 校验错误明细（结构化，如模具禁用/缺失的详细信息） */
+    private List<MouldValidationErrorDetail> validationErrorDetailList = new ArrayList<>();
     /** 优先级跟踪日志静默深度（局部搜索模拟分支时递增） */
     private int priorityTraceMuteDepth = 0;
 
@@ -184,6 +187,28 @@ public class LhScheduleContext {
             return;
         }
         this.validationErrorList.add(message);
+    }
+
+    /**
+     * 追加一条结构化校验错误明细
+     *
+     * @param detail 模具校验错误明细
+     */
+    public void addValidationErrorDetail(MouldValidationErrorDetail detail) {
+        if (detail != null) {
+            this.validationErrorDetailList.add(detail);
+        }
+    }
+
+    /**
+     * 批量追加结构化校验错误明细
+     *
+     * @param details 模具校验错误明细列表
+     */
+    public void addValidationErrorDetails(List<MouldValidationErrorDetail> details) {
+        if (details != null) {
+            this.validationErrorDetailList.addAll(details);
+        }
     }
 
     /**

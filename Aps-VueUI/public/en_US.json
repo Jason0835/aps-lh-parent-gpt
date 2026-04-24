@@ -189,6 +189,13 @@
             "user": "增加用户"
           }
         }
+      },
+      "tq": {
+        "specifyMachine": {
+          "column": {
+            "materialCode": "Bead Code"
+          }
+        }
       }
     },
     "api": {

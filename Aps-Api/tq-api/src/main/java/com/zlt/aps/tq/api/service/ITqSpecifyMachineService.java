@@ -1,61 +1,49 @@
 package com.zlt.aps.tq.api.service;
 
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.tq.api.domain.dto.TqSpecifyMachineDto;
+import com.zlt.aps.tq.api.domain.entity.TqSpecifyMachine;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * 胎圈定点机台对外暴露接口
- */
 @FeignClient(contextId = "iTqSpecifyMachineService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.tq:tq}")
 public interface ITqSpecifyMachineService {
 
-    /**
-     * 根据条件查询定点机台列表
-     */
-    @PostMapping("/tq/specifyMachine/listSpecifyMachine")
-    TableDataInfo listSpecifyMachine(@RequestBody TqSpecifyMachineDto dto);
+    @PostMapping("/tqSpecifyMachine/list")
+    @ApiOperation("查询定点机台列表")
+    TableDataInfo list(@RequestBody TqSpecifyMachine entity);
 
-    /**
-     * 根据id查询定点机台信息
-     */
-    @GetMapping("/tq/specifyMachine/getSpecifyMachine/{id}")
-    TqSpecifyMachineDto getSpecifyMachine(@PathVariable("id") Long id);
+    @GetMapping("/tqSpecifyMachine/{id}")
+    @ApiOperation("获取定点机台信息")
+    TqSpecifyMachine getInfo(@PathVariable("id") Long id);
 
-    /**
-     * 保存定点机台信息（id为空则新增，id不为空则修改）
-     */
-    @PostMapping("/tq/specifyMachine/saveSpecifyMachine")
-    AjaxResult saveSpecifyMachine(@RequestBody TqSpecifyMachineDto dto);
+    @PostMapping("/tqSpecifyMachine/save")
+    @ApiOperation("保存定点机台信息（id为空则新增，id不为空则修改）")
+    AjaxResult save(@RequestBody TqSpecifyMachine entity);
 
-    /**
-     * 批量删除定点机台信息(逻辑删)
-     * @param ids 多个id逗号分割
-     */
-    @PostMapping("/tq/specifyMachine/deleteSpecifyMachine/{ids}")
-    AjaxResult deleteSpecifyMachine(@PathVariable("ids") Long[] ids);
+    @PostMapping("/tqSpecifyMachine/delete/{ids}")
+    @ApiOperation("批量删除定点机台信息(逻辑删)")
+    AjaxResult removeByIds(@PathVariable("ids") List<Long> ids);
 
-    /**
-     * 删除全部定点机台信息(逻辑删)
-     */
-    @PostMapping("/tq/specifyMachine/deleteAllSpecifyMachine")
-    AjaxResult deleteAllSpecifyMachine();
+    @PostMapping("/tqSpecifyMachine/deleteAll")
+    @ApiOperation("删除全部定点机台信息(逻辑删)")
+    AjaxResult deleteAll();
 
-    /**
-     * 导出接口
-     * @param dto
-     */
-    @PostMapping("/tq/specifyMachine/exportData")
-    List<TqSpecifyMachineDto> exportData(@RequestBody TqSpecifyMachineDto dto);
+    @PostMapping("/tqSpecifyMachine/exportData/{fileName}")
+    @ApiOperation("导出定点机台信息")
+    byte[] exportData(@RequestBody TqSpecifyMachine entity, @PathVariable("fileName") String fileName);
 
-    @PostMapping("/tq/specifyMachine/importData")
+    @PostMapping("/tqSpecifyMachine/exportList")
+    @ApiOperation("导出定点机台列表")
+    List<TqSpecifyMachine> exportList(@RequestBody TqSpecifyMachine entity);
+
+    @PostMapping("/tqSpecifyMachine/importData")
     @ApiOperation("导入胎圈定点机台信息")
-    public AjaxResult importData(@RequestBody List<TqSpecifyMachineDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
+    AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
 }

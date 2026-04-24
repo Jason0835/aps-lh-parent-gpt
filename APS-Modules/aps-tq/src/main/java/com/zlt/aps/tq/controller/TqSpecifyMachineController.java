@@ -1,101 +1,150 @@
 package com.zlt.aps.tq.controller;
 
-
-import com.ruoyi.common.core.web.controller.BaseController;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.exception.CustomException;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.tq.api.domain.dto.TqSpecifyMachineDto;
-import com.zlt.aps.tq.entity.TqSpecifyMachine;
-import com.zlt.aps.tq.service.TqSpecifyMachineService;
+import com.zlt.aps.tq.api.domain.entity.TqSpecifyMachine;
+import com.zlt.aps.tq.api.domain.vo.TqSpecifyMachineExportVO;
+import com.zlt.aps.tq.mapper.TqSpecifyMachineMapper;
+import com.zlt.aps.tq.service.ITqSpecifyMachineService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.BeanUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
-@Api(tags = {"胎圈定点机台接口"})
+@Slf4j
+@Api(tags = "胎圈定点机台信息")
 @RestController
-@RequestMapping("/tq/specifyMachine")
-public class TqSpecifyMachineController extends BaseController {
+@RequestMapping("/tqSpecifyMachine")
+public class TqSpecifyMachineController extends AbstractDocBizController<TqSpecifyMachine> {
+
+    @Autowired
+    private ITqSpecifyMachineService tqSpecifyMachineService;
 
     @Resource
-    private TqSpecifyMachineService TqSpecifyMachineService;
+    private TqSpecifyMachineMapper tqSpecifyMachineMapper;
 
-    @ApiOperation("根据条件查询定点机台列表")
-    @PostMapping("/listSpecifyMachine")
-    public TableDataInfo listSpecifyMachine(@RequestBody TqSpecifyMachineDto dto) {
+    @ApiOperation("查询胎圈定点机台信息列表")
+    @PostMapping("/list")
+    @Override
+    public TableDataInfo list(@RequestBody TqSpecifyMachine queryVO) {
         startPage();
-        dto.setOrderStr(orderStr());
-        List<TqSpecifyMachineDto> list = TqSpecifyMachineService.listSpecifyMachine(dto);
+        List<TqSpecifyMachine> list = tqSpecifyMachineMapper.listSpecifyMachine(queryVO);
         return getDataTable(list);
     }
 
-    @ApiOperation("根据id查询定点机台信息")
-    @GetMapping("/getSpecifyMachine/{id}")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    public TqSpecifyMachineDto getSpecifyMachine(@PathVariable("id") Long id) {
-        TqSpecifyMachineDto dto = new TqSpecifyMachineDto();
-        BeanUtils.copyProperties(TqSpecifyMachineService.getById(id), dto);
-        return dto;
+    @Log(title = "胎圈定点机台信息", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody TqSpecifyMachine billVO) {
+        return super.save(billVO);
     }
 
-    @Log(title = "ui.tq.specifyMachine.column.modalName", businessType = BusinessType.INSERT_OR_UPDATE)
-    @ApiOperation("保存定点机台信息（id为空则新增，id不为空则修改）")
-    @PostMapping("/saveSpecifyMachine")
-    public AjaxResult saveSpecifyMachine(@RequestBody TqSpecifyMachineDto dto) {
-        TqSpecifyMachine entity = new TqSpecifyMachine();
-        BeanUtils.copyProperties(dto, entity);
-        TqSpecifyMachineService.saveSpecifyMachine(entity);
-        return AjaxResult.success();
+    @Log(title = "胎圈定点机台信息", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @PostMapping("/delete/{ids}")
+    public AjaxResult deleteByIds(@PathVariable("ids") List<Long> ids) {
+        return super.removeByIds(ids);
     }
 
-    @Log(title = "ui.tq.specifyMachine.column.modalName", businessType = BusinessType.DELETE)
-    @ApiOperation("批量删除定点机台信息(逻辑删)")
-    @PostMapping("/deleteSpecifyMachine/{ids}")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "ids", dataType = "Array", value = "id數組", paramType = "query")
-    })
-    public AjaxResult deleteSpecifyMachine(@PathVariable("ids") Long[] ids) {
-        TqSpecifyMachineService.deleteSpecifyMachine(ids);
-        return AjaxResult.success();
+    @ApiOperation("获取详细信息")
+    @GetMapping("/{id}")
+    @Override
+    public TqSpecifyMachine getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
     }
 
-    @Log(title = "ui.tq.specifyMachine.column.modalName", businessType = BusinessType.DELETE)
-    @ApiOperation("删除全部定点机台信息(逻辑删)")
-    @PostMapping("/deleteAllSpecifyMachine")
-    public AjaxResult deleteAllSpecifyMachine() {
-        TqSpecifyMachineService.deleteAllSpecifyMachine();
-        return AjaxResult.success();
-    }
-
-    @Log(title = "ui.tq.specifyMachine.column.modalName", businessType = BusinessType.EXPORT)
-    @ApiOperation("导出数据")
-    @PostMapping("/exportData")
-    public List<TqSpecifyMachineDto> exportData(@RequestBody TqSpecifyMachineDto dto) {
-        startPage();
-        dto.setOrderStr(orderStr());
-        List<TqSpecifyMachineDto> list = TqSpecifyMachineService.listSpecifyMachine(dto);
-        return list;
-    }
-
-    @Log(title = "ui.tq.specifyMachine.column.modalName", businessType = BusinessType.IMPORT)
+    @Log(title = "胎圈定点机台信息", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
     @PostMapping("/importData")
-    @ApiOperation("导入胎圈定点机台信息")
-    public AjaxResult importData(@RequestBody List<TqSpecifyMachineDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
+    }
+
+    @Log(title = "胎圈定点机台信息", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody TqSpecifyMachine queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        List<TqSpecifyMachineExportVO> list = getExportDataList(queryVO);
+        ExcelUtil<TqSpecifyMachineExportVO> util = new ExcelUtil<>(TqSpecifyMachineExportVO.class);
+        org.apache.poi.ss.usermodel.Workbook workbook = util.exportExcelFromList(list, fileName);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        return out.toByteArray();
+    }
+
+    @ApiOperation("校验定点机台唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody TqSpecifyMachine specifyMachine) {
+        return tqSpecifyMachineService.checkUnique(specifyMachine);
+    }
+
+    @Log(title = "胎圈定点机台信息", businessType = BusinessType.DELETE)
+    @ApiOperation("删除全部(逻辑删)")
+    @PostMapping("/deleteAll")
+    public AjaxResult deleteAll() {
+        tqSpecifyMachineService.deleteAllSpecifyMachine();
+        return AjaxResult.success();
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return tqSpecifyMachineService;
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "0";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "CREATE_TIME desc";
+    }
+
+    protected List<TqSpecifyMachineExportVO> getExportDataList(TqSpecifyMachine obj) {
+        List<TqSpecifyMachine> list = tqSpecifyMachineMapper.listSpecifyMachine(obj);
+        
+        // 转换为VO
+        List<TqSpecifyMachineExportVO> voList = new ArrayList<>();
+        for (TqSpecifyMachine machine : list) {
+            TqSpecifyMachineExportVO vo = new TqSpecifyMachineExportVO();
+            vo.setMaterialCode(machine.getMaterialCode());
+            vo.setMachineName(machine.getMachineName());
+            vo.setLineType(machine.getLineType());
+            vo.setJobType(machine.getJobType());
+            vo.setRemark(machine.getRemark());
+            vo.setUpdateTime(machine.getUpdateTime());
+            voList.add(vo);
         }
-        return TqSpecifyMachineService.importData(list, updateSupport, importLogId);
+        return voList;
+    }
+
+    @Override
+    protected void builderCondition(QueryWrapper<TqSpecifyMachine> queryWrapper, TqSpecifyMachine queryVO) {
+        queryWrapper.eq("is_delete", 0);
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "material_code", queryVO.getMaterialCode());
+        queryWrapper.eq(queryVO.getMachineId() != null, "machine_id", queryVO.getMachineId());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getLineType()), "line_type", queryVO.getLineType());
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getJobType()), "job_type", queryVO.getJobType());
     }
 }

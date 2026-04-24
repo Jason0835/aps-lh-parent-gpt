@@ -1,5 +1,6 @@
 package com.zlt.aps.tq.api.service;
 
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -11,65 +12,36 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * 胎圈机台信息对外暴露接口
- */
 @FeignClient(contextId = "iTqMachineInfoService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.tq:tq}")
 public interface ITqMachineInfoService {
 
-    /**
-     * 获取胎圈机台信息列表
-     *
-     * @param machineInfo
-     * @return
-     */
-    @PostMapping("/tq/machine/list")
+    @PostMapping("/tqMachineInfo/list")
     TableDataInfo list(@RequestBody TqMachineInfo machineInfo);
 
-    /**
-     * 删除胎圈机台信息
-     *
-     * @param ids
-     * @return
-     */
-    @DeleteMapping("/tq/machine/{ids}")
-    AjaxResult remove(@PathVariable("ids") Long[] ids);
+    @PostMapping("/tqMachineInfo/save")
+    AjaxResult save(@Validated @RequestBody TqMachineInfo machineInfo);
 
-    /**
-     * 新增胎圈机台信息
-     *
-     * @param machineInfo
-     * @return
-     */
-    @PostMapping("/tq/machine")
-    AjaxResult add(@Validated @RequestBody TqMachineInfo machineInfo);
+    @PostMapping("/tqMachineInfo/delete/{ids}")
+    AjaxResult removeByIds(@PathVariable("ids") List<Long> ids);
 
-    /**
-     * 根据ID获取详细信息
-     *
-     * @param id
-     * @return
-     */
-    @GetMapping(value = "/tq/machine/{id}")
+    @GetMapping("/tqMachineInfo/{id}")
     TqMachineInfo getInfo(@PathVariable("id") Long id);
 
-    /**
-     * 修改胎圈机台信息
-     *
-     * @param machineInfo
-     * @return
-     */
-    @PutMapping("/tq/machine")
-    AjaxResult edit(@Validated @RequestBody TqMachineInfo machineInfo);
+    @PostMapping("/tqMachineInfo/checkUnique")
+    String checkUnique(@Validated @RequestBody TqMachineInfo machineInfo);
 
-    /**
-     * 校验胎圈机台唯一性
-     *
-     * @param machineInfo
-     * @return
-     */
-    @PostMapping("/tq/machine/checkMachineCodeUnique")
-    String checkMachineCodeUnique(@Validated @RequestBody TqMachineInfo machineInfo);
+    @PostMapping("/tqMachineInfo/exportData/{fileName}")
+    byte[] exportData(@RequestBody TqMachineInfo machineInfo, @PathVariable("fileName") String fileName);
+
+    @PostMapping("/tqMachineInfo/listMachineInfo")
+    List<TqMachineInfo> listMachineInfo(@RequestBody TqMachineInfo machineInfo);
+
+    @PostMapping("/tqMachineInfo/listEnabledMachines")
+    List<TqMachineInfo> listEnabledMachines();
+
+    @PostMapping("/tqMachineInfo/importData")
+    @ApiOperation("导入胎圈机台信息")
+    AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
     /**
      * 导出胎圈机台列表
@@ -77,18 +49,6 @@ public interface ITqMachineInfoService {
      * @param machineInfo
      * @return
      */
-    @PostMapping("/tq/machine/exportList")
+    @PostMapping("/tqMachineInfo/exportList")
     List<TqMachineInfo> exportList(@RequestBody TqMachineInfo machineInfo);
-
-    /**
-     * 根据条件查询机台信息
-     * @param machineInfo 查询条件
-     * @return 结果
-     */
-    @PostMapping("/tq/machine/listMachineInfo")
-    List<TqMachineInfo> listMachineInfo(@RequestBody TqMachineInfo machineInfo);
-
-    @PostMapping("/tq/machine/importData")
-    @ApiOperation("导入胎面机台信息")
-    public AjaxResult importData(@RequestBody List<TqMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
 }

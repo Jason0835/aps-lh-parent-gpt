@@ -109,7 +109,16 @@ public interface ILhScheduleResultRemoteService {
      * @return 结果
      */
     @PostMapping("/lhScheduleResult/publish")
-    public AjaxResult publish(@RequestBody LhScheduleResult dto);
+    public AjaxResult publish(@RequestBody LhScheduleResult dto, @RequestParam("ids") String ids);
+
+    /**
+     * 硫化排程结果下发到MES
+     *
+     * @return 下发结果
+     */
+    @ApiOperation("硫化排程结果下发到MES")
+    @PostMapping("/lhScheduleResult/issueToMes")
+    AjaxResult issueToMes();
 
     /**
      * 根据排程结束日获取窗口内 8 个班次的日期展示列表

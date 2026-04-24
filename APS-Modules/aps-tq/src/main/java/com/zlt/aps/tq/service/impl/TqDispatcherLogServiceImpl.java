@@ -29,8 +29,8 @@ import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.tq.api.domain.entity.TqDispatcherLog;
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
 import com.zlt.aps.tq.mapper.TqDispatcherLogMapper;
+import com.zlt.aps.tq.service.ITqMachineInfoService;
 import com.zlt.aps.tq.service.TqDispatcherLogService;
-import com.zlt.aps.tq.service.TqMachineInfoService;
 
 /**
  * 胎圈调度员排程操作日志Service业务层处理
@@ -45,7 +45,7 @@ public class TqDispatcherLogServiceImpl implements TqDispatcherLogService
     private TqDispatcherLogMapper tqDispatcherLogMapper;
 
     @Autowired
-    private TqMachineInfoService machineInfoService;
+    private ITqMachineInfoService machineInfoService;
 
     @Value("${excelModelPath}")
     public String excelModelPath;

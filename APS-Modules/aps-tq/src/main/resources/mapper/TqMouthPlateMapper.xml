@@ -2,48 +2,38 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.tq.mapper.TqMouthPlateMapper">
 
-    <sql id="selectMouthPlateVo">
-        select id, mouth_plate_code, machine_id, status, remark, del_flag, create_by, create_time, update_by, update_time
-        from t_tq_mouth_plate
-    </sql>
-
     <select id="selectMouthPlateWithMachineInfo"
-            parameterType="com.zlt.aps.tq.entity.TqMouthPlate"
-            resultType="com.zlt.aps.tq.api.domain.dto.TqMouthPlateDto">
+            parameterType="com.zlt.aps.tq.api.domain.entity.TqMouthPlate"
+            resultType="com.zlt.aps.tq.api.domain.entity.TqMouthPlate">
         select * from (
-            SELECT mp.*,mi.MACHINE_NAME
+            SELECT mp.ID, mp.MOUTH_PLATE_CODE, mp.MACHINE_ID, mp.STATUS, mp.REMARK,
+                   mp.IS_DELETE, mp.CREATE_BY, mp.CREATE_TIME, mp.UPDATE_BY, mp.UPDATE_TIME,
+                   mi.MACHINE_NAME
             FROM T_TQ_MOUTH_PLATE mp
             LEFT JOIN T_TQ_MACHINE_INFO mi
             ON mp.MACHINE_ID = mi.ID
-            where mp.del_flag = '0'
+            where mp.is_delete = '0'
             <if test="mouthPlateCode != null  and mouthPlateCode != ''">
                 and INSTR(mp.mouth_plate_code, #{mouthPlateCode}) > 0
             </if>
             <if test="machineId != null">and mp.machine_id = #{machineId}</if>
             <if test="status != null  and status != ''">and mp.status = #{status}</if>
-            <if test="orderStr == null">
-                order by mp.create_time desc
-            </if>
+            order by mp.create_time desc
         ) t
-        <if test="orderStr != null">
-            order by ${orderStr}
-        </if>
     </select>
 
-    <select id="checkUnique" parameterType="com.zlt.aps.tq.entity.TqMouthPlate" resultType="int">
+    <select id="checkUnique" parameterType="com.zlt.aps.tq.api.domain.entity.TqMouthPlate" resultType="int">
         SELECT count(1)
-        FROM T_TQ_MOUTH_PLATE mp
-        LEFT JOIN T_TQ_MACHINE_INFO mi
-        ON mp.MACHINE_ID = mi.ID
-        where mp.del_flag = '0'
-        and mp.mouth_plate_code = #{mouthPlateCode}
-        and mp.machine_id = #{machineId}
-        <if test="id != null and id != ''">and mp.id != #{id}</if>
+        FROM T_TQ_MOUTH_PLATE
+        where is_delete = '0'
+        and mouth_plate_code = #{mouthPlateCode}
+        and machine_id = #{machineId}
+        <if test="id != null">and id != #{id}</if>
     </select>
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO T_TQ_MOUTH_PLATE (
-        mouth_plate_code, machine_id, status, create_by, create_time, update_by, update_time, remark, del_flag
+        mouth_plate_code, machine_id, status, create_by, create_time, update_by, update_time, remark, is_delete
         )
         VALUES
         <foreach collection="list" item="MouthPlate" separator=",">
@@ -66,8 +56,7 @@
         remark = VALUES(remark)
     </insert>
 
-
     <update id="deleteAll">
-        update T_TQ_MOUTH_PLATE set del_flag = NULL where del_flag = '0'
+        update T_TQ_MOUTH_PLATE set is_delete = '1' where is_delete = '0'
     </update>
 </mapper>

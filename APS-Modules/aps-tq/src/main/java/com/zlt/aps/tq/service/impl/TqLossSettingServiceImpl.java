@@ -1,179 +1,122 @@
 package com.zlt.aps.tq.service.impl;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
-import com.zlt.aps.tq.api.domain.dto.TqLossSettingDto;
+import com.zlt.aps.tq.api.domain.entity.TqLossSetting;
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
-import com.zlt.aps.tq.entity.TqLossSetting;
 import com.zlt.aps.tq.mapper.TqLossSettingMapper;
-import com.zlt.aps.tq.service.TqLossSettingService;
-import com.zlt.aps.tq.service.TqMachineInfoService;
+import com.zlt.aps.tq.service.ITqLossSettingService;
+import com.zlt.aps.tq.service.ITqMachineInfoService;
+import com.zlt.bill.common.service.AbstractDocService;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
-/**
- * 胎圈损耗率设定Service业务层处理
- *
- * @author chen
- * @date 2021-07-13
- */
+@Slf4j
 @Service
-public class TqLossSettingServiceImpl extends ServiceImpl<TqLossSettingMapper, TqLossSetting> implements TqLossSettingService {
-    @Autowired
+public class TqLossSettingServiceImpl extends AbstractDocService<TqLossSetting> implements ITqLossSettingService {
+
+    @Resource
     private TqLossSettingMapper tqLossSettingMapper;
 
-    @Autowired
-    private TqMachineInfoService tqMachineInfoService;
+    @Resource
+    private ITqMachineInfoService tqMachineInfoService;
 
-    /**
-     * 查询胎圈损耗率设定
-     *
-     * @param id 胎圈损耗率设定ID
-     * @return 胎圈损耗率设定
-     */
     @Override
-    public TqLossSettingDto selectTqLossSettingById(Long id) {
-        return tqLossSettingMapper.selectTqLossSettingById(id);
+    protected String getDocTypeCode() {
+        return "TQ_LOSS_SETTING";
     }
 
-    /**
-     * 查询胎圈损耗率设定列表
-     *
-     * @param tqLossSetting 胎圈损耗率设定
-     * @return 胎圈损耗率设定
-     */
     @Override
-    public List<TqLossSettingDto> selectTqLossSettingList(TqLossSetting tqLossSetting) {
-        return tqLossSettingMapper.selectTqLossSettingList(tqLossSetting);
+    protected List<String> getCheckUniqueFields() {
+        return Arrays.asList("materialCode", "machineId");
     }
 
-    /**
-     * 新增胎圈损耗率设定
-     *
-     * @param tqLossSetting 胎圈损耗率设定
-     * @return 结果
-     */
     @Override
-    public int insertTqLossSetting(TqLossSetting tqLossSetting) {
-        checkParamAndUnique(tqLossSetting);
-        tqLossSetting.setBaseVale(null);
-        return tqLossSettingMapper.insertTqLossSetting(tqLossSetting);
-    }
-
-    /**
-     * 修改胎圈损耗率设定
-     *
-     * @param tqLossSetting 胎圈损耗率设定
-     * @return 结果
-     */
-    @Override
-    public int updateTqLossSetting(TqLossSetting tqLossSetting) {
-        checkParamAndUnique(tqLossSetting);
-        tqLossSetting.setBaseVale(tqLossSetting.getId());
-        return tqLossSettingMapper.updateTqLossSetting(tqLossSetting);
-    }
-
-    /**
-     * 批量删除胎圈损耗率设定
-     *
-     * @param ids 需要删除的胎圈损耗率设定ID
-     * @return 结果
-     */
-    @Override
-    public int deleteTqLossSettingByIds(Long[] ids) {
-        return tqLossSettingMapper.deleteTqLossSettingByIds(ids);
-    }
-
-    /**
-     * 删除胎圈损耗率设定信息
-     *
-     * @param id 胎圈损耗率设定ID
-     * @return 结果
-     */
-    @Override
-    public int deleteTqLossSettingById(Long id) {
-        return tqLossSettingMapper.deleteTqLossSettingById(id);
-    }
-
-    /**
-     * 校验记录唯一性
-     */
-    @Override
-    public String checkTqLossSettingUnique(TqLossSetting tqLossSetting) {
-        if (tqLossSetting == null) {
-            return UserConstants.NOT_UNIQUE;
-        }
-        int num = tqLossSettingMapper.checkTqLossSettingUnique(tqLossSetting);
-        if (num > 0) {
+    public String checkUnique(TqLossSetting lossSetting) {
+        QueryWrapper<TqLossSetting> wrapper = new QueryWrapper<>();
+        wrapper.ne(lossSetting.getId() != null, "ID", lossSetting.getId());
+        wrapper.eq("MATERIAL_CODE", lossSetting.getMaterialCode());
+        wrapper.eq(lossSetting.getMachineId() != null, "MACHINE_ID", lossSetting.getMachineId());
+        wrapper.isNull(lossSetting.getMachineId() == null, "MACHINE_ID");
+        wrapper.eq("IS_DELETE", 0);
+        if (tqLossSettingMapper.selectCount(wrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
         }
         return UserConstants.UNIQUE;
     }
 
-    /**
-     * 导入数据，并保存记录
-     *
-     * @param list          要导入数据
-     * @param updateSupport 已存在是否更新
-     * @param importLogId   导入日志id
-     * @return 导入后提示信息
-     */
     @Override
-    public AjaxResult importData(List<TqLossSettingDto> list, boolean updateSupport, Long importLogId) {
+    public List<TqLossSetting> listLossSetting(TqLossSetting lossSetting) {
+        return tqLossSettingMapper.selectLossSettingList(lossSetting);
+    }
+
+    @Override
+    public void deleteAll() {
+        QueryWrapper<TqLossSetting> wrapper = new QueryWrapper<>();
+        wrapper.eq("IS_DELETE", 0);
+        List<TqLossSetting> list = tqLossSettingMapper.selectList(wrapper);
+        if (CollectionUtils.isNotEmpty(list)) {
+            for (TqLossSetting item : list) {
+                item.setIsDelete(1);
+                tqLossSettingMapper.updateById(item);
+            }
+        }
+    }
+
+    @Override
+    public AjaxResult importData(List<TqLossSetting> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;
-        // 校验
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        List<TqLossSettingDto> importList = new ArrayList<>();
-        //将机台名称转换为机台id，并做校验
+        List<TqLossSetting> importList = new ArrayList<>();
+
         List<TqMachineInfo> machineInfoList = tqMachineInfoService.selectMachineInfoList(new TqMachineInfo());
         if (CollectionUtils.isEmpty(machineInfoList)) {
-            // 未查询到机台信息
             String message = I18nUtil.getMessage("ui.error.message.column.machineIsNull");
             addImportErrorLog(importLogId, null, message, importErrorLogs);
             return AjaxResult.error(message, importErrorLogs);
         }
-//        Map<String, Long> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(TqMachineInfo::getMachineCode, TqMachineInfo::getId));
-        Map<String, Long> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getId));
+        Map<String, Long> machineNameMap = machineInfoList.stream().collect(Collectors.toMap(TqMachineInfo::getMachineName, TqMachineInfo::getId, (a, b) -> a));
 
-        //按业务主键分组
-        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getBeadCode()+a.getMachineName()), Collectors.counting()));
+        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getMaterialCode() == null ? "" : a.getMaterialCode()) + "_" + (a.getMachineName() == null ? "" : a.getMachineName()), Collectors.counting()));
 
         for (int i = 0; i < list.size(); i++) {
-            TqLossSettingDto lossSetting = list.get(i);
+            TqLossSetting lossSetting = list.get(i);
 
-            //重复记录校验
-            Long hasValue = groupMap.get(lossSetting.getBeadCode()+lossSetting.getMachineName());
-            if (hasValue > 1) {
+            String groupKey = (lossSetting.getMaterialCode() == null ? "" : lossSetting.getMaterialCode()) + "_" + (lossSetting.getMachineName() == null ? "" : lossSetting.getMachineName());
+            Long hasValue = groupMap.get(groupKey);
+            if (hasValue != null && hasValue > 1) {
                 failureNum++;
                 lossSetting.setId(-999L);
                 String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
                 String columnName = I18nUtil.getMessage("ui.data.column.loss.beadCode");
                 String columnName2 = I18nUtil.getMessage("ui.data.column.loss.line");
-                message=String.format(message,columnName+"+"+columnName2);
-                addImportErrorLog(importLogId, i + 2,message, importErrorLogs);
+                message = String.format(message, columnName + "+" + columnName2);
+                addImportErrorLog(importLogId, i + 2, message, importErrorLogs);
                 continue;
             }
 
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, lossSetting);
+
             String machineName = lossSetting.getMachineName();
-            Long machineId = machineCodeMap.get(machineName);
-            // 代码和机台名称不能同时为空校验
-            if (StringUtils.isEmpty(machineName) && StringUtils.isEmpty(lossSetting.getBeadCode())) {
+            Long machineId = machineNameMap.get(machineName);
+
+            if (StringUtils.isEmpty(machineName) && StringUtils.isEmpty(lossSetting.getMaterialCode())) {
                 addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.loss.isAllNull"), validated);
             }
@@ -181,12 +124,13 @@ public class TqLossSettingServiceImpl extends ServiceImpl<TqLossSettingMapper, T
                 addImportErrorLog(importLogId, i + 2,
                         I18nUtil.getMessage("ui.error.message.column.machineNotExist"), validated);
             }
+
             if (CollectionUtils.isEmpty(validated)) {
                 lossSetting.setMachineId(machineId);
-                lossSetting.setBaseVale(null);
-                if (StringUtils.isBlank(lossSetting.getBeadCode())) {
-                    lossSetting.setBeadCode(null);
+                if (StringUtils.isBlank(lossSetting.getMaterialCode())) {
+                    lossSetting.setMaterialCode(null);
                 }
+                lossSetting.setIsDelete(0);
                 importList.add(lossSetting);
             } else {
                 failureNum++;
@@ -194,29 +138,27 @@ public class TqLossSettingServiceImpl extends ServiceImpl<TqLossSettingMapper, T
                 importErrorLogs.addAll(validated);
             }
         }
+
         try {
-            //勾选更新记录，调用merge即可
             if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
                 successNum = importList.size();
                 tqLossSettingMapper.mergeSql(importList);
             } else {
-                //查询数据库已存在对象
                 for (int i = 0; i < list.size(); i++) {
-                    TqLossSettingDto excelItem = list.get(i);
-                    // 错误记录跳过
+                    TqLossSetting excelItem = list.get(i);
                     if (excelItem.getId() != null && excelItem.getId().equals(-999L)) {
                         continue;
                     }
-                    // 唯一性校验
-                    TqLossSetting tmLossSetting = new TqLossSetting();
-                    BeanUtils.copyProperties(excelItem, tmLossSetting);
-                    int unique = tqLossSettingMapper.checkTqLossSettingUnique(tmLossSetting);
+                    QueryWrapper<TqLossSetting> wrapper = new QueryWrapper<>();
+                    wrapper.eq("MATERIAL_CODE", excelItem.getMaterialCode());
+                    wrapper.eq(excelItem.getMachineId() != null, "MACHINE_ID", excelItem.getMachineId());
+                    wrapper.isNull(excelItem.getMachineId() == null, "MACHINE_ID");
+                    wrapper.eq("IS_DELETE", 0);
+                    Long unique = tqLossSettingMapper.selectCount(wrapper);
                     if (unique == 0) {
-                        //不存在插入
                         successNum++;
-                        tqLossSettingMapper.insertTqLossSetting(tmLossSetting);
+                        baseDao.save(excelItem);
                     } else {
-                        // 存在，插入错误详细日志
                         failureNum++;
                         addImportErrorLog(importLogId, i + 2,
                                 I18nUtil.getMessage("ui.error.message.loss.unique"), importErrorLogs);
@@ -225,37 +167,16 @@ public class TqLossSettingServiceImpl extends ServiceImpl<TqLossSettingMapper, T
             }
         } catch (Exception e) {
             e.printStackTrace();
-            // 执行sql失败，插入导入失败记录
             successNum = 0;
             failureNum = list.size();
             importErrorLogs.clear();
             addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
         }
+
         if (failureNum > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
     }
-
-    @Override
-    public void deleteAll() {
-        this.tqLossSettingMapper.deleteAll();
-    }
-
-    /**
-     * 检查参数是否合法，记录是否唯一
-     *
-     * @param tqLossSetting 要检查记录
-     */
-    private void checkParamAndUnique(TqLossSetting tqLossSetting) {
-        if (tqLossSetting.getMachineId() == null && StringUtils.isEmpty(tqLossSetting.getBeadCode())) {
-            throw new RuntimeException(I18nUtil.getMessage("ui.error.message.loss.isAllNull"));
-        }
-        String unique = checkTqLossSettingUnique(tqLossSetting);
-        if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new RuntimeException(I18nUtil.getMessage("ui.error.message.loss.unique"));
-        }
-    }
-
 }

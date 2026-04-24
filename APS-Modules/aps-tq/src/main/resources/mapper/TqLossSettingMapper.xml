@@ -4,143 +4,53 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.tq.mapper.TqLossSettingMapper">
 
-    <resultMap type="com.zlt.aps.tq.api.domain.dto.TqLossSettingDto" id="TqLossSettingResult">
-        <result property="id" column="id"/>
-        <result property="beadCode" column="bead_code"/>
-        <result property="machineId" column="machine_id"/>
-        <result property="machineName" column="machine_name"/>
-        <result property="lossRate" column="loss_rate"/>
-        <result property="createBy" column="create_by"/>
-        <result property="createTime" column="create_time"/>
-        <result property="updateBy" column="update_by"/>
-        <result property="updateTime" column="update_time"/>
-        <result property="delFlag" column="del_flag"/>
-        <result property="remark" column="remark"/>
+    <resultMap type="com.zlt.aps.tq.api.domain.entity.TqLossSetting" id="TqLossSettingResult">
+        <id property="id" column="ID"/>
+        <result property="materialCode" column="MATERIAL_CODE"/>
+        <result property="machineId" column="MACHINE_ID"/>
+        <result property="machineName" column="MACHINE_NAME"/>
+        <result property="lossRate" column="LOSS_RATE"/>
+        <result property="remark" column="REMARK"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
     </resultMap>
 
-    <sql id="selectTqLossSettingVo">
-        select id, bead_code, machine_id, loss_rate, create_by, create_time, update_by, update_time, del_flag, remark from t_tq_loss_setting
-    </sql>
-
-    <select id="selectTqLossSettingList" parameterType="com.zlt.aps.tq.entity.TqLossSetting"
+    <select id="selectLossSettingList" parameterType="com.zlt.aps.tq.api.domain.entity.TqLossSetting"
             resultMap="TqLossSettingResult">
-        select * from (
-            select a.*,b.machine_name
-            from t_tq_loss_setting a
-            left join T_TQ_MACHINE_INFO b
-            on a.machine_id = b.id and b.del_flag = '0'
-            where a.del_flag = '0'
-            <if test="beadCode != null  and beadCode != ''">and INSTR(a.bead_code, #{beadCode}) > 0</if>
-            <if test="machineId != null ">and a.machine_id = #{machineId}</if>
-            <if test="orderStr == null">
-                order by a.create_time desc
-            </if>
-        ) t
-        <if test="orderStr != null">
-            order by ${orderStr}
-        </if>
+        select a.ID, a.MATERIAL_CODE, a.MACHINE_ID, a.LOSS_RATE, a.REMARK,
+               a.CREATE_BY, a.CREATE_TIME, a.UPDATE_BY, a.UPDATE_TIME,
+               b.MACHINE_NAME
+        from T_TQ_LOSS_SETTING a
+        left join T_TQ_MACHINE_INFO b on a.MACHINE_ID = b.ID and b.IS_DELETE = 0
+        where a.IS_DELETE = 0
+        <if test="materialCode != null and materialCode != ''">and INSTR(a.MATERIAL_CODE, #{materialCode}) > 0</if>
+        <if test="machineId != null">and a.MACHINE_ID = #{machineId}</if>
+        order by a.CREATE_TIME desc
     </select>
-
-    <select id="selectTqLossSettingById" parameterType="Long" resultMap="TqLossSettingResult">
-        <include refid="selectTqLossSettingVo"/>
-        where id = #{id}
-    </select>
-
-    <select id="checkTqLossSettingUnique" parameterType="com.zlt.aps.tq.entity.TqLossSetting"
-            resultType="int">
-        select count(1)
-        from t_tq_loss_setting
-        where del_flag = '0'
-        <if test="beadCode != null  and beadCode != ''">and bead_code = #{beadCode}</if>
-        <if test="beadCode == null  or beadCode == ''">and bead_code is null</if>
-        <if test="machineId != null  and machineId != ''">and machine_id = #{machineId}</if>
-        <if test="machineId == null  or machineId == ''">and machine_id is null</if>
-        <if test="id != null and id != ''">and id != #{id}</if>
-    </select>
-
-    <insert id="insertTqLossSetting" parameterType="com.zlt.aps.tq.entity.TqLossSetting">
-        insert into t_tq_loss_setting
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="id != null">id,</if>
-            <if test="beadCode != null and beadCode != ''">bead_code,</if>
-            <if test="machineId != null and machineId != ''">machine_id,</if>
-            <if test="lossRate != null">loss_rate,</if>
-            <if test="createBy != null">create_by,</if>
-            <if test="createTime != null">create_time,</if>
-            <if test="updateBy != null">update_by,</if>
-            <if test="updateTime != null">update_time,</if>
-            <if test="delFlag != null">del_flag,</if>
-            <if test="remark != null">remark,</if>
-        </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="id != null">#{id},</if>
-            <if test="beadCode != null and beadCode != ''">#{beadCode},</if>
-            <if test="machineId != null and machineId != ''">#{machineId},</if>
-            <if test="lossRate != null">#{lossRate},</if>
-            <if test="createBy != null">#{createBy},</if>
-            <if test="createTime != null">#{createTime},</if>
-            <if test="updateBy != null">#{updateBy},</if>
-            <if test="updateTime != null">#{updateTime},</if>
-            <if test="delFlag != null">#{delFlag},</if>
-            <if test="remark != null">#{remark},</if>
-        </trim>
-    </insert>
-
-    <update id="updateTqLossSetting" parameterType="com.zlt.aps.tq.entity.TqLossSetting">
-        update t_tq_loss_setting
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="beadCode != null and beadCode != ''">bead_code = #{beadCode},</if>
-            <if test="beadCode == null or beadCode == ''">bead_code = NULL,</if>
-            machine_id = #{machineId,jdbcType=VARCHAR},
-            <if test="lossRate != null">loss_rate = #{lossRate},</if>
-            <if test="createBy != null">create_by = #{createBy},</if>
-            <if test="createTime != null">create_time = #{createTime},</if>
-            <if test="updateBy != null">update_by = #{updateBy},</if>
-            <if test="updateTime != null">update_time = #{updateTime},</if>
-            <if test="delFlag != null">del_flag = #{delFlag},</if>
-            <if test="remark != null">remark = #{remark},</if>
-        </trim>
-        where id = #{id}
-    </update>
-
-    <delete id="deleteTqLossSettingById" parameterType="Long">
-        update t_tq_loss_setting
-        set del_flag = NULL
-        where id = #{id}
-    </delete>
-
-    <delete id="deleteTqLossSettingByIds" parameterType="String">
-        update t_tq_loss_setting set del_flag = NULL where id in
-        <foreach item="id" collection="array" open="(" separator="," close=")">
-            #{id}
-        </foreach>
-    </delete>
 
     <insert id="mergeSql" parameterType="list">
-        INSERT INTO t_tq_loss_setting (
-        bead_code, machine_id, loss_rate, create_by, create_time, remark, del_flag
+        INSERT INTO T_TQ_LOSS_SETTING (
+            MATERIAL_CODE, MACHINE_ID, LOSS_RATE, CREATE_BY, CREATE_TIME, REMARK, IS_DELETE
         )
         VALUES
-        <foreach collection="list" item="LossSetting" separator=",">
+        <foreach collection="list" item="item" separator=",">
             (
-            #{LossSetting.beadCode,jdbcType=VARCHAR},
-            #{LossSetting.machineId,jdbcType=DOUBLE},
-            #{LossSetting.lossRate,jdbcType=DOUBLE},
-            #{LossSetting.createBy,jdbcType=VARCHAR},
+            #{item.materialCode,jdbcType=VARCHAR},
+            #{item.machineId,jdbcType=BIGINT},
+            #{item.lossRate,jdbcType=DOUBLE},
+            #{item.createBy,jdbcType=VARCHAR},
             NOW(),
-            #{LossSetting.remark,jdbcType=VARCHAR},
-            '0'
+            #{item.remark,jdbcType=VARCHAR},
+            0
             )
         </foreach>
         ON DUPLICATE KEY UPDATE
-        loss_rate = VALUES(loss_rate),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
+        LOSS_RATE = VALUES(LOSS_RATE),
+        UPDATE_BY = VALUES(CREATE_BY),
+        UPDATE_TIME = NOW(),
+        REMARK = VALUES(REMARK)
     </insert>
 
-
-    <update id="deleteAll">
-        update t_tq_loss_setting set del_flag = NULL where del_flag = '0'
-    </update>
 </mapper>
