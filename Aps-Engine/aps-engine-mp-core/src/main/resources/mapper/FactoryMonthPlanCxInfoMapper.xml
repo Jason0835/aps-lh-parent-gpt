@@ -12,6 +12,7 @@
                cmf.FIXED_STRUCTURE1,
                cmf.FIXED_STRUCTURE2,
                cmf.FIXED_STRUCTURE3,
+               cmf.FIXED_STRUCTURE4,
                cmf.FIXED_MATERIAL_CODE,
                cmf.DISABLE_STRUCTURE,
                cmf.DISABLE_MATERIAL_CODE

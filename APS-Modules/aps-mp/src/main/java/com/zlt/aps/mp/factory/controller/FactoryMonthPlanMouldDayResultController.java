@@ -204,6 +204,67 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
         List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, false);
         byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list);
         
+        // 合并月计划、结构转产表的导出数据
+        byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1);
+        // 保存导出日志
+        this.saveExportLog(queryVO, fileName, beginTime, list);
+        return resultBytes;
+    }
+
+    /**
+     * 全物料导出
+     */
+    @Log(title = "S2-0604.排产结果-全物料导出", businessType = BusinessType.EXPORT)
+    @ApiOperation("全物料导出")
+    @PostMapping("/exportAllMaterial/{fileName}")
+    public byte[] exportAllMaterial(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        Date beginTime = DateUtils.getNowDate();
+        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, true);
+        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list);
+
+        // 合并月计划、结构转产表的导出数据
+        byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1);
+        // 保存导出日志
+        this.saveExportLog(queryVO, fileName, beginTime, list);
+        return resultBytes;
+    }
+
+    /**
+     * 保存导出日志
+     * 
+     * @param queryVO   查询条件
+     * @param fileName  导出文件名
+     * @param beginTime 导出开始时间
+     * @param list      导出数据
+     */
+    private void saveExportLog(FactoryMonthPlanMouldDayResult queryVO, String fileName, Date beginTime,
+                               List<FactoryMonthPlanMouldDayResultExportVo> list) {
+        Date endTime = DateUtils.getNowDate();
+        ExportLog exportLog = new ExportLog();
+        exportLog.setProcedureCode("0");
+        exportLog.setExportParams(queryVO.toString());
+        String uri = ServletUtils.getRequest().getRequestURI();
+        exportLog.setFunctionCode(uri.split("/")[1]);
+        exportLog.setFunctionName(fileName);
+        exportLog.setFileName(fileName + ".xlsx");
+        exportLog.setRowCount(list.size());
+        exportLog.setBeginTime(beginTime);
+        exportLog.setEndTime(endTime);
+        exportLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        this.iExportLogService.add(exportLog);
+    }
+
+    /**
+     * 合并月计划、结构转产表的导出数据
+     * 
+     * @param queryVO     查询条件
+     * @param excelBytes1 第一个页签的excel数据
+     * @return
+     * @throws IOException
+     */
+    private byte[] mergeStructureAllocationSheet(FactoryMonthPlanMouldDayResult queryVO, byte[] excelBytes1)
+            throws IOException {
         // 同时组装结构转产表导出excel
         MpStructureAllocation factoryMonthPlanMouldDayResult = new MpStructureAllocation();
         factoryMonthPlanMouldDayResult.setFactoryCode(queryVO.getFactoryCode());
@@ -225,47 +286,6 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
             targetWorkbook.write(outputStream);
             resultBytes = outputStream.toByteArray();
         }
-        
-        Date endTime = DateUtils.getNowDate();
-        ExportLog exportLog = new ExportLog();
-        exportLog.setProcedureCode("0");
-        exportLog.setExportParams(queryVO.toString());
-        String uri = ServletUtils.getRequest().getRequestURI();
-        exportLog.setFunctionCode(uri.split("/")[1]);
-        exportLog.setFunctionName(fileName);
-        exportLog.setFileName(fileName + ".xlsx");
-        exportLog.setRowCount(list.size());
-        exportLog.setBeginTime(beginTime);
-        exportLog.setEndTime(endTime);
-        exportLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
-        this.iExportLogService.add(exportLog);
-        return resultBytes;
-    }
-
-    /**
-     * 全物料导出
-     */
-    @Log(title = "S2-0604.排产结果-全物料导出", businessType = BusinessType.EXPORT)
-    @ApiOperation("全物料导出")
-    @PostMapping("/exportAllMaterial/{fileName}")
-    public byte[] exportAllMaterial(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
-                             HttpServletResponse response) throws IOException {
-        Date beginTime = DateUtils.getNowDate();
-        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, true);
-        byte[] resultBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list);
-        Date endTime = DateUtils.getNowDate();
-        ExportLog exportLog = new ExportLog();
-        exportLog.setProcedureCode("0");
-        exportLog.setExportParams(queryVO.toString());
-        String uri = ServletUtils.getRequest().getRequestURI();
-        exportLog.setFunctionCode(uri.split("/")[1]);
-        exportLog.setFunctionName(fileName);
-        exportLog.setFileName(fileName + ".xlsx");
-        exportLog.setRowCount(list.size());
-        exportLog.setBeginTime(beginTime);
-        exportLog.setEndTime(endTime);
-        exportLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
-        this.iExportLogService.add(exportLog);
         return resultBytes;
     }
 

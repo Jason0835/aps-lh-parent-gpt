@@ -27,6 +27,11 @@ public enum CxMachineFixedPriorityEnum {
      * 3 固定结构3
      */
     FIXED_STRUCTURE_THIRD(3, "固定结构3"),
+
+    /**
+     * 4 固定结构4
+     */
+    FIXED_STRUCTURE_FOUR(4, "固定结构4"),
     /**
      * 2ⁿ-1,n=31 默认值
      */
