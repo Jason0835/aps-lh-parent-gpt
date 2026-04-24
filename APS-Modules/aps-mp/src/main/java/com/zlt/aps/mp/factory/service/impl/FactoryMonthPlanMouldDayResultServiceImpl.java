@@ -181,14 +181,12 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
 //        DateUtils.getDate(monthStart.with(TemporalAdjusters.lastDayOfMonth()))
         Map<String, Integer> cavityResults = new HashMap<>(0); // 型腔可用量（按结构+主花纹分组）
         Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
-        if (isAllMaterial) {
-            List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
-                    .moldCavityInsertMaxValueCalculator(params.getYear(), params.getMonth(), params.getFactoryCode(),
-                            null, null, true);
-            if (CollectionUtils.isNotEmpty(moldResult)) {
-                cavityResults = moldResult.get(0).getCavityResults();
-                insertResults = moldResult.get(0).getInsertResults();
-            }
+        List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
+                .moldCavityInsertMaxValueCalculator(params.getYear(), params.getMonth(), params.getFactoryCode(),
+                        null, null, true);
+        if (CollectionUtils.isNotEmpty(moldResult)) {
+            cavityResults = moldResult.get(0).getCavityResults();
+            insertResults = moldResult.get(0).getInsertResults();
         }
 
         // 2、构建导出总表
@@ -226,11 +224,12 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 // 2.1.2.2、未排量负数处理
                 Integer differenceQty = Optional.ofNullable(result.getDifferenceQty()).orElse(0); 
                 result.setDifferenceQty(differenceQty >= 0? differenceQty: 0);
-                // 2.1.2.3、实单未排产 = 高优先级 + 中优先级 - 实际排产，如果为负数则设为0
+                // 2.1.2.3、实单未排产 = 高优先级 + 中优先级 - 高优先级实际 - 中优先级实际，如果为负数则设为0
                 Integer heightQty = Optional.ofNullable(result.getHeightQty()).orElse(0);
                 Integer midQty = Optional.ofNullable(result.getMidQty()).orElse(0);
-                Integer totalQty = Optional.ofNullable(result.getTotalQty()).orElse(0);
-                Integer actualOrderUnproduced = heightQty + midQty - totalQty;
+                Integer heightProductionQty = Optional.ofNullable(result.getHeightProductionQty()).orElse(0);
+                Integer midProductionQty = Optional.ofNullable(result.getMidProductionQty()).orElse(0);
+                Integer actualOrderUnproduced = heightQty + midQty - heightProductionQty - midProductionQty;
                 result.setActualOrderUnproduced(actualOrderUnproduced > 0? actualOrderUnproduced: 0);
                 // 2.1.2.4、补充型腔数
                 if (result.getMouldCavityQty() == null) {
