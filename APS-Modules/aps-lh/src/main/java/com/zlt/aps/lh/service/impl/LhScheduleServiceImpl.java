@@ -1,11 +1,15 @@
 package com.zlt.aps.lh.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
+import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
@@ -28,10 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * 硫化排程主服务实现
@@ -185,4 +186,72 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         return result;
     }
 
+    /**
+     * 转机台前校验接口
+     *
+     * @param dto 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult changeMachinePreCheck(LhTransferDeskDTO dto) {
+        if (dto.getId() == null) {
+            return AjaxResult.error("请选择需要转机台的记录");
+        }
+        if (dto.getLhMachineCode() == null) {
+            return AjaxResult.error("新机台编码不能为空");
+        }
+
+        Long ids = dto.getId();
+        String newMachineCode = dto.getLhMachineCode();
+        List<LhScheduleResult> existResultList = scheduleResultMapper.changeMachinePreCheck(Collections.singletonList(ids), newMachineCode);
+
+        List<String> errorMessages = new ArrayList<>();
+        for (LhScheduleResult existResult : existResultList) {
+            String existScheduleDate = DateUtil.format(existResult.getScheduleDate(), "yyyy-MM-dd");
+            String existMachineCode = existResult.getLhMachineCode();
+            String existMaterialCode = existResult.getMaterialCode();
+            errorMessages.add(String.format("排程日期:%s，物料编码：%s，机台编号：%s，已经存在！", existScheduleDate, existMaterialCode, existMachineCode));
+        }
+        if (CollUtil.isNotEmpty(errorMessages)) {
+            return AjaxResult.error(String.join(";", errorMessages));
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 转机台操作
+     *
+     * @param dto 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult changeMachine(LhTransferDeskDTO dto) {
+        if (dto.getId() == null) {
+            return AjaxResult.error("请选择需要转机台的记录");
+        }
+        if (dto.getLhMachineCode() == null) {
+            return AjaxResult.error("新机台编码不能为空");
+        }
+
+        // 检查所有记录是否已发布
+        LhScheduleResult record = scheduleResultMapper.selectById(dto.getId());
+        if (ApsConstant.APS_STRING_1.equals(record.getIsRelease())) {
+            return AjaxResult.error("已发布的排程记录不允许转机台");
+        }
+
+        // 更新机台信息
+        String oldMachine = record.getLhMachineCode();
+        record.setLhMachineCode(dto.getLhMachineCode());
+        record.setLhMachineName(dto.getLhMachineName());
+
+        // 更新备注
+        String remark = record.getRemark() != null ? record.getRemark() : "";
+        record.setRemark(remark + "转机台时间：" + DateUtil.now() + "【原机台：" + oldMachine + ",转入机台：" + dto.getLhMachineCode() + "】");
+
+        // 设置为待发布
+        record.setIsRelease("0");
+
+        scheduleResultMapper.updateById(record);
+        return AjaxResult.success("转机台成功");
+    }
 }

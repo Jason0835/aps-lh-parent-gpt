@@ -51,4 +51,23 @@
         </foreach>
     </insert>
 
+    <select id="changeMachinePreCheck" resultType="com.zlt.aps.lh.api.domain.entity.LhScheduleResult">
+        SELECT e.*
+        FROM t_lh_schedule_result e
+        INNER JOIN (
+            SELECT DISTINCT SCHEDULE_DATE, MATERIAL_CODE
+            FROM t_lh_schedule_result
+            WHERE IS_DELETE = 0
+            <if test="ids != null and ids.size() > 0">
+                AND ID IN
+                <foreach item="id" collection="ids" open="(" separator="," close=")">
+                    #{id}
+                </foreach>
+            </if>
+              AND LH_MACHINE_CODE = #{newMachineCode}
+        ) ori
+        ON e.SCHEDULE_DATE = ori.SCHEDULE_DATE AND e.MATERIAL_CODE = ori.MATERIAL_CODE
+        WHERE e.IS_DELETE = 0
+    </select>
+
 </mapper>

@@ -21,10 +21,14 @@ public class LhTransferDeskDTO implements Serializable {
     @ApiModelProperty(value = "id")
     private Long id;
 
-    @ApiModelProperty(value = "转硫化机台编号")
+    @ApiModelProperty(value = "转硫化机台编号", required = true)
     @NotBlank(message = "转硫化机台编号不能为空")
     private String lhMachineCode;
 
-    @ApiModelProperty(value = "分厂编号")
+    @ApiModelProperty(value = "转硫化机台名称", required = true)
+    @NotBlank(message = "转硫化机台名称不能为空")
+    private String lhMachineName;
+
+    @ApiModelProperty(value = "分厂编号", required = true)
     private String factoryCode;
 }

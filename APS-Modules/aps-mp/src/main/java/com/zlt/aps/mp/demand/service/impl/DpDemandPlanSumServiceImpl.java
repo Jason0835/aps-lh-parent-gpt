@@ -103,6 +103,11 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
             batchUpdateStructurePriorityForDemandPlan(billVO,existObj);
             return;
         }
+        if (StringUtils.isNotBlank(billVO.getIsSchedule())) {
+            list.forEach(dpDemandPlan -> dpDemandPlan.setIsSchedule(billVO.getIsSchedule()));
+            this.baseDao.updateBatch(list);
+            return;
+        }
         list.forEach(dpDemandPlan -> dpDemandPlan.setIsProduction(billVO.getIsProduction()));
         this.baseDao.updateBatch(list);
     }
@@ -328,6 +333,11 @@ public class DpDemandPlanSumServiceImpl extends AbstractDocService<DpDemandPlanS
         }
         if(StringUtils.isNotBlank(billVO.getStructurePriority())) {
             batchUpdateStructurePriorityForDemandPlanSum(billVO,existObj);
+            return;
+        }
+        if(StringUtils.isNotBlank(billVO.getIsSchedule())) {
+            billVO.setIsSchedule(billVO.getIsSchedule());
+            this.dpDemandPlanSumEntityMapper.updateById(billVO);
             return;
         }
         billVO.setIsProduction(billVO.getIsProduction());

@@ -22,4 +22,7 @@ public interface LhScheduleResultMapper extends BaseMapper<LhScheduleResult> {
      * @return 插入记录数
      */
     int insertBatch(@Param("list") List<LhScheduleResult> list);
+
+    List<LhScheduleResult> changeMachinePreCheck(@Param("ids") List<Long> ids,
+                                                 @Param("newMachineCode") String newMachineCode);
 }

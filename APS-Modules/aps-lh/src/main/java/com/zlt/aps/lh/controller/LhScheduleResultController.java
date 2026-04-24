@@ -1,28 +1,18 @@
 package com.zlt.aps.lh.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.github.pagehelper.util.StringUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
-import com.zlt.aps.lh.api.domain.dto.LhOrderInsertParamDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleShiftDateQueryDTO;
-import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
+import com.zlt.aps.lh.api.domain.dto.*;
+import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.service.ILhScheduleService;
-import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -31,34 +21,18 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 硫化排程控制器
@@ -334,29 +308,23 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @PostMapping("/validateChangeMachine")
     @ApiOperation("硫化排程结果转机台校验")
     public AjaxResult validateChangeMachine(@RequestBody LhTransferDeskDTO dto) {
-//        ValidateResult validateResult = lhScheduleResultCheckHandle.changeMachinePreCheck(dto);
-//        if (!validateResult.isSuccess()) {
-//            return AjaxResult.error(validateResult.getMsg());
-//        }
-
-        return AjaxResult.success("校验通过");
+        return lhScheduleService.changeMachinePreCheck(dto);
     }
 
     /**
      * 转机台
-     * @param dto
-     * @return
+     * @param dto 请求参数
+     * @return 结果
      */
     @PostMapping("/changeMachine")
     @ApiOperation("转机台")
     public AjaxResult changeMachine(@RequestBody LhTransferDeskDTO dto) {
-//        ValidateResult validateResult = lhScheduleResultCheckHandle.changeMachinePreCheck(dto);
-//        if (!validateResult.isSuccess()) {
-//            return AjaxResult.error(validateResult.getMsg());
-//        }
-//        //调用转机台业务
-//        lhScheduleResultService.changeMachine(dto);
-        return AjaxResult.success();
+        AjaxResult ajaxResult = lhScheduleService.changeMachinePreCheck(dto);
+        if (ajaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
+            return ajaxResult;
+        }
+        //调用转机台业务
+        return lhScheduleService.changeMachine(dto);
     }
 
     @Log(title = "ui.data.column.lhParams.modelName")
