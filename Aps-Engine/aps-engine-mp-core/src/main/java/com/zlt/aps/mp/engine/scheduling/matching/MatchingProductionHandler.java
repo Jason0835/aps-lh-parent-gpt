@@ -1738,7 +1738,7 @@ public class MatchingProductionHandler {
         
         baseDao.saveBatch(statisticsList);
         this.saveSpecialMaterialResult(productionContext);
-//        this.updateMatchingProductionLog(productionContext); // 更新排产日志
+        this.updateMatchingProductionLog(productionContext); // 保存搭配日志
     }
 
     /**
@@ -3371,16 +3371,17 @@ public class MatchingProductionHandler {
         if (StringUtils.isBlank(tempLogContent)) {
             return;
         }
-        // 2、获取月计划原先的排产日志记录
-        MouldProductionLog logInfo = CollectionUtils.firstElement(baseDao.selectByMap(MouldProductionLog.class,
-                Collections.singletonMap("PRODUCTION_VERSION", context.getProductionVersion())));
-        if (logInfo == null) {
-            return;
-        }
-        // 3、搭配日志拼接到原日志后
-        String newLogContent = new StringBuilder(logInfo.getLogContent()).append(tempLogContent).toString();
-        logInfo.setLogContent(newLogContent);
-        baseDao.update(logInfo);
+        // 2、创建月计划原先的排产日志记录
+        MouldProductionLog logInfo = new MouldProductionLog();
+        logInfo.setFactoryCode(context.getFactoryCode());
+        logInfo.setYear(context.getYear());
+        logInfo.setMonth(context.getMonth());
+        logInfo.setMonthPlanVersion(context.getMonthPlanVersion());
+        logInfo.setProductionVersion(context.getProductionVersion());
+        logInfo.setPlanType(context.getPlanType());
+        logInfo.setWorkNo(context.getProductionVersion());
+        logInfo.setLogContent(tempLogContent);
+        baseDao.insert(logInfo);
     }
 
     /**

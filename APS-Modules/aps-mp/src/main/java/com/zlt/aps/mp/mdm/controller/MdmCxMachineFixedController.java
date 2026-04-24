@@ -226,7 +226,7 @@ public class MdmCxMachineFixedController extends AbstractDocBizController<MdmCxM
                 List<String> splitFixedStructure3 = machineFixed.getSplitFixedStructure3();
                 List<String> splitFixedStructure4 = machineFixed.getSplitFixedStructure4();
 
-                int splitFixedStructureMaxSize = Math.max(Math.max(splitFixedStructure1.size(), splitFixedStructure2.size()), splitFixedStructure3.size());
+                int splitFixedStructureMaxSize = Math.max(Math.max(Math.max(splitFixedStructure1.size(), splitFixedStructure2.size()), splitFixedStructure3.size()),splitFixedStructure4.size());
 
                 List<String> splitFixedMaterialCode = machineFixed.getSplitFixedMaterialCode();
                 List<String> splitFixedMaterialDesc = machineFixed.getSplitFixedMaterialDesc();
