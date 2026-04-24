@@ -15,7 +15,7 @@
       :rules="rules"
       :columns="columns"
       label-position="right"
-      label-width="120px"
+      label-width="160px"
       v-loading="loading"
     >
     </info-form>
@@ -123,9 +123,8 @@ export default {
           prop: "remark",
           label: this.$t("ui.data.column.mouldCleanPlan.remark"),
           type: "textarea",
-          rows: 3,
-          maxlength: 360,
-          showWordLimit: true,
+          span: 24,
+          maxlength: 300,
         },
       ];
     },

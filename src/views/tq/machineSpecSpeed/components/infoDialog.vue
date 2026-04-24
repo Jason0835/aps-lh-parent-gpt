@@ -29,7 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { saveSpecifyMachine } from "@/api/tq/specifyMachine";
+import { saveMachineSpecSpeed } from "@/api/tq/machineSpecSpeed";
 import { listEnabledMachines } from "@/api/tq/machine";
 
 export default {
@@ -44,17 +44,17 @@ export default {
       form: {},
       machineList: [],
       rules: {
-        materialCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
         machineId: [
           {
             required: true,
             message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        materialCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
             trigger: "blur",
           },
         ],
@@ -67,19 +67,13 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.tq.specifyMachine.column.modalName")
+        this.$t("ui.tq.machineSpecSpeed.column.modalName")
       );
     },
     columns() {
       return [
         {
-          label: this.$t("ui.tq.specifyMachine.column.materialCode"),
-          prop: "materialCode",
-          span: 24,
-          required: true,
-        },
-        {
-          label: this.$t("ui.specifyMachine.column.machineName"),
+          label: this.$t("ui.tq.machineSpecSpeed.column.machineCode"),
           prop: "machineId",
           span: 24,
           required: true,
@@ -88,30 +82,43 @@ export default {
           filterable: true,
           loading: this.machineLoading,
           props: {
-            label: "machineName",
+            label: "machineCode",
             value: "id",
           },
           onFocus: this.handleMachineFocus,
         },
         {
-          label: this.$t("ui.specifyMachine.column.lineType"),
-          prop: "lineType",
+          label: this.$t("ui.tq.machineSpecSpeed.column.materialCode"),
+          prop: "materialCode",
           span: 24,
-          type: "select",
-          dictData: this.parentDict.type.LINE_TYPE,
+          required: true,
+          maxlength: "20",
         },
         {
-          label: this.$t("ui.specifyMachine.column.jobType"),
-          prop: "jobType",
+          label: this.$t("ui.tq.machineSpecSpeed.column.standardSpeed"),
+          prop: "standardSpeed",
           span: 24,
-          type: "select",
-          dictData: this.parentDict.type.JOB_TYPE,
+          type: "number",
+        },
+        {
+          label: this.$t("ui.tq.machineSpecSpeed.column.quota"),
+          prop: "quota",
+          span: 24,
+          type: "number",
+        },
+        {
+          label: this.$t("ui.tq.machineSpecSpeed.column.quotaMes"),
+          prop: "quotaMes",
+          span: 24,
+          type: "number",
+          disabled: this.isEdit,
         },
         {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
           span: 24,
           type: "textarea",
+          maxlength: "500",
         },
       ];
     },
@@ -120,7 +127,7 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        const res = await saveSpecifyMachine(params);
+        const res = await saveMachineSpecSpeed(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -147,23 +154,15 @@ export default {
         this.loadMachineList();
       }
     },
-    show(data) {
+    async show(data) {
       this.visible = true;
-      this.machineList = [];
+      // 一进页面就加载机台数据源
+      await this.loadMachineList();
       if (data) {
         this.isEdit = true;
         this.form = {
           ...data,
         };
-        // 编辑模式下，将当前选中的机台加入下拉选项
-        if (data.machineId && data.machineName) {
-          this.machineList = [
-            {
-              id: data.machineId,
-              machineCode: data.machineName,
-            },
-          ];
-        }
       } else {
         this.isEdit = false;
         this.form = {};

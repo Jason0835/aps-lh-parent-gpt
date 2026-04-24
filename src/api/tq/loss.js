@@ -1,6 +1,5 @@
-import request from '@/utils/request'
+import request, { downloadLink } from '@/utils/request'
 
-// =
 export function listLoss(query) {
   return request({
     url: '/tq/loss/list',
@@ -8,20 +7,23 @@ export function listLoss(query) {
     data: query
   })
 }
-export function editLoss(query) {
+
+export function saveLoss(query) {
   return request({
-    url: '/tq/loss/edit',
+    url: '/tq/loss/save',
     method: 'post',
     data: query
   })
 }
 
-export function removeLoss(query) {
+export function removeLoss(ids) {
   return request({
     url: '/tq/loss/remove',
     method: 'post',
-    data: query
+    params: { ids: ids }
   })
 }
 
-
+export function exportLoss(query) {
+  return downloadLink("/tq/loss/export", query)
+}

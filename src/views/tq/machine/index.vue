@@ -142,34 +142,6 @@ export default {
       return [
         { type: "selection", fixed: "left" },
         {
-          label: this.$t("common.option"),
-          prop: "option",
-          width: "180px",
-          fixed: "left",
-          render: ({ row }) => {
-            return (
-              <div>
-                <el-button
-                  v-hasPermi={["tq:machine:edit"]}
-                  class="minus"
-                  type="primary"
-                  onClick={() => this.handleEdit(row)}
-                >
-                  {this.$t("ui.frame.btn.modify")}
-                </el-button>
-                <el-button
-                  v-hasPermi={["tq:machine:remove"]}
-                  class="minus"
-                  type="danger"
-                  onClick={() => this.handleDelete(row)}
-                >
-                  {this.$t("ui.frame.btn.delete")}
-                </el-button>
-              </div>
-            );
-          },
-        },
-        {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
           minWidth: 100,
@@ -178,23 +150,6 @@ export default {
           label: this.$t("ui.data.column.machine.machineName"),
           prop: "machineName",
           minWidth: 100,
-        },
-        {
-          label: this.$t("ui.data.column.machine.efficiency"),
-          prop: "efficiency",
-          minWidth: 80,
-          type: "number",
-        },
-        {
-          label: this.$t("ui.data.column.machine.toolingInfo"),
-          prop: "toolingInfo",
-          minWidth: 100,
-        },
-        {
-          label: this.$t("ui.data.column.machine.quata"),
-          prop: "quata",
-          minWidth: 100,
-          type: "number",
         },
         {
           label: this.$t("ui.data.column.machine.classShift"),
@@ -247,6 +202,33 @@ export default {
           minWidth: 100,
           formatter: (row) => {
             return row.remark || "-";
+          },
+        },
+        {
+          label: this.$t("common.option"),
+          prop: "option",
+          width: "180px",
+          render: ({ row }) => {
+            return (
+              <div>
+                <el-button
+                  v-hasPermi={["tq:machine:edit"]}
+                  class="minus"
+                  type="primary"
+                  onClick={() => this.handleEdit(row)}
+                >
+                  {this.$t("ui.frame.btn.modify")}
+                </el-button>
+                <el-button
+                  v-hasPermi={["tq:machine:remove"]}
+                  class="minus"
+                  type="danger"
+                  onClick={() => this.handleDelete(row)}
+                >
+                  {this.$t("ui.frame.btn.delete")}
+                </el-button>
+              </div>
+            );
           },
         },
       ];

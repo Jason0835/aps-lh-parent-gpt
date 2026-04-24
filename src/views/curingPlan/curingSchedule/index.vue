@@ -1,4 +1,4 @@
-
+﻿
 <template>
   <basic-container>
     <page-table
@@ -25,7 +25,7 @@
           v-hasPermi="['lh:lhScheduleResult:autoLhScheduleResult']"
           type="warning"
           @click="handleAutoPlan"
-          >{{ $t("自动排产") }}</el-button
+          >{{ $t("ui.data.column.scheduleResult.autoSchedule") }}</el-button
         >
         <!-- <el-button
           v-hasPermi="['lh:lhScheduleResult:autoLhScheduleResult']"
@@ -69,21 +69,21 @@
           type="primary"
           @click="handleChangePlan"
           :disabled="selection.length == 0"
-          >{{ $t("调量") }}</el-button
+          >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button
         >
 
         <el-button
           type="primary"
           :disabled="selection.length === 0"
           @click="handlePublish"
-          >{{ $t("排产发布") }}</el-button
+          >{{ $t("ui.data.column.scheduleResult.schedulePublish") }}</el-button
         >
         <el-button
           v-hasPermi="['lh:lhScheduleResult:changeMachine']"
           type="primary"
           :disabled="selection.length == 0"
           @click="getAdjustTextNo"
-          >{{ $t("文字示方调整") }}</el-button
+          >{{ $t("ui.data.column.scheduleResult.textAdjust") }}</el-button
         >
         <el-button
           v-hasPermi="['monthplan:mouldingDayResult:import']"
@@ -146,7 +146,7 @@
     </page-table>
     <tlt-upload-form
       ref="tltUploadForm"
-      title="导入硫化排程结果信息数据"
+      :title="$t('ui.data.column.scheduleResult.importLhScheduleResultData')"
       downloadUrl="/lh/lhScheduleResult/importTemplate"
       uploadUrl="/lh/lhScheduleResult/exportCombine"
       @uploadSuccess="getList"
@@ -155,7 +155,7 @@
     />
     <tlt-upload-form
       ref="tltUploadForm2"
-      title="导入硫化排程结果信息数据"
+      :title="$t('ui.data.column.scheduleResult.importLhScheduleResultData')"
       downloadUrl="/lh/lhScheduleResult/importTemplate"
       uploadUrl="/lh/lhScheduleResult/importData2"
       @uploadSuccess="getList"
@@ -164,14 +164,14 @@
     />
     <tlt-upload
       ref="tltUpload"
-      title="导入完成量"
+      :title="$t('ui.data.column.scheduleResult.importFinishQty')"
       downloadUrl="/lh/lhScheduleResult/importTemplate"
       uploadUrl="/lh/lhScheduleResult/importData"
       @uploadSuccess="getList"
     />
     <AddDialog ref="addDialogRef" @success="handelSuccess" />
     <InfoDialog ref="infoDialogRef" @success="handelSuccess" />
-    <AutoPlanDialog ref="autoPlanDialogRef" @success="handleAutoPlanSuccess" />
+    <AutoPlanDialog ref="autoPlanDialogRef" @success="handleAutoPlanSuccess" @validationError="handleValidationError" />
     <ChangeMachineDialog
       ref="changeMachineDialogRef"
       @success="handelSuccess"
@@ -179,6 +179,7 @@
     <ChangeReleaseStatusDialog ref="changeReleaseStatusDialogRef" />
     <el-button style="display: none" ref="hidePopoverBtnRef"></el-button>
     <changePlanDialog ref="changePlanRef" @success="getList" />
+    <ValidationErrorDialog ref="validationErrorDialogRef" />
   </basic-container>
 </template>
 <script>
@@ -191,6 +192,7 @@ import {
   removeScheduleResult,
   exportScheduleResult,
   publishScheduleResult,
+  issueToMes,
   exportCombine,
   getScheduleDate,
   adjustTextNo,
@@ -206,6 +208,7 @@ import AutoPlanDialog from "./components/autoPlanDialog.vue";
 import ChangeMachineDialog from "./components/changeMachineDialog.vue";
 import ChangeReleaseStatusDialog from "./components/changeReleaseStatusDialog.vue";
 import changePlanDialog from "./components/changePlanDialog.vue";
+import ValidationErrorDialog from "./components/validationErrorDialog.vue";
 
 export default {
   name: "CuringSchedule",
@@ -219,14 +222,16 @@ export default {
     ChangeMachineDialog,
     ChangeReleaseStatusDialog,
     changePlanDialog,
+    ValidationErrorDialog,
   },
   dicts: [
     "adjust_type",
-    "IS_RELEASE",
+    "IS_RELEASE_LH",
     "biz_factory_name",
     "biz_end_type",
     "biz_construction_stage",
     "lh_schedule_type",
+    "biz_mould_Type",
   ],
   provide() {
     return {
@@ -322,19 +327,19 @@ export default {
         { type: "selection", fixed: "left" },
 
         {
-          label: this.$t("硫化机台"),
+          label: this.$t("ui.data.column.scheduleResult.lhMachineCode"),
           prop: "lhMachineCode",
         },
         {
-          label: this.$t("物料编码"),
+          label: this.$t("ui.data.column.scheduleResult.materialCode"),
           prop: "materialCode",
         },
         {
-          label: this.$t("物料描述"),
+          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
           prop: "materialDesc",
         },
         {
-          label: this.$t("胎胚描述"),
+          label: this.$t("ui.data.column.scheduleResult.embryoDesc"),
           prop: "mainMaterialDesc",
         },
         {
@@ -347,294 +352,318 @@ export default {
         },
 
         {
-          label: this.$t("合计余量"),
+          label: this.$t("ui.data.column.scheduleResult.totalSurplusQty"),
           prop: "mouldSurplusQty",
         },
         {
-          label: this.$t("胎胚库存"),
+          label: this.$t("ui.data.column.scheduleResult.embryoStock"),
           prop: "embryoStock",
         },
         {
-          label: this.$t("硫化班产"),
+          label: this.$t("ui.data.column.scheduleResult.lhShiftQty"),
           prop: "singleMouldShiftQty",
         },
         {
-          label: this.$t("左右模"),
-          prop: "leftRightMould",
-        },
-        {
-          prop: "constructionStage",
-          label: this.$t("示方类型"),
+          label: this.$t("ui.data.column.scheduleResult.isRelease"),
+          prop: "isRelease",
+          minWidth: 100,
           formatter: (row, column, value, index) => {
-            return this.selectDictLabel(this.dict.type.biz_construction_stage , value);
+            return this.selectDictLabel(this.dict.type.IS_RELEASE_LH, value);
           },
         },
+
         {
-          label: this.$t("类型"),
-          prop: "isEnd",
-          formatter: (row, column, value, index) => {
-            return this.selectDictLabel(this.dict.type.biz_end_type, value);
-          },
+          label: this.$t("ui.data.column.scheduleResult.batchNo"),
+          prop: "batchNo",
+          width: 180,
         },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.baseInfo"),
-        //   visible: true,
-        //   children: [
-        //     {
-        //       label: this.$t("ui.data.column.scheduleResult.isRelease"),
-        //       prop: "isRelease",
-        //       minWidth: 100,
-        //       formatter: (row, column, value, index) => {
-        //         return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
-        //       },
-        //     },
-        //     {
-        //       label: this.$t("批次号"),
-        //       prop: "orderNo",
-        //       width: 160,
-        //     },
-        //     {
-        //       label: this.$t("工单号"),
-        //       prop: "factoryCode",
-        //     },
-        //     {
-        //       label: this.$t("工厂"),
-        //       prop: "factoryCode",
-        //     },
-
-        //     {
-        //       label: this.$t("月度计划"),
-        //       prop: "factoryCode",
-        //     },
-        //     {
-        //       label: this.$t("成型产量"),
-        //       prop: "factoryCode",
-        //     },
-        //     {
-        //       label: this.$t("月计划剩余量"),
-        //       prop: "factoryCode",
-        //     },
-
-        //     {
-        //       label: this.$t("胎胚库存"),
-        //       prop: "factoryCode",
-        //     },
-        //     {
-        //       label: this.$t("单班硫化量"),
-        //       prop: "factoryCode",
-        //     },
-        //   ],
-        // },
         {
-          label: this.$t("早班") + " " + this.dateList[0].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.orderNo"),
+          prop: "orderNo",
+          width: 180,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.morningShift") + " " + (this.dateList[0]?.shiftDate ?? ""),
           children: [
-            // {
-            //   prop: "class1Sort",
-            //   label: this.$t("顺序"),
-            // },
+            {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+            },
+            {
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value, index) => {
+                const dictValue = value || "0";
+                return this.selectDictLabel(this.dict.type.biz_construction_stage, dictValue);
+              },
+            },
+            {
+              prop: "class1IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value, index) => {
+                return this.calcShiftIsEnd(row, 1);
+              },
+            },
             {
               prop: "class1PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
             },
             {
               prop: "class1FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
             },
-            // {
-            //   prop: "class2AvailableLhShift",
-            //   label: this.$t("类型"),
-            // },
             {
               prop: "class1Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.remark"),
             },
           ],
         },
         {
-          label: this.$t("中班") + " " + this.dateList[1].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.middleShift") + " " + (this.dateList[1]?.shiftDate ?? ""),
           children: [
-            // {
-            //   prop: "class2Sort",
-            //   label: this.$t("顺序"),
-            // },
+            {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+            },
+            {
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value, index) => {
+                const dictValue = value || "0";
+                return this.selectDictLabel(this.dict.type.biz_construction_stage, dictValue);
+              },
+            },
+           {
+              prop: "class2IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value, index) => {
+                return this.calcShiftIsEnd(row, 2);
+              },
+            },
             {
               prop: "class2PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
             },
             {
               prop: "class2FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
             },
-            // {
-            //   prop: "class2AvailableLhShift",
-            //   label: this.$t("类型"),
-            // },
             {
               prop: "class2Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.remark"),
             },
 
           ],
         },
         {
-          label: this.$t("晚班") + " " + this.dateList[2].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.nightShift") + " " + (this.dateList[2]?.shiftDate ?? ""),
           children: [
-            // {
-            //   prop: "class3Sort",
-            //   label: this.$t("顺序"),
-            // },
+            {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+            },
+            {
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value, index) => {
+                const dictValue = value || "0";
+                return this.selectDictLabel(this.dict.type.biz_construction_stage, dictValue);
+              },
+            },
+           {
+              prop: "class3IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value, index) => {
+                return this.calcShiftIsEnd(row, 3);
+              },
+            },
             {
               prop: "class3PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
             },
             {
               prop: "class3FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
             },
-            // {
-            //   prop: "class2AvailableLhShift",
-            //   label: this.$t("类型"),
-            // },
             {
               prop: "class3Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.remark"),
             },
 
           ],
         },
         {
-          label: this.$t("早班") + " " + this.dateList[3].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.morningShift") + " " + (this.dateList[3]?.shiftDate ?? ""),
           children: [
-            // {
-            //   prop: "class4Sort",
-            //   label: this.$t("顺序"),
-            // },
+            {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+            },
+            {
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value, index) => {
+                const dictValue = value || "0";
+                return this.selectDictLabel(this.dict.type.biz_construction_stage, dictValue);
+              },
+            },
+           {
+              prop: "class4IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value, index) => {
+                return this.calcShiftIsEnd(row, 4);
+              },
+            },
             {
               prop: "class4PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
             },
             {
               prop: "class4FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
             },
-            // {
-            //   prop: "class2AvailableLhShift",
-            //   label: this.$t("类型"),
-            // },
             {
               prop: "class4Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.remark"),
             },
 
           ],
         },
         {
-          label: this.$t("中班") + " " + this.dateList[4].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.middleShift") + " " + (this.dateList[4]?.shiftDate ?? ""),
           children: [
-            // {
-            //   prop: "class5Sort",
-            //   label: this.$t("顺序"),
-            // },
+            {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+            },
+            {
+              prop: "mouldMethod",
+              label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+            },
+            {
+              prop: "class5IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value, index) => {
+                return this.calcShiftIsEnd(row, 5);
+              },
+            },
             {
               prop: "class5PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
             },
             {
               prop: "class5FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
             },
-            // {
-            //   prop: "class2AvailableLhShift",
-            //   label: this.$t("类型"),
-            // },
             {
               prop: "class5Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.remark"),
             },
 
           ],
         },
         {
-          label: this.$t("晚班") + " " + this.dateList[5].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.nightShift") + " " + (this.dateList[5]?.shiftDate ?? ""),
           children: [
-            // {
-            //   prop: "class6Sort",
-            //   label: this.$t("顺序"),
-            // },
+            {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+            },
+            {
+              prop: "mouldMethod",
+              label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+            },
+            {
+              prop: "class6IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value, index) => {
+                return this.calcShiftIsEnd(row, 6);
+              },
+            },
             {
               prop: "class6PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
             },
             {
               prop: "class6FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
             },
-            // {
-            //   prop: "class2AvailableLhShift",
-            //   label: this.$t("类型"),
-            // },
             {
               prop: "class6Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.remark"),
             },
 
           ],
         },
         {
-          label: this.$t("早班") + " " + this.dateList[6].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.morningShift") + " " + (this.dateList[6]?.shiftDate ?? ""),
           children: [
-            // {
-            //   prop: "class7Sort",
-            //   label: this.$t("顺序"),
-            // },
+            {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+            },
+            {
+              prop: "mouldMethod",
+              label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+            },
+            {
+              prop: "class7IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value, index) => {
+                return this.calcShiftIsEnd(row, 7);
+              },
+            },
             {
               prop: "class7PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
             },
             {
               prop: "class7FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
             },
-            // {
-            //   prop: "class2AvailableLhShift",
-            //   label: this.$t("类型"),
-            // },
             {
               prop: "class7Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.remark"),
             },
 
           ],
         },
         {
-          label: this.$t("中班") + " " + this.dateList[7].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.middleShift") + " " + (this.dateList[7]?.shiftDate ?? ""),
           children: [
-            // {
-            //   prop: "class8Sort",
-            //   label: this.$t("顺序"),
-            // },
+            {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+            },
+            {
+              prop: "mouldMethod",
+              label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+            },
+            {
+              prop: "class8IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value, index) => {
+                return this.calcShiftIsEnd(row, 8);
+              },
+            },
             {
               prop: "class8PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
             },
             {
               prop: "class8FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
             },
-            // {
-            //   prop: "class2AvailableLhShift",
-            //   label: this.$t("类型"),
-            // },
             {
               prop: "class8Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.remark"),
             },
 
           ],
         },
         {
           prop: "remark",
-          label: this.$t("备注"),
+          label: this.$t("ui.data.column.remark"),
         },
         {
           prop: "updateTime",
@@ -706,21 +735,21 @@ export default {
             return (
               <dict-select
                 v-model={form.isRelease}
-                options={this.dict.type.IS_RELEASE}
+                options={this.dict.type.IS_RELEASE_LH}
               />
             );
           },
         },
         {
-          label: this.$t("物料编码"),
+          label: this.$t("ui.data.column.scheduleResult.materialCode"),
           prop: "materialCode",
         },
         {
-          label: this.$t("物料描述"),
+          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
           prop: "materialDesc",
         },
         {
-          label: this.$t("胚胎描述"),
+          label: this.$t("ui.data.column.scheduleResult.embryoDesc"),
           prop: "mainMaterialDesc",
         },
         {
@@ -736,6 +765,19 @@ export default {
     },
   },
   methods: {
+    calcShiftIsEnd(row, shiftIndex) {
+      const specEndTime = row.specEndTime;
+      if (!specEndTime) return this.selectDictLabel(this.dict.type.biz_end_type, "0");
+      const specEnd = new Date(specEndTime).getTime();
+      const startTimeField = "class" + shiftIndex + "StartTime";
+      const shiftStart = row[startTimeField];
+      if (!shiftStart) return this.selectDictLabel(this.dict.type.biz_end_type, "0");
+      const shiftStartTs = new Date(shiftStart).getTime();
+      if (specEnd >= shiftStartTs) {
+        return this.selectDictLabel(this.dict.type.biz_end_type, "1");
+      }
+      return this.selectDictLabel(this.dict.type.biz_end_type, "0");
+    },
     async getAdjustTextNo() {
       try {
         this.loading = true;
@@ -775,9 +817,12 @@ export default {
       }
     },
     handleAutoPlanSuccess(params) {
-      // this.search.scheduleDate = params.scheduleDate;
-      // this.query.scheduleDate = params.scheduleDate;
       this.getList();
+    },
+    handleValidationError(data) {
+      if (this.$refs.validationErrorDialogRef) {
+        this.$refs.validationErrorDialogRef.show(data);
+      }
     },
     handleAdd() {
       if (this.$refs.addDialogRef) {
@@ -786,7 +831,9 @@ export default {
     },
     handleEdit(row) {
       if (this.$refs.infoDialogRef) {
-        this.$refs.infoDialogRef.show(row);
+        // 深拷贝 row 数据，避免编辑时影响列表原始数据
+        const rowCopy = JSON.parse(JSON.stringify(row));
+        this.$refs.infoDialogRef.show(rowCopy);
       }
     },
     handleChangeMachine() {
@@ -808,7 +855,9 @@ export default {
     },
     handleShowChangeQty(row) {
       if (this.$refs.infoDialogRef) {
-        this.$refs.infoDialogRef.show(row, true);
+        // 深拷贝 row 数据，避免编辑时影响列表原始数据
+        const rowCopy = JSON.parse(JSON.stringify(row));
+        this.$refs.infoDialogRef.show(rowCopy, true);
       }
     },
     async handleChangeQty(row) {
@@ -866,7 +915,7 @@ export default {
         .catch(() => {});
     },
     handleExport() {
-      this.$confirm(this.$t(`确定导出所有硫化排程结果信息？`), {
+      this.$confirm(this.$t(`ui.data.column.scheduleResult.confirmExportLhScheduleResult`), {
         type: "warning",
       }).then(() => {
         try {
@@ -908,10 +957,24 @@ export default {
             scheduleDate: this.query.scheduleDate,
             ids: ids.join(),
           };
-          const data = await publishScheduleResult(params);
-          this.$modal.msgSuccess(data.msg);
-          // this.$set(this.page, "current", 1);
-          this.getList();
+          const valid = await issueToMes();
+          if (valid.msg == "0") {
+            this.$confirm(
+              this.$t("ui.data.column.scheduleResult.hasNullLhMachineCode")
+            )
+              .then(async () => {
+                const data = await publishScheduleResult(params);
+                this.$modal.msgSuccess(data.msg);
+                this.getList();
+              })
+              .catch(() => {
+                this.loading = false;
+              });
+          } else {
+            const data = await publishScheduleResult(params);
+            this.$modal.msgSuccess(data.msg);
+            this.getList();
+          }
         } catch (error) {
           console.error(error);
         } finally {
@@ -937,8 +1000,8 @@ export default {
       this.$set(this.page, "pageSize", pageSize);
       this.getList();
     },
-    handelSuccess() {
-      this.getList();
+    async handelSuccess() {
+      await this.getList();
     },
     handleSelectionChange(rows) {
       this.selection = rows;
@@ -1043,15 +1106,23 @@ export default {
     async getList() {
       try {
         this.loading = true;
+        await this.getDate();
         const data = await listScheduleResult(this.formatParams());
-
-        this.data = data.rows;
+        this.data = data.rows || [];
         this.page.total = data.total;
       } catch (error) {
         console.error(error);
       } finally {
         this.loading = false;
-        this.getDate();
+        this.$nextTick(() => {
+          const tableRef = this.$refs.curingScheduleTable;
+          if (tableRef && tableRef.getTableRef) {
+            const table = tableRef.getTableRef();
+            if (table && table.doLayout) {
+              table.doLayout();
+            }
+          }
+        });
       }
     },
   },

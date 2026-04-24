@@ -29,12 +29,11 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { saveSpecifyMachine } from "@/api/tq/specifyMachine";
+import { saveLoss } from "@/api/tq/loss";
 import { listEnabledMachines } from "@/api/tq/machine";
 
 export default {
   components: { infoForm },
-  inject: ["parentDict"],
   data() {
     return {
       loading: false,
@@ -51,13 +50,6 @@ export default {
             trigger: "blur",
           },
         ],
-        machineId: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "blur",
-          },
-        ],
       },
     };
   },
@@ -67,22 +59,22 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.tq.specifyMachine.column.modalName")
+        this.$t("ui.data.column.tq.loss.modelName")
       );
     },
     columns() {
       return [
         {
-          label: this.$t("ui.tq.specifyMachine.column.materialCode"),
+          label: this.$t("ui.data.column.loss.beadCode"),
           prop: "materialCode",
           span: 24,
           required: true,
+          maxlength: "20",
         },
         {
-          label: this.$t("ui.specifyMachine.column.machineName"),
+          label: this.$t("ui.data.column.loss.line"),
           prop: "machineId",
           span: 24,
-          required: true,
           type: "select",
           dictData: this.machineList,
           filterable: true,
@@ -94,33 +86,35 @@ export default {
           onFocus: this.handleMachineFocus,
         },
         {
-          label: this.$t("ui.specifyMachine.column.lineType"),
-          prop: "lineType",
+          label: this.$t("ui.data.column.loss.lossRate"),
+          prop: "lossRate",
           span: 24,
-          type: "select",
-          dictData: this.parentDict.type.LINE_TYPE,
-        },
-        {
-          label: this.$t("ui.specifyMachine.column.jobType"),
-          prop: "jobType",
-          span: 24,
-          type: "select",
-          dictData: this.parentDict.type.JOB_TYPE,
+          type: "number",
+          min: 0,
+          max: 99.99,
+          precision: 2,
         },
         {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
           span: 24,
           type: "textarea",
+          maxlength: "300",
         },
       ];
     },
   },
   methods: {
     async save(params) {
+      if (!params.materialCode && !params.machineId) {
+        this.$modal.msgWarning(
+          this.$t("ui.error.message.loss.isAllNull") || "代码和机台不能全部为空"
+        );
+        return;
+      }
       try {
         this.loading = true;
-        const res = await saveSpecifyMachine(params);
+        const res = await saveLoss(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -155,12 +149,11 @@ export default {
         this.form = {
           ...data,
         };
-        // 编辑模式下，将当前选中的机台加入下拉选项
         if (data.machineId && data.machineName) {
           this.machineList = [
             {
               id: data.machineId,
-              machineCode: data.machineName,
+              machineName: data.machineName,
             },
           ];
         }

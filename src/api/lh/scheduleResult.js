@@ -219,6 +219,13 @@ export function publishScheduleResult(query) {
     data: query
   })
 }
+
+export function issueToMes() {
+  return request({
+    url: '/lh/lhScheduleResult/issueToMes',
+    method: 'post'
+  })
+}
 /**
  * 根据规格号查询物料号List
  * @param {*} query

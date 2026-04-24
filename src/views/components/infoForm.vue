@@ -300,7 +300,8 @@ export default {
         <el-switch
           v-model={this.form[item.prop]}
           disabled={item.disabled}
-
+          active-value={activeValue}
+          inactive-value={inactiveValue}
         />
       );
     },

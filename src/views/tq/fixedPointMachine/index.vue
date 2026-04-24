@@ -54,12 +54,13 @@
   </basic-container>
 </template>
 <script>
-import { mapState } from "vuex";
 import {
   listSpecifyMachine,
+  saveSpecifyMachine,
   removeSpecifyMachine,
-  exportData,
+  exportSpecifyMachine,
 } from "@/api/tq/specifyMachine";
+import { listEnabledMachines } from "@/api/tq/machine";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import InfoDialog from "./components/infoDialog.vue";
 
@@ -78,6 +79,7 @@ export default {
   data() {
     return {
       loading: false,
+      machineLoading: false,
       data: [],
       selection: [],
       page: {
@@ -88,20 +90,18 @@ export default {
       sort: {},
       search: {},
       query: {},
+      machineList: [],
     };
   },
   computed: {
-    ...mapState({
-      machines: (state) => state.bead.machines,
-    }),
     columns() {
       return [
         { type: "selection", fixed: "left" },
         {
-          prop: "beadCode",
+          prop: "materialCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.tq.specifyMachine.column.beadCode"),
+          label: this.$t("ui.tq.specifyMachine.column.materialCode"),
         },
         {
           prop: "machineName",
@@ -133,6 +133,12 @@ export default {
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
+        },
+        {
+          prop: "updateTime",
+          halign: "center",
+          label: this.$t("ui.common.column.updateTime"),
+          minWidth: 150,
         },
         {
           align: "center",
@@ -167,16 +173,21 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.tq.specifyMachine.column.beadCode"),
-          prop: "beadCode",
+          label: this.$t("ui.tq.specifyMachine.column.materialCode"),
+          prop: "materialCode",
         },
         {
           label: this.$t("ui.specifyMachine.column.machineName"),
           prop: "machineId",
           type: "select",
-          dictData: this.machines,
-          valueKey: "id",
-          labelKey: "machineName",
+          dictData: this.machineList,
+          filterable: true,
+          loading: this.machineLoading,
+          props: {
+            label: "machineName",
+            value: "id",
+          },
+          onFocus: this.handleMachineFocus,
         },
         {
           label: this.$t("ui.data.column.specifyMachine.lineType"),
@@ -209,7 +220,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeSpecifyMachine({ ids }).then((data) => {
+        removeSpecifyMachine(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -227,7 +238,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = this.selection.map((row) => row.id).join(",");
-        removeSpecifyMachine({ ids }).then((data) => {
+        removeSpecifyMachine(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -246,7 +257,7 @@ export default {
             pageSize: undefined,
             pageNum: undefined,
           };
-          exportData(params);
+          exportSpecifyMachine(params);
         } catch (error) {
           console.error(error);
         } finally {
@@ -301,9 +312,26 @@ export default {
         this.loading = false;
       }
     },
+    async loadMachineList() {
+      this.machineLoading = true;
+      try {
+        const res = await listEnabledMachines();
+        this.machineList = Array.isArray(res) ? res : (res.data || res.rows || []);
+      } catch (error) {
+        console.log(error);
+      } finally {
+        this.machineLoading = false;
+      }
+    },
+    handleMachineFocus() {
+      if (this.machineList.length === 0) {
+        this.loadMachineList();
+      }
+    },
   },
-  created() {
-    this.$store.dispatch("bead/getMachineList");
+  mounted() {
+    this.getList();
+    this.loadMachineList();
   },
   activated() {
     this.getList();

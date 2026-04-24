@@ -1,8 +1,7 @@
-
 <template>
   <basic-container>
     <page-table
-      tableRef="ParamsMoldingParamsMainTable"
+      tableRef="tqLossMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -21,67 +20,50 @@
       <template slot="header">
         <el-button
           type="primary"
+          plain
+          v-hasPermi="['tq:loss:add']"
           @click="handleAdd"
-
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
-          type="warning"
-          :disabled="selection.length == 0"
-          @click="handleEdit(selection[0])"
-          >{{ $t("ui.frame.btn.modify") }}</el-button
-        >
-        <el-button
           type="danger"
-          @click="handleDeleteAll"
-          :disabled="selection.length == 0"
+          plain
+          v-hasPermi="['tq:loss:remove']"
+          @click="handleBatchDelete"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <el-button
+          v-hasPermi="['tq:loss:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
-        <el-button @click="handleExport">{{
-          $t("ui.frame.btn.export")
-        }}</el-button>
+        <el-button
+          @click="handleExport"
+          v-hasPermi="['tq:loss:export']"
+          >{{ $t("ui.frame.btn.export") }}</el-button
+        >
       </template>
     </page-table>
-    <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/cx/cxKeyProduct/importTemplate"
-      uploadUrl="/cx/cxKeyProduct/importData"
+      downloadUrl="/tq/loss/importTemplate"
+      uploadUrl="/tq/loss/importData"
       @uploadSuccess="getList"
-    >
-    </tlt-upload>
-    <infoDialog ref="infoRef" @success="getList" />
+    />
+    <InfoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 <script>
-//lib
-// import moment from "moment";
-//utils
-import { downloadLink } from "@/utils/request";
-//interface
-import { listMoldingParams, removeMoldingParams } from "@/api/cx/keyProduct";
-//components
+import { listLoss, removeLoss, exportLoss } from "@/api/tq/loss";
+import { listEnabledMachines } from "@/api/tq/machine";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
-import infoDialog from "./components/infoDialog.vue";
-import structureSelect from "@/views/components/structureSelect.vue";
+import InfoDialog from "./components/infoDialog.vue";
 
 export default {
- name: "KeyProduct",
+  name: "TqLoss",
   components: {
     tltUpload,
-    infoDialog,
-    structureSelect,
-  },
-  dicts: ['biz_yes_no','biz_factory_name'],
-  provide() {
-    return {
-      parentDict: this.dict,
-    };
+    InfoDialog,
   },
   data() {
     return {
@@ -96,63 +78,89 @@ export default {
       sort: {},
       search: {},
       query: {},
-      importDefaultValue: {},
-      importRules: {},
+      machineList: [],
     };
   },
   computed: {
+    searchColumns() {
+      return [
+        {
+          label: this.$t("ui.data.column.loss.beadCode"),
+          prop: "materialCode",
+        },
+        {
+          label: this.$t("ui.data.column.loss.line"),
+          prop: "machineId",
+          type: "select",
+          dictData: this.machineList,
+          labelKey: "machineName",
+          valueKey: "id",
+          filterable: true,
+        },
+      ];
+    },
     columns() {
-      let columns = [
+      return [
         { type: "selection", fixed: "left" },
         {
-          prop: "structureName",
+          prop: "materialCode",
           align: "center",
-          label: this.$t("结构"),
-          // sortable: "custom",
+          halign: "center",
+          label: this.$t("ui.data.column.loss.beadCode"),
+          minWidth: 120,
         },
         {
-          prop: "embryoCode",
+          prop: "machineName",
           align: "center",
-          label: this.$t("胎胚代码"),
+          halign: "center",
+          label: this.$t("ui.data.column.loss.line"),
+          minWidth: 120,
         },
         {
-          prop: "embryoDesc",
+          prop: "lossRate",
           align: "center",
-          label: this.$t("胎胚描述"),
+          halign: "center",
+          label: this.$t("ui.data.column.loss.lossRate"),
+          minWidth: 100,
+          formatter: (row) => {
+            return row.lossRate != null ? row.lossRate + "%" : "-";
+          },
         },
         {
-          prop: "isActive",
-          align: "center",
-          label: this.$t("是否启用"),
-          // sortable: "custom",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          prop: "remark",
+          halign: "center",
+          label: this.$t("ui.common.column.remark"),
+          minWidth: 100,
+          formatter: (row) => {
+            return row.remark || "-";
           },
         },
         {
           prop: "updateTime",
-          align: "center",
-          label: this.$t("ui.data.column.updateTime"),
-          minWidth: 160,
+          halign: "center",
+          label: this.$t("ui.common.column.updateTime"),
+          minWidth: 150,
         },
-
         {
           align: "center",
-          align: "center",
+          halign: "center",
           label: this.$t("ui.data.btn.option"),
-
+          prop: "option",
+          width: 180,
           fixed: "right",
           render: ({ row }) => {
             return (
               <div>
                 <el-button
+                  v-hasPermi={["tq:loss:edit"]}
                   class="minus"
-                  type="success"
+                  type="primary"
                   onClick={() => this.handleEdit(row)}
                 >
-                  {this.$t("ui.frame.btn.update")}
+                  {this.$t("ui.frame.btn.modify")}
                 </el-button>
                 <el-button
+                  v-hasPermi={["tq:loss:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -162,40 +170,6 @@ export default {
               </div>
             );
           },
-        },
-      ];
-
-      return columns;
-    },
-    searchColumns() {
-      return [
-        {
-          label: this.$t("结构"),
-          prop: "structureName",
-          render: (form, item) => {
-            return (
-              <structureSelect
-                v-model={form[item.prop]}
-                factoryCode={form.factoryCode || "116"}
-                machineType="CX"
-                clearable
-              />
-            );
-          },
-        },
-        {
-          label: this.$t("胎胚代码"),
-          prop: "embryoCode",
-        },
-        {
-          label: this.$t("胎胚描述"),
-          prop: "embryoDesc",
-        },
-        {
-          label: this.$t("是否启用"),
-          prop: "isActive",
-          type: "select",
-          dictData: this.dict.type.biz_yes_no,
         },
       ];
     },
@@ -217,7 +191,7 @@ export default {
       }).then(() => {
         const ids = row.id;
         this.loading = true;
-        removeMoldingParams({ ids })
+        removeLoss(ids)
           .then((data) => {
             this.$modal.msgSuccess(data.msg);
             this.$set(this.page, "current", 1);
@@ -229,24 +203,48 @@ export default {
           });
       });
     },
-    handleDeleteAll() {
-      console.log(this.selection);
-      let ids = "";
-      for (let i = 0; i < this.selection.length; i++) {
-        if (i == this.selection.length - 1) {
-          ids = ids + this.selection[i].id;
-        } else {
-          ids = ids + this.selection[i].id + ",";
-        }
+    handleBatchDelete() {
+      if (this.selection.length === 0) {
+        this.$modal.msgWarning(
+          this.$t("common.confirm.selectDeleteData") || "请选择需要删除的数据"
+        );
+        return;
       }
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeMoldingParams({ ids }).then((data) => {
-          this.$modal.msgSuccess(data.msg);
-          this.$set(this.page, "current", 1);
-          this.getList();
-        });
+        const ids = this.selection.map((row) => row.id).join(",");
+        this.loading = true;
+        removeLoss(ids)
+          .then((data) => {
+            this.$modal.msgSuccess(data.msg);
+            this.$set(this.page, "current", 1);
+            this.getList();
+          })
+          .catch((error) => {
+            console.log(error);
+            this.loading = false;
+          });
+      });
+    },
+    handleExport() {
+      this.$confirm(this.$t("ui.data.column.loss.exportConfirm"), {
+        type: "warning",
+      }).then(() => {
+        try {
+          this.loading = true;
+          let params = this.formatParams(false);
+          params = {
+            ...params,
+            pageSize: undefined,
+            pageNum: undefined,
+          };
+          exportLoss(params);
+        } catch (error) {
+          console.error(error);
+        } finally {
+          this.loading = false;
+        }
       });
     },
     handleSearch(data) {
@@ -259,9 +257,6 @@ export default {
       this.$set(this.page, "pageSize", pageSize);
       this.getList();
     },
-    handelSuccess() {
-      this.getList();
-    },
     handleSortChange({ column, prop, order }) {
       if (order) {
         this.sort = {
@@ -269,7 +264,6 @@ export default {
           isAsc: order == "ascending" ? "asc" : "desc",
         };
       } else {
-        //默认排序
         this.sort = {};
       }
       this.getList();
@@ -277,48 +271,42 @@ export default {
     handleSelectionChange(rows) {
       this.selection = rows;
     },
-    handleExport() {
-      downloadLink("/cx/cxKeyProduct/export", this.formatParams(false));
-    },
-
-    // utils
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
         ...this.sort,
       };
-
       if (hasPage) {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
       }
-
-      if (params.createTime && params.createTime[0]) {
-        params.createTimeStart = params.createTime[0];
-        params.createTimeEnd = params.createTime[1];
-        params.createTime = undefined;
-      }
-
       return params;
     },
-    // api
     async getList() {
       try {
         this.loading = true;
-        const res = await listMoldingParams(this.formatParams());
-        const data = res?.data ?? res;
-        this.data = Array.isArray(data?.rows) ? data.rows : (Array.isArray(data) ? data : []);
-        this.page.total = data?.total ?? 0;
+        const data = await listLoss(this.formatParams());
+        this.data = data.rows;
+        this.page.total = data.total;
       } catch (error) {
         console.error(error);
-        this.data = [];
-        this.page.total = 0;
       } finally {
         this.loading = false;
       }
     },
+    async loadMachineList() {
+      try {
+        const res = await listEnabledMachines();
+        this.machineList = Array.isArray(res) ? res : (res.data || res.rows || []);
+      } catch (error) {
+        console.log(error);
+      }
+    },
   },
-  created() {},
+  mounted() {
+    this.getList();
+    this.loadMachineList();
+  },
   activated() {
     this.getList();
   },
