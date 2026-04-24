@@ -1757,6 +1757,8 @@
   "ui.frame.btn.details": "明细",
   "ui.frame.btn.edit": "编辑",
   "ui.frame.btn.export": "导出",
+  "ui.frame.btn.submit": "提交",
+  "ui.frame.btn.moldingScheduleSequence": "成型排程顺位",
   "ui.frame.btn.exportMonthRecords": "导出月份记录",
   "ui.frame.btn.file": "归档",
   "ui.frame.btn.get.new.group": "抓取新品种的替换品种分组",

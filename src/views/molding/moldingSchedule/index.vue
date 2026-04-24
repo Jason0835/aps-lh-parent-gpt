@@ -88,6 +88,9 @@
           v-hasPermi="['cx:productConstruction:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
+        <el-button type="primary" @click="handleGotoMoldingScheduleSequence"
+          >{{ $t("ui.frame.btn.moldingScheduleSequence") }}</el-button
+        >
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -1002,6 +1005,9 @@ export default {
     handleExport() {
       downloadLink("/cx/cxScheduleResult/export", this.formatParams(false));
     },
+    handleGotoMoldingScheduleSequence() {
+      this.$router.push("/moldingPlanManagement/moldingScheduleSequence");
+    },
     handleProducingIssue() {
       this.$confirm(this.$t("ui.biz.alter.producingIssue")).then(async () => {
         try {
@@ -1285,10 +1291,10 @@ export default {
     this.$store.dispatch("molding/getMachineList");
     this.$store.dispatch("curing/getMachineList");
   },
-  mounted() {
-    // 初始化加载列表
-    this.getList();
-  },
+  // mounted() {
+  //   // 初始化加载列表
+  //   this.getList();
+  // },
   watch: {
     moldingMachines() {
       this.$forceUpdate();

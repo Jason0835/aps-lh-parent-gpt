@@ -681,6 +681,8 @@
   "ui.frame.btn.detail": "详情",
   "ui.frame.btn.import": "导入",
   "ui.frame.btn.export": "导出",
+  "ui.frame.btn.submit": "提交",
+  "ui.frame.btn.moldingScheduleSequence": "成型排程顺位",
   "ui.biz.alter.isStop": "确认禁用吗?",
   "ui.biz.alter.isOpen": "确认启用吗?",
   "ui.frame.btn.fold": "折叠",
