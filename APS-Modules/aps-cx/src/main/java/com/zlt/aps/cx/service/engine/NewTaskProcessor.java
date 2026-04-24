@@ -84,12 +84,10 @@ public class NewTaskProcessor {
         }
 
         if (structureTaskMap.isEmpty()) {
-            log.info("无新增和续作剩余任务，跳过均衡");
+            log.info("无新增和续作剩余任务，说明续作任务全部都是1并且没有新增胎胚，跳过均衡");
             return allResults;
         }
-
         // Step 2: 保底预留已在 ContinueTaskProcessor 完成，此处不再做保底预留
-        // 传 false 给 BalancingService 避免重复预留
         boolean forceKeepHistoryForBalancing = false;
 
         // Step 3: 按结构处理
@@ -99,8 +97,7 @@ public class NewTaskProcessor {
 
             log.info("--- 处理结构 {}，共 {} 个新增任务 ---", structureName, newTasksForStructure.size());
 
-            // Step 3.1: 获取该结构可安排的机台（按 PRODUCTION_VERSION 过滤）
-            // 同一结构下所有任务的 productionVersion 应一致，取第一个
+            // Step 3.1: 获取该结构可安排的机台（按 PRODUCTION_VERSION 过滤）同一结构下所有任务的 productionVersion 应一致，取第一个
             String productionVersion = newTasksForStructure.get(0).getProductionVersion();
             List<MpCxCapacityConfiguration> availableMachines =
                     getAvailableMachinesForStructure(structureName, scheduleDate, context, productionVersion);
@@ -161,27 +158,27 @@ public class NewTaskProcessor {
                         .add(constrainedTask.getEmbryoCode());
             }
 
-            // Step 3.5: 参与均衡的任务 = 新增任务 + 续作剩余需求（含约束量试）
-            // 续作保底预留已在 ContinueTaskProcessor 完成，剩余需求在此统一均衡
+            // Step 3.5: 参与均衡的任务 = balancedTasks（已包含新增任务和续作剩余任务）
+            // 注意：续作剩余任务已在 Step 1.1 加入 structureTaskMap，此处不再重复添加
             List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForStructure = new ArrayList<>(balancedTasks);
-
-            // 加入续作剩余 demand > 0 的任务
+            
+            // 统计续作剩余数量（仅用于日志）
             int continueRemaining = 0;
             if (!CollectionUtils.isEmpty(continueTasks)) {
                 for (CoreScheduleAlgorithmService.DailyEmbryoTask task : continueTasks) {
                     if (structureName.equals(task.getStructureName())) {
                         int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
                         if (demand > 0) {
-                            allTasksForStructure.add(task);
                             continueRemaining++;
                         }
                     }
                 }
             }
 
-            log.info("结构 {}：续作已占机台={}, 续作剩余={}, 均衡新增={}, 约束量试={}",
+            log.info("结构 {}：续作已占机台={}, 续作剩余={}, 均衡新增={}, 约束量试={}, 参与均衡总任务数={}",
                     structureName, continueLoadMap.size(), continueRemaining,
-                    balancedTasks.size() - constrainedTrials.size(), constrainedTrials.size());
+                    balancedTasks.size() - constrainedTrials.size() - continueRemaining, constrainedTrials.size(),
+                    allTasksForStructure.size());
 
             // Step 3.6: 构建机台最大硫化机数映射
             Map<String, Integer> machineMaxLhMap = buildMachineMaxLhMap(
@@ -220,6 +217,9 @@ public class NewTaskProcessor {
                 result.setTaskAllocations(new ArrayList<>());
 
                 int usedCapacity = 0;
+                
+                // 关键修复：不能简单遍历 embryoAssignments，因为同一个 embryoCode 可能对应多个不同的 task（不同物料）
+                // 需要保留每个独立的 EmbryoAssignment，而不是按 embryoCode 合并
                 for (BalancingService.EmbryoAssignment embryoAssignment
                         : assignment.getEmbryoAssignments()) {
                     CoreScheduleAlgorithmService.DailyEmbryoTask task =
@@ -235,21 +235,29 @@ public class NewTaskProcessor {
 
                     CoreScheduleAlgorithmService.TaskAllocation taskAlloc =
                             new CoreScheduleAlgorithmService.TaskAllocation();
+                    // 重要：直接使用当前 embryoAssignment 对应的 task 对象，确保物料信息正确
                     taskAlloc.setEmbryoCode(task.getEmbryoCode());
                     taskAlloc.setMaterialCode(task.getMaterialCode());
                     taskAlloc.setMaterialDesc(task.getMaterialDesc());
                     taskAlloc.setMainMaterialDesc(task.getMainMaterialDesc());
                     taskAlloc.setStructureName(task.getStructureName());
-                    taskAlloc.setQuantity(task.getPlannedProduction() != null ? task.getPlannedProduction() : 0);
-                    taskAlloc.setVulcanizeMachineCount(assignedQty);
+                    // quantity 和 endingExtraInventory 使用 TaskGroupService 预计算的胎胚数量
+                    // assignedQty 单位是硫化机台数，不能作为排产量
+                    int taskPlannedQty = task.getEndingExtraInventory() != null && task.getEndingExtraInventory() > 0
+                            ? task.getEndingExtraInventory() : task.getDemandQuantity();
+                    taskAlloc.setQuantity(taskPlannedQty);
+                    taskAlloc.setVulcanizeMachineCount(assignedQty);  // assignedQty 单位：硫化机台数
+                    taskAlloc.setEndingExtraInventory(task.getEndingExtraInventory());
                     taskAlloc.setPriority(task.getPriority());
                     taskAlloc.setStockHours(task.getStockHours());
                     taskAlloc.setIsTrialTask(task.getIsTrialTask());
+                    taskAlloc.setIsProductionTrial(task.getIsProductionTrial());
                     taskAlloc.setIsContinueTask(task.getIsContinueTask());
                     taskAlloc.setIsEndingTask(task.getIsEndingTask());
                     taskAlloc.setEndingSurplusQty(task.getEndingSurplusQty());
                     taskAlloc.setIsMainProduct(task.getIsMainProduct());
                     taskAlloc.setLhId(task.getLhId());
+                    taskAlloc.setIsLastEndingBatch(task.getIsLastEndingBatch());
 
                     result.getTaskAllocations().add(taskAlloc);
                 }
@@ -281,15 +289,13 @@ public class NewTaskProcessor {
                 }
                 log.info("均衡后机台分配结果：");
                 for (CoreScheduleAlgorithmService.MachineAllocationResult mr : allResults) {
-                    Map<String, Integer> embryoQtyMap = new LinkedHashMap<>();
+                    // 改进日志：显示每个任务的物料信息，避免误导
+                    List<String> taskDetails = new ArrayList<>();
                     for (CoreScheduleAlgorithmService.TaskAllocation ta : mr.getTaskAllocations()) {
-                        int lhCount = ta.getVulcanizeMachineCount() > 0 ? ta.getVulcanizeMachineCount() : 1;
-                        embryoQtyMap.merge(ta.getEmbryoCode(), lhCount, Integer::sum);
+                        String detail = ta.getEmbryoCode() + "[" + ta.getMaterialCode() + "]" + "(" + ta.getVulcanizeMachineCount() + ")";
+                        taskDetails.add(detail);
                     }
-                    List<String> embryos = embryoQtyMap.entrySet().stream()
-                            .map(e -> e.getKey() + "(" + e.getValue() + ")")
-                            .collect(Collectors.toList());
-                    log.info("  机台 {}: {}", mr.getMachineCode(), embryos);
+                    log.info("  机台 {}: {}", mr.getMachineCode(), taskDetails);
                 }
             }
         }
@@ -317,7 +323,10 @@ public class NewTaskProcessor {
     /**
      * 获取指定结构在当前日期可安排的机台配置（按 PRODUCTION_VERSION 过滤）
      *
-     * <p>beginDay/endDay 是月内天数(1-31)，用 scheduleDate.getDayOfMonth() 过滤
+     * <p>过滤条件：
+     * 1. 日期范围 (beginDay/endDay 是月内天数 1-31)
+     * 2. 生产版本匹配
+     * 3. 机台必须在 availableMachines 中存在且可用
      */
     private List<MpCxCapacityConfiguration> getAvailableMachinesForStructure(
             String structureName, LocalDate scheduleDate, ScheduleContextVo context,
@@ -327,11 +336,22 @@ public class NewTaskProcessor {
                     context.getStructureAllocationMap().get(structureName);
             if (configs != null && !configs.isEmpty()) {
                 int dayOfMonth = scheduleDate.getDayOfMonth();
+                
+                // 获取可用成型机编码集合
+                Set<String> availableMachineCodes = new HashSet<>();
+                if (context.getAvailableMachines() != null) {
+                    for (MdmMoldingMachine machine : context.getAvailableMachines()) {
+                        availableMachineCodes.add(machine.getCxMachineCode());
+                    }
+                }
+                
                 return configs.stream()
                         .filter(c -> c.getBeginDay() != null && c.getEndDay() != null)
                         .filter(c -> c.getBeginDay() <= dayOfMonth && c.getEndDay() >= dayOfMonth)
                         .filter(c -> productionVersion == null
                                 || productionVersion.equals(c.getProductionVersion()))
+                        // 过滤：只保留存在于 availableMachines 中的机台
+                        .filter(c -> availableMachineCodes.contains(c.getCxMachineCode()))
                         .collect(Collectors.toList());
             }
         }
@@ -444,19 +464,6 @@ public class NewTaskProcessor {
         }
 
         return result;
-    }
-
-    /**
-     * 获取是否强制保留历史任务配置
-     */
-    private boolean getForceKeepHistoryConfig(ScheduleContextVo context) {
-        if (context.getParamConfigMap() != null) {
-            CxParamConfig config = context.getParamConfigMap().get("FORCE_KEEP_HISTORY_TASK");
-            if (config != null && config.getParamValue() != null) {
-                return "1".equals(config.getParamValue()) || "true".equalsIgnoreCase(config.getParamValue());
-            }
-        }
-        return false;
     }
 
     /**

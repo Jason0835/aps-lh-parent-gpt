@@ -10,15 +10,15 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
+import com.zlt.aps.common.utils.ExportUtil;
+import com.zlt.aps.common.utils.ImportUtil;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanExportVO;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanImportVO;
 import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
-import com.zlt.file.encryptbyll.FileEncryptUtils;
+
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.zlt.mix.common.core.constant.ZltConstant;
-import com.zlt.mix.common.core.utils.ExcelUtil;
-import com.zlt.mix.common.utils.ExportUtil;
-import com.zlt.mix.common.utils.ImportUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -58,8 +58,6 @@ public class LhPrecisionPlanUIController extends BaseController {
     private IImportLogService iImportLogService;
 
     private final String prefix = "schedule/lhPrecisionPlan";
-
-    private boolean useFileEncrypt = true;
 
     @RequiresPermissions("lh:lhPrecisionPlan:view")
     @GetMapping()
@@ -134,7 +132,7 @@ public class LhPrecisionPlanUIController extends BaseController {
     @PostMapping("/importData")
     @ResponseBody
     public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception {
-        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+        byte[] data = file.getBytes();
         ImportLog importLog = ImportUtil.getImportLogAndUploadFile(data, ZltConstant.PROCEDURE_CODE_LH,
                 I18nUtil.getMessage("ui.lh.precision.plan.model.name"), file.getOriginalFilename());
         importLog = iImportLogService.add(importLog);

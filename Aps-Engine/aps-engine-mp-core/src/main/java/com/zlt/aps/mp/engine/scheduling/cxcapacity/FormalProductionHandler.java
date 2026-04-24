@@ -3,11 +3,14 @@ package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.engine.daylimit.MouldProductionLimitTypeEnum;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
+import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
@@ -23,6 +26,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +48,10 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final GroupPlanPrioritySelector groupPlanPrioritySelector;
 
+    private final ClearProductionInfoHandler clearProductionInfoHandler;
+
+    private final DifferentGroupMoldAllocationAdjustHandler differentGroupMoldAllocationAdjustHandler;
+
     /**
      * 正式排产，对结构按已经分配好的机台产能进行排产
      * 先在机结构，其次新增结构
@@ -54,11 +62,12 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
      * 1.4、在机结构的新增Sku排产
      * 2、新增结构排产
      *
-     * @param context          排产上下文
-     * @param allGroupPlanInfo 所有结构信息
-     * @param allContinueInfo  在机结构信息
+     * @param context           排产上下文
+     * @param allGroupPlanInfo  所有结构信息
+     * @param allAllocationList 结构排产分配信息
+     * @param allContinueInfo   在机结构信息
      */
-    public void productionContinueGroup(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, Map<String, CxContinueInfoHelper> allContinueInfo) {
+    public void productionContinueGroup(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, List<MpStructureAllocation> allAllocationList, Map<String, CxContinueInfoHelper> allContinueInfo) {
         if (CollectionUtils.isEmpty(allGroupPlanInfo) && CollectionUtils.isEmpty(allContinueInfo)) {
             //记录日志
             log.info(TbrMouldFormalProductionLogRecorder.addDataEmptyLog(context));
@@ -72,7 +81,7 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
         allGroupPlanInfo.forEach((structureName, groupPlanInfo) -> groupPlanInfo.setThisRoundCanProduction());
         log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupLog(productionContext));
         //续作部分排产 1、续作Sku 2、续作Sku同规格同花纹高优先级量 3、续作Sku同生胎共模具高优先级量
-        productionContinue(cxAddSkuProductionHandler, ProductionStageEnum.FORMAL_STAGE, productionContext, allContinueInfo, allGroupPlanInfo);
+        productionContinue(cxAddSkuProductionHandler, ProductionStageEnum.FORMAL_STAGE, productionContext, allContinueInfo, Collections.emptyList(), allGroupPlanInfo, allAllocationList);
 
 //        //4、一次性排产完毕
 //        reachGroupLhMachines(productionContext, FormalRoundEnum.DISPOSABLE_LH_MACHINE, allGroupPlanInfo, allContinueInfo);
@@ -90,6 +99,25 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
         if (!CollectionUtils.isEmpty(newGroupSortList)) {
             newGroupSortList.forEach(groupPlan -> productionGroupAddSku(productionContext, allGroupPlanInfo, groupPlan, FormalRoundEnum.LATTER_HALF_PRIORITY, ""));
         }
+    }
+
+    @Override
+    public void handlerByMoldAllocationAdjust(Context context, ProductionStageEnum productionStage, Map<String, CxContinueInfoHelper> allContinueInfo, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, List<MpStructureAllocation> allAllocationList) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        //说明在模拟阶段已经处理
+        if (Boolean.TRUE.equals(productionContext.getHandlerMoldRatioDeductFlag())) {
+            return;
+        }
+        //1、获取不同结构模具分配比例释放调整信息
+        differentGroupMoldAllocationAdjustHandler.checkMoldRatioAllocation(context);
+        TbrMouldFormalProductionLogRecorder.addFinishedByGroupMoldRatioLog(context);
+        //2、清除续作排产数据
+        clearProductionInfoHandler.resetBeforeFormalProduction(context, allGroupPlanInfo, allAllocationList);
+        TbrMouldFormalProductionLogRecorder.addResetProductionContinueLog(context);
+        //3、重排续作部分
+        allContinueInfo.forEach((structureName, cxContinueInfo) -> {
+            productionContinueByType(cxAddSkuProductionHandler, productionStage, context, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SKU);
+        });
     }
 
     /**
@@ -140,6 +168,7 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
             });
         });
     }
+
     /**
      * @param context          排产上下文
      * @param round            轮次

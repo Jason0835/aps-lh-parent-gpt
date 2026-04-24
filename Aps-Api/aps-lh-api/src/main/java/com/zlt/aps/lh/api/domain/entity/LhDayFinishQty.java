@@ -53,12 +53,4 @@ public class LhDayFinishQty extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "厂别")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
-
-    @ApiModelProperty(value = "年份")
-    @TableField(value = "YEAR")
-    private BigDecimal year;
-
-    @ApiModelProperty(value = "删除标识")
-    @TableField(value = "IS_DELETE")
-    private Integer isDelete;
 }

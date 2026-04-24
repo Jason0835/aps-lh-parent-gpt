@@ -3,12 +3,12 @@ package com.zlt.aps.lh.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
+import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
-import com.zlt.aps.lh.api.domain.entity.LhShiftFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.ScheduleStepEnum;
@@ -16,13 +16,14 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.exception.ScheduleDomainExceptionHelper;
 import com.zlt.aps.lh.exception.ScheduleErrorCode;
 import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
+import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
 import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMouldCleanPlanMapper;
 import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
-import com.zlt.aps.lh.mapper.LhShiftFinishQtyMapper;
 import com.zlt.aps.lh.mapper.LhSpecifyMachineMapper;
+import com.zlt.aps.lh.mapper.MdmCapsuleChuckMapper;
 import com.zlt.aps.lh.mapper.MdmDevMaintenancePlanMapper;
 import com.zlt.aps.lh.mapper.MdmDevicePlanShutMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
@@ -44,6 +45,7 @@ import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
 import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
@@ -53,6 +55,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -61,6 +64,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * 硫化排程基础数据服务实现
@@ -111,10 +117,13 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     private MdmMonthSurplusMapper monthSurplusMapper;
 
     @Resource
-    private LhShiftFinishQtyMapper lhShiftFinishQtyMapper;
+    private LhDayFinishQtyMapper lhDayFinishQtyMapper;
 
     @Resource
     private MdmMaterialInfoMapper mdmMaterialInfoMapper;
+
+    @Resource
+    private MdmCapsuleChuckMapper mdmCapsuleChuckMapper;
 
     @Resource
     private LhMachineOnlineInfoMapper lhMachineOnlineInfoMapper;
@@ -185,14 +194,17 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // 11. 加载月底计划余量
         loadMonthSurplus(context, factoryCode, year, month);
 
-        // 12. 加载各班次完成量（T日，用于前日欠/超产差值修正）
-        loadShiftFinishQty(context, factoryCode, scheduleDate);
+        // 12. 加载前日物料日完成量（用于前日欠/超产差值修正）
+        loadDayFinishQty(context, factoryCode, LhScheduleTimeUtil.addDays(targetDate, -1));
 
-        // 13. 加载月累计完成量（截至T-1，用于月余量回退口径）
-        loadMaterialMonthFinishedQty(context, factoryCode, scheduleDate);
+        // 13. 加载月累计完成量（截至目标排产日期，按目标日所在月份统计）
+        loadMaterialMonthFinishedQty(context, factoryCode, targetDate);
 
         // 14. 加载物料信息
         loadMaterialInfo(context, factoryCode);
+
+        // 14.1 加载胶囊卡盘分组
+        loadCapsuleChuck(context, factoryCode);
 
         // 15. 加载MES硫化在机信息（从 T-1 开始，按配置天数向前追溯最近有数据日期）
         int machineOnlineLookbackDays = context.getParamIntValue(
@@ -565,86 +577,114 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 加载各班次完成量，按machineCode+materialCode建立Map
+     * 加载指定日期的物料日完成量，按“物料+完成日期”建立Map。
      *
-     * @param context      排程上下文
-     * @param factoryCode  分厂编号
-     * @param scheduleDate 排程日期
+     * @param context     排程上下文
+     * @param factoryCode 分厂编号
+     * @param finishDate  完成日期
      */
-    private void loadShiftFinishQty(LhScheduleContext context, String factoryCode, Date scheduleDate) {
-        Date day = LhScheduleTimeUtil.clearTime(scheduleDate);
-        List<LhShiftFinishQty> shiftFinishQtyList = lhShiftFinishQtyMapper.selectList(
-                new LambdaQueryWrapper<LhShiftFinishQty>()
-                        .eq(LhShiftFinishQty::getFactoryCode, factoryCode)
-                        .eq(LhShiftFinishQty::getScheduleDate, day)
-                        .eq(LhShiftFinishQty::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
-        Map<String, LhShiftFinishQty> shiftFinishQtyMap = new HashMap<>(64);
-        if (shiftFinishQtyList != null) {
-            for (LhShiftFinishQty finishQty : shiftFinishQtyList) {
-                String key = finishQty.getLhMachineCode() + "_" + finishQty.getMaterialCode();
-                shiftFinishQtyMap.put(key, finishQty);
+    private void loadDayFinishQty(LhScheduleContext context, String factoryCode, Date finishDate) {
+        Date dayStart = LhScheduleTimeUtil.clearTime(finishDate);
+        Date nextDayStart = LhScheduleTimeUtil.addDays(dayStart, 1);
+        List<LhDayFinishQty> dayFinishQtyList = lhDayFinishQtyMapper.selectList(
+                new LambdaQueryWrapper<LhDayFinishQty>()
+                        .eq(LhDayFinishQty::getFactoryCode, factoryCode)
+                        .ge(LhDayFinishQty::getFinishDate, dayStart)
+                        .lt(LhDayFinishQty::getFinishDate, nextDayStart)
+                        .and(wrapper -> wrapper.eq(LhDayFinishQty::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                                .or()
+                                .isNull(LhDayFinishQty::getIsDelete)));
+        Map<String, Integer> materialDayFinishedQtyMap = new HashMap<>(64);
+        if (!CollectionUtils.isEmpty(dayFinishQtyList)) {
+            for (LhDayFinishQty finishQty : dayFinishQtyList) {
+                if (StringUtils.isEmpty(finishQty.getMaterialCode())) {
+                    continue;
+                }
+                String key = buildMaterialDayKey(finishQty.getMaterialCode(), dayStart);
+                materialDayFinishedQtyMap.merge(key, resolveDayFinishedQty(finishQty), Integer::sum);
             }
         }
-        context.setShiftFinishQtyMap(shiftFinishQtyMap);
-        log.debug("各班次完成量加载完成, 数量: {}", shiftFinishQtyMap.size());
+        context.setMaterialDayFinishedQtyMap(materialDayFinishedQtyMap);
+        log.debug("日完成量加载完成, 完成日期: {}, 记录数: {}",
+                LhScheduleTimeUtil.formatDate(dayStart), materialDayFinishedQtyMap.size());
     }
 
     /**
-     * 加载月累计完成量（截至排程窗口起点T日前），按物料编号建立Map。
+     * 加载月累计完成量（截至目标排产日期含当天），按物料编号建立Map。
      *
-     * @param context      排程上下文
-     * @param factoryCode  分厂编号
-     * @param scheduleDate 排程窗口起点 T 日
+     * @param context     排程上下文
+     * @param factoryCode 分厂编号
+     * @param targetDate  排程目标日
      */
-    private void loadMaterialMonthFinishedQty(LhScheduleContext context, String factoryCode, Date scheduleDate) {
-        Date tDay = LhScheduleTimeUtil.clearTime(scheduleDate);
+    private void loadMaterialMonthFinishedQty(LhScheduleContext context, String factoryCode, Date targetDate) {
+        Date targetDay = LhScheduleTimeUtil.clearTime(targetDate);
+        Date nextTargetDay = LhScheduleTimeUtil.addDays(targetDay, 1);
         Calendar calendar = Calendar.getInstance();
-        calendar.setTime(tDay);
+        calendar.setTime(targetDay);
         calendar.set(Calendar.DAY_OF_MONTH, 1);
         Date monthStart = LhScheduleTimeUtil.clearTime(calendar.getTime());
 
-        List<LhShiftFinishQty> monthFinishList = lhShiftFinishQtyMapper.selectList(
-                new LambdaQueryWrapper<LhShiftFinishQty>()
-                        .eq(LhShiftFinishQty::getFactoryCode, factoryCode)
-                        .ge(LhShiftFinishQty::getScheduleDate, monthStart)
-                        .lt(LhShiftFinishQty::getScheduleDate, tDay)
-                        .eq(LhShiftFinishQty::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        List<LhDayFinishQty> monthFinishList = lhDayFinishQtyMapper.selectList(
+                new LambdaQueryWrapper<LhDayFinishQty>()
+                        .eq(LhDayFinishQty::getFactoryCode, factoryCode)
+                        .ge(LhDayFinishQty::getFinishDate, monthStart)
+                        .lt(LhDayFinishQty::getFinishDate, nextTargetDay)
+                        .and(wrapper -> wrapper.eq(LhDayFinishQty::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                                .or()
+                                .isNull(LhDayFinishQty::getIsDelete)));
 
         Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>(64);
-        if (monthFinishList != null) {
-            for (LhShiftFinishQty finishQty : monthFinishList) {
+        if (!CollectionUtils.isEmpty(monthFinishList)) {
+            for (LhDayFinishQty finishQty : monthFinishList) {
                 if (StringUtils.isEmpty(finishQty.getMaterialCode())) {
                     continue;
                 }
                 materialMonthFinishedQtyMap.merge(
                         finishQty.getMaterialCode(),
-                        resolveTotalFinishedQty(finishQty),
+                        resolveDayFinishedQty(finishQty),
                         Integer::sum);
             }
         }
 
         context.setMaterialMonthFinishedQtyMap(materialMonthFinishedQtyMap);
-        log.debug("月累计完成量加载完成, 数量: {}, 起始日: {}, 截止: {}",
+        log.debug("月累计完成量加载完成, 数量: {}, 起始日: {}, 截止: {}(含当天)",
                 materialMonthFinishedQtyMap.size(),
                 LhScheduleTimeUtil.formatDate(monthStart),
-                LhScheduleTimeUtil.formatDate(LhScheduleTimeUtil.addDays(tDay, -1)));
+                LhScheduleTimeUtil.formatDate(targetDay));
     }
 
     /**
-     * 汇总一条班次完成记录的总完成量。
+     * 生成“物料+完成日期”聚合Key。
      *
-     * @param finishQty 班次完成记录
-     * @return 总完成量
+     * @param materialCode 物料编码
+     * @param finishDate 完成日期
+     * @return 聚合Key
      */
-    private int resolveTotalFinishedQty(LhShiftFinishQty finishQty) {
-        return (finishQty.getClass1FinishQty() != null ? finishQty.getClass1FinishQty() : 0)
-                + (finishQty.getClass2FinishQty() != null ? finishQty.getClass2FinishQty() : 0)
-                + (finishQty.getClass3FinishQty() != null ? finishQty.getClass3FinishQty() : 0)
-                + (finishQty.getClass4FinishQty() != null ? finishQty.getClass4FinishQty() : 0)
-                + (finishQty.getClass5FinishQty() != null ? finishQty.getClass5FinishQty() : 0)
-                + (finishQty.getClass6FinishQty() != null ? finishQty.getClass6FinishQty() : 0)
-                + (finishQty.getClass7FinishQty() != null ? finishQty.getClass7FinishQty() : 0)
-                + (finishQty.getClass8FinishQty() != null ? finishQty.getClass8FinishQty() : 0);
+    private String buildMaterialDayKey(String materialCode, Date finishDate) {
+        return materialCode + "_" + LhScheduleTimeUtil.formatDate(LhScheduleTimeUtil.clearTime(finishDate));
+    }
+
+    /**
+     * 解析单条日完成记录的完成量。
+     *
+     * @param finishQty 日完成记录
+     * @return 完成量
+     */
+    private int resolveDayFinishedQty(LhDayFinishQty finishQty) {
+        if (Objects.isNull(finishQty)) {
+            return 0;
+        }
+        return resolveFinishQtyValue(finishQty.getDayFinishQty());
+    }
+
+    /**
+     * 将完成量安全转换为整数件数，供月累计完成量汇总使用。
+     *
+     * @param finishQty 完成量
+     * @return 整数件数
+     */
+    private int resolveFinishQtyValue(BigDecimal finishQty) {
+        return Objects.nonNull(finishQty) ? finishQty.intValue() : 0;
     }
 
     /**
@@ -659,15 +699,99 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                         .eq(MdmMaterialInfo::getFactoryCode, factoryCode)
                         .eq(MdmMaterialInfo::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>(256);
+        Map<String, Integer> embryoDescMaterialCountMap = new HashMap<>(128);
         if (materialInfoList != null) {
             for (MdmMaterialInfo materialInfo : materialInfoList) {
                 if (materialInfo.getMaterialCode() != null) {
                     materialInfoMap.put(materialInfo.getMaterialCode(), materialInfo);
                 }
+                String embryoDesc = normalizeGroupToken(materialInfo.getEmbryoDesc());
+                if (StringUtils.isNotEmpty(embryoDesc)) {
+                    embryoDescMaterialCountMap.merge(embryoDesc, 1, Integer::sum);
+                }
             }
         }
         context.setMaterialInfoMap(materialInfoMap);
+        context.setEmbryoDescMaterialCountMap(embryoDescMaterialCountMap);
         log.debug("物料信息加载完成, 数量: {}", materialInfoMap.size());
+    }
+
+    /**
+     * 加载胶囊卡盘分组，按规格和英寸分别建立快速判定Map。
+     *
+     * @param context 排程上下文
+     * @param factoryCode 分厂编号
+     */
+    private void loadCapsuleChuck(LhScheduleContext context, String factoryCode) {
+        List<MdmCapsuleChuck> capsuleChuckList = mdmCapsuleChuckMapper.selectList(
+                new LambdaQueryWrapper<MdmCapsuleChuck>()
+                        .eq(MdmCapsuleChuck::getFactoryCode, factoryCode)
+                        .eq(MdmCapsuleChuck::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+
+        Map<String, String> capsuleSpecPeerMap = new HashMap<>(64);
+        Map<String, String> capsuleProSizePeerMap = new HashMap<>(64);
+        if (!CollectionUtils.isEmpty(capsuleChuckList)) {
+            for (MdmCapsuleChuck capsuleChuck : capsuleChuckList) {
+                registerCapsuleGroup(capsuleSpecPeerMap, capsuleChuck.getSpecifications());
+                registerCapsuleGroup(capsuleProSizePeerMap, capsuleChuck.getProSize());
+            }
+        }
+        context.setCapsuleSpecPeerMap(capsuleSpecPeerMap);
+        context.setCapsuleProSizePeerMap(capsuleProSizePeerMap);
+        log.debug("胶囊卡盘分组加载完成, 规格组: {}, 英寸组: {}",
+                capsuleSpecPeerMap.size(), capsuleProSizePeerMap.size());
+    }
+
+    /**
+     * 注册一条胶囊卡盘分组。
+     *
+     * @param capsuleGroupMap 分组Map
+     * @param rawGroupValue 原始逗号分隔值
+     */
+    private void registerCapsuleGroup(Map<String, String> capsuleGroupMap, String rawGroupValue) {
+        Set<String> normalizedTokens = splitGroupTokens(rawGroupValue);
+        if (CollectionUtils.isEmpty(normalizedTokens)) {
+            return;
+        }
+        String groupKey = String.join(",", normalizedTokens);
+        for (String token : normalizedTokens) {
+            capsuleGroupMap.putIfAbsent(token, groupKey);
+        }
+    }
+
+    /**
+     * 解析逗号分隔分组并做trim去重。
+     *
+     * @param rawGroupValue 原始分组值
+     * @return 去重后的分组元素
+     */
+    private Set<String> splitGroupTokens(String rawGroupValue) {
+        Set<String> normalizedTokens = new TreeSet<>();
+        if (StringUtils.isEmpty(rawGroupValue)) {
+            return normalizedTokens;
+        }
+        String[] tokenArray = rawGroupValue.split(",");
+        for (String token : tokenArray) {
+            String normalizedToken = normalizeGroupToken(token);
+            if (StringUtils.isNotEmpty(normalizedToken)) {
+                normalizedTokens.add(normalizedToken);
+            }
+        }
+        return normalizedTokens;
+    }
+
+    /**
+     * 统一分组字段格式，屏蔽前后空格和空串脏数据。
+     *
+     * @param token 原始值
+     * @return 归一化结果
+     */
+    private String normalizeGroupToken(String token) {
+        if (StringUtils.isEmpty(token)) {
+            return null;
+        }
+        String normalizedToken = token.trim();
+        return StringUtils.isEmpty(normalizedToken) ? null : normalizedToken;
     }
 
     /**

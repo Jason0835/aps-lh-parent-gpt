@@ -25,8 +25,8 @@ public class RawWarningConfig extends BaseEntity {
     /**
      * 工厂编码
      */
-    @Excel(name = "工厂编码")
-    @ImportExcelValidated(required = true, maxLength = 10)
+    @Excel(name = "工厂", dictType = "biz_factory_name")
+    @ImportExcelValidated(required = true, maxLength = 10, dictType = "biz_factory_name")
     @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
@@ -35,7 +35,7 @@ public class RawWarningConfig extends BaseEntity {
      * 原材料编码
      */
     @Excel(name = "原材料编码")
-    @ImportExcelValidated(required = true, maxLength = 10)
+    @ImportExcelValidated(maxLength = 20)
     @ApiModelProperty(value = "原材料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
@@ -44,7 +44,7 @@ public class RawWarningConfig extends BaseEntity {
      * 原材料名称
      */
     @Excel(name = "原材料名称")
-    @ImportExcelValidated(required = true, maxLength = 100)
+    @ImportExcelValidated(maxLength = 100)
     @ApiModelProperty(value = "原材料名称", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
     private String materialDesc;
@@ -76,7 +76,7 @@ public class RawWarningConfig extends BaseEntity {
     /**
      * 是否启用：0-禁用 1-启用
      */
-    @Excel(name = "是否启用", dictType = "sys_yes_no")
+    @Excel(name = "是否启用", dictType = "sys_yes_no", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "是否启用", name = "enabled")
     @TableField(value = "ENABLED")
     private String enabled;
@@ -92,15 +92,24 @@ public class RawWarningConfig extends BaseEntity {
     /**
      * 通知方式：多个用逗号分隔，email,sms,wechat
      */
-    @Excel(name = "通知方式")
     @ApiModelProperty(value = "通知方式", name = "notifyTypes")
     @TableField(value = "NOTIFY_TYPES")
     private String notifyTypes;
 
-
-    @Excel(name = "ui.data.column.rawSpecialMaterialRecord.remark")
+    /**
+     * 备注
+     */
+    @Excel(name = "备注")
     @ImportExcelValidated(maxLength = 300)
     @ApiModelProperty("备注")
     @TableField("REMARK")
     private String remark;
+
+    /**
+     * 更新日期
+     */
+    @Excel(name = "更新日期", dateFormat = "yyyy-MM-dd HH:mm:ss", type = Excel.Type.EXPORT)
+    @ApiModelProperty(value = "更新日期", name = "updateTime")
+    @TableField(value = "UPDATE_TIME", fill = FieldFill.UPDATE)
+    private java.util.Date updateTime;
 }

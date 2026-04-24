@@ -15,6 +15,7 @@ import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.NewSpecFailReasonEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
+import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
@@ -25,6 +26,7 @@ import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.SingleMouldShiftQtyUtil;
@@ -65,6 +67,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private IEndingJudgmentStrategy endingJudgmentStrategy;
     @Resource
     private LocalSearchMachineAllocatorStrategy localSearchMachineAllocator;
+    @Resource
+    private TargetScheduleQtyResolver targetScheduleQtyResolver;
 
     @Override
     public String getStrategyType() {
@@ -98,7 +102,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         log.info("新增排产 - 胎胚库存调整");
         // 新增SKU的胎胚库存调整
         for (LhScheduleResult result : context.getScheduleResultList()) {
-            if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())) {
+            // 排除换活字块（换活字块不需要胎胚库存调整）
+            if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())
+                    || "1".equals(result.getIsTypeBlock())) {
                 continue;
             }
             // 检查胎胚库存是否满足，若不足则削减计划量
@@ -119,7 +125,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
         }
         finalizeZeroPlanNewSpecResults(context);
+        // 新增结果在库存裁剪后需按最终计划量复核收尾语义，避免“未收完却标收尾”。
+        refreshNewSpecEndingFlagByResult(context);
         syncMachineStateAfterNewAdjust(context);
+        // S4.5 后置步骤均完成后，再按当前待排列表收口结构视图，避免影响本阶段元数据回查。
+        context.rebuildStructureSkuMapFromPending(context.getNewSpecSkuList());
     }
 
     @Override
@@ -148,6 +158,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             // 1. 匹配候选机台
             List<MachineScheduleDTO> candidates = machineMatch.matchMachines(context, sku);
             if (candidates.isEmpty()) {
+                traceNewSpecMachineDecision(context, sku, candidates, null, null,
+                        new HashSet<String>(0), NewSpecFailReasonEnum.MACHINE_SELECTION_FAILED,
+                        false, false, "无可用硫化机台");
                 addUnscheduledResult(context, sku, "无可用硫化机台", unscheduledReasonCountMap);
                 iterator.remove();
                 continue;
@@ -162,13 +175,19 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             boolean scheduled = false;
             NewSpecFailReasonEnum failReason = NewSpecFailReasonEnum.MACHINE_SELECTION_FAILED;
             Set<String> excludedMachineCodes = new HashSet<>(candidates.size());
+            Integer originalTargetScheduleQty = sku.getTargetScheduleQty();
+            MachineScheduleDTO finalMachine = null;
+            Date finalProductionStartTime = null;
+            boolean finalUsedPreferredMachine = false;
             while (true) {
                 MachineScheduleDTO candidateMachine;
+                boolean selectedFromPreferredMachine = false;
                 if (!preferredMachineTried && preferredMachine != null
                         && StringUtils.isNotEmpty(preferredMachine.getMachineCode())
                         && !excludedMachineCodes.contains(preferredMachine.getMachineCode())) {
                     candidateMachine = preferredMachine;
                     preferredMachineTried = true;
+                    selectedFromPreferredMachine = true;
                 } else {
                     candidateMachine = machineMatch.selectBestMachine(
                             context, sku, candidates, excludedMachineCodes);
@@ -190,7 +209,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         machineCode, endingTime);
 
                 // 4. 先分配换模窗口，失败则继续尝试下一台候选机台
-                Date mouldChangeStartTime = mouldChangeBalance.allocateMouldChange(context, machineReadyTime);
+                Date mouldChangeStartTime = mouldChangeBalance.allocateMouldChange(context, machineCode, machineReadyTime);
                 if (mouldChangeStartTime == null) {
                     excludedMachineCodes.add(machineCode);
                     failReason = selectHigherPriorityFailReason(
@@ -213,8 +232,20 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
                 // 6. 基于首检分配时间生成新增规格排产结果，并校验当日是否有有效产能
                 // 业务口径：换模总时长已包含首检时长，不再额外叠加 FIRST_INSPECTION_HOURS
+                // 时间链路固定为：机台可开工 -> 换模开始 -> 换模/首检结束 -> 实际开产。
                 Date productionStartTime = inspectionTime;
                 int machineMouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(candidateMachine);
+                int refinedTargetQty = getTargetScheduleQtyResolver().refineTargetQtyByMachineCapacity(
+                        context, sku, candidateMachine, productionStartTime, shifts);
+                if (refinedTargetQty <= 0) {
+                    inspectionBalance.rollbackInspection(context, inspectionTime);
+                    mouldChangeBalance.rollbackMouldChange(context, mouldChangeStartTime);
+                    excludedMachineCodes.add(machineCode);
+                    failReason = selectHigherPriorityFailReason(
+                            failReason, NewSpecFailReasonEnum.NO_CAPACITY_IN_SCHEDULE_WINDOW);
+                    continue;
+                }
+                sku.setTargetScheduleQty(refinedTargetQty);
                 LhScheduleResult result = buildNewSpecScheduleResult(
                         context, candidateMachine, sku, productionStartTime, mouldChangeStartTime,
                         mouldChangeCompleteTime, shifts, machineMouldQty, isEnding);
@@ -222,6 +253,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     // 无有效产能时回滚首检和换模占用，避免影响后续SKU排产
                     inspectionBalance.rollbackInspection(context, inspectionTime);
                     mouldChangeBalance.rollbackMouldChange(context, mouldChangeStartTime);
+                    // 候选机台失败时恢复原目标量，避免把本次失败收敛值泄漏到后续候选机台。
+                    sku.setTargetScheduleQty(originalTargetScheduleQty);
                     excludedMachineCodes.add(machineCode);
                     failReason = selectHigherPriorityFailReason(
                             failReason, NewSpecFailReasonEnum.NO_CAPACITY_IN_SCHEDULE_WINDOW);
@@ -234,6 +267,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 updateMachineState(context, candidateMachine, sku, result);
                 registerMachineAssignment(context, machineCode, result);
                 scheduledCount++;
+                finalMachine = candidateMachine;
+                finalProductionStartTime = productionStartTime;
+                finalUsedPreferredMachine = selectedFromPreferredMachine;
                 iterator.remove();
                 scheduled = true;
                 log.debug("新增排产完成, SKU: {}, 机台: {}, 机台就绪: {}, 换模开始: {}, 换模结束: {}, 首检开始: {}, 开产时间: {}",
@@ -248,8 +284,14 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
 
             if (!scheduled) {
                 // 所有候选机台都失败，记录未排产原因并移出待排队列
+                traceNewSpecMachineDecision(context, sku, candidates, preferredMachine, null,
+                        excludedMachineCodes, failReason, false, false, null);
                 addUnscheduledResult(context, sku, failReason.getDescription(), unscheduledReasonCountMap);
                 iterator.remove();
+            } else {
+                traceNewSpecMachineDecision(context, sku, candidates, preferredMachine, finalMachine,
+                        excludedMachineCodes, null, true, finalUsedPreferredMachine,
+                        PriorityTraceLogHelper.formatDateTime(finalProductionStartTime));
             }
         }
         log.info("新增排产完成, 成功: {}, 未排: {}, 原因分布: {}",
@@ -323,6 +365,61 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
+     * 输出新增排产机台决策跟踪日志。
+     *
+     * @param context 排程上下文
+     * @param sku 当前SKU
+     * @param candidates 候选机台
+     * @param preferredMachine 局部搜索首选机台
+     * @param finalMachine 最终机台
+     * @param excludedMachineCodes 已排除机台
+     * @param failReason 失败原因
+     * @param success 是否成功
+     * @param usedPreferredMachine 是否使用局部搜索首选
+     * @param startTimeText 开产时间文本或附加说明
+     */
+    private void traceNewSpecMachineDecision(LhScheduleContext context, SkuScheduleDTO sku,
+                                             List<MachineScheduleDTO> candidates,
+                                             MachineScheduleDTO preferredMachine,
+                                             MachineScheduleDTO finalMachine,
+                                             Set<String> excludedMachineCodes,
+                                             NewSpecFailReasonEnum failReason,
+                                             boolean success,
+                                             boolean usedPreferredMachine,
+                                             String startTimeText) {
+        if (!PriorityTraceLogHelper.isEnabled(context)) {
+            return;
+        }
+        String title = "新增排产机台决策";
+        StringBuilder detailBuilder = new StringBuilder(512);
+        PriorityTraceLogHelper.appendLine(detailBuilder,
+                "SKU=" + PriorityTraceLogHelper.safeText(sku.getMaterialCode())
+                        + ", 候选数=" + PriorityTraceLogHelper.sizeOf(candidates)
+                        + ", 启用局部搜索首选=" + PriorityTraceLogHelper.yesNo(preferredMachine != null));
+        PriorityTraceLogHelper.appendLine(detailBuilder,
+                "局部搜索首选机台=" + PriorityTraceLogHelper.safeText(
+                        preferredMachine == null ? null : preferredMachine.getMachineCode())
+                        + ", 最终选中机台=" + PriorityTraceLogHelper.safeText(
+                        finalMachine == null ? null : finalMachine.getMachineCode())
+                        + ", 实际采用首选=" + PriorityTraceLogHelper.yesNo(usedPreferredMachine));
+        PriorityTraceLogHelper.appendLine(detailBuilder,
+                "已排除机台=" + (CollectionUtils.isEmpty(excludedMachineCodes)
+                        ? "-" : String.join(",", excludedMachineCodes)));
+        if (success) {
+            PriorityTraceLogHelper.appendLine(detailBuilder,
+                    "决策结果=成功, 开产时间=" + PriorityTraceLogHelper.safeText(startTimeText));
+        } else {
+            PriorityTraceLogHelper.appendLine(detailBuilder,
+                    "决策结果=失败, 原因=" + PriorityTraceLogHelper.safeText(
+                            failReason == null ? null : failReason.getDescription())
+                            + ", 备注=" + PriorityTraceLogHelper.safeText(startTimeText));
+        }
+        String detail = detailBuilder.toString().trim();
+        log.info("{}\n{}", title, detail);
+        PriorityTraceLogHelper.appendProcessLog(context, title, detail);
+    }
+
+    /**
      * 构建局部搜索窗口（当前SKU + 后续若干SKU）。
      *
      * @param context 排程上下文
@@ -384,6 +481,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         result.setIsDelete(0);
         result.setScheduleType(NEW_SPEC_SCHEDULE_TYPE);
         result.setIsChangeMould("1");
+        result.setIsTypeBlock("0");
         result.setConstructionStage(sku.getConstructionStage());
         result.setEmbryoNo(sku.getEmbryoNo());
         result.setTextNo(sku.getTextNo());
@@ -395,13 +493,49 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         result.setRealScheduleDate(context.getScheduleDate());
         result.setProductionStatus("0");
         result.setMouldCode(resolveMouldCode(context, sku.getMaterialCode()));
+        // 保存真实换模开始时间，供下游换模计划表直接复用。
+        result.setMouldChangeStartTime(mouldChangeStartTime);
 
         // 按班次分配计划量
         int pendingQty = sku.resolveTargetScheduleQty();
         distributeToShifts(context, result, shifts, startTime,
                 sku.getShiftCapacity(), sku.getLhTimeSeconds(), mouldQty, pendingQty);
         refreshResultSummary(context, result);
+        // 新增结果先按实际排产量复核收尾标记，后续若再被库存裁剪会在 adjustEmbryoStock 收口阶段二次复核。
+        refreshEndingFlagByResult(result);
         return result;
+    }
+
+    /**
+     * 基于最终计划量复核新增结果收尾标记。
+     * <p>口径：仅新增结果生效；当日计划量 >= 硫化余量时记为收尾，否则记为正常。</p>
+     *
+     * @param context 排程上下文
+     */
+    private void refreshNewSpecEndingFlagByResult(LhScheduleContext context) {
+        if (context == null || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return;
+        }
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            refreshEndingFlagByResult(result);
+        }
+    }
+
+    /**
+     * 基于结果行“最终计划量 vs 硫化余量”复核收尾标记。
+     *
+     * @param result 排程结果
+     */
+    private void refreshEndingFlagByResult(LhScheduleResult result) {
+        if (result == null || !NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())) {
+            return;
+        }
+        Integer surplusQty = result.getMouldSurplusQty();
+        if (surplusQty == null || surplusQty <= 0) {
+            return;
+        }
+        int finalPlanQty = result.getDailyPlanQty() != null ? result.getDailyPlanQty() : 0;
+        result.setIsEnd(finalPlanQty >= surplusQty ? "1" : "0");
     }
 
     /**
@@ -548,7 +682,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         Map<String, Integer> zeroPlanQtyMap = new LinkedHashMap<>(8);
         List<LhScheduleResult> zeroPlanResults = new ArrayList<>(8);
         for (LhScheduleResult result : context.getScheduleResultList()) {
-            if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())) {
+            // 排除换活字块（换活字块不需要零计划量裁剪）
+            if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())
+                    || "1".equals(result.getIsTypeBlock())) {
                 continue;
             }
             if (result.getDailyPlanQty() != null && result.getDailyPlanQty() > 0) {
@@ -642,6 +778,17 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 .filter(code -> code != null && !code.trim().isEmpty())
                 .distinct()
                 .collect(Collectors.joining(","));
+    }
+
+    /**
+     * 获取目标排产量解析器。
+     *
+     * @return 目标排产量解析器
+     */
+    private TargetScheduleQtyResolver getTargetScheduleQtyResolver() {
+        return targetScheduleQtyResolver != null
+                ? targetScheduleQtyResolver
+                : new TargetScheduleQtyResolver();
     }
 
     private void updateMachineState(LhScheduleContext context, MachineScheduleDTO machine, SkuScheduleDTO sku, LhScheduleResult result) {
@@ -796,6 +943,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             if (result == null
                     || !StringUtils.equals(materialCode, result.getMaterialCode())
                     || !NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())
+                    || "1".equals(result.getIsTypeBlock())  // 排除换活字块
                     || result.getDailyPlanQty() == null
                     || result.getDailyPlanQty() <= 0) {
                 continue;

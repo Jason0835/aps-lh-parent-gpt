@@ -79,20 +79,25 @@ public class SkuPrioritySelector {
             }
             selectedSkuPriorityList.add(priority);
         });
-        if (CollectionUtils.isEmpty(selectedSkuPriorityList)) {
+        //20260422+ 供应链优先-即物料优先
+        List<ProductionSkuPriorityVo> finalSelectedList = getFinalSelectedList(selectedSkuPriorityList);
+        if (CollectionUtils.isEmpty(finalSelectedList)) {
             return StringUtils.EMPTY;
+        }
+        if (finalSelectedList.size() == BigDecimal.ONE.intValue()) {
+            return finalSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
         }
         //最低实单硫化机台
         if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE == formalRound) {
-            return getCoveredMostSku(selectedSkuPriorityList);
+            return getCoveredMostSku(finalSelectedList);
         }
-        String coveredResult = getCoveredMostSku(selectedSkuPriorityList);
-        if(!StringUtils.EMPTY.equals(coveredResult)){
+        String coveredResult = getCoveredMostSku(finalSelectedList);
+        if (!StringUtils.EMPTY.equals(coveredResult)) {
             return coveredResult;
         }
         //不可覆盖，挑选剩余量最少的
-        selectedSkuPriorityList.sort(Comparator.comparing(ProductionSkuPriorityVo::getDiffValueByNoCovered));
-        return selectedSkuPriorityList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
+        finalSelectedList.sort(Comparator.comparing(ProductionSkuPriorityVo::getDiffValueByNoCovered));
+        return finalSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
     }
 
     /**
@@ -144,18 +149,23 @@ public class SkuPrioritySelector {
             }
             selectedSkuPriorityList.add(priority);
         });
-        if (CollectionUtils.isEmpty(selectedSkuPriorityList)) {
+        //20260422+ 供应链优先-即物料优先
+        List<ProductionSkuPriorityVo> finalSelectedList = getFinalSelectedList(selectedSkuPriorityList);
+        if (CollectionUtils.isEmpty(finalSelectedList)) {
             return StringUtils.EMPTY;
         }
+        if (finalSelectedList.size() == BigDecimal.ONE.intValue()) {
+            return finalSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
+        }
         //可覆盖--挑选可排产量多的
-        List<ProductionSkuPriorityVo> coveredList = selectedSkuPriorityList.stream().filter(single -> single.isCovered()).collect(Collectors.toList());
+        List<ProductionSkuPriorityVo> coveredList = finalSelectedList.stream().filter(single -> single.isCovered()).collect(Collectors.toList());
         if (!CollectionUtils.isEmpty(coveredList)) {
             coveredList.sort(Comparator.comparing(ProductionSkuPriorityVo::getNeedDays, Comparator.reverseOrder()));
             return coveredList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
         }
         //不可覆盖，挑选剩余量最少的
-        selectedSkuPriorityList.sort(Comparator.comparing(ProductionSkuPriorityVo::getDiffValueByNoCovered));
-        return selectedSkuPriorityList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
+        finalSelectedList.sort(Comparator.comparing(ProductionSkuPriorityVo::getDiffValueByNoCovered));
+        return finalSelectedList.get(BigDecimal.ZERO.intValue()).getMaterialDesc();
     }
 
     /**
@@ -356,7 +366,7 @@ public class SkuPrioritySelector {
         if (CollectionUtils.isEmpty(productionDaySet)) {
             return null;
         }
-        return new ProductionSkuPriorityVo(materialDesc, maxLhDays, productionDaySet.size(), needProductionInfo.getMaxNeedDays());
+        return new ProductionSkuPriorityVo(materialDesc, maxLhDays, productionDaySet.size(), needProductionInfo.getMaxNeedDays(), singlePriority.isHasSupplyChainPriority());
     }
 
     /**
@@ -394,7 +404,27 @@ public class SkuPrioritySelector {
         if (CollectionUtils.isEmpty(productionDaySet)) {
             return null;
         }
-        return new ProductionSkuPriorityVo(materialDesc, maxLhDays, productionDaySet.size(), needProductionInfo.getMaxNeedDays());
+        return new ProductionSkuPriorityVo(materialDesc, maxLhDays, productionDaySet.size(), needProductionInfo.getMaxNeedDays(), singlePriority.isHasSupplyChainPriority());
+    }
+
+    /**
+     * 20260422+
+     * 获取最终可挑选的级别
+     * 单独将供应链优先最先
+     *
+     * @param selectedTopList 符合条件的Top3列表
+     * @return
+     */
+    private static List<ProductionSkuPriorityVo> getFinalSelectedList(List<ProductionSkuPriorityVo> selectedTopList) {
+        if (CollectionUtils.isEmpty(selectedTopList)) {
+            return Collections.emptyList();
+        }
+        //20260422+ 供应链优先-即物料优先
+        List<ProductionSkuPriorityVo> hasSupplyChainPriorityList = selectedTopList.stream().filter(singleSelected -> singleSelected.isHasSupplyChainPriority()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasSupplyChainPriorityList)) {
+            return selectedTopList;
+        }
+        return hasSupplyChainPriorityList;
     }
 
     /**

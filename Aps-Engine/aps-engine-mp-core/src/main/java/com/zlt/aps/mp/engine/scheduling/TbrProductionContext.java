@@ -11,6 +11,7 @@ import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.SpecialMaterialInfoVo;
+import com.zlt.aps.mp.engine.handler.MoldRatioDayDeductHelper;
 import com.zlt.aps.mp.engine.handler.SkuProductionCounter;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -51,6 +52,18 @@ public class TbrProductionContext extends Context {
      * sku损耗量统计(因换模、换活字块导致)
      */
     private Map<String, Integer> skuWastageQtyMap;
+    /**
+     * 是否处理了模具分配比例降膜 true 表示处理
+     */
+    private Boolean handlerMoldRatioDeductFlag;
+    /**
+     * 20260420+ 模具分配比例周期内降膜次数
+     */
+    private Map<Integer, MoldRatioDayDeductHelper> moldRatioDeductMap;
+    /**
+     * 20260420+ 强制降膜的Sku信息
+     */
+    private Map<String, Map<Integer, Integer>> forceDeductSkuMap;
     /**
      * 分组排产计划
      * key 结构名 value 排产计划集合

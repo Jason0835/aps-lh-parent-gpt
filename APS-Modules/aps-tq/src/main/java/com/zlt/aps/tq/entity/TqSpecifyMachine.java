@@ -45,4 +45,8 @@ public class TqSpecifyMachine extends ApsBaseEntity implements Serializable {
     @ApiModelProperty(value = "作业类型，数据维护在数据字典：0-限制作业；1-不可作业")
     @TableField("JOB_TYPE")
     private String jobType;
+
+    @ApiModelProperty(value = "删除标识：0--正常，1-删除")
+    @TableField("IS_DELETE")
+    private String delFlag;
 }

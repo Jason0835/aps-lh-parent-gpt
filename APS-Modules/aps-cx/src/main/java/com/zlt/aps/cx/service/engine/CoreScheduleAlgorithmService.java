@@ -26,6 +26,7 @@ import java.util.Set;
  */
 public interface CoreScheduleAlgorithmService {
 
+
     /**
      * 执行完整排程算法
      *
@@ -216,6 +217,8 @@ public interface CoreScheduleAlgorithmService {
         private BigDecimal stockHours;
         /** 是否试制任务 */
         private Boolean isTrialTask;
+        /** 是否量试任务（施工阶段为02-量试） */
+        private Boolean isProductionTrial;
         /** 是否收尾任务 */
         private Boolean isEndingTask;
         /** 收尾余量 */
@@ -226,6 +229,10 @@ public interface CoreScheduleAlgorithmService {
         private Boolean isContinueTask;
         /** 硫化任务ID（关联LhScheduleResult） */
         private Long lhId;
+        /** 收尾额外库存（实际需生产量，用于均衡分配时扣除成型余量） */
+        private Integer endingExtraInventory;
+        /** 是否收尾最后一批（不补整车） */
+        private Boolean isLastEndingBatch;
     }
 
     /**

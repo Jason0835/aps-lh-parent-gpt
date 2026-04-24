@@ -134,18 +134,27 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
         BeanUtils.copyProperties(queryVO, vo);
         List<LhPrecisionPlan> list = lhPrecisionPlanService.selectLhPrecisionPlanList(vo);
         
-        // 转换为导出VO
         List<LhPrecisionPlanExportVO> exportList = new ArrayList<>();
         for (LhPrecisionPlan plan : list) {
             LhPrecisionPlanExportVO exportVO = new LhPrecisionPlanExportVO();
             BeanUtils.copyProperties(plan, exportVO);
-            // 到期日为负数时显示为0
             if (exportVO.getDaysToDue() != null && exportVO.getDaysToDue() < 0) {
                 exportVO.setDaysToDue(0);
             }
+            exportVO.setRemark(decodeRemark(exportVO.getRemark()));
             exportList.add(exportVO);
         }
         return exportList;
+    }
+
+    private String decodeRemark(String remark) {
+        if (remark == null) return null;
+        return remark.replace("__PERCENT__", "%")
+                     .replace("__AMP__", "&")
+                     .replace("__LT__", "<")
+                     .replace("__GT__", ">")
+                     .replace("__QUOT__", "\"")
+                     .replace("__APOS__", "'");
     }
 
     /**

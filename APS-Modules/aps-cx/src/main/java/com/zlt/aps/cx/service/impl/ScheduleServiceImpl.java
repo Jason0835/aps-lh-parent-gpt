@@ -26,6 +26,7 @@ import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.mapper.CxStructureTreadConfigMapper;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -174,9 +175,10 @@ public class ScheduleServiceImpl implements ScheduleService {
             List<CxScheduleResult> scheduleResults = coreScheduleAlgorithmService.executeSchedule(context);
 
             // 3.1 删除该排程日期范围内已有的排程结果（主表+子表），避免重复数据
-            LocalDate startDate = request.getScheduleDate();
+            // 注意：排程从 scheduleDate 前2天开始（SCHEDULE_START_OFFSET_DAYS=2），需要一并清除
+            LocalDate startDate = request.getScheduleDate().minusDays(2);
             int days = request.getDays() != null ? request.getDays() : DEFAULT_SCHEDULE_DAYS;
-            for (int d = 0; d < days; d++) {
+            for (int d = 0; d < days + 2; d++) {
                 LocalDate date = startDate.plusDays(d);
                 deleteExistingScheduleResults(date);
             }
@@ -233,7 +235,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
-     * 删除指定日期的排程结果（主表+子表）
+     * 删除指定日期的排程结果(主表+子表)
      */
     private void deleteExistingScheduleResults(LocalDate scheduleDate) {
         // 先查出该日期所有主表记录，获取ID用于删子表
@@ -243,18 +245,21 @@ public class ScheduleServiceImpl implements ScheduleService {
         );
 
         if (!existingResults.isEmpty()) {
-            // 删除子表：按每个主表ID删除
-            for (CxScheduleResult existing : existingResults) {
-                scheduleDetailService.deleteByMainId(existing.getId());
-            }
-            log.info("删除日期 {} 的子表记录，共 {} 条主表关联", scheduleDate, existingResults.size());
+            // 提取所有主表ID
+            List<Long> mainIds = existingResults.stream()
+                    .map(CxScheduleResult::getId)
+                    .collect(Collectors.toList());
 
-            // 删除主表
+            // 批量删除子表：按主表ID列表一次性删除
+            scheduleDetailService.deleteByMainIds(mainIds);
+            log.info("批量删除日期 {} 的子表记录，共 {} 条主表关联", scheduleDate, mainIds.size());
+
+            // 批量删除主表
             scheduleResultMapper.delete(
                     new LambdaQueryWrapper<CxScheduleResult>()
                             .eq(CxScheduleResult::getScheduleDate, scheduleDate)
             );
-            log.info("删除日期 {} 的主表记录 {} 条", scheduleDate, existingResults.size());
+            log.info("批量删除日期 {} 的主表记录 {} 条", scheduleDate, existingResults.size());
         } else {
             log.info("日期 {} 无历史排程数据，跳过删除", scheduleDate);
         }
@@ -864,8 +869,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         // 获取当前天的班次配置（用于获取硫化任务的班次计划量）
         List<CxShiftConfig> currentDayShifts = getCurrentDayShifts(context);
 
-        // 计算成型余量映射（按硫化任务的班次计划量分配库存）
+        // 计算成型余量映射（按物料的日硫化量比例分配库存）
         Map<String, Integer> formingRemainderMap = new HashMap<>();
+        Map<String, MonthPlanProductLhCapacityVo> materialLhCapacityMap = context.getMaterialLhCapacityMap();
         Map<String, Integer> materialStockMap = calculateFormingRemainderMap(
                 context.getMaterials(),
                 monthSurplusMap,
@@ -873,7 +879,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                 context.getLhScheduleResults(),
                 currentDayShifts,
                 formingRemainderMap,
-                context.getScheduleDate());
+                context.getScheduleDate(),
+                materialLhCapacityMap);
         context.setFormingRemainderMap(formingRemainderMap);
         context.setMaterialStockMap(materialStockMap);
         log.info("计算成型余量映射 {} 条，物料库存分配 {} 条", formingRemainderMap.size(), materialStockMap.size());
@@ -1112,16 +1119,18 @@ public class ScheduleServiceImpl implements ScheduleService {
      *
      * <p>功能：
      * <ul>
-     *   <li>按硫化任务的班次计划量作为需求比例，分配共用胎胚库存</li>
+     *   <li>按硫化任务的日硫化量比例分配共用胎胚库存</li>
      *   <li>最后一条物料用倒扣形式（总库存 - 已分配）</li>
      * </ul>
      *
-     * @param materials          物料信息列表
-     * @param monthSurplusMap    月度计划硫化余量映射
-     * @param stocks             胎胚库存列表
-     * @param lhScheduleResults  硫化排程结果（用于获取班次计划量作为需求比例）
-     * @param dayShifts          当前天班次配置
-     * @param formingRemainderMap 成型余量映射（输出参数）
+     * @param materials              物料信息列表
+     * @param monthSurplusMap        月度计划硫化余量映射
+     * @param stocks                 胎胚库存列表
+     * @param lhScheduleResults      硫化排程结果（用于获取班次计划量作为需求比例）
+     * @param dayShifts              当前天班次配置
+     * @param formingRemainderMap    成型余量映射（输出参数）
+     * @param scheduleDate           排程日期
+     * @param materialLhCapacityMap  物料日硫化产能映射（用于获取日硫化量）
      * @return 物料库存映射（按物料编码分配库存）
      */
     private Map<String, Integer> calculateFormingRemainderMap(
@@ -1131,15 +1140,28 @@ public class ScheduleServiceImpl implements ScheduleService {
             List<LhScheduleResult> lhScheduleResults,
             List<CxShiftConfig> dayShifts,
             Map<String, Integer> formingRemainderMap,
-            LocalDate scheduleDate) {
+            LocalDate scheduleDate,
+            Map<String, MonthPlanProductLhCapacityVo> materialLhCapacityMap) {
 
         // 用于返回的物料库存映射
         Map<String, Integer> materialStockMap = new HashMap<>();
 
         try {
-            // 按硫化任务维度分配库存，共用胎胚按硫化任务需求比例分配
-            materialStockMap = allocateStockByMaterialRatio(stocks, lhScheduleResults, dayShifts, scheduleDate);
+            // 按硫化任务维度分配库存，共用胎胚按日硫化量比例分配
+            materialStockMap = allocateStockByMaterialRatio(stocks, lhScheduleResults, dayShifts, scheduleDate, materialLhCapacityMap);
             log.debug("按硫化任务维度分配胎胚库存 {} 条", materialStockMap.size());
+
+            // 按物料编码汇总库存（从 materialStockMap 按硫化任务汇总）
+            Map<String, Integer> stockByMaterial = new HashMap<>();
+            if (lhScheduleResults != null && materialStockMap != null) {
+                for (LhScheduleResult lh : lhScheduleResults) {
+                    if (lh.getMaterialCode() != null && lh.getId() != null) {
+                        String taskKey = String.valueOf(lh.getId());
+                        int stock = materialStockMap.getOrDefault(taskKey, 0);
+                        stockByMaterial.merge(lh.getMaterialCode(), stock, Integer::sum);
+                    }
+                }
+            }
 
             // 计算成型余量
             for (Map.Entry<String, MdmMonthSurplus> entry : monthSurplusMap.entrySet()) {
@@ -1148,8 +1170,8 @@ public class ScheduleServiceImpl implements ScheduleService {
 
                 int vulcanizingRemainder = surplus.getPlanSurplusQty() != null
                         ? surplus.getPlanSurplusQty().intValue() : 0;
-                int embryoStock = materialStockMap.getOrDefault(materialCode, 0);
-                int formingRemainder = Math.max(0, vulcanizingRemainder - embryoStock);
+                int materialStock = stockByMaterial.getOrDefault(materialCode, 0);
+                int formingRemainder = Math.max(0, vulcanizingRemainder - materialStock);
 
                 formingRemainderMap.put(materialCode, formingRemainder);
             }
@@ -1311,16 +1333,24 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
-     * 按比例分配胎胚库存到硫化任务
+     * 按日硫化量比例分配胎胚库存到硫化任务
      *
-     * <p>当一个胎胚被多个物料共用时，按各硫化任务的班次计划量需求比例分配库存
+     * <p>当一个胎胚被多个物料共用时，按各物料的日硫化量比例分配库存
      * <p>最后一条硫化任务用倒扣形式（总库存 - 已分配）
+     *
+     * @param stocks                 胎胚库存列表
+     * @param lhScheduleResults      硫化排程结果列表
+     * @param dayShifts              当前天班次配置
+     * @param scheduleDate           排程日期
+     * @param materialLhCapacityMap  物料日硫化产能映射（用于获取日硫化量）
+     * @return 硫化任务ID → 分配的库存数量
      */
     private Map<String, Integer> allocateStockByMaterialRatio(
             List<CxStock> stocks,
             List<LhScheduleResult> lhScheduleResults,
             List<CxShiftConfig> dayShifts,
-            LocalDate scheduleDate) {
+            LocalDate scheduleDate,
+            Map<String, MonthPlanProductLhCapacityVo> materialLhCapacityMap) {
 
         Map<String, Integer> materialStockMap = new HashMap<>();
 
@@ -1356,13 +1386,32 @@ public class ScheduleServiceImpl implements ScheduleService {
                 materialStockMap.merge(taskKey, totalStock, Integer::sum);
                 log.debug("胎胚 {} 只对应硫化任务 {}，分配库存 {}", embryoCode, taskKey, totalStock);
             } else {
-                // 胎胚对应多个硫化任务，按硫化任务需求比例分配
+                // 胎胚对应多个硫化任务，按物料的日硫化量比例分配
                 int totalDemand = 0;
                 List<TaskDemand> taskDemands = new ArrayList<>();
+
                 for (LhScheduleResult lh : relatedTasks) {
-                    ShiftPlanResult shiftResult = getShiftPlanQtyWithShiftName(lh, dayShifts, scheduleDate);
-                    taskDemands.add(new TaskDemand(lh.getId(), shiftResult.planQty, lh.getMaterialCode(), shiftResult.shiftName));
-                    totalDemand += shiftResult.planQty;
+                    String materialCode = lh.getMaterialCode();
+                    int dayVulcanizationQty = 0;
+
+                    // 从 materialLhCapacityMap 获取日硫化量
+                    if (materialLhCapacityMap != null && materialCode != null) {
+                        MonthPlanProductLhCapacityVo capacityVo = materialLhCapacityMap.get(materialCode);
+                        if (capacityVo != null) {
+                            // 使用默认日硫化量（优先标准产能，其次MES产能）
+                            dayVulcanizationQty = capacityVo.getDefaultDayVulcanizationQty() != null
+                                    ? capacityVo.getDefaultDayVulcanizationQty() : 0;
+                        }
+                    }
+
+                    // 如果日硫化量为0，使用班次计划量作为后备
+                    if (dayVulcanizationQty <= 0) {
+                        ShiftPlanResult shiftResult = getShiftPlanQtyWithShiftName(lh, dayShifts, scheduleDate);
+                        dayVulcanizationQty = shiftResult.planQty;
+                    }
+
+                    taskDemands.add(new TaskDemand(lh.getId(), dayVulcanizationQty, materialCode, "日硫化量"));
+                    totalDemand += dayVulcanizationQty;
                 }
 
                 if (totalDemand == 0) {
@@ -1371,9 +1420,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                     for (TaskDemand td : taskDemands) {
                         materialStockMap.merge(td.taskKey, avgStock, Integer::sum);
                     }
-                    log.debug("胎胚 {} 对应多个硫化任务但总需求为0，平均分配库存 {}", embryoCode, avgStock);
+                    log.debug("胎胚 {} 对应多个硫化任务但总日硫化量为0，平均分配库存 {}", embryoCode, avgStock);
                 } else {
-                    // 按比例分配，最后一条用倒扣
+                    // 按日硫化量比例分配，最后一条用倒扣
                     int allocatedTotal = 0;
 
                     for (int i = 0; i < taskDemands.size(); i++) {
@@ -1384,15 +1433,15 @@ public class ScheduleServiceImpl implements ScheduleService {
                             // 最后一个硫化任务分配剩余库存（倒扣）
                             currentStock = totalStock - allocatedTotal;
                         } else {
-                            // 按比例分配
+                            // 按日硫化量比例分配
                             currentStock = (int) ((long) totalStock * td.demand / totalDemand);
                         }
 
                         materialStockMap.merge(td.taskKey, currentStock, Integer::sum);
                         allocatedTotal += currentStock;
 
-                        log.debug("物料编码 {}，胎胚 {} 共用分配：硫化任务 {} 需求（{}班） {}，分配库存 {}",
-                                td.materialCode, embryoCode, td.taskKey, td.shiftName, td.demand, currentStock);
+                        log.debug("物料编码 {}，胎胚 {} 共用分配：硫化任务 {} 日硫化量 {}，分配库存 {}",
+                                td.materialCode, embryoCode, td.taskKey, td.demand, currentStock);
                     }
                 }
             }

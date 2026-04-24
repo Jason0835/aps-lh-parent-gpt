@@ -50,11 +50,4 @@ public class CxKeyProduct extends BaseEntity {
     @ApiModelProperty(value = "是否启用：0-禁用 1-启用")
     @TableField("IS_ACTIVE")
     private Integer isActive;
-
-    @ApiModelProperty(value = "更新时间")
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
-    @Excel(name = "ui.data.column.cxKeyProduct.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
-    @TableField(value = "UPDATE_TIME")
-    private Date updateTime;
 }

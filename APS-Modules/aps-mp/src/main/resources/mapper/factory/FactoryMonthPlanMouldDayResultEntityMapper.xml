@@ -10,10 +10,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.MATERIAL_DESC,
 		    m.STRUCTURE_NAME,
             MAX(IF(C.ID IS NULL, '02', '01')) STRUCTURE_TYPE,
-		    r.PRODUCT_STATUS,
+		    i.PRODUCT_STATUS,
             m.EMBRYO_CODE,
             m.EMBRYO_DESC MAIN_MATERIAL_DESC,
-		    r.CONSTRUCTION_STAGE,
+		    i.CONSTRUCTION_STAGE,
 		    m.BRAND,
 		    m.SPECIFICATIONS,
 		    m.MAIN_PATTERN,
@@ -91,6 +91,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND d.FACTORY_CODE = m.FACTORY_CODE 
 		    AND d.MATERIAL_CODE = m.MATERIAL_CODE 
 		    AND d.is_delete = 0
+		    LEFT JOIN T_MP_PROC_MONTH_PLAN_INIT i on i.MONTH_PLAN_ID = d.id
+            AND m.FACTORY_CODE = i.FACTORY_CODE 
+		    AND i.PRODUCTION_VERSION = #{dayResult.productionVersion}
+            AND i.IS_DELETE = 0 
 		    LEFT JOIN T_MP_MOULDING_DAY_RESULT r ON m.MATERIAL_CODE = r.MATERIAL_CODE 
 		    AND m.FACTORY_CODE = r.FACTORY_CODE 
 		    AND r.production_version = #{dayResult.productionVersion}
@@ -106,7 +110,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND m.STRUCTURE_NAME IS NOT NULL 
             AND (QUALITY_STATE_CODE != '2' or QUALITY_STATE_CODE is null or d.FACTORY_CODE = m.FACTORY_CODE)
         <if test="!isAllMaterial">
-            AND m.FACTORY_CODE = r.FACTORY_CODE
+            AND d.FACTORY_CODE = m.FACTORY_CODE
         </if>
 		GROUP BY
 		    MM.MIN_PRO_SIZE,
@@ -115,10 +119,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.MATERIAL_DESC,
 		    m.STRUCTURE_NAME,
 		    d.STRUCTURE_TYPE,
-		    r.PRODUCT_STATUS,
+		    i.PRODUCT_STATUS,
             m.EMBRYO_CODE,
             m.EMBRYO_DESC,
-		    r.CONSTRUCTION_STAGE,
+		    i.CONSTRUCTION_STAGE,
 		    m.BRAND,
 		    m.SPECIFICATIONS,
 		    m.MAIN_PATTERN,

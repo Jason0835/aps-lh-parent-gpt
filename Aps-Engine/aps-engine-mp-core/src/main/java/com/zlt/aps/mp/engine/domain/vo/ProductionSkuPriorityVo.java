@@ -30,6 +30,10 @@ public class ProductionSkuPriorityVo implements Serializable {
      * 计划还需排产天数
      */
     private Integer needDays;
+    /**
+     * 是否供应链优先-即物料优先
+     */
+    private boolean hasSupplyChainPriority;
 
     /**
      * 构造函数
@@ -39,11 +43,12 @@ public class ProductionSkuPriorityVo implements Serializable {
      * @param maxMouldDays 模具最大可排产天数
      * @param needDays     还需排产天数
      */
-    public ProductionSkuPriorityVo(String materialDesc, Integer maxLhDays, Integer maxMouldDays, Integer needDays) {
+    public ProductionSkuPriorityVo(String materialDesc, Integer maxLhDays, Integer maxMouldDays, Integer needDays, boolean hasSupplyChainPriority) {
         this.materialDesc = materialDesc;
         this.maxLhDays = maxLhDays;
         this.maxMouldDays = maxMouldDays;
         this.needDays = needDays;
+        this.hasSupplyChainPriority = hasSupplyChainPriority;
     }
 
     /**

@@ -84,7 +84,7 @@ public class TqSpecifyMachineServiceImpl extends ServiceImpl<TqSpecifyMachineMap
         QueryWrapper<TqSpecifyMachine> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("BEAD_CODE", entity.getBeadCode());
         queryWrapper.eq("MACHINE_ID", entity.getMachineId());
-        queryWrapper.eq("DEL_FLAG", ApsConstant.DEL_FLAG_NORMAL);
+        queryWrapper.eq("IS_DELETE", ApsConstant.DEL_FLAG_NORMAL);
         if (entity.getId() != null) {
             queryWrapper.ne("ID", entity.getId());  //编辑的时候校验，要过滤掉自身的id
         }
@@ -103,7 +103,7 @@ public class TqSpecifyMachineServiceImpl extends ServiceImpl<TqSpecifyMachineMap
     public void deleteSpecifyMachine(Long[] ids) {
         LambdaUpdateWrapper<TqSpecifyMachine> wrapper = new LambdaUpdateWrapper<>();
         wrapper.in(ApsBaseEntity::getId, Arrays.asList(ids));
-        wrapper.set(ApsBaseEntity::getDelFlag, null);
+        wrapper.set(ApsBaseEntity::getDelFlag, "1");
         wrapper.set(ApsBaseEntity::getUpdateBy, SecurityUtils.getUsername());
         wrapper.set(ApsBaseEntity::getUpdateTime, new Date());
         super.getBaseMapper().update(null, wrapper);

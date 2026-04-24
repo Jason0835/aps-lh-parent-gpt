@@ -184,7 +184,7 @@ public class CxAddSkuProductionHandler {
             retrieveNextSku(context, productionStage, formalRound, groupPlanInfo, needProductionInfo, excludeDays, isLastSkuPlan, startDay);
             return;
         }
-        addChangeMouldInfo(productionContext, addSkuInfo, startDay, beforeSkuInfo, doubleMouldList);
+        CxLhMouldProductionCalculator.addChangeMouldInfo(productionContext, addSkuInfo, startDay, beforeSkuInfo, doubleMouldList);
         groupPlanInfo.afterProductionResetThisRound();
         productionAddSkuByContinueCxMachine(context, productionStage, formalRound, groupPlanInfo, excludeDays);
     }
@@ -277,7 +277,7 @@ public class CxAddSkuProductionHandler {
             retrieveNextSku(context, needProductionInfo, cxMachineCode, productionPlanList, productionPlan, mouldShellMap, excludeDays);
             return;
         }
-        addChangeMouldInfo(productionContext, addSkuInfo, startDay, cxLhGroup.getBeforeSku(), doubleMouldList);
+        CxLhMouldProductionCalculator.addChangeMouldInfo(productionContext, addSkuInfo, startDay, cxLhGroup.getBeforeSku(), doubleMouldList);
         productionPlanInfo.afterProductionResetThisRound();
         productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap, excludeDays);
     }
@@ -545,28 +545,6 @@ public class CxAddSkuProductionHandler {
             productionQty = productionQtyList.stream().mapToInt(Integer::intValue).sum();
         }
         lhGroup.updateBeforeSkuInfo(materialDesc, planInfo.getMaterialCode(), productionQty, dayLhQty);
-    }
-
-    /**
-     * 换模次数+1处理
-     *
-     * @param productionContext 排产上下文
-     * @param addSkuInfo        排产Sku
-     * @param startDay          换模日
-     * @param beforeSku         前Sku信息
-     * @param doubleMouldList   排产模具
-     */
-    private void addChangeMouldInfo(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo addSkuInfo, Integer startDay, BeforeSkuProductionInfo beforeSku, List<ProductionMouldInfoVo> doubleMouldList) {
-        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(productionContext, addSkuInfo, beforeSku, beforeSku);
-        boolean isChangeMould = changeMouldInfo.isChangeMould();
-        if (!isChangeMould) {
-            return;
-        }
-        //需要换模-换模次数处理
-        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
-        Integer changeMouldDay = startDay;
-        Set<String> mouldCodeSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
-        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
     }
 
     /**

@@ -126,6 +126,14 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
             LhPrecisionPlanImportVO importVO = list.get(i);
             
             // 校验必填项
+            if (StringUtil.isBlank(importVO.getFactoryCode())) {
+                failureNum++;
+                String message = I18nUtil.getMessage("ui.lh.precision.plan.factoryCodeRequired");
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                    errorNum, String.format(message, errorNum), importErrorLogs);
+                continue;
+            }
+
             if (StringUtil.isBlank(importVO.getMachineCode())) {
                 failureNum++;
                 String message = I18nUtil.getMessage("ui.lh.precision.plan.machineCodeRequired");
@@ -168,6 +176,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
             
             // 转换为实体对象
             LhPrecisionPlan entity = new LhPrecisionPlan();
+            entity.setFactoryCode(importVO.getFactoryCode());
             entity.setMachineCode(importVO.getMachineCode());
             entity.setPrecisionType("精度计划");
             entity.setPlanDate(importVO.getPlanDate());
@@ -177,7 +186,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
             entity.setWarningStatus(WARNING_STATUS_NO);
             entity.setIsWarningSent(WARNING_SENT_NO);
             entity.setCompletionStatus(COMPLETION_STATUS_PENDING);
-            entity.setDataSource(DATA_SOURCE_MES);
+            entity.setDataSource(DATA_SOURCE_AUTO);
             entity.setYear(year);
             calculateDaysToDue(entity);
             
@@ -283,7 +292,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
         plan.setCompanyCode(mesPlan.getCompanyCode());
         plan.setFactoryCode(mesPlan.getFactoryCode());
         plan.setMesSourceId(mesPlan.getId());
-        plan.setDataSource(DATA_SOURCE_AUTO);
+        plan.setDataSource(DATA_SOURCE_MES);
 
         LocalDate actualDateLocal = parseDate(mesPlan.getFirstWashTime());
         if (actualDateLocal == null) {
@@ -474,7 +483,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
 
         plan.setMachineCode(machineCode);
         plan.setPrecisionType(PRECISION_TYPE_LH);
-        plan.setDataSource(DATA_SOURCE_AUTO);
+        plan.setDataSource(DATA_SOURCE_MES);
 
         LocalDate lastActualDateLocal = lastActualDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         LocalDate planDateLocal = lastActualDateLocal.plusYears(intervalYears);

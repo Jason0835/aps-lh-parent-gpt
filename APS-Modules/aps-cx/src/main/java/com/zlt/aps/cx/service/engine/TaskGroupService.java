@@ -2,10 +2,12 @@ package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
+import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.cx.service.engine.CoreScheduleAlgorithmService;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
 import lombok.RequiredArgsConstructor;
@@ -46,17 +48,31 @@ public class TaskGroupService {
 
     // ==================== 业务阈值常量 ====================
 
-    /** 收尾舍弃阈值：非主销产品余量≤此值时舍弃（条） */
-    private static final int ENDING_DISCARD_THRESHOLD = 2;
+    /** 收尾舍弃阈值默认值：非主销产品余量≤此值时舍弃（条） */
+    private static final int DEFAULT_ENDING_DISCARD_THRESHOLD = 2;
 
-    /** 成型余量紧急阈值：成型余量低于此值标记为紧急收尾（条） */
-    private static final int ENDING_URGENT_FORMING_REMAINDER = 400;
+    /** 成型余量紧急阈值默认值：成型余量低于此值标记为紧急收尾（条） */
+    private static final int DEFAULT_ENDING_URGENT_FORMING_REMAINDER = 400;
 
-    /** 近期收尾天数阈值（10 天内） */
-    private static final int ENDING_DAYS_THRESHOLD = 10;
+    /** 近期收尾天数阈值默认值（10 天内） */
+    private static final int DEFAULT_ENDING_DAYS_THRESHOLD = 10;
 
-    /** 紧急收尾天数阈值（3 天内） */
-    private static final int URGENT_ENDING_DAYS = 3;
+    /** 紧急收尾天数阈值默认值（3 天内） */
+    private static final int DEFAULT_URGENT_ENDING_DAYS = 3;
+
+    // ==================== 参数配置编码 ====================
+
+    /** 参数编码：收尾舍弃阈值 */
+    private static final String PARAM_ENDING_DISCARD_THRESHOLD = "ENDING_DISCARD_THRESHOLD";
+
+    /** 参数编码：成型余量紧急阈值 */
+    private static final String PARAM_ENDING_URGENT_FORMING_REMAINDER = "ENDING_URGENT_FORMING_REMAINDER";
+
+    /** 参数编码：近期收尾天数阈值 */
+    private static final String PARAM_ENDING_DAYS_THRESHOLD = "ENDING_DAYS_THRESHOLD";
+
+    /** 参数编码：紧急收尾天数阈值 */
+    private static final String PARAM_URGENT_ENDING_DAYS = "URGENT_ENDING_DAYS";
 
     /** 库存低水位阈值（小时）：低于此值提升优先级 */
     private static final BigDecimal STOCK_LOW_HOURS_THRESHOLD = new BigDecimal("4");
@@ -164,7 +180,7 @@ public class TaskGroupService {
             log.warn("硫化排程结果为空，无法分组任务");
             return result;
         }
-        log.info("任务分组开始：共 {} 条硫化记录", lhScheduleResults.size());
+        log.info("【任务分组】收到 {} 条硫化记录", lhScheduleResults.size());
 
         // 构建基础映射
         Map<String, MdmMaterialInfo> materialMap = buildMaterialMap(context);
@@ -174,12 +190,60 @@ public class TaskGroupService {
             machineOnlineEmbryoMap = new HashMap<>();
         }
 
+        // 获取当前班次的排量（每个班次只处理自己班次有排量的任务）
+        final int currentClassIndex = getCurrentClassIndex(dayShifts);
+        
         // 直接遍历每条硫化记录，为每条记录创建独立的任务
         int skippedNullEmbryo = 0;
         int skippedNullTask = 0;
+        int skippedVulcanizeSurplusZero = 0;  // 硫化余量<=0跳过的任务数
+        int skippedFormingRemainderZero = 0;  // 成型余量<=0跳过的任务数
+        
+        // 跟踪每个物料已使用的成型余量（用于多任务共享同一物料的场景）
+        Map<String, Integer> materialUsedFormingRemainder = new HashMap<>();
+        // 跟踪每个物料已处理的任务列表（用于回溯更新 isLastEndingBatch）
+        Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> materialTasksMap = new HashMap<>();
+        
         for (LhScheduleResult lhResult : lhScheduleResults) {
             if (lhResult.getEmbryoCode() == null) {
                 skippedNullEmbryo++;
+                continue;
+            }
+            
+            // 库存够硫化当天剩余班次的消耗，跳过该任务
+            // 逻辑：
+            // - 班次1（第一天）：判断库存够硫化班次1+班次2的计划，够了就跳过
+            // - 班次2（第一天）：判断库存够硫化班次2的计划，够了就跳过
+            // - 班次1（第二天）：判断库存够硫化班次1+班次2+班次3的计划，够了就跳过
+            // - 依次类推
+            int currentStock = getCurrentStock(context, lhResult.getId());
+            int todayRemainingDemand = calculateTodayRemainingDemand(context, dayShifts, lhResult);
+            if (todayRemainingDemand > 0 && currentStock >= todayRemainingDemand) {
+                log.info("库存充足跳过: 胎胚={}, 库存={}, 当日剩余需求={}, 当前班次={}", 
+                        lhResult.getEmbryoCode(), currentStock, todayRemainingDemand, dayShifts.get(0).getShiftCode());
+                skippedNullTask++;
+                continue;
+            }
+
+            // 检查1：硫化余量 <= 0，说明该物料已超产，不再需要生产
+            String materialCode = lhResult.getMaterialCode();
+            if (context.getMonthSurplusMap() != null && materialCode != null) {
+                MdmMonthSurplus monthSurplus = context.getMonthSurplusMap().get(materialCode);
+                if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
+                    int vulcanizeSurplus = monthSurplus.getPlanSurplusQty().intValue();
+                    if (vulcanizeSurplus <= 0) {
+                        log.debug("物料 {} 硫化余量={} <= 0，已超产，跳过该任务", materialCode, vulcanizeSurplus);
+                        skippedVulcanizeSurplusZero++;
+                        continue;
+                    }
+                }
+            }
+
+            // 检查2：成型余量 <= 0，说明胎胚库存已满足硫化需求，不再需要成型生产
+            Integer formingRemainder = getFormingRemainder(materialCode, context);
+            if (formingRemainder != null && formingRemainder <= 0) {
+                log.debug("物料 {} 成型余量={} <= 0，胎胚已满足，跳过该任务", materialCode, formingRemainder);
+                skippedFormingRemainderZero++;
                 continue;
             }
 
@@ -190,8 +254,7 @@ public class TaskGroupService {
                 continue;
             }
 
-            String materialCode = lhResult.getMaterialCode();
-              String embryoCode = lhResult.getEmbryoCode();
+            String embryoCode = lhResult.getEmbryoCode();
 
             // 判断任务类型
             List<String> continueMachineCodes = findContinueMachines(materialCode, embryoCode, machineOnlineEmbryoMap);
@@ -208,17 +271,61 @@ public class TaskGroupService {
             task.setContinueMachineCodes(continueMachineCodes);
             task.setIsFirstTask(!isContinueTask && !isTrialTask && !isProductionTrial);
 
-            // S5.2.4 计算收尾属性
-            calculateEndingInfo(task, context, scheduleDate);
+            // 将任务添加到物料任务列表（用于回溯更新）
+            materialTasksMap.computeIfAbsent(materialCode, k -> new ArrayList<>()).add(task);
+
+            // S5.2.4 计算收尾属性（传入已使用的成型余量）
+            int usedRemainder = materialUsedFormingRemainder.getOrDefault(materialCode, 0);
+            calculateEndingInfo(task, context, scheduleDate, usedRemainder);
 
             // S5.2.5 计算待排产量
             calculatePlannedProduction(task, context, scheduleDate);
             // S5.2.6 收尾余量处理
             handleEndingRemainder(task, context);
+            
+            // S5.2.6.1 收尾余量处理后再次检查：如果 handleEndingRemainder 标记了 isLastEndingBatch，需要回溯更新
+            if (Boolean.TRUE.equals(task.getIsLastEndingBatch())) {
+                List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(materialCode);
+                if (allTasksForMaterial != null) {
+                    for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
+                        if (prevTask != task && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
+                            prevTask.setIsLastEndingBatch(true);
+                            log.info("回溯更新 isLastEndingBatch（收尾余量处理）: 物料={}, 胎胚={} → true", materialCode, prevTask.getEmbryoCode());
+                        }
+                    }
+                }
+            }
+
+            // 打印收尾任务完整信息（所有字段已填充完毕）
+            // 条件：成型余量低于阈值 或 紧急收尾
+            Integer endingSurplus = task.getEndingSurplusQty();
+            if ((endingSurplus != null && endingSurplus < getEndingUrgentFormingRemainder(context))
+                    || Boolean.TRUE.equals(task.getIsUrgentEnding())) {
+                // 获取计算公式所需参数
+                int vulcanizeDmd = task.getVulcanizeDemand() != null ? task.getVulcanizeDemand() : 0;
+                int stock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
+                int netDemand = Math.max(0, vulcanizeDmd - stock);
+                BigDecimal lossRate = context.getLossRate() != null ? context.getLossRate() : BigDecimal.ZERO;
+                int tripCap = getTripCapacity(task.getStructureName(), context);
+                int plannedProd = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
+                log.info("成型余量低于阈值的收尾任务：物料={}, 剩余成型余量={}, 阈值={} | 收尾任务={}, 收尾余量={}, 硫化余量={}, 收尾日={}, 距收尾天={}, 紧急收尾={}, 近期收尾={}, 收尾最后一批={} | 计算公式：(日硫化量{} - 库存{}) × (1 + 损耗率{}) = {} × {} = {} | 整车({})取整后待排产量={}, 需车数={}, 最终需生产量={}",
+                        embryoCode, task.getEndingSurplusQty(), getEndingUrgentFormingRemainder(context),
+                        task.getIsEndingTask(), task.getEndingSurplusQty(), task.getVulcanizeSurplusQty(),
+                        task.getEndingDate(), task.getDaysToEnding(), task.getIsUrgentEnding(), task.getIsNearEnding(), task.getIsLastEndingBatch(),
+                        vulcanizeDmd, stock, lossRate, netDemand, lossRate.add(BigDecimal.ONE).setScale(4, BigDecimal.ROUND_HALF_UP), plannedProd,
+                        tripCap, task.getPlannedProduction(), task.getRequiredCars(), task.getEndingExtraInventory());
+            }
+            
+            // 更新已使用的成型余量（累加当前任务的 endingExtraInventory）
+            if (task.getEndingExtraInventory() != null && task.getEndingExtraInventory() > 0) {
+                materialUsedFormingRemainder.merge(materialCode, task.getEndingExtraInventory(), Integer::sum);
+                log.debug("物料 {} 已使用成型余量累计: {}", materialCode, materialUsedFormingRemainder.get(materialCode));
+            }
+            
             // S5.2.7 停产特殊处理
             handleOpeningClosingDay(task, context, dayShifts);
             // S5.2.8 试制任务：产量必须是双数，不补整车
-            if (Boolean.TRUE.equals(isTrialTask)) {
+            if (Boolean.TRUE.equals(isTrialTask) || Boolean.TRUE.equals(isProductionTrial)) {
                 Integer pp = task.getPlannedProduction();
                 if (pp != null && pp % 2 != 0) {
                     task.setPlannedProduction(pp - 1);
@@ -237,11 +344,11 @@ public class TaskGroupService {
             }
         }
 
-        log.info("任务分组完成：续作 {} 个，试制 {} 个，新增 {} 个，跳过无效胚胎 {} 个，跳过空任务 {} 个",
+        log.info("【任务分组结果】续作:{}个 | 试制:{}个 | 新增:{}个 | 跳过无效胚胎:{}个 | 跳过空任务:{}个 | 跳过硫化余量<=0:{}个 | 跳过成型余量<=0:{}个",
                 result.getContinueTasks().size(),
                 result.getTrialTasks().size(),
                 result.getNewTasks().size(),
-                skippedNullEmbryo, skippedNullTask);
+                skippedNullEmbryo, skippedNullTask, skippedVulcanizeSurplusZero, skippedFormingRemainderZero);
         return result;
     }
 
@@ -250,48 +357,54 @@ public class TaskGroupService {
      *
      * <p>包括：成型余量、是否收尾任务、是否10天内收尾、是否3天内收尾（紧急）、收尾日
      *
-     * @param task         胎胚任务
-     * @param context      排程上下文
-     * @param scheduleDate 排程日期
+     * @param task           胎胚任务
+     * @param context        排程上下文
+     * @param scheduleDate   排程日期
+     * @param usedRemainder  该物料已使用的成型余量（前面任务已排产的数量）
      */
     public void calculateEndingInfo(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
             ScheduleContextVo context,
-            LocalDate scheduleDate) {
+            LocalDate scheduleDate,
+            int usedRemainder) {
 
-        String embryoCode = task.getEmbryoCode();
+        String materialCode = task.getMaterialCode();
 
         // 获取成型余量（从预计算的映射中获取）
         Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
-        Integer formingRemainder = null;
+        Integer totalFormingRemainder = null;
         Integer vulcanizeSurplusQty = null;
 
         // 从月计划余量获取硫化余量
         if (context.getMonthSurplusMap() != null) {
-            MdmMonthSurplus monthSurplus = context.getMonthSurplusMap().get(embryoCode);
+            MdmMonthSurplus monthSurplus = context.getMonthSurplusMap().get(materialCode);
             if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
                 vulcanizeSurplusQty = monthSurplus.getPlanSurplusQty().intValue();
             }
         }
 
-        // 获取成型余量
-        if (formingRemainderMap != null && formingRemainderMap.containsKey(embryoCode)) {
-            formingRemainder = formingRemainderMap.get(embryoCode);
-        } else if (vulcanizeSurplusQty != null) {
-            // 成型余量 = 硫化余量 - 胎胚库存
-            int currentStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
-            formingRemainder = vulcanizeSurplusQty - currentStock;
+        // 获取总成型余量
+        if (formingRemainderMap != null && formingRemainderMap.containsKey(materialCode)) {
+            totalFormingRemainder = formingRemainderMap.get(materialCode);
+        }
+
+        // 计算当前任务的剩余成型余量 = 总成型余量 - 已使用成型余量
+        Integer remainingFormingRemainder = null;
+        if (totalFormingRemainder != null) {
+            remainingFormingRemainder = Math.max(0, totalFormingRemainder - usedRemainder);
+            log.debug("物料 {} 总成型余量={}, 已使用={}, 剩余={}", 
+                    materialCode, totalFormingRemainder, usedRemainder, remainingFormingRemainder);
         }
 
         task.setVulcanizeSurplusQty(vulcanizeSurplusQty);
-        task.setEndingSurplusQty(formingRemainder);
+        task.setEndingSurplusQty(remainingFormingRemainder);  // 使用剩余成型余量
 
-        // 判断是否收尾任务（成型余量 <= 0）
-        boolean isEndingTask = formingRemainder != null && formingRemainder <= 0;
+        // 判断是否收尾任务（剩余成型余量 <= 0）
+        boolean isEndingTask = remainingFormingRemainder != null && remainingFormingRemainder <= 0;
         task.setIsEndingTask(isEndingTask);
 
-        // 获取收尾日（从物料收尾管理表）
-        LocalDate endingDate = findEndingDate(embryoCode, context);
+        // 获取收尾日（从物料收尾管理表，该表以物料编码为键）
+        LocalDate endingDate = findEndingDate(task.getMaterialCode(), context);
         task.setEndingDate(endingDate);
 
         if (endingDate != null) {
@@ -299,24 +412,18 @@ public class TaskGroupService {
             task.setDaysToEnding(daysToEnding);
 
             // 判断是否10天内收尾
-            boolean isNearEnding = daysToEnding >= 0 && daysToEnding <= ENDING_DAYS_THRESHOLD;
+            boolean isNearEnding = daysToEnding >= 0 && daysToEnding <= getEndingDaysThreshold(context);
             task.setIsNearEnding(isNearEnding);
 
-            // 判断是否3天内收尾（紧急）
-            boolean isUrgentEnding = daysToEnding >= 0 && daysToEnding <= URGENT_ENDING_DAYS;
+            // 判断是否3天内收尾（紧急），或成型余量>=400（库存积压风险）
+            boolean isUrgentEnding = (daysToEnding >= 0 && daysToEnding <= getUrgentEndingDays(context))
+                    || (remainingFormingRemainder != null && remainingFormingRemainder <= getEndingUrgentFormingRemainder(context));
             task.setIsUrgentEnding(isUrgentEnding);
 
             if (isUrgentEnding) {
                 log.info("紧急收尾任务：物料={}, 收尾日={}, 距收尾{}天",
-                        embryoCode, endingDate, daysToEnding);
+                        task.getMaterialCode(), endingDate, daysToEnding);
             }
-        }
-
-        // 成型余量小于阈值也标记为紧急收尾
-        if (formingRemainder != null && formingRemainder < ENDING_URGENT_FORMING_REMAINDER && formingRemainder > 0) {
-            task.setIsUrgentEnding(true);
-            log.info("成型余量低于阈值的收尾任务：物料={}, 成型余量={}, 阈值={}",
-                    embryoCode, formingRemainder, ENDING_URGENT_FORMING_REMAINDER);
         }
 
         // 计算优先级
@@ -401,6 +508,29 @@ public class TaskGroupService {
     }
 
     // ==================== 私有方法 ====================
+
+    /**
+     * 获取成型余量
+     *
+     * <p>从 context 的 formingRemainderMap 中获取（key 是物料编码），如果没有则根据硫化余量和库存计算。
+     *
+     * @param materialCode 物料编码
+     * @param context      排程上下文
+     * @return 成型余量，无法计算时返回 null
+     */
+    private Integer getFormingRemainder(String materialCode, ScheduleContextVo context) {
+        if (materialCode == null) {
+            return null;
+        }
+
+        // 从context.getFormingRemainderMap映射中获取（key 是物料编码）
+        Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
+        if (formingRemainderMap != null && formingRemainderMap.containsKey(materialCode)) {
+            return formingRemainderMap.get(materialCode);
+        }
+
+        return 0;
+    }
 
     /**
      * 构建物料映射（双索引：materialCode + embryoCode）
@@ -499,12 +629,30 @@ public class TaskGroupService {
                 embryoCode, vulcanizeDemand, currentStock);
 
         // 获取物料信息
+        // 重要：优先使用 lhResult 中的 materialCode，因为同一个 embryoCode 可能对应多个不同的物料
+        String materialCodeFromLh = lhResult.getMaterialCode();
         MdmMaterialInfo material = materialMap.get(embryoCode);
-        if (material == null) {
-            log.debug("buildSingleTask：物料信息为空，embryoCode={}", embryoCode);
+        
+        // 如果 lhResult 中有 materialCode，优先使用；否则从 materialMap 中获取
+        String finalMaterialCode = materialCodeFromLh;
+        String materialDesc = null;
+        String mainMaterialDesc = null;
+        String structureNameFromMaterial = null;
+        
+        if (finalMaterialCode == null && material != null) {
+            // lhResult 中没有 materialCode，从 materialMap 中获取
+            finalMaterialCode = material.getMaterialCode();
+            materialDesc = material.getMaterialDesc();
+            mainMaterialDesc = material.getEmbryoDesc();
+            structureNameFromMaterial = material.getStructureName();
+        } else if (material != null) {
+            // lhResult 中有 materialCode，但保留 material 的其他信息（如描述）
+            materialDesc = material.getMaterialDesc();
+            mainMaterialDesc = material.getEmbryoDesc();
+            structureNameFromMaterial = material.getStructureName();
         }
-
-        String structureName = material != null ? material.getStructureName() : lhResult.getStructureName();
+        
+        String structureName = structureNameFromMaterial != null ? structureNameFromMaterial : lhResult.getStructureName();
 
         // 构建任务
         CoreScheduleAlgorithmService.DailyEmbryoTask task = new CoreScheduleAlgorithmService.DailyEmbryoTask();
@@ -513,17 +661,21 @@ public class TaskGroupService {
         task.setVulcanizeDemand(vulcanizeDemand);
         task.setCurrentStock(currentStock);
         task.setProductionVersion(lhResult.getProductionVersion());
-
-        if (material != null) {
-            task.setMaterialDesc(material.getMaterialDesc());
-            task.setMainMaterialDesc(material.getEmbryoDesc());
-            task.setStructureName(material.getStructureName());
-            task.setMaterialCode(material.getMaterialCode());
+        task.setMaterialCode(finalMaterialCode);  // 直接使用 lhResult 或 materialMap 中的 materialCode
+        
+        if (materialDesc != null) {
+            task.setMaterialDesc(materialDesc);
         } else {
-            task.setMaterialDesc(embryoCode);
-            task.setMainMaterialDesc(embryoCode);
-            task.setStructureName(structureName);
+            task.setMaterialDesc(finalMaterialCode != null ? finalMaterialCode : embryoCode);
         }
+        
+        if (mainMaterialDesc != null) {
+            task.setMainMaterialDesc(mainMaterialDesc);
+        } else {
+            task.setMainMaterialDesc(embryoCode);
+        }
+        
+        task.setStructureName(structureName);
 
         task.setDemandQuantity(vulcanizeDemand);
         task.setAssignedQuantity(0);
@@ -577,6 +729,32 @@ public class TaskGroupService {
     }
 
     /**
+     * 获取当前班次对应的硫化班次索引
+     *
+     * <p>从 dayShifts 中获取当前班次的 classField，然后提取班次索引。
+     * 例如：CLASS1 -> 1, CLASS2 -> 2, CLASS3 -> 3
+     *
+     * @param dayShifts 当前班次配置列表
+     * @return 班次索引 (1-8)，如果没有有效的班次配置则返回 0
+     */
+    private int getCurrentClassIndex(List<CxShiftConfig> dayShifts) {
+        if (dayShifts == null || dayShifts.isEmpty()) {
+            return 0;
+        }
+        // 获取第一个班次的 classField
+        CxShiftConfig shiftConfig = dayShifts.get(0);
+        String classField = shiftConfig.getClassField();
+        if (classField != null && classField.startsWith("CLASS")) {
+            try {
+                return Integer.parseInt(classField.replace("CLASS", ""));
+            } catch (NumberFormatException e) {
+                log.warn("无法解析班次字段: {}", classField);
+            }
+        }
+        return 0;
+    }
+
+    /**
      * 根据班次索引获取硫化记录的计划量
      *
      * @param lhResult   硫化记录
@@ -617,6 +795,61 @@ public class TaskGroupService {
             return 0;
         }
         return materialStockMap.getOrDefault(String.valueOf(lhId), 0);
+    }
+
+    /**
+     * 计算当日剩余班次的硫化需求总量
+     *
+     * <p>按班次维度判断库存是否充足：
+     * - 班次1（第一天）：库存 >= 班次1计划量 + 班次2计划量 → 跳过
+     * - 班次2（第一天）：库存 >= 班次2计划量 → 跳过
+     * - 班次1（第二天）：库存 >= 班次1+2+3计划量 → 跳过
+     * - 依次类推
+     *
+     * @param context   排程上下文
+     * @param dayShifts 当前班次配置列表（singleShiftList，只含当前班次）
+     * @param lhResult  硫化记录
+     * @return 当日剩余班次的硫化需求总量
+     */
+    private int calculateTodayRemainingDemand(ScheduleContextVo context, List<CxShiftConfig> dayShifts, LhScheduleResult lhResult) {
+        if (dayShifts == null || dayShifts.isEmpty()) {
+            return 0;
+        }
+        CxShiftConfig currentShift = dayShifts.get(0);
+        int currentScheduleDay = currentShift.getScheduleDay() != null ? currentShift.getScheduleDay() : 1;
+        int currentClassIndex = currentShift.getDayShiftOrder() != null ? currentShift.getDayShiftOrder() : 1;
+
+        // 从上下文获取所有班次配置，确定当天有几个班次
+        List<CxShiftConfig> allShifts = context.getShiftConfigList();
+        if (allShifts == null || allShifts.isEmpty()) {
+            return 0;
+        }
+        // 当天班次数 = scheduleDay 等于当前班的班次数
+        int shiftsPerDay = (int) allShifts.stream()
+                .filter(c -> c.getScheduleDay() != null && c.getScheduleDay().equals(currentScheduleDay))
+                .count();
+        if (shiftsPerDay <= 0) {
+            shiftsPerDay = 1;
+        }
+
+        // 计算当日剩余班次数（含当前班次）
+        int remainingShifts = shiftsPerDay - currentClassIndex + 1;
+        if (remainingShifts <= 0) {
+            return 0;
+        }
+
+        // 计算需求：从当前班次到当日最后一个班次的 classPlanQty 总和
+        int totalDemand = 0;
+        for (int i = 0; i < remainingShifts; i++) {
+            int classOffset = (currentScheduleDay - 1) * 3 + currentClassIndex + i - 1; // 0-indexed class field offset
+            if (classOffset >= 0 && classOffset < 8) {
+                Integer classDemand = getClassPlanQtyByIndex(lhResult, classOffset + 1); // classIndex is 1-based
+                if (classDemand != null && classDemand > 0) {
+                    totalDemand += classDemand;
+                }
+            }
+        }
+        return totalDemand;
     }
 
     /**
@@ -709,10 +942,14 @@ public class TaskGroupService {
      * @param context    排程上下文
      * @return 收尾日期，无则返回 null
      */
-    private LocalDate findEndingDate(String embryoCode, ScheduleContextVo context) {
+    /**
+     * 从物料收尾管理表获取计划收尾日期
+     * @param materialCode 物料编码（CxMaterialEnding.materialCode 存的是物料编码）
+     */
+    private LocalDate findEndingDate(String materialCode, ScheduleContextVo context) {
         if (context.getMaterialEndings() != null) {
             for (CxMaterialEnding ending : context.getMaterialEndings()) {
-                if (embryoCode.equals(ending.getMaterialCode())) {
+                if (materialCode.equals(ending.getMaterialCode())) {
                     return ending.getPlannedEndingDate();
                 }
             }
@@ -806,26 +1043,30 @@ public class TaskGroupService {
 
         // 今天最后一天收尾
         int tripCapacity = getTripCapacity(task.getStructureName(), context);
-        if (!Boolean.TRUE.equals(task.getIsMainProduct()) && endingSurplusQty <= ENDING_DISCARD_THRESHOLD) {
+        if (!Boolean.TRUE.equals(task.getIsMainProduct()) && endingSurplusQty <= getEndingDiscardThreshold(context)) {
             // 非主销产品 + 收尾余量≤2条，舍弃当天排产
             task.setPlannedProduction(0);
             task.setRequiredCars(0);
             task.setEndingExtraInventory(0);
             task.setEndingAbandoned(true);
             task.setEndingAbandonedQty(endingSurplusQty);
+            task.setIsLastEndingBatch(true);
             log.info("收尾任务 {} 余量{}条被舍弃（非主销+余量≤2）", task.getEmbryoCode(), endingSurplusQty);
         } else if (!Boolean.TRUE.equals(task.getIsMainProduct())) {
             // 非主销产品 + 收尾余量>2条，按实际量下（不补车）
-            // requiredCars 按实际量计算，不足一车的部分也算1车
-            int planned = task.getPlannedProduction();
-            task.setRequiredCars((planned + tripCapacity - 1) / Math.max(tripCapacity, 1));
-            task.setEndingExtraInventory(planned);
+            // endingExtraInventory 设置为实际余量（不取整），用于后续均衡分配时扣除
+            task.setEndingExtraInventory(endingSurplusQty);
+            
+            // requiredCars 按实际余量计算，不足一车的部分也算1车
+            task.setRequiredCars((endingSurplusQty + tripCapacity - 1) / Math.max(tripCapacity, 1));
+            
+            // plannedProduction 保持取整后的值（用于显示），但实际生产按 endingExtraInventory
             task.setIsLastEndingBatch(true);
-            log.info("收尾任务 {} 今天最后一批（非主销），余量={}，计划={}",
-                    task.getEmbryoCode(), endingSurplusQty, planned);
+            log.info("收尾任务 {} 今天最后一批（非主销），余量={}，计划={}，实际生产={}",
+                    task.getEmbryoCode(), endingSurplusQty, task.getPlannedProduction(), endingSurplusQty);
         } else {
             // 主销产品最后一批：不够一车则补足到一车
-            if (endingExtraInventory > 0 && endingExtraInventory < tripCapacity) {
+            if (endingSurplusQty > 0 && endingSurplusQty < tripCapacity) {
                 task.setPlannedProduction(tripCapacity);
                 task.setRequiredCars(1);
                 task.setEndingExtraInventory(tripCapacity);
@@ -1263,5 +1504,87 @@ public class TaskGroupService {
      */
     private int getTripCapacity(String structureName, ScheduleContextVo context) {
         return productionCalculator.getTripCapacity(structureName, context);
+    }
+
+    // ==================== 参数配置获取方法 ====================
+
+    /**
+     * 获取收尾舍弃阈值：非主销产品余量≤此值时舍弃
+     * 优先使用参数配置，否则使用默认值
+     */
+    private int getEndingDiscardThreshold(ScheduleContextVo context) {
+        if (context.getParamConfigMap() != null) {
+            CxParamConfig config = context.getParamConfigMap().get(PARAM_ENDING_DISCARD_THRESHOLD);
+            if (config != null && config.getParamValue() != null) {
+                try {
+                    int value = Integer.parseInt(config.getParamValue());
+                    log.debug("收尾舍弃阈值使用参数配置: {}", value);
+                    return value;
+                } catch (NumberFormatException e) {
+                    log.warn("解析收尾舍弃阈值配置失败: {}", config.getParamValue());
+                }
+            }
+        }
+        return DEFAULT_ENDING_DISCARD_THRESHOLD;
+    }
+
+    /**
+     * 获取成型余量紧急阈值：成型余量低于此值标记为紧急收尾
+     * 优先使用参数配置，否则使用默认值
+     */
+    private int getEndingUrgentFormingRemainder(ScheduleContextVo context) {
+        if (context.getParamConfigMap() != null) {
+            CxParamConfig config = context.getParamConfigMap().get(PARAM_ENDING_URGENT_FORMING_REMAINDER);
+            if (config != null && config.getParamValue() != null) {
+                try {
+                    int value = Integer.parseInt(config.getParamValue());
+                    log.debug("成型余量紧急阈值使用参数配置: {}", value);
+                    return value;
+                } catch (NumberFormatException e) {
+                    log.warn("解析成型余量紧急阈值配置失败: {}", config.getParamValue());
+                }
+            }
+        }
+        return DEFAULT_ENDING_URGENT_FORMING_REMAINDER;
+    }
+
+    /**
+     * 获取近期收尾天数阈值（10天内）
+     * 优先使用参数配置，否则使用默认值
+     */
+    private int getEndingDaysThreshold(ScheduleContextVo context) {
+        if (context.getParamConfigMap() != null) {
+            CxParamConfig config = context.getParamConfigMap().get(PARAM_ENDING_DAYS_THRESHOLD);
+            if (config != null && config.getParamValue() != null) {
+                try {
+                    int value = Integer.parseInt(config.getParamValue());
+                    log.debug("近期收尾天数阈值使用参数配置: {}", value);
+                    return value;
+                } catch (NumberFormatException e) {
+                    log.warn("解析近期收尾天数阈值配置失败: {}", config.getParamValue());
+                }
+            }
+        }
+        return DEFAULT_ENDING_DAYS_THRESHOLD;
+    }
+
+    /**
+     * 获取紧急收尾天数阈值（3天内）
+     * 优先使用参数配置，否则使用默认值
+     */
+    private int getUrgentEndingDays(ScheduleContextVo context) {
+        if (context.getParamConfigMap() != null) {
+            CxParamConfig config = context.getParamConfigMap().get(PARAM_URGENT_ENDING_DAYS);
+            if (config != null && config.getParamValue() != null) {
+                try {
+                    int value = Integer.parseInt(config.getParamValue());
+                    log.debug("紧急收尾天数阈值使用参数配置: {}", value);
+                    return value;
+                } catch (NumberFormatException e) {
+                    log.warn("解析紧急收尾天数阈值配置失败: {}", config.getParamValue());
+                }
+            }
+        }
+        return DEFAULT_URGENT_ENDING_DAYS;
     }
 }

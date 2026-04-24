@@ -111,7 +111,7 @@ public class RawSpecialMaterialStock extends BaseEntity {
      * 原材料仓库数：钢丝库：是指原材料库（钢丝专门有个钢丝库）---陈经理确认
      */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.warehouseStock")
-    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
+    @ImportExcelValidated(required = false,  digits = true , min = 0, max = 999999)
     @ApiModelProperty(value = "原材料仓库数", name = "warehouseStock")
     @TableField(value = "WAREHOUSE_STOCK")
     private Integer warehouseStock;
@@ -120,7 +120,7 @@ public class RawSpecialMaterialStock extends BaseEntity {
      * 中间库库存数
      */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.midStock")
-    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
+    @ImportExcelValidated(required = false,  digits = true , min = 0, max = 999999)
     @ApiModelProperty(value = "中间库库存数", name = "midStock")
     @TableField(value = "MID_STOCK")
     private Integer midStock;
@@ -129,7 +129,7 @@ public class RawSpecialMaterialStock extends BaseEntity {
      * 车间库库存数：原材料中间库：是指车间库---陈经理确认
      */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.workshopStock")
-    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
+    @ImportExcelValidated(required = false,  digits = true , min = 0, max = 999999)
     @ApiModelProperty(value = "车间库库存数", name = "workshopStock")
     @TableField(value = "WORKSHOP_STOCK")
     private Integer workshopStock;
@@ -138,7 +138,7 @@ public class RawSpecialMaterialStock extends BaseEntity {
      * 总库存：总库房：是指汇总库存---陈经理确认
      */
     @Excel(name = "ui.data.column.rawSpecialMaterialStock.totalStock")
-    @ImportExcelValidated(required = true,  digits = true , min = 0, max = 999999)
+    @ImportExcelValidated(required = false,  digits = true , min = 0, max = 999999)
     @ApiModelProperty(value = "总库存", name = "totalStock")
     @TableField(value = "TOTAL_STOCK")
     private Integer totalStock;

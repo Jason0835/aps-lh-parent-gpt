@@ -46,6 +46,36 @@ public class TbrSimulateProductionLogRecorder {
     }
 
     /**
+     * 增加 不同分组续作模具按分配比例调整后 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，不同分组续作模具按分配比例调整完成====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addFinishedByGroupMoldRatioLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，不同分组续作模具按分配比例调整完成====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 不同分组续作模具按分配比例调整后重排续作 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，不同分组续作模具按分配比例调整完成重排续作====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addResetProductionContinueLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，不同分组续作模具按分配比例调整完成重排续作====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加分组计划模具正式排产没有需要排产的数据日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，正式开始分组计划模具排产没有排产的数据====
      *

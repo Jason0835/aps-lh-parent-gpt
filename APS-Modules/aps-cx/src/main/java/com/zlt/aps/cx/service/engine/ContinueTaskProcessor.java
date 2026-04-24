@@ -110,33 +110,16 @@ public class ContinueTaskProcessor {
             String machineCode = historyEntry.getKey();
             Set<String> historyEmbryos = historyEntry.getValue();
 
-            // 跳过无效数据
-            if (machineCode == null || historyEmbryos == null || historyEmbryos.isEmpty()) {
-                continue;
-            }
-
             for (String embryoCode : historyEmbryos) {
-                // 跳过 null 胎胚编码
-                if (embryoCode == null) {
-                    continue;
-                }
-                
                 // 在续作任务列表中找到 demand > 0 的任务
                 CoreScheduleAlgorithmService.DailyEmbryoTask matchedTask = null;
                 for (CoreScheduleAlgorithmService.DailyEmbryoTask task : continueTasks) {
-                    // 跳过 null 任务
-                    if (task == null) {
-                        continue;
-                    }
-                    String taskEmbryoCode = task.getEmbryoCode();
-                    // 跳过 null 胎胚编码比较
-                    if (taskEmbryoCode == null || !embryoCode.equals(taskEmbryoCode)) {
-                        continue;
-                    }
-                    int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
-                    if (demand > 0) {
-                        matchedTask = task;
-                        break;
+                    if (embryoCode.equals(task.getEmbryoCode())) {
+                        int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
+                        if (demand > 0) {
+                            matchedTask = task;
+                            break;
+                        }
                     }
                 }
 
@@ -175,24 +158,33 @@ public class ContinueTaskProcessor {
             int reservedVulcanizeCount,
             ScheduleContextVo context) {
 
+        // quantity 应该始终是胎胚数量，不是硫化机数
+        // 使用 endingExtraInventory（最终需要生产的量，经过收尾处理）
+        int quantity = task.getEndingExtraInventory() != null && task.getEndingExtraInventory() > 0
+                ? task.getEndingExtraInventory() : task.getDemandQuantity();
+
         CoreScheduleAlgorithmService.TaskAllocation taskAllocation = new CoreScheduleAlgorithmService.TaskAllocation();
         taskAllocation.setEmbryoCode(task.getEmbryoCode());
         taskAllocation.setMaterialCode(task.getMaterialCode());
         taskAllocation.setMaterialDesc(task.getMaterialDesc());
         taskAllocation.setMainMaterialDesc(task.getMainMaterialDesc());
         taskAllocation.setStructureName(task.getStructureName());
-        taskAllocation.setQuantity(reservedVulcanizeCount);  // 只记录预留量
-        taskAllocation.setVulcanizeMachineCount(reservedVulcanizeCount);
+        taskAllocation.setQuantity(quantity);  // 设置为胎胚数量
+        taskAllocation.setVulcanizeMachineCount(reservedVulcanizeCount);  // 硫化机数单独存储
         taskAllocation.setPriority(task.getPriority());
         taskAllocation.setStockHours(task.getStockHours());
         taskAllocation.setIsTrialTask(task.getIsTrialTask());
+        taskAllocation.setIsProductionTrial(task.getIsProductionTrial());
         taskAllocation.setIsEndingTask(task.getIsEndingTask());
         taskAllocation.setEndingSurplusQty(task.getEndingSurplusQty());
+        taskAllocation.setEndingExtraInventory(task.getEndingExtraInventory());  // 设置收尾额外库存
+        taskAllocation.setIsLastEndingBatch(task.getIsLastEndingBatch());  // 设置是否收尾最后一批
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
         taskAllocation.setIsContinueTask(true);  // 标记为续作预留
         taskAllocation.setLhId(task.getLhId());
 
         allocation.getTaskAllocations().add(taskAllocation);
+        // 注意：这里占用的是硫化机数，不是胎胚数量
         allocation.setUsedCapacity(allocation.getUsedCapacity() + reservedVulcanizeCount);
         allocation.setRemainingCapacity(allocation.getRemainingCapacity() - reservedVulcanizeCount);
     }
@@ -647,8 +639,11 @@ public class ContinueTaskProcessor {
         taskAllocation.setPriority(task.getPriority());
         taskAllocation.setStockHours(task.getStockHours());
         taskAllocation.setIsTrialTask(task.getIsTrialTask());
+        taskAllocation.setIsProductionTrial(task.getIsProductionTrial());
         taskAllocation.setIsEndingTask(task.getIsEndingTask());
         taskAllocation.setEndingSurplusQty(task.getEndingSurplusQty());
+        taskAllocation.setEndingExtraInventory(task.getEndingExtraInventory());  // 设置收尾额外库存
+        taskAllocation.setIsLastEndingBatch(task.getIsLastEndingBatch());  // 设置是否收尾最后一批
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
         taskAllocation.setLhId(task.getLhId());
 

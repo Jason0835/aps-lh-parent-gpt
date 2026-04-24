@@ -67,8 +67,8 @@ public class CxLhMouldProductionCalculator {
             productionQty = Math.min(productionQty, openMaxQty);
             lossQty = theoryProductionQty - productionQty;
         }
-        //todo 20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
         Integer lossQtyDiffValue = productionQty;
+        //20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
         Integer specialMaterialLimitQty = productionContext.getSpecialMaterialProductionQtyBySku(groupPlanInfo, productionQty);
         if (specialMaterialLimitQty <= BigDecimal.ZERO.intValue()) {
             continueSkuPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
@@ -152,7 +152,7 @@ public class CxLhMouldProductionCalculator {
                 Integer openMaxQty = context.getOpenDayMaxQty(day, dayLhQty);
                 realDayProductionQty = Math.min(realDayProductionQty, openMaxQty);
             }
-            //todo 20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
+            //20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
             Integer specialMaterialLimitQty = productionContext.getSpecialMaterialProductionQtyBySku(productionPlanInfo, realDayProductionQty);
             if (specialMaterialLimitQty <= BigDecimal.ZERO.intValue()) {
                 skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
@@ -252,7 +252,7 @@ public class CxLhMouldProductionCalculator {
                 Integer openMaxQty = context.getOpenDayMaxQty(day, dayLhQty);
                 realDayProductionQty = Math.min(realDayProductionQty, openMaxQty);
             }
-            //todo 20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
+            //20260211 特殊材料消耗库存量比较，库存量与realDayProductionQty取最小
             Integer specialMaterialLimitQty = productionContext.getSpecialMaterialProductionQtyBySku(productionPlanInfo, realDayProductionQty);
             if (specialMaterialLimitQty <= BigDecimal.ZERO.intValue()) {
                 skuProductionPlanList.forEach(singlePlan -> singlePlan.setIsThisRound(YesOrNoEnum.NO.getValue()));
@@ -414,6 +414,27 @@ public class CxLhMouldProductionCalculator {
         updateChangeMouldInfoByMould(context, beforeConclusionDay, productionPlan.getMaterialDesc(), singleMould);
     }
 
+    /**
+     * 换模次数+1处理
+     *
+     * @param productionContext 排产上下文
+     * @param addSkuInfo        排产Sku
+     * @param startDay          换模日
+     * @param beforeSku         前Sku信息
+     * @param doubleMouldList   排产模具
+     */
+    public static void addChangeMouldInfo(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo addSkuInfo, Integer startDay, BeforeSkuProductionInfo beforeSku, List<ProductionMouldInfoVo> doubleMouldList) {
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(productionContext, addSkuInfo, beforeSku, beforeSku);
+        boolean isChangeMould = changeMouldInfo.isChangeMould();
+        if (!isChangeMould) {
+            return;
+        }
+        //需要换模-换模次数处理
+        DayCapacityLimitVo changeMouldLimitHandler = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        Integer changeMouldDay = startDay;
+        Set<String> mouldCodeSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
+        changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
+    }
     /**
      * 判断是否需要结束标记
      * 1、看是否需要重新判断胎胚种类数及配比
@@ -777,7 +798,7 @@ public class CxLhMouldProductionCalculator {
         });
         //双模排产量-增加日产能使用量
         addDayCapacityQtyByMould(productionContext, productionDay, productionPlan, updateInfo, doubleMouldList);
-        //todo 20260211 更新特殊材料的库存消耗量
+        //20260211 更新特殊材料的库存消耗量
         productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupPlanInfo, realDayProductionQty);
     }
 
@@ -852,7 +873,7 @@ public class CxLhMouldProductionCalculator {
         });
         //双模排产量-增加日产能使用量
         addDayCapacityQtyByMould(productionContext, productionDay, singlePlan, updateInfo, doubleMouldList);
-        //todo 20260211 特殊材料的库存消耗量
+        //20260211 特殊材料的库存消耗量
         productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupPlanInfo, realDayProductionQty);
     }
 
@@ -870,14 +891,7 @@ public class CxLhMouldProductionCalculator {
         Integer productionDay = updateInfo.getProductionDay();
         Integer realDayProductionQty = updateInfo.getRealDayProductionQty();
         //排产信息更新
-        String materialDesc = productionSkuInfo.getMaterialDesc();
-//        cxLhGroup.setProductionQty(realDayProductionQty);
         cxLhGroup.setProductionDay(productionDay);
-//        cxLhGroup.setDayMaxProductionQty(dayMaxProductionQty);
-//        cxLhGroup.setMaterialDesc(materialDesc);
-//        cxLhGroup.setMaterialCode(productionSkuInfo.getMaterialCode());
-//        cxLhGroup.setEmbryoCode(productionSkuInfo.getEmbryoCode());
-//        cxLhGroup.setProductionMouldSet(usedMouldSet);
         BeforeSkuProductionInfo beforeSku = BeforeSkuProductionInfo.createByProductionPlan(productionSkuInfo, realDayProductionQty, productionDay, usedMouldSet);
         cxLhGroup.setBeforeSku(beforeSku);
         cxMachineInfo.getCxLhRatioMap().put(cxLhGroup.getLhGroupNo(), cxLhGroup);

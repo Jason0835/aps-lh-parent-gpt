@@ -471,7 +471,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
      * @param contextDTO 周程滚动调整上下文对象
      */
     @Override
-    protected void initStructureStartAndEndDay(MpRollAdjustContextDTO contextDTO){
+    public void initStructureStartAndEndDay(MpRollAdjustContextDTO contextDTO){
         int beginDay = FactoryConstant.MONTH_MAX_DAY;
         int endDay = 0;
         List<MpStructureAllocation> structureAllocationList = contextDTO.getOneStructureAllocationList();

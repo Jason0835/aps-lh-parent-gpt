@@ -18,14 +18,14 @@
                           AND smr.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
                           AND smr.MATERIAL_CODE = mcd.CHILD_MATERIAL_CODE)
            AND EXISTS (SELECT 1
-                         FROM t_mp_proc_month_plan_init mpi
+                         FROM T_DP_DEMAND_PLAN mpi
+                         LEFT JOIN T_MDM_SKU_CONSTRUCTION_REF scr 
+                           ON scr.MATERIAL_CODE = mpi.MATERIAL_CODE
+                          AND scr.IS_DELETE = 0
                         WHERE IFNULL(mpi.IS_DELETE, 0) = 0
                           AND mpi.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                          AND mpi.YEAR = #{year,jdbcType=DECIMAL}
-                          AND mpi.MONTH = #{month,jdbcType=DECIMAL}
                           AND mpi.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-                          AND mpi.PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR}
-                          AND mcd.EMBRYO_CODE = mpi.EMBRYO_CODE)
+                          AND mcd.EMBRYO_CODE = scr.EMBRYO_CODE)
 
     </select>
 

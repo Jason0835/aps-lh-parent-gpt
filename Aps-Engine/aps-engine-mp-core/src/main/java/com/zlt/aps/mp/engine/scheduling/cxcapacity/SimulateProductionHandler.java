@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxContinueInfoHelper;
@@ -8,10 +9,10 @@ import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
 import com.zlt.aps.mp.engine.handler.SupplementCxMachineDistributionHandler;
-import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -21,10 +22,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -58,6 +56,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final SupplementCxMachineDistributionHandler supplementCxMachineDistributionHandler;
 
+    private final DifferentGroupMoldAllocationAdjustHandler differentGroupMoldAllocationAdjustHandler;
+
     /**
      * 模拟排产计划
      *
@@ -70,7 +70,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //设置收尾机台信息-空
         productionContext.setReverseFindSet(new HashSet<>());
         //1、模拟排产前的数据处理
-        beforeSimulateProductionHandler(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
+        clearProductionInfoHandler.beforeSimulateProductionHandler(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         log.info(TbrSimulateProductionLogRecorder.addResetDataFinishLog(productionContext));
         //2、在机结构对在产成型机台进行模拟模具排产
         mouldProductionByContinueGroup(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
@@ -84,33 +84,19 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         supplementCxMachineDistributionHandler.handlerTailCapacity(productionContext, allGroupPlanMap);
     }
 
-    /**
-     * 1、在模拟排产前的处理
-     * 1.1、对测算在产机台收尾点的续作部分排产清除
-     * 1.2、根据在产机台分配结果，构建分组计划的在产机台排产限制信息
-     *
-     * @param context                排产上下文
-     * @param allGroupPlanMap        所有分组计划
-     * @param continueAllocationList 在产机台分配情况
-     * @param allContinueMap         所有续作信息
-     */
-    private void beforeSimulateProductionHandler(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
-        if (CollectionUtils.isEmpty(allContinueMap)) {
-            return;
-        }
+    @Override
+    public void handlerByMoldAllocationAdjust(Context context, ProductionStageEnum productionStage, Map<String, CxContinueInfoHelper> allContinueInfo, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, List<MpStructureAllocation> allAllocationList) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        //对测算成型产能分配的续作部分进行重排-先清空已排信息
-        clearProductionInfoHandler.clearProductionData(productionContext);
-        //在机结构对在产机台构建硫化组限制
-        Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
-        allContinueMap.forEach((structureName, cxContinueInfo) -> {
-            ProductionPlanGroupInfo groupPlanInfo = allGroupPlanMap.get(structureName);
-            List<CxMachineAllocationPlanHelper> continueCxMachineAllocation = groupPlanMap.get(groupPlanInfo);
-            if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
-                log.warn(TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(productionContext, structureName, null, null));
-                return;
-            }
-            groupPlanInfo.buildDayProductionLimitInfoByContinue(context, continueCxMachineAllocation);
+        //1、获取不同结构模具分配比例释放调整信息
+        differentGroupMoldAllocationAdjustHandler.checkMoldRatioAllocation(context);
+        productionContext.setHandlerMoldRatioDeductFlag(Boolean.TRUE);
+        TbrSimulateProductionLogRecorder.addFinishedByGroupMoldRatioLog(context);
+        //2、清除续作排产数据
+        clearProductionInfoHandler.beforeSimulateProductionHandler(context, allGroupPlanInfo, continueAllocationList, allContinueInfo);
+        TbrSimulateProductionLogRecorder.addResetProductionContinueLog(context);
+        //3、重排续作部分
+        allContinueInfo.forEach((structureName, cxContinueInfo) -> {
+            productionContinueByType(cxAddSkuProductionHandler, productionStage, context, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SKU);
         });
     }
 
@@ -134,7 +120,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         //1、在机结构-在产机台-续作Sku排产
-        productionContinue(cxAddSkuProductionHandler, ProductionStageEnum.SIMULATE_STAGE, productionContext, allContinueMap, allGroupPlanMap);
+        productionContinue(cxAddSkuProductionHandler, ProductionStageEnum.SIMULATE_STAGE, productionContext, allContinueMap, continueAllocationList, allGroupPlanMap, Collections.emptyList());
         Map<ProductionPlanGroupInfo, List<CxMachineAllocationPlanHelper>> groupPlanMap = continueAllocationList.stream().collect(Collectors.groupingBy(CxMachineAllocationPlanHelper::getProductionPlanInfo));
         //2、在机结构-新增Sku排产 优先给特殊结构所在机台选择
         allContinueMap.entrySet().stream().sorted((entry1, entry2) -> {

@@ -27,6 +27,7 @@ import com.zlt.aps.mp.engine.scheduling.cxcapacity.AdjustContinueSkuProductionQt
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ClearProductionInfoHandler;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.FormalProductionHandler;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCxMachineCalculationHandler;
+import com.zlt.aps.mp.engine.scheduling.matching.MatchingProductionHandler;
 import com.zlt.aps.mp.engine.service.DpRequireDataService;
 import com.zlt.aps.mp.engine.service.MonthProductionDataService;
 import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
@@ -62,6 +63,8 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
 
     private final ContinueGroupInfoHandler continueGroupInfoHandler;
 
+    private final MatchingProductionHandler matchingProductionHandler;
+
     private final WarningInformationHandler warningInformationHandler;
 
     private final ClearProductionInfoHandler clearProductionInfoHandler;
@@ -82,6 +85,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
                                      FormalProductionHandler formalProductionHandler,
                                      ISysDictDataCacheService iSysDictDataCacheService,
                                      ContinueGroupInfoHandler continueGroupInfoHandler,
+                                     MatchingProductionHandler matchingProductionHandler,
                                      WarningInformationHandler warningInformationHandler,
                                      MonthProductionDataService monthProductionDataService,
                                      ClearProductionInfoHandler clearProductionInfoHandler,
@@ -94,6 +98,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
         this.formalProductionHandler = formalProductionHandler;
         this.iSysDictDataCacheService = iSysDictDataCacheService;
         this.continueGroupInfoHandler = continueGroupInfoHandler;
+        this.matchingProductionHandler = matchingProductionHandler;
         this.warningInformationHandler = warningInformationHandler;
         this.clearProductionInfoHandler = clearProductionInfoHandler;
         this.initNoProductionRecordHandler = initNoProductionRecordHandler;
@@ -159,14 +164,12 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
         //获取结构排产信息
         List<MpStructureAllocation> allAllocationList = getMonthProductionDataService().getStructureAllocationInfoByProductionVersion(productionContext);
         log.info(TbrMouldFormalProductionLogRecorder.addStartMouldFormalLog(productionContext));
-        //清除模拟排产信息
-        clearProductionInfoHandler.clearProductionData(productionContext);
-        //重新构建分组计划的硫化组限制信息
-        resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, allAllocationList);
+        //清除模拟排产信息、重新构建分组计划的硫化组限制信息
+        clearProductionInfoHandler.resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, allAllocationList);
         log.info(TbrMouldFormalProductionLogRecorder.addResetDataFinishLog(productionContext));
-        formalProductionHandler.productionContinueGroup(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
-        //11、最后搭配排产 TODO 报错，先注释掉
-//        MatchingProductionHandler.matchingProduction(productionContext, estimateGroupCxAllocationMap, structureLhRatioList);
+        formalProductionHandler.productionContinueGroup(productionContext, estimateGroupCxAllocationMap, allAllocationList, cxContinueInfoMap);
+        //11、最后搭配排产
+        matchingProductionHandler.matchingProduction(productionContext.getProductionVersion(), productionContext);
         //12、保存模具排产结果
         Map<Long, Integer> sumProductionMap = saveMouldProductionInfo(productionContext, estimateGroupCxAllocationMap);
         //保存未排计划明细
@@ -347,32 +350,6 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
             log.info(TbrProductionGroupLogRecorder.addOnLineGroupSetUpDataLog(context, structureName));
             ContinueSkuCalculator.setContinueSkuPlanDemandQty(context, groupPlanInfo, cxContinueInfoHelper);
             ContinueSkuCalculator.initContinueCxMachineLimit(context, groupPlanInfo, cxContinueInfoHelper);
-        });
-    }
-
-    /**
-     * 10：在正式排产前重新构建分组限制信息
-     *
-     * @param context           排产上下文
-     * @param allGroupPlanInfo  所有分组计划对象
-     * @param allAllocationList 分组转产配置
-     */
-    private void resetBeforeFormalProduction(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, List<MpStructureAllocation> allAllocationList) {
-        //根据分组转产配置，重新构建分组的限制信息
-        allGroupPlanInfo.forEach((groupName, groupProductionInfo) -> {
-            List<MpStructureAllocation> groupAllocationList;
-            if (CollectionUtils.isEmpty(allAllocationList)) {
-                groupAllocationList = new ArrayList<>();
-            } else {
-                groupAllocationList = allAllocationList.stream().filter(singleAllocation -> groupName.equals(singleAllocation.getStructureName())).collect(Collectors.toList());
-            }
-            //重新设置分配的机台
-            Set<String> allocationSet = groupAllocationList.stream().map(MpStructureAllocation::getCxMachineCode).collect(Collectors.toSet());
-            groupProductionInfo.setAllocationCxMachineCodeSet(allocationSet);
-            groupProductionInfo.buildDayProductionLimitInfoByStructureAllocation(context, groupAllocationList);
-
-            //将产能限制Map 置空
-            groupProductionInfo.setDailyCapacityLimitVoMap(null);
         });
     }
 

@@ -302,6 +302,34 @@ public class MesItfController {
     }
 
     /**
+     * 同步产月度计划及硫化施工信息同步接口（SKU与施工关系表）
+     *
+     * @return 结果
+     */
+    @ApiOperation("同步产月度计划及硫化施工信息同步接口（SKU与施工关系表）")
+    @PostMapping("/syncLhConstructionInfo")
+    public AjaxResult syncLhConstructionInfo(String factoryCode, String dataVersion) {
+        AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
+        syncDataLogs.setFactoryCode(factoryCode);
+        syncDataLogs.setDataVersion(dataVersion);
+        return mesBomItfService.syncLhConstructionInfo(syncDataLogs);
+    }
+
+    /**
+     * 半部件BOM接口
+     *
+     * @return 结果
+     */
+    @ApiOperation("半部件BOM接口")
+    @PostMapping("/syncConstructionInfo")
+    public AjaxResult syncConstructionInfo(String factoryCode, String dataVersion) {
+        AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
+        syncDataLogs.setFactoryCode(factoryCode);
+        syncDataLogs.setDataVersion(dataVersion);
+        return mesBomItfService.syncConstructionInfo(syncDataLogs);
+    }
+
+    /**
      * 同步BOM
      *
      * @return 结果

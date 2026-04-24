@@ -1,12 +1,16 @@
 package com.zlt.aps.cx.controller;
 
 import cn.hutool.core.date.DateUtil;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
 import com.zlt.aps.cx.service.CxScheduleResultService;
@@ -23,6 +27,7 @@ import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiModelProperty;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,7 +95,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      */
     @Log(title = "ui.data.column.cxScheduleResult.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
-    @DeleteMapping("/remove")
+    @PostMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
@@ -139,21 +144,24 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             return AjaxResult.error("排程日期不能为空");
         }
         if (dto.getDays() == null || dto.getDays() < 1) {
-            dto.setDays(3);  // 默认排产3天
+            // 默认排产3天
+            dto.setDays(3);
         }
         // 只需要调用一次executeSchedule，days参数表示排产天数
         ScheduleRequestVo request = new ScheduleRequestVo();
-        request.setScheduleDate(dto.getScheduleDate());  // 最后一天日期
+        // 最后一天日期
+        request.setScheduleDate(dto.getScheduleDate());
         request.setOverwrite(dto.getOverwrite() != null ? dto.getOverwrite() : false);
         request.setFactoryCode(dto.getFactoryCode());
         request.setScheduleType(dto.getScheduleType());
         request.setScheduleMode(dto.getScheduleType());
-        request.setDays(dto.getDays());  // 传递排产天数
+        // 传递排产天数
+        request.setDays(dto.getDays());
         ScheduleService.ScheduleResult result = scheduleService.executeSchedule(request);
         if (result.isSuccess()) {
-            return AjaxResult.success(result);
+            return AjaxResult.success();
         } else {
-// 校验不通过时，构建校验摘要返回前端
+            // 校验不通过时，构建校验摘要返回前端
             ScheduleService.ValidationSummary summary = new ScheduleService.ValidationSummary();
             summary.setErrorCount(result.getValidationErrors() != null ? result.getValidationErrors().size() : 0);
             summary.setWarningCount(result.getValidationWarnings() != null ? result.getValidationWarnings().size() : 0);
@@ -428,17 +436,16 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
 	@Override
 	protected void builderCondition(QueryWrapper<CxScheduleResult> queryWrapper, CxScheduleResult queryVO) {
-		// 排程日期区间查询（使用 searchValue 传递开始时间，remark 传递结束时间）
-		if (PubUtil.isNotEmpty(queryVO.getSearchValue()) && PubUtil.isNotEmpty(queryVO.getRemark())) {
-            Date beginDay = DateUtil.parse(queryVO.getSearchValue());
-            Date endDay = DateUtil.parse(queryVO.getRemark());
-            endDay = DateUtil.endOfDay(endDay);
-			queryWrapper.between("SCHEDULE_DATE", beginDay, endDay);
-		}
+		// 排程日期查询
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getScheduleDate()), "SCHEDULE_DATE", queryVO.getScheduleDate());
 		// 机台代码模糊查询
 		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getCxMachineCode()), "CX_MACHINE_CODE", queryVO.getCxMachineCode());
-		// 胎胚代码模糊查询
-		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getEmbryoCode()), "EMBRYO_CODE", queryVO.getEmbryoCode());
+		// 物料代码模糊查询
+		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
+        // 物料代码模糊查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialDesc()), "MATERIAL_DESC", queryVO.getMaterialDesc());
+        // 物料代码模糊查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMainMaterialDesc()), "MAIN_MATERIAL_DESC", queryVO.getMainMaterialDesc());
 		// 订单号精确查询
 		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getOrderNo()), "ORDER_NO", queryVO.getOrderNo());
 		// 生产状态精确查询
@@ -446,6 +453,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 		// 发布状态精确查询
 		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getIsRelease()), "IS_RELEASE", queryVO.getIsRelease());
 	}
+
 
     @Override
     protected String getTypeCode() {

@@ -41,8 +41,8 @@ public class CxPrecisionPlan extends BaseEntity implements Serializable {
     private String precisionCycle;
 
     /** 计划日期 */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("PLAN_DATE")
     private Date planDate;
 

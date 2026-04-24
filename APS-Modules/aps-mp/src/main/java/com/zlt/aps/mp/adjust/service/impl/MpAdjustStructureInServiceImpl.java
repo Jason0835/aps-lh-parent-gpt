@@ -275,6 +275,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         paramCodeList.add(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_PRODUCTION_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.STRUCTURE_ADJUST_PRE_CLOSE_DAY.getCode());
+        paramCodeList.add(MonthPlanEnums.CX_LH_RATIO_EXTRA.getCode());
         return productionSchedulingDataService.getFactoryParamByCondition(context,paramCodeList);
     }
 

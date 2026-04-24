@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -27,18 +28,21 @@ public class CxPrecisionPlan extends BaseEntity implements Serializable {
 
     /** 分厂编码 */
     @Excel(name = "ui.data.column.cxPrecisionPlan.factoryCode", dictType = "biz_factory_name")
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "分厂编码")
     @TableField("FACTORY_CODE")
     private String factoryCode;
 
     /** 机台编号 */
     @Excel(name = "ui.data.column.cxPrecisionPlan.machineCode")
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "机台编号")
     @TableField("MACHINE_CODE")
     private String machineCode;
 
     /** 精度类型 */
     @Excel(name = "ui.data.column.cxPrecisionPlan.accuracyType", dictType = "cx_precision_plan_type")
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "精度类型")
     @TableField("PRECISION_TYPE")
     private String precisionType;
@@ -50,10 +54,10 @@ public class CxPrecisionPlan extends BaseEntity implements Serializable {
     private String precisionCycle;
 
     /** 计划日期 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.planDate", dateFormat = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.cxPrecisionPlan.planDate", dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty(value = "计划日期")
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("PLAN_DATE")
     private Date planDate;
 

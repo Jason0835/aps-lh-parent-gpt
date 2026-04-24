@@ -255,7 +255,7 @@ public class MatchingProductionHandler {
 //                productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, productionQty); // 占用
                 Integer productionQty = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum(); // 已排产量
                 Integer remainQty = productionContext.getSpecialMaterialBatchRemainQty(groupInfo, productionQty, false); // 剩余量
-                if (productionQty < remainQty) { // 如果储备量少于剩余量，则需要补够剩余量，优先补到有富余产能，且搭配量最大的规格上
+                if (productionQty < remainQty) { // 如果未生产量少于剩余量，则需要补够剩余量，优先补到有富余产能，且搭配量最大的规格上
                     Integer unAllocateQty = remainQty - productionQty;
                     MonthPlanProductionRequirePlanVo plan = productionPlanList.stream().max(Comparator.comparing(MonthPlanProductionRequirePlanVo::getProductionQty)).orElse(null);
                     plan.setProductionQty(unAllocateQty);
@@ -508,7 +508,7 @@ public class MatchingProductionHandler {
                         productionQty = productionQty > totalProductionQty ? productionQty - totalProductionQty : 0;
                         limitHelper.setPlanQty(limitHelper.getPlanQty() + totalProductionQty);
                         if (totalProductionQty > 0) {
-                            productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, productionQty); // 更新特殊材料占用
+                            productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, totalProductionQty); // 更新特殊材料占用
                             String mainPattern = CollectionUtils.firstElement(productionPlanList).getMainPattern(); // 主花纹
                             groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern); // 重新计算统计产能
                             this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
@@ -1209,7 +1209,7 @@ public class MatchingProductionHandler {
                         ContinueTypeEnum.NO_CONTINUE);
                 Integer realProductionQty = lhProductionQtyHelper.getRealSumProductionQty() - realSumProductionQty;
                 if (realProductionQty > 0) {
-                    productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, productionQty); // 更新特殊材料占用
+                    productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, realProductionQty); // 更新特殊材料占用
                     Set<String> useMouldSet = newDoubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).distinct().collect(Collectors.toSet());
                     String scheduleLogName = productionContext.getIsActualOrder()? "实单补量": "搭配排产";
                     this.addTempLog(productionContext, String.format("结构:%s,【%s】,%s日,规格:%s,新增模具%s,排产量:%s", structureName, scheduleLogName, usedBeginDate, materialDesc, useMouldSet, realProductionQty));
@@ -2054,15 +2054,14 @@ public class MatchingProductionHandler {
                 .filter(Objects::nonNull).max(Long::compareTo).orElse(0L);
         
         // 合并需求计划
-        Map<String, MonthPlanProductionRequirePlanVo> requireMap = productionContext.getAllProductionPlan().values()
-                .stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMaterialCode,
-                        Function.identity(), (p1, p2) -> {
-                            p1.setHeightLossQty(safeAdd(p1.getHeightLossQty(), p2.getHeightLossQty()));
-                            p1.setMidQty(safeAdd(p1.getMidQty(), p2.getMidQty()));
-                            p1.setPostponeQty(safeAdd(p1.getPostponeQty(), p2.getPostponeQty()));
-                            return p1;
-                        }));
-        
+//        Map<String, MonthPlanProductionRequirePlanVo> requireMap = productionContext.getAllProductionPlan().values()
+//                .stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMaterialCode,
+//                        Function.identity(), (p1, p2) -> {
+//                            p1.setHeightLossQty(safeAdd(p1.getHeightLossQty(), p2.getHeightLossQty()));
+//                            p1.setMidQty(safeAdd(p1.getMidQty(), p2.getMidQty()));
+//                            p1.setPostponeQty(safeAdd(p1.getPostponeQty(), p2.getPostponeQty()));
+//                            return p1;
+//                        }));
         for (FactoryMonthPlanMouldDayResult plan : dayResultList) {
             Integer factProdQty = factProdReqMap.getOrDefault(plan.getMaterialDesc(), 0); // 实单补量
             Integer matchingQty = matchingQtyMap.getOrDefault(plan.getMaterialDesc(), 0); // 搭配补量
@@ -2072,47 +2071,21 @@ public class MatchingProductionHandler {
             FactoryMonthPlanMouldDayResult firstPlan = CollectionUtils.firstElement(resultList);
             // 原有记录有同规格的更新（有ID）；没有的说明是新搭配的规格，需要新增（无ID）
             FactoryMonthPlanMouldDayResult oldPlan = oldPlanMap.get(plan.getMaterialCode());
+//            MonthPlanProductionRequirePlanVo requirePlan = requireMap.get(plan.getMaterialCode());
+//            if (requirePlan != null) {
+//                plan.setHeightLossQty(requirePlan.getHeightQty());
+//                plan.setMidLossQty(requirePlan.getMidQty());
+//                plan.setPostponeQty(requirePlan.getPostponeQty());
+//            }
             if (oldPlan != null) {
-                MonthPlanProductionRequirePlanVo requirePlan = requireMap.get(oldPlan.getMaterialCode());
-                if (requirePlan != null) {
-                    oldPlan.setHeightQty(requirePlan.getHeightQty());
-                    oldPlan.setMidLossQty(requirePlan.getMidQty());
-                    oldPlan.setPostponeQty(requirePlan.getPostponeQty());
-                }
-                plan.setConventionProductionQty(matchingQty);
-                plan.setTotalQty(oldPlan.getTotalQty() + matchingQty + factProdQty);
-                Integer temFactProdQty = factProdQty + oldPlan.getTotalQty();
-                // 高优先级
-                Integer diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "heightQty", "heightProductionQty");
-                temFactProdQty -= diffQty;
-                // 中优先级
-                diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "midLossQty", "midProductionQty");
-                temFactProdQty -= diffQty;
-                // 暂缓
-                diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "postponeQty", "postponeProductionQty");
-                temFactProdQty -= diffQty;
                 // 差异
-                plan.setDifferenceQty(oldPlan.getDifferenceQty() - factProdQty);
-                plan.setCycleProductionQty(oldPlan.getCycleProductionQty());
+                plan.setDifferenceQty(oldPlan.getDifferenceQty() > factProdQty? oldPlan.getDifferenceQty() - factProdQty: 0);
                 plan.setMouldCavityQty(oldPlan.getMouldCavityQty());
                 plan.setTypeBlockQty(oldPlan.getTypeBlockQty());
                 plan.setFactProdReqQty(oldPlan.getFactProdReqQty());
                 plan.setReason(oldPlan.getReason());
                 plan.setId(oldPlan.getId());
             } else {
-                plan.setConventionProductionQty(matchingQty + factProdQty);
-                plan.setTotalQty(plan.getConventionProductionQty());
-                Integer temFactProdQty = factProdQty;
-                // 高优先级
-                Integer diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "heightQty", "heightProductionQty");
-                temFactProdQty -= diffQty;
-                // 中优先级
-                diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "midLossQty", "midProductionQty");
-                temFactProdQty -= diffQty;
-                // 暂缓
-                diffQty = this.allocationProductionQty(plan, oldPlan, factProdQty, temFactProdQty, "postponeQty", "postponeProductionQty");
-                temFactProdQty -= diffQty;
-                plan.setCycleProductionQty(0);
                 if (plan.getProductionSequence() == null) {
                     productionSequence++;
                     plan.setProductionSequence(productionSequence);
@@ -2121,6 +2094,8 @@ public class MatchingProductionHandler {
                 plan.setFactProdReqQty(0);
                 plan.setReason(null);
             }
+            plan.statisticsTotalQty(); // 重新统计汇总值
+            plan.allocateProductionByPriority(); // 按优先级重新分配实际排产量
             plan.setCreateBy(firstPlan.getCreateBy());
             plan.setCreateTime(firstPlan.getCreateTime());
             plan.setUpdateBy(firstPlan.getUpdateBy());
@@ -3330,7 +3305,9 @@ public class MatchingProductionHandler {
                 standardLengthMap = new HashMap<>();
                 specialMaterialInfoMap.put(specialMaterialCode, standardLengthMap);
             }
-            standardLengthMap.put(specialMaterialStockInfo.getStandardLength(), SpecialMaterialInfoVo.createInitInfo(specialMaterialStockInfo));
+            SpecialMaterialInfoVo stockInfoVo = SpecialMaterialInfoVo.createInitInfo(specialMaterialStockInfo);
+            stockInfoVo.setSumNoRoundProductionQty(stockInfoVo.getStock());
+            standardLengthMap.put(specialMaterialStockInfo.getStandardLength(), stockInfoVo);
         });
         productionContext.setSpecialMaterialInfoMap(specialMaterialInfoMap);
     }

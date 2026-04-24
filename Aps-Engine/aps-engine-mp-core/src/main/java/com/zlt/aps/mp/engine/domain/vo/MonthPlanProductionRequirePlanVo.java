@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.domain.vo;
 
+import com.zlt.aps.common.core.enums.QualityStateEnum;
 import com.zlt.aps.enums.*;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.ProductionMonthPlanInit;
@@ -47,6 +48,10 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 不可生产标志
      */
     private String cantProduce;
+    /**
+     * 质控状态
+     */
+    private String qualityStateCode;
     /**
      * 排产标记 默认可排产
      */
@@ -408,6 +413,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         setProSize(productBaseInfo.getProSize());
         setMainPattern(productBaseInfo.getMainPattern());
         setCantProduce(productBaseInfo.getCantProduce());
+        setQualityStateCode(productBaseInfo.getQualityStateCode());
         setProductCategory(productBaseInfo.getProductCategory());
     }
 

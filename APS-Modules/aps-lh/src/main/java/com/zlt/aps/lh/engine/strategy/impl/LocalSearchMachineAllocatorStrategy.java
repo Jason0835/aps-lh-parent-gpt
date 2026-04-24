@@ -157,7 +157,9 @@ public class LocalSearchMachineAllocatorStrategy {
         }
 
         SkuScheduleDTO currentSku = windowSkuList.get(level);
-        List<MachineScheduleDTO> candidates = level == 0 ? firstLevelCandidates : machineMatch.matchMachines(context, currentSku);
+        List<MachineScheduleDTO> candidates = level == 0
+                ? firstLevelCandidates
+                : matchMachinesForSimulation(context, machineMatch, currentSku);
         if (CollectionUtils.isEmpty(candidates)) {
             // 本层无可行机台，按不可行分支处理并继续探索后续层
             dfsSelect(context, windowSkuList, level + 1, firstLevelCandidates, machineMatch, mouldChangeBalance,
@@ -204,6 +206,26 @@ public class LocalSearchMachineAllocatorStrategy {
                     inspectionBalance, capacityCalculate, shifts, virtualMachineEndTimeMap, reservationStack,
                     currentFeasibleCount, currentPenalty + INFEASIBLE_PENALTY, firstMachineCode, deadlineMs,
                     bestFeasibleCountHolder, bestPenaltyHolder, bestFirstMachineCodeHolder);
+        }
+    }
+
+    /**
+     * 在局部搜索模拟分支中匹配候选机台。
+     * <p>模拟分支仅用于评估，不应输出最终决策日志口径以外的跟踪日志。</p>
+     *
+     * @param context 排程上下文
+     * @param machineMatch 机台匹配策略
+     * @param currentSku 当前SKU
+     * @return 候选机台列表
+     */
+    private List<MachineScheduleDTO> matchMachinesForSimulation(LhScheduleContext context,
+                                                                 IMachineMatchStrategy machineMatch,
+                                                                 SkuScheduleDTO currentSku) {
+        context.enterPriorityTraceMuteScope();
+        try {
+            return machineMatch.matchMachines(context, currentSku);
+        } finally {
+            context.exitPriorityTraceMuteScope();
         }
     }
 
@@ -265,7 +287,7 @@ public class LocalSearchMachineAllocatorStrategy {
         // 按“机台准备 -> 换模 -> 首检 -> 产能估算”的顺序串行预占资源
         Date machineEndTime = resolveMachineEndTime(context, machine, shifts, virtualMachineEndTimeMap);
         Date machineReadyTime = capacityCalculate.calculateStartTime(context, machineCode, machineEndTime);
-        Date mouldChangeStartTime = mouldChangeBalance.allocateMouldChange(context, machineReadyTime);
+        Date mouldChangeStartTime = mouldChangeBalance.allocateMouldChange(context, machineCode, machineReadyTime);
         if (mouldChangeStartTime == null) {
             return null;
         }
@@ -434,6 +456,7 @@ public class LocalSearchMachineAllocatorStrategy {
         }
         return new Date();
     }
+
 }
 
 /**
