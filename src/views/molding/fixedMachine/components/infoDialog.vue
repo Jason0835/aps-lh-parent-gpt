@@ -176,6 +176,21 @@ export default {
           },
         },
         {
+          prop: "fixedStructure4",
+          label: this.$t("ui.data.column.workWearInfo.fixedStructure4"),
+          maxlength: 500,
+          render: (form) => {
+            return (
+              <structureSelect
+                key={form.fixedStructure4}
+                multiple={true}
+                v-model={form.fixedStructure4}
+                oldList={form.fixedStructure4}
+              />
+            );
+          },
+        },
+        {
           prop: "fixedMaterialCode",
           label: this.$t("ui.data.column.workWearInfo.fixedMaterialCode"),
           maxlength: 500,

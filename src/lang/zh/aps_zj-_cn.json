@@ -131,6 +131,7 @@
   "ui.data.column.workWearInfo.fixedStructure1": "固定结构1",
   "ui.data.column.workWearInfo.fixedStructure2": "固定结构2",
   "ui.data.column.workWearInfo.fixedStructure3": "固定结构3",
+  "ui.data.column.workWearInfo.fixedStructure4": "固定结构4",
   "ui.data.column.workWearInfo.fixedMaterialCode": "固定SKU",
   "ui.data.column.workWearInfo.disableStructure": "不可作业结构",
   "ui.data.column.workWearInfo.disableMaterialCode": "不可作业SKU",
