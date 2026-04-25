@@ -9,6 +9,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.aps.cx.api.domain.vo.CxStockImportVo;
 import com.zlt.aps.cx.api.service.ICxStockRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
@@ -163,7 +164,7 @@ public class CxStockUIController extends BaseUIController<CxStock> {
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<CxStock> util = new ExcelUtil<>(CxStock.class);
+        ExcelUtil<CxStockImportVo> util = new ExcelUtil<>(CxStockImportVo.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }

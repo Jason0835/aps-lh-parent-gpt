@@ -637,7 +637,7 @@ public class HolidayScheduleServiceImpl implements HolidayScheduleService {
                 if (predictedParkingHours.compareTo(BigDecimal.valueOf(maxParkingHours)) > 0) {
                     EmbryoConsumptionSuggestion suggestion = new EmbryoConsumptionSuggestion();
                     suggestion.setEmbryoCode(stock.getEmbryoCode());
-                    suggestion.setEmbryoName(stock.getMaterialName());
+                    suggestion.setEmbryoName(stock.getEmbryoDesc());
                     suggestion.setCurrentStock(stock.getStockNum());
                     suggestion.setParkingHours(parkingHours);
                     suggestion.setSuggestedConsumption(stock.getEffectiveStock());
