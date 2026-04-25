@@ -253,6 +253,13 @@ export default {
             return this.selectDictLabel(this.dict.type.finish_completion, value);
           },
         },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.updateTime"),
+          minWidth: 160,
+        },
 
         // {
         //   prop: "createByName",
