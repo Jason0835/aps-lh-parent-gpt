@@ -17,6 +17,8 @@ import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -25,13 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.commons.lang3.StringUtils;
+import java.util.*;
 
 @Api(tags = "硫化排程结果")
 @Controller
@@ -215,11 +211,26 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
      * @param dto 生成入参
      * @return 处理结果
      */
+    @RequiresPermissions("lh:lhScheduleResult:generateTextPlan")
     @ApiOperation("生成文字示方换模计划")
     @PostMapping("/generateTextMouldChangePlan")
     @ResponseBody
     public AjaxResult generateTextMouldChangePlan(@RequestBody LhGenerateTextMouldPlanDTO dto) {
         return iLhScheduleResultRemoteService.generateTextMouldChangePlan(dto);
+    }
+
+    /**
+     * 换模开产增加计划
+     *
+     * @param scheduleResult 当前硫化排程结果
+     * @return 处理结果
+     */
+    @RequiresPermissions("lh:lhScheduleResult:increaseMouldStartPlan")
+    @ApiOperation("换模开产增加计划")
+    @PostMapping("/increaseMouldStartPlan")
+    @ResponseBody
+    public AjaxResult increaseMouldStartPlan(@RequestBody LhScheduleResult scheduleResult) {
+        return iLhScheduleResultRemoteService.increaseMouldStartPlan(scheduleResult);
     }
 
     @Override

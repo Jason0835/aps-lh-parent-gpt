@@ -76,4 +76,12 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
      * @return 处理结果
      */
     AjaxResult generateTextMouldChangePlan(LhGenerateTextMouldPlanDTO dto);
+
+    /**
+     * 换模开产增加计划。
+     *
+     * @param scheduleResult 当前硫化排程结果
+     * @return 处理结果
+     */
+    AjaxResult increaseMouldStartPlan(LhScheduleResult scheduleResult);
 }
