@@ -57,7 +57,7 @@ import infoDialog from './components/infoDialog.vue'
 export default {
   name: 'CxStock',
   components: { TltUploadForm, infoDialog },
-  dicts: ['biz_factory_name', 'biz_yes_no'],
+  dicts: ['biz_factory_name'],
   provide() {
     return { parentDict: this.dict }
   },
@@ -81,13 +81,25 @@ export default {
       selection: [],
       page: { current: 1, pageSize: 20, total: 0 },
       sort: {},
-      search: {},
-      query: {}
+      search: {
+        factoryCode: '116'
+      },
+      query: {
+        factoryCode: '116'
+      }
     }
   },
   computed: {
     searchColumns() {
       return [
+        {
+          prop: 'factoryCode',
+          label: this.$t('ui.data.column.cxStock.factoryCode'),
+          type: 'select',
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+          clearable: true
+        },
         {
           prop: 'stockDate',
           label: this.$t('ui.data.column.cxStock.stockDate'),
@@ -105,21 +117,12 @@ export default {
           type: 'input'
         },
         {
-          prop: 'factoryCode',
-          label: this.$t('ui.data.column.cxStock.factoryCode'),
-          type: 'select',
-          dictData: this.dict.type.biz_factory_name,
-          filterable: true,
-          clearable: true
+          prop: 'embryoDesc',
+          label: this.$t('ui.data.column.cxStock.embryoDesc'),
+          placeholder: this.$t('common.rule.input'),
+          type: 'input'
         },
-        {
-          prop: 'isEndingSku',
-          label: this.$t('ui.data.column.cxStock.isEndingSku'),
-          type: 'select',
-          dictData: this.dict.type.biz_yes_no,
-          filterable: true,
-          clearable: true
-        }
+
       ]
     },
     columns() {
@@ -150,6 +153,13 @@ export default {
           minWidth: 140
         },
         {
+          prop: 'embryoDesc',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxStock.embryoDesc'),
+          minWidth: 180
+        },
+        {
           prop: 'stockNum',
           align: 'center',
           halign: 'center',
@@ -157,36 +167,11 @@ export default {
           minWidth: 120
         },
         {
-          prop: 'overTimeStock',
+          prop: 'updateTime',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxStock.overTimeStock'),
-          minWidth: 120
-        },
-        {
-          prop: 'modifyNum',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.cxStock.modifyNum'),
-          minWidth: 120
-        },
-        {
-          prop: 'badNum',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.cxStock.badNum'),
-          minWidth: 120
-        },
-
-        {
-          prop: 'isEndingSku',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.column.cxStock.isEndingSku'),
-          minWidth: 120,
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          }
+          label: this.$t('ui.common.column.updateTime'),
+          minWidth: 160
         },
         {
           prop: 'remark',

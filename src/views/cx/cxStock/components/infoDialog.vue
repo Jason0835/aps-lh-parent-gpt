@@ -32,10 +32,11 @@
 import { saveCxStock } from "@/api/cx/cxStock";
 
 import infoForm from "@/views/components/infoForm.vue";
+import materialCodeSelect from "./materialCodeSelect.vue";
 
 export default {
   name: "InfoDialog",
-  components: { infoForm },
+  components: { infoForm, materialCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -45,6 +46,13 @@ export default {
       dict: this.parentDict,
       form: {},
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
         stockDate: [
           {
             required: true,
@@ -63,6 +71,18 @@ export default {
           {
             required: true,
             message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+          {
+            validator: (rule, value, callback) => {
+              if (value === undefined || value === null || value === "") {
+                callback(new Error(this.$t("common.rule.input")));
+              } else if (!/^[1-9]\d*$/.test(String(value))) {
+                callback(new Error("库存量必须为正整数"));
+              } else {
+                callback();
+              }
+            },
             trigger: "blur",
           },
         ],
@@ -91,42 +111,27 @@ export default {
         {
           prop: "embryoCode",
           label: this.$t("ui.data.column.cxStock.embryoCode"),
-          maxlength: 64,
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.embryoCode}
+                v-model={form.embryoCode}
+                onChange={this.handleEmbryoCodeChange}
+              />
+            );
+          },
+        },
+        {
+          prop: "embryoDesc",
+          label: this.$t("ui.data.column.cxStock.embryoDesc"),
+          disabled: true,
         },
         {
           prop: "stockNum",
           label: this.$t("ui.data.column.cxStock.stockNum"),
           type: "number",
-          min: 0,
-          precision: 2,
-        },
-        {
-          prop: "overTimeStock",
-          label: this.$t("ui.data.column.cxStock.overTimeStock"),
-          type: "number",
-          min: 0,
-          precision: 2,
-        },
-        {
-          prop: "modifyNum",
-          label: this.$t("ui.data.column.cxStock.modifyNum"),
-          type: "number",
-          min: -999999,
-          precision: 2,
-        },
-        {
-          prop: "badNum",
-          label: this.$t("ui.data.column.cxStock.badNum"),
-          type: "number",
-          min: 0,
-          precision: 2,
-        },
-        {
-          prop: "isEndingSku",
-          label: this.$t("ui.data.column.cxStock.isEndingSku"),
-          type: "select",
-          dictData: this.dict.type.biz_yes_no,
-          filterable: true,
+          min: 1,
+          precision: 0,
         },
         {
           prop: "remark",
@@ -139,6 +144,10 @@ export default {
     },
   },
   methods: {
+    handleEmbryoCodeChange(value, row) {
+      this.$set(this.form, "embryoCode", value);
+      this.$set(this.form, "embryoDesc", (row && row.embryoDesc) || "");
+    },
     show(row) {
       this.visible = true;
       if (row) {
@@ -147,7 +156,8 @@ export default {
       } else {
         this.isEdit = false;
         this.form = {
-          isEndingSku: "0",
+          factoryCode: "116",
+          embryoDesc: "",
         };
       }
     },

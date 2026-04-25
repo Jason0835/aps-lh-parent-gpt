@@ -2369,6 +2369,8 @@
   "ui.data.column.cxStock.modelName": "成型库存",
   "ui.data.column.cxStock.stockDate": "库存日期",
   "ui.data.column.cxStock.embryoCode": "胎胚代码",
+  "ui.data.column.cxStock.embryoDesc": "胎胚描述",
+  "ui.data.column.cxStock.updateDay": "更新时间",
   "ui.data.column.cxStock.stockNum": "库存量",
   "ui.data.column.cxStock.overTimeStock": "超期库存",
   "ui.data.column.cxStock.modifyNum": "修正数量",

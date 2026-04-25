@@ -43,12 +43,13 @@
            @click="handleExport"
            v-hasPermi="['lh:lhMouldChangePlan:export']"
          >{{ $t("ui.frame.btn.export") }}</el-button>
-         <el-button
-           type="success"
-           v-hasPermi="['lh:lhMouldChangePlan:issue']"
-           @click="handleIssueSchedule"
-           :disabled="!canIssueSchedule"
-         >{{ $t("ui.data.btn.lhMouldChangePlan.issueSchedule") }}</el-button>
+          <el-button
+            type="primary"
+            plain
+            v-hasPermi="['lh:lhMouldChangePlan:issue']"
+            @click="handleIssueSchedule"
+            :disabled="!canIssueSchedule"
+          >{{ $t("ui.data.btn.lhMouldChangePlan.issueSchedule") }}</el-button>
        </template>
     </page-table>
     <tlt-upload-form
