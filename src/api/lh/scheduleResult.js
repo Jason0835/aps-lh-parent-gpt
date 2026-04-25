@@ -329,3 +329,19 @@ export function adjustTextNo(query) {
     data: query
   })
 }
+
+/**
+ * 生成文字示方换模计划
+ * @param {*} query
+ * @returns
+ */
+export function generateTextMouldChangePlan(query) {
+  return request({
+    url: '/lh/lhScheduleResult/generateTextMouldChangePlan',
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+  })
+}

@@ -2445,6 +2445,8 @@
   "ui.data.alert.lhMouldChangePlan.scheduleDateRequired": "排程日期不能为空",
   "ui.data.alert.lhMouldChangePlan.issueSuccess": "发布成功",
   "ui.data.alert.lhMouldChangePlan.issueFail": "发布失败",
+  "ui.data.alert.lhMouldChangePlan.generateTextPlan.replaceConfirm": "同机台同日已存在未发布换模计划，确认后将执行替换",
+  "ui.data.alert.lhMouldChangePlan.generateTextPlan.success": "生成文字示方换模计划成功",
   "ui.data.column.lhPrecisionPlan.factoryCode": "分厂",
   "ui.data.column.lhPrecisionPlan.machineCode": "机台编号",
   "ui.data.column.lhPrecisionPlan.precisionType": "精度类型",
