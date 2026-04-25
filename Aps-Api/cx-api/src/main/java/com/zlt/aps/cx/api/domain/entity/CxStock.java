@@ -101,7 +101,7 @@ public class CxStock extends BaseEntity {
     /**
      * 排程使用库存
      */
-    @Excel(name = "ui.data.column.stock.scheduleUseStock",type = Excel.Type.EXPORT)
+//    @Excel(name = "ui.data.column.stock.scheduleUseStock",type = Excel.Type.EXPORT)
     @TableField(exist = false)
     private Long scheduleUseStock;
 
