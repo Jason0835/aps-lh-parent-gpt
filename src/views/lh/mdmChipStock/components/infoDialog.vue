@@ -103,6 +103,12 @@ export default {
           disabled: true,
         },
         {
+          prop: "remainStockNum",
+          label: this.$t("ui.data.column.lhChipStock.remainStockNum"),
+          type: "number",
+          disabled: true,
+        },
+        {
           prop: "remark",
           label: this.$t("ui.data.column.lhChipStock.remark"),
           type: "textarea",
@@ -112,7 +118,20 @@ export default {
       ];
     },
   },
+  watch: {
+    "form.stockNum"() {
+      this.calcRemainStockNum();
+    },
+    "form.finishQty"() {
+      this.calcRemainStockNum();
+    },
+  },
   methods: {
+    calcRemainStockNum() {
+      const stockNum = Number(this.form.stockNum || 0);
+      const finishQty = Number(this.form.finishQty || 0);
+      this.$set(this.form, "remainStockNum", stockNum - finishQty);
+    },
     // api
     async save(params) {
       try {
@@ -180,6 +199,7 @@ export default {
           id: undefined,
         };
       }
+      this.calcRemainStockNum();
     },
     hide() {
       this.form = {};

@@ -311,6 +311,9 @@ export default {
       }
     },
   },
+  created() {
+    this.getList();
+  },
   activated() {
     this.getList();
   },
