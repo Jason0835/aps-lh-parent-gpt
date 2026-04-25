@@ -88,6 +88,13 @@ export default {
   transition: border-color 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
   width: 100%;
 }
+.el-textarea__inner {
+  font-family: Helvetica Neue, Helvetica, PingFang SC, Hiragino Sans GB,
+    Microsoft YaHei, Arial, sans-serif;
+  color: #000;
+  font-size: inherit;
+  font-weight: 500;
+}
 .el-input.is-disabled .el-input__inner {
   // 字体颜色：#b1b1b1
   background-color: #f7f8fa;
