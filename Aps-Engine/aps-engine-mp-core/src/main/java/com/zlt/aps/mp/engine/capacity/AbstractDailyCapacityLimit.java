@@ -306,12 +306,12 @@ public abstract class AbstractDailyCapacityLimit {
             }
             // 日计划量
             dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
-            if (mpFinalVo.getFieldValueByFieldName("materialCode") != null){
+            /*if (mpFinalVo.getFieldValueByFieldName("materialCode") != null){
                 String materialCode = (String) mpFinalVo.getFieldValueByFieldName("materialCode") ;
                 if (materialCode.equals("3302002582") && iDay == 10){
                     System.out.println("materialCode = " + materialCode + ", iDay = " + iDay);
                 }
-            }
+            }*/
             if (dailyCapacityLimitVo.isOpenProductionFirstDay()){
                 //若开产首日，将日硫化量等比例减，奇数+1
                 dailyLhQty = getProportionalDeductQty(dailyCapacityLimitVo,dailyLhQty);
@@ -776,7 +776,7 @@ public abstract class AbstractDailyCapacityLimit {
      * @return
      */
     public  String getEmbryoCodeField(){
-        return "mainMaterialDesc";
+        return "embryoCode";
     }
 
     /**

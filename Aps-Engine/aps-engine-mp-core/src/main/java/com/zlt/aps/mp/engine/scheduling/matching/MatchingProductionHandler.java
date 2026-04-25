@@ -1312,7 +1312,7 @@ public class MatchingProductionHandler {
         MpDailyCapacityLimitVo dayLimitVo = groupInfo.getDailyCapacityLimitVoMap().get(day);
         if (dayLimitVo != null) {
             Set<String> embryoCodeSet = dayLimitVo.getEmbryoCodes();
-            String embryoCode = firstPlan.getMainMaterialDesc();
+            String embryoCode = firstPlan.getEmbryoCode();
             if (!embryoCodeSet.contains(embryoCode)) {
                 GroupPlanCxLhCapacityLimitHelper limit = groupInfo.getDayProductionLimitInfo().get(day);
                 if (limit != null && limit.getMaxEmbryoCodeCount() != null

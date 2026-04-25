@@ -521,7 +521,7 @@ public class MatchingAdjuestProductionHandler {
         // 1、检查胎胚数是否满足条件
         if (dailyCapacityLimitVo.getMaxEmbryoTypes() <= dailyCapacityLimitVo.getUsedEmbryoTypes()) { // 胎胚数已达上限，则不能继续添加新胎胚
             Set<String> embryoCodes = dailyCapacityLimitVo.getEmbryoCodes();
-            if (!embryoCodes.contains(plan.getMainMaterialDesc())) {
+            if (!embryoCodes.contains(plan.getEmbryoCode())) {
                 return false;
             }
         }
@@ -1289,8 +1289,8 @@ public class MatchingAdjuestProductionHandler {
             dailyCapacityLimitVo.setUsedLhMachines(dailyCapacityLimitVo.getUsedLhMachines() + 1); // 更新硫化机使用情况
             dailyCapacityLimitVo.setPatternUsedLhMachines(dailyCapacityLimitVo.getPatternUsedLhMachines() + 1);
             Set<String> embryoCodes = dailyCapacityLimitVo.getEmbryoCodes();
-            if (!embryoCodes.contains(plan.getMainMaterialDesc())) {
-                embryoCodes.add(plan.getMainMaterialDesc());
+            if (!embryoCodes.contains(plan.getEmbryoCode())) {
+                embryoCodes.add(plan.getEmbryoCode());
                 dailyCapacityLimitVo.setUsedEmbryoTypes(embryoCodes.size());
             }
         }
