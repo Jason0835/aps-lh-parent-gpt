@@ -67,6 +67,18 @@ export default {
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
+          {
+            validator: (rule, value, callback) => {
+              if (value === undefined || value === null || value === "") {
+                callback(new Error(this.$t("common.rule.input")));
+              } else if (!/^\d{1,10}$/.test(String(value))) {
+                callback(new Error("库存量必须为非负整数，且最多10位"));
+              } else {
+                callback();
+              }
+            },
+            trigger: "blur",
+          },
         ],
       },
     };
@@ -95,6 +107,8 @@ export default {
           prop: "stockNum",
           label: this.$t("ui.data.column.lhChipStock.stockNum"),
           type: "number",
+          min: 0,
+          precision: 0,
         },
         {
           prop: "finishQty",
@@ -197,6 +211,7 @@ export default {
         this.form = {
           factoryCode: "116",
           id: undefined,
+          finishQty: 0,
         };
       }
       this.calcRemainStockNum();

@@ -41,8 +41,8 @@ export default {
       data: [],
       page: { current: 1, pageSize: 20, total: 0 },
       sort: {},
-      search: { factoryCode: '116' },
-      query: { factoryCode: '116' }
+      search: { factoryCode: '116', onlineDate: new Date().toISOString().slice(0, 10) },
+      query: { factoryCode: '116', onlineDate: new Date().toISOString().slice(0, 10) }
     }
   },
   computed: {
