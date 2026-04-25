@@ -7,10 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
-import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
+import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
@@ -60,6 +57,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     @Resource
     private ScheduleExecutionGuard scheduleExecutionGuard;
+
+    @Resource
+    private LhTextMouldChangePlanGenerator textMouldChangePlanGenerator;
 
     @Override
     public LhScheduleResponseDTO executeSchedule(LhScheduleRequestDTO request) {
@@ -341,6 +341,17 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return AjaxResult.error("调量失败，请稍后重试");
         }
         return AjaxResult.success("调量成功，记录已回置待发布");
+    }
+
+    /**
+     * 根据单条排程结果生成文字示方换模计划。
+     *
+     * @param dto 生成入参
+     * @return 处理结果
+     */
+    @Override
+    public AjaxResult generateTextMouldChangePlan(LhGenerateTextMouldPlanDTO dto) {
+        return textMouldChangePlanGenerator.generate(dto);
     }
 
     /**

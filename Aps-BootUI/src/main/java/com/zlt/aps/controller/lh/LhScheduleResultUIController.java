@@ -206,6 +206,18 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
         return iLhScheduleResultRemoteService.adjustTextNo(dto);
     }
 
+    /**
+     * 生成文字示方换模计划
+     *
+     * @param dto 生成入参
+     * @return 处理结果
+     */
+    @ApiOperation("生成文字示方换模计划")
+    @PostMapping("/generateTextMouldChangePlan")
+    @ResponseBody
+    public AjaxResult generateTextMouldChangePlan(@RequestBody LhGenerateTextMouldPlanDTO dto) {
+        return iLhScheduleResultRemoteService.generateTextMouldChangePlan(dto);
+    }
 
     @Override
     public String getProcedureCode() {
