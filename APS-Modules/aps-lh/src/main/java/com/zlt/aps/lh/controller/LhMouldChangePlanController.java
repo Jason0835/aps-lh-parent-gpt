@@ -229,7 +229,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     @Override
     protected String getOrderBy() {
-        return "plan_date desc, create_time desc";
+        return " update_time desc,plan_date desc";
     }
 
     /**
