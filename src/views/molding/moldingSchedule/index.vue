@@ -35,12 +35,12 @@
           v-hasPermi="['cx:cxScheduleResult:add']"
           type="warning"
           @click="handleAdd"
-          >{{ $t("插单") }}</el-button
+          >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button
         >
         <el-button
           v-hasPermi="['cx:cxScheduleResult:edit']"
           type="warning"
-          :disabled="selection.length != 1"
+          :disabled="!canModifySelection"
           @click="() => handleEdit(selection[0])"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         >
@@ -383,7 +383,7 @@ export default {
         //   ],
         // },
         {
-          label: this.$t("一班") + " " + this.dateList[0].shiftDate,
+          label: this.$t("夜班") + " " + this.dateList[0].shiftDate,
           children: [
             {
               prop: "class1PlanQty",
@@ -412,7 +412,7 @@ export default {
           ],
         },
         {
-          label: this.$t("二班") + " " + this.dateList[1].shiftDate,
+          label: this.$t("早班") + " " + this.dateList[1].shiftDate,
           children: [
             // {
             //   prop: "class2Sort",
@@ -446,7 +446,7 @@ export default {
           ],
         },
         {
-          label: this.$t("三班") + " " + this.dateList[2].shiftDate,
+          label: this.$t("中班") + " " + this.dateList[2].shiftDate,
           children: [
             // {
             //   prop: "class3Sort",
@@ -480,7 +480,7 @@ export default {
           ],
         },
         {
-          label: this.$t("四班") + " " + this.dateList[3].shiftDate,
+          label: this.$t("夜班") + " " + this.dateList[3].shiftDate,
           children: [
             // {
             //   prop: "class4Sort",
@@ -514,7 +514,7 @@ export default {
           ],
         },
         {
-          label: this.$t("五班") + " " + this.dateList[4].shiftDate,
+          label: this.$t("早班") + " " + this.dateList[4].shiftDate,
           children: [
             // {
             //   prop: "class5Sort",
@@ -548,7 +548,7 @@ export default {
           ],
         },
         {
-          label: this.$t("六班") + " " + this.dateList[5].shiftDate,
+          label: this.$t("中班") + " " + this.dateList[5].shiftDate,
           children: [
           // {
           //     prop: "class6Sort",
@@ -582,7 +582,7 @@ export default {
           ],
         },
         {
-          label: this.$t("七班") + " " + this.dateList[6].shiftDate,
+          label: this.$t("夜班") + " " + this.dateList[6].shiftDate,
           children: [
             // {
             //   prop: "class7Sort",
@@ -616,7 +616,7 @@ export default {
           ],
         },
         {
-          label: this.$t("八班") + " " + this.dateList[7].shiftDate,
+          label: this.$t("早班") + " " + this.dateList[7].shiftDate,
           children: [
           // {
           //     prop: "class8Sort",
@@ -821,16 +821,33 @@ export default {
         },
       ];
     },
+    canModifySelection() {
+      if (this.selection.length !== 1) {
+        return false;
+      }
+      return String(this.selection[0]?.isRelease) === "0";
+    },
   },
   methods: {
     handleAdd() {
-      if (this.$refs.addRef) {
-        this.$refs.addRef.show();
+      if (this.$refs.editRef) {
+        this.$refs.editRef.show(
+          {
+            scheduleDate: this.query.scheduleDate,
+          },
+          "insert"
+        );
       }
     },
     handleEdit(row) {
+      if (!row || String(row.isRelease) !== "0") {
+        this.$modal.msgWarning(
+          this.$t("ui.data.column.scheduleResult.onlyUnreleasedEditable")
+        );
+        return;
+      }
       if (this.$refs.editRef) {
-        this.$refs.editRef.show(row);
+        this.$refs.editRef.show(row, "edit");
       }
     },
     handleDelete(rows) {

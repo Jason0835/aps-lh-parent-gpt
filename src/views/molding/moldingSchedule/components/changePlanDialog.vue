@@ -118,7 +118,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("早班") +dateList[0].shiftDate }}
+              {{ $t("夜班") + dateList[0].shiftDate }}
             </h4>
           </el-col>
 
@@ -163,7 +163,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("中班")+dateList[1].shiftDate }}
+              {{ $t("早班") + dateList[1].shiftDate }}
             </h4>
           </el-col>
 
@@ -211,7 +211,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("晚班")+dateList[2].shiftDate }}
+              {{ $t("中班") + dateList[2].shiftDate }}
             </h4>
           </el-col>
 
@@ -259,7 +259,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("早") +dateList[3].shiftDate }}
+              {{ $t("夜班") + dateList[3].shiftDate }}
             </h4>
           </el-col>
 
@@ -307,7 +307,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("中班"+dateList[4].shiftDate) }}
+              {{ $t("早班") + dateList[4].shiftDate }}
             </h4>
           </el-col>
 
@@ -355,7 +355,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("晚班"+dateList[5].shiftDate) }}
+              {{ $t("中班") + dateList[5].shiftDate }}
             </h4>
           </el-col>
 
@@ -405,7 +405,7 @@
 
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("早班"+dateList[6].shiftDate) }}
+              {{ $t("夜班") + dateList[6].shiftDate }}
             </h4>
           </el-col>
 
@@ -454,7 +454,7 @@
 
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("中班"+dateList[7].shiftDate) }}
+              {{ $t("早班") + dateList[7].shiftDate }}
             </h4>
           </el-col>
 

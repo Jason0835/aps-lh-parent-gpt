@@ -365,6 +365,7 @@
   "ui.data.column.cd15ScheduleResult.modalName": "钢丝斜裁排程结果",
   "ui.data.column.scheduleResult.unschedule": "未排产",
   "ui.data.column.scheduleResult.insertOrder": "插单",
+  "ui.data.column.scheduleResult.onlyUnreleasedEditable": "仅未发布数据允许修改",
   "ui.data.column.scheduleResult.batchNo": "批次号",
   "ui.data.column.scheduleResult.orderNo": "工单号",
   "ui.data.column.scheduleResult.validationError": "校验错误详情",
