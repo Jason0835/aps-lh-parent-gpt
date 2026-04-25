@@ -30,11 +30,11 @@
 
 <script>
 import { saveCxStructureTreadConfig } from "@/api/cx/cxStructureTreadConfig";
-
+import structureSelect from "@/views/components/structureSelect.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm },
+  components: { infoForm, structureSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -95,6 +95,15 @@ export default {
           span: 24,
           required: true,
           maxlength: 50,
+          render: (form) => {
+            return (
+              <structureSelect
+                key={form.structureCode}
+                multiple={false}
+                v-model={form.structureCode}
+              />
+            );
+          },
         },
         {
           label: this.$t("ui.data.column.cxStructureTreadConfig.treadCount"),
@@ -122,6 +131,10 @@ export default {
       if (data) {
         this.isEdit = true;
         this.form = { ...data };
+      } else {
+        this.form = {
+          factoryCode: "116",
+        };
       }
     },
     hide() {

@@ -53,6 +53,7 @@ import { downloadLink } from '@/utils/request'
 import { listCxStructureTreadConfig, removeCxStructureTreadConfig } from '@/api/cx/cxStructureTreadConfig'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import infoDialog from './components/infoDialog.vue'
+import { mapGetters } from 'vuex'
 
 export default {
   name: 'CxStructureTreadConfig',
@@ -86,6 +87,7 @@ export default {
     }
   },
   computed: {
+    ...mapGetters('globalList', ['structureList']),
     searchColumns() {
       return [
         {
@@ -99,8 +101,10 @@ export default {
         {
           prop: 'structureCode',
           label: this.$t('ui.data.column.cxStructureTreadConfig.structureCode'),
-          placeholder: this.$t('common.rule.input'),
-          type: 'input'
+          type: 'select',
+          dictData: this.structureList,
+          filterable: true,
+          clearable: true
         }
       ]
     },
