@@ -387,6 +387,18 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
     /**
+     * 换模开产增加计划。
+     *
+     * @param scheduleResult 当前硫化排程结果
+     * @return 处理结果
+     */
+    @PostMapping("/increaseMouldStartPlan")
+    @ApiOperation("换模开产增加计划")
+    public AjaxResult increaseMouldStartPlan(@RequestBody LhScheduleResult scheduleResult) {
+        return lhScheduleService.increaseMouldStartPlan(scheduleResult);
+    }
+
+    /**
      * 发布当天未发布的排程结果
      * 发布流程：1.更新发布状态为"待发布" → 2.调用issueToMes下发MES → 3.根据MES反馈更新发布状态
      */

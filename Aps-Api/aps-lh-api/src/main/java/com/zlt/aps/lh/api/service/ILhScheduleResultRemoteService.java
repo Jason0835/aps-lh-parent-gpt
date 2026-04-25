@@ -113,6 +113,16 @@ public interface ILhScheduleResultRemoteService {
     AjaxResult generateTextMouldChangePlan(@RequestBody LhGenerateTextMouldPlanDTO dto);
 
     /**
+     * 换模开产增加计划
+     *
+     * @param scheduleResult 当前硫化排程结果
+     * @return 处理结果
+     */
+    @ApiOperation("换模开产增加计划")
+    @PostMapping("/lhScheduleResult/increaseMouldStartPlan")
+    AjaxResult increaseMouldStartPlan(@RequestBody LhScheduleResult scheduleResult);
+
+    /**
      * 发布所有排程结果
      *
      * @param dto 查询条件

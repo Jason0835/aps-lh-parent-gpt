@@ -61,6 +61,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Resource
     private LhTextMouldChangePlanGenerator textMouldChangePlanGenerator;
 
+    @Resource
+    private LhIncreaseMouldStartPlanService increaseMouldStartPlanService;
+
     @Override
     public LhScheduleResponseDTO executeSchedule(LhScheduleRequestDTO request) {
         log.info("接收排程请求, 工厂: {}, 日期: {}",
@@ -352,6 +355,17 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Override
     public AjaxResult generateTextMouldChangePlan(LhGenerateTextMouldPlanDTO dto) {
         return textMouldChangePlanGenerator.generate(dto);
+    }
+
+    /**
+     * 换模开产增加计划。
+     *
+     * @param scheduleResult 当前硫化排程结果
+     * @return 处理结果
+     */
+    @Override
+    public AjaxResult increaseMouldStartPlan(LhScheduleResult scheduleResult) {
+        return increaseMouldStartPlanService.increase(scheduleResult);
     }
 
     /**
