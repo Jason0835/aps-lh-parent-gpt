@@ -28,6 +28,9 @@
           @click="handleAutoPlan"
           >{{ $t("自动排产") }}</el-button
         >
+        <el-button type="primary" @click="handleGotoMoldingScheduleSequence"
+          >{{ $t("ui.frame.btn.moldingScheduleSequence") }}</el-button
+        >
         <!-- <el-button v-hasPermi="['cx:cxScheduleResult:add']" type="warning">{{
           $t("成型机操作工请假")
         }}</el-button> -->
@@ -86,9 +89,6 @@
           @click="handleExport"
           v-hasPermi="['cx:productConstruction:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
-        >
-        <el-button type="primary" @click="handleGotoMoldingScheduleSequence"
-          >{{ $t("ui.frame.btn.moldingScheduleSequence") }}</el-button
         >
       </template>
     </page-table>
@@ -762,25 +762,25 @@ export default {
         //   ],
         // },
       ];
-      columns.push({
-        align: "center",
-        width: 120,
-        fixed: "right",
-        label: this.$t("操作"),
-        render: ({ row }) => {
-          return (
-            <el-button
-              type="text"
-              onClick={(event) => {
-                event.stopPropagation();
-                this.handleViewDetail(row);
-              }}
-            >
-              {this.$t("查看车次")}
-            </el-button>
-          );
-        },
-      });
+      // columns.push({
+      //   align: "center",
+      //   width: 120,
+      //   fixed: "right",
+      //   label: this.$t("操作"),
+      //   render: ({ row }) => {
+      //     return (
+      //       <el-button
+      //         type="text"
+      //         onClick={(event) => {
+      //           event.stopPropagation();
+      //           this.handleViewDetail(row);
+      //         }}
+      //       >
+      //         {this.$t("查看车次")}
+      //       </el-button>
+      //     );
+      //   },
+      // });
 
       return columns;
     },

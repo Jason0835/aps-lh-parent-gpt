@@ -284,6 +284,15 @@ export function submitMoldingScheduleSequence(query) {
   })
 }
 
+// 成型排程顺位新增（占位接口，后续可替换）
+export function addMoldingScheduleSequence(query) {
+  return request({
+    url: 'cx/cxScheduleResult/sequenceAddMock',
+    method: 'post',
+    data: query,
+  })
+}
+
 
 export function generatePlan(query) {
   return request({

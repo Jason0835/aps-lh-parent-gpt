@@ -21,36 +21,30 @@
     >
       <template slot="header">
         <el-button
-          v-hasPermi="['cx:productConstruction:import']"
-          @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        >
-        <el-button
-          @click="handleExport"
-          v-hasPermi="['cx:productConstruction:export']"
-          >{{ $t("ui.frame.btn.export") }}</el-button
+          v-hasPermi="['cx:cxScheduleResult:add']"
+          type="warning"
+          @click="handleAdd"
+          >{{ $t("common.button.add") }}</el-button
         >
         <el-button v-if="hasDirtyData" type="primary" @click="handleSubmit"
           >{{ $t("ui.frame.btn.submit") }}</el-button
         >
       </template>
     </page-table>
-    <tlt-upload
-      ref="tltUpload"
-      downloadUrl="/cx/cxScheduleResult/importTemplate"
-      uploadUrl="/cx/cxScheduleResult/importData"
-      @uploadSuccess="getList"
-    />
+    <editDialog ref="editRef" @success="getList" />
   </basic-container>
 </template>
 
 <script>
 import moment from "moment";
 import { mapState } from "vuex";
-import { downloadLink } from "@/utils/request";
-import { listCxScheduleResult, submitMoldingScheduleSequence } from "@/api/cx/cxScheduleResult";
+import {
+  addMoldingScheduleSequence,
+  listCxScheduleResult,
+  submitMoldingScheduleSequence,
+} from "@/api/cx/cxScheduleResult";
 import { getScheduleDate } from "@/api/lh/scheduleResult";
-import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import editDialog from "./components/editDialog.vue";
 
 const SHIFT_COUNT = 8;
 const EDIT_FIELDS = ["PlanQty", "FinishQty", "Analysis", "RecipeType"];
@@ -58,7 +52,7 @@ const EDIT_FIELDS = ["PlanQty", "FinishQty", "Analysis", "RecipeType"];
 export default {
   name: "MoldingScheduleSequence",
   components: {
-    tltUpload,
+    editDialog,
   },
   dicts: ["IS_RELEASE", "biz_factory_name", "MACHINE_TYPE"],
   data() {
@@ -153,6 +147,19 @@ export default {
     },
   },
   methods: {
+    handleAdd() {
+      if (this.$refs.editRef) {
+        this.$refs.editRef.show(
+          {
+            scheduleDate: this.query.scheduleDate,
+          },
+          "insert",
+          {
+            submitHandler: addMoldingScheduleSequence,
+          }
+        );
+      }
+    },
     getShiftLabel(shift) {
       const labels = ["一班", "二班", "三班", "四班", "五班", "六班", "七班", "八班"];
       return labels[shift - 1] || "";
@@ -259,9 +266,6 @@ export default {
         this.sort = {};
       }
       this.getList();
-    },
-    handleExport() {
-      downloadLink("/cx/cxScheduleResult/export", this.formatParams(false));
     },
     async handleSubmit() {
       if (!this.hasDirtyData) return;

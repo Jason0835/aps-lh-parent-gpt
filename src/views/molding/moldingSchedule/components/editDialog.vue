@@ -44,6 +44,7 @@ export default {
       visible: false,
       isEdit: false,
       dialogMode: "edit",
+      submitHandler: null,
       form: {},
       rules: {
         // specName: [
@@ -600,8 +601,8 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-
-        await cxScheduleResultEdit(params);
+        const handler = this.submitHandler || cxScheduleResultEdit;
+        await handler(params);
         this.loading = false;
         this.$modal.msgSuccess(
           this.$t("common.msg.ajax.operation.success")
@@ -615,9 +616,10 @@ export default {
     },
 
     //utils
-    show(data, mode = "edit") {
+    show(data, mode = "edit", options = {}) {
       this.visible = true;
       this.dialogMode = mode;
+      this.submitHandler = options.submitHandler || null;
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -631,6 +633,7 @@ export default {
       // this.resetForm("infoForm");
       this.isEdit = false;
       this.dialogMode = "edit";
+      this.submitHandler = null;
       this.visible = false;
     },
 
