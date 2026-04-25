@@ -33,14 +33,14 @@ public class CxStructureTreadConfig extends BaseEntity implements Serializable {
     private String factoryCode;
 
     @ApiModelProperty(value = "结构")
-    @Excel(name = "ui.data.column.cxStructureTreadConfig.structureCode")
+    @Excel(name = "ui.data.column.cxStructureTreadConfig.structureCode",width = 60,align = Excel.Align.LEFT)
     @ImportExcelValidated(required = true)
     @TableField(value = "STRUCTURE_CODE")
     private String structureCode;
 
-    @ApiModelProperty(value = "整车胎面条数")
+    @ApiModelProperty(value = "整车胎面(条)")
     @Excel(name = "ui.data.column.cxStructureTreadConfig.treadCount")
-    @ImportExcelValidated(required = true)
+    @ImportExcelValidated(required = true,digits=true)
     @TableField(value = "TREAD_COUNT")
     private Integer treadCount;
 

@@ -64,8 +64,6 @@ public class CxStructureTreadConfigServiceImpl extends AbstractDocService<CxStru
         int failureNum = 0;
         List<CxStructureTreadConfig> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
-
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             CxStructureTreadConfig docEntity = list.get(i);
@@ -113,7 +111,8 @@ public class CxStructureTreadConfigServiceImpl extends AbstractDocService<CxStru
             } else {
                 failureNum++;
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
-                        String.format(uniqueMsg, errorNum), importErrorLogs);
+                        I18nUtil.getMessage("ui.data.alert.cxStructureTreadConfig.structureCodeNotUnique"),
+                        importErrorLogs);
             }
         }
 
@@ -205,7 +204,7 @@ public class CxStructureTreadConfigServiceImpl extends AbstractDocService<CxStru
         LambdaQueryWrapper<CxStructureTreadConfig> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(CxStructureTreadConfig::getFactoryCode, entity.getFactoryCode());
         queryWrapper.eq(CxStructureTreadConfig::getStructureCode, entity.getStructureCode());
-        return cxStructureTreadConfigMapper.selectOne(queryWrapper);
+        return cxStructureTreadConfigMapper.selectList(queryWrapper).stream().findFirst().orElse(null);
     }
 
     private void fillDefaultFactoryCode(CxStructureTreadConfig entity) {
