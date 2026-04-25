@@ -1,15 +1,18 @@
 package com.zlt.aps.lh.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.apache.ibatis.type.JdbcType;
 
 import java.util.Date;
 
@@ -82,6 +85,16 @@ public class LhChipStock extends BaseEntity {
     @TableField(value = "DATA_VERSION")
     @ApiModelProperty(value = "版本号")
     private String dataVersion;
+
+
+    /**
+     * 更新时间
+     */
+    @Excel(name = "ui.data.column.lhChipStock.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE, jdbcType = JdbcType.TIMESTAMP)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @ApiModelProperty(value = "更新时间")
+    private Date updateTime;
 
 
     /**
