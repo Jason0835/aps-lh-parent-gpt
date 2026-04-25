@@ -89,7 +89,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
         int failureNum = 0;
         List<LhMouldChangePlan> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
+        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.unique");
 
         // 1.进行非空校验,Excel中数据重复校验
         for (int i = 0; i < list.size(); i++) {
@@ -236,6 +236,21 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 }
                 importList.add(docEntity);
                 successNum++;
+            } else if (updateSupport) {
+                LambdaQueryWrapper<LhMouldChangePlan> queryWrapper = new LambdaQueryWrapper<>();
+                queryWrapper.eq(LhMouldChangePlan::getFactoryCode, docEntity.getFactoryCode());
+                queryWrapper.eq(LhMouldChangePlan::getLhMachineCode, docEntity.getLhMachineCode());
+                queryWrapper.eq(LhMouldChangePlan::getScheduleDate, docEntity.getScheduleDate());
+                LhMouldChangePlan exist = lhMouldChangePlanMapper.selectOne(queryWrapper);
+                if (exist == null) {
+                    failureNum++;
+                    ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
+                            String.format(uniqueMsg, errorNum), importErrorLogs);
+                    continue;
+                }
+                docEntity.setId(exist.getId());
+                lhMouldChangePlanMapper.updateById(docEntity);
+                successNum++;
             } else {
                 failureNum++;
                 // 数据库已经存在,不允许插入
@@ -244,11 +259,13 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             }
         }
 
-        if (CollectionUtils.isEmpty(importList)) {
+        if (CollectionUtils.isEmpty(importList) && successNum == 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         }
 
-        successNum = baseDao.saveBatch(importList);
+        if (CollectionUtils.isNotEmpty(importList)) {
+            successNum += baseDao.saveBatch(importList);
+        }
 
         // 返回提示信息及错误集合
         if (failureNum > 0) {

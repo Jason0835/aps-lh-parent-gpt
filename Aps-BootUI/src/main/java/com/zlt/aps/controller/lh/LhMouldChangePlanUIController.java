@@ -214,7 +214,7 @@ public class LhMouldChangePlanUIController extends BaseUIController<LhMouldChang
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iLhMouldChangePlanService.importData(context,false);
+        AjaxResult ajaxResult = iLhMouldChangePlanService.importData(context,updateSupport);
         return ajaxResult;
     }
 
