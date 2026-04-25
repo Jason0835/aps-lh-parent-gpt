@@ -86,11 +86,18 @@
           >{{ $t("ui.data.column.scheduleResult.textAdjust") }}</el-button
         >
         <el-button
-          v-hasPermi="['lh:lhScheduleResult:autoLhScheduleResult']"
+          v-hasPermi="['lh:lhScheduleResult:generateTextPlan']"
           type="primary"
           :disabled="selection.length != 1"
           @click="handleGenerateTextMouldChangePlan"
-          >{{ $t("生成文字示方换模计划") }}</el-button
+        >{{ $t("ui.data.btn.lhMouldChangePlan.generateTextPlan") }}</el-button
+        >
+        <el-button
+          v-hasPermi="['lh:lhScheduleResult:increaseMouldStartPlan']"
+          type="primary"
+          :disabled="selection.length != 1"
+          @click="handleIncreaseMouldStartPlan"
+        >{{ $t("ui.data.btn.lhScheduleResult.increaseMouldStartPlan") }}</el-button
         >
         <el-button
           v-hasPermi="['monthplan:mouldingDayResult:import']"
@@ -204,6 +211,7 @@ import {
   getScheduleDate,
   adjustTextNo,
   generateTextMouldChangePlan,
+  increaseMouldStartPlan,
 } from "@/api/lh/scheduleResult";
 import { checkPermi } from "@/utils/permission";
 
@@ -773,6 +781,28 @@ export default {
     },
   },
   methods: {
+    async handleIncreaseMouldStartPlan() {
+      try {
+        const row = this.selection[0];
+        await this.$confirm(
+          this.$t("ui.data.alert.lhScheduleResult.increaseMouldStartPlanConfirm"),
+          {
+            type: "warning",
+          }
+        );
+        this.loading = true;
+        const result = await increaseMouldStartPlan(row);
+        this.$modal.msgSuccess(
+          result.msg ||
+          this.$t("ui.data.alert.lhScheduleResult.increaseMouldStartPlanSuccess")
+        );
+        this.getList();
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.loading = false;
+      }
+    },
     calcShiftIsEnd(row, shiftIndex) {
       const specEndTime = row.specEndTime;
       if (!specEndTime) return this.selectDictLabel(this.dict.type.biz_end_type, "0");

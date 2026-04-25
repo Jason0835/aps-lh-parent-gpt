@@ -345,3 +345,19 @@ export function generateTextMouldChangePlan(query) {
     },
   })
 }
+
+/**
+ * 换模开产增加计划
+ * @param {*} query
+ * @returns
+ */
+export function increaseMouldStartPlan(query) {
+  return request({
+    url: '/lh/lhScheduleResult/increaseMouldStartPlan',
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+  })
+}
