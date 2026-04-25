@@ -9,6 +9,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.mapper.CxStockMapper;
 import com.zlt.aps.cx.service.CxStockService;
+import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -120,8 +121,19 @@ public class CxStockController extends AbstractDocBizController<CxStock> {
     @Override
     protected List<CxStock> listExportData(CxStock obj) {
         QueryWrapper<CxStock> wrapper = new QueryWrapper<>();
+        startPage("update_time desc");
         this.builderCondition(wrapper, obj);
-        return cxStockMapper.selectList(wrapper);
+        List<CxStock> list = cxStockMapper.selectList(wrapper);
+        AppUtils.formatData(list, getQueryFormulas());
+        for (CxStock stock : list) {
+            stock.setUpdateDay(stock.getUpdateTime());
+        }
+        return list;
+    }
+
+    @Override
+    protected String[] getQueryFormulas() {
+        return cxStockService.getQueryFormulas();
     }
 
     @Override
@@ -140,6 +152,10 @@ public class CxStockController extends AbstractDocBizController<CxStock> {
 		}
 		// 胎胚代码模糊查询
 		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getEmbryoCode()), "EMBRYO_CODE", queryVO.getEmbryoCode());
+		// 胎胚描述模糊查询（关联表）
+		queryWrapper.apply(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("embryoDesc")),
+				"EXISTS (SELECT 1 FROM T_MDM_MATERIAL_INFO m WHERE m.EMBRYO_CODE = t_cx_stock.EMBRYO_CODE AND m.MATERIAL_DESC LIKE CONCAT('%',{0},'%'))",
+				queryVO.getFieldValueByFieldName("embryoDesc"));
 		// 分厂编号精确查询
 		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
 		// 是否收尾SKU精确查询
@@ -158,6 +174,6 @@ public class CxStockController extends AbstractDocBizController<CxStock> {
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "update_time desc";
     }
 }

@@ -49,4 +49,9 @@ public interface CxStockService extends IDocService<CxStock> {
      * 分页查询库存
      */
     Page<CxStock> pageList(Page<CxStock> page, String alertStatus);
+
+    /**
+     * 获取查询反显公式
+     */
+    String[] getQueryFormulas();
 }

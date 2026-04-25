@@ -149,7 +149,7 @@ public class CxStockServiceImpl extends AbstractDocService<CxStock> implements C
         int failureNum = 0;
         List<CxStock> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
-        String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
+        String uniqueMsg = I18nUtil.getMessage("ui.data.alert.cxStock.embryoCodeNotUnique");
 
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
@@ -169,22 +169,22 @@ public class CxStockServiceImpl extends AbstractDocService<CxStock> implements C
             if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
-
-            if (StringUtil.isBlank(docEntity.getEmbryoCode())) {
-                failureNum++;
-                String message = I18nUtil.getMessage("ui.data.alert.cxStock.embryoCodeRequired");
-                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                        errorNum, String.format(message, errorNum), importErrorLogs);
-                continue;
-            }
-
-            if (docEntity.getStockDate() == null) {
-                failureNum++;
-                String message = I18nUtil.getMessage("ui.data.alert.cxStock.stockDateRequired");
-                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                        errorNum, String.format(message, errorNum), importErrorLogs);
-                continue;
-            }
+//
+//            if (StringUtil.isBlank(docEntity.getEmbryoCode())) {
+//                failureNum++;
+//                String message = I18nUtil.getMessage("ui.data.alert.cxStock.embryoCodeRequired");
+//                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+//                        errorNum, String.format(message, errorNum), importErrorLogs);
+//                continue;
+//            }
+//
+//            if (docEntity.getStockDate() == null) {
+//                failureNum++;
+//                String message = I18nUtil.getMessage("ui.data.alert.cxStock.stockDateRequired");
+//                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+//                        errorNum, String.format(message, errorNum), importErrorLogs);
+//                continue;
+//            }
 
             if (checkUnique(docEntity).equals(UserConstants.UNIQUE)) {
                 importList.add(docEntity);
@@ -251,5 +251,12 @@ public class CxStockServiceImpl extends AbstractDocService<CxStock> implements C
     @Override
     protected String getDocTypeCode() {
         return "";
+    }
+
+    @Override
+    public String[] getQueryFormulas() {
+        return new String[]{
+                "embryoDesc -> getcolvalue(T_MDM_MATERIAL_INFO, MATERIAL_DESC, EMBRYO_CODE, embryoCode)"
+        };
     }
 }
