@@ -337,7 +337,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 调量后同步汇总计划量，并回置为未发布状态，确保后续重新发布
         ShiftFieldUtil.syncDailyPlanQty(record);
-        record.setIsRelease(ApsConstant.APS_STRING_0);
+        record.setIsRelease(ReleaseStatusEnum.PENDING_RELEASE.getCode());
 
         int updateCount = scheduleResultMapper.updateById(record);
         if (updateCount <= 0) {
