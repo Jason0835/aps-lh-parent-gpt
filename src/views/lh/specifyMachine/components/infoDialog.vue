@@ -29,10 +29,8 @@
 </template>
 
 <script>
-import {
-  editLhSpecifyMachine,
-  getLhMachineList,
-} from "@/api/lh/lhSpecifyMachine";
+import { editLhSpecifyMachine } from "@/api/lh/lhSpecifyMachine";
+import { listMachine } from "@/api/lh/machine";
 
 import infoForm from "@/views/components/infoForm.vue";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
@@ -43,16 +41,10 @@ export default {
   data() {
     return {
       loading: false,
-      machineLoading: false,
       visible: false,
       isEdit: false,
       form: {},
       machineOptions: [],
-      machinePageSize: 100,
-      machinePageNum: 1,
-      machineHasMore: true,
-      machineQuery: "",
-      machineScrollWrap: null,
       rules: {
         factoryCode: [
           {
@@ -84,9 +76,6 @@ export default {
         ],
       },
     };
-  },
-  beforeDestroy() {
-    this.unbindMachineScroll();
   },
   computed: {
     title: function () {
@@ -126,17 +115,7 @@ export default {
           label: this.$t("ui.data.column.lhSpecifyMachine.machineCode"),
           type: "select",
           dictData: this.machineOptions,
-          props: {
-            label: "machineCode",
-            value: "machineCode",
-          },
           filterable: true,
-          remote: true,
-          remoteMethod: this.remoteMachineMethod,
-          loading: this.machineLoading,
-          onFocus: this.handleMachineFocus,
-          onVisibleChange: this.handleMachineDropdownVisibleChange,
-          popperClass: "lh-specify-machine-select-dropdown",
         },
         {
           prop: "jobType",
@@ -170,88 +149,30 @@ export default {
         this.loading = false;
       }
     },
-    async queryMachineList(append = false) {
-      this.machineLoading = true;
+    async getMachineList() {
       try {
-        const res = await getLhMachineList({
-          machineCode: this.machineQuery,
-          pageNum: this.machinePageNum,
-          pageSize: this.machinePageSize,
-        });
-        const currentList = res.data || res || [];
-        if (append) {
-          const optionMap = new Map();
-          [...this.machineOptions, ...currentList].forEach((item) => {
-            optionMap.set(item.machineCode, item);
+        const res = await listMachine(this.form.factoryCode ? { factoryCode: this.form.factoryCode } : {});
+        const list = res.rows || [];
+        const map = new Map();
+        if (this.isEdit && this.form.machineCode) {
+          map.set(this.form.machineCode, {
+            label: this.form.machineCode,
+            value: this.form.machineCode,
           });
-          this.machineOptions = Array.from(optionMap.values());
-        } else {
-          this.machineOptions = currentList;
         }
-        this.machineHasMore = currentList.length >= this.machinePageSize;
+        list.forEach((item) => {
+          if (item && item.machineCode) {
+            map.set(item.machineCode, {
+              label: item.machineCode,
+              value: item.machineCode,
+            });
+          }
+        });
+        this.machineOptions = Array.from(map.values());
       } catch (error) {
+        this.machineOptions = [];
         console.log(error);
-      } finally {
-        this.machineLoading = false;
       }
-    },
-    async remoteMachineMethod(query) {
-      this.machineQuery = (query || "").trim();
-      this.machinePageNum = 1;
-      this.machineHasMore = true;
-      await this.queryMachineList(false);
-    },
-    async loadMoreMachineList() {
-      if (this.machineLoading || !this.machineHasMore) {
-        return;
-      }
-      this.machinePageNum += 1;
-      await this.queryMachineList(true);
-    },
-    handleMachineScroll(event) {
-      if (this.machineLoading || !this.machineHasMore) {
-        return;
-      }
-      const wrap = event.target;
-      const reachedBottom =
-        wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 20;
-      if (reachedBottom) {
-        this.loadMoreMachineList();
-      }
-    },
-    bindMachineScroll() {
-      this.$nextTick(() => {
-        const wrap = document.querySelector(
-          ".lh-specify-machine-select-dropdown .el-select-dropdown__wrap"
-        );
-        if (!wrap) {
-          return;
-        }
-        this.unbindMachineScroll();
-        this.machineScrollWrap = wrap;
-        this.machineScrollWrap.addEventListener(
-          "scroll",
-          this.handleMachineScroll,
-          { passive: true }
-        );
-      });
-    },
-    unbindMachineScroll() {
-      if (!this.machineScrollWrap) {
-        return;
-      }
-      this.machineScrollWrap.removeEventListener("scroll", this.handleMachineScroll);
-      this.machineScrollWrap = null;
-    },
-    handleMachineDropdownVisibleChange(visible) {
-      if (visible) {
-        this.bindMachineScroll();
-        return;
-      }
-      this.unbindMachineScroll();
-    },
-    handleMachineFocus() {
-      this.remoteMachineMethod(this.machineQuery || "");
     },
     handleSpecCodeChange(value, row) {
       this.$set(this.form, "specCode", value);
@@ -265,8 +186,8 @@ export default {
         if (data.machineCode) {
           this.machineOptions = [
             {
-              machineCode: data.machineCode,
-              machineName: data.machineName || data.machineCode,
+              label: data.machineCode,
+              value: data.machineCode,
             },
           ];
         }
@@ -277,17 +198,11 @@ export default {
         };
         this.machineOptions = [];
       }
-      this.machinePageNum = 1;
-      this.machineHasMore = true;
-      this.machineQuery = "";
+      this.getMachineList();
     },
     hide() {
-      this.unbindMachineScroll();
       this.form = {};
       this.machineOptions = [];
-      this.machinePageNum = 1;
-      this.machineHasMore = true;
-      this.machineQuery = "";
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;

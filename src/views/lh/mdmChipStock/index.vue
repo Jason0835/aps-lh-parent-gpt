@@ -162,6 +162,13 @@ export default {
         //   minWidth: 120,
         // },
         {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhChipStock.updateTime"),
+          minWidth: 180,
+        },
+        {
           prop: "remark",
           align: "center",
           halign: "center",
