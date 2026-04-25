@@ -239,13 +239,31 @@ export default {
   },
 
   methods: {
-    // api
+    encodeRemark(remark) {
+      if (!remark) return remark;
+      return remark
+        .replace(/%/g, '__PERCENT__')
+        .replace(/&/g, '__AMP__')
+        .replace(/</g, '__LT__')
+        .replace(/>/g, '__GT__')
+        .replace(/"/g, '__QUOT__')
+        .replace(/'/g, '__APOS__');
+    },
     async save(params) {
-      // console.log(params);
       try {
         this.loading = true;
-
-        const res = await insertOrder(params);
+        const saveParams = {
+          ...params,
+          class1Analysis: this.encodeRemark(params.class1Analysis),
+          class2Analysis: this.encodeRemark(params.class2Analysis),
+          class3Analysis: this.encodeRemark(params.class3Analysis),
+          class4Analysis: this.encodeRemark(params.class4Analysis),
+          class5Analysis: this.encodeRemark(params.class5Analysis),
+          class6Analysis: this.encodeRemark(params.class6Analysis),
+          class7Analysis: this.encodeRemark(params.class7Analysis),
+          class8Analysis: this.encodeRemark(params.class8Analysis),
+        };
+        const res = await insertOrder(saveParams);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();

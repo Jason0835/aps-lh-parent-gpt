@@ -255,6 +255,15 @@ export function changeMachine(query) {
   })
 }
 
+// 转机台确认提交（占位接口，后续可替换）
+export function submitChangeMachineMock(query) {
+  return request({
+    url: 'cx/cxScheduleResult/submitChangeMachineMock',
+    method: 'post',
+    data: query,
+  })
+}
+
 export function parseCxScheduleResult(query) {
   return request({
    url: `cx/cxScheduleResult/parseCxScheduleResult`,
@@ -263,6 +272,15 @@ export function parseCxScheduleResult(query) {
     // headers: {
     //   'Content-Type': 'application/json;charset=UTF-8'
     // },
+  })
+}
+
+// 成型排程顺位提交（占位接口，后续可替换）
+export function submitMoldingScheduleSequence(query) {
+  return request({
+    url: 'cx/cxScheduleResult/sequenceSubmitMock',
+    method: 'post',
+    data: query,
   })
 }
 

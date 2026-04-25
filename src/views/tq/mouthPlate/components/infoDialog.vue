@@ -29,7 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { saveSpecifyMachine } from "@/api/tq/specifyMachine";
+import { saveMouthPlate } from "@/api/tq/mouthPlate";
 import { listEnabledMachines } from "@/api/tq/machine";
 
 export default {
@@ -41,10 +41,12 @@ export default {
       machineLoading: false,
       visible: false,
       isEdit: false,
-      form: {},
+      form: {
+        status: "0",
+      },
       machineList: [],
       rules: {
-        materialCode: [
+        mouthPlateCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -55,7 +57,7 @@ export default {
           {
             required: true,
             message: this.$t("common.rule.select"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
       },
@@ -67,16 +69,17 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.tq.specifyMachine.column.modalName")
+        this.$t("ui.data.column.tq.mouthPlate.modelName")
       );
     },
     columns() {
       return [
         {
-          label: this.$t("ui.tq.specifyMachine.column.materialCode"),
-          prop: "materialCode",
+          label: this.$t("ui.data.column.mouthPlateCode"),
+          prop: "mouthPlateCode",
           span: 24,
           required: true,
+          maxlength: "30",
         },
         {
           label: this.$t("ui.specifyMachine.column.machineName"),
@@ -94,24 +97,19 @@ export default {
           onFocus: this.handleMachineFocus,
         },
         {
-          label: this.$t("ui.specifyMachine.column.lineType"),
-          prop: "lineType",
+          label: this.$t("ui.data.column.mouthPlateStatus"),
+          prop: "status",
           span: 24,
-          type: "select",
-          dictData: this.parentDict.type.LINE_TYPE,
-        },
-        {
-          label: this.$t("ui.specifyMachine.column.jobType"),
-          prop: "jobType",
-          span: 24,
-          type: "select",
-          dictData: this.parentDict.type.JOB_TYPE,
+          type: "switch",
+          activeValue: "0",
+          inactiveValue: "1",
         },
         {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
           span: 24,
           type: "textarea",
+          maxlength: "300",
         },
       ];
     },
@@ -120,7 +118,7 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        const res = await saveSpecifyMachine(params);
+        const res = await saveMouthPlate(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -166,11 +164,11 @@ export default {
         }
       } else {
         this.isEdit = false;
-        this.form = {};
+        this.form = { status: "0" };
       }
     },
     hide() {
-      this.form = {};
+      this.form = { status: "0" };
       this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;

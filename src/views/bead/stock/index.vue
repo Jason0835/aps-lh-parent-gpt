@@ -323,8 +323,8 @@ export default {
         params.createTime = undefined;
       }
       if (params.stockDate && params.stockDate[0]) {
-        params.startTime = params.stockDate[0];
-        params.endTime = params.stockDate[1];
+        params.stockDateStart = params.stockDate[0];
+        params.stockDateEnd = params.stockDate[1];
         params.stockDate = undefined;
       }
 

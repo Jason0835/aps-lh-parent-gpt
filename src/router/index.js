@@ -648,6 +648,13 @@ constantRoutes.push(
         hidden: true,
         meta: { title: "成型未排程结果" },
       },
+      {
+        path: "moldingScheduleSequence",
+        component: () => import("@/views/molding/moldingSchedule/sequence"),
+        name: "MoldingScheduleSequence",
+        hidden: true,
+        meta: { title: "成型排程顺位" },
+      },
     ],
   },
   {

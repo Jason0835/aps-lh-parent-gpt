@@ -577,6 +577,7 @@ import {
 import {
   changeQty,
   getScheduleDate,
+  validateAdjustQuantity,
 } from "@/api/lh/scheduleResult";
 
 
@@ -1114,10 +1115,49 @@ export default {
       });
     },
 
+    encodeRemark(remark) {
+      if (!remark) return remark;
+      return remark
+        .replace(/%/g, '__PERCENT__')
+        .replace(/&/g, '__AMP__')
+        .replace(/</g, '__LT__')
+        .replace(/>/g, '__GT__')
+        .replace(/"/g, '__QUOT__')
+        .replace(/'/g, '__APOS__');
+    },
+    decodeRemark(remark) {
+      if (!remark) return remark;
+      return remark
+        .replace(/__PERCENT__/g, '%')
+        .replace(/__AMP__/g, '&')
+        .replace(/__LT__/g, '<')
+        .replace(/__GT__/g, '>')
+        .replace(/__QUOT__/g, '"')
+        .replace(/__APOS__/g, "'");
+    },
+    /**
+     * 调量保存前先调用后端校验接口，校验通过后再提交实际保存。
+     * @param {Object} params 调量保存参数
+     * @returns {Promise<void>}
+     * @throws {Error} 当接口调用失败时抛出异常
+     */
     async save(params) {
       try {
         this.loading = true;
-        const res = await changeQty(params);
+        await validateAdjustQuantity(params);
+        const saveParams = {
+          ...params,
+          remark: this.encodeRemark(params.remark),
+          class1AnalysisInput: this.encodeRemark(params.class1AnalysisInput),
+          class2AnalysisInput: this.encodeRemark(params.class2AnalysisInput),
+          class3AnalysisInput: this.encodeRemark(params.class3AnalysisInput),
+          class4AnalysisInput: this.encodeRemark(params.class4AnalysisInput),
+          class5AnalysisInput: this.encodeRemark(params.class5AnalysisInput),
+          class6AnalysisInput: this.encodeRemark(params.class6AnalysisInput),
+          class7AnalysisInput: this.encodeRemark(params.class7AnalysisInput),
+          class8AnalysisInput: this.encodeRemark(params.class8AnalysisInput),
+        };
+        const res = await changeQty(saveParams);
         this.loading = false;
         this.$modal.msgSuccess(
           this.$t("common.msg.ajax.operation.success")
@@ -1137,6 +1177,15 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          remark: this.decodeRemark(data.remark),
+          class1Analysis: this.decodeRemark(data.class1Analysis),
+          class2Analysis: this.decodeRemark(data.class2Analysis),
+          class3Analysis: this.decodeRemark(data.class3Analysis),
+          class4Analysis: this.decodeRemark(data.class4Analysis),
+          class5Analysis: this.decodeRemark(data.class5Analysis),
+          class6Analysis: this.decodeRemark(data.class6Analysis),
+          class7Analysis: this.decodeRemark(data.class7Analysis),
+          class8Analysis: this.decodeRemark(data.class8Analysis),
         };
         this.getDate(data.scheduleDate)
         // this.getInfo(data.id);

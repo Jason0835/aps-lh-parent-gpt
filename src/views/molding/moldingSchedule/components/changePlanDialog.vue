@@ -129,7 +129,7 @@
             >
               <el-input
                 v-model="form.class1PlanQty"
-                :disabled="three1PlanTimeDisabled"
+                :disabled="three1PlanTimeDisabled || isShiftLocked(1)"
               ></el-input>
             </el-form-item>
           </el-col>
@@ -149,6 +149,7 @@
               <el-input
                 v-model="form.class1AnalysisInput"
                 maxlength="66"
+                :disabled="isShiftLocked(1)"
               ></el-input>
             </el-form-item>
           </el-col>
@@ -174,7 +175,7 @@
               <el-input-number
                 class="w100"
                 v-model="form.class2PlanQty"
-                :disabled="three2PlanTimeDisabled"
+                :disabled="three2PlanTimeDisabled || isShiftLocked(2)"
                 :min="0"
                 controls-position="right"
               ></el-input-number>
@@ -196,6 +197,7 @@
               <el-input
                 v-model="form.class2AnalysisInput"
                 maxlength="66"
+                :disabled="isShiftLocked(2)"
               ></el-input>
             </el-form-item>
           </el-col>
@@ -221,7 +223,7 @@
               <el-input-number
                 class="w100"
                 v-model="form.class3PlanQty"
-                :disabled="three3PlanTimeDisabled"
+                :disabled="three3PlanTimeDisabled || isShiftLocked(3)"
                 :min="0"
                 controls-position="right"
               ></el-input-number>
@@ -243,6 +245,7 @@
               <el-input
                 v-model="form.class3AnalysisInput"
                 maxlength="66"
+                :disabled="isShiftLocked(3)"
               ></el-input>
             </el-form-item>
           </el-col>
@@ -268,7 +271,7 @@
               <el-input-number
                 class="w100"
                 v-model="form.class4PlanQty"
-                :disabled="three4PlanTimeDisabled"
+                :disabled="three4PlanTimeDisabled || isShiftLocked(4)"
                 :min="0"
                 controls-position="right"
               ></el-input-number>
@@ -290,6 +293,7 @@
               <el-input
                 v-model="form.class4AnalysisInput"
                 maxlength="66"
+                :disabled="isShiftLocked(4)"
               ></el-input>
             </el-form-item>
           </el-col>
@@ -315,7 +319,7 @@
               <el-input-number
                 class="w100"
                 v-model="form.class5PlanQty"
-                :disabled="three5PlanTimeDisabled"
+                :disabled="three5PlanTimeDisabled || isShiftLocked(5)"
                 :min="0"
                 controls-position="right"
               ></el-input-number>
@@ -337,6 +341,7 @@
               <el-input
                 v-model="form.class5AnalysisInput"
                 maxlength="66"
+                :disabled="isShiftLocked(5)"
               ></el-input>
             </el-form-item>
           </el-col>
@@ -362,7 +367,7 @@
               <el-input-number
                 class="w100"
                 v-model="form.class6PlanQty"
-                :disabled="three6PlanTimeDisabled"
+                :disabled="three6PlanTimeDisabled || isShiftLocked(6)"
                 :min="0"
                 controls-position="right"
               ></el-input-number>
@@ -384,6 +389,7 @@
               <el-input
                 v-model="form.class6AnalysisInput"
                 maxlength="66"
+                :disabled="isShiftLocked(6)"
               ></el-input>
             </el-form-item>
           </el-col>
@@ -411,7 +417,7 @@
               <el-input-number
                 class="w100"
                 v-model="form.class7PlanQty"
-                :disabled="three7PlanTimeDisabled"
+                :disabled="three7PlanTimeDisabled || isShiftLocked(7)"
                 :min="0"
                 controls-position="right"
               ></el-input-number>
@@ -433,6 +439,7 @@
               <el-input
                 v-model="form.class7AnalysisInput"
                 maxlength="66"
+                :disabled="isShiftLocked(7)"
               ></el-input>
             </el-form-item>
           </el-col>
@@ -459,7 +466,7 @@
               <el-input-number
                 class="w100"
                 v-model="form.class8PlanQty"
-                :disabled="three8PlanTimeDisabled"
+                :disabled="three8PlanTimeDisabled || isShiftLocked(8)"
                 :min="0"
                 controls-position="right"
               ></el-input-number>
@@ -481,6 +488,7 @@
               <el-input
                 v-model="form.class8AnalysisInput"
                 maxlength="66"
+                :disabled="isShiftLocked(8)"
               ></el-input>
             </el-form-item>
           </el-col>
@@ -532,6 +540,9 @@ export default {
       three3PlanTimeDisabled: false,
       three4PlanTimeDisabled: false,
       three5PlanTimeDisabled: false,
+      three6PlanTimeDisabled: false,
+      three7PlanTimeDisabled: false,
+      three8PlanTimeDisabled: false,
       two1PlanTimeDisabled: false,
       two2PlanTimeDisabled: false,
       rules: {
@@ -1005,6 +1016,9 @@ export default {
     },
   },
   methods: {
+    isShiftLocked(shift) {
+      return Number(this.form[`class${shift}FinishQty`] || 0) !== 0;
+    },
     // api
     async getInfo(id) {
       try {
@@ -1112,6 +1126,9 @@ export default {
       this.three3PlanTimeDisabled = false;
       this.three4PlanTimeDisabled = false;
       this.three5PlanTimeDisabled = false;
+      this.three6PlanTimeDisabled = false;
+      this.three7PlanTimeDisabled = false;
+      this.three8PlanTimeDisabled = false;
       this.two1PlanTimeDisabled = false;
       this.two2PlanTimeDisabled = false;
     },

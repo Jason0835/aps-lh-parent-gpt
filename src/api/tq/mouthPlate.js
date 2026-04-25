@@ -1,33 +1,36 @@
-import request,{ downloadLink } from '@/utils/request'
+import request, { downloadLink } from '@/utils/request'
 
-/**
- * 口型板列表
- * @param {Object} query
- * @returns
- */
 export function listMouthPlate(query) {
   return request({
-    url: 'tq/mouthPlate/list',
+    url: '/tq/mouthPlate/list',
     method: 'post',
     data: query
   })
 }
-/**
- * 编辑成型机台
- * @param {Object} query
- * @returns
- */
-export function editMouthPlate(query) {
+
+export function saveMouthPlate(query) {
   return request({
-    url: 'tq/mouthPlate/edit',
+    url: '/tq/mouthPlate/save',
     method: 'post',
     data: query
   })
 }
-export function removeMouthPlate(query) {
+
+export function removeMouthPlate(ids) {
   return request({
-    url: 'tq/mouthPlate/remove',
+    url: '/tq/mouthPlate/remove',
     method: 'post',
-    data: query
+    params: { ids: ids }
   })
+}
+
+export function removeAllMouthPlate() {
+  return request({
+    url: '/tq/mouthPlate/removeAll',
+    method: 'post'
+  })
+}
+
+export function exportMouthPlate(query) {
+  return downloadLink("/tq/mouthPlate/export", query)
 }

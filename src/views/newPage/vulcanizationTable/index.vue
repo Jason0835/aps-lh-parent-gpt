@@ -356,8 +356,8 @@ export default {
       }
       if (params.yearMonth) {
         let arr = params.yearMonth.split("-");
-        params.year = arr[0];
-        params.month = arr[1];
+        params.year = parseInt(arr[0]);
+        params.month = parseInt(arr[1]);
         params.yearMonth = "";
       }
       return params;

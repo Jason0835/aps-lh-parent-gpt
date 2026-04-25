@@ -181,6 +181,8 @@ export default {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
           type: "textarea",
+          maxlength: 300,
+          "show-word-limit": true,
         },
         {
           render: () => {
@@ -192,6 +194,24 @@ export default {
               </div>
             );
           },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+          prop: "mouldMethod",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class1IsEnd",
+          disabled: true,
+          span: 12,
         },
         {
           label: this.$t("一班计划"),
@@ -228,6 +248,24 @@ export default {
           },
         },
         {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+          prop: "mouldMethod",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class2IsEnd",
+          disabled: true,
+          span: 12,
+        },
+        {
           label: this.$t("二班计划量"),
           prop: "class2PlanQty",
           disabled: this.isChangeQty ? this.plan2Disabled : true,
@@ -244,6 +282,7 @@ export default {
           prop: "class2Analysis",
           // disabled: true,
           span: 12,
+          maxlength: 200,
         },
         {
           render: () => {
@@ -255,6 +294,24 @@ export default {
               </div>
             );
           },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+          prop: "mouldMethod",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class3IsEnd",
+          disabled: true,
+          span: 12,
         },
         {
           label: this.$t("三班计划量"),
@@ -286,6 +343,24 @@ export default {
           },
         },
         {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+          prop: "mouldMethod",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class4IsEnd",
+          disabled: true,
+          span: 12,
+        },
+        {
           label: this.$t("四班计划量"),
           prop: "class4PlanQty",
           disabled: this.isChangeQty ? this.plan4Disabled : true,
@@ -302,6 +377,7 @@ export default {
           prop: "class4Analysis",
           // disabled: true,
           span: 12,
+          maxlength: 200,
         },
         // {
         //   label: this.$t("ui.data.column.scheduleResult.class4Analysis.lh"),
@@ -320,6 +396,24 @@ export default {
           },
         },
         {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+          prop: "mouldMethod",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class5IsEnd",
+          disabled: true,
+          span: 12,
+        },
+        {
           label: this.$t("五班计划量"),
           prop: "class5PlanQty",
           disabled: this.isChangeQty ? this.plan5Disabled : true,
@@ -336,6 +430,7 @@ export default {
           prop: "class5Analysis",
           // disabled: true,
           span: 12,
+          maxlength: 200,
         },
         {
           render: () => {
@@ -347,6 +442,24 @@ export default {
               </div>
             );
           },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+          prop: "mouldMethod",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class6IsEnd",
+          disabled: true,
+          span: 12,
         },
         {
           label: this.$t("六班计划量"),
@@ -365,6 +478,7 @@ export default {
           prop: "class6Analysis",
           // disabled: true,
           span: 12,
+          maxlength: 200,
         },
         {
           render: () => {
@@ -376,6 +490,24 @@ export default {
               </div>
             );
           },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+          prop: "mouldMethod",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class7IsEnd",
+          disabled: true,
+          span: 12,
         },
         {
           label: this.$t("七班计划量"),
@@ -394,6 +526,7 @@ export default {
           prop: "class7Analysis",
           // disabled: true,
           span: 12,
+          maxlength: 200,
         },
         {
           render: () => {
@@ -405,6 +538,24 @@ export default {
               </div>
             );
           },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+          prop: "mouldMethod",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class8IsEnd",
+          disabled: true,
+          span: 12,
         },
         {
           label: this.$t("八班计划量"),
@@ -423,6 +574,7 @@ export default {
           prop: "class8Analysis",
           // disabled: true,
           span: 12,
+          maxlength: 200,
         },
 
       ];
@@ -430,27 +582,68 @@ export default {
     },
   },
   methods: {
-    // api
+    calcShiftIsEndFields(data) {
+      const specEndTime = data.specEndTime;
+      if (!specEndTime) return;
+      const specEnd = new Date(specEndTime).getTime();
+      for (let i = 1; i <= 8; i++) {
+        const startTimeField = "class" + i + "StartTime";
+        const shiftStart = data[startTimeField];
+        if (shiftStart && specEnd >= new Date(shiftStart).getTime()) {
+          this.$set(this.form, "class" + i + "IsEnd", "1");
+        } else {
+          this.$set(this.form, "class" + i + "IsEnd", "0");
+        }
+      }
+    },
+    encodeRemark(remark) {
+      if (!remark) return remark;
+      return remark
+        .replace(/%/g, '__PERCENT__')
+        .replace(/&/g, '__AMP__')
+        .replace(/</g, '__LT__')
+        .replace(/>/g, '__GT__')
+        .replace(/"/g, '__QUOT__')
+        .replace(/'/g, '__APOS__');
+    },
+    decodeRemark(remark) {
+      if (!remark) return remark;
+      return remark
+        .replace(/__PERCENT__/g, '%')
+        .replace(/__AMP__/g, '&')
+        .replace(/__LT__/g, '<')
+        .replace(/__GT__/g, '>')
+        .replace(/__QUOT__/g, '"')
+        .replace(/__APOS__/g, "'");
+    },
     async save(params) {
-      // console.log(params);
       try {
         this.loading = true;
+        const saveParams = {
+          ...params,
+          remark: this.encodeRemark(params.remark),
+          class1Analysis: this.encodeRemark(params.class1Analysis),
+          class2Analysis: this.encodeRemark(params.class2Analysis),
+          class3Analysis: this.encodeRemark(params.class3Analysis),
+          class4Analysis: this.encodeRemark(params.class4Analysis),
+          class5Analysis: this.encodeRemark(params.class5Analysis),
+          class6Analysis: this.encodeRemark(params.class6Analysis),
+          class7Analysis: this.encodeRemark(params.class7Analysis),
+          class8Analysis: this.encodeRemark(params.class8Analysis),
+        };
+        let data;
         if (this.isChangeQty) {
-          const data = await changeQty({
-            ...params,
-          });
-          this.$modal.msgSuccess(data.msg);
+          data = await changeQty(saveParams);
         } else {
-          const data = await editScheduleResult({
-            ...params,
-          });
-          this.$modal.msgSuccess(data.msg);
+          data = await editScheduleResult(saveParams);
         }
 
         this.$emit("success");
         this.hide();
+        this.$modal.msgSuccess(data.msg || "保存成功");
       } catch (error) {
-        console.log(error);
+        console.error("保存失败:", error);
+        this.$modal.msgError(error.message || "保存失败");
       } finally {
         this.loading = false;
       }
@@ -464,7 +657,17 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          remark: this.decodeRemark(data.remark),
+          class1Analysis: this.decodeRemark(data.class1Analysis),
+          class2Analysis: this.decodeRemark(data.class2Analysis),
+          class3Analysis: this.decodeRemark(data.class3Analysis),
+          class4Analysis: this.decodeRemark(data.class4Analysis),
+          class5Analysis: this.decodeRemark(data.class5Analysis),
+          class6Analysis: this.decodeRemark(data.class6Analysis),
+          class7Analysis: this.decodeRemark(data.class7Analysis),
+          class8Analysis: this.decodeRemark(data.class8Analysis),
         };
+        this.calcShiftIsEndFields(data);
 
         if (data.scheduleDate) {
           if (moment().isAfter(data.scheduleDate + " 19:00:00")) {

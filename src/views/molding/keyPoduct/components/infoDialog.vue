@@ -170,7 +170,7 @@ export default {
         const checkData = {
           structureName: params.structureName,
           embryoCode: params.embryoCode,
-          id: params.id || null
+          id: this.form.id || null
         };
         const checkRes = await checkUniqueCxKeyProduct(checkData);
         if (checkRes.data && checkRes.data.exist) {

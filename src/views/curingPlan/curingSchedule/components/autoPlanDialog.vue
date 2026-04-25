@@ -32,6 +32,7 @@ import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
 import { lhValidateAutoPlan, autoPlan } from "@/api/lh/scheduleResult";
+
 export default {
   components: { infoForm },
   inject: ["parentDict"],
@@ -114,12 +115,23 @@ export default {
         //   this.$modal.msgError(this.$t("ui.biz.alter.CanNotRecreate"));
         // }
         const data = await autoPlan(params);
-        // 接口返回：{ success, message, batchNo }；兼容旧版 { msg }
+        // 接口返回：{ success, message, batchNo, validationErrors }；兼容旧版 { msg }
         const tip = data.message || data.msg || "";
         if (data.success === false) {
-          this.$modal.msgError(
-            tip || this.$t("ui.data.btn.ajax.code.msg")
-          );
+          const hasValidationDetails =
+            (data.validationErrors &&
+              Array.isArray(data.validationErrors) &&
+              data.validationErrors.length > 0) ||
+            (data.validationErrorDetails &&
+              Array.isArray(data.validationErrorDetails) &&
+              data.validationErrorDetails.length > 0);
+          if (hasValidationDetails) {
+            this.$emit("validationError", data);
+          } else {
+            this.$modal.msgError(
+              tip || this.$t("ui.data.btn.ajax.code.msg")
+            );
+          }
           return;
         }
         this.$modal.msgSuccess(

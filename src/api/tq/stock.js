@@ -9,14 +9,14 @@ export function listStock(query) {
 }
 export function addStock(query) {
   return request({
-    url: '/tq/stock/add',
+    url: '/tq/stock/save',
     method: 'post',
     data: query
   })
 }
 export function editStock(query) {
   return request({
-    url: '/tq/stock/edit',
+    url: '/tq/stock/save',
     method: 'post',
     data: query
   })

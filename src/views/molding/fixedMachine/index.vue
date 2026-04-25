@@ -221,6 +221,29 @@ export default {
           },
         },
         {
+          prop: "fixedStructure4",
+          label: this.$t("ui.data.column.workWearInfo.fixedStructure4"),
+          width: 300,
+          render: ({ row }) => {
+            return (
+              <el-popover
+                placement="left"
+                title={this.$t("ui.data.column.workWearInfo.fixedStructure4")}
+                width="500"
+                trigger="click"
+                content={row.fixedStructure4}
+              >
+                <div domPropsInnerHTML={this.renderHtml(row.fixedStructure4)}></div>
+                <div
+                  slot="reference"
+                  style="cursor: pointer;"
+                  domPropsInnerHTML={this.renderHtml(row.fixedStructure4)}
+                ></div>
+              </el-popover>
+            );
+          },
+        },
+        {
           prop: "fixedMaterialCode",
           label: this.$t("ui.data.column.workWearInfo.fixedMaterialCode"),
           width: 300,
@@ -448,6 +471,10 @@ export default {
           label: this.$t("ui.data.column.workWearInfo.fixedStructure3"),
         },
         {
+          prop: "fixedStructure4",
+          label: this.$t("ui.data.column.workWearInfo.fixedStructure4"),
+        },
+        {
           label: this.$t("ui.data.column.workWearInfo.disableStructure"),
           prop: "disableStructure",
           // type: "select",
@@ -554,7 +581,8 @@ export default {
       return params;
     },
     renderHtml(structure) {
-      return structure.replace(/[,，]/g, "<br>");
+      const text = structure === null || structure === undefined ? "" : String(structure);
+      return text.replace(/[,，]/g, "<br>");
     },
     // api
     async getList() {
