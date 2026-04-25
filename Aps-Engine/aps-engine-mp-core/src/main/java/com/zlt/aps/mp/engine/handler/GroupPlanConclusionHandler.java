@@ -98,17 +98,16 @@ public class GroupPlanConclusionHandler {
         }
         //不间断的收尾时间: 连续收尾日集合
         List<GroupPlanCxLhCapacityLimitHelper> realLowMinLhMachineDayList = getForcedConclusionDayInfo(context, lowMinLhMachineDayList, allAllocationInfo);
+        //20260424+ 收尾机台选择 获取在 conclusionDay日前，等于最低实单硫化机台数的日期
+        CxMachineBaseInfoVo selectCxMachineInfo = getConclusionCxMachine(context, groupPlanInfo, allAllocationInfo);
+        if (null != selectCxMachineInfo) {
+            CxMachineAllocationPlanHelper conclusionAllocationRange = selectCxMachineInfo.getLastAllocationInfo();
+            handlerContinueDayMinLhMachineDays(context, groupPlanInfo, conclusionAllocationRange, realLowMinLhMachineDayList);
+        }
         if (CollectionUtils.isEmpty(realLowMinLhMachineDayList)) {
             //记录日志
             GroupPlanConclusionLogRecorder.addNoConclusionInfoLog(context, groupName, minLhMachineCount);
             return GroupConclusionInfoVo.buildNoConclusionInfo(minLhMachineCount);
-        }
-        //收尾机台选择
-        CxMachineBaseInfoVo selectCxMachineInfo = getConclusionCxMachine(context, groupPlanInfo, allAllocationInfo);
-        //20260424+ 获取在 conclusionDay日前，等于最低实单硫化机台数的日期
-        if (null != selectCxMachineInfo) {
-            CxMachineAllocationPlanHelper conclusionAllocationRange = selectCxMachineInfo.getLastAllocationInfo();
-            handlerContinueDayMinLhMachineDays(context, groupPlanInfo, conclusionAllocationRange, realLowMinLhMachineDayList);
         }
         //按日期排序
         realLowMinLhMachineDayList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
@@ -472,7 +471,8 @@ public class GroupPlanConclusionHandler {
             return;
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        List<GroupPlanCxLhCapacityLimitHelper> minLhMachineDayList = getMinLhMachineDayInfo(productionContext, groupPlan);
+        Integer earliestLowMinLhMachineDay = getLowMinLhMachineConclusionDay(realLowMinLhMachineDayList);
+        List<GroupPlanCxLhCapacityLimitHelper> minLhMachineDayList = getMinLhMachineDayInfo(productionContext, groupPlan, earliestLowMinLhMachineDay);
         if (CollectionUtils.isEmpty(minLhMachineDayList)) {
             return;
         }
@@ -491,13 +491,28 @@ public class GroupPlanConclusionHandler {
     }
 
     /**
-     * 获取从conclusionDay往前，连续排产都是实单最低硫化机台数的天数信息
+     * 获取低于实单最低硫化机台数的最早有效日期
      *
-     * @param context       排产上下文
-     * @param groupPlanInfo 分组信息
+     * @param realLowMinLhMachineDayList 一段连续低于最低实单硫化机台数排产日集合信息
      * @return
      */
-    private List<GroupPlanCxLhCapacityLimitHelper> getMinLhMachineDayInfo(Context context, ProductionPlanGroupInfo groupPlanInfo) {
+    private Integer getLowMinLhMachineConclusionDay(List<GroupPlanCxLhCapacityLimitHelper> realLowMinLhMachineDayList) {
+        if (CollectionUtils.isEmpty(realLowMinLhMachineDayList)) {
+            return null;
+        }
+        realLowMinLhMachineDayList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay));
+        return realLowMinLhMachineDayList.get(BigDecimal.ZERO.intValue()).getDay();
+    }
+
+    /**
+     * 获取从conclusionDay往前，连续排产都是实单最低硫化机台数的天数信息
+     *
+     * @param context                    排产上下文
+     * @param groupPlanInfo              分组信息
+     * @param earliestLowMinLhMachineDay 低于实单硫化机台数的最早排产日
+     * @return
+     */
+    private List<GroupPlanCxLhCapacityLimitHelper> getMinLhMachineDayInfo(Context context, ProductionPlanGroupInfo groupPlanInfo, Integer earliestLowMinLhMachineDay) {
         if (null == groupPlanInfo) {
             return Collections.emptyList();
         }
@@ -516,8 +531,13 @@ public class GroupPlanConclusionHandler {
         if (CollectionUtils.isEmpty(lowMinLhMachineDayList)) {
             return Collections.emptyList();
         }
-        lowMinLhMachineDayList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay, Comparator.reverseOrder()));
-        Integer endDay = lowMinLhMachineDayList.get(BigDecimal.ZERO.intValue()).getDay();
+        Integer endDay;
+        if (null != earliestLowMinLhMachineDay) {
+            endDay = context.getPreviousDay(earliestLowMinLhMachineDay);
+        } else {
+            lowMinLhMachineDayList.sort(Comparator.comparing(GroupPlanCxLhCapacityLimitHelper::getDay, Comparator.reverseOrder()));
+            endDay = lowMinLhMachineDayList.get(BigDecimal.ZERO.intValue()).getDay();
+        }
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayLimitMap = lowMinLhMachineDayList.stream().collect(Collectors.toMap(GroupPlanCxLhCapacityLimitHelper::getDay, Function.identity()));
         List<GroupPlanCxLhCapacityLimitHelper> effectiveList = new ArrayList<>();
         for (Integer day = endDay; day >= ProductionConstant.MONTH_START_DAY; ) {
