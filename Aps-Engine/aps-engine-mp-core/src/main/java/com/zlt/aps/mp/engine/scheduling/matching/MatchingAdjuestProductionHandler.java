@@ -796,7 +796,7 @@ public class MatchingAdjuestProductionHandler {
             return;
         }
         adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList, day, daylyCapacityLimit,
-                contextDTO.getParamMap(), mpProdFinal.getMainPattern());
+                contextDTO.getParamMap(), mpProdFinal.getMainPattern(),mpProdFinal.getEmbryoCode());
     }
 
     /**
@@ -1234,7 +1234,7 @@ public class MatchingAdjuestProductionHandler {
         if (isChangeMould) { // 如果是换模具，则只能增加首日排产量
             Integer changeMouldFirstQty = new MpAdjustDailyCapacityLimit().getFirstDayQty(
                     contextDTO.getFactoryMonthPlanProdFinalList(), scheduleDay, dailyCapacityLimitVo,
-                    contextDTO.getParamMap(), plan.getMainPattern());
+                    contextDTO.getParamMap(), plan.getMainPattern(),plan.getEmbryoCode());
             allocationQty = intValue(changeMouldFirstQty); // 每次仅新增一台硫化机
         }
         if (allocationQty <= 0) {
@@ -1421,7 +1421,7 @@ public class MatchingAdjuestProductionHandler {
         newDailyCapacityLimitVo.setDayOpenCloseFlag(oldDailyCapacityLimitVo.getDayOpenCloseFlag());
         newDailyCapacityLimitVo.setDayProductionRate(oldDailyCapacityLimitVo.getDayProductionRate());
         new MpAdjustDailyCapacityLimit().calcLhMachinesWithEmbryoTypes(Collections.singletonList(plan), day,
-                newDailyCapacityLimitVo, contextDTO.getParamMap(), null);
+                newDailyCapacityLimitVo, contextDTO.getParamMap(), null,null);
         return newDailyCapacityLimitVo.getUsedLhMachines();
     }
 

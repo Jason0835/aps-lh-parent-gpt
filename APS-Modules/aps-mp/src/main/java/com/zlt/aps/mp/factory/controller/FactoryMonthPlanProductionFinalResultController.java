@@ -440,7 +440,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 
                 for (int m = newOnLineDay; m <= structureDeadLine; m++){
                     // 计算产能限制
-                    adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(targetMonthPLanList,m, dailyCapacityLimitVoMap.get(m), contextDTO.getParamMap(), mpFinalVo.getMainPattern());
+                    adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(targetMonthPLanList,m, dailyCapacityLimitVoMap.get(m), contextDTO.getParamMap(), mpFinalVo.getMainPattern(),mpFinalVo.getEmbryoCode());
                     // 获取当日型腔数量（主花纹模具相关校验使用，型腔/2 为机台数）
                     int cavityQty = getNewCavityQty(contextDTO, mpFinalVo, m);
                     // 检查：当前每日硫化机台数、当前每日胎胚种类数 符合性

@@ -510,7 +510,8 @@ public class MatchingProductionHandler {
                         if (totalProductionQty > 0) {
                             productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, totalProductionQty); // 更新特殊材料占用
                             String mainPattern = CollectionUtils.firstElement(productionPlanList).getMainPattern(); // 主花纹
-                            groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern); // 重新计算统计产能
+                            String embryoCode = CollectionUtils.firstElement(productionPlanList).getEmbryoCode(); // 胎胚号
+                            groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern,embryoCode); // 重新计算统计产能
                             this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
                             if (plan.getMatchEndDay() == realEndDay) { // 如果区间最后一天有排产，且往后结构还没有结束，则继续尝试往后延一天
                                 Integer nextEndDay = this.getNextDay(productionContext, realEndDay, endDay);
@@ -677,7 +678,7 @@ public class MatchingProductionHandler {
                             .mapToInt(MpDailyCapacityLimitVo::getUsedLhMachines).sum();
                     Integer allMaxLhMachines = productionContext.getBaseDataContainer().getLhMachineInfoList().size();
                     // 2.2.2.4、完成判断后重算当天的排产统计，防止后续使用有问题
-                    groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, day, firstPlan.getMainPattern());
+                    groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, day, firstPlan.getMainPattern(),firstPlan.getEmbryoCode());
                     // 2.2.2.5、判断结构机台数
                     if (usedLhMachines > maxLhMachineCount) {
                         break inner;
@@ -785,7 +786,7 @@ public class MatchingProductionHandler {
         Map<String, Object> paramMap = groupInfo.composeDailyCapacityParamMap(productionContext);
         List<FactoryMonthPlanMouldDayResult> mouldDayResultList = new ArrayList<>(resultMap.values());
         MpDailyCapacityLimitVo daylyCapacityLimitlt = groupInfo.getDailyCapacityLimitVoMap().get(day);
-        dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, day, daylyCapacityLimitlt, paramMap, mpMouldDayResult.getMainPattern());
+        dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, day, daylyCapacityLimitlt, paramMap, mpMouldDayResult.getMainPattern(),mpMouldDayResult.getEmbryoCode());
     }
     
 
@@ -1223,7 +1224,8 @@ public class MatchingProductionHandler {
                     limitHelper.setMouldQty(limitHelper.getMouldQty() + newDoubleMouldList.size());
                     limitHelper.setPlanQty(limitHelper.getPlanQty() + realProductionQty);
                     String mainPattern = CollectionUtils.firstElement(productionPlanList).getMainPattern(); // 主花纹
-                    groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern); // 重新计算统计产能
+                    String embryoCode = CollectionUtils.firstElement(productionPlanList).getEmbryoCode(); // 胎胚号
+                    groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern,embryoCode); // 重新计算统计产能
                     return true; // 新增模具后直接结束，后面走续作逻辑
                 }
             }

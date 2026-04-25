@@ -594,7 +594,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (dailyCapacityLimitVoMap.get(i) == null){
                 continue;
             }
-            adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(),null);
+            adjustDailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mpProdFinalList,i, dailyCapacityLimitVoMap.get(i), contextDTO.getParamMap(),null,null);
         }
     }
 

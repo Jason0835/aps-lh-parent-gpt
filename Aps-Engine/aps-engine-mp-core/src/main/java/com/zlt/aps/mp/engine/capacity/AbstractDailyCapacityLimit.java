@@ -223,8 +223,8 @@ public abstract class AbstractDailyCapacityLimit {
      * @param mainPattern 主花纹
      */
     public void calcLhMachinesWithEmbryoTypes(List<? extends BaseEntity> mpProdFinalList, int iDay,
-                                                MpDailyCapacityLimitVo dailyCapacityLimitVo,Map<String,Object> paramMap,String mainPattern) {
-        calcLhMachinesWithEmbryoTypes2(mpProdFinalList,iDay,dailyCapacityLimitVo,paramMap,mainPattern,false);
+                                                MpDailyCapacityLimitVo dailyCapacityLimitVo,Map<String,Object> paramMap,String mainPattern,String embryoCode) {
+        calcLhMachinesWithEmbryoTypes2(mpProdFinalList,iDay,dailyCapacityLimitVo,paramMap,mainPattern,embryoCode,false);
     }
     /**
      *  1、计算当前每日硫化机台数,根据日计划量反向判断
@@ -240,7 +240,7 @@ public abstract class AbstractDailyCapacityLimit {
      * @param mainPattern 主花纹
      */
     private Integer calcLhMachinesWithEmbryoTypes2(List<? extends BaseEntity> mpProdFinalList, int iDay,
-                                              MpDailyCapacityLimitVo dailyCapacityLimitVo,Map<String,Object> paramMap,String mainPattern,boolean returnFirstQty) {
+                                              MpDailyCapacityLimitVo dailyCapacityLimitVo,Map<String,Object> paramMap,String mainPattern,String embryoCode,boolean returnFirstQty) {
         if (PubUtil.isEmpty(mpProdFinalList) || dailyCapacityLimitVo == null){
             return null;
         }
@@ -262,6 +262,9 @@ public abstract class AbstractDailyCapacityLimit {
         int mpFullMachinesAddMould = 0;
         int mpOpenMachinesAddMould = 0;
         int mpBlockMachinesAddMould = 0;
+
+        //前日有计划量的同胎胚数
+        int preSameEmbryoCount = 0;
 
         //Map<主花纹,减模机台数>
         Map<String,Integer> patternDecMouldMap = new HashMap<>();
@@ -303,12 +306,12 @@ public abstract class AbstractDailyCapacityLimit {
             }
             // 日计划量
             dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
-        /*    if (mpFinalVo.getFieldValueByFieldName("materialCode") != null){
+            if (mpFinalVo.getFieldValueByFieldName("materialCode") != null){
                 String materialCode = (String) mpFinalVo.getFieldValueByFieldName("materialCode") ;
-                if (materialCode.equals("3302001311") && iDay == 26){
+                if (materialCode.equals("3302002582") && iDay == 10){
                     System.out.println("materialCode = " + materialCode + ", iDay = " + iDay);
                 }
-            }*/
+            }
             if (dailyCapacityLimitVo.isOpenProductionFirstDay()){
                 //若开产首日，将日硫化量等比例减，奇数+1
                 dailyLhQty = getProportionalDeductQty(dailyCapacityLimitVo,dailyLhQty);
@@ -361,9 +364,17 @@ public abstract class AbstractDailyCapacityLimit {
             }
 
             // 统计胎胚种类数
+            embryoFieldValue = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
             if (dayPlanQty >= changeMouldFirstQty){
-                embryoFieldValue = (String) mpFinalVo.getFieldValueByFieldName(getEmbryoCodeField());
                 dailyCapacityLimitVo.getEmbryoCodes().add(embryoFieldValue);
+            }
+
+            // 统计同胎胚前日计划量的个数
+            if (!StringUtil.isEmptyWithTrim(embryoCode) && embryoCode.equals(embryoFieldValue)){
+                Integer preDayValue = (Integer)mpFinalVo.getFieldValueByFieldName(day1Field);
+                if (preDayValue != null && preDayValue > 0) {
+                    preSameEmbryoCount += 1;
+                }
             }
         }
 
@@ -392,6 +403,11 @@ public abstract class AbstractDailyCapacityLimit {
         //==================计算主花纹向下的硫化机台数==========================
 
         if (returnFirstQty){
+            if (preSameEmbryoCount > 0){
+                //次日共用胎胚起模，32条；
+                return (Integer)paramMap.get(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode());
+            }
+
             int patternDecMouldCount = patternDecMouldMap.get(mainPattern) == null ? 0:patternDecMouldMap.get(mainPattern);
             int patternAddMouldCount = patternAddMouldMap.get(mainPattern) == null ? 0:patternAddMouldMap.get(mainPattern);
             int patternNoChangeDecMouldCount = patternNoChangeDecMouldMap.get(mainPattern) == null ? 0:patternNoChangeDecMouldMap.get(mainPattern);
@@ -429,8 +445,8 @@ public abstract class AbstractDailyCapacityLimit {
      * @param mainPattern 主花纹
      */
     public Integer getFirstDayQty(List<? extends BaseEntity> mpProdFinalList, int iDay,
-                                               MpDailyCapacityLimitVo dailyCapacityLimitVo,Map<String,Object> paramMap,String mainPattern) {
-        return calcLhMachinesWithEmbryoTypes2(mpProdFinalList,iDay,dailyCapacityLimitVo,paramMap,mainPattern,true);
+                                               MpDailyCapacityLimitVo dailyCapacityLimitVo,Map<String,Object> paramMap,String mainPattern,String embryoCode) {
+        return calcLhMachinesWithEmbryoTypes2(mpProdFinalList,iDay,dailyCapacityLimitVo,paramMap,mainPattern,embryoCode,true);
     }
 
     private Integer getFirstDayQty(int patternDecMouldCount,int patternAddMouldCount,Map<String,Object> paramMap){
