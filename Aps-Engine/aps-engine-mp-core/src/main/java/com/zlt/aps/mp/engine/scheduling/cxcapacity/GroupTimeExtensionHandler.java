@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.zlt.aps.constant.StringConstant;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.GroupCapacityProductionLimitHelper;
@@ -85,6 +86,8 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         if (handledDayInfo.contains(handlerKey)) {
             GroupTimeExtensionConclusionLogRecorder.addNoTimeExtensionConclusionHandlerLog(context, groupName, cxMachineCodeInfo);
             timeExtensionOneDayConclusion(context, groupPlan, earliestConclusion, nextDay);
+            //20260425+ 标记不再进行分配？
+            groupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             return;
         }
         handledDayInfo.add(handlerKey);
