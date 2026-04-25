@@ -5,8 +5,10 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.LhBatchNoRedisGenerator;
+import com.zlt.aps.lh.mapper.CxLhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
+import org.apache.commons.lang3.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -27,12 +29,15 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     private LhScheduleResultMapper mapper;
 
     @Resource
+    private CxLhScheduleResultMapper cxLhScheduleResultMapper;
+
+    @Resource
     private LhBatchNoRedisGenerator batchNoRedisGenerator;
 
     @Override
     public List<LhScheduleResult> selectByDateAndFactory(Date scheduleDate, String factoryCode) {
         return mapper.selectList(new LambdaQueryWrapper<LhScheduleResult>()
-                .eq(LhScheduleResult::getFactoryCode, factoryCode)
+                .eq(StringUtils.isNotEmpty(factoryCode), LhScheduleResult::getFactoryCode, factoryCode)
                 .eq(LhScheduleResult::getScheduleDate, scheduleDate)
                 .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
     }
@@ -75,5 +80,20 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     @Override
     public String generateNextBatchNo(Date scheduleDate, String factoryCode) {
         return batchNoRedisGenerator.nextBatchNo(scheduleDate, factoryCode);
+    }
+
+    @Override
+    public void updateReleaseStatus(LhScheduleResult item) {
+        LhScheduleResult updateEntity = new LhScheduleResult();
+        updateEntity.setId(item.getId());
+        updateEntity.setIsRelease(item.getIsRelease());
+        mapper.updateById(updateEntity);
+    }
+
+    @Override
+    public List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> getCxLhScheduleResultList(Date scheduleDate) {
+        LambdaQueryWrapper<com.zlt.aps.cx.entity.schedule.LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getScheduleDate, scheduleDate);
+        return cxLhScheduleResultMapper.selectList(wrapper);
     }
 }

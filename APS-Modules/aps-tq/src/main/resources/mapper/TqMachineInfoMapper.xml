@@ -5,25 +5,22 @@
 <mapper namespace="com.zlt.aps.tq.mapper.TqMachineInfoMapper">
 
     <resultMap type="com.zlt.aps.tq.api.domain.entity.TqMachineInfo" id="MachineInfoResult">
-        <result property="id" column="id"/>
-        <result property="machineCode" column="machine_code"/>
-        <result property="machineName" column="machine_name"/>
-        <result property="efficiency" column="efficiency"/>
-        <result property="toolingInfo" column="tooling_info"/>
-        <result property="quata" column="quata"/>
-        <result property="classShift" column="class_shift"/>
-        <result property="openMachineClass" column="open_machine_class"/>
-        <result property="status" column="status"/>
-        <result property="remark" column="remark"/>
-        <result property="delFlag" column="IS_DELETE"/>
-        <result property="createBy" column="create_by"/>
-        <result property="createTime" column="create_time"/>
-        <result property="updateBy" column="update_by"/>
-        <result property="updateTime" column="update_time"/>
+        <result property="id" column="ID"/>
+        <result property="machineCode" column="MACHINE_CODE"/>
+        <result property="machineName" column="MACHINE_NAME"/>
+        <result property="classShift" column="CLASS_SHIFT"/>
+        <result property="openMachineClass" column="OPEN_MACHINE_CLASS"/>
+        <result property="status" column="STATUS"/>
+        <result property="remark" column="REMARK"/>
+        <result property="isDelete" column="IS_DELETE"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
     </resultMap>
 
     <sql id="selectMachineInfoVo">
-        select id, machine_code, machine_name, efficiency, tooling_info, quata, class_shift, open_machine_class, status, remark, IS_DELETE, create_by, create_time, update_by, update_time from t_tq_machine_info
+        select ID, MACHINE_CODE, MACHINE_NAME, CLASS_SHIFT, OPEN_MACHINE_CLASS, STATUS, REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME from T_TQ_MACHINE_INFO
     </sql>
 
     <select id="selectMachineInfoList" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineInfo"
@@ -31,16 +28,11 @@
         <include refid="selectMachineInfoVo"/>
         <where>
             IS_DELETE ='0'
-            <if test="machineCode != null  and machineCode != ''">and INSTR(machine_code, #{machineCode}) > 0</if>
-            <if test="machineName != null  and machineName != ''">and machine_name like concat(concat('%',#{machineName}), '%')</if>
-            <if test="status != null  and status != ''">and status = #{status}</if>
+            <if test="machineCode != null  and machineCode != ''">and INSTR(MACHINE_CODE, #{machineCode}) > 0</if>
+            <if test="machineName != null  and machineName != ''">and MACHINE_NAME like concat(concat('%',#{machineName}), '%')</if>
+            <if test="status != null  and status != ''">and STATUS = #{status}</if>
         </where>
-        <if test="orderStr == null">
-            order by create_time desc
-        </if>
-        <if test="orderStr != null">
-            order by ${orderStr}
-        </if>
+        order by CREATE_TIME desc
     </select>
 
     <select id="checkMachineCodeUnique" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineInfo"
@@ -48,9 +40,9 @@
         <include refid="selectMachineInfoVo"/>
         <where>
             IS_DELETE ='0'
-            <if test="id != null  and id != ''">and id != #{id}</if>
-            <if test="machineCode != null  and machineCode != ''">and machine_code = #{machineCode}</if>
-            <if test="machineName != null  and machineName != ''">and machine_name = #{machineName}</if>
+            <if test="id != null  and id != ''">and ID != #{id}</if>
+            <if test="machineCode != null  and machineCode != ''">and MACHINE_CODE = #{machineCode}</if>
+            <if test="machineName != null  and machineName != ''">and MACHINE_NAME = #{machineName}</if>
         </where>
     </select>
 
@@ -59,81 +51,10 @@
         <include refid="selectMachineInfoVo"/>
         <where>
             IS_DELETE ='0'
-            <if test="machineCode != null  and machineCode != ''">and machine_code != #{machineCode}</if>
-            <if test="machineName != null  and machineName != ''">and machine_name = #{machineName}</if>
+            <if test="machineCode != null  and machineCode != ''">and MACHINE_CODE != #{machineCode}</if>
+            <if test="machineName != null  and machineName != ''">and MACHINE_NAME = #{machineName}</if>
         </where>
     </select>
-
-
-    <select id="selectMachineInfoById" parameterType="Long" resultMap="MachineInfoResult">
-        <include refid="selectMachineInfoVo"/>
-        where id = #{id}
-    </select>
-
-    <insert id="insertMachineInfo" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineInfo">
-        insert into t_tq_machine_info
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="id != null">id,</if>
-            <if test="machineCode != null">machine_code,</if>
-            <if test="machineName != null">machine_name,</if>
-            <if test="efficiency != null">efficiency,</if>
-            <if test="toolingInfo != null">tooling_info,</if>
-            <if test="quata != null">quata,</if>
-            <if test="classShift != null">class_shift,</if>
-            <if test="openMachineClass != null">open_machine_class,</if>
-            <if test="status != null">status,</if>
-            <if test="remark != null">remark,</if>
-            <if test="delFlag != null">IS_DELETE,</if>
-            <if test="createBy != null">create_by,</if>
-            <if test="createTime != null">create_time,</if>
-            <if test="updateBy != null">update_by,</if>
-            <if test="updateTime != null">update_time,</if>
-        </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="id != null">#{id},</if>
-            <if test="machineCode != null">#{machineCode},</if>
-            <if test="machineName != null">#{machineName},</if>
-            <if test="efficiency != null">#{efficiency},</if>
-            <if test="toolingInfo != null">#{toolingInfo},</if>
-            <if test="quata != null">#{quata},</if>
-            <if test="classShift != null">#{classShift},</if>
-            <if test="openMachineClass != null">#{openMachineClass},</if>
-            <if test="status != null">#{status},</if>
-            <if test="remark != null">#{remark},</if>
-            <if test="delFlag != null">#{delFlag},</if>
-            <if test="createBy != null">#{createBy},</if>
-            <if test="createTime != null">#{createTime},</if>
-            <if test="updateBy != null">#{updateBy},</if>
-            <if test="updateTime != null">#{updateTime},</if>
-        </trim>
-    </insert>
-
-    <update id="updateMachineInfo" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineInfo">
-        update t_tq_machine_info
-        <trim prefix="SET" suffixOverrides=",">
-            machine_name = #{machineName,jdbcType=VARCHAR},
-            efficiency = #{efficiency,jdbcType=DOUBLE},
-            tooling_info = #{toolingInfo,jdbcType=VARCHAR},
-            quata = #{quata,jdbcType=DECIMAL},
-            class_shift = #{classShift,jdbcType=VARCHAR},
-            open_machine_class = #{openMachineClass,jdbcType=VARCHAR},
-            status = #{status,jdbcType=VARCHAR},
-            remark = #{remark,jdbcType=VARCHAR},
-            <if test="delFlag != null">IS_DELETE = #{delFlag,jdbcType=VARCHAR},</if>
-            <if test="createBy != null">create_by = #{createBy,jdbcType=VARCHAR},</if>
-            <if test="createTime != null">create_time = #{createTime,jdbcType=DATE},</if>
-            <if test="updateBy != null">update_by = #{updateBy,jdbcType=VARCHAR},</if>
-            <if test="updateTime != null">update_time = #{updateTime,jdbcType=DATE},</if>
-        </trim>
-        where id = #{id}
-    </update>
-
-    <delete id="deleteMachineInfoByIds" parameterType="String">
-        UPDATE t_tq_machine_info SET IS_DELETE = '1' where id in
-        <foreach item="id" collection="array" open="(" separator="," close=")">
-            #{id}
-        </foreach>
-    </delete>
 
     <select id="listMachineInfo" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineInfo"
             resultMap="MachineInfoResult">
@@ -143,8 +64,8 @@
             from T_TQ_SPECIFY_MACHINE a
             inner JOIN T_TQ_MACHINE_INFO b
             on a.MACHINE_ID=b.ID and b.STATUS = '0'
-            where a.DEL_FLAG='0' and a.JOB_TYPE='0'
-            and a.BEAD_CODE=#{machineCode,jdbcType=VARCHAR}
+            where a.IS_DELETE='0' and a.JOB_TYPE='0'
+            and a.MATERIAL_CODE=#{machineCode,jdbcType=VARCHAR}
         </if>
 
         <if test="id == 2">
@@ -152,46 +73,43 @@
             from T_TQ_MOUTH_PLATE a
             inner JOIN T_TQ_MACHINE_INFO b
             on a.MACHINE_ID=b.ID and b.STATUS = '0'
-            where a.DEL_FLAG='0' and a.STATUS='0'
+            where a.IS_DELETE='0' and a.STATUS='0'
             and a.MOUTH_PLATE_CODE=#{machineName,jdbcType=VARCHAR}
             and a.MACHINE_ID not in (
             select MACHINE_ID
             from T_TQ_SPECIFY_MACHINE
-            where DEL_FLAG='0' and JOB_TYPE='0'
-            and BEAD_CODE=#{machineCode,jdbcType=VARCHAR}
+            where IS_DELETE='0' and JOB_TYPE='0'
+            and MATERIAL_CODE=#{machineCode,jdbcType=VARCHAR}
             )
         </if>
 
         <if test="id == 3">
             select a.ID,a.MACHINE_CODE,a.MACHINE_NAME
-            from t_tq_machine_info a
+            from T_TQ_MACHINE_INFO a
             where a.IS_DELETE='0' and a.STATUS='0'
             and a.ID not in (
             select MACHINE_ID
             from T_TQ_SPECIFY_MACHINE
-            where DEL_FLAG='0' and JOB_TYPE='0'
-            and BEAD_CODE=#{machineCode,jdbcType=VARCHAR}
+            where IS_DELETE='0' and JOB_TYPE='0'
+            and MATERIAL_CODE=#{machineCode,jdbcType=VARCHAR}
             union
             select MACHINE_ID
             from T_TQ_MOUTH_PLATE
-            where DEL_FLAG='0' and STATUS='0'
+            where IS_DELETE='0' and STATUS='0'
             and MOUTH_PLATE_CODE=#{machineName,jdbcType=VARCHAR}
             )
         </if>
     </select>
 
     <insert id="mergeSql" parameterType="list">
-        INSERT INTO t_tq_machine_info (
-        machine_code, machine_name, efficiency, tooling_info, quata, class_shift, open_machine_class, status, create_by, create_time, remark, IS_DELETE
+        INSERT INTO T_TQ_MACHINE_INFO (
+        MACHINE_CODE, MACHINE_NAME, CLASS_SHIFT, OPEN_MACHINE_CLASS, STATUS, CREATE_BY, CREATE_TIME, REMARK, IS_DELETE
         )
         VALUES
         <foreach collection="list" item="MACHINE" separator=",">
             (
             #{MACHINE.machineCode,jdbcType=VARCHAR},
             #{MACHINE.machineName,jdbcType=VARCHAR},
-            #{MACHINE.efficiency,jdbcType=DOUBLE},
-            #{MACHINE.toolingInfo,jdbcType=VARCHAR},
-            #{MACHINE.quata,jdbcType=DOUBLE},
             #{MACHINE.classShift,jdbcType=VARCHAR},
             #{MACHINE.openMachineClass,jdbcType=VARCHAR},
             #{MACHINE.status,jdbcType=VARCHAR},
@@ -202,15 +120,13 @@
             )
         </foreach>
         ON DUPLICATE KEY UPDATE
-        machine_name = VALUES(machine_name),
-        efficiency = VALUES(efficiency),
-        tooling_info = VALUES(tooling_info),
-        quata = VALUES(quata),
-        class_shift = VALUES(class_shift),
-        open_machine_class = VALUES(open_machine_class),
-        status = VALUES(status),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
+        MACHINE_NAME = VALUES(MACHINE_NAME),
+        CLASS_SHIFT = VALUES(CLASS_SHIFT),
+        OPEN_MACHINE_CLASS = VALUES(OPEN_MACHINE_CLASS),
+        STATUS = VALUES(STATUS),
+        UPDATE_BY = VALUES(CREATE_BY),
+        UPDATE_TIME = NOW(),
+        REMARK = VALUES(REMARK)
     </insert>
+
 </mapper>

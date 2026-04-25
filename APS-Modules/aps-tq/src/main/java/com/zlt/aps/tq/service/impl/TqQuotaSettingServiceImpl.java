@@ -20,7 +20,7 @@ import com.zlt.aps.common.core.utils.ImportUtil;
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
 import com.zlt.aps.tq.api.domain.entity.TqQuotaSetting;
 import com.zlt.aps.tq.mapper.TqQuotaSettingMapper;
-import com.zlt.aps.tq.service.TqMachineInfoService;
+import com.zlt.aps.tq.service.ITqMachineInfoService;
 import com.zlt.aps.tq.service.TqQuotaSettingService;
 
 
@@ -36,7 +36,7 @@ public class TqQuotaSettingServiceImpl implements TqQuotaSettingService {
     private TqQuotaSettingMapper tqQuotaSettingMapper;
 
     @Autowired
-    private TqMachineInfoService tqMachineInfoService;
+    private ITqMachineInfoService tqMachineInfoService;
 
     /**
      * 查询胎圈定额设定

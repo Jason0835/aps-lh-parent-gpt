@@ -20,4 +20,12 @@ public interface ILhRepairCapsuleService extends IDocService<LhRepairCapsule> {
      * @return 结果
      */
     int saveOrUpdateBatch(List<LhRepairCapsule> list);
+
+    /**
+     * 查询导出数据
+     *
+     * @param obj 查询条件
+     * @return 结果
+     */
+    String[] getQueryFormulas();
 }

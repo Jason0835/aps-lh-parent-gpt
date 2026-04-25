@@ -28,6 +28,8 @@ public class ScheduleExecutionGuard {
 
     private static final long DEFAULT_LOCK_TTL_MINUTES = 120L;
     private static final String LOCK_KEY_PREFIX = "APS:LH:SCHEDULE:LOCK:";
+    private static final String ISSUE_LOCK_KEY_PREFIX = "APS:LH:ISSUE_TO_MES:LOCK:";
+    private static final long ISSUE_LOCK_TTL_SECONDS = 60L;
 
     private static final DefaultRedisScript<Long> RELEASE_SCRIPT = new DefaultRedisScript<>(
             "if redis.call('get', KEYS[1]) == ARGV[1] then "
@@ -92,5 +94,35 @@ public class ScheduleExecutionGuard {
 
     private String buildLockKey(String factoryCode, Date targetDate) {
         return LOCK_KEY_PREFIX + factoryCode + ":" + LhScheduleTimeUtil.getDateStr(targetDate);
+    }
+
+    public String acquireIssueLock() {
+        String lockKey = ISSUE_LOCK_KEY_PREFIX + LhScheduleTimeUtil.getDateStr(new Date());
+        String token = UUID.randomUUID().toString();
+        try {
+            Boolean locked = stringRedisTemplate.opsForValue()
+                    .setIfAbsent(lockKey, token, ISSUE_LOCK_TTL_SECONDS, TimeUnit.SECONDS);
+            if (Boolean.TRUE.equals(locked)) {
+                log.info("排程下发MES锁获取成功, key: {}", lockKey);
+                return token;
+            }
+            return null;
+        } catch (Exception e) {
+            log.error("排程下发MES锁获取失败, key: {}", lockKey, e);
+            return null;
+        }
+    }
+
+    public void releaseIssueLock(String token) {
+        if (token == null) {
+            return;
+        }
+        String lockKey = ISSUE_LOCK_KEY_PREFIX + LhScheduleTimeUtil.getDateStr(new Date());
+        try {
+            stringRedisTemplate.execute(RELEASE_SCRIPT, Collections.singletonList(lockKey), token);
+            log.info("排程下发MES锁释放完成, key: {}", lockKey);
+        } catch (Exception e) {
+            log.warn("排程下发MES锁释放失败, key: {}, 原因: {}", lockKey, e.getMessage());
+        }
     }
 }

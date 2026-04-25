@@ -4,146 +4,46 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.tq.mapper.TqStockMapper">
 
-    <resultMap type="com.zlt.aps.tq.api.domain.entity.TqStock" id="StockResult">
-        <result property="id" column="id"/>
-        <result property="stockDate" column="stock_date"/>
-        <result property="materialCode" column="material_code"/>
-        <result property="stockNum" column="stock_num"/>
-        <result property="modifyNum" column="modify_num"/>
-        <result property="badNum" column="bad_num"/>
-        <result property="remark" column="remark"/>
-        <result property="delFlag" column="IS_DELETE"/>
-        <result property="createBy" column="create_by"/>
-        <result property="createTime" column="create_time"/>
-        <result property="updateBy" column="update_by"/>
-        <result property="updateTime" column="update_time"/>
-    </resultMap>
-
-    <sql id="selectStockVo">
-        select id, stock_date, material_code, stock_num, modify_num, bad_num, remark, IS_DELETE, create_by, create_time, update_by, update_time from t_tq_stock
-    </sql>
-
-    <select id="selectStockList" parameterType="com.zlt.aps.tq.api.domain.entity.TqStock" resultMap="StockResult">
-        <include refid="selectStockVo"/>
-        where IS_DELETE='0'
-        <if test="startTime != null and startTime !='' ">
-            and stock_date  <![CDATA[  >=  ]]> STR_TO_DATE(#{startTime},'%Y-%m-%d')
+    <select id="checkStockListUnic" parameterType="com.zlt.aps.tq.api.domain.entity.TqStock"
+            resultType="com.zlt.aps.tq.api.domain.entity.TqStock">
+        select ID, STOCK_DATE, MATERIAL_CODE, STOCK_NUM, MODIFY_NUM, BAD_NUM, REMARK, IS_DELETE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME
+        from t_tq_stock
+        where IS_DELETE = '0'
+        <if test="entity.id != null">
+            and ID != #{entity.id}
         </if>
-        <if test="endTime != null and endTime !='' ">
-            and stock_date  <![CDATA[   <=  ]]> STR_TO_DATE(#{endTime},'%Y-%m-%d %H:%i:%s')
+        <if test="entity.stockDate != null">
+            and STOCK_DATE = #{entity.stockDate}
         </if>
-        <if test="materialCode != null  and materialCode != ''">
-            and INSTR(material_code, #{materialCode}) > 0
-        </if>
-        <if test="orderStr == null">
-            order by stock_date desc
-        </if>
-        <if test="orderStr != null">
-            order by ${orderStr}
+        <if test="entity.materialCode != null and entity.materialCode != ''">
+            and MATERIAL_CODE = #{entity.materialCode}
         </if>
     </select>
-
-    <select id="checkStockListUnic" parameterType="com.zlt.aps.tq.api.domain.entity.TqStock" resultMap="StockResult">
-        <include refid="selectStockVo"/>
-        where IS_DELETE='0'
-        <if test="id != null and id !='' ">
-            and id != #{id}
-        </if>
-        <if test="stockDate != null ">
-            and stock_date =#{stockDate}
-        </if>
-        <if test="materialCode != null  and materialCode != ''">
-            and material_code = #{materialCode}
-        </if>
-    </select>
-
-
-    <select id="selectStockById" parameterType="Long" resultMap="StockResult">
-        <include refid="selectStockVo"/>
-        where id = #{id}
-    </select>
-
-    <insert id="insertStock" parameterType="com.zlt.aps.tq.api.domain.entity.TqStock">
-        insert into t_tq_stock
-        <trim prefix="(" suffix=")" suffixOverrides=",">
-            <if test="id != null">id,</if>
-            <if test="stockDate != null">stock_date,</if>
-            <if test="materialCode != null">material_code,</if>
-            <if test="stockNum != null">stock_num,</if>
-            <if test="modifyNum != null">modify_num,</if>
-            <if test="badNum != null">bad_num,</if>
-            <if test="remark != null">remark,</if>
-            <if test="delFlag != null">IS_DELETE,</if>
-            <if test="createBy != null">create_by,</if>
-            <if test="createTime != null">create_time,</if>
-            <if test="updateBy != null">update_by,</if>
-            <if test="updateTime != null">update_time,</if>
-        </trim>
-        <trim prefix="values (" suffix=")" suffixOverrides=",">
-            <if test="id != null">#{id},</if>
-            <if test="stockDate != null">#{stockDate},</if>
-            <if test="materialCode != null">#{materialCode},</if>
-            <if test="stockNum != null">#{stockNum},</if>
-            <if test="modifyNum != null">#{modifyNum},</if>
-            <if test="badNum != null">#{badNum},</if>
-            <if test="remark != null">#{remark},</if>
-            <if test="delFlag != null">#{delFlag},</if>
-            <if test="createBy != null">#{createBy},</if>
-            <if test="createTime != null">#{createTime},</if>
-            <if test="updateBy != null">#{updateBy},</if>
-            <if test="updateTime != null">#{updateTime},</if>
-        </trim>
-    </insert>
-
-    <update id="updateStock" parameterType="com.zlt.aps.tq.api.domain.entity.TqStock">
-        update t_tq_stock
-        <trim prefix="SET" suffixOverrides=",">
-            <if test="stockDate != null">stock_date = #{stockDate},</if>
-            <if test="materialCode != null">material_code = #{materialCode},</if>
-            <if test="stockNum != null">stock_num = #{stockNum},</if>
-            modify_num = #{modifyNum,jdbcType=DECIMAL},
-            bad_num = #{badNum,jdbcType=DECIMAL},
-            <if test="remark != null">remark = #{remark},</if>
-            <if test="delFlag != null">IS_DELETE = #{delFlag},</if>
-            <if test="createBy != null">create_by = #{createBy},</if>
-            <if test="createTime != null">create_time = #{createTime},</if>
-            <if test="updateBy != null">update_by = #{updateBy},</if>
-            <if test="updateTime != null">update_time = #{updateTime},</if>
-        </trim>
-        where id = #{id}
-    </update>
-
-    <delete id="deleteStockByIds" parameterType="String">
-        update t_tq_stock set IS_DELETE = '1' where id in
-        <foreach item="id" collection="array" open="(" separator="," close=")">
-            #{id}
-        </foreach>
-    </delete>
 
     <insert id="mergeSql" parameterType="list">
         INSERT INTO t_tq_stock (
-        stock_date, material_code, stock_num, modify_num, bad_num, create_by, create_time, remark, IS_DELETE
+            STOCK_DATE, MATERIAL_CODE, STOCK_NUM, MODIFY_NUM, BAD_NUM, CREATE_BY, CREATE_TIME, REMARK, IS_DELETE
         )
         VALUES
         <foreach collection="list" item="STOCK" separator=",">
             (
-            #{STOCK.stockDate,jdbcType=DATE},
-            #{STOCK.materialCode,jdbcType=VARCHAR},
-            #{STOCK.stockNum,jdbcType=DOUBLE},
-            #{STOCK.modifyNum,jdbcType=DOUBLE},
-            #{STOCK.badNum,jdbcType=DOUBLE},
-            #{STOCK.createBy,jdbcType=VARCHAR},
-            NOW(),
-            #{STOCK.remark,jdbcType=VARCHAR},
-            '0'
+                #{STOCK.stockDate,jdbcType=DATE},
+                #{STOCK.materialCode,jdbcType=VARCHAR},
+                #{STOCK.stockNum,jdbcType=DOUBLE},
+                #{STOCK.modifyNum,jdbcType=DOUBLE},
+                #{STOCK.badNum,jdbcType=DOUBLE},
+                #{STOCK.createBy,jdbcType=VARCHAR},
+                NOW(),
+                #{STOCK.remark,jdbcType=VARCHAR},
+                '0'
             )
         </foreach>
         ON DUPLICATE KEY UPDATE
-        stock_num = VALUES(stock_num),
-        modify_num = VALUES(modify_num),
-        bad_num = VALUES(bad_num),
-        update_by = VALUES(create_by),
-        update_time = NOW(),
-        remark = VALUES(remark)
+            STOCK_NUM = VALUES(STOCK_NUM),
+            MODIFY_NUM = VALUES(MODIFY_NUM),
+            BAD_NUM = VALUES(BAD_NUM),
+            UPDATE_BY = VALUES(CREATE_BY),
+            UPDATE_TIME = NOW(),
+            REMARK = VALUES(REMARK)
     </insert>
 </mapper>

@@ -1,7 +1,9 @@
 package com.zlt.aps.tq.mapper;
 
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -11,14 +13,7 @@ import java.util.List;
  * @author zlt
  * @date 2021-05-28
  */
-public interface TqMachineInfoMapper {
-    /**
-     * 查询胎圈机台信息
-     *
-     * @param id 胎圈机台信息ID
-     * @return 胎圈机台信息
-     */
-    public TqMachineInfo selectMachineInfoById(Long id);
+public interface TqMachineInfoMapper extends BaseMapper<TqMachineInfo> {
 
     /**
      * 查询胎圈机台信息列表
@@ -27,30 +22,6 @@ public interface TqMachineInfoMapper {
      * @return 胎圈机台信息集合
      */
     public List<TqMachineInfo> selectMachineInfoList(TqMachineInfo machineInfo);
-
-    /**
-     * 新增胎圈机台信息
-     *
-     * @param machineInfo 胎圈机台信息
-     * @return 结果
-     */
-    public int insertMachineInfo(TqMachineInfo machineInfo);
-
-    /**
-     * 修改胎圈机台信息
-     *
-     * @param machineInfo 胎圈机台信息
-     * @return 结果
-     */
-    public int updateMachineInfo(TqMachineInfo machineInfo);
-
-    /**
-     * 批量删除胎圈机台信息
-     *
-     * @param ids 需要删除的数据ID
-     * @return 结果
-     */
-    public int deleteMachineInfoByIds(Long[] ids);
 
     /**
      * 校验胎圈机台唯一性
@@ -72,4 +43,5 @@ public interface TqMachineInfoMapper {
      * @param list 要合并的集合
      */
     public void mergeSql(List<TqMachineInfo> list);
+
 }

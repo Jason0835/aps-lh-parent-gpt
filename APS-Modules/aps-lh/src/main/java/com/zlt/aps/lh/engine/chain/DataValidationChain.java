@@ -82,6 +82,7 @@ public class DataValidationChain {
      */
     public boolean validate(LhScheduleContext context) {
         context.getValidationErrorList().clear();
+        context.getValidationErrorDetailList().clear();
         for (List<IDataValidator> segment : groupSegments) {
             List<IDataValidator> enabledValidators = resolveEnabledValidators(context, segment);
             if (enabledValidators.isEmpty()) {

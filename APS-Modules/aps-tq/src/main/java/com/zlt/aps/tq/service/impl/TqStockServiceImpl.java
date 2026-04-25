@@ -1,155 +1,96 @@
 package com.zlt.aps.tq.service.impl;
 
-import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.utils.ImportUtil;
+import com.zlt.aps.tq.api.domain.entity.TqStock;
+import com.zlt.aps.tq.mapper.TqStockMapper;
+import com.zlt.aps.tq.service.ITqStockService;
+import com.zlt.bill.common.service.AbstractDocService;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
+import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections.CollectionUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import static com.zlt.aps.common.core.utils.ImportUtil.addImportErrorLog;
 
-import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.common.core.utils.ImportUtil;
-import com.zlt.aps.tq.api.domain.entity.TqStock;
-import com.zlt.aps.tq.mapper.TqStockMapper;
-import com.zlt.aps.tq.service.TqStockService;
-
-/**
- * 胎圈库存信息Service业务层处理
- *
- * @author zlt
- * @date 2021-05-31
- */
+@Slf4j
 @Service
-public class TqStockServiceImpl implements TqStockService {
-    @Autowired
-    private TqStockMapper stockMapper;
+public class TqStockServiceImpl extends AbstractDocService<TqStock> implements ITqStockService {
 
-    /**
-     * 查询胎圈库存信息
-     *
-     * @param id 胎圈库存信息ID
-     * @return 胎圈库存信息
-     */
+    @Resource
+    private TqStockMapper tqStockMapper;
+
     @Override
-    public TqStock selectStockById(Long id) {
-        return stockMapper.selectStockById(id);
+    protected String getDocTypeCode() {
+        return "TQ_STOCK";
     }
 
-    /**
-     * 查询胎圈库存信息列表
-     *
-     * @param TqStock 胎圈库存信息
-     * @return 胎圈库存信息
-     */
     @Override
-    public List<TqStock> selectStockList(TqStock stock) {
-        if (StringUtils.isNotEmpty(stock.getEndTime())) {
-            stock.setEndTime(stock.getEndTime() + " 23:59:59");
+    public String checkUnique(TqStock entity) {
+        QueryWrapper<TqStock> wrapper = new QueryWrapper<>();
+        wrapper.ne(entity.getId() != null, "ID", entity.getId());
+        wrapper.eq("STOCK_DATE", entity.getStockDate());
+        wrapper.eq("MATERIAL_CODE", entity.getMaterialCode());
+        wrapper.eq("IS_DELETE", 0);
+        if (tqStockMapper.selectCount(wrapper) > 0) {
+            return UserConstants.NOT_UNIQUE;
         }
-        return stockMapper.selectStockList(stock);
+        return UserConstants.UNIQUE;
     }
 
-    /**
-     * 新增胎圈库存信息
-     *
-     * @param TqStock 胎圈库存信息
-     * @return 结果
-     */
     @Override
-    public int insertStock(TqStock stock) {
-        stock.setBaseVale(null);
-        return stockMapper.insertStock(stock);
+    protected List<String> getCheckUniqueFields() {
+        return Arrays.asList("stockDate", "materialCode");
     }
 
-    /**
-     * 修改胎圈库存信息
-     *
-     * @param stock 胎圈库存信息
-     * @return 结果
-     */
-    @Override
-    public int updateStock(TqStock stock) {
-        stock.setBaseVale(stock.getId());
-        return stockMapper.updateStock(stock);
-    }
-
-    /**
-     * 批量删除胎圈库存信息
-     *
-     * @param ids 需要删除的胎圈库存信息ID
-     * @return 结果
-     */
-    @Override
-    public int deleteStockByIds(Long[] ids) {
-        return stockMapper.deleteStockByIds(ids);
-    }
-
-    /**
-     * 校验胎圈库存唯一性（根据库存日期+物料编号+id）
-     */
-    public List<TqStock> checkStockListUnic(TqStock stock) {
-        return stockMapper.checkStockListUnic(stock);
-    }
-
-    /**
-     * 导入数据，并保存记录
-     *
-     * @param list          要导入数据
-     * @param updateSupport 已存在是否更新
-     * @param importLogId   导入日志id
-     * @return 导入后提示信息
-     */
     @Override
     public AjaxResult importData(List<TqStock> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;
-        //做校验
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         List<TqStock> importList = new ArrayList<>();
 
-        //按业务主键分组
-        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getStockDate()+a.getMaterialCode()), Collectors.counting()));
+        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getStockDate() + a.getMaterialCode()), Collectors.counting()));
 
         for (int i = 0; i < list.size(); i++) {
             TqStock stock = list.get(i);
 
-            //重复记录校验
-            Long hasValue = groupMap.get(stock.getStockDate()+stock.getMaterialCode());
-            if (hasValue > 1) {
+            Long hasValue = groupMap.get(stock.getStockDate() + stock.getMaterialCode());
+            if (hasValue != null && hasValue > 1) {
                 failureNum++;
                 stock.setId(-999L);
                 String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
                 String columnName = I18nUtil.getMessage("ui.data.column.stock.stockDate");
                 String columnName2 = I18nUtil.getMessage("ui.data.column.tq.scheduleResult.beadCode");
-                message=String.format(message,columnName+"+"+columnName2);
-                addImportErrorLog(importLogId, i + 2,message, importErrorLogs);
+                message = String.format(message, columnName + "+" + columnName2);
+                addImportErrorLog(importLogId, i + 2, message, importErrorLogs);
                 continue;
             }
 
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 2, stock);
             if (CollectionUtils.isEmpty(validated)) {
-
-                BigDecimal StockNum =stock.getStockNum()==null?new BigDecimal(0):stock.getStockNum();
-                BigDecimal ModifyNum =stock.getModifyNum()==null?new BigDecimal(0):stock.getModifyNum();
-                BigDecimal BadNum =stock.getBadNum()==null?new BigDecimal(0):stock.getBadNum();
-                BigDecimal dd= StockNum.add(ModifyNum).subtract(BadNum);
-                if(dd.compareTo(new BigDecimal(0))<0){
+                BigDecimal stockNum = stock.getStockNum() == null ? BigDecimal.ZERO : stock.getStockNum();
+                BigDecimal modifyNum = stock.getModifyNum() == null ? BigDecimal.ZERO : stock.getModifyNum();
+                BigDecimal badNum = stock.getBadNum() == null ? BigDecimal.ZERO : stock.getBadNum();
+                BigDecimal dd = stockNum.add(modifyNum).subtract(badNum);
+                if (dd.compareTo(BigDecimal.ZERO) < 0) {
                     failureNum++;
                     stock.setId(-999L);
                     addImportErrorLog(importLogId, i + 2,
                             I18nUtil.getMessage("ui.data.column.stock.stockNumValidate"), importErrorLogs);
                     continue;
                 }
-
-                stock.setBaseVale(null);
                 importList.add(stock);
             } else {
                 failureNum++;
@@ -158,38 +99,28 @@ public class TqStockServiceImpl implements TqStockService {
             }
         }
         try {
-            //勾选更新记录，调用merge即可
             if (updateSupport && CollectionUtils.isNotEmpty(importList)) {
                 successNum = importList.size();
-                stockMapper.mergeSql(importList);
+                tqStockMapper.mergeSql(importList);
             } else {
-                //查询数据库已存在对象
                 for (int i = 0; i < list.size(); i++) {
                     TqStock excelItem = list.get(i);
-                    // 错误记录跳过
                     if (excelItem.getId() != null && excelItem.getId().equals(-999L)) {
                         continue;
                     }
-
-                    // 唯一性校验
-                    List<TqStock> unic = stockMapper.checkStockListUnic(excelItem);
+                    List<TqStock> unic = tqStockMapper.checkStockListUnic(excelItem);
                     if (CollectionUtils.isEmpty(unic)) {
-                        //不存在插入
                         successNum++;
-                        stockMapper.insertStock(excelItem);
+                        baseDao.save(excelItem);
                     } else {
-                        // 存在，插入错误详细日志
                         failureNum++;
                         addImportErrorLog(importLogId, i + 2,
                                 I18nUtil.getMessage("ui.stock.message.unique"), importErrorLogs);
-                        continue;
                     }
-
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
-            // 执行sql失败，插入导入失败记录
             successNum = 0;
             failureNum = list.size();
             importErrorLogs.clear();

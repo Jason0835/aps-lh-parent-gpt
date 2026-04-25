@@ -105,6 +105,13 @@
             "user": "增加用户"
           }
         }
+      },
+      "tq": {
+        "specifyMachine": {
+          "column": {
+            "materialCode": "Mã lốp"
+          }
+        }
       }
     },
     "api": {

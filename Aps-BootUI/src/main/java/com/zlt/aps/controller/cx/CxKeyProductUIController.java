@@ -49,35 +49,6 @@ public class CxKeyProductUIController extends BaseUIController<CxKeyProduct> {
     @Autowired
     private ICxKeyProductRemoteService iCxKeyProductService;
 
-    private final String prefix = "aps/cx/cxKeyProduct";
-
-    /**
-     * 跳转至主页面
-     */
-    @RequiresPermissions("cx:cxKeyProduct:view")
-    @GetMapping()
-    public String toIndex() {
-        return prefix + "/cxKeyProduct";
-    }
-
-    /**
-     * 跳转至新增页面
-     */
-    @GetMapping("/add")
-    public String add(ModelMap mmap) {
-        mmap.put("cxKeyProduct", new CxKeyProduct());
-        return prefix + "/add";
-    }
-
-    /**
-     * 跳转至修改页面
-     */
-    @GetMapping("/edit/{id}")
-    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("cxKeyProduct", iCxKeyProductService.getInfo(id));
-        return prefix + "/edit";
-    }
-
     /**
      * 根据条件查询主表数据
      */
@@ -92,7 +63,7 @@ public class CxKeyProductUIController extends BaseUIController<CxKeyProduct> {
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("cx:cxKeyProduct:edit")
+    @RequiresPermissions({"cx:cxKeyProduct:edit", "cx:cxKeyProduct:add"})
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(CxKeyProduct cxKeyProduct) {
@@ -167,6 +138,7 @@ public class CxKeyProductUIController extends BaseUIController<CxKeyProduct> {
     }
 
     @ApiOperation("数据导出")
+    @RequiresPermissions("cx:cxKeyProduct:export")
     @GetMapping({"/export"})
     @ResponseBody
     @Override
@@ -179,6 +151,7 @@ public class CxKeyProductUIController extends BaseUIController<CxKeyProduct> {
         response.flushBuffer();
     }
 
+    @RequiresPermissions("cx:cxKeyProduct:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")

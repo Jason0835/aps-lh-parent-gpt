@@ -124,7 +124,7 @@ public class PrecedentStockUpService {
       }
       PrecedentStockUpContext context = buildContext(supplyOrderPool);
       // 2. 验证前置条件
-      Set<String> eligibleSkus = findEligibleSkus(context);
+      Set<String> eligibleSkus = findEligibleSkus(supplyOrderPool.getFactoryCode(), context);
       if (CollectionUtils.isEmpty(eligibleSkus)) {
         log.warn("有效SKU为空, 工厂: {}, 年: {}, 月: {}", supplyOrderPool.getFactoryCode(), supplyOrderPool.getYear(),supplyOrderPool.getMonth());
         if(validateFlag) {
@@ -643,7 +643,7 @@ public class PrecedentStockUpService {
   }
 
 
-  private Set<String> findEligibleSkus(PrecedentStockUpContext context) {
+  private Set<String> findEligibleSkus(String factoryCode, PrecedentStockUpContext context) {
     // 1. 获取不在周期排产结构配置表中的SKU
     Set<String> skusExcludingStructure = filterSkusExcludingStructure(context);
     if (skusExcludingStructure.isEmpty()) {
@@ -659,8 +659,12 @@ public class PrecedentStockUpService {
     if (intersectedSkus.isEmpty()) {
       return Collections.emptySet();
     }
-    // 4. 排除超期SKU
-    return excludeOverduePrecedentProduction(intersectedSkus);
+    // 4 筛选出质控状态是在产的SKU
+    List<MdmMaterialInfo> materialInfos = materialInfoService.findMaterialInfo(factoryCode, intersectedSkus);
+    Set<String> inProductSkuSet = materialInfos.stream().map(MdmMaterialInfo::getMaterialCode).collect(Collectors.toSet());
+    
+    // 5. 排除超期SKU
+    return excludeOverduePrecedentProduction(inProductSkuSet);
   }
 
   private Set<String> excludeOverduePrecedentProduction(Set<String> intersectedSkus) {

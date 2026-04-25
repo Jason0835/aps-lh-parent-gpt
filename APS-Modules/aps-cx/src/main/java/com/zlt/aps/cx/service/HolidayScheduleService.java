@@ -1,7 +1,7 @@
 package com.zlt.aps.cx.service;
 
-import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.vo.ScheduleContextVo;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -21,38 +21,36 @@ import java.util.Map;
  */
 public interface HolidayScheduleService {
 
+    // ==================== 以下为废弃方法（按天判断，已改用按班次判断） ====================
+
     /**
-     * 检查是否为节假日
-     *
-     * @param date 日期
-     * @return 是否为节假日
+     * 检查是否为节假日（废弃：已改用按班次级别判断）
+     * @deprecated use {@link #determineShiftType(LocalDate, int)} instead
      */
+    @Deprecated
     boolean isHoliday(LocalDate date);
 
     /**
-     * 检查是否为停产日
+     * 检查是否为停产日（废弃：已改用按班次级别判断）
      * 停产日 = 节假日首日
-     *
-     * @param date 日期
-     * @return 是否为停产日
+     * @deprecated use {@link #determineShiftType(LocalDate, int)} instead
      */
+    @Deprecated
     boolean isStopProductionDay(LocalDate date);
 
     /**
-     * 检查是否为开产日
+     * 检查是否为开产日（废弃：已改用按班次级别判断）
      * 开产日 = 节假日后首个工作日
-     *
-     * @param date 日期
-     * @return 是否为开产日
+     * @deprecated use {@link #determineShiftType(LocalDate, int)} instead
      */
+    @Deprecated
     boolean isStartProductionDay(LocalDate date);
 
     /**
-     * 检查是否为停产前一天
-     *
-     * @param date 日期
-     * @return 是否为停产前一天
+     * 检查是否为停产前一天（废弃：已改用按班次级别判断）
+     * @deprecated use {@link #determineShiftType(LocalDate, int)} instead
      */
+    @Deprecated
     boolean isBeforeHoliday(LocalDate date);
 
     /**
@@ -141,15 +139,67 @@ public interface HolidayScheduleService {
     List<EmbryoConsumptionSuggestion> checkEmbryoParkingTime(LocalDate scheduleDate, LocalDateTime formingStopTime);
 
     /**
-     * 调整节假日排程策略
-     * 根据节假日类型调整排程策略
+     * 调整节假日排程策略（按天级别，兼容旧接口）
      *
      * @param scheduleDate 排程日期
      * @param originalResult 原始排程结果
      * @param context 排程上下文
      * @return 调整后的排程结果
+     * @deprecated 使用 {@link #adjustHolidaySchedule(LocalDate, int, List, ScheduleContextVo)} 替代
      */
+    @Deprecated
     List<CxScheduleResult> adjustHolidaySchedule(LocalDate scheduleDate, List<CxScheduleResult> originalResult, ScheduleContextVo context);
+
+    /**
+     * 按班次级别调整排程策略
+     *
+     * 班次判断逻辑：
+     * - 停产班（本班次=0）：不排程，返回空
+     * - 开产首个班（本班次=1 且 上班次=0）：走开产逻辑
+     * - 停产前一天班（本班次=1 且 下班次=0）：走停产前一天逻辑
+     * - 正常班（本班次=1 且 上下班次都是开产）：不做特殊处理
+     *
+     * @param scheduleDate 排程日期
+     * @param shiftOrder 班次序号（1=一班, 2=二班, 3=三班）
+     * @param originalResult 原始排程结果
+     * @param context 排程上下文
+     * @return 调整后的排程结果
+     */
+    List<CxScheduleResult> adjustHolidaySchedule(LocalDate scheduleDate, int shiftOrder,
+                                                 List<CxScheduleResult> originalResult, ScheduleContextVo context);
+
+    /**
+     * 按班次级别判断班次类型
+     *
+     * @param date 日期
+     * @param shiftOrder 班次序号（1,2,3）
+     * @return 班次类型枚举
+     */
+    ShiftType determineShiftType(LocalDate date, int shiftOrder);
+
+    /**
+     * 班次类型枚举
+     */
+    enum ShiftType {
+        /** 停产班：本班次=0(停产) */
+        CLOSED("停产班"),
+        /** 开产班（首个）：本班次=1(开产) 且 上个班次=0(停产) */
+        OPEN_START("开产首个班次"),
+        /** 停产前一天班（末个）：本班次=1(开产) 且 下个班次=0(停产) */
+        BEFORE_CLOSE("停产前一天班次"),
+        /** 正常班：本班次=1(开产) 且 上下班次都是开产 */
+        NORMAL("正常班");
+
+        private final String desc;
+
+        ShiftType(String desc) {
+            this.desc = desc;
+        }
+
+        public String getDesc() {
+            return desc;
+        }
+    }
 
     /**
      * 节假日信息

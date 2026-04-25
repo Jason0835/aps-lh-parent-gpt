@@ -49,6 +49,11 @@ public class LhRepairCapsule extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.lhRepairCapsule.materialCode")
     private String materialCode;
 
+    @ApiModelProperty(value = "物料描述")
+    @TableField(exist = false)
+    @Excel(name = "ui.data.column.lhRepairCapsule.materialDesc",width = 60)
+    private String materialDesc;
+
     @ApiModelProperty(value = "胶囊已使用次数")
     @TableField(value = "REPLACE_CAPSULE_COUNT")
     @Excel(name = "ui.data.column.lhRepairCapsule.replaceCapsuleCount")
@@ -61,7 +66,7 @@ public class LhRepairCapsule extends BaseEntity implements Serializable {
 
     @ApiModelProperty(value = "品牌")
     @TableField(value = "BRAND")
-    @Excel(name = "ui.data.column.lhRepairCapsule.brand", dictType = "biz_brand_type")
+//    @Excel(name = "ui.data.column.lhRepairCapsule.brand", dictType = "biz_brand_type")
     private String brand;
 
     @ApiModelProperty(value = "版本号")
@@ -73,6 +78,10 @@ public class LhRepairCapsule extends BaseEntity implements Serializable {
     private String companyCode;
 
 
+    @ApiModelProperty(value = "更新日期")
+    @TableField(exist = false)
+    @Excel(name = "ui.data.column.lhRepairCapsule.updateDate", dateFormat = "yyyy-MM-dd HH:mm:ss")
+    private Date updateDate;
 
     @ApiModelProperty(value = "获取日期开始")
     @TableField(exist = false)

@@ -33,4 +33,16 @@ public class LhRepairCapsuleServiceImpl extends AbstractDocService<LhRepairCapsu
         baseDao.insertBatch(list);
         return list.size();
     }
+
+    /**
+     * 查询导出数据
+     *
+     * @return 结果
+     */
+    @Override
+    public String[] getQueryFormulas() {
+        return new String[]{
+                "materialDesc -> getcolvalue(T_MDM_MATERIAL_INFO, MATERIAL_DESC, MATERIAL_CODE, materialCode)",
+        };
+    }
 }

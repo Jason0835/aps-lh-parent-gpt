@@ -199,6 +199,10 @@ public class ProductionCapacityParamConfiguration {
      * 模具分配比例调整周期日
      */
     private Integer moldAllocationRatioCycle;
+    /**
+     * 实单最低硫化机台数最多可连续排产天数
+     */
+    private Integer minLhMachineContinueDays;
 
     private String cxLhRatioExtraValue;
     /**
@@ -246,7 +250,7 @@ public class ProductionCapacityParamConfiguration {
             } catch (NumberFormatException e) {
                 lhMachines = BigDecimal.ZERO.intValue();
             }
-            if (lhMachines > BigDecimal.ZERO.intValue()) {
+            if (lhMachines != BigDecimal.ZERO.intValue()) {
                 extraMap.put(groupName, lhMachines);
             }
         }

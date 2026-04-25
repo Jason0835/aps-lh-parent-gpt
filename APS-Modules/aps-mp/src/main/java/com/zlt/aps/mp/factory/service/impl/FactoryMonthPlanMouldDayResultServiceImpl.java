@@ -1,5 +1,7 @@
 package com.zlt.aps.mp.factory.service.impl;
 
+import static com.zlt.aps.common.core.utils.ApsNumberUtils.*;
+
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -36,6 +38,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.ApsNumberUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
@@ -222,8 +225,11 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     result.setDayVulcanizationQty(result.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION);
                 }
                 // 2.1.2.2、未排量负数处理
-                Integer differenceQty = Optional.ofNullable(result.getDifferenceQty()).orElse(0); 
+                Integer prodReqPlan = intValue(result.getHeightQty()) + intValue(result.getMidQty())
+                        + intValue(result.getCycleReserveQty()) + intValue(result.getConventionReserveQty());
+                Integer differenceQty = prodReqPlan - intValue(result.getTotalQty());
                 result.setDifferenceQty(differenceQty >= 0? differenceQty: 0);
+                result.setProdReqPlan(prodReqPlan);
                 // 2.1.2.3、实单未排产 = 高优先级 + 中优先级 - 高优先级实际 - 中优先级实际，如果为负数则设为0
                 Integer heightQty = Optional.ofNullable(result.getHeightQty()).orElse(0);
                 Integer midQty = Optional.ofNullable(result.getMidQty()).orElse(0);
@@ -884,26 +890,26 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             }
         }
         for (FactoryMonthPlanMouldDayResultExportVo result: recordList) {
-            subtotal.setAverageSaleQty(this.safeAdd(subtotal.getAverageSaleQty(), result.getAverageSaleQty()));
-            subtotal.setProdReqPlan(this.safeAdd(subtotal.getProdReqPlan(), result.getProdReqPlan()));
-            subtotal.setHeightQty(this.safeAdd(subtotal.getHeightQty(), result.getHeightQty()));
-            subtotal.setMidQty(this.safeAdd(subtotal.getMidQty(), result.getMidQty()));
-            subtotal.setCycleReserveQty(this.safeAdd(subtotal.getCycleReserveQty(), result.getCycleReserveQty()));
-            subtotal.setConventionReserveQty(this.safeAdd(subtotal.getConventionReserveQty(), result.getConventionReserveQty()));
-            subtotal.setFactProdReqQty(this.safeAdd(subtotal.getFactProdReqQty(), result.getFactProdReqQty()));
-            subtotal.setTotalQty(this.safeAdd(subtotal.getTotalQty(), result.getTotalQty()));
-            subtotal.setHeightProductionQty(this.safeAdd(subtotal.getHeightProductionQty(), result.getHeightProductionQty()));
-            subtotal.setMidProductionQty(this.safeAdd(subtotal.getMidProductionQty(), result.getMidProductionQty()));
-            subtotal.setCycleProductionQty(this.safeAdd(subtotal.getCycleProductionQty(), result.getCycleProductionQty()));
-            subtotal.setConventionProductionQty(this.safeAdd(subtotal.getConventionProductionQty(), result.getConventionProductionQty()));
-            subtotal.setPostponeProductionQty(this.safeAdd(subtotal.getPostponeProductionQty(), result.getPostponeProductionQty()));
-            subtotal.setActualOrderUnproduced(this.safeAdd(subtotal.getActualOrderUnproduced(), result.getActualOrderUnproduced()));
-            subtotal.setDifferenceQty(this.safeAdd(subtotal.getDifferenceQty(), result.getDifferenceQty()));
-            subtotal.setLast27(this.safeAdd(subtotal.getLast27(), result.getLast27()));
-            subtotal.setLast28(this.safeAdd(subtotal.getLast28(), result.getLast28()));
-            subtotal.setLast29(this.safeAdd(subtotal.getLast29(), result.getLast29()));
-            subtotal.setLast30(this.safeAdd(subtotal.getLast30(), result.getLast30()));
-            subtotal.setLast31(this.safeAdd(subtotal.getLast31(), result.getLast31()));
+            subtotal.setAverageSaleQty(safeAdd(subtotal.getAverageSaleQty(), result.getAverageSaleQty()));
+            subtotal.setProdReqPlan(safeAdd(subtotal.getProdReqPlan(), result.getProdReqPlan()));
+            subtotal.setHeightQty(safeAdd(subtotal.getHeightQty(), result.getHeightQty()));
+            subtotal.setMidQty(safeAdd(subtotal.getMidQty(), result.getMidQty()));
+            subtotal.setCycleReserveQty(safeAdd(subtotal.getCycleReserveQty(), result.getCycleReserveQty()));
+            subtotal.setConventionReserveQty(safeAdd(subtotal.getConventionReserveQty(), result.getConventionReserveQty()));
+            subtotal.setFactProdReqQty(safeAdd(subtotal.getFactProdReqQty(), result.getFactProdReqQty()));
+            subtotal.setTotalQty(safeAdd(subtotal.getTotalQty(), result.getTotalQty()));
+            subtotal.setHeightProductionQty(safeAdd(subtotal.getHeightProductionQty(), result.getHeightProductionQty()));
+            subtotal.setMidProductionQty(safeAdd(subtotal.getMidProductionQty(), result.getMidProductionQty()));
+            subtotal.setCycleProductionQty(safeAdd(subtotal.getCycleProductionQty(), result.getCycleProductionQty()));
+            subtotal.setConventionProductionQty(safeAdd(subtotal.getConventionProductionQty(), result.getConventionProductionQty()));
+            subtotal.setPostponeProductionQty(safeAdd(subtotal.getPostponeProductionQty(), result.getPostponeProductionQty()));
+            subtotal.setActualOrderUnproduced(safeAdd(subtotal.getActualOrderUnproduced(), result.getActualOrderUnproduced()));
+            subtotal.setDifferenceQty(safeAdd(subtotal.getDifferenceQty(), result.getDifferenceQty()));
+            subtotal.setLast27(safeAdd(subtotal.getLast27(), result.getLast27()));
+            subtotal.setLast28(safeAdd(subtotal.getLast28(), result.getLast28()));
+            subtotal.setLast29(safeAdd(subtotal.getLast29(), result.getLast29()));
+            subtotal.setLast30(safeAdd(subtotal.getLast30(), result.getLast30()));
+            subtotal.setLast31(safeAdd(subtotal.getLast31(), result.getLast31()));
             
             for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day ++) {
                 String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
@@ -915,9 +921,5 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             }
         }
         return subtotal;
-    }
-
-    private Integer safeAdd(Integer value1, Integer value2) {
-        return Optional.ofNullable(value1).orElse(0) + Optional.ofNullable(value2).orElse(0);
     }
 }
