@@ -13,11 +13,11 @@ import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
-import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
+import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.capacity.MpMonthPlanDailyCapacityLimit;
 import com.zlt.aps.mp.engine.check.SkuSecondChecker;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -26,7 +26,6 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
-import com.zlt.aps.mp.engine.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionQtyModelEnum;
 import com.zlt.aps.mp.engine.handler.CalculateStructureCxMachineNumber;
 import com.zlt.aps.mp.engine.handler.CxLhMouldProductionCalculator;
@@ -34,8 +33,10 @@ import com.zlt.aps.mp.engine.handler.MouldProductionResultHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanMouldDayDetailMapper;
 import com.zlt.aps.mp.engine.mapper.FactoryMouldingDayResultMapper;
+import com.zlt.aps.mp.engine.mapper.FactoryProductionInitMapper;
 import com.zlt.aps.mp.engine.mapper.MonthPlanRequireMapper;
 import com.zlt.aps.mp.engine.mapper.MpStructureAllocationMapper;
+import com.zlt.aps.mp.engine.scheduling.AbstractDataLoaderService;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -44,7 +45,6 @@ import com.zlt.aps.mp.engine.scheduling.init.ProductionInitParamConfiguration;
 import com.zlt.aps.mp.engine.service.DpRequireDataService;
 import com.zlt.aps.mp.engine.service.MonthProductionDataService;
 import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
-import com.zlt.aps.mp.engine.utils.MouldRelationDeduplicator;
 import com.zlt.aps.mp.engine.utils.ProductionCycleUtils;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.common.utils.PubUtil;
@@ -52,6 +52,7 @@ import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -66,7 +67,6 @@ import java.util.*;
 import java.util.Map.Entry;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * 搭配排产处理类
@@ -75,7 +75,13 @@ import java.util.stream.Stream;
  */
 @Slf4j
 @Component
-public class MatchingProductionHandler {
+public class MatchingProductionHandler extends AbstractDataLoaderService {
+    
+    public MatchingProductionHandler(ProductionMdmDataService dataService, DpRequireDataService dpRequireDataService,
+            MonthProductionDataService monthProductionDataService, ProductionHistoryHandler productionHistoryHandler) {
+        super(dataService, dpRequireDataService, monthProductionDataService, productionHistoryHandler);
+    }
+
     @Autowired
     private ProductionMdmDataService productionSchedulingDataService;
     @Autowired
@@ -96,6 +102,8 @@ public class MatchingProductionHandler {
     private MpStructureAllocationMapper mpStructureAllocationMapper;
     @Autowired
     private MpMonthPlanStatisticsEntityMapper mpMonthPlanStatisticsEntityMapper;
+    @Autowired
+    private FactoryProductionInitMapper factoryProductionInitMapper;
     @Autowired
     private BaseDao baseDao;
 
@@ -510,7 +518,8 @@ public class MatchingProductionHandler {
                         if (totalProductionQty > 0) {
                             productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, totalProductionQty); // 更新特殊材料占用
                             String mainPattern = CollectionUtils.firstElement(productionPlanList).getMainPattern(); // 主花纹
-                            groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern); // 重新计算统计产能
+                            String embryoCode = CollectionUtils.firstElement(productionPlanList).getEmbryoCode(); // 胎胚号
+                            groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern,embryoCode); // 重新计算统计产能
                             this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
                             if (plan.getMatchEndDay() == realEndDay) { // 如果区间最后一天有排产，且往后结构还没有结束，则继续尝试往后延一天
                                 Integer nextEndDay = this.getNextDay(productionContext, realEndDay, endDay);
@@ -677,7 +686,7 @@ public class MatchingProductionHandler {
                             .mapToInt(MpDailyCapacityLimitVo::getUsedLhMachines).sum();
                     Integer allMaxLhMachines = productionContext.getBaseDataContainer().getLhMachineInfoList().size();
                     // 2.2.2.4、完成判断后重算当天的排产统计，防止后续使用有问题
-                    groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, day, firstPlan.getMainPattern());
+                    groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, day, firstPlan.getMainPattern(),firstPlan.getEmbryoCode());
                     // 2.2.2.5、判断结构机台数
                     if (usedLhMachines > maxLhMachineCount) {
                         break inner;
@@ -785,7 +794,7 @@ public class MatchingProductionHandler {
         Map<String, Object> paramMap = groupInfo.composeDailyCapacityParamMap(productionContext);
         List<FactoryMonthPlanMouldDayResult> mouldDayResultList = new ArrayList<>(resultMap.values());
         MpDailyCapacityLimitVo daylyCapacityLimitlt = groupInfo.getDailyCapacityLimitVoMap().get(day);
-        dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, day, daylyCapacityLimitlt, paramMap, mpMouldDayResult.getMainPattern());
+        dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, day, daylyCapacityLimitlt, paramMap, mpMouldDayResult.getMainPattern(),mpMouldDayResult.getEmbryoCode());
     }
     
 
@@ -1223,7 +1232,8 @@ public class MatchingProductionHandler {
                     limitHelper.setMouldQty(limitHelper.getMouldQty() + newDoubleMouldList.size());
                     limitHelper.setPlanQty(limitHelper.getPlanQty() + realProductionQty);
                     String mainPattern = CollectionUtils.firstElement(productionPlanList).getMainPattern(); // 主花纹
-                    groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern); // 重新计算统计产能
+                    String embryoCode = CollectionUtils.firstElement(productionPlanList).getEmbryoCode(); // 胎胚号
+                    groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern,embryoCode); // 重新计算统计产能
                     return true; // 新增模具后直接结束，后面走续作逻辑
                 }
             }
@@ -1310,7 +1320,7 @@ public class MatchingProductionHandler {
         MpDailyCapacityLimitVo dayLimitVo = groupInfo.getDailyCapacityLimitVoMap().get(day);
         if (dayLimitVo != null) {
             Set<String> embryoCodeSet = dayLimitVo.getEmbryoCodes();
-            String embryoCode = firstPlan.getMainMaterialDesc();
+            String embryoCode = firstPlan.getEmbryoCode();
             if (!embryoCodeSet.contains(embryoCode)) {
                 GroupPlanCxLhCapacityLimitHelper limit = groupInfo.getDayProductionLimitInfo().get(day);
                 if (limit != null && limit.getMaxEmbryoCodeCount() != null
@@ -2054,14 +2064,6 @@ public class MatchingProductionHandler {
                 .filter(Objects::nonNull).max(Long::compareTo).orElse(0L);
         
         // 合并需求计划
-//        Map<String, MonthPlanProductionRequirePlanVo> requireMap = productionContext.getAllProductionPlan().values()
-//                .stream().collect(Collectors.toMap(MonthPlanProductionRequirePlanVo::getMaterialCode,
-//                        Function.identity(), (p1, p2) -> {
-//                            p1.setHeightLossQty(safeAdd(p1.getHeightLossQty(), p2.getHeightLossQty()));
-//                            p1.setMidQty(safeAdd(p1.getMidQty(), p2.getMidQty()));
-//                            p1.setPostponeQty(safeAdd(p1.getPostponeQty(), p2.getPostponeQty()));
-//                            return p1;
-//                        }));
         for (FactoryMonthPlanMouldDayResult plan : dayResultList) {
             Integer factProdQty = factProdReqMap.getOrDefault(plan.getMaterialDesc(), 0); // 实单补量
             Integer matchingQty = matchingQtyMap.getOrDefault(plan.getMaterialDesc(), 0); // 搭配补量
@@ -2071,12 +2073,6 @@ public class MatchingProductionHandler {
             FactoryMonthPlanMouldDayResult firstPlan = CollectionUtils.firstElement(resultList);
             // 原有记录有同规格的更新（有ID）；没有的说明是新搭配的规格，需要新增（无ID）
             FactoryMonthPlanMouldDayResult oldPlan = oldPlanMap.get(plan.getMaterialCode());
-//            MonthPlanProductionRequirePlanVo requirePlan = requireMap.get(plan.getMaterialCode());
-//            if (requirePlan != null) {
-//                plan.setHeightLossQty(requirePlan.getHeightQty());
-//                plan.setMidLossQty(requirePlan.getMidQty());
-//                plan.setPostponeQty(requirePlan.getPostponeQty());
-//            }
             if (oldPlan != null) {
                 // 差异
                 plan.setDifferenceQty(oldPlan.getDifferenceQty() > factProdQty? oldPlan.getDifferenceQty() - factProdQty: 0);
@@ -2108,37 +2104,6 @@ public class MatchingProductionHandler {
             saveResultList.add(plan);
         }
         return saveResultList;
-    }
-
-    /**
-     * 分配排产数量
-     * 
-     * @param plan             新排产记录
-     * @param oldPlan          旧排产记录
-     * @param newProductQty    排产量
-     * @param reqFieldName     需求量字段名
-     * @param productFieldName 排产量字段名
-     * @return
-     */
-    private Integer allocationProductionQty(FactoryMonthPlanMouldDayResult plan, FactoryMonthPlanMouldDayResult oldPlan,
-                                            Integer factProdQty, Integer newProductQty, String reqFieldName,
-                                            String productFieldName) {
-        Integer diffQty = 0; // 未分配量
-        if (oldPlan == null) {
-            plan.setFieldValueByFieldName(productFieldName, 0);
-            return diffQty;
-        }
-        Integer productQty = intValue(oldPlan.getFieldValueByFieldName(productFieldName));
-        if (factProdQty > 0) {
-            Integer reqQty = intValue(oldPlan.getFieldValueByFieldName(reqFieldName));
-            if (newProductQty > 0 && reqQty > productQty) {
-                diffQty = Math.min(reqQty - productQty, newProductQty);
-                plan.setFieldValueByFieldName(productFieldName, productQty + diffQty);
-            }
-        } else {
-            plan.setFieldValueByFieldName(productFieldName, productQty);
-        }
-        return diffQty;
     }
 
     /**
@@ -2580,121 +2545,6 @@ public class MatchingProductionHandler {
     }
 
     /**
-     * 获取初始化业务的参数设定
-     *
-     * @param productionContext
-     * @return
-     */
-    private ProductionCapacityParamConfiguration createParamConfiguration(TbrProductionContext productionContext) {
-        List<String> paramCodeList = new ArrayList<>(64);
-        //日排产相关
-        paramCodeList.add(MonthPlanEnums.DAY_CHANGE_GROUP_COUNT.getCode());
-        paramCodeList.add(MonthPlanEnums.CHANGE_MOULD_LH_MACHINE_NUMBER.getCode());
-        paramCodeList.add(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode());
-        paramCodeList.add(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY_DIFF.getCode());
-        paramCodeList.add(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode());
-        paramCodeList.add(MonthPlanEnums.CHANGE_TYPE_BLOCK_MAX_QTY.getCode());
-        paramCodeList.add(MonthPlanEnums.SINGLE_CX_EMBRYO_CODE_COUNT.getCode());
-        paramCodeList.add(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
-        paramCodeList.add(MonthPlanEnums.DAY_MIN_CAPACITY.getCode());
-        //排产控制相关
-        paramCodeList.add(MonthPlanEnums.SUM_PRODUCTION_QTY.getCode());
-        paramCodeList.add(MonthPlanEnums.HEIGHT_DIFF_QTY.getCode());
-        paramCodeList.add(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode());
-        paramCodeList.add(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
-        paramCodeList.add(MonthPlanEnums.MATCHING_BOOST_DAY.getCode());
-        paramCodeList.add(MonthPlanEnums.MAX_BOOST_DAY.getCode());
-        paramCodeList.add(MonthPlanEnums.MIN_PRODUCTION_DAYS.getCode());
-        paramCodeList.add(MonthPlanEnums.MIN_ALLOCATION_DAYS.getCode());
-        paramCodeList.add(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode());
-        paramCodeList.add(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
-        paramCodeList.add(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode());
-        paramCodeList.add(MonthPlanEnums.RESERVE_PERCENT.getCode());
-        //降膜排产相关
-        paramCodeList.add(MonthPlanEnums.DEDUCT_MOULD_MIN_LH_MACHINE_COUNT.getCode());
-        paramCodeList.add(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_DAY.getCode());
-        paramCodeList.add(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
-        paramCodeList.add(MonthPlanEnums.SECOND_NEAR_DEAD_LINE_DAY.getCode());
-        paramCodeList.add(MonthPlanEnums.SECOND_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
-        paramCodeList.add(MonthPlanEnums.LAST_NEAR_DEAD_LINE_DAY.getCode());
-        paramCodeList.add(MonthPlanEnums.LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode());
-        //其他
-        paramCodeList.add(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode());
-        paramCodeList.add(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
-        paramCodeList.add(MonthPlanEnums.SPECIAL_MATERIAL_CODE.getCode());
-        //获取数据
-        Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
-        if (CollectionUtils.isEmpty(paramConfigurationMap)) {
-            return null;
-        }
-        ProductionCapacityParamConfiguration configuration = new ProductionCapacityParamConfiguration();
-        //排产控制相关
-        Object minProductionDaysValue = paramConfigurationMap.get(MonthPlanEnums.MIN_PRODUCTION_DAYS.getCode());
-        if (null == minProductionDaysValue) {
-            configuration.setMinProductionDays(BigDecimal.ZERO.intValue());
-        } else {
-            configuration.setMinProductionDays((Integer) minProductionDaysValue);
-        }
-        configuration.setMinAllocationDays((Integer) paramConfigurationMap.get(MonthPlanEnums.MIN_ALLOCATION_DAYS.getCode()));
-        configuration.setNoCycleProductionMinLhMachineNumber((Integer) paramConfigurationMap.get(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode()));
-        String boostProductionTypeValue = (String) paramConfigurationMap.get(MonthPlanEnums.BOOST_PRODUCTION_TYPE_VALUE.getCode());
-        if (StringUtils.isBlank(boostProductionTypeValue)) {
-            configuration.setBoostProductionType(Collections.emptySet());
-        } else {
-            configuration.setBoostProductionType(Stream.of(boostProductionTypeValue.split(StringConstant.COMMA)).collect(Collectors.toSet()));
-        }
-        //外销贴牌-品牌配置
-        String oemBrandConfig = (String) paramConfigurationMap.get(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
-        if (StringUtils.isBlank(oemBrandConfig)) {
-            configuration.setOemBrandConfig(Collections.emptySet());
-        } else {
-            configuration.setOemBrandConfig(Stream.of(oemBrandConfig.split(StringConstant.COMMA)).collect(Collectors.toSet()));
-        }
-        //外销贴牌-总产量配置，单位条
-        configuration.setOemBrandCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode()));
-        //周期储备量占实单的比例(%)
-        configuration.setReservePercent((Integer) paramConfigurationMap.get(MonthPlanEnums.RESERVE_PERCENT.getCode()));
-
-        configuration.setMaxBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode()));
-        configuration.setMatchingBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MATCHING_BOOST_DAY.getCode()));
-        configuration.setSkuSecondProduction((Integer) paramConfigurationMap.get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode()));
-        configuration.setHeightDiffQty((Integer) paramConfigurationMap.get(MonthPlanEnums.HEIGHT_DIFF_QTY.getCode()));
-        configuration.setSumProductionQty((Integer) paramConfigurationMap.get(MonthPlanEnums.SUM_PRODUCTION_QTY.getCode()));
-        //日排产相关
-        configuration.setDayChangeGroupCount((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_CHANGE_GROUP_COUNT.getCode()));
-        configuration.setChangeMouldLhMachineNumber((Integer) paramConfigurationMap.get(MonthPlanEnums.CHANGE_MOULD_LH_MACHINE_NUMBER.getCode()));
-        configuration.setChangeMouldFirstQty((Integer) paramConfigurationMap.get(MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode()));
-        configuration.setChangeTypeBlockQtyDiff((Integer) paramConfigurationMap.get(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY_DIFF.getCode()));
-        configuration.setChangeTypeBlockQty((Integer) paramConfigurationMap.get(MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode()));
-        configuration.setChangeTypeBlockMaxQty((Integer) paramConfigurationMap.get(MonthPlanEnums.CHANGE_TYPE_BLOCK_MAX_QTY.getCode()));
-        configuration.setSingleCxEmbryoCodeCount((Integer) paramConfigurationMap.get(MonthPlanEnums.SINGLE_CX_EMBRYO_CODE_COUNT.getCode()));
-        configuration.setDayMaxCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MAX_CAPACITY.getCode()));
-        configuration.setDayMinCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MIN_CAPACITY.getCode()));
-        //降膜排产相关
-        configuration.setDeductMouldMinLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.DEDUCT_MOULD_MIN_LH_MACHINE_COUNT.getCode()));
-        configuration.setFirstNearDeadLineMaxLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode()));
-        configuration.setFirstNearDeadLineDay((Integer) paramConfigurationMap.get(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_DAY.getCode()));
-        configuration.setSecondNearDeadLineMaxLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.SECOND_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode()));
-        configuration.setSecondNearDeadLineDay((Integer) paramConfigurationMap.get(MonthPlanEnums.SECOND_NEAR_DEAD_LINE_DAY.getCode()));
-        configuration.setLastNearDeadLineMaxLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.LAST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode()));
-        configuration.setLastNearDeadLineDay((Integer) paramConfigurationMap.get(MonthPlanEnums.LAST_NEAR_DEAD_LINE_DAY.getCode()));
-        //其它
-        configuration.setSectionWidthDiffValue((Integer) paramConfigurationMap.get(MonthPlanEnums.SECTION_WIDTH_DIFF_VALUE.getCode()));
-        Object deductionLhMachineValue = paramConfigurationMap.get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode());
-        Integer deductionLhMachine = Optional.ofNullable((Integer) deductionLhMachineValue).orElse(BigDecimal.ZERO.intValue());
-        configuration.setDeductionLhMachineCount(deductionLhMachine);
-        //特殊原材料
-        Object specialMaterialCodeValue = paramConfigurationMap.get(MonthPlanEnums.SPECIAL_MATERIAL_CODE.getCode());
-        String specialMaterialCode = (String) Optional.ofNullable(specialMaterialCodeValue).orElse("");
-        if (StringUtils.isBlank(specialMaterialCode)) {
-            configuration.setSpecialMaterialCodeSet(Collections.emptySet());
-        } else {
-            configuration.setSpecialMaterialCodeSet(Stream.of(specialMaterialCode.split(StringConstant.COMMA)).collect(Collectors.toSet()));
-        }
-        return configuration;
-    }
-    
-    /**
      * 检查二次上机
      *
      * @param productionPlanInfo 排产计划信息
@@ -2717,81 +2567,6 @@ public class MatchingProductionHandler {
         int skuSecondProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuSecondProduction();
         SkuSecondChecker skuSecondChecker = new SkuSecondChecker(startDay, lastCloseDay, skuSecondProductionDays);
         return skuSecondChecker.doCheck();
-    }
-
-    /**
-     * 获取需要排产的SKU的模具配置信息 key = materialDesc: value =
-     * List<MonthPlanProductMouldInfoVo>
-     *
-     * @param productionContext
-     * @return
-     */
-    private Map<String, List<MonthPlanProductMouldInfoVo>> getProductionMouldInfo(TbrProductionContext productionContext) {
-        // 已有模具的配置关系
-        List<MonthPlanProductMouldInfoVo> productMouldInfoList = this.getDataService().getEnableProductionMouldInfo(productionContext);
-        // 新模具到货计划关系
-        List<MonthPlanProductMouldInfoVo> mouldDeliveryList = this.getDataService().getEnableProductionMouldDeliveryInfo(productionContext);
-
-        List<MonthPlanProductMouldInfoVo> allMouldRelationInfoList = MouldRelationDeduplicator.deduplicateAndMerge(productMouldInfoList, mouldDeliveryList, productionContext);
-        if (CollectionUtils.isEmpty(allMouldRelationInfoList)) {
-            return Collections.emptyMap();
-        }
-        return allMouldRelationInfoList.stream()
-                .collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getMaterialDesc));
-    }
-
-    /**
-     * 获取SKU的日硫化产能信息 key = materialDesc: value = MonthPlanProductLhCapacityVo
-     *
-     * @param productionContext 排产上下文
-     * @param mode              日硫化量模式
-     * @return
-     */
-    private Map<String, MonthPlanProductLhCapacityVo> getProductLhCapacityInfo(TbrProductionContext productionContext,
-                                                                               DayVulcanizationModeEnum mode) {
-        List<MonthPlanProductLhCapacityVo> lhCapacityList = this.getDataService()
-                .getProductLhCapacityInfo(productionContext);
-        if (CollectionUtils.isEmpty(lhCapacityList)) {
-//            log.info(TbrProductionInitLogRecorder.addDayLhCapacityInfoEmptyLog(productionContext));
-            return Collections.emptyMap();
-        }
-        // 计算日硫化产能
-        lhCapacityList.forEach(lhCapacity -> lhCapacity.calculateDayVulcanizationQty(mode));
-        return lhCapacityList.stream().collect(Collectors.toMap(MonthPlanProductLhCapacityVo::getMaterialDesc,
-                Function.identity(), (before, after) -> after));
-    }
-
-    /**
-     * 获取初始化业务的参数设定
-     *
-     * @param productionContext
-     * @return
-     */
-    private ProductionInitParamConfiguration createInitParamConfiguration(TbrProductionContext productionContext) {
-        ProductionInitParamConfiguration configuration = new ProductionInitParamConfiguration();
-        List<String> paramCodeList = new ArrayList<>(16);
-        paramCodeList.add(MonthPlanEnums.OPEN_PREEMPTION_MOULD.getCode());
-        paramCodeList.add(MonthPlanEnums.OPEN_LEVEL_RATIO.getCode());
-        paramCodeList.add(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode());
-        Map<String, Object> paramConfigurationMap = this.getDataService().getFactoryParamByCondition(productionContext,
-                paramCodeList);
-        if (CollectionUtils.isEmpty(paramConfigurationMap)) {
-//            log.info(TbrProductionInitLogRecorder.addInitParamEmptyLog(productionContext));
-            return configuration;
-        }
-        configuration.setOpenPreemptionMouldCapacity(
-                (String) paramConfigurationMap.get(MonthPlanEnums.OPEN_PREEMPTION_MOULD.getCode()));
-        configuration.setOpenLevelRatio((String) paramConfigurationMap.get(MonthPlanEnums.OPEN_LEVEL_RATIO.getCode()));
-        // 日硫化量获取
-        String dayVulcanizationParam = (String) paramConfigurationMap
-                .get(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode());
-        if (StringUtils.isBlank(dayVulcanizationParam)) {
-            configuration.setDayVulcanizationQtyConfiguration(DayVulcanizationModeEnum.STANDARD_CAPACITY);
-        } else {
-            configuration
-                    .setDayVulcanizationQtyConfiguration(DayVulcanizationModeEnum.getInstance(dayVulcanizationParam));
-        }
-        return configuration;
     }
 
     /**
@@ -3391,5 +3166,10 @@ public class MatchingProductionHandler {
      */
     public ProductionMdmDataService getDataService() {
         return productionSchedulingDataService;
+    }
+
+    @Override
+    public void run(Context context, Object userObj) {
+        
     }
 }

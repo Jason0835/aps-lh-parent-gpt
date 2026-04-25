@@ -104,7 +104,7 @@ public class CxStructureTreadConfigController extends AbstractDocBizController<C
 
     @Override
     protected String getTypeCode() {
-        return "0";
+        return "";
     }
 
     @Override

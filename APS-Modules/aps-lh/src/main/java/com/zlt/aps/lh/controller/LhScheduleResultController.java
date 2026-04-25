@@ -374,6 +374,17 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         return AjaxResult.success();
     }
 
+    /**
+     * 生成文字示方换模计划。
+     *
+     * @param dto 生成入参
+     * @return 处理结果
+     */
+    @PostMapping("/generateTextMouldChangePlan")
+    @ApiOperation("生成文字示方换模计划")
+    public AjaxResult generateTextMouldChangePlan(@RequestBody LhGenerateTextMouldPlanDTO dto) {
+        return lhScheduleService.generateTextMouldChangePlan(dto);
+    }
 
     /**
      * 发布当天未发布的排程结果

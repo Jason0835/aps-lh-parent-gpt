@@ -103,6 +103,16 @@ public interface ILhScheduleResultRemoteService {
     AjaxResult adjustTextNo(@RequestBody LhTransferDeskDTO dto);
 
     /**
+     * 生成文字示方换模计划
+     *
+     * @param dto 生成入参
+     * @return 处理结果
+     */
+    @ApiOperation("生成文字示方换模计划")
+    @PostMapping("/lhScheduleResult/generateTextMouldChangePlan")
+    AjaxResult generateTextMouldChangePlan(@RequestBody LhGenerateTextMouldPlanDTO dto);
+
+    /**
      * 发布所有排程结果
      *
      * @param dto 查询条件

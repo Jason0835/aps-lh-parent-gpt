@@ -193,8 +193,19 @@ public class GroupPlanCxLhCapacityLimitHelper {
      * @param addLhMachines
      */
     public void addMaxLhMachines(Integer addLhMachines) {
-        if (null == addLhMachines || addLhMachines <= BigDecimal.ZERO.intValue()) {
+        if (null == addLhMachines || addLhMachines == BigDecimal.ZERO.intValue()) {
             return;
+        }
+        //小于零时，不能小于机台数
+        if (addLhMachines < BigDecimal.ZERO.intValue()) {
+            if ((this.maxLhMachineCount + addLhMachines) <= BigDecimal.ZERO.intValue()) {
+                return;
+            }
+            //不等，则表示结构首日切换
+            int diffValue = this.maxTheoryLhMachineCount - this.maxLhMachineCount;
+            if (diffValue >= Math.abs(addLhMachines)) {
+                return;
+            }
         }
         this.maxLhMachineCount = this.maxLhMachineCount + addLhMachines;
         if (null != this.maxTheoryLhMachineCount) {
@@ -932,6 +943,10 @@ public class GroupPlanCxLhCapacityLimitHelper {
         Integer maxEmbryoCodeCount = initLimitHelper.getMaxEmbryoCodeCount();
         maxEmbryoCodeCount = maxEmbryoCodeCount + lhRatio.getMaxEmbryoQty();
         initLimitHelper.maxEmbryoCodeCount = maxEmbryoCodeCount;
+        //理论最大硫化配比
+        Integer maxTheoryLhMachineCount = Optional.ofNullable(initLimitHelper.getMaxTheoryLhMachineCount()).orElse(BigDecimal.ZERO.intValue());
+        maxTheoryLhMachineCount = maxTheoryLhMachineCount + Optional.ofNullable(lhRatio.getLhMachineMaxQty()).orElse(BigDecimal.ZERO.intValue());
+        initLimitHelper.maxTheoryLhMachineCount = maxTheoryLhMachineCount;
     }
 
     /**

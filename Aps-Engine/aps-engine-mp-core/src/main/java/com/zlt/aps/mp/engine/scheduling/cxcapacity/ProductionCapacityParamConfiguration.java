@@ -250,7 +250,7 @@ public class ProductionCapacityParamConfiguration {
             } catch (NumberFormatException e) {
                 lhMachines = BigDecimal.ZERO.intValue();
             }
-            if (lhMachines > BigDecimal.ZERO.intValue()) {
+            if (lhMachines != BigDecimal.ZERO.intValue()) {
                 extraMap.put(groupName, lhMachines);
             }
         }

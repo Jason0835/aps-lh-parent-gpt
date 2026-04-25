@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -25,18 +26,21 @@ public class CxStructureTreadConfig extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "厂别")
-    @Excel(name = "ui.data.column.mdmStructureTreadConfig.factoryCode", dictType = "biz_factory_name")
+    @ApiModelProperty(value = "工厂")
+    @Excel(name = "ui.data.column.cxStructureTreadConfig.factoryCode", dictType = "biz_factory_name")
+    @ImportExcelValidated(required = true)
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     @ApiModelProperty(value = "结构")
-    @Excel(name = "ui.data.column.mdmStructureTreadConfig.structureCode")
+    @Excel(name = "ui.data.column.cxStructureTreadConfig.structureCode",width = 60,align = Excel.Align.LEFT)
+    @ImportExcelValidated(required = true)
     @TableField(value = "STRUCTURE_CODE")
     private String structureCode;
 
-    @ApiModelProperty(value = "整车胎面条数")
-    @Excel(name = "ui.data.column.mdmStructureTreadConfig.treadCount")
+    @ApiModelProperty(value = "整车胎面(条)")
+    @Excel(name = "ui.data.column.cxStructureTreadConfig.treadCount")
+    @ImportExcelValidated(required = true,digits=true)
     @TableField(value = "TREAD_COUNT")
     private Integer treadCount;
 

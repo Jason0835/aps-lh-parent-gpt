@@ -1,10 +1,7 @@
 package com.zlt.aps.lh.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
-import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
+import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.bill.common.service.IDocService;
@@ -71,4 +68,12 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
      * @return 结果
      */
     AjaxResult adjustQuantity(LhScheduleResultUpdateDTO dto);
+
+    /**
+     * 根据单条硫化排程结果生成文字示方换模计划。
+     *
+     * @param dto 生成入参
+     * @return 处理结果
+     */
+    AjaxResult generateTextMouldChangePlan(LhGenerateTextMouldPlanDTO dto);
 }

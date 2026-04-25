@@ -49,6 +49,7 @@ public class ConclusionLhMachineHandler {
             return BeforeSkuProductionInfo.buildEmpty(productionDay);
         }
         String mainPattern = addSkuInfo.getMainPattern();
+        String embryoCode = addSkuInfo.getEmbryoCode();
         String materialDesc = addSkuInfo.getMaterialDesc();
         if (StringUtils.isBlank(materialDesc) || StringUtils.isBlank(mainPattern)) {
             return BeforeSkuProductionInfo.buildEmpty(productionDay);
@@ -57,7 +58,7 @@ public class ConclusionLhMachineHandler {
         if (CollectionUtils.isEmpty(conclusionSkuInfo)) {
             return BeforeSkuProductionInfo.buildEmpty(productionDay);
         }
-        Integer firstQty = getProductionDayQty(context, groupInfo, productionDay, mainPattern);
+        Integer firstQty = getProductionDayQty(context, groupInfo, productionDay, mainPattern,embryoCode);
         TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         Integer changMouldFirstQty = paramConfiguration.getChangeMouldFirstQty();
@@ -83,12 +84,13 @@ public class ConclusionLhMachineHandler {
         if (null == addSkuInfo || null == productionDay) {
             return null;
         }
+        String embryoCode = addSkuInfo.getEmbryoCode();
         String mainPattern = addSkuInfo.getMainPattern();
         String materialDesc = addSkuInfo.getMaterialDesc();
         if (StringUtils.isBlank(materialDesc) || StringUtils.isBlank(mainPattern)) {
             return null;
         }
-        Integer firstQty = getProductionDayQty(context, groupInfo, productionDay, mainPattern);
+        Integer firstQty = getProductionDayQty(context, groupInfo, productionDay, mainPattern,embryoCode);
         TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         Integer changMouldFirstQty = paramConfiguration.getChangeMouldFirstQty();
@@ -109,7 +111,7 @@ public class ConclusionLhMachineHandler {
      *
      * @param context
      */
-    private static Integer getProductionDayQty(Context context, ProductionPlanGroupInfo groupInfo, Integer iDay, String mainPattern) {
+    private static Integer getProductionDayQty(Context context, ProductionPlanGroupInfo groupInfo, Integer iDay, String mainPattern, String embryoCode) {
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = groupInfo.getDailyCapacityLimitVoMap();
         if (dailyCapacityLimitVoMap.get(iDay) == null) {
             return null;
@@ -122,7 +124,7 @@ public class ConclusionLhMachineHandler {
         //2. 组装参数Map
         Map<String, Object> paramMap = groupInfo.composeDailyCapacityParamMap(productionContext);
         //3. 计算日产能
-        Integer firstQty = dailyCapacityLimitObj.getFirstDayQty(mouldDayResultList, iDay, dailyCapacityLimitVoMap.get(iDay), paramMap, mainPattern);
+        Integer firstQty = dailyCapacityLimitObj.getFirstDayQty(mouldDayResultList, iDay, dailyCapacityLimitVoMap.get(iDay), paramMap, mainPattern,embryoCode);
         return firstQty;
     }
 

@@ -1434,6 +1434,35 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 获取在productionDay是否排产了需要排产Sku的胎胚
+     *
+     * @param productionDay     排产日
+     * @param productionSkuInfo 排产Sku信息
+     * @return
+     */
+    public boolean hasProductionEmbryo(Integer productionDay, MonthPlanProductionRequirePlanVo productionSkuInfo) {
+        if (null == productionDay || null == productionSkuInfo) {
+            return false;
+        }
+        String embryoCode = productionSkuInfo.getEmbryoCode();
+        if (StringUtils.isBlank(embryoCode)) {
+            return false;
+        }
+        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
+            return false;
+        }
+        GroupPlanCxLhCapacityLimitHelper dayLimitInfo = dayProductionLimitInfo.get(productionDay);
+        if (null == dayLimitInfo) {
+            return false;
+        }
+        Set<String> productionEmbryoCodeSet = dayLimitInfo.getProductionEmbryoCodeSet();
+        if (CollectionUtils.isEmpty(productionEmbryoCodeSet)) {
+            return false;
+        }
+        return productionEmbryoCodeSet.contains(embryoCode);
+    }
+
+    /**
      * 增加结构的Sku日排产信息
      *
      * @param productionContext    排产上下文
@@ -2216,7 +2245,7 @@ public class ProductionPlanGroupInfo {
             if (dailyCapacityLimitVoMap.get(i) == null) {
                 continue;
             }
-            dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, i, dailyCapacityLimitVoMap.get(i), paramMap, null);
+            dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, i, dailyCapacityLimitVoMap.get(i), paramMap, null, null);
         }
     }
 
@@ -2225,7 +2254,7 @@ public class ProductionPlanGroupInfo {
      *
      * @param context
      */
-    public void reCalcMpDailyCapacityLimitByDay(Context context, Integer iDay, String mainPattern) {
+    public void reCalcMpDailyCapacityLimitByDay(Context context, Integer iDay, String mainPattern, String embryoCode) {
         if (dailyCapacityLimitVoMap.get(iDay) == null) {
             return;
         }
@@ -2237,7 +2266,7 @@ public class ProductionPlanGroupInfo {
         //2. 组装参数Map
         Map<String, Object> paramMap = composeDailyCapacityParamMap(productionContext);
         //3. 计算日产能
-        dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, iDay, dailyCapacityLimitVoMap.get(iDay), paramMap, mainPattern);
+        dailyCapacityLimitObj.calcLhMachinesWithEmbryoTypes(mouldDayResultList, iDay, dailyCapacityLimitVoMap.get(iDay), paramMap, mainPattern, embryoCode);
     }
 
     /**
