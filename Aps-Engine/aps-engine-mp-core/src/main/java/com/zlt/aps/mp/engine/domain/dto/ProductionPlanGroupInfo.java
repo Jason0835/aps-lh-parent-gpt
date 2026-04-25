@@ -20,10 +20,7 @@ import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.handler.ConclusionLhMachineHandler;
 import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
-import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
-import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
-import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
 import com.zlt.aps.utils.ProductSpecificationsUtils;
 import com.zlt.common.utils.PubUtil;
@@ -230,7 +227,8 @@ public class ProductionPlanGroupInfo {
         Map<String, Map<String, BigDecimal>> embryoSpecialMaterialInfoMap = productionContext.getBaseDataContainer().getEmbryoSpecialMaterialInfoMap();
         // 本结构涉及的特殊材料清单
         Map<String, BigDecimal> materialMap = new HashMap<>();
-        for (MonthPlanProductionRequirePlanVo planVo : groupPlanData) { // 遍历需求计划，取有特殊材料清单的记录作为本结构的特殊材料清单（正常都一样，防止数据有异常）
+        // 遍历需求计划，取有特殊材料清单的记录作为本结构的特殊材料清单（正常都一样，防止数据有异常）
+        for (MonthPlanProductionRequirePlanVo planVo : groupPlanData) {
             Map<String, BigDecimal> skuMaterialMap = embryoSpecialMaterialInfoMap.get(planVo.getEmbryoCode());
             if (!CollectionUtils.isEmpty(skuMaterialMap)) {
                 materialMap.putAll(skuMaterialMap);
@@ -241,7 +239,8 @@ public class ProductionPlanGroupInfo {
             return groupInfo;
         }
         groupInfo.setEmbryoSpecialMaterialInfoMap(materialMap);
-        productionContext.updateSpecialMaterialStructureRelationMap(groupInfo); // 刷新上下文的特殊材料结构关系表
+        // 刷新上下文的特殊材料结构关系表
+        productionContext.updateSpecialMaterialStructureRelationMap(groupInfo);
 
         List<String> materialCodeList = groupPlanData.stream()
                 .map(MonthPlanProductionRequirePlanVo::getMaterialDesc).distinct().collect(Collectors.toList());
@@ -262,7 +261,6 @@ public class ProductionPlanGroupInfo {
         }
         // 模具数换算成硫化机台数
         groupInfo.minLhMachineCountByMould = mouldCodeSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-
         return groupInfo;
     }
 
@@ -336,30 +334,6 @@ public class ProductionPlanGroupInfo {
             return BigDecimal.ZERO.intValue();
         }
         return effectiveList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
-    }
-
-    /**
-     * 获取分组的理论最大可排产量
-     * = 理论分配天数 * Sku日硫化量(min(所有可排产Sku日硫化量)) * 硫化机台数(min(分组所有成型硫化配比的最大硫化机台数))
-     *
-     * @return
-     */
-    public Integer getTheoryMaxProductionQty() {
-        return theoryDays * minLhMachineCount * getDayCapacityBySingleLh();
-    }
-
-    /**
-     * 获取余量的可排产量
-     * = 剩余需天数 * Sku日硫化量(min(所有可排产Sku日硫化量)) * 硫化机台数(min(分组所有成型硫化配比的最大硫化机台数))
-     *
-     * @return
-     */
-    public Integer getRemainingMaxProductionQty() {
-        Integer remainingNeedDays = getRemainingNeedAllocationDays();
-        if (remainingNeedDays <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
-        }
-        return remainingNeedDays * minLhMachineCount * getDayCapacityBySingleLh();
     }
 
     /**
@@ -454,82 +428,6 @@ public class ProductionPlanGroupInfo {
         }
         String lowMinLhMachineNoReachMinProductionDaysReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_LOW_MIN_LH_MACHINE_COUNT_WHOLE_STRUCTURE_NAME, realAllocationDayBeforeConclusion, minProductionDays);
         groupPlanData.forEach(singlePlan -> singlePlan.setNoProductionAndAddReason(lowMinLhMachineNoReachMinProductionDaysReason));
-    }
-
-    /**
-     * 粗步计算 结构需求量需要的成型产能分配
-     * 结构有效总需求量/(结构下SKU最小日硫化量 * 结构最小硫化配比值 * 月份生产天数
-     * 保留1位小数
-     * 如果 小数部分 > 0.9，则向上取整
-     *
-     * @param context         排产上下文
-     * @param requirePlanList 需排产的计划
-     * @return
-     */
-    public static Map<String, ProductionPlanGroupInfo> statisticsAndEstimateCxAllocationByGroup(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
-        if (CollectionUtils.isEmpty(requirePlanList)) {
-            return Collections.emptyMap();
-        }
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
-        List<MonthPlanStructureLhRatioVo> structureLhRatioList = baseDataContainer.getStructureLhRatioList();
-        //根据结构成型硫化配比信息，提取结构最小的硫化配比和结构分组成型硫化配比
-        Map<String, List<MonthPlanStructureLhRatioVo>> structureGroupMap = getStructureGroupInfo(structureLhRatioList);
-        Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioMap(structureGroupMap);
-        //1、对计划按结构分组，构建结构分组对象ProductionPlanGroupInfo
-        Map<String, ProductionPlanGroupInfo> groupInfoMap = buildGroupPlanInfoMap(context, requirePlanList, structureGroupMap);
-        //2、提取有效净需求--剔除不可排产的，且没有超出模具产能-汇总需求量，并获得分组下最小日硫化产能
-        calculateEffectiveByMouldMaxCapacity(context, groupInfoMap);
-        //3、根据结构的硫化配比及最小的硫化机台数 估算需要的成型机台数
-        groupInfoMap.forEach((structureName, groupInfo) -> {
-            MonthPlanStructureLhRatioVo ratioInfo = minLhRatioMap.get(structureName);
-            if (null == ratioInfo) {
-                groupInfo.setAllocationZero();
-                log.info(TbrProductionGroupLogRecorder.addGroupLhRatioEmptyLog(context, structureName));
-                return;
-            }
-            groupInfo.setMinLhMachineCount(ratioInfo.getLhMachineMaxQty());
-            //粗算所需成型机台数
-            groupInfo.calculateNeedCxCapacityMachineCount(context, context.getMaxProductionDays());
-        });
-        //4、对分组计划中没有满足最低上机天数的，将天数上调到最低上机天数-由模拟排产阶段决定是否要提前收尾
-        ProductionCapacityParamConfiguration paramConfiguration = baseDataContainer.getParamConfiguration();
-        Integer minProductionDays = paramConfiguration.getMinProductionDays();
-        groupInfoMap.forEach((structureName, groupInfo) -> {
-            Integer theoryDays = groupInfo.getTheoryDays();
-            Integer minAllocationDays = groupInfo.getMinAllocationDays(productionContext);
-            //分配天数为零，或是小于最小要求天数，则设置不排产
-            if (groupInfo.isBelowMinProductionDays(minProductionDays)) {
-                groupInfo.setNoProductionNoReachMinProductionDays(minProductionDays);
-                return;
-            }
-            Integer realTheoryDays = Math.max(theoryDays, minAllocationDays);
-            groupInfo.setTheoryDays(realTheoryDays);
-            groupInfo.setLeftOverNeedAllocationDays(realTheoryDays);
-            if (realTheoryDays.equals(theoryDays)) {
-                return;
-            }
-            //重新计算估算的机台数
-            BigDecimal newNeedCxCapacityMachineCount = BigDecimal.valueOf(realTheoryDays).divide(BigDecimal.valueOf(context.getMonthDays()), 1, RoundingMode.UP);
-            groupInfo.setNeedCxCapacityMachineCount(newNeedCxCapacityMachineCount);
-        });
-        return groupInfoMap;
-    }
-
-    /**
-     * 理论需排产天数是否低于最小要求排产天数
-     * 如果theoryDays或是minProductionDays为空，
-     * 则都认为低于
-     * 否则 theoryDays < minProductionDays
-     *
-     * @param minProductionDays
-     * @return
-     */
-    public boolean isBelowMinProductionDays(Integer minProductionDays) {
-        if (null == minProductionDays || null == theoryDays) {
-            return true;
-        }
-        return theoryDays < minProductionDays;
     }
 
     /**
@@ -838,55 +736,6 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
-     * 计算需要分配的成型产能机台数，保留1位小数
-     * 双模方式
-     * 有效总需求量 / (SKU最小日硫化量 * 2 * 结构最小硫化配比 * 月度可排产天数),两位小数
-     * 如果 小数部分 >0.9，则向上取整
-     * 否则 = 保留1位小数
-     *
-     * @param context                排产上下文
-     * @param monthMaxProductionDays 月度最大可生产天数
-     */
-    public void calculateNeedCxCapacityMachineCount(Context context, Integer monthMaxProductionDays) {
-        if (sumPlanQty <= BigDecimal.ZERO.intValue()) {
-            setAllocationZero();
-            return;
-        }
-        if (minLhMachineCount <= BigDecimal.ZERO.intValue()) {
-            setAllocationZero();
-            return;
-        }
-        if (minLhDayCapacityQty <= BigDecimal.ZERO.intValue()) {
-            setAllocationZero();
-            return;
-        }
-        BigDecimal monthMaxDays = BigDecimal.valueOf(Long.valueOf(monthMaxProductionDays));
-        //单台成型日产能 = 最低硫化机台数 * 最小硫化量(单模) * 2
-        BigDecimal singleMinDayCapacity = getDayCapacityByLhRatio(minLhMachineCount);
-        //理论需排产天数
-        Integer theoryDays = BigDecimal.valueOf(sumPlanQty).divide(singleMinDayCapacity, 0, RoundingMode.UP).intValue();
-        //单台成型月产能 = 单台成型日产能 * 月份可排产天数(排除停产日)
-        BigDecimal singleCxMonthCapacity = singleMinDayCapacity.multiply(monthMaxDays);
-        BigDecimal machineCount = BigDecimal.valueOf(sumPlanQty).divide(singleCxMonthCapacity, 2, RoundingMode.HALF_UP);
-        //取整数部分，向下取整
-        BigDecimal integerPart = machineCount.setScale(0, RoundingMode.DOWN);
-        //小数部分
-        BigDecimal decimalPart = machineCount.subtract(integerPart);
-        if (decimalPart.compareTo(BigDecimal.valueOf(ProductionConstant.REPAIR_WHOLE)) > BigDecimal.ZERO.intValue()) {
-            needCxCapacityMachineCount = integerPart.add(BigDecimal.ONE);
-            theoryDays = needCxCapacityMachineCount.multiply(monthMaxDays).intValue();
-            this.theoryDays = theoryDays;
-            this.leftOverNeedAllocationDays = theoryDays;
-            log.info(TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(context, groupName, sumPlanQty, minLhMachineCount, minLhDayCapacityQty, theoryDays, needCxCapacityMachineCount));
-            return;
-        }
-        this.theoryDays = theoryDays;
-        this.leftOverNeedAllocationDays = theoryDays;
-        needCxCapacityMachineCount = machineCount.setScale(1, RoundingMode.UP);
-        log.info(TbrProductionGroupLogRecorder.addGroupCalculateCxMachineCountLog(context, groupName, sumPlanQty, minLhMachineCount, minLhDayCapacityQty, theoryDays, needCxCapacityMachineCount));
-    }
-
-    /**
      * 得到计划上机日
      *
      * @param productionPlan 排产计划
@@ -974,47 +823,6 @@ public class ProductionPlanGroupInfo {
             return BigDecimal.ZERO.intValue();
         }
         return leftOverNeedAllocationDays;
-    }
-
-    /**
-     * 根据成型对应硫化配比，得到剩余需求量需要分配的天数
-     *
-     * @param lhRatio 硫化配比
-     * @return
-     */
-    @Deprecated
-    public Integer calculateNeedDays(Integer lhRatio) {
-        if (minLhDayCapacityQty <= BigDecimal.ZERO.intValue() || null == lhRatio || lhRatio <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
-        }
-        //剩余需求量
-        Integer remainingProductionQty = getRemainingProductionQty();
-        if (remainingProductionQty <= BigDecimal.ZERO.intValue()) {
-            return BigDecimal.ZERO.intValue();
-        }
-        BigDecimal dayCapacity = getDayCapacityByLhRatio(lhRatio);
-        return BigDecimal.valueOf(remainingProductionQty).divide(dayCapacity, 0, RoundingMode.UP).intValue();
-    }
-
-    /**
-     * 获取结构分组下剩余还需排产量
-     *
-     * @return
-     */
-    @Deprecated
-    private Integer getRemainingProductionQty() {
-        //标记是否分配完毕
-        if (YesOrNoEnum.YES.getValue().equals(isAllocationFinish)) {
-            return BigDecimal.ZERO.intValue();
-        }
-        if (CollectionUtils.isEmpty(groupPlanData)) {
-            return BigDecimal.ZERO.intValue();
-        }
-        List<MonthPlanProductionRequirePlanVo> hasProductionList = groupPlanData.stream().filter(productionPlan -> productionPlan.hasProduction()).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(hasProductionList)) {
-            return BigDecimal.ZERO.intValue();
-        }
-        return hasProductionList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
     }
 
     /**
@@ -1214,35 +1022,6 @@ public class ProductionPlanGroupInfo {
             return BigDecimal.ZERO.intValue();
         }
         return embryoSpecialMaterialInfoMap.keySet().size();
-    }
-
-    /**
-     * 判断结构是否含有专用特殊材料同时也有共用特殊材料（排产优先级最高）
-     *
-     * @param productionContext
-     * @return
-     */
-    public Boolean hasDedicatedSpecialMaterials(TbrProductionContext productionContext) {
-        if (!this.isSpecialMaterial()) {
-            return false;
-        }
-        boolean hasDedicatedSpecialMaterials = false; // 是否包含专用特殊材料
-        boolean hasShareSpecialMaterials = false; // 是否包含共用特殊材料
-        for (String specialMaterialCode : this.embryoSpecialMaterialInfoMap.keySet()) {
-            Set<String> structureNameSet = productionContext.getSpecialMaterialStructureRelationMap().get(specialMaterialCode); // 获取使用该特殊材料的结构
-            if (CollectionUtils.isEmpty(structureNameSet)) {
-                continue;
-            }
-            if (!structureNameSet.contains(this.groupName)) {
-                continue;
-            }
-            if (structureNameSet.size() == 1) { // 只有一个结构使用，说明是专用特殊此材料，需要标记上有专用特殊材料
-                hasDedicatedSpecialMaterials = true;
-            } else {
-                hasShareSpecialMaterials = true;
-            }
-        }
-        return hasDedicatedSpecialMaterials && hasShareSpecialMaterials; // 同时包含专用与共用特殊材料
     }
 
     /**
@@ -1537,40 +1316,6 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
-     * 增加日排产信息
-     *
-     * @param singleDayProductionInfo
-     */
-    @Deprecated
-    public void addDayProductionInfo(GroupPlanDayProductionInfoHelper singleDayProductionInfo) {
-        if (null == dayProductionInfo) {
-            dayProductionInfo = new HashMap<>();
-        }
-        if (null == singleDayProductionInfo || !singleDayProductionInfo.isEffective()) {
-            return;
-        }
-        Integer productionDay = singleDayProductionInfo.getProductionDay();
-        if (null == productionDay) {
-            return;
-        }
-        List<GroupPlanDayProductionInfoHelper> plannedProductionList = dayProductionInfo.get(productionDay);
-        if (null == plannedProductionList) {
-            plannedProductionList = new ArrayList<>();
-            dayProductionInfo.put(productionDay, plannedProductionList);
-        }
-        if (CollectionUtils.isEmpty(plannedProductionList)) {
-            plannedProductionList.add(singleDayProductionInfo);
-            return;
-        }
-        String key = singleDayProductionInfo.getDuplicateKey();
-        GroupPlanDayProductionInfoHelper find = plannedProductionList.stream().filter(plannedProduction -> key.equals(plannedProduction.getDuplicateKey())).findFirst().orElse(null);
-        if (null == find) {
-            plannedProductionList.add(singleDayProductionInfo);
-            return;
-        }
-    }
-
-    /**
      * 获取分组的日排产汇总信息集合
      * 当前为胎胚种类信息和硫化组信息
      *
@@ -1636,166 +1381,6 @@ public class ProductionPlanGroupInfo {
             }
         });
         return productionDayList;
-    }
-
-    /**
-     * 按结构分组硫化配比
-     *
-     * @param structureLhRatioList 成型硫化配比集合
-     * @return
-     */
-    private static Map<String, List<MonthPlanStructureLhRatioVo>> getStructureGroupInfo(List<MonthPlanStructureLhRatioVo> structureLhRatioList) {
-        if (CollectionUtils.isEmpty(structureLhRatioList)) {
-            return Collections.emptyMap();
-        }
-        return structureLhRatioList.stream().collect(Collectors.groupingBy(MonthPlanStructureLhRatioVo::getStructureName));
-    }
-
-    /**
-     * 按结构提取最小硫化配比信息
-     *
-     * @param structureGroupMap 结构配比分组
-     * @return
-     */
-    private static Map<String, MonthPlanStructureLhRatioVo> getMinLhRatioMap(Map<String, List<MonthPlanStructureLhRatioVo>> structureGroupMap) {
-        if (CollectionUtils.isEmpty(structureGroupMap)) {
-            return Collections.emptyMap();
-        }
-        Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = new HashMap<>();
-        structureGroupMap.forEach((structureName, ratioList) -> {
-            if (CollectionUtils.isEmpty(ratioList)) {
-                return;
-            }
-            ratioList.sort(Comparator.comparing(MonthPlanStructureLhRatioVo::getLhMachineMaxQty));
-            minLhRatioMap.put(structureName, ratioList.get(BigDecimal.ZERO.intValue()));
-        });
-        return minLhRatioMap;
-    }
-
-    /**
-     * 构建结构分组基础信息
-     * 结构对应的计划，以及结构下所有的硫化配比信息
-     *
-     * @param context            排产上下文
-     * @param allRequirePlanList 所有排产计划
-     * @param structureGroupMap  结构硫化配比配置信息
-     */
-    private static Map<String, ProductionPlanGroupInfo> buildGroupPlanInfoMap(Context context, List<MonthPlanProductionRequirePlanVo> allRequirePlanList, Map<String, List<MonthPlanStructureLhRatioVo>> structureGroupMap) {
-        if (CollectionUtils.isEmpty(allRequirePlanList)) {
-            return Collections.emptyMap();
-        }
-        List<MonthPlanProductionRequirePlanVo> effectiveList = allRequirePlanList.stream().filter(singlePlan -> StringUtils.isNotBlank(singlePlan.getStructureName())).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(effectiveList)) {
-            return Collections.emptyMap();
-        }
-        //TBR-按结构名分组排产计划
-        Map<String, List<MonthPlanProductionRequirePlanVo>> groupPlanMap = effectiveList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getStructureName));
-        Map<String, ProductionPlanGroupInfo> groupInfoMap = new HashMap<>(groupPlanMap.size());
-        groupPlanMap.forEach((structureName, planList) -> {
-            ProductionPlanGroupInfo groupInfo = ProductionPlanGroupInfo.createInitByGroupList(context, structureName, context.getProductType(), planList);
-            //设置对应的硫化配比信息：分不同机型有不同配比
-            List<MonthPlanStructureLhRatioVo> cxLhRatioList = structureGroupMap.get(structureName);
-            if (CollectionUtils.isEmpty(cxLhRatioList)) {
-                groupInfo.setCxMachineLhRationMap(Collections.emptyMap());
-            } else {
-                Map<String, MonthPlanStructureLhRatioVo> allCxLhRatioMap = cxLhRatioList.stream().collect(Collectors.toMap(MonthPlanStructureLhRatioVo::getCxMachineTypeCode, Function.identity(), (before, after) -> after));
-                groupInfo.setCxMachineLhRationMap(allCxLhRatioMap);
-            }
-            groupInfoMap.put(structureName, groupInfo);
-        });
-        return groupInfoMap;
-    }
-
-    /**
-     * 计算结构的有效需求量，需要根据模具信息
-     *
-     * @param context      排产上下文
-     * @param groupInfoMap 结构分组计划
-     */
-    private static void calculateEffectiveByMouldMaxCapacity(Context context, Map<String, ProductionPlanGroupInfo> groupInfoMap) {
-        //得到结构主花纹下最大可用模具数-按物料描述分组取最大
-        Map<String, Integer> structureMainPatternMaxMouldGroup = getStructureMainPatternMaxMouldNumber(context);
-        /**
-         * 1、剔除不可排产的
-         * 2、剔除超出模具产能部分
-         * 3、设置结构分组的总的有效需求和最小日硫化量
-         */
-        //按结构+主花纹分组
-        String groupKeyFormat = "%s|*|%s";
-        groupInfoMap.forEach((structureName, groupInfo) -> {
-            List<MonthPlanProductionRequirePlanVo> groupPlanData = groupInfo.getGroupPlanData();
-            if (CollectionUtils.isEmpty(groupPlanData)) {
-                groupInfo.setSumPlanQty(BigDecimal.ZERO.intValue());
-                return;
-            }
-            //剔除不排产的计划
-            List<MonthPlanProductionRequirePlanVo> productionPlanList = groupPlanData.stream().filter(productionPlan -> YesOrNoEnum.YES.getCode().equals(productionPlan.getProductionFlag())).collect(Collectors.toList());
-            if (CollectionUtils.isEmpty(productionPlanList)) {
-                groupInfo.setSumPlanQty(BigDecimal.ZERO.intValue());
-                return;
-            }
-            //最小日硫化量
-            Integer minDayLhCapacity = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getDayVulcanizationQty).min().getAsInt();
-            groupInfo.setMinLhDayCapacityQty(minDayLhCapacity);
-            List<Integer> mainPatternEffectiveQty = new ArrayList<>();
-            //按主花纹分组需求
-            Map<String, List<MonthPlanProductionRequirePlanVo>> mainPatternGroup = productionPlanList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMainPattern));
-            mainPatternGroup.forEach((mainPattern, groupPlanList) -> {
-                String groupKey = String.format(groupKeyFormat, structureName, mainPattern);
-                Integer maxMouldNumber = structureMainPatternMaxMouldGroup.get(groupKey);
-                if (null == maxMouldNumber) {
-                    maxMouldNumber = BigDecimal.ZERO.intValue();
-                }
-                Integer lhMachineCount = maxMouldNumber / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-                Integer sumPlanQty = groupPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getCxCapacityRequireQty).sum();
-                Integer maxMouldCapacity = lhMachineCount * minDayLhCapacity * ProductionConstant.DOUBLE_MOULD_PRODUCTION * context.getMaxProductionDays();
-                log.info(TbrProductionGroupLogRecorder.addGroupCalculateCapacityLog(context, groupKey, sumPlanQty, maxMouldNumber, maxMouldCapacity));
-                mainPatternEffectiveQty.add(Math.min(sumPlanQty, maxMouldCapacity));
-            });
-            Integer sumPlanQty = mainPatternEffectiveQty.stream().mapToInt(Integer::intValue).sum();
-            log.info(TbrProductionGroupLogRecorder.addGroupCalculateCapacityLog(context, structureName, sumPlanQty));
-            groupInfo.setSumPlanQty(sumPlanQty);
-        });
-    }
-
-    /**
-     * 获取 结构 + 主花纹下可使用的模具最大数量
-     *
-     * @param context
-     * @return
-     */
-    private static Map<String, Integer> getStructureMainPatternMaxMouldNumber(Context context) {
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        List<MonthPlanProductMouldInfoVo> allMouldRelation = productionContext.getBaseDataContainer().getSkuMouldRelationMap().values().stream().flatMap(Collection::stream).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(allMouldRelation)) {
-            return Collections.emptyMap();
-        }
-        //按结构+主花纹分组模具信息
-        Map<String, List<MonthPlanProductMouldInfoVo>> structureMainPatternGroup = allMouldRelation.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getStructureNameAndMainPattern));
-        Map<String, Integer> structureAndMainPatternMap = new HashMap<>();
-        Map<String, MouldAllocationInfoVo> structureMainPatternAllocationLimit = productionContext.getBaseDataContainer().getGroupMainPatternAllocationLimitMap();
-        structureMainPatternGroup.forEach((structureAndMainPattern, mouldRelationList) -> {
-            Integer maxMouldNumber = BigDecimal.ZERO.intValue();
-            if (CollectionUtils.isEmpty(mouldRelationList)) {
-                structureAndMainPatternMap.put(structureAndMainPattern, maxMouldNumber);
-                return;
-            }
-            Map<String, Long> materialGroup = mouldRelationList.stream().collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getMaterialDesc, Collectors.counting()));
-            List<Long> mouldNumberList = new ArrayList<>(materialGroup.values());
-            mouldNumberList.sort(Comparator.comparing(Long::valueOf, Comparator.reverseOrder()));
-            maxMouldNumber = mouldNumberList.get(BigDecimal.ZERO.intValue()).intValue();
-            //增加与分配比例的比较
-            if (!structureMainPatternAllocationLimit.containsKey(structureAndMainPattern)) {
-                structureAndMainPatternMap.put(structureAndMainPattern, maxMouldNumber);
-                return;
-            }
-            //分配比例与最大数，二者取最小
-            Integer limitNumber = structureMainPatternAllocationLimit.get(structureAndMainPattern).getAllocationQty();
-            log.info(TbrProductionGroupLogRecorder.addGroupMainPatternMaxMouldNumberLog(context, structureAndMainPattern, limitNumber, maxMouldNumber));
-            maxMouldNumber = Math.min(maxMouldNumber, limitNumber);
-            structureAndMainPatternMap.put(structureAndMainPattern, maxMouldNumber);
-        });
-        return structureAndMainPatternMap;
     }
 
     /**
@@ -2349,7 +1934,6 @@ public class ProductionPlanGroupInfo {
         }
         Set<Integer> canProductionDaySet = hasAddSkuList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
         Set<Integer> rangeSet = getEffectiveRange(context, canProductionDaySet);
-//        Set<Integer> rangeSet = ContinuousProductionDayHandler.getEarliestContinuousRange(context, 2, canProductionDaySet, stopDaySet);
         if (CollectionUtils.isEmpty(rangeSet)) {
             return null;
         }
@@ -2499,29 +2083,6 @@ public class ProductionPlanGroupInfo {
             preClosingDay = context.getNextHasProductionDay(preClosingDay, stopDayInfo);
         }
         return LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
-    }
-
-    /**
-     * 获取一段排产范围
-     *
-     * @param hasAddSkuList 有空出硫化组的排产天集合信息
-     * @param excludeDays   需要剔除的收尾时间点
-     * @return
-     */
-    private SelectRangeLhMachineInfo getRangeInfo(List<GroupPlanCxLhCapacityLimitHelper> hasAddSkuList, Set<Integer> excludeDays) {
-        if (CollectionUtils.isEmpty(hasAddSkuList)) {
-            return null;
-        }
-        //20260113 剔除需要排除的收尾时间点
-        if (!CollectionUtils.isEmpty(excludeDays)) {
-            hasAddSkuList = hasAddSkuList.stream().filter(singleGroup -> !excludeDays.contains(singleGroup.getDay())).collect(Collectors.toList());
-        }
-        if (CollectionUtils.isEmpty(hasAddSkuList)) {
-            return null;
-        }
-        GroupPlanCxLhCapacityLimitHelper selectedDayLimit = hasAddSkuList.get(BigDecimal.ZERO.intValue());
-        GroupPlanCxLhCapacityLimitHelper endDayLimit = hasAddSkuList.get(hasAddSkuList.size() - BigDecimal.ONE.intValue());
-        return new SelectRangeLhMachineInfo(selectedDayLimit, endDayLimit);
     }
 
     /**
