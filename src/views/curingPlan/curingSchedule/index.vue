@@ -86,6 +86,13 @@
           >{{ $t("ui.data.column.scheduleResult.textAdjust") }}</el-button
         >
         <el-button
+          v-hasPermi="['lh:lhScheduleResult:autoLhScheduleResult']"
+          type="primary"
+          :disabled="selection.length != 1"
+          @click="handleGenerateTextMouldChangePlan"
+          >{{ $t("生成文字示方换模计划") }}</el-button
+        >
+        <el-button
           v-hasPermi="['monthplan:mouldingDayResult:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
@@ -196,6 +203,7 @@ import {
   exportCombine,
   getScheduleDate,
   adjustTextNo,
+  generateTextMouldChangePlan,
 } from "@/api/lh/scheduleResult";
 import { checkPermi } from "@/utils/permission";
 
@@ -777,6 +785,35 @@ export default {
         return this.selectDictLabel(this.dict.type.biz_end_type, "1");
       }
       return this.selectDictLabel(this.dict.type.biz_end_type, "0");
+    },
+    async handleGenerateTextMouldChangePlan() {
+      try {
+        this.loading = true;
+        const row = this.selection[0];
+        const result = await generateTextMouldChangePlan({
+          id: row.id,
+          factoryCode: row.factoryCode,
+        });
+        if (result && result.needConfirm) {
+          await this.$confirm(result.msg || this.$t("ui.data.alert.lhMouldChangePlan.generateTextPlan.replaceConfirm"), {
+            type: "warning",
+          });
+          const confirmResult = await generateTextMouldChangePlan({
+            id: row.id,
+            factoryCode: row.factoryCode,
+            confirmReplace: true,
+          });
+          this.$modal.msgSuccess(confirmResult.msg || this.$t("ui.data.alert.lhMouldChangePlan.generateTextPlan.success"));
+          this.getList();
+          return;
+        }
+        this.$modal.msgSuccess(result.msg || this.$t("ui.data.alert.lhMouldChangePlan.generateTextPlan.success"));
+        this.getList();
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.loading = false;
+      }
     },
     async getAdjustTextNo() {
       try {

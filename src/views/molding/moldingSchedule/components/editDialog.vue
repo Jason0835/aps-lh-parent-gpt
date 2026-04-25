@@ -43,6 +43,7 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
+      dialogMode: "edit",
       form: {},
       rules: {
         // specName: [
@@ -57,10 +58,12 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("ui.data.column.cxScheduleResult.cxAutoPlan");
+      return this.dialogMode === "insert"
+        ? this.$t("ui.data.column.scheduleResult.insertOrder")
+        : this.$t("ui.frame.btn.modify");
     },
     columns() {
-      return [
+      const columns = [
         {
           label: this.$t("ui.data.column.scheduleResult.baseInfo"),
           type: "title",
@@ -279,7 +282,7 @@ export default {
 
         // ui.data.column.scheduleResult.class1
         {
-          label: this.$t("早班"),
+          label: this.$t("夜班"),
           type: "title",
         },
         // {
@@ -318,7 +321,7 @@ export default {
 
         //  ui.data.column.scheduleResult.class2
         {
-          label: this.$t("中班"),
+          label: this.$t("早班"),
           type: "title",
         },
         // {
@@ -368,7 +371,7 @@ export default {
         },
 
         {
-          label: this.$t("晚班"),
+          label: this.$t("中班"),
           type: "title",
         },
 
@@ -402,7 +405,7 @@ export default {
 
         // ui.data.column.scheduleResult.class4
         {
-          label: this.$t("早班"),
+          label: this.$t("夜班"),
           type: "title",
         },
 
@@ -435,7 +438,7 @@ export default {
 
         // ui.data.column.scheduleResult.class5
         {
-          label: this.$t("中班"),
+          label: this.$t("早班"),
           type: "title",
         },
 
@@ -467,7 +470,7 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("晚班"),
+          label: this.$t("中班"),
           type: "title",
         },
 
@@ -499,7 +502,7 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("早班"),
+          label: this.$t("夜班"),
           type: "title",
         },
 
@@ -532,7 +535,7 @@ export default {
 
         // ui.data.column.scheduleResult.class5
         {
-          label: this.$t("中班"),
+          label: this.$t("早班"),
           type: "title",
         },
 
@@ -564,9 +567,35 @@ export default {
           disabled: true,
         },
       ];
+      return columns.map((column) => {
+        if (!column.prop) {
+          return column;
+        }
+        return {
+          ...column,
+          disabled: this.isColumnDisabled(column.prop),
+        };
+      });
     },
   },
   methods: {
+    isColumnDisabled(prop) {
+      if (this.dialogMode === "insert") {
+        return prop === "scheduleDate";
+      }
+      const readonlyBeforeRemain = new Set([
+        "scheduleDate",
+        "orderNo",
+        "cxBatchNo",
+        "isRelease",
+        "cxMachineCode",
+        "lhMachineCode",
+        "materialCode",
+        "materialDesc",
+        "mainMaterialDesc",
+      ]);
+      return readonlyBeforeRemain.has(prop);
+    },
     // api
     async save(params) {
       try {
@@ -586,8 +615,9 @@ export default {
     },
 
     //utils
-    show(data) {
+    show(data, mode = "edit") {
       this.visible = true;
+      this.dialogMode = mode;
       if (data) {
         this.isEdit = true;
         this.form = {
@@ -600,15 +630,17 @@ export default {
       this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;
+      this.dialogMode = "edit";
       this.visible = false;
     },
 
     handleConfirm() {
       this.$refs.form.triggerConfirm((params) => {
-        this.save({
-          ...params,
-          local: "xg",
-        });
+        const submitParams =
+          this.dialogMode === "insert"
+            ? { ...params }
+            : { ...params, local: "xg" };
+        this.save(submitParams);
       });
       // this.$refs.form.validate((valid) => {
       //   if (valid) {
