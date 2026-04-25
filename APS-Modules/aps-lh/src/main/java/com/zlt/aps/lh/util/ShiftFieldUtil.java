@@ -98,6 +98,21 @@ public final class ShiftFieldUtil {
     }
 
     /**
+     * 设置班次完成量
+     *
+     * @param result     排程结果
+     * @param shiftIndex 班次索引 1～8
+     * @param finishQty  完成量
+     */
+    public static void setShiftFinishQty(LhScheduleResult result, int shiftIndex, Integer finishQty) {
+        if (!isValidIndex(shiftIndex)) {
+            log.warn("未知班次索引: {}", shiftIndex);
+            return;
+        }
+        BeanUtil.setProperty(result, propertyPrefix(shiftIndex) + "FinishQty", finishQty);
+    }
+
+    /**
      * 设置班次原因分析。
      *
      * @param result 排程结果

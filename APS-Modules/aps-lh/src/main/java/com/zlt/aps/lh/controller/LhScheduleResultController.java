@@ -27,12 +27,16 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -61,6 +65,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     @Autowired
     private ScheduleExecutionGuard scheduleExecutionGuard;
+
+    @Autowired
+    private LhScheduleResultMapper lhScheduleResultMapper;
 
     /**
      * 获取排程日期对象列表
@@ -103,38 +110,10 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @Override
     public TableDataInfo list(@RequestBody LhScheduleResult entity) {
         TableDataInfo tableDataInfo = super.list(entity);
-//        List<LhScheduleResult> list = (List<LhScheduleResult>) tableDataInfo.getRows();
-//        if (CollectionUtils.isNotEmpty(list)) {
-//            List<Long> idList = list.stream().map(BaseEntity::getId).collect(Collectors.toList());
-//            LhDispatcherLog queryVO = new LhDispatcherLog();
-//            queryVO.setScheduleDate(entity.getScheduleDate());
-//            List<LhDispatcherLogVo> lhDispatcherLogVos = lhDispatcherLogServiceImpl.selectIsChangeList(queryVO, idList);
-//            Map<Long, LhDispatcherLogVo> logVoMap = new HashMap<>(16);
-//            if (CollectionUtils.isNotEmpty(lhDispatcherLogVos)) {
-//                logVoMap = lhDispatcherLogVos.stream().collect(Collectors.toMap(LhDispatcherLogVo::getScheduleId, Function.identity(), (s1, s2) -> s1));
-//            }
-//            for (LhScheduleResult lhScheduleResult : list) {
-//                Long id = lhScheduleResult.getId();
-//                if (logVoMap.containsKey(id)) {
-//                    LhDispatcherLogVo lhDispatcherLogVo = logVoMap.get(id);
-//                    BeanUtils.copyBeanProp(lhScheduleResult, lhDispatcherLogVo);
-//                }
-//                Integer class1PlanQty = ObjectUtils.defaultIfNull(lhScheduleResult.getClass1PlanQty(), 0);
-//                Integer class2PlanQty = ObjectUtils.defaultIfNull(lhScheduleResult.getClass2PlanQty(), 0);
-//                Integer class3PlanQty = ObjectUtils.defaultIfNull(lhScheduleResult.getClass3PlanQty(), 0);
-//                Integer class4PlanQty = ObjectUtils.defaultIfNull(lhScheduleResult.getClass4PlanQty(), 0);
-//                Integer class5PlanQty = ObjectUtils.defaultIfNull(lhScheduleResult.getClass5PlanQty(), 0);
-//                Integer class6PlanQty = ObjectUtils.defaultIfNull(lhScheduleResult.getClass6PlanQty(), 0);
-//                double totalPlanQty = class1PlanQty + class2PlanQty + class3PlanQty + class4PlanQty + class5PlanQty + class6PlanQty;
-//                Integer class1FinishQty = ObjectUtils.defaultIfNull(lhScheduleResult.getClass1FinishQty(), 0);
-//                Integer class2FinishQty = ObjectUtils.defaultIfNull(lhScheduleResult.getClass2FinishQty(), 0);
-//                Integer class3FinishQty = ObjectUtils.defaultIfNull(lhScheduleResult.getClass3FinishQty(), 0);
-//                Integer class4FinishQty = ObjectUtils.defaultIfNull(lhScheduleResult.getClass4FinishQty(), 0);
-//                Integer class5FinishQty = ObjectUtils.defaultIfNull(lhScheduleResult.getClass5FinishQty(), 0);
-//                Integer class6FinishQty = ObjectUtils.defaultIfNull(lhScheduleResult.getClass6FinishQty(), 0);
-//                double totalFinishQty = class1FinishQty + class2FinishQty + class3FinishQty + class4FinishQty + class5FinishQty + class6FinishQty;
-//            }
-//        }
+        List<LhScheduleResult> list = (List<LhScheduleResult>) tableDataInfo.getRows();
+        if (CollectionUtils.isNotEmpty(list)) {
+            list.forEach(this::decodeRemarkFields);
+        }
         return tableDataInfo;
     }
 
@@ -142,7 +121,11 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @GetMapping(value = "/{billId}")
     @Override
     public LhScheduleResult getInfo(@PathVariable("billId") Long billId) {
-        return super.getInfo(billId);
+        LhScheduleResult result = super.getInfo(billId);
+        if (result != null) {
+            decodeRemarkFields(result);
+        }
+        return result;
     }
 
 
@@ -208,7 +191,107 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @Override
     public byte[] exportData(@RequestBody LhScheduleResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        return super.exportData(queryVO, fileName, response);
+        QueryWrapper<LhScheduleResult> queryWrapper = new QueryWrapper<>();
+        builderCondition(queryWrapper, queryVO);
+        List<LhScheduleResult> list = lhScheduleResultMapper.selectList(queryWrapper);
+        processExportShiftDisplay(list);
+        if (CollectionUtils.isNotEmpty(list)) {
+            list.forEach(this::decodeRemarkFields);
+        }
+        ExcelUtil<LhScheduleResult> util = new ExcelUtil<>(LhScheduleResult.class);
+        Workbook workbook = util.exportExcelFromList(list, fileName);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        return out.toByteArray();
+    }
+
+    /**
+     * 导出前处理班次显示数据：收尾班后续班次字段置空、计划量为0置空
+     *
+     * @param list 排程结果列表
+     */
+    private void processExportShiftDisplay(List<LhScheduleResult> list) {
+        if (CollectionUtils.isEmpty(list)) {
+            return;
+        }
+        for (LhScheduleResult result : list) {
+            int referenceQty = resolveReferenceQty(result);
+            if (referenceQty <= 0) {
+                clearZeroPlanQty(result);
+                continue;
+            }
+            int totalPlanQty = ShiftFieldUtil.resolveScheduledQty(result);
+            if (totalPlanQty < referenceQty) {
+                clearZeroPlanQty(result);
+                continue;
+            }
+            int endingShift = resolveEndingShift(result, referenceQty);
+            for (int i = 1; i <= 8; i++) {
+                if (i > endingShift) {
+                    ShiftFieldUtil.setShiftPlanQty(result, i, null, null, null);
+                    ShiftFieldUtil.setShiftFinishQty(result, i, null);
+                    ShiftFieldUtil.setShiftAnalysis(result, i, null);
+                } else {
+                    Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, i);
+                    if (planQty == null || planQty == 0) {
+                        ShiftFieldUtil.setShiftPlanQty(result, i, null,
+                                ShiftFieldUtil.getShiftStartTime(result, i),
+                                ShiftFieldUtil.getShiftEndTime(result, i));
+                        ShiftFieldUtil.setShiftFinishQty(result, i, null);
+                        ShiftFieldUtil.setShiftAnalysis(result, i, null);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 取硫化余量和胎胚库存中的较大值作为收尾判断基准量
+     *
+     * @param result 排程结果
+     * @return 基准量
+     */
+    private int resolveReferenceQty(LhScheduleResult result) {
+        int surplusQty = result.getMouldSurplusQty() != null ? result.getMouldSurplusQty() : 0;
+        int embryoStock = result.getEmbryoStock() != null ? result.getEmbryoStock() : 0;
+        return Math.max(surplusQty, embryoStock);
+    }
+
+    /**
+     * 定位收尾班次：逐班扣减基准量，基准量耗尽的班次即为收尾班
+     *
+     * @param result       排程结果
+     * @param referenceQty 基准量（硫化余量与胎胚库存的较大值）
+     * @return 收尾班次索引（1~8），无收尾返回8
+     */
+    private int resolveEndingShift(LhScheduleResult result, int surplusQty) {
+        int remaining = surplusQty;
+        for (int i = 1; i <= 8; i++) {
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, i);
+            remaining -= (planQty != null ? planQty : 0);
+            if (remaining <= 0) {
+                return i;
+            }
+        }
+        return 8;
+    }
+
+    /**
+     * 将无排班班次的计划量、完成量、原因分析置空
+     *
+     * @param result 排程结果
+     */
+    private void clearZeroPlanQty(LhScheduleResult result) {
+        for (int i = 1; i <= 8; i++) {
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, i);
+            if (planQty == null || planQty == 0) {
+                ShiftFieldUtil.setShiftPlanQty(result, i, null,
+                        ShiftFieldUtil.getShiftStartTime(result, i),
+                        ShiftFieldUtil.getShiftEndTime(result, i));
+                ShiftFieldUtil.setShiftFinishQty(result, i, null);
+                ShiftFieldUtil.setShiftAnalysis(result, i, null);
+            }
+        }
     }
 
     @Log(title = "ui.data.column.lhParams.modelName")
@@ -280,6 +363,34 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     /** 插单可用机台模拟：请求未带分厂时的默认分厂编码 */
     private static final String MOCK_SCHEDULE_MACHINE_FACTORY_DEFAULT = "116";
+
+    /**
+     * 解码备注字段中的特殊字符转义
+     *
+     * @param remark 备注内容
+     * @return 解码后的备注内容
+     */
+    private String decodeRemark(String remark) {
+        if (remark == null) return null;
+        return remark.replace("__PERCENT__", "%")
+                     .replace("__AMP__", "&")
+                     .replace("__LT__", "<")
+                     .replace("__GT__", ">")
+                     .replace("__QUOT__", "\"")
+                     .replace("__APOS__", "'");
+    }
+
+    /**
+     * 解码排程结果中需要转义的字段：备注 + 8个班次原因分析
+     *
+     * @param result 排程结果
+     */
+    private void decodeRemarkFields(LhScheduleResult result) {
+        result.setRemark(decodeRemark(result.getRemark()));
+        for (int i = 1; i <= 8; i++) {
+            ShiftFieldUtil.setShiftAnalysis(result, i, decodeRemark(ShiftFieldUtil.getShiftAnalysis(result, i)));
+        }
+    }
     /** 插单可用机台模拟：字典 sys_enable_disable 启用 */
     private static final String MOCK_SCHEDULE_MACHINE_STATUS_ENABLED = "0";
     /** 插单可用机台模拟：字典 IS_HAVE 有向心机构 */
