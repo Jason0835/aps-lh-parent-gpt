@@ -187,10 +187,15 @@
               :label="$t('ui.data.column.scheduleResult.plan')"
               prop="class1PlanQty"
             >
-              <el-input
+              <el-input-number
+                class="w100"
                 v-model="form.class1PlanQty"
                 :disabled="three1PlanTimeDisabled"
-              ></el-input>
+                :min="0"
+                :max="maxPlanQty"
+                :precision="0"
+                controls-position="right"
+              ></el-input-number>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -236,6 +241,8 @@
                 v-model="form.class2PlanQty"
                 :disabled="three2PlanTimeDisabled"
                 :min="0"
+                :max="maxPlanQty"
+                :precision="0"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -283,6 +290,8 @@
                 v-model="form.class3PlanQty"
                 :disabled="three3PlanTimeDisabled"
                 :min="0"
+                :max="maxPlanQty"
+                :precision="0"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -330,6 +339,8 @@
                 v-model="form.class4PlanQty"
                 :disabled="three4PlanTimeDisabled"
                 :min="0"
+                :max="maxPlanQty"
+                :precision="0"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -377,6 +388,8 @@
                 v-model="form.class5PlanQty"
                 :disabled="three5PlanTimeDisabled"
                 :min="0"
+                :max="maxPlanQty"
+                :precision="0"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -424,6 +437,8 @@
                 v-model="form.class6PlanQty"
                 :disabled="three6PlanTimeDisabled"
                 :min="0"
+                :max="maxPlanQty"
+                :precision="0"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -473,6 +488,8 @@
                 v-model="form.class7PlanQty"
                 :disabled="three7PlanTimeDisabled"
                 :min="0"
+                :max="maxPlanQty"
+                :precision="0"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -521,6 +538,8 @@
                 v-model="form.class8PlanQty"
                 :disabled="three8PlanTimeDisabled"
                 :min="0"
+                :max="maxPlanQty"
+                :precision="0"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -586,6 +605,8 @@ export default {
   inject: ["parentDict"],
   data() {
     return {
+      // MySQL int 最大值，前端计划量输入需限制在该范围内。
+      maxPlanQty: 2147483647,
       loading: false,
       visible: false,
       isEdit: false,
