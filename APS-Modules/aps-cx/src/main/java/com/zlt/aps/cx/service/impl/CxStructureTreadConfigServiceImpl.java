@@ -67,10 +67,10 @@ public class CxStructureTreadConfigServiceImpl extends AbstractDocService<CxStru
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             CxStructureTreadConfig docEntity = list.get(i);
-            fillDefaultFactoryCode(docEntity);
+//            fillDefaultFactoryCode(docEntity);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
-                    "factoryCode", "structureCode","treadCount");
+                    "factoryCode", "structureCode");
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
                 docEntity.setId(-999L);
