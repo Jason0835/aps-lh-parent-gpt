@@ -75,7 +75,7 @@ export default {
     TltUploadForm,
     infoDialog,
   },
-  dicts: ["biz_factory_name", "biz_yes_no", "CHANGE_MOULD_TYPE", "IS_RELEASE", "CLASS_NUM", "lr_molds", "finish_completion"],
+  dicts: ["biz_factory_name", "biz_yes_no", "CHANGE_MOULD_TYPE", "IS_RELEASE", "class_num_two_mm", "lr_molds", "finish_completion"],
   provide() {
     return {
       parentDict: this.dict,
@@ -167,7 +167,7 @@ export default {
           label: this.$t("ui.data.column.lhMouldChangePlan.classIndex"),
           minWidth: 120,
           formatter: (row, column, value, index) => {
-            return this.selectDictLabel(this.dict.type.CLASS_NUM, value);
+            return this.selectDictLabel(this.dict.type.class_num_two_mm, value);
           },
         },
         {

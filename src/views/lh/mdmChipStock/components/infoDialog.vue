@@ -30,10 +30,10 @@
 
 <script>
 import {
-  checkMdmChipStockUnique,
-  editMdmChipStock,
-  mergeMdmChipStock,
-} from "@/api/lh/mdmChipStock";
+  checkLhChipStockUnique,
+  editLhChipStock,
+  mergeLhChipStock,
+} from "@/api/lh/lhChipStock";
 
 import infoForm from "@/views/components/infoForm.vue";
 
@@ -81,29 +81,30 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.mdmChipStock.factoryCode"),
+          label: this.$t("ui.data.column.lhChipStock.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
+          filterable: true,
         },
         {
           prop: "chipCode",
-          label: this.$t("ui.data.column.mdmChipStock.chipCode"),
+          label: this.$t("ui.data.column.lhChipStock.chipCode"),
           maxlength: 32,
         },
         {
           prop: "stockNum",
-          label: this.$t("ui.data.column.mdmChipStock.stockNum"),
+          label: this.$t("ui.data.column.lhChipStock.stockNum"),
           type: "number",
         },
         {
           prop: "finishQty",
-          label: this.$t("ui.data.column.mdmChipStock.finishQty"),
+          label: this.$t("ui.data.column.lhChipStock.finishQty"),
           type: "number",
           disabled: true,
         },
         {
           prop: "remark",
-          label: this.$t("ui.data.column.mdmChipStock.remark"),
+          label: this.$t("ui.data.column.lhChipStock.remark"),
           type: "textarea",
           rows: 3,
           maxlength: 500,
@@ -121,7 +122,7 @@ export default {
           params.finishQty = null;
         }
 
-        const res = await editMdmChipStock(params);
+        const res = await editLhChipStock(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -135,7 +136,7 @@ export default {
       try {
         this.loading = true;
 
-        const res = await mergeMdmChipStock(params);
+        const res = await mergeLhChipStock(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -147,11 +148,11 @@ export default {
     },
     async checkUniqueAndSave(params) {
       try {
-        const res = await checkMdmChipStockUnique(params);
+        const res = await checkLhChipStockUnique(params);
         if (res === 0) {
           await this.save(params);
         } else {
-          await this.$confirm(this.$t("mdmChipStock.chipCodeExistsConfirmMerge"), {
+          await this.$confirm(this.$t("lhChipStock.chipCodeExistsConfirmMerge"), {
             type: "warning",
             confirmButtonText: this.$t("common.button.confirm"),
             cancelButtonText: this.$t("common.button.cancel"),

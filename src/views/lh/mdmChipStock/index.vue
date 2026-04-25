@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="mdmChipStockMainTable"
+      tableRef="lhChipStockMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -21,30 +21,30 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['lh:mdmChipStock:edit']"
+          v-hasPermi="['lh:lhChipStock:edit']"
           @click="handleAdd"
         >{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button
           type="danger"
-          v-hasPermi="['lh:mdmChipStock:remove']"
+          v-hasPermi="['lh:lhChipStock:remove']"
           :disabled="selection.length == 0"
           @click="handleBatchDelete"
         >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
-          v-hasPermi="['lh:mdmChipStock:import']"
+          v-hasPermi="['lh:lhChipStock:import']"
           @click="$refs.tltUpload.handleImport()"
         >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           @click="handleExport"
-          v-hasPermi="['lh:mdmChipStock:export']"
+          v-hasPermi="['lh:lhChipStock:export']"
         >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-      downloadUrl="/lh/mdmChipStock/importTemplate"
-      uploadUrl="/lh/mdmChipStock/importData"
+      downloadUrl="/lh/lhChipStock/importTemplate"
+      uploadUrl="/lh/lhChipStock/importData"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
@@ -54,12 +54,12 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listMdmChipStock, removeMdmChipStock } from "@/api/lh/mdmChipStock";
+import { listLhChipStock, removeLhChipStock } from "@/api/lh/lhChipStock";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "MdmChipStock",
+  name: "LhChipStock",
   components: {
     TltUploadForm,
     infoDialog,
@@ -113,14 +113,14 @@ export default {
         //   prop: "companyCode",
         //   align: "center",
         //   halign: "center",
-        //   label: this.$t("ui.data.column.mdmChipStock.companyCode"),
+        //   label: this.$t("ui.data.column.lhChipStock.companyCode"),
         //   minWidth: 120,
         // },
         {
           prop: "factoryCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.mdmChipStock.factoryCode"),
+          label: this.$t("ui.data.column.lhChipStock.factoryCode"),
           minWidth: 120,
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -130,42 +130,42 @@ export default {
           prop: "chipCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.mdmChipStock.chipCode"),
+          label: this.$t("ui.data.column.lhChipStock.chipCode"),
           minWidth: 150,
         },
         {
           prop: "stockNum",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.mdmChipStock.stockNum"),
+          label: this.$t("ui.data.column.lhChipStock.stockNum"),
           minWidth: 120,
         },
         {
           prop: "finishQty",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.mdmChipStock.finishQty"),
+          label: this.$t("ui.data.column.lhChipStock.finishQty"),
           minWidth: 120,
         },
         {
           prop: "remainStockNum",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.mdmChipStock.remainStockNum"),
+          label: this.$t("ui.data.column.lhChipStock.remainStockNum"),
           minWidth: 120,
         },
         // {
         //   prop: "dataVersion",
         //   align: "center",
         //   halign: "center",
-        //   label: this.$t("ui.data.column.mdmChipStock.dataVersion"),
+        //   label: this.$t("ui.data.column.lhChipStock.dataVersion"),
         //   minWidth: 120,
         // },
         {
           prop: "remark",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.mdmChipStock.remark"),
+          label: this.$t("ui.data.column.lhChipStock.remark"),
           minWidth: 200,
         },
         {
@@ -178,7 +178,7 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["lh:mdmChipStock:edit"]}
+                  v-hasPermi={["lh:lhChipStock:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
@@ -186,7 +186,7 @@ export default {
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["lh:mdmChipStock:remove"]}
+                  v-hasPermi={["lh:lhChipStock:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -203,14 +203,14 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.mdmChipStock.factoryCode"),
+          label: this.$t("ui.data.column.lhChipStock.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
         },
         {
-          label: this.$t("ui.data.column.mdmChipStock.chipCode"),
+          label: this.$t("ui.data.column.lhChipStock.chipCode"),
           prop: "chipCode",
         },
       ];
@@ -232,7 +232,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeMdmChipStock(ids).then((data) => {
+        removeLhChipStock(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -253,7 +253,7 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeMdmChipStock(ids).then((data) => {
+        removeLhChipStock(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -285,7 +285,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/lh/mdmChipStock/export", this.formatParams(false));
+      downloadLink("/lh/lhChipStock/export", this.formatParams(false));
     },
     formatParams(hasPage = true) {
       const params = {
@@ -301,7 +301,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listMdmChipStock(this.formatParams());
+        const data = await listLhChipStock(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {

@@ -89,6 +89,13 @@ export default {
           minWidth: 150,
         },
         {
+          prop: "materialDesc",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhRepairCapsule.materialDesc"),
+          minWidth: 180,
+        },
+        {
           prop: "replaceCapsuleCount",
           align: "center",
           halign: "center",
@@ -137,6 +144,10 @@ export default {
         {
           label: this.$t("ui.data.column.lhRepairCapsule.materialCode"),
           prop: "materialCode",
+        },
+        {
+          label: this.$t("ui.data.column.lhRepairCapsule.materialDesc"),
+          prop: "materialDesc",
         },
         // {
         //   label: this.$t("ui.data.column.lhRepairCapsule.brand"),

@@ -186,7 +186,7 @@ export default {
           prop: "classIndex",
           label: this.$t("ui.data.column.lhMouldChangePlan.classIndex"),
           type: "select",
-          dictData: this.parentDict.type.CLASS_NUM,
+          dictData: this.parentDict.type.class_num_two_mm,
           filterable: true,
         },
         {
