@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.controller;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -93,7 +94,11 @@ public class CxMachineOnlineInfoController extends AbstractDocBizController<CxMa
     protected List<CxMachineOnlineInfo> listExportData(CxMachineOnlineInfo obj) {
         QueryWrapper<CxMachineOnlineInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return cxMachineOnlineInfoMapper.selectList(wrapper);
+        List<CxMachineOnlineInfo> list = cxMachineOnlineInfoMapper.selectList(wrapper);
+        for (CxMachineOnlineInfo item : list) {
+            item.setUpdateDay(item.getUpdateTime() == null ? "" : DateUtil.formatDateTime(item.getUpdateTime()));
+        }
+        return list;
     }
 
     @Override

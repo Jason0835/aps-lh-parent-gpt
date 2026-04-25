@@ -45,25 +45,30 @@ public class CxMachineOnlineInfo extends BaseEntity implements Serializable {
     @TableField(value = "CX_CODE")
     private String cxCode;
 
-    @ApiModelProperty(value = "在机物料编码（NC）", name = "materialCode")
+    @ApiModelProperty(value = "物料编码", name = "materialCode")
     @Excel(name = "ui.data.column.cxMachineOnlineInfo.materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
-    @ApiModelProperty(value = "在机物料编码（MES）", name = "mesMaterialCode")
+    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @Excel(name = "ui.data.column.cxMachineOnlineInfo.mesMaterialCode",width = 20)
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
 
-    @ApiModelProperty(value = "在机物料描述", name = "specDesc")
+    @ApiModelProperty(value = "物料描述", name = "specDesc")
     @Excel(name = "ui.data.column.cxMachineOnlineInfo.specDesc",width = 50)
     @TableField(value = "SPEC_DESC")
     private String specDesc;
 
-    @ApiModelProperty(value = "在机胎胚描述", name = "embryoSpec")
+    @ApiModelProperty(value = "胎胚描述", name = "embryoSpec")
     @Excel(name = "ui.data.column.cxMachineOnlineInfo.embryoSpec",width = 50)
     @TableField(value = "EMBRYO_SPEC")
     private String embryoSpec;
+
+    /** 更新时间，用于导出展示 */
+    @Excel(name = "ui.data.column.cxMachineOnlineInfo.updateDay", width = 20, type = Excel.Type.EXPORT)
+    @TableField(exist = false)
+    private String updateDay;
 
     @ApiModelProperty(value = "版本号", name = "dataVersion")
 //    @Excel(name = "ui.data.column.cxMachineOnlineInfo.dataVersion")
