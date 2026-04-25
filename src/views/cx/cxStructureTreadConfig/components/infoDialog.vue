@@ -37,6 +37,17 @@ export default {
   components: { infoForm, structureSelect },
   inject: ["parentDict"],
   data() {
+    const validateInteger = (rule, value, callback) => {
+      if (value === undefined || value === null || value === "") {
+        callback();
+        return;
+      }
+      if (!Number.isInteger(Number(value))) {
+        callback(new Error("请输入整数"));
+        return;
+      }
+      callback();
+    };
     return {
       loading: false,
       visible: false,
@@ -62,6 +73,10 @@ export default {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "blur",
+          },
+          {
+            validator: validateInteger,
+            trigger: ["blur", "change"],
           },
         ],
         factoryCode: [

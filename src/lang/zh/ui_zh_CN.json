@@ -2362,7 +2362,7 @@
   "ui.data.column.cxStructureTreadConfig.modelName": "胎面整车配置",
   "ui.data.column.cxStructureTreadConfig.stockDate": "库存日期",
   "ui.data.column.cxStructureTreadConfig.structureCode": "结构",
-  "ui.data.column.cxStructureTreadConfig.treadCount": "整车胎面条数",
+  "ui.data.column.cxStructureTreadConfig.treadCount": "整车胎面(条)",
   "ui.data.column.cxStructureTreadConfig.dataVersion": "版本号",
   "ui.data.column.cxStructureTreadConfig.factoryCode": "工厂",
   "ui.data.alert.cxStructureTreadConfig.structureCodeNotUnique": "结构已存在，不能重复",
