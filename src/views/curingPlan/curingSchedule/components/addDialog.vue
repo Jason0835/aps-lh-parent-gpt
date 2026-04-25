@@ -87,12 +87,12 @@ export default {
     //   curingMachines: (state) => state.curing.machines,
     // }),
     title: function () {
-      return this.$t("添加硫化排程结果信息");
+      return this.$t("ui.frame.btn.add") + this.$t("ui.data.column.lh.scheduleResult.modelName");
     },
     columns() {
       return [
         {
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.scheduleResult.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
@@ -146,91 +146,91 @@ export default {
           prop: "leftRightMold",
         },
         {
-          label: this.$t("一班计划"),
+          label: this.$t("ui.data.column.scheduleResult.class1PlanQty"),
           prop: "class1PlanQty",
           span: 24,
           type: "number",
         },
         {
-          label: this.$t("一班备注"),
+          label: this.$t("ui.data.column.scheduleResult.class1Analysis"),
           prop: "class1Analysis",
           span: 24,
         },
 
          {
-          label: this.$t("二班计划"),
+          label: this.$t("ui.data.column.scheduleResult.class2PlanQty"),
           prop: "class2PlanQty",
           span: 24,
           type: "number",
         },
         {
-          label: this.$t("二班备注"),
+          label: this.$t("ui.data.column.scheduleResult.class2Analysis"),
           prop: "class2Analysis",
           span: 24,
         },
          {
-          label: this.$t("三班计划"),
+          label: this.$t("ui.data.column.scheduleResult.class3PlanQty"),
           prop: "class3PlanQty",
           span: 24,
           type: "number",
         },
         {
-          label: this.$t("三班备注"),
+          label: this.$t("ui.data.column.scheduleResult.class3Analysis"),
           prop: "class3Analysis",
           span: 24,
         },
           {
-            label: this.$t("四班计划"),
+            label: this.$t("ui.data.column.scheduleResult.class4PlanQty"),
             prop: "class4PlanQty",
             span: 24,
             type: "number",
           },
           {
-            label: this.$t("四班备注"),
+            label: this.$t("ui.data.column.scheduleResult.class4Analysis"),
             prop: "class4Analysis",
             span: 24,
           },
           {
-            label: this.$t("五班计划"),
+            label: this.$t("ui.data.column.scheduleResult.class5PlanQty"),
             prop: "class5PlanQty",
             span: 24,
             type: "number",
           },
           {
-            label: this.$t("五班备注"),
+            label: this.$t("ui.data.column.scheduleResult.class5Analysis"),
             prop: "class5Analysis",
             span: 24,
           },
             {
-              label: this.$t("六班计划"),
+              label: this.$t("ui.data.column.scheduleResult.class6PlanQty"),
               prop: "class6PlanQty",
               span: 24,
               type: "number",
             },
             {
-              label: this.$t("六班备注"),
+              label: this.$t("ui.data.column.scheduleResult.class6Analysis"),
               prop: "class6Analysis",
               span: 24,
             },
             {
-              label: this.$t("七班计划"),
+              label: this.$t("ui.data.column.scheduleResult.class7PlanQty"),
               prop: "class7PlanQty",
               span: 24,
               type: "number",
             },
             {
-              label: this.$t("七班备注"),
+              label: this.$t("ui.data.column.scheduleResult.class7Analysis"),
               prop: "class7Analysis",
               span: 24,
             },
             {
-          label: this.$t("八班计划"),
+          label: this.$t("ui.data.column.scheduleResult.class8PlanQty"),
           prop: "class8PlanQty",
           span: 24,
           type: "number",
         },
         {
-          label: this.$t("八班备注"),
+          label: this.$t("ui.data.column.scheduleResult.class8Analysis"),
           prop: "class8Analysis",
           span: 24,
         },

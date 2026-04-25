@@ -333,7 +333,13 @@ export default {
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
-
+        {
+          label: this.$t("ui.data.column.factoryCode"),
+          prop: "factoryCode",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
         {
           label: this.$t("ui.data.column.scheduleResult.lhMachineCode"),
           prop: "lhMachineCode",
@@ -396,33 +402,32 @@ export default {
             {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 1),
             },
             {
               prop: "constructionStage",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-              formatter: (row, column, value, index) => {
-                const dictValue = value || "0";
-                return this.selectDictLabel(this.dict.type.biz_construction_stage, dictValue);
-              },
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 1),
             },
             {
               prop: "class1IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value, index) => {
-                return this.calcShiftIsEnd(row, 1);
-              },
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 1),
             },
             {
               prop: "class1PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 1),
             },
             {
               prop: "class1FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 1),
             },
             {
               prop: "class1Analysis",
-              label: this.$t("ui.data.column.remark"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 1),
             },
           ],
         },
@@ -432,33 +437,32 @@ export default {
             {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 2),
             },
             {
               prop: "constructionStage",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-              formatter: (row, column, value, index) => {
-                const dictValue = value || "0";
-                return this.selectDictLabel(this.dict.type.biz_construction_stage, dictValue);
-              },
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 2),
             },
            {
               prop: "class2IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value, index) => {
-                return this.calcShiftIsEnd(row, 2);
-              },
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 2),
             },
             {
               prop: "class2PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 2),
             },
             {
               prop: "class2FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 2),
             },
             {
               prop: "class2Analysis",
-              label: this.$t("ui.data.column.remark"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 2),
             },
 
           ],
@@ -469,33 +473,32 @@ export default {
             {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 3),
             },
             {
               prop: "constructionStage",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-              formatter: (row, column, value, index) => {
-                const dictValue = value || "0";
-                return this.selectDictLabel(this.dict.type.biz_construction_stage, dictValue);
-              },
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 3),
             },
            {
               prop: "class3IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value, index) => {
-                return this.calcShiftIsEnd(row, 3);
-              },
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 3),
             },
             {
               prop: "class3PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 3),
             },
             {
               prop: "class3FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 3),
             },
             {
               prop: "class3Analysis",
-              label: this.$t("ui.data.column.remark"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 3),
             },
 
           ],
@@ -506,33 +509,32 @@ export default {
             {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 4),
             },
             {
               prop: "constructionStage",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-              formatter: (row, column, value, index) => {
-                const dictValue = value || "0";
-                return this.selectDictLabel(this.dict.type.biz_construction_stage, dictValue);
-              },
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 4),
             },
            {
               prop: "class4IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value, index) => {
-                return this.calcShiftIsEnd(row, 4);
-              },
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 4),
             },
             {
               prop: "class4PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 4),
             },
             {
               prop: "class4FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 4),
             },
             {
               prop: "class4Analysis",
-              label: this.$t("ui.data.column.remark"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 4),
             },
 
           ],
@@ -543,29 +545,32 @@ export default {
             {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 5),
             },
             {
-              prop: "mouldMethod",
-              label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 5),
             },
             {
               prop: "class5IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value, index) => {
-                return this.calcShiftIsEnd(row, 5);
-              },
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 5),
             },
             {
               prop: "class5PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 5),
             },
             {
               prop: "class5FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 5),
             },
             {
               prop: "class5Analysis",
-              label: this.$t("ui.data.column.remark"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 5),
             },
 
           ],
@@ -576,29 +581,32 @@ export default {
             {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 6),
             },
             {
-              prop: "mouldMethod",
-              label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 6),
             },
             {
               prop: "class6IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value, index) => {
-                return this.calcShiftIsEnd(row, 6);
-              },
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 6),
             },
             {
               prop: "class6PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 6),
             },
             {
               prop: "class6FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 6),
             },
             {
               prop: "class6Analysis",
-              label: this.$t("ui.data.column.remark"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 6),
             },
 
           ],
@@ -609,29 +617,32 @@ export default {
             {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 7),
             },
             {
-              prop: "mouldMethod",
-              label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 7),
             },
             {
               prop: "class7IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value, index) => {
-                return this.calcShiftIsEnd(row, 7);
-              },
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 7),
             },
             {
               prop: "class7PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 7),
             },
             {
               prop: "class7FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 7),
             },
             {
               prop: "class7Analysis",
-              label: this.$t("ui.data.column.remark"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 7),
             },
 
           ],
@@ -642,29 +653,32 @@ export default {
             {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 8),
             },
             {
-              prop: "mouldMethod",
-              label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 8),
             },
             {
               prop: "class8IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value, index) => {
-                return this.calcShiftIsEnd(row, 8);
-              },
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 8),
             },
             {
               prop: "class8PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 8),
             },
             {
               prop: "class8FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 8),
             },
             {
               prop: "class8Analysis",
-              label: this.$t("ui.data.column.remark"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 8),
             },
 
           ],
@@ -774,15 +788,33 @@ export default {
   },
   methods: {
     calcShiftIsEnd(row, shiftIndex) {
-      const specEndTime = row.specEndTime;
-      if (!specEndTime) return this.selectDictLabel(this.dict.type.biz_end_type, "0");
-      const specEnd = new Date(specEndTime).getTime();
-      const startTimeField = "class" + shiftIndex + "StartTime";
-      const shiftStart = row[startTimeField];
-      if (!shiftStart) return this.selectDictLabel(this.dict.type.biz_end_type, "0");
-      const shiftStartTs = new Date(shiftStart).getTime();
-      if (specEnd >= shiftStartTs) {
-        return this.selectDictLabel(this.dict.type.biz_end_type, "1");
+      if (this.isShiftAfterEnding(row, shiftIndex)) {
+        return '';
+      }
+      const planQty = row['class' + shiftIndex + 'PlanQty'];
+      if (planQty == null || planQty <= 0) {
+        return '';
+      }
+      const referenceQty = Math.max(row.mouldSurplusQty || 0, row.embryoStock || 0);
+      if (referenceQty <= 0) {
+        return this.selectDictLabel(this.dict.type.biz_end_type, "0");
+      }
+      let totalPlanQty = 0;
+      for (let i = 1; i <= 8; i++) {
+        totalPlanQty += (row['class' + i + 'PlanQty'] || 0);
+      }
+      if (totalPlanQty < referenceQty) {
+        return this.selectDictLabel(this.dict.type.biz_end_type, "0");
+      }
+      let remaining = referenceQty;
+      for (let i = 1; i <= 8; i++) {
+        remaining -= (row['class' + i + 'PlanQty'] || 0);
+        if (remaining <= 0) {
+          if (i === shiftIndex) {
+            return this.selectDictLabel(this.dict.type.biz_end_type, "1");
+          }
+          break;
+        }
       }
       return this.selectDictLabel(this.dict.type.biz_end_type, "0");
     },
@@ -814,6 +846,76 @@ export default {
       } finally {
         this.loading = false;
       }
+    },
+    isShiftAfterEnding(row, shiftIndex) {
+      const referenceQty = Math.max(row.mouldSurplusQty || 0, row.embryoStock || 0);
+      if (referenceQty <= 0) {
+        return false;
+      }
+      let totalPlanQty = 0;
+      for (let i = 1; i <= 8; i++) {
+        totalPlanQty += (row['class' + i + 'PlanQty'] || 0);
+      }
+      if (totalPlanQty < referenceQty) {
+        return false;
+      }
+      let remaining = referenceQty;
+      for (let i = 1; i <= 8; i++) {
+        remaining -= (row['class' + i + 'PlanQty'] || 0);
+        if (remaining <= 0) {
+          return shiftIndex > i;
+        }
+      }
+      return false;
+    },
+    shiftLeftRightMouldFormatter(row, column, value, shiftIndex) {
+      if (this.isShiftAfterEnding(row, shiftIndex)) return '';
+      const planQty = row['class' + shiftIndex + 'PlanQty'];
+      if (planQty == null || planQty <= 0) return '';
+      return value;
+    },
+    shiftConstructionStageFormatter(row, column, value, shiftIndex) {
+      if (this.isShiftAfterEnding(row, shiftIndex)) return '';
+      const planQty = row['class' + shiftIndex + 'PlanQty'];
+      if (planQty == null || planQty <= 0) return '';
+      const dictValue = value || "0";
+      return this.selectDictLabel(this.dict.type.biz_construction_stage, dictValue);
+    },
+    shiftPlanQtyFormatter(row, column, value, shiftIndex) {
+      if (this.isShiftAfterEnding(row, shiftIndex)) return '';
+      if (value == null || value === 0) return '';
+      return value;
+    },
+    shiftFinishQtyFormatter(row, column, value, shiftIndex) {
+      if (this.isShiftAfterEnding(row, shiftIndex)) return '';
+      const planQty = row['class' + shiftIndex + 'PlanQty'];
+      if (planQty == null || planQty <= 0) return '';
+      return value;
+    },
+    shiftAnalysisFormatter(row, column, value, shiftIndex) {
+      if (this.isShiftAfterEnding(row, shiftIndex)) return '';
+      const planQty = row['class' + shiftIndex + 'PlanQty'];
+      if (planQty == null || planQty <= 0) return '';
+      return value;
+    },
+    decodeRemark(remark) {
+      if (!remark) return remark;
+      return remark
+        .replace(/__PERCENT__/g, '%')
+        .replace(/__AMP__/g, '&')
+        .replace(/__LT__/g, '<')
+        .replace(/__GT__/g, '>')
+        .replace(/__QUOT__/g, '"')
+        .replace(/__APOS__/g, "'");
+    },
+    decodeRemarkFields(row) {
+      if (!row) return row;
+      row.remark = this.decodeRemark(row.remark);
+      for (let i = 1; i <= 8; i++) {
+        const field = 'class' + i + 'Analysis';
+        row[field] = this.decodeRemark(row[field]);
+      }
+      return row;
     },
     async getAdjustTextNo() {
       try {
@@ -1145,7 +1247,9 @@ export default {
         this.loading = true;
         await this.getDate();
         const data = await listScheduleResult(this.formatParams());
-        this.data = data.rows || [];
+        const rows = data.rows || [];
+        rows.forEach(row => this.decodeRemarkFields(row));
+        this.data = rows;
         this.page.total = data.total;
       } catch (error) {
         console.error(error);

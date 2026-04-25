@@ -119,7 +119,7 @@ export default {
               <dict-select
                 v-model={form.isRelease}
                 disabled
-                options={this.parentDict.type.IS_RELEASE}
+                options={this.parentDict.type.IS_RELEASE_LH}
               />
             );
           },
@@ -169,15 +169,6 @@ export default {
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.adjustType"),
-          prop: "operType",
-          span: 12,
-          disabled: this.isChangeQty ? false : true,
-          type: "select",
-          dictData: this.parentDict.type.adjust_type,
-        },
-
-        {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
           type: "textarea",
@@ -189,32 +180,14 @@ export default {
             return (
               <div class="line-header">
                 <span>
-                  {this.$t("一班")}
+                  {this.$t("ui.data.column.scheduleResult.class11.lh")}
                 </span>
               </div>
             );
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
-          prop: "leftRightMould",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
-          prop: "mouldMethod",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.type"),
-          prop: "class1IsEnd",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("一班计划"),
+          label: this.$t("ui.data.column.scheduleResult.class1PlanQty"),
           prop: "class1PlanQty",
           disabled: this.isChangeQty ? this.plan1Disabled : true,
           span: 12,
@@ -228,353 +201,219 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.class1Analysis.lh"),
           prop: "class1Analysis",
-          // disabled: true,
-          span: 12,
+          type: "textarea",
+          maxlength: 200,
+          "show-word-limit": true,
         },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.class1Analysis.lh"),
-        //   prop: "class1AnalysisInput",
-        //   span: 12,
-        // },
         {
           render: () => {
             return (
               <div class="line-header">
                 <span>
-                  {this.$t("二班")}
+                  {this.$t("ui.data.column.scheduleResult.class22.lh")}
                 </span>
               </div>
             );
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
-          prop: "leftRightMould",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
-          prop: "mouldMethod",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.type"),
-          prop: "class2IsEnd",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("二班计划量"),
+          label: this.$t("ui.data.column.scheduleResult.class2PlanQty"),
           prop: "class2PlanQty",
           disabled: this.isChangeQty ? this.plan2Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("二班完成量"),
+          label: this.$t("ui.data.column.scheduleResult.class2FinishQty"),
           prop: "class2FinishQty",
           disabled: true,
           span: 12,
         },
         {
-          label: this.$t("二班计备注"),
+          label: this.$t("ui.data.column.scheduleResult.class2Analysis"),
           prop: "class2Analysis",
-          // disabled: true,
-          span: 12,
+          type: "textarea",
           maxlength: 200,
+          "show-word-limit": true,
         },
         {
           render: () => {
             return (
               <div class="line-header">
                 <span>
-                  {this.$t("三班")}
+                  {this.$t("ui.data.column.scheduleResult.class33.lh")}
                 </span>
               </div>
             );
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
-          prop: "leftRightMould",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
-          prop: "mouldMethod",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.type"),
-          prop: "class3IsEnd",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("三班计划量"),
+          label: this.$t("ui.data.column.scheduleResult.class3PlanQty"),
           prop: "class3PlanQty",
           disabled: this.isChangeQty ? this.plan2Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("三班完成量"),
+          label: this.$t("ui.data.column.scheduleResult.class3FinishQty"),
           prop: "class3FinishQty",
           disabled: true,
           span: 12,
         },
         {
-          label: this.$t("三班计备注"),
+          label: this.$t("ui.data.column.scheduleResult.class3Analysis"),
           prop: "class3Analysis",
-          // disabled: true,
-          span: 12,
+          type: "textarea",
+          maxlength: 200,
+          "show-word-limit": true,
         },
         {
           render: () => {
             return (
               <div class="line-header">
                 <span>
-                  {this.$t("四班")}
+                  {this.$t("ui.data.column.scheduleResult.class44.lh")}
                 </span>
               </div>
             );
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
-          prop: "leftRightMould",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
-          prop: "mouldMethod",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.type"),
-          prop: "class4IsEnd",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("四班计划量"),
+          label: this.$t("ui.data.column.scheduleResult.class4PlanQty"),
           prop: "class4PlanQty",
           disabled: this.isChangeQty ? this.plan4Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("四班完成量"),
+          label: this.$t("ui.data.column.scheduleResult.class4FinishQty"),
           prop: "class4FinishQty",
           disabled: true,
           span: 12,
         },
         {
-          label: this.$t("四班备注"),
+          label: this.$t("ui.data.column.scheduleResult.class4Analysis"),
           prop: "class4Analysis",
-          // disabled: true,
-          span: 12,
+          type: "textarea",
           maxlength: 200,
+          "show-word-limit": true,
         },
-        // {
-        //   label: this.$t("ui.data.column.scheduleResult.class4Analysis.lh"),
-        //   prop: "class4AnalysisInput",
-        //   span: 12,
-        // },
         {
           render: () => {
             return (
               <div class="line-header">
                 <span>
-                  {this.$t("五班")}
+                  {this.$t("ui.data.column.scheduleResult.class55.lh")}
                 </span>
               </div>
             );
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
-          prop: "leftRightMould",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
-          prop: "mouldMethod",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.type"),
-          prop: "class5IsEnd",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("五班计划量"),
+          label: this.$t("ui.data.column.scheduleResult.class5PlanQty"),
           prop: "class5PlanQty",
           disabled: this.isChangeQty ? this.plan5Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("五班完成量"),
+          label: this.$t("ui.data.column.scheduleResult.class5FinishQty"),
           prop: "class5FinishQty",
           disabled: true,
           span: 12,
         },
         {
-          label: this.$t("五班备注"),
+          label: this.$t("ui.data.column.scheduleResult.class5Analysis"),
           prop: "class5Analysis",
-          // disabled: true,
-          span: 12,
+          type: "textarea",
           maxlength: 200,
+          "show-word-limit": true,
         },
         {
           render: () => {
             return (
               <div class="line-header">
                 <span>
-                  {this.$t("六班")}
+                  {this.$t("ui.data.column.scheduleResult.class66.lh")}
                 </span>
               </div>
             );
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
-          prop: "leftRightMould",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
-          prop: "mouldMethod",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.type"),
-          prop: "class6IsEnd",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("六班计划量"),
+          label: this.$t("ui.data.column.scheduleResult.class6PlanQty"),
           prop: "class6PlanQty",
           disabled: this.isChangeQty ? this.plan5Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("六班完成量"),
+          label: this.$t("ui.data.column.scheduleResult.class6FinishQty"),
           prop: "class6FinishQty",
           disabled: true,
           span: 12,
         },
         {
-          label: this.$t("六班备注"),
+          label: this.$t("ui.data.column.scheduleResult.class6Analysis"),
           prop: "class6Analysis",
-          // disabled: true,
-          span: 12,
+          type: "textarea",
           maxlength: 200,
+          "show-word-limit": true,
         },
         {
           render: () => {
             return (
               <div class="line-header">
                 <span>
-                  {this.$t("七班")}
+                  {this.$t("ui.data.column.scheduleResult.class77.lh")}
                 </span>
               </div>
             );
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
-          prop: "leftRightMould",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
-          prop: "mouldMethod",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.type"),
-          prop: "class7IsEnd",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("七班计划量"),
+          label: this.$t("ui.data.column.scheduleResult.class7PlanQty"),
           prop: "class7PlanQty",
           disabled: this.isChangeQty ? this.plan5Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("七班完成量"),
+          label: this.$t("ui.data.column.scheduleResult.class7FinishQty"),
           prop: "class7FinishQty",
           disabled: true,
           span: 12,
         },
         {
-          label: this.$t("七班备注"),
+          label: this.$t("ui.data.column.scheduleResult.class7Analysis"),
           prop: "class7Analysis",
-          // disabled: true,
-          span: 12,
+          type: "textarea",
           maxlength: 200,
+          "show-word-limit": true,
         },
         {
           render: () => {
             return (
               <div class="line-header">
                 <span>
-                  {this.$t("八班")}
+                  {this.$t("ui.data.column.scheduleResult.class88.lh")}
                 </span>
               </div>
             );
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
-          prop: "leftRightMould",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.mouldMethod"),
-          prop: "mouldMethod",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.type"),
-          prop: "class8IsEnd",
-          disabled: true,
-          span: 12,
-        },
-        {
-          label: this.$t("八班计划量"),
+          label: this.$t("ui.data.column.scheduleResult.class8PlanQty"),
           prop: "class8PlanQty",
           disabled: this.isChangeQty ? this.plan5Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("八班完成量"),
+          label: this.$t("ui.data.column.scheduleResult.class8FinishQty"),
           prop: "class8FinishQty",
           disabled: true,
           span: 12,
         },
         {
-          label: this.$t("八班备注"),
+          label: this.$t("ui.data.column.scheduleResult.class8Analysis"),
           prop: "class8Analysis",
-          // disabled: true,
-          span: 12,
+          type: "textarea",
           maxlength: 200,
+          "show-word-limit": true,
         },
 
       ];
@@ -619,6 +458,9 @@ export default {
     async save(params) {
       try {
         this.loading = true;
+        // 处理完成量：值不大于0时不带入保存
+        const finishQtyFields = ['class1FinishQty', 'class2FinishQty', 'class3FinishQty', 'class4FinishQty',
+          'class5FinishQty', 'class6FinishQty', 'class7FinishQty', 'class8FinishQty'];
         const saveParams = {
           ...params,
           remark: this.encodeRemark(params.remark),
@@ -631,6 +473,12 @@ export default {
           class7Analysis: this.encodeRemark(params.class7Analysis),
           class8Analysis: this.encodeRemark(params.class8Analysis),
         };
+        // 移除不大于0的完成量字段
+        finishQtyFields.forEach(field => {
+          if (saveParams[field] == null || saveParams[field] <= 0) {
+            delete saveParams[field];
+          }
+        });
         let data;
         if (this.isChangeQty) {
           data = await changeQty(saveParams);
@@ -666,6 +514,14 @@ export default {
           class6Analysis: this.decodeRemark(data.class6Analysis),
           class7Analysis: this.decodeRemark(data.class7Analysis),
           class8Analysis: this.decodeRemark(data.class8Analysis),
+          class1FinishQty: data.class1FinishQty == null ? 0 : data.class1FinishQty,
+          class2FinishQty: data.class2FinishQty == null ? 0 : data.class2FinishQty,
+          class3FinishQty: data.class3FinishQty == null ? 0 : data.class3FinishQty,
+          class4FinishQty: data.class4FinishQty == null ? 0 : data.class4FinishQty,
+          class5FinishQty: data.class5FinishQty == null ? 0 : data.class5FinishQty,
+          class6FinishQty: data.class6FinishQty == null ? 0 : data.class6FinishQty,
+          class7FinishQty: data.class7FinishQty == null ? 0 : data.class7FinishQty,
+          class8FinishQty: data.class8FinishQty == null ? 0 : data.class8FinishQty,
         };
         this.calcShiftIsEndFields(data);
 
