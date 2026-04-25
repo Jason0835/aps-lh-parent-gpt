@@ -2,7 +2,6 @@ package com.zlt.aps.mp.engine.handler;
 
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.mp.engine.check.SkuSecondChecker;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
@@ -323,11 +322,17 @@ public class CxLhMouldProductionCalculator {
             return new DayProductionQtyHelper(productionDay, false, lhProductionQtyHelper.getDayMaxProductionQty(), BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue(), false);
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
+        ProductionPlanGroupInfo productionPlanInfo = lhProductionQtyHelper.getProductionPlanInfo();
         //首日排产量参数
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         Integer firstQty = paramConfiguration.getChangeMouldFirstQty();
         //首日非前Sku收尾日
         if (!firstDay.equals(conclusionDay)) {
+            //20260425+ 前日胎胚有排产，首日32
+            boolean isProductionEmbryo = productionPlanInfo.hasProductionEmbryo(productionDay - BigDecimal.ONE.intValue(), productionSkuInfo);
+            if (isProductionEmbryo) {
+                firstQty = paramConfiguration.getChangeTypeBlockQty();
+            }
             Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - firstQty;
             return new DayProductionQtyHelper(productionDay, false, firstQty, lossQty, BigDecimal.ZERO.intValue(), true);
         }
@@ -345,7 +350,7 @@ public class CxLhMouldProductionCalculator {
         boolean isChangeMould = !productionContext.getBaseDataContainer().isShareMouldSameGroup(beforeSku, needProductionSku);
         if (isChangeMould) {
             //换模
-            return buildByChangeMould(productionDay, lhProductionQtyHelper, paramConfiguration);
+            return buildByChangeMould(productionDay, lhProductionQtyHelper, paramConfiguration, productionSkuInfo);
         }
         Integer changeTypeBlockQtyDiff = paramConfiguration.getChangeTypeBlockQtyDiff();
         //当天损耗量
@@ -435,6 +440,7 @@ public class CxLhMouldProductionCalculator {
         Set<String> mouldCodeSet = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.toSet());
         changeMouldLimitHandler.addChangeMouldUsedQty(productionContext, changeMouldDay, addSkuInfo.getMaterialDesc(), mouldCodeSet);
     }
+
     /**
      * 判断是否需要结束标记
      * 1、看是否需要重新判断胎胚种类数及配比
@@ -666,14 +672,21 @@ public class CxLhMouldProductionCalculator {
      * @param productionDay         排产日
      * @param lhProductionQtyHelper 排产信息
      * @param paramConfiguration    排产参数
+     * @param productionSkuInfo     排产Sku
      * @return
      */
-    private static DayProductionQtyHelper buildByChangeMould(Integer productionDay, LhProductionQtyHelper lhProductionQtyHelper, ProductionCapacityParamConfiguration paramConfiguration) {
+    private static DayProductionQtyHelper buildByChangeMould(Integer productionDay, LhProductionQtyHelper lhProductionQtyHelper, ProductionCapacityParamConfiguration paramConfiguration, MonthPlanProductionRequirePlanVo productionSkuInfo) {
         CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
         String beforeSku = cxLhGroup.getBeforeSku().getMaterialDesc();
         Integer firstQty = paramConfiguration.getChangeMouldFirstQty();
+        ProductionPlanGroupInfo productionPlanInfo = lhProductionQtyHelper.getProductionPlanInfo();
         //没有前规格，通常为结构上机首日
         if (StringUtils.isBlank(beforeSku)) {
+            //20260425+ 前日胎胚有排产，首日32
+            boolean isProductionEmbryo = productionPlanInfo.hasProductionEmbryo(productionDay - BigDecimal.ONE.intValue(), productionSkuInfo);
+            if (isProductionEmbryo) {
+                firstQty = paramConfiguration.getChangeTypeBlockQty();
+            }
             Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - firstQty;
             return new DayProductionQtyHelper(productionDay, false, firstQty, lossQty, BigDecimal.ZERO.intValue(), true);
         }
@@ -684,12 +697,22 @@ public class CxLhMouldProductionCalculator {
         Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - beforeSkuProductionQty;
         Integer halfQty = beforeSkuDayMaxQty / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         if (beforeSkuProductionQty < halfQty) {
+            //20260425+ 前日胎胚有排产，首日32
+            boolean isProductionEmbryo = productionPlanInfo.hasProductionEmbryo(productionDay - BigDecimal.ONE.intValue(), productionSkuInfo);
+            if (isProductionEmbryo) {
+                firstQty = paramConfiguration.getChangeTypeBlockQty();
+            }
             //当天换模 损耗量 = 当天损耗量 - 首日排产量
             lossQty = lossQty - firstQty;
             if (lossQty < BigDecimal.ZERO.intValue()) {
                 lossQty = BigDecimal.ZERO.intValue();
             }
             return new DayProductionQtyHelper(productionDay, false, firstQty, lossQty, BigDecimal.ZERO.intValue(), true);
+        }
+        //20260425+ 前日胎胚有排产，首日32
+        boolean isProductionEmbryo = productionPlanInfo.hasProductionEmbryo(productionDay, productionSkuInfo);
+        if (isProductionEmbryo) {
+            firstQty = paramConfiguration.getChangeTypeBlockQty();
         }
         //隔天换模
         if (lossQty < BigDecimal.ZERO.intValue()) {
