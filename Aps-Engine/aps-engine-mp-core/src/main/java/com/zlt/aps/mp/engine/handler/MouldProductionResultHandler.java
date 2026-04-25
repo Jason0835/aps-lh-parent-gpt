@@ -112,7 +112,6 @@ public class MouldProductionResultHandler {
                 dayResult.setProductionSequence(Long.valueOf(productionCounter.getSkuProductionSort(materialDesc)));
             }
             //未排原因
-
             mergeNoProductionReason(dayResult, requireList, noProductionQtyReason);
             //排产信息 开始日期、结束日期、排产量、日排产量、硫化时间
             detailLogInfo.forEach(productionInfo -> summaryDayQtyInfo(dayResult, productionInfo));

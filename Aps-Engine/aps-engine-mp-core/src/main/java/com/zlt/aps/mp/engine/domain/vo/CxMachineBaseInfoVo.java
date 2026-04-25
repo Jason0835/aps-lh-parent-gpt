@@ -1094,7 +1094,11 @@ public class CxMachineBaseInfoVo implements Serializable {
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return CxMachineFixedPriorityEnum.DEFAULT;
         }
-        Set<String> materialCodePlanSet = groupPlanData.stream().map(MonthPlanProductionRequirePlanVo::getMaterialCode).collect(Collectors.toSet());
+        List<MonthPlanProductionRequirePlanVo> hasProductionList = groupPlanData.stream().filter(singleSku -> singleSku.getOriginProductionQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
+        if(CollectionUtils.isEmpty(hasProductionList)){
+            return CxMachineFixedPriorityEnum.DEFAULT;
+        }
+        Set<String> materialCodePlanSet = hasProductionList.stream().map(MonthPlanProductionRequirePlanVo::getMaterialCode).collect(Collectors.toSet());
         Set<String> fixedMaterialCodeSet = new HashSet<>();
         CollectValueUtils.addSingleValueToCollect(fixedMaterialCodeSet, fixedMaterialCode, StringConstant.COMMA);
         for (String materialCode : materialCodePlanSet) {

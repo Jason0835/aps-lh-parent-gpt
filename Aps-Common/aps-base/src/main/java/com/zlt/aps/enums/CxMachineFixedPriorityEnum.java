@@ -14,7 +14,7 @@ public enum CxMachineFixedPriorityEnum {
     /**
      * 0 固定SKU
      */
-    FIXED_SKU(0, "固定SKU"),
+    FIXED_SKU(9, "固定SKU"),
     /**
      * 1 固定结构1
      */
