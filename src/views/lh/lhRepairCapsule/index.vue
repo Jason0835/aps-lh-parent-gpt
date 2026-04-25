@@ -109,6 +109,13 @@ export default {
           label: this.$t("ui.data.column.lhRepairCapsule.replaceCapsuleCount2"),
           minWidth: 120,
         },
+        {
+          prop: "updateTime",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhRepairCapsule.updateDate"),
+          minWidth: 150,
+        },
         // {
         //   prop: "brand",
         //   align: "center",

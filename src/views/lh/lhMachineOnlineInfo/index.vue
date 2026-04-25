@@ -48,10 +48,12 @@ export default {
       },
       sort: {},
       search: {
-        factoryCode: '116'
+        factoryCode: '116',
+        onlineDate: new Date().toISOString().slice(0, 10)
       },
       query: {
-        factoryCode: '116'
+        factoryCode: '116',
+        onlineDate: new Date().toISOString().slice(0, 10)
       }
     }
   },
@@ -129,16 +131,17 @@ export default {
           filterable: true
         },
         {
-          label: this.$t('ui.data.column.lhMachineOnlineInfo.lhCode'),
-          prop: 'lhCode',
-          type: 'input'
-        },
-        {
           label: this.$t('ui.data.column.lhMachineOnlineInfo.onlineDate'),
           prop: 'onlineDate',
           type: 'date',
           valueFormat: 'yyyy-MM-dd'
-        }
+        },
+        {
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.lhCode'),
+          prop: 'lhCode',
+          type: 'input'
+        },
+
       ]
     }
   },

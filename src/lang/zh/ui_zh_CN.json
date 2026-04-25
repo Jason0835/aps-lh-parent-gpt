@@ -2399,7 +2399,7 @@
   "lhChipStock.chipCodeExistsConfirmMerge": "\u82af\u7247\u7f16\u53f7\u5df2\u5b58\u5728\uff0c\u662f\u5426\u5408\u5e76\u5230\u5df2\u6709\u8bb0\u5f55\uff1f",
   "ui.data.column.lhMachineOnlineInfo.modelName": "硫化在机信息",
   "ui.data.column.lhMachineOnlineInfo.factoryCode": "工厂",
-  "ui.data.column.lhMachineOnlineInfo.onlineDate": "在机日期",
+  "ui.data.column.lhMachineOnlineInfo.onlineDate": "日期",
   "ui.data.column.lhMachineOnlineInfo.lhCode": "硫化机台",
   "ui.data.column.lhMachineOnlineInfo.materialCode": "在机物料编码(NC)",
   "ui.data.column.lhMachineOnlineInfo.mesMaterialCode": "在机物料编码(MES)",
