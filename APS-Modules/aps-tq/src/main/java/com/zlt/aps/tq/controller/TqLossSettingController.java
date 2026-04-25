@@ -1,93 +1,120 @@
 package com.zlt.aps.tq.controller;
 
-import com.ruoyi.common.core.web.controller.BaseController;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.tq.api.domain.dto.TqLossSettingDto;
-import com.zlt.aps.tq.entity.TqLossSetting;
-import com.zlt.aps.tq.service.TqLossSettingService;
+import com.zlt.aps.tq.api.domain.entity.TqLossSetting;
+import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
+import com.zlt.aps.tq.api.domain.vo.TqLossSettingExportVO;
+import com.zlt.aps.tq.mapper.TqLossSettingMapper;
+import com.zlt.aps.tq.service.ITqLossSettingService;
+import com.zlt.aps.tq.service.ITqMachineInfoService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
+import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.BeanUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
-/**
- * 胎圈损耗率设定Controller
- *
- * @author chen
- * @date 2021-07-13
- */
+@Slf4j
+@Api(tags = "胎圈损耗率设定")
 @RestController
-@RequestMapping("/tq/loss")
-public class TqLossSettingController extends BaseController {
-    @Autowired
-    private TqLossSettingService tqLossSettingService;
+@RequestMapping("/tqLossSetting")
+public class TqLossSettingController extends AbstractDocBizController<TqLossSetting> {
 
-    /**
-     * 查询胎圈损耗率设定列表
-     */
+    @Autowired
+    private ITqLossSettingService tqLossSettingService;
+
+    @Autowired
+    private ITqMachineInfoService tqMachineInfoService;
+
+    @Resource
+    private TqLossSettingMapper tqLossSettingMapper;
+
     @ApiOperation("查询胎圈损耗率设定列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody TqLossSettingDto dto) {
+    @Override
+    public TableDataInfo list(@RequestBody TqLossSetting queryVO) {
         startPage();
-        dto.setOrderStr(orderStr());
-        TqLossSetting tqLossSetting = new TqLossSetting();
-        BeanUtils.copyProperties(dto, tqLossSetting);
-        List<TqLossSettingDto> list = tqLossSettingService.selectTqLossSettingList(tqLossSetting);
+        List<TqLossSetting> list = tqLossSettingMapper.selectLossSettingList(queryVO);
         return getDataTable(list);
     }
 
-    /**
-     * 获取胎圈损耗率设定详细信息
-     */
-    @ApiOperation("获取胎圈损耗率设定详细信息")
-    @GetMapping(value = "/{id}")
-    public TqLossSettingDto getInfo(@PathVariable("id") Long id) {
-        return tqLossSettingService.selectTqLossSettingById(id);
+    @Log(title = "胎圈损耗率设定", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody TqLossSetting billVO) {
+        return super.save(billVO);
     }
 
-    /**
-     * 新增胎圈损耗率设定
-     */
-    @Log(title = "ui.data.column.tq.loss.modelName", businessType = BusinessType.INSERT)
-    @ApiOperation("新增胎圈损耗率设定")
-    @PostMapping("/add")
-    public AjaxResult add(@RequestBody TqLossSettingDto dto) {
-        TqLossSetting tqLossSetting = new TqLossSetting();
-        BeanUtils.copyProperties(dto, tqLossSetting);
-        return toAjax(tqLossSettingService.insertTqLossSetting(tqLossSetting));
+    @Log(title = "胎圈损耗率设定", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @PostMapping("/delete/{ids}")
+    public AjaxResult deleteByIds(@PathVariable("ids") List<Long> ids) {
+        return super.removeByIds(ids);
     }
 
-    /**
-     * 修改胎圈损耗率设定
-     */
-    @Log(title = "ui.data.column.tq.loss.modelName", businessType = BusinessType.UPDATE)
-    @ApiOperation("修改胎圈损耗率设定")
-    @PostMapping("/edit")
-    public AjaxResult edit(@RequestBody TqLossSettingDto dto) {
-        TqLossSetting tqLossSetting = new TqLossSetting();
-        BeanUtils.copyProperties(dto, tqLossSetting);
-        return toAjax(tqLossSettingService.updateTqLossSetting(tqLossSetting));
+    @ApiOperation("获取详细信息")
+    @GetMapping("/{id}")
+    @Override
+    public TqLossSetting getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
     }
 
-    /**
-     * 删除胎圈损耗率设定
-     */
-    @Log(title = "ui.data.column.tq.loss.modelName", businessType = BusinessType.DELETE)
-    @ApiOperation("删除胎圈损耗率设定")
-    @DeleteMapping("/{ids}")
-    public AjaxResult remove(@PathVariable Long[] ids) {
-        return toAjax(tqLossSettingService.deleteTqLossSettingByIds(ids));
+    @Log(title = "胎圈损耗率设定", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
     }
 
+    @Log(title = "胎圈损耗率设定", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody TqLossSetting queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        List<TqLossSettingExportVO> list = getExportDataList(queryVO);
+        ExcelUtil<TqLossSettingExportVO> util = new ExcelUtil<>(TqLossSettingExportVO.class);
+        Workbook workbook = util.exportExcelFromList(list, fileName);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        return out.toByteArray();
+    }
 
-    @Log(title = "ui.data.column.tq.loss.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody TqLossSetting lossSetting) {
+        return tqLossSettingService.checkUnique(lossSetting);
+    }
+
+    @Log(title = "胎圈损耗率设定", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出胎圈损耗率列表")
+    @PostMapping("/exportList")
+    public List<TqLossSetting> exportList(@RequestBody TqLossSetting lossSetting) {
+        startPage();
+        return tqLossSettingService.listLossSetting(lossSetting);
+    }
+
     @ApiOperation("删除全部(逻辑删)")
     @PostMapping("/deleteAll")
     public AjaxResult deleteAll() {
@@ -95,39 +122,61 @@ public class TqLossSettingController extends BaseController {
         return AjaxResult.success();
     }
 
-
-    /**
-     * 导出胎圈损耗率设定列表
-     */
-    @Log(title = "ui.data.column.tq.loss.modelName", businessType = BusinessType.EXPORT)
-    @ApiOperation("导出胎圈损耗率设定列表")
-    @PostMapping("/getList")
-    public List<TqLossSettingDto> getList(@RequestBody TqLossSettingDto dto) {
-        startPage();
-        dto.setOrderStr(orderStr());
-        TqLossSetting tqLossSetting = new TqLossSetting();
-        BeanUtils.copyProperties(dto, tqLossSetting);
-        return tqLossSettingService.selectTqLossSettingList(tqLossSetting);
+    @Override
+    protected IDocService getDocService() {
+        return tqLossSettingService;
     }
 
-    /**
-     * 校验胎圈损耗率设定唯一性
-     */
-    @ApiOperation("校验胎圈损耗率设定唯一性")
-    @PostMapping("/checkTqLossSettingUnique")
-    public String checkTqLossSettingUnique(@RequestBody TqLossSettingDto dto) {
-        TqLossSetting tqLossSetting = new TqLossSetting();
-        BeanUtils.copyProperties(dto, tqLossSetting);
-        return tqLossSettingService.checkTqLossSettingUnique(tqLossSetting);
+    @Override
+    protected String getTypeCode() {
+        return "0";
     }
 
-    @Log(title = "ui.data.column.tq.loss.modelName", businessType = BusinessType.IMPORT)
-    @PostMapping("/importData")
-    @ApiOperation("导入胎圈损耗率信息")
-    public AjaxResult importData(@RequestBody List<TqLossSettingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+    @Override
+    protected String getOrderBy() {
+        return "CREATE_TIME desc";
+    }
+
+    @Override
+    protected List<TqLossSetting> listExportData(TqLossSetting obj) {
+        QueryWrapper<TqLossSetting> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + getOrderBy());
+        return tqLossSettingMapper.selectList(wrapper);
+    }
+
+    private List<TqLossSettingExportVO> getExportDataList(TqLossSetting obj) {
+        QueryWrapper<TqLossSetting> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        wrapper.last("ORDER BY " + getOrderBy());
+        List<TqLossSetting> list = tqLossSettingMapper.selectList(wrapper);
+
+        // 查询机台信息
+        Map<Long, String> machineMap = new HashMap<>();
+        if (!list.isEmpty()) {
+            List<TqMachineInfo> machineList = tqMachineInfoService.selectMachineInfoList(new TqMachineInfo());
+            machineMap = machineList.stream()
+                    .collect(Collectors.toMap(TqMachineInfo::getId, TqMachineInfo::getMachineName, (v1, v2) -> v1));
         }
-        return tqLossSettingService.importData(list, updateSupport, importLogId);
+
+        // 转换为VO
+        List<TqLossSettingExportVO> voList = new ArrayList<>();
+        for (TqLossSetting setting : list) {
+            TqLossSettingExportVO vo = new TqLossSettingExportVO();
+            vo.setMaterialCode(setting.getMaterialCode());
+            vo.setMachineName(machineMap.getOrDefault(setting.getMachineId(), ""));
+            vo.setLossRate(setting.getLossRate());
+            vo.setRemark(setting.getRemark());
+            vo.setUpdateTime(setting.getUpdateTime());
+            voList.add(vo);
+        }
+        return voList;
+    }
+
+    @Override
+    protected void builderCondition(QueryWrapper<TqLossSetting> queryWrapper, TqLossSetting queryVO) {
+        queryWrapper.eq("IS_DELETE", 0);
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
+        queryWrapper.eq(queryVO.getMachineId() != null, "MACHINE_ID", queryVO.getMachineId());
     }
 }

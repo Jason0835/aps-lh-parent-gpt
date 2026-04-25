@@ -63,8 +63,8 @@ import com.zlt.aps.tq.engine.service.TqEngineService;
 import com.zlt.aps.tq.engine.vo.TqScheduleResultVo;
 import com.zlt.aps.tq.entity.TqScheduleResult;
 import com.zlt.aps.tq.mapper.TqScheduleResultMapper;
+import com.zlt.aps.tq.service.ITqMachineInfoService;
 import com.zlt.aps.tq.service.TqDispatcherLogService;
-import com.zlt.aps.tq.service.TqMachineInfoService;
 import com.zlt.aps.tq.service.TqScheduleResultService;
 
 /**
@@ -80,7 +80,7 @@ public class TqScheduleResultServiceImpl extends ServiceImpl<TqScheduleResultMap
     @Value("${excelModelPath}")
     private String excelModelPath;
     @Autowired
-    private TqMachineInfoService machineInfoService;
+    private ITqMachineInfoService machineInfoService;
     @Resource
     private TqEngineService tqEngineService;
     @Resource

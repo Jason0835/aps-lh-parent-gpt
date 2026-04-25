@@ -64,4 +64,13 @@ public interface ILhScheduleResultService {
      * @return 新批次号
      */
     String generateNextBatchNo(Date scheduleDate, String factoryCode);
+
+    /**
+     * 更新排程结果发布状态
+     *
+     * @param item 排程结果（需包含id和isRelease）
+     */
+    void updateReleaseStatus(LhScheduleResult item);
+
+    List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> getCxLhScheduleResultList(Date scheduleDate);
 }

@@ -3,12 +3,8 @@ package com.zlt.aps.mp.factory.listener;
 import com.alibaba.fastjson.JSONObject;
 import com.ruoyi.api.gateway.system.service.ISysConfigService;
 import com.ruoyi.common.core.utils.reflect.ReflectUtils;
-import com.zlt.aps.enums.LocationTypeEnum;
-import com.zlt.aps.mp.demand.service.impl.OrderAllocationServiceImpl;
-import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
-import com.zlt.aps.utils.GenerageMapKeyUtils;
-import com.zlt.aps.utils.IncrementService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.enums.LocationTypeEnum;
 import com.zlt.aps.itf.scm.service.IScmItfService;
 import com.zlt.aps.itf.scm.vo.SyncOutFacScheduleVersionVo;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
@@ -16,7 +12,11 @@ import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
 import com.zlt.aps.mp.api.domain.dto.MonthPlanFinalizedEventDto;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.demand.service.impl.OrderAllocationServiceImpl;
 import com.zlt.aps.mp.factory.event.MonthPlanFinalizedEvent;
+import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
+import com.zlt.aps.utils.IncrementService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -92,8 +92,11 @@ public class MonthPlanFinalizedChangeEventListeners {
             } catch (Exception e) {
                 log.error("获取配置失败", e);
             }
+            log.info("参数：{}", isSyncScm);
             if (CollectionUtils.isNotEmpty(finalList) && isSyncScm) {
+                log.info("月计划定稿事件传给SCM-start");
                 iScmItfService.publicFacScheduleVersion(buildOutFacScheduleVersionVoList(eventDto));
+                log.info("月计划定稿事件传给SCM-end");
             }
             boolean isSyncMes = Boolean.TRUE;
             try {
@@ -106,7 +109,9 @@ public class MonthPlanFinalizedChangeEventListeners {
             }
             // 7、传给MES
             if (isSyncMes) {
+                log.info("月计划定稿事件传给MES-start");
                 finalResultService.issueMonthPlan(eventDto.getParam());
+                log.info("月计划定稿事件传给MES-end");
             }
             log.info("月计划定稿事件执行完成");
         } catch (Exception e) {
@@ -119,6 +124,7 @@ public class MonthPlanFinalizedChangeEventListeners {
         if (CollectionUtils.isEmpty(finalList)) {
             return Collections.emptyList();
         }
+        log.info("开始处理月计划定稿下发SCM数据");
         List<String> uniqueKeyList = eventDto.getMaterialTotalQtyMap().keySet().stream().map(item -> eventDto.getFactoryCode() + "|" + item).collect(Collectors.toList());
         List<MdmMaterialInfo> materialInfoList = materialInfoEntityMapper.selectByUniqueKeyList(uniqueKeyList);
         Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
@@ -180,6 +186,7 @@ public class MonthPlanFinalizedChangeEventListeners {
             }
             syncOutFacScheduleVersionVoList.add(versionVo);
         }
+        log.info("处理月计划定稿下发SCM数据结束，数据行数：{}", syncOutFacScheduleVersionVoList.size());
         return syncOutFacScheduleVersionVoList;
     }
 }

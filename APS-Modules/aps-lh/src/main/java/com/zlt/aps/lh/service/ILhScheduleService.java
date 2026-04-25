@@ -1,7 +1,10 @@
 package com.zlt.aps.lh.service;
 
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
+import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
+import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.bill.common.service.IDocService;
@@ -40,4 +43,32 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
      * @return 班次 1～8 与对应 MM/dd，顺序与默认 8 班模板日历日一致
      */
     List<LhScheduleShiftDateVO> listScheduleShiftDates(Date scheduleDate);
+
+    /**
+     * 转机台前校验接口
+     * @param dto 参数
+     * @return 结果
+     */
+    AjaxResult changeMachinePreCheck(LhTransferDeskDTO dto);
+
+    /**
+     * 转机台操作
+     * @param dto 参数
+     * @return 结果
+     */
+    AjaxResult changeMachine(LhTransferDeskDTO dto);
+
+    /**
+     * 调量前校验
+     * @param dto 参数
+     * @return 结果
+     */
+    AjaxResult adjustQuantityPreCheck(LhScheduleResultUpdateDTO dto);
+
+    /**
+     * 调量操作
+     * @param dto 参数
+     * @return 结果
+     */
+    AjaxResult adjustQuantity(LhScheduleResultUpdateDTO dto);
 }

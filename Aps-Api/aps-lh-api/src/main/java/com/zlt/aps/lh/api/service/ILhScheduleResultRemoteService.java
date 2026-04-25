@@ -5,13 +5,12 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.lh.api.domain.dto.*;
+import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
-import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
-import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
 
 import java.util.List;
 
@@ -110,7 +109,16 @@ public interface ILhScheduleResultRemoteService {
      * @return 结果
      */
     @PostMapping("/lhScheduleResult/publish")
-    public AjaxResult publish(@RequestBody LhScheduleResult dto);
+    public AjaxResult publish(@RequestBody LhScheduleResult dto, @RequestParam("ids") String ids);
+
+    /**
+     * 硫化排程结果下发到MES
+     *
+     * @return 下发结果
+     */
+    @ApiOperation("硫化排程结果下发到MES")
+    @PostMapping("/lhScheduleResult/issueToMes")
+    AjaxResult issueToMes();
 
     /**
      * 根据排程结束日获取窗口内 8 个班次的日期展示列表
@@ -122,4 +130,7 @@ public interface ILhScheduleResultRemoteService {
     @PostMapping("/lhScheduleResult/listScheduleShiftDates")
     List<LhScheduleShiftDateVO> listScheduleShiftDates(@RequestBody LhScheduleShiftDateQueryDTO query);
 
+    @ApiOperation("硫化排程结果调量校验")
+    @PostMapping("/lhScheduleResult/validateAdjustQuantity")
+    AjaxResult validateAdjustQuantity(@RequestBody LhScheduleResultUpdateDTO dto);
 }

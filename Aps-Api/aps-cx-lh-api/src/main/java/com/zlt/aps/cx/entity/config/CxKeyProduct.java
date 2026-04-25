@@ -16,7 +16,7 @@ import java.util.Date;
 
 /**
  * 关键产品配置实体
- * 
+ * <p>
  * 定义关键产品列表，用于开产首班排除等场景判断
  *
  * @author APS Team
@@ -31,7 +31,7 @@ public class CxKeyProduct extends BaseEntity {
     @Excel(name = "ui.data.column.cxKeyProduct.structureName")
     @ApiModelProperty(value = "结构名称")
     @TableField("STRUCTURE_NAME")
-    @ImportValidated(maxLength = 100)
+    @ImportValidated(required = true, maxLength = 100)
     private String structureName;
 
     @Excel(name = "ui.data.column.cxKeyProduct.embryoCode")
@@ -49,5 +49,10 @@ public class CxKeyProduct extends BaseEntity {
     @Excel(name = "ui.data.column.cxKeyProduct.isActive", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否启用：0-禁用 1-启用")
     @TableField("IS_ACTIVE")
+    @ImportValidated(required = true, dictType = "biz_yes_no")
     private Integer isActive;
+
+    @ApiModelProperty(value = "行数")
+    @TableField(exist = false)
+    private Integer rowNo;
 }

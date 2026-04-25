@@ -132,6 +132,9 @@ public abstract class AbsLhScheduleTemplate {
         if (validationErrors != null && !validationErrors.isEmpty()) {
             response.setValidationErrors(new ArrayList<>(validationErrors));
         }
+        if (context.getValidationErrorDetailList() != null && !context.getValidationErrorDetailList().isEmpty()) {
+            response.setValidationErrorDetails(new ArrayList<>(context.getValidationErrorDetailList()));
+        }
         return response;
     }
 

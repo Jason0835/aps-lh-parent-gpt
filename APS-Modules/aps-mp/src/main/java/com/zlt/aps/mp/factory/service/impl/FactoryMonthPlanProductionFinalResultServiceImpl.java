@@ -14,16 +14,12 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.IncrementConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
-import com.zlt.aps.utils.BeanCopyUtils;
-import com.zlt.aps.utils.IncrementService;
-import com.zlt.aps.utils.JsonUtils;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.utils.AjaxResultUtils;
-import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.enums.EventModuleTypeEnum;
 import com.zlt.aps.maindata.enums.ReleaseStatusEnum;
@@ -33,11 +29,15 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.common.utils.GroupedMapWithOrder;
 import com.zlt.aps.mp.common.utils.poi.WorksheetData;
 import com.zlt.aps.mp.demand.mapper.MpPredictionDetailEntityMapper;
+import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.mp.factory.event.MonthPlanFinalizedEvent;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
+import com.zlt.aps.utils.BeanCopyUtils;
+import com.zlt.aps.utils.IncrementService;
+import com.zlt.aps.utils.JsonUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.core.dao.basedao.BaseDao;
@@ -750,6 +750,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 || StringUtils.isBlank(param.getMonthPlanVersion()) || StringUtils.isBlank(param.getProductionVersion())) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.checkParam"));
         }
+        log.info("月计划下发MES参数：年：{}，月：{}，分厂：{}，需求计划版本：{}，分厂月计划版本：{}", param.getYear(), param.getMonth(), param.getFactoryCode(), param.getMonthPlanVersion(), param.getProductionVersion());
         // 查询可发布的数据
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode());
@@ -774,6 +775,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode())
                 .set(FactoryMonthPlanProductionFinalResult::getIsRelease, ReleaseStatusEnum.RELEASING.getCode());
         factoryMonthPlanProductionFinalResultEntityMapper.update(null, updateWrapper);
+        log.info("月计划下发MES更新发布状态->发布中");
         AjaxResult ajaxResult = mesItfService.issueMonthPlan(monthPlanProdFinalList);
         if (AjaxResultUtils.checkAjaxError(ajaxResult)) {
             throw new RuntimeException(String.valueOf(ajaxResult.get(AjaxResult.MSG_TAG)));
@@ -788,6 +790,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode())
                 .set(FactoryMonthPlanProductionFinalResult::getIsRelease, ReleaseStatusEnum.RELEASE.getCode());
         factoryMonthPlanProductionFinalResultEntityMapper.update(null, updateWrapper);
+        log.info("月计划下发MES更新发布状态->已发布");
         return AjaxResult.success();
     }
 }

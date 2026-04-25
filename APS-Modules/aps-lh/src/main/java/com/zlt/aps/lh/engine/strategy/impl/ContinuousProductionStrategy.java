@@ -28,6 +28,7 @@ import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.SingleMouldShiftQtyUtil;
+import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +38,6 @@ import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -45,6 +45,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -65,6 +66,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     private static final String TYPE_BLOCK_TRIGGER_FALLBACK = "在机前规格兜底触发";
     private static final String TYPE_BLOCK_SKIP_REASON_T1_NOT_END =
             "T-1 最新记录未收尾，跳过兜底反查";
+    private static final int TYPE_BLOCK_SWITCH_MAX_ATTEMPTS = 16;
 
     @Resource
     private OrderNoGenerator orderNoGenerator;
@@ -191,7 +193,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         List<LhShiftConfigVO> shifts = LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate());
 
         for (LhScheduleResult result : context.getScheduleResultList()) {
-            if (!"01".equals(result.getScheduleType())) {
+            if (!CONTINUOUS_SCHEDULE_TYPE.equals(result.getScheduleType())
+                    && !"1".equals(result.getIsTypeBlock())) {
                 continue;
             }
             // 重新按班次分配（夜->早->中顺序按可用量分配）
@@ -226,10 +229,10 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         log.info("续作排产 - 降模排产");
         List<LhShiftConfigVO> shifts = LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate());
 
-        // 按materialCode分组找出同SKU多机台情况
+        // 按materialCode分组找出同SKU多机台情况（续作+换活字块统一收口）
         Map<String, List<LhScheduleResult>> skuResultMap = new HashMap<>();
         for (LhScheduleResult result : context.getScheduleResultList()) {
-            if ("01".equals(result.getScheduleType())) {
+            if (isContinuousPhaseResult(result)) {
                 skuResultMap.computeIfAbsent(result.getMaterialCode(), k -> new ArrayList<>()).add(result);
             }
         }
@@ -466,7 +469,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (machine.getEstimatedEndTime() == null) {
             return null;
         }
-        Date switchStartTime = resolveAllowedSwitchStartTime(context, machine.getEstimatedEndTime());
+        Date switchStartTime = resolveAllowedSwitchStartTime(
+                context, machine.getMachineCode(), machine.getEstimatedEndTime());
         // 换活字块：允许切换时间 + 换活字块总耗时
         return LhScheduleTimeUtil.addHours(switchStartTime,
                 LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context));
@@ -488,23 +492,84 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * 解析允许发起切换（换模/换活字块）的开始时间。
      * <p>20:00:00（含）到次日早班前禁止发起切换，需顺延到下一个早班开始时间。</p>
      */
-    private Date resolveAllowedSwitchStartTime(LhScheduleContext context, Date endingTime) {
+    private Date resolveAllowedSwitchStartTime(LhScheduleContext context, String machineCode, Date endingTime) {
         if (endingTime == null) {
             return null;
         }
-        if (!LhScheduleTimeUtil.isNoMouldChangeTime(context, endingTime)) {
-            return endingTime;
+        Date adjustedTime = endingTime;
+        for (int attempt = 0; attempt < TYPE_BLOCK_SWITCH_MAX_ATTEMPTS; attempt++) {
+            Date downtimeAdjustedTime = resolveDowntimeAdjustedSwitchStartTime(
+                    context, machineCode, adjustedTime);
+            if (downtimeAdjustedTime.after(adjustedTime)) {
+                adjustedTime = downtimeAdjustedTime;
+                continue;
+            }
+            if (!LhScheduleTimeUtil.isNoMouldChangeTime(context, adjustedTime)) {
+                return adjustedTime;
+            }
+            adjustedTime = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(context, adjustedTime);
         }
+        log.warn("换活字块切换起点达到最大尝试次数, 机台: {}, 原始时间: {}",
+                machineCode, LhScheduleTimeUtil.formatDateTime(endingTime));
+        return adjustedTime;
+    }
 
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(endingTime);
-        int hour = calendar.get(Calendar.HOUR_OF_DAY);
-        Date morningBaseDate = LhScheduleTimeUtil.clearTime(endingTime);
-        if (hour >= LhScheduleTimeUtil.getNoMouldChangeStartHour(context)) {
-            morningBaseDate = LhScheduleTimeUtil.addDays(morningBaseDate, 1);
+    /**
+     * 根据停机窗口顺延换活字块切换起点。
+     * <p>当候选切换窗口与机台停机窗口重叠时，顺延到重叠停机结束时刻。</p>
+     */
+    private Date resolveDowntimeAdjustedSwitchStartTime(LhScheduleContext context,
+                                                        String machineCode,
+                                                        Date candidateStartTime) {
+        if (context == null
+                || StringUtils.isEmpty(machineCode)
+                || candidateStartTime == null) {
+            return candidateStartTime;
         }
-        return LhScheduleTimeUtil.buildTime(
-                morningBaseDate, LhScheduleTimeUtil.getMorningStartHour(context), 0, 0);
+        Date candidateEndTime = LhScheduleTimeUtil.addHours(
+                candidateStartTime, LhScheduleTimeUtil.getTypeBlockChangeTotalHours(context));
+        Date latestOverlapEndTime = null;
+        if (!CollectionUtils.isEmpty(context.getDevicePlanShutList())) {
+            for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
+                if (planShut == null
+                        || !StringUtils.equals(machineCode, planShut.getMachineCode())
+                        || planShut.getBeginDate() == null
+                        || planShut.getEndDate() == null
+                        || !planShut.getBeginDate().before(planShut.getEndDate())) {
+                    continue;
+                }
+                if (!candidateStartTime.before(planShut.getEndDate())
+                        || !planShut.getBeginDate().before(candidateEndTime)) {
+                    continue;
+                }
+                if (latestOverlapEndTime == null || planShut.getEndDate().after(latestOverlapEndTime)) {
+                    latestOverlapEndTime = planShut.getEndDate();
+                }
+            }
+        }
+        List<MachineCleaningWindowDTO> cleaningWindowList = resolveMachineCleaningWindowList(context, machineCode);
+        if (!CollectionUtils.isEmpty(cleaningWindowList)) {
+            for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
+                if (Objects.isNull(cleaningWindow)
+                        || Objects.isNull(cleaningWindow.getCleanStartTime())) {
+                    continue;
+                }
+                Date cleaningReadyTime = cleaningWindow.getReadyTime() != null
+                        ? cleaningWindow.getReadyTime() : cleaningWindow.getCleanEndTime();
+                if (Objects.isNull(cleaningReadyTime)
+                        || !cleaningWindow.getCleanStartTime().before(cleaningReadyTime)) {
+                    continue;
+                }
+                if (!candidateStartTime.before(cleaningReadyTime)
+                        || !cleaningWindow.getCleanStartTime().before(candidateEndTime)) {
+                    continue;
+                }
+                if (latestOverlapEndTime == null || cleaningReadyTime.after(latestOverlapEndTime)) {
+                    latestOverlapEndTime = cleaningReadyTime;
+                }
+            }
+        }
+        return latestOverlapEndTime != null ? latestOverlapEndTime : candidateStartTime;
     }
 
     /**
@@ -615,7 +680,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                             + ", 当前物料=" + PriorityTraceLogHelper.safeText(machine.getCurrentMaterialCode())
                             + ", 基准时间=" + PriorityTraceLogHelper.formatDateTime(estimatedEndTime)
                             + ", 实际切换起点=" + PriorityTraceLogHelper.formatDateTime(
-                            resolveAllowedSwitchStartTime(context, estimatedEndTime)));
+                            resolveAllowedSwitchStartTime(context, machine.getMachineCode(), estimatedEndTime)));
         }
         String detail = detailBuilder.toString().trim();
         log.info("{}\n{}", title, detail);
@@ -1255,7 +1320,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         Map<String, Integer> zeroPlanQtyMap = new LinkedHashMap<>(8);
         List<LhScheduleResult> zeroPlanResults = new ArrayList<>(8);
         for (LhScheduleResult result : context.getScheduleResultList()) {
-            if (!CONTINUOUS_SCHEDULE_TYPE.equals(result.getScheduleType())) {
+            if (!isContinuousPhaseResult(result)) {
                 continue;
             }
             if (result.getDailyPlanQty() != null && result.getDailyPlanQty() > 0) {
@@ -1332,18 +1397,33 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 判断结果是否属于可驱动机台终态的有效续作结果。
+     * 判断结果是否属于可驱动机台终态的有效结果。
+     * <p>除续作结果外，S4.4 产生的换活字块结果也需要参与机台终态回写，
+     * 否则会在 S4.5 选机时丢失真实收尾时间。</p>
      *
      * @param result 排程结果
-     * @return true-有效续作结果；false-非有效续作结果
+     * @return true-有效结果；false-非有效结果
      */
     private boolean isEffectiveContinuousResult(LhScheduleResult result) {
-        return result != null
-                && CONTINUOUS_SCHEDULE_TYPE.equals(result.getScheduleType())
+        return isContinuousPhaseResult(result)
                 && result.getDailyPlanQty() != null
                 && result.getDailyPlanQty() > 0
                 && result.getSpecEndTime() != null
                 && StringUtils.isNotEmpty(result.getLhMachineCode());
+    }
+
+    /**
+     * 判断结果是否属于续作阶段结果（含换活字块）。
+     *
+     * @param result 排程结果
+     * @return true-续作阶段结果；false-非续作阶段结果
+     */
+    private boolean isContinuousPhaseResult(LhScheduleResult result) {
+        if (result == null) {
+            return false;
+        }
+        return CONTINUOUS_SCHEDULE_TYPE.equals(result.getScheduleType())
+                || "1".equals(result.getIsTypeBlock());
     }
 
     /**
@@ -1436,8 +1516,33 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return 0;
         }
         int targetScheduleQty = sku.resolveTargetScheduleQty();
-        int retainedQty = resolveEffectiveScheduledQty(context, materialCode, CONTINUOUS_SCHEDULE_TYPE);
+        int retainedQty = resolveEffectiveContinuousPhaseScheduledQty(context, materialCode);
         return Math.max(targetScheduleQty - retainedQty, 0);
+    }
+
+    /**
+     * 统计同物料在续作阶段最终保留的有效计划量（含换活字块）。
+     *
+     * @param context 排程上下文
+     * @param materialCode 物料编码
+     * @return 有效计划量
+     */
+    private int resolveEffectiveContinuousPhaseScheduledQty(LhScheduleContext context, String materialCode) {
+        if (context == null || StringUtils.isEmpty(materialCode) || CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return 0;
+        }
+        int totalQty = 0;
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (result == null
+                    || !StringUtils.equals(materialCode, result.getMaterialCode())
+                    || !isContinuousPhaseResult(result)
+                    || result.getDailyPlanQty() == null
+                    || result.getDailyPlanQty() <= 0) {
+                continue;
+            }
+            totalQty += result.getDailyPlanQty();
+        }
+        return totalQty;
     }
 
     /**

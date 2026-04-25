@@ -1,11 +1,16 @@
 package com.zlt.aps.lh.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
 import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
+import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
+import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
@@ -21,6 +26,7 @@ import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -28,10 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * 硫化排程主服务实现
@@ -185,4 +188,226 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         return result;
     }
 
+    /**
+     * 转机台前校验接口
+     *
+     * @param dto 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult changeMachinePreCheck(LhTransferDeskDTO dto) {
+        if (dto.getId() == null) {
+            return AjaxResult.error("请选择需要转机台的记录");
+        }
+        if (dto.getLhMachineCode() == null) {
+            return AjaxResult.error("新机台编码不能为空");
+        }
+
+        Long ids = dto.getId();
+        String newMachineCode = dto.getLhMachineCode();
+        List<LhScheduleResult> existResultList = scheduleResultMapper.changeMachinePreCheck(Collections.singletonList(ids), newMachineCode);
+
+        List<String> errorMessages = new ArrayList<>();
+        for (LhScheduleResult existResult : existResultList) {
+            String existScheduleDate = DateUtil.format(existResult.getScheduleDate(), "yyyy-MM-dd");
+            String existMachineCode = existResult.getLhMachineCode();
+            String existMaterialCode = existResult.getMaterialCode();
+            errorMessages.add(String.format("排程日期:%s，物料编码：%s，机台编号：%s，已经存在！", existScheduleDate, existMaterialCode, existMachineCode));
+        }
+        if (CollUtil.isNotEmpty(errorMessages)) {
+            return AjaxResult.error(String.join(";", errorMessages));
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 转机台操作
+     *
+     * @param dto 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult changeMachine(LhTransferDeskDTO dto) {
+        if (dto.getId() == null) {
+            return AjaxResult.error("请选择需要转机台的记录");
+        }
+        if (dto.getLhMachineCode() == null) {
+            return AjaxResult.error("新机台编码不能为空");
+        }
+
+        // 检查所有记录是否已发布
+        LhScheduleResult record = scheduleResultMapper.selectById(dto.getId());
+        if (ApsConstant.APS_STRING_1.equals(record.getIsRelease())) {
+            return AjaxResult.error("已发布的排程记录不允许转机台");
+        }
+
+        // 更新机台信息
+        String oldMachine = record.getLhMachineCode();
+        record.setLhMachineCode(dto.getLhMachineCode());
+        record.setLhMachineName(dto.getLhMachineName());
+
+        // 更新备注
+        String remark = record.getRemark() != null ? record.getRemark() : "";
+        record.setRemark(remark + "转机台时间：" + DateUtil.now() + "【原机台：" + oldMachine + ",转入机台：" + dto.getLhMachineCode() + "】");
+
+        // 设置为待发布
+        record.setIsRelease("0");
+
+        scheduleResultMapper.updateById(record);
+        return AjaxResult.success("转机台成功");
+    }
+
+    /**
+     * 调量前校验
+     *
+     * @param dto 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult adjustQuantityPreCheck(LhScheduleResultUpdateDTO dto) {
+        if (Objects.isNull(dto) || Objects.isNull(dto.getId())) {
+            return AjaxResult.error("请选择需要调量的排程记录");
+        }
+
+        LhScheduleResult record = scheduleResultMapper.selectById(dto.getId());
+        if (Objects.isNull(record)) {
+            return AjaxResult.error("排程记录不存在或已删除");
+        }
+
+        Date now = new Date();
+        boolean hasAdjustField = false;
+        List<String> errorMessages = new ArrayList<>();
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            Integer adjustPlanQty = getAdjustPlanQty(dto, shiftIndex);
+            if (Objects.isNull(adjustPlanQty)) {
+                continue;
+            }
+            hasAdjustField = true;
+            if (adjustPlanQty < 0) {
+                errorMessages.add(String.format("第%s班计划量不能小于0", shiftIndex));
+            }
+            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(record, shiftIndex);
+            if (Objects.isNull(shiftEndTime)) {
+                errorMessages.add(String.format("第%s班结束时间缺失，禁止调量", shiftIndex));
+            } else if (!now.before(shiftEndTime)) {
+                errorMessages.add(String.format("第%s班已结束，历史班次不可调量", shiftIndex));
+            }
+            Integer finishQty = Optional.ofNullable(ShiftFieldUtil.getShiftFinishQty(record, shiftIndex)).orElse(0);
+            if (adjustPlanQty < finishQty) {
+                errorMessages.add(String.format("第%s班计划量不能小于完成量%s", shiftIndex, finishQty));
+            }
+        }
+
+        if (!hasAdjustField) {
+            errorMessages.add("未检测到可调量的班次计划量字段");
+        }
+        if (CollUtil.isNotEmpty(errorMessages)) {
+            return AjaxResult.error(String.join("；", errorMessages));
+        }
+        return AjaxResult.success();
+    }
+
+    /**
+     * 调量操作
+     *
+     * @param dto 参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult adjustQuantity(LhScheduleResultUpdateDTO dto) {
+        AjaxResult preCheck = adjustQuantityPreCheck(dto);
+        if (preCheck.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
+            return preCheck;
+        }
+
+        LhScheduleResult record = scheduleResultMapper.selectById(dto.getId());
+        if (Objects.isNull(record)) {
+            return AjaxResult.error("排程记录不存在或已删除");
+        }
+
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            Integer adjustPlanQty = getAdjustPlanQty(dto, shiftIndex);
+            if (Objects.nonNull(adjustPlanQty)) {
+                setAdjustPlanQty(record, shiftIndex, adjustPlanQty);
+            }
+        }
+
+        // 调量后同步汇总计划量，并回置为未发布状态，确保后续重新发布
+        ShiftFieldUtil.syncDailyPlanQty(record);
+        record.setIsRelease(ApsConstant.APS_STRING_0);
+
+        int updateCount = scheduleResultMapper.updateById(record);
+        if (updateCount <= 0) {
+            return AjaxResult.error("调量失败，请稍后重试");
+        }
+        return AjaxResult.success("调量成功，记录已回置待发布");
+    }
+
+    /**
+     * 获取指定班次的调量计划值。
+     *
+     * @param dto        调量参数
+     * @param shiftIndex 班次索引（1~8）
+     * @return 班次计划量，未传入返回null
+     */
+    private Integer getAdjustPlanQty(LhScheduleResultUpdateDTO dto, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1:
+                return dto.getClass1PlanQty();
+            case 2:
+                return dto.getClass2PlanQty();
+            case 3:
+                return dto.getClass3PlanQty();
+            case 4:
+                return dto.getClass4PlanQty();
+            case 5:
+                return dto.getClass5PlanQty();
+            case 6:
+                return dto.getClass6PlanQty();
+            case 7:
+                return dto.getClass7PlanQty();
+            case 8:
+                return dto.getClass8PlanQty();
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * 设置指定班次计划量。
+     *
+     * @param record     排程结果
+     * @param shiftIndex 班次索引（1~8）
+     * @param planQty    调整后的计划量
+     */
+    private void setAdjustPlanQty(LhScheduleResult record, int shiftIndex, Integer planQty) {
+        switch (shiftIndex) {
+            case 1:
+                record.setClass1PlanQty(planQty);
+                break;
+            case 2:
+                record.setClass2PlanQty(planQty);
+                break;
+            case 3:
+                record.setClass3PlanQty(planQty);
+                break;
+            case 4:
+                record.setClass4PlanQty(planQty);
+                break;
+            case 5:
+                record.setClass5PlanQty(planQty);
+                break;
+            case 6:
+                record.setClass6PlanQty(planQty);
+                break;
+            case 7:
+                record.setClass7PlanQty(planQty);
+                break;
+            case 8:
+                record.setClass8PlanQty(planQty);
+                break;
+            default:
+                break;
+        }
+    }
 }

@@ -194,6 +194,13 @@ public class DpDemandPlanSum extends BaseEntity {
     @ApiModelProperty(value = "是否排产", name = "isProduction")
     @TableField(value = "IS_PRODUCTION")
     private String isProduction;
+    
+    /**
+     * 常规储备是否排产
+     */
+    @ApiModelProperty(value = "常规储备是否排产", name = "isSchedule")
+    @TableField(value = "IS_SCHEDULE")
+    private String isSchedule;
 
     /**
      * 净需求(含暂缓)

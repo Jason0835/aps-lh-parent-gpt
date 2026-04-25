@@ -8,13 +8,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
-import com.zlt.aps.lh.api.domain.dto.LhOrderInsertParamDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleShiftDateQueryDTO;
-import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
+import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
@@ -23,17 +17,9 @@ import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.io.IOUtils;
-import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
@@ -43,6 +29,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
 
 @Api(tags = "硫化排程结果")
 @Controller
@@ -197,6 +186,14 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
         return iLhScheduleResultRemoteService.changeMachine(dto);
     }
 
+    @ApiOperation("硫化排程结果调量校验")
+    //@RequiresPermissions("lh:lhScheduleResult:validateAdjustQuantity")
+    @PostMapping("/validateAdjustQuantity")
+    @ResponseBody
+    public AjaxResult validateAdjustQuantity(@RequestBody LhScheduleResultUpdateDTO dto) {
+        return iLhScheduleResultRemoteService.validateAdjustQuantity(dto);
+    }
+
     @ApiOperation("调量")
 //    @RequiresPermissions("lh:lhScheduleResult:adjustQuantity")
     @PostMapping("/adjustQuantity")
@@ -244,12 +241,29 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
 //    @RequiresPermissions("lh:scheduleResult:publish")
     @PostMapping("/publish")
     @ResponseBody
-    public AjaxResult publish(LhScheduleResult dto) {
-        // 默认发布当天排程结果
+    public AjaxResult publish(@RequestBody Map<String, String> params) {
+        LhScheduleResult dto = new LhScheduleResult();
+        String ids = params.get("ids");
+        String scheduleDateStr = params.get("scheduleDate");
+        if (StringUtils.isNotEmpty(scheduleDateStr)) {
+            try {
+                dto.setScheduleDate(DateUtils.parseDate(scheduleDateStr));
+            } catch (Exception e) {
+                dto.setScheduleDate(DateUtils.addDays(new Date(), 1));
+            }
+        }
         if (dto.getScheduleDate() == null) {
             dto.setScheduleDate(DateUtils.addDays(new Date(), 1));
         }
-        return iLhScheduleResultRemoteService.publish(dto);
+        return iLhScheduleResultRemoteService.publish(dto, ids);
+    }
+
+    @ApiOperation("硫化排程结果下发到MES")
+//    @RequiresPermissions("lh:scheduleResult:issueToMes")
+    @PostMapping("/issueToMes")
+    @ResponseBody
+    public AjaxResult issueToMes() {
+        return iLhScheduleResultRemoteService.issueToMes();
     }
 
 }

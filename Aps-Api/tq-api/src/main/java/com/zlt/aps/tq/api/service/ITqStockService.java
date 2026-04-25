@@ -1,5 +1,6 @@
 package com.zlt.aps.tq.api.service;
 
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -11,78 +12,28 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * 胎圈库存信息对外暴露接口
- */
 @FeignClient(contextId = "iTqStockService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.tq:tq}")
 public interface ITqStockService {
 
-    /**
-     * 获取胎圈库存信息列表
-     *
-     * @param stock
-     * @return
-     */
-    @PostMapping("/tq/stock/list")
+    @PostMapping("/tqStock/list")
     TableDataInfo list(@RequestBody TqStock stock);
 
-    /**
-     * 删除胎圈库存信息
-     *
-     * @param ids
-     * @return
-     */
-    @DeleteMapping("/tq/stock/{ids}")
-    AjaxResult remove(@PathVariable("ids") Long[] ids);
+    @PostMapping("/tqStock/save")
+    AjaxResult save(@Validated @RequestBody TqStock stock);
 
-    /**
-     * 新增胎圈库存信息
-     *
-     * @param stock
-     * @return
-     */
-    @PostMapping("/tq/stock")
-    AjaxResult add(@Validated @RequestBody TqStock stock);
+    @PostMapping("/tqStock/delete/{ids}")
+    AjaxResult removeByIds(@PathVariable("ids") List<Long> ids);
 
+    @GetMapping("/tqStock/{id}")
+    TqStock getInfo(@PathVariable("id") Long id);
 
-    /**
-     * 根据ID获取详细信息
-     *
-     * @param id
-     * @return
-     */
-    @GetMapping(value = "/tq/stock/selectStockById/{id}")
-    TqStock selectStockById(@PathVariable("id") Long id);
+    @PostMapping("/tqStock/checkUnique")
+    String checkUnique(@Validated @RequestBody TqStock stock);
 
-    /**
-     * 根据ID获取详细信息
-     *
-     * @param id
-     * @return
-     */
-    @GetMapping(value = "/tq/stock/{id}")
-    AjaxResult getInfo(@PathVariable("id") Long id);
+    @PostMapping("/tqStock/exportData/{fileName}")
+    byte[] exportData(@RequestBody TqStock stock, @PathVariable("fileName") String fileName);
 
-    /**
-     * 修改胎圈库存信息
-     *
-     * @param stock
-     * @return
-     */
-    @PutMapping("/tq/stock")
-    AjaxResult edit(@Validated @RequestBody TqStock stock);
-
-    /**
-     * 导出胎圈库存信息
-     *
-     * @param stock
-     * @return
-     */
-    @PostMapping("/tq/stock/exportList")
-    List<TqStock> exportList(@RequestBody TqStock stock);
-
-    @PostMapping("/tq/stock/importData")
-    @ApiOperation("导入胎圈定点机台信息")
-    public AjaxResult importData(@RequestBody List<TqStock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
-
+    @PostMapping("/tqStock/importData")
+    @ApiOperation("导入胎圈库存信息")
+    AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 }

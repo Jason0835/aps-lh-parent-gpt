@@ -1,9 +1,8 @@
 package com.zlt.aps.lh.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.github.pagehelper.util.StringUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.ruoyi.common.core.utils.bean.BeanUtils;
+import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
@@ -12,17 +11,14 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
-import com.zlt.aps.lh.api.domain.dto.LhOrderInsertParamDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleRequestDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResponseDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleResultUpdateDTO;
-import com.zlt.aps.lh.api.domain.dto.LhScheduleShiftDateQueryDTO;
-import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
+import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.lh.api.domain.dto.*;
+import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
+import com.zlt.aps.lh.component.ScheduleExecutionGuard;
+import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.service.ILhScheduleService;
-import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -33,31 +29,14 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.function.Function;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -73,6 +52,15 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     @Autowired
     private ILhScheduleService lhScheduleService;
+
+    @Autowired
+    private ILhScheduleResultService lhScheduleResultService;
+
+    @Autowired
+    private IMesItfService mesItfService;
+
+    @Autowired
+    private ScheduleExecutionGuard scheduleExecutionGuard;
 
     /**
      * 获取排程日期对象列表
@@ -334,42 +322,45 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @PostMapping("/validateChangeMachine")
     @ApiOperation("硫化排程结果转机台校验")
     public AjaxResult validateChangeMachine(@RequestBody LhTransferDeskDTO dto) {
-//        ValidateResult validateResult = lhScheduleResultCheckHandle.changeMachinePreCheck(dto);
-//        if (!validateResult.isSuccess()) {
-//            return AjaxResult.error(validateResult.getMsg());
-//        }
-
-        return AjaxResult.success("校验通过");
+        return lhScheduleService.changeMachinePreCheck(dto);
     }
 
     /**
      * 转机台
-     * @param dto
-     * @return
+     * @param dto 请求参数
+     * @return 结果
      */
     @PostMapping("/changeMachine")
     @ApiOperation("转机台")
     public AjaxResult changeMachine(@RequestBody LhTransferDeskDTO dto) {
-//        ValidateResult validateResult = lhScheduleResultCheckHandle.changeMachinePreCheck(dto);
-//        if (!validateResult.isSuccess()) {
-//            return AjaxResult.error(validateResult.getMsg());
-//        }
-//        //调用转机台业务
-//        lhScheduleResultService.changeMachine(dto);
-        return AjaxResult.success();
+        AjaxResult ajaxResult = lhScheduleService.changeMachinePreCheck(dto);
+        if (ajaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
+            return ajaxResult;
+        }
+        //调用转机台业务
+        return lhScheduleService.changeMachine(dto);
+    }
+
+    /**
+     * 转机台校验
+     */
+    @Log(title = "ui.data.column.lhParams.modelName")
+    @PostMapping("/validateAdjustQuantity")
+    @ApiOperation("硫化排程结果转机台校验")
+    public AjaxResult validateAdjustQuantity(@RequestBody LhScheduleResultUpdateDTO dto) {
+        return lhScheduleService.adjustQuantityPreCheck(dto);
     }
 
     @Log(title = "ui.data.column.lhParams.modelName")
     @PostMapping("/adjustQuantity")
     @ApiOperation("调量")
     public AjaxResult adjustQuantity(@RequestBody LhScheduleResultUpdateDTO dto) {
-//        ValidateResult validateResult = lhScheduleResultCheckHandle.updateLhScheduleResultCheck(dto);
-//        if (!validateResult.isSuccess()) {
-//            return AjaxResult.error(validateResult.getMsg());
-//        }
-//        //调用调量业务
-//        lhScheduleAdjustService.preAdjustment(dto);
-        return AjaxResult.success();
+        AjaxResult ajaxResult = lhScheduleService.adjustQuantityPreCheck(dto);
+        if (ajaxResult.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
+            return ajaxResult;
+        }
+        //调用调量业务
+        return lhScheduleService.adjustQuantity(dto);
     }
 
     /**
@@ -386,82 +377,71 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     /**
      * 发布当天未发布的排程结果
+     * 发布流程：1.更新发布状态为"待发布" → 2.调用issueToMes下发MES → 3.根据MES反馈更新发布状态
      */
     @Log(title = "ui.data.column.lh.scheduleResult.modelName", businessType = BusinessType.PUBLISH)
     @ApiOperation("发布排程")
     @PostMapping("/publish")
-    public AjaxResult publish(@RequestBody LhScheduleResult dto) {
-//        // 发布前需要先获得同步锁，防止在集群环境下出现一个前端命令发送两次mes请求，modify by hak 20220708
-//        if (syncDataLogsService.checkPublishLocking("lh:publish:lock", dto.getIds())) {
-//            // 如果已经被锁定了，则直接返回
-//            return AjaxResult.success();
-//        }
-//        int releasingOrTimeoutByIds = lhScheduleResultService.isReleasingOrTimeoutByIds(Arrays.stream(dto.getIds()).mapToLong(Long::longValue).toArray());
-//        if (releasingOrTimeoutByIds > 0) {
-//            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.release.isReleasingOrTimeoutById"));
-//        }
-////        //获取数据版本号 由于报错先注释，后续由hak调整
-////        String dataVersion = syncDataLogsService.getDataVersion(ApsConstant.LH_DEPLOY_SYNC_KEY);
-//        String dataVersion = "";
-//        // 厂别、分公司编号
-//        String factoryCode = factoryService.getFactoryCode();
-//        String companyCode = factoryService.getCompanyCode();
-//
-//        LhScheduleResult scheduleResult = new LhScheduleResult();
-//        org.springframework.beans.BeanUtils.copyProperties(dto, scheduleResult);
-//        QueryWrapper<LhScheduleResult> wrapper = new QueryWrapper<>();
-//        this.builderCondition(wrapper, scheduleResult);
-//        wrapper.in(PubUtil.isNotEmpty(scheduleResult.getIds()), "id", Arrays.asList(scheduleResult.getIds()));
-//        // 过滤未发布及发布失败的数据
-//        List<LhScheduleResult> list = lhScheduleResultEntityMapper.selectList(wrapper).stream()
-//                .filter(item -> ApsConstant.NO_RELEASE.equals(item.getIsRelease()) || ApsConstant.FAILURE_RELEASE.equals(item.getIsRelease()) || ApsConstant.WAIT_RELEASING.equals(item.getIsRelease())).collect(Collectors.toList());
-//        if (CollectionUtils.isEmpty(list)) {
-//            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.errorPublish"));
-//        }
-//        // 获取机台id为空和多机台的记录
-//        List<LhScheduleResult> collect = list.stream().filter(item -> StringUtil.isEmpty(item.getLhMachineCode()) || item.getLhMachineCode().contains(",")).collect(Collectors.toList());
-//        if (!collect.isEmpty()) {
-//            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.hasMultipleIds"));
-//        }
-//        //排程发布
-//        long[] arr = list.stream().mapToLong(BaseEntity::getId).toArray();
-//
-//        Date scheduleDate = scheduleResult.getScheduleDate();
-//        AjaxResult ajaxResult = null;
-//        try {
-//            ajaxResult = lhScheduleResultService.publish(arr, scheduleDate, dataVersion, factoryCode, companyCode);
-//            // 后续需要替换成新的itf同步接口
-////            // 请求参数
-////            JSONObject params = new JSONObject();
-////            params.put("scheduleDate", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD, scheduleDate));
-////            params.put("rowCount", arr.length);
-////            SyncParamsVO syncParamsVO = new SyncParamsVO();
-////            syncParamsVO.setSyncKey(ApsConstant.LH_DEPLOY_SYNC_KEY);
-////            syncParamsVO.setDataVersion(dataVersion);
-////            syncParamsVO.setParams(params);
-////            syncParamsVO.setFactoryCode(factoryCode);
-////            syncParamsVO.setCompanyCode(companyCode);
-////            syncDataHandle.syncNotice(syncParamsVO);
-//
-//            // 取回mes的反馈结果
-//            SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
-//            String status = logs.getStatus();
-//            // 更新状态
-//            lhScheduleResultService.updateReleaseStatus(dataVersion, arr, status);
-//            if (ApsConstant.IS_RELEASE.equals(status)) {
-//                // 成功
-//                ajaxResult = AjaxResult.success();
-//            } else {
-//                // 失败，需要返回异常信息
-//                ajaxResult = AjaxResult.error(logs.getMsg());
-//            }
-//        } catch (Exception e) {
-//            //异常时进行堆栈内容打印
-//            e.printStackTrace();
-//            ajaxResult = AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
-//        }
-//        return ajaxResult;
-        return AjaxResult.success();
+    public AjaxResult publish(@RequestBody LhScheduleResult dto, @RequestParam(value = "ids", required = false) String ids) {
+        if (dto.getScheduleDate() == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.errorPublish"));
+        }
+
+        List<LhScheduleResult> list = lhScheduleResultService.selectByDateAndFactory(
+                dto.getScheduleDate(), dto.getFactoryCode());
+
+        if (StringUtils.isNotEmpty(ids)) {
+            List<Long> idList = Arrays.stream(ids.split(","))
+                    .map(String::trim)
+                    .map(Long::parseLong)
+                    .collect(Collectors.toList());
+            list = list.stream()
+                    .filter(item -> idList.contains(item.getId()))
+                    .collect(Collectors.toList());
+        }
+
+        List<LhScheduleResult> filteredList = list.stream()
+                .filter(item -> ApsConstant.NO_RELEASE.equals(item.getIsRelease())
+                        || ApsConstant.FAILURE_RELEASE.equals(item.getIsRelease())
+                        || ApsConstant.WAIT_RELEASING.equals(item.getIsRelease()))
+                .collect(Collectors.toList());
+
+        if (CollectionUtils.isEmpty(filteredList)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.errorPublish"));
+        }
+
+        List<LhScheduleResult> invalidRecords = filteredList.stream()
+                .filter(item -> StringUtils.isEmpty(item.getLhMachineCode()) || item.getLhMachineCode().contains(","))
+                .collect(Collectors.toList());
+        if (!invalidRecords.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.hasMultipleIds"));
+        }
+
+        long[] arr = filteredList.stream().mapToLong(BaseEntity::getId).toArray();
+
+        try {
+            AjaxResult issueResult = issueLhScheduleResultToMes();
+            if (issueResult != null && Objects.equals(HttpStatus.SUCCESS, issueResult.get(AjaxResult.CODE_TAG))) {
+                for (LhScheduleResult item : filteredList) {
+                    item.setIsRelease(ApsConstant.IS_RELEASE);
+                    lhScheduleResultService.updateReleaseStatus(item);
+                }
+                return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
+            } else {
+                for (LhScheduleResult item : filteredList) {
+                    item.setIsRelease(ApsConstant.FAILURE_RELEASE);
+                    lhScheduleResultService.updateReleaseStatus(item);
+                }
+                return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
+            }
+        } catch (Exception e) {
+            log.error("硫化排程发布失败", e);
+            for (LhScheduleResult item : filteredList) {
+                item.setIsRelease(ApsConstant.FAILURE_RELEASE);
+                lhScheduleResultService.updateReleaseStatus(item);
+            }
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
+        }
     }
 
 
@@ -485,58 +465,68 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @Log(title = "硫化排程结果下发", businessType = BusinessType.PUBLISH)
     @PostMapping("/issueToMes")
     public AjaxResult issueLhScheduleResultToMes() {
+        String token = scheduleExecutionGuard.acquireIssueLock();
+        if (token == null) {
+            return AjaxResult.error("排程下发操作正在进行中，请稍后再试");
+        }
+        try {
+            return doIssueLhScheduleResultToMes();
+        } finally {
+            scheduleExecutionGuard.releaseIssueLock(token);
+        }
+    }
 
-//        // 获取今天、明天、后天的日期
-//        LocalDate today = LocalDate.now();
-//        LocalDate tomorrow = today.plusDays(1);
-//        LocalDate dayAfterTomorrow = today.plusDays(2);
-//
-//        // 只查询当天的排程结果数据（包含8班数据）- 使用aps-cx-lh-api实体
-//        List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> scheduleResultList =
-//                lhScheduleResultService.getCxLhScheduleResultList(java.sql.Date.valueOf(today));
-//
-//        if (scheduleResultList.isEmpty()) {
-//            return AjaxResult.error("没有需要下发的硫化排程结果数据");
-//        }
-//
-//        // 转换为3天的下发数据
-//        List<LhScheduleResultIssue> day1IssueList = new ArrayList<>();    // 当天（更新）
-//        List<LhScheduleResultIssue> day2IssueList = new ArrayList<>();    // 隔天（更新）
-//        List<LhScheduleResultIssue> day3IssueList = new ArrayList<>();    // 后天（插入）
-//
-//        for (com.zlt.aps.cx.entity.schedule.LhScheduleResult source : scheduleResultList) {
-//            // 第1天（当天）- 更新2班数据（早中班）
-//            LhScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, today);
-//            if (day1Issue != null) {
-//                day1IssueList.add(day1Issue);
-//            }
-//
-//            // 第2天（隔天）- 更新3班数据（夜早中班）
-//            LhScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, tomorrow);
-//            if (day2Issue != null) {
-//                day2IssueList.add(day2Issue);
-//            }
-//
-//            // 第3天（后天）- 下发3班数据（夜早中班）
-//            LhScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, dayAfterTomorrow);
-//            if (day3Issue != null) {
-//                day3IssueList.add(day3Issue);
-//            }
-//        }
-//
-//        if (day1IssueList.isEmpty() && day2IssueList.isEmpty() && day3IssueList.isEmpty()) {
-//            return AjaxResult.error("没有需要下发的硫化排程结果数据");
-//        }
-//
-//        // 合并所有数据并调用下发接口
-//        List<LhScheduleResultIssue> allIssueList = new ArrayList<>();
-//        allIssueList.addAll(day1IssueList);
-//        allIssueList.addAll(day2IssueList);
-//        allIssueList.addAll(day3IssueList);
-//
-//        // 通过Feign客户端调用itf模块的下发接口
-//        return mesItfService.issueLhScheduleResult(allIssueList);
-        return AjaxResult.success();
+    private AjaxResult doIssueLhScheduleResultToMes() {
+        LocalDate today = LocalDate.now();
+        LocalDate tomorrow = today.plusDays(1);
+        LocalDate dayAfterTomorrow = today.plusDays(2);
+
+        List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> scheduleResultList =
+                lhScheduleResultService.getCxLhScheduleResultList(java.sql.Date.valueOf(today));
+
+        if (scheduleResultList.isEmpty()) {
+            return AjaxResult.error("没有需要下发的硫化排程结果数据");
+        }
+
+        scheduleResultList = scheduleResultList.stream()
+                .filter(item -> !ApsConstant.IS_RELEASE.equals(item.getIsRelease()))
+                .collect(Collectors.toList());
+
+        if (scheduleResultList.isEmpty()) {
+            return AjaxResult.error("所有排程结果已下发，无需重复下发");
+        }
+
+        List<LhScheduleResultIssue> day1IssueList = new ArrayList<>();
+        List<LhScheduleResultIssue> day2IssueList = new ArrayList<>();
+        List<LhScheduleResultIssue> day3IssueList = new ArrayList<>();
+
+        for (com.zlt.aps.cx.entity.schedule.LhScheduleResult source : scheduleResultList) {
+            LhScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, today);
+            if (day1Issue != null) {
+                day1IssueList.add(day1Issue);
+            }
+
+            LhScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, tomorrow);
+            if (day2Issue != null) {
+                day2IssueList.add(day2Issue);
+            }
+
+            LhScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, dayAfterTomorrow);
+            if (day3Issue != null) {
+                day3IssueList.add(day3Issue);
+            }
+        }
+
+        if (day1IssueList.isEmpty() && day2IssueList.isEmpty() && day3IssueList.isEmpty()) {
+            return AjaxResult.error("没有需要下发的硫化排程结果数据");
+        }
+
+        List<LhScheduleResultIssue> allIssueList = new ArrayList<>();
+        allIssueList.addAll(day1IssueList);
+        allIssueList.addAll(day2IssueList);
+        allIssueList.addAll(day3IssueList);
+
+        return mesItfService.issueLhScheduleResult(allIssueList);
     }
 
 

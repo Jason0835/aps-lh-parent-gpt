@@ -87,6 +87,11 @@ public class CxMachineBaseInfoVo implements Serializable {
     private String fixedStructure3;
 
     /**
+     * 固定结构4
+     */
+    private String fixedStructure4;
+
+    /**
      * 固定SKU
      */
     private String fixedMaterialCode;
@@ -231,6 +236,9 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         if (StringUtils.isNotBlank(fixedStructure3)) {
             CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure3, StringConstant.COMMA);
+        }
+        if (StringUtils.isNotBlank(fixedStructure4)) {
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure4, StringConstant.COMMA);
         }
         //capacityInfo.setFixStructureCount(fixedStructureSet.size());
 
@@ -410,6 +418,8 @@ public class CxMachineBaseInfoVo implements Serializable {
         fixedPriorityValue = Math.min(fixedPriorityValue, fixedPriorityValue2);
         Integer fixedPriorityValue3 = getFixedStructurePriority(fixedStructure3, CxMachineFixedPriorityEnum.FIXED_STRUCTURE_THIRD, structureName).getPriorityValue();
         fixedPriorityValue = Math.min(fixedPriorityValue, fixedPriorityValue3);
+        Integer fixedPriorityValue4 = getFixedStructurePriority(fixedStructure4, CxMachineFixedPriorityEnum.FIXED_STRUCTURE_FOUR, structureName).getPriorityValue();
+        fixedPriorityValue = Math.min(fixedPriorityValue, fixedPriorityValue4);
         Integer fixedPrioritySku = getFixedMaterialCodePriority(groupPlanInfo).getPriorityValue();
         return Math.min(fixedPriorityValue, fixedPrioritySku);
     }
@@ -440,6 +450,9 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         if (StringUtils.isNotBlank(fixedStructure3)) {
             CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure3, StringConstant.COMMA);
+        }
+        if (StringUtils.isNotBlank(fixedStructure4)) {
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure4, StringConstant.COMMA);
         }
         if (fixedStructureSet.contains(groupPlanInfo.getGroupName())) {
             return true;
@@ -1094,7 +1107,7 @@ public class CxMachineBaseInfoVo implements Serializable {
 
     /**
      * 是否有固定
-     * fixedStructure1,fixedStructure2,fixedStructure3,fixedMaterialCode
+     * fixedStructure1,fixedStructure2,fixedStructure3,fixedStructure4,fixedMaterialCode
      * 都为空，则无固定 = false;
      *
      * @return
@@ -1107,6 +1120,9 @@ public class CxMachineBaseInfoVo implements Serializable {
             return true;
         }
         if (StringUtils.isNotBlank(fixedStructure3)) {
+            return true;
+        }
+        if (StringUtils.isNotBlank(fixedStructure4)) {
             return true;
         }
         if (StringUtils.isNotBlank(fixedMaterialCode)) {

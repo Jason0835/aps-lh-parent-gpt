@@ -8,6 +8,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
 import com.zlt.aps.lh.service.ILhRepairCapsuleService;
+import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -64,7 +65,12 @@ public class LhRepairCapsuleController extends AbstractDocBizController<LhRepair
     protected List<LhRepairCapsule> listExportData(LhRepairCapsule obj) {
         QueryWrapper<LhRepairCapsule> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return lhRepairCapsuleMapper.selectList(wrapper);
+        List<LhRepairCapsule> list = lhRepairCapsuleMapper.selectList(wrapper);
+        for (LhRepairCapsule lhRepairCapsule : list){
+            lhRepairCapsule.setUpdateDate(lhRepairCapsule.getUpdateTime());
+        }
+        AppUtils.formatData(list, getQueryFormulas());
+        return list;
     }
 
     @Override
@@ -78,6 +84,9 @@ public class LhRepairCapsuleController extends AbstractDocBizController<LhRepair
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("brand")), "BRAND", queryVO.getFieldValueByFieldName("brand"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("lhCode")), "LH_CODE", queryVO.getFieldValueByFieldName("lhCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.apply(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")),
+                "EXISTS (SELECT 1 FROM T_MDM_MATERIAL_INFO m WHERE m.MATERIAL_CODE = t_lh_repair_capsule.MATERIAL_CODE AND m.MATERIAL_DESC LIKE CONCAT('%',{0},'%'))",
+                queryVO.getFieldValueByFieldName("materialDesc"));
         String obtainTimeBegin = queryVO.getObtainTimeBegin();
         String obtainTimeEnd = queryVO.getObtainTimeEnd();
         if (PubUtil.isNotEmpty(obtainTimeBegin)) {
@@ -91,6 +100,11 @@ public class LhRepairCapsuleController extends AbstractDocBizController<LhRepair
     @Override
     protected String getTypeCode() {
         return "0";
+    }
+
+    @Override
+    protected String[] getQueryFormulas() {
+        return lhRepairCapsuleService.getQueryFormulas();
     }
 
     @Override

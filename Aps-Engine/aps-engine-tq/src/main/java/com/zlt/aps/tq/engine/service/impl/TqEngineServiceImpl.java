@@ -1151,32 +1151,32 @@ public class TqEngineServiceImpl implements TqEngineService {
             return true;
         }).filter(m -> StringUtils.contains(m.getOpenMachineClass(), classCode)) // 对应班次可用
                 .filter(m -> {// 寸口需要在工装范围内
-                    String toolingInfo = m.getToolingInfo(); // 工装信息
-                    if (StringUtils.isNotEmpty(toolingInfo)) {
-                        String[] toolingInfoArr = toolingInfo.split("-");
-                        BigDecimal minDimension = BigDecimal.ZERO;
-                        BigDecimal maxDimension = BigDecimal.ZERO;
-                        if (toolingInfoArr.length > 0) {
-                            String minDimensionStr = toolingInfoArr[0];
-                            minDimension = NumberUtils.isDigits(minDimensionStr) ? new BigDecimal(minDimensionStr)
-                                    : BigDecimal.ZERO; // 寸口限制最小
-                        }
-                        if (toolingInfoArr.length > 1) {
-                            String maxDimensionStr = toolingInfoArr[1];
-                            maxDimension = NumberUtils.isDigits(maxDimensionStr) ? new BigDecimal(maxDimensionStr)
-                                    : BigDecimal.ZERO; // 寸口限制最大
-                            if (minDimension.compareTo(maxDimension) > 0) {
-                                maxDimension = minDimension;
-                            }
-                        }
-                        if (minDimension.compareTo(dimension) > 0) {
-                            return false;
-                        }
-                        if (maxDimension.compareTo(dimension) < 0) {
-                            return false;
-                        }
-                        return true;
-                    }
+//                    String toolingInfo = m.getToolingInfo(); // 工装信息
+//                    if (StringUtils.isNotEmpty(toolingInfo)) {
+//                        String[] toolingInfoArr = toolingInfo.split("-");
+//                        BigDecimal minDimension = BigDecimal.ZERO;
+//                        BigDecimal maxDimension = BigDecimal.ZERO;
+//                        if (toolingInfoArr.length > 0) {
+//                            String minDimensionStr = toolingInfoArr[0];
+//                            minDimension = NumberUtils.isDigits(minDimensionStr) ? new BigDecimal(minDimensionStr)
+//                                    : BigDecimal.ZERO; // 寸口限制最小
+//                        }
+//                        if (toolingInfoArr.length > 1) {
+//                            String maxDimensionStr = toolingInfoArr[1];
+//                            maxDimension = NumberUtils.isDigits(maxDimensionStr) ? new BigDecimal(maxDimensionStr)
+//                                    : BigDecimal.ZERO; // 寸口限制最大
+//                            if (minDimension.compareTo(maxDimension) > 0) {
+//                                maxDimension = minDimension;
+//                            }
+//                        }
+//                        if (minDimension.compareTo(dimension) > 0) {
+//                            return false;
+//                        }
+//                        if (maxDimension.compareTo(dimension) < 0) {
+//                            return false;
+//                        }
+//                        return true;
+//                    }
                     return false;
                 }).sorted(new Comparator<TqMachineInfo>() {// 按剩余产能升序排序
                     @Override

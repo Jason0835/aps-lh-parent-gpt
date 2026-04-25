@@ -146,6 +146,8 @@ public class MdmCxMachineFixedController extends AbstractDocBizController<MdmCxM
             mergedItem.setFixedStructure2(mergeField(groupItemList, MdmCxMachineFixed::getFixedStructure2));
             // 合并固定结构3
             mergedItem.setFixedStructure3(mergeField(groupItemList, MdmCxMachineFixed::getFixedStructure3));
+            // 合并固定结构4
+            mergedItem.setFixedStructure4(mergeField(groupItemList, MdmCxMachineFixed::getFixedStructure4));
             // 合并固定SKU
             mergedItem.setFixedMaterialCode(mergeField(groupItemList, MdmCxMachineFixed::getFixedMaterialCode));
             // 合并固定物料描述
@@ -222,8 +224,9 @@ public class MdmCxMachineFixedController extends AbstractDocBizController<MdmCxM
                 List<String> splitFixedStructure1 = machineFixed.getSplitFixedStructure1();
                 List<String> splitFixedStructure2 = machineFixed.getSplitFixedStructure2();
                 List<String> splitFixedStructure3 = machineFixed.getSplitFixedStructure3();
+                List<String> splitFixedStructure4 = machineFixed.getSplitFixedStructure4();
 
-                int splitFixedStructureMaxSize = Math.max(Math.max(splitFixedStructure1.size(), splitFixedStructure2.size()), splitFixedStructure3.size());
+                int splitFixedStructureMaxSize = Math.max(Math.max(Math.max(splitFixedStructure1.size(), splitFixedStructure2.size()), splitFixedStructure3.size()),splitFixedStructure4.size());
 
                 List<String> splitFixedMaterialCode = machineFixed.getSplitFixedMaterialCode();
                 List<String> splitFixedMaterialDesc = machineFixed.getSplitFixedMaterialDesc();
@@ -249,6 +252,9 @@ public class MdmCxMachineFixedController extends AbstractDocBizController<MdmCxM
                     }
                     if (i < splitFixedStructure3.size()) {
                         fixed.setFixedStructure3(splitFixedStructure3.get(i));
+                    }
+                    if (i < splitFixedStructure4.size()) {
+                        fixed.setFixedStructure4(splitFixedStructure4.get(i));
                     }
 
                     if (i < splitFixedMaterialCode.size()) {
@@ -292,6 +298,7 @@ public class MdmCxMachineFixedController extends AbstractDocBizController<MdmCxM
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("fixedStructure1")), "FIXED_STRUCTURE1", queryVO.getFieldValueByFieldName("fixedStructure1"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("fixedStructure2")), "FIXED_STRUCTURE2", queryVO.getFieldValueByFieldName("fixedStructure2"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("fixedStructure3")), "FIXED_STRUCTURE3", queryVO.getFieldValueByFieldName("fixedStructure3"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("fixedStructure4")), "FIXED_STRUCTURE4", queryVO.getFieldValueByFieldName("fixedStructure4"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("fixedMaterialCode")), "FIXED_MATERIAL_CODE", queryVO.getFieldValueByFieldName("fixedMaterialCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("disableStructure")), "DISABLE_STRUCTURE", queryVO.getFieldValueByFieldName("disableStructure"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("disableMaterialCode")), "DISABLE_MATERIAL_CODE", queryVO.getFieldValueByFieldName("disableMaterialCode"));

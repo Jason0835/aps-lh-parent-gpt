@@ -82,6 +82,15 @@ public class MdmCxMachineFixed extends BaseEntity {
     private String fixedStructure3;
 
     /**
+     * 固定结构4 多个以,分隔拼接
+     */
+    @ImportExcelValidated(maxLength = 500)
+    @Excel(name = "ui.data.column.mdmCxMachineFixed.fixedStructure4")
+    @ApiModelProperty(value = "固定结构4 多个以,分隔拼接", name = "fixedStructure4")
+    @TableField(value = "FIXED_STRUCTURE4", updateStrategy = FieldStrategy.IGNORED)
+    private String fixedStructure4;
+
+    /**
      * 固定SKU  多个以,分隔拼接
      */
     @ImportExcelValidated(maxLength = 500)
@@ -139,6 +148,11 @@ public class MdmCxMachineFixed extends BaseEntity {
     public List<String> getSplitFixedStructure3() {
         String fixedStructure3 = StringUtils.defaultIfBlank(this.fixedStructure3, "");
         return Arrays.stream(fixedStructure3.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
+    }
+
+    public List<String> getSplitFixedStructure4() {
+        String fixedStructure4 = StringUtils.defaultIfBlank(this.fixedStructure4, "");
+        return Arrays.stream(fixedStructure4.split(",")).filter(StringUtils::isNotBlank).map(String::trim).collect(Collectors.toList());
     }
 
     public List<String> getSplitFixedMaterialCode() {
