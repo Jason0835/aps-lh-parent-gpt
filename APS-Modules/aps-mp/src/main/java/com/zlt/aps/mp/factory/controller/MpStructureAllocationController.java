@@ -45,6 +45,7 @@ import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -319,6 +320,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         String[] params4DayResult;
         String monthPlanVersion;
         String productVersion = "I" + DateUtils.dateTimeNow();
+        ZipSecureFile.setMinInflateRatio(Double.MIN_VALUE); // 跳过poi的解压倍数校验
         try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
             Sheet sheet = wb.getSheet(sheetName);
             if (sheet == null || sheet.getRow(0) == null) {
