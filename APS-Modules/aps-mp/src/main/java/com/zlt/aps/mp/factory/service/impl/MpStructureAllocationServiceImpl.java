@@ -2086,6 +2086,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             String noFactoryStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noFactoryStr");
             String yearErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.yearErrorStr");
             String monthErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.monthErrorStr");
+            String notTotalQtyStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noTotalQty");
 
             // 过滤合计等数据
             list = list.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialCode())).collect(Collectors.toList());
@@ -2102,6 +2103,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
                 // 赋值开始结束日期
                 setBeginDayAndEndDay(item);
+                // 校验是否有排产
+                item.statisticsTotalQty(); // 统计总排产量
+                if (item.getTotalQty() <= 0) {
+                    item.setId(-999L);
+                    failureNum++;
+                    addImportErrorLog(importLogId, errorNum, notTotalQtyStr, importErrorLogs);
+                    continue;
+                }
 
                 if (productTypeMap.containsKey(params[3])) {
                     item.setProductTypeCode(productTypeMap.get(params[3]));
@@ -2290,7 +2299,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             insertItem.setTypeBlockQty(insertResults.getOrDefault(materialDesc, 0));
             
             // 各排产量倒推，高优先级排产数量 = min(高优先级，剩余排产量) ->中优先级排产数量 = min(中优先级，剩余排产量) ->周期排产储备排产 = min(周期储备量，剩余排产量) -> 常规储备排产 = 剩余排产量；
-            insertItem.statisticsTotalQty();
             insertItem.allocateProductionByPriority();
             // 生成统计信息（handleMonthPlanStatistics）
             mpMonthPlanStaticService.handleMonthPlanStatistics(insertList);
