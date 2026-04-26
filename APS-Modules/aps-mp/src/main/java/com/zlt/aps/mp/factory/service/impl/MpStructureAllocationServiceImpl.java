@@ -60,6 +60,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -119,8 +120,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final FactoryMonthPlanProductLhCapacityMapper factoryMonthPlanProductLhCapacityMapper;
     private final IFactoryParamService factoryParamService;
     private final MoldCavityInsertMaxValueCalculatorImpl moldCavityInsertMaxValueCalculator;
-    private final MpMonthPlanStaticService mpMonthPlanStaticService;
     private final Map<Long, Map<String, String>> importMachineMapCache = new ConcurrentHashMap<>();
+    @Autowired
+    @Lazy
+    private MpMonthPlanStaticService mpMonthPlanStaticService;
     /**
      * 日计划字段名称
      */
