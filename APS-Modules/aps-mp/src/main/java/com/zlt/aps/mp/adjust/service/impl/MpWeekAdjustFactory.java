@@ -35,7 +35,9 @@ public class MpWeekAdjustFactory {
     public void init() {
         strategyList.forEach(item -> {
             WeekAdjustType annotation = AnnotationUtils.findAnnotation(item.getClass(), WeekAdjustType.class);
-            strategyMap.put(annotation.adjustType(),item);
+            if (annotation != null) {
+                strategyMap.put(annotation.adjustType(),item);
+            }
         });
     }
 

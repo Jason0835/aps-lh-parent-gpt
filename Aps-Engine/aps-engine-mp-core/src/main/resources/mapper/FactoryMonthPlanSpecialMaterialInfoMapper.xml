@@ -30,12 +30,22 @@
     </select>
 
     <select id="getSpecialMaterialEmbryoInfoByRequire" resultType="com.zlt.aps.mp.engine.domain.vo.EmbryoSpecialMaterialInfoVo">
-        SELECT mcd.FACTORY_CODE,
+        SELECT distinct 
+               mcd.FACTORY_CODE,
                mcd.EMBRYO_CODE,
                mcd.CHILD_MATERIAL_CODE,
                mcd.CHILD_MATERIAL_NAME,
-               mcd.DOSAGE
+               mcd.DOSAGE,
+               mpc.EMBRYO_CODE,
+               msr.STRUCTURE_NAME
           FROM t_mdm_material_consume_detail mcd
+         INNER JOIN t_mdm_sku_construction_ref mpc
+            ON mcd.EMBRYO_CODE = mpc.EMBRYO_CODE
+           AND mpc.FACTORY_CODE = mcd.FACTORY_CODE
+           AND IFNULL(mpc.IS_DELETE, 0) = 0
+         INNER JOIN t_mdm_sku_structure_ref msr
+            ON msr.MAIN_MATERIAL_DESC = mpc.MAIN_MATERIAL_DESC
+           AND IFNULL(msr.IS_DELETE, 0) = 0
          WHERE IFNULL(mcd.IS_DELETE, 0) = 0
            AND mcd.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND EXISTS (SELECT 1
@@ -46,17 +56,11 @@
                           AND smr.MATERIAL_CODE = mcd.CHILD_MATERIAL_CODE)
            AND EXISTS (SELECT 1
                          FROM t_dp_demand_plan prp
-                         LEFT JOIN t_mdm_sku_construction_ref mpc
-                           ON mpc.FACTORY_CODE = prp.FACTORY_CODE
-                          AND mpc.MATERIAL_CODE = prp.MATERIAL_CODE
-                          AND IFNULL(mpc.IS_DELETE, 0) = 0
                         WHERE IFNULL(prp.IS_DELETE, 0) = 0
-                          AND mpc.ID IS NOT NULL
-                          AND prp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-                          AND prp.YEAR = #{year,jdbcType=DECIMAL}
-                          AND prp.MONTH = #{month,jdbcType=DECIMAL}
                           AND prp.MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
-                          AND mcd.EMBRYO_CODE = mpc.EMBRYO_CODE)
+                          AND prp.FACTORY_CODE = mpc.FACTORY_CODE
+                          AND prp.MATERIAL_CODE = mpc.MATERIAL_CODE
+                          )
     </select>
 
     <select id="getSpecialMaterialStockInfo" resultType="com.zlt.aps.mp.engine.domain.vo.SpecialMaterialStockVo">

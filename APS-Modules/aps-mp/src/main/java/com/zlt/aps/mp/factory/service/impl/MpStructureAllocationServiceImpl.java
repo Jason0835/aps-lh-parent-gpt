@@ -25,14 +25,24 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
+import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.mp.adjust.service.impl.MpMonthPlanStaticService;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.api.enums.AlternativeTypeEnum;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
+import com.zlt.aps.mp.engine.basedata.assemble.construction.ConstructionSelector;
+import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductConstructionInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductLhCapacityVo;
+import com.zlt.aps.mp.engine.enums.DayVulcanizationModeEnum;
+import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductConstructionMapper;
+import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductLhCapacityMapper;
 import com.zlt.aps.mp.engine.mapper.FactoryMouldingDayResultMapper;
 import com.zlt.aps.mp.enums.StructureAllocationExportDataTypeEnum;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportChangeCountVo;
@@ -44,10 +54,12 @@ import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.common.utils.StringUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -60,6 +72,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.zlt.common.utils.ImportExcelValidatedUtils.addImportErrorLog;
@@ -101,6 +115,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final DpDemandPlanEntityMapper dpDemandPlanEntityMapper;
     private final FactoryMonthPlanProductionFinalResultEntityMapper factoryMonthPlanProductionFinalResultEntityMapper;
     private final ISysDictDataCacheService sysDictDataCacheService;
+    private final FactoryMonthPlanProductConstructionMapper factoryMonthPlanProductConstructionMapper;
+    private final FactoryMonthPlanProductLhCapacityMapper factoryMonthPlanProductLhCapacityMapper;
+    private final IFactoryParamService factoryParamService;
+    private final MoldCavityInsertMaxValueCalculatorImpl moldCavityInsertMaxValueCalculator;
+    private final MpMonthPlanStaticService mpMonthPlanStaticService;
     private final Map<Long, Map<String, String>> importMachineMapCache = new ConcurrentHashMap<>();
     /**
      * 日计划字段名称
@@ -1786,7 +1805,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             setBeginDayAndEndDay(item);
             // 赋值交替类型（仅对校验通过的有效记录）
             genAlternatingType(item, machineLastValidRecordMap, lastMonthMachineFinalMap);
-//            item.setIsHasSpecialMaterial();
             insertList.add(item);
 
             machineMap.put(item.getStructureName(), item.getCxMachineCode());
@@ -1798,6 +1816,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         try {
             successNum = insertList.size();
             if(CollUtil.isNotEmpty(insertList)){
+                // 填充关联栏位
+                this.fillStructureAllocation(insertList);
                 // 插入新记录
                 baseDao.insertBatch(insertList);
             }
@@ -1818,7 +1838,129 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
     }
 
+    /**
+     * 填充导入结构转产表数据的关联栏位
+     * @param insertList
+     */
+    private void fillStructureAllocation(List<MpStructureAllocation> insertList) {
+        // 填充关联字段
+        MpStructureAllocation mpStructureAllocation = CollectionUtils.firstElement(insertList);
+        // 创建计时器
+        StopWatch watch = new StopWatch();
+        watch.start();
+
+        // 创建查询数据的异步任务
+        // 查询月周期排产结构配置
+        CompletableFuture<List<MdmMonCycleSchStruConf>> monCycleSchStruConfFuture = CompletableFuture.supplyAsync(
+                () -> queryMdmMonCycleSchStruConf(mpStructureAllocation)
+        );
+        // 查询周期排产结构配置
+        CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture = CompletableFuture.supplyAsync(
+                () -> queryMdmCycleSchStruConf(mpStructureAllocation)
+        );
+        // 查询工厂排产设定
+        CompletableFuture<List<FactoryParam>> factoryParamFuture = CompletableFuture.supplyAsync(
+                () -> queryFactoryParam(mpStructureAllocation)
+        );
+        // 查询BOM物料消耗明细
+        CompletableFuture<List<MdmMaterialConsumeDetail>> materialConsumeDetailFuture = CompletableFuture.supplyAsync(
+                () -> queryMaterialConsumeDetailList(mpStructureAllocation)
+        );
+        // 查询特殊材料记录
+        CompletableFuture<List<RawSpecialMaterialRecord>> rawSpecialMaterialRecordFuture = CompletableFuture.supplyAsync(
+                () -> querySpecialMaterialRecordList(mpStructureAllocation)
+        );
+        // 查询sku与结构关系
+        CompletableFuture<List<MdmSkuStructureRef>> skuStructureRefFuture = CompletableFuture.supplyAsync(
+                () -> querySkuStructureRef(mpStructureAllocation)
+        );
+
+        // 查询SKU与施工（示方书）关系
+        CompletableFuture<List<MdmSkuConstructionRef>> skuConstructionRefFuture = CompletableFuture.supplyAsync(
+                () -> querySkuConstructionRef(mpStructureAllocation)
+        );
+
+
+        try {
+            // 等待所有异步任务执行完成
+            CompletableFuture.allOf(
+                    monCycleSchStruConfFuture,
+                    cycleSchStruConfFuture,
+                    factoryParamFuture,
+                    materialConsumeDetailFuture,
+                    rawSpecialMaterialRecordFuture,
+                    skuStructureRefFuture,
+                    skuConstructionRefFuture
+            ).join();
+
+            log.info("并行查询数据执行完成");
+
+        } catch (CompletionException e) {
+            // 异常处理
+            Throwable throwable = e.getCause();
+            log.error("查询数据失败! 失败原因:{}", throwable.getMessage(), throwable);
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.initDataFailure"), throwable);
+        } finally {
+            watch.stop();
+        }
+
+        log.info("初始化任务执行完成 ==> 耗时:{} ms", watch.getLastTaskTimeMillis());
+
+        List<MdmMonCycleSchStruConf> monCycleSchStruConfList = monCycleSchStruConfFuture.join();
+        List<MdmCycleSchStruConf> cycleSchStruConfList = cycleSchStruConfFuture.join();
+        List<FactoryParam> factoryParamList = factoryParamFuture.join();
+        List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = materialConsumeDetailFuture.join();
+        List<RawSpecialMaterialRecord> specialMaterialList = rawSpecialMaterialRecordFuture.join();
+        List<MdmSkuStructureRef> skuStructureRefList = skuStructureRefFuture.join();
+        List<MdmSkuConstructionRef> skuConstructionRefList= skuConstructionRefFuture.join();
+        
+        for (MpStructureAllocation structure: insertList) {
+            String structureName = structure.getStructureName();
+            // 设置是否含有特殊材料
+            String materialCode = skuStructureRefList.stream()
+                    .filter(vo -> StringUtils.equals(vo.getStructureName(), structure.getStructureName()))
+                    .findFirst()
+                    .map(MdmSkuStructureRef::getMaterialCode)
+                    .orElse(null);
+            String embryoCode = skuConstructionRefList.stream()
+                    .filter(vo -> StringUtils.equals(vo.getMaterialCode(), materialCode))
+                    .findFirst()
+                    .map(MdmSkuConstructionRef::getEmbryoCode)
+                    .orElse(null);
+            boolean isHasSpecialMaterial = hasSpecialMaterial(embryoCode, mdmMaterialConsumeDetailList, specialMaterialList);
+            structure.setIsHasSpecialMaterial(isHasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
+            
+
+            // 设置实单最低硫化机台数
+            Integer minLhMachineCount = 0;
+            MdmMonCycleSchStruConf monCycleSchStruConf = monCycleSchStruConfList.stream()
+                    .filter(v -> StringUtils.equals(structureName, v.getStructureName()))
+                    .findFirst()
+                    .orElse(new MdmMonCycleSchStruConf());
+            minLhMachineCount = monCycleSchStruConf.getMinVulcanizingMachine();
+
+            if (minLhMachineCount == null) {
+                MdmCycleSchStruConf cycleSchStruConf = cycleSchStruConfList.stream()
+                        .filter(v -> StringUtils.equals(structureName, v.getStructureName()))
+                        .findFirst()
+                        .orElse(new MdmCycleSchStruConf());
+                minLhMachineCount = cycleSchStruConf.getMinVulcanizingMachine();
+            }
+
+            if (minLhMachineCount == null) {
+                FactoryParam factoryParam = factoryParamList.stream()
+                        .filter(v -> StringUtils.equals(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode(), v.getParamCode()))
+                        .findFirst()
+                        .orElse(new FactoryParam());
+                minLhMachineCount = Convert.toInt(factoryParam.getParamValue(), 0);
+            }
+        }
+    }
+
     private void setBeginDayAndEndDay(MpStructureAllocation item) {
+        if (item.getBeginDay() != null && item.getEndDay() != null) {
+            return;
+        }
         for (int i = 1; i <= 31; i++) {
             Object fieldValue = ReflectUtils.getFieldValue(item, "day" + i);
             if (ObjUtil.isNotNull(fieldValue)) {
@@ -2010,6 +2152,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             try {
                 successNum = insertList.size();
                 if(CollUtil.isNotEmpty(insertList)) {
+                    // 填充字段信息
+                    this.fillMonthPlanMouldResult(insertList);
                     // 插入新记录
                     baseDao.insertBatch(insertList);
                 }
@@ -2028,6 +2172,125 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             }
         } finally {
             clearImportMachineMap(importLogId);
+        }
+    }
+    
+    /**
+     * 填充导入月计划数据的关联栏位
+     * @param insertList
+     */
+    private void fillMonthPlanMouldResult(List<FactoryMonthPlanMouldDayResult> insertList) {
+        // 计划类型、产品品类、MES物料编码、产品分类、排产分类、规格、花纹、品牌、SUM(高优先级数量)、月均销量、库销比、SUM(生产需求计划)、SUM(实际生产需求（含损耗）)、结构类型 --- 数据源：需求计划
+        FactoryMonthPlanMouldDayResult firstResult = CollectionUtils.firstElement(insertList);
+        String monthPlanVersion = firstResult.getMonthPlanVersion();
+//        String productionVersion = firstResult.getProductionVersion();
+        String factoryCode = firstResult.getFactoryCode();
+        String productTypeCode = firstResult.getProductTypeCode();
+        Integer year = firstResult.getYear();
+        Integer month = firstResult.getMonth();
+        
+        // 加载需求计划
+        QueryWrapper<DpDemandPlan> dpDemandPlanQueryWrapper = new QueryWrapper<>();
+        dpDemandPlanQueryWrapper.select("MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
+                "PRODUCTION_TYPE", "SPECIFICATIONS", "PATTERN", "BRAND", "SUM(HEIGHT_QTY) HEIGHT_QTY",
+                "AVERAGE_SALE_QTY", "STOCK_QTY", "SUM(NET_QTY) NET_QTY", "SUM(POSTPONE_NET_QTY) POSTPONE_NET_QTY",
+                "STRUCTURE_TYPE");
+        dpDemandPlanQueryWrapper.groupBy("MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
+                "PRODUCTION_TYPE", "SPECIFICATIONS", "PATTERN", "BRAND", "AVERAGE_SALE_QTY", "STOCK_QTY",
+                "STRUCTURE_TYPE");
+        dpDemandPlanQueryWrapper.eq("FACTORY_CODE", factoryCode);
+        dpDemandPlanQueryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
+        Map<String, DpDemandPlan> dpDemandPlanMap = dpDemandPlanEntityMapper.selectList(dpDemandPlanQueryWrapper)
+                .stream().filter(p -> p.getUnPostponeNetQty() != null)
+                .collect(Collectors.toMap(DpDemandPlan::getMaterialCode, Function.identity()));
+        // 加载sku与施工关系
+        Map<String, List<MonthPlanProductConstructionInfoVo>> constructionInfoMap = factoryMonthPlanProductConstructionMapper
+                .getConstructionByRequire(factoryCode, year, month, monthPlanVersion).stream()
+                .collect(Collectors.groupingBy(MonthPlanProductConstructionInfoVo::getMaterialCode));
+        // 日硫化量获取
+        DayVulcanizationModeEnum mode = null;
+        FactoryParam dayVulcanizationParam = CollectionUtils.firstElement(factoryParamService.getFactoryParamByCondition(factoryCode, productTypeCode, Collections.singletonList(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode())));
+        if (dayVulcanizationParam != null) {
+            String dayVulcanizationCode = StringUtils.isNoneEmpty(dayVulcanizationParam.getParamValue())? dayVulcanizationParam.getParamValue(): dayVulcanizationParam.getDefauleValue();
+            mode = DayVulcanizationModeEnum.getInstance(dayVulcanizationCode);
+        } else {
+            mode = DayVulcanizationModeEnum.STANDARD_CAPACITY;
+        }
+        Map<String, MonthPlanProductLhCapacityVo> productLhCapacityMap = factoryMonthPlanProductLhCapacityMapper
+                .getProductionLhCapacityInfo(factoryCode, year, month, monthPlanVersion).stream().collect(Collectors
+                        .toMap(MonthPlanProductLhCapacityVo::getMaterialCode, Function.identity(), (m1, m2) -> m1));
+        // 加载型腔活块数
+        Map<String, Integer> cavityResults = new HashMap<>(0); // 型腔可用量（按结构+主花纹分组）
+        Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
+        List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
+                .moldCavityInsertMaxValueCalculator(year, month, factoryCode,
+                        null, null, true);
+        if (!CollectionUtils.isEmpty(moldResult)) {
+            cavityResults = moldResult.get(0).getCavityResults();
+            insertResults = moldResult.get(0).getInsertResults();
+        }
+        
+        
+        for (FactoryMonthPlanMouldDayResult insertItem: insertList) {
+            String structureName = insertItem.getStructureName();
+            String materialDesc = insertItem.getMaterialDesc();
+            String materialCode = insertItem.getMaterialCode();
+            DpDemandPlan demandPlan = dpDemandPlanMap.get(materialCode);
+            if (demandPlan != null) {
+                structureName = demandPlan.getStructureName();
+                insertItem.setStructureName(structureName);
+                insertItem.setMesMaterialCode(demandPlan.getMesMaterialCode());
+                insertItem.setPlanType(demandPlan.getPlanType());
+                insertItem.setProductTypeCode(demandPlan.getProductTypeCode());
+                insertItem.setSpecifications(demandPlan.getSpecifications());
+                insertItem.setPattern(demandPlan.getPattern());
+                insertItem.setBrand(demandPlan.getBrand());
+                insertItem.setHeightQty(demandPlan.getHeightQty());
+                insertItem.setAverageSaleQty(demandPlan.getAverageSaleQty());
+                insertItem.setProdReqPlan(demandPlan.getNetQty());
+                insertItem.setStructureType(demandPlan.getStructureType());
+                insertItem.setMainPattern(demandPlan.getMainPattern());
+            }
+            // 胎胚号、施工阶段、是否零度材料、制造示方书号、文字示方书号、硫化示方书号---数据源：SKU与示方书关系，关联：SKU+胎胚描述
+            List<MonthPlanProductConstructionInfoVo> constructionConfigurationList = constructionInfoMap.get(materialCode);
+            if (!CollectionUtils.isEmpty(constructionConfigurationList)) {
+                MonthPlanProductConstructionInfoVo constructionInfo = ConstructionSelector.selectOneConstruction(constructionConfigurationList, insertItem.getProductTypeCode());
+                if (constructionInfo != null) {
+                    insertItem.setEmbryoCode(constructionInfo.getEmbryoCode());
+                    insertItem.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
+                    insertItem.setIsZeroRack(constructionInfo.getIsZeroRack());
+                    insertItem.setEmbryoNo(constructionInfo.getEmbryoNo());
+                    insertItem.setTextNo(constructionInfo.getTextNo());
+                    insertItem.setLhNo(constructionInfo.getLhNo());
+                } else {
+                    insertItem.setConstructionStage(ConstructionStageEnum.NO_CONSTRUCTION.getStage());
+                }
+            }
+            // 日硫化量（单模），单条硫化时间---数据源：SKU双模日硫化量， 日标准产量/2，硫化总时间(s)
+            MonthPlanProductLhCapacityVo capacityVo = productLhCapacityMap.get(materialCode);
+            if (capacityVo != null) {
+                capacityVo.calculateDayVulcanizationQty(mode);
+                insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty());
+            }
+            
+            // 英寸---根据结构名称解析
+            if (!StringUtil.isEmptyWithTrim(structureName)){
+                // 正则：R后面跟数字（可能带小数点）
+                Pattern pattern = Pattern.compile("R\\d+(?:\\.\\d+)?");
+                Matcher matcher = pattern.matcher(structureName);
+                String proSize = matcher.find() ? matcher.group() : "";
+                insertItem.setProSize(proSize);
+            }
+            
+            // 型腔数量---同结构主花纹最大的型腔数量
+            insertItem.setMouldCavityQty(cavityResults.getOrDefault(insertItem.getStructureName() + insertItem.getMainPattern(), 0));
+            insertItem.setTypeBlockQty(insertResults.getOrDefault(materialDesc, 0));
+            
+            // 各排产量倒推，高优先级排产数量 = min(高优先级，剩余排产量) ->中优先级排产数量 = min(中优先级，剩余排产量) ->周期排产储备排产 = min(周期储备量，剩余排产量) -> 常规储备排产 = 剩余排产量；
+            insertItem.statisticsTotalQty();
+            insertItem.allocateProductionByPriority();
+            // 生成统计信息（handleMonthPlanStatistics）
+            mpMonthPlanStaticService.handleMonthPlanStatistics(insertList);
         }
     }
 

@@ -29,4 +29,8 @@ public class EmbryoSpecialMaterialInfoVo implements Serializable {
      * 一条胎胚消耗的数量
      */
     private BigDecimal dosage;
+    /**
+     * 结构名称
+     */
+    private String structureName;
 }
