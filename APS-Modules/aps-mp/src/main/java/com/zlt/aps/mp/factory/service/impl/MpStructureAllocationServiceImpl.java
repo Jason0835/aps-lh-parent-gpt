@@ -2269,6 +2269,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 insertItem.setPattern(demandPlan.getPattern());
                 insertItem.setBrand(demandPlan.getBrand());
                 insertItem.setHeightQty(demandPlan.getHeightQty());
+                insertItem.setHeightLossQty(demandPlan.getHeightQty());
+                insertItem.setMidLossQty(demandPlan.getMidQty());
+                insertItem.setCycleReserveLossQty(demandPlan.getCycleReserveQty());
+                insertItem.setConventionReserveQty(demandPlan.getConventionReserveQty());
+                insertItem.setPostponeQty(demandPlan.getPostponeQty());
                 insertItem.setAverageSaleQty(demandPlan.getAverageSaleQty());
                 insertItem.setProdReqPlan(demandPlan.getNetQty());
                 insertItem.setStructureType(demandPlan.getStructureType());
