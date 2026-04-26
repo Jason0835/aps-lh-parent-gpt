@@ -2301,7 +2301,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             MonthPlanProductLhCapacityVo capacityVo = productLhCapacityMap.get(materialCode);
             if (capacityVo != null) {
                 capacityVo.calculateDayVulcanizationQty(mode);
-                insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty());
+                insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty()/2);
             }
             
             // 英寸---根据结构名称解析
