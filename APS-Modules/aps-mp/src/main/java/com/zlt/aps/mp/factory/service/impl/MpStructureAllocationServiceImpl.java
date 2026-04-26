@@ -2217,10 +2217,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         dpDemandPlanQueryWrapper.select("MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
                 "PRODUCTION_TYPE", "SPECIFICATIONS", "PATTERN", "BRAND", "SUM(HEIGHT_QTY) HEIGHT_QTY",
                 "AVERAGE_SALE_QTY", "STOCK_QTY", "SUM(NET_QTY) NET_QTY", "SUM(POSTPONE_NET_QTY) POSTPONE_NET_QTY",
-                "STRUCTURE_TYPE");
+                "STRUCTURE_TYPE", "SUM(MID_QTY) MID_QTY", "SUM(CYCLE_RESERVE_QTY) CYCLE_RESERVE_QTY",
+                "SUM(CONVENTION_RESERVE_QTY) CONVENTION_RESERVE_QTY", "SUM(POSTPONE_QTY) POSTPONE_QTY", "MAIN_PATTERN");
         dpDemandPlanQueryWrapper.groupBy("MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
                 "PRODUCTION_TYPE", "SPECIFICATIONS", "PATTERN", "BRAND", "AVERAGE_SALE_QTY", "STOCK_QTY",
-                "STRUCTURE_TYPE");
+                "STRUCTURE_TYPE", "MAIN_PATTERN");
         dpDemandPlanQueryWrapper.eq("FACTORY_CODE", factoryCode);
         dpDemandPlanQueryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
         Map<String, DpDemandPlan> dpDemandPlanMap = dpDemandPlanEntityMapper.selectList(dpDemandPlanQueryWrapper)
