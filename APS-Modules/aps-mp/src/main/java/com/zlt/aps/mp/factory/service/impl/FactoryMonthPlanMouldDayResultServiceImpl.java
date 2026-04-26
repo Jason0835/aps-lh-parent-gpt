@@ -238,14 +238,14 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 Integer actualOrderUnproduced = heightQty + midQty - heightProductionQty - midProductionQty;
                 result.setActualOrderUnproduced(actualOrderUnproduced > 0? actualOrderUnproduced: 0);
                 // 2.1.2.4、补充型腔数
-                if (result.getMouldCavityQty() == null) {
+                if (result.getMouldCavityQty() == null || result.getMouldCavityQty() == 0) {
                     result.setMouldCavityQty(cavityResults.getOrDefault(result.getStructureName() + result.getMainPattern(), 0));
                 }
                 // 2.1.2.5、记录主花纹的最大型腔数
                 Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(result.getMainPattern(), 0);
                 maxMouldCavityQtyMap.put(result.getMainPattern(), Math.max(maxMouldCavityQty, result.getMouldCavityQty()));
                 // 2.1.2.5 补充活块数
-                if (result.getTypeBlockQty() == null) {
+                if (result.getTypeBlockQty() == null || result.getTypeBlockQty() == 0) {
                     result.setTypeBlockQty(insertResults.getOrDefault(result.getMaterialDesc(), 0));
                 }
                 // 2.1.2.6、记录物料的最大活块数

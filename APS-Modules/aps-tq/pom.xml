@@ -11,7 +11,6 @@
 
     <groupId>com.zlt.aps.tq</groupId>
     <artifactId>aps-tq</artifactId>
-    <version>1.0.3-SNAPSHOT</version>
     <name>aps-tq</name>
     <description>胎圈工序模块</description>
 
@@ -20,17 +19,20 @@
     </properties>
 
     <dependencies>
-<!--        <dependency>-->
-<!--            <groupId>com.zlt</groupId>-->
-<!--            <artifactId>zlt-module-starter</artifactId>-->
-<!--        </dependency>-->
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-module-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+        </dependency>
 <!--        &lt;!&ndash; 使用第三方swagger的ui  范围地址：http://localhost:8080/doc.html &ndash;&gt;-->
 <!--        <dependency>-->
 <!--            <groupId>com.github.xiaoymin</groupId>-->
 <!--            <artifactId>swagger-bootstrap-ui</artifactId>-->
 <!--            <version>1.9.6</version>-->
 <!--        </dependency>-->
-
         <dependency>
             <groupId>com.zlt.aps.tq</groupId>
             <artifactId>aps-tq-api</artifactId>

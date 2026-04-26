@@ -564,7 +564,7 @@ public class ExcelUtils {
                 FileUtils.writeByteArrayToFile(temp, tempBytes);
             }
             byte [] output = FileUtils.readFileToByteArray(temp);
-//            FileUtils.writeByteArrayToFile(new File("test.xlsx"), output);
+            FileUtils.writeByteArrayToFile(new File("test.xlsx"), output);
             if(temp.exists()) {
                 boolean delete = temp.delete();
             }

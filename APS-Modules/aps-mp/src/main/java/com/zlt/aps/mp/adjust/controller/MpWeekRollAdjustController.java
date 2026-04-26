@@ -124,14 +124,14 @@ public class MpWeekRollAdjustController extends BaseController {
     @ApiOperation("自动调整")
     @PostMapping("/autoAdjust")
     public AjaxResult autoAdjust(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
-        String key = ApsConstant.REDIS_ADJUST_STRUCT_AUTO + weekRollAdjustDTO.getFactoryCode()+weekRollAdjustDTO.getAdjustType();
-        if (!StringUtil.isEmptyWithTrim(weekRollAdjustDTO.getScheduledMachines())){
-            key = key+weekRollAdjustDTO.getScheduledMachines();
-        }
-        if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
-            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.distributed.lock.fail"));
-        }
-        redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
+//        String key = ApsConstant.REDIS_ADJUST_STRUCT_AUTO + weekRollAdjustDTO.getFactoryCode()+weekRollAdjustDTO.getAdjustType();
+//        if (!StringUtil.isEmptyWithTrim(weekRollAdjustDTO.getScheduledMachines())){
+//            key = key+weekRollAdjustDTO.getScheduledMachines();
+//        }
+//        if (ApsConstant.TRUE.equals(redisService.getCacheObject(key))) {
+//            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.distributed.lock.fail"));
+//        }
+//        redisService.setCacheObject(key, ApsConstant.TRUE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         try{
             // 获取周程滚动调整策略
             IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
@@ -153,7 +153,7 @@ public class MpWeekRollAdjustController extends BaseController {
             }
             return AjaxResult.success(contextDTO.getAdjustResultList());
         }finally {
-            redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
+//            redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         }
     }
 
