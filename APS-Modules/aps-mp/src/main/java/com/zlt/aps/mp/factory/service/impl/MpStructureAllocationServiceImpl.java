@@ -1841,8 +1841,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
         //返回提示信息及错误集合
         cacheImportMachineMap(importLogId, machineMap);
-        if (failureNum > 0) {
+        if (successNum == 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+        } else if (failureNum > 0) {
+            return AjaxResult.success(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
@@ -2184,8 +2186,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
             }
             //返回提示信息及错误集合
-            if (failureNum > 0) {
+            if (successNum == 0) {
                 return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+            } else if (failureNum > 0) {
+                return AjaxResult.success(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
             } else {
                 return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
             }
