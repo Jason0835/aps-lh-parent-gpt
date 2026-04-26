@@ -23,6 +23,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
@@ -2214,19 +2215,18 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         
         // 加载需求计划
         QueryWrapper<DpDemandPlan> dpDemandPlanQueryWrapper = new QueryWrapper<>();
-        dpDemandPlanQueryWrapper.select("MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
+        dpDemandPlanQueryWrapper.select("STRUCTURE_NAME", "MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
                 "PRODUCTION_TYPE", "SPECIFICATIONS", "PATTERN", "BRAND", "SUM(HEIGHT_QTY) HEIGHT_QTY",
                 "AVERAGE_SALE_QTY", "STOCK_QTY", "SUM(NET_QTY) NET_QTY", "SUM(POSTPONE_NET_QTY) POSTPONE_NET_QTY",
                 "STRUCTURE_TYPE", "SUM(MID_QTY) MID_QTY", "SUM(CYCLE_RESERVE_QTY) CYCLE_RESERVE_QTY",
                 "SUM(CONVENTION_RESERVE_QTY) CONVENTION_RESERVE_QTY", "SUM(POSTPONE_QTY) POSTPONE_QTY", "MAIN_PATTERN");
-        dpDemandPlanQueryWrapper.groupBy("MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
+        dpDemandPlanQueryWrapper.groupBy("STRUCTURE_NAME", "MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
                 "PRODUCTION_TYPE", "SPECIFICATIONS", "PATTERN", "BRAND", "AVERAGE_SALE_QTY", "STOCK_QTY",
                 "STRUCTURE_TYPE", "MAIN_PATTERN");
         dpDemandPlanQueryWrapper.eq("FACTORY_CODE", factoryCode);
         dpDemandPlanQueryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
         Map<String, DpDemandPlan> dpDemandPlanMap = dpDemandPlanEntityMapper.selectList(dpDemandPlanQueryWrapper)
-                .stream().filter(p -> p.getUnPostponeNetQty() != null)
-                .collect(Collectors.toMap(DpDemandPlan::getMaterialCode, Function.identity()));
+                .stream().collect(Collectors.toMap(DpDemandPlan::getMaterialCode, Function.identity()));
         // 加载sku与施工关系
         Map<String, List<MonthPlanProductConstructionInfoVo>> constructionInfoMap = factoryMonthPlanProductConstructionMapper
                 .getConstructionByRequire(factoryCode, year, month, monthPlanVersion).stream()
@@ -2279,6 +2279,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 insertItem.setProdReqPlan(demandPlan.getNetQty());
                 insertItem.setStructureType(demandPlan.getStructureType());
                 insertItem.setMainPattern(demandPlan.getMainPattern());
+                // 计算库销比
+                insertItem.setInventorySalesRatio(BigDecimalUtils.div(demandPlan.getStockQty(), demandPlan.getAverageSaleQty(), 1));
             }
             // 胎胚号、施工阶段、是否零度材料、制造示方书号、文字示方书号、硫化示方书号---数据源：SKU与示方书关系，关联：SKU+胎胚描述
             List<MonthPlanProductConstructionInfoVo> constructionConfigurationList = constructionInfoMap.get(materialCode);
@@ -2317,9 +2319,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             
             // 各排产量倒推，高优先级排产数量 = min(高优先级，剩余排产量) ->中优先级排产数量 = min(中优先级，剩余排产量) ->周期排产储备排产 = min(周期储备量，剩余排产量) -> 常规储备排产 = 剩余排产量；
             insertItem.allocateProductionByPriority();
-            // 生成统计信息（handleMonthPlanStatistics）
-            mpMonthPlanStaticService.handleMonthPlanStatistics(insertList);
         }
+        // 生成统计信息（handleMonthPlanStatistics）
+        mpMonthPlanStaticService.handleMonthPlanStatistics(insertList);
     }
 
     private void setBeginDayAndEndDay(FactoryMonthPlanMouldDayResult item) {
