@@ -1747,6 +1747,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         String noFactoryStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noFactoryStr");
         String yearErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.yearErrorStr");
         String monthErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.monthErrorStr");
+        String noPlanStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noPlanStr");
 
         // 过滤合计等数据
         list = list.stream().filter(item -> StringUtils.isNotBlank(item.getCxMachineCode())).collect(Collectors.toList());
@@ -1806,6 +1807,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             }
             // 赋值开始结束日期
             setBeginDayAndEndDay(item);
+            if (item.getBeginDay() == null || item.getEndDay() == null) { // 没有排产的结构过滤掉
+                item.setId(-999L);
+                failureNum++;
+                addImportErrorLog(importLogId, errorNum, noPlanStr, importErrorLogs);
+                continue;
+            }
             // 赋值交替类型（仅对校验通过的有效记录）
             genAlternatingType(item, machineLastValidRecordMap, lastMonthMachineFinalMap);
             insertList.add(item);
