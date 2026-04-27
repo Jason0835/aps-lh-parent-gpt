@@ -193,7 +193,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     /**
      * 导出列表
      */
-    @Log(title = "S2-0604.排产结果-生产计划排产结果", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.factoryMonthPlanMouldDayResult.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override
@@ -214,7 +214,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     /**
      * 全物料导出
      */
-    @Log(title = "S2-0604.排产结果-全物料导出", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.factoryMonthPlanMouldDayResult.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("全物料导出")
     @PostMapping("/exportAllMaterial/{fileName}")
     public byte[] exportAllMaterial(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,

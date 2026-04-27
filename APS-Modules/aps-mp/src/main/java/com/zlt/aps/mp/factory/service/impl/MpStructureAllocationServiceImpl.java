@@ -23,6 +23,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
@@ -1747,6 +1748,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         String noFactoryStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noFactoryStr");
         String yearErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.yearErrorStr");
         String monthErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.monthErrorStr");
+        String noPlanStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noPlanStr");
 
         // 过滤合计等数据
         list = list.stream().filter(item -> StringUtils.isNotBlank(item.getCxMachineCode())).collect(Collectors.toList());
@@ -1806,6 +1808,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             }
             // 赋值开始结束日期
             setBeginDayAndEndDay(item);
+            if (item.getBeginDay() == null || item.getEndDay() == null) { // 没有排产的结构过滤掉
+                item.setId(-999L);
+                failureNum++;
+                addImportErrorLog(importLogId, errorNum, noPlanStr, importErrorLogs);
+                continue;
+            }
             // 赋值交替类型（仅对校验通过的有效记录）
             genAlternatingType(item, machineLastValidRecordMap, lastMonthMachineFinalMap);
             insertList.add(item);
@@ -1834,8 +1842,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
         //返回提示信息及错误集合
         cacheImportMachineMap(importLogId, machineMap);
-        if (failureNum > 0) {
+        if (successNum == 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+        } else if (failureNum > 0) {
+            return AjaxResult.success(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
@@ -2086,6 +2096,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             String noFactoryStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noFactoryStr");
             String yearErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.yearErrorStr");
             String monthErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.monthErrorStr");
+            String notTotalQtyStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noTotalQty");
 
             // 过滤合计等数据
             list = list.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialCode())).collect(Collectors.toList());
@@ -2102,6 +2113,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
                 // 赋值开始结束日期
                 setBeginDayAndEndDay(item);
+                // 校验是否有排产
+                item.statisticsTotalQty(); // 统计总排产量
+                if (item.getTotalQty() <= 0) {
+                    item.setId(-999L);
+                    failureNum++;
+                    addImportErrorLog(importLogId, errorNum, notTotalQtyStr, importErrorLogs);
+                    continue;
+                }
 
                 if (productTypeMap.containsKey(params[3])) {
                     item.setProductTypeCode(productTypeMap.get(params[3]));
@@ -2168,8 +2187,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 addImportErrorLog(importLogId, null, e.getMessage(), importErrorLogs);
             }
             //返回提示信息及错误集合
-            if (failureNum > 0) {
+            if (successNum == 0) {
                 return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+            } else if (failureNum > 0) {
+                return AjaxResult.success(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
             } else {
                 return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
             }
@@ -2194,18 +2215,18 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         
         // 加载需求计划
         QueryWrapper<DpDemandPlan> dpDemandPlanQueryWrapper = new QueryWrapper<>();
-        dpDemandPlanQueryWrapper.select("MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
+        dpDemandPlanQueryWrapper.select("STRUCTURE_NAME", "MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
                 "PRODUCTION_TYPE", "SPECIFICATIONS", "PATTERN", "BRAND", "SUM(HEIGHT_QTY) HEIGHT_QTY",
                 "AVERAGE_SALE_QTY", "STOCK_QTY", "SUM(NET_QTY) NET_QTY", "SUM(POSTPONE_NET_QTY) POSTPONE_NET_QTY",
-                "STRUCTURE_TYPE");
-        dpDemandPlanQueryWrapper.groupBy("MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
+                "STRUCTURE_TYPE", "SUM(MID_QTY) MID_QTY", "SUM(CYCLE_RESERVE_QTY) CYCLE_RESERVE_QTY",
+                "SUM(CONVENTION_RESERVE_QTY) CONVENTION_RESERVE_QTY", "SUM(POSTPONE_QTY) POSTPONE_QTY", "MAIN_PATTERN");
+        dpDemandPlanQueryWrapper.groupBy("STRUCTURE_NAME", "MATERIAL_CODE", "MES_MATERIAL_CODE", "PLAN_TYPE", "PRODUCT_TYPE_CODE",
                 "PRODUCTION_TYPE", "SPECIFICATIONS", "PATTERN", "BRAND", "AVERAGE_SALE_QTY", "STOCK_QTY",
-                "STRUCTURE_TYPE");
+                "STRUCTURE_TYPE", "MAIN_PATTERN");
         dpDemandPlanQueryWrapper.eq("FACTORY_CODE", factoryCode);
         dpDemandPlanQueryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
         Map<String, DpDemandPlan> dpDemandPlanMap = dpDemandPlanEntityMapper.selectList(dpDemandPlanQueryWrapper)
-                .stream().filter(p -> p.getUnPostponeNetQty() != null)
-                .collect(Collectors.toMap(DpDemandPlan::getMaterialCode, Function.identity()));
+                .stream().collect(Collectors.toMap(DpDemandPlan::getMaterialCode, Function.identity()));
         // 加载sku与施工关系
         Map<String, List<MonthPlanProductConstructionInfoVo>> constructionInfoMap = factoryMonthPlanProductConstructionMapper
                 .getConstructionByRequire(factoryCode, year, month, monthPlanVersion).stream()
@@ -2249,10 +2270,17 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 insertItem.setPattern(demandPlan.getPattern());
                 insertItem.setBrand(demandPlan.getBrand());
                 insertItem.setHeightQty(demandPlan.getHeightQty());
+                insertItem.setHeightLossQty(demandPlan.getHeightQty());
+                insertItem.setMidLossQty(demandPlan.getMidQty());
+                insertItem.setCycleReserveLossQty(demandPlan.getCycleReserveQty());
+                insertItem.setConventionReserveQty(demandPlan.getConventionReserveQty());
+                insertItem.setPostponeQty(demandPlan.getPostponeQty());
                 insertItem.setAverageSaleQty(demandPlan.getAverageSaleQty());
                 insertItem.setProdReqPlan(demandPlan.getNetQty());
                 insertItem.setStructureType(demandPlan.getStructureType());
                 insertItem.setMainPattern(demandPlan.getMainPattern());
+                // 计算库销比
+                insertItem.setInventorySalesRatio(BigDecimalUtils.div(demandPlan.getStockQty(), demandPlan.getAverageSaleQty(), 1));
             }
             // 胎胚号、施工阶段、是否零度材料、制造示方书号、文字示方书号、硫化示方书号---数据源：SKU与示方书关系，关联：SKU+胎胚描述
             List<MonthPlanProductConstructionInfoVo> constructionConfigurationList = constructionInfoMap.get(materialCode);
@@ -2273,7 +2301,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             MonthPlanProductLhCapacityVo capacityVo = productLhCapacityMap.get(materialCode);
             if (capacityVo != null) {
                 capacityVo.calculateDayVulcanizationQty(mode);
-                insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty());
+                insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty()/2);
             }
             
             // 英寸---根据结构名称解析
@@ -2290,11 +2318,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             insertItem.setTypeBlockQty(insertResults.getOrDefault(materialDesc, 0));
             
             // 各排产量倒推，高优先级排产数量 = min(高优先级，剩余排产量) ->中优先级排产数量 = min(中优先级，剩余排产量) ->周期排产储备排产 = min(周期储备量，剩余排产量) -> 常规储备排产 = 剩余排产量；
-            insertItem.statisticsTotalQty();
             insertItem.allocateProductionByPriority();
-            // 生成统计信息（handleMonthPlanStatistics）
-            mpMonthPlanStaticService.handleMonthPlanStatistics(insertList);
         }
+        // 生成统计信息（handleMonthPlanStatistics）
+        mpMonthPlanStaticService.handleMonthPlanStatistics(insertList);
     }
 
     private void setBeginDayAndEndDay(FactoryMonthPlanMouldDayResult item) {

@@ -6,6 +6,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -19,6 +20,7 @@ import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
 import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
 import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
+import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhMouldCleanPlanMapper;
 import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
@@ -140,6 +142,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     @Resource
     private LhScheduleResultMapper lhScheduleResultMapper;
 
+    @Resource
+    private LhMouldChangePlanEntityMapper lhMouldChangePlanMapper;
+
     @Override
     public void loadAllBaseData(LhScheduleContext context) {
         String factoryCode = context.getFactoryCode();
@@ -197,8 +202,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         // 12. 加载前日物料日完成量（用于前日欠/超产差值修正）
         loadDayFinishQty(context, factoryCode, LhScheduleTimeUtil.addDays(targetDate, -1));
 
-        // 13. 加载月累计完成量（截至目标排产日期，按目标日所在月份统计）
-        loadMaterialMonthFinishedQty(context, factoryCode, targetDate);
+        // 13. 加载月累计完成量（截至排产T-1日（包含），按目标日所在月份统计）
+        loadMaterialMonthFinishedQty(context, factoryCode, LhScheduleTimeUtil.addDays(scheduleDate, -1));
 
         // 14. 加载物料信息
         loadMaterialInfo(context, factoryCode);
@@ -223,6 +228,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
 
         // 19. 加载前日硫化排程结果
         loadPreviousScheduleResults(context, factoryCode, targetDate);
+        // 20. 加载前日模具交替计划，供滚动衔接继承
+        loadPreviousMouldChangePlans(context, factoryCode, targetDate);
 
         log.info("基础数据加载完成, 工厂: {}, 目标日: {}, T日: {}",
                 factoryCode, LhScheduleTimeUtil.formatDate(targetDate), LhScheduleTimeUtil.formatDate(scheduleDate));
@@ -249,6 +256,24 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         }
         context.setPreviousScheduleResultList(list);
         log.info("前日排程基础数据加载完成, 数量: {}, 日期: {}", list.size(), LhScheduleTimeUtil.formatDate(previousDate));
+    }
+
+    /**
+     * 加载前日模具交替计划。
+     *
+     * @param context 排程上下文
+     * @param factoryCode 分厂编号
+     * @param targetDate 排程目标日
+     */
+    private void loadPreviousMouldChangePlans(LhScheduleContext context, String factoryCode, Date targetDate) {
+        Date previousDate = LhScheduleTimeUtil.addDays(targetDate, -1);
+        List<LhMouldChangePlan> list = lhMouldChangePlanMapper.selectList(new LambdaQueryWrapper<LhMouldChangePlan>()
+                .eq(LhMouldChangePlan::getFactoryCode, factoryCode)
+                .eq(LhMouldChangePlan::getScheduleDate, previousDate)
+                .eq(LhMouldChangePlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        context.setPreviousMouldChangePlanList(list != null ? list : new ArrayList<>());
+        log.info("前日模具交替计划加载完成, 数量: {}, 日期: {}",
+                context.getPreviousMouldChangePlanList().size(), LhScheduleTimeUtil.formatDate(previousDate));
     }
 
     /**
@@ -610,14 +635,14 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 加载月累计完成量（截至目标排产日期含当天），按物料编号建立Map。
+     * 加载月累计完成量（截至排产T-1日（包含）），按物料编号建立Map。
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号
-     * @param targetDate  排程目标日
+     * @param cutoffDate  截止日期（T-1日，含当天）
      */
-    private void loadMaterialMonthFinishedQty(LhScheduleContext context, String factoryCode, Date targetDate) {
-        Date targetDay = LhScheduleTimeUtil.clearTime(targetDate);
+    private void loadMaterialMonthFinishedQty(LhScheduleContext context, String factoryCode, Date cutoffDate) {
+        Date targetDay = LhScheduleTimeUtil.clearTime(cutoffDate);
         Date nextTargetDay = LhScheduleTimeUtil.addDays(targetDay, 1);
         Calendar calendar = Calendar.getInstance();
         calendar.setTime(targetDay);
@@ -647,7 +672,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
         }
 
         context.setMaterialMonthFinishedQtyMap(materialMonthFinishedQtyMap);
-        log.debug("月累计完成量加载完成, 数量: {}, 起始日: {}, 截止: {}(含当天)",
+        log.debug("月累计完成量加载完成, 数量: {}, 起始日: {}, 截止: {}(含当天, 即T-1日)",
                 materialMonthFinishedQtyMap.size(),
                 LhScheduleTimeUtil.formatDate(monthStart),
                 LhScheduleTimeUtil.formatDate(targetDay));
