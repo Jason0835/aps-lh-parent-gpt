@@ -84,4 +84,14 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
      * @return 处理结果
      */
     AjaxResult increaseMouldStartPlan(LhScheduleResult scheduleResult);
+
+    /**
+     * 导出数据
+     *
+     * @param list 数据列表
+     * @param scheduleDate 排程日期
+     * @return 导出数据
+     */
+    byte[] exportData(List<LhScheduleResult> list, Date scheduleDate);
+
 }

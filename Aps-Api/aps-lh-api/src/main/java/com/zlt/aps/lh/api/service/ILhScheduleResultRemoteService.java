@@ -153,4 +153,14 @@ public interface ILhScheduleResultRemoteService {
     @ApiOperation("硫化排程结果调量校验")
     @PostMapping("/lhScheduleResult/validateAdjustQuantity")
     AjaxResult validateAdjustQuantity(@RequestBody LhScheduleResultUpdateDTO dto);
+    /**
+     * 导出导入模板
+     *
+     * @param entity
+     * @param fileName
+     * @return
+     */
+    @ApiOperation("导出导入模板")
+    @PostMapping("/lhScheduleResult/downloadTemplate/{fileName}")
+    byte[] downloadTemplate(@RequestBody LhScheduleResult entity,  @PathVariable("fileName") String fileName);
 }

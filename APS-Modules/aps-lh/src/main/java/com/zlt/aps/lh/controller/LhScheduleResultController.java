@@ -1,9 +1,14 @@
 package com.zlt.aps.lh.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.common.constant.HttpStatus;
-import com.ruoyi.common.core.utils.poi.ExcelUtil;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -17,9 +22,11 @@ import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.component.ScheduleExecutionGuard;
+import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -27,16 +34,12 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
-import com.zlt.aps.lh.util.ShiftFieldUtil;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -58,6 +61,15 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     private ILhScheduleService lhScheduleService;
 
     @Autowired
+    private LhScheduleResultMapper lhScheduleResultMapper;
+
+    @Autowired
+    private IExportLogService iExportLogService;
+
+    @Autowired
+    private IImportErrorLogService iImportErrorLogService;
+
+    @Autowired
     private ILhScheduleResultService lhScheduleResultService;
 
     @Autowired
@@ -65,9 +77,6 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     @Autowired
     private ScheduleExecutionGuard scheduleExecutionGuard;
-
-    @Autowired
-    private LhScheduleResultMapper lhScheduleResultMapper;
 
     /**
      * 获取排程日期对象列表
@@ -173,12 +182,16 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
     @ApiOperation(value = "模板下载" , notes = "导入模板下载")
-    @GetMapping("/downloadTemplate")
-    @ResponseBody
-    public void downloadTemplate(HttpServletResponse response) throws IOException {
-        String fileName = I18nUtil.getMessage("ui.data.column.lh.scheduleResult.modelName");
-        ExcelUtil<LhScheduleResult> util = new ExcelUtil<>(LhScheduleResult.class);
-        util.exportExcel(response, null, fileName, fileName);
+    @PostMapping("/downloadTemplate/{fileName}")
+    public byte[] downloadTemplate(@RequestBody LhScheduleResult queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        queryVO = queryVO == null ? new LhScheduleResult() : queryVO;
+        List<LhScheduleResult> list = new ArrayList<>();
+        LhScheduleResult  lhScheduleResult = new LhScheduleResult();
+        lhScheduleResult.setScheduleDate(queryVO.getScheduleDate());
+        list.add(lhScheduleResult);
+        byte[] resultBytes = lhScheduleService.exportData(list, queryVO.getScheduleDate());
+        return resultBytes;
     }
 
 
@@ -191,18 +204,23 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @Override
     public byte[] exportData(@RequestBody LhScheduleResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
-        QueryWrapper<LhScheduleResult> queryWrapper = new QueryWrapper<>();
-        builderCondition(queryWrapper, queryVO);
-        List<LhScheduleResult> list = lhScheduleResultMapper.selectList(queryWrapper);
-        processExportShiftDisplay(list);
-        if (CollectionUtils.isNotEmpty(list)) {
-            list.forEach(this::decodeRemarkFields);
-        }
-        ExcelUtil<LhScheduleResult> util = new ExcelUtil<>(LhScheduleResult.class);
-        Workbook workbook = util.exportExcelFromList(list, fileName);
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        workbook.write(out);
-        return out.toByteArray();
+        Date beginTime = DateUtils.getNowDate();
+        List<LhScheduleResult> list = this.listExportData(queryVO);
+        byte[] resultBytes = lhScheduleService.exportData(list, queryVO.getScheduleDate());
+        Date endTime = DateUtils.getNowDate();
+        ExportLog exportLog = new ExportLog();
+        exportLog.setProcedureCode("0");
+        exportLog.setExportParams(queryVO.toString());
+        String uri = ServletUtils.getRequest().getRequestURI();
+        exportLog.setFunctionCode(uri.split("/")[1]);
+        exportLog.setFunctionName(fileName);
+        exportLog.setFileName(fileName + ".xlsx");
+        exportLog.setRowCount(list.size());
+        exportLog.setBeginTime(beginTime);
+        exportLog.setEndTime(endTime);
+        exportLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        this.iExportLogService.add(exportLog);
+        return resultBytes;
     }
 
     /**
@@ -293,7 +311,13 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
             }
         }
     }
-
+    @Override
+    protected List<LhScheduleResult> listExportData(LhScheduleResult obj) {
+        QueryWrapper<LhScheduleResult> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        startPage(getOrderBy());
+        return lhScheduleResultMapper.selectList(wrapper);
+    }
     @Log(title = "ui.data.column.lhParams.modelName")
     @ApiOperation("插单查询可用机台列表")
     @PostMapping("/getScheduleMachineInfo")
@@ -371,7 +395,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * @return 解码后的备注内容
      */
     private String decodeRemark(String remark) {
-        if (remark == null) return null;
+        if (remark == null) {
+            return null;
+        }
         return remark.replace("__PERCENT__", "%")
                      .replace("__AMP__", "&")
                      .replace("__LT__", "<")

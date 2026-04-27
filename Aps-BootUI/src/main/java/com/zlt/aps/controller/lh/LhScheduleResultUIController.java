@@ -60,11 +60,16 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
      * 重写导入模板的生成逻辑
      */
     @ApiOperation("下载导入模板")
-    @Override
-    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+    @GetMapping("/importTemplate")
+    @ResponseBody
+    public AjaxResult importTemplate(HttpServletResponse response,LhScheduleResult result) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<LhScheduleResult> util = new ExcelUtil<>(LhScheduleResult.class);
-        util.exportExcel(response, null, fileName, fileName);
+        LhScheduleResult entity = result == null ? new LhScheduleResult() : result;
+        byte[] excelBytes = iLhScheduleResultRemoteService.downloadTemplate(entity, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
         return AjaxResult.success();
     }
 

@@ -5,6 +5,8 @@ import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -24,12 +26,14 @@ import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.io.InputStream;
 import java.util.*;
 
 /**
@@ -481,4 +485,303 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         }
         ShiftFieldUtil.setShiftAnalysis(record, shiftIndex, analysis);
     }
+    /**
+     * 导出数据
+     *
+     * @param list 数据列表
+     * @param scheduleDate 排程日期
+     * @return 导出数据
+     */
+    @Override
+    public byte[] exportData(List<LhScheduleResult> list, Date scheduleDate) {
+        InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("excelModel/lhjhtemplate.xlsx");
+        if (Objects.isNull(inputStream)) {
+            throw new ServiceException("硫化计划导出模板不存在");
+        }
+        List<LhScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
+        Map<String, Object> tableMap = buildExportTableMap(exportList, scheduleDate);
+        List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
+        excelDataList.add(buildExportDataList(exportList));
+        return ExcelUtils.writeMultiList(inputStream, 1, tableMap, excelDataList);
+    }
+
+    /**
+     * 构建模板表头数据
+     *
+     * @param list 排程结果列表
+     * @param scheduleDate 排程日期
+     * @return 模板表头数据
+     */
+    private Map<String, Object> buildExportTableMap(List<LhScheduleResult> list, Date scheduleDate) {
+        Map<String, Object> tableMap = new HashMap<>(16);
+        Date exportScheduleDate = Objects.nonNull(scheduleDate) ? scheduleDate : list.stream()
+                .map(LhScheduleResult::getScheduleDate)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        List<LhScheduleShiftDateVO> shiftDateList = listScheduleShiftDates(exportScheduleDate);
+        for (int i = 0; i < LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
+            String shiftDate = i < shiftDateList.size() ? shiftDateList.get(i).getShiftDate() : "";
+            tableMap.put("shiftDate" + (i + 1), shiftDate);
+        }
+        tableMap.put("yearmonthday", DateUtil.format(exportScheduleDate, "yyyy年MM月dd日"));
+        tableMap.put("productionVersion", PubUtil.isNotEmpty(list) ? list.get(0).getProductionVersion() : "");
+        tableMap.put("batchNo", PubUtil.isNotEmpty(list) ? list.get(0).getBatchNo() : "");
+        return tableMap;
+    }
+
+    /**
+     * 构建模板列表数据
+     *
+     * @param list 排程结果列表
+     * @return 模板列表数据
+     */
+    private List<Map<String, Object>> buildExportDataList(List<LhScheduleResult> list) {
+        List<Map<String, Object>> dataList = new ArrayList<>(list.size() + 1);
+        dataList.add(buildSummaryRow(list));
+        for (LhScheduleResult result : list) {
+            Map<String, Object> row = new HashMap<>(96);
+            row.put("lhMachineCode", result.getLhMachineCode());
+            row.put("materialCode", result.getMaterialCode());
+            row.put("materialDesc", result.getMaterialDesc());
+            row.put("mainMaterialDesc", result.getMainMaterialDesc());
+            row.put("scheduleType", buildScheduleTypeName(result.getScheduleType()));
+            row.put("mouldSurplusQty", result.getMouldSurplusQty());
+            row.put("embryoStock", result.getEmbryoStock());
+            row.put("singleMouldShiftQty", result.getSingleMouldShiftQty());
+            row.put("leftRightMould", result.getLeftRightMould());
+            row.put("mouldMethod", result.getMouldMethod());
+            row.put("totalFinishQty", sumFinishQty(result));
+            row.put("dailyPlanQty", result.getDailyPlanQty());
+            row.put("totalPlanQty", result.getDailyPlanQty());
+            row.put("remark", result.getRemark());
+            for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+                row.put("class" + shift + "Order", buildShiftOrder(result, shift));
+                row.put("class" + shift + "PlanQty", getClassPlanQty(result, shift));
+                row.put("class" + shift + "FinishQty", getClassFinishQty(result, shift));
+                row.put("class" + shift + "Type", buildShiftType(result, shift));
+                row.put("class" + shift + "Analysis", getClassAnalysis(result, shift));
+                row.put("class" + shift + "Dot", "");
+            }
+            dataList.add(row);
+        }
+        return dataList;
+    }
+
+    /**
+     * 构建排程类型名称
+     *
+     * @param scheduleType 排程类型编码
+     * @return 排程类型名称
+     */
+    private String buildScheduleTypeName(String scheduleType) {
+        if ("01".equals(scheduleType)) {
+            return "续作";
+        }
+        if ("02".equals(scheduleType)) {
+            return "新增";
+        }
+        return scheduleType;
+    }
+
+    /**
+     * 构建导出首行汇总数据
+     *
+     * @param list 排程结果列表
+     * @return 汇总行数据
+     */
+    private Map<String, Object> buildSummaryRow(List<LhScheduleResult> list) {
+        Map<String, Object> row = new HashMap<>(96);
+        int totalPlanQty = 0;
+        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+            int classPlanQty = sumPlanQtyByShift(list, shift);
+            int classFinishQty = sumFinishQtyByShift(list, shift);
+            row.put("class" + shift + "PlanQty", classPlanQty);
+            row.put("class" + shift + "FinishQty", classFinishQty);
+            totalPlanQty += classPlanQty;
+        }
+        row.put("dailyPlanQty", sumPlanQtyByShift(list, 6)
+                + sumPlanQtyByShift(list, 7)
+                + sumPlanQtyByShift(list, 8));
+        row.put("totalFinishQty", sumFinishQtyByShift(list, 6)
+                + sumFinishQtyByShift(list, 7)
+                + sumFinishQtyByShift(list, 8));
+        row.put("totalPlanQty", totalPlanQty);
+        return row;
+    }
+
+    /**
+     * 汇总指定班次计划量
+     *
+     * @param list 排程结果列表
+     * @param shift 班次序号
+     * @return 计划量合计
+     */
+    private int sumPlanQtyByShift(List<LhScheduleResult> list, int shift) {
+        return list.stream()
+                .map(result -> getClassPlanQty(result, shift))
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+    }
+
+    /**
+     * 汇总指定班次完成量
+     *
+     * @param list 排程结果列表
+     * @param shift 班次序号
+     * @return 完成量合计
+     */
+    private int sumFinishQtyByShift(List<LhScheduleResult> list, int shift) {
+        return list.stream()
+                .map(result -> getClassFinishQty(result, shift))
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+    }
+
+    /**
+     * 构建班次顺序
+     *
+     * @param result 排程结果
+     * @param shift  班次序号
+     * @return 班次顺序
+     */
+    private Object buildShiftOrder(LhScheduleResult result, int shift) {
+        Integer planQty = getClassPlanQty(result, shift);
+        return Objects.nonNull(planQty) && planQty > 0 ? result.getScheduleOrder() : "";
+    }
+
+    /**
+     * 构建班次类型
+     *
+     * @param result 排程结果
+     * @param shift  班次序号
+     * @return 班次类型
+     */
+    private String buildShiftType(LhScheduleResult result, int shift) {
+        Integer planQty = getClassPlanQty(result, shift);
+        if (Objects.isNull(planQty) || planQty <= 0) {
+            return "";
+        }
+        if ("1".equals(result.getIsFirst())) {
+            return "首检";
+        }
+        if ("01".equals(result.getConstructionStage())) {
+            return "试验";
+        }
+        if ("02".equals(result.getConstructionStage())) {
+            return "量试";
+        }
+        if ("1".equals(result.getIsEnd())) {
+            return "收尾";
+        }
+        return "正常";
+    }
+
+    /**
+     * 汇总实际完成量
+     *
+     * @param result 排程结果
+     * @return 实际完成量合计
+     */
+    private int sumFinishQty(LhScheduleResult result) {
+        int total = 0;
+        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+            Integer finishQty = getClassFinishQty(result, shift);
+            total += Objects.isNull(finishQty) ? 0 : finishQty;
+        }
+        return total;
+    }
+
+    /**
+     * 获取指定班次计划量
+     *
+     * @param result 排程结果
+     * @param shift  班次序号
+     * @return 计划量
+     */
+    private Integer getClassPlanQty(LhScheduleResult result, int shift) {
+        switch (shift) {
+            case 1:
+                return result.getClass1PlanQty();
+            case 2:
+                return result.getClass2PlanQty();
+            case 3:
+                return result.getClass3PlanQty();
+            case 4:
+                return result.getClass4PlanQty();
+            case 5:
+                return result.getClass5PlanQty();
+            case 6:
+                return result.getClass6PlanQty();
+            case 7:
+                return result.getClass7PlanQty();
+            case 8:
+                return result.getClass8PlanQty();
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * 获取指定班次完成量
+     *
+     * @param result 排程结果
+     * @param shift  班次序号
+     * @return 完成量
+     */
+    private Integer getClassFinishQty(LhScheduleResult result, int shift) {
+        switch (shift) {
+            case 1:
+                return result.getClass1FinishQty();
+            case 2:
+                return result.getClass2FinishQty();
+            case 3:
+                return result.getClass3FinishQty();
+            case 4:
+                return result.getClass4FinishQty();
+            case 5:
+                return result.getClass5FinishQty();
+            case 6:
+                return result.getClass6FinishQty();
+            case 7:
+                return result.getClass7FinishQty();
+            case 8:
+                return result.getClass8FinishQty();
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * 获取指定班次原因分析
+     *
+     * @param result 排程结果
+     * @param shift  班次序号
+     * @return 原因分析
+     */
+    private String getClassAnalysis(LhScheduleResult result, int shift) {
+        switch (shift) {
+            case 1:
+                return result.getClass1Analysis();
+            case 2:
+                return result.getClass2Analysis();
+            case 3:
+                return result.getClass3Analysis();
+            case 4:
+                return result.getClass4Analysis();
+            case 5:
+                return result.getClass5Analysis();
+            case 6:
+                return result.getClass6Analysis();
+            case 7:
+                return result.getClass7Analysis();
+            case 8:
+                return result.getClass8Analysis();
+            default:
+                return null;
+        }
+    }
+
 }
