@@ -160,16 +160,34 @@ export default {
           label: this.$t("早班") + " " + this.dateList[0].shiftDate,
           children: [
             {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 1),
+            },
+            {
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 1),
+            },
+            {
+              prop: "class1IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 1),
+            },
+            {
               prop: "class1PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 1),
             },
             {
               prop: "class1FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 1),
             },
             {
               prop: "class1Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 1),
             },
           ],
         },
@@ -177,16 +195,34 @@ export default {
           label: this.$t("中班") + " " + this.dateList[1].shiftDate,
           children: [
             {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 2),
+            },
+            {
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 2),
+            },
+            {
+              prop: "class2IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 2),
+            },
+            {
               prop: "class2PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 2),
             },
             {
               prop: "class2FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 2),
             },
             {
               prop: "class2Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 2),
             },
           ],
         },
@@ -194,16 +230,34 @@ export default {
           label: this.$t("晚班") + " " + this.dateList[2].shiftDate,
           children: [
             {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 3),
+            },
+            {
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 3),
+            },
+            {
+              prop: "class3IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 3),
+            },
+            {
               prop: "class3PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 3),
             },
             {
               prop: "class3FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 3),
             },
             {
               prop: "class3Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 3),
             },
           ],
         },
@@ -211,16 +265,34 @@ export default {
           label: this.$t("早班") + " " + this.dateList[3].shiftDate,
           children: [
             {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 4),
+            },
+            {
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 4),
+            },
+            {
+              prop: "class4IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 4),
+            },
+            {
               prop: "class4PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 4),
             },
             {
               prop: "class4FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 4),
             },
             {
               prop: "class4Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 4),
             },
           ],
         },
@@ -228,16 +300,34 @@ export default {
           label: this.$t("中班") + " " + this.dateList[4].shiftDate,
           children: [
             {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 5),
+            },
+            {
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 5),
+            },
+            {
+              prop: "class5IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 5),
+            },
+            {
               prop: "class5PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 5),
             },
             {
               prop: "class5FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 5),
             },
             {
               prop: "class5Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 5),
             },
           ],
         },
@@ -245,16 +335,34 @@ export default {
           label: this.$t("晚班") + " " + this.dateList[5].shiftDate,
           children: [
             {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 6),
+            },
+            {
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 6),
+            },
+            {
+              prop: "class6IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 6),
+            },
+            {
               prop: "class6PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 6),
             },
             {
               prop: "class6FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 6),
             },
             {
               prop: "class6Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 6),
             },
           ],
         },
@@ -262,16 +370,34 @@ export default {
           label: this.$t("早班") + " " + this.dateList[6].shiftDate,
           children: [
             {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 7),
+            },
+            {
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 7),
+            },
+            {
+              prop: "class7IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 7),
+            },
+            {
               prop: "class7PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 7),
             },
             {
               prop: "class7FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 7),
             },
             {
               prop: "class7Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 7),
             },
           ],
         },
@@ -279,16 +405,34 @@ export default {
           label: this.$t("中班") + " " + this.dateList[7].shiftDate,
           children: [
             {
+              prop: "leftRightMould",
+              label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+              formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 8),
+            },
+            {
+              prop: "constructionStage",
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+              formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 8),
+            },
+            {
+              prop: "class8IsEnd",
+              label: this.$t("ui.data.column.scheduleResult.type"),
+              formatter: (row, column, value) => this.calcShiftIsEnd(row, 8),
+            },
+            {
               prop: "class8PlanQty",
-              label: this.$t("计划"),
+              label: this.$t("ui.data.column.scheduleResult.plan"),
+              formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 8),
             },
             {
               prop: "class8FinishQty",
-              label: this.$t("实际"),
+              label: this.$t("ui.data.column.scheduleResult.actual"),
+              formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 8),
             },
             {
               prop: "class8Analysis",
-              label: this.$t("备注"),
+              label: this.$t("ui.data.column.scheduleResult.analysis"),
+              formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 8),
             },
           ],
         },
@@ -305,6 +449,88 @@ export default {
     },
   },
   methods: {
+    calcShiftIsEnd(row, shiftIndex) {
+      if (this.isShiftAfterEnding(row, shiftIndex)) {
+        return "";
+      }
+      const planQty = row["class" + shiftIndex + "PlanQty"];
+      if (planQty == null || planQty <= 0) {
+        return "";
+      }
+      const referenceQty = Math.max(row.mouldSurplusQty || 0, row.embryoStock || 0);
+      if (referenceQty <= 0) {
+        return this.selectDictLabel(this.parentDict.type.biz_end_type, "0");
+      }
+      let totalPlanQty = 0;
+      for (let i = 1; i <= 8; i++) {
+        totalPlanQty += row["class" + i + "PlanQty"] || 0;
+      }
+      if (totalPlanQty < referenceQty) {
+        return this.selectDictLabel(this.parentDict.type.biz_end_type, "0");
+      }
+      let remaining = referenceQty;
+      for (let i = 1; i <= 8; i++) {
+        remaining -= row["class" + i + "PlanQty"] || 0;
+        if (remaining <= 0) {
+          if (i === shiftIndex) {
+            return this.selectDictLabel(this.parentDict.type.biz_end_type, "1");
+          }
+          break;
+        }
+      }
+      return this.selectDictLabel(this.parentDict.type.biz_end_type, "0");
+    },
+    isShiftAfterEnding(row, shiftIndex) {
+      const referenceQty = Math.max(row.mouldSurplusQty || 0, row.embryoStock || 0);
+      if (referenceQty <= 0) {
+        return false;
+      }
+      let totalPlanQty = 0;
+      for (let i = 1; i <= 8; i++) {
+        totalPlanQty += row["class" + i + "PlanQty"] || 0;
+      }
+      if (totalPlanQty < referenceQty) {
+        return false;
+      }
+      let remaining = referenceQty;
+      for (let i = 1; i <= 8; i++) {
+        remaining -= row["class" + i + "PlanQty"] || 0;
+        if (remaining <= 0) {
+          return shiftIndex > i;
+        }
+      }
+      return false;
+    },
+    shiftLeftRightMouldFormatter(row, column, value, shiftIndex) {
+      if (this.isShiftAfterEnding(row, shiftIndex)) return "";
+      const planQty = row["class" + shiftIndex + "PlanQty"];
+      if (planQty == null || planQty <= 0) return "";
+      return value;
+    },
+    shiftConstructionStageFormatter(row, column, value, shiftIndex) {
+      if (this.isShiftAfterEnding(row, shiftIndex)) return "";
+      const planQty = row["class" + shiftIndex + "PlanQty"];
+      if (planQty == null || planQty <= 0) return "";
+      const dictValue = value || "0";
+      return this.selectDictLabel(this.parentDict.type.biz_construction_stage, dictValue);
+    },
+    shiftPlanQtyFormatter(row, column, value, shiftIndex) {
+      if (this.isShiftAfterEnding(row, shiftIndex)) return "";
+      if (value == null || value === 0) return "";
+      return value;
+    },
+    shiftFinishQtyFormatter(row, column, value, shiftIndex) {
+      if (this.isShiftAfterEnding(row, shiftIndex)) return "";
+      const planQty = row["class" + shiftIndex + "PlanQty"];
+      if (planQty == null || planQty <= 0) return "";
+      return value;
+    },
+    shiftAnalysisFormatter(row, column, value, shiftIndex) {
+      if (this.isShiftAfterEnding(row, shiftIndex)) return "";
+      const planQty = row["class" + shiftIndex + "PlanQty"];
+      if (planQty == null || planQty <= 0) return "";
+      return value;
+    },
     /**
      * 查询可用机台列表（仅查询启用且未被排程结果占用的机台）。
      * @returns {Promise<void>}
