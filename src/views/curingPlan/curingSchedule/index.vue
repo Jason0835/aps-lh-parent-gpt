@@ -1050,7 +1050,9 @@ export default {
         const ids = row.id;
         removeScheduleResult({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
-          // this.$set(this.page, "current", 1);
+          if (this.data.length <= 1 && this.page.current > 1) {
+            this.$set(this.page, "current", this.page.current - 1);
+          }
           this.getList();
         });
       });
@@ -1074,7 +1076,9 @@ export default {
             };
             const data = await removeScheduleResult(params);
             this.$modal.msgSuccess(data.msg);
-            this.$set(this.page, "current", 1);
+            if (ids.length >= this.data.length && this.page.current > 1) {
+              this.$set(this.page, "current", this.page.current - 1);
+            }
             this.getList();
           } catch (error) {
           } finally {

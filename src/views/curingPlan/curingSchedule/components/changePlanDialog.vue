@@ -99,9 +99,9 @@
           <el-col :span="12">
             <el-form-item
               :label="$t('硫化班产')"
-              prop="mouldSurplusQty"
+              prop="singleMouldShiftQty"
             >
-              <el-input v-model="form.mouldSurplusQty" disabled></el-input>
+              <el-input v-model="form.singleMouldShiftQty" disabled></el-input>
             </el-form-item>
           </el-col>
           <!-- <el-col :span="12">

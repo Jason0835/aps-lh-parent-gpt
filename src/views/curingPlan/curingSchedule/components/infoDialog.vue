@@ -137,14 +137,14 @@ export default {
         //   span: 12,
         // },
         {
-          label: this.$t("ui.data.column.scheduleResult.dailyPlanQty"),
-          prop: "dailyPlanQty",
+          label: this.$t("ui.data.column.scheduleResult.totalSurplusQty"),
+          prop: "mouldSurplusQty",
           disabled: true,
           span: 12,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.lhMachineCode"),
-          prop: "lhMachineName",
+          prop: "lhMachineCode",
           span: 12,
           disabled: true,
         },
@@ -154,17 +154,9 @@ export default {
           disabled: true,
           span: 12,
         },
-        this.isChangeQty
-          ? {}
-          : {
-              label: this.$t("ui.data.column.scheduleResult.leftRightMold"),
-              prop: "leftRightMold",
-              span: 12,
-            },
         {
-          label: this.$t("ui.data.column.scheduleResult.embryoCode"),
-          prop: "embryoCode",
-          // disabled: this.isChangeQty ? false : true,
+          label: this.$t("ui.data.column.scheduleResult.materialCode"),
+          prop: "materialCode",
           disabled: true,
           span: 12,
         },
@@ -199,6 +191,42 @@ export default {
           span: 12,
         },
         {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          prop: "constructionStage",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.constructionStage}
+                disabled
+                options={this.parentDict.type.biz_construction_stage}
+              />
+            );
+          },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class1IsEnd",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.class1IsEnd}
+                disabled
+                options={this.parentDict.type.biz_end_type}
+              />
+            );
+          },
+        },
+        {
           label: this.$t("ui.data.column.scheduleResult.class1Analysis.lh"),
           prop: "class1Analysis",
           type: "textarea",
@@ -227,6 +255,42 @@ export default {
           prop: "class2FinishQty",
           disabled: true,
           span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          prop: "constructionStage",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.constructionStage}
+                disabled
+                options={this.parentDict.type.biz_construction_stage}
+              />
+            );
+          },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class2IsEnd",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.class2IsEnd}
+                disabled
+                options={this.parentDict.type.biz_end_type}
+              />
+            );
+          },
         },
         {
           label: this.$t("ui.data.column.scheduleResult.class2Analysis"),
@@ -259,6 +323,42 @@ export default {
           span: 12,
         },
         {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          prop: "constructionStage",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.constructionStage}
+                disabled
+                options={this.parentDict.type.biz_construction_stage}
+              />
+            );
+          },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class3IsEnd",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.class3IsEnd}
+                disabled
+                options={this.parentDict.type.biz_end_type}
+              />
+            );
+          },
+        },
+        {
           label: this.$t("ui.data.column.scheduleResult.class3Analysis"),
           prop: "class3Analysis",
           type: "textarea",
@@ -287,6 +387,42 @@ export default {
           prop: "class4FinishQty",
           disabled: true,
           span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          prop: "constructionStage",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.constructionStage}
+                disabled
+                options={this.parentDict.type.biz_construction_stage}
+              />
+            );
+          },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class4IsEnd",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.class4IsEnd}
+                disabled
+                options={this.parentDict.type.biz_end_type}
+              />
+            );
+          },
         },
         {
           label: this.$t("ui.data.column.scheduleResult.class4Analysis"),
@@ -319,6 +455,42 @@ export default {
           span: 12,
         },
         {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          prop: "constructionStage",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.constructionStage}
+                disabled
+                options={this.parentDict.type.biz_construction_stage}
+              />
+            );
+          },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class5IsEnd",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.class5IsEnd}
+                disabled
+                options={this.parentDict.type.biz_end_type}
+              />
+            );
+          },
+        },
+        {
           label: this.$t("ui.data.column.scheduleResult.class5Analysis"),
           prop: "class5Analysis",
           type: "textarea",
@@ -347,6 +519,42 @@ export default {
           prop: "class6FinishQty",
           disabled: true,
           span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          prop: "constructionStage",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.constructionStage}
+                disabled
+                options={this.parentDict.type.biz_construction_stage}
+              />
+            );
+          },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class6IsEnd",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.class6IsEnd}
+                disabled
+                options={this.parentDict.type.biz_end_type}
+              />
+            );
+          },
         },
         {
           label: this.$t("ui.data.column.scheduleResult.class6Analysis"),
@@ -379,6 +587,42 @@ export default {
           span: 12,
         },
         {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          prop: "constructionStage",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.constructionStage}
+                disabled
+                options={this.parentDict.type.biz_construction_stage}
+              />
+            );
+          },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class7IsEnd",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.class7IsEnd}
+                disabled
+                options={this.parentDict.type.biz_end_type}
+              />
+            );
+          },
+        },
+        {
           label: this.$t("ui.data.column.scheduleResult.class7Analysis"),
           prop: "class7Analysis",
           type: "textarea",
@@ -409,6 +653,42 @@ export default {
           span: 12,
         },
         {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          prop: "constructionStage",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.constructionStage}
+                disabled
+                options={this.parentDict.type.biz_construction_stage}
+              />
+            );
+          },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class8IsEnd",
+          disabled: true,
+          span: 12,
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.class8IsEnd}
+                disabled
+                options={this.parentDict.type.biz_end_type}
+              />
+            );
+          },
+        },
+        {
           label: this.$t("ui.data.column.scheduleResult.class8Analysis"),
           prop: "class8Analysis",
           type: "textarea",
@@ -422,17 +702,33 @@ export default {
   },
   methods: {
     calcShiftIsEndFields(data) {
-      const specEndTime = data.specEndTime;
-      if (!specEndTime) return;
-      const specEnd = new Date(specEndTime).getTime();
+      const referenceQty = Math.max(data.mouldSurplusQty || 0, data.embryoStock || 0);
       for (let i = 1; i <= 8; i++) {
-        const startTimeField = "class" + i + "StartTime";
-        const shiftStart = data[startTimeField];
-        if (shiftStart && specEnd >= new Date(shiftStart).getTime()) {
-          this.$set(this.form, "class" + i + "IsEnd", "1");
-        } else {
-          this.$set(this.form, "class" + i + "IsEnd", "0");
+        const planQty = data['class' + i + 'PlanQty'];
+        if (planQty == null || planQty <= 0 || referenceQty <= 0) {
+          this.$set(this.form, 'class' + i + 'IsEnd', '0');
+          continue;
         }
+        let totalPlanQty = 0;
+        for (let j = 1; j <= 8; j++) {
+          totalPlanQty += (data['class' + j + 'PlanQty'] || 0);
+        }
+        if (totalPlanQty < referenceQty) {
+          this.$set(this.form, 'class' + i + 'IsEnd', '0');
+          continue;
+        }
+        let remaining = referenceQty;
+        let isEndShift = false;
+        for (let j = 1; j <= 8; j++) {
+          remaining -= (data['class' + j + 'PlanQty'] || 0);
+          if (remaining <= 0) {
+            if (j === i) {
+              isEndShift = true;
+            }
+            break;
+          }
+        }
+        this.$set(this.form, 'class' + i + 'IsEnd', isEndShift ? '1' : '0');
       }
     },
     encodeRemark(remark) {
