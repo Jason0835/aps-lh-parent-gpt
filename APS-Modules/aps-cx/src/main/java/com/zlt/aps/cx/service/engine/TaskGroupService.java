@@ -200,8 +200,7 @@ public class TaskGroupService {
                 String factoryCode = context.getFactoryCode();
                 ScheduleDayTypeHelper.ShiftType st = scheduleDayTypeHelper.determineShiftType(
                         currentScheduleDate, currentShift.getDayShiftOrder(), factoryCode);
-                isOpeningShift = st == ScheduleDayTypeHelper.ShiftType.OPEN_START
-                        || scheduleDayTypeHelper.isOpeningDay(currentScheduleDate, factoryCode);
+                isOpeningShift = st == ScheduleDayTypeHelper.ShiftType.OPEN_START;
             }
         }
 
@@ -1147,7 +1146,7 @@ public class TaskGroupService {
      * <ol>
      *   <li>已停产日（isStopDay）→ 产量=0</li>
      *   <li>当前班次停产/停产前一个班次/停产标识日 → handleClosingDayTaskV2（反推封顶）</li>
-     *   <li>开产班次（OPEN_START 或 isOpeningDay）→ handleOpeningDayTaskV2（6/24备货）</li>
+     *   <li>开产班次（OPEN_START）→ handleOpeningDayTaskV2（6/24备货）</li>
      *   <li>明天有停产 → 跨天封顶</li>
      * </ol>
      *
