@@ -50,6 +50,7 @@ import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportChangeCountVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
+import com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -119,6 +120,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final ISysDictDataCacheService sysDictDataCacheService;
     private final FactoryMonthPlanProductConstructionMapper factoryMonthPlanProductConstructionMapper;
     private final FactoryMonthPlanProductLhCapacityMapper factoryMonthPlanProductLhCapacityMapper;
+    private final MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
     private final IFactoryParamService factoryParamService;
     private final MoldCavityInsertMaxValueCalculatorImpl moldCavityInsertMaxValueCalculator;
     private final Map<Long, Map<String, String>> importMachineMapCache = new ConcurrentHashMap<>();
@@ -1721,7 +1723,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     }
 
     /**
-     * 导入
+     * 导入结构转产表
      *
      * @param list             列表数据
      * @param updateSupport    覆盖
@@ -1753,15 +1755,16 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 过滤合计等数据
         list = list.stream().filter(item -> StringUtils.isNotBlank(item.getCxMachineCode())).collect(Collectors.toList());
 
-        Map<String, String> machineMap = new HashMap<>();
-        Map<String, MpStructureAllocation> machineLastValidRecordMap = new HashMap<>();
-        Map<String, FactoryMonthPlanProductionFinalResult> lastMonthMachineFinalMap = Collections.emptyMap();
+        // 构建每个成型机的当前排产结构
+        Map<String, MpStructureAllocation> machineLastValidRecordMap = new HashMap<>(); 
         Integer importYear = Convert.toInt(year, null);
         Integer importMonth = Convert.toInt(month, null);
         String importFactoryCode = factoryMap.get(factoryName);
         if (importYear != null && importMonth != null && StringUtils.isNotBlank(importFactoryCode)) {
-            lastMonthMachineFinalMap = getLastMonthMachineFinalMap(importFactoryCode, importYear, importMonth);
+            // 上个月的定稿数据作为初始在产结构数据
+            machineLastValidRecordMap = this.getLastMachineStructureMap(importFactoryCode, importYear, importMonth);
         }
+        Map<String, String> machineMap = new HashMap<>();
 
         //3.公共校验（非空校验、长度校验等）
         for (int i = 0; i < list.size(); i++) {
@@ -1807,7 +1810,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 continue;
             }
             // 赋值开始结束日期
-            setBeginDayAndEndDay(item);
+            this.setBeginDayAndEndDay(item);
             if (item.getBeginDay() == null || item.getEndDay() == null) { // 没有排产的结构过滤掉
                 item.setId(-999L);
                 failureNum++;
@@ -1815,7 +1818,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 continue;
             }
             // 赋值交替类型（仅对校验通过的有效记录）
-            genAlternatingType(item, machineLastValidRecordMap, lastMonthMachineFinalMap);
+            this.genAlternatingType(item, machineLastValidRecordMap);
             insertList.add(item);
 
             machineMap.put(item.getStructureName(), item.getCxMachineCode());
@@ -1863,6 +1866,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         watch.start();
 
         // 创建查询数据的异步任务
+        // 查询成型硫化结构配比
+        CompletableFuture<List<MdmStructureLhRatio>> structureLhRatioFuture = CompletableFuture.supplyAsync(
+                () -> queryMdmStructureLhRatio(mpStructureAllocation)
+        );
         // 查询月周期排产结构配置
         CompletableFuture<List<MdmMonCycleSchStruConf>> monCycleSchStruConfFuture = CompletableFuture.supplyAsync(
                 () -> queryMdmMonCycleSchStruConf(mpStructureAllocation)
@@ -1887,16 +1894,15 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         CompletableFuture<List<MdmSkuStructureRef>> skuStructureRefFuture = CompletableFuture.supplyAsync(
                 () -> querySkuStructureRef(mpStructureAllocation)
         );
-
         // 查询SKU与施工（示方书）关系
         CompletableFuture<List<MdmSkuConstructionRef>> skuConstructionRefFuture = CompletableFuture.supplyAsync(
                 () -> querySkuConstructionRef(mpStructureAllocation)
         );
 
-
         try {
             // 等待所有异步任务执行完成
             CompletableFuture.allOf(
+                    structureLhRatioFuture,
                     monCycleSchStruConfFuture,
                     cycleSchStruConfFuture,
                     factoryParamFuture,
@@ -1920,6 +1926,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         log.info("初始化任务执行完成 ==> 耗时:{} ms", watch.getLastTaskTimeMillis());
 
         List<MdmMonCycleSchStruConf> monCycleSchStruConfList = monCycleSchStruConfFuture.join();
+        List<MdmStructureLhRatio> structureLhRatioList = structureLhRatioFuture.join();
         List<MdmCycleSchStruConf> cycleSchStruConfList = cycleSchStruConfFuture.join();
         List<FactoryParam> factoryParamList = factoryParamFuture.join();
         List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = materialConsumeDetailFuture.join();
@@ -1942,7 +1949,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     .orElse(null);
             boolean isHasSpecialMaterial = hasSpecialMaterial(embryoCode, mdmMaterialConsumeDetailList, specialMaterialList);
             structure.setIsHasSpecialMaterial(isHasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
-            
+
+
+            // 设置最大胎胚种类数、最大硫化机台数
+            if (PubUtil.isNotEmpty(structureLhRatioList)) {
+                MdmStructureLhRatio mdmStructureLhRatio = structureLhRatioList.get(0);
+                structure.setMaxEmbryoCodeCount(mdmStructureLhRatio.getMaxEmbryoQty());
+                structure.setMaxLhMachineCount(mdmStructureLhRatio.getLhMachineMaxQty());
+            }
 
             // 设置实单最低硫化机台数
             Integer minLhMachineCount = 0;
@@ -1985,29 +1999,22 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
     }
 
+    /**
+     * 处理结构交替类型
+     * @param item
+     * @param machineLastValidRecordMap // 每个机台的当前结构
+     */
     private void genAlternatingType(MpStructureAllocation item,
-                                    Map<String, MpStructureAllocation> machineLastValidRecordMap,
-                                    Map<String, FactoryMonthPlanProductionFinalResult> lastMonthMachineFinalMap) {
+                                    Map<String, MpStructureAllocation> machineLastValidRecordMap) {
         if (item == null || StringUtils.isBlank(item.getCxMachineCode())) {
             return;
         }
         String machineCode = item.getCxMachineCode();
         MpStructureAllocation previousRecord = machineLastValidRecordMap.get(machineCode);
         if (previousRecord != null) {
-            if (StringUtils.equals(previousRecord.tbrProSize(), item.tbrProSize())) {
-                item.setAlternatingType(AlternativeTypeEnum.STRUCT_ALTERNATIVE.getCode());
-            } else {
-                item.setAlternatingType(AlternativeTypeEnum.PRO_SIZE_ALTERNATIVE.getCode());
-            }
-            machineLastValidRecordMap.put(machineCode, item);
-            return;
-        }
-
-        FactoryMonthPlanProductionFinalResult lastMonthRecord = lastMonthMachineFinalMap.get(machineCode);
-        if (lastMonthRecord != null) {
-            if (StringUtils.equals(lastMonthRecord.getStructureName(), item.getStructureName())) {
+            if (StringUtils.equals(previousRecord.getStructureName(), item.getStructureName())) {
                 item.setAlternatingType(AlternativeTypeEnum.CONTINUE.getCode());
-            } else if (StringUtils.equals(lastMonthRecord.getProSize(), item.tbrProSize())) {
+            } else if (StringUtils.equals(previousRecord.tbrProSize(), item.tbrProSize())) {
                 item.setAlternatingType(AlternativeTypeEnum.STRUCT_ALTERNATIVE.getCode());
             } else {
                 item.setAlternatingType(AlternativeTypeEnum.PRO_SIZE_ALTERNATIVE.getCode());
@@ -2015,55 +2022,94 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         } else {
             item.setAlternatingType(AlternativeTypeEnum.CONTINUE.getCode());
         }
-        machineLastValidRecordMap.put(machineCode, item);
+        machineLastValidRecordMap.put(machineCode, item);// 本结构替换到机台上
     }
 
-    private Map<String, FactoryMonthPlanProductionFinalResult> getLastMonthMachineFinalMap(String factoryCode, Integer year, Integer month) {
+    /**
+     * 获取上个月最后一天各机台排产的结构
+     * @param factoryCode
+     * @param year
+     * @param month
+     * @return
+     */
+    private Map<String, MpStructureAllocation> getLastMachineStructureMap(String factoryCode, Integer year, Integer month) {
         if (StringUtils.isBlank(factoryCode) || year == null || month == null) {
             return Collections.emptyMap();
         }
-        java.time.YearMonth currentYearMonth = java.time.YearMonth.of(year, month);
-        java.time.YearMonth previousYearMonth = currentYearMonth.minusMonths(1);
+        // 1、获取上个月日历
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(year, month - 1, 1); // 通过日历获取本月一号的日历
+        calendar.add(Calendar.MONTH, -1); // 切换到上个月
+        Integer lastYear = calendar.get(Calendar.YEAR);
+        Integer lastMonth = calendar.get(Calendar.MONTH) + 1;
+        // 1.1、加载上个月的工作日历
+        MpStructureAllocation queryParams = new MpStructureAllocation();
+        queryParams.setFactoryCode(factoryCode);
+        queryParams.setYear(lastYear);
+        queryParams.setMonth(lastMonth);
+        List<MdmWorkCalendar> workCalendar = this.queryMdmWorkCalendar(queryParams);
+        // 1.2、取出最后一个工作日
+        MdmWorkCalendar lastMdmWorkCalendar = workCalendar.stream()
+                .filter(c -> ApsConstant.APS_ZERO_1.equals(c.getProcCode())
+                        && YesOrNoEnum.YES.getCode().equals(c.getDayFlag())).max(Comparator.comparing(MdmWorkCalendar::getDay)).orElse(null);
+        if (lastMdmWorkCalendar == null) {
+            return Collections.emptyMap();
+        }
+        Integer lastDay = lastMdmWorkCalendar.getDay();
 
-        FactoryMonthPlanProductionFinalResult queryParam = new FactoryMonthPlanProductionFinalResult();
-        queryParam.setFactoryCode(factoryCode);
-        queryParam.setYear(previousYearMonth.getYear());
-        queryParam.setMonth(previousYearMonth.getMonthValue());
-
-        List<FactoryMonthPlanProductionFinalResult> lastMonthFinalList = monthPlanProductionFinalResultService.listMonthProdFinalPlans(queryParam);
+        // 2、加载上个月定稿版本的相关数据
+        // 2.1、获取上个月定稿版本
+        LambdaQueryWrapper<MpFactoryProductionVersion> versionQueryWrapper = new LambdaQueryWrapper<>();
+        versionQueryWrapper.eq(MpFactoryProductionVersion::getFactoryCode, factoryCode);
+        versionQueryWrapper.eq(MpFactoryProductionVersion::getYear, lastYear);
+        versionQueryWrapper.eq(MpFactoryProductionVersion::getMonth, lastMonth);
+        versionQueryWrapper.eq(MpFactoryProductionVersion::getIsFinal, YesOrNoEnum.YES.getCode());
+        MpFactoryProductionVersion procVersion = CollectionUtils.firstElement(mpFactoryProductionVersionMapper.selectList(versionQueryWrapper));
+        if (procVersion == null || StringUtils.isEmpty(procVersion.getProductionVersion())) {
+            return Collections.emptyMap();
+        }
+        // 2.2、获取上个月定稿版本对应的结构转产表
+        String productionVersion = procVersion.getProductionVersion();
+        LambdaQueryWrapper<MpStructureAllocation> structureQueryWrapper = new LambdaQueryWrapper<>();
+        structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, factoryCode);
+        structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion, productionVersion);
+        List<MpStructureAllocation> lastMonthFinalList = entityMapper.selectList(structureQueryWrapper);
         if (CollUtil.isEmpty(lastMonthFinalList)) {
             return Collections.emptyMap();
         }
-
-        Map<String, FactoryMonthPlanProductionFinalResult> machineRecordMap = new HashMap<>();
-        Map<String, Integer> machineLastScheduleDayMap = new HashMap<>();
-        for (FactoryMonthPlanProductionFinalResult record : lastMonthFinalList) {
+        // 2.3、加载上个月定稿版本的统计记录
+        LambdaQueryWrapper<MpMonthPlanStatistics> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MpMonthPlanStatistics::getFactoryCode, factoryCode);
+        queryWrapper.eq(MpMonthPlanStatistics::getProductionVersion, productionVersion);
+        Map<String, MpMonthPlanStatistics> statisticsMap = mpMonthPlanStatisticsEntityMapper.selectList(queryWrapper)
+                .stream().collect(
+                        Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
+        
+        // 3、根据上个月定岗数据构建最后一天的结构排产情况
+        Map<String, MpStructureAllocation> machineStructureMap = new HashMap<>();
+        for (MpStructureAllocation record : lastMonthFinalList) {
             String machineCode = record.getCxMachineCode();
-            if (StringUtils.isBlank(machineCode)) {
+            String structureName = record.getStructureName();
+            if (StringUtils.isBlank(structureName) || StringUtils.isBlank(machineCode)) {
                 continue;
             }
-            int lastScheduleDay = getLastScheduleDay(record);
-            if (lastScheduleDay <= 0) {
+            // 3.1、获取结构上个月最后一天的排产统计信息
+            MpMonthPlanStatistics statistics = statisticsMap.get(structureName);
+            if (statistics == null) {
                 continue;
             }
-            Integer currentLastScheduleDay = machineLastScheduleDayMap.get(machineCode);
-            if (currentLastScheduleDay == null || lastScheduleDay >= currentLastScheduleDay) {
-                machineLastScheduleDayMap.put(machineCode, lastScheduleDay);
-                machineRecordMap.put(machineCode, record);
+            String dayStatisticsStr = (String)statistics.getFieldValueByFieldName(String.format(DAY_FIELD_NAME_FORMAT, lastDay));
+            if (StringUtils.isEmpty(dayStatisticsStr) || !JSONValidator.from(dayStatisticsStr).validate()) {
+                continue;
             }
-        }
-        return machineRecordMap;
-    }
-
-    private int getLastScheduleDay(FactoryMonthPlanProductionFinalResult record) {
-        for (int day = 31; day >= 1; day--) {
-            Object value = record.getFieldValueByFieldName(String.format(DAY_FIELD_NAME_FORMAT, day));
-            Integer dayQty = Convert.toInt(value, 0);
-            if (dayQty != null && dayQty > 0) {
-                return day;
+            // 3.2、检查最后一天的排产，如果硫化机数大于0说明有排产，则添加到列表中
+            MpDayProductionStatisticsDetailVo dayStatistics = JSONObject.parseObject(dayStatisticsStr, MpDayProductionStatisticsDetailVo.class);
+            if (dayStatistics.getLhMachines() == null || dayStatistics.getLhMachines() <= 0) {
+                continue;
             }
+            machineStructureMap.put(machineCode, record);
         }
-        return 0;
+        return machineStructureMap;
     }
 
     /**
