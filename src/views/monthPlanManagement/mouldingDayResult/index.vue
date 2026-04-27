@@ -154,6 +154,7 @@ export default {
       productionVersion: null,
       stat: {},
       dayNum: 31,
+      lastRouteLoadKey: "",
     };
   },
   computed: {
@@ -456,6 +457,14 @@ export default {
       ];
     },
   },
+  watch: {
+    $route: {
+      immediate: false,
+      handler() {
+        this.initByRouteAndLoad();
+      },
+    },
+  },
   methods: {
     handleAdd() {
       if (this.$refs.infoRef) {
@@ -731,6 +740,9 @@ export default {
       }
     },
     getDaysInMonth(yearMonth) {
+      if (!yearMonth) {
+        return 31;
+      }
       // 解析输入，支持 "2026-2" 或 "2026-02" 格式
       const [year, month] = yearMonth.split("-").map(Number);
 
@@ -741,12 +753,16 @@ export default {
       // 返回当月的天数
       return lastDay.getDate();
     },
-  },
-  created() {
-    if (this.$route.query) {
-      console.log(this.$route.query);
-      let defaultParams = {
-        ...this.$route.query,
+    initByRouteAndLoad() {
+      const routeQuery = this.$route.query || {};
+      const routePath = this.$route.path || "";
+      const routeKey = `${routePath}?${JSON.stringify(routeQuery)}`;
+      if (routeKey === this.lastRouteLoadKey) {
+        return;
+      }
+      this.lastRouteLoadKey = routeKey;
+      const defaultParams = {
+        ...routeQuery,
       };
       this.search = {
         ...defaultParams,
@@ -754,11 +770,17 @@ export default {
       this.query = {
         ...defaultParams,
       };
-    }
-    this.dayNum=this.getDaysInMonth(this.$route.query.yearMonth)
-    this.getList();
+      this.dayNum = this.getDaysInMonth(routeQuery.yearMonth);
+      this.$set(this.page, "current", 1);
+      this.getList();
+    },
   },
-  activated() {},
+  created() {
+    this.initByRouteAndLoad();
+  },
+  activated() {
+    this.initByRouteAndLoad();
+  },
 };
 </script>
 <style lang="scss" scoped>
