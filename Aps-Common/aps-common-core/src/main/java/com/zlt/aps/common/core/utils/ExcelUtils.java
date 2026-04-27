@@ -5,6 +5,7 @@ import com.zlt.aps.common.core.domain.BorderStyleVo;
 import com.zlt.aps.common.core.domain.ExcelCellRangeAddress;
 import com.zlt.aps.common.core.domain.ExcelImg;
 import com.zlt.aps.common.core.domain.ExcelStyleVo;
+
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -19,6 +20,7 @@ import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -832,6 +834,8 @@ public class ExcelUtils {
         if (sourceSheet == null) {
             throw new IllegalArgumentException("源工作表不存在: " + sheetIdex);
         }
+        // 样式映射表（工作簿级别）
+        Map<Integer, CellStyle> styleMapping = new HashMap<>();
         
         // 2. 在目标工作簿中创建新Sheet
         Sheet targetSheet = targetWorkbook.createSheet(sourceSheet.getSheetName());
@@ -862,7 +866,7 @@ public class ExcelUtils {
                 if (sourceCell == null) continue;
                 
                 Cell targetCell = targetRow.createCell(j);
-                copyCell(sourceCell, targetCell, sourceWorkbook, targetWorkbook);
+                copyCell(sourceCell, targetCell, sourceWorkbook, targetWorkbook, styleMapping);
             }
         }
         
@@ -877,12 +881,24 @@ public class ExcelUtils {
      * 复制单元格（处理值、样式、公式）
      */
     private static void copyCell(Cell sourceCell, Cell targetCell, 
-                                 Workbook sourceWorkbook, Workbook targetWorkbook) {
-        // 复制样式（这里做了简单处理，复杂项目可能需要 clone 样式）
-        CellStyle newStyle = targetWorkbook.createCellStyle();
-        newStyle.cloneStyleFrom(sourceCell.getCellStyle());
-        targetCell.setCellStyle(newStyle);
-        
+                                 Workbook sourceWorkbook, Workbook targetWorkbook, Map<Integer, CellStyle> styleMapping) {
+        // 如果源单元格使用默认样式，直接跳过
+        CellStyle sourceStyle = sourceCell.getCellStyle();
+        if (sourceStyle.equals(sourceWorkbook.getCellStyleAt(0))) {
+            // 使用目标工作簿的默认样式，不创建新样式
+            targetCell.setCellStyle(targetWorkbook.getCellStyleAt(0));
+        } else {
+            // 非默认样式，则从缓存中获取样式
+            int styleIndex = sourceStyle.getIndex();
+            CellStyle targetStyle = styleMapping.computeIfAbsent(styleIndex, k -> {
+                // 缓存也没有这个样式的情况下才创建，创建后保存到样式缓存中
+                CellStyle newStyle = targetWorkbook.createCellStyle();
+                newStyle.cloneStyleFrom(sourceStyle);
+                styleMapping.put(styleIndex, newStyle);
+                return newStyle;
+            });
+            targetCell.setCellStyle(targetStyle);
+        }
         // 复制值/公式
         switch (sourceCell.getCellType()) {
             case STRING:
