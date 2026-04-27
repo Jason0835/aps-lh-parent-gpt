@@ -68,7 +68,7 @@
           v-hasPermi="['lh:lhScheduleResult:changeMachine']"
           type="primary"
           @click="handleChangePlan"
-          :disabled="selection.length == 0"
+          :disabled="selection.length !== 1"
           >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button
         >
 
@@ -78,13 +78,13 @@
           @click="handlePublish"
           >{{ $t("ui.data.column.scheduleResult.schedulePublish") }}</el-button
         >
-        <el-button
+        <!-- <el-button
           v-hasPermi="['lh:lhScheduleResult:changeMachine']"
           type="primary"
           :disabled="selection.length == 0"
           @click="getAdjustTextNo"
           >{{ $t("ui.data.column.scheduleResult.textAdjust") }}</el-button
-        >
+        > -->
         <el-button
           v-hasPermi="['lh:lhScheduleResult:generateTextPlan']"
           type="primary"

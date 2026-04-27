@@ -209,22 +209,22 @@
           <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analysis')"
-              prop="class1AnalysisInput"
+              prop="class1Analysis"
             >
               <el-input
-                v-model="form.class1AnalysisInput"
+                v-model="form.class1Analysis"
                 maxlength="66"
               ></el-input>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <!-- <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analySystem')"
               prop="class1Analysis"
             >
               <el-input v-model="form.class1Analysis" disabled></el-input>
             </el-form-item>
-          </el-col>
+          </el-col> -->
           <el-col :span="24">
             <h4 class="form-header h4">
               {{ $t("中班")+dateList[1].shiftDate }}
@@ -258,22 +258,22 @@
           <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analysis')"
-              prop="class2AnalysisInput"
+              prop="class2Analysis"
             >
               <el-input
-                v-model="form.class2AnalysisInput"
+                v-model="form.class2Analysis"
                 maxlength="66"
               ></el-input>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <!-- <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analySystem')"
               prop="class2Analysis"
             >
               <el-input v-model="form.class2Analysis" disabled></el-input>
             </el-form-item>
-          </el-col>
+          </el-col> -->
           <el-col :span="24">
             <h4 class="form-header h4">
               {{ $t("晚班")+dateList[2].shiftDate }}
@@ -307,22 +307,22 @@
           <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analysis')"
-              prop="class3AnalysisInput"
+              prop="class3Analysis"
             >
               <el-input
-                v-model="form.class3AnalysisInput"
+                v-model="form.class3Analysis"
                 maxlength="66"
               ></el-input>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <!-- <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analySystem')"
               prop="class3Analysis"
             >
               <el-input v-model="form.class3Analysis" disabled></el-input>
             </el-form-item>
-          </el-col>
+          </el-col> -->
           <el-col :span="24">
             <h4 class="form-header h4">
               {{ $t("早") +dateList[3].shiftDate }}
@@ -356,22 +356,22 @@
           <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analysis')"
-              prop="class4AnalysisInput"
+              prop="class4Analysis"
             >
               <el-input
-                v-model="form.class4AnalysisInput"
+                v-model="form.class4Analysis"
                 maxlength="66"
               ></el-input>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <!-- <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analySystem')"
               prop="class4Analysis"
             >
               <el-input v-model="form.class4Analysis" disabled></el-input>
             </el-form-item>
-          </el-col>
+          </el-col> -->
           <el-col :span="24">
             <h4 class="form-header h4">
               {{ $t("中班"+dateList[4].shiftDate) }}
@@ -405,22 +405,22 @@
           <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analysis')"
-              prop="class5AnalysisInput"
+              prop="class5Analysis"
             >
               <el-input
-                v-model="form.class5AnalysisInput"
+                v-model="form.class5Analysis"
                 maxlength="66"
               ></el-input>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <!-- <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analySystem')"
               prop="class5Analysis"
             >
               <el-input v-model="form.class5Analysis" disabled></el-input>
             </el-form-item>
-          </el-col>
+          </el-col> -->
           <el-col :span="24">
             <h4 class="form-header h4">
               {{ $t("晚班"+dateList[5].shiftDate) }}
@@ -454,22 +454,22 @@
           <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analysis')"
-              prop="class6AnalysisInput"
+              prop="class6Analysis"
             >
               <el-input
-                v-model="form.class6AnalysisInput"
+                v-model="form.class6Analysis"
                 maxlength="66"
               ></el-input>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <!-- <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analySystem')"
               prop="class6Analysis"
             >
               <el-input v-model="form.class6Analysis" disabled></el-input>
             </el-form-item>
-          </el-col>
+          </el-col> -->
 
 
           <el-col :span="24">
@@ -505,22 +505,22 @@
           <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analysis')"
-              prop="class7AnalysisInput"
+              prop="class7Analysis"
             >
               <el-input
-                v-model="form.class7AnalysisInput"
+                v-model="form.class7Analysis"
                 maxlength="66"
               ></el-input>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <!-- <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analySystem')"
               prop="class7Analysis"
             >
               <el-input v-model="form.class7Analysis" disabled></el-input>
             </el-form-item>
-          </el-col>
+          </el-col> -->
 
           <el-col :span="24">
             <h4 class="form-header h4">
@@ -555,22 +555,22 @@
           <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analysis')"
-              prop="class8AnalysisInput"
+              prop="class8Analysis"
             >
               <el-input
-                v-model="form.class8AnalysisInput"
+                v-model="form.class8Analysis"
                 maxlength="66"
               ></el-input>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <!-- <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.analySystem')"
               prop="class8Analysis"
             >
               <el-input v-model="form.class8Analysis" disabled></el-input>
             </el-form-item>
-          </el-col>
+          </el-col> -->
         </el-row>
       </el-form>
     </div>
@@ -619,6 +619,9 @@ export default {
       three3PlanTimeDisabled: false,
       three4PlanTimeDisabled: false,
       three5PlanTimeDisabled: false,
+      three6PlanTimeDisabled: false,
+      three7PlanTimeDisabled: false,
+      three8PlanTimeDisabled: false,
       two1PlanTimeDisabled: false,
       two2PlanTimeDisabled: false,
       rules: {
@@ -916,7 +919,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.analysis"),
-          prop: "class1AnalysisInput",
+          prop: "class1Analysis",
           span: 12,
           maxlength: "66",
         },
@@ -956,7 +959,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.analysis"),
-          prop: "class2AnalysisInput",
+          prop: "class2Analysis",
           span: 12,
           maxlength: "66",
         },
@@ -997,7 +1000,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.analysis"),
-          prop: "class3AnalysisInput",
+          prop: "class3Analysis",
           span: 12,
           maxlength: "66",
         },
@@ -1037,7 +1040,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.analysis"),
-          prop: "class4AnalysisInput",
+          prop: "class4Analysis",
           span: 12,
           maxlength: "66",
         },
@@ -1078,7 +1081,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.analysis"),
-          prop: "class5AnalysisInput",
+          prop: "class5Analysis",
           span: 12,
           maxlength: "66",
         },
@@ -1100,6 +1103,18 @@ export default {
         console.log(res);
         this.dateList=res
       } catch (error) {}
+    },
+    updatePlanTimeDisabledByClassTime(data) {
+      const now = moment();
+      for (let i = 1; i <= 8; i++) {
+        const endTime = data[`class${i}EndTime`];
+        if (!endTime) {
+          this[`three${i}PlanTimeDisabled`] = true;
+          continue;
+        }
+        const formattedEndTime = moment(endTime).format("YYYY-MM-DD HH:mm:ss");
+        this[`three${i}PlanTimeDisabled`] = now.isAfter(formattedEndTime);
+      }
     },
     // api
     async getInfo(id) {
@@ -1169,14 +1184,14 @@ export default {
         const saveParams = {
           ...params,
           remark: this.encodeRemark(params.remark),
-          class1AnalysisInput: this.encodeRemark(params.class1AnalysisInput),
-          class2AnalysisInput: this.encodeRemark(params.class2AnalysisInput),
-          class3AnalysisInput: this.encodeRemark(params.class3AnalysisInput),
-          class4AnalysisInput: this.encodeRemark(params.class4AnalysisInput),
-          class5AnalysisInput: this.encodeRemark(params.class5AnalysisInput),
-          class6AnalysisInput: this.encodeRemark(params.class6AnalysisInput),
-          class7AnalysisInput: this.encodeRemark(params.class7AnalysisInput),
-          class8AnalysisInput: this.encodeRemark(params.class8AnalysisInput),
+          class1Analysis: this.encodeRemark(params.class1Analysis),
+          class2Analysis: this.encodeRemark(params.class2Analysis),
+          class3Analysis: this.encodeRemark(params.class3Analysis),
+          class4Analysis: this.encodeRemark(params.class4Analysis),
+          class5Analysis: this.encodeRemark(params.class5Analysis),
+          class6Analysis: this.encodeRemark(params.class6Analysis),
+          class7Analysis: this.encodeRemark(params.class7Analysis),
+          class8Analysis: this.encodeRemark(params.class8Analysis),
         };
         const res = await changeQty(saveParams);
         this.loading = false;
@@ -1208,39 +1223,22 @@ export default {
           class7Analysis: this.decodeRemark(data.class7Analysis),
           class8Analysis: this.decodeRemark(data.class8Analysis),
         };
-        this.getDate(data.scheduleDate)
+        this.getDate(data.scheduleDate);
+        this.updatePlanTimeDisabledByClassTime(data);
         // this.getInfo(data.id);
 
         if (data.scheduleDate) {
-          if (moment().isAfter(data.scheduleDate)) {
-            this.three1PlanTimeDisabled = true;
-            this.two1PlanTimeDisabled = true;
-          }
-          if (moment().isAfter(data.scheduleDate + " 08:00:00")) {
-            this.three2PlanTimeDisabled = true;
-          }
-          if (moment().isAfter(data.scheduleDate + " 12:00:00")) {
-            this.two2PlanTimeDisabled = true;
-          }
-          if (moment().isAfter(data.scheduleDate + " 16:00:00")) {
-            this.three3PlanTimeDisabled = true;
-          }
-          if (moment().isAfter(moment(data.scheduleDate).add(1, "days"))) {
-            this.three4PlanTimeDisabled = true;
-          }
-          if (
-            moment().isAfter(
-              moment(data.scheduleDate + " 08:00:00").add(1, "days")
-            )
-          ) {
-            this.three5PlanTimeDisabled = true;
-          }
+          this.two1PlanTimeDisabled = moment().isAfter(data.scheduleDate);
+          this.two2PlanTimeDisabled = moment().isAfter(data.scheduleDate + " 12:00:00");
         } else {
           this.three1PlanTimeDisabled = true;
           this.three2PlanTimeDisabled = true;
           this.three3PlanTimeDisabled = true;
           this.three4PlanTimeDisabled = true;
           this.three5PlanTimeDisabled = true;
+          this.three6PlanTimeDisabled = true;
+          this.three7PlanTimeDisabled = true;
+          this.three8PlanTimeDisabled = true;
           this.two1PlanTimeDisabled = true;
           this.two2PlanTimeDisabled = true;
         }
@@ -1257,6 +1255,9 @@ export default {
       this.three3PlanTimeDisabled = false;
       this.three4PlanTimeDisabled = false;
       this.three5PlanTimeDisabled = false;
+      this.three6PlanTimeDisabled = false;
+      this.three7PlanTimeDisabled = false;
+      this.three8PlanTimeDisabled = false;
       this.two1PlanTimeDisabled = false;
       this.two2PlanTimeDisabled = false;
     },
