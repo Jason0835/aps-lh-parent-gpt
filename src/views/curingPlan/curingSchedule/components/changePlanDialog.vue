@@ -619,6 +619,9 @@ export default {
       three3PlanTimeDisabled: false,
       three4PlanTimeDisabled: false,
       three5PlanTimeDisabled: false,
+      three6PlanTimeDisabled: false,
+      three7PlanTimeDisabled: false,
+      three8PlanTimeDisabled: false,
       two1PlanTimeDisabled: false,
       two2PlanTimeDisabled: false,
       rules: {
@@ -1101,6 +1104,18 @@ export default {
         this.dateList=res
       } catch (error) {}
     },
+    updatePlanTimeDisabledByClassTime(data) {
+      const now = moment();
+      for (let i = 1; i <= 8; i++) {
+        const endTime = data[`class${i}EndTime`];
+        if (!endTime) {
+          this[`three${i}PlanTimeDisabled`] = true;
+          continue;
+        }
+        const formattedEndTime = moment(endTime).format("YYYY-MM-DD HH:mm:ss");
+        this[`three${i}PlanTimeDisabled`] = now.isAfter(formattedEndTime);
+      }
+    },
     // api
     async getInfo(id) {
       try {
@@ -1208,39 +1223,22 @@ export default {
           class7Analysis: this.decodeRemark(data.class7Analysis),
           class8Analysis: this.decodeRemark(data.class8Analysis),
         };
-        this.getDate(data.scheduleDate)
+        this.getDate(data.scheduleDate);
+        this.updatePlanTimeDisabledByClassTime(data);
         // this.getInfo(data.id);
 
         if (data.scheduleDate) {
-          if (moment().isAfter(data.scheduleDate)) {
-            this.three1PlanTimeDisabled = true;
-            this.two1PlanTimeDisabled = true;
-          }
-          if (moment().isAfter(data.scheduleDate + " 08:00:00")) {
-            this.three2PlanTimeDisabled = true;
-          }
-          if (moment().isAfter(data.scheduleDate + " 12:00:00")) {
-            this.two2PlanTimeDisabled = true;
-          }
-          if (moment().isAfter(data.scheduleDate + " 16:00:00")) {
-            this.three3PlanTimeDisabled = true;
-          }
-          if (moment().isAfter(moment(data.scheduleDate).add(1, "days"))) {
-            this.three4PlanTimeDisabled = true;
-          }
-          if (
-            moment().isAfter(
-              moment(data.scheduleDate + " 08:00:00").add(1, "days")
-            )
-          ) {
-            this.three5PlanTimeDisabled = true;
-          }
+          this.two1PlanTimeDisabled = moment().isAfter(data.scheduleDate);
+          this.two2PlanTimeDisabled = moment().isAfter(data.scheduleDate + " 12:00:00");
         } else {
           this.three1PlanTimeDisabled = true;
           this.three2PlanTimeDisabled = true;
           this.three3PlanTimeDisabled = true;
           this.three4PlanTimeDisabled = true;
           this.three5PlanTimeDisabled = true;
+          this.three6PlanTimeDisabled = true;
+          this.three7PlanTimeDisabled = true;
+          this.three8PlanTimeDisabled = true;
           this.two1PlanTimeDisabled = true;
           this.two2PlanTimeDisabled = true;
         }
@@ -1257,6 +1255,9 @@ export default {
       this.three3PlanTimeDisabled = false;
       this.three4PlanTimeDisabled = false;
       this.three5PlanTimeDisabled = false;
+      this.three6PlanTimeDisabled = false;
+      this.three7PlanTimeDisabled = false;
+      this.three8PlanTimeDisabled = false;
       this.two1PlanTimeDisabled = false;
       this.two2PlanTimeDisabled = false;
     },
