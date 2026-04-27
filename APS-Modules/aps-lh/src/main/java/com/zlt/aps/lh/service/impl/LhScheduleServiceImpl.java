@@ -289,12 +289,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (adjustPlanQty < 0) {
                 errorMessages.add(String.format("第%s班计划量不能小于0", shiftIndex));
             }
-            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(record, shiftIndex);
+            /*Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(record, shiftIndex);
             if (Objects.isNull(shiftEndTime)) {
                 errorMessages.add(String.format("第%s班结束时间缺失，禁止调量", shiftIndex));
             } else if (!now.before(shiftEndTime)) {
                 errorMessages.add(String.format("第%s班已结束，历史班次不可调量", shiftIndex));
-            }
+            }*/
             Integer finishQty = Optional.ofNullable(ShiftFieldUtil.getShiftFinishQty(record, shiftIndex)).orElse(0);
             if (adjustPlanQty < finishQty) {
                 errorMessages.add(String.format("第%s班计划量不能小于完成量%s", shiftIndex, finishQty));
@@ -332,6 +332,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             Integer adjustPlanQty = getAdjustPlanQty(dto, shiftIndex);
             if (Objects.nonNull(adjustPlanQty)) {
                 setAdjustPlanQty(record, shiftIndex, adjustPlanQty);
+                setAdjustAnalysis(record, shiftIndex, getAdjustAnalysis(dto, shiftIndex));
             }
         }
 
@@ -434,5 +435,49 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             default:
                 break;
         }
+    }
+
+    /**
+     * 获取指定班次的调量原因分析。
+     *
+     * @param dto        调量参数
+     * @param shiftIndex 班次索引（1~8）
+     * @return 原因分析，未传入返回null
+     */
+    private String getAdjustAnalysis(LhScheduleResultUpdateDTO dto, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1:
+                return dto.getClass1Analysis();
+            case 2:
+                return dto.getClass2Analysis();
+            case 3:
+                return dto.getClass3Analysis();
+            case 4:
+                return dto.getClass4Analysis();
+            case 5:
+                return dto.getClass5Analysis();
+            case 6:
+                return dto.getClass6Analysis();
+            case 7:
+                return dto.getClass7Analysis();
+            case 8:
+                return dto.getClass8Analysis();
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * 设置指定班次原因分析。
+     *
+     * @param record     排程结果
+     * @param shiftIndex 班次索引（1~8）
+     * @param analysis   原因分析，为null时保留原值
+     */
+    private void setAdjustAnalysis(LhScheduleResult record, int shiftIndex, String analysis) {
+        if (Objects.isNull(analysis)) {
+            return;
+        }
+        ShiftFieldUtil.setShiftAnalysis(record, shiftIndex, analysis);
     }
 }
