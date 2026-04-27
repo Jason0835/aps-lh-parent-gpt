@@ -1507,6 +1507,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         headMap.put("unPostponeNetQty", I18nUtil.getMessage("ui.data.column.demandPlanSum.unPostponeNetQty"));
         headMap.put("totalQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.totalQty"));
         headMap.put("differenceQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.differenceQty"));
+        headMap.put("beginDay", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.beginDay"));
+        headMap.put("endDay", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.endDay"));
         headMap.put("allotDays", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.allotDays"));
         headMap.put("maxLhMachineCount", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.maxLhMachineCount"));
         headMap.put("dailyproductionQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.dailyproductionQty"));
@@ -1673,6 +1675,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         listDataMap.put(this.getRealFieldName("unPostponeNetQty", suffix), exportVo.getUnPostponeNetQty());
         listDataMap.put(this.getRealFieldName("totalQty", suffix), exportVo.getTotalQty());
         listDataMap.put(this.getRealFieldName("differenceQty", suffix), exportVo.getDifferenceQty());
+        listDataMap.put(this.getRealFieldName("beginDay", suffix), exportVo.getBeginDay());
+        listDataMap.put(this.getRealFieldName("endDay", suffix), exportVo.getEndDay());
         listDataMap.put(this.getRealFieldName("allotDays", suffix), exportVo.getAllotDays());
         listDataMap.put(this.getRealFieldName("maxLhMachineCount", suffix), exportVo.getMaxLhMachineCount());
         listDataMap.put(this.getRealFieldName("day1", suffix), exportVo.getDay1());

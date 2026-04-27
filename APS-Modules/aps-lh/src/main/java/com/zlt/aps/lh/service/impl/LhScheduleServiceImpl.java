@@ -253,8 +253,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         String remark = record.getRemark() != null ? record.getRemark() : "";
         record.setRemark(remark + "转机台时间：" + DateUtil.now() + "【原机台：" + oldMachine + ",转入机台：" + dto.getLhMachineCode() + "】");
 
-        // 设置为待发布
-        record.setIsRelease("0");
+        // 发布状态是已发布的话，需要更新为待发布
+        if (ReleaseStatusEnum.RELEASED.getCode().equals(record.getIsRelease())) {
+            record.setIsRelease(ReleaseStatusEnum.PENDING_RELEASE.getCode());
+        }
 
         scheduleResultMapper.updateById(record);
         return AjaxResult.success("转机台成功");
@@ -338,7 +340,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 调量后同步汇总计划量，并回置为未发布状态，确保后续重新发布
         ShiftFieldUtil.syncDailyPlanQty(record);
-        record.setIsRelease(ReleaseStatusEnum.PENDING_RELEASE.getCode());
+        // 发布状态是已发布的话，需要更新为待发布
+        if (ReleaseStatusEnum.RELEASED.getCode().equals(record.getIsRelease())) {
+            record.setIsRelease(ReleaseStatusEnum.PENDING_RELEASE.getCode());
+        }
 
         int updateCount = scheduleResultMapper.updateById(record);
         if (updateCount <= 0) {
