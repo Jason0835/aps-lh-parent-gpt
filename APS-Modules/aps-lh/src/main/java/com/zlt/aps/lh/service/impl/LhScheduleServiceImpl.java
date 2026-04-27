@@ -289,12 +289,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (adjustPlanQty < 0) {
                 errorMessages.add(String.format("第%s班计划量不能小于0", shiftIndex));
             }
-            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(record, shiftIndex);
+            /*Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(record, shiftIndex);
             if (Objects.isNull(shiftEndTime)) {
                 errorMessages.add(String.format("第%s班结束时间缺失，禁止调量", shiftIndex));
             } else if (!now.before(shiftEndTime)) {
                 errorMessages.add(String.format("第%s班已结束，历史班次不可调量", shiftIndex));
-            }
+            }*/
             Integer finishQty = Optional.ofNullable(ShiftFieldUtil.getShiftFinishQty(record, shiftIndex)).orElse(0);
             if (adjustPlanQty < finishQty) {
                 errorMessages.add(String.format("第%s班计划量不能小于完成量%s", shiftIndex, finishQty));
