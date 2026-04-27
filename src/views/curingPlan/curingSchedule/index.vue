@@ -161,7 +161,7 @@
     <tlt-upload-form
       ref="tltUploadForm"
       :title="$t('ui.data.column.scheduleResult.importLhScheduleResultData')"
-      downloadUrl="/lh/lhScheduleResult/importTemplate"
+      downloadUrl="/lh/lhScheduleResult/importTemplateDown"
       uploadUrl="/lh/lhScheduleResult/exportCombine"
       @uploadSuccess="getList"
       :columns="importColumns"
@@ -170,7 +170,7 @@
     <tlt-upload-form
       ref="tltUploadForm2"
       :title="$t('ui.data.column.scheduleResult.importLhScheduleResultData')"
-      downloadUrl="/lh/lhScheduleResult/importTemplate"
+      downloadUrl="/lh/lhScheduleResult/importTemplateDown"
       uploadUrl="/lh/lhScheduleResult/importData2"
       @uploadSuccess="getList"
       :columns="importColumns"
@@ -179,8 +179,9 @@
     <tlt-upload
       ref="tltUpload"
       :title="$t('ui.data.column.scheduleResult.importFinishQty')"
-      downloadUrl="/lh/lhScheduleResult/importTemplate"
-      uploadUrl="/lh/lhScheduleResult/importData"
+      downloadUrl="/lh/lhScheduleResult/importTemplateDown"
+      :download-params="importTemplateDownloadParams"
+      uploadUrl="/lh/lhScheduleResult/importDataByCust"
       @uploadSuccess="getList"
     />
     <AddDialog ref="addDialogRef" @success="handelSuccess" />
@@ -338,6 +339,11 @@ export default {
     ...mapState({
       curingMachines: (state) => state.curing.machines,
     }),
+    importTemplateDownloadParams() {
+      return {
+        scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+      };
+    },
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },

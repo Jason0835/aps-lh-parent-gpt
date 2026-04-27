@@ -18,7 +18,7 @@
       accept=".xls,.xlsx"
       :headers="upload.headers"
       :before-upload="beforeUpload"
-      :action="upload.url + uploadUrl + '?updateSupport=' + updateSupport"
+      :action="uploadAction"
       :disabled="upload.isUploading"
       :on-progress="handleFileUploadProgress"
       :on-success="handleFileSuccess"
@@ -65,6 +65,10 @@ export default {
     value: String | Number,
     disabled: Boolean,
     downloadUrl: String, //下载模板地址
+    downloadParams: {
+      type: Object,
+      default: () => ({}),
+    },
     uploadUrl: String, //上传模板地址
     options: Array,
     updateSupport: {
@@ -131,7 +135,14 @@ export default {
     },
     handleTemplateDownload() {
       let downloadDom = document.createElement("a");
-      downloadDom.href = process.env.VUE_APP_BASE_API + this.downloadUrl;
+      const queryString = Object.keys(this.downloadParams || {})
+        .filter((key) => this.downloadParams[key] !== undefined && this.downloadParams[key] !== null && this.downloadParams[key] !== "")
+        .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(this.downloadParams[key])}`)
+        .join("&");
+      downloadDom.href =
+        process.env.VUE_APP_BASE_API +
+        this.downloadUrl +
+        (queryString ? `${this.downloadUrl.includes("?") ? "&" : "?"}${queryString}` : "");
       document.body.appendChild(downloadDom);
       downloadDom.click();
       document.body.removeChild(downloadDom);
