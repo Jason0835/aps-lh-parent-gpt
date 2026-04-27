@@ -2,16 +2,19 @@ package com.zlt.aps.lh.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
 import com.ruoyi.api.gateway.system.service.IImportLogService;
-import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
+import com.ruoyi.common.core.utils.bean.BeanUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.exception.CustomException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
@@ -24,18 +27,22 @@ import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.component.ScheduleExecutionGuard;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
+import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.ExcelReadUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -181,15 +188,49 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         return super.importData(importContext,updateSupport);
     }
 
+
+    /**
+     * 导入数据
+     * @param importContext 导入上下文
+     * @param updateSupport 已存在记录是否更新
+     * @return 结果
+     */
+    @Log(title = "ui.data.column.port.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importDataByCust/{updateSupport}")
+    public AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport, @RequestBody LhScheduleImportDTO importDTO) throws Exception {
+        Date beginTime = DateUtils.getNowDate();
+        ImportContext importContext = importDTO.getImportContext();
+        LhScheduleResult result = importDTO.getScheduleResult();
+        byte[] fileBytes = importContext.getFileBytes();
+        String sheetName = "硫化计划";
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
+        importLog = this.iImportLogService.add(importLog);
+        ExcelUtil<LhScheduleResultTemplateImportVO> util = new ExcelUtil<>(LhScheduleResultTemplateImportVO.class);
+        // 模板第1行为key表头，第9行开始是明细数据，因此表头行数传9，并关闭二级表头。
+        List<LhScheduleResultTemplateImportVO> list = util.importExcel(
+                sheetName, new ByteArrayInputStream(fileBytes), 0, 7, -1);
+        AjaxResult ajaxResult = lhScheduleService.importScheduleTemplate(list,result, updateSupport, importLog.getId());
+        Date endTime = DateUtils.getNowDate();
+        importLog.setRowCount(list.size());
+        importLog.setBeginTime(beginTime);
+        importLog.setEndTime(endTime);
+        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
+        ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
+        return ajaxResult;
+    }
+
+
     @ApiOperation(value = "模板下载" , notes = "导入模板下载")
     @PostMapping("/downloadTemplate/{fileName}")
     public byte[] downloadTemplate(@RequestBody LhScheduleResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         queryVO = queryVO == null ? new LhScheduleResult() : queryVO;
         List<LhScheduleResult> list = new ArrayList<>();
-        LhScheduleResult  lhScheduleResult = new LhScheduleResult();
-        lhScheduleResult.setScheduleDate(queryVO.getScheduleDate());
-        list.add(lhScheduleResult);
+//        LhScheduleResult  lhScheduleResult = new LhScheduleResult();
+//        lhScheduleResult.setScheduleDate(queryVO.getScheduleDate());
+//        list.add(lhScheduleResult);
         byte[] resultBytes = lhScheduleService.exportData(list, queryVO.getScheduleDate());
         return resultBytes;
     }

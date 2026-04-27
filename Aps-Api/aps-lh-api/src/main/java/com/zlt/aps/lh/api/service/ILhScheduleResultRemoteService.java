@@ -163,4 +163,5 @@ public interface ILhScheduleResultRemoteService {
     @ApiOperation("导出导入模板")
     @PostMapping("/lhScheduleResult/downloadTemplate/{fileName}")
     byte[] downloadTemplate(@RequestBody LhScheduleResult entity,  @PathVariable("fileName") String fileName);
+
 }
