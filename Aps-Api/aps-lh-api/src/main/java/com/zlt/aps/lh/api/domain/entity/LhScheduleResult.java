@@ -167,6 +167,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 规格结束时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.specEndTime")
     @ApiModelProperty(value = "规格结束时间", name = "specEndTime")
     @TableField(value = "SPEC_END_TIME")
@@ -191,6 +192,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 1班计划开始时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class1StartTime")
     @ApiModelProperty(value = "1班计划开始时间", name = "class1StartTime")
     @TableField(value = "CLASS1_START_TIME")
@@ -199,6 +201,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 1班计划结束时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class1EndTime")
     @ApiModelProperty(value = "1班计划结束时间", name = "class1EndTime")
     @TableField(value = "CLASS1_END_TIME")
@@ -231,6 +234,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 2班计划开始时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class2StartTime")
     @ApiModelProperty(value = "2班计划开始时间", name = "class2StartTime")
     @TableField(value = "CLASS2_START_TIME")
@@ -239,6 +243,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 2班计划结束时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class2EndTime")
     @ApiModelProperty(value = "2班计划结束时间", name = "class2EndTime")
     @TableField(value = "CLASS2_END_TIME")
@@ -271,6 +276,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 3班计划开始时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class3StartTime")
     @ApiModelProperty(value = "3班计划开始时间", name = "class3StartTime")
     @TableField(value = "CLASS3_START_TIME")
@@ -279,6 +285,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 3班计划结束时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class3EndTime")
     @ApiModelProperty(value = "3班计划结束时间", name = "class3EndTime")
     @TableField(value = "CLASS3_END_TIME")
@@ -311,6 +318,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 4班计划开始时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class4StartTime")
     @ApiModelProperty(value = "4班计划开始时间", name = "class4StartTime")
     @TableField(value = "CLASS4_START_TIME")
@@ -319,6 +327,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 4班计划结束时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class4EndTime")
     @ApiModelProperty(value = "4班计划结束时间", name = "class4EndTime")
     @TableField(value = "CLASS4_END_TIME")
@@ -351,6 +360,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 5班计划开始时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class5StartTime")
     @ApiModelProperty(value = "5班计划开始时间", name = "class5StartTime")
     @TableField(value = "CLASS5_START_TIME")
@@ -359,6 +369,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 5班计划结束时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class5EndTime")
     @ApiModelProperty(value = "5班计划结束时间", name = "class5EndTime")
     @TableField(value = "CLASS5_END_TIME")
@@ -391,6 +402,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 6班计划开始时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class6StartTime")
     @ApiModelProperty(value = "6班计划开始时间", name = "class6StartTime")
     @TableField(value = "CLASS6_START_TIME")
@@ -399,6 +411,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 6班计划结束时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class6EndTime")
     @ApiModelProperty(value = "6班计划结束时间", name = "class6EndTime")
     @TableField(value = "CLASS6_END_TIME")
@@ -431,6 +444,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 7班计划开始时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class7StartTime")
     @ApiModelProperty(value = "7班计划开始时间", name = "class7StartTime")
     @TableField(value = "CLASS7_START_TIME")
@@ -439,6 +453,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 7班计划结束时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class7EndTime")
     @ApiModelProperty(value = "7班计划结束时间", name = "class7EndTime")
     @TableField(value = "CLASS7_END_TIME")
@@ -471,6 +486,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 8班计划开始时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class8StartTime")
     @ApiModelProperty(value = "8班计划开始时间", name = "class8StartTime")
     @TableField(value = "CLASS8_START_TIME")
@@ -479,6 +495,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 8班计划结束时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.class8EndTime")
     @ApiModelProperty(value = "8班计划结束时间", name = "class8EndTime")
     @TableField(value = "CLASS8_END_TIME")
@@ -527,6 +544,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 保留最新的一次发布成功时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.newestPublishTime")
     @ApiModelProperty(value = "最新发布成功时间", name = "newestPublishTime")
     @TableField(value = "NEWEST_PUBLISH_TIME")
@@ -631,6 +649,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 实际排程日期
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.realScheduleDate")
     @ApiModelProperty(value = "实际排程日期", name = "realScheduleDate")
     @TableField(value = "REAL_SCHEDULE_DATE")
@@ -639,6 +658,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * T日规格结束时间
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.tdaySpecEndTime")
     @ApiModelProperty(value = "T日规格结束时间", name = "tdaySpecEndTime")
     @TableField(value = "TDAY_SPEC_END_TIME")

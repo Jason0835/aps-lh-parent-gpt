@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.service;
 
+
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.CxTreadParkingConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
@@ -109,17 +110,6 @@ public interface ConstraintCheckService {
      * @return 校验结果
      */
     ConstraintCheckResult checkLhRatioConstraint(String structureName, String machineType, int lhMachineCount);
-
-    /**
-     * 检查关键产品约束
-     * 开产首班不排关键产品
-     *
-     * @param material     物料信息
-     * @param isOpeningDay 是否开产日
-     * @param isFirstShift 是否首班
-     * @return 校验结果
-     */
-    ConstraintCheckResult checkKeyProductConstraint(MdmMaterialInfo material, boolean isOpeningDay, boolean isFirstShift);
 
     /**
      * 检查试制约束
