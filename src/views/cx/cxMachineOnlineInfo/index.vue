@@ -26,6 +26,7 @@
 </template>
 
 <script>
+import { mapState } from 'vuex'
 import { downloadLink } from '@/utils/request'
 import { listCxMachineOnlineInfo } from '@/api/cx/cxMachineOnlineInfo'
 
@@ -46,6 +47,9 @@ export default {
     }
   },
   computed: {
+    ...mapState({
+      moldingMachines: state => state.molding.machines
+    }),
     searchColumns() {
       return [
         {
@@ -59,8 +63,12 @@ export default {
         {
           prop: 'cxCode',
           label: this.$t('ui.data.column.cxMachineOnlineInfo.cxCode'),
-          placeholder: this.$t('common.rule.input'),
-          type: 'input'
+          type: 'select',
+          dictData: this.moldingMachines,
+          labelKey: 'cxMachineCode',
+          valueKey: 'cxMachineCode',
+          filterable: true,
+          clearable: true
         },
         {
           prop: 'onlineDate',
@@ -138,6 +146,17 @@ export default {
       ]
     }
   },
+  watch: {
+    moldingMachines() {
+      this.$forceUpdate()
+    }
+  },
+  created() {
+    this.$store.dispatch('molding/getMachineList')
+  },
+  activated() {
+    this.getList()
+  },
   methods: {
     handleExport() {
       downloadLink('/cx/cxMachineOnlineInfo/export', this.formatParams(false))
@@ -184,9 +203,6 @@ export default {
         this.loading = false
       }
     }
-  },
-  activated() {
-    this.getList()
   }
 }
 </script>
