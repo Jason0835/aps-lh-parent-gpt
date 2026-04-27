@@ -22,7 +22,7 @@ import java.util.Map;
  * <p>按班次级别判断开产/停产逻辑：
  * - 停产班：本班次 = 0(停产)，不做处理
  * - 开产班（首个）：本班次 = 1(开产) 且 上个班次 = 0(停产)，走开产逻辑
- * - 停产前一天班（末个）：本班次 = 1(开产) 且 下个班次 = 0(停产)，走停产前一天逻辑
+ * - 停产前一个班（末个）：本班次 = 1(开产) 且 下个班次 = 0(停产)，走停产前一个班逻辑
  *
  * @author APS Team
  */
@@ -79,8 +79,8 @@ public class ScheduleDayTypeHelper {
         CLOSED("停产班"),
         /** 开产班（首个）：本班次=1(开产) 且 上个班次=0(停产) */
         OPEN_START("开产首个班次"),
-        /** 停产前一天班（末个）：本班次=1(开产) 且 下个班次=0(停产) */
-        BEFORE_CLOSE("停产前一天班次"),
+        /** 停产前一个班（末个）：本班次=1(开产) 且 下个班次=0(停产) */
+        BEFORE_CLOSE("停产前一个班次"),
         /** 正常班：本班次=1(开产) 且 上下班次都是开产 */
         NORMAL("正常班");
         
@@ -469,10 +469,7 @@ public class ScheduleDayTypeHelper {
                 return SHIFT_FLAG_START;
         }
         
-        String flag = getShiftFlag(prevDate, prevShiftOrder, factoryCode);
-        log.debug("获取上一个班次标志，日期: {}，班次: {} -> 日期: {}，班次: {}，标志: {}",
-                date, shiftOrder, prevDate, prevShiftOrder, flag);
-        return flag;
+        return getShiftFlag(prevDate, prevShiftOrder, factoryCode);
     }
 
     /**
@@ -515,10 +512,7 @@ public class ScheduleDayTypeHelper {
                 return SHIFT_FLAG_START;
         }
         
-        String flag = getShiftFlag(nextDate, nextShiftOrder, factoryCode);
-        log.debug("获取下一个班次标志，日期: {}，班次: {} -> 日期: {}，班次: {}，标志: {}",
-                date, shiftOrder, nextDate, nextShiftOrder, flag);
-        return flag;
+        return getShiftFlag(nextDate, nextShiftOrder, factoryCode);
     }
 
     // ==================== 班次类型判定 ====================
@@ -529,7 +523,7 @@ public class ScheduleDayTypeHelper {
      * 判断逻辑：
      * - 停产班：本班次 = 0(停产)，不做处理
      * - 开产班（首个）：本班次 = 1(开产) 且 上个班次 = 0(停产)，走开产逻辑
-     * - 停产前一天班（末个）：本班次 = 1(开产) 且 下个班次 = 0(停产)，走停产前一天逻辑
+     * - 停产前一个班（末个）：本班次 = 1(开产) 且 下个班次 = 0(停产)，走停产前一个班逻辑
      *
      * @param date       日期
      * @param shiftOrder 班次序号（1,2,3）
@@ -547,70 +541,33 @@ public class ScheduleDayTypeHelper {
         
         // 1. 判断是否为停产班
         if (SHIFT_FLAG_STOP.equals(currentFlag)) {
-            log.info("班次类型判定：工厂={}, 日期={}, 班次={}, 结果=停产班", 
-                    factoryCode, date, getShiftName(shiftOrder));
+            log.info("班次类型判定：工厂={}, 日期={}, 当天第{}班, 结果=停产班", 
+                    factoryCode, date, shiftOrder);
             return ShiftType.CLOSED;
         }
         
-        // 2. 本班次是开产，判断是开产首个班还是停产前一天班
+        // 2. 本班次是开产，判断是开产首个班还是停产前一个班
         String prevFlag = getPreviousShiftFlag(date, shiftOrder, factoryCode);
         String nextFlag = getNextShiftFlag(date, shiftOrder, factoryCode);
         
         // 上个班次是停产 -> 开产首个班次
         if (SHIFT_FLAG_STOP.equals(prevFlag)) {
-            log.info("班次类型判定：工厂={}, 日期={}, 班次={}, 上个班次=停产, 结果=开产首个班次", 
-                    factoryCode, date, getShiftName(shiftOrder));
+            log.info("班次类型判定：工厂={}, 日期={}, 当天第{}班, 上个班次停产, 结果=开产首个班次", 
+                    factoryCode, date, shiftOrder);
             return ShiftType.OPEN_START;
         }
         
-        // 下个班次是停产 -> 停产前一天班次
+        // 下个班次是停产 -> 停产前一个班次
         if (SHIFT_FLAG_STOP.equals(nextFlag)) {
-            log.info("班次类型判定：工厂={}, 日期={}, 班次={}, 下个班次=停产, 结果=停产前一天班次", 
-                    factoryCode, date, getShiftName(shiftOrder));
+            log.info("班次类型判定：工厂={}, 日期={}, 当天第{}班, 下个班次停产, 结果=停产前一个班次", 
+                    factoryCode, date, shiftOrder);
             return ShiftType.BEFORE_CLOSE;
         }
         
         // 正常班
-        log.info("班次类型判定：工厂={}, 日期={}, 班次={}, 结果=正常班", 
-                factoryCode, date, getShiftName(shiftOrder));
+        log.info("班次类型判定：工厂={}, 日期={}, 当天第{}班, 结果=正常班(上下班次均正常)", 
+                factoryCode, date, shiftOrder);
         return ShiftType.NORMAL;
-    }
-
-    // ==================== 判断方法（无工厂编号，兼容旧调用） ====================
-
-    /**
-     * 判断是否为停产班（本班次=0）
-     */
-    public boolean isClosedShift(LocalDate date, int shiftOrder) {
-        return determineShiftType(date, shiftOrder, null) == ShiftType.CLOSED;
-    }
-
-    /**
-     * 判断是否为开产首个班次（本班次=1 且 上班次=0）
-     */
-    public boolean isOpenStartShift(LocalDate date, int shiftOrder) {
-        return determineShiftType(date, shiftOrder, null) == ShiftType.OPEN_START;
-    }
-
-    /**
-     * 判断是否为停产班（本班次=0）
-     */
-    public boolean isClosingShift(LocalDate date, int shiftOrder) {
-        return determineShiftType(date, shiftOrder, null) == ShiftType.CLOSED;
-    }
-
-    /**
-     * 判断是否为停产前一天班次（本班次=1 且 下班次=0）
-     */
-    public boolean isBeforeCloseShift(LocalDate date, int shiftOrder) {
-        return determineShiftType(date, shiftOrder, null) == ShiftType.BEFORE_CLOSE;
-    }
-
-    /**
-     * 判断是否为正常班次（本班次=1 且 上下班次都是开产）
-     */
-    public boolean isNormalShift(LocalDate date, int shiftOrder) {
-        return determineShiftType(date, shiftOrder, null) == ShiftType.NORMAL;
     }
 
     // ==================== 判断方法（带工厂编号） ====================
@@ -637,31 +594,13 @@ public class ScheduleDayTypeHelper {
     }
 
     /**
-     * 判断是否为停产前一天班次（本班次=1 且 下班次=0），带工厂编号
+     * 判断是否为停产前一个班次（本班次=1 且 下班次=0），带工厂编号
      */
     public boolean isBeforeCloseShift(LocalDate date, int shiftOrder, String factoryCode) {
         return determineShiftType(date, shiftOrder, factoryCode) == ShiftType.BEFORE_CLOSE;
     }
 
-    /**
-     * 判断是否为正常班次，带工厂编号
-     */
-    public boolean isNormalShift(LocalDate date, int shiftOrder, String factoryCode) {
-        return determineShiftType(date, shiftOrder, factoryCode) == ShiftType.NORMAL;
-    }
-
     // ==================== 班次停产判断（用于排程主循环跳过停产班次） ====================
-
-    /**
-     * 判断某天某班次是否停产（无工厂编号，兼容旧调用）
-     *
-     * @param date          查询日期
-     * @param dayShiftOrder 班次顺序（1=一班, 2=二班, 3=三班）
-     * @return true 表示该班次停产
-     */
-    public boolean isShiftStopped(LocalDate date, int dayShiftOrder) {
-        return SHIFT_FLAG_STOP.equals(getShiftFlag(date, dayShiftOrder));
-    }
 
     /**
      * 判断某天某班次是否停产（带工厂编号）
@@ -673,8 +612,8 @@ public class ScheduleDayTypeHelper {
      */
     public boolean isShiftStopped(LocalDate date, int dayShiftOrder, String factoryCode) {
         String flag = getShiftFlag(date, dayShiftOrder, factoryCode);
-        log.debug("班次停产判断：工厂={}, 日期={}, 班次={}, 标志={}, 结果={}", 
-                factoryCode, date, getShiftName(dayShiftOrder), flag, SHIFT_FLAG_STOP.equals(flag));
+        log.debug("班次停产判断：工厂={}, 日期={}, 当天第{}班, 标志={}, 结果={}", 
+                factoryCode, date, dayShiftOrder, flag, SHIFT_FLAG_STOP.equals(flag));
         return SHIFT_FLAG_STOP.equals(flag);
     }
 
@@ -705,6 +644,20 @@ public class ScheduleDayTypeHelper {
         return shift1Stopped && shift2Stopped && shift3Stopped;
     }
 
+    /**
+     * 判断某天是否包含任一班次停产（用于跨天封顶检查）
+     * 只要有一个班次的shift_flag="0"就返回true
+     */
+    public boolean hasAnyClosingShift(LocalDate date, String factoryCode) {
+        MdmWorkCalendar calendar = getCalendar(date, factoryCode);
+        if (calendar == null) {
+            return false;
+        }
+        return SHIFT_FLAG_STOP.equals(calendar.getOneShiftFlag())
+                || SHIFT_FLAG_STOP.equals(calendar.getTwoShiftFlag())
+                || SHIFT_FLAG_STOP.equals(calendar.getThreeShiftFlag());
+    }
+
     // ==================== 原有按天级别判断方法（兼容保留） ====================
 
     /**
@@ -733,14 +686,7 @@ public class ScheduleDayTypeHelper {
     }
 
     /**
-     * 获取指定日期对应的 DayFlagInfo
-     */
-    public DayFlagInfo getDayFlagInfo(LocalDate date) {
-        return findNearestDayFlag(date);
-    }
-
-    /**
-     * 判断是否为停产日（已停产）
+     * 判断是否为停产日（已停产，往后停产）
      */
     public boolean isStopDay(LocalDate date) {
         return isStopDay(date, null);
@@ -793,10 +739,6 @@ public class ScheduleDayTypeHelper {
     /**
      * 判断是否正常生产日（既不是停产日也不是停产标识日）
      */
-    public boolean isNormalProductionDay(LocalDate date) {
-        return !isStopDay(date) && !isStopFlagDay(date);
-    }
-
     /**
      * 根据时间字符串（HH:mm格式）确定对应的班次序号
      *
@@ -815,10 +757,15 @@ public class ScheduleDayTypeHelper {
             String startTime = shiftConfig.getStartTime();
             String endTime = shiftConfig.getEndTime();
             if (startTime != null && endTime != null) {
-                // 时间格式为 HH:mm:ss，截取前5位比较
                 String start = startTime.length() >= 5 ? startTime.substring(0, 5) : startTime;
                 String end = endTime.length() >= 5 ? endTime.substring(0, 5) : endTime;
-                if (timeStr.compareTo(start) >= 0 && timeStr.compareTo(end) < 0) {
+                boolean inShift;
+                if (start.compareTo(end) <= 0) {
+                    inShift = timeStr.compareTo(start) >= 0 && timeStr.compareTo(end) < 0;
+                } else {
+                    inShift = timeStr.compareTo(start) >= 0 || timeStr.compareTo(end) < 0;
+                }
+                if (inShift) {
                     return shiftConfig.getDayShiftOrder();
                 }
             }
@@ -834,17 +781,11 @@ public class ScheduleDayTypeHelper {
                 }
             }
         }
+        // 时间早于第一个班次的开始时间（如停锅05:30，第一班06:00），归为第一班
+        com.zlt.aps.cx.entity.config.CxShiftConfig firstShift = shiftConfigs.get(0);
+        if (firstShift != null && firstShift.getDayShiftOrder() != null) {
+            return firstShift.getDayShiftOrder();
+        }
         return null;
-    }
-
-    /**
-     * 清理缓存（测试用或需要重新加载时调用）
-     */
-    public void clearCache() {
-        calendarCache.clear();
-        cacheLoaded = false;
-        cachedFactoryCode = null;
-        cacheStartDate = null;
-        cacheEndDate = null;
     }
 }

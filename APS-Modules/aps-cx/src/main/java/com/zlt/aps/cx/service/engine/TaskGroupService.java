@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 
 /**
@@ -182,6 +183,28 @@ public class TaskGroupService {
         Map<String, MdmMaterialInfo> materialMap = buildMaterialMap(context);
         Map<String, CxStock> stockMap = buildStockMap(context);
 
+        // 一次性加载所有阈值配置（避免循环中重复打印日志）
+        int endingDiscardThreshold = getEndingDiscardThreshold(context);
+        int endingUrgentFormingRemainder = getEndingUrgentFormingRemainder(context);
+        int endingDaysThreshold = getEndingDaysThreshold(context);
+        int urgentEndingDays = getUrgentEndingDays(context);
+        log.info("【收尾参数配置】收尾舍弃阈值={}, 成型余量紧急阈值={}, 近期收尾天数={}, 紧急收尾天数={}",
+                endingDiscardThreshold, endingUrgentFormingRemainder, endingDaysThreshold, urgentEndingDays);
+
+        // 判断当前班次是否为开产班次（用于提前过滤关键产品）
+        boolean isOpeningShift = false;
+        if (dayShifts != null && !dayShifts.isEmpty()) {
+            CxShiftConfig currentShift = dayShifts.get(0);
+            if (currentShift.getDayShiftOrder() != null) {
+                LocalDate currentScheduleDate = context.getCurrentScheduleDate();
+                String factoryCode = context.getFactoryCode();
+                ScheduleDayTypeHelper.ShiftType st = scheduleDayTypeHelper.determineShiftType(
+                        currentScheduleDate, currentShift.getDayShiftOrder(), factoryCode);
+                isOpeningShift = st == ScheduleDayTypeHelper.ShiftType.OPEN_START
+                        || scheduleDayTypeHelper.isOpeningDay(currentScheduleDate, factoryCode);
+            }
+        }
+
         if (machineOnlineEmbryoMap == null) {
             machineOnlineEmbryoMap = new HashMap<>();
         }
@@ -205,6 +228,8 @@ public class TaskGroupService {
                 skippedNullEmbryo++;
                 continue;
             }
+
+            log.info("========== 处理任务: 胎胚={}, 物料={} ==========", lhResult.getEmbryoCode(), lhResult.getMaterialCode());
             
             // 库存够硫化当天剩余班次的消耗，跳过该任务
             // 逻辑：
@@ -215,7 +240,7 @@ public class TaskGroupService {
             int currentStock = getCurrentStock(context, lhResult.getId());
             int todayRemainingDemand = calculateTodayRemainingDemand(context, dayShifts, lhResult);
             if (todayRemainingDemand > 0 && currentStock >= todayRemainingDemand) {
-                log.info("库存充足跳过: 胎胚={}, 库存={}, 当日剩余需求={}, 当前班次={}", 
+                log.debug("库存充足跳过: 胎胚={}, 库存={}, 当日剩余需求={}, 当前班次={}", 
                         lhResult.getEmbryoCode(), currentStock, todayRemainingDemand, dayShifts.get(0).getShiftCode());
                 skippedNullTask++;
                 continue;
@@ -250,6 +275,14 @@ public class TaskGroupService {
                 continue;
             }
 
+            // 开产班次提前过滤关键产品（不在分组中保留，直接在循环中跳过）
+            if (isOpeningShift && context.getKeyProductCodes() != null
+                    && lhResult.getEmbryoCode() != null
+                    && context.getKeyProductCodes().contains(lhResult.getEmbryoCode())) {
+                log.info("开产班次关键产品跳过: 胎胚={}", lhResult.getEmbryoCode());
+                continue;
+            }
+
             String embryoCode = lhResult.getEmbryoCode();
 
             // 判断任务类型
@@ -274,6 +307,34 @@ public class TaskGroupService {
             int usedRemainder = materialUsedFormingRemainder.getOrDefault(materialCode, 0);
             calculateEndingInfo(task, context, scheduleDate, usedRemainder);
 
+            // S5.2.4.1 开产班次：更新 vulcanizeDemand 为下一个有计划的 CLASS 的量
+            if (isOpeningShift) {
+                int currentDemand = task.getVulcanizeDemand() != null ? task.getVulcanizeDemand() : 0;
+                if (currentDemand <= 0) {
+                    if (lhResult != null) {
+                        if (currentClassIndex > 0) {
+                            for (int ci = currentClassIndex + 1; ci <= 8; ci++) {
+                                Integer nextPlan = getClassPlanQtyByIndex(lhResult, ci);
+                                if (nextPlan != null && nextPlan > 0) {
+                                    task.setVulcanizeDemand(nextPlan);
+                                    log.info("开产班次: 胎胚={}, 当前CLASS{}计划=0, 使用CLASS{}计划={}",
+                                            embryoCode, currentClassIndex, ci, nextPlan);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                // 同时算出开产基准量（6/24 × 双模日硫化，往下取整车），供 handleOpeningDayTaskV2 封顶用
+                int doubleMoldDailyCapacity = getDailyLhCapacityByTask(task, context) * 2;
+                if (doubleMoldDailyCapacity > 0) {
+                    int raw = (int) Math.ceil(6.0 / 24.0 * doubleMoldDailyCapacity);
+                    int tripCapacity = getTripCapacity(task.getStructureName(), context);
+                    int openingBase = tripCapacity > 0 ? (raw / tripCapacity) * tripCapacity : raw;
+                    task.setOpeningShiftCapacity(openingBase);
+                }
+            }
+
             // S5.2.5 计算待排产量
             calculatePlannedProduction(task, context, scheduleDate);
             // S5.2.6 收尾余量处理
@@ -297,19 +358,19 @@ public class TaskGroupService {
             Integer endingSurplus = task.getEndingSurplusQty();
             if ((endingSurplus != null && endingSurplus < getEndingUrgentFormingRemainder(context))
                     || Boolean.TRUE.equals(task.getIsUrgentEnding())) {
-                // 获取计算公式所需参数
                 int vulcanizeDmd = task.getVulcanizeDemand() != null ? task.getVulcanizeDemand() : 0;
                 int stock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
                 int netDemand = Math.max(0, vulcanizeDmd - stock);
                 BigDecimal lossRate = context.getLossRate() != null ? context.getLossRate() : BigDecimal.ZERO;
                 int tripCap = getTripCapacity(task.getStructureName(), context);
                 int plannedProd = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
-                log.info("成型余量低于阈值的收尾任务：物料={}, 剩余成型余量={}, 阈值={} | 收尾任务={}, 收尾余量={}, 硫化余量={}, 收尾日={}, 距收尾天={}, 紧急收尾={}, 近期收尾={}, 收尾最后一批={} | 计算公式：(日硫化量{} - 库存{}) × (1 + 损耗率{}) = {} × {} = {} | 整车({})取整后待排产量={}, 需车数={}, 最终需生产量={}",
-                        embryoCode, task.getEndingSurplusQty(), getEndingUrgentFormingRemainder(context),
-                        task.getIsEndingTask(), task.getEndingSurplusQty(), task.getVulcanizeSurplusQty(),
-                        task.getEndingDate(), task.getDaysToEnding(), task.getIsUrgentEnding(), task.getIsNearEnding(), task.getIsLastEndingBatch(),
-                        vulcanizeDmd, stock, lossRate, netDemand, lossRate.add(BigDecimal.ONE).setScale(4, BigDecimal.ROUND_HALF_UP), plannedProd,
-                        tripCap, task.getPlannedProduction(), task.getRequiredCars(), task.getEndingExtraInventory());
+                log.info("收尾任务[{}]: 剩余余量={}, 收尾日={}, 距收尾={}天, 紧急={}, 近期={}, 最后一批={}",
+                        embryoCode, task.getEndingSurplusQty(), task.getEndingDate(),
+                        task.getDaysToEnding(), task.getIsUrgentEnding(), task.getIsNearEnding(), task.getIsLastEndingBatch());
+                log.info("  排产计算: (硫化{} - 库存{}) × (1+损耗{}) = {}×{}={}, 整车({})取整→待排={}, 需车={}, 实际={}",
+                        vulcanizeDmd, stock, lossRate, netDemand,
+                        lossRate.add(BigDecimal.ONE).setScale(4, BigDecimal.ROUND_HALF_UP),
+                        plannedProd, tripCap, task.getPlannedProduction(), task.getRequiredCars(), task.getEndingExtraInventory());
             }
             
             // 更新已使用的成型余量（累加当前任务的 endingExtraInventory）
@@ -416,10 +477,6 @@ public class TaskGroupService {
                     || (remainingFormingRemainder != null && remainingFormingRemainder <= getEndingUrgentFormingRemainder(context));
             task.setIsUrgentEnding(isUrgentEnding);
 
-            if (isUrgentEnding) {
-                log.info("紧急收尾任务：物料={}, 收尾日={}, 距收尾{}天",
-                        task.getMaterialCode(), endingDate, daysToEnding);
-            }
         }
 
         // 计算优先级
@@ -621,7 +678,7 @@ public class TaskGroupService {
 
         // 获取分配给该硫化任务的库存（按硫化任务维度分配，共用胎胚库存已按比例分配）
         int currentStock = getCurrentStock(context, lhResult.getId());
-        log.info("硫化任务排量: embryoCode={}, vulcanizeDemand={}, currentStock={}",
+        log.debug("硫化任务排量: embryoCode={}, vulcanizeDemand={}, currentStock={}",
                 embryoCode, vulcanizeDemand, currentStock);
 
         // 获取物料信息
@@ -1088,14 +1145,13 @@ public class TaskGroupService {
     /**
      * S5.2.7 开停产特殊处理
      *
-     * <p>调整逻辑（v2）：
-     * <ul>
-     *   <li>每个班次进来都要检查今天有没有包含停产班次，有就要走停产逻辑</li>
-     *   <li>检查当前班次是否是停产前一个班次（即下班次为停产班次）</li>
-     *   <li>如果包含停产，依据硫化停锅时间倒推当前班次到停产班次还需生成的量</li>
-     *   <li>反推公式：反推总量 = (停锅时间 - 当前班次开始时间 - 预留消化时间) / 单胎单模时长 × 模数</li>
-     *   <li>如果任务之前走了收尾余量处理，以停产为优先，调整回来</li>
-     * </ul>
+     * <p>每个班次处理时调用，顺序判断：
+     * <ol>
+     *   <li>已停产日（isStopDay）→ 产量=0</li>
+     *   <li>当前班次停产/停产前一个班次/停产标识日 → handleClosingDayTaskV2（反推封顶）</li>
+     *   <li>开产班次（OPEN_START 或 isOpeningDay）→ handleOpeningDayTaskV2（6/24备货）</li>
+     *   <li>明天有停产 → 跨天封顶</li>
+     * </ol>
      *
      * @param task      胎胚任务
      * @param context   排程上下文
@@ -1122,26 +1178,70 @@ public class TaskGroupService {
 
         // ==================== 停产逻辑调整（v2）====================
         // 每个班次都检查：今天有没有包含停产班次
-        // 判断条件1：当前班次本身是否为停产班次（shift_flag="0"）
-        boolean isCurrentClosingShift = scheduleDayTypeHelper.isClosingShift(scheduleDate, currentDayShiftOrder, factoryCode);
-        // 判断条件2：当前班次的下一个班次是否为停产班次（即当前班次是停产前最后一个生产班次）
-        boolean isBeforeClosingShift = scheduleDayTypeHelper.isBeforeCloseShift(scheduleDate, currentDayShiftOrder, factoryCode);
+        // 通过一次 determineShiftType 获取班次类型，避免重复调用
+        ScheduleDayTypeHelper.ShiftType shiftType = scheduleDayTypeHelper.determineShiftType(
+                scheduleDate, currentDayShiftOrder, factoryCode);
+        boolean isCurrentClosingShift = shiftType == ScheduleDayTypeHelper.ShiftType.CLOSED;
+        boolean isBeforeClosingShift = shiftType == ScheduleDayTypeHelper.ShiftType.BEFORE_CLOSE;
         // 判断条件3：当前班次本身是否是停产标识日的班次（包含停产班次的当天）
         boolean isStopFlagDayToday = scheduleDayTypeHelper.isStopFlagDay(scheduleDate, factoryCode);
 
-        log.info("停产判断：工厂={}, 日期={}, dayShiftOrder={}, isClosing={}, isBeforeClose={}, isStopFlagDay={}",
-                factoryCode, scheduleDate, currentDayShiftOrder, isCurrentClosingShift, isBeforeClosingShift, isStopFlagDayToday);
-
         if (isCurrentClosingShift || isBeforeClosingShift || isStopFlagDayToday) {
+            log.info("当前班次事件: 工厂={}, 日期={}, 当天第{}班, 类型={}, 停产标识日={}",
+                    factoryCode, scheduleDate, currentDayShiftOrder,
+                    isCurrentClosingShift ? "停产班"
+                            : isBeforeClosingShift ? "停产前一个班次(下个班次停产)"
+                            : "停产标识日",
+                    isStopFlagDayToday);
             // 今天包含停产班次，走停产逻辑
             handleClosingDayTaskV2(task, context, scheduleDate, currentDayShiftOrder, dayShifts);
             return;
         }
 
-        // ==================== 开产日处理 ====================
-        if (scheduleDayTypeHelper.isOpeningDay(scheduleDate, factoryCode)) {
-            handleOpeningDayTaskV2(task, context, scheduleDate, currentDayShiftOrder);
+        // ==================== 停产日前一天封顶 ====================
+        // 如果明天有停产班次，需跨天封顶当前班次的产量
+        // 避免前一个班次过量生产，导致停产后库存过剩（此检查必须在开产日前，避免被截断）
+        LocalDate nextDay = scheduleDate.plusDays(1);
+        boolean isNextDayStop = scheduleDayTypeHelper.hasAnyClosingShift(nextDay, factoryCode);
+
+        // ==================== 开产处理 ====================
+        // 判断条件：班次类型为 OPEN_START（本班次开产，上个班次停产）或 isOpeningDay
+        boolean isOpening = shiftType == ScheduleDayTypeHelper.ShiftType.OPEN_START
+                || scheduleDayTypeHelper.isOpeningDay(scheduleDate, factoryCode);
+        if (isOpening) {
+            handleOpeningDayTaskV2(task, context, scheduleDate, currentDayShiftOrder, dayShifts);
+            if (isNextDayStop) {
+                int closingRequiredStock = calculateClosingRequiredStockV2(task, context, scheduleDate, currentDayShiftOrder, dayShifts);
+                int currentStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
+                int thisShiftNeeded = Math.max(0, closingRequiredStock - currentStock);
+                int normalDemand = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
+                int cappedProduction = Math.min(normalDemand, thisShiftNeeded);
+                log.info("跨天封顶(明天{}有停产,开产日): 胎胚={}, 反推需求={}, 库存={}, 还需={}, 正常需求={}, 封顶={}",
+                        nextDay, task.getEmbryoCode(), closingRequiredStock, currentStock,
+                        thisShiftNeeded, normalDemand, cappedProduction);
+                int tripCapacity = getTripCapacity(task.getStructureName(), context);
+                int roundedProduction = productionCalculator.roundToVehicle(cappedProduction, tripCapacity);
+                task.setPlannedProduction(roundedProduction);
+                task.setEndingExtraInventory(roundedProduction);
+                task.setRequiredCars(tripCapacity > 0 ? (roundedProduction + tripCapacity - 1) / tripCapacity : 0);
+            }
             return;
+        }
+
+        if (isNextDayStop) {
+            int closingRequiredStock = calculateClosingRequiredStockV2(task, context, scheduleDate, currentDayShiftOrder, dayShifts);
+            int currentStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
+            int thisShiftNeeded = Math.max(0, closingRequiredStock - currentStock);
+            int normalDemand = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
+            int cappedProduction = Math.min(normalDemand, thisShiftNeeded);
+            log.info("跨天封顶(明天{}有停产): 胎胚={}, 反推需求={}, 库存={}, 还需={}, 正常需求={}, 封顶={}",
+                    nextDay, task.getEmbryoCode(), closingRequiredStock, currentStock,
+                    thisShiftNeeded, normalDemand, cappedProduction);
+            int tripCapacity = getTripCapacity(task.getStructureName(), context);
+            int roundedProduction = productionCalculator.roundToVehicle(cappedProduction, tripCapacity);
+            task.setPlannedProduction(roundedProduction);
+            task.setEndingExtraInventory(roundedProduction);
+            task.setRequiredCars(tripCapacity > 0 ? (roundedProduction + tripCapacity - 1) / tripCapacity : 0);
         }
     }
 
@@ -1162,76 +1262,15 @@ public class TaskGroupService {
      * @param scheduleDate       排程日期
      * @param currentDayShiftOrder 当前班次序号
      */
-    private void handleClosingDayTask(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                       ScheduleContextVo context,
-                                       LocalDate scheduleDate,
-                                       int currentDayShiftOrder) {
-        // 标记为停产日任务
-        task.setIsClosingDayTask(true);
-
-        // 确定停锅班次
-        Integer closingShiftOrder = determineClosingShiftOrder(context);
-        task.setClosingShiftOrder(closingShiftOrder);
-
-        if (closingShiftOrder == null) {
-            log.warn("停产日 {} 无法确定停锅班次，保持原计划量", scheduleDate);
-            return;
-        }
-
-        // 计算反推总量
-        int closingRequiredStock = calculateClosingRequiredStock(task, context, scheduleDate);
-        task.setClosingRequiredStock(closingRequiredStock);
-
-        int currentStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
-        int normalDemand = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
-
-        // 当前班次到停机时间还需的量
-        int thisShiftNeeded = Math.max(0, closingRequiredStock - currentStock);
-
-        // 封顶：取正常需求和反推需求中的较小值
-        int cappedProduction = Math.min(normalDemand, thisShiftNeeded);
-
-        log.info("停产反推封顶: embryoCode={}, closingShiftOrder={}, closingRequiredStock={}, " +
-                        "currentStock={}, normalDemand={}, thisShiftNeeded={}, cappedProduction={}, " +
-                        "currentDayShiftOrder={}",
-                task.getEmbryoCode(), closingShiftOrder, closingRequiredStock,
-                currentStock, normalDemand, thisShiftNeeded, cappedProduction, currentDayShiftOrder);
-
-        // 如果当前班次是停锅班次，不补整车（按实量下）
-        if (currentDayShiftOrder == closingShiftOrder) {
-            // 不补整车：用封顶量直接作为 endingExtraInventory
-            int tripCapacity = getTripCapacity(task.getStructureName(), context);
-            if (tripCapacity > 0 && cappedProduction > 0 && cappedProduction % tripCapacity != 0) {
-                // 向下取整到整车
-                int roundedDown = (cappedProduction / tripCapacity) * tripCapacity;
-                // 但停产最后班次可以不整车，保持封顶量
-                log.info("停锅班次不补整车: embryoCode={}, cappedProduction={}, 向下整车={}, 保持不整车={}",
-                        task.getEmbryoCode(), cappedProduction, roundedDown, cappedProduction);
-            }
-            task.setPlannedProduction(cappedProduction);
-            task.setEndingExtraInventory(cappedProduction);
-            task.setRequiredCars(cappedProduction > 0 ? 1 : 0);
-        } else if (currentDayShiftOrder < closingShiftOrder) {
-            // 停锅班次之前的班次：按封顶量正常排产，整车取整
-            int tripCapacity = getTripCapacity(task.getStructureName(), context);
-            int roundedProduction = productionCalculator.roundToVehicle(cappedProduction, tripCapacity);
-            task.setPlannedProduction(roundedProduction);
-            task.setEndingExtraInventory(roundedProduction);
-            task.setRequiredCars(tripCapacity > 0
-                    ? (roundedProduction + tripCapacity - 1) / tripCapacity : 0);
-        }
-        // currentDayShiftOrder > closingShiftOrder 不应出现（已被班次停产跳过）
-    }
-
     /**
-     * 停产任务处理 V2：每个班次检查是否包含停产班次，按反推公式计算
+     * 停产任务处理：每个班次检查是否包含停产班次，按反推公式计算
      *
      * <p>调整逻辑：
      * <ul>
      *   <li>每个班次进来都要检查今天有没有包含停产班次</li>
      *   <li>如果包含停产班次，依据硫化停锅时间倒推当前班次到停产班次还需生成的量</li>
      *   <li>反推公式：反推总量 = (停锅时间 - 当前班次开始时间 - 预留消化时间) / 单胎单模时长 × 模数</li>
-     *   <li>封顶：取正常需求和反推需求中的较小值</li>
+     *   <li>封顶：取收尾后实需(endingExtraInventory)和反推需求中的较小值</li>
      *   <li>如果任务之前走了收尾余量处理，以停产为优先调整回来</li>
      * </ul>
      *
@@ -1275,19 +1314,18 @@ public class TaskGroupService {
         task.setClosingRequiredStock(closingRequiredStock);
 
         int currentStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
-        int normalDemand = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
+        int endingInventory = task.getEndingExtraInventory() != null ? task.getEndingExtraInventory() : 0;
 
         // 当前班次到停机时间还需的量
         int thisShiftNeeded = Math.max(0, closingRequiredStock - currentStock);
 
-        // 封顶：取正常需求和反推需求中的较小值
-        int cappedProduction = Math.min(normalDemand, thisShiftNeeded);
+        // 封顶：取 endingExtraInventory（收尾/试制调整后的量）和反推需求中的较小值
+        // 如果 endingExtraInventory < 反推需求，说明收尾已经在限制了，停产不放大
+        int cappedProduction = Math.min(endingInventory, thisShiftNeeded);
 
-        log.info("停产反推封顶V2: embryoCode={}, closingShiftOrder={}, closingRequiredStock={}, " +
-                        "currentStock={}, normalDemand={}, thisShiftNeeded={}, cappedProduction={}, " +
-                        "currentDayShiftOrder={}",
+        log.info("停产反推封顶: 胎胚={}, 停锅班次=当天第{}班, 反推需胎胚={}, 当前库存={}, 收尾后实需={}, 还需生产={}, 封顶={}, 当前班次=当天第{}班",
                 task.getEmbryoCode(), closingShiftOrder, closingRequiredStock,
-                currentStock, normalDemand, thisShiftNeeded, cappedProduction, currentDayShiftOrder);
+                currentStock, endingInventory, thisShiftNeeded, cappedProduction, currentDayShiftOrder);
 
         // ==================== 如果之前走了收尾余量处理，以停产为优先调整回来 ====================
         if (Boolean.TRUE.equals(task.getIsLastEndingBatch())) {
@@ -1389,7 +1427,7 @@ public class TaskGroupService {
                 String timePart = vulcanizingStopTimeStr.length() >= 5
                         ? vulcanizingStopTimeStr.substring(0, 5) : vulcanizingStopTimeStr;
                 stopTime = LocalDateTime.of(scheduleDate,
-                        java.time.LocalTime.parse(timePart));
+                        LocalTime.parse(timePart));
             } catch (Exception e) {
                 log.warn("停产反推V2：解析停锅时间失败: {}", vulcanizingStopTimeStr);
                 return 0;
@@ -1419,10 +1457,8 @@ public class TaskGroupService {
 
         int requiredStock = (int) Math.ceil((double) durationSeconds / singleTireMoldSeconds * moldQty);
 
-        log.info("停产反推总量V2: embryoCode={}, dailyLhCapacity={}, moldQty={}, ratio={}, " +
-                        "singleTireMoldSeconds={}, stopTime={}, shiftStartTime={}, reservedDigestHours={}h, " +
-                        "durationSeconds={}, requiredStock={}",
-                task.getEmbryoCode(), dailyLhCapacity, moldQty, ratio,
+        log.info("停产反推总量: 胎胚={}, 单模日硫化量={}, 模数={}, 单胎时长={}s, 停锅={}, 当前班次开始={}, 消化={}h, 可用={}s, 需胎胚={}",
+                task.getEmbryoCode(), dailyLhCapacity, moldQty,
                 String.format("%.1f", singleTireMoldSeconds), stopTime, shiftStartTime, reservedDigestHours,
                 durationSeconds, requiredStock);
 
@@ -1448,82 +1484,44 @@ public class TaskGroupService {
     }
 
     /**
-     * 开产日任务处理 V2：提前一班备货（简化公式）
+     * 开产日任务处理（开产基准量已在 groupTasks 中提前算出并存于 openingShiftCapacity）
      *
-     * <p>调整逻辑：
-     * <ul>
-     *   <li>获取开产班次下一个班次的硫化任务，排除关键产品</li>
-     *   <li>endingExtraInventory = (6/24) × 物料日硫化量</li>
-     *   <li>开产首班不补整车</li>
-     * </ul>
+     * <p>逻辑：
+     * <ol>
+     *   <li>取 groupTasks 中预存的 openingShiftCapacity（开产基准量，向下取整到整车）</li>
+     *   <li>与收尾/试制调整后的 endingExtraInventory 比较，取较小值</li>
+     * </ol>
+     *
+     * <p>注意：关键产品已在 groupTasks 中提前过滤，不会进入此方法
      *
      * @param task               胎胚任务
      * @param context            排程上下文
      * @param scheduleDate       排程日期
      * @param currentDayShiftOrder 当前班次序号
+     * @param dayShifts          当前班次配置
      */
     private void handleOpeningDayTaskV2(CoreScheduleAlgorithmService.DailyEmbryoTask task,
                                          ScheduleContextVo context,
                                          LocalDate scheduleDate,
-                                         int currentDayShiftOrder) {
-        // 确定硫化开产班次和成型开产班次
-        Integer lhOpeningShiftOrder = determineLhOpeningShiftOrder(context);
-        if (lhOpeningShiftOrder == null) {
-            log.warn("开产日 {} 无法确定硫化开产班次，保持原计划量", scheduleDate);
-            return;
-        }
-        int formingOpeningShiftOrder = Math.max(1, lhOpeningShiftOrder - 1);
-        task.setLhOpeningShiftOrder(lhOpeningShiftOrder);
-        task.setFormingOpeningShiftOrder(formingOpeningShiftOrder);
+                                         int currentDayShiftOrder,
+                                         List<CxShiftConfig> dayShifts) {
+        task.setIsOpeningDayTask(true);
 
-        log.info("开产日班次确定V2: embryoCode={}, lhOpeningShiftOrder={}, formingOpeningShiftOrder={}, currentDayShiftOrder={}",
-                task.getEmbryoCode(), lhOpeningShiftOrder, formingOpeningShiftOrder, currentDayShiftOrder);
+        // 收尾/试制已正常算完（vulcanizeDemand 已在循环中被更新为下游 CLASS 计划量）
+        // openingShiftCapacity 为 6/24 开产基准量，取较小值封顶
+        int openingBase = task.getOpeningShiftCapacity() != null ? task.getOpeningShiftCapacity() : 0;
+        int endingAdjusted = task.getEndingExtraInventory() != null ? task.getEndingExtraInventory() : 0;
+        int finalProduction = Math.min(openingBase, endingAdjusted);
 
-        // ==================== 关键产品过滤 ====================
-        // 开产时过滤关键产品：如果当前任务是关键产品，开产首班不排
-        boolean isKeyProduct = context.getKeyProductCodes() != null
-                && task.getEmbryoCode() != null
-                && context.getKeyProductCodes().contains(task.getEmbryoCode());
+        task.setPlannedProduction(finalProduction);
+        task.setEndingExtraInventory(finalProduction);
 
-        // 当前班次 = 成型开产首班（早于硫化开产一个班次）
-        if (currentDayShiftOrder == formingOpeningShiftOrder && currentDayShiftOrder < lhOpeningShiftOrder) {
-            // 关键产品在开产首班不排产
-            if (isKeyProduct) {
-                task.setPlannedProduction(0);
-                task.setEndingExtraInventory(0);
-                task.setRequiredCars(0);
-                log.info("开产首班关键产品不排: embryoCode={}, 标记为关键产品", task.getEmbryoCode());
-                return;
-            }
+        int tripCapacity = getTripCapacity(task.getStructureName(), context);
+        task.setRequiredCars(tripCapacity > 0 ? (finalProduction + tripCapacity - 1) / tripCapacity : 0);
 
-            // ==================== 简化公式：endingExtraInventory = (6/24) × 物料日硫化量 ====================
-            int dailyLhCapacity = getDailyLhCapacityByTask(task, context);
-            if (dailyLhCapacity <= 0) {
-                log.warn("开产首班V2：物料日硫化量为0，embryoCode={}", task.getEmbryoCode());
-                task.setPlannedProduction(0);
-                task.setEndingExtraInventory(0);
-                task.setRequiredCars(0);
-                return;
-            }
-
-            // endingExtraInventory = (6/24) × 物料日硫化量
-            int openingInventory = (int) Math.ceil(6.0 / 24.0 * dailyLhCapacity);
-
-            // 开产首班不补整车
-            task.setPlannedProduction(openingInventory);
-            task.setEndingExtraInventory(openingInventory);
-            task.setRequiredCars(openingInventory > 0 ? 1 : 0);
-            task.setIsOpeningDayTask(true);
-            task.setOpeningShiftCapacity(openingInventory);
-
-            log.info("开产首班备货V2: embryoCode={}, 物料日硫化量={}, (6/24)×日硫化={}, 不补整车",
-                    task.getEmbryoCode(), dailyLhCapacity, openingInventory);
-        } else if (currentDayShiftOrder >= lhOpeningShiftOrder) {
-            // 硫化已开产的班次：正常排产（demand已在buildSingleTask中正确计算）
-            task.setIsOpeningDayTask(true);
-            log.info("开产非首班正常排产V2: embryoCode={}, currentDayShiftOrder={}, demand={}",
-                    task.getEmbryoCode(), currentDayShiftOrder, task.getVulcanizeDemand());
-        }
+        log.info("开产日排产: 胎胚={}, 开产基准={}, 收尾后实需={}, 最终产量={}, 需车={}",
+                task.getEmbryoCode(), openingBase, endingAdjusted, finalProduction,
+                tripCapacity > 0 ? (finalProduction + tripCapacity - 1) / tripCapacity : 0);
     }
 
     /**
@@ -1535,17 +1533,21 @@ public class TaskGroupService {
      * @return 停锅班次的dayShiftOrder，找不到返回null
      */
     private Integer determineClosingShiftOrder(ScheduleContextVo context) {
-        String vulcanizingStopTimeStr = context.getVulcanizingStopTimeStr();
-        if (vulcanizingStopTimeStr == null || vulcanizingStopTimeStr.isEmpty()) {
-            log.warn("未配置硫化机停锅时间(VULCANIZING_STOP_TIME)，无法确定停锅班次");
-            return null;
+        LocalDateTime stopDateTime = context.getVulcanizingStopDateTime();
+        if (stopDateTime == null) {
+            // 回退：只有 HH:mm 格式，用旧方法按时分匹配
+            String vulcanizingStopTimeStr = context.getVulcanizingStopTimeStr();
+            if (vulcanizingStopTimeStr == null || vulcanizingStopTimeStr.isEmpty()) {
+                log.warn("未配置硫化机停锅时间(VULCANIZING_STOP_TIME)，无法确定停锅班次");
+                return null;
+            }
+            List<CxShiftConfig> shiftConfigs = getSortedShiftConfigs(context);
+            String timePart = extractTimePart(vulcanizingStopTimeStr);
+            return scheduleDayTypeHelper.getShiftOrderByTime(timePart, shiftConfigs);
         }
-        // 获取班次配置（按dayShiftOrder排序）
-        List<CxShiftConfig> shiftConfigs = getSortedShiftConfigs(context);
-        // 提取时间部分 HH:mm，用于与班次时间比较
-        // 格式可能是 "2026-05-19 5:30" 或 "5:30"，都需要提取出 "05:30"
-        String timePart = extractTimePart(vulcanizingStopTimeStr);
-        return scheduleDayTypeHelper.getShiftOrderByTime(timePart, shiftConfigs);
+
+        // 使用完整日期时间匹配：遍历所有班次，结合排程日期算出每个班次的实际起止时间
+        return findShiftOrderByDateTime(stopDateTime, context);
     }
 
     /**
@@ -1586,23 +1588,55 @@ public class TaskGroupService {
     }
 
     /**
-     * 确定硫化开产班次序号
+     * 根据完整日期时间查找对应的班次序号
      *
-     * <p>根据硫化开模时间（参数配置）和班次时间表，确定开模时间落在哪个班次。
+     * <p>遍历所有班次配置，结合排程日期算出每个班次的实际起止时间范围，
+     * 找到目标时间落在哪个班次内。支持跨天班次。
      *
-     * @param context 排程上下文
-     * @return 硫化开产班次的dayShiftOrder，找不到返回null
+     * @param dateTime 目标日期时间（如停锅时间 2026-05-19T05:30）
+     * @param context  排程上下文
+     * @return 班次序号（dayShiftOrder），找不到返回第一个班次序号
      */
-    private Integer determineLhOpeningShiftOrder(ScheduleContextVo context) {
-        String vulcanizingOpenTimeStr = context.getVulcanizingOpenTimeStr();
-        if (vulcanizingOpenTimeStr == null || vulcanizingOpenTimeStr.isEmpty()) {
-            log.warn("未配置硫化开模时间(VULCANIZING_OPEN_TIME)，无法确定硫化开产班次");
+    private Integer findShiftOrderByDateTime(LocalDateTime dateTime, ScheduleContextVo context) {
+        LocalDate scheduleDate = context.getScheduleDate();
+        if (scheduleDate == null) {
             return null;
         }
-        List<CxShiftConfig> shiftConfigs = getSortedShiftConfigs(context);
-        // 提取时间部分 HH:mm，用于与班次时间比较
-        String timePart = extractTimePart(vulcanizingOpenTimeStr);
-        return scheduleDayTypeHelper.getShiftOrderByTime(timePart, shiftConfigs);
+        // 排程起始日期：前端传入最后一天，往前推2天
+        LocalDate scheduleStartDate = scheduleDate.minusDays(2);
+
+        List<CxShiftConfig> allShifts = context.getShiftConfigList();
+        if (allShifts == null || allShifts.isEmpty()) {
+            return null;
+        }
+
+        for (CxShiftConfig shift : allShifts) {
+            if (shift.getScheduleDay() == null || shift.getDayShiftOrder() == null) continue;
+
+            LocalDate shiftDate = scheduleStartDate.plusDays(shift.getScheduleDay() - 1);
+            LocalTime shiftStartTime = shift.getShiftStartTime();
+            LocalTime shiftEndTime = shift.getShiftEndTime();
+
+            LocalDateTime shiftStart = LocalDateTime.of(shiftDate, shiftStartTime);
+            LocalDateTime shiftEnd = LocalDateTime.of(shiftDate, shiftEndTime);
+
+            // 跨天班次：endTime <= startTime，结束时间加1天
+            if (!shiftEnd.isAfter(shiftStart)) {
+                shiftEnd = shiftEnd.plusDays(1);
+            }
+
+            if (!dateTime.isBefore(shiftStart) && dateTime.isBefore(shiftEnd)) {
+                return shift.getDayShiftOrder();
+            }
+        }
+
+        // 兜底：取第一个班次
+        CxShiftConfig firstShift = allShifts.stream()
+                .filter(s -> s.getScheduleDay() != null && s.getDayShiftOrder() != null)
+                .min(Comparator.comparingInt(CxShiftConfig::getScheduleDay)
+                        .thenComparingInt(CxShiftConfig::getDayShiftOrder))
+                .orElse(null);
+        return firstShift != null ? firstShift.getDayShiftOrder() : null;
     }
 
     /**
@@ -1616,116 +1650,8 @@ public class TaskGroupService {
         // 只取第1天的班次配置（排程天数不同但班次时间相同）
         return allShifts.stream()
                 .filter(c -> c.getScheduleDay() != null && c.getScheduleDay() == 1)
-                .sorted(java.util.Comparator.comparingInt(c -> c.getDayShiftOrder() != null ? c.getDayShiftOrder() : 0))
+                .sorted(Comparator.comparingInt(c -> c.getDayShiftOrder() != null ? c.getDayShiftOrder() : 0))
                 .collect(java.util.stream.Collectors.toList());
-    }
-
-    /**
-     * 计算停产反推总量
-     *
-     * <p>从成型停机时间到硫化停锅时间，硫化需要消耗的胎胚总量。
-     * <pre>
-     *   成型停机时间 = 硫化停锅时间 - 预留消化时间
-     *   反推总量 = 时长(秒) / 单胎单模硫化时长(秒) × 模数
-     * </pre>
-     *
-     * @param task         胎胚任务
-     * @param context      排程上下文
-     * @param scheduleDate 排程日期
-     * @return 反推总量（条数）
-     */
-    private int calculateClosingRequiredStock(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                               ScheduleContextVo context,
-                                               LocalDate scheduleDate) {
-        // 从硫化排程结果反推
-        LhScheduleResult lhResult = findLhResultByTask(task, context);
-        if (lhResult == null) {
-            log.warn("停产反推：无法找到胎胚 {} 对应的硫化排程结果，使用默认0", task.getEmbryoCode());
-            return 0;
-        }
-
-        // 计算单胎单模硫化时长(秒)
-        int dailyLhCapacity = getDailyLhCapacity(lhResult, context);
-        int moldQty = task.getVulcanizeMoldCount() != null ? task.getVulcanizeMoldCount() : 1;
-        int ratio = getStructureLhRatio(task, context);
-        if (dailyLhCapacity <= 0 || ratio <= 0) {
-            return 0;
-        }
-        double singleTireMoldSeconds = (double) 24 * 3600 / ((long) ratio * dailyLhCapacity);
-
-        // 预留消化时间
-        int reservedDigestHours = context.getReservedDigestHours() != null ? context.getReservedDigestHours() : 1;
-        // 从成型停机到硫化停锅的时长 = 预留消化时间（小时）
-        double durationSeconds = reservedDigestHours * 3600.0;
-
-        // 反推总量 = 时长 / 单胎单模时长 × 模数
-        int requiredStock = (int) Math.ceil(durationSeconds / singleTireMoldSeconds * moldQty);
-
-        log.info("停产反推总量计算: embryoCode={}, dailyLhCapacity={}, moldQty={}, ratio={}, " +
-                        "singleTireMoldSeconds={}, reservedDigestHours={}h, requiredStock={}",
-                task.getEmbryoCode(), dailyLhCapacity, moldQty, ratio,
-                String.format("%.1f", singleTireMoldSeconds), reservedDigestHours, requiredStock);
-
-        return requiredStock;
-    }
-
-    /**
-     * 获取硫化开产班次的需求量
-     *
-     * <p>成型开产首班（早于硫化开产一个班次）需要用硫化开产班次的CLASS需求量。
-     *
-     * @param task                胎胚任务
-     * @param context             排程上下文
-     * @param lhOpeningShiftOrder 硫化开产班次序号
-     * @return 硫化开产班次的需求量
-     */
-    private int getNextShiftDemand(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                    ScheduleContextVo context,
-                                    int lhOpeningShiftOrder) {
-        LhScheduleResult lhResult = findLhResultByTask(task, context);
-        if (lhResult == null) {
-            return 0;
-        }
-
-        // 硫化开产班次对应的classField
-        // dayShiftOrder -> classField 映射
-        List<CxShiftConfig> shiftConfigs = getSortedShiftConfigs(context);
-        String targetClassField = null;
-        for (CxShiftConfig shiftConfig : shiftConfigs) {
-            if (shiftConfig.getDayShiftOrder() != null && shiftConfig.getDayShiftOrder() == lhOpeningShiftOrder) {
-                targetClassField = shiftConfig.getClassField();
-                break;
-            }
-        }
-
-        if (targetClassField == null || !targetClassField.startsWith("CLASS")) {
-            log.warn("无法找到硫化开产班次 {} 对应的classField", lhOpeningShiftOrder);
-            return 0;
-        }
-
-        try {
-            int classIndex = Integer.parseInt(targetClassField.substring(5));
-            Integer planQty = getClassPlanQtyByIndex(lhResult, classIndex);
-            return planQty != null ? planQty : 0;
-        } catch (NumberFormatException e) {
-            log.warn("无法解析classField: {}", targetClassField);
-            return 0;
-        }
-    }
-
-    /**
-     * 计算开产首班6小时产能
-     */
-    private int calculateOpeningShiftCapacity(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                               ScheduleContextVo context) {
-        int dailyLhCapacity = getDailyLhCapacityByTask(task, context);
-        int ratio = getStructureLhRatio(task, context);
-        if (dailyLhCapacity <= 0 || ratio <= 0) {
-            return 300; // 默认6h × 50条/h
-        }
-        double singleTireMoldSeconds = (double) 24 * 3600 / ((long) ratio * dailyLhCapacity);
-        int capacity = (int) Math.floor(6 * 3600.0 / singleTireMoldSeconds);
-        return Math.max(capacity, 0);
     }
 
     /**
@@ -1764,7 +1690,7 @@ public class TaskGroupService {
         if (context.getMaterialLhCapacityMap() != null && lhResult.getMaterialCode() != null) {
             MonthPlanProductLhCapacityVo vo = context.getMaterialLhCapacityMap().get(lhResult.getMaterialCode());
             if (vo != null && vo.getDayVulcanizationQty() != null) {
-                return vo.getDayVulcanizationQty();
+                return vo.getDayVulcanizationQty() / 2;
             }
         }
         return 0;
@@ -1778,7 +1704,7 @@ public class TaskGroupService {
         if (context.getMaterialLhCapacityMap() != null && task.getMaterialCode() != null) {
             MonthPlanProductLhCapacityVo vo = context.getMaterialLhCapacityMap().get(task.getMaterialCode());
             if (vo != null && vo.getDayVulcanizationQty() != null) {
-                return vo.getDayVulcanizationQty();
+                return vo.getDayVulcanizationQty() / 2;
             }
         }
         return 0;
@@ -1821,9 +1747,7 @@ public class TaskGroupService {
             CxParamConfig config = context.getParamConfigMap().get(PARAM_ENDING_DISCARD_THRESHOLD);
             if (config != null && config.getParamValue() != null) {
                 try {
-                    int value = Integer.parseInt(config.getParamValue());
-                    log.debug("收尾舍弃阈值使用参数配置: {}", value);
-                    return value;
+                    return Integer.parseInt(config.getParamValue());
                 } catch (NumberFormatException e) {
                     log.warn("解析收尾舍弃阈值配置失败: {}", config.getParamValue());
                 }
@@ -1841,9 +1765,7 @@ public class TaskGroupService {
             CxParamConfig config = context.getParamConfigMap().get(PARAM_ENDING_URGENT_FORMING_REMAINDER);
             if (config != null && config.getParamValue() != null) {
                 try {
-                    int value = Integer.parseInt(config.getParamValue());
-                    log.debug("成型余量紧急阈值使用参数配置: {}", value);
-                    return value;
+                    return Integer.parseInt(config.getParamValue());
                 } catch (NumberFormatException e) {
                     log.warn("解析成型余量紧急阈值配置失败: {}", config.getParamValue());
                 }
@@ -1861,9 +1783,7 @@ public class TaskGroupService {
             CxParamConfig config = context.getParamConfigMap().get(PARAM_ENDING_DAYS_THRESHOLD);
             if (config != null && config.getParamValue() != null) {
                 try {
-                    int value = Integer.parseInt(config.getParamValue());
-                    log.debug("近期收尾天数阈值使用参数配置: {}", value);
-                    return value;
+                    return Integer.parseInt(config.getParamValue());
                 } catch (NumberFormatException e) {
                     log.warn("解析近期收尾天数阈值配置失败: {}", config.getParamValue());
                 }
@@ -1881,9 +1801,7 @@ public class TaskGroupService {
             CxParamConfig config = context.getParamConfigMap().get(PARAM_URGENT_ENDING_DAYS);
             if (config != null && config.getParamValue() != null) {
                 try {
-                    int value = Integer.parseInt(config.getParamValue());
-                    log.debug("紧急收尾天数阈值使用参数配置: {}", value);
-                    return value;
+                    return Integer.parseInt(config.getParamValue());
                 } catch (NumberFormatException e) {
                     log.warn("解析紧急收尾天数阈值配置失败: {}", config.getParamValue());
                 }
