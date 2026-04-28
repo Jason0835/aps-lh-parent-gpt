@@ -267,6 +267,18 @@ export default {
           minWidth: 100,
         },
         {
+          label: this.$t("工厂"),
+          prop: "factoryCode",
+          align: "center",
+          minWidth: 80,
+          formatter: (row, column, value, index) => {
+            if (!value) {
+              return "";
+            }
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
           label: this.$t("工单号"),
           prop: "orderNo",
           align: "center",
@@ -307,6 +319,12 @@ export default {
           label: this.$t("物料描述"),
           prop: "materialDesc",
           minWidth: 350,
+        },
+        {
+          label: this.$t("胎胚代码"),
+          prop: "embryoCode",
+          minWidth: 120,
+          align: "center",
         },
         {
           label: this.$t("胎胚描述"),
@@ -383,7 +401,7 @@ export default {
         //   ],
         // },
         {
-          label: this.$t("夜班") + " " + this.dateList[0].shiftDate,
+          label: this.$t("早班") + " " + this.dateList[0].shiftDate,
           children: [
             {
               prop: "class1PlanQty",
@@ -412,7 +430,7 @@ export default {
           ],
         },
         {
-          label: this.$t("早班") + " " + this.dateList[1].shiftDate,
+          label: this.$t("中班") + " " + this.dateList[1].shiftDate,
           children: [
             // {
             //   prop: "class2Sort",
@@ -446,7 +464,7 @@ export default {
           ],
         },
         {
-          label: this.$t("中班") + " " + this.dateList[2].shiftDate,
+          label: this.$t("夜班") + " " + this.dateList[2].shiftDate,
           children: [
             // {
             //   prop: "class3Sort",
@@ -480,7 +498,7 @@ export default {
           ],
         },
         {
-          label: this.$t("夜班") + " " + this.dateList[3].shiftDate,
+          label: this.$t("早班") + " " + this.dateList[3].shiftDate,
           children: [
             // {
             //   prop: "class4Sort",
@@ -514,7 +532,7 @@ export default {
           ],
         },
         {
-          label: this.$t("早班") + " " + this.dateList[4].shiftDate,
+          label: this.$t("中班") + " " + this.dateList[4].shiftDate,
           children: [
             // {
             //   prop: "class5Sort",
@@ -548,7 +566,7 @@ export default {
           ],
         },
         {
-          label: this.$t("中班") + " " + this.dateList[5].shiftDate,
+          label: this.$t("夜班") + " " + this.dateList[5].shiftDate,
           children: [
           // {
           //     prop: "class6Sort",
@@ -582,7 +600,7 @@ export default {
           ],
         },
         {
-          label: this.$t("夜班") + " " + this.dateList[6].shiftDate,
+          label: this.$t("早班") + " " + this.dateList[6].shiftDate,
           children: [
             // {
             //   prop: "class7Sort",
@@ -616,7 +634,7 @@ export default {
           ],
         },
         {
-          label: this.$t("早班") + " " + this.dateList[7].shiftDate,
+          label: this.$t("中班") + " " + this.dateList[7].shiftDate,
           children: [
           // {
           //     prop: "class8Sort",
@@ -985,8 +1003,8 @@ export default {
     },
     handleAutoPlanSuccess(scheduleDate) {
       if (scheduleDate) {
-        this.query.scheduleDate = scheduleDate;
-        this.search.scheduleDate = scheduleDate;
+        this.$set(this.query, 'scheduleDate', scheduleDate);
+        this.search = { ...this.search, scheduleDate };
       }
       this.$set(this.page, "current", 1);
       this.getList();
