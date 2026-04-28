@@ -243,6 +243,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     : buildScheduleResult(context, machine, sku, startTime, null, shifts, machineMouldQty, isEnding);
             if (result != null) {
                 result.setScheduleType("01");
+                result.setIsChangeMould("0");
+                result.setIsTypeBlock("0");
                 result.setIsEnd(isEnding ? "1" : "0");
                 if (inheritedResult == null) {
                     context.getScheduleResultList().add(result);
@@ -336,7 +338,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             LhScheduleResult assignedResult = assignedResults.get(i);
             if (assignedResult == null
                     || !assignedResult.isRollingInherited()
-                    || !StringUtils.equals(CONTINUOUS_SCHEDULE_TYPE, assignedResult.getScheduleType())
                     || !StringUtils.equals(materialCode, assignedResult.getMaterialCode())) {
                 continue;
             }

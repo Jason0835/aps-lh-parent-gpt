@@ -67,21 +67,27 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
         return stock >= finish;
     }
 
+    /**
+     * 导入时先统一关键字段，避免空分厂或前后空格导致唯一性校验与更新查询不一致。
+     */
+    private void normalizeImportKey(LhChipStock entity) {
+        if (StringUtil.isBlank(entity.getFactoryCode())) {
+            entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        } else {
+            entity.setFactoryCode(entity.getFactoryCode().trim());
+        }
+        if (StringUtil.isNotBlank(entity.getChipCode())) {
+            entity.setChipCode(entity.getChipCode().trim());
+        }
+    }
+
     @Override
     public int updateFinishQty(String factoryCode, String chipCode, Integer finishQty) {
-        LambdaQueryWrapper<LhChipStock> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(LhChipStock::getFactoryCode, factoryCode);
-        wrapper.eq(LhChipStock::getChipCode, chipCode);
-        LhChipStock exist = lhChipStockMapper.selectOne(wrapper);
-        if (exist == null) {
-            return 0;
-        }
         LambdaUpdateWrapper<LhChipStock> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(LhChipStock::getFactoryCode, factoryCode);
         updateWrapper.eq(LhChipStock::getChipCode, chipCode);
         updateWrapper.set(LhChipStock::getFinishQty, finishQty);
-        int result = lhChipStockMapper.update(null, updateWrapper);
-        return result;
+        return lhChipStockMapper.update(null, updateWrapper);
     }
 
     /**
@@ -91,6 +97,8 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
     public AjaxResult importData(List<LhChipStock> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;
+        int insertNum = 0;
+        int updateNum = 0;
         List<LhChipStock> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
@@ -114,6 +122,7 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
                 continue;
             }
 
+            normalizeImportKey(docEntity);
             calculateRemainStock(docEntity);
 
             if (!checkStockVsFinish(docEntity)) {
@@ -127,20 +136,26 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
             String checkResult = checkUnique(docEntity);
             if (UserConstants.UNIQUE.equals(checkResult)) {
                 docEntity.setRowState(RowStateEnum.ADDED);
-                if (StringUtil.isBlank(docEntity.getFactoryCode())) {
-                    docEntity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-                }
                 importList.add(docEntity);
-                successNum++;
             } else {
                 if (updateSupport) {
-                    QueryWrapper<LhChipStock> queryWrapper = new QueryWrapper<>();
-                    queryWrapper.eq("FACTORY_CODE", docEntity.getFactoryCode());
-                    queryWrapper.eq("CHIP_CODE", docEntity.getChipCode());
-                    LhChipStock exist = lhChipStockMapper.selectOne(queryWrapper);
+                    LambdaQueryWrapper<LhChipStock> queryWrapper = new LambdaQueryWrapper<>();
+                    queryWrapper.eq(LhChipStock::getFactoryCode, docEntity.getFactoryCode());
+                    queryWrapper.eq(LhChipStock::getChipCode, docEntity.getChipCode());
+                    queryWrapper.orderByAsc(LhChipStock::getId);
+                    List<LhChipStock> exists = lhChipStockMapper.selectList(queryWrapper);
+                    if (CollectionUtils.size(exists) > 1) {
+                        failureNum++;
+                        ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                                errorNum, String.format("第%s行导入失败：分厂、芯片编码对应多条库存数据，请先清理重复数据后再导入。", errorNum), importErrorLogs);
+                        continue;
+                    }
+                    LhChipStock exist = CollectionUtils.isEmpty(exists) ? null : exists.get(0);
                     if (exist != null) {
-                        exist.setStockNum(exist.getStockNum() + (docEntity.getStockNum() != null ? docEntity.getStockNum() : 0));
-                        exist.setFinishQty(exist.getFinishQty() + (docEntity.getFinishQty() != null ? docEntity.getFinishQty() : 0));
+                        exist.setStockNum((exist.getStockNum() != null ? exist.getStockNum() : 0)
+                                + (docEntity.getStockNum() != null ? docEntity.getStockNum() : 0));
+                        exist.setFinishQty((exist.getFinishQty() != null ? exist.getFinishQty() : 0)
+                                + (docEntity.getFinishQty() != null ? docEntity.getFinishQty() : 0));
                         calculateRemainStock(exist);
                         if (!checkStockVsFinish(exist)) {
                             failureNum++;
@@ -149,7 +164,7 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
                                     errorNum, String.format(message, errorNum), importErrorLogs);
                         } else {
                             lhChipStockMapper.updateById(exist);
-                            successNum++;
+                            updateNum++;
                         }
                     }
                 } else {
@@ -160,11 +175,11 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
             }
         }
 
-        if (CollectionUtils.isEmpty(importList)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+        if (CollectionUtils.isNotEmpty(importList)) {
+            insertNum = baseDao.saveBatch(importList);
         }
 
-        successNum = baseDao.saveBatch(importList);
+        successNum = insertNum + updateNum;
 
         if (failureNum > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
@@ -203,10 +218,15 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
      */
     @Override
     public AjaxResult mergeSave(LhChipStock lhChipStock) {
-        QueryWrapper<LhChipStock> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("FACTORY_CODE", lhChipStock.getFactoryCode());
-        queryWrapper.eq("CHIP_CODE", lhChipStock.getChipCode());
-        LhChipStock exist = lhChipStockMapper.selectOne(queryWrapper);
+        LambdaQueryWrapper<LhChipStock> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(LhChipStock::getFactoryCode, lhChipStock.getFactoryCode());
+        queryWrapper.eq(LhChipStock::getChipCode, lhChipStock.getChipCode());
+        queryWrapper.orderByAsc(LhChipStock::getId);
+        List<LhChipStock> exists = lhChipStockMapper.selectList(queryWrapper);
+        if (CollectionUtils.size(exists) > 1) {
+            return AjaxResult.error("分厂、芯片编码对应多条库存数据，请先清理重复数据后再保存。");
+        }
+        LhChipStock exist = CollectionUtils.isEmpty(exists) ? null : exists.get(0);
 
         if (exist != null) {
             int newStockNum = (exist.getStockNum() != null ? exist.getStockNum() : 0)
