@@ -7,6 +7,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
 import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
@@ -23,6 +24,7 @@ import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.component.ScheduleExecutionGuard;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
@@ -35,6 +37,7 @@ import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.ExcelReadUtils;
+import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -47,6 +50,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -84,6 +88,10 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     @Autowired
     private ScheduleExecutionGuard scheduleExecutionGuard;
+
+
+    @Autowired
+    private IImportLogService iImportLogService;
 
     /**
      * 获取排程日期对象列表
@@ -191,7 +199,6 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     /**
      * 导入数据
-     * @param importContext 导入上下文
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */

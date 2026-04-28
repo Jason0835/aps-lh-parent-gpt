@@ -60,9 +60,9 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
      * 重写导入模板的生成逻辑
      */
     @ApiOperation("下载导入模板")
-    @GetMapping("/importTemplate")
+    @GetMapping("/importTemplateDown")
     @ResponseBody
-    public AjaxResult importTemplate(HttpServletResponse response,LhScheduleResult result) throws IOException {
+    public void importTemplateDown(LhScheduleResult result,HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
         LhScheduleResult entity = result == null ? new LhScheduleResult() : result;
         byte[] excelBytes = iLhScheduleResultRemoteService.downloadTemplate(entity, fileName);
@@ -70,7 +70,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
-        return AjaxResult.success();
+
     }
 
     @PostMapping({"/importData"})
@@ -86,10 +86,42 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iLhScheduleResultRemoteService.importData(context, false);
+        AjaxResult ajaxResult = iLhScheduleResultRemoteService.importData(context, updateSupport);
         return ajaxResult;
     }
 
+
+    @PostMapping({"/importDataByCust"})
+    @ResponseBody
+    @ApiOperation("数据导入")
+    public AjaxResult importDataByCust(@RequestPart("file") MultipartFile file,
+                                       @RequestParam("updateSupport") boolean updateSupport,
+                                       @RequestParam(value = "factoryCode", required = false) String factoryCode,
+                                       @RequestParam(value = "scheduleDate", required = false) String scheduleDate,
+                                       LhScheduleResult result) throws Exception {
+        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+
+        ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(this.getFunctionName());
+        context.setProcedureCode(this.getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
+        context.setFileBytes(data);
+
+        LhScheduleImportDTO importDTO = new LhScheduleImportDTO();
+        importDTO.setImportContext(context);
+        result = result == null ? new LhScheduleResult() : result;
+        if (StringUtils.isBlank(result.getFactoryCode()) && StringUtils.isNotBlank(factoryCode)) {
+            result.setFactoryCode(factoryCode);
+        }
+        if (result.getScheduleDate() == null && StringUtils.isNotBlank(scheduleDate)) {
+            result.setScheduleDate(DateUtils.parseDate(scheduleDate));
+        }
+        importDTO.setScheduleResult(result);
+
+        AjaxResult ajaxResult = iLhScheduleResultRemoteService.importDataByCust(updateSupport, importDTO);
+        return ajaxResult;
+    }
 
     @ApiOperation("插单查询可用机台列表")
 //    @RequiresPermissions("lh:lhScheduleResult:getScheduleMachineInfo")

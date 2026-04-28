@@ -11,6 +11,8 @@ import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
+import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
 
 import java.util.List;
 
@@ -164,4 +166,14 @@ public interface ILhScheduleResultRemoteService {
     @PostMapping("/lhScheduleResult/downloadTemplate/{fileName}")
     byte[] downloadTemplate(@RequestBody LhScheduleResult entity,  @PathVariable("fileName") String fileName);
 
+    /**
+     * 导入数据
+     *
+     * @param updateSupport
+     * @param importDTO
+     * @return
+     */
+    @ApiOperation("导入数据")
+    @PostMapping("/lhScheduleResult/importDataByCust/{updateSupport}")
+    AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport, @RequestBody LhScheduleImportDTO importDTO);
 }
