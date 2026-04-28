@@ -68,13 +68,22 @@ public class LhTextMouldChangePlanGenerator {
                 && !StringUtils.equals(dto.getFactoryCode(), scheduleResult.getFactoryCode())) {
             return AjaxResult.error(message("ui.data.alert.lhMouldChangePlan.generateTextPlan.factoryCodeMismatch"));
         }
+        // 次日中班计划量不为0，不可生成。
+        if (!Objects.equals(scheduleResult.getClass5PlanQty(), 0)) {
+            return AjaxResult.error(message("ui.data.alert.lhMouldChangePlan.generateTextPlan.midPlanReqZero"));
+        }
+        // 次日中班（class5StartTime）开始日期必须等于当前时间+1天，历史记录不可生成。
+        String class5StartTimeValidateMessage = validateNextMiddleShiftStartTime(scheduleResult);
+        if (StringUtils.isNotBlank(class5StartTimeValidateMessage)) {
+            return AjaxResult.error(class5StartTimeValidateMessage);
+        }
 
         String validateMessage = validateScheduleResult(scheduleResult);
         if (StringUtils.isNotBlank(validateMessage)) {
             return AjaxResult.error(validateMessage);
         }
 
-        Date targetScheduleDate = LhScheduleTimeUtil.addDays(LhScheduleTimeUtil.clearTime(scheduleResult.getScheduleDate()), 1);
+        Date targetScheduleDate = LhScheduleTimeUtil.clearTime(scheduleResult.getClass5StartTime());
         List<LhMouldChangePlan> targetPlans = listTargetMiddleShiftPlans(scheduleResult.getFactoryCode(), targetScheduleDate);
 
         String releaseValidateMessage = validateTargetPlansCanInsert(targetPlans, scheduleResult.getLhMachineCode());
@@ -115,6 +124,24 @@ public class LhTextMouldChangePlanGenerator {
         }
         if (StringUtils.isBlank(scheduleResult.getMaterialCode())) {
             return message("ui.data.alert.lhMouldChangePlan.generateTextPlan.materialCodeRequired");
+        }
+        return null;
+    }
+
+    /**
+     * 校验次日中班开始时间是否为当前日期的下一天。
+     *
+     * @param scheduleResult 排程结果
+     * @return 校验失败信息；为空表示通过
+     */
+    private String validateNextMiddleShiftStartTime(LhScheduleResult scheduleResult) {
+        if (Objects.isNull(scheduleResult.getClass5StartTime())) {
+            return message("ui.data.alert.lhMouldChangePlan.generateTextPlan.class5StartTimeRequired");
+        }
+        Date expectedTargetDate = LhScheduleTimeUtil.addDays(LhScheduleTimeUtil.clearTime(new Date()), 1);
+        Date class5StartDate = LhScheduleTimeUtil.clearTime(scheduleResult.getClass5StartTime());
+        if (!DateUtil.isSameDay(class5StartDate, expectedTargetDate)) {
+            return message("ui.data.alert.lhMouldChangePlan.generateTextPlan.onlyTomorrowAllowed");
         }
         return null;
     }
