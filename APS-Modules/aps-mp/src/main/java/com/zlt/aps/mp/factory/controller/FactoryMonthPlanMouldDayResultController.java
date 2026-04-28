@@ -202,7 +202,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
         // 组装月计划导出excel
         Date beginTime = DateUtils.getNowDate();
         List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, false, false);
-        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list);
+        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, false);
         
         // 合并月计划、结构转产表的导出数据
         byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1);
@@ -222,7 +222,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
         // 组装月计划导出excel
         Date beginTime = DateUtils.getNowDate();
         List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, false, true);
-        byte[] excelBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list);
+        byte[] excelBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, true);
         
         // 保存导出日志
         this.saveExportLog(queryVO, fileName, beginTime, list);
@@ -239,7 +239,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
                              HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
         List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, true, false);
-        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list);
+        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, false);
 
         // 合并月计划、结构转产表的导出数据
         byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1);
