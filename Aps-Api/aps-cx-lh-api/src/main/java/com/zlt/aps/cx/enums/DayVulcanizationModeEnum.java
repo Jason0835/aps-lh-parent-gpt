@@ -68,4 +68,20 @@ public enum DayVulcanizationModeEnum {
         }
         return getByCode(String.valueOf(code));
     }
+
+
+    /**
+     * 获取该模式对应的数据库字段名
+     */
+    public String getFieldName() {
+        switch (this) {
+            case MES_CAPACITY:
+                return "mesCapacity";
+            case APS_CAPACITY:
+                return "apsCapacity";
+            case STANDARD_CAPACITY:
+            default:
+                return "standardCapacity";
+        }
+    }
 }

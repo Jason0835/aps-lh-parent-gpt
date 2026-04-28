@@ -114,10 +114,10 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
         // 4. 根据是否传入日期返回不同结果
         if (targetDate != null) {
             // 计算指定日期的可用量
-            return calculateForSpecificDate(year, month, factoryCode, targetDate, mouldInfoMap, materialToStructureMap);
+            return calculateForSpecificDate(year, month, factoryCode, targetDate, mouldInfoMap, materialToStructureMap, isAllMaterial);
         } else {
             // 计算整个月份的可用量
-            return calculateForMonth(year, month, factoryCode, mouldInfoMap, materialToStructureMap);
+            return calculateForMonth(year, month, factoryCode, mouldInfoMap, materialToStructureMap, isAllMaterial);
         }
     }
 
@@ -126,7 +126,8 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
      */
     private List<DailyMouldAvailabilityResult> calculateForMonth(Integer year, Integer month, String factoryCode,
                                                                  Map<String, ProductionMouldInfoVo> mouldInfoMap,
-                                                                 Map<String, String> materialToStructureMap) {
+                                                                 Map<String, String> materialToStructureMap,
+                                                                 Boolean isAllMaterial) {
         // 获取排产周期信息
         ProductionCycleInfo cycleInfo = getProductionCycleInfo(year, month, factoryCode);
         Date productionStartDate = cycleInfo.getStartDate();
@@ -141,16 +142,18 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
 
         // 2. 提前查询当月模具分配表，构建缓存（一次性）
         Map<String, Integer> allocationCache = new HashMap<>();
-        List<MdmMouldAllocation> allocations = mdmMouldAllocationMapper.selectList(
-                new QueryWrapper<MdmMouldAllocation>()
-                        .eq("FACTORY_CODE", factoryCode)
-                        .eq("YEAR", year)
-                        .eq("MONTH", month)
-                        .eq("PRODUCT_TYPE_CODE", ProductTypeEnum.WHOLE_STEEL.getValue())
-        );
-        for (MdmMouldAllocation alloc : allocations) {
-            String key = alloc.getStructureName()  + alloc.getMainPattern();
-            allocationCache.put(key, alloc.getAllocationQty());
+        if (isAllMaterial) { // 如果是全物料查询，忽略模具分配配置
+            List<MdmMouldAllocation> allocations = mdmMouldAllocationMapper.selectList(
+                    new QueryWrapper<MdmMouldAllocation>()
+                    .eq("FACTORY_CODE", factoryCode)
+                    .eq("YEAR", year)
+                    .eq("MONTH", month)
+                    .eq("PRODUCT_TYPE_CODE", ProductTypeEnum.WHOLE_STEEL.getValue())
+                    );
+            for (MdmMouldAllocation alloc : allocations) {
+                String key = alloc.getStructureName()  + alloc.getMainPattern();
+                allocationCache.put(key, alloc.getAllocationQty());
+            }
         }
 
         // 遍历整个排产周期的每一天
@@ -225,7 +228,8 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
      */
     private List<DailyMouldAvailabilityResult> calculateForSpecificDate(Integer year, Integer month, String factoryCode,
                                                                   Date targetDate, Map<String, ProductionMouldInfoVo> mouldInfoMap,
-                                                                  Map<String, String> materialToStructureMap) {
+                                                                  Map<String, String> materialToStructureMap,
+                                                                  Boolean isAllMaterial) {
         // 获取排产周期信息
         ProductionCycleInfo cycleInfo = getProductionCycleInfo(year, month, factoryCode);
 
@@ -250,16 +254,18 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
 
         // 2. 提前查询当月模具分配表，构建缓存（一次性）
         Map<String, Integer> allocationCache = new HashMap<>();
-        List<MdmMouldAllocation> allocations = mdmMouldAllocationMapper.selectList(
-                new QueryWrapper<MdmMouldAllocation>()
-                        .eq("FACTORY_CODE", factoryCode)
-                        .eq("YEAR", year)
-                        .eq("MONTH", month)
-                        .eq("PRODUCT_TYPE_CODE", ProductTypeEnum.WHOLE_STEEL.getValue())
-        );
-        for (MdmMouldAllocation alloc : allocations) {
-            String key = alloc.getStructureName() + alloc.getMainPattern();
-            allocationCache.put(key, alloc.getAllocationQty());
+        if (isAllMaterial) { // 如果是全物料查询，忽略模具分配配置
+            List<MdmMouldAllocation> allocations = mdmMouldAllocationMapper.selectList(
+                    new QueryWrapper<MdmMouldAllocation>()
+                            .eq("FACTORY_CODE", factoryCode)
+                            .eq("YEAR", year)
+                            .eq("MONTH", month)
+                            .eq("PRODUCT_TYPE_CODE", ProductTypeEnum.WHOLE_STEEL.getValue())
+            );
+            for (MdmMouldAllocation alloc : allocations) {
+                String key = alloc.getStructureName() + alloc.getMainPattern();
+                allocationCache.put(key, alloc.getAllocationQty());
+            }
         }
 
         // 计算可用量

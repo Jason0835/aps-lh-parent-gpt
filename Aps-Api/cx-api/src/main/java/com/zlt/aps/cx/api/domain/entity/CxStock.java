@@ -66,7 +66,7 @@ public class CxStock extends BaseEntity {
 
     /** 库存量 */
     @Excel(name = "ui.data.column.cxStock.stockNum")
-    @ImportExcelValidated(required = true,digits = true,max = 999999)
+    @ImportExcelValidated(required = true,digits = true,max = 9999999)
     @ApiModelProperty(value = "库存量", name = "stockNum")
     @TableField(value = "STOCK_NUM")
     private Integer stockNum;

@@ -57,7 +57,7 @@ public enum ValidationItem {
     STRUCTURE_LH_RATIO("结构硫化配比", "T_MDM_STRUCTURE_LH_RATIO", ValidationLevel.WARN, 50),
     
     /** 物料日硫化产能 */
-    MATERIAL_LH_CAPACITY("物料日硫化产能", "计算得出", ValidationLevel.WARN, 51),
+    MATERIAL_LH_CAPACITY("物料日硫化产能", "T_MDM_MONTH_PLAN_PRODUCT_LH_CAPACITY", ValidationLevel.WARN, 51),
     
     /** 设备计划停机 */
     DEVICE_PLAN_SHUT("设备计划停机", "T_MDM_DEVICE_PLAN_SHUT", ValidationLevel.INFO, 52),
