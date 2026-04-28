@@ -50,6 +50,14 @@
           @click="handleRevoke"
           >{{ $t("撤销提交") }}
         </el-button>
+        <el-button
+          type="primary"
+          plain
+          :loading="btnLoading"
+           v-hasPermi="['monthplan:demandPlan:extendsConfiguration']"
+          @click="handleExtends"
+          >{{ $t("继承人工配置") }}
+        </el-button>
         <!-- <el-button
           type="success"
           plain
@@ -150,7 +158,8 @@ import {
   saveDemandPlan,
   genenrDemandPlan,
   getVersionSelect,
-  totalDemandPlan
+  totalDemandPlan,
+  extendsConfiguration
 } from "@/api/monthplan/demandPlan";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import infoForm from "@/views/components/infoForm.vue";
@@ -756,6 +765,33 @@ export default {
           obj.month = arr[1];
         }
         deleteMonthPlanRequire(obj).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        }).finally(()=>{
+          this.btnLoading=false
+        })
+      });
+    },
+    async handleExtends(){
+      this.$confirm(this.$t("继承人工配置会用上个版本的配置覆盖当前版本的【结构优先、物料优先、是否排产、常规储备是否排产】，确认继承？"), {
+        type: "warning",
+      }).then(() => {
+        this.btnLoading=true
+        const params = {
+          ...this.search,
+          ...this.query,
+        };
+        let obj={
+          factoryCode:params.factoryCode,
+          monthPlanVersion:params.monthPlanVersion
+        }
+        if (params.yearMonth) {
+          let arr = params.yearMonth.split("-");
+          obj.year = arr[0];
+          obj.month = arr[1];
+        }
+        extendsConfiguration(obj).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();

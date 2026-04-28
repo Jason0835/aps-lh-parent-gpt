@@ -47,3 +47,10 @@ export function totalDemandPlan(query) {
     data: query
   })
 }
+export function extendsConfiguration(query) {
+  return request({
+    url: '/monthplan/demandPlan/extendsConfiguration',
+    method: 'post',
+    data: query
+  })
+}
