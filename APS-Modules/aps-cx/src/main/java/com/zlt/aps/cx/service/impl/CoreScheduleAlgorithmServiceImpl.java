@@ -146,15 +146,15 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
             // 检查当前天是否是整天停产
             if (scheduleDayTypeHelper.isFullDayStopped(currentScheduleDate, factoryCode)) {
-                log.info("第 {} 天日期 {} 整天停产，跳过班次 {} 的排程", day, currentScheduleDate, shiftConfig.getShiftCode());
+                log.info("第 {} 天日期 {} 整天停产，跳过第 {} 个班次 {} 的排程", day, currentScheduleDate, shiftIndex, shiftConfig.getShiftCode());
                 continue;
             }
 
             // 检查当前班次是否停产
             Integer dayShiftOrder = shiftConfig.getDayShiftOrder();
             if (dayShiftOrder != null && scheduleDayTypeHelper.isShiftStopped(currentScheduleDate, dayShiftOrder, factoryCode)) {
-                log.info("第 {} 天日期 {} 班次 {}(dayShiftOrder={}) 停产，跳过该班次排程",
-                        day, currentScheduleDate, shiftConfig.getShiftCode(), dayShiftOrder);
+                log.info("第 {} 天日期 {} 第 {} 个班次 {}(dayShiftOrder={}) 停产，跳过该班次排程",
+                        day, currentScheduleDate, shiftIndex, shiftConfig.getShiftCode(), dayShiftOrder);
                 continue;
             }
 
@@ -325,8 +325,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setIsLastEndingBatch(taskAlloc.getIsLastEndingBatch());  // 设置是否收尾最后一批
                 // 使用新逻辑：根据班次级别判断开产/停产/停产前一天
                 int shiftOrder = shiftConfig.getDayShiftOrder() != null ? shiftConfig.getDayShiftOrder() : 1;
-                task.setIsOpeningDayTask(scheduleDayTypeHelper.isOpenStartShift(scheduleDate, shiftOrder, factoryCode));
-                task.setIsClosingDayTask(scheduleDayTypeHelper.isClosedShift(scheduleDate, shiftOrder, factoryCode));
+                ScheduleDayTypeHelper.ShiftType shiftType = scheduleDayTypeHelper.determineShiftType(scheduleDate, shiftOrder, factoryCode);
+                task.setIsOpeningDayTask(shiftType == ScheduleDayTypeHelper.ShiftType.OPEN_START);
+                task.setIsClosingDayTask(shiftType == ScheduleDayTypeHelper.ShiftType.CLOSED);
                 task.setStockHours(taskAlloc.getStockHours());
                 task.setPriority(taskAlloc.getPriority());
                 task.setLhId(taskAlloc.getLhId());
@@ -343,19 +344,17 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     taskType = "续作任务";
                 } else if (Boolean.TRUE.equals(taskAlloc.getIsTrialTask())) {
                     taskType = "试制任务";
+                } else if (Boolean.TRUE.equals(taskAlloc.getIsProductionTrial())) {
+                    taskType = "量试任务";
                 } else {
                     taskType = "新增任务";
                 }
-                log.info("  【{}】物料编码:{} | 物料描述:{} | 胎胚:{} | 主物料:{} | 规格:{} | 待排产量:{}条 | 需{}车(每车{}条) | 库存可撑:{}h | 硫化机:{}台",
-                        taskType,
-                        taskAlloc.getMaterialCode(),
-                        taskAlloc.getMaterialDesc(),
-                        taskAlloc.getEmbryoCode(),
+                log.info("  【{}】物料={} | 规格={}",
+                        taskType, taskAlloc.getMaterialCode() + "/" + taskAlloc.getMaterialDesc() + "/" + taskAlloc.getEmbryoCode(),
+                        taskAlloc.getStructureName());
+                log.info("    → 主物料={} | 待排={}条/{}车(每车{}条) | 库存={}h | 硫化机={}台",
                         taskAlloc.getMainMaterialDesc(),
-                        taskAlloc.getStructureName(),
-                        actualQty,
-                        cars,
-                        tripCapacity,
+                        actualQty, cars, tripCapacity,
                         String.format("%.1f", taskAlloc.getStockHours()),
                         task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0);
 

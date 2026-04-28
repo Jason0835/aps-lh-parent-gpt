@@ -76,6 +76,7 @@ public class TaskGroupService {
 
     /** 库存中等水位阈值（小时） */
     private static final BigDecimal STOCK_MEDIUM_HOURS_THRESHOLD = new BigDecimal("6");
+    private static final BigDecimal ZERO_NET_DEMAND_ENDING_MAX_HOURS = new BigDecimal("6");
 
     /** 库存高水位阈值（小时）：超过此值降低优先级 */
     private static final int STOCK_HIGH_HOURS_THRESHOLD = 18;
@@ -230,21 +231,6 @@ public class TaskGroupService {
 
             log.info("========== 处理任务: 胎胚={}, 物料={} ==========", lhResult.getEmbryoCode(), lhResult.getMaterialCode());
             
-            // 库存够硫化当天剩余班次的消耗，跳过该任务
-            // 逻辑：
-            // - 班次1（第一天）：判断库存够硫化班次1+班次2的计划，够了就跳过
-            // - 班次2（第一天）：判断库存够硫化班次2的计划，够了就跳过
-            // - 班次1（第二天）：判断库存够硫化班次1+班次2+班次3的计划，够了就跳过
-            // - 依次类推
-            int currentStock = getCurrentStock(context, lhResult.getId());
-            int todayRemainingDemand = calculateTodayRemainingDemand(context, dayShifts, lhResult);
-            if (todayRemainingDemand > 0 && currentStock >= todayRemainingDemand) {
-                log.debug("库存充足跳过: 胎胚={}, 库存={}, 当日剩余需求={}, 当前班次={}", 
-                        lhResult.getEmbryoCode(), currentStock, todayRemainingDemand, dayShifts.get(0).getShiftCode());
-                skippedNullTask++;
-                continue;
-            }
-
             // 检查1：硫化余量 <= 0，说明该物料已超产，不再需要生产
             String materialCode = lhResult.getMaterialCode();
             if (context.getMonthSurplusMap() != null && materialCode != null) {
@@ -364,8 +350,17 @@ public class TaskGroupService {
                 log.info("收尾任务[{}]: 剩余余量={}, 收尾日={}, 距收尾={}天, 紧急={}, 近期={}, 最后一批={}",
                         embryoCode, task.getEndingSurplusQty(), task.getEndingDate(),
                         task.getDaysToEnding(), task.getIsUrgentEnding(), task.getIsNearEnding(), task.getIsLastEndingBatch());
-                if (isTrialProduction) {
-                    log.info("  排产计算[试制]: (硫化{} - 库存{}) = {}, 试制不补整车→待排={}, 需车={}, 实际={}",
+                if (netDemand == 0
+                        && endingSurplus != null
+                        && endingSurplus > 0
+                        && task.getPlannedProduction() != null
+                        && task.getPlannedProduction() > 0) {
+                    BigDecimal extraHours = calculateProductionStockHours(task,
+                            task.getPlannedProduction(), context);
+                    log.info("  排产计算[库存覆盖后收尾补产]: 当前硫化需求已被库存覆盖，收尾余量={}, 6h封顶补产={}, 对应可供硫化时长={}h",
+                            endingSurplus, task.getPlannedProduction(), extraHours);
+                } else if (isTrialProduction) {
+                    log.info("  排产计算[试制量试]: (硫化{} - 库存{}) = {}, 试制不补整车→待排={}, 需车={}, 实际={}",
                             vulcanizeDmd, stock, netDemand,
                             tripCap, task.getPlannedProduction(), task.getRequiredCars(), task.getEndingExtraInventory());
                 } else {
@@ -392,7 +387,7 @@ public class TaskGroupService {
                 if (pp != null && pp % 2 != 0) {
                     task.setPlannedProduction(pp - 1);
                     task.setEndingExtraInventory(pp - 1);
-                    log.debug("试制任务 {} 产量{}为奇数，调整为偶数{}", task.getEmbryoCode(), pp, pp - 1);
+                    log.debug("试制量试任务 {} 产量{}为奇数，调整为偶数{}", task.getEmbryoCode(), pp, pp - 1);
                 }
             }
 
@@ -856,61 +851,6 @@ public class TaskGroupService {
     }
 
     /**
-     * 计算当日剩余班次的硫化需求总量
-     *
-     * <p>按班次维度判断库存是否充足：
-     * - 班次1（第一天）：库存 >= 班次1计划量 + 班次2计划量 → 跳过
-     * - 班次2（第一天）：库存 >= 班次2计划量 → 跳过
-     * - 班次1（第二天）：库存 >= 班次1+2+3计划量 → 跳过
-     * - 依次类推
-     *
-     * @param context   排程上下文
-     * @param dayShifts 当前班次配置列表（singleShiftList，只含当前班次）
-     * @param lhResult  硫化记录
-     * @return 当日剩余班次的硫化需求总量
-     */
-    private int calculateTodayRemainingDemand(ScheduleContextVo context, List<CxShiftConfig> dayShifts, LhScheduleResult lhResult) {
-        if (dayShifts == null || dayShifts.isEmpty()) {
-            return 0;
-        }
-        CxShiftConfig currentShift = dayShifts.get(0);
-        int currentScheduleDay = currentShift.getScheduleDay() != null ? currentShift.getScheduleDay() : 1;
-        int currentClassIndex = currentShift.getDayShiftOrder() != null ? currentShift.getDayShiftOrder() : 1;
-
-        // 从上下文获取所有班次配置，确定当天有几个班次
-        List<CxShiftConfig> allShifts = context.getShiftConfigList();
-        if (allShifts == null || allShifts.isEmpty()) {
-            return 0;
-        }
-        // 当天班次数 = scheduleDay 等于当前班的班次数
-        int shiftsPerDay = (int) allShifts.stream()
-                .filter(c -> c.getScheduleDay() != null && c.getScheduleDay().equals(currentScheduleDay))
-                .count();
-        if (shiftsPerDay <= 0) {
-            shiftsPerDay = 1;
-        }
-
-        // 计算当日剩余班次数（含当前班次）
-        int remainingShifts = shiftsPerDay - currentClassIndex + 1;
-        if (remainingShifts <= 0) {
-            return 0;
-        }
-
-        // 计算需求：从当前班次到当日最后一个班次的 classPlanQty 总和
-        int totalDemand = 0;
-        for (int i = 0; i < remainingShifts; i++) {
-            int classOffset = (currentScheduleDay - 1) * 3 + currentClassIndex + i - 1; // 0-indexed class field offset
-            if (classOffset >= 0 && classOffset < 8) {
-                Integer classDemand = getClassPlanQtyByIndex(lhResult, classOffset + 1); // classIndex is 1-based
-                if (classDemand != null && classDemand > 0) {
-                    totalDemand += classDemand;
-                }
-            }
-        }
-        return totalDemand;
-    }
-
-    /**
      * S5.2.3 计算库存可供硫化时长（stockHours）
      *
      * <p>任务分组阶段：成型产出未知（本次排程的结果），无法按班次动态推算，
@@ -1050,6 +990,20 @@ public class TaskGroupService {
         // Step 1: 与库存对冲，计算净需求
         int netDemand = Math.max(0, vulcanizeDemand - currentStock);
 
+        if (netDemand == 0) {
+            int endingFallbackProduction = calculateEndingFallbackProduction(task, context);
+            if (endingFallbackProduction > 0) {
+                int tripCapacity = getTripCapacity(task.getStructureName(), context);
+                task.setPlannedProduction(endingFallbackProduction);
+                task.setRequiredCars(calculateRequiredCars(endingFallbackProduction, tripCapacity));
+                task.setEndingExtraInventory(endingFallbackProduction);
+                log.info("库存已覆盖当前硫化需求，按收尾余量补产: 胎胚={}, 收尾余量={}, 6h封顶补产={}, 需车={}",
+                        task.getEmbryoCode(), task.getEndingSurplusQty(),
+                        endingFallbackProduction, task.getRequiredCars());
+                return;
+            }
+        }
+
         // Step 2: 乘以(1 + 损耗率)，但试制任务不考虑损耗率
         int requiredProductionValue;
         if (Boolean.TRUE.equals(task.getIsTrialTask()) || Boolean.TRUE.equals(task.getIsProductionTrial())) {
@@ -1080,6 +1034,33 @@ public class TaskGroupService {
         task.setPlannedProduction(plannedProduction);
         task.setRequiredCars(requiredCars);
         task.setEndingExtraInventory(plannedProduction);
+    }
+
+    /**
+     * 库存已覆盖当前硫化需求时，如果仍有收尾余量，则补一段受限产量。
+     *
+     * <p>补产量同时满足：
+     * 1. 不超过当前任务剩余收尾量
+     * 2. 按硫化消耗换算后不超过 6 小时
+     *
+     * <p>这条分支仍按整车下，但为了不突破“收尾余量”和“6小时封顶”两个约束，
+     * 会在上限内向下取到可下的最大整车量。
+     */
+    private int calculateEndingFallbackProduction(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+                                                  ScheduleContextVo context) {
+        Integer endingSurplusQty = task.getEndingSurplusQty();
+        if (endingSurplusQty == null || endingSurplusQty <= 0) {
+            return 0;
+        }
+
+        int maxQtyByHours = calculateQuantityByStockHours(task, context, ZERO_NET_DEMAND_ENDING_MAX_HOURS);
+        if (maxQtyByHours <= 0) {
+            return 0;
+        }
+
+        int upperBound = Math.min(endingSurplusQty, maxQtyByHours);
+        int tripCapacity = getTripCapacity(task.getStructureName(), context);
+        return productionCalculator.roundToTrip(upperBound, tripCapacity, "FLOOR");
     }
 
     /**
@@ -1714,13 +1695,7 @@ public class TaskGroupService {
      * 获取日硫化量
      */
     private int getDailyLhCapacity(LhScheduleResult lhResult, ScheduleContextVo context) {
-        if (context.getMaterialLhCapacityMap() != null && lhResult.getMaterialCode() != null) {
-            MonthPlanProductLhCapacityVo vo = context.getMaterialLhCapacityMap().get(lhResult.getMaterialCode());
-            if (vo != null && vo.getDayVulcanizationQty() != null) {
-                return vo.getDayVulcanizationQty() / 2;
-            }
-        }
-        return 0;
+        return resolveSingleMoldDailyLhCapacity(lhResult != null ? lhResult.getMaterialCode() : null, context);
     }
 
     /**
@@ -1728,13 +1703,7 @@ public class TaskGroupService {
      */
     private int getDailyLhCapacityByTask(CoreScheduleAlgorithmService.DailyEmbryoTask task,
                                           ScheduleContextVo context) {
-        if (context.getMaterialLhCapacityMap() != null && task.getMaterialCode() != null) {
-            MonthPlanProductLhCapacityVo vo = context.getMaterialLhCapacityMap().get(task.getMaterialCode());
-            if (vo != null && vo.getDayVulcanizationQty() != null) {
-                return vo.getDayVulcanizationQty() / 2;
-            }
-        }
-        return 0;
+        return resolveSingleMoldDailyLhCapacity(task != null ? task.getMaterialCode() : null, context);
     }
 
     /**
@@ -1761,6 +1730,71 @@ public class TaskGroupService {
      */
     private int getTripCapacity(String structureName, ScheduleContextVo context) {
         return productionCalculator.getTripCapacity(structureName, context);
+    }
+
+    private int calculateQuantityByStockHours(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+                                              ScheduleContextVo context,
+                                              BigDecimal maxHours) {
+        int dailyLhCapacity = getDailyLhCapacityByTask(task, context);
+        int moldQty = task.getVulcanizeMoldCount() != null && task.getVulcanizeMoldCount() > 0
+                ? task.getVulcanizeMoldCount() : 1;
+        if (dailyLhCapacity <= 0 || moldQty <= 0 || maxHours == null
+                || maxHours.compareTo(BigDecimal.ZERO) <= 0) {
+            return 0;
+        }
+
+        return maxHours
+                .multiply(BigDecimal.valueOf(dailyLhCapacity))
+                .multiply(BigDecimal.valueOf(moldQty))
+                .divide(BigDecimal.valueOf(24), 0, BigDecimal.ROUND_DOWN)
+                .intValue();
+    }
+
+    private BigDecimal calculateProductionStockHours(CoreScheduleAlgorithmService.DailyEmbryoTask task,
+                                                     int quantity,
+                                                     ScheduleContextVo context) {
+        int dailyLhCapacity = getDailyLhCapacityByTask(task, context);
+        int moldQty = task.getVulcanizeMoldCount() != null && task.getVulcanizeMoldCount() > 0
+                ? task.getVulcanizeMoldCount() : 1;
+        if (quantity <= 0 || dailyLhCapacity <= 0 || moldQty <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal singleTireMoldSeconds = BigDecimal.valueOf(SECONDS_PER_DAY)
+                .divide(BigDecimal.valueOf(dailyLhCapacity), 2, BigDecimal.ROUND_HALF_UP);
+        return BigDecimal.valueOf(quantity)
+                .multiply(singleTireMoldSeconds)
+                .divide(BigDecimal.valueOf(moldQty), 2, BigDecimal.ROUND_HALF_UP)
+                .divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 2, BigDecimal.ROUND_HALF_UP);
+    }
+
+    private int calculateRequiredCars(int quantity, int tripCapacity) {
+        if (quantity <= 0 || tripCapacity <= 0) {
+            return 0;
+        }
+        return (quantity + tripCapacity - 1) / tripCapacity;
+    }
+
+    private MonthPlanProductLhCapacityVo getMaterialLhCapacityVo(String materialCode,
+                                                                 ScheduleContextVo context) {
+        if (context.getMaterialLhCapacityMap() == null || materialCode == null) {
+            return null;
+        }
+        return context.getMaterialLhCapacityMap().get(materialCode);
+    }
+
+    private int resolveSingleMoldDailyLhCapacity(String materialCode, ScheduleContextVo context) {
+        MonthPlanProductLhCapacityVo vo = getMaterialLhCapacityVo(materialCode, context);
+        if (vo == null) {
+            return 0;
+        }
+        if (vo.getDayVulcanizationQty() != null && vo.getDayVulcanizationQty() > 0) {
+            return vo.getDayVulcanizationQty() / 2;
+        }
+        if (vo.getStandardCapacity() != null && vo.getStandardCapacity() > 0) {
+            return vo.getStandardCapacity();
+        }
+        return 0;
     }
 
     // ==================== 参数配置获取方法 ====================
