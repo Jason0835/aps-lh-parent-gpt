@@ -3,6 +3,7 @@ package com.zlt.aps.lh.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.bill.common.service.IDocService;
 
@@ -84,4 +85,16 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
      * @return 处理结果
      */
     AjaxResult increaseMouldStartPlan(LhScheduleResult scheduleResult);
+
+    /**
+     * 导出数据
+     *
+     * @param list 数据列表
+     * @param scheduleDate 排程日期
+     * @return 导出数据
+     */
+    byte[] exportData(List<LhScheduleResult> list, Date scheduleDate);
+
+
+    AjaxResult importScheduleTemplate(List<LhScheduleResultTemplateImportVO> list, LhScheduleResult result, boolean updateSupport, Long id);
 }
