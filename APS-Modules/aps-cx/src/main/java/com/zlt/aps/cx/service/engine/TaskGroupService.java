@@ -293,30 +293,30 @@ public class TaskGroupService {
             calculateEndingInfo(task, context, scheduleDate, usedRemainder);
 
             // S5.2.4.1 开产班次：更新 vulcanizeDemand 为下一个有计划的 CLASS 的量
-            if (isOpeningShift) {
-                int currentDemand = task.getVulcanizeDemand() != null ? task.getVulcanizeDemand() : 0;
-                if (currentDemand <= 0) {
-                    if (currentClassIndex > 0) {
-                        for (int ci = currentClassIndex + 1; ci <= 8; ci++) {
-                            Integer nextPlan = getClassPlanQtyByIndex(lhResult, ci);
-                            if (nextPlan != null && nextPlan > 0) {
-                                task.setVulcanizeDemand(nextPlan);
-                                log.info("开产班次: 胎胚={}, 当前CLASS{}计划=0, 使用CLASS{}计划={}",
-                                        embryoCode, currentClassIndex, ci, nextPlan);
-                                break;
-                            }
-                        }
-                    }
-                }
-                // 同时算出开产基准量（6/24 × 双模日硫化，往下取整车），供 handleOpeningDayTaskV2 封顶用
-                int doubleMoldDailyCapacity = getDailyLhCapacityByTask(task, context) * 2;
-                if (doubleMoldDailyCapacity > 0) {
-                    int raw = (int) Math.ceil(6.0 / 24.0 * doubleMoldDailyCapacity);
-                    int tripCapacity = getTripCapacity(task.getStructureName(), context);
-                    int openingBase = tripCapacity > 0 ? (raw / tripCapacity) * tripCapacity : raw;
-                    task.setOpeningShiftCapacity(openingBase);
-                }
-            }
+//            if (isOpeningShift) {
+//                int currentDemand = task.getVulcanizeDemand() != null ? task.getVulcanizeDemand() : 0;
+//                if (currentDemand <= 0) {
+//                    if (currentClassIndex > 0) {
+//                        for (int ci = currentClassIndex + 1; ci <= 8; ci++) {
+//                            Integer nextPlan = getClassPlanQtyByIndex(lhResult, ci);
+//                            if (nextPlan != null && nextPlan > 0) {
+//                                task.setVulcanizeDemand(nextPlan);
+//                                log.info("开产班次: 胎胚={}, 当前CLASS{}计划=0, 使用CLASS{}计划={}",
+//                                        embryoCode, currentClassIndex, ci, nextPlan);
+//                                break;
+//                            }
+//                        }
+//                    }
+//                }
+//                // 同时算出开产基准量（6/24 × 双模日硫化，往下取整车），供 handleOpeningDayTaskV2 封顶用
+//                int doubleMoldDailyCapacity = getDailyLhCapacityByTask(task, context) * 2;
+//                if (doubleMoldDailyCapacity > 0) {
+//                    int raw = (int) Math.ceil(6.0 / 24.0 * doubleMoldDailyCapacity);
+//                    int tripCapacity = getTripCapacity(task.getStructureName(), context);
+//                    int openingBase = tripCapacity > 0 ? (raw / tripCapacity) * tripCapacity : raw;
+//                    task.setOpeningShiftCapacity(openingBase);
+//                }
+//            }
 
             // S5.2.5 计算待排产量
             calculatePlannedProduction(task, context, scheduleDate);
