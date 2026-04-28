@@ -107,7 +107,7 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
             int errorNum = i + 2;
             LhChipStock docEntity = list.get(i);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
-            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated);
+//            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,this.getCheckUniqueFields().toArray(new String[0]));
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
                 docEntity.setId(-999L);
@@ -127,6 +127,7 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
 
             if (!checkStockVsFinish(docEntity)) {
                 failureNum++;
+                //第{0}行，库存量不能小于完成量
                 String message = I18nUtil.getMessage("ui.data.alert.lhChipStock.stockLessThanFinish");
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                         errorNum, String.format(message, errorNum), importErrorLogs);
@@ -146,8 +147,9 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
                     List<LhChipStock> exists = lhChipStockMapper.selectList(queryWrapper);
                     if (CollectionUtils.size(exists) > 1) {
                         failureNum++;
+                        String message = I18nUtil.getMessage("ui.data.alert.lhChipStock.importDuplicateData");
                         ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                                errorNum, String.format("第%s行导入失败：分厂、芯片编码对应多条库存数据，请先清理重复数据后再导入。", errorNum), importErrorLogs);
+                                errorNum, String.format(message, errorNum), importErrorLogs);
                         continue;
                     }
                     LhChipStock exist = CollectionUtils.isEmpty(exists) ? null : exists.get(0);
