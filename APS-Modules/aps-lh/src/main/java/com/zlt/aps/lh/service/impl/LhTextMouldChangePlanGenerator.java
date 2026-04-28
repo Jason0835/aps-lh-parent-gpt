@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.service.impl;
 
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.ObjUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -69,7 +70,8 @@ public class LhTextMouldChangePlanGenerator {
             return AjaxResult.error(message("ui.data.alert.lhMouldChangePlan.generateTextPlan.factoryCodeMismatch"));
         }
         // 次日中班计划量不为0，不可生成。
-        if (!Objects.equals(scheduleResult.getClass5PlanQty(), 0)) {
+        Integer plan = ObjUtil.defaultIfNull(scheduleResult.getClass5PlanQty(), 0);
+        if (!Objects.equals(plan, 0)) {
             return AjaxResult.error(message("ui.data.alert.lhMouldChangePlan.generateTextPlan.midPlanReqZero"));
         }
         // 次日中班（class5StartTime）开始日期必须等于当前时间+1天，历史记录不可生成。
