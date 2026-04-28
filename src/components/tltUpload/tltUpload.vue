@@ -70,6 +70,10 @@ export default {
       default: () => ({}),
     },
     uploadUrl: String, //上传模板地址
+    uploadParams: {
+      type: Object,
+      default: () => ({}),
+    },
     options: Array,
     updateSupport: {
       // 是否更新已经存在的用户数据
@@ -97,6 +101,23 @@ export default {
         fileList: [],
       },
     };
+  },
+  computed: {
+    uploadAction() {
+      const queryParams = {
+        updateSupport: this.updateSupport,
+        ...(this.uploadParams || {}),
+      };
+      const queryString = Object.keys(queryParams)
+        .filter((key) => queryParams[key] !== undefined && queryParams[key] !== null && queryParams[key] !== "")
+        .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(queryParams[key])}`)
+        .join("&");
+      const baseUrl = `${this.upload.url}${this.uploadUrl || ""}`;
+      if (!queryString) {
+        return baseUrl;
+      }
+      return `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}${queryString}`;
+    },
   },
 
   methods: {

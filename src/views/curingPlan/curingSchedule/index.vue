@@ -181,6 +181,7 @@
       :title="$t('ui.data.column.scheduleResult.importFinishQty')"
       downloadUrl="/lh/lhScheduleResult/importTemplateDown"
       :download-params="importTemplateDownloadParams"
+      :upload-params="importByCustUploadParams"
       uploadUrl="/lh/lhScheduleResult/importDataByCust"
       @uploadSuccess="getList"
     />
@@ -341,6 +342,12 @@ export default {
     }),
     importTemplateDownloadParams() {
       return {
+        scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+      };
+    },
+    importByCustUploadParams() {
+      return {
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
         scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
       };
     },
