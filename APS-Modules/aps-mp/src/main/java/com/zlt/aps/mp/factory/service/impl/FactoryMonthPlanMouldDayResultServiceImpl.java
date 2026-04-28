@@ -185,6 +185,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, params.getFactoryCode());
         structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion, params.getProductionVersion());
         structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, params.getFactoryCode());
+        structureQueryWrapper.eq(StringUtils.isNotEmpty(params.getStructureName()), MpStructureAllocation::getStructureName, params.getStructureName());
         Map<String, MpStructureAllocation> structureAllocationMap = mpStructureAllocationMapper
                 .selectList(structureQueryWrapper).stream().collect(
                         Collectors.toMap(MpStructureAllocation::getStructureName, Function.identity(), (s1, s2) -> s1));
@@ -418,6 +419,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         queryWrapper.eq(MpMonthPlanStatistics::getFactoryCode, factoryMonthPlanMouldDayResult.getFactoryCode());
         queryWrapper.eq(MpMonthPlanStatistics::getIsDelete, YesOrNoEnum.NO.getValue());
         queryWrapper.eq(MpMonthPlanStatistics::getProductionVersion, productionVersion);
+        queryWrapper.eq(StringUtils.isNoneEmpty(factoryMonthPlanMouldDayResult.getStructureName()), MpMonthPlanStatistics::getStructureName, factoryMonthPlanMouldDayResult.getStructureName());
         Map<String, MpMonthPlanStatistics> statisticsMap = mpMonthPlanStatisticsEntityMapper.selectList(queryWrapper)
                 .stream().collect(
                         Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
@@ -432,7 +434,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      */
     @Override
     public byte[] getFactoryMonthPlanMouldDayResultExportByte(FactoryMonthPlanMouldDayResult queryResult,
-                                                              List<FactoryMonthPlanMouldDayResultExportVo> list) {
+                                                              List<FactoryMonthPlanMouldDayResultExportVo> list,
+                                                              boolean isFinal) {
         // 1、获取模板
         ClassLoader classLoader = this.getClass().getClassLoader();
         InputStream inputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldDayResultExportTemp.xlsx");
@@ -542,7 +545,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         }
         
         // 构建特殊材料排产结果
-        this.buildSpecialMaterialInfo(queryResult, tableMap, excelDataList);
+        this.buildSpecialMaterialInfo(queryResult, tableMap, excelDataList, isFinal);
 
         // 将单元格样式放入context
         if (PubUtil.isNotEmpty(cellStyleList)) {
@@ -560,7 +563,15 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      * @param excelDataList
      */
     private void buildSpecialMaterialInfo(FactoryMonthPlanMouldDayResult queryResult, Map<String, Object> tableMap,
-                                          List<List<Map<String, Object>>> excelDataList) {
+                                          List<List<Map<String, Object>>> excelDataList, boolean isFinal) {
+        if (isFinal) {
+            Map<String, Object> listDataMap = new HashMap<>();
+            listDataMap.put("specialMaterialResult", "");
+            List<Map<String, Object>> listData = new ArrayList<>();
+            listData.add(listDataMap);
+            excelDataList.add(listData);
+            return;
+        }
         // 1、加载特殊材料列表
         List<RawSpecialMaterialRecord> recordList = null;
         // 1.1、仅加载参数有配置的特殊材料清单

@@ -117,6 +117,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="!isAllMaterial">
             AND d.FACTORY_CODE = m.FACTORY_CODE
         </if>
+        <if test="dayResult.structureName != null and dayResult.structureName != ''">
+            AND m.STRUCTURE_NAME = #{dayResult.structureName}
+        </if>
 		GROUP BY
 		    MM.MIN_PRO_SIZE,
 		    m.MATERIAL_CODE,
