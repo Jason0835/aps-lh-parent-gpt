@@ -26,6 +26,7 @@ import java.io.ByteArrayInputStream;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -195,5 +196,16 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
     @ResponseBody
     public AjaxResult createMonthRequireVersion() {
         return iDpDemandPlanService.createMonthRequireVersion();
+    }
+    
+    /**
+     * 继承人工配置
+     */
+    @ApiOperation("继承人工配置")
+    @PostMapping("/demandPlan/extendsConfiguration")
+    @RequiresPermissions("monthplan:demandPlan:extendsConfiguration")
+    @ResponseBody
+    public AjaxResult extendsConfiguration(@RequestBody  DpDemandPlan createCondition) {
+        return iDpDemandPlanService.extendsConfiguration(createCondition);
     }
 }
