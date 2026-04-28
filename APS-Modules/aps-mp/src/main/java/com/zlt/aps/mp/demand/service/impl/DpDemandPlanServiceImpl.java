@@ -1,9 +1,11 @@
 package com.zlt.aps.mp.demand.service.impl;
 
+import com.alibaba.nacos.shaded.com.google.common.base.Objects;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.google.common.collect.Lists;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
@@ -14,8 +16,6 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.BizScheduleTypeEnum;
 import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.utils.ApsNumberUtils;
-import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmOutbountOrdersNotScanEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -27,6 +27,7 @@ import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
 import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
 import com.zlt.aps.maindata.service.IMpMonthlySaleQtyService;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.mp.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
@@ -49,6 +50,7 @@ import com.zlt.aps.mp.common.utils.RequirementVersionService;
 import com.zlt.aps.mp.common.utils.SummaryDemandPlanService;
 import com.zlt.aps.mp.common.utils.poi.AlternateMaterialSelector;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
+import com.zlt.aps.mp.demand.mapper.DpDemandPlanSumEntityMapper;
 import com.zlt.aps.mp.demand.service.IDpDemandPlanService;
 import com.zlt.aps.mp.demand.service.IDpOrderPoolSnapshotService;
 import com.zlt.aps.mp.demand.service.ISalesOrderPoolService;
@@ -80,8 +82,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Propagation;
@@ -151,10 +153,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private final PrecedentStockUpService precedentStockUpService;
     // 批量插入处理器
     private final BatchInsertProcessor<DpDemandPlan> batchInsertProcessor;
-
+    // 结构转产表
     private final IMpStructureAllocationService mpStructureAllocationService;
-    
+    // 未扫描订单
     private final MdmOutbountOrdersNotScanEntityMapper mdmOutbountOrdersNotScanEntityMapper;
+    // 需求计划统计表
+    private final DpDemandPlanSumEntityMapper dpDemandPlanSumEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -612,6 +616,113 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 8: 后续处理
         postProcess(createCondition, predictionContext, finalPlans,allocationResult);
         return finalPlans;
+    }
+    
+
+    /**
+     * 继承人工配置
+     * @param extendsDemandPlan
+     * @return
+     */
+    @Override
+    public AjaxResult extendsConfiguration(DpDemandPlan extendsDemandPlan) {
+        if (extendsDemandPlan == null || StringUtils.isEmpty(extendsDemandPlan.getMonthPlanVersion())) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.noExistVersion"));
+        }
+        String monthPlanVersion = extendsDemandPlan.getMonthPlanVersion();
+        String factoryCode = extendsDemandPlan.getFactoryCode();
+        Integer year = extendsDemandPlan.getYear();
+        Integer month = extendsDemandPlan.getMonth();
+//        String planType = extendsDemandPlan.getPlanType();
+        
+        // 1、加载待处理需求计划
+        LambdaQueryWrapper<DpDemandPlan> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(DpDemandPlan::getFactoryCode, factoryCode);
+        queryWrapper.eq(DpDemandPlan::getMonthPlanVersion, monthPlanVersion);
+        List<DpDemandPlan> currentDemandPlanList = demandPlanEntityMapper.selectList(queryWrapper);
+        Map<String, List<DpDemandPlan>> currentDemandPlanMap = currentDemandPlanList.stream()
+                .collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersion));
+        if (CollectionUtils.isEmpty(currentDemandPlanList)) {
+            AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.noExistVersion"));
+        }
+        LambdaQueryWrapper<DpDemandPlanSum> sumQueryWrapper = new LambdaQueryWrapper<>();
+        sumQueryWrapper.eq(DpDemandPlanSum::getFactoryCode, factoryCode);
+        sumQueryWrapper.eq(DpDemandPlanSum::getMonthPlanVersion, monthPlanVersion);
+        List<DpDemandPlanSum> currentDemandPlanSumList = dpDemandPlanSumEntityMapper.selectList(sumQueryWrapper);
+        if (CollectionUtils.isEmpty(currentDemandPlanSumList)) {
+            AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.noExistVersion"));
+        }
+        
+        // 2、加载待处理需求计划版本的上一个版本（同年、月、工厂、计划类型）
+        String planType = CollectionUtils.firstElement(currentDemandPlanList).getPlanType();
+        LambdaQueryWrapper<DpDemandPlanSum> lastSumQueryWrapper = new LambdaQueryWrapper<>();
+        lastSumQueryWrapper.eq(DpDemandPlanSum::getFactoryCode, factoryCode);
+        lastSumQueryWrapper.eq(DpDemandPlanSum::getYear, year);
+        lastSumQueryWrapper.eq(DpDemandPlanSum::getMonth, month);
+        lastSumQueryWrapper.eq(DpDemandPlanSum::getPlanType, planType);
+        String inSql = "MONTH_PLAN_VERSION IN (SELECT MAX(MONTH_PLAN_VERSION) FROM T_DP_DEMAND_PLAN_SUM WHERE IS_DELETE = 0 AND FACTORY_CODE = {0} AND YEAR = {1} AND MONTH = {2} AND PLAN_TYPE = {3} AND MONTH_PLAN_VERSION < {4})";
+        lastSumQueryWrapper.apply(inSql, factoryCode, year, month, planType, monthPlanVersion);
+        List<DpDemandPlanSum> applyDemandPlanSumList = dpDemandPlanSumEntityMapper.selectList(lastSumQueryWrapper);
+        if (CollectionUtils.isEmpty(applyDemandPlanSumList)) { // 没有上一个版本，不需要继承
+            return AjaxResult.success();
+        }
+        Map<String, DpDemandPlanSum> lastPlanMap = currentDemandPlanSumList.stream()
+                .collect(Collectors.toMap(DpDemandPlanSum::getMaterialCode, Function.identity(), (p1, p2) -> p1));
+
+        // 3、遍历待更新，将上版本需求计划的【结构优先、物料优先、是否排产】继承过去
+        List<DpDemandPlan> updateDemandPlanList = new ArrayList<>(); // 有继承更新的需求计划
+        List<DpDemandPlanSum> updateDemandPlanSumList = new ArrayList<>(); // 有继承更新的需求计划统计
+        for (DpDemandPlanSum currentPlanSum: currentDemandPlanSumList) {
+            String materialCode = currentPlanSum.getMaterialCode();
+            DpDemandPlanSum lastDemandPlanSum = lastPlanMap.get(materialCode); // 上个版本同物料的需求记录
+            List<DpDemandPlan> demandPlanList = currentDemandPlanMap.get(materialCode); // 待更新版本同物料的需求记录
+            if (lastDemandPlanSum != null) {
+                // 3.1、判断不一样的才做继承，并记录有调整过的计划数据
+                boolean isExtends = false;
+                // 3.2、继承结构优先
+                if (!Objects.equal(currentPlanSum.getStructurePriority(), lastDemandPlanSum.getStructurePriority())) {
+                    currentPlanSum.setStructurePriority(lastDemandPlanSum.getStructurePriority());
+                    if (!CollectionUtils.isEmpty(demandPlanList)) {
+                        demandPlanList.forEach(plan -> plan.setStructurePriority(lastDemandPlanSum.getStructurePriority()));
+                    }
+                    isExtends = true;
+                }
+                // 3.2、继承物料优先
+                if (!Objects.equal(currentPlanSum.getScmPriority(), lastDemandPlanSum.getScmPriority())) {
+                    currentPlanSum.setScmPriority(lastDemandPlanSum.getScmPriority());
+                    if (!CollectionUtils.isEmpty(demandPlanList)) {
+                        demandPlanList.forEach(plan -> plan.setScmPriority(lastDemandPlanSum.getScmPriority()));
+                    }
+                    isExtends = true;
+                }
+                // 3.3、继承是否排产
+                if (!Objects.equal(currentPlanSum.getIsProduction(), lastDemandPlanSum.getIsProduction())) {
+                    currentPlanSum.setIsProduction(lastDemandPlanSum.getIsProduction());
+                    if (!CollectionUtils.isEmpty(demandPlanList)) {
+                        demandPlanList.forEach(plan -> plan.setIsProduction(lastDemandPlanSum.getIsProduction()));
+                    }
+                    isExtends = true;
+                }
+                // 3.4、继承常规储备是否排产
+                if (!Objects.equal(currentPlanSum.getIsSchedule(), lastDemandPlanSum.getIsSchedule())) {
+                    currentPlanSum.setIsSchedule(lastDemandPlanSum.getIsSchedule());
+                    if (!CollectionUtils.isEmpty(demandPlanList)) {
+                        demandPlanList.forEach(plan -> plan.setIsSchedule(lastDemandPlanSum.getIsSchedule()));
+                    }
+                    isExtends = true;
+                }
+                if (isExtends) {
+                    updateDemandPlanSumList.add(currentPlanSum);
+                    if (!CollectionUtils.isEmpty(demandPlanList)) {
+                        updateDemandPlanList.addAll(demandPlanList);
+                    }
+                }
+            }
+        }
+        baseDao.updateBatch(updateDemandPlanSumList);
+        baseDao.updateBatch(updateDemandPlanList);
+        
+        return AjaxResult.success();
     }
 
     private List<SupplyOrderPool> createSupplyOrder(DpDemandPlan createCondition,YearMonth yearMonth)  {

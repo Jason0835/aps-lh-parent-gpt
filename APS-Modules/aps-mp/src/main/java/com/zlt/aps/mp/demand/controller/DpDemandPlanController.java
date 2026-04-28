@@ -235,6 +235,15 @@ public class DpDemandPlanController extends AbstractDocBizController<DpDemandPla
         dpDemandPlanService.createMonthRequire(createCondition);
         return AjaxResult.success();
     }
+    
+    /**
+     * 继承人工配置
+     * @return
+     */
+    @PostMapping("/extendsConfiguration")
+    public AjaxResult extendsConfiguration(@RequestBody DpDemandPlan extendsDemandPlan) {
+        return dpDemandPlanService.extendsConfiguration(extendsDemandPlan);
+    }
 
     @ApiOperation("生成需求计划版本")
     @PostMapping("/createMonthRequireVersion")
