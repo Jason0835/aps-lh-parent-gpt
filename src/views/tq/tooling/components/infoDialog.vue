@@ -29,28 +29,18 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { saveMachineChuck } from "@/api/tq/machineChuck";
-import { listEnabledMachines } from "@/api/tq/machine";
+import { saveTooling } from "@/api/tq/tooling";
 
 export default {
   components: { infoForm },
   data() {
     return {
       loading: false,
-      machineLoading: false,
       visible: false,
       isEdit: false,
       form: {},
-      machineList: [],
       rules: {
-        machineId: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        chuckCode: [
+        toolingCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -66,42 +56,27 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.tq.machineChuck.column.modalName")
+        this.$t("ui.tq.tooling.column.modalName")
       );
     },
     columns() {
       return [
         {
-          label: this.$t("ui.tq.machineChuck.column.machineCode"),
-          prop: "machineId",
-          span: 24,
-          required: true,
-          type: "select",
-          dictData: this.machineList,
-          filterable: true,
-          loading: this.machineLoading,
-          props: {
-            label: "machineName",
-            value: "id",
-          },
-          onFocus: this.handleMachineFocus,
-        },
-        {
-          label: this.$t("ui.tq.machineChuck.column.chuckCode"),
-          prop: "chuckCode",
+          label: this.$t("ui.tq.tooling.column.toolingCode"),
+          prop: "toolingCode",
           span: 24,
           required: true,
           maxlength: "50",
         },
         {
-          label: this.$t("ui.tq.machineChuck.column.chuckName"),
-          prop: "chuckName",
+          label: this.$t("ui.tq.tooling.column.toolingName"),
+          prop: "toolingName",
           span: 24,
           maxlength: "100",
         },
         {
-          label: this.$t("ui.tq.machineChuck.column.inchSize"),
-          prop: "inchSize",
+          label: this.$t("ui.tq.tooling.column.totalQty"),
+          prop: "totalQty",
           span: 24,
           type: "number",
         },
@@ -119,7 +94,7 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        const res = await saveMachineChuck(params);
+        const res = await saveTooling(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -129,48 +104,16 @@ export default {
         this.loading = false;
       }
     },
-    async loadMachineList() {
-      this.machineLoading = true;
-      try {
-        const res = await listEnabledMachines();
-        const list = Array.isArray(res) ? res : (res.data || res.rows || []);
-        this.machineList = list;
-      } catch (error) {
-        console.log(error);
-      } finally {
-        this.machineLoading = false;
-      }
-    },
-    handleMachineFocus() {
-      if (this.machineList.length === 0) {
-        this.loadMachineList();
-      }
-    },
-    async show(data) {
+    show(data) {
       this.visible = true;
-      this.machineList = [];
       if (data) {
         this.isEdit = true;
         this.form = {
           ...data,
         };
-        // 先加载所有机台列表
-        await this.loadMachineList();
-        // 如果当前机台不在列表中，添加到列表
-        if (data.machineId && data.machineName) {
-          const exists = this.machineList.some(item => item.id === data.machineId);
-          if (!exists) {
-            this.machineList.unshift({
-              id: data.machineId,
-              machineName: data.machineName,
-            });
-          }
-        }
       } else {
         this.isEdit = false;
         this.form = {};
-        // 新增时预加载机台列表
-        await this.loadMachineList();
       }
     },
     hide() {
@@ -178,7 +121,6 @@ export default {
       this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
-      this.machineList = [];
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);

@@ -92,6 +92,11 @@ export default {
           type: "select", //GLUE_TYPE
           dictData: this.parentDict.type.biz_factory_name,
         },
+        {
+          prop: "machineCode",
+          label: this.$t("ui.data.column.machine.machineCode"),
+          type: "input",
+        },
       ]
     },
     columns: function () {

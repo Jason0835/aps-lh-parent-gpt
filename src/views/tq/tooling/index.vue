@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="tqMachineChuckMainTable"
+      tableRef="tqToolingMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -21,33 +21,33 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['tq:machineChuck:add']"
+          v-hasPermi="['tq:tooling:add']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
           type="danger"
           plain
-          v-hasPermi="['tq:machineChuck:remove']"
+          v-hasPermi="['tq:tooling:remove']"
           @click="handleBatchDelete"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <el-button
-          v-hasPermi="['tq:machineChuck:import']"
+          v-hasPermi="['tq:tooling:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
         <el-button
           @click="handleExport"
-          v-hasPermi="['tq:machineChuck:export']"
+          v-hasPermi="['tq:tooling:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
     </page-table>
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/tq/machineChuck/importTemplate"
-      uploadUrl="/tq/machineChuck/importData"
+      downloadUrl="/tq/tooling/importTemplate"
+      uploadUrl="/tq/tooling/importData"
       @uploadSuccess="getList"
     />
     <InfoDialog ref="infoRef" @success="getList" />
@@ -55,16 +55,15 @@
 </template>
 <script>
 import {
-  listMachineChuck,
-  removeMachineChuck,
-  exportMachineChuck,
-} from "@/api/tq/machineChuck";
-import { listEnabledMachines } from "@/api/tq/machine";
+  listTooling,
+  removeTooling,
+  exportTooling,
+} from "@/api/tq/tooling";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import InfoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TqMachineChuck",
+  name: "TqTooling",
   components: {
     tltUpload,
     InfoDialog,
@@ -72,7 +71,6 @@ export default {
   data() {
     return {
       loading: false,
-      machineLoading: false,
       data: [],
       selection: [],
       page: {
@@ -83,20 +81,14 @@ export default {
       sort: {},
       search: {},
       query: {},
-      machineList: [],
     };
   },
   computed: {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.tq.machineChuck.column.machineCode"),
-          prop: "machineId",
-          type: "select",
-          dictData: this.machineList,
-          labelKey: "machineName",
-          valueKey: "id",
-          filterable: true,
+          label: this.$t("ui.tq.tooling.column.toolingCode"),
+          prop: "toolingCode",
         },
       ];
     },
@@ -104,31 +96,24 @@ export default {
       return [
         { type: "selection", fixed: "left" },
         {
-          prop: "machineName",
+          prop: "toolingCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.specifyMachine.column.machineName"),
+          label: this.$t("ui.tq.tooling.column.toolingCode"),
           minWidth: 120,
         },
         {
-          prop: "chuckCode",
+          prop: "toolingName",
           align: "center",
           halign: "center",
-          label: this.$t("ui.tq.machineChuck.column.chuckCode"),
+          label: this.$t("ui.tq.tooling.column.toolingName"),
           minWidth: 120,
         },
         {
-          prop: "chuckName",
+          prop: "totalQty",
           align: "center",
           halign: "center",
-          label: this.$t("ui.tq.machineChuck.column.chuckName"),
-          minWidth: 120,
-        },
-        {
-          prop: "inchSize",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.tq.machineChuck.column.inchSize"),
+          label: this.$t("ui.tq.tooling.column.totalQty"),
           minWidth: 100,
         },
         {
@@ -143,7 +128,7 @@ export default {
         {
           prop: "updateTime",
           halign: "center",
-          label: this.$t("ui.tq.machineChuck.column.updateTime"),
+          label: this.$t("ui.tq.tooling.column.updateTime"),
           minWidth: 150,
         },
         {
@@ -157,7 +142,7 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["tq:machineChuck:edit"]}
+                  v-hasPermi={["tq:tooling:edit"]}
                   class="minus"
                   type="primary"
                   onClick={() => this.handleEdit(row)}
@@ -165,7 +150,7 @@ export default {
                   {this.$t("ui.frame.btn.modify")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["tq:machineChuck:remove"]}
+                  v-hasPermi={["tq:tooling:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -195,7 +180,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeMachineChuck(ids).then((data) => {
+        removeTooling(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -213,7 +198,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = this.selection.map((row) => row.id).join(",");
-        removeMachineChuck(ids).then((data) => {
+        removeTooling(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -221,7 +206,7 @@ export default {
       });
     },
     handleExport() {
-      this.$confirm(this.$t("ui.tq.machineChuck.confirm.export"), {
+      this.$confirm(this.$t("ui.tq.tooling.confirm.export"), {
         type: "warning",
       }).then(() => {
         try {
@@ -232,7 +217,7 @@ export default {
             pageSize: undefined,
             pageNum: undefined,
           };
-          exportMachineChuck(params);
+          exportTooling(params);
         } catch (error) {
           console.error(error);
         } finally {
@@ -278,7 +263,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listMachineChuck(this.formatParams());
+        const data = await listTooling(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -287,35 +272,9 @@ export default {
         this.loading = false;
       }
     },
-    async loadMachineList() {
-      this.machineLoading = true;
-      try {
-        const res = await listEnabledMachines();
-        this.machineList = Array.isArray(res) ? res : (res.data || res.rows || []);
-      } catch (error) {
-        console.log(error);
-      } finally {
-        this.machineLoading = false;
-      }
-    },
-    handleMachineFocus() {
-      if (this.machineList.length === 0) {
-        this.loadMachineList();
-      }
-    },
   },
   mounted() {
-    this.getList();
-    this.loadMachineList();
-  },
-  activated() {
     this.getList();
   },
 };
 </script>
-<style lang="scss" scoped>
-.more-btn {
-  margin: 2px 0;
-  width: 100%;
-}
-</style>

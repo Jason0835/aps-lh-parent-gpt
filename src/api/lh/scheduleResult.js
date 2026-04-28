@@ -220,10 +220,11 @@ export function publishScheduleResult(query) {
   })
 }
 
-export function issueToMes() {
+export function issueToMes(query) {
   return request({
     url: '/lh/lhScheduleResult/issueToMes',
-    method: 'post'
+    method: 'post',
+    params: query
   })
 }
 /**
