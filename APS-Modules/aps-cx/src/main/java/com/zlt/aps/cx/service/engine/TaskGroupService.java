@@ -959,16 +959,6 @@ public class TaskGroupService {
             }
         }
 
-        // 如果取不到日硫化量，尝试从lhResult的硫化时长和模数计算
-        if (dailyLhCapacity == null || dailyLhCapacity <= 0) {
-            if (lhResult != null && lhResult.getLhTime() != null && lhResult.getLhTime() > 0
-                    && lhResult.getMouldQty() != null && lhResult.getMouldQty() > 0) {
-                int lhTimeSeconds = lhResult.getLhTime();
-                int mouldQty = lhResult.getMouldQty();
-                dailyLhCapacity = (SECONDS_PER_DAY / lhTimeSeconds) * mouldQty;
-            }
-        }
-
         // 仍然取不到，无法计算
         if (dailyLhCapacity == null || dailyLhCapacity <= 0) {
             log.warn("无法获取物料 {} 的日硫化量，stockHours 无法计算", task.getEmbryoCode());
@@ -1002,10 +992,8 @@ public class TaskGroupService {
         String logDailyLhCapacity;
         if (originalDoubleMoldDayVulcanizationQty > 0) {
             logDailyLhCapacity = "双模=" + originalDoubleMoldDayVulcanizationQty + ", 单模=" + dailyLhCapacity;
-        } else if (isStandardCapacity) {
-            logDailyLhCapacity = "标准=" + dailyLhCapacity;
         } else {
-            logDailyLhCapacity = "估算=" + dailyLhCapacity;
+            logDailyLhCapacity = "标准=" + dailyLhCapacity;
         }
         log.debug("物料 {} stockHours计算: 日硫化量({}), 单胎单模时长={}s, 模数={}, 库存={}, 库存可供时长={}h",
                 task.getEmbryoCode(), logDailyLhCapacity, singleTireMoldSeconds, taskMoldQty, currentStock, stockHours);
