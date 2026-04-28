@@ -2397,6 +2397,7 @@
   "lhChipStock.notUnique": "芯片编号已存在",
   "lhChipStock.batchEditNotOpen": "批量编辑功能暂未开放",
   "lhChipStock.chipCodeExistsConfirmMerge": "芯片编号已存在，是否合并到已有记录？",
+  "ui.data.alert.lhChipStock.importDuplicateData": "第%s行导入失败：分厂、芯片编码对应多条库存数据，请先清理重复数据后再导入。",
   "ui.data.column.lhMachineOnlineInfo.modelName": "硫化在机信息",
   "ui.data.column.lhMachineOnlineInfo.factoryCode": "工厂",
   "ui.data.column.lhMachineOnlineInfo.onlineDate": "日期",
