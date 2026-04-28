@@ -28,19 +28,15 @@
 </template>
 
 <script>
-import { mapState } from "vuex";
-
 import infoForm from "@/views/components/infoForm.vue";
+import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import {
-  validateAdd,
-  editScheduleResult,
   insertOrder,
   selectListMdmProductConstruction,
   getScheduleMachineInfo,
 } from "@/api/lh/scheduleResult";
-import { debounce } from "@/utils";
 export default {
-  components: { infoForm },
+  components: { infoForm, materialCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -79,6 +75,13 @@ export default {
             trigger: "blur",
           },
         ],
+        materialCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "change",
+          },
+        ],
       },
     };
   },
@@ -92,7 +95,7 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.scheduleResult.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
@@ -100,6 +103,7 @@ export default {
           listeners: {
             change: this.handleScheduleDateChange,
           },
+          disabled:true
         },
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
@@ -111,6 +115,7 @@ export default {
           listeners: {
             change: this.handleScheduleDateChange,
           },
+           disabled:true
         },
         // {
         //   label: this.$t("ui.data.column.scheduleResult.specCode"),
@@ -137,13 +142,27 @@ export default {
           prop: "lhMachineCode",
           type: "select",
           dictData: this.curingMachines,
-
           filterable: true,
           disabled: this.curingMachines.length === 0,
+           disabled:true
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.leftRightMold"),
-          prop: "leftRightMold",
+          prop: "materialCode",
+          label: this.$t("ui.data.column.scheduleResult.materialCode"),
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.materialCode}
+                v-model={form.materialCode}
+                onChange={this.handleMaterialCodeChange}
+              />
+            );
+          },
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          prop: "materialDesc",
+          disabled: true,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.class1PlanQty"),
@@ -156,8 +175,12 @@ export default {
           prop: "class1Analysis",
           span: 24,
         },
-
-         {
+        // 左右模
+        // {
+        //   label: this.$t("ui.data.column.scheduleResult.leftRightMold"),
+        //   prop: "leftRightMold",
+        // },
+        {
           label: this.$t("ui.data.column.scheduleResult.class2PlanQty"),
           prop: "class2PlanQty",
           span: 24,
@@ -168,7 +191,7 @@ export default {
           prop: "class2Analysis",
           span: 24,
         },
-         {
+        {
           label: this.$t("ui.data.column.scheduleResult.class3PlanQty"),
           prop: "class3PlanQty",
           span: 24,
@@ -179,51 +202,51 @@ export default {
           prop: "class3Analysis",
           span: 24,
         },
-          {
-            label: this.$t("ui.data.column.scheduleResult.class4PlanQty"),
-            prop: "class4PlanQty",
-            span: 24,
-            type: "number",
-          },
-          {
-            label: this.$t("ui.data.column.scheduleResult.class4Analysis"),
-            prop: "class4Analysis",
-            span: 24,
-          },
-          {
-            label: this.$t("ui.data.column.scheduleResult.class5PlanQty"),
-            prop: "class5PlanQty",
-            span: 24,
-            type: "number",
-          },
-          {
-            label: this.$t("ui.data.column.scheduleResult.class5Analysis"),
-            prop: "class5Analysis",
-            span: 24,
-          },
-            {
-              label: this.$t("ui.data.column.scheduleResult.class6PlanQty"),
-              prop: "class6PlanQty",
-              span: 24,
-              type: "number",
-            },
-            {
-              label: this.$t("ui.data.column.scheduleResult.class6Analysis"),
-              prop: "class6Analysis",
-              span: 24,
-            },
-            {
-              label: this.$t("ui.data.column.scheduleResult.class7PlanQty"),
-              prop: "class7PlanQty",
-              span: 24,
-              type: "number",
-            },
-            {
-              label: this.$t("ui.data.column.scheduleResult.class7Analysis"),
-              prop: "class7Analysis",
-              span: 24,
-            },
-            {
+        {
+          label: this.$t("ui.data.column.scheduleResult.class4PlanQty"),
+          prop: "class4PlanQty",
+          span: 24,
+          type: "number",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.class4Analysis"),
+          prop: "class4Analysis",
+          span: 24,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.class5PlanQty"),
+          prop: "class5PlanQty",
+          span: 24,
+          type: "number",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.class5Analysis"),
+          prop: "class5Analysis",
+          span: 24,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.class6PlanQty"),
+          prop: "class6PlanQty",
+          span: 24,
+          type: "number",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.class6Analysis"),
+          prop: "class6Analysis",
+          span: 24,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.class7PlanQty"),
+          prop: "class7PlanQty",
+          span: 24,
+          type: "number",
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.class7Analysis"),
+          prop: "class7Analysis",
+          span: 24,
+        },
+        {
           label: this.$t("ui.data.column.scheduleResult.class8PlanQty"),
           prop: "class8PlanQty",
           span: 24,
@@ -239,6 +262,23 @@ export default {
   },
 
   methods: {
+    handleMaterialCodeChange(val, row) {
+      if (val) {
+        this.$set(this.form, "materialDesc", row.materialDesc);
+      } else {
+        this.$set(this.form, "materialDesc", "");
+      }
+    },
+    decodeRemark(remark) {
+      if (!remark) return remark;
+      return remark
+        .replace(/__PERCENT__/g, "%")
+        .replace(/__AMP__/g, "&")
+        .replace(/__LT__/g, "<")
+        .replace(/__GT__/g, ">")
+        .replace(/__QUOT__/g, '"')
+        .replace(/__APOS__/g, "'");
+    },
     encodeRemark(remark) {
       if (!remark) return remark;
       return remark
@@ -274,23 +314,44 @@ export default {
       }
     },
     //utils
-    show(data) {
+    async show(data) {
       this.visible = true;
-      //设置默认值为明天
-      let nowDate = new Date();
-      let tomorrow = new Date(nowDate);
+      const nowDate = new Date();
+      const tomorrow = new Date(nowDate);
       tomorrow.setDate(nowDate.getDate() + 1);
-      this.form = {
+      const form = {
         factoryCode: "116",
-        scheduleDate: tomorrow.toISOString().slice(0, 10), // 保留yyyy-MM-dd
+        scheduleDate: tomorrow.toISOString().slice(0, 10),
       };
-      this.handleScheduleDateChange();
-      // if (data) {
-      //   this.isEdit = true;
-      //   this.form = {
-      //     ...data,
-      //   };
-      // }
+      if (data) {
+        const keys = [
+          "factoryCode",
+          "scheduleDate",
+          "lhMachineCode",
+          "materialCode",
+          "materialDesc",
+          "mouldSurplusQty",
+          "embryoStock",
+        ];
+        for (let i = 1; i <= 8; i++) {
+          keys.push(`class${i}PlanQty`, `class${i}Analysis`);
+        }
+        keys.forEach((k) => {
+          if (data[k] === undefined || data[k] === null) {
+            return;
+          }
+          let v = data[k];
+          if (/^class\d+Analysis$/.test(k)) {
+            v = this.decodeRemark(String(v));
+          }
+          form[k] = v;
+        });
+      }
+      this.form = form;
+      await this.loadCuringMachinesDropdown();
+      if (!data?.lhMachineCode) {
+        this.$set(this.form, "lhMachineCode", "");
+      }
     },
     hide() {
       this.form = {};
@@ -301,9 +362,8 @@ export default {
     },
 
     handleScheduleDateChange() {
-      this.curingMachines = [];
-      this.$set(this.form, 'lhMachineCode', "");
-      this.handleProductCodeChange();
+      this.$set(this.form, "lhMachineCode", "");
+      this.loadCuringMachinesDropdown();
     },
     async handleSpecCodeChange() {
       if (!this.form.factoryCode ) {
@@ -330,37 +390,27 @@ export default {
       this.curingMachines = [];
       this.$set(this.form, 'lhMachineCode', "");
     },
-    async handleProductCodeChange() {
-      if (
-        !this.form.factoryCode ||
-
-        !this.form.scheduleDate
-      ) {
+    async loadCuringMachinesDropdown() {
+      if (!this.form.factoryCode || !this.form.scheduleDate) {
+        this.curingMachines = [];
         return;
       }
-
-      this.curingMachines = [];
-      this.$set(this.form, 'lhMachineCode', "");
       try {
         const res = await getScheduleMachineInfo({
           factoryCode: this.form.factoryCode,
-          // productCode: this.form.productCode,
           scheduleDate: this.form.scheduleDate,
-          // specCode: this.form.specCode,
         });
-        console.log(res);
-        let list=[]
-        for(let i=0;i<res.length;i++){
-          list.push({
-            label: res[i].machineCode,
-            value: res[i].machineCode,
-          })
-        }
-        this.curingMachines = list
-        console.log(this.curingMachines);
+        this.curingMachines = (res || []).map((r) => ({
+          label: r.machineCode,
+          value: r.machineCode,
+        }));
       } catch (error) {
         console.error(error);
+        this.curingMachines = [];
       }
+    },
+    handleProductCodeChange() {
+      this.handleScheduleDateChange();
     },
 
     handleConfirm() {

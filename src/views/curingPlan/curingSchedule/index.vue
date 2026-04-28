@@ -36,6 +36,7 @@
         <el-button
           v-hasPermi="['lh:lhScheduleResult:insertOrder']"
           type="warning"
+          :disabled="selection.length != 1"
           @click="handleAdd"
           >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button
         >
@@ -1008,7 +1009,9 @@ export default {
     },
     handleAdd() {
       if (this.$refs.addDialogRef) {
-        this.$refs.addDialogRef.show();
+        const row =
+          this.selection.length === 1 ? this.selection[0] : null;
+        this.$refs.addDialogRef.show(row);
       }
     },
     handleEdit(row) {
