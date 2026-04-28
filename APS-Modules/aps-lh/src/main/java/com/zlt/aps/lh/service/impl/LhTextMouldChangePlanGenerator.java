@@ -38,7 +38,7 @@ public class LhTextMouldChangePlanGenerator {
     /**
      * 中班班次字典值。
      */
-    private static final String MIDDLE_SHIFT_CLASS_INDEX = "2";
+    private static final String MIDDLE_SHIFT_CLASS_INDEX = "03";
 
     @Resource
     private LhScheduleResultMapper scheduleResultMapper;
