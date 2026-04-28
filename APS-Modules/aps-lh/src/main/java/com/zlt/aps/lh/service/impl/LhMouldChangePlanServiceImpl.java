@@ -240,7 +240,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 LambdaQueryWrapper<LhMouldChangePlan> queryWrapper = new LambdaQueryWrapper<>();
                 queryWrapper.eq(LhMouldChangePlan::getFactoryCode, docEntity.getFactoryCode());
                 queryWrapper.eq(LhMouldChangePlan::getLhMachineCode, docEntity.getLhMachineCode());
-                queryWrapper.eq(LhMouldChangePlan::getScheduleDate, docEntity.getScheduleDate());
+                queryWrapper.eq(LhMouldChangePlan::getPlanDate, docEntity.getPlanDate());
                 LhMouldChangePlan exist = lhMouldChangePlanMapper.selectOne(queryWrapper);
                 if (exist == null) {
                     failureNum++;
@@ -280,13 +280,13 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
      */
     @Override
     public String checkUnique(LhMouldChangePlan docEntityVO) {
-        // 唯一性判断维度：工厂 + 机台编号 + 排程日期
+        // 唯一性判断维度：工厂 + 机台编码 + 计划日期
         LambdaQueryWrapper<LhMouldChangePlan> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.ne(PubUtil.isNotEmpty(docEntityVO.getFieldValueByFieldName("id")),
                 LhMouldChangePlan::getId, docEntityVO.getFieldValueByFieldName("id"));
         queryWrapper.eq(LhMouldChangePlan::getFactoryCode, docEntityVO.getFactoryCode());
         queryWrapper.eq(LhMouldChangePlan::getLhMachineCode, docEntityVO.getLhMachineCode());
-        queryWrapper.eq(LhMouldChangePlan::getScheduleDate, docEntityVO.getScheduleDate());
+        queryWrapper.eq(LhMouldChangePlan::getPlanDate, docEntityVO.getPlanDate());
 
         if (lhMouldChangePlanMapper.selectCount(queryWrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
@@ -297,7 +297,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("factoryCode", "lhMachineCode", "scheduleDate");
+        return Arrays.asList("factoryCode", "lhMachineCode", "planDate");
     }
 
     /**

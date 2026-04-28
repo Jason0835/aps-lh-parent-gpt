@@ -144,6 +144,7 @@ public class CxStockServiceImpl extends AbstractDocService<CxStock> implements C
 
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public AjaxResult importData(List<CxStock> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;
@@ -155,7 +156,7 @@ public class CxStockServiceImpl extends AbstractDocService<CxStock> implements C
             int errorNum = i + 2;
             CxStock docEntity = list.get(i);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
-            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated);
+            ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated, this.getCheckUniqueFields().toArray(new String[0]));
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
                 docEntity.setId(-999L);
@@ -191,13 +192,20 @@ public class CxStockServiceImpl extends AbstractDocService<CxStock> implements C
                 successNum++;
             } else {
                 if (updateSupport) {
-                    QueryWrapper<CxStock> queryWrapper = new QueryWrapper<>();
-                    queryWrapper.eq("FACTORY_CODE", docEntity.getFactoryCode());
-                    queryWrapper.eq("STOCK_DATE", docEntity.getStockDate());
-                    queryWrapper.eq("EMBRYO_CODE", docEntity.getEmbryoCode());
-                    CxStock existEntity = cxStockMapper.selectOne(queryWrapper);
-                    if (existEntity != null) {
-                        docEntity.setId(existEntity.getId());
+                    LambdaQueryWrapper<CxStock> queryWrapper = new LambdaQueryWrapper<>();
+                    queryWrapper.eq(CxStock::getFactoryCode, docEntity.getFactoryCode());
+                    queryWrapper.eq(CxStock::getStockDate, docEntity.getStockDate());
+                    queryWrapper.eq(CxStock::getEmbryoCode, docEntity.getEmbryoCode());
+                    logger.info("updateSupport:{}", docEntity);
+                    List<CxStock> existList = cxStockMapper.selectList(queryWrapper);
+                    if (existList.size() > 1) {
+                        failureNum++;
+                        String multipleMsg = I18nUtil.getMessage("ui.data.alert.cxStock.multipleRecords");
+                        ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                                errorNum, String.format(multipleMsg, errorNum), importErrorLogs);
+                        continue;
+                    } else if (existList.size() == 1) {
+                        docEntity.setId(existList.get(0).getId());
                         importList.add(docEntity);
                         successNum++;
                     }

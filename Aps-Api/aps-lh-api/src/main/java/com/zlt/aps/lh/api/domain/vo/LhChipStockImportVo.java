@@ -1,0 +1,107 @@
+package com.zlt.aps.lh.api.domain.vo;
+
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import org.apache.ibatis.type.JdbcType;
+
+import java.util.Date;
+
+/**
+ * 芯片库存
+ *
+ * @author APS Team
+ * @date 2026-04-02
+ */
+@Data
+@EqualsAndHashCode(callSuper = false)
+@TableName("T_LH_CHIP_STOCK")
+@ApiModel(description = "芯片库存")
+public class LhChipStockImportVo extends BaseEntity {
+
+
+    /**
+     * 分公司
+     */
+    // @Excel(name = "ui.data.column.lhChipStock.companyCode")
+    @TableField(value = "COMPANY_CODE")
+    @ApiModelProperty(value = "分公司")
+    private String companyCode;
+
+    /**
+     * 工厂
+     */
+    @Excel(name = "ui.data.column.lhChipStock.factoryCode", dictType = "biz_factory_name")
+    @TableField(value = "FACTORY_CODE")
+    @ApiModelProperty(value = "工厂")
+    private String factoryCode;
+
+    /**
+     * 芯片编号 - 芯片的唯一标识
+     */
+    @Excel(name = "ui.data.column.lhChipStock.chipCode")
+    @TableField(value = "CHIP_CODE")
+    @ApiModelProperty(value = "芯片编号 - 芯片的唯一标识")
+    private String chipCode;
+
+    /**
+     * 库存量 - 芯片库存量
+     */
+    @Excel(name = "ui.data.column.lhChipStock.stockNum")
+    @TableField(value = "STOCK_NUM")
+    @ApiModelProperty(value = "库存量 - 芯片库存量")
+    private Integer stockNum;
+
+    /**
+     * 完成量
+     */
+    @Excel(name = "ui.data.column.lhChipStock.finishQty")
+    @TableField(value = "FINISH_QTY")
+    @ApiModelProperty(value = "完成量")
+    private Integer finishQty;
+
+    // ============== 非数据库字段 ==============
+    /**
+     * 剩余可用量 = 库存量 - 完成量 (虚字段，不保存数据库)
+     */
+    @TableField(exist = false)
+//    @Excel(name = "ui.data.column.lhChipStock.remainStockNum")
+    @ApiModelProperty(value = "剩余可用量 = 库存量 - 完成量")
+    private Integer remainStockNum;
+
+    /**
+     * 版本号
+     */
+//    @Excel(name = "ui.data.column.lhChipStock.dataVersion")
+    @TableField(value = "DATA_VERSION")
+    @ApiModelProperty(value = "版本号")
+    private String dataVersion;
+
+
+    /**
+     * 更新时间
+     */
+//    @Excel(name = "ui.data.column.lhChipStock.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE, jdbcType = JdbcType.TIMESTAMP)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @ApiModelProperty(value = "更新时间")
+    private Date updateTime;
+
+
+    /**
+     * 备注
+     */
+    @Excel(name = "ui.data.column.lhChipStock.remark")
+    @TableField(value = "REMARK")
+    @ApiModelProperty(value = "备注")
+    private String remark;
+
+
+}
