@@ -605,6 +605,9 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 if (CollectionUtils.isNotEmpty(stockList)) {
                     for (RawSpecialMaterialStock stock: stockList) {
                         Integer oriStandardlenLong = stock.getStandardLength();
+                        if (oriStandardlenLong == null) {
+                            continue;
+                        }
                         Integer batchNum = 0;
                         String itemStr = String.format(itemFormat, batchNum, oriStandardlenLong);
                         if (builder.length() > 0) {
