@@ -24,6 +24,7 @@ import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
@@ -45,7 +46,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -232,17 +232,22 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
             boolean isEnding = endingJudgmentStrategy.isEnding(context, sku);
 
-            // 创建排程结果（续作从班次1开始）
-            Date startTime = shifts.isEmpty() ? new Date() : shifts.get(0).getShiftStartDateTime();
+            // 滚动衔接时沿用机台继承后的可用时间，避免从重叠窗口首班重复起排。
+            Date startTime = resolveContinuousStartTime(context, machine, shifts);
             int machineMouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
             sku.setMouldQty(machineMouldQty);
-            LhScheduleResult result = buildScheduleResult(
-                    context, machine, sku, startTime, shifts, machineMouldQty, isEnding);
+            LhScheduleResult inheritedResult = findMergeableRollingInheritedResult(context, machineCode, sku.getMaterialCode());
+            LhScheduleResult result = inheritedResult != null
+                    ? appendScheduleToInheritedResult(context, inheritedResult, machine, sku,
+                    startTime, shifts, machineMouldQty, isEnding)
+                    : buildScheduleResult(context, machine, sku, startTime, null, shifts, machineMouldQty, isEnding);
             if (result != null) {
                 result.setScheduleType("01");
                 result.setIsEnd(isEnding ? "1" : "0");
-                context.getScheduleResultList().add(result);
-                registerMachineAssignment(context, machineCode, result);
+                if (inheritedResult == null) {
+                    context.getScheduleResultList().add(result);
+                    registerMachineAssignment(context, machineCode, result);
+                }
                 // 续作已完成当日排产，不应继续参与后续结构优先级判断。
                 context.removePendingSkuFromStructureMap(sku);
 
@@ -255,6 +260,129 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 }
             }
         }
+    }
+
+    /**
+     * 解析续作起排时间。
+     * <p>滚动衔接场景下从机台继承后的可用时间继续排；普通场景仍从窗口首班开始。</p>
+     */
+    private Date resolveContinuousStartTime(LhScheduleContext context,
+                                            MachineScheduleDTO machine,
+                                            List<LhShiftConfigVO> shifts) {
+        Date defaultStartTime = CollectionUtils.isEmpty(shifts) ? new Date() : shifts.get(0).getShiftStartDateTime();
+        if (context == null || !context.isRollingScheduleHandoff()) {
+            return defaultStartTime;
+        }
+        Date appendStartTime = resolveRollingAppendStartTime(context, shifts);
+        if (machine == null || machine.getEstimatedEndTime() == null) {
+            return appendStartTime != null ? appendStartTime : defaultStartTime;
+        }
+        if (appendStartTime == null || machine.getEstimatedEndTime().after(appendStartTime)) {
+            return machine.getEstimatedEndTime();
+        }
+        return appendStartTime;
+    }
+
+    /**
+     * 解析滚动排程的追加起点。
+     * <p>只允许续作从目标日第一班开始继续排，避免回写到重叠继承窗口。</p>
+     */
+    private Date resolveRollingAppendStartTime(LhScheduleContext context, List<LhShiftConfigVO> shifts) {
+        if (context == null
+                || context.getScheduleTargetDate() == null
+                || CollectionUtils.isEmpty(shifts)) {
+            return null;
+        }
+        Date targetDate = LhScheduleTimeUtil.clearTime(context.getScheduleTargetDate());
+        Date appendStartTime = null;
+        for (LhShiftConfigVO shift : shifts) {
+            if (shift == null
+                    || shift.getWorkDate() == null
+                    || shift.getShiftStartDateTime() == null) {
+                continue;
+            }
+            if (!targetDate.equals(LhScheduleTimeUtil.clearTime(shift.getWorkDate()))) {
+                continue;
+            }
+            if (appendStartTime == null || shift.getShiftStartDateTime().before(appendStartTime)) {
+                appendStartTime = shift.getShiftStartDateTime();
+            }
+        }
+        return appendStartTime;
+    }
+
+    /**
+     * 查找可并入的滚动继承续作结果。
+     *
+     * @param context 排程上下文
+     * @param machineCode 机台编号
+     * @param materialCode 物料编码
+     * @return 可并入结果；未命中返回 null
+     */
+    private LhScheduleResult findMergeableRollingInheritedResult(LhScheduleContext context,
+                                                                 String machineCode,
+                                                                 String materialCode) {
+        if (context == null
+                || StringUtils.isEmpty(machineCode)
+                || StringUtils.isEmpty(materialCode)
+                || CollectionUtils.isEmpty(context.getMachineAssignmentMap())) {
+            return null;
+        }
+        List<LhScheduleResult> assignedResults = context.getMachineAssignmentMap().get(machineCode);
+        if (CollectionUtils.isEmpty(assignedResults)) {
+            return null;
+        }
+        for (int i = assignedResults.size() - 1; i >= 0; i--) {
+            LhScheduleResult assignedResult = assignedResults.get(i);
+            if (assignedResult == null
+                    || !assignedResult.isRollingInherited()
+                    || !StringUtils.equals(CONTINUOUS_SCHEDULE_TYPE, assignedResult.getScheduleType())
+                    || !StringUtils.equals(materialCode, assignedResult.getMaterialCode())) {
+                continue;
+            }
+            return assignedResult;
+        }
+        return null;
+    }
+
+    /**
+     * 将滚动衔接后的续作剩余计划并入已继承结果。
+     *
+     * @param context 排程上下文
+     * @param inheritedResult 已继承结果
+     * @param machine 机台
+     * @param sku SKU
+     * @param startTime 起排时间
+     * @param shifts 班次列表
+     * @param machineMouldQty 机台模台数
+     * @param isEnding 是否收尾
+     * @return 合并后的继承结果
+     */
+    private LhScheduleResult appendScheduleToInheritedResult(LhScheduleContext context,
+                                                             LhScheduleResult inheritedResult,
+                                                             MachineScheduleDTO machine,
+                                                             SkuScheduleDTO sku,
+                                                             Date startTime,
+                                                             List<LhShiftConfigVO> shifts,
+                                                             int machineMouldQty,
+                                                             boolean isEnding) {
+        LhScheduleResult appendedResult = buildScheduleResult(
+                context, machine, sku, startTime, null, shifts, machineMouldQty, isEnding);
+        if (appendedResult == null
+                || appendedResult.getDailyPlanQty() == null
+                || appendedResult.getDailyPlanQty() <= 0) {
+            return null;
+        }
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            Integer shiftPlanQty = ShiftFieldUtil.getShiftPlanQty(appendedResult, shiftIndex);
+            if (shiftPlanQty == null || shiftPlanQty <= 0) {
+                continue;
+            }
+            ShiftFieldUtil.copyShiftPlanFields(appendedResult, shiftIndex, inheritedResult, shiftIndex);
+        }
+        inheritedResult.setIsEnd(isEnding ? "1" : "0");
+        refreshResultSummary(context, inheritedResult, shifts);
+        return inheritedResult;
     }
 
     @Override
@@ -618,28 +746,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 }
             }
         }
-        List<MachineCleaningWindowDTO> cleaningWindowList = resolveMachineCleaningWindowList(context, machineCode);
-        if (!CollectionUtils.isEmpty(cleaningWindowList)) {
-            for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
-                if (Objects.isNull(cleaningWindow)
-                        || Objects.isNull(cleaningWindow.getCleanStartTime())) {
-                    continue;
-                }
-                Date cleaningReadyTime = cleaningWindow.getReadyTime() != null
-                        ? cleaningWindow.getReadyTime() : cleaningWindow.getCleanEndTime();
-                if (Objects.isNull(cleaningReadyTime)
-                        || !cleaningWindow.getCleanStartTime().before(cleaningReadyTime)) {
-                    continue;
-                }
-                if (!candidateStartTime.before(cleaningReadyTime)
-                        || !cleaningWindow.getCleanStartTime().before(candidateEndTime)) {
-                    continue;
-                }
-                if (latestOverlapEndTime == null || cleaningReadyTime.after(latestOverlapEndTime)) {
-                    latestOverlapEndTime = cleaningReadyTime;
-                }
-            }
-        }
         return latestOverlapEndTime != null ? latestOverlapEndTime : candidateStartTime;
     }
 
@@ -659,8 +765,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         boolean isEnding = endingJudgmentStrategy.isEnding(context, sku);
         int machineMouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
         sku.setMouldQty(machineMouldQty);
+        Date switchStartTime = typeBlock ? resolveTypeBlockChangeStartTime(context, startTime) : null;
         LhScheduleResult result = buildScheduleResult(
-                context, machine, sku, startTime, shifts, machineMouldQty, isEnding);
+                context, machine, sku, startTime, switchStartTime, shifts, machineMouldQty, isEnding);
         if (result == null || result.getDailyPlanQty() == null || result.getDailyPlanQty() <= 0) {
             sku.setTargetScheduleQty(originalTargetScheduleQty);
             return false;
@@ -671,7 +778,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             result.setIsTypeBlock("1");
             result.setMouldCode(resolveMouldCode(context, sku.getMaterialCode(), machine.getCurrentMaterialCode()));
             // 换活字块虽然不是新增规格换模，但下游换模计划仍按真实切换开始时间生成。
-            result.setMouldChangeStartTime(resolveTypeBlockChangeStartTime(context, startTime));
+            result.setMouldChangeStartTime(switchStartTime);
         } else {
             result.setScheduleType("01");  // 续作保持不变
             result.setIsChangeMould("0");
@@ -1006,6 +1113,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                                                   MachineScheduleDTO machine,
                                                   SkuScheduleDTO sku,
                                                   Date startTime,
+                                                  Date switchStartTime,
                                                   List<LhShiftConfigVO> shifts,
                                                   int mouldQty,
                                                   boolean isEnding) {
@@ -1050,7 +1158,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         result.setOrderNo(orderNo);
 
         int refinedTargetQty = getTargetScheduleQtyResolver().refineTargetQtyByMachineCapacity(
-                context, sku, machine, startTime, shifts);
+                context, sku, machine, switchStartTime, startTime, shifts);
 
         // 按班次分配计划量
         int remaining = refinedTargetQty;
@@ -1166,9 +1274,11 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 return shiftEndTime;
             }
             long secondsNeeded = (long) Math.ceil((double) shiftPlanQty / mouldQty) * lhTimeSeconds;
+            List<MachineCleaningWindowDTO> cleaningWindowList = resolveEffectiveCleaningWindowList(
+                    context, result, resolveFirstPlannedShiftStartTime(result));
             Date shiftCompletionTime = ShiftCapacityResolverUtil.resolveCompletionTimeWithDowntimes(
                     context.getDevicePlanShutList(),
-                    resolveMachineCleaningWindowList(context, result.getLhMachineCode()),
+                    cleaningWindowList,
                     result.getLhMachineCode(),
                     shiftStartTime,
                     secondsNeeded);
@@ -1221,8 +1331,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         int shiftCapacity = result.getSingleMouldShiftQty() != null ? result.getSingleMouldShiftQty() : 0;
         int remaining = targetQty;
         Date cursorStartTime = resolveRedistributeStartTime(result, shifts);
-        List<MachineCleaningWindowDTO> cleaningWindowList = resolveMachineCleaningWindowList(
-                context, result.getLhMachineCode());
+        List<MachineCleaningWindowDTO> cleaningWindowList = resolveEffectiveCleaningWindowList(
+                context, result, resolveFirstPlannedShiftStartTime(result));
         int dryIceLossQty = context.getParamIntValue(
                 LhScheduleParamConstant.DRY_ICE_LOSS_QTY, LhScheduleConstant.DRY_ICE_LOSS_QTY);
         int dryIceDurationHours = context.getParamIntValue(
@@ -1781,6 +1891,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 result.getMouldQty() != null ? result.getMouldQty() : 0);
         if (lhTimeSeconds > 0 && mouldQty > 0) {
             Date actualCompletionTime = null;
+            List<MachineCleaningWindowDTO> cleaningWindowList = resolveEffectiveCleaningWindowList(
+                    context, result, resolveFirstPlannedShiftStartTime(result));
             for (int shiftIndex = 1; shiftIndex <= 8; shiftIndex++) {
                 Integer shiftPlanQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
                 Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
@@ -1791,7 +1903,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 long secondsNeeded = (long) Math.ceil((double) shiftPlanQty / mouldQty) * lhTimeSeconds;
                 Date shiftCompletionTime = ShiftCapacityResolverUtil.resolveCompletionTimeWithDowntimes(
                         context.getDevicePlanShutList(),
-                        resolveMachineCleaningWindowList(context, result.getLhMachineCode()),
+                        cleaningWindowList,
                         result.getLhMachineCode(),
                         shiftStartTime,
                         secondsNeeded);
@@ -1822,66 +1934,50 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (context == null || result == null || CollectionUtils.isEmpty(shifts)) {
             return;
         }
-        List<MachineCleaningWindowDTO> cleaningWindowList = resolveMachineCleaningWindowList(context, result.getLhMachineCode());
-        if (CollectionUtils.isEmpty(cleaningWindowList)) {
+        Date switchStartTime = result.getMouldChangeStartTime();
+        Date productionStartTime = resolveFirstPlannedShiftStartTime(result);
+        if (switchStartTime == null || productionStartTime == null) {
             return;
         }
-        for (LhShiftConfigVO shift : shifts) {
-            int shiftIndex = shift.getShiftIndex();
-            Integer shiftPlanQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
-            if (shiftPlanQty == null || shiftPlanQty <= 0) {
-                continue;
-            }
-            Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
-            if (shiftStartTime == null) {
-                continue;
-            }
-            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
-            if (shiftEndTime == null) {
-                shiftEndTime = shift.getShiftEndDateTime();
-            }
-            Date shiftActualEndTime = resolveShiftActualCompletionTime(context, result, shiftIndex, shiftStartTime, shiftEndTime);
-            if (shiftActualEndTime == null || !isShiftHitByCleaningWindow(shiftStartTime, shiftActualEndTime, cleaningWindowList)) {
-                continue;
-            }
-            ShiftFieldUtil.setShiftAnalysis(result, shiftIndex, TYPE_BLOCK_CLEANING_ANALYSIS);
+        List<MachineCleaningWindowDTO> cleaningWindowList = resolveMachineCleaningWindowList(context, result.getLhMachineCode());
+        if (!MachineCleaningOverlapUtil.hasOverlap(cleaningWindowList, switchStartTime, productionStartTime)) {
+            return;
+        }
+        int firstPlannedShiftIndex = resolveFirstPlannedShiftIndex(result);
+        if (firstPlannedShiftIndex > 0) {
+            ShiftFieldUtil.setShiftAnalysis(result, firstPlannedShiftIndex, TYPE_BLOCK_CLEANING_ANALYSIS);
         }
     }
 
     /**
-     * 推导班次内该条结果的真实生产结束时间。
+     * 获取首个有排产量的班次索引。
      *
-     * @param context 排程上下文
      * @param result 排程结果
-     * @param shiftIndex 班次索引
-     * @param shiftStartTime 班次生产开始时间
-     * @param defaultEndTime 默认结束时间
-     * @return 班次真实结束时间
+     * @return 班次索引；未找到返回 -1
      */
-    private Date resolveShiftActualCompletionTime(LhScheduleContext context,
-                                                  LhScheduleResult result,
-                                                  int shiftIndex,
-                                                  Date shiftStartTime,
-                                                  Date defaultEndTime) {
-        if (context == null || result == null || shiftStartTime == null) {
-            return defaultEndTime;
+    private int resolveFirstPlannedShiftIndex(LhScheduleResult result) {
+        if (result == null) {
+            return -1;
         }
-        Integer shiftPlanQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
-        int lhTimeSeconds = result.getLhTime() != null ? result.getLhTime() : 0;
-        int mouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(
-                result.getMouldQty() != null ? result.getMouldQty() : 0);
-        if (shiftPlanQty == null || shiftPlanQty <= 0 || lhTimeSeconds <= 0 || mouldQty <= 0) {
-            return defaultEndTime;
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            Integer shiftPlanQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+            if (shiftPlanQty != null && shiftPlanQty > 0) {
+                return shiftIndex;
+            }
         }
-        long secondsNeeded = (long) Math.ceil((double) shiftPlanQty / mouldQty) * lhTimeSeconds;
-        Date completionTime = ShiftCapacityResolverUtil.resolveCompletionTimeWithDowntimes(
-                context.getDevicePlanShutList(),
-                resolveMachineCleaningWindowList(context, result.getLhMachineCode()),
-                result.getLhMachineCode(),
-                shiftStartTime,
-                secondsNeeded);
-        return completionTime != null
-                ? constrainCompletionWithinShift(completionTime, defaultEndTime) : defaultEndTime;
+        return -1;
+    }
+
+    /**
+     * 获取首个有排产量班次的开始时间。
+     *
+     * @param result 排程结果
+     * @return 班次开始时间
+     */
+    private Date resolveFirstPlannedShiftStartTime(LhScheduleResult result) {
+        int firstPlannedShiftIndex = resolveFirstPlannedShiftIndex(result);
+        return firstPlannedShiftIndex > 0
+                ? ShiftFieldUtil.getShiftStartTime(result, firstPlannedShiftIndex) : null;
     }
 
     /**
@@ -1901,43 +1997,32 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         return completionTime.after(shiftEndTime) ? shiftEndTime : completionTime;
     }
 
-    /**
-     * 判断班次区间是否命中任一清洗窗口。
-     *
-     * @param shiftStartTime 班次开始时间
-     * @param shiftEndTime 班次结束时间
-     * @param cleaningWindowList 清洗窗口列表
-     * @return true-命中；false-未命中
-     */
-    private boolean isShiftHitByCleaningWindow(Date shiftStartTime, Date shiftEndTime,
-                                               List<MachineCleaningWindowDTO> cleaningWindowList) {
-        if (shiftStartTime == null || shiftEndTime == null || CollectionUtils.isEmpty(cleaningWindowList)) {
-            return false;
-        }
-        for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
-            if (cleaningWindow == null || cleaningWindow.getCleanStartTime() == null) {
-                continue;
-            }
-            Date cleanStartTime = cleaningWindow.getCleanStartTime();
-            Date cleanEndTime = cleaningWindow.getReadyTime() != null
-                    ? cleaningWindow.getReadyTime() : cleaningWindow.getCleanEndTime();
-            if (cleanEndTime == null) {
-                continue;
-            }
-            // 严格相交才算命中：仅端点相接不视为清洗影响该班次生产。
-            if (shiftStartTime.before(cleanEndTime) && shiftEndTime.after(cleanStartTime)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private List<MachineCleaningWindowDTO> resolveMachineCleaningWindowList(LhScheduleContext context, String machineCode) {
         MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
         if (machine == null || CollectionUtils.isEmpty(machine.getCleaningWindowList())) {
             return new ArrayList<>();
         }
         return machine.getCleaningWindowList();
+    }
+
+    /**
+     * 解析续作/换活字块结果在排产阶段需要生效的清洗窗口。
+     *
+     * @param context 排程上下文
+     * @param result 排程结果
+     * @param firstProductionStartTime 首个有排产量班次开始时间
+     * @return 有效清洗窗口列表
+     */
+    private List<MachineCleaningWindowDTO> resolveEffectiveCleaningWindowList(LhScheduleContext context,
+                                                                              LhScheduleResult result,
+                                                                              Date firstProductionStartTime) {
+        if (result == null) {
+            return new ArrayList<>(0);
+        }
+        List<MachineCleaningWindowDTO> cleaningWindowList = resolveMachineCleaningWindowList(
+                context, result.getLhMachineCode());
+        return new ArrayList<>(MachineCleaningOverlapUtil.excludeOverlapWindows(
+                cleaningWindowList, result.getMouldChangeStartTime(), firstProductionStartTime));
     }
 
     private String resolveMachineEmbryoCode(LhScheduleContext context, MachineScheduleDTO machine) {
