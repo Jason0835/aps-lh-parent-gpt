@@ -202,7 +202,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
      * 继承人工配置
      */
     @ApiOperation("继承人工配置")
-    @PostMapping("/demandPlan/extendsConfiguration")
+    @PostMapping("/extendsConfiguration")
     @RequiresPermissions("monthplan:demandPlan:extendsConfiguration")
     @ResponseBody
     public AjaxResult extendsConfiguration(@RequestBody  DpDemandPlan createCondition) {
