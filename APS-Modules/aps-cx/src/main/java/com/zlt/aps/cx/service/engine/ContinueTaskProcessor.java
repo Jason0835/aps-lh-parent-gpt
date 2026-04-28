@@ -123,6 +123,17 @@ public class ContinueTaskProcessor {
                     continue;
                 }
 
+                // 检查该机台是否支持当前结构+PRODUCTION_VERSION
+                List<MpCxCapacityConfiguration> availableForTask = getAvailableMachinesForStructure(
+                        matchedTask.getStructureName(), scheduleDate, context, matchedTask.getProductionVersion());
+                boolean machineAvailable = availableForTask.stream()
+                        .anyMatch(c -> machineCode.equals(c.getCxMachineCode()));
+                if (!machineAvailable) {
+                    log.info("机台 {} 不支持结构 {} 的生产版本 {}，跳过保底预留胎胚 {}",
+                            machineCode, matchedTask.getStructureName(), matchedTask.getProductionVersion(), embryoCode);
+                    continue;
+                }
+
                 int demand = matchedTask.getVulcanizeMachineCount() != null ? matchedTask.getVulcanizeMachineCount() : 0;
 
                 // 保底预留1个硫化机

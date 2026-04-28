@@ -10,6 +10,7 @@ import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.lh.api.domain.entity.LhChipStock;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.lh.api.domain.vo.LhChipStockImportVo;
 import com.zlt.aps.lh.api.service.ILhChipStockRemoteService;
 import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -161,7 +162,7 @@ public class LhChipStockUIController extends BaseUIController<LhChipStock> {
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<LhChipStock> util = new ExcelUtil<>(LhChipStock.class);
+        ExcelUtil<LhChipStockImportVo> util = new ExcelUtil<>(LhChipStockImportVo.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }

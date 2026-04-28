@@ -20,9 +20,7 @@ public class ParamConfigValidationStrategy extends BaseValidationStrategy {
 
     /** 关键参数编码列表（必须存在） */
     private static final Set<String> REQUIRED_PARAM_CODES = new HashSet<>(Arrays.asList(
-            "LOSS_RATE",              // 损耗率
-            "MAX_TYPES_PER_MACHINE",  // 机台种类上限
-            "DEFAULT_TRIP_CAPACITY"   // 默认整车容量
+            "LOSS_RATE"             // 损耗率
     ));
 
     /** 关键参数默认值映射 */
@@ -33,12 +31,8 @@ public class ParamConfigValidationStrategy extends BaseValidationStrategy {
 
     static {
         PARAM_DEFAULTS.put("LOSS_RATE", "0.02");
-        PARAM_DEFAULTS.put("MAX_TYPES_PER_MACHINE", "4");
-        
-        
+
         PARAM_DESCRIPTIONS.put("LOSS_RATE", "损耗率，用于计算实际产能");
-        PARAM_DESCRIPTIONS.put("MAX_TYPES_PER_MACHINE", "单个机台最多生产的物料种类数");
-       
     }
 
     @Override
