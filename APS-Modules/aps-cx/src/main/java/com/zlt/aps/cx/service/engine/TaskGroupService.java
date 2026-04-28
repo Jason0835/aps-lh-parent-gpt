@@ -989,8 +989,10 @@ public class TaskGroupService {
 
         // Step 1: 与库存对冲，计算净需求
         int netDemand = Math.max(0, vulcanizeDemand - currentStock);
+        boolean isTrialLikeTask = Boolean.TRUE.equals(task.getIsTrialTask())
+                || Boolean.TRUE.equals(task.getIsProductionTrial());
 
-        if (netDemand == 0) {
+        if (netDemand == 0 && !isTrialLikeTask) {
             int endingFallbackProduction = calculateEndingFallbackProduction(task, context);
             if (endingFallbackProduction > 0) {
                 int tripCapacity = getTripCapacity(task.getStructureName(), context);
@@ -1006,8 +1008,8 @@ public class TaskGroupService {
 
         // Step 2: 乘以(1 + 损耗率)，但试制任务不考虑损耗率
         int requiredProductionValue;
-        if (Boolean.TRUE.equals(task.getIsTrialTask()) || Boolean.TRUE.equals(task.getIsProductionTrial())) {
-            // 试制任务不计算损耗率
+        if (isTrialLikeTask) {
+            // 试制量试任务不计算损耗率
             requiredProductionValue = netDemand;
         } else {
             BigDecimal lossRate = context.getLossRate() != null ? context.getLossRate() : BigDecimal.ZERO;
@@ -1022,8 +1024,8 @@ public class TaskGroupService {
         int tripCapacity = getTripCapacity(task.getStructureName(), context);
         int plannedProduction;
         int requiredCars;
-        if (Boolean.TRUE.equals(task.getIsTrialTask()) || Boolean.TRUE.equals(task.getIsProductionTrial())) {
-            // 试制任务：不补整车，使用实际需求量
+        if (isTrialLikeTask) {
+            // 试制量试任务：不补整车，使用实际需求量
             plannedProduction = requiredProductionValue;
             requiredCars = tripCapacity > 0 ? requiredProductionValue / tripCapacity : 0;
         } else {
