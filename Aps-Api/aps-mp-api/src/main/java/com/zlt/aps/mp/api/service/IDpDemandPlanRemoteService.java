@@ -89,4 +89,11 @@ public interface IDpDemandPlanRemoteService {
     @ApiOperation("生成需求计划")
     @PostMapping("/demandPlan/createMonthRequireVersion")
     AjaxResult createMonthRequireVersion();
+    
+    /**
+     * 继承人工配置
+     */
+    @ApiOperation("继承人工配置")
+    @PostMapping("/demandPlan/extendsConfiguration")
+    AjaxResult extendsConfiguration(@RequestBody  DpDemandPlan createCondition);
 }

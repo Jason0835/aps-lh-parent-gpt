@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.demand.service;
 
 
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.common.utils.PredictionContext;
@@ -66,5 +67,12 @@ public interface IDpDemandPlanService extends IDocService<DpDemandPlan> {
      * @return
      */
     List<DpDemandPlan> createInitPredictionRequire(DpDemandPlan param, MpFactoryProductionVersion finalVersion, PredictionContext predictionContext);
+    
+    /**
+     * 继承人工配置
+     * @param extendsDemandPlan
+     * @return
+     */
+    AjaxResult extendsConfiguration(DpDemandPlan extendsDemandPlan);
 }
 
