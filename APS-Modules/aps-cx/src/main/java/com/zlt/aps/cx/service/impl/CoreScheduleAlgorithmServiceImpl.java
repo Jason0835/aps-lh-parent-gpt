@@ -139,6 +139,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         int shiftIndex = 0;
         int totalShifts = sortedShiftConfigs.size();
         for (CxShiftConfig shiftConfig : sortedShiftConfigs) {
+            shiftIndex++;
             int day = shiftConfig.getScheduleDay();
             LocalDate currentScheduleDate = context.getScheduleDate()
                     .minusDays(SCHEDULE_START_OFFSET_DAYS).plusDays(day - 1);
@@ -157,7 +158,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 continue;
             }
 
-            shiftIndex++;
             // 获取历史胎胚数量用于日志
             int historyCount = machineOnlineEmbryoMap != null ? machineOnlineEmbryoMap.values().stream().mapToInt(Collection::size).sum() : 0;
             log.info("【班次开始】#{}/{} | 日期:{} | 班次:{} | 历史胎胚数量:{}",
