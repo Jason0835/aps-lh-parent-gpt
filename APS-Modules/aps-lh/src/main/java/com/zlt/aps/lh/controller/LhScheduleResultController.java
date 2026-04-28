@@ -327,7 +327,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * 定位收尾班次：逐班扣减基准量，基准量耗尽的班次即为收尾班
      *
      * @param result       排程结果
-     * @param referenceQty 基准量（硫化余量与胎胚库存的较大值）
+     * @param surplusQty 基准量（硫化余量与胎胚库存的较大值）
      * @return 收尾班次索引（1~8），无收尾返回8
      */
     private int resolveEndingShift(LhScheduleResult result, int surplusQty) {
