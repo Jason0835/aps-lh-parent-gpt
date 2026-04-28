@@ -27,7 +27,8 @@ public interface IFactoryMonthPlanMouldDayResultService extends IDocService<Fact
      * @param isAllMaterial
      * @return
      */
-    List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult, boolean isAllMaterial);
+    List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult,
+                                                               boolean isAllMaterial, boolean isFinal);
 
     /**
      * 导出数据

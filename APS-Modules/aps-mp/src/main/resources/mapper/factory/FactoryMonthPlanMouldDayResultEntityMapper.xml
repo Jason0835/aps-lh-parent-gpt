@@ -93,7 +93,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             AND m.FACTORY_CODE = i.FACTORY_CODE 
 		    AND i.PRODUCTION_VERSION = #{dayResult.productionVersion}
             AND i.IS_DELETE = 0 
-		    LEFT JOIN T_MP_MOULDING_DAY_RESULT r ON m.MATERIAL_CODE = r.MATERIAL_CODE 
+        <choose>
+	        <when test="isFinal">
+            LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL r ON m.MATERIAL_CODE = r.MATERIAL_CODE
+	        </when>
+	        <otherwise>
+            LEFT JOIN T_MP_MOULDING_DAY_RESULT r ON m.MATERIAL_CODE = r.MATERIAL_CODE
+            </otherwise>
+        </choose>
 		    AND m.FACTORY_CODE = r.FACTORY_CODE 
 		    AND r.production_version = #{dayResult.productionVersion}
 		    AND r.IS_DELETE = 0 
