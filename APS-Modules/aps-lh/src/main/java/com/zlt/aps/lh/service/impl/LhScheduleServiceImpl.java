@@ -5,7 +5,6 @@ import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -240,9 +239,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 检查所有记录是否已发布
         LhScheduleResult record = scheduleResultMapper.selectById(dto.getId());
-        if (ApsConstant.APS_STRING_1.equals(record.getIsRelease())) {
-            return AjaxResult.error("已发布的排程记录不允许转机台");
-        }
 
         // 更新机台信息
         String oldMachine = record.getLhMachineCode();
