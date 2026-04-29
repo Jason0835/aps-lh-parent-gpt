@@ -510,6 +510,36 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         if (vo.getClass7PlanQty() != null) record.setClass7PlanQty(vo.getClass7PlanQty());
         if (vo.getClass8PlanQty() != null) record.setClass8PlanQty(vo.getClass8PlanQty());
 
+        // 更新示方书类型
+        if (vo.getClass1RecipeType() != null) record.setClass1RecipeType(vo.getClass1RecipeType());
+        if (vo.getClass2RecipeType() != null) record.setClass2RecipeType(vo.getClass2RecipeType());
+        if (vo.getClass3RecipeType() != null) record.setClass3RecipeType(vo.getClass3RecipeType());
+        if (vo.getClass4RecipeType() != null) record.setClass4RecipeType(vo.getClass4RecipeType());
+        if (vo.getClass5RecipeType() != null) record.setClass5RecipeType(vo.getClass5RecipeType());
+        if (vo.getClass6RecipeType() != null) record.setClass6RecipeType(vo.getClass6RecipeType());
+        if (vo.getClass7RecipeType() != null) record.setClass7RecipeType(vo.getClass7RecipeType());
+        if (vo.getClass8RecipeType() != null) record.setClass8RecipeType(vo.getClass8RecipeType());
+
+        // 更新示方书编号
+        if (vo.getClass1RecipeNo() != null) record.setClass1RecipeNo(vo.getClass1RecipeNo());
+        if (vo.getClass2RecipeNo() != null) record.setClass2RecipeNo(vo.getClass2RecipeNo());
+        if (vo.getClass3RecipeNo() != null) record.setClass3RecipeNo(vo.getClass3RecipeNo());
+        if (vo.getClass4RecipeNo() != null) record.setClass4RecipeNo(vo.getClass4RecipeNo());
+        if (vo.getClass5RecipeNo() != null) record.setClass5RecipeNo(vo.getClass5RecipeNo());
+        if (vo.getClass6RecipeNo() != null) record.setClass6RecipeNo(vo.getClass6RecipeNo());
+        if (vo.getClass7RecipeNo() != null) record.setClass7RecipeNo(vo.getClass7RecipeNo());
+        if (vo.getClass8RecipeNo() != null) record.setClass8RecipeNo(vo.getClass8RecipeNo());
+
+        // 更新原因分析手工输入
+        if (vo.getClass1AnalysisInput() != null) record.setClass1AnalysisInput(vo.getClass1AnalysisInput());
+        if (vo.getClass2AnalysisInput() != null) record.setClass2AnalysisInput(vo.getClass2AnalysisInput());
+        if (vo.getClass3AnalysisInput() != null) record.setClass3AnalysisInput(vo.getClass3AnalysisInput());
+        if (vo.getClass4AnalysisInput() != null) record.setClass4AnalysisInput(vo.getClass4AnalysisInput());
+        if (vo.getClass5AnalysisInput() != null) record.setClass5AnalysisInput(vo.getClass5AnalysisInput());
+        if (vo.getClass6AnalysisInput() != null) record.setClass6AnalysisInput(vo.getClass6AnalysisInput());
+        if (vo.getClass7AnalysisInput() != null) record.setClass7AnalysisInput(vo.getClass7AnalysisInput());
+        if (vo.getClass8AnalysisInput() != null) record.setClass8AnalysisInput(vo.getClass8AnalysisInput());
+
         // 调整为待发布状态
         record.setIsRelease("0");
 

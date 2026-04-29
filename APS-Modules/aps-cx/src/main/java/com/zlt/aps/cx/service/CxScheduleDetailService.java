@@ -1,8 +1,11 @@
 package com.zlt.aps.cx.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.vo.CxScheduleDetailVo;
+import com.zlt.aps.cx.vo.ScheduleDetailQueryVo;
+import com.zlt.aps.cx.vo.ScheduleUpdateDetailPlanQtyVo;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -21,6 +24,14 @@ public interface CxScheduleDetailService extends IService<CxScheduleDetail> {
      * @return 明细列表（包含主表关联信息）
      */
     List<CxScheduleDetailVo> listVoByMainId(Long mainId);
+
+    /**
+     * 根据主表字段组合查询明细列表（带主表信息）
+     *
+     * @param query 查询条件
+     * @return 明细列表（包含主表关联信息）
+     */
+    List<CxScheduleDetailVo> listVoByQuery(ScheduleDetailQueryVo query);
 
     /**
      * 根据机台和日期查询明细（带主表信息）
@@ -119,4 +130,13 @@ public interface CxScheduleDetailService extends IService<CxScheduleDetail> {
      * @return 车次号
      */
     Integer getNextTripNo(Long mainId, String shiftCode);
+
+    /**
+     * 修改明细1-8班计划量，同步更新主表
+     * 校验逻辑同 adjustQty：历史班次不可修改、修改后不能低于已完成量
+     *
+     * @param vo 修改请求
+     * @return 是否成功
+     */
+    AjaxResult updatePlanQty(ScheduleUpdateDetailPlanQtyVo vo);
 }
