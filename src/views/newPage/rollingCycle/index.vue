@@ -1324,7 +1324,11 @@ export default {
             row.version === item.version
         );
         if (sourceItem && sourceItem.productTypeCode) {
-          return { ...item, productTypeCode: sourceItem.productTypeCode };
+          return { 
+            ...item, 
+            productTypeCode: sourceItem.productTypeCode,
+            dayVulcanizationQty: sourceItem.dayVulcanizationQty
+          };
         }
         return item;
       });
