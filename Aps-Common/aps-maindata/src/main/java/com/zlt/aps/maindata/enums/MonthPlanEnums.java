@@ -276,7 +276,11 @@ public enum MonthPlanEnums {
     /**
      * SYS0209009 结构实单最低硫化机台数可连续排产天数，超出则强制收尾
      */
-    MIN_LH_MACHINE_CONTINUE_DAYS("SYS0209009","结构实单最低硫化机台数可连续排产天数，超出则强制收尾");
+    MIN_LH_MACHINE_CONTINUE_DAYS("SYS0209009","结构实单最低硫化机台数可连续排产天数，超出则强制收尾"),
+    /**
+     * SYS0209010 月计划排产模式 1 交付优先 非1则为效率优先
+     */
+    PRODUCTION_MODE("SYS0209010","月计划排产模式 1 交付优先 非1则为效率优先");
 
     private final String code;
     private final String name;

@@ -83,8 +83,14 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      * 初始备份--后续重排使用
      */
     private CxMachineAllocationPlanHelper cloneObject;
-    //拼接字符
+    /**
+     * 拼接字符
+     */
     private static final String TIME_EXTENSION_KEY_FORMAT = "%s|@|%s|@|%s";
+    /**
+     * 分组切换日限制时，前分组需要延长到的排产日
+     */
+    private Integer timeExtensionDay;
 
     /**
      * 构造函数
@@ -257,6 +263,18 @@ public class CxMachineAllocationPlanHelper implements Serializable {
             realConclusionDay = realConclusionDay - BigDecimal.ONE.intValue();
         }
         return realConclusionDay;
+    }
+
+    /**
+     * 因分组切换日限制，导致前分组需要延长收尾的日
+     *
+     * @param timeExtensionDay
+     */
+    public void setTimeExtensionDayByChangeLimit(Integer timeExtensionDay) {
+        if (null == timeExtensionDay) {
+            return;
+        }
+        this.timeExtensionDay = timeExtensionDay;
     }
 
     /**

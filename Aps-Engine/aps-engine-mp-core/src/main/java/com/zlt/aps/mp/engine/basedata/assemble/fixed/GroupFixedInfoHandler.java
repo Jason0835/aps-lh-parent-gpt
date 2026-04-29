@@ -36,11 +36,17 @@ public class GroupFixedInfoHandler {
         }
         List<CxMachineBaseInfoVo> allCxMachineInfo = allCxMachineInfoMap.values().stream().collect(Collectors.toList());
         allGroupInfoMap.forEach((structName, groupInfo) -> {
+            //分组能排产的机台配置：固定1~固定4都算
             List<CxMachineBaseInfoVo> hasFixedList = allCxMachineInfo.stream().filter(singleMachineInfo -> singleMachineInfo.hasFixedMachine(groupInfo)).collect(Collectors.toList());
-            if (CollectionUtils.isEmpty(hasFixedList)) {
+            if (!CollectionUtils.isEmpty(hasFixedList)) {
+                groupInfo.setFixedCxMachineSet(hasFixedList.stream().map(CxMachineBaseInfoVo::getCxMachineCode).collect(Collectors.toSet()));
+            }
+            //20260427+ 因成型固定机台定义变化：固定1~固定3为选择机台的优先级；固定4位为分组能排产的机台配置
+            List<CxMachineBaseInfoVo> hasPriorityFixedList = allCxMachineInfo.stream().filter(singleMachieInfo -> singleMachieInfo.hasPriorityFixedMachine(groupInfo)).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(hasPriorityFixedList)) {
                 return;
             }
-            groupInfo.setFixedCxMachineSet(hasFixedList.stream().map(CxMachineBaseInfoVo::getCxMachineCode).collect(Collectors.toSet()));
+            groupInfo.setPriorityFixedCxMachineSet(hasPriorityFixedList.stream().map(CxMachineBaseInfoVo::getCxMachineCode).collect(Collectors.toSet()));
         });
     }
 

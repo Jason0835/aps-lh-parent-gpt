@@ -421,6 +421,30 @@ public class BaseDataContainer implements Serializable {
     }
 
     /**
+     * 清空鼓工装的使用信息
+     * 包含当前三种工装
+     * 成型鼓、胎体鼓、带束层鼓
+     */
+    public void clearTireDrumUsedInfo() {
+        if (CollectionUtils.isEmpty(tireDrumInfoMap)) {
+            return;
+        }
+        //各种鼓类型：三类 成型鼓、胎体鼓、带束层鼓
+        tireDrumInfoMap.forEach((workWeakType, limitGroupMap) -> {
+            if (CollectionUtils.isEmpty(limitGroupMap)) {
+                return;
+            }
+            //某个类型鼓的使用信息
+            limitGroupMap.forEach((groupId, tireDrumInfo) -> {
+                if (null == tireDrumInfo) {
+                    return;
+                }
+                tireDrumInfo.clearUsedInfo();
+            });
+        });
+    }
+
+    /**
      * 按groupName增加在productionDay日的成型工装使用量
      * 因当前TBR都是三股机台，故而工装类型全部+1
      *

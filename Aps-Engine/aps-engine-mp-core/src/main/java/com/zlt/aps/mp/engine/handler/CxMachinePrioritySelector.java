@@ -153,6 +153,19 @@ public class CxMachinePrioritySelector {
     }
 
     /**
+     * 设置同规格、同英寸，断面宽等信息
+     *
+     * @param context            排产上下文
+     * @param fixedPriorityList  机台集合
+     * @param needProductionPlan 需排产的分组计划
+     */
+    public void setSameInfo(Context context, List<CxMachineBaseInfoVo> fixedPriorityList, ProductionPlanGroupInfo needProductionPlan) {
+        //4、断面宽差值±10 断面宽差值范围参数
+        Integer diffValue = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
+        //设置是否同规格，同英寸,断面宽
+        fixedPriorityList.forEach(cxMachineInfo -> cxMachineInfo.setSameInfoByCurrentGroupPlan(context, needProductionPlan, diffValue));
+    }
+    /**
      * 在产机台是否有排产含有特殊原材料的分组计划
      * 只有有一台排过 = true，所有没排则 = false
      *
@@ -189,20 +202,6 @@ public class CxMachinePrioritySelector {
     private Boolean hasSpecialStructure(CxMachineBaseInfoVo machine) {
         return machine.getAllocationList().stream()
                 .anyMatch(allocation -> allocation.getProductionPlanInfo().isSpecialMaterial());
-    }
-
-    /**
-     * 设置同规格、同英寸，断面宽等信息
-     *
-     * @param context            排产上下文
-     * @param fixedPriorityList  机台集合
-     * @param needProductionPlan 需排产的分组计划
-     */
-    private void setSameInfo(Context context, List<CxMachineBaseInfoVo> fixedPriorityList, ProductionPlanGroupInfo needProductionPlan) {
-        //4、断面宽差值±10 断面宽差值范围参数
-        Integer diffValue = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getSectionWidthDiffValue();
-        //设置是否同规格，同英寸,断面宽
-        fixedPriorityList.forEach(cxMachineInfo -> cxMachineInfo.setSameInfoByCurrentGroupPlan(context, needProductionPlan, diffValue));
     }
 
 }

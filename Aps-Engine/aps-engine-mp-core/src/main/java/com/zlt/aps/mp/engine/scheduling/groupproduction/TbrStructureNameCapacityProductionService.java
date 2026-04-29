@@ -132,6 +132,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         continueGroupInfoHandler.buildContinueGroupInfo(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
         //6、对续作结构进行在产成型机台分配(测算在产成型机台的收尾点以及可能月初释放的机台)-并记录在机结构的收尾点机台信息
         List<CxMachineAllocationPlanHelper> continueAllocationList = productionCxMachineCalculationHandler.allocationContinueAndProductionContinue(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap);
+        backupGroupAllocationInfoByCalculationStage(productionContext);
         KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, estimateGroupCxAllocationMap, cxContinueInfoMap, continueAllocationList);
         // 7、详设:
         //      （5）特别场景：在排产时，我们的原则是续作优先，若共用模具情况下，续作高优先级的已没有，
