@@ -502,6 +502,33 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
      * 复制主表字段到VO
      */
     private void copyMainFieldsToVo(CxScheduleResult main, CxScheduleDetailVo vo) {
+        vo.setClass1RecipeType(main.getClass1RecipeType());
+        vo.setClass2RecipeType(main.getClass2RecipeType());
+        vo.setClass3RecipeType(main.getClass3RecipeType());
+        vo.setClass4RecipeType(main.getClass4RecipeType());
+        vo.setClass5RecipeType(main.getClass5RecipeType());
+        vo.setClass6RecipeType(main.getClass6RecipeType());
+        vo.setClass7RecipeType(main.getClass7RecipeType());
+        vo.setClass8RecipeType(main.getClass8RecipeType());
+
+        vo.setClass1RecipeNo(main.getClass1RecipeNo());
+        vo.setClass2RecipeNo(main.getClass2RecipeNo());
+        vo.setClass3RecipeNo(main.getClass3RecipeNo());
+        vo.setClass4RecipeNo(main.getClass4RecipeNo());
+        vo.setClass5RecipeNo(main.getClass5RecipeNo());
+        vo.setClass6RecipeNo(main.getClass6RecipeNo());
+        vo.setClass7RecipeNo(main.getClass7RecipeNo());
+        vo.setClass8RecipeNo(main.getClass8RecipeNo());
+
+        vo.setClass1AnalysisInput(main.getClass1AnalysisInput());
+        vo.setClass2AnalysisInput(main.getClass2AnalysisInput());
+        vo.setClass3AnalysisInput(main.getClass3AnalysisInput());
+        vo.setClass4AnalysisInput(main.getClass4AnalysisInput());
+        vo.setClass5AnalysisInput(main.getClass5AnalysisInput());
+        vo.setClass6AnalysisInput(main.getClass6AnalysisInput());
+        vo.setClass7AnalysisInput(main.getClass7AnalysisInput());
+        vo.setClass8AnalysisInput(main.getClass8AnalysisInput());
+
         vo.setCxMachineCode(main.getCxMachineCode());
         vo.setCxMachineName(main.getCxMachineName());
         vo.setCxMachineType(main.getCxMachineType());

@@ -7,6 +7,7 @@ import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
+import com.zlt.aps.cx.service.engine.CoreScheduleAlgorithmService;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,13 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 任务分组服务 — 成型排程 S5.2 阶段
@@ -211,18 +218,42 @@ public class TaskGroupService {
 
         // 获取当前班次的排量（每个班次只处理自己班次有排量的任务）
         final int currentClassIndex = getCurrentClassIndex(dayShifts);
-        
+
         // 直接遍历每条硫化记录，为每条记录创建独立的任务
         int skippedNullEmbryo = 0;
         int skippedNullTask = 0;
         int skippedVulcanizeSurplusZero = 0;  // 硫化余量<=0跳过的任务数
         int skippedFormingRemainderZero = 0;  // 成型余量<=0跳过的任务数
-        
+
         // 跟踪每个物料已使用的成型余量（用于多任务共享同一物料的场景）
         Map<String, Integer> materialUsedFormingRemainder = new HashMap<>();
         // 跟踪每个物料已处理的任务列表（用于回溯更新 isLastEndingBatch）
         Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> materialTasksMap = new HashMap<>();
-        
+
+        // 预计算：哪些结构的全部胎胚都是关键产品（开产班次时不进行过滤，否则整个结构无任务可排）
+        Set<String> allKeyProductStructures = new HashSet<>();
+        if (isOpeningShift && context.getKeyProductCodes() != null && !context.getKeyProductCodes().isEmpty()) {
+            Map<String, Set<String>> structureEmbryoMap = new HashMap<>();
+            for (LhScheduleResult lh : lhScheduleResults) {
+                if (lh.getEmbryoCode() != null && lh.getStructureName() != null) {
+                    structureEmbryoMap.computeIfAbsent(lh.getStructureName(), k -> new HashSet<>()).add(lh.getEmbryoCode());
+                }
+            }
+            for (Map.Entry<String, Set<String>> entry : structureEmbryoMap.entrySet()) {
+                boolean allKey = true;
+                for (String ec : entry.getValue()) {
+                    if (!context.getKeyProductCodes().contains(ec)) {
+                        allKey = false;
+                        break;
+                    }
+                }
+                if (allKey) {
+                    allKeyProductStructures.add(entry.getKey());
+                    log.info("开产班次: 结构 {} 全部为关键产品，跳过关键产品过滤", entry.getKey());
+                }
+            }
+        }
+
         for (LhScheduleResult lhResult : lhScheduleResults) {
             if (lhResult.getEmbryoCode() == null) {
                 skippedNullEmbryo++;
@@ -230,7 +261,7 @@ public class TaskGroupService {
             }
 
             log.info("========== 处理任务: 胎胚={}, 物料={} ==========", lhResult.getEmbryoCode(), lhResult.getMaterialCode());
-            
+
             // 检查1：硫化余量 <= 0，说明该物料已超产，不再需要生产
             String materialCode = lhResult.getMaterialCode();
             if (context.getMonthSurplusMap() != null && materialCode != null) {
@@ -261,9 +292,11 @@ public class TaskGroupService {
             }
 
             // 开产班次提前过滤关键产品（不在分组中保留，直接在循环中跳过）
+            // 但如果该结构全部为关键产品，则不进行过滤（避免整个结构无任务可排）
             if (isOpeningShift && context.getKeyProductCodes() != null
                     && lhResult.getEmbryoCode() != null
-                    && context.getKeyProductCodes().contains(lhResult.getEmbryoCode())) {
+                    && context.getKeyProductCodes().contains(lhResult.getEmbryoCode())
+                    && !allKeyProductStructures.contains(lhResult.getStructureName())) {
                 log.info("开产班次关键产品跳过: 胎胚={}", lhResult.getEmbryoCode());
                 continue;
             }
@@ -322,7 +355,7 @@ public class TaskGroupService {
             calculatePlannedProduction(task, context, scheduleDate);
             // S5.2.6 收尾余量处理
             handleEndingRemainder(task, context);
-            
+
             // S5.2.6.1 收尾余量处理后再次检查：如果 handleEndingRemainder 标记了 isLastEndingBatch，需要回溯更新
             if (Boolean.TRUE.equals(task.getIsLastEndingBatch())) {
                 List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(materialCode);
@@ -372,13 +405,13 @@ public class TaskGroupService {
                             tripCap, task.getPlannedProduction(), task.getRequiredCars(), task.getEndingExtraInventory());
                 }
             }
-            
+
             // 更新已使用的成型余量（累加当前任务的 endingExtraInventory）
             if (task.getEndingExtraInventory() != null && task.getEndingExtraInventory() > 0) {
                 materialUsedFormingRemainder.merge(materialCode, task.getEndingExtraInventory(), Integer::sum);
                 log.debug("物料 {} 已使用成型余量累计: {}", materialCode, materialUsedFormingRemainder.get(materialCode));
             }
-            
+
             // S5.2.7 停产特殊处理
             handleOpeningClosingDay(task, context, dayShifts);
             // S5.2.8 试制任务：产量必须是双数，不补整车
@@ -449,7 +482,7 @@ public class TaskGroupService {
         Integer remainingFormingRemainder = null;
         if (totalFormingRemainder != null) {
             remainingFormingRemainder = Math.max(0, totalFormingRemainder - usedRemainder);
-            log.debug("物料 {} 总成型余量={}, 已使用={}, 剩余={}", 
+            log.debug("物料 {} 总成型余量={}, 已使用={}, 剩余={}",
                     materialCode, totalFormingRemainder, usedRemainder, remainingFormingRemainder);
         }
 
@@ -635,7 +668,7 @@ public class TaskGroupService {
      * @return 续作机台编码列表
      */
     private List<String> findContinueMachines(String materialCode, String embryoCode,
-                                               Map<String, Set<String>> machineOnlineEmbryoMap) {
+                                              Map<String, Set<String>> machineOnlineEmbryoMap) {
         List<String> machineCodes = new ArrayList<>();
         String combinedKey = embryoCode;
         for (Map.Entry<String, Set<String>> entry : machineOnlineEmbryoMap.entrySet()) {
@@ -685,13 +718,13 @@ public class TaskGroupService {
         // 重要：优先使用 lhResult 中的 materialCode，因为同一个 embryoCode 可能对应多个不同的物料
         String materialCodeFromLh = lhResult.getMaterialCode();
         MdmMaterialInfo material = materialMap.get(embryoCode);
-        
+
         // 如果 lhResult 中有 materialCode，优先使用；否则从 materialMap 中获取
         String finalMaterialCode = materialCodeFromLh;
         String materialDesc = null;
         String mainMaterialDesc = null;
         String structureNameFromMaterial = null;
-        
+
         if (finalMaterialCode == null && material != null) {
             // lhResult 中没有 materialCode，从 materialMap 中获取
             finalMaterialCode = material.getMaterialCode();
@@ -704,7 +737,7 @@ public class TaskGroupService {
             mainMaterialDesc = material.getEmbryoDesc();
             structureNameFromMaterial = material.getStructureName();
         }
-        
+
         String structureName = structureNameFromMaterial != null ? structureNameFromMaterial : lhResult.getStructureName();
 
         // 构建任务
@@ -715,19 +748,19 @@ public class TaskGroupService {
         task.setCurrentStock(currentStock);
         task.setProductionVersion(lhResult.getProductionVersion());
         task.setMaterialCode(finalMaterialCode);  // 直接使用 lhResult 或 materialMap 中的 materialCode
-        
+
         if (materialDesc != null) {
             task.setMaterialDesc(materialDesc);
         } else {
             task.setMaterialDesc(finalMaterialCode != null ? finalMaterialCode : embryoCode);
         }
-        
+
         if (mainMaterialDesc != null) {
             task.setMainMaterialDesc(mainMaterialDesc);
         } else {
             task.setMainMaterialDesc(embryoCode);
         }
-        
+
         task.setStructureName(structureName);
 
         task.setDemandQuantity(vulcanizeDemand);
@@ -974,8 +1007,8 @@ public class TaskGroupService {
      * @param scheduleDate 排程日期
      */
     private void calculatePlannedProduction(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                             ScheduleContextVo context,
-                                             LocalDate scheduleDate) {
+                                            ScheduleContextVo context,
+                                            LocalDate scheduleDate) {
         // 停产日：当天产量设为0
         if (scheduleDayTypeHelper.isStopDay(scheduleDate, context.getFactoryCode())) {
             task.setPlannedProduction(0);
@@ -1079,7 +1112,7 @@ public class TaskGroupService {
      * @param context 排程上下文
      */
     private void handleEndingRemainder(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                        ScheduleContextVo context) {
+                                       ScheduleContextVo context) {
         // 仅处理近3天收尾的紧急任务
         if (!Boolean.TRUE.equals(task.getIsUrgentEnding())) {
             return;
@@ -1114,10 +1147,10 @@ public class TaskGroupService {
             // 非主销产品 + 收尾余量>2条，按实际量下（不补车）
             // endingExtraInventory 设置为实际余量（不取整），用于后续均衡分配时扣除
             task.setEndingExtraInventory(endingSurplusQty);
-            
+
             // requiredCars 按实际余量计算，不足一车的部分也算1车
             task.setRequiredCars((endingSurplusQty + tripCapacity - 1) / Math.max(tripCapacity, 1));
-            
+
             // plannedProduction 保持取整后的值（用于显示），但实际生产按 endingExtraInventory
             task.setIsLastEndingBatch(true);
             log.info("收尾任务 {} 今天最后一批（非主销），余量={}，计划={}，实际生产={}",
@@ -1152,8 +1185,8 @@ public class TaskGroupService {
      * @param dayShifts 当前班次配置
      */
     private void handleOpeningClosingDay(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                          ScheduleContextVo context,
-                                          List<CxShiftConfig> dayShifts) {
+                                         ScheduleContextVo context,
+                                         List<CxShiftConfig> dayShifts) {
         LocalDate scheduleDate = context.getCurrentScheduleDate();
         String factoryCode = context.getFactoryCode();
 
@@ -1273,10 +1306,10 @@ public class TaskGroupService {
      * @param dayShifts          当前班次配置
      */
     private void handleClosingDayTaskV2(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                         ScheduleContextVo context,
-                                         LocalDate scheduleDate,
-                                         int currentDayShiftOrder,
-                                         List<CxShiftConfig> dayShifts) {
+                                        ScheduleContextVo context,
+                                        LocalDate scheduleDate,
+                                        int currentDayShiftOrder,
+                                        List<CxShiftConfig> dayShifts) {
         // 标记为停产日任务
         task.setIsClosingDayTask(true);
 
@@ -1362,7 +1395,7 @@ public class TaskGroupService {
      * 辅助方法：根据班次与停锅班次的关系计算 requiredCars
      */
     private int cappedCapacity(CoreScheduleAlgorithmService.DailyEmbryoTask task, int cappedProduction,
-                                int tripCapacity, int closingShiftOrder, int currentDayShiftOrder) {
+                               int tripCapacity, int closingShiftOrder, int currentDayShiftOrder) {
         if (currentDayShiftOrder == closingShiftOrder) {
             return cappedProduction > 0 ? 1 : 0; // 停锅班次不补整车
         } else {
@@ -1383,10 +1416,10 @@ public class TaskGroupService {
      * @return 反推总量（条数）
      */
     private int calculateClosingRequiredStockV2(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                                 ScheduleContextVo context,
-                                                 LocalDate scheduleDate,
-                                                 int currentDayShiftOrder,
-                                                 List<CxShiftConfig> dayShifts) {
+                                                ScheduleContextVo context,
+                                                LocalDate scheduleDate,
+                                                int currentDayShiftOrder,
+                                                List<CxShiftConfig> dayShifts) {
         // 从硫化排程结果反推
         LhScheduleResult lhResult = findLhResultByTask(task, context);
         if (lhResult == null) {
@@ -1419,7 +1452,7 @@ public class TaskGroupService {
                 String timePart = vulcanizingStopTimeStr.length() >= 5
                         ? vulcanizingStopTimeStr.substring(0, 5) : vulcanizingStopTimeStr;
                 stopTime = LocalDateTime.of(scheduleDate,
-                        LocalTime.parse(timePart));
+                        java.time.LocalTime.parse(timePart));
             } catch (Exception e) {
                 log.warn("停产反推V2：解析停锅时间失败: {}", vulcanizingStopTimeStr);
                 return 0;
@@ -1500,10 +1533,10 @@ public class TaskGroupService {
      * @param dayShifts          当前班次配置
      */
     private void handleOpeningDayTaskV2(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                         ScheduleContextVo context,
-                                         LocalDate scheduleDate,
-                                         int currentDayShiftOrder,
-                                         List<CxShiftConfig> dayShifts) {
+                                        ScheduleContextVo context,
+                                        LocalDate scheduleDate,
+                                        int currentDayShiftOrder,
+                                        List<CxShiftConfig> dayShifts) {
         task.setIsOpeningDayTask(true);
 
         // 收尾/试制已正常算完（vulcanizeDemand 已在循环中被更新为下游 CLASS 计划量）
@@ -1660,7 +1693,7 @@ public class TaskGroupService {
         // 只取第1天的班次配置（排程天数不同但班次时间相同）
         return allShifts.stream()
                 .filter(c -> c.getScheduleDay() != null && c.getScheduleDay() == 1)
-                .sorted(Comparator.comparingInt(c -> c.getDayShiftOrder() != null ? c.getDayShiftOrder() : 0))
+                .sorted(java.util.Comparator.comparingInt(c -> c.getDayShiftOrder() != null ? c.getDayShiftOrder() : 0))
                 .collect(java.util.stream.Collectors.toList());
     }
 
@@ -1668,7 +1701,7 @@ public class TaskGroupService {
      * 根据任务查找对应的LhScheduleResult
      */
     private LhScheduleResult findLhResultByTask(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                                 ScheduleContextVo context) {
+                                                ScheduleContextVo context) {
         if (task.getLhId() != null) {
             List<LhScheduleResult> lhResults = context.getLhScheduleResults();
             if (lhResults != null) {
@@ -1704,7 +1737,7 @@ public class TaskGroupService {
      * 通过任务获取日硫化量
      */
     private int getDailyLhCapacityByTask(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                          ScheduleContextVo context) {
+                                         ScheduleContextVo context) {
         return resolveSingleMoldDailyLhCapacity(task != null ? task.getMaterialCode() : null, context);
     }
 
@@ -1712,7 +1745,7 @@ public class TaskGroupService {
      * 获取结构硫化配比
      */
     private int getStructureLhRatio(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                     ScheduleContextVo context) {
+                                    ScheduleContextVo context) {
         if (context.getStructureLhRatioMap() != null && task.getStructureName() != null) {
             com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio lhRatio =
                     context.getStructureLhRatioMap().get(task.getStructureName());
