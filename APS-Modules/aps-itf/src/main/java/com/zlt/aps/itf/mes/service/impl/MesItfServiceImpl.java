@@ -1005,28 +1005,29 @@ public class MesItfServiceImpl implements MesItfService {
 
             if (!insertOrUpdateList.isEmpty()) {
                 try {
-                    List<Long> lhIds = new ArrayList<>();
-                    List<Long> cx15Ids = new ArrayList<>();
-                    List<Long> cx60Ids = new ArrayList<>();
-
-                    for (MdmDevMaintenancePlan plan : insertOrUpdateList) {
-                        if ("硫化精度".equals(plan.getPrecisionType()) && plan.getId() != null) {
-                            lhIds.add(plan.getId());
-                        } else if ("成型15天".equals(plan.getPrecisionType()) && plan.getId() != null) {
-                            cx15Ids.add(plan.getId());
-                        } else if ("成型60天".equals(plan.getPrecisionType()) && plan.getId() != null) {
-                            cx60Ids.add(plan.getId());
-                        }
-                    }
-
-                    if (!lhIds.isEmpty()) {
-                        try {
-                            lhPrecisionPlanRemoteService.generateFromMaintenancePlan(lhIds);
-                        } catch (Exception e) {
-                            log.error("自动生成并推算硫化精度计划失败", e);
-                        }
-                    }
-
+                    cxPrecisionPlanRemoteService.generateFromMaintenancePlan(new ArrayList<>(), 15);
+//                    List<Long> lhIds = new ArrayList<>();
+//                    List<Long> cx15Ids = new ArrayList<>();
+//                    List<Long> cx60Ids = new ArrayList<>();
+//
+//                    for (MdmDevMaintenancePlan plan : insertOrUpdateList) {
+//                        if ("硫化精度".equals(plan.getPrecisionType()) && plan.getId() != null) {
+//                            lhIds.add(plan.getId());
+//                        } else if ("成型精度15天".equals(plan.getPrecisionType()) && plan.getId() != null) {
+//                            cx15Ids.add(plan.getId());
+//                        } else if ("成型精度60天".equals(plan.getPrecisionType()) && plan.getId() != null) {
+//                            cx60Ids.add(plan.getId());
+//                        }
+//                    }
+//
+//                    if (!lhIds.isEmpty()) {
+//                        try {
+//                            lhPrecisionPlanRemoteService.generateFromMaintenancePlan(lhIds);
+//                        } catch (Exception e) {
+//                            log.error("自动生成并推算硫化精度计划失败", e);
+//                        }
+//                    }
+//
 //                    if (!cx15Ids.isEmpty()) {
 //                        try {
 //                            cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx15Ids, 15);
@@ -1034,7 +1035,7 @@ public class MesItfServiceImpl implements MesItfService {
 //                            log.error("自动生成并推算成型精度计划（15天）失败", e);
 //                        }
 //                    }
-//
+
 //                    if (!cx60Ids.isEmpty()) {
 //                        try {
 //                            cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx60Ids, 60);

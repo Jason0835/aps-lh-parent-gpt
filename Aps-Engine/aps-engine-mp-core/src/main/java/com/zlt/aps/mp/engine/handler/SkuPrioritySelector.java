@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.google.common.collect.Sets;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
@@ -66,19 +67,10 @@ public class SkuPrioritySelector {
             return StringUtils.EMPTY;
         }
         Integer maxCount = productionContext.getBaseDataContainer().getParamConfiguration().getHeightPrioritySkuPreCount();
-        List<SkuPriorityInfo> selectedList = getHighestPriorityCount(skuPriorityList, maxCount);
-        if (CollectionUtils.isEmpty(selectedList)) {
+        List<ProductionSkuPriorityVo> selectedSkuPriorityList = getEffectiveHighestPriorityCount(productionContext, groupPlanInfo, continueType, skuPriorityList, maxCount, allSkuList, lhGroup, startDay, endDay);
+        if (CollectionUtils.isEmpty(selectedSkuPriorityList)) {
             return StringUtils.EMPTY;
         }
-        Integer maxLhDays = getLhMaxDays(context, startDay, endDay);
-        List<ProductionSkuPriorityVo> selectedSkuPriorityList = new ArrayList<>();
-        selectedList.forEach(singlePriority -> {
-            ProductionSkuPriorityVo priority = buildProductionSkuPriorityInfo(productionContext, singlePriority, groupPlanInfo, continueType, allSkuList, lhGroup, maxLhDays, startDay, endDay);
-            if (null == priority) {
-                return;
-            }
-            selectedSkuPriorityList.add(priority);
-        });
         //20260422+ 供应链优先-即物料优先
         List<ProductionSkuPriorityVo> finalSelectedList = getFinalSelectedList(selectedSkuPriorityList);
         if (CollectionUtils.isEmpty(finalSelectedList)) {
@@ -136,19 +128,10 @@ public class SkuPrioritySelector {
             return StringUtils.EMPTY;
         }
         Integer maxCount = productionContext.getBaseDataContainer().getParamConfiguration().getHeightPrioritySkuPreCount();
-        List<SkuPriorityInfo> selectedList = getHighestPriorityCount(skuPriorityList, maxCount);
-        if (CollectionUtils.isEmpty(selectedList)) {
+        List<ProductionSkuPriorityVo> selectedSkuPriorityList = getEffectiveHighestPriorityCount(productionContext, cxMachineInfo, skuPriorityList, maxCount, allSkuList, cxLhGroup, startDay, endDay);
+        if (CollectionUtils.isEmpty(selectedSkuPriorityList)) {
             return StringUtils.EMPTY;
         }
-        Integer maxLhDays = getLhMaxDays(context, startDay, endDay);
-        List<ProductionSkuPriorityVo> selectedSkuPriorityList = new ArrayList<>();
-        selectedList.forEach(singlePriority -> {
-            ProductionSkuPriorityVo priority = buildProductionSkuPriorityInfo(productionContext, singlePriority, cxMachineInfo, allSkuList, cxLhGroup, maxLhDays, startDay, endDay);
-            if (null == priority) {
-                return;
-            }
-            selectedSkuPriorityList.add(priority);
-        });
         //20260422+ 供应链优先-即物料优先
         List<ProductionSkuPriorityVo> finalSelectedList = getFinalSelectedList(selectedSkuPriorityList);
         if (CollectionUtils.isEmpty(finalSelectedList)) {
@@ -265,6 +248,95 @@ public class SkuPrioritySelector {
     /**
      * 获取最高优先级的列表
      *
+     * @param context         排产上下文
+     * @param groupPlanInfo   分组对象
+     * @param skuPriorityList 所有列表
+     * @param continueType    类型
+     * @param allSkuList      所有还需排产Sku
+     * @param maxCount        最大个数
+     * @param lhGroup         硫化组信息
+     * @param startDay        开始排产日
+     * @param endDay          结束排产日
+     * @return
+     * @
+     */
+    private static List<ProductionSkuPriorityVo> getEffectiveHighestPriorityCount(Context context, ProductionPlanGroupInfo groupPlanInfo, ContinueTypeEnum continueType, List<SkuPriorityInfo> skuPriorityList, Integer maxCount, List<MonthPlanProductionRequirePlanVo> allSkuList, EarliestConclusionLhGroupHelper lhGroup, Integer startDay, Integer endDay) {
+        if (CollectionUtils.isEmpty(skuPriorityList) || null == maxCount || maxCount < BigDecimal.ZERO.intValue()) {
+            return Collections.emptyList();
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Integer maxLhDays = getLhMaxDays(productionContext, startDay, endDay);
+        List<ProductionSkuPriorityVo> highestList = new ArrayList<>();
+        Set<String> foundSet = Sets.newHashSet();
+        for (int count = BigDecimal.ONE.intValue(); count <= maxCount; ) {
+            List<SkuPriorityInfo> matchList = skuPriorityList.stream().filter(singlePriority -> !foundSet.contains(singlePriority.getSku())).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(matchList)) {
+                break;
+            }
+            //排序：供应链优先 -> 先高优先级(模具受限优先 -> 库销比优先 -> 小批量优先 -> 量大优先) -> 再其他(模具受限优先 -> 库销比优先 -> 小批量优先 -> 量大优先)
+            SkuPriorityInfo highestPriority = getHighestPrioritySku(matchList);
+            if (null == highestPriority) {
+                break;
+            }
+            foundSet.add(highestPriority.getSku());
+            //有模具产能
+            ProductionSkuPriorityVo priority = buildProductionSkuPriorityInfo(productionContext, highestPriority, groupPlanInfo, continueType, allSkuList, lhGroup, maxLhDays, startDay, endDay);
+            if (null == priority) {
+                continue;
+            }
+            highestList.add(priority);
+            count = count + BigDecimal.ONE.intValue();
+        }
+        return highestList;
+    }
+
+    /**
+     * 获取最高优先级的列表
+     *
+     * @param context         排产上下文
+     * @param cxMachineInfo   分配成型机台
+     * @param skuPriorityList 所有列表
+     * @param allSkuList      所有还需排产Sku
+     * @param maxCount        最大个数
+     * @param cxLhGroup       硫化组信息
+     * @param startDay        开始排产日
+     * @param endDay          结束排产日
+     * @return
+     * @
+     */
+    private static List<ProductionSkuPriorityVo> getEffectiveHighestPriorityCount(Context context, CxMachineBaseInfoVo cxMachineInfo, List<SkuPriorityInfo> skuPriorityList, Integer maxCount, List<MonthPlanProductionRequirePlanVo> allSkuList, CxLhProductionHelper cxLhGroup, Integer startDay, Integer endDay) {
+        if (CollectionUtils.isEmpty(skuPriorityList) || null == maxCount || maxCount < BigDecimal.ZERO.intValue()) {
+            return Collections.emptyList();
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Integer maxLhDays = getLhMaxDays(productionContext, startDay, endDay);
+        List<ProductionSkuPriorityVo> highestList = new ArrayList<>();
+        Set<String> foundSet = Sets.newHashSet();
+        for (int count = BigDecimal.ONE.intValue(); count <= maxCount; ) {
+            List<SkuPriorityInfo> matchList = skuPriorityList.stream().filter(singlePriority -> !foundSet.contains(singlePriority.getSku())).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(matchList)) {
+                break;
+            }
+            //排序：供应链优先 -> 先高优先级(模具受限优先 -> 库销比优先 -> 小批量优先 -> 量大优先) -> 再其他(模具受限优先 -> 库销比优先 -> 小批量优先 -> 量大优先)
+            SkuPriorityInfo highestPriority = getHighestPrioritySku(matchList);
+            if (null == highestPriority) {
+                break;
+            }
+            foundSet.add(highestPriority.getSku());
+            //有模具产能
+            ProductionSkuPriorityVo priority = buildProductionSkuPriorityInfo(productionContext, highestPriority, cxMachineInfo, allSkuList, cxLhGroup, maxLhDays, startDay, endDay);
+            if (null == priority) {
+                continue;
+            }
+            highestList.add(priority);
+            count = count + BigDecimal.ONE.intValue();
+        }
+        return highestList;
+    }
+
+    /**
+     * 获取最高优先级的列表
+     *
      * @param skuPriorityList 所有列表
      * @param maxCount        最大个数
      * @return
@@ -292,9 +364,6 @@ public class SkuPrioritySelector {
             }
         }
         return highestList;
-//            //排序：供应链优先 -> 先高优先级(模具受限优先 -> 库销比优先 -> 小批量优先 -> 量大优先) -> 再其他(模具受限优先 -> 库销比优先 -> 小批量优先 -> 量大优先)
-//            skuPriorityList.sort(Comparator.comparing(SkuPriorityInfo::isHasSupplyChainPriority, Comparator.reverseOrder()).thenComparing(SkuPriorityInfo::isHasHeightPriority, Comparator.reverseOrder()).thenComparing(SkuPriorityInfo::isHasMoldCapacityLimit, Comparator.reverseOrder()).thenComparing(SkuPriorityInfo::getInventorySaleRatio).thenComparing(SkuPriorityInfo::isLessMinQty, Comparator.reverseOrder()).thenComparing(SkuPriorityInfo::getTotalNetRequirement, Comparator.reverseOrder()));
-//        return skuPriorityList.subList(BigDecimal.ZERO.intValue(), maxCount);
     }
 
     /**

@@ -85,7 +85,9 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         String handlerKey = earliestConclusion.getTimeExtensionDayInfo(nextDay);
         if (handledDayInfo.contains(handlerKey)) {
             GroupTimeExtensionConclusionLogRecorder.addNoTimeExtensionConclusionHandlerLog(context, groupName, cxMachineCodeInfo);
-            timeExtensionOneDayConclusion(context, groupPlan, earliestConclusion, nextDay);
+            if (handledDayInfo.size() > BigDecimal.ONE.intValue()) {
+                handlerTimeExtensionDay(context, groupPlan, earliestConclusion, handledDayInfo, nextDay);
+            }
             //20260425+ 标记不再进行分配？
             groupPlan.setIsAllocationFinish(YesOrNoEnum.YES.getValue());
             return;
@@ -145,7 +147,9 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         String handlerKey = allocationRange.getTimeExtensionDayInfo(nextDay);
         if (handledDayInfo.contains(handlerKey)) {
             GroupTimeExtensionConclusionLogRecorder.addNoTimeExtensionConclusionHandlerLog(context, groupName, cxMachineCodeInfo);
-            timeExtensionOneDayConclusionByNoOnLine(context, groupPlan, allocationRange, nextDay);
+            if (handledDayInfo.size() > BigDecimal.ONE.intValue()) {
+                handlerTimeExtensionDay(context, groupPlan, allocationRange, handledDayInfo, nextDay);
+            }
             return;
         }
         handledDayInfo.add(handlerKey);
@@ -266,11 +270,11 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
     /**
      * 当nextDay已经处理过时，则取在此之前的最后一个日为其收尾日
      *
-     * @param context
-     * @param groupPlan
-     * @param earliestConclusion
-     * @param handledDayInfo
-     * @param nextDay
+     * @param context            排产上下文
+     * @param groupPlan          分组对象
+     * @param earliestConclusion 收尾信息
+     * @param handledDayInfo     处理的排产日信息
+     * @param nextDay            下一个日期
      */
     private void handlerTimeExtensionDay(Context context, ProductionPlanGroupInfo groupPlan, CxMachineAllocationPlanHelper earliestConclusion, Set<String> handledDayInfo, Integer nextDay) {
         String handlerKey = earliestConclusion.getTimeExtensionDayInfo(nextDay);
@@ -279,13 +283,16 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         }
         Integer earliestConclusionDay = earliestConclusion.getEndDay();
         String prefix = earliestConclusion.getTimeExtensionPrefix();
+        Integer startIndex = prefix.length();
         Set<Integer> effectiveDaySet = Sets.newHashSet();
         handledDayInfo.forEach(singleDay -> {
             if (!singleDay.startsWith(prefix)) {
                 return;
             }
-            Integer day = Integer.valueOf(singleDay.replaceAll(prefix, ""));
-            if (day < nextDay && day > earliestConclusionDay) {
+            Integer endIndex = singleDay.length();
+            String dayValue = singleDay.substring(startIndex, endIndex);
+            Integer day = Integer.valueOf(dayValue);
+            if (day > earliestConclusionDay) {
                 effectiveDaySet.add(day);
             }
         });
@@ -294,7 +301,8 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         }
         List<Integer> timeExtensionDayList = new ArrayList<>(effectiveDaySet);
         timeExtensionDayList.sort(Comparator.comparing(Integer::intValue));
-        timeExtensionDayList.forEach(timeExtensionDay -> timeExtensionOneDayConclusion(context, groupPlan, earliestConclusion, timeExtensionDay));
+        List<Integer> effectiveDayList = timeExtensionDayList.subList(BigDecimal.ZERO.intValue(), timeExtensionDayList.size() - BigDecimal.ONE.intValue());
+        effectiveDayList.forEach(timeExtensionDay -> timeExtensionOneDayConclusion(context, groupPlan, earliestConclusion, timeExtensionDay));
     }
 
     /**
