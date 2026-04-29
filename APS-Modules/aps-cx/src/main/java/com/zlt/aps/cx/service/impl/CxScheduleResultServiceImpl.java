@@ -219,13 +219,13 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .filter(Objects::nonNull)
                 .filter(item -> !Objects.equals(item.getId(), -999L))
                 .map(CxScheduleResultTemplateImportVO::getCxMachineCode)
-                .filter(StringUtil::isNotBlank).map(String::trim).distinct()
+                .filter(StringUtils::isNotBlank).map(String::trim).distinct()
                 .collect(Collectors.toList());
         List<String> materialCodes = list.stream()
                 .filter(Objects::nonNull)
                 .filter(item -> !Objects.equals(item.getId(), -999L))
                 .map(CxScheduleResultTemplateImportVO::getMaterialCode)
-                .filter(StringUtil::isNotBlank).map(String::trim).distinct()
+                .filter(StringUtils::isNotBlank).map(String::trim).distinct()
                 .collect(Collectors.toList());
 
         Map<String, CxScheduleResult> existMap = new LinkedHashMap<>();
@@ -251,13 +251,13 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 continue;
             }
 
-            if (StringUtil.isBlank(row.getCxMachineCode())) {
+            if (StringUtils.isBlank(row.getCxMachineCode())) {
                 failureNum++;
                 ImportExcelValidatedUtils.addImportErrorLog(logId, ImportErrorTypeEnums.OTHERS.getCode(),
                         rowNum, "第" + rowNum + "行 成型机台编号不能为空", importErrorLogs);
                 continue;
             }
-            if (StringUtil.isBlank(row.getMaterialCode())) {
+            if (StringUtils.isBlank(row.getMaterialCode())) {
                 failureNum++;
                 ImportExcelValidatedUtils.addImportErrorLog(logId, ImportErrorTypeEnums.OTHERS.getCode(),
                         rowNum, "第" + rowNum + "行 物料编号不能为空", importErrorLogs);
