@@ -40,13 +40,13 @@
           @click="handleAdd"
           >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button
         >
-        <el-button
+        <!-- <el-button
           v-hasPermi="['cx:cxScheduleResult:edit']"
           type="warning"
           :disabled="!canModifySelection"
           @click="() => handleEdit(selection[0])"
           >{{ $t("ui.frame.btn.modify") }}</el-button
-        >
+        > -->
         <el-button
           v-hasPermi="['cx:cxScheduleResult:remove']"
           type="danger"
@@ -850,13 +850,10 @@ export default {
   },
   methods: {
     handleAdd() {
-      if (this.$refs.editRef) {
-        this.$refs.editRef.show(
-          {
-            scheduleDate: this.query.scheduleDate,
-          },
-          "insert"
-        );
+      if (this.$refs.addRef) {
+        this.$refs.addRef.show({
+          scheduleDate: this.query.scheduleDate,
+        });
       }
     },
     handleEdit(row) {

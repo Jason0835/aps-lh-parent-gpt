@@ -59,6 +59,14 @@
           </el-col>
           <el-col :span="12">
             <el-form-item
+              :label="$t('ui.data.column.cxScheduleResult.lhMachineCode')"
+              prop="lhMachineCode"
+            >
+              <el-input v-model="form.lhMachineCode" disabled></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item
               :label="$t('物料编码')"
               prop="materialCode"
             >

@@ -161,7 +161,8 @@ export default {
       }
     },
     getShiftLabel(shift) {
-      const labels = ["一班", "二班", "三班", "四班", "五班", "六班", "七班", "八班"];
+      // 表头班次顺序：早班、中班、晚班、早班、中班、晚班、早班、中班
+      const labels = ["早班", "中班", "晚班", "早班", "中班", "晚班", "早班", "中班"];
       return labels[shift - 1] || "";
     },
     createEditableColumn(prop, label, type) {

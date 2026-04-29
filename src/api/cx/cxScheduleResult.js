@@ -87,6 +87,18 @@ export function validateAdd(query) {
   })
 }
 
+// 成型插单新增
+export function insertOrder(query) {
+  return request({
+    url: '/cx/cxScheduleResult/insertOrder',
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    }
+  })
+}
+
 export function cxScheduleResultEdit(query) {
   return request({
     url: '/cx/cxScheduleResult/save',
