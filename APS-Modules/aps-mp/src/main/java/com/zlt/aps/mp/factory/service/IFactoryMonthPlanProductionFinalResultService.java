@@ -126,4 +126,14 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      */
     @Transactional(rollbackFor = Exception.class)
     AjaxResult issueMonthPlan(FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal);
+    
+    /**
+     * 导入定稿
+     * @param list 列表数据
+     * @param updateSupport 覆盖
+     * @param importLogId 导入日志ID
+     * @param params 导入参数
+     * @return 结果
+     */
+    AjaxResult importDataFinalResult(List<FactoryMonthPlanProductionFinalResult> list, boolean updateSupport, Long importLogId, FactoryMonthPlanProductionFinalResult params);
 }
