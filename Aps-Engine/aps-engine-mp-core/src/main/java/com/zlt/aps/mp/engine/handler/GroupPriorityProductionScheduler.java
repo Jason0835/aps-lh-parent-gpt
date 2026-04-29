@@ -14,7 +14,6 @@ import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.CxCapacityAllocationHandler;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.CxMouldProductionHandler;
-import com.zlt.aps.mp.engine.scheduling.cxcapacity.GroupTimeExtensionHandler;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.SpecialMaterialScheduleHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,8 +46,6 @@ public class GroupPriorityProductionScheduler {
     private final CxCapacityAllocationHandler cxCapacityAllocationHandler;
 
     private final SpecialMaterialScheduleHandler specialMaterialScheduleHandler;
-
-    private final GroupTimeExtensionHandler groupTimeExtensionHandler;
 
     /**
      * 以交付优先的排产方式模拟
@@ -126,6 +123,8 @@ public class GroupPriorityProductionScheduler {
             preSelectedGroupMap.add(groupName);
             excludeGroupPlan.clear();
         }
+        //20260429+ 前分组分配是否需要延长处理
+        cxMouldProductionHandler.handlerTimeExtensionDayConclusionByBeforeGroup(productionContext, addHelper);
         //下一批
         allocationCxMachine(context, excludeGroupPlan, preSelectedGroupMap);
     }
@@ -186,6 +185,8 @@ public class GroupPriorityProductionScheduler {
         } else {
             excludeGroupPlan.clear();
         }
+        //20260429+ 前分组分配是否需要延长处理
+        cxMouldProductionHandler.handlerTimeExtensionDayConclusionByBeforeGroup(productionContext, addHelper);
         //下一批
         productionGroupFixedCxMachine(context, excludeGroupPlan, priorityFixedGroupList);
     }
@@ -404,9 +405,9 @@ public class GroupPriorityProductionScheduler {
         //更新剩余天数：分组的剩余天数、成型机台剩余可分配天数
         addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, monthMaxDays);
+        //20260429+ 前分组分配信息传递，用于当需要前分组强制延长收尾时需要
         CxMachineAllocationPlanHelper beforeAllocation = selectedCxMachine.addAllocationPlanInfo(productionContext, addHelper);
-        //20260429+ 前分组因每日切换限制需要延长收尾
-        groupTimeExtensionHandler.handlerTimeExtensionDayConclusion(productionContext, beforeAllocation);
+        addHelper.setBeforeAllocationByChangeLimit(beforeAllocation);
         return addHelper;
     }
 
