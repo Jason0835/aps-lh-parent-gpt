@@ -16,9 +16,10 @@ public interface ILhScheduleResultIssueService {
     /**
      * 硫化排程结果下发到MES
      * 业务规则：
-     * 1. 更新当天的2班（早中班）- 清空一班数据
-     * 2. 更新明天的3班（早中晚班）
-     * 3. 下发后天的3班（早中晚班）
+     * 1. 更新窗口首日的2班（早中班）- 清空一班数据
+     * 2. 更新窗口次日的3班（夜早中班）
+     * 3. 下发排程日期当天的3班（夜早中班）
+     * 日期从下发数据中推导，不再依赖LocalDate.now()
      *
      * @param lhScheduleResultIssueList 硫化排程结果列表
      * @param factoryCode 工厂编码
