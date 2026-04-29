@@ -205,7 +205,7 @@ public class DpDemandPlanUIController extends BaseUIController<DpDemandPlan> {
     @PostMapping("/extendsConfiguration")
     @RequiresPermissions("monthplan:demandPlan:extendsConfiguration")
     @ResponseBody
-    public AjaxResult extendsConfiguration(@RequestBody  DpDemandPlan createCondition) {
+    public AjaxResult extendsConfiguration(DpDemandPlan createCondition) {
         return iDpDemandPlanService.extendsConfiguration(createCondition);
     }
 }
