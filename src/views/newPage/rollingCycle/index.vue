@@ -1368,8 +1368,8 @@ export default {
       if (newVal === oldVal) return;
       try {
         console.log("发送请求数据:", JSON.stringify(row));
-        await updateSkuScheduleItems(row);
-        this.getOutResultList(row.productionVersion, row.version);
+        await saveAdjustResult(row);
+        // this.getOutResultList(row.productionVersion, row.version);
       } catch (err) {
         console.log(err);
       }
