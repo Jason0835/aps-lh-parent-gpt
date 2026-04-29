@@ -55,6 +55,7 @@ public class CxPrecisionPlan extends BaseEntity implements Serializable {
 
     /** 计划日期 */
     @Excel(name = "ui.data.column.cxPrecisionPlan.planDate", dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "计划日期")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
