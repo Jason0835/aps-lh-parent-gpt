@@ -214,11 +214,13 @@ public class CxCapacityAllocationHandler {
         Integer needAllocationDays = confirmNeedAllocationDays;
         CxMachineAllocationPlanHelper addHelper = createAllocationPlanHelper(cxMachineInfo, lhRatioInfo, allocationGroupPlan, null, needAllocationDays, startDay, context.getMonthDays());
         CxMachineAllocationPlanHelper beforeGroupAllocation = cxMachineInfo.addAllocationPlanInfo(context, addHelper);
-        //20260429+ 前分组分配是否需要强制延长
-        cxMouldProductionHandler.handlerTimeExtensionDayConclusion(productionContext, beforeGroupAllocation);
+        //20260429+ 记录前分组分配信息，用以判断前分组是否需要强制延长
+        addHelper.setBeforeAllocationByChangeLimit(beforeGroupAllocation);
         allocationGroupPlan.updateLeftOverNeedAllocationDays(needAllocationDays);
         //20260109 标记分配完成--不能标记分配完成，有可能因提前收尾导致需要在其它机台进行分配 对成型机台进行模拟模具排产
         cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineInfo.getCxMachineCode(), addHelper, new HashSet<>());
+        //20260429+ 前分组分配强制延长处理
+        cxMouldProductionHandler.handlerTimeExtensionDayConclusionByBeforeGroup(productionContext, addHelper);
         //20260322 剩余时间-有可能因提前收尾，导致时间变化
         Integer leftOver = cxMachineInfo.getRemainCapacity();
         //还有剩余产能，继续挑选下一个分组结构
@@ -562,6 +564,8 @@ public class CxCapacityAllocationHandler {
         if (capacityDays < minAllocationDays) {
             return false;
         }
+        String daysInfo = hasProductionDaySet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        TbrProductionGroupLogRecorder.addGroupMatchCxMachineProductionInfoLog(productionContext, groupName, singleMachine.getCxMachineCode(), daysInfo);
         //设置历史信息
         singleMachine.setLastBoardingDate(BigDecimal.ZERO.intValue());
         singleMachine.setProductionCount(BigDecimal.ZERO.intValue());
@@ -726,9 +730,6 @@ public class CxCapacityAllocationHandler {
         //成型剩余产能
         Integer realRemainingDays = hasProductionSet.size();
         TbrProductionGroupLogRecorder.addReverseCxMachineMatchCapacityLog(context, cxMachineInfo, realRemainingDays, structureName, remainingNeedDays);
-        /*if (realRemainingDays < remainingNeedDays) {
-            return;
-        }*/
         //结构需求与机台产能差异天数 sandy+ 2026.3.29
         groupPlan.setDiffStructureAndMachineDays(remainingNeedDays - realRemainingDays);
         groupPlan.setMachineReverseAllocationDays(Math.min(remainingNeedDays, realRemainingDays));

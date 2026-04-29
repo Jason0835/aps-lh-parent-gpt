@@ -392,18 +392,8 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         String selectedCxMachineCode = earliestConclusion.getCxMachineCode();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(selectedCxMachineCode);
-        List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
-        if (CollectionUtils.isEmpty(allocationList)) {
-            return;
-        }
-        boolean hasProductionFlag = false;
-        for (CxMachineAllocationPlanHelper assigned : allocationList) {
-            if (assigned == earliestConclusion) {
-                hasProductionFlag = true;
-                break;
-            }
-        }
-        if (!hasProductionFlag) {
+        //存在分配才延长
+        if (!cxMachineInfo.hasAllocation(earliestConclusion)) {
             return;
         }
         //分配延长一天
