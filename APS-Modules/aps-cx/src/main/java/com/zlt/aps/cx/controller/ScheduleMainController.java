@@ -2,6 +2,7 @@ package com.zlt.aps.cx.controller;
 
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ruoyi.common.core.annotation.Excel;
@@ -11,8 +12,10 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
+import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
+import com.zlt.aps.cx.mapper.CxShiftConfigMapper;
 import com.zlt.aps.cx.mapper.MdmMoldingMachineMapper;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.service.ScheduleService;
@@ -45,7 +48,9 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -74,14 +79,89 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     @Autowired
     private MdmMoldingMachineMapper moldingMachineMapper;
 
+    @Autowired
+    private CxShiftConfigMapper cxShiftConfigMapper;
+
     /**
-     * 查询成型排程结果列表
+     * 查询成型排程结果列表，同时填充各班次的开始/结束时间
      */
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody CxScheduleResult queryVO) {
-        return super.list(queryVO);
+        TableDataInfo tableDataInfo = super.list(queryVO);
+
+        List<?> rows = tableDataInfo.getRows();
+        if (rows == null || rows.isEmpty()) {
+            return tableDataInfo;
+        }
+
+        List<CxScheduleResult> results = (List<CxScheduleResult>) rows;
+
+        List<CxShiftConfig> shiftConfigs = cxShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<CxShiftConfig>()
+                        .eq(CxShiftConfig::getIsActive, 1)
+                        .orderByAsc(CxShiftConfig::getScheduleDay)
+                        .orderByAsc(CxShiftConfig::getDayShiftOrder));
+
+        Map<String, CxShiftConfig> classFieldMap = new HashMap<>();
+        for (CxShiftConfig config : shiftConfigs) {
+            if (config.getClassField() != null) {
+                classFieldMap.put(config.getClassField(), config);
+            }
+        }
+
+        for (CxScheduleResult record : results) {
+            if (record.getScheduleDate() == null) {
+                continue;
+            }
+            LocalDate scheduleDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
+
+            for (int i = 1; i <= 8; i++) {
+                CxShiftConfig config = classFieldMap.get("CLASS" + i);
+                if (config == null) {
+                    continue;
+                }
+
+                int dayOffset;
+                if (config.getScheduleDay() == 1) {
+                    dayOffset = -2;
+                } else if (config.getScheduleDay() == 2) {
+                    dayOffset = -1;
+                } else {
+                    dayOffset = 0;
+                }
+
+                LocalTime startLocalTime = config.getShiftStartTime();
+                LocalTime endLocalTime = config.getShiftEndTime();
+
+                LocalDate startDate;
+                LocalDate endDate;
+                if (config.getIsCrossDay() != null && config.getIsCrossDay() == 1) {
+                    startDate = scheduleDate.plusDays(dayOffset - 1);
+                    endDate = scheduleDate.plusDays(dayOffset);
+                } else {
+                    startDate = scheduleDate.plusDays(dayOffset);
+                    endDate = scheduleDate.plusDays(dayOffset);
+                }
+
+                Date start = DateUtil.toDate(startDate.atTime(startLocalTime));
+                Date end = DateUtil.toDate(endDate.atTime(endLocalTime));
+
+                switch (i) {
+                    case 1: record.setClass1StartTime(start); record.setClass1EndTime(end); break;
+                    case 2: record.setClass2StartTime(start); record.setClass2EndTime(end); break;
+                    case 3: record.setClass3StartTime(start); record.setClass3EndTime(end); break;
+                    case 4: record.setClass4StartTime(start); record.setClass4EndTime(end); break;
+                    case 5: record.setClass5StartTime(start); record.setClass5EndTime(end); break;
+                    case 6: record.setClass6StartTime(start); record.setClass6EndTime(end); break;
+                    case 7: record.setClass7StartTime(start); record.setClass7EndTime(end); break;
+                    case 8: record.setClass8StartTime(start); record.setClass8EndTime(end); break;
+                }
+            }
+        }
+
+        return tableDataInfo;
     }
 
     /**
