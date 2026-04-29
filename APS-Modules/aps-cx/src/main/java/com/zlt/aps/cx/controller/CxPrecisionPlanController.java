@@ -218,4 +218,31 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
         }
     }
 
+    /**
+     * 自动推算成型精度计划（15天周期）
+     */
+    @ApiOperation("自动推算成型精度计划（15天周期）")
+    @PostMapping("/autoCalculateCx15Days")
+    public AjaxResult autoCalculateCxPrecisionPlan15Days(@RequestParam("year") Integer year) {
+        return cxPrecisionPlanService.autoCalculateCxPrecisionPlan(year);
+    }
+
+    /**
+     * 自动推算成型精度计划（60天周期）
+     */
+    @ApiOperation("自动推算成型精度计划（60天周期）")
+    @PostMapping("/autoCalculateCx60Days")
+    public AjaxResult autoCalculateCxPrecisionPlan60Days(@RequestParam("year") Integer year) {
+        return cxPrecisionPlanService.autoCalculateCxPrecisionPlan(year);
+    }
+
+//    /**
+//     * 根据设备保养计划生成并推算成型精度计划
+//     */
+//    @ApiOperation("根据设备保养计划生成并推算成型精度计划")
+//    @PostMapping("/generateFromMaintenance")
+//    public AjaxResult generateFromMaintenancePlan(@RequestBody List<Long> maintenancePlanIds,
+//                                                   @RequestParam("cycleDays") Integer cycleDays) {
+//        return cxPrecisionPlanService.generateFromMaintenancePlanByIds(maintenancePlanIds, cycleDays);
+//    }
 }

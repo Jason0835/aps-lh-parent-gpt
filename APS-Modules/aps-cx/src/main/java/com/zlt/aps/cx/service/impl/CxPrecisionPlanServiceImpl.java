@@ -353,6 +353,27 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
                     affected += upsertByMesSourceId(plan);
                 }
             }
+            // 取 mesPlans 有实际日期的数据
+            Map<String, List<MdmDevMaintenancePlan>> mesPlansWithImplementDate = mesPlans.stream()
+                    .filter(i -> i.getFirstWashTime() != null)
+                    .collect(Collectors.groupingBy(x -> String.valueOf(x.getFactoryCode()) + "|"
+                        + String.valueOf(x.getDevCode()) + "|" + String.valueOf(x.getPrecisionType())));
+
+            for (Map.Entry<String, List<MdmDevMaintenancePlan>> entry : mesPlansWithImplementDate.entrySet()) {
+                List<MdmDevMaintenancePlan> list = entry.getValue().stream()
+                        .sorted(Comparator.comparing(MdmDevMaintenancePlan::getFirstWashTime))
+                        .collect(Collectors.toList());
+
+                if (!list.isEmpty()) {
+                    MdmDevMaintenancePlan lastPlan = list.get(list.size() - 1);
+                    CxPrecisionPlan plan = createNextPlanFromActualMes(lastPlan, targetYear);
+                    if (plan != null) {
+                        affected += upsertNextPlanByBizKey(plan);
+                    }
+                }
+            }
+
+
 
             return affected;
         } finally {
@@ -379,6 +400,44 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
             cxPrecisionPlanMapper.updateById(cxPrecisionPlan);
         }
         return 1;
+    }
+
+    /**
+     * 按业务唯一键同步由 MES 实际时间推算出的下一次计划。
+     * 推算计划没有 MES 原始记录，不能使用 mesSourceId 做幂等判断。
+     */
+    private int upsertNextPlanByBizKey(CxPrecisionPlan plan) {
+        if (plan == null || StringUtil.isBlank(plan.getMachineCode()) || StringUtil.isBlank(plan.getPrecisionType())
+            || plan.getPlanDate() == null) {
+            return 0;
+        }
+        CxPrecisionPlan existPlan = selectExistingNextPlan(plan);
+        if (existPlan == null) {
+            cxPrecisionPlanMapper.insert(plan);
+            return 1;
+        }
+        applyMesFields(existPlan, plan);
+        cxPrecisionPlanMapper.updateById(existPlan);
+        return 1;
+    }
+
+    /**
+     * 按工厂、机台、精度类型、计划日期查找已存在的下一次计划，仅匹配没有 mesSourceId 的推算计划。
+     */
+    private CxPrecisionPlan selectExistingNextPlan(CxPrecisionPlan plan) {
+        LambdaQueryWrapper<CxPrecisionPlan> existWrapper = new LambdaQueryWrapper<>();
+        if (StringUtil.isBlank(plan.getFactoryCode())) {
+            existWrapper.isNull(CxPrecisionPlan::getFactoryCode);
+        } else {
+            existWrapper.eq(CxPrecisionPlan::getFactoryCode, plan.getFactoryCode());
+        }
+        existWrapper.eq(CxPrecisionPlan::getMachineCode, plan.getMachineCode())
+            .eq(CxPrecisionPlan::getPrecisionType, plan.getPrecisionType())
+            .eq(CxPrecisionPlan::getPlanDate, plan.getPlanDate())
+            .isNull(CxPrecisionPlan::getMesSourceId)
+            .eq(CxPrecisionPlan::getIsDelete, 0)
+            .last("limit 1");
+        return cxPrecisionPlanMapper.selectOne(existWrapper);
     }
 
     /**
@@ -443,6 +502,47 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         plan.setYear(new BigDecimal(year));
         plan.setDaysToDue(DateUtil.betweenDay(DateUtil.date(), planDate, true));
 
+        plan.setCompletionStatus(COMPLETION_STATUS_PENDING);
+        plan.setWarningStatus(WARNING_STATUS_NO);
+        plan.setIsWarningSent(WARNING_SENT_NO);
+        plan.setIsDelete(0);
+        plan.setBaseVale(null);
+        return plan;
+    }
+
+    /**
+     * 根据 MES 实际完成时间推算下一次计划。
+     * 该计划不是 MES 原始同步记录，因此 mesSourceId 置空，actualDate 置空。
+     */
+    private CxPrecisionPlan createNextPlanFromActualMes(MdmDevMaintenancePlan mesPlan, Integer year) {
+        Date actualDate = parseDate(mesPlan.getFirstWashTime());
+        if (actualDate == null) {
+            return null;
+        }
+
+        String precisionCycle = extractNumberFromPrecisionType(mesPlan.getPrecisionType());
+        Integer cycleDays = safeParseInt(precisionCycle);
+        if (cycleDays == null) {
+            log.error("解析精度类型失败：{}", mesPlan.getPrecisionType());
+            return null;
+        }
+
+        Date planDate = DateUtil.offsetDay(actualDate, cycleDays);
+        CxPrecisionPlan plan = new CxPrecisionPlan();
+        plan.setMachineCode(mesPlan.getDevCode());
+        plan.setPrecisionType(precisionCycle);
+        plan.setPrecisionCycle(precisionCycle);
+        plan.setCompanyCode(mesPlan.getCompanyCode());
+        plan.setFactoryCode(mesPlan.getFactoryCode());
+        plan.setMesSourceId(null);
+        plan.setDataSource(DATA_SOURCE_AUTO);
+        plan.setSyncTime(mesPlan.getUpdateTime());
+        plan.setActualDate(null);
+        plan.setLastMaintenanceDate(actualDate);
+        plan.setPlanDate(planDate);
+        plan.setDueDate(planDate);
+        plan.setYear(new BigDecimal(year));
+        plan.setDaysToDue(DateUtil.betweenDay(DateUtil.date(), planDate, true));
         plan.setCompletionStatus(COMPLETION_STATUS_PENDING);
         plan.setWarningStatus(WARNING_STATUS_NO);
         plan.setIsWarningSent(WARNING_SENT_NO);
@@ -622,6 +722,11 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         return result > 0;
     }
 
+    @Override
+    public AjaxResult autoCalculateCxPrecisionPlan(Integer year) {
+        generatePlansFromMes(year);
+        return AjaxResult.success();
+    }
 
 
     /**
