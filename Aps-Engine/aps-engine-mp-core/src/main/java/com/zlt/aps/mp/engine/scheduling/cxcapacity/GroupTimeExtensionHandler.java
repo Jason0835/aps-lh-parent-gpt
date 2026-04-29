@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.zlt.aps.constant.StringConstant;
@@ -162,6 +163,50 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         timeExtensionOneDayConclusionByNoOnLine(context, groupPlan, allocationRange, nextDay);
         //重新模拟排产
         cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, cxMachineCodeInfo, allocationRange, handledDayInfo);
+    }
+
+    /**
+     * 前分组，因衔接分组日切换次数限制，导致需要自动延长收尾
+     * 场景：后分组衔接时，因每日切换次数限制，后分组需往后起始排产
+     * 则前结构自动延长
+     *
+     * @param context          排产上下文
+     * @param beforeAllocation 前分组配置
+     */
+    public void handlerTimeExtensionDayConclusion(Context context, CxMachineAllocationPlanHelper beforeAllocation) {
+        if (null == beforeAllocation) {
+            return;
+        }
+        Integer newEndDay = beforeAllocation.getTimeExtensionDay();
+        if (null == newEndDay) {
+            return;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        if (newEndDay < productionContext.getCycleFirstProductionDay()) {
+            return;
+        }
+        Integer originEndDay = beforeAllocation.getEndDay();
+        if (originEndDay >= newEndDay) {
+            return;
+        }
+        String cxMachineCode = beforeAllocation.getCxMachineCode();
+        CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
+        if (null == cxMachineInfo) {
+            return;
+        }
+        Set<Integer> stopDays = Optional.ofNullable(cxMachineInfo.getStopDayInfo()).orElse(Collections.emptySet());
+        int startTimeExtensionDay = originEndDay + BigDecimal.ONE.intValue();
+        List<Integer> effectiveDayList = Lists.newArrayList();
+        for (; startTimeExtensionDay <= newEndDay; startTimeExtensionDay++) {
+            if (stopDays.contains(startTimeExtensionDay)) {
+                continue;
+            }
+            effectiveDayList.add(startTimeExtensionDay);
+        }
+        if (CollectionUtils.isEmpty(effectiveDayList)) {
+            return;
+        }
+        effectiveDayList.forEach(timeExtensionDay -> forceTimeExtensionOneDayConclusion(context, beforeAllocation, timeExtensionDay));
     }
 
     /**
@@ -328,6 +373,33 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         lastAllocationInfo.timeExtensionOneDay(newEndDay);
         //机台延长一天
         cxMachineInfo.timeExtensionOneDayConclusion(productionContext, newEndDay, lastAllocationInfo);
+        //分组计划增加分配一天
+        groupPlan.timeExtensionOneDayConclusion();
+    }
+
+    /**
+     * 对分组计划在earliestConclusion分配基础上强制延长收尾一天
+     *
+     * @param context            排产上下文
+     * @param earliestConclusion 收尾的分配信息
+     * @param newEndDay          新的收尾日
+     */
+    private void forceTimeExtensionOneDayConclusion(Context context, CxMachineAllocationPlanHelper earliestConclusion, Integer newEndDay) {
+        ProductionPlanGroupInfo groupPlan = earliestConclusion.getProductionPlanInfo();
+        if (!checkBaseInfo(context, groupPlan, earliestConclusion, newEndDay)) {
+            return;
+        }
+        String selectedCxMachineCode = earliestConclusion.getCxMachineCode();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(selectedCxMachineCode);
+        //存在分配才延长
+        if (!cxMachineInfo.hasAllocation(earliestConclusion)) {
+            return;
+        }
+        //分配延长一天
+        earliestConclusion.timeExtensionOneDay(newEndDay);
+        //机台延长一天
+        cxMachineInfo.timeExtensionOneDayConclusion(productionContext, newEndDay, earliestConclusion);
         //分组计划增加分配一天
         groupPlan.timeExtensionOneDayConclusion();
     }

@@ -53,9 +53,10 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
     /**
      * 下发硫化排程结果到MES
      * 业务规则：
-     * 1. 当天数据：更新（存在则更新，不存在则插入）
-     * 2. 隔天数据：更新（存在则更新，不存在则插入）
-     * 3. 第三天数据：插入
+     * 1. 窗口首日数据：更新（存在则更新，不存在则插入）
+     * 2. 窗口次日数据：更新（存在则更新，不存在则插入）
+     * 3. 排程日期当天数据：先删除后插入
+     * 日期从下发数据中推导，不再依赖LocalDate.now()
      *
      * @param lhScheduleResultIssueList 硫化排程结果列表
      * @param factoryCode               厂别
@@ -71,44 +72,58 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
         // 获取下发接口版本号
         String dataVersion = syncDataHandle.getDataVersion(ItfSyncKeyEnum.SYNC_LH_SCHEDULE_RESULT.getCode());
 
-        // 获取今天、明天、后天的日期
-        LocalDate today = LocalDate.now();
-        LocalDate tomorrow = today.plusDays(1);
-        LocalDate dayAfterTomorrow = today.plusDays(2);
+        // 从数据中提取所有不重复的排程日期并排序
+        List<LocalDate> distinctDates = lhScheduleResultIssueList.stream()
+                .filter(item -> item.getScheduleDate() != null)
+                .map(item -> item.getScheduleDate().toLocalDate())
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+
+        if (distinctDates.isEmpty()) {
+            return AjaxResult.success("没有需要下发的数据");
+        }
+
+        LocalDate firstDate = distinctDates.get(0);
+        LocalDate lastDate = distinctDates.get(distinctDates.size() - 1);
 
         // 按日期分组处理数据
-        List<LhScheduleResultIssue> todayList = filterByDate(lhScheduleResultIssueList, today);
-        List<LhScheduleResultIssue> tomorrowList = filterByDate(lhScheduleResultIssueList, tomorrow);
-        List<LhScheduleResultIssue> dayAfterTomorrowList = filterByDate(lhScheduleResultIssueList, dayAfterTomorrow);
+        List<LhScheduleResultIssue> day1List = filterByDate(lhScheduleResultIssueList, distinctDates.get(0));
+        List<LhScheduleResultIssue> day2List = distinctDates.size() > 1
+                ? filterByDate(lhScheduleResultIssueList, distinctDates.get(1))
+                : new ArrayList<>();
+        List<LhScheduleResultIssue> day3List = distinctDates.size() > 2
+                ? filterByDate(lhScheduleResultIssueList, distinctDates.get(2))
+                : new ArrayList<>();
 
-        // 处理当天的数据：转换为MES实体
-        List<MesLhScheduleResult> todayMesList = convertToMesList(todayList, dataVersion, companyCode, factoryCode);
+        // 处理窗口首日数据：转换为MES实体
+        List<MesLhScheduleResult> day1MesList = convertToMesList(day1List, dataVersion, companyCode, factoryCode);
 
-        // 处理明天的数据：转换为MES实体
-        List<MesLhScheduleResult> tomorrowMesList = convertToMesList(tomorrowList, dataVersion, companyCode, factoryCode);
+        // 处理窗口次日数据：转换为MES实体
+        List<MesLhScheduleResult> day2MesList = convertToMesList(day2List, dataVersion, companyCode, factoryCode);
 
-        // 处理后天的数据：转换为MES实体
-        List<MesLhScheduleResult> dayAfterTomorrowMesList = convertToMesList(dayAfterTomorrowList, dataVersion, companyCode, factoryCode);
+        // 处理排程日期当天数据：转换为MES实体
+        List<MesLhScheduleResult> day3MesList = convertToMesList(day3List, dataVersion, companyCode, factoryCode);
 
-        // 当天和隔天数据：更新（存在则更新，不存在则插入）
-        upsertLhScheduleResult(todayMesList, dataVersion);
-        upsertLhScheduleResult(tomorrowMesList, dataVersion);
+        // 窗口首日和次日数据：更新（存在则更新，不存在则插入）
+        upsertLhScheduleResult(day1MesList, dataVersion);
+        upsertLhScheduleResult(day2MesList, dataVersion);
 
-        // 第三天数据：先删除后插入（确保数据干净）
-        insertLhScheduleResult(dayAfterTomorrowMesList, dayAfterTomorrow, dataVersion);
+        // 排程日期当天数据：先删除后插入（确保数据干净）
+        insertLhScheduleResult(day3MesList, lastDate, dataVersion);
 
         // 合并所有数据用于发送MQ
         List<MesLhScheduleResult> allMesList = new ArrayList<>();
-        allMesList.addAll(todayMesList);
-        allMesList.addAll(tomorrowMesList);
-        allMesList.addAll(dayAfterTomorrowMesList);
+        allMesList.addAll(day1MesList);
+        allMesList.addAll(day2MesList);
+        allMesList.addAll(day3MesList);
 
         if (CollectionUtils.isEmpty(allMesList)) {
             return AjaxResult.success("没有需要下发的数据");
         }
 
         // 发送MQ通知MES
-        return sendMqNotice(allMesList, today, dayAfterTomorrow, dataVersion, factoryCode, companyCode);
+        return sendMqNotice(allMesList, firstDate, lastDate, dataVersion, factoryCode, companyCode);
     }
 
     /**
@@ -193,8 +208,8 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
     /**
      * 发送MQ通知
      */
-    private AjaxResult sendMqNotice(List<MesLhScheduleResult> allMesList, LocalDate today, 
-                                  LocalDate dayAfterTomorrow, String dataVersion, 
+    private AjaxResult sendMqNotice(List<MesLhScheduleResult> allMesList, LocalDate startDate,
+                                  LocalDate endDate, String dataVersion,
                                   String factoryCode, String companyCode) {
         AjaxResult ajaxResult;
         try {
@@ -205,8 +220,8 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
             // 请求参数
             JSONObject params = new JSONObject();
             params.put("rowCount", allMesList.size());
-            params.put("startDate", today.format(DATE_FORMATTER));
-            params.put("endDate", dayAfterTomorrow.format(DATE_FORMATTER));
+            params.put("startDate", startDate.format(DATE_FORMATTER));
+            params.put("endDate", endDate.format(DATE_FORMATTER));
             syncParamsVO.setParams(params);
             syncParamsVO.setDataSys(SysCode.APS);
             syncParamsVO.setDockSys(com.zlt.aps.common.core.constant.ApsConstant.DOCK_SYS_MES);

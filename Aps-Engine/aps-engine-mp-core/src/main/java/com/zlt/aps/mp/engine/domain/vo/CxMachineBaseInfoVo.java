@@ -10,7 +10,9 @@ import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
+import com.zlt.aps.mp.engine.enums.GroupCxMachinePriorityEnum;
 import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
+import com.zlt.aps.mp.engine.handler.CxMachineGroupPriorityValueHelper;
 import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
@@ -130,6 +132,10 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 挑选时使用，可排产天数与需求天数的差值
      */
     private Integer capacityDiffValue;
+    /**
+     * 挑选时使用匹配
+     */
+    private CxMachineGroupPriorityValueHelper priorityValue;
     /**
      * 挑选时使用，排产日集合
      */
@@ -478,6 +484,94 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 20260427+ 判定机台是否为结构优先指定机台
+     * 需要判断 指定结构固定1~3
+     *
+     * @param groupPlanInfo 结构信息
+     * @return
+     */
+    public boolean hasPriorityFixedMachine(ProductionPlanGroupInfo groupPlanInfo) {
+        if (null == groupPlanInfo) {
+            return false;
+        }
+        //无固定配置
+        if (!hasFixed()) {
+            return false;
+        }
+        //判定结构
+        Set<String> fixedStructureSet = new HashSet<>();
+        if (StringUtils.isNotBlank(fixedStructure1)) {
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure1, StringConstant.COMMA);
+        }
+        if (StringUtils.isNotBlank(fixedStructure2)) {
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure2, StringConstant.COMMA);
+        }
+        if (StringUtils.isNotBlank(fixedStructure3)) {
+            CollectValueUtils.addSingleValueToCollect(fixedStructureSet, fixedStructure3, StringConstant.COMMA);
+        }
+        if (fixedStructureSet.contains(groupPlanInfo.getGroupName())) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 在前面已经匹配了机台与结构的排产天数信息
+     *
+     * @param context            排产上下文
+     * @param preProductionGroup 预排分组
+     * @param diffValue          断面宽差值
+     */
+    public void setSelectedPriorityValue(Context context, ProductionPlanGroupInfo preProductionGroup, Integer diffValue) {
+        if (null == preProductionGroup) {
+            return;
+        }
+        //设置同规格、同英寸、断面宽差值
+        setSameInfoByCurrentGroupPlan(context, preProductionGroup, diffValue);
+        //需求天数
+        Integer needDays = preProductionGroup.getLeftOverNeedAllocationDays();
+        //成型产能天数
+        Integer capacityDays = getSelectedProductionDys();
+        Integer capacityDiffValue = needDays - capacityDays;
+        // [0,1] 完全覆盖
+        if (BigDecimal.ZERO.intValue() <= capacityDiffValue && capacityDiffValue <= BigDecimal.ONE.intValue()) {
+            setFullyCoveredPriorityValue(needDays, capacityDays);
+            return;
+        }
+        // (1,max) 超出覆盖
+        if (capacityDiffValue > BigDecimal.ONE.intValue()) {
+            setBeyondCoveredPriorityValue(needDays, capacityDays);
+            return;
+        }
+        // (-min,0) 不覆盖
+        setNoCoveredPriorityValue(needDays, capacityDays);
+    }
+
+    /**
+     * 选择优先级-值
+     *
+     * @return
+     */
+    public Integer getSelectedPriorityValue() {
+        if (null == priorityValue) {
+            return GroupCxMachinePriorityEnum.DEFAULT_VALUE.getPriorityValue();
+        }
+        return priorityValue.getPriorityType().getPriorityValue();
+    }
+
+    /**
+     * 选择优先级的差值：需求天数 - 成型产能天数
+     *
+     * @return
+     */
+    public Integer getSelectedPriorityDiffValue() {
+        if (null == priorityValue) {
+            return Integer.MAX_VALUE;
+        }
+        return priorityValue.getDiffValue();
+    }
+
+    /**
      * 判断机台排产的最后一个结构
      * 是否为特殊结构
      *
@@ -627,12 +721,16 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 新增分配的分组计划信息
      * 同时，将成型工装的日使用量 + 1
      * 因都是3鼓机台，故而每种工装类型的日使用量都 + 1
+     * 并同时返回前分组信息，
+     * 用以后续前分组是否需要强制延长收尾的业务判断
+     * 空则表示没有前分组强制延长收尾的必要
      *
      * @param addAllocationPlan 分配信息对象
+     * @return 返回前分组信息，用以后续前分组是否需要强制延长收尾的业务判断
      */
-    public void addAllocationPlanInfo(Context context, CxMachineAllocationPlanHelper addAllocationPlan) {
+    public CxMachineAllocationPlanHelper addAllocationPlanInfo(Context context, CxMachineAllocationPlanHelper addAllocationPlan) {
         if (null == addAllocationPlan) {
-            return;
+            return null;
         }
         if (null == allocationList) {
             allocationList = new ArrayList<>();
@@ -650,7 +748,31 @@ public class CxMachineBaseInfoVo implements Serializable {
             String groupName = addAllocationPlan.getAllocationGroup();
             log.info(TbrProductionGroupLogRecorder.addCxMachineChangeGroupLog(productionContext, cxMachineCode, startDay, groupName));
             baseDataContainer.getDayCapacityLimit().addChangeGroupNameUsedQty(productionContext, startDay, cxMachineCode, groupName);
+            //20260429+ 前分组是否需要延长，返回前分组配置信息
+            return getBeforeTimeExtensionDayConclusion(productionContext, lastAllocation, startDay);
         }
+        return null;
+    }
+
+    /**
+     * 当前是否存在分配信息
+     * 1、如果没有分配信息，则直接为false
+     * <p>
+     * true表示存在, false 表示不存在
+     *
+     * @param allocationInfo 分配信息对象
+     * @return
+     */
+    public boolean hasAllocation(CxMachineAllocationPlanHelper allocationInfo) {
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return false;
+        }
+        for (CxMachineAllocationPlanHelper assigned : allocationList) {
+            if (assigned == allocationInfo) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -808,7 +930,6 @@ public class CxMachineBaseInfoVo implements Serializable {
         baseDataContainer.addUsedCount(newEndDay, proSize, cxMachineCode);
         //分组占用每日产能
         dayCapacityLimit.addCxMachineGroupNameAllocationUsedQty(context, newEndDay, timeExtensionAllocation);
-
     }
 
     /**
@@ -981,6 +1102,31 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 获取前结构是否需要延长
+     * 因每日结构切换限制导致延长
+     *
+     * @param productionContext 排产上下文
+     * @param last              前分组排产信息
+     * @param afterStartDay     后分组的起始排产日
+     * @return
+     */
+    private CxMachineAllocationPlanHelper getBeforeTimeExtensionDayConclusion(TbrProductionContext productionContext, CxMachineAllocationPlanHelper last, Integer afterStartDay) {
+        if (null == last || null == afterStartDay) {
+            return null;
+        }
+        Integer beforeEndDay = last.getEndDay();
+        Integer theoryConnectionDay = afterStartDay - BigDecimal.ONE.intValue();
+        if (theoryConnectionDay <= productionContext.getCycleFirstProductionDay()) {
+            return null;
+        }
+        if (theoryConnectionDay > beforeEndDay) {
+            last.setTimeExtensionDayByChangeLimit(theoryConnectionDay);
+            return last;
+        }
+        return null;
+    }
+
+    /**
      * 获取成型机台在startDay~周期结束日可排产的集合信息
      * 需要剔除自身的停产日
      *
@@ -1095,7 +1241,7 @@ public class CxMachineBaseInfoVo implements Serializable {
             return CxMachineFixedPriorityEnum.DEFAULT;
         }
         List<MonthPlanProductionRequirePlanVo> hasProductionList = groupPlanData.stream().filter(singleSku -> singleSku.getOriginProductionQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
-        if(CollectionUtils.isEmpty(hasProductionList)){
+        if (CollectionUtils.isEmpty(hasProductionList)) {
             return CxMachineFixedPriorityEnum.DEFAULT;
         }
         Set<String> materialCodePlanSet = hasProductionList.stream().map(MonthPlanProductionRequirePlanVo::getMaterialCode).collect(Collectors.toSet());
@@ -1185,7 +1331,6 @@ public class CxMachineBaseInfoVo implements Serializable {
         String proSize = productionPlanInfo.getProSizeInfo();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
-        baseDataContainer.getCxMachineBaseInfo().get(cxMachineCode);
         DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
         for (Integer productionDay = startDay; productionDay <= endDay; productionDay++) {
             if (stopDayInfo.contains(productionDay)) {
@@ -1274,15 +1419,16 @@ public class CxMachineBaseInfoVo implements Serializable {
     /**
      * 根据机台的续作信息，设置
      * 同规格、同英寸、断面宽
+     * 默认：非同规格、非同英寸、非断面宽范围
      *
      * @param productionContext 排产上下文
      * @param addGroupPlan      新增分配分组
      * @param diffValue         断面宽差值
      */
     private void setSameInfoByContinueGroup(TbrProductionContext productionContext, ProductionPlanGroupInfo addGroupPlan, Integer diffValue) {
-        sameSpecifications = YesOrNoEnum.YES.getCode();
-        sameProSize = YesOrNoEnum.YES.getCode();
-        sectionWidthCondition = YesOrNoEnum.YES.getCode();
+        sameSpecifications = YesOrNoEnum.NO.getCode();
+        sameProSize = YesOrNoEnum.NO.getCode();
+        sectionWidthCondition = YesOrNoEnum.NO.getCode();
         Map<String, String> cxMachineContinueInfoMap = productionContext.getContinueStructureMap();
         if (CollectionUtils.isEmpty(cxMachineContinueInfoMap)) {
             return;
@@ -1329,4 +1475,85 @@ public class CxMachineBaseInfoVo implements Serializable {
         this.sectionWidthCondition = sectionWidthCondition;
     }
 
+    /**
+     * 设置 完全覆盖 优先级
+     *
+     * @param needDays     需求天数
+     * @param capacityDays 成型产能天数
+     */
+    private void setFullyCoveredPriorityValue(Integer needDays, Integer capacityDays) {
+        Integer capacityDiffValue = needDays - capacityDays;
+        // [0,1] 完全覆盖
+        if (!(BigDecimal.ZERO.intValue() <= capacityDiffValue && capacityDiffValue <= BigDecimal.ONE.intValue())) {
+            return;
+        }
+        if (YesOrNoEnum.YES.getCode().equals(sameSpecifications)) {
+            this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.SAME_SPECIFICATIONS_FULLY_COVERED, needDays, capacityDays);
+            return;
+        }
+        if (YesOrNoEnum.YES.getCode().equals(sameProSize)) {
+            this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.SAME_PRO_SIZE_FULLY_COVERED, needDays, capacityDays);
+            return;
+        }
+        if (YesOrNoEnum.YES.getCode().equals(sectionWidthCondition)) {
+            this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.SECTION_WIDTH_FULLY_COVERED, needDays, capacityDays);
+            return;
+        }
+        this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.OTHER_FULLY_COVERED, needDays, capacityDays);
+        return;
+    }
+
+    /**
+     * 设置 超出覆盖 优先级
+     *
+     * @param needDays     需求天数
+     * @param capacityDays 成型产能天数
+     */
+    private void setBeyondCoveredPriorityValue(Integer needDays, Integer capacityDays) {
+        Integer capacityDiffValue = needDays - capacityDays;
+        if (capacityDiffValue <= BigDecimal.ONE.intValue()) {
+            return;
+        }
+        if (YesOrNoEnum.YES.getCode().equals(sameSpecifications)) {
+            this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.SAME_SPECIFICATIONS_BEYOND_COVERED, needDays, capacityDays);
+            return;
+        }
+        if (YesOrNoEnum.YES.getCode().equals(sameProSize)) {
+            this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.SAME_PRO_SIZE_BEYOND_COVERED, needDays, capacityDays);
+            return;
+        }
+        if (YesOrNoEnum.YES.getCode().equals(sectionWidthCondition)) {
+            this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.SECTION_WIDTH_BEYOND_COVERED, needDays, capacityDays);
+            return;
+        }
+        this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.OTHER_BEYOND_COVERED, needDays, capacityDays);
+        return;
+    }
+
+    /**
+     * 设置 不覆盖 优先级
+     *
+     * @param needDays     需求天数
+     * @param capacityDays 成型产能天数
+     */
+    private void setNoCoveredPriorityValue(Integer needDays, Integer capacityDays) {
+        Integer capacityDiffValue = needDays - capacityDays;
+        if (capacityDiffValue >= BigDecimal.ZERO.intValue()) {
+            return;
+        }
+        if (YesOrNoEnum.YES.getCode().equals(sameSpecifications)) {
+            this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.SAME_SPECIFICATIONS_NO_COVERED, needDays, capacityDays);
+            return;
+        }
+        if (YesOrNoEnum.YES.getCode().equals(sameProSize)) {
+            this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.SAME_PRO_SIZE_NO_COVERED, needDays, capacityDays);
+            return;
+        }
+        if (YesOrNoEnum.YES.getCode().equals(sectionWidthCondition)) {
+            this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.SECTION_WIDTH_NO_COVERED, needDays, capacityDays);
+            return;
+        }
+        this.priorityValue = new CxMachineGroupPriorityValueHelper(GroupCxMachinePriorityEnum.OTHER_NO_COVERED, needDays, capacityDays);
+        return;
+    }
 }

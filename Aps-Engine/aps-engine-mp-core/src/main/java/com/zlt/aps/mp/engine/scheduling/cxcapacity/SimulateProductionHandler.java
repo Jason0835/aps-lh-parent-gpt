@@ -1,5 +1,7 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
@@ -12,6 +14,7 @@ import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
+import com.zlt.aps.mp.engine.handler.GroupPriorityProductionScheduler;
 import com.zlt.aps.mp.engine.handler.SupplementCxMachineDistributionHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
@@ -54,12 +57,16 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     private final SpecialMaterialScheduleHandler specialMaterialScheduleHandler;
 
+    private final GroupPriorityProductionScheduler groupPriorityProductionScheduler;
+
     private final SupplementCxMachineDistributionHandler supplementCxMachineDistributionHandler;
 
     private final DifferentGroupMoldAllocationAdjustHandler differentGroupMoldAllocationAdjustHandler;
 
     /**
      * 模拟排产计划
+     * //1、在机结构对在产成型机台进行模拟模具排产
+     * clearSimulateDataAndResetProductionContinue(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
      *
      * @param productionContext      排产上下文
      * @param allGroupPlanMap        所有排产分组计划
@@ -69,17 +76,19 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
     public void productionGroupPlan(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
         //设置收尾机台信息-空
         productionContext.setReverseFindSet(new HashSet<>());
+        Integer productionMode = productionContext.getBaseDataContainer().getParamConfiguration().getProductionMode();
         //1、模拟排产前的数据处理
         clearProductionInfoHandler.beforeSimulateProductionHandler(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         log.info(TbrSimulateProductionLogRecorder.addResetDataFinishLog(productionContext));
         //2、在机结构对在产成型机台进行模拟模具排产
         mouldProductionByContinueGroup(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
-        //3、对在产机台-收尾成型机台，反向匹配待排结构
-        cxCapacityAllocationHandler.reverseMachineAllocation(productionContext, allGroupPlanMap);
-        //4、对结构重新标记分配完成情况--还需分配量>最小上机时间的结构，重新标记没有分配完成
-        resetFlagAllocationFinish(productionContext, allGroupPlanMap);
-        //5、对还需排产结构，获取优先级最高的结构--结构新增
-        addNewGroupPlanHandler(productionContext, allGroupPlanMap, new HashSet<>());
+        if (YesOrNoEnum.YES.getValue().equals(productionMode)) {
+            //交付优先，在机分组之后，按分组的高优先级排序，优先级高的分组先进行排产
+            deliveryPriorityProduction(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
+        } else {
+            //效率优先，在机分组之后，按收尾机台(排除空机台)的切换匹配分组待需分配排产
+            efficiencyPriorityProduction(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
+        }
         //6、对成型剩余不满足最短上机天数的机台进行分配结构处理
         supplementCxMachineDistributionHandler.handlerTailCapacity(productionContext, allGroupPlanMap);
     }
@@ -98,6 +107,73 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         allContinueInfo.forEach((structureName, cxContinueInfo) -> {
             productionContinueByType(cxAddSkuProductionHandler, productionStage, context, allGroupPlanInfo, structureName, cxContinueInfo, ContinueTypeEnum.SAME_SKU);
         });
+    }
+
+    /**
+     * 以订单交付性角度：即高优先级订单结构优先
+     * 交付优先排产模式
+     *
+     * @param productionContext
+     */
+    private void deliveryPriorityProduction(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
+        //1、按高优先级，获取预期排产的分组信息
+        Set<String> preSelectedGroupSet = Sets.newHashSet();
+        log.info(TbrSimulateProductionLogRecorder.addStartDeliveryPriorityLog(productionContext));
+        groupPriorityProductionScheduler.allocationCxMachine(productionContext, Sets.newHashSet(), preSelectedGroupSet);
+        //2、判断预期排产分组中是是否有设置固定1~3的分组
+        List<ProductionPlanGroupInfo> hasFixedPriorityCxMachineList = getGroupFixedCxMachine(productionContext, preSelectedGroupSet);
+        if (CollectionUtils.isEmpty(hasFixedPriorityCxMachineList)) {
+            return;
+        }
+        //3、开始重排在产分组在产机台续作
+        resetProduction(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
+        //4、对固定分组进行排产
+        TbrSimulateProductionLogRecorder.addDeliveryPriorityFixedCxMachineGroupLog(productionContext);
+        groupPriorityProductionScheduler.productionGroupFixedCxMachine(productionContext, Sets.newHashSet(), hasFixedPriorityCxMachineList);
+        //5、在对剩余的进行Top3排产
+        TbrSimulateProductionLogRecorder.addDeliveryPriorityLeftOverGroupLog(productionContext);
+        groupPriorityProductionScheduler.allocationCxMachine(productionContext, Sets.newHashSet(), Sets.newHashSet());
+    }
+
+    /**
+     * 以生产角度：生产切换角度
+     * 效率优先排产
+     * 1、对收尾机台(空机台剔除),从机台角度选择分组计划
+     * 2、对剩余还需排产分组，以分组角度，按优先级获取最高优先级分组，挑选可排产机台(此时空机台参与排产)
+     *
+     * @param productionContext      排产上下文
+     * @param allGroupPlanMap        所有分组对象集合
+     * @param continueAllocationList 所有在产分组-对在产机台的分配信息集合
+     * @param allContinueMap         所有在产分组续作Sku信息集合
+     */
+    private void efficiencyPriorityProduction(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
+        //1、对在产机台-收尾成型机台，反向匹配待排结构
+        cxCapacityAllocationHandler.reverseMachineAllocation(productionContext, allGroupPlanMap);
+        //2、对结构重新标记分配完成情况--还需分配量>最小上机时间的结构，重新标记没有分配完成
+        resetFlagAllocationFinish(productionContext, allGroupPlanMap);
+        //3、对还需排产结构，获取优先级最高的结构--结构新增
+        addNewGroupPlanHandler(productionContext, allGroupPlanMap, new HashSet<>());
+    }
+
+    /**
+     * 重新开始模拟排产：
+     * 1、清空收尾机台设置
+     * 2、将成型产能分配还原到在产分组对在产机台的初始分配(测算分配)
+     * 3、在产分组对在产机台已分配情况进行模拟排产
+     *
+     * @param productionContext      排产上下文
+     * @param allGroupPlanMap        所有分组对象集合
+     * @param continueAllocationList 所有在产机台对在产分组的分配信息集合
+     * @param allContinueMap         所有续作Sku集合
+     */
+    private void resetProduction(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
+        //1、清空机台收尾设置
+        productionContext.setReverseFindSet(new HashSet<>());
+        //2、还原设置(包涵在产机台对在产分配的续作分配)
+        clearProductionInfoHandler.resetProductionBySimulateProductionHandler(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
+        TbrSimulateProductionLogRecorder.addDeliveryPriorityResetContinueLog(productionContext);
+        //3、在机结构对在产成型机台进行模拟模具排产
+        mouldProductionByContinueGroup(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
     }
 
     /**
@@ -243,7 +319,9 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //更新剩余天数：分组的剩余天数、成型机台剩余可分配天数
         addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
-        selectedCxMachine.addAllocationPlanInfo(context, addHelper);
+        CxMachineAllocationPlanHelper beforeGroupAllocation = selectedCxMachine.addAllocationPlanInfo(context, addHelper);
+        //20260429+ 存储前分组分配信息，用以前分组是否需要强制延长
+        addHelper.setBeforeAllocationByChangeLimit(beforeGroupAllocation);
         //对成型机台进行模拟模具排产
         cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper, new HashSet<>());
         //20260323 重新获取剩余天数：可能因提前收尾变化，导致计划实际没有排，下轮直接排除,不能比较分配完成
@@ -253,6 +331,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         } else {
             excludeGroupPlan.remove(groupName);
         }
+        //20260429+ 前分组分配强制延长处理
+        cxMouldProductionHandler.handlerTimeExtensionDayConclusionByBeforeGroup(productionContext, addHelper);
         //重新获取机台的剩余日：可能因提前收尾变化，导致实际分配天数与初始分配天数不一致
         Integer leftOver = selectedCxMachine.getRemainingDays();
         boolean isProductionByCxMachine = !originLeftOverByCxMachine.equals(leftOver);
@@ -265,6 +345,39 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             resetFlagAllocationFinish(context, allGroupPlanMap);
         }
         addNewGroupPlanHandler(context, allGroupPlanMap, excludeGroupPlan);
+    }
+
+    /**
+     * 对预期排产分组，是否有固定分组，如果有则固定分组优先选择固定机台
+     *
+     * @param context             排产上下文
+     * @param preSelectedGroupSet Top之后的预排分组集合
+     * @return 返回有设置固定1~固定3的分组集合
+     */
+    private List<ProductionPlanGroupInfo> getGroupFixedCxMachine(Context context, Set<String> preSelectedGroupSet) {
+        if (CollectionUtils.isEmpty(preSelectedGroupSet)) {
+            return Collections.emptyList();
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, ProductionPlanGroupInfo> allGroupMap = productionContext.getGroupProductionInfo();
+        if (CollectionUtils.isEmpty(allGroupMap)) {
+            return Collections.emptyList();
+        }
+        List<ProductionPlanGroupInfo> priorityFixedGroupList = Lists.newArrayList();
+        preSelectedGroupSet.forEach(groupName -> {
+            ProductionPlanGroupInfo groupInfo = allGroupMap.get(groupName);
+            if (null == groupInfo) {
+                return;
+            }
+            if (CollectionUtils.isEmpty(groupInfo.getPriorityFixedCxMachineSet())) {
+                return;
+            }
+            priorityFixedGroupList.add(groupInfo);
+        });
+        if (CollectionUtils.isEmpty(priorityFixedGroupList)) {
+            return Collections.emptyList();
+        }
+        return priorityFixedGroupList;
     }
 
 }

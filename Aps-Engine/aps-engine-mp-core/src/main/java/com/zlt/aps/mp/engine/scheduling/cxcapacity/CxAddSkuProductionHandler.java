@@ -4,7 +4,10 @@ import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
-import com.zlt.aps.mp.engine.daylimit.*;
+import com.zlt.aps.mp.engine.daylimit.BeforeSkuProductionInfo;
+import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
+import com.zlt.aps.mp.engine.daylimit.MouldProductionLimitTypeEnum;
+import com.zlt.aps.mp.engine.daylimit.MouldShellBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
@@ -83,8 +86,7 @@ public class CxAddSkuProductionHandler {
         //处理需要提前收尾(需要调整到成型机台下的收尾点，包含成型机台最后一个配置的分配信息和成型机台剩余时间调整)
         groupPlanBeforeConclusionHandler.handlerBeforeConclusion(context, groupPlanInfo, continueCxMachineAllocation);
 
-        //20260330 分组计划标记分配完成，需要验证是否需要进行分组计划分配延长处理
-//        markTimeExtensionCxMachine(context, continueCxMachineAllocation);
+        //20260330 分组计划标记分配完成，需要验证是否需要进行分组计划分配延长处理 markTimeExtensionCxMachine(context, continueCxMachineAllocation)
         groupTimeExtensionHandler.handlerTimeExtension(this, context, structureName, cxContinueInfo, continueCxMachineAllocation, handledDayInfo);
         //设置收尾机台
         continueCxMachineAllocation.forEach(cxMachineAllocation -> {
@@ -128,8 +130,7 @@ public class CxAddSkuProductionHandler {
         List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
         List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
         BeforeSkuProductionInfo beforeSkuInfo = lhGroup.getBeforeSkuInfo();
-        //获取优先级最高的Sku信息
-//        String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList);
+        //获取优先级最高的Sku信息 getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList)
         String materialDesc = SkuPrioritySelector.getHighestPrioritySku(context, productionStage, formalRound, groupPlanInfo, lhGroup, ContinueTypeEnum.NO_CONTINUE, leftOverHasProductionList, new HashSet<>(), startDay, endDay);
         TbrMouldProductionLogRecorder.addContinueGroupLhGroupFindSkuLog(context, groupName, onLineMachineInfo, materialDesc);
         if (StringUtils.isBlank(materialDesc)) {
@@ -176,6 +177,7 @@ public class CxAddSkuProductionHandler {
         Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(groupPlanInfo, groupPlanInfo.getAllocationCxMachineCodeSet(), lhGroup.transformCxLhGroup(), sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //开始排产
+        TbrMouldProductionLogRecorder.addSkuNeedProductionInfoLog(context, groupName, materialDesc, ContinueTypeEnum.NO_CONTINUE.getDesc(), sumProductionQty);
         CxLhMouldProductionCalculator.lhProductionByGroupHandler(context, lhProductionQtyHelper, startDay, endDay, doubleMouldList, needProductionInfo.getNeedProductionList(), ContinueTypeEnum.NO_CONTINUE);
         //递归：重新获取下一组
         Integer productionQty = lhProductionQtyHelper.getRealSumProductionQty();
@@ -223,8 +225,7 @@ public class CxAddSkuProductionHandler {
             log.info(TbrMouldProductionLogRecorder.addLhGroupStartLimitEndLog(context, groupName, cxMachineCode, startDay, endDay));
             return;
         }
-        //获取优先级最高的Sku信息
-//        String materialDesc = getSelectedAddSku(productionContext, startDay, endDay, productionPlanList);
+        //获取优先级最高的Sku信息 getSelectedAddSku(productionContext, startDay, endDay, productionPlanList);
         String materialDesc = SkuPrioritySelector.getHighestPrioritySku(productionContext, ProductionStageEnum.SIMULATE_STAGE, cxMachineInfo, cxLhGroup, productionPlanList, new HashSet<>(), startDay, endDay);
         if (StringUtils.isBlank(materialDesc)) {
             //记录日志

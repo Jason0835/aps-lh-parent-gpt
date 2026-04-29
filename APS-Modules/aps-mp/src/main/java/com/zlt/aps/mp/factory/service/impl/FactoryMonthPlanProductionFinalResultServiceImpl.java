@@ -1,5 +1,7 @@
 package com.zlt.aps.mp.factory.service.impl;
 
+import static com.zlt.aps.common.core.utils.ApsNumberUtils.*;
+
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.ReflectUtil;
 import com.alibaba.fastjson.JSON;
@@ -44,6 +46,7 @@ import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +56,7 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -792,5 +796,59 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         factoryMonthPlanProductionFinalResultEntityMapper.update(null, updateWrapper);
         log.info("月计划下发MES更新发布状态->已发布");
         return AjaxResult.success();
+    }
+    
+    /**
+     * 导入定稿
+     * @param list 列表数据
+     * @param updateSupport 覆盖
+     * @param importLogId 导入日志ID
+     * @param params 导入参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult importDataFinalResult(List<FactoryMonthPlanProductionFinalResult> list, boolean updateSupport,
+                                            Long importLogId, FactoryMonthPlanProductionFinalResult params) {
+        // 1、加载定稿版本，只加载指定结构
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, params.getFactoryCode());
+        queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, params.getProductionVersion());
+        queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getStructureName, params.getStructureName());
+        List<FactoryMonthPlanProductionFinalResult> finalList = factoryMonthPlanProductionFinalResultEntityMapper
+                .selectList(queryWrapper);
+        
+        // 2、把导入数据合并到原版本中
+        List<FactoryMonthPlanProductionFinalResult> updateList = new ArrayList<>();
+        Map<String, FactoryMonthPlanProductionFinalResult> importMap = list.stream().collect(Collectors.toMap(FactoryMonthPlanProductionFinalResult::getMaterialCode, Function.identity(), (p1, p2) -> p1));
+        int successNum = 0;
+        for (FactoryMonthPlanProductionFinalResult finalResult: finalList) {
+            String materialCode = finalResult.getMaterialCode();
+            FactoryMonthPlanProductionFinalResult finalImport = importMap.get(materialCode);
+            if (finalImport == null) {
+                continue;
+            }
+            boolean isChange = false;
+            for (int day = FactoryConstant.MONTH_START_DAY; day < FactoryConstant.MONTH_MAX_DAY; day ++) {
+                String fieldName = FactoryConstant.DAY_FIELD + day;
+                int oldValue = intValue(finalResult.getFieldValueByFieldName(fieldName));
+                int newValue = intValue(finalImport.getFieldValueByFieldName(fieldName));
+                if (oldValue != newValue) {
+                    if (newValue > 0) {
+                        finalResult.setFieldValueByFieldName(fieldName, newValue);
+                    } else {
+                        finalResult.setFieldValueByFieldName(fieldName, null);
+                    }
+                    isChange = true;
+                    successNum ++;
+                }
+            }
+            if (isChange) { // 如果有有更新，需要重算部分栏位并添加到更新列表中
+                finalResult.statisticsTotalQty();
+                finalResult.setBaseVale(finalResult.getId());
+                updateList.add(finalResult);
+            }
+        }
+        baseDao.updateBatch(updateList);
+        return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
     }
 }

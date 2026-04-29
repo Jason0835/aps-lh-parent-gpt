@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
+import com.google.common.collect.Sets;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
@@ -78,6 +79,10 @@ public class ProductionPlanGroupInfo {
      */
     private Set<String> fixedCxMachineSet;
     /**
+     * 20260427+ 分组指定的固定1~固定3集合
+     */
+    private Set<String> priorityFixedCxMachineSet;
+    /**
      * 估算需要的机台数
      */
     private BigDecimal needCxCapacityMachineCount;
@@ -142,18 +147,6 @@ public class ProductionPlanGroupInfo {
      */
     private Set<String> allocationCxMachineCodeSet;
     /**
-     * 确定结构机台分配后，成型硫化配比最后一天排产分组信息
-     * 在机结构-需要考虑后续新增机台场景
-     */
-    @Deprecated
-    private Map<Integer, CxLhProductionHelper> cxLhRatioMap;
-    /**
-     * 日排产信息
-     * 数据存储
-     */
-    @Deprecated
-    private Map<Integer, List<GroupPlanDayProductionInfoHelper>> dayProductionInfo;
-    /**
      * 是否分配完毕 1 分配完成
      */
     private Integer isAllocationFinish;
@@ -204,6 +197,7 @@ public class ProductionPlanGroupInfo {
         groupInfo.setIsZero(YesOrNoEnum.NO.getCode());
         groupInfo.setGroupPlanData(groupPlanData);
         groupInfo.setFixedCxMachineSet(new HashSet<>());
+        groupInfo.setPriorityFixedCxMachineSet(new HashSet<>());
         groupInfo.setIsLatestSpecialMaterial(false);
         groupInfo.setHasBeforeConclusionHandler(true);
 
@@ -494,29 +488,6 @@ public class ProductionPlanGroupInfo {
             return;
         }
         leftOverNeedAllocationDays = leftOverNeedAllocationDays + deductionDays;
-    }
-
-    /**
-     * 获取结构下，最早收尾的硫化机台组
-     *
-     * @return
-     */
-    @Deprecated
-    public CxLhProductionHelper getEarliestConclusionLhGroup() {
-        //获取成型硫化组
-        if (CollectionUtils.isEmpty(cxLhRatioMap)) {
-            return null;
-        }
-        List<CxLhProductionHelper> cxLhGroupList = new ArrayList<>(cxLhRatioMap.values());
-        //剔除一开始没有排产的？
-        List<CxLhProductionHelper> hasProductionList = cxLhGroupList.stream().filter(cxLhGroup -> null != cxLhGroup.getProductionDay()).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(hasProductionList)) {
-            return null;
-        }
-        //按最后排产日，进行升序排序
-        hasProductionList.sort(Comparator.comparing(CxLhProductionHelper::getProductionDay).thenComparing(CxLhProductionHelper::getLhGroupNo));
-        //取得第一条：即最早收尾的硫化组
-        return hasProductionList.get(BigDecimal.ZERO.intValue());
     }
 
     /**

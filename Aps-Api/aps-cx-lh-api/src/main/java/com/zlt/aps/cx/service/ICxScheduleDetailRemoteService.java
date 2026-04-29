@@ -3,6 +3,8 @@ package com.zlt.aps.cx.service;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
+import com.zlt.aps.cx.vo.ScheduleDetailQueryVo;
+import com.zlt.aps.cx.vo.ScheduleUpdateDetailPlanQtyVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -51,6 +53,20 @@ public interface ICxScheduleDetailRemoteService {
     AjaxResult listByShift(
             @RequestParam("mainId") Long mainId,
             @RequestParam("shiftCode") String shiftCode);
+
+    /**
+     * 综合查询明细列表（支持主表字段过滤）
+     */
+    @ApiOperation("综合查询明细列表")
+    @PostMapping("/cxScheduleDetail/listByQuery")
+    AjaxResult listByQuery(@RequestBody ScheduleDetailQueryVo query);
+
+    /**
+     * 批量修改明细计划量（同步更新主表）
+     */
+    @ApiOperation("批量修改明细计划量")
+    @PostMapping("/cxScheduleDetail/updatePlanQty")
+    AjaxResult updatePlanQty(@RequestBody List<ScheduleUpdateDetailPlanQtyVo> voList);
 
     /**
      * 根据ID获取详细信息

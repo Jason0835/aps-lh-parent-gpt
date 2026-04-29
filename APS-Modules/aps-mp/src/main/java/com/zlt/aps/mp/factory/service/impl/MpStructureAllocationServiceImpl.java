@@ -2167,7 +2167,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 item.statisticsTotalQty(); // 统计总排产量
                 if (item.getTotalQty() <= 0) {
                     item.setId(-999L);
-                    failureNum++;
+//                    failureNum++; // 没有计划量的仅忽略不导入，不计入错误数中
                     addImportErrorLog(importLogId, errorNum, notTotalQtyStr, importErrorLogs);
                     continue;
                 }

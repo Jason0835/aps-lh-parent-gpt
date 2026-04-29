@@ -641,7 +641,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         queryWrapper.eq(DpDemandPlan::getMonthPlanVersion, monthPlanVersion);
         List<DpDemandPlan> currentDemandPlanList = demandPlanEntityMapper.selectList(queryWrapper);
         Map<String, List<DpDemandPlan>> currentDemandPlanMap = currentDemandPlanList.stream()
-                .collect(Collectors.groupingBy(DpDemandPlan::getMonthPlanVersion));
+                .collect(Collectors.groupingBy(DpDemandPlan::getMaterialCode));
         if (CollectionUtils.isEmpty(currentDemandPlanList)) {
             AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.noExistVersion"));
         }
@@ -662,11 +662,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         lastSumQueryWrapper.eq(DpDemandPlanSum::getPlanType, planType);
         String inSql = "MONTH_PLAN_VERSION IN (SELECT MAX(MONTH_PLAN_VERSION) FROM T_DP_DEMAND_PLAN_SUM WHERE IS_DELETE = 0 AND FACTORY_CODE = {0} AND YEAR = {1} AND MONTH = {2} AND PLAN_TYPE = {3} AND MONTH_PLAN_VERSION < {4})";
         lastSumQueryWrapper.apply(inSql, factoryCode, year, month, planType, monthPlanVersion);
-        List<DpDemandPlanSum> applyDemandPlanSumList = dpDemandPlanSumEntityMapper.selectList(lastSumQueryWrapper);
-        if (CollectionUtils.isEmpty(applyDemandPlanSumList)) { // 没有上一个版本，不需要继承
+        List<DpDemandPlanSum> lastDemandPlanSumList = dpDemandPlanSumEntityMapper.selectList(lastSumQueryWrapper);
+        if (CollectionUtils.isEmpty(lastDemandPlanSumList)) { // 没有上一个版本，不需要继承
             return AjaxResult.success();
         }
-        Map<String, DpDemandPlanSum> lastPlanMap = currentDemandPlanSumList.stream()
+        Map<String, DpDemandPlanSum> lastPlanMap = lastDemandPlanSumList.stream()
                 .collect(Collectors.toMap(DpDemandPlanSum::getMaterialCode, Function.identity(), (p1, p2) -> p1));
 
         // 3、遍历待更新，将上版本需求计划的【结构优先、物料优先、是否排产】继承过去

@@ -9,6 +9,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -825,5 +826,41 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
         }
     }
 
+    /**
+     * 重新统计总排产量
+     */
+    public void statisticsTotalQty() {
+        this.totalQty = Optional.ofNullable(this.day1).orElse(0) +
+                Optional.ofNullable(this.day2).orElse(0) +
+                Optional.ofNullable(this.day3).orElse(0) +
+                Optional.ofNullable(this.day4).orElse(0) +
+                Optional.ofNullable(this.day5).orElse(0) +
+                Optional.ofNullable(this.day6).orElse(0) +
+                Optional.ofNullable(this.day7).orElse(0) +
+                Optional.ofNullable(this.day8).orElse(0) +
+                Optional.ofNullable(this.day9).orElse(0) +
+                Optional.ofNullable(this.day10).orElse(0) +
+                Optional.ofNullable(this.day11).orElse(0) +
+                Optional.ofNullable(this.day12).orElse(0) +
+                Optional.ofNullable(this.day13).orElse(0) +
+                Optional.ofNullable(this.day14).orElse(0) +
+                Optional.ofNullable(this.day15).orElse(0) +
+                Optional.ofNullable(this.day16).orElse(0) +
+                Optional.ofNullable(this.day17).orElse(0) +
+                Optional.ofNullable(this.day18).orElse(0) +
+                Optional.ofNullable(this.day19).orElse(0) +
+                Optional.ofNullable(this.day20).orElse(0) +
+                Optional.ofNullable(this.day21).orElse(0) +
+                Optional.ofNullable(this.day22).orElse(0) +
+                Optional.ofNullable(this.day23).orElse(0) +
+                Optional.ofNullable(this.day24).orElse(0) +
+                Optional.ofNullable(this.day25).orElse(0) +
+                Optional.ofNullable(this.day26).orElse(0) +
+                Optional.ofNullable(this.day27).orElse(0) +
+                Optional.ofNullable(this.day28).orElse(0) +
+                Optional.ofNullable(this.day29).orElse(0) +
+                Optional.ofNullable(this.day30).orElse(0) +
+                Optional.ofNullable(this.day31).orElse(0);
+    }
 
 }

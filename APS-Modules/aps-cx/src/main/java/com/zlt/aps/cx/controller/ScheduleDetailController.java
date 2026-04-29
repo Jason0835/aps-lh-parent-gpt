@@ -3,13 +3,15 @@ package com.zlt.aps.cx.controller;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.service.CxScheduleDetailService;
+import com.zlt.aps.cx.vo.CxScheduleDetailVo;
+import com.zlt.aps.cx.vo.ScheduleDetailQueryVo;
+import com.zlt.aps.cx.vo.ScheduleUpdateDetailPlanQtyVo;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -28,7 +30,7 @@ public class ScheduleDetailController {
     private CxScheduleDetailService cxScheduleDetailService;
 
     /**
-     * 根据主表ID查询明细列表
+     * 根据主表ID查询明细列表（带主表信息）
      */
     @ApiOperation("根据主表ID查询明细列表")
     @GetMapping("/listByMainId/{mainId}")
@@ -36,22 +38,17 @@ public class ScheduleDetailController {
         if (mainId == null) {
             return AjaxResult.error("主表ID不能为空");
         }
-        List<CxScheduleDetail> details = cxScheduleDetailService.listByMainId(mainId);
+        List<CxScheduleDetailVo> details = cxScheduleDetailService.listVoByMainId(mainId);
         return AjaxResult.success(details);
     }
 
     /**
-     * 根据机台和日期查询明细
+     * 综合查询明细列表（支持主表字段过滤，带主表信息）
      */
-    @ApiOperation("根据机台和日期查询明细")
-    @GetMapping("/listByMachineAndDate")
-    public AjaxResult listByMachineAndDate(
-            @RequestParam("cxMachineCode") String cxMachineCode,
-            @RequestParam("scheduleDate") LocalDate scheduleDate) {
-        if (cxMachineCode == null || scheduleDate == null) {
-            return AjaxResult.error("机台编码和排程日期不能为空");
-        }
-        List<CxScheduleDetail> details = cxScheduleDetailService.listByMachineAndDate(cxMachineCode, scheduleDate);
+    @ApiOperation("综合查询明细列表")
+    @PostMapping("/listByQuery")
+    public AjaxResult listByQuery(@RequestBody ScheduleDetailQueryVo query) {
+        List<CxScheduleDetailVo> details = cxScheduleDetailService.listVoByQuery(query);
         return AjaxResult.success(details);
     }
 
@@ -84,5 +81,15 @@ public class ScheduleDetailController {
             return AjaxResult.error("排程明细不存在");
         }
         return AjaxResult.success(detail);
+    }
+
+    /**
+     * 批量修改明细1-8班计划量，同步更新主表
+     * 校验逻辑同调量：历史班次不可修改、修改后不能低于已完成量
+     */
+    @ApiOperation("批量修改明细计划量")
+    @PostMapping("/updatePlanQty")
+    public AjaxResult updatePlanQty(@RequestBody List<ScheduleUpdateDetailPlanQtyVo> voList) {
+        return cxScheduleDetailService.batchUpdatePlanQty(voList);
     }
 }

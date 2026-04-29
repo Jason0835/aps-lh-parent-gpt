@@ -7,10 +7,7 @@ import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductMouldInfoVo;
-import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
-import com.zlt.aps.mp.engine.domain.vo.SpecialMaterialInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.handler.MoldRatioDayDeductHelper;
 import com.zlt.aps.mp.engine.handler.SkuProductionCounter;
 import lombok.Data;
@@ -122,6 +119,11 @@ public class TbrProductionContext extends Context {
      * 是否实单补量，用于搭配排产中部分逻辑的判断，逻辑进入实单排产和搭配排产时会进行切换
      */
     private Boolean isActualOrder;
+    /**
+     * 20260428+ 模拟排产重排使用
+     * 在产机台测算完成的分组-信息
+     */
+    private Map<String, GroupContinueAllocationInfoVo> continueCalculationAllocationInfo;
 
     /**
      * 加入收尾，方向匹配结构集合
@@ -424,6 +426,7 @@ public class TbrProductionContext extends Context {
 
     /**
      * 清空所有的换模使用量
+     * 保留日成型分配量、结构每日切换次数
      */
     public void clearAllDayLimitUsed() {
         DayCapacityLimitVo dayCapacityLimitVo = baseDataContainer.getDayCapacityLimit();
@@ -431,6 +434,24 @@ public class TbrProductionContext extends Context {
             return;
         }
         dayCapacityLimitVo.resetUsedQty();
+    }
+
+    /**
+     * 清空日使用信息
+     * 1、清空成型工装占用量
+     * 2、清空日产限制使用信息
+     * 3、清空日成型分配量
+     * 4、清空结构每日切换次数量
+     */
+    public void clearAllDayUsedInfo() {
+        //成型工装占用量清空
+        baseDataContainer.clearTireDrumUsedInfo();
+        //日
+        DayCapacityLimitVo dayCapacityLimit = baseDataContainer.getDayCapacityLimit();
+        if (null == dayCapacityLimit) {
+            return;
+        }
+        dayCapacityLimit.clearUsedInfo();
     }
 
     /**

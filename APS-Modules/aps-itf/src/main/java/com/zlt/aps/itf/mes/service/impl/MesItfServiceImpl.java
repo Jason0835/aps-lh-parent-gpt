@@ -1433,6 +1433,13 @@ public class MesItfServiceImpl implements MesItfService {
             for (List<LhScheFinishQty> saveList : splitList) {
                 lhMesSyncRemoteService.saveScheFinishQtyBatch(saveList);
             }
+
+            // 硫化排程完成量回写硫化排程结果表各班次完成量
+            try {
+                lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertOrUpdateList);
+            } catch (Exception e) {
+                log.error("【硫化排程完成量回写】回写硫化排程结果表完成量异常", e);
+            }
         }
         return AjaxResult.success();
     }

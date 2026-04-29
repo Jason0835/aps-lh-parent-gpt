@@ -434,6 +434,119 @@ public class MpAdjustResult extends BaseEntity {
     private String adjustDetailId;
 
     /**
+     * 产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productTypeCode", dictType = "biz_product_type")
+    @ApiModelProperty(value = "产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢", name = "productTypeCode")
+    @TableField(value = "PRODUCT_TYPE_CODE")
+    private String productTypeCode;
+
+    /**
+     * 英寸
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.proSize")
+    @ApiModelProperty(value = "英寸", name = "proSize")
+    @TableField(value = "PRO_SIZE")
+    private String proSize;
+
+    /**
+     * 生胎代码
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.embryoCode")
+    @ApiModelProperty(value = "生胎代码", name = "embryoCode")
+    @TableField(value = "EMBRYO_CODE")
+    private String embryoCode;
+
+    /**
+     * 主物料(胎胚号)
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.mainMaterialDesc")
+    @ApiModelProperty(value = "主物料(胎胚号)", name = "mainMaterialDesc")
+    @TableField(value = "MAIN_MATERIAL_DESC")
+    private String mainMaterialDesc;
+
+    /**
+     * 品牌
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.brand", dictType = "biz_brand_type")
+    @ApiModelProperty(value = "品牌", name = "brand")
+    @TableField(value = "BRAND")
+    private String brand;
+
+    /**
+     * 规格
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.specifications")
+    @ApiModelProperty(value = "规格", name = "specifications")
+    @TableField(value = "SPECIFICATIONS")
+    private String specifications;
+
+    /**
+     * 花纹
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.pattern")
+    @ApiModelProperty(value = "花纹", name = "pattern")
+    @TableField(value = "PATTERN")
+    private String pattern;
+
+    /**
+     * 高优先级
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.heightQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "高优先级", name = "heightQty")
+    @TableField(value = "HEIGHT_QTY")
+    private Integer heightQty;
+
+    /**
+     * 中优先级
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.midQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "中优先级", name = "midQty")
+    @TableField(value = "MID_QTY")
+    private Integer midQty;
+
+    /**
+     * 暂缓订单
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.postponeQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "暂缓订单", name = "postponeQty")
+    @TableField(value = "POSTPONE_QTY")
+    private Integer postponeQty;
+
+    /**
+     * 周期排产储备
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.cycleReserveQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "周期排产储备", name = "cycleReserveQty")
+    @TableField(value = "CYCLE_RESERVE_QTY")
+    private Integer cycleReserveQty;
+
+    /**
+     * 常规储备
+     */
+    @Excel(name = "ui.data.column.productionMonthPlanInit.conventionReserveQty", cellType = Excel.ColumnType.NUMERIC)
+    @ApiModelProperty(value = "常规储备", name = "conventionReserveQty")
+    @TableField(value = "CONVENTION_RESERVE_QTY")
+    private Integer conventionReserveQty;
+
+
+    /**
+     * 日硫化量
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.dayVulcanizationQty")
+    @ApiModelProperty(value = "日硫化量", name = "dayVulcanizationQty")
+    @TableField(value = "DAY_VULCANIZATION_QTY")
+    private Integer dayVulcanizationQty;
+
+    /**
+     * 施工阶段 0 无工艺 1 试制 2 量试 3 正式
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.schedulingType")
+    @ApiModelProperty(value = "施工阶段 0 无工艺 1 试制 2 量试 3 正式", name = "constructionStage")
+    @TableField(value = "CONSTRUCTION_STAGE")
+    private String constructionStage;
+
+    /**
      * 最大的型腔数，用于排序
      */
     @TableField(exist = false)

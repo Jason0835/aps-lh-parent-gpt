@@ -51,45 +51,72 @@ public class GroupPlanPrioritySelector {
      * @param excludeGroupPlan 需要排除的分组
      * @return
      */
-    public ProductionPlanGroupInfo getHeightPriorityGroup(Context context, Set<String> excludeGroupPlan) {
+    public ProductionPlanGroupInfo getHighestPriorityGroup(Context context, Set<String> excludeGroupPlan) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Map<String, ProductionPlanGroupInfo> allGroupPlan = productionContext.getGroupProductionInfo();
         if (CollectionUtils.isEmpty(allGroupPlan)) {
             return null;
         }
-        List<ProductionPlanGroupInfo> needProductionGroupList = allGroupPlan.values().stream().filter(singleGroup -> {
-            if (excludeGroupPlan.contains(singleGroup.getGroupName())) {
-                return false;
-            }
-            return singleGroup.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue();
-        }).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(needProductionGroupList)) {
+        List<ProductionPlanGroupInfo> allGroupPlanRange = Lists.newArrayList(allGroupPlan.values());
+        return getHighestPriorityGroupByGroupRange(context, allGroupPlanRange, excludeGroupPlan);
+//        List<ProductionPlanGroupInfo> needProductionGroupList = allGroupPlan.values().stream().filter(singleGroup -> {
+//            if (excludeGroupPlan.contains(singleGroup.getGroupName())) {
+//                return false;
+//            }
+//            return singleGroup.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue();
+//        }).collect(Collectors.toList());
+//        if (CollectionUtils.isEmpty(needProductionGroupList)) {
+//            return null;
+//        }
+//        ProductionPlanGroupInfo selected;
+//        //结构优先列表 sandy+ 2026.3.26
+//        List<ProductionPlanGroupInfo> structurePriorityList = needProductionGroupList.stream().filter(x -> {
+//            return x.getGroupPlanData().stream().filter(y -> YesOrNoEnum.YES.getCode().equals(y.getStructurePriority())).count() > 0;
+//        }).collect(Collectors.toList());
+//        if (!CollectionUtils.isEmpty(structurePriorityList)) {
+//            needProductionGroupList = structurePriorityList;
+//        }
+//
+//        //高优先级需求SKU个数多的优先
+//        Integer maxHeightPriority = needProductionGroupList.stream().mapToInt(ProductionPlanGroupInfo::getHeightPriorityCount).max().getAsInt();
+//        List<ProductionPlanGroupInfo> heightList = needProductionGroupList.stream().filter(groupPlan -> maxHeightPriority.equals(groupPlan.getHeightPriorityCount())).collect(Collectors.toList());
+//        if (heightList.size() == BigDecimal.ONE.intValue()) {
+//            selected = heightList.get(BigDecimal.ZERO.intValue());
+//        } else {
+//            selected = getHighestOneGroup(productionContext, heightList);
+//        }
+//        //如果选上的是特殊原材料结构，则从所有特殊原材料结构中重新获取
+//        if (selected.isSpecialMaterial()) {
+//            TbrSpecialMaterialProductionLogRecorder.addProductionSpecialMaterialInfoLog(productionContext, "新结构挑选到");
+//            return getHeightPriorityGroupBySpecialMaterial(productionContext, excludeGroupPlan);
+//        }
+//        return selected;
+    }
+
+    /**
+     * 从groupRange排产计划分组中，获取最高优先级的分组
+     * 1、获取还有需要分配的结构
+     * 2、高优先级需求量Sku个数多的优先
+     * 3、模具受限下，分组需求量小的优先(还需分配天数)
+     * 4、使用特殊原材料共用性差的分组优先
+     * 6、使用特殊原材料Sku个数多的优先
+     * 5、分组需求量大的优先
+     * 7、当选上的是含有特殊原材料的结构时：从所有的含有特殊原材料的结构重新选择
+     * 7.1、特殊原材料共用性差的原材料结构优先
+     * 7.2、使用SKu个数多的优先
+     * 7.3、需求量大的优先
+     *
+     * @param context          排产上下文
+     * @param excludeGroupPlan 需要排除的分组
+     * @return
+     */
+    public ProductionPlanGroupInfo getHighestPriorityGroupByRange(Context context, List<ProductionPlanGroupInfo> groupRange, Set<String> excludeGroupPlan) {
+        if (CollectionUtils.isEmpty(groupRange)) {
             return null;
         }
-        ProductionPlanGroupInfo selected;
-        //结构优先列表 sandy+ 2026.3.26
-        List<ProductionPlanGroupInfo> structurePriorityList = needProductionGroupList.stream().filter(x -> {
-            return x.getGroupPlanData().stream().filter(y -> YesOrNoEnum.YES.getCode().equals(y.getStructurePriority())).count() > 0;
-        }).collect(Collectors.toList());
-        if (!CollectionUtils.isEmpty(structurePriorityList)) {
-            needProductionGroupList = structurePriorityList;
-        }
-
-        //高优先级需求SKU个数多的优先
-        Integer maxHeightPriority = needProductionGroupList.stream().mapToInt(ProductionPlanGroupInfo::getHeightPriorityCount).max().getAsInt();
-        List<ProductionPlanGroupInfo> heightList = needProductionGroupList.stream().filter(groupPlan -> maxHeightPriority.equals(groupPlan.getHeightPriorityCount())).collect(Collectors.toList());
-        if (heightList.size() == BigDecimal.ONE.intValue()) {
-            selected = heightList.get(BigDecimal.ZERO.intValue());
-        } else {
-            selected = getHighestOneGroup(productionContext, heightList);
-        }
-        //如果选上的是特殊原材料结构，则从所有特殊原材料结构中重新获取
-        if (selected.isSpecialMaterial()) {
-            TbrSpecialMaterialProductionLogRecorder.addProductionSpecialMaterialInfoLog(productionContext, "新结构挑选到");
-            return getHeightPriorityGroupBySpecialMaterial(productionContext, excludeGroupPlan);
-        }
-        return selected;
+        return getHighestPriorityGroupByGroupRange(context, groupRange, excludeGroupPlan);
     }
+
 
     /**
      * 对需排产的分组计划，按优先级排序
@@ -232,6 +259,63 @@ public class GroupPlanPrioritySelector {
         fixedGroupPlanList.sort(Comparator.comparing(ProductionPlanGroupInfo::getLastBoardingDate, Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(ProductionPlanGroupInfo::getProductionCount, Comparator.nullsLast(Comparator.reverseOrder())));
         selected = fixedGroupPlanList.get(BigDecimal.ZERO.intValue());
         log.info(TbrProductionGroupLogRecorder.addCxMachineSelectedGroupPlanLog(context, selected.getGroupName(), selected.getIsZero(), cxMachineCode, cxMachineTypeCode, GroupCxMachineSelectedTypeEnum.HISTORY_QUALITY_PRIORITY));
+        return selected;
+    }
+
+    /**
+     * 从指定的分组集合中获取最高优先级的分组信息
+     * 1、结构优先的优先
+     * 2、高优先级需求量Sku个数多的优先
+     * 3、模具受限下，分组需求量小的优先(还需分配天数)
+     * 4、使用特殊原材料共用性差的分组优先
+     * 6、使用特殊原材料Sku个数多的优先
+     * 5、分组需求量大的优先
+     * 7、当选上的是含有特殊原材料的结构时：从所有的含有特殊原材料的结构重新选择
+     * 7.1、特殊原材料共用性差的原材料结构优先
+     * 7.2、使用SKu个数多的优先
+     * 7.3、需求量大的优先
+     *
+     * @param context          排产上下文
+     * @param groupRangeList   指定的分组计划集合
+     * @param excludeGroupPlan 需要排除的分组集合
+     * @return
+     */
+    private ProductionPlanGroupInfo getHighestPriorityGroupByGroupRange(Context context, List<ProductionPlanGroupInfo> groupRangeList, Set<String> excludeGroupPlan) {
+        if (CollectionUtils.isEmpty(groupRangeList)) {
+            return null;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Set<String> realExcludeGroupPlan = Optional.ofNullable(excludeGroupPlan).orElse(Collections.emptySet());
+        List<ProductionPlanGroupInfo> needProductionGroupList = groupRangeList.stream().filter(singleGroup -> {
+            if (realExcludeGroupPlan.contains(singleGroup.getGroupName())) {
+                return false;
+            }
+            return singleGroup.getRemainingNeedAllocationDays() > BigDecimal.ZERO.intValue();
+        }).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(needProductionGroupList)) {
+            return null;
+        }
+        //结构优先列表 sandy+ 2026.3.26
+        List<ProductionPlanGroupInfo> structurePriorityList = needProductionGroupList.stream().filter(x ->
+                x.getGroupPlanData().stream().filter(y -> YesOrNoEnum.YES.getCode().equals(y.getStructurePriority())).count() > BigDecimal.ZERO.intValue()
+        ).collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(structurePriorityList)) {
+            needProductionGroupList = structurePriorityList;
+        }
+        ProductionPlanGroupInfo selected;
+        //高优先级需求SKU个数多的优先
+        Integer maxHeightPriority = needProductionGroupList.stream().mapToInt(ProductionPlanGroupInfo::getHeightPriorityCount).max().getAsInt();
+        List<ProductionPlanGroupInfo> heightList = needProductionGroupList.stream().filter(groupPlan -> maxHeightPriority.equals(groupPlan.getHeightPriorityCount())).collect(Collectors.toList());
+        if (heightList.size() == BigDecimal.ONE.intValue()) {
+            selected = heightList.get(BigDecimal.ZERO.intValue());
+        } else {
+            selected = getHighestOneGroup(productionContext, heightList);
+        }
+        //如果选上的是特殊原材料结构，则从所有特殊原材料结构中重新获取
+        if (selected.isSpecialMaterial()) {
+            TbrSpecialMaterialProductionLogRecorder.addProductionSpecialMaterialInfoLog(productionContext, "新结构挑选到");
+            return getHeightPriorityGroupBySpecialMaterial(productionContext, realExcludeGroupPlan);
+        }
         return selected;
     }
 

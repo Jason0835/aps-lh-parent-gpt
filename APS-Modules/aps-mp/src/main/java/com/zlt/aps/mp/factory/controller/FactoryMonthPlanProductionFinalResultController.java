@@ -1,11 +1,14 @@
 package com.zlt.aps.mp.factory.controller;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.bean.copier.CopyOptions;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.PageUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
@@ -15,21 +18,16 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
-import com.zlt.aps.constant.StringConstant;
-import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.service.IBatchMpMonthPlanStatisticsService;
 import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
-import com.zlt.aps.mp.adjust.service.impl.AbstractBaseWeekAdjustService;
 import com.zlt.aps.mp.adjust.service.impl.MpAdjustStructureOutStrategy;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
@@ -53,13 +51,17 @@ import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultServ
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.ExcelReadUtils;
+import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.openxml4j.util.ZipSecureFile;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
@@ -67,11 +69,10 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -81,7 +82,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -116,9 +116,6 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     protected MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
 
     @Autowired
-    private IExportLogService iExportLogService;
-
-    @Autowired
     protected IMpAdjustStructureInService mpAdjustStructureInService;
 
     @Autowired
@@ -129,6 +126,12 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 
     @Autowired
     protected MpAdjustStructureOutStrategy mpAdjustStructureOutStrategy;
+    @Autowired
+    private IExportLogService iExportLogService;
+    @Autowired
+    private IImportLogService iImportLogService;
+    @Autowired
+    private IImportErrorLogService iImportErrorLogService;
 
     /**
      * 查询工厂月度生产计划-最终排产计划定稿
@@ -242,8 +245,6 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         Workbook workbook = util.exportExcel2(response, exportList, fileName);
         byte[] resultBytes =  ExcelReadUtils.writeExcel(workbook);
         Date endTime = DateUtils.getNowDate();
-//        FileOutputStream fo = new FileOutputStream("test.xlsx");
-//        fo.write(resultBytes);
 
         // 3、保存导出记录
         ExportLog exportLog = new ExportLog();
@@ -260,7 +261,61 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         iExportLogService.add(exportLog);
         return resultBytes;
     }
+    
+    /**
+     * 导入数据
+     */
+    @Log(title = "排产过程_结构排产", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importSkuScheduleItems")
+    public AjaxResult importSkuScheduleItems(@RequestBody ImportContext importContext,
+                                                    @RequestParam("updateSupport") boolean updateSupport,
+                                                    @RequestParam("factoryCode") String factoryCode,
+                                                    @RequestParam("productionVersion") String productionVersion,
+                                                    @RequestParam("structureName") String structureName
+            )
+            throws IOException {
+        if (importContext == null || importContext.getFileBytes() == null || importContext.getFileBytes().length == 0) {
+            return AjaxResult.error("导入文件不能为空");
+        }
+        // 构建导入参数
+        FactoryMonthPlanProductionFinalResult params = new FactoryMonthPlanProductionFinalResult();
+        params.setFactoryCode(factoryCode);
+        params.setStructureName(structureName);
+        params.setProductionVersion(productionVersion);
+        
+        Date beginTime = DateUtils.getNowDate();
+        byte[] fileBytes = importContext.getFileBytes();
+//        ImportLog importLog = new ImportLog();
+//        importLog.setId(-99L);
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(fileBytes, importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
+        importLog = this.iImportLogService.add(importLog);
+        ZipSecureFile.setMinInflateRatio(Double.MIN_VALUE); // 跳过poi的解压倍数校验
+        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
+            Sheet sheet = wb.getSheetAt(0); // 取第一个页签
+            ExcelUtil<FactoryMonthPlanProductionFinalResult> util4DayResult = new ExcelUtil<>(FactoryMonthPlanProductionFinalResult.class);
+            InputStream input = new ByteArrayInputStream(fileBytes);
+            List<FactoryMonthPlanProductionFinalResult> finalList = util4DayResult.importExcel(sheet.getSheetName(), input, 3, 1, -1);
+            // 月计划排产导入
+            AjaxResult ajaxResult = factoryMonthPlanProductionFinalResultService.importDataFinalResult(finalList, updateSupport, importLog.getId(), params);
+            
+            Date endTime = DateUtils.getNowDate();
+            importLog.setRowCount(finalList == null ? 0 : finalList.size());
+            importLog.setBeginTime(beginTime);
+            importLog.setEndTime(endTime);
+            importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+            ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
+            ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
+            ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
+            ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
+            return ajaxResult;
+        } catch (Exception e) {
+            log.warn("importDataStructureAllocation workbook parse failed", e);
+            return AjaxResult.error("导入文件格式不正确");
+        }
 
+    }
+    
     @Override
     protected List<FactoryMonthPlanProductionFinalResult> listExportData(FactoryMonthPlanProductionFinalResult obj) {
         return factoryMonthPlanProductionFinalResultService.getDataList(obj);
@@ -347,7 +402,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @Override
     public AjaxResult save(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal){
         // 重新计算和校验
-        recalculateAndCheck(factoryMonthPlanProdFinal);
+        //recalculateAndCheck(factoryMonthPlanProdFinal);
         return super.save(factoryMonthPlanProdFinal);
     }
 
@@ -365,7 +420,6 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         contextDTO.setMpMonth(factoryMonthPlanProdFinal.getMonth());
         contextDTO.setProductionVersion(factoryMonthPlanProdFinal.getProductionVersion());
         contextDTO.setMonthPlanVersion(factoryMonthPlanProdFinal.getMonthPlanVersion());
-
         // 结构名称
         String structureNameParam = contextDTO.getStructureName();
 
@@ -470,7 +524,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         }
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
         // 保存月计划统计结果
-        mpAdjustStructureOutStrategy.saveMonthPlanStatisticsResult(contextDTO, null);
+        mpAdjustStructureOutStrategy.saveMonthPlanStatisticsResult(contextDTO, YesOrNoEnum.YES.getCode());
     }
 
     /**

@@ -2,6 +2,7 @@ package com.zlt.aps.mp.adjust.service.impl;
 
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustResultService;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
@@ -63,6 +64,30 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     protected List<String> getCheckUniqueFields() {
         // 唯一校验字段
         return Collections.emptyList();
+    }
+
+    @Override
+    public void forceUpdateById(MpAdjustResult entity) {
+        //1、更新开始和结束日期
+        String dayField;
+        int realBeginDay = FactoryConstant.MONTH_MAX_DAY+1;
+        int realEndDay = 0;
+        for (int i = FactoryConstant.MONTH_START_DAY; i <= FactoryConstant.MONTH_MAX_DAY; i++){
+            dayField = FactoryConstant.DAY_FIELD + i;
+            if (entity.getFieldValueByFieldName(dayField) != null &&
+                    (Integer) entity.getFieldValueByFieldName(dayField) != 0){
+                if (realBeginDay > i){
+                    realBeginDay = i;
+                }
+                if (realEndDay < i){
+                    realEndDay = i;
+                }
+            }
+        }
+        entity.setBeginDay(realBeginDay==FactoryConstant.MONTH_MAX_DAY+1 ? 0:realBeginDay);
+        entity.setEndDay(realEndDay);
+        //2、更新每日调整值
+        mpAdjustResultEntityMapper.forceUpdateById(entity);
     }
 
     @Override

@@ -4,6 +4,8 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.service.ICxScheduleDetailRemoteService;
+import com.zlt.aps.cx.vo.ScheduleDetailQueryVo;
+import com.zlt.aps.cx.vo.ScheduleUpdateDetailPlanQtyVo;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -85,6 +87,28 @@ public class CxScheduleDetailUIController {
             @RequestParam("mainId") Long mainId,
             @RequestParam("shiftCode") String shiftCode) {
         return iCxScheduleDetailService.listByShift(mainId, shiftCode);
+    }
+
+    /**
+     * 综合查询明细列表（支持主表字段过滤）
+     */
+    @ApiOperation("综合查询明细列表")
+    @RequiresPermissions("cx:cxScheduleDetail:list")
+    @PostMapping("/listByQuery")
+    @ResponseBody
+    public AjaxResult listByQuery(@RequestBody ScheduleDetailQueryVo query) {
+        return iCxScheduleDetailService.listByQuery(query);
+    }
+
+    /**
+     * 批量修改明细计划量（同步更新主表）
+     */
+    @ApiOperation("批量修改明细计划量")
+    @RequiresPermissions("cx:cxScheduleDetail:edit")
+    @PostMapping("/updatePlanQty")
+    @ResponseBody
+    public AjaxResult updatePlanQty(@RequestBody List<ScheduleUpdateDetailPlanQtyVo> voList) {
+        return iCxScheduleDetailService.updatePlanQty(voList);
     }
 
     /**

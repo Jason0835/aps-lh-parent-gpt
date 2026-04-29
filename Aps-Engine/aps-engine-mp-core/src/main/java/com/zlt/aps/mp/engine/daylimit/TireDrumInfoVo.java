@@ -103,6 +103,24 @@ public class TireDrumInfoVo implements Serializable {
     }
 
     /**
+     * 清空鼓的使用信息
+     * 包含：
+     * 1、使用量
+     * 2、使用的成型机台信息
+     */
+    public void clearUsedInfo() {
+        if (CollectionUtils.isEmpty(dayLimitInfoMap)) {
+            return;
+        }
+        dayLimitInfoMap.forEach((day, dayLimitInfo) -> {
+            if (null == dayLimitInfo) {
+                return;
+            }
+            dayLimitInfo.clearUsedCount();
+        });
+    }
+
+    /**
      * 根据英寸，匹配到鼓
      *
      * @param matchParam 匹配对象

@@ -121,14 +121,14 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
         List<LhPrecisionPlan> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
+        String excelDuplicateMsg = I18nUtil.getMessage("ui.lh.precision.plan.excelDuplicate");
 
         // 1. 校验必填项 + Excel内部数据重复校验
         Set<String> excelUniqueSet = new HashSet<>();
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             LhPrecisionPlanImportVO importVO = list.get(i);
-            
-            // 校验必填项
+
             if (StringUtil.isBlank(importVO.getFactoryCode())) {
                 failureNum++;
                 String message = I18nUtil.getMessage("ui.lh.precision.plan.factoryCodeRequired");
@@ -165,23 +165,23 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
                 continue;
             }
 
-            // Excel内部重复校验：工厂+机台+计划日期
+            // Excel内部重复校验：工厂+硫化机台+计划日期
             String uniqueKey = importVO.getFactoryCode() + "-" + importVO.getMachineCode() + "-" + importVO.getPlanDate();
             if (excelUniqueSet.contains(uniqueKey)) {
                 failureNum++;
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                    errorNum, String.format(uniqueMsg, errorNum), importErrorLogs);
+                    errorNum, String.format(excelDuplicateMsg, errorNum), importErrorLogs);
                 importVO.setRowNum(-999);
                 continue;
             }
             excelUniqueSet.add(uniqueKey);
         }
 
-        // 2. 数据库重复校验
+        // 2. 数据库重复校验（工厂+硫化机台+计划日期）
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             LhPrecisionPlanImportVO importVO = list.get(i);
-            
+
             // 跳过已标记为错误的行
             if (importVO.getRowNum() != null && importVO.getRowNum() == -999) {
                 continue;
@@ -189,24 +189,24 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
 
             // 计算年度
             BigDecimal year = new BigDecimal(importVO.getPlanDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate().getYear());
-            
-            // 查询数据库是否已存在
-            QueryWrapper<LhPrecisionPlan> existWrapper = new QueryWrapper<>();
-            existWrapper.eq("FACTORY_CODE", importVO.getFactoryCode());
-            existWrapper.eq("MACHINE_CODE", importVO.getMachineCode());
-            existWrapper.eq("PLAN_DATE", importVO.getPlanDate());
-            existWrapper.eq("IS_DELETE", 0);
+
+            // 查询数据库是否已存在（维度：工厂+硫化机台+计划日期）
+            LambdaQueryWrapper<LhPrecisionPlan> existWrapper = new LambdaQueryWrapper<>();
+            existWrapper.eq(LhPrecisionPlan::getFactoryCode, importVO.getFactoryCode())
+                    .eq(LhPrecisionPlan::getMachineCode, importVO.getMachineCode())
+                    .eq(LhPrecisionPlan::getPlanDate, importVO.getPlanDate())
+                    .eq(LhPrecisionPlan::getIsDelete, 0);
             List<LhPrecisionPlan> existList = lhPrecisionPlanMapper.selectList(existWrapper);
-            
+
             if (!existList.isEmpty()) {
                 if (!updateSupport) {
-                    // 不更新且数据已存在，报错
+                    // 未勾选更新已存在的数据，校验重复性，报错
                     failureNum++;
                     ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                         errorNum, String.format(uniqueMsg, errorNum), importErrorLogs);
                     continue;
                 } else {
-                    // 更新支持，删除已存在的数据
+                    // 勾选更新已存在的数据，删除已存在的数据后重新插入
                     for (LhPrecisionPlan exist : existList) {
                         lhPrecisionPlanMapper.deleteById(exist.getId());
                     }

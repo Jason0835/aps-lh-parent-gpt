@@ -1090,13 +1090,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         // 结构名称
         String structureNameParam = contextDTO.getStructureName();
-//        monthPLanList = monthPLanList.stream()
-//                .filter(vo -> StringUtils.isEmpty(structureNameParam) || structureNameParam.equals(vo.getStructureName()))
-//                .collect(Collectors.toList());
-//        if (PubUtil.isEmpty(monthPLanList)) {
-//            log.warn("处理月计划统计结果：过滤后月度生产计划列表为空，直接返回");
-//            return;
-//        }
 
         // 获取产品品类
         String productType = ProductTypeEnum.WHOLE_STEEL.getValue();
@@ -3398,6 +3391,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setProSize(materialInfo.getProSize());
             adjustDetailVo.setDayVulcanizationQty(Convert.toInt(skuLhCapacity.getStandardCapacity(),0) / 2);
             adjustDetailVo.setCuringTime(skuLhCapacity.getVulcanizationTime());
+            adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
             adjustDetailVo.setMainMaterialDesc(skuConstructionRef.getMainMaterialDesc());
             adjustDetailVo.setProductStatus(productStatus);
             adjustDetailVo.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
@@ -3428,6 +3422,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setMaterialDesc(monthPlan.getMaterialDesc());
         adjustDetailVo.setProductTypeCode(monthPlan.getProductTypeCode());
         adjustDetailVo.setProductStatus(monthPlan.getProductStatus());
+        adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
         adjustDetailVo.setMainMaterialDesc(monthPlan.getMainMaterialDesc());
         adjustDetailVo.setConstructionStage(monthPlan.getConstructionStage());
         adjustDetailVo.setBrand(monthPlan.getBrand());

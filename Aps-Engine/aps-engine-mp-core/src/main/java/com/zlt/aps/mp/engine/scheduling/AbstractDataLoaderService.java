@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.scheduling;
 
+import com.google.common.collect.Maps;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.Constant;
@@ -19,6 +20,7 @@ import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -141,6 +143,26 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
         //17. 初始硫化机台信息
         productionContext.getBaseDataContainer().setLhMachineInfoList(getDataService().listLhMachineInfo(productionContext));
+    }
+
+    /**
+     * 备份在测算阶段对分组的分配信息
+     *
+     * @param context 排产上下文
+     */
+    protected void backupGroupAllocationInfoByCalculationStage(Context context) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, ProductionPlanGroupInfo> allGroupInfo = productionContext.getGroupProductionInfo();
+        if (CollectionUtils.isEmpty(allGroupInfo)) {
+            productionContext.setContinueCalculationAllocationInfo(Collections.emptyMap());
+            return;
+        }
+        Map<String, GroupContinueAllocationInfoVo> backupInfo = Maps.newHashMap();
+        allGroupInfo.forEach((groupName, groupInfo) -> {
+            GroupContinueAllocationInfoVo singleBackupInfo = new GroupContinueAllocationInfoVo(groupInfo.getLeftOverNeedAllocationDays(), groupInfo.getIsAllocationFinish());
+            backupInfo.put(groupName, singleBackupInfo);
+        });
+        productionContext.setContinueCalculationAllocationInfo(backupInfo);
     }
 
     /**
@@ -445,6 +467,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.SINGLE_CX_EMBRYO_CODE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_MIN_CAPACITY.getCode());
+        paramCodeList.add(MonthPlanEnums.PRODUCTION_MODE.getCode());
         //排产控制相关
         paramCodeList.add(MonthPlanEnums.SUM_PRODUCTION_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.HEIGHT_DIFF_QTY.getCode());
@@ -577,7 +600,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         } else {
             configuration.setMinLhMachineContinueDays((Integer) continueMinLhMachines);
         }
-
+        //20260429+ 月计划排产模式 1 交付优先，非1则为效率优先
+        configuration.setProductionMode((Integer) paramConfigurationMap.get(MonthPlanEnums.PRODUCTION_MODE.getCode()));
         return configuration;
     }
 

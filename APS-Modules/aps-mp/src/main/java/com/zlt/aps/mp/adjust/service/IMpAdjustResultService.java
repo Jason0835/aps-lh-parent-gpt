@@ -20,6 +20,12 @@ import com.zlt.bill.common.service.IDocService;
 public interface IMpAdjustResultService  extends IDocService<MpAdjustResult>{
 
     /**
+     * 通过ID,强制更新调整结果
+     * @param entity 工厂
+     */
+    void forceUpdateById(MpAdjustResult entity);
+
+    /**
      * 通过版本删除调整结果
      * @param factoryCode 工厂
      * @param year 年份
