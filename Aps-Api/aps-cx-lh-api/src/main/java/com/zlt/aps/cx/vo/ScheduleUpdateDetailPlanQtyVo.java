@@ -6,17 +6,12 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
-/**
- * 调量请求VO
- *
- * @author APS Team
- */
 @Data
-@ApiModel(value = "调量请求对象")
-public class ScheduleAdjustVo {
+@ApiModel(value = "修改明细计划量请求对象")
+public class ScheduleUpdateDetailPlanQtyVo {
 
-    @ApiModelProperty(value = "排程记录ID", required = true)
-    private Long id;
+    @ApiModelProperty(value = "明细ID", required = true)
+    private Long detailId;
 
     // ==================== 计划量 ====================
 
@@ -43,32 +38,6 @@ public class ScheduleAdjustVo {
 
     @ApiModelProperty(value = "八班计划量（中班D3=T+2日）")
     private BigDecimal class8PlanQty;
-
-    // ==================== 完成量（校验用） ====================
-
-    @ApiModelProperty(value = "一班完成量（校验用）")
-    private BigDecimal class1FinishQty;
-
-    @ApiModelProperty(value = "二班完成量（校验用）")
-    private BigDecimal class2FinishQty;
-
-    @ApiModelProperty(value = "三班完成量（校验用）")
-    private BigDecimal class3FinishQty;
-
-    @ApiModelProperty(value = "四班完成量（校验用）")
-    private BigDecimal class4FinishQty;
-
-    @ApiModelProperty(value = "五班完成量（校验用）")
-    private BigDecimal class5FinishQty;
-
-    @ApiModelProperty(value = "六班完成量（校验用）")
-    private BigDecimal class6FinishQty;
-
-    @ApiModelProperty(value = "七班完成量（校验用）")
-    private BigDecimal class7FinishQty;
-
-    @ApiModelProperty(value = "八班完成量（校验用）")
-    private BigDecimal class8FinishQty;
 
     // ==================== 示方书类型 ====================
 
