@@ -1,5 +1,7 @@
 package com.zlt.aps.lh.service;
 
+import com.zlt.aps.lh.api.domain.dto.LhInsertOrderValidateResultDTO;
+import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 
 import java.util.Date;
@@ -73,4 +75,20 @@ public interface ILhScheduleResultService {
     void updateReleaseStatus(LhScheduleResult item);
 
     List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> getCxLhScheduleResultList(Date scheduleDate);
+
+    /**
+     * 插单校验
+     *
+     * @param dto 插单请求数据
+     * @return 校验结果
+     */
+    LhInsertOrderValidateResultDTO validateInsertOrder(LhOrderInsertDTO dto);
+
+    /**
+     * 执行插单操作
+     * <p>保存排程结果到硫化排程结果表，数据来源记录为插单，发布状态默认为待发布</p>
+     *
+     * @param dto 插单请求数据
+     */
+    void insertOrder(LhOrderInsertDTO dto);
 }

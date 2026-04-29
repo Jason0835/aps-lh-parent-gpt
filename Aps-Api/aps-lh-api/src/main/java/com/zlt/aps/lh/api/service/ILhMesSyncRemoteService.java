@@ -67,4 +67,8 @@ public interface ILhMesSyncRemoteService {
     @ApiOperation("查询模具交替计划完成回报已存在数据")
     @PostMapping("/mesSync/selectMoldAlterPlanFinishExists")
     List<LhMoldAlterPlanFinish> selectMoldAlterPlanFinishExists(@RequestBody List<LhMoldAlterPlanFinish> list);
+
+    @ApiOperation("硫化排程完成量回写硫化排程结果表各班次完成量")
+    @PostMapping("/mesSync/writeBackScheduleResultFinishQty")
+    AjaxResult writeBackScheduleResultFinishQty(@RequestBody List<LhScheFinishQty> list);
 }

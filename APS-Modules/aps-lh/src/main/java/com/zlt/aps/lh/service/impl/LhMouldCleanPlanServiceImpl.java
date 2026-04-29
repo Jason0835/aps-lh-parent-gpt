@@ -54,6 +54,16 @@ public class LhMouldCleanPlanServiceImpl extends AbstractDocService<LhMouldClean
     }
 
     @Override
+    public int save(LhMouldCleanPlan entity) {
+        if (entity.getId() != null) {
+            entity.setBaseVale(entity.getId());
+        } else {
+            entity.setBaseVale(null);
+        }
+        return super.save(entity);
+    }
+
+    @Override
     public int syncFromMouldCleanWarn() {
         String lockKey = "sync:mould:clean:plan";
         if (redisService.getCacheObject(lockKey) != null) {

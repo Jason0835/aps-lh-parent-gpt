@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tq.mapper.TqMachineChuckMapper">
+
+    <select id="listMachineChuck" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineChuck"
+            resultType="com.zlt.aps.tq.api.domain.entity.TqMachineChuck">
+        select * from (
+            select mc.ID, mc.MACHINE_ID, mc.CHUCK_CODE, mc.CHUCK_NAME, mc.INCH_SIZE,
+                   mc.REMARK, mc.IS_DELETE, mc.CREATE_BY, mc.CREATE_TIME, mc.UPDATE_BY, mc.UPDATE_TIME,
+                   mi.MACHINE_CODE, mi.MACHINE_NAME
+            from T_TQ_MACHINE_CHUCK mc
+            left join T_TQ_MACHINE_INFO mi on mc.MACHINE_ID = mi.ID
+            where mc.IS_DELETE = '0'
+            <if test="machineId != null">
+                and mc.MACHINE_ID = #{machineId}
+            </if>
+            order by mc.create_time desc
+        ) t
+    </select>
+
+    <select id="checkUnique" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineChuck" resultType="int">
+        SELECT count(1)
+        FROM T_TQ_MACHINE_CHUCK
+        where IS_DELETE = '0'
+        and MACHINE_ID = #{machineId}
+        and CHUCK_CODE = #{chuckCode}
+        <if test="id != null">and ID != #{id}</if>
+    </select>
+
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_TQ_MACHINE_CHUCK (
+            machine_id, chuck_code, chuck_name, inch_size, remark,
+            create_by, create_time, update_by, update_time, is_delete
+        )
+        VALUES
+        <foreach collection="list" item="MachineChuck" separator=",">
+            (
+            #{MachineChuck.machineId,jdbcType=DOUBLE},
+            #{MachineChuck.chuckCode,jdbcType=VARCHAR},
+            #{MachineChuck.chuckName,jdbcType=VARCHAR},
+            #{MachineChuck.inchSize,jdbcType=DECIMAL},
+            #{MachineChuck.remark,jdbcType=VARCHAR},
+            #{MachineChuck.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{MachineChuck.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            '0'
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        chuck_name = VALUES(chuck_name),
+        inch_size = VALUES(inch_size),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
+
+    <update id="deleteAllMachineChuck">
+        update T_TQ_MACHINE_CHUCK set IS_DELETE = '1' where IS_DELETE = '0'
+    </update>
+</mapper>

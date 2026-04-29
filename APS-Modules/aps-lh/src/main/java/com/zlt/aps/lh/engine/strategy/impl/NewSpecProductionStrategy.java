@@ -615,6 +615,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (result == null || !NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())) {
             return;
         }
+        if ("1".equals(result.getIsEnd())) {
+            return;
+        }
         Integer surplusQty = result.getMouldSurplusQty();
         if (surplusQty == null || surplusQty <= 0) {
             return;
