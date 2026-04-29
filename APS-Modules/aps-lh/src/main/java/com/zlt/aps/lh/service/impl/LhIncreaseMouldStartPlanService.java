@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.service.impl;
 
+import cn.hutool.core.date.DateTime;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -49,7 +50,12 @@ public class LhIncreaseMouldStartPlanService {
     /**
      * 中班起始班次索引。
      */
-    private static final int MIDDLE_SHIFT_INDEX = 2;
+    private static final int MIDDLE_SHIFT_INDEX = 4;
+
+    /**
+     * 中班班次字典值。
+     */
+    private static final String MIDDLE_SHIFT_CLASS_INDEX = "03";
 
     @Resource
     private LhScheduleResultMapper scheduleResultMapper;
@@ -115,8 +121,9 @@ public class LhIncreaseMouldStartPlanService {
     private LhMouldChangePlan getCurrentMouldChangePlan(LhScheduleResult scheduleResult, String companyCode) {
         return mouldChangePlanMapper.selectOne(new LambdaQueryWrapper<LhMouldChangePlan>()
                 .eq(LhMouldChangePlan::getFactoryCode, scheduleResult.getFactoryCode())
-                .eq(LhMouldChangePlan::getScheduleDate, scheduleResult.getScheduleDate())
-                .eq(LhMouldChangePlan::getOrderNo, scheduleResult.getOrderNo())
+                .eq(LhMouldChangePlan::getScheduleDate, DateUtil.offsetDay(scheduleResult.getScheduleDate(), -1))
+                .eq(LhMouldChangePlan::getLhMachineCode, scheduleResult.getLhMachineCode())
+                .eq(LhMouldChangePlan::getClassIndex, MIDDLE_SHIFT_CLASS_INDEX)
                 .eq(LhMouldChangePlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
                 .last("LIMIT 1"));
     }
@@ -129,11 +136,11 @@ public class LhIncreaseMouldStartPlanService {
      * @param companyCode    分公司编码
      */
     private void syncMouldChangePlanFinishStatus(LhScheduleResult scheduleResult, String companyCode) {
+        DateTime scheduleDate = DateUtil.offsetDay(scheduleResult.getScheduleDate(), -1);
         LhMoldAlterPlanFinish finishRecord = moldAlterPlanFinishMapper.selectOne(new LambdaQueryWrapper<LhMoldAlterPlanFinish>()
                 .eq(LhMoldAlterPlanFinish::getFactoryCode, scheduleResult.getFactoryCode())
                 .eq(StringUtils.isNotBlank(companyCode), LhMoldAlterPlanFinish::getCompanyCode, companyCode)
-                .eq(LhMoldAlterPlanFinish::getScheduleDate, scheduleResult.getScheduleDate())
-                .eq(LhMoldAlterPlanFinish::getOrderNo, scheduleResult.getOrderNo())
+                .eq(LhMoldAlterPlanFinish::getScheduleDate, scheduleDate)
                 .eq(LhMoldAlterPlanFinish::getFinishStatus, MOULD_FINISH_COMPLETED)
                 .eq(LhMoldAlterPlanFinish::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
                 .last("LIMIT 1"));
@@ -141,11 +148,11 @@ public class LhIncreaseMouldStartPlanService {
             return;
         }
 
-        mouldChangePlanMapper.update(null, new LambdaUpdateWrapper<LhMouldChangePlan>()
+        int update = mouldChangePlanMapper.update(null, new LambdaUpdateWrapper<LhMouldChangePlan>()
                 .set(LhMouldChangePlan::getMouldStatus, MOULD_FINISH_COMPLETED)
-                .eq(LhMouldChangePlan::getFactoryCode, scheduleResult.getFactoryCode())
-                .eq(LhMouldChangePlan::getScheduleDate, scheduleResult.getScheduleDate())
-                .eq(LhMouldChangePlan::getOrderNo, scheduleResult.getOrderNo())
+                .eq(LhMouldChangePlan::getFactoryCode, finishRecord.getFactoryCode())
+                .eq(LhMouldChangePlan::getScheduleDate, finishRecord.getScheduleDate())
+                .eq(LhMouldChangePlan::getOrderNo, finishRecord.getOrderNo())
                 .eq(LhMouldChangePlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
     }
 
@@ -162,6 +169,10 @@ public class LhIncreaseMouldStartPlanService {
 
     /**
      * 重算当前排程记录从中班开始的班次计划量。
+     * <p>计算口径分为两段：</p>
+     * <p>1. 先根据“中班开始时间 + 换模总耗时”得到实际开产时间，再用中班剩余可生产秒数折算中班计划量。</p>
+     * <p>2. 后续班次不再按班次时长逐班折算，而是基于“当前累计已分配量”继续补齐后续班次计划量。</p>
+     * <p>最后通过 {@link ShiftFieldUtil#syncDailyPlanQty(LhScheduleResult)} 将 1～8 班计划量重新汇总到日计划量。</p>
      *
      * @param scheduleResult 当前排程结果
      */
@@ -177,16 +188,20 @@ public class LhIncreaseMouldStartPlanService {
                     I18nUtil.getMessage("ui.data.alert.lhScheduleResult.increaseMouldStartPlan.middleShiftEndTimeEmpty"));
         }
 
+        // 将换模总耗时从“小时”换算成“秒”，再叠加到中班开始时间上，得到换模结束后的真实开产时间。
         long mouldChangeSeconds = mouldChangeHours.multiply(BigDecimal.valueOf(3600L)).longValue();
         Date productionStartTime = new Date(middleShiftStartTime.getTime() + mouldChangeSeconds * 1000L);
+        // 中班计划量只看“换模完成后到中班结束前”还能完整覆盖多少模次。
         int middleShiftPlanQty = calculateMiddleShiftPlanQty(productionStartTime, middleShiftEndTime, scheduleResult.getLhTime());
         ShiftFieldUtil.setShiftPlanQty(scheduleResult, MIDDLE_SHIFT_INDEX, middleShiftPlanQty,
                 ShiftFieldUtil.getShiftStartTime(scheduleResult, MIDDLE_SHIFT_INDEX),
                 ShiftFieldUtil.getShiftEndTime(scheduleResult, MIDDLE_SHIFT_INDEX));
 
+        // allocatedQty 表示从中班开始已经累计回写到结果行的计划量，后续班次都基于这个累计值继续推算。
         int allocatedQty = middleShiftPlanQty;
         int lastUpdatedShiftIndex = middleShiftPlanQty > 0 ? MIDDLE_SHIFT_INDEX : -1;
         for (int shiftIndex = MIDDLE_SHIFT_INDEX + 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            // 后续班次沿用当前实现口径：不再看班次时长，只按“剩余量 + 单班产能规则”直接回写计划量。
             Integer planQty = calculateFollowingShiftPlanQty(scheduleResult, allocatedQty);
             ShiftFieldUtil.setShiftPlanQty(scheduleResult, shiftIndex, planQty,
                     ShiftFieldUtil.getShiftStartTime(scheduleResult, shiftIndex),
@@ -200,14 +215,18 @@ public class LhIncreaseMouldStartPlanService {
         Integer lastPlanQty = lastUpdatedShiftIndex > 0
                 ? ShiftFieldUtil.getShiftPlanQty(scheduleResult, lastUpdatedShiftIndex)
                 : null;
+        // 最后一个实际承接生产的班次若未达到单班标准产能，则视为收尾班次，标记为尾规格。
         if (Objects.nonNull(lastPlanQty) && lastPlanQty < scheduleResult.getSingleMouldShiftQty()) {
             scheduleResult.setIsEnd(ApsConstant.TRUE);
         }
+        // 重新汇总 1～8 班计划量，保证 DAILY_PLAN_QTY 与班次字段保持一致。
         ShiftFieldUtil.syncDailyPlanQty(scheduleResult);
     }
 
     /**
      * 计算中班计划量。
+     * <p>当前实现按“中班剩余可生产秒数 / 单模硫化时长”向上取整。</p>
+     * <p>也就是说，只要班次尾部还能容纳 1 模的部分生产窗口，就会按 1 模计入计划量。</p>
      *
      * @param productionStartTime 换模完成后的开产时间
      * @param shiftEndTime        中班结束时间
@@ -226,6 +245,9 @@ public class LhIncreaseMouldStartPlanService {
 
     /**
      * 计算后续班次计划量。
+     * <p>当前实现不再按后续班次的起止时间重新折算可生产模次，而是只根据已分配量反推剩余量。</p>
+     * <p>当仍有剩余量时，返回值取“剩余量”和“单班硫化量”的较小值；当无剩余量时返回 0。</p>
+     * <p>该口径用于保证后续班次回写不会超过硫化余量，同时单班计划量也不会超过单班标准产能。</p>
      *
      * @param scheduleResult 当前排程结果
      * @param allocatedQty   已分配计划量累计
@@ -236,7 +258,7 @@ public class LhIncreaseMouldStartPlanService {
         if (remainingQty <= 0) {
             return 0;
         }
-        return Math.max(remainingQty, scheduleResult.getSingleMouldShiftQty());
+        return Math.min(remainingQty, scheduleResult.getSingleMouldShiftQty());
     }
 
     /**

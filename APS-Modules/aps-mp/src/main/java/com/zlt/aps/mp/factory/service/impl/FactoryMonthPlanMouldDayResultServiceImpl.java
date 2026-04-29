@@ -49,7 +49,9 @@ import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialStockEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanProdFinal;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
@@ -64,6 +66,7 @@ import com.zlt.aps.mp.engine.mapper.MpStructureAllocationMapper;
 import com.zlt.aps.mp.enums.MonthPlanExportDataTypeEnum;
 import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
+import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.SpecialMaterialResultEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -90,6 +93,8 @@ import lombok.extern.slf4j.Slf4j;
 public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocService<FactoryMonthPlanMouldDayResult>  implements IFactoryMonthPlanMouldDayResultService {
     @Autowired
     private FactoryMonthPlanMouldDayResultEntityMapper factoryMonthPlanMouldDayResultEntityMapper;
+    @Autowired
+    private FactoryMonthPlanProductionFinalResultEntityMapper factoryMonthPlanProductionFinalResultEntityMapper;
     @Autowired
     private MpMonthPlanStatisticsEntityMapper mpMonthPlanStatisticsEntityMapper;
     @Autowired
@@ -153,13 +158,17 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      */
     @Override
     public List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult params,
-                                                                      boolean isAllMaterial) {
+                                                                      boolean isAllMaterial, boolean isFinal) {
         // 1、加载构建导出列表的各项数据
         // 1.1、加载月计划表头信息
-        this.loadExportTableData(params);
+        if (isFinal) { // 按是否定稿版本取对应表格的数据
+            this.loadFinalExportTableData(params);
+        } else {
+            this.loadExportTableData(params);
+        }
         // 1.2、加载月计划模具排产明细
         List<FactoryMonthPlanMouldDayResultExportVo> recordList = factoryMonthPlanMouldDayResultEntityMapper
-                .getExportList(params, isAllMaterial);
+                .getExportList(params, isAllMaterial, isFinal);
         if (CollectionUtils.isEmpty(recordList)) {
             return recordList;
         }
@@ -176,6 +185,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, params.getFactoryCode());
         structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion, params.getProductionVersion());
         structureQueryWrapper.eq(MpStructureAllocation::getFactoryCode, params.getFactoryCode());
+        structureQueryWrapper.eq(StringUtils.isNotEmpty(params.getStructureName()), MpStructureAllocation::getStructureName, params.getStructureName());
         Map<String, MpStructureAllocation> structureAllocationMap = mpStructureAllocationMapper
                 .selectList(structureQueryWrapper).stream().collect(
                         Collectors.toMap(MpStructureAllocation::getStructureName, Function.identity(), (s1, s2) -> s1));
@@ -342,6 +352,27 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     }
 
     /**
+     * 加载月计划表头信息
+     * @param params
+     */
+    private void loadFinalExportTableData(FactoryMonthPlanMouldDayResult params) {
+        QueryWrapper<FactoryMonthPlanProductionFinalResult> resultQueryWrapper = new QueryWrapper<>();
+        resultQueryWrapper.select("YEAR", "MONTH", "`YEAR_MONTH`", "MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE");
+        resultQueryWrapper.groupBy("YEAR", "MONTH", "`YEAR_MONTH`", "MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE");
+        resultQueryWrapper.eq("FACTORY_CODE", params.getFactoryCode());
+        resultQueryWrapper.eq("PRODUCTION_VERSION", params.getProductionVersion());
+        List<FactoryMonthPlanProductionFinalResult> headList = factoryMonthPlanProductionFinalResultEntityMapper.selectList(resultQueryWrapper);
+        if (!CollectionUtils.isEmpty(headList)) {
+            FactoryMonthPlanProductionFinalResult head = headList.get(0);
+            params.setYear(head.getYear());
+            params.setMonth(head.getMonth());
+            params.setYearMonth(head.getYearMonth());
+            params.setProductTypeCode(head.getProductTypeCode());
+            params.setMonthPlanVersion(head.getMonthPlanVersion());
+        }
+    }
+
+    /**
      * 构建小计行
      * 
      * @param embryoCountStatisticsRecord 胎胚统计
@@ -388,6 +419,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         queryWrapper.eq(MpMonthPlanStatistics::getFactoryCode, factoryMonthPlanMouldDayResult.getFactoryCode());
         queryWrapper.eq(MpMonthPlanStatistics::getIsDelete, YesOrNoEnum.NO.getValue());
         queryWrapper.eq(MpMonthPlanStatistics::getProductionVersion, productionVersion);
+        queryWrapper.eq(StringUtils.isNoneEmpty(factoryMonthPlanMouldDayResult.getStructureName()), MpMonthPlanStatistics::getStructureName, factoryMonthPlanMouldDayResult.getStructureName());
         Map<String, MpMonthPlanStatistics> statisticsMap = mpMonthPlanStatisticsEntityMapper.selectList(queryWrapper)
                 .stream().collect(
                         Collectors.toMap(MpMonthPlanStatistics::getStructureName, Function.identity(), (s1, s2) -> s1));
@@ -402,7 +434,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      */
     @Override
     public byte[] getFactoryMonthPlanMouldDayResultExportByte(FactoryMonthPlanMouldDayResult queryResult,
-                                                              List<FactoryMonthPlanMouldDayResultExportVo> list) {
+                                                              List<FactoryMonthPlanMouldDayResultExportVo> list,
+                                                              boolean isFinal) {
         // 1、获取模板
         ClassLoader classLoader = this.getClass().getClassLoader();
         InputStream inputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldDayResultExportTemp.xlsx");
@@ -512,7 +545,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         }
         
         // 构建特殊材料排产结果
-        this.buildSpecialMaterialInfo(queryResult, tableMap, excelDataList);
+        this.buildSpecialMaterialInfo(queryResult, tableMap, excelDataList, isFinal);
 
         // 将单元格样式放入context
         if (PubUtil.isNotEmpty(cellStyleList)) {
@@ -530,7 +563,15 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      * @param excelDataList
      */
     private void buildSpecialMaterialInfo(FactoryMonthPlanMouldDayResult queryResult, Map<String, Object> tableMap,
-                                          List<List<Map<String, Object>>> excelDataList) {
+                                          List<List<Map<String, Object>>> excelDataList, boolean isFinal) {
+        if (isFinal) {
+            Map<String, Object> listDataMap = new HashMap<>();
+            listDataMap.put("specialMaterialResult", "");
+            List<Map<String, Object>> listData = new ArrayList<>();
+            listData.add(listDataMap);
+            excelDataList.add(listData);
+            return;
+        }
         // 1、加载特殊材料列表
         List<RawSpecialMaterialRecord> recordList = null;
         // 1.1、仅加载参数有配置的特殊材料清单

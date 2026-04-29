@@ -119,18 +119,13 @@ public class ShiftScheduleService {
         int tripCapacity = getTripCapacity(task.getStructureName(), context);
 
         // 调试日志
-        log.info("scheduleTaskToShifts: embryoCode={}, materialCode={}, materialDesc={}, structureName={}, " +
-                        "endingExtraInventory(待排产量)={}, vulcanizeMachineCount(硫化机台数)={}, " +
-                        "tripCapacity(整车容量/每车条数)={}, " +
-                        "isTrial={}, isClosingDay={}, isOpeningDay={}, isEnding={}, isContinue={}, " +
-                        "stockHours(库存可供时长h)={}, isOpeningDayTask={}, isLastEndingBatch={}, dayShifts.size={}",
-                task.getEmbryoCode(), task.getMaterialCode(), task.getMaterialDesc(), task.getStructureName(),
+        log.debug("scheduleTaskToShifts: embryo={}, material={}, 待排={}条/{}台, " +
+                        "试制={}, 停产={}, 开产={}, 收尾={}, 续作={}, 库存={}h, dayShifts={}",
+                task.getEmbryoCode(), task.getMaterialCode(),
                 endingExtraInventory, task.getVulcanizeMachineCount(),
-                tripCapacity,
-                task.getIsTrialTask(), task.getIsClosingDayTask(), task.getIsOpeningDayTask(),
-                task.getIsEndingTask(), task.getIsContinueTask(),
-                task.getStockHours(), task.getIsOpeningDayTask(), task.getIsLastEndingBatch(),
-                dayShifts != null ? dayShifts.size() : "null");
+                task.getIsTrialTask(), task.getIsClosingDayTask(),
+                task.getIsOpeningDayTask(), task.getIsEndingTask(), task.getIsContinueTask(),
+                task.getStockHours(), dayShifts != null ? dayShifts.size() : "null");
 
         // 判断任务类型，按优先级从高到低
         boolean isTrial = Boolean.TRUE.equals(task.getIsTrialTask());
@@ -171,8 +166,6 @@ public class ShiftScheduleService {
                     }
                     return scheduleOpeningTask(task, machineCode, context, dayShifts, scheduleDate, tripCapacity);
                 } else {
-                    // 开产非首班：按普通任务全产能排产
-                    log.info("开产非首班，任务 {} 按普通任务排产（shiftOrder={}）", task.getEmbryoCode(), shiftOrder);
                     return scheduleNormalTask(task, machineCode, context, dayShifts, scheduleDate, tripCapacity);
                 }
             }
@@ -667,8 +660,6 @@ public class ShiftScheduleService {
 
         List<ShiftProductionResult> results = new ArrayList<>();
         int totalQty = task.getEndingExtraInventory();
-        log.info("scheduleNormalTask: embryoCode={}, 待排产量={}, tripCapacity={}, dayShifts.size={}",
-                task.getEmbryoCode(), totalQty, tripCapacity, dayShifts != null ? dayShifts.size() : "null");
         if (totalQty <= 0) {
             return results;
         }

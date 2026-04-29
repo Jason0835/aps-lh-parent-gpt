@@ -4,7 +4,6 @@ import com.alibaba.fastjson.JSONObject;
 import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.itf.constant.SysCode;
@@ -16,6 +15,7 @@ import com.zlt.aps.itf.vo.MonthPlanIssue;
 import com.zlt.aps.itf.vo.SyncDataLogs;
 import com.zlt.aps.maindata.utils.ScmListUtils;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.sync.handle.SyncDataHandle;
 import com.zlt.sync.povo.SyncParamsVO;
 import com.zlt.sync.service.SyncDataLogsService;
@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -54,6 +55,11 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
 
     @Autowired
     private MonthPlanIssueEntityMapper monthPlanIssueEntityMapper;
+
+    /**
+     * 月计划下发写入MES中间库的单批处理数量，避免单次SQL过长。
+     */
+    private static final int MONTH_PLAN_ISSUE_BATCH_SIZE = 30;
 
     private static void genCxMonthPlanIssuesList(Map<String, FactoryMonthPlanProductionFinalResult> groupMap, List<CxMonthPlanIssue> cxMonthPlanIssuesList, String dataVersion) {
         Set<Map.Entry<String, FactoryMonthPlanProductionFinalResult>> entrySet = groupMap.entrySet();
@@ -92,11 +98,11 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
         List<CxMonthPlanIssue> cxMonthPlanIssuesList = new ArrayList<>();
         genCxMonthPlanIssuesList(groupMap, cxMonthPlanIssuesList, dataVersion);
 
-        monthPlanIssueEntityMapper.batchUpdateMonthPlanIssue(monthPlanIssues);
-        monthPlanIssueEntityMapper.batchInsertMonthPlanIssue(monthPlanIssues);
+        executeByBatch(monthPlanIssues, monthPlanIssueEntityMapper::batchUpdateMonthPlanIssue);
+        executeByBatch(monthPlanIssues, monthPlanIssueEntityMapper::batchInsertMonthPlanIssue);
         // 成型月计划
-        monthPlanIssueEntityMapper.batchUpdateCxMonthPlanIssue(cxMonthPlanIssuesList);
-        monthPlanIssueEntityMapper.batchInsertCxMonthPlanIssue(cxMonthPlanIssuesList);
+        executeByBatch(cxMonthPlanIssuesList, monthPlanIssueEntityMapper::batchUpdateCxMonthPlanIssue);
+        executeByBatch(cxMonthPlanIssuesList, monthPlanIssueEntityMapper::batchInsertCxMonthPlanIssue);
         // 发送MQ
         AjaxResult ajaxResult = null;
         String factoryCode = monthPlanIssueList.get(0).getFactoryCode();
@@ -134,6 +140,24 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
         }
         return ajaxResult;
+    }
+
+    /**
+     * 按固定批量拆分列表后执行数据库写入，降低单次批量更新或新增SQL长度。
+     *
+     * @param dataList 数据列表
+     * @param batchConsumer 分批处理逻辑
+     * @param <T> 数据类型
+     * @throws RuntimeException 数据库写入异常时向上抛出，交由事务或上层异常处理
+     */
+    private <T> void executeByBatch(List<T> dataList, Consumer<List<T>> batchConsumer) {
+        if (CollectionUtils.isEmpty(dataList)) {
+            return;
+        }
+        List<List<T>> splitList = ScmListUtils.getSplitList(dataList, MONTH_PLAN_ISSUE_BATCH_SIZE);
+        for (List<T> splitItemList : splitList) {
+            batchConsumer.accept(splitItemList);
+        }
     }
 
     private void genMonthPlanIssueList(List<FactoryMonthPlanProductionFinalResult> monthPlanIssueList, Map<String, FactoryMonthPlanProductionFinalResult> groupMap, List<MonthPlanIssue> monthPlanIssues, String dataVersion) {

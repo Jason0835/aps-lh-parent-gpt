@@ -142,7 +142,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
 
         // 2. 提前查询当月模具分配表，构建缓存（一次性）
         Map<String, Integer> allocationCache = new HashMap<>();
-        if (isAllMaterial) { // 如果是全物料查询，忽略模具分配配置
+        if (!isAllMaterial) { // 如果是全物料查询，忽略模具分配配置
             List<MdmMouldAllocation> allocations = mdmMouldAllocationMapper.selectList(
                     new QueryWrapper<MdmMouldAllocation>()
                     .eq("FACTORY_CODE", factoryCode)
@@ -254,7 +254,7 @@ public class MoldCavityInsertMaxValueCalculatorImpl {
 
         // 2. 提前查询当月模具分配表，构建缓存（一次性）
         Map<String, Integer> allocationCache = new HashMap<>();
-        if (isAllMaterial) { // 如果是全物料查询，忽略模具分配配置
+        if (!isAllMaterial) { // 如果是全物料查询，忽略模具分配配置
             List<MdmMouldAllocation> allocations = mdmMouldAllocationMapper.selectList(
                     new QueryWrapper<MdmMouldAllocation>()
                             .eq("FACTORY_CODE", factoryCode)
