@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -17,6 +18,7 @@ import java.util.Date;
 public class ScheduleInsertVo {
 
     @ApiModelProperty(value = "排程日期", required = true)
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "GMT+8")
     private Date scheduleDate;
 
     @ApiModelProperty(value = "机台编码", required = true)
