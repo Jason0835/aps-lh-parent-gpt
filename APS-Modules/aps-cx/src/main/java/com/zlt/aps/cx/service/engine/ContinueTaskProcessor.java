@@ -106,20 +106,29 @@ public class ContinueTaskProcessor {
             Set<String> historyEmbryos = historyEntry.getValue();
 
             for (String embryoCode : historyEmbryos) {
-                // 在续作任务列表中找到 demand > 0 的任务
+                // 在续作任务列表中找到有排产需求的任务（vulcanizeMachineCount>0 且 plannedProduction>0）
                 CoreScheduleAlgorithmService.DailyEmbryoTask matchedTask = null;
+                boolean foundAbandoned = false;
                 for (CoreScheduleAlgorithmService.DailyEmbryoTask task : continueTasks) {
                     if (embryoCode.equals(task.getEmbryoCode())) {
                         int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
-                        if (demand > 0) {
+                        Integer plannedProd = task.getPlannedProduction();
+                        if (demand > 0 && (plannedProd != null && plannedProd > 0)) {
                             matchedTask = task;
                             break;
+                        }
+                        if (plannedProd != null && plannedProd <= 0) {
+                            foundAbandoned = true;
                         }
                     }
                 }
 
                 if (matchedTask == null) {
-                    log.debug("机台 {} 的历史胎胚 {} 在续作任务中无剩余需求，跳过保底预留", machineCode, embryoCode);
+                    if (foundAbandoned) {
+                        log.info("机台 {} 的历史胎胚 {} 计划产量为0（已舍弃），跳过保底预留", machineCode, embryoCode);
+                    } else {
+                        log.debug("机台 {} 的历史胎胚 {} 在续作任务中无剩余需求，跳过保底预留", machineCode, embryoCode);
+                    }
                     continue;
                 }
 

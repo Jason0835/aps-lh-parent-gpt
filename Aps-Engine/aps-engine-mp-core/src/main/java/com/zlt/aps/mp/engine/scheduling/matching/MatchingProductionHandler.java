@@ -357,6 +357,8 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                     continueInfo, copyLimitMap);
             if (isAddMould) {
                 return materialDesc; // 只要有新增模具，则直接结束走续作逻辑
+            } else {
+                productionPlanList.forEach(p -> p.setProductionQty(0)); // 如果无法增模，则直接清空未排量，不会进入下一次循环。
             }
         } while (true);
         return null;
@@ -468,7 +470,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             List<MonthPlanProductionRequirePlanVo> productionPlanList = productionPlanMap.get(materialDesc);
             MonthPlanProductionRequirePlanVo plan = CollectionUtils.firstElement(productionPlanList);
             Integer realStartDay = plan.getMatchBeginDay() != null? plan.getMatchBeginDay(): startDay; // 本次循环的开始日期，如果是续作且开始搭配日不为空，则以此为准，否则从接口开始日开始检索
-            Integer realEndDay = this.getRealEndDay(productionContext, plan, realStartDay, endDay); // 本次循环的结束日期
+            Integer realEndDay = this.getRealEndDay(productionContext, groupInfo, plan, realStartDay, endDay, false); // 本次循环的结束日期
             
             Integer maxProductionQty = needProductionInfo.getDayMaxProductionQty();
             // 3、SKU外层循环，反复扫描该SKU搭配期间的每一天，只要一次扫描能搭配上任意一天，则再重新尝试扫描一次，直到无法搭配上后则结束外层循环
@@ -569,7 +571,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
      * @param lastProductDay 收尾日期
      * @return
      */
-    private Integer getRealEndDay(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo plan, Integer beginDay, Integer endDay) {
+    private Integer getRealEndDay(TbrProductionContext productionContext, ProductionPlanGroupInfo groupInfo, MonthPlanProductionRequirePlanVo plan, Integer beginDay, Integer endDay, boolean isNewMod) {
         // 1、如果需求计划的搭配结束日期已经在之前的循环中结算出来则以此为准，否则以SKU的收尾日为准
         Integer realEndDay = plan.getMatchEndDay() != null? plan.getMatchEndDay(): endDay;
         // 2、不能早于搭配开始日期
@@ -583,6 +585,32 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                 realEndDay = nextDay;
             }
         }
+        
+        // 增模校验，检查是否有降模的情况，如果有，则只能在降模前新增模具
+        if (isNewMod) {
+            Integer lastDayPlanQty = null;
+            for (int day = beginDay; day < realEndDay; day ++) {
+                GroupPlanCxLhCapacityLimitHelper capacityLimitHelper = groupInfo.getDayProductionLimitInfo().get(day);
+                Map<String, SkuDayProductionInfoHelper> productionSkuQtyMap = capacityLimitHelper.getProductionSkuQtyInfo();
+                Integer planQty = 0;
+                inner: {
+                    if (PubUtil.isEmpty(productionSkuQtyMap)) {
+                        break inner;
+                    }
+                    SkuDayProductionInfoHelper skuProductionInfo = productionSkuQtyMap.get(plan.getMaterialDesc());
+                    if (PubUtil.isEmpty(skuProductionInfo)) {
+                        break inner;
+                    }
+                    planQty = intValue(skuProductionInfo.getSumProductionQty());
+                }
+                if (lastDayPlanQty != null && planQty < lastDayPlanQty) { // 今天的计划比昨天低，则今天是减模日，则只能在今天之前加模
+                    realEndDay = day;
+                    break;
+                }
+                lastDayPlanQty = planQty;
+            }
+        }
+        
         return realEndDay;
     }
 
@@ -1115,8 +1143,10 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         int startDay = limitMap.firstKey();
         int endDay = limitMap.lastKey();
         MonthPlanProductionRequirePlanVo plan = CollectionUtils.firstElement(productionPlanList);
+        
+        // 2.1、检查是否有降模排产的情况，如果有，则只能在降模前新增模具
         Integer realStartDay = plan.getMatchBeginDay() != null? plan.getMatchBeginDay(): startDay; // 本次循环的开始日期，如果是续作且开始搭配日不为空，则以此为准，否则从接口开始日开始检索
-        Integer realEndDay = this.getRealEndDay(productionContext, plan, realStartDay, endDay); // 本次循环的结束日期
+        Integer realEndDay = this.getRealEndDay(productionContext, groupInfo, plan, realStartDay, endDay, true); // 本次循环的结束日期
         Integer productionQty = needProductionInfo.getSumNeedProductionQty(); // 需求量
         Integer maxProductionQty = needProductionInfo.getDayMaxProductionQty(); // 单机台硫化上限
         List<MatchingMouldDayUsedHelper> mouldDayUsedList = this.caculateMouldDayUsed(productionContext, materialDesc,
@@ -1162,6 +1192,11 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             if (!isBoost && productionQty <= productionContext.getBaseDataContainer().getParamConfiguration().getChangeMouldFirstQty()) {
                 continue; // 如果剩余排产量不足首日排产量，则结束
             }
+            // 7、如果当天就是结束日，则不能增模
+            if (realEndDay <= usedBeginDate) {
+                continue;
+            }
+            
             
             // 根据剩余可排模具限制模具数量
             MatchingPlanLimitHelper limitHelper = limitMap.get(usedBeginDate);

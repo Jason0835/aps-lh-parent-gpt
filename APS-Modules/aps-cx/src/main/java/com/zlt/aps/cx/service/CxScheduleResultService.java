@@ -2,13 +2,16 @@ package com.zlt.aps.cx.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
 import com.zlt.aps.cx.vo.ScheduleQueryVo;
 import com.zlt.aps.cx.vo.ScheduleResultVo;
-import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.bill.common.service.IDocService;
 
 import java.time.LocalDate;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -26,5 +29,24 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      */
     List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate);
 
+    /**
+     * 基于模板导出数据
+     *
+     * @param list         排程结果列表
+     * @param scheduleDate 排程日期
+     * @return 模板 Excel 字节数据
+     */
+    byte[] exportData(List<CxScheduleResult> list, Date scheduleDate);
 
+    /**
+     * 基于模板导入数据
+     *
+     * @param list          模板导入VO列表
+     * @param result        查询参数（含工厂/日期）
+     * @param updateSupport 已存在记录是否更新
+     * @param logId         导入日志ID
+     * @return 导入结果
+     */
+    AjaxResult importScheduleTemplate(List<CxScheduleResultTemplateImportVO> list,
+                                      CxScheduleResult result, boolean updateSupport, Long logId);
 }

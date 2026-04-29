@@ -721,8 +721,12 @@ public class CxMachineBaseInfoVo implements Serializable {
      * 新增分配的分组计划信息
      * 同时，将成型工装的日使用量 + 1
      * 因都是3鼓机台，故而每种工装类型的日使用量都 + 1
+     * 并同时返回前分组信息，
+     * 用以后续前分组是否需要强制延长收尾的业务判断
+     * 空则表示没有前分组强制延长收尾的必要
      *
      * @param addAllocationPlan 分配信息对象
+     * @return 返回前分组信息，用以后续前分组是否需要强制延长收尾的业务判断
      */
     public CxMachineAllocationPlanHelper addAllocationPlanInfo(Context context, CxMachineAllocationPlanHelper addAllocationPlan) {
         if (null == addAllocationPlan) {
@@ -744,10 +748,31 @@ public class CxMachineBaseInfoVo implements Serializable {
             String groupName = addAllocationPlan.getAllocationGroup();
             log.info(TbrProductionGroupLogRecorder.addCxMachineChangeGroupLog(productionContext, cxMachineCode, startDay, groupName));
             baseDataContainer.getDayCapacityLimit().addChangeGroupNameUsedQty(productionContext, startDay, cxMachineCode, groupName);
-            //20260429+ 前结构是否需要延长
+            //20260429+ 前分组是否需要延长，返回前分组配置信息
             return getBeforeTimeExtensionDayConclusion(productionContext, lastAllocation, startDay);
         }
         return null;
+    }
+
+    /**
+     * 当前是否存在分配信息
+     * 1、如果没有分配信息，则直接为false
+     * <p>
+     * true表示存在, false 表示不存在
+     *
+     * @param allocationInfo 分配信息对象
+     * @return
+     */
+    public boolean hasAllocation(CxMachineAllocationPlanHelper allocationInfo) {
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return false;
+        }
+        for (CxMachineAllocationPlanHelper assigned : allocationList) {
+            if (assigned == allocationInfo) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

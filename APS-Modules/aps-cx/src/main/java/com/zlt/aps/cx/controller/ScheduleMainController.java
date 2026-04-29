@@ -5,9 +5,12 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
@@ -25,6 +28,8 @@ import com.zlt.aps.cx.api.domain.vo.ScheduleInsertVo;
 import com.zlt.aps.cx.api.domain.vo.ScheduleTransferMachineVo;
 import com.zlt.aps.cx.api.domain.vo.ScheduleUpdateRemarkVo;
 import com.zlt.aps.cx.vo.ScheduleRequestVo;
+import com.zlt.aps.cx.vo.CxScheduleImportDTO;
+import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.mp.api.domain.entity.CxScheduleResultIssue;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
@@ -40,6 +45,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -47,6 +53,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -780,14 +787,78 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         newRecord.setEmbryoCode(vo.getEmbryoCode());
         newRecord.setMaterialCode(vo.getMaterialCode());
         newRecord.setMaterialDesc(vo.getSpecDesc());
+        newRecord.setMainMaterialDesc(vo.getMainMaterialDesc());
         newRecord.setOrderNo(vo.getMaterialCode());
         newRecord.setBomDataVersion(vo.getExampleNo());
+        newRecord.setStructureName(vo.getStructureName());
+        newRecord.setCxBatchNo(vo.getCxBatchNo());
+        newRecord.setTotalStock(vo.getTotalStock());
+        newRecord.setLhMachineCode(vo.getLhMachineCode());
+        newRecord.setLhMachineQty(vo.getLhMachineQty());
+        newRecord.setSpecDimension(vo.getSpecDimension());
+        newRecord.setCxRemainQty(vo.getCxRemainQty());
+        newRecord.setLhRemainQty(vo.getLhRemainQty());
+        newRecord.setLhClassQty(vo.getLhClassQty());
+
+        // 计划量
         newRecord.setClass1PlanQty(vo.getClass1PlanQty());
         newRecord.setClass2PlanQty(vo.getClass2PlanQty());
         newRecord.setClass3PlanQty(vo.getClass3PlanQty());
+        newRecord.setClass4PlanQty(vo.getClass4PlanQty());
+        newRecord.setClass5PlanQty(vo.getClass5PlanQty());
+        newRecord.setClass6PlanQty(vo.getClass6PlanQty());
+        newRecord.setClass7PlanQty(vo.getClass7PlanQty());
+        newRecord.setClass8PlanQty(vo.getClass8PlanQty());
+
+        // 完成量
+        newRecord.setClass1FinishQty(vo.getClass1FinishQty());
+        newRecord.setClass2FinishQty(vo.getClass2FinishQty());
+        newRecord.setClass3FinishQty(vo.getClass3FinishQty());
+        newRecord.setClass4FinishQty(vo.getClass4FinishQty());
+        newRecord.setClass5FinishQty(vo.getClass5FinishQty());
+        newRecord.setClass6FinishQty(vo.getClass6FinishQty());
+        newRecord.setClass7FinishQty(vo.getClass7FinishQty());
+        newRecord.setClass8FinishQty(vo.getClass8FinishQty());
+
+        // 原因分析
         newRecord.setClass1Analysis(vo.getClass1Analysis());
         newRecord.setClass2Analysis(vo.getClass2Analysis());
         newRecord.setClass3Analysis(vo.getClass3Analysis());
+        newRecord.setClass4Analysis(vo.getClass4Analysis());
+        newRecord.setClass5Analysis(vo.getClass5Analysis());
+        newRecord.setClass6Analysis(vo.getClass6Analysis());
+        newRecord.setClass7Analysis(vo.getClass7Analysis());
+        newRecord.setClass8Analysis(vo.getClass8Analysis());
+
+        // 原因分析手工输入
+        newRecord.setClass1AnalysisInput(vo.getClass1AnalysisInput());
+        newRecord.setClass2AnalysisInput(vo.getClass2AnalysisInput());
+        newRecord.setClass3AnalysisInput(vo.getClass3AnalysisInput());
+        newRecord.setClass4AnalysisInput(vo.getClass4AnalysisInput());
+        newRecord.setClass5AnalysisInput(vo.getClass5AnalysisInput());
+        newRecord.setClass6AnalysisInput(vo.getClass6AnalysisInput());
+        newRecord.setClass7AnalysisInput(vo.getClass7AnalysisInput());
+        newRecord.setClass8AnalysisInput(vo.getClass8AnalysisInput());
+
+        // 示方书类型
+        newRecord.setClass1RecipeType(vo.getClass1RecipeType());
+        newRecord.setClass2RecipeType(vo.getClass2RecipeType());
+        newRecord.setClass3RecipeType(vo.getClass3RecipeType());
+        newRecord.setClass4RecipeType(vo.getClass4RecipeType());
+        newRecord.setClass5RecipeType(vo.getClass5RecipeType());
+        newRecord.setClass6RecipeType(vo.getClass6RecipeType());
+        newRecord.setClass7RecipeType(vo.getClass7RecipeType());
+        newRecord.setClass8RecipeType(vo.getClass8RecipeType());
+
+        // 示方书编号
+        newRecord.setClass1RecipeNo(vo.getClass1RecipeNo());
+        newRecord.setClass2RecipeNo(vo.getClass2RecipeNo());
+        newRecord.setClass3RecipeNo(vo.getClass3RecipeNo());
+        newRecord.setClass4RecipeNo(vo.getClass4RecipeNo());
+        newRecord.setClass5RecipeNo(vo.getClass5RecipeNo());
+        newRecord.setClass6RecipeNo(vo.getClass6RecipeNo());
+        newRecord.setClass7RecipeNo(vo.getClass7RecipeNo());
+        newRecord.setClass8RecipeNo(vo.getClass8RecipeNo());
 
         // 数据来源：1-插单
         newRecord.setDataSource("1");
@@ -1040,6 +1111,42 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             case 7: record.setClass7PlanQty(value); break;
             case 8: record.setClass8PlanQty(value); break;
         }
+    }
+
+    /**
+     * 下载导入模板
+     */
+    @ApiOperation(value = "导入模板下载")
+    @PostMapping("/downloadTemplate/{fileName}")
+    public byte[] downloadTemplate(@RequestBody CxScheduleResult queryVO, @PathVariable("fileName") String fileName,
+                                   HttpServletResponse response) throws IOException {
+        queryVO = queryVO == null ? new CxScheduleResult() : queryVO;
+        return cxScheduleResultService.exportData(Collections.emptyList(), queryVO.getScheduleDate());
+    }
+
+    /**
+     * 自定义导入数据（基于模板cxjhtemplate.xls）
+     */
+    @ApiOperation(value = "自定义导入数据")
+    @PostMapping("/importDataByCust/{updateSupport}")
+    @Log(title = "成型排程导入", businessType = BusinessType.IMPORT)
+    public AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport,
+                                       @RequestBody CxScheduleImportDTO importDTO) throws Exception {
+        ImportContext importContext = importDTO.getImportContext();
+        if (importContext == null) {
+            return AjaxResult.error("导入上下文不能为空");
+        }
+        CxScheduleResult scheduleResult = importDTO.getScheduleResult();
+        if (scheduleResult == null) {
+            scheduleResult = new CxScheduleResult();
+        }
+        byte[] fileBytes = importContext.getFileBytes();
+        String sheetName = "成型计划";
+        ExcelUtil<CxScheduleResultTemplateImportVO> util = new ExcelUtil<>(CxScheduleResultTemplateImportVO.class);
+        // 使用3参数版本: sheetName, InputStream, headRowNum
+        List<CxScheduleResultTemplateImportVO> list = util.importExcel(
+                sheetName, new java.io.ByteArrayInputStream(fileBytes), 0);
+        return cxScheduleResultService.importScheduleTemplate(list, scheduleResult, updateSupport, null);
     }
 
 }

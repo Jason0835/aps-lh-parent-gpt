@@ -92,15 +92,28 @@ public class CxMouldProductionHandler {
     }
 
     /**
-     * 前分组，因衔接分组日切换次数限制，导致需要自动延长收尾
+     * 对因每日结构切换限制或是其它原因导致的间断处理
+     * 将前分组的收尾延长到下一分配的起始日前一天
      * 场景：后分组衔接时，因每日切换次数限制，后分组需往后起始排产
      * 则前结构自动延长
      *
-     * @param context          排产上下文
-     * @param beforeAllocation 前分组配置
+     * @param context   排产上下文
+     * @param addHelper 当前分组分配信息
      */
-    public void handlerTimeExtensionDayConclusion(Context context, CxMachineAllocationPlanHelper beforeAllocation) {
-        groupTimeExtensionHandler.handlerTimeExtensionDayConclusion(context, beforeAllocation);
+    public void handlerTimeExtensionDayConclusionByBeforeGroup(Context context, CxMachineAllocationPlanHelper addHelper) {
+        if (null == addHelper) {
+            return;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        String cxMachineCode = addHelper.getCxMachineCode();
+        CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
+        if (null == cxMachineInfo) {
+            return;
+        }
+        if (!cxMachineInfo.hasAllocation(addHelper)) {
+            return;
+        }
+        groupTimeExtensionHandler.handlerTimeExtensionDayConclusion(context, addHelper.getBeforeAllocation());
     }
 
     /**

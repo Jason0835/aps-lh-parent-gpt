@@ -139,4 +139,13 @@ public interface CxScheduleDetailService extends IService<CxScheduleDetail> {
      * @return 是否成功
      */
     AjaxResult updatePlanQty(ScheduleUpdateDetailPlanQtyVo vo);
+
+    /**
+     * 批量修改明细1-8班计划量，同步更新主表
+     * 校验逻辑同 adjustQty：历史班次不可修改、修改后不能低于已完成量
+     *
+     * @param voList 修改请求列表
+     * @return 是否成功
+     */
+    AjaxResult batchUpdatePlanQty(List<ScheduleUpdateDetailPlanQtyVo> voList);
 }

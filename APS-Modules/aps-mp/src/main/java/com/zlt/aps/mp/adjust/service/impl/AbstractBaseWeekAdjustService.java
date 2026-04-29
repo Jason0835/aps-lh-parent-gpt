@@ -13,6 +13,8 @@ import com.google.common.collect.Maps;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.IncrementConstant;
 import com.zlt.aps.constant.StringConstant;
@@ -20,70 +22,54 @@ import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
+import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.maindata.enums.EventModuleTypeEnum;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.maindata.service.IBatchMpMonthPlanStatisticsService;
-import com.zlt.aps.mp.adjust.service.IBatchMpAdjustMaterialLogService;
-import com.zlt.aps.mp.adjust.service.IBatchMpAdjustResultService;
-import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
-import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
-import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
-import com.zlt.aps.utils.IncrementService;
-import com.zlt.aps.utils.ThreadPoolUtil;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.constant.BusiConstant;
-import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
-import com.zlt.aps.mp.engine.constant.ProductionConstant;
-import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.maindata.enums.MsgTemplateEnums;
+import com.zlt.aps.maindata.event.publisher.EventPublisher;
+import com.zlt.aps.maindata.mapper.MdmMonthSurplusEntityMapper;
+import com.zlt.aps.maindata.service.IBatchMpMonthPlanStatisticsService;
 import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.maindata.utils.MessageServiceUtils;
-import com.zlt.aps.mp.adjust.service.IMpAdjustMaterialLogService;
-import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustMaterialLog;
-import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
-import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
-import com.zlt.aps.itf.mes.IMesItfService;
-import com.zlt.aps.maindata.mapper.MdmMonthSurplusEntityMapper;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustStructureOutEntityMapper;
-import com.zlt.aps.mp.adjust.service.IMpAdjustResultService;
-import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
-import com.zlt.aps.mp.adjust.service.IMpAdjustStructureLogService;
-import com.zlt.aps.mp.adjust.service.IMpWeekAdjustService;
+import com.zlt.aps.mp.adjust.service.*;
+import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
+import com.zlt.aps.mp.api.domain.dto.MonthPlanFinalizedEventDto;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
-import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
-import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
-import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
-import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
-import com.zlt.aps.mp.api.domain.entity.MdmSkuLhCapacity;
-import com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureLog;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
-import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor;
-import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
-import com.zlt.aps.mp.api.domain.entity.MpTrialPlan;
-import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
-import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
+import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.api.enums.AdjustItemSourceEnum;
 import com.zlt.aps.mp.common.utils.DistributedVersionGenerator;
 import com.zlt.aps.mp.common.utils.StringUtil;
+import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.demand.service.IDpDemandPlanService;
+import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
+import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.utils.DateUtils;
+import com.zlt.aps.mp.factory.event.MonthPlanAdjustedEvent;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
+import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
 import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
+import com.zlt.aps.utils.IncrementService;
+import com.zlt.aps.utils.ThreadPoolUtil;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.core.dao.basedao.BaseDao;
+import com.zlt.msg.message.domain.vo.MessageContext;
+import com.zlt.msg.message.enums.MsgTypeEnums;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StopWatch;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -96,16 +82,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import com.zlt.msg.message.domain.vo.MessageContext;
-import com.zlt.msg.message.enums.MsgTypeEnums;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.CollectionUtils;
-import org.springframework.util.StopWatch;
 
 /**
  * 周程滚动调整通用抽象类
@@ -183,6 +159,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected DpDemandPlanEntityMapper demandPlanEntityMapper;
+
+    @Autowired
+    protected EventPublisher eventPublisher;
 
     @Override
     public void generateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
@@ -925,11 +904,175 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             updateStructureAllocationList(contextDTO);
             // 9、处理月计划统计结果
             handleMonthPlanStatistics(contextDTO);
+            // 10、发布月计划调整确认事件，异步推送SCM和MES
+            publishMonthPlanAdjustedEvent(contextDTO);
             log.info("周程调整确认流程执行完成");
         } catch (Exception e) {
             log.error("周程调整确认流程执行异常", e);
             throw new BusinessException("周程调整确认失败：" + e.getMessage());
         }
+    }
+
+    /**
+     * 发布月计划调整确认事件。
+     * <p>
+     * 事件只负责触发后续异步推送，不参与周程调整主流程的事务结果；若事件参数构建或发布失败，
+     * 记录异常后返回，避免外部系统推送异常影响已经完成的月计划调整确认。
+     * </p>
+     *
+     * @param contextDTO 周程调整上下文
+     * @return 无
+     * @throws BusinessException 不主动抛出业务异常，异常在方法内部记录
+     */
+    private void publishMonthPlanAdjustedEvent(MpRollAdjustContextDTO contextDTO) {
+        try {
+            MonthPlanFinalizedEventDto eventDto = buildMonthPlanAdjustedEventDto(contextDTO);
+            if (eventDto == null) {
+                return;
+            }
+            log.info("发布月计划调整事件开始 ==> 参数={}", JSONObject.toJSONString(eventDto));
+            MonthPlanAdjustedEvent event = new MonthPlanAdjustedEvent(
+                    this,
+                    EventModuleTypeEnum.MONTH_PLAN.getCode(),
+                    SecurityUtils.getUsername(),
+                    eventDto
+            );
+            eventPublisher.publish(event);
+            log.info("发布月计划调整事件完成");
+        } catch (Exception e) {
+            log.error("发布月计划调整事件失败，工厂：{}，年份：{}，月份：{}，排产版本：{}",
+                    contextDTO.getFactoryCode(), contextDTO.getMpYear(), contextDTO.getMpMonth(),
+                    contextDTO.getProductionVersion(), e);
+        }
+    }
+
+    /**
+     * 构建月计划调整确认事件参数。
+     * <p>
+     * 按调整后的年月、工厂、需求版本和排产版本重新查询最终月计划表，确保异步推送使用数据库中的整月全量数据。
+     * 最新需求版本优先使用调整需求计划版本；若最终计划表仍使用原需求版本存储，则自动回退到上下文原需求版本或排产版本全量查询。
+     * </p>
+     *
+     * @param contextDTO 周程调整上下文
+     * @return 月计划定稿事件参数，参数不足时返回null
+     * @throws BusinessException 不主动抛出业务异常，查询异常由调用方记录
+     */
+    private MonthPlanFinalizedEventDto buildMonthPlanAdjustedEventDto(MpRollAdjustContextDTO contextDTO) {
+        if (contextDTO == null || contextDTO.getMpYear() == null || contextDTO.getMpMonth() == null
+                || StringUtils.isBlank(contextDTO.getFactoryCode()) || StringUtils.isBlank(contextDTO.getProductionVersion())) {
+            log.warn("构建月计划调整事件参数失败：工厂、年月或排产版本为空，跳过事件发布");
+            return null;
+        }
+        String queryMonthPlanVersion = resolveAdjustedMonthPlanVersion(contextDTO);
+        String pushMonthPlanVersion = contextDTO.getVersion();
+        List<FactoryMonthPlanProductionFinalResult> finalList = queryAdjustedMonthPlanList(contextDTO, queryMonthPlanVersion);
+        String contextMonthPlanVersion = contextDTO.getMonthPlanVersion();
+        if (PubUtil.isEmpty(finalList) && StringUtils.isNotBlank(contextMonthPlanVersion)
+                && !StringUtils.equals(queryMonthPlanVersion, contextMonthPlanVersion)) {
+            log.warn("按调整需求版本未查询到月计划调整全量数据，尝试使用原需求版本查询，调整需求版本：{}，原需求版本：{}",
+                    queryMonthPlanVersion, contextMonthPlanVersion);
+            finalList = queryAdjustedMonthPlanList(contextDTO, contextMonthPlanVersion);
+        }
+        if (PubUtil.isEmpty(finalList)) {
+            log.warn("按需求版本未查询到月计划调整全量数据，尝试仅按排产版本查询，调整需求版本：{}，原需求版本：{}",
+                    queryMonthPlanVersion, contextMonthPlanVersion);
+            finalList = queryAdjustedMonthPlanList(contextDTO, null);
+        }
+
+        MonthPlanFinalizedEventDto eventDto = new MonthPlanFinalizedEventDto();
+        eventDto.setFactoryCode(contextDTO.getFactoryCode());
+        eventDto.setYear(contextDTO.getMpYear());
+        eventDto.setMonth(contextDTO.getMpMonth());
+        eventDto.setMonthPlanVersion(pushMonthPlanVersion);
+        eventDto.setProductionVersion(contextDTO.getProductionVersion());
+        eventDto.setMaterialTotalQtyMap(buildMaterialTotalQtyMap(finalList));
+        eventDto.setParam(buildMonthPlanAdjustedPushParam(contextDTO, pushMonthPlanVersion));
+        eventDto.setFinalList(finalList);
+        return eventDto;
+    }
+
+    /**
+     * 解析月计划调整事件展示用的最新需求版本。
+     *
+     * @param contextDTO 周程调整上下文
+     * @return 最新需求版本，优先调整需求计划版本
+     * @throws BusinessException 不抛出业务异常
+     */
+    private String resolveAdjustedMonthPlanVersion(MpRollAdjustContextDTO contextDTO) {
+        if (StringUtils.isNotBlank(contextDTO.getAdjustMonthPlanVersion())) {
+            return contextDTO.getAdjustMonthPlanVersion();
+        }
+        if (StringUtils.isNotBlank(contextDTO.getMonthPlanVersion())) {
+            return contextDTO.getMonthPlanVersion();
+        }
+        List<FactoryMonthPlanFinalAdjustVo> monthPlanList = contextDTO.getFactoryMonthPlanProdFinalList();
+        if (PubUtil.isNotEmpty(monthPlanList)) {
+            FactoryMonthPlanFinalAdjustVo monthPlan = monthPlanList.stream()
+                    .filter(Objects::nonNull)
+                    .filter(item -> StringUtils.isNotBlank(item.getMonthPlanVersion()))
+                    .findFirst()
+                    .orElse(null);
+            return monthPlan == null ? null : monthPlan.getMonthPlanVersion();
+        }
+        return null;
+    }
+
+    /**
+     * 查询调整确认后的整月最终月计划。
+     *
+     * @param contextDTO        周程调整上下文
+     * @param monthPlanVersion  需求计划版本，为空时只按年月、工厂、排产版本查询
+     * @return 调整确认后的整月最终月计划列表
+     * @throws BusinessException 不主动抛出业务异常，数据库异常由调用方处理
+     */
+    private List<FactoryMonthPlanProductionFinalResult> queryAdjustedMonthPlanList(MpRollAdjustContextDTO contextDTO, String monthPlanVersion) {
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, contextDTO.getFactoryCode())
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, contextDTO.getMpYear())
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, contextDTO.getMpMonth())
+                .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, contextDTO.getProductionVersion())
+                .eq(StringUtils.isNotBlank(monthPlanVersion), FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, monthPlanVersion)
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, YesOrNoEnum.NO.getValue());
+        return factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
+    }
+
+    /**
+     * 构建物料总量汇总Map。
+     *
+     * @param finalList 最终月计划列表
+     * @return 物料编码与整月计划总量的映射
+     * @throws BusinessException 不抛出业务异常
+     */
+    private Map<String, Integer> buildMaterialTotalQtyMap(List<FactoryMonthPlanProductionFinalResult> finalList) {
+        Map<String, Integer> materialTotalQtyMap = new HashMap<>();
+        if (PubUtil.isEmpty(finalList)) {
+            return materialTotalQtyMap;
+        }
+        for (FactoryMonthPlanProductionFinalResult result : finalList) {
+            if (result == null || StringUtils.isBlank(result.getMaterialCode())) {
+                continue;
+            }
+            materialTotalQtyMap.merge(result.getMaterialCode(), Convert.toInt(result.getTotalQty(), 0), Integer::sum);
+        }
+        return materialTotalQtyMap;
+    }
+
+    /**
+     * 构建月计划调整后推送参数。
+     *
+     * @param contextDTO        周程调整上下文
+     * @param monthPlanVersion  外部推送查询使用的需求计划版本
+     * @return 月计划下发查询参数
+     * @throws BusinessException 不抛出业务异常
+     */
+    private FactoryMonthPlanProductionFinalResult buildMonthPlanAdjustedPushParam(MpRollAdjustContextDTO contextDTO, String monthPlanVersion) {
+        FactoryMonthPlanProductionFinalResult param = new FactoryMonthPlanProductionFinalResult();
+        param.setFactoryCode(contextDTO.getFactoryCode());
+        param.setYear(contextDTO.getMpYear());
+        param.setMonth(contextDTO.getMpMonth());
+        param.setMonthPlanVersion(monthPlanVersion);
+        param.setProductionVersion(contextDTO.getProductionVersion());
+        return param;
     }
 
 
@@ -947,13 +1090,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         // 结构名称
         String structureNameParam = contextDTO.getStructureName();
-//        monthPLanList = monthPLanList.stream()
-//                .filter(vo -> StringUtils.isEmpty(structureNameParam) || structureNameParam.equals(vo.getStructureName()))
-//                .collect(Collectors.toList());
-//        if (PubUtil.isEmpty(monthPLanList)) {
-//            log.warn("处理月计划统计结果：过滤后月度生产计划列表为空，直接返回");
-//            return;
-//        }
 
         // 获取产品品类
         String productType = ProductTypeEnum.WHOLE_STEEL.getValue();
@@ -3255,6 +3391,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             adjustDetailVo.setProSize(materialInfo.getProSize());
             adjustDetailVo.setDayVulcanizationQty(Convert.toInt(skuLhCapacity.getStandardCapacity(),0) / 2);
             adjustDetailVo.setCuringTime(skuLhCapacity.getVulcanizationTime());
+            adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
             adjustDetailVo.setMainMaterialDesc(skuConstructionRef.getMainMaterialDesc());
             adjustDetailVo.setProductStatus(productStatus);
             adjustDetailVo.setConstructionStage(ConstructionStageEnum.FORMAL_PRODUCTION.getStage());
@@ -3285,6 +3422,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustDetailVo.setMaterialDesc(monthPlan.getMaterialDesc());
         adjustDetailVo.setProductTypeCode(monthPlan.getProductTypeCode());
         adjustDetailVo.setProductStatus(monthPlan.getProductStatus());
+        adjustDetailVo.setEmbryoCode(skuConstructionRef.getEmbryoCode());
         adjustDetailVo.setMainMaterialDesc(monthPlan.getMainMaterialDesc());
         adjustDetailVo.setConstructionStage(monthPlan.getConstructionStage());
         adjustDetailVo.setBrand(monthPlan.getBrand());

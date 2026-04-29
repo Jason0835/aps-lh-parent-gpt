@@ -1,17 +1,6 @@
 package com.zlt.aps.mp.adjust.service.impl;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
-import org.apache.commons.lang3.ObjectUtils;
-import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
-
+import cn.hutool.core.convert.Convert;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.common.core.constant.BusiConstant;
@@ -25,16 +14,20 @@ import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
-import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.capacity.MpMonthPlanDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.common.utils.PubUtil;
+import org.apache.commons.lang3.ObjectUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
-import cn.hutool.core.convert.Convert;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 /**
  * 月计划统计服务
- * 
+ *
  * @author zlt
  *
  */
@@ -42,7 +35,7 @@ import cn.hutool.core.convert.Convert;
 public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonthAdapter {
     /**
      * 生成统计记录
-     * 
+     *
      * @param resultList
      */
     public void handleMonthPlanStatistics(List<FactoryMonthPlanMouldDayResult> resultList) {
@@ -57,12 +50,12 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
         contextDTO.setMpMonth(mpMonth);
         contextDTO.setFactoryCode(factoryCode);
         contextDTO.setProductionVersion(productionVersion);
-        
+
         QueryWrapper<MpStructureAllocation> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("FACTORY_CODE", factoryCode);
         queryWrapper.eq("PRODUCTION_VERSION", productionVersion);
         List<MpStructureAllocation> structureAllocationList = mpStructureAllocationEntityMapper.selectList(queryWrapper);
-        
+
         // 设置周程滚动参数
         contextDTO
                 .setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), productType));
@@ -104,7 +97,7 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
                 weekRollAdjustEngine.initDayProductionInfo(contextDTO, dailyCapacityLimitVoMap);
                 // 设置日产能限制Map
                 contextDTO.setDailyCapacityLimitVoMap(
-                        ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
+                        ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<Integer, MpDailyCapacityLimitVo>()));
 
                 // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
                 reCalcMonthPlanDailyCapacityLimit(contextDTO, monthList, mpMonthPlanDailyCapacityLimit);
@@ -128,7 +121,7 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
 
     /**
      * 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
-     * 
+     *
      * @param contextDTO      周程滚动上下文
      * @param mpProdFinalList 定稿记录列表
      */
@@ -148,7 +141,7 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
 
     /**
      * 构建月计划统计结果
-     * 
+     *
      * @param mpProdFinalList 月计划定稿列表
      * @return 统计结果列表
      */

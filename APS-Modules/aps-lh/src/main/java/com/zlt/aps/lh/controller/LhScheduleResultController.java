@@ -26,6 +26,7 @@ import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
+import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.component.ScheduleExecutionGuard;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
@@ -488,14 +489,22 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     private static final int MOCK_SCHEDULE_MACHINE_QUOTA_HALF_STEEL = 100;
 
     @Log(title = "ui.data.column.lhParams.modelName")
+    @ApiOperation("插单校验")
+    @PostMapping("/validateInsertOrder")
+    public AjaxResult validateInsertOrder(@RequestBody LhOrderInsertDTO insertDTO) {
+        LhInsertOrderValidateResultDTO result = lhScheduleResultService.validateInsertOrder(insertDTO);
+        return AjaxResult.success(result);
+    }
+
+    @Log(title = "ui.data.column.lhParams.modelName")
     @ApiOperation("插单")
     @PostMapping("/insertOrder")
     public AjaxResult insertOrder(@RequestBody LhOrderInsertDTO insertDTO){
-//        ValidateResult validateResult = lhScheduleResultCheckHandle.insertLhScheduleResultCheck(insertDTO);
-//        if (!validateResult.isSuccess()) {
-//            return AjaxResult.error(validateResult.getMsg());
-//        }
-//        lhScheduleResultService.insertOrder(insertDTO);
+        LhInsertOrderValidateResultDTO validateResult = lhScheduleResultService.validateInsertOrder(insertDTO);
+        if (!validateResult.isValid()) {
+            return AjaxResult.error(String.join(";", validateResult.getErrorMessages()));
+        }
+        lhScheduleResultService.insertOrder(insertDTO);
         return AjaxResult.success();
     }
 
@@ -628,19 +637,27 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         long[] arr = filteredList.stream().mapToLong(BaseEntity::getId).toArray();
 
         try {
-            AjaxResult issueResult = issueLhScheduleResultToMes();
-            if (issueResult != null && Objects.equals(HttpStatus.SUCCESS, issueResult.get(AjaxResult.CODE_TAG))) {
-                for (LhScheduleResult item : filteredList) {
-                    item.setIsRelease(ApsConstant.IS_RELEASE);
-                    lhScheduleResultService.updateReleaseStatus(item);
+            String token = scheduleExecutionGuard.acquireIssueLock();
+            if (token == null) {
+                return AjaxResult.error("排程下发操作正在进行中，请稍后再试");
+            }
+            try {
+                AjaxResult issueResult = doIssueLhScheduleResultToMes(dto.getScheduleDate());
+                if (issueResult != null && Objects.equals(HttpStatus.SUCCESS, issueResult.get(AjaxResult.CODE_TAG))) {
+                    for (LhScheduleResult item : filteredList) {
+                        item.setIsRelease(ApsConstant.IS_RELEASE);
+                        lhScheduleResultService.updateReleaseStatus(item);
+                    }
+                    return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
+                } else {
+                    for (LhScheduleResult item : filteredList) {
+                        item.setIsRelease(ApsConstant.FAILURE_RELEASE);
+                        lhScheduleResultService.updateReleaseStatus(item);
+                    }
+                    return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
                 }
-                return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
-            } else {
-                for (LhScheduleResult item : filteredList) {
-                    item.setIsRelease(ApsConstant.FAILURE_RELEASE);
-                    lhScheduleResultService.updateReleaseStatus(item);
-                }
-                return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
+            } finally {
+                scheduleExecutionGuard.releaseIssueLock(token);
             }
         } catch (Exception e) {
             log.error("硫化排程发布失败", e);
@@ -660,37 +677,44 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * 1. 夜班是凌晨的叫夜班，所以当天的夜班是已经在执行确定了
      * 2. 到早上的时候触发排程，排程逻辑是夜早中
      * 3. 8班对应关系（使用aps-cx-lh-api实体）：
-     *    - 1-2班：当天的早、中班（夜班已生产）
-     *    - 3-5班：第二天的夜、早、中班
-     *    - 6-8班：第三天的夜、早、中班
+     *    - 1-2班：窗口首日的早、中班（夜班已生产）
+     *    - 3-5班：窗口次日的夜、早、中班
+     *    - 6-8班：排程日期当天的夜、早、中班
      * 4. 中间表映射：1班=夜班，2班=早班，3班=中班
-     * 5. 当天、隔天数据更新（存在则更新，不存在则插入）
-     * 6. 第三天数据下发（插入）
+     * 5. 窗口首日、次日数据更新（存在则更新，不存在则插入）
+     * 6. 排程日期当天数据下发（插入）
      *
+     * @param scheduleDate 排程日期（窗口最后一天）
      * @return 下发结果
      */
     @ApiOperation(value = "硫化排程结果下发到MES", notes = "将硫化排程结果下发到MES中间表，8班数据对应3天班次")
     @Log(title = "硫化排程结果下发", businessType = BusinessType.PUBLISH)
     @PostMapping("/issueToMes")
-    public AjaxResult issueLhScheduleResultToMes() {
+    public AjaxResult issueLhScheduleResultToMes(@RequestParam(value = "scheduleDate", required = false) Date scheduleDate) {
+        if (scheduleDate == null) {
+            scheduleDate = java.sql.Date.valueOf(LocalDate.now());
+        }
         String token = scheduleExecutionGuard.acquireIssueLock();
         if (token == null) {
             return AjaxResult.error("排程下发操作正在进行中，请稍后再试");
         }
         try {
-            return doIssueLhScheduleResultToMes();
+            return doIssueLhScheduleResultToMes(scheduleDate);
         } finally {
             scheduleExecutionGuard.releaseIssueLock(token);
         }
     }
 
-    private AjaxResult doIssueLhScheduleResultToMes() {
-        LocalDate today = LocalDate.now();
-        LocalDate tomorrow = today.plusDays(1);
-        LocalDate dayAfterTomorrow = today.plusDays(2);
+    private AjaxResult doIssueLhScheduleResultToMes(Date scheduleDate) {
+        // 按排程日期窗口计算3天日期，与listScheduleShiftDates逻辑一致
+        // scheduleDate是窗口最后一天，往前推SCHEDULE_DAYS-1天为窗口第一天
+        LocalDate scheduleLocalDate = scheduleDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+        LocalDate day1 = scheduleLocalDate.minusDays(LhScheduleConstant.SCHEDULE_DAYS - 1);
+        LocalDate day2 = scheduleLocalDate.minusDays(LhScheduleConstant.SCHEDULE_DAYS - 2);
+        LocalDate day3 = scheduleLocalDate;
 
         List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> scheduleResultList =
-                lhScheduleResultService.getCxLhScheduleResultList(java.sql.Date.valueOf(today));
+                lhScheduleResultService.getCxLhScheduleResultList(java.sql.Date.valueOf(scheduleLocalDate));
 
         if (scheduleResultList.isEmpty()) {
             return AjaxResult.error("没有需要下发的硫化排程结果数据");
@@ -709,17 +733,17 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         List<LhScheduleResultIssue> day3IssueList = new ArrayList<>();
 
         for (com.zlt.aps.cx.entity.schedule.LhScheduleResult source : scheduleResultList) {
-            LhScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, today);
+            LhScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, day1);
             if (day1Issue != null) {
                 day1IssueList.add(day1Issue);
             }
 
-            LhScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, tomorrow);
+            LhScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, day2);
             if (day2Issue != null) {
                 day2IssueList.add(day2Issue);
             }
 
-            LhScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, dayAfterTomorrow);
+            LhScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, day3);
             if (day3Issue != null) {
                 day3IssueList.add(day3Issue);
             }

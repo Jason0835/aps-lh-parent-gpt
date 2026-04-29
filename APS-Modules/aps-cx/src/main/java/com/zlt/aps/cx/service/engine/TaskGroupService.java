@@ -222,7 +222,31 @@ public class TaskGroupService {
         Map<String, Integer> materialUsedFormingRemainder = new HashMap<>();
         // 跟踪每个物料已处理的任务列表（用于回溯更新 isLastEndingBatch）
         Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> materialTasksMap = new HashMap<>();
-        
+
+        // 预计算：哪些结构的全部胎胚都是关键产品（开产班次时不进行过滤，否则整个结构无任务可排）
+        Set<String> allKeyProductStructures = new HashSet<>();
+        if (isOpeningShift && context.getKeyProductCodes() != null && !context.getKeyProductCodes().isEmpty()) {
+            Map<String, Set<String>> structureEmbryoMap = new HashMap<>();
+            for (LhScheduleResult lh : lhScheduleResults) {
+                if (lh.getEmbryoCode() != null && lh.getStructureName() != null) {
+                    structureEmbryoMap.computeIfAbsent(lh.getStructureName(), k -> new HashSet<>()).add(lh.getEmbryoCode());
+                }
+            }
+            for (Map.Entry<String, Set<String>> entry : structureEmbryoMap.entrySet()) {
+                boolean allKey = true;
+                for (String ec : entry.getValue()) {
+                    if (!context.getKeyProductCodes().contains(ec)) {
+                        allKey = false;
+                        break;
+                    }
+                }
+                if (allKey) {
+                    allKeyProductStructures.add(entry.getKey());
+                    log.info("开产班次: 结构 {} 全部为关键产品，跳过关键产品过滤", entry.getKey());
+                }
+            }
+        }
+
         for (LhScheduleResult lhResult : lhScheduleResults) {
             if (lhResult.getEmbryoCode() == null) {
                 skippedNullEmbryo++;
@@ -261,9 +285,11 @@ public class TaskGroupService {
             }
 
             // 开产班次提前过滤关键产品（不在分组中保留，直接在循环中跳过）
+            // 但如果该结构全部为关键产品，则不进行过滤（避免整个结构无任务可排）
             if (isOpeningShift && context.getKeyProductCodes() != null
                     && lhResult.getEmbryoCode() != null
-                    && context.getKeyProductCodes().contains(lhResult.getEmbryoCode())) {
+                    && context.getKeyProductCodes().contains(lhResult.getEmbryoCode())
+                    && !allKeyProductStructures.contains(lhResult.getStructureName())) {
                 log.info("开产班次关键产品跳过: 胎胚={}", lhResult.getEmbryoCode());
                 continue;
             }
@@ -1529,8 +1555,8 @@ public class TaskGroupService {
         int tripCapacity = getTripCapacity(task.getStructureName(), context);
         task.setRequiredCars(tripCapacity > 0 ? (finalProduction + tripCapacity - 1) / tripCapacity : 0);
 
-        log.info("开产日排产: 胎胚={}, 开产基准={}, 收尾后实需={}, 最终产量={}, 需车={}",
-                task.getEmbryoCode(), openingBase, endingAdjusted, finalProduction,
+        log.info("开产日排产: 胎胚={},  收尾后实需={}, 最终产量={}, 需车={}",
+                task.getEmbryoCode(), endingAdjusted, finalProduction,
                 tripCapacity > 0 ? (finalProduction + tripCapacity - 1) / tripCapacity : 0);
     }
 

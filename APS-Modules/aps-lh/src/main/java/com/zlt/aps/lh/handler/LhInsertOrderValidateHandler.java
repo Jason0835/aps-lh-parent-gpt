@@ -1,0 +1,504 @@
+package com.zlt.aps.lh.handler;
+
+import cn.hutool.core.date.DateUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.lh.api.constant.LhScheduleConstant;
+import com.zlt.aps.lh.api.domain.dto.LhInsertOrderValidateResultDTO;
+import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
+import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
+import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
+import com.zlt.aps.lh.api.enums.ShiftEnum;
+import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
+import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
+import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
+import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
+import com.zlt.aps.lh.mapper.MdmMonthSurplusMapper;
+import com.zlt.aps.lh.mapper.MdmSkuLhCapacityMapper;
+import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.MouldStatusUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+/**
+ * 硫化插单校验处理器
+ * <p>负责插单前的所有校验逻辑，包括：</p>
+ * <ul>
+ *   <li>物料编码校验</li>
+ *   <li>班次计划量校验</li>
+ *   <li>重复插单校验</li>
+ *   <li>历史班次校验</li>
+ *   <li>机台可用性校验及产能提示</li>
+ *   <li>硫化余量超产提示</li>
+ *   <li>模具可用性提示</li>
+ * </ul>
+ *
+ * @author APS
+ */
+@Slf4j
+@Component
+public class LhInsertOrderValidateHandler {
+
+    @Resource
+    private MdmMaterialInfoMapper mdmMaterialInfoMapper;
+
+    @Resource
+    private LhMachineInfoMapper lhMachineInfoMapper;
+
+    @Resource
+    private LhScheduleResultMapper lhScheduleResultMapper;
+
+    @Resource
+    private MdmSkuLhCapacityMapper mdmSkuLhCapacityMapper;
+
+    @Resource
+    private MdmMonthSurplusMapper mdmMonthSurplusMapper;
+
+    @Resource
+    private MdmSkuMouldRelMapper mdmSkuMouldRelMapper;
+
+    @Resource
+    private LhMouldChangePlanEntityMapper lhMouldChangePlanEntityMapper;
+
+    /**
+     * 执行插单校验
+     *
+     * @param dto 插单请求数据
+     * @return 校验结果
+     */
+    public LhInsertOrderValidateResultDTO validateInsertOrder(LhOrderInsertDTO dto) {
+        LhInsertOrderValidateResultDTO result = new LhInsertOrderValidateResultDTO();
+        result.setValid(true);
+
+        validateMaterialCode(dto, result);
+        validateShiftPlanQty(dto, result);
+        validateDuplicateInsert(dto, result);
+        validateHistoricalShift(dto, result);
+        checkMachineAvailability(dto, result);
+        checkMouldSurplus(dto, result);
+        checkMouldAvailability(dto, result);
+
+        return result;
+    }
+
+    /**
+     * 获取物料编码（优先使用productCode，其次使用materialCode）
+     *
+     * @param dto 插单数据
+     * @return 物料编码
+     */
+    private String resolveMaterialCode(LhOrderInsertDTO dto) {
+        return StringUtils.isNotBlank(dto.getProductCode()) ? dto.getProductCode() : dto.getMaterialCode();
+    }
+
+    /**
+     * 校验物料编码是否存在
+     *
+     * @param dto    插单数据
+     * @param result 校验结果
+     */
+    private void validateMaterialCode(LhOrderInsertDTO dto, LhInsertOrderValidateResultDTO result) {
+        String materialCode = resolveMaterialCode(dto);
+        if (StringUtils.isBlank(materialCode)) {
+            result.addError(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.materialCodeBlank"));
+            return;
+        }
+        LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmMaterialInfo::getMaterialCode, materialCode);
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            wrapper.eq(MdmMaterialInfo::getFactoryCode, dto.getFactoryCode());
+        }
+        wrapper.last("LIMIT 1");
+        MdmMaterialInfo materialInfo = mdmMaterialInfoMapper.selectOne(wrapper);
+        if (Objects.isNull(materialInfo)) {
+            result.addError(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.materialCodeNotFound", materialCode));
+        }
+    }
+
+    /**
+     * 校验8个班次中至少有一个班的计划量有值
+     *
+     * @param dto    插单数据
+     * @param result 校验结果
+     */
+    private void validateShiftPlanQty(LhOrderInsertDTO dto, LhInsertOrderValidateResultDTO result) {
+        boolean hasAnyPlanQty = false;
+        if (dto.getClass1PlanQty() != null && dto.getClass1PlanQty() > 0) hasAnyPlanQty = true;
+        if (dto.getClass2PlanQty() != null && dto.getClass2PlanQty() > 0) hasAnyPlanQty = true;
+        if (dto.getClass3PlanQty() != null && dto.getClass3PlanQty() > 0) hasAnyPlanQty = true;
+        if (dto.getClass4PlanQty() != null && dto.getClass4PlanQty() > 0) hasAnyPlanQty = true;
+        if (dto.getClass5PlanQty() != null && dto.getClass5PlanQty() > 0) hasAnyPlanQty = true;
+        if (dto.getClass6PlanQty() != null && dto.getClass6PlanQty() > 0) hasAnyPlanQty = true;
+        if (dto.getClass7PlanQty() != null && dto.getClass7PlanQty() > 0) hasAnyPlanQty = true;
+        if (dto.getClass8PlanQty() != null && dto.getClass8PlanQty() > 0) hasAnyPlanQty = true;
+
+        if (!hasAnyPlanQty) {
+            result.addError(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.shiftPlanQtyEmpty"));
+        }
+    }
+
+    /**
+     * 重复插单校验：检查是否存在相同（物料编码+硫化机台）的排程结果
+     *
+     * @param dto    插单数据
+     * @param result 校验结果
+     */
+    private void validateDuplicateInsert(LhOrderInsertDTO dto, LhInsertOrderValidateResultDTO result) {
+        String materialCode = resolveMaterialCode(dto);
+        if (StringUtils.isBlank(materialCode) || StringUtils.isBlank(dto.getLhMachineCode())) {
+            return;
+        }
+        LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhScheduleResult::getMaterialCode, materialCode)
+                .eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode())
+                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        if (dto.getScheduleDate() != null) {
+            wrapper.eq(LhScheduleResult::getScheduleDate, dto.getScheduleDate());
+        }
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            wrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
+        }
+        Long count = lhScheduleResultMapper.selectCount(wrapper);
+        if (count != null && count > 0) {
+            result.addError(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.duplicateInsert", materialCode, dto.getLhMachineCode()));
+        }
+    }
+
+    /**
+     * 历史班次校验：只能往当前班次或后续班次插单，不能往历史班次插单
+     *
+     * @param dto    插单数据
+     * @param result 校验结果
+     */
+    private void validateHistoricalShift(LhOrderInsertDTO dto, LhInsertOrderValidateResultDTO result) {
+        if (dto.getScheduleDate() == null) {
+            return;
+        }
+
+        Date now = new Date();
+        Date scheduleDate = dto.getScheduleDate();
+
+        Date today = DateUtil.beginOfDay(now);
+        Date scheduleDay = DateUtil.beginOfDay(scheduleDate);
+
+        if (scheduleDay.after(today)) {
+            return;
+        }
+
+        if (scheduleDay.before(today)) {
+            result.addError(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.historicalDate", DateUtil.formatDate(scheduleDate)));
+            return;
+        }
+
+        List<LhShiftConfigVO> shifts = LhScheduleTimeUtil.buildDefaultScheduleShifts(null, scheduleDate);
+        int currentShiftIndex = resolveCurrentShiftIndex(shifts, now);
+
+        if (currentShiftIndex < 0) {
+            return;
+        }
+
+        for (int i = 1; i < currentShiftIndex; i++) {
+            Integer planQty = getPlanQtyByShiftIndex(dto, i);
+            if (planQty != null && planQty > 0) {
+                LhShiftConfigVO shift = findShiftByIndex(shifts, i);
+                String shiftName = shift != null ? shift.getShiftName() : ("第" + i + "班");
+                result.addError(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.historicalShift", shiftName));
+            }
+        }
+    }
+
+    /**
+     * 检查硫化机台是否可用，填充机台班产，校验各班次剩余产能
+     *
+     * @param dto    插单数据
+     * @param result 校验结果
+     */
+    private void checkMachineAvailability(LhOrderInsertDTO dto, LhInsertOrderValidateResultDTO result) {
+        if (StringUtils.isBlank(dto.getLhMachineCode())) {
+            return;
+        }
+
+        LambdaQueryWrapper<LhMachineInfo> machineWrapper = new LambdaQueryWrapper<>();
+        machineWrapper.eq(LhMachineInfo::getMachineCode, dto.getLhMachineCode());
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            machineWrapper.eq(LhMachineInfo::getFactoryCode, dto.getFactoryCode());
+        }
+        machineWrapper.last("LIMIT 1");
+        LhMachineInfo machineInfo = lhMachineInfoMapper.selectOne(machineWrapper);
+
+        if (Objects.isNull(machineInfo)) {
+            result.addWarning(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.machineNotExist", dto.getLhMachineCode()));
+            return;
+        }
+
+        if (!"0".equals(machineInfo.getStatus())) {
+            result.addWarning(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.machineUnavailable", dto.getLhMachineCode()));
+        }
+
+        Integer machineQuota = machineInfo.getQuota();
+        if (machineQuota == null || machineQuota <= 0) {
+            String materialCode = resolveMaterialCode(dto);
+            LambdaQueryWrapper<MdmSkuLhCapacity> capacityWrapper = new LambdaQueryWrapper<>();
+            capacityWrapper.eq(MdmSkuLhCapacity::getMaterialCode, materialCode);
+            if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+                capacityWrapper.eq(MdmSkuLhCapacity::getFactoryCode, dto.getFactoryCode());
+            }
+            capacityWrapper.last("LIMIT 1");
+            MdmSkuLhCapacity skuCapacity = mdmSkuLhCapacityMapper.selectOne(capacityWrapper);
+            if (skuCapacity != null && skuCapacity.getClassCapacity() != null) {
+                machineQuota = skuCapacity.getClassCapacity();
+            }
+        }
+
+        if (machineQuota != null && machineQuota > 0) {
+            result.setMachineShiftCapacity(machineQuota);
+            calculateRemainingCapacity(dto, result, machineQuota);
+        }
+    }
+
+    /**
+     * 计算各班次剩余产能
+     *
+     * @param dto          插单数据
+     * @param result       校验结果
+     * @param shiftCapacity 班产
+     */
+    private void calculateRemainingCapacity(LhOrderInsertDTO dto, LhInsertOrderValidateResultDTO result,
+                                            Integer shiftCapacity) {
+        LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode())
+                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        if (dto.getScheduleDate() != null) {
+            wrapper.eq(LhScheduleResult::getScheduleDate, dto.getScheduleDate());
+        }
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            wrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
+        }
+        List<LhScheduleResult> existingResults = lhScheduleResultMapper.selectList(wrapper);
+
+        int[] scheduledQtyByShift = new int[LhScheduleConstant.MAX_SHIFT_SLOT_COUNT + 1];
+        for (LhScheduleResult existing : existingResults) {
+            for (int i = 1; i <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
+                Integer planQty = ShiftFieldUtil.getShiftPlanQty(existing, i);
+                scheduledQtyByShift[i] += (planQty != null ? planQty : 0);
+            }
+        }
+
+        List<LhShiftConfigVO> shifts = LhScheduleTimeUtil.buildDefaultScheduleShifts(null, dto.getScheduleDate());
+
+        for (int i = 1; i <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
+            int scheduledQty = scheduledQtyByShift[i];
+            int remaining = shiftCapacity - scheduledQty;
+            Integer insertQty = getPlanQtyByShiftIndex(dto, i);
+            if (insertQty != null && insertQty > 0 && remaining < insertQty) {
+                String shiftName = getShiftName(shifts, i);
+                result.addWarning(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.capacityInsufficient", shiftName, shiftCapacity, scheduledQty, remaining, insertQty));
+            }
+
+            LhInsertOrderValidateResultDTO.ShiftCapacityInfo capacityInfo =
+                    new LhInsertOrderValidateResultDTO.ShiftCapacityInfo(
+                            i,
+                            getShiftName(shifts, i),
+                            shiftCapacity,
+                            scheduledQty,
+                            Math.max(remaining, 0)
+                    );
+            result.getRemainingCapacityByShift().add(capacityInfo);
+        }
+    }
+
+    /**
+     * 检查硫化余量，进行超产提示
+     *
+     * @param dto    插单数据
+     * @param result 校验结果
+     */
+    private void checkMouldSurplus(LhOrderInsertDTO dto, LhInsertOrderValidateResultDTO result) {
+        String materialCode = resolveMaterialCode(dto);
+        if (StringUtils.isBlank(materialCode)) {
+            return;
+        }
+
+        Calendar cal = Calendar.getInstance();
+        int currentYear = cal.get(Calendar.YEAR);
+        int currentMonth = cal.get(Calendar.MONTH) + 1;
+
+        LambdaQueryWrapper<MdmMonthSurplus> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmMonthSurplus::getMaterialCode, materialCode)
+                .eq(MdmMonthSurplus::getYear, currentYear)
+                .eq(MdmMonthSurplus::getMonth, currentMonth);
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            wrapper.eq(MdmMonthSurplus::getFactoryCode, dto.getFactoryCode());
+        }
+        wrapper.orderByDesc(MdmMonthSurplus::getCreateTime);
+        wrapper.last("LIMIT 1");
+        MdmMonthSurplus monthSurplus = mdmMonthSurplusMapper.selectOne(wrapper);
+
+        int surplusQty = 0;
+        if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
+            surplusQty = monthSurplus.getPlanSurplusQty().intValue();
+        }
+        result.setMouldSurplusQty(surplusQty);
+
+        int totalInsertQty = calculateTotalInsertQty(dto);
+        if (surplusQty > 0 && totalInsertQty > surplusQty) {
+            result.addWarning(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldSurplusExceeded", surplusQty, totalInsertQty, (totalInsertQty - surplusQty)));
+        }
+    }
+
+    /**
+     * 检查物料编码使用模具是否可用
+     *
+     * @param dto    插单数据
+     * @param result 校验结果
+     */
+    private void checkMouldAvailability(LhOrderInsertDTO dto, LhInsertOrderValidateResultDTO result) {
+        String materialCode = resolveMaterialCode(dto);
+        if (StringUtils.isBlank(materialCode)) {
+            return;
+        }
+
+        LambdaQueryWrapper<MdmSkuMouldRel> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmSkuMouldRel::getMaterialCode, materialCode);
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            wrapper.eq(MdmSkuMouldRel::getFactoryCode, dto.getFactoryCode());
+        }
+        List<MdmSkuMouldRel> mouldRelList = mdmSkuMouldRelMapper.selectList(wrapper);
+
+        if (CollectionUtils.isEmpty(mouldRelList)) {
+            result.addWarning(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldRelNotConfigured", materialCode));
+            return;
+        }
+
+        List<String> unavailableMoulds = mouldRelList.stream()
+                .map(MdmSkuMouldRel::getMouldCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .filter(mouldCode -> !isMouldEnabled(mouldCode))
+                .collect(Collectors.toList());
+
+        if (CollectionUtils.isNotEmpty(unavailableMoulds)) {
+            result.addWarning(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldUnavailable", materialCode, String.join(",", unavailableMoulds)));
+        }
+    }
+
+    /**
+     * 判断模具是否可用
+     *
+     * @param mouldCode 模具编号
+     * @return true-可用，false-不可用
+     */
+    private boolean isMouldEnabled(String mouldCode) {
+        return true;
+    }
+
+    /**
+     * 计算插单总量
+     *
+     * @param dto 插单数据
+     * @return 插单总量
+     */
+    private int calculateTotalInsertQty(LhOrderInsertDTO dto) {
+        int total = 0;
+        if (dto.getClass1PlanQty() != null) total += dto.getClass1PlanQty();
+        if (dto.getClass2PlanQty() != null) total += dto.getClass2PlanQty();
+        if (dto.getClass3PlanQty() != null) total += dto.getClass3PlanQty();
+        if (dto.getClass4PlanQty() != null) total += dto.getClass4PlanQty();
+        if (dto.getClass5PlanQty() != null) total += dto.getClass5PlanQty();
+        if (dto.getClass6PlanQty() != null) total += dto.getClass6PlanQty();
+        if (dto.getClass7PlanQty() != null) total += dto.getClass7PlanQty();
+        if (dto.getClass8PlanQty() != null) total += dto.getClass8PlanQty();
+        return total;
+    }
+
+    /**
+     * 根据班次索引获取计划量
+     *
+     * @param dto        插单数据
+     * @param shiftIndex 班次索引（1-8）
+     * @return 计划量
+     */
+    private Integer getPlanQtyByShiftIndex(LhOrderInsertDTO dto, int shiftIndex) {
+        switch (shiftIndex) {
+            case 1: return dto.getClass1PlanQty();
+            case 2: return dto.getClass2PlanQty();
+            case 3: return dto.getClass3PlanQty();
+            case 4: return dto.getClass4PlanQty();
+            case 5: return dto.getClass5PlanQty();
+            case 6: return dto.getClass6PlanQty();
+            case 7: return dto.getClass7PlanQty();
+            case 8: return dto.getClass8PlanQty();
+            default: return null;
+        }
+    }
+
+    /**
+     * 解析当前时间所在的班次索引
+     *
+     * @param shifts 班次列表
+     * @param now    当前时间
+     * @return 当前班次索引，未匹配返回-1
+     */
+    private int resolveCurrentShiftIndex(List<LhShiftConfigVO> shifts, Date now) {
+        for (LhShiftConfigVO shift : shifts) {
+            Date start = shift.getShiftStartDateTime();
+            Date end = shift.getShiftEndDateTime();
+            if (start != null && end != null && !now.before(start) && now.before(end)) {
+                return shift.getShiftIndex();
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 根据班次索引查找班次配置
+     *
+     * @param shifts     班次列表
+     * @param shiftIndex 班次索引
+     * @return 班次配置
+     */
+    private LhShiftConfigVO findShiftByIndex(List<LhShiftConfigVO> shifts, int shiftIndex) {
+        for (LhShiftConfigVO shift : shifts) {
+            if (shift.getShiftIndex() != null && shift.getShiftIndex() == shiftIndex) {
+                return shift;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 获取班次名称
+     *
+     * @param shifts     班次列表
+     * @param shiftIndex 班次索引
+     * @return 班次名称
+     */
+    private String getShiftName(List<LhShiftConfigVO> shifts, int shiftIndex) {
+        LhShiftConfigVO shift = findShiftByIndex(shifts, shiftIndex);
+        if (shift != null && StringUtils.isNotBlank(shift.getShiftName())) {
+            return shift.getShiftName();
+        }
+        return "第" + shiftIndex + "班";
+    }
+}

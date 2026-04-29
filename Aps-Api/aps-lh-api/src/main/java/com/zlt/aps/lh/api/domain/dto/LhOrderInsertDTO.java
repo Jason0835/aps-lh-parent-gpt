@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.api.domain.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -11,9 +12,10 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
+ * 硫化插单请求数据传输对象
+ *
  * @author xh
  * @version 1.0
- * @Description
  * @date 2025/3/20
  */
 @Data
@@ -25,24 +27,27 @@ public class LhOrderInsertDTO implements Serializable {
     private String factoryCode;
 
     @ApiModelProperty(value = "自动排程批次号", name = "batchNo")
-    @NotBlank(message = "自动排程批次号不能为空")
     private String batchNo;
 
     @ApiModelProperty(value = "硫化机台编号", name = "lhMachineCode")
-    @NotBlank(message = "硫化机台编号不能为空")
     private String lhMachineCode;
 
     @ApiModelProperty(value = "硫化机台名称", name = "lhMachineName")
-    @NotBlank(message = "硫化机台名称不能为空")
     private String lhMachineName;
 
     @ApiModelProperty(value = "规格代码", name = "specCode")
-    @NotBlank(message = "规格代码不能为空")
     private String specCode;
 
     @ApiModelProperty(value = "物料编号", name = "productCode")
-    @NotBlank(message = "物料编号不能为空")
+    @JsonProperty(value = "productCode")
     private String productCode;
+
+    @ApiModelProperty(value = "物料编号（前端兼容字段）", name = "materialCode")
+    @JsonProperty(value = "materialCode")
+    private String materialCode;
+
+    @ApiModelProperty(value = "物料描述", name = "materialDesc")
+    private String materialDesc;
 
     /**
      * 存储当前左右模情况，如果非单模单规格的则可为空，单模单规格则存储对应的模信息，如：存储内容，L/R、L1/R1
@@ -63,7 +68,6 @@ public class LhOrderInsertDTO implements Serializable {
      * 一班计划量
      */
     @ApiModelProperty(value = "一班计划量", name = "class1PlanQty")
-    @NotNull(message = "一班计划量不能为空")
     private Integer class1PlanQty;
 
     /**
@@ -71,7 +75,6 @@ public class LhOrderInsertDTO implements Serializable {
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
     @ApiModelProperty(value = "一班计划开始时间", name = "class1StartTime")
-    @NotNull(message = "一班计划开始时间不能为空")
     private Date class1StartTime;
 
     /**
@@ -79,7 +82,6 @@ public class LhOrderInsertDTO implements Serializable {
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
     @ApiModelProperty(value = "一班计划结束时间", name = "class1EndTime")
-    @NotNull(message = "一班计划结束时间不能为空")
     private Date class1EndTime;
 
     /**
@@ -94,7 +96,6 @@ public class LhOrderInsertDTO implements Serializable {
      * 二班计划量
      */
     @ApiModelProperty(value = "二班计划量", name = "class2PlanQty")
-    @NotNull(message = "二班计划量不能为空")
     private Integer class2PlanQty;
 
     /**
@@ -102,7 +103,6 @@ public class LhOrderInsertDTO implements Serializable {
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
     @ApiModelProperty(value = "二班计划开始时间", name = "class2StartTime")
-    @NotNull(message = "二班计划开始时间不能为空")
     private Date class2StartTime;
 
     /**
@@ -110,7 +110,6 @@ public class LhOrderInsertDTO implements Serializable {
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
     @ApiModelProperty(value = "二班计划结束时间", name = "class2EndTime")
-    @NotNull(message = "二班计划结束时间不能为空")
     private Date class2EndTime;
 
     /**
@@ -125,7 +124,6 @@ public class LhOrderInsertDTO implements Serializable {
      * 三班计划量
      */
     @ApiModelProperty(value = "三班计划量", name = "class3PlanQty")
-    @NotNull(message = "三班计划量不能为空")
     private Integer class3PlanQty;
 
     /**
@@ -133,7 +131,6 @@ public class LhOrderInsertDTO implements Serializable {
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
     @ApiModelProperty(value = "三班计划开始时间", name = "class3StartTime")
-    @NotNull(message = "三班计划开始时间不能为空")
     private Date class3StartTime;
 
     /**
@@ -141,7 +138,6 @@ public class LhOrderInsertDTO implements Serializable {
      */
     @JsonFormat(pattern = "yyyy-MM-dd")
     @ApiModelProperty(value = "三班计划结束时间", name = "class3EndTime")
-    @NotNull(message = "三班计划结束时间不能为空")
     private Date class3EndTime;
 
     /**

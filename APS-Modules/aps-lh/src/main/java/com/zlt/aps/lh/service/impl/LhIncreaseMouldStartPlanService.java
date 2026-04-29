@@ -100,7 +100,7 @@ public class LhIncreaseMouldStartPlanService {
         if (!isMouldPlanCompleted(mouldChangePlan)) {
             return AjaxResult.error(String.format(
                     I18nUtil.getMessage("ui.data.alert.lhScheduleResult.increaseMouldStartPlan.mouldStatusUnfinished"),
-                    DateUtil.formatDate(mouldChangePlan.getScheduleDate()), currentResult.getLhMachineCode()));
+                    DateUtil.formatDate(DateUtil.offsetDay(scheduleResult.getScheduleDate(), -1)), currentResult.getLhMachineCode()));
         }
 
         recalculateShiftPlanQty(currentResult);

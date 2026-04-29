@@ -122,4 +122,16 @@ public interface ICxScheduleResultService {
      */
     @PostMapping("/cxScheduleResult/importData")
     AjaxResult importData(@RequestBody ImportContext context, @RequestParam("updateSupport") boolean updateSupport);
+
+    /**
+     * 模板下载
+     */
+    @PostMapping("/cxScheduleResult/downloadTemplate/{fileName}")
+    byte[] downloadTemplate(@RequestBody CxScheduleResult entity, @PathVariable("fileName") String fileName);
+
+    /**
+     * 自定义导入数据
+     */
+    @PostMapping("/cxScheduleResult/importDataByCust/{updateSupport}")
+    AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport, @RequestBody CxScheduleImportDTO importDTO);
 }

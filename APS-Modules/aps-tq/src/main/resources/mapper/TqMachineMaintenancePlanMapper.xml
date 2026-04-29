@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.tq.mapper.TqMachineMaintenancePlanMapper">
+
+    <select id="listMachineMaintenancePlan" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineMaintenancePlan"
+            resultType="com.zlt.aps.tq.api.domain.entity.TqMachineMaintenancePlan">
+        select * from (
+            select mp.ID, mp.FACTORY_CODE, mp.MACHINE_ID, mp.DOWNTIME_DATE, mp.DOWNTIME_SHIFT,
+                   mp.DOWNTIME_HOURS, mp.REMARK, mp.IS_DELETE, mp.CREATE_BY, mp.CREATE_TIME,
+                   mp.UPDATE_BY, mp.UPDATE_TIME,
+                   mi.MACHINE_NAME
+            from T_TQ_MACHINE_MAINTENANCE_PLAN mp
+            left join T_TQ_MACHINE_INFO mi on mp.MACHINE_ID = mi.ID
+            where mp.IS_DELETE = '0'
+            <if test="downtimeDateBegin != null">
+                and mp.DOWNTIME_DATE &gt;= #{downtimeDateBegin}
+            </if>
+            <if test="downtimeDateEnd != null">
+                and mp.DOWNTIME_DATE &lt;= #{downtimeDateEnd}
+            </if>
+            <if test="machineId != null">
+                and mp.MACHINE_ID = #{machineId}
+            </if>
+            order by mp.DOWNTIME_DATE desc, mi.MACHINE_NAME
+        ) t
+    </select>
+
+    <select id="checkUnique" parameterType="com.zlt.aps.tq.api.domain.entity.TqMachineMaintenancePlan" resultType="int">
+        SELECT count(1)
+        FROM T_TQ_MACHINE_MAINTENANCE_PLAN
+        where IS_DELETE = '0'
+        and DOWNTIME_DATE = #{downtimeDate}
+        and MACHINE_ID = #{machineId}
+        and DOWNTIME_SHIFT = #{downtimeShift}
+        <if test="id != null">and ID != #{id}</if>
+    </select>
+
+    <insert id="mergeSql" parameterType="list">
+        INSERT INTO T_TQ_MACHINE_MAINTENANCE_PLAN (
+            factory_code, machine_id, downtime_date, downtime_shift, downtime_hours, remark,
+            create_by, create_time, update_by, update_time, is_delete
+        )
+        VALUES
+        <foreach collection="list" item="Plan" separator=",">
+            (
+            #{Plan.factoryCode,jdbcType=VARCHAR},
+            #{Plan.machineId,jdbcType=BIGINT},
+            #{Plan.downtimeDate,jdbcType=DATE},
+            #{Plan.downtimeShift,jdbcType=VARCHAR},
+            #{Plan.downtimeHours,jdbcType=DECIMAL},
+            #{Plan.remark,jdbcType=VARCHAR},
+            #{Plan.createBy,jdbcType=VARCHAR},
+            NOW(),
+            #{Plan.updateBy,jdbcType=VARCHAR},
+            NOW(),
+            '0'
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        downtime_hours = VALUES(downtime_hours),
+        update_by = VALUES(create_by),
+        update_time = NOW(),
+        remark = VALUES(remark)
+    </insert>
+
+    <update id="deleteAllMachineMaintenancePlan">
+        update T_TQ_MACHINE_MAINTENANCE_PLAN set IS_DELETE = '1' where IS_DELETE = '0'
+    </update>
+
+</mapper>

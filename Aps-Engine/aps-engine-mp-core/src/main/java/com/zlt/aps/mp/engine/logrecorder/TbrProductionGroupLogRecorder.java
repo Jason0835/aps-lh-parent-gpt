@@ -841,6 +841,26 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加 分组成型机匹配排产日 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 成型机台 %s 理论可排产日[%s]====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名
+     * @param cxMachineCode     成型机台
+     * @param productionDayInfo 可排产日信息
+     * @return
+     */
+    public static String addGroupMatchCxMachineProductionInfoLog(Context context, String groupName, String cxMachineCode, String productionDayInfo) {
+        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 成型机台 %s 理论可排产日[%s]====";
+        String logContent = String.format(logContentFormat,
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, cxMachineCode, productionDayInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MACHINE_MATCH_PLAN, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加结构剩余待分配天数小于最下排产天数日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 剩余待排产天数[%s]不满足最小排产天数[%s]====
      *

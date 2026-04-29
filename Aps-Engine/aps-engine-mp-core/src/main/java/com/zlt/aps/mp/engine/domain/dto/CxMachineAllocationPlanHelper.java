@@ -91,6 +91,10 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      * 分组切换日限制时，前分组需要延长到的排产日
      */
     private Integer timeExtensionDay;
+    /**
+     * 分组切换日，前分组分配信息，记录是否需要延长处理
+     */
+    private CxMachineAllocationPlanHelper beforeAllocation;
 
     /**
      * 构造函数
@@ -275,6 +279,15 @@ public class CxMachineAllocationPlanHelper implements Serializable {
             return;
         }
         this.timeExtensionDay = timeExtensionDay;
+    }
+
+    /**
+     * 因分组切换日限制，存储前分组配置
+     *
+     * @param beforeAllocation
+     */
+    public void setBeforeAllocationByChangeLimit(CxMachineAllocationPlanHelper beforeAllocation) {
+        this.beforeAllocation = beforeAllocation;
     }
 
     /**

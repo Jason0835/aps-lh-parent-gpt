@@ -320,8 +320,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, context.getMonthDays());
         CxMachineAllocationPlanHelper beforeGroupAllocation = selectedCxMachine.addAllocationPlanInfo(context, addHelper);
-        //20260429+ 前分组分配是否需要强制延长
-        cxMouldProductionHandler.handlerTimeExtensionDayConclusion(productionContext, beforeGroupAllocation);
+        //20260429+ 存储前分组分配信息，用以前分组是否需要强制延长
+        addHelper.setBeforeAllocationByChangeLimit(beforeGroupAllocation);
         //对成型机台进行模拟模具排产
         cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper, new HashSet<>());
         //20260323 重新获取剩余天数：可能因提前收尾变化，导致计划实际没有排，下轮直接排除,不能比较分配完成
@@ -331,6 +331,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         } else {
             excludeGroupPlan.remove(groupName);
         }
+        //20260429+ 前分组分配强制延长处理
+        cxMouldProductionHandler.handlerTimeExtensionDayConclusionByBeforeGroup(productionContext, addHelper);
         //重新获取机台的剩余日：可能因提前收尾变化，导致实际分配天数与初始分配天数不一致
         Integer leftOver = selectedCxMachine.getRemainingDays();
         boolean isProductionByCxMachine = !originLeftOverByCxMachine.equals(leftOver);

@@ -14,6 +14,7 @@ import com.zlt.aps.lh.mapper.LhMoldAlterPlanFinishMapper;
 import com.zlt.aps.lh.mapper.LhMouldCleanWarnMapper;
 import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
 import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
+import com.zlt.aps.lh.service.ILhScheFinishQtyService;
 import com.zlt.core.dao.basedao.BaseDao;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -55,6 +56,9 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
 
     @Autowired
     private LhMoldAlterPlanFinishMapper lhMoldAlterPlanFinishMapper;
+
+    @Autowired
+    private ILhScheFinishQtyService lhScheFinishQtyService;
 
     @Override
     @ApiOperation("批量删除硫化在机信息")
@@ -162,5 +166,12 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @PostMapping("/selectMoldAlterPlanFinishExists")
     public List<LhMoldAlterPlanFinish> selectMoldAlterPlanFinishExists(@RequestBody List<LhMoldAlterPlanFinish> list) {
         return lhMoldAlterPlanFinishMapper.selectByUniqueKeyList(list);
+    }
+
+    @Override
+    @ApiOperation("硫化排程完成量回写硫化排程结果表各班次完成量")
+    @PostMapping("/writeBackScheduleResultFinishQty")
+    public AjaxResult writeBackScheduleResultFinishQty(@RequestBody List<LhScheFinishQty> list) {
+        return lhScheFinishQtyService.writeBackScheduleResultFinishQty(list);
     }
 }
