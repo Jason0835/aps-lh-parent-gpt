@@ -780,14 +780,78 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         newRecord.setEmbryoCode(vo.getEmbryoCode());
         newRecord.setMaterialCode(vo.getMaterialCode());
         newRecord.setMaterialDesc(vo.getSpecDesc());
+        newRecord.setMainMaterialDesc(vo.getMainMaterialDesc());
         newRecord.setOrderNo(vo.getMaterialCode());
         newRecord.setBomDataVersion(vo.getExampleNo());
+        newRecord.setStructureName(vo.getStructureName());
+        newRecord.setCxBatchNo(vo.getCxBatchNo());
+        newRecord.setTotalStock(vo.getTotalStock());
+        newRecord.setLhMachineCode(vo.getLhMachineCode());
+        newRecord.setLhMachineQty(vo.getLhMachineQty());
+        newRecord.setSpecDimension(vo.getSpecDimension());
+        newRecord.setCxRemainQty(vo.getCxRemainQty());
+        newRecord.setLhRemainQty(vo.getLhRemainQty());
+        newRecord.setLhClassQty(vo.getLhClassQty());
+
+        // 计划量
         newRecord.setClass1PlanQty(vo.getClass1PlanQty());
         newRecord.setClass2PlanQty(vo.getClass2PlanQty());
         newRecord.setClass3PlanQty(vo.getClass3PlanQty());
+        newRecord.setClass4PlanQty(vo.getClass4PlanQty());
+        newRecord.setClass5PlanQty(vo.getClass5PlanQty());
+        newRecord.setClass6PlanQty(vo.getClass6PlanQty());
+        newRecord.setClass7PlanQty(vo.getClass7PlanQty());
+        newRecord.setClass8PlanQty(vo.getClass8PlanQty());
+
+        // 完成量
+        newRecord.setClass1FinishQty(vo.getClass1FinishQty());
+        newRecord.setClass2FinishQty(vo.getClass2FinishQty());
+        newRecord.setClass3FinishQty(vo.getClass3FinishQty());
+        newRecord.setClass4FinishQty(vo.getClass4FinishQty());
+        newRecord.setClass5FinishQty(vo.getClass5FinishQty());
+        newRecord.setClass6FinishQty(vo.getClass6FinishQty());
+        newRecord.setClass7FinishQty(vo.getClass7FinishQty());
+        newRecord.setClass8FinishQty(vo.getClass8FinishQty());
+
+        // 原因分析
         newRecord.setClass1Analysis(vo.getClass1Analysis());
         newRecord.setClass2Analysis(vo.getClass2Analysis());
         newRecord.setClass3Analysis(vo.getClass3Analysis());
+        newRecord.setClass4Analysis(vo.getClass4Analysis());
+        newRecord.setClass5Analysis(vo.getClass5Analysis());
+        newRecord.setClass6Analysis(vo.getClass6Analysis());
+        newRecord.setClass7Analysis(vo.getClass7Analysis());
+        newRecord.setClass8Analysis(vo.getClass8Analysis());
+
+        // 原因分析手工输入
+        newRecord.setClass1AnalysisInput(vo.getClass1AnalysisInput());
+        newRecord.setClass2AnalysisInput(vo.getClass2AnalysisInput());
+        newRecord.setClass3AnalysisInput(vo.getClass3AnalysisInput());
+        newRecord.setClass4AnalysisInput(vo.getClass4AnalysisInput());
+        newRecord.setClass5AnalysisInput(vo.getClass5AnalysisInput());
+        newRecord.setClass6AnalysisInput(vo.getClass6AnalysisInput());
+        newRecord.setClass7AnalysisInput(vo.getClass7AnalysisInput());
+        newRecord.setClass8AnalysisInput(vo.getClass8AnalysisInput());
+
+        // 示方书类型
+        newRecord.setClass1RecipeType(vo.getClass1RecipeType());
+        newRecord.setClass2RecipeType(vo.getClass2RecipeType());
+        newRecord.setClass3RecipeType(vo.getClass3RecipeType());
+        newRecord.setClass4RecipeType(vo.getClass4RecipeType());
+        newRecord.setClass5RecipeType(vo.getClass5RecipeType());
+        newRecord.setClass6RecipeType(vo.getClass6RecipeType());
+        newRecord.setClass7RecipeType(vo.getClass7RecipeType());
+        newRecord.setClass8RecipeType(vo.getClass8RecipeType());
+
+        // 示方书编号
+        newRecord.setClass1RecipeNo(vo.getClass1RecipeNo());
+        newRecord.setClass2RecipeNo(vo.getClass2RecipeNo());
+        newRecord.setClass3RecipeNo(vo.getClass3RecipeNo());
+        newRecord.setClass4RecipeNo(vo.getClass4RecipeNo());
+        newRecord.setClass5RecipeNo(vo.getClass5RecipeNo());
+        newRecord.setClass6RecipeNo(vo.getClass6RecipeNo());
+        newRecord.setClass7RecipeNo(vo.getClass7RecipeNo());
+        newRecord.setClass8RecipeNo(vo.getClass8RecipeNo());
 
         // 数据来源：1-插单
         newRecord.setDataSource("1");
