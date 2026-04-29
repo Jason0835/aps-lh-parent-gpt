@@ -23,6 +23,12 @@ import java.util.List;
 @Mapper
 public interface MpAdjustResultEntityMapper extends CommBaseMapper<MpAdjustResult> {
 
+    /**
+     * 动态更新（只更新非空字段）
+     * @param entity 实体（必须包含 id）
+     * @return 影响行数
+     */
+    int forceUpdateById(MpAdjustResult entity);
 
     /**
      * 通过版本删除调整结果

@@ -393,7 +393,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @Override
     public AjaxResult save(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal){
         // 重新计算和校验
-        recalculateAndCheck(factoryMonthPlanProdFinal);
+        //recalculateAndCheck(factoryMonthPlanProdFinal);
         return super.save(factoryMonthPlanProdFinal);
     }
 
@@ -411,7 +411,6 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         contextDTO.setMpMonth(factoryMonthPlanProdFinal.getMonth());
         contextDTO.setProductionVersion(factoryMonthPlanProdFinal.getProductionVersion());
         contextDTO.setMonthPlanVersion(factoryMonthPlanProdFinal.getMonthPlanVersion());
-
         // 结构名称
         String structureNameParam = contextDTO.getStructureName();
 
@@ -516,7 +515,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         }
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
         // 保存月计划统计结果
-        mpAdjustStructureOutStrategy.saveMonthPlanStatisticsResult(contextDTO, null);
+        mpAdjustStructureOutStrategy.saveMonthPlanStatisticsResult(contextDTO, YesOrNoEnum.YES.getCode());
     }
 
     /**

@@ -2910,6 +2910,7 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setProductTypeCode(adjustStructInVo.getProductTypeCode());
         mpFinalVo.setProductionType(adjustStructInVo.getProductionType());
         mpFinalVo.setProductStatus(adjustStructInVo.getProductStatus());
+        mpFinalVo.setEmbryoCode(adjustStructInVo.getEmbryoCode());
         mpFinalVo.setMainMaterialDesc(adjustStructInVo.getMainMaterialDesc());
         mpFinalVo.setMesMaterialCode(adjustStructInVo.getMesMaterialCode());
         mpFinalVo.setMaterialCode(adjustStructInVo.getMaterialCode());
@@ -2969,6 +2970,7 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setProductTypeCode(adjustStructOutVo.getProductTypeCode());
         mpFinalVo.setProductionType(adjustStructOutVo.getProductionType());
         mpFinalVo.setProductStatus(adjustStructOutVo.getProductStatus());
+        mpFinalVo.setEmbryoCode(adjustStructOutVo.getEmbryoCode());
         mpFinalVo.setMainMaterialDesc(adjustStructOutVo.getMainMaterialDesc());
         mpFinalVo.setMesMaterialCode(adjustStructOutVo.getMesMaterialCode());
         mpFinalVo.setMaterialCode(adjustStructOutVo.getMaterialCode());

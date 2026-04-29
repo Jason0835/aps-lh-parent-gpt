@@ -143,7 +143,10 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody MpAdjustResult billVO){
-        return super.save(billVO);
+
+        mpAdjustResultService.forceUpdateById(billVO);
+        return AjaxResult.success();
+        //return super.save(billVO);
     }
 
     /**
