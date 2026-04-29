@@ -2246,8 +2246,11 @@ export default {
       console.log(rows);
       this.selection = rows;
     },
+	// 结构间调整导出
     handleExport() {
-      downloadLink("/monthplan/factoryMonthPlanFinalResult/exportSkuScheduleItems", this.formatParams(false));
+	  const params = this.formatParams(false);
+	  params.structureName = this.formInline.structureName; // 只导出指定结构的数据
+      downloadLink("/monthplan/factoryMonthPlanFinalResult/exportSkuScheduleItems", params);
     },
 
     formatParams() {
