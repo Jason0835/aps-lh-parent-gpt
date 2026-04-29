@@ -156,6 +156,7 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             CxPrecisionPlan docEntity = list.get(i);
+            docEntity.setDataSource(DATA_SOURCE_AUTO);
             if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
