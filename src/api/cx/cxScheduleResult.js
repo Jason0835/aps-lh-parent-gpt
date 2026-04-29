@@ -94,7 +94,7 @@ export function cxScheduleResultEdit(query) {
     data: query
   })
 }
-export function insertOrder(query) {
+export function adjustQty(query) {
   return request({
     url: '/cx/cxScheduleResult/adjustQty',
     method: 'post',

@@ -209,6 +209,8 @@ export default {
     "PRODUCTION_STATUS",
     "biz_factory_name",
     "MACHINE_TYPE",
+    "trial_status",
+    "biz_yes_no",
   ],
   provide() {
     return {
