@@ -32,6 +32,7 @@ import infoForm from "@/views/components/infoForm.vue";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import {
   insertOrder,
+  validateInsertOrder,
   selectListMdmProductConstruction,
   getScheduleMachineInfo,
 } from "@/api/lh/scheduleResult";
@@ -303,10 +304,27 @@ export default {
           class7Analysis: this.encodeRemark(params.class7Analysis),
           class8Analysis: this.encodeRemark(params.class8Analysis),
         };
-        const res = await insertOrder(saveParams);
-        this.$modal.msgSuccess(res.msg);
-        this.$emit("success");
-        this.hide();
+        const validateRes = await validateInsertOrder(saveParams);
+        if (validateRes.valid) {
+          if (validateRes.warningMessages && validateRes.warningMessages.length > 0) {
+            const warningMsg = validateRes.warningMessages.join('\n');
+            const confirmResult = await this.$confirm(warningMsg, this.$t('ui.data.column.lhScheduleResult.insertOrder.validateFail'), {
+              confirmButtonText: this.$t('common.button.confirm'),
+              cancelButtonText: this.$t('common.button.cancel'),
+              type: 'warning',
+            }).catch(() => false);
+            if (!confirmResult) {
+              return;
+            }
+          }
+          const res = await insertOrder(saveParams);
+          this.$modal.msgSuccess(res.msg);
+          this.$emit("success");
+          this.hide();
+        } else {
+          const errorMsg = validateRes.errorMessages ? validateRes.errorMessages.join('\n') : '校验失败';
+          this.$modal.msgError(errorMsg);
+        }
       } catch (error) {
         console.log(error);
       } finally {

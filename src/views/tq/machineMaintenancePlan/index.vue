@@ -65,7 +65,7 @@ import InfoDialog from "./components/infoDialog.vue";
 
 export default {
   name: "TqMachineMaintenancePlan",
-  dicts: ["biz_class_type"],
+  dicts: ["class_num_three_plan"],
   components: {
     tltUpload,
     InfoDialog,
@@ -133,7 +133,7 @@ export default {
           label: this.$t("ui.tq.machineMaintenancePlan.column.downtimeShift"),
           minWidth: 100,
           formatter: (row) => {
-            return this.selectDictLabel(this.dict.type.biz_class_type, row.downtimeShift) || "-";
+            return this.selectDictLabel(this.dict.type.class_num_three_plan, row.downtimeShift) || "-";
           },
         },
         {
