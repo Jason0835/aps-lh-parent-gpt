@@ -101,14 +101,14 @@ public class CxScheduleDetailUIController {
     }
 
     /**
-     * 修改明细计划量（同步更新主表）
+     * 批量修改明细计划量（同步更新主表）
      */
-    @ApiOperation("修改明细计划量")
+    @ApiOperation("批量修改明细计划量")
     @RequiresPermissions("cx:cxScheduleDetail:edit")
     @PostMapping("/updatePlanQty")
     @ResponseBody
-    public AjaxResult updatePlanQty(@RequestBody ScheduleUpdateDetailPlanQtyVo vo) {
-        return iCxScheduleDetailService.updatePlanQty(vo);
+    public AjaxResult updatePlanQty(@RequestBody List<ScheduleUpdateDetailPlanQtyVo> voList) {
+        return iCxScheduleDetailService.updatePlanQty(voList);
     }
 
     /**

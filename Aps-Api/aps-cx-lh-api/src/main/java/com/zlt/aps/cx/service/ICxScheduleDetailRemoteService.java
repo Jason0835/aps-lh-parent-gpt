@@ -62,11 +62,11 @@ public interface ICxScheduleDetailRemoteService {
     AjaxResult listByQuery(@RequestBody ScheduleDetailQueryVo query);
 
     /**
-     * 修改明细计划量（同步更新主表）
+     * 批量修改明细计划量（同步更新主表）
      */
-    @ApiOperation("修改明细计划量")
+    @ApiOperation("批量修改明细计划量")
     @PostMapping("/cxScheduleDetail/updatePlanQty")
-    AjaxResult updatePlanQty(@RequestBody ScheduleUpdateDetailPlanQtyVo vo);
+    AjaxResult updatePlanQty(@RequestBody List<ScheduleUpdateDetailPlanQtyVo> voList);
 
     /**
      * 根据ID获取详细信息

@@ -310,6 +310,82 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
         return AjaxResult.success("明细计划量修改成功");
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult batchUpdatePlanQty(List<ScheduleUpdateDetailPlanQtyVo> voList) {
+        if (voList == null || voList.isEmpty()) {
+            return AjaxResult.error("更新列表不能为空");
+        }
+
+        // 收集需要更新的主表ID
+        Set<Long> mainIdsToUpdate = new HashSet<>();
+
+        // 逐个处理每个明细的更新
+        for (ScheduleUpdateDetailPlanQtyVo vo : voList) {
+            AjaxResult result = updatePlanQty(vo);
+            if (result == null || (Integer) result.get("code") != 200) {
+                // 如果任何一个失败，返回错误信息
+                return result;
+            }
+            // 收集主表ID用于后续统一更新
+            if (vo.getDetailId() != null) {
+                CxScheduleDetail detail = getById(vo.getDetailId());
+                if (detail != null) {
+                    mainIdsToUpdate.add(detail.getMainId());
+                }
+            }
+        }
+
+        // 对所有受影响的主表进行重新汇总计算
+        for (Long mainId : mainIdsToUpdate) {
+            recalculateMainTable(mainId);
+        }
+
+        log.info("批量明细调量成功，共更新{}条记录", voList.size());
+        return AjaxResult.success("批量明细计划量修改成功，共更新" + voList.size() + "条记录");
+    }
+
+    /**
+     * 重新计算主表的汇总数据
+     */
+    private void recalculateMainTable(Long mainId) {
+        CxScheduleResult main = cxScheduleResultMapper.selectById(mainId);
+        if (main == null) {
+            return;
+        }
+
+        // 查询该主表下所有明细
+        List<CxScheduleDetail> allDetails = list(new LambdaQueryWrapper<CxScheduleDetail>()
+                .eq(CxScheduleDetail::getMainId, mainId));
+
+        BigDecimal sumClass1 = BigDecimal.ZERO, sumClass2 = BigDecimal.ZERO;
+        BigDecimal sumClass3 = BigDecimal.ZERO, sumClass4 = BigDecimal.ZERO;
+        BigDecimal sumClass5 = BigDecimal.ZERO, sumClass6 = BigDecimal.ZERO;
+        BigDecimal sumClass7 = BigDecimal.ZERO, sumClass8 = BigDecimal.ZERO;
+
+        for (CxScheduleDetail d : allDetails) {
+            if (d.getClass1PlanQty() != null) sumClass1 = sumClass1.add(d.getClass1PlanQty());
+            if (d.getClass2PlanQty() != null) sumClass2 = sumClass2.add(d.getClass2PlanQty());
+            if (d.getClass3PlanQty() != null) sumClass3 = sumClass3.add(d.getClass3PlanQty());
+            if (d.getClass4PlanQty() != null) sumClass4 = sumClass4.add(d.getClass4PlanQty());
+            if (d.getClass5PlanQty() != null) sumClass5 = sumClass5.add(d.getClass5PlanQty());
+            if (d.getClass6PlanQty() != null) sumClass6 = sumClass6.add(d.getClass6PlanQty());
+            if (d.getClass7PlanQty() != null) sumClass7 = sumClass7.add(d.getClass7PlanQty());
+            if (d.getClass8PlanQty() != null) sumClass8 = sumClass8.add(d.getClass8PlanQty());
+        }
+
+        main.setClass1PlanQty(sumClass1);
+        main.setClass2PlanQty(sumClass2);
+        main.setClass3PlanQty(sumClass3);
+        main.setClass4PlanQty(sumClass4);
+        main.setClass5PlanQty(sumClass5);
+        main.setClass6PlanQty(sumClass6);
+        main.setClass7PlanQty(sumClass7);
+        main.setClass8PlanQty(sumClass8);
+        main.setIsRelease("0");
+        cxScheduleResultMapper.updateById(main);
+    }
+
     /** 判断班次是否已过（与ScheduleMainController.isShiftPast逻辑一致） */
     private boolean isShiftPast(int classIndex, LocalDate scheduleDate, LocalDateTime now) {
         LocalDate endDate;

@@ -84,12 +84,12 @@ public class ScheduleDetailController {
     }
 
     /**
-     * 修改明细1-8班计划量，同步更新主表
+     * 批量修改明细1-8班计划量，同步更新主表
      * 校验逻辑同调量：历史班次不可修改、修改后不能低于已完成量
      */
-    @ApiOperation("修改明细计划量")
+    @ApiOperation("批量修改明细计划量")
     @PostMapping("/updatePlanQty")
-    public AjaxResult updatePlanQty(@RequestBody ScheduleUpdateDetailPlanQtyVo vo) {
-        return cxScheduleDetailService.updatePlanQty(vo);
+    public AjaxResult updatePlanQty(@RequestBody List<ScheduleUpdateDetailPlanQtyVo> voList) {
+        return cxScheduleDetailService.batchUpdatePlanQty(voList);
     }
 }

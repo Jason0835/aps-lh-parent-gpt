@@ -5,9 +5,12 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
@@ -25,6 +28,8 @@ import com.zlt.aps.cx.api.domain.vo.ScheduleInsertVo;
 import com.zlt.aps.cx.api.domain.vo.ScheduleTransferMachineVo;
 import com.zlt.aps.cx.api.domain.vo.ScheduleUpdateRemarkVo;
 import com.zlt.aps.cx.vo.ScheduleRequestVo;
+import com.zlt.aps.cx.vo.CxScheduleImportDTO;
+import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.mp.api.domain.entity.CxScheduleResultIssue;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
@@ -40,6 +45,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -47,6 +53,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -1104,6 +1111,42 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             case 7: record.setClass7PlanQty(value); break;
             case 8: record.setClass8PlanQty(value); break;
         }
+    }
+
+    /**
+     * 下载导入模板
+     */
+    @ApiOperation(value = "导入模板下载")
+    @PostMapping("/downloadTemplate/{fileName}")
+    public byte[] downloadTemplate(@RequestBody CxScheduleResult queryVO, @PathVariable("fileName") String fileName,
+                                   HttpServletResponse response) throws IOException {
+        queryVO = queryVO == null ? new CxScheduleResult() : queryVO;
+        return cxScheduleResultService.exportData(Collections.emptyList(), queryVO.getScheduleDate());
+    }
+
+    /**
+     * 自定义导入数据（基于模板cxjhtemplate.xls）
+     */
+    @ApiOperation(value = "自定义导入数据")
+    @PostMapping("/importDataByCust/{updateSupport}")
+    @Log(title = "成型排程导入", businessType = BusinessType.IMPORT)
+    public AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport,
+                                       @RequestBody CxScheduleImportDTO importDTO) throws Exception {
+        ImportContext importContext = importDTO.getImportContext();
+        if (importContext == null) {
+            return AjaxResult.error("导入上下文不能为空");
+        }
+        CxScheduleResult scheduleResult = importDTO.getScheduleResult();
+        if (scheduleResult == null) {
+            scheduleResult = new CxScheduleResult();
+        }
+        byte[] fileBytes = importContext.getFileBytes();
+        String sheetName = "成型计划";
+        ExcelUtil<CxScheduleResultTemplateImportVO> util = new ExcelUtil<>(CxScheduleResultTemplateImportVO.class);
+        // 使用3参数版本: sheetName, InputStream, headRowNum
+        List<CxScheduleResultTemplateImportVO> list = util.importExcel(
+                sheetName, new java.io.ByteArrayInputStream(fileBytes), 0);
+        return cxScheduleResultService.importScheduleTemplate(list, scheduleResult, updateSupport, null);
     }
 
 }

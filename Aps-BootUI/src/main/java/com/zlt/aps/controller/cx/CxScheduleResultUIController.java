@@ -10,11 +10,13 @@ import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.service.ICxScheduleResultService;
+import com.zlt.aps.cx.vo.CxScheduleImportDTO;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -132,12 +134,16 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      * 重写导入模板的生成逻辑
      */
     @ApiOperation("下载导入模板")
-    @Override
-    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+    @GetMapping("/importTemplateDown")
+    @ResponseBody
+    public void importTemplateDown(CxScheduleResult result, HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<CxScheduleResult> util = new ExcelUtil<>(CxScheduleResult.class);
-        util.exportExcel(response, null, fileName, fileName);
-        return AjaxResult.success();
+        result = result == null ? new CxScheduleResult() : result;
+        byte[] excelBytes = iCxScheduleResultService.downloadTemplate(result, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
     }
 
     /**
@@ -249,6 +255,35 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
         AjaxResult ajaxResult = iCxScheduleResultService.importData(context, updateSupport);
+        return ajaxResult;
+    }
+
+    @PostMapping({"/importDataByCust"})
+    @ResponseBody
+    @ApiOperation("数据导入")
+    public AjaxResult importDataByCust(@RequestPart("file") MultipartFile file,
+                                       @RequestParam("updateSupport") boolean updateSupport,
+                                       @RequestParam(value = "factoryCode", required = false) String factoryCode,
+                                       @RequestParam(value = "scheduleDate", required = false) String scheduleDate,
+                                       CxScheduleResult result) throws Exception {
+        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+
+        ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(this.getFunctionName());
+        context.setProcedureCode(this.getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
+        context.setFileBytes(data);
+
+        CxScheduleImportDTO importDTO = new CxScheduleImportDTO();
+        importDTO.setImportContext(context);
+        result = result == null ? new CxScheduleResult() : result;
+        if (result.getScheduleDate() == null && StringUtils.isNotBlank(scheduleDate)) {
+            result.setScheduleDate(com.ruoyi.common.core.utils.DateUtils.parseDate(scheduleDate));
+        }
+        importDTO.setScheduleResult(result);
+
+        AjaxResult ajaxResult = iCxScheduleResultService.importDataByCust(updateSupport, importDTO);
         return ajaxResult;
     }
 }
