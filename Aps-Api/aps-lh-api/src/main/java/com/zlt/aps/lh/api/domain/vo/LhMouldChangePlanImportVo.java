@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -45,6 +46,7 @@ public class LhMouldChangePlanImportVo extends BaseEntity implements Serializabl
 
     @ApiModelProperty(value = "计划日期")
     @Excel(name = "ui.data.column.lhMouldChangePlan.planDate", dateFormat = "yyyy-MM-dd")
+    @ImportExcelValidated(required = true)
     @TableField(value = "PLAN_DATE")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
@@ -62,6 +64,7 @@ public class LhMouldChangePlanImportVo extends BaseEntity implements Serializabl
 
     @ApiModelProperty(value = "排程日期")
     @Excel(name = "ui.data.column.lhMouldChangePlan.scheduleDate", dateFormat = "yyyy-MM-dd")
+    @ImportExcelValidated(required = true)
     @TableField(value = "SCHEDULE_DATE")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
@@ -116,6 +119,7 @@ public class LhMouldChangePlanImportVo extends BaseEntity implements Serializabl
 
     @ApiModelProperty(value = "模具号")
     @Excel(name = "ui.data.column.lhMouldChangePlan.mouldCode")
+    @ImportExcelValidated(required = true, maxLength = 250)
     @TableField(value = "MOULD_CODE")
     private String mouldCode;
 
