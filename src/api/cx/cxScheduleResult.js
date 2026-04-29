@@ -98,7 +98,10 @@ export function adjustQty(query) {
   return request({
     url: '/cx/cxScheduleResult/adjustQty',
     method: 'post',
-    data: query
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    }
   })
 }
 
