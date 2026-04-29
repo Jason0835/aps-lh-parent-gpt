@@ -145,8 +145,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                     endDate = scheduleDate.plusDays(dayOffset);
                 }
 
-                Date start = DateUtil.toDate(startDate.atTime(startLocalTime));
-                Date end = DateUtil.toDate(endDate.atTime(endLocalTime));
+                Date start = Date.from(startDate.atTime(startLocalTime).atZone(java.time.ZoneId.systemDefault()).toInstant());
+                Date end = Date.from(endDate.atTime(endLocalTime).atZone(java.time.ZoneId.systemDefault()).toInstant());
 
                 switch (i) {
                     case 1: record.setClass1StartTime(start); record.setClass1EndTime(end); break;
