@@ -2507,7 +2507,7 @@
   "ui.lh.precision.plan.data.source": "数据来源",
   "ui.lh.precision.plan.updateTime": "更新时间",
   "ui.lh.precision.plan.sync.from.mes": "生成硫化机保养计划",
-  "ui.cx.precision.plan.sync.from.mes": "生成成型机保养计划",
+  "ui.cx.precision.plan.sync.from.mes": "生成成型机精度计划",
   "ui.lh.precision.plan.sync.confirm": "是否从MES同步硫化精度计划数据？",
   "ui.cx.precision.plan.sync.confirm": "是否从MES同步成型精度计划数据？",
   "ui.lh.precision.plan.auto.generate.confirm": "是否自动生成{year}年度的硫化精度计划？",
