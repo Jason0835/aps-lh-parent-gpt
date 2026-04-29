@@ -779,6 +779,26 @@ export default {
             prop: `day${i + 1}`,
             minWidth: "80px",
             type: "number",
+            render: ({ row }) => {
+              const prop = `day${i + 1}`;
+              return (
+                <div>
+                  {row.id ? (
+                    <el-input
+                      value={row[prop] || ""}
+                      size="mini"
+                      onInput={(value) => {
+                        row[prop] = (value || "").replace(/[^\d]/g, "");
+                      }}
+                      onFocus={() => this.onDayEditFocus(row, prop)}
+                      onBlur={() => this.handleResultDayEdit(row, prop)}
+                    ></el-input>
+                  ) : (
+                    <span>{row[prop] || ""}</span>
+                  )}
+                </div>
+              );
+            },
           });
         }
         return list;
@@ -1349,8 +1369,21 @@ export default {
       try {
         console.log("发送请求数据:", JSON.stringify(row));
         await updateSkuScheduleItems(row);
-        this.$modal.msgSuccess("更新成功");
         this.getOutResultList(row.productionVersion, row.version);
+      } catch (err) {
+        console.log(err);
+      }
+    },
+
+    //修改调整结果tab每日计划量
+    async handleResultDayEdit(row, prop) {
+      if (!row.id) return;
+      const oldVal = this.normalizeDayValue(this.dayEditOriginalValue);
+      const newVal = this.normalizeDayValue(row[prop]);
+      if (newVal === oldVal) return;
+      try {
+        await saveAdjustResult(row);
+        this.getList();
       } catch (err) {
         console.log(err);
       }
