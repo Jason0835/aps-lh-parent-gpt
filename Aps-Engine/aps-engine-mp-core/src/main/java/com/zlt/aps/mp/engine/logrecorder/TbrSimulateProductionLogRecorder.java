@@ -46,6 +46,66 @@ public class TbrSimulateProductionLogRecorder {
     }
 
     /**
+     * 增加 开始交付优先排产模式日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，开始进行交付优先排产模式进行模拟排产====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addStartDeliveryPriorityLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，开始进行交付优先排产模式进行模拟排产====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 交付优先排产模式因结构固定重排续作日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产因结构固定重排续作====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addDeliveryPriorityResetContinueLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产因结构固定重排续作====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 交付优先排产模式因结构固定优先分组挑选固定机台日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产：分组固定优先挑选固定机台====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addDeliveryPriorityFixedCxMachineGroupLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产：分组固定优先挑选固定机台====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 交付优先排产模式剩余分组排产日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产：剩余分组需求排产====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addDeliveryPriorityLeftOverGroupLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产：剩余分组需求排产====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加 不同分组续作模具按分配比例调整后 日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，不同分组续作模具按分配比例调整完成====
      *

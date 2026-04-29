@@ -77,10 +77,20 @@ public class DayCapacityLimitVo implements Serializable {
     }
 
     /**
+     * 清空日限制业务信息
+     */
+    public void clearUsedInfo() {
+        if (CollectionUtils.isEmpty(dayCapacityLimitMap)) {
+            return;
+        }
+        dayCapacityLimitMap.forEach((productionDay, dayLimit) -> dayLimit.clearUsedInfo());
+    }
+
+    /**
      * 重新设置使用量信息
-     * 包含日结构切换次数
-     * 日换模次数
+     * 包含 日换模次数
      * 日排产量
+     * 只保留：日结构切换次数、日成型分配总量
      */
     public void resetUsedQty() {
         if (CollectionUtils.isEmpty(dayCapacityLimitMap)) {
@@ -167,12 +177,12 @@ public class DayCapacityLimitVo implements Serializable {
      *
      * @return
      */
-    public Set<Integer> getEnableOemBrandProductionRange(TbrProductionContext productionContext,MonthPlanProductionRequirePlanVo addSkuInfo) {
+    public Set<Integer> getEnableOemBrandProductionRange(TbrProductionContext productionContext, MonthPlanProductionRequirePlanVo addSkuInfo) {
         if (CollectionUtils.isEmpty(dayCapacityLimitMap)) {
             return new HashSet<>();
         }
         List<DayCapacityLimitHelper> dayLimitList = dayCapacityLimitMap.values().stream().collect(Collectors.toList());
-        if (DayCapacityLimitHelper.checkIsOemBrand(productionContext,addSkuInfo.getBrand())){
+        if (DayCapacityLimitHelper.checkIsOemBrand(productionContext, addSkuInfo.getBrand())) {
             //若是贴牌，增加贴牌总产能的限制
             //1. 每日贴牌总产能合计
             Integer sumBrandProductionCapacity = dayLimitList.stream()
@@ -183,7 +193,7 @@ public class DayCapacityLimitVo implements Serializable {
             //2. 贴牌总产能（参数）
             Integer oemBrandCapacity = productionContext.getBaseDataContainer().getParamConfiguration().getOemBrandCapacity();
             oemBrandCapacity = oemBrandCapacity == null ? 0 : oemBrandCapacity;
-            if (sumBrandProductionCapacity > oemBrandCapacity ){
+            if (sumBrandProductionCapacity > oemBrandCapacity) {
                 // 每日贴牌总产能合计 > 贴牌总产能（参数）
                 return new HashSet<>();
             }

@@ -587,6 +587,26 @@ public class TbrMouldProductionLogRecorder {
     }
 
     /**
+     * 增加 Sku排产前还是排产量 日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s %s Sku：%s 待排产量: %s====
+     *
+     * @param context      排程上下文
+     * @param groupName    分组名-结构
+     * @param materialDesc Sku信息
+     * @param text         文本：续作等
+     * @param needSumQty   还需排产量
+     * @return
+     */
+    public static String addSkuNeedProductionInfoLog(Context context, String groupName, String materialDesc, String text, Integer needSumQty) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s %s Sku：%s 待排产量: %s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, text, materialDesc, needSumQty);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_SKU_MOULD_PRODUCTION_NO_QTY, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加在机结构续作Sku降膜排产没有结果日志记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 续作Sku：%s 降膜排产没有结果====
      *

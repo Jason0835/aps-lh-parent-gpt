@@ -127,13 +127,6 @@ public class ContinueSkuCalculator {
             limitMap.put(day, limitHelper);
         }
         groupPlanInfo.setDayProductionLimitInfo(limitMap);
-        //硫化分组设置?
-        Map<Integer, CxLhProductionHelper> cxLhRatioMap = new HashMap<>(maxLhMachineCount);
-        for (int lhGroupNo = BigDecimal.ONE.intValue(); lhGroupNo <= maxLhMachineCount; lhGroupNo++) {
-            CxLhProductionHelper cxLhGroup = CxLhProductionHelper.createEmptyLhGroup(groupName, lhGroupNo, cxMachineInfo);
-            cxLhRatioMap.put(lhGroupNo, cxLhGroup);
-        }
-        groupPlanInfo.setCxLhRatioMap(cxLhRatioMap);
     }
 
     /**

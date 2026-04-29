@@ -74,6 +74,7 @@ public class CxContinueProductionHandler {
             DeductMouldVo deductMould = DeductMouldScheduler.createDeductMouldBySku(continueSkuDeadLineDays, stopDays, new HashSet<>(), paramConfiguration, cxContinueSkuInfo);
             //20260421+ 降膜排产信息调整
             setDeductInfo(context, groupPlanInfo, deductMould, cxContinueSkuInfo);
+            TbrMouldProductionLogRecorder.addSkuNeedProductionInfoLog(context, groupName, materialDesc, ContinueTypeEnum.SAME_SKU.getDesc(), deductMould.getRemainingQty());
             List<DailyScheduleVo> resultList = DeductMouldScheduler.scheduleProduction(deductMould);
             //分配结果
             if (CollectionUtils.isEmpty(resultList)) {
@@ -179,6 +180,7 @@ public class CxContinueProductionHandler {
         Integer realSumProductionQty = BigDecimal.ZERO.intValue();
         LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlanInfo, cxMachineCodeInfo, earliestConclusionLhGroup.transformCxLhGroup(), sumProductionQty, realSumProductionQty, dayMaxProductionQty);
         //逐日进行排产
+        TbrMouldProductionLogRecorder.addSkuNeedProductionInfoLog(context, groupName, addSkuInfo.getMaterialDesc(), continueType.getDesc(), sumProductionQty);
         CxLhMouldProductionCalculator.lhProductionByGroupHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList, continueType);
         //递归：实际没有排产，则该Sku跳过
         Integer productionQty = lhProductionQtyHelper.getRealSumProductionQty();

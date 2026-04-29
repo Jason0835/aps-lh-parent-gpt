@@ -92,6 +92,18 @@ public class CxMouldProductionHandler {
     }
 
     /**
+     * 前分组，因衔接分组日切换次数限制，导致需要自动延长收尾
+     * 场景：后分组衔接时，因每日切换次数限制，后分组需往后起始排产
+     * 则前结构自动延长
+     *
+     * @param context          排产上下文
+     * @param beforeAllocation 前分组配置
+     */
+    public void handlerTimeExtensionDayConclusion(Context context, CxMachineAllocationPlanHelper beforeAllocation) {
+        groupTimeExtensionHandler.handlerTimeExtensionDayConclusion(context, beforeAllocation);
+    }
+
+    /**
      * 重新构建成型对应的收尾信息，从分配的起始天数开始
      *
      * @param context        排产上下文
@@ -102,41 +114,9 @@ public class CxMouldProductionHandler {
     private static void buildNewLhConclusionInfo(Context context, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo ratio, CxMachineAllocationPlanHelper productionPlan) {
         //构建硫化组信息--因为时间段更新
         Map<Integer, CxLhProductionHelper> cxLhRatioMap = buildCxLhGroupInfo(context, cxMachineInfo, ratio, productionPlan);
-
-//        ProductionPlanGroupInfo productionPlanInfo = productionPlan.getProductionPlanInfo();
-//        Integer maxLhCount = ratio.getLhMachineMaxQty();
-//        Set<Integer> newCxLhGroupNo = new HashSet<>();
-//        //切换结构首日需要扣减的硫化机台数
-//        TbrProductionContext productionContext = ((TbrProductionContext) context);
-//        Integer deductionLhMachineCount = productionContext.getBaseDataContainer().getParamConfiguration().getDeductionLhMachineCount();
-//        //重新构建过--因为时间段更新
-//        Map<Integer, CxLhProductionHelper> cxLhRatioMap = new HashMap<>(maxLhCount);
-//        Integer newStartDay = 0;
-//        //若非（1号且续作结构）
-//        boolean noContinueStruct = (!(startDay.equals(FactoryConstant.MONTH_START_DAY) &&
-//                productionPlanInfo.getGroupName().equals(productionContext.getContinueStructureMap().get(cxMachineInfo.getCxMachineCode()))));
-//        for (Integer cxLhGroupNo = BigDecimal.ONE.intValue(); cxLhGroupNo <= maxLhCount; cxLhGroupNo++) {
-//            newStartDay = startDay;
-//            if (noContinueStruct && cxLhGroupNo <= deductionLhMachineCount) {
-//                //模拟排产，成型机只会有1台；将小于扣减的硫化机台数的起始日+1，即首日不上机; sandy+ 2026.3.19
-//                newStartDay = startDay + 1;
-//            }
-//            newCxLhGroupNo.add(cxLhGroupNo);
-//            updateProductionInfo(cxLhRatioMap, cxLhGroupNo, productionPlanInfo.getGroupName(), cxMachineInfo.getCxMachineCode(), newStartDay);
-//        }
         cxMachineInfo.setCxLhRatioMap(cxLhRatioMap);
         //按日构建限制
         buildDayLimitInfo(context, cxMachineInfo, productionPlan);
-//        Set<Integer> needDeletedGroupNo = new HashSet<>();
-//        cxLhRatioMap.forEach((cxLhGroupNo, helper) -> {
-//            if (!newCxLhGroupNo.contains(cxLhGroupNo)) {
-//                needDeletedGroupNo.add(cxLhGroupNo);
-//            }
-//        });
-//        if (CollectionUtils.isEmpty(needDeletedGroupNo)) {
-//            return;
-//        }
-//        needDeletedGroupNo.forEach(deletedGroupNo -> cxLhRatioMap.remove(deletedGroupNo));
     }
 
     /**
@@ -171,7 +151,6 @@ public class CxMouldProductionHandler {
             updateProductionInfo(cxLhRatioMap, cxLhGroupNo, productionPlanInfo.getGroupName(), cxMachineInfo.getCxMachineCode(), newStartDay);
         }
         return cxLhRatioMap;
-//        cxMachineInfo.setCxLhRatioMap(cxLhRatioMap);
     }
 
     /**

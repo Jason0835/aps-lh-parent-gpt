@@ -145,8 +145,15 @@ public class DayCapacityLimitHelper implements Serializable {
     }
 
     /**
-     * 重置换模、换结构、排产量
-     * 使用量
+     * 清除所有使用信息
+     */
+    public void clearUsedInfo() {
+        initUsedInfo();
+    }
+
+    /**
+     * 重置换模、排产量、使用量
+     * 保留：日总成型分配量、日切换结构次数
      */
     public void resetUsedQty() {
         Integer currentAllocationQty = this.cxMachineAllocationQty;
@@ -246,7 +253,7 @@ public class DayCapacityLimitHelper implements Serializable {
         Integer realProductionQty = getRealProductionQty(productionQty, lossQty, false);
         sumProductionCapacityQty = sumProductionCapacityQty + realProductionQty;
         // 累计OEM贴牌数量，sandy+ 2026.3.23
-        if (checkIsOemBrand(context,productionPlan.getBrand())){
+        if (checkIsOemBrand(context, productionPlan.getBrand())) {
             sumBrandProductionCapacity = sumBrandProductionCapacity + realProductionQty;
         }
         String materialDesc = productionPlan.getMaterialDesc();
@@ -264,21 +271,23 @@ public class DayCapacityLimitHelper implements Serializable {
 
     /**
      * 检查当前品牌是否OEM
+     *
      * @param context 上下文
-     * @param brand 品牌
+     * @param brand   品牌
      * @return true - OEM贴牌， false - 非OEM
      */
-    public static boolean checkIsOemBrand(Context context,String brand){
-        if (StringUtil.isEmptyWithTrim(brand)){
+    public static boolean checkIsOemBrand(Context context, String brand) {
+        if (StringUtil.isEmptyWithTrim(brand)) {
             return false;
         }
-        TbrProductionContext productionContext = (TbrProductionContext)context;
+        TbrProductionContext productionContext = (TbrProductionContext) context;
         Set<String> oemBrandSet = productionContext.getBaseDataContainer().getParamConfiguration().getOemBrandConfig();
-        if (PubUtil.isEmpty(oemBrandSet)){
+        if (PubUtil.isEmpty(oemBrandSet)) {
             return false;
         }
         return oemBrandSet.contains(brand);
     }
+
     /**
      * 释放-排产量
      *
@@ -289,7 +298,7 @@ public class DayCapacityLimitHelper implements Serializable {
      * @param productionQty 排产量
      * @param lossQty       损耗量
      */
-    public void deductionSkuDayProductionQty(Context context, Integer productionDay, String materialDesc, Set<String> usedMouldSet, Integer productionQty, Integer lossQty,String brand) {
+    public void deductionSkuDayProductionQty(Context context, Integer productionDay, String materialDesc, Set<String> usedMouldSet, Integer productionQty, Integer lossQty, String brand) {
         if (null == productionDay || StringUtils.isBlank(materialDesc) || CollectionUtils.isEmpty(usedMouldSet)) {
             return;
         }
@@ -307,7 +316,7 @@ public class DayCapacityLimitHelper implements Serializable {
             sumProductionCapacityQty = BigDecimal.ZERO.intValue();
         }
         // 累计OEM贴牌数量，sandy+ 2026.3.23
-        if (checkIsOemBrand(context,brand)){
+        if (checkIsOemBrand(context, brand)) {
             sumBrandProductionCapacity = sumBrandProductionCapacity - realProductionQty;
             if (sumBrandProductionCapacity <= BigDecimal.ZERO.intValue()) {
                 sumBrandProductionCapacity = BigDecimal.ZERO.intValue();

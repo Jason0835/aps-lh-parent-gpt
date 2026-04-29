@@ -203,10 +203,16 @@ public class ProductionCapacityParamConfiguration {
      * 实单最低硫化机台数最多可连续排产天数
      */
     private Integer minLhMachineContinueDays;
-
+    /**
+     * 结构硫化成型配比额外处理配置值
+     */
     private String cxLhRatioExtraValue;
     /**
-     * 结构硫化成型配比额外增加配置
+     * 月计划排产模式 1 交付优先 非1则为效率优先
+     */
+    private Integer productionMode;
+    /**
+     * 结构硫化成型配比额外处理配置集合
      */
     private Map<String, Integer> extraMap;
 
