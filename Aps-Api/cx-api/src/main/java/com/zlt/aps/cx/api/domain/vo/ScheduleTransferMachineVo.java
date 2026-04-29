@@ -23,4 +23,7 @@ public class ScheduleTransferMachineVo {
 
     @ApiModelProperty(value = "新机台名称")
     private String newMachineName;
+
+    @ApiModelProperty(value = "是否确认转机台（产能不足时前端再次调用传入true）")
+    private Boolean confirmed;
 }

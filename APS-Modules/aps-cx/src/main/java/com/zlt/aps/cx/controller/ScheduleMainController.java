@@ -13,6 +13,7 @@ import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
+import com.zlt.aps.cx.mapper.MdmMoldingMachineMapper;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.service.ScheduleService;
 import com.zlt.aps.cx.api.domain.vo.ScheduleAdjustVo;
@@ -23,6 +24,7 @@ import com.zlt.aps.cx.api.domain.vo.ScheduleUpdateRemarkVo;
 import com.zlt.aps.cx.vo.ScheduleRequestVo;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.mp.api.domain.entity.CxScheduleResultIssue;
+import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -68,6 +70,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
     @Autowired
     private IMesItfService mesItfService;
+
+    @Autowired
+    private MdmMoldingMachineMapper moldingMachineMapper;
 
     /**
      * 查询成型排程结果列表
@@ -486,28 +491,13 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             return AjaxResult.error("排程记录不存在");
         }
 
-        // 判断是否已发布
-        if ("1".equals(record.getIsRelease())) {
-            return AjaxResult.error("已发布的排程记录不允许调量");
-        }
-
-        // 判断当前时间，计算可调整的班次
+        LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
         LocalDateTime now = LocalDateTime.now();
-        Date scheduleDate = record.getScheduleDate();
-        
-        // 如果是当天，需要根据当前时间判断可调整的班次
-        LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
-        if (scheduleLocalDate.equals(LocalDate.now())) {
-            int currentHour = now.getHour();
-            // 8点前：可调整所有班次
-            // 8点后：早班已生产，不可调整；中班可调整
-            // 16点后：早中班已生产，不可调整
-            if (currentHour >= 16 && vo.getClass2PlanQty() != null) {
-                // 中班计划量校验：不能低于已完成量
-                if (record.getClass2FinishQty() != null && vo.getClass2PlanQty().compareTo(record.getClass2FinishQty()) < 0) {
-                    return AjaxResult.error("中班计划量不能低于已完成量：" + record.getClass2FinishQty());
-                }
-            }
+
+        // 校验每个班次的计划量
+        AjaxResult validationResult = validateAdjustQtyShifts(vo, record, scheduleLocalDate, now);
+        if (validationResult != null) {
+            return validationResult;
         }
 
         // 更新计划量
@@ -522,7 +512,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
         // 调整为待发布状态
         record.setIsRelease("0");
-        
+
         int rows = cxScheduleResultMapper.updateById(record);
         if (rows > 0) {
             log.info("调量成功，记录ID：{}", vo.getId());
@@ -530,6 +520,88 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         } else {
             return AjaxResult.error("调量失败");
         }
+    }
+
+    /**
+     * 校验调量时各班的计划量
+     * 业务规则：
+     * - 根据各班次的结束时间判断是否为历史班次
+     * - 已结束的班次不可调整
+     * - 修改后的计划量不能低于已完成量
+     */
+    private AjaxResult validateAdjustQtyShifts(ScheduleAdjustVo vo, CxScheduleResult record,
+                                                LocalDate scheduleLocalDate, LocalDateTime now) {
+        String[] shiftNames = {"", "早班(D1)", "中班(D1)", "夜班(D2)", "早班(D2)", "中班(D2)", "夜班(D3)", "早班(D3)", "中班(D3)"};
+
+        BigDecimal[] planQtys = {null, vo.getClass1PlanQty(), vo.getClass2PlanQty(), vo.getClass3PlanQty(),
+                vo.getClass4PlanQty(), vo.getClass5PlanQty(), vo.getClass6PlanQty(),
+                vo.getClass7PlanQty(), vo.getClass8PlanQty()};
+        BigDecimal[] finishQtys = {null, record.getClass1FinishQty(), record.getClass2FinishQty(),
+                record.getClass3FinishQty(), record.getClass4FinishQty(), record.getClass5FinishQty(),
+                record.getClass6FinishQty(), record.getClass7FinishQty(), record.getClass8FinishQty()};
+
+        for (int i = 1; i <= 8; i++) {
+            if (planQtys[i] == null) {
+                continue;
+            }
+
+            if (isShiftPast(i, scheduleLocalDate, now)) {
+                return AjaxResult.error(shiftNames[i] + "计划量不可调整：该班次已过");
+            }
+
+            if (finishQtys[i] != null && planQtys[i].compareTo(finishQtys[i]) < 0) {
+                return AjaxResult.error(shiftNames[i] + "计划量不能低于已完成量：" + finishQtys[i]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 判断指定班次是否为历史班次（已结束）
+     * 注：record.getScheduleDate() 存储的是 T+2日（8班的最后一天），需要反推T日和T+1日
+     *   CLASS1: D1早班 T日=scheduleDate-2, 06:00-13:59 -> 结束于 scheduleDate-2 14:00
+     *   CLASS2: D1中班 T日=scheduleDate-2, 14:00-21:59 -> 结束于 scheduleDate-2 22:00
+     *   CLASS3: D2夜班 T+1日=scheduleDate-1(跨天), 22:00-05:59 -> 结束于 scheduleDate-1 06:00
+     *   CLASS4: D2早班 T+1日=scheduleDate-1, 06:00-13:59 -> 结束于 scheduleDate-1 14:00
+     *   CLASS5: D2中班 T+1日=scheduleDate-1, 14:00-21:59 -> 结束于 scheduleDate-1 22:00
+     *   CLASS6: D3夜班 T+2日=scheduleDate(跨天), 22:00-05:59 -> 结束于 scheduleDate+1 06:00
+     *   CLASS7: D3早班 T+2日=scheduleDate, 06:00-13:59 -> 结束于 scheduleDate 14:00
+     *   CLASS8: D3中班 T+2日=scheduleDate, 14:00-21:59 -> 结束于 scheduleDate 22:00
+     */
+    private boolean isShiftPast(int classIndex, LocalDate scheduleDate, LocalDateTime now) {
+        LocalDate endDate;
+        int endHour;
+
+        switch (classIndex) {
+            case 1: endDate = scheduleDate.minusDays(2); endHour = 14; break;
+            case 2: endDate = scheduleDate.minusDays(2); endHour = 22; break;
+            case 3: endDate = scheduleDate.minusDays(1); endHour = 6; break;
+            case 4: endDate = scheduleDate.minusDays(1); endHour = 14; break;
+            case 5: endDate = scheduleDate.minusDays(1); endHour = 22; break;
+            case 6: endDate = scheduleDate; endHour = 6; break;
+            case 7: endDate = scheduleDate; endHour = 14; break;
+            case 8: endDate = scheduleDate; endHour = 22; break;
+            default: return false;
+        }
+
+        LocalDateTime shiftEnd = endDate.atTime(endHour, 0);
+        return !now.isBefore(shiftEnd);
+    }
+
+    /**
+     * 转机台专用：判断班次是否可转移到新机台
+     * 1. 已结束的班次不可转移（基于 isShiftPast 时间判断）
+     * 2. T日夜班(CLASS3)即使未到结束时间也不转移（业务规则）
+     */
+    private boolean isShiftTransferable(int classIndex, LocalDate scheduleDate, LocalDateTime now) {
+        if (isShiftPast(classIndex, scheduleDate, now)) {
+            return false;
+        }
+        if (classIndex == 3) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -548,36 +620,71 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             return AjaxResult.error("排程日期、机台编码、胎胚编码不能为空");
         }
 
-        // 校验唯一性
+        Date scheduleDate = DateUtil.parse(vo.getScheduleDate());
+
+        // 校验唯一性：排程日期 + 机台编号 + 胎胚编号 + 物料编码 + 示方书版本
         QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("SCHEDULE_DATE", DateUtil.parse(vo.getScheduleDate()));
+        queryWrapper.eq("SCHEDULE_DATE", scheduleDate);
         queryWrapper.eq("CX_MACHINE_CODE", vo.getCxMachineCode());
         queryWrapper.eq("EMBRYO_CODE", vo.getEmbryoCode());
-        queryWrapper.eq("ORDER_NO", vo.getMaterialCode());
+        queryWrapper.eq("MATERIAL_CODE", vo.getMaterialCode());
+        if (vo.getExampleNo() != null) {
+            queryWrapper.eq("BOM_DATA_VERSION", vo.getExampleNo());
+        }
         Long count = cxScheduleResultMapper.selectCount(queryWrapper);
         if (count > 0) {
-            return AjaxResult.error("插单失败：该日已存在相同机台、胎胚、物料的排程记录");
+            return AjaxResult.error("插单失败：该日已存在相同机台、胎胚、物料、示方书版本的排程记录");
+        }
+
+        // 校验各班计划量不能超过机台最大日产能（按天分组，排程记录scheduleDate=T+2日）
+        //   CLASS1(D1早班=T日) + CLASS2(D1中班=T日)  -> 一天
+        //   CLASS3(D2夜班=T+1日)                      -> 一天
+        int maxDayCapacity = 0;
+        MdmMoldingMachine machine = moldingMachineMapper.selectOne(
+                new QueryWrapper<MdmMoldingMachine>()
+                        .eq("CX_MACHINE_CODE", vo.getCxMachineCode())
+                        .eq("IS_ACTIVE", 1));
+        if (machine != null && machine.getMaxDayCapacity() != null) {
+            maxDayCapacity = machine.getMaxDayCapacity();
+        }
+        if (maxDayCapacity > 0) {
+            BigDecimal day1Total = BigDecimal.ZERO;
+            BigDecimal day2Total = BigDecimal.ZERO;
+            if (vo.getClass1PlanQty() != null) day1Total = day1Total.add(vo.getClass1PlanQty());
+            if (vo.getClass2PlanQty() != null) day1Total = day1Total.add(vo.getClass2PlanQty());
+            if (vo.getClass3PlanQty() != null) day2Total = day2Total.add(vo.getClass3PlanQty());
+
+            if (day1Total.compareTo(BigDecimal.valueOf(maxDayCapacity)) > 0) {
+                return AjaxResult.error("插单失败：T日(早班+中班)计划量(" + day1Total + ")超过机台最大日产(" + maxDayCapacity + ")");
+            }
+            if (day2Total.compareTo(BigDecimal.valueOf(maxDayCapacity)) > 0) {
+                return AjaxResult.error("插单失败：T+1日(夜班)计划量(" + day2Total + ")超过机台最大日产(" + maxDayCapacity + ")");
+            }
         }
 
         // 创建新记录
         CxScheduleResult newRecord = new CxScheduleResult();
-        newRecord.setScheduleDate(DateUtil.parse(vo.getScheduleDate()));
+        newRecord.setScheduleDate(scheduleDate);
         newRecord.setCxMachineCode(vo.getCxMachineCode());
         newRecord.setCxMachineName(vo.getCxMachineName());
         newRecord.setEmbryoCode(vo.getEmbryoCode());
+        newRecord.setMaterialCode(vo.getMaterialCode());
+        newRecord.setMaterialDesc(vo.getSpecDesc());
         newRecord.setOrderNo(vo.getMaterialCode());
-        newRecord.setMaterialCode(vo.getSpecDesc());
+        newRecord.setBomDataVersion(vo.getExampleNo());
         newRecord.setClass1PlanQty(vo.getClass1PlanQty());
         newRecord.setClass2PlanQty(vo.getClass2PlanQty());
         newRecord.setClass3PlanQty(vo.getClass3PlanQty());
         newRecord.setClass1Analysis(vo.getClass1Analysis());
         newRecord.setClass2Analysis(vo.getClass2Analysis());
         newRecord.setClass3Analysis(vo.getClass3Analysis());
-        
+
+        // 数据来源：1-插单
+        newRecord.setDataSource("1");
         // 设置为待发布状态
         newRecord.setIsRelease("0");
         newRecord.setProductionStatus("0");
-        
+
         int rows = cxScheduleResultMapper.insert(newRecord);
         if (rows > 0) {
             log.info("插单成功，记录ID：{}", newRecord.getId());
@@ -634,11 +741,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     /**
      * 【转机台】转换机台
      * 业务规则：
-     * 1. 默认带出所选记录的排程日期、原机台
-     * 2. 选择新机台后自动下拉显示可选机台清单
-     * 3. 检查唯一性：排程日期 + 成型机台 + 胎胚描述
-     * 4. 若已发布：不允许转机台
-     * 5. 更新备注【"原机台：" + 旧机台 + ",转入机台：" + 新机台】
+     * 1. 只能转移当前班次未执行计划以及后续班次计划，不能转移历史班次计划
+     * 2. 选择新机台后需校验新机台对应班次是否有足够的产能
+     * 3. 若已发布过给MES，则发布状态更新为待发布，需再次发布至MES
+     * 4. 更新备注【"原机台：" + 旧机台 + ",转入机台：" + 新机台】
+     * 5. 历史班次的计划量保留在原记录上（清空为0不转移到新机台）
      */
     @Log(title = "转机台", businessType = BusinessType.UPDATE)
     @ApiOperation("转机台")
@@ -651,32 +758,178 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             return AjaxResult.error("新机台编码不能为空");
         }
 
-        // 检查所有记录是否已发布
         List<CxScheduleResult> records = cxScheduleResultMapper.selectBatchIds(vo.getIds());
-        for (CxScheduleResult record : records) {
-            if ("1".equals(record.getIsRelease())) {
-                return AjaxResult.error("已发布的排程记录不允许转机台");
-            }
+        if (records.isEmpty()) {
+            return AjaxResult.error("未找到排程记录");
         }
 
-        // 更新机台信息
+        LocalDateTime now = LocalDateTime.now();
+
+        // 校验并收集每个记录的转移数据
+        List<CxScheduleResult> transferRecords = new ArrayList<>();
         for (CxScheduleResult record : records) {
+            LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
+
+            if (scheduleLocalDate.isBefore(now.toLocalDate())) {
+                return AjaxResult.error("记录ID=" + record.getId() + "的排程日期为历史日期，不可转机台");
+            }
+
+            boolean hasTransferableShift = false;
+            for (int i = 1; i <= 8; i++) {
+                if (isShiftTransferable(i, scheduleLocalDate, now)) {
+                    BigDecimal planQty = getClassPlanQty(record, i);
+                    if (planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0) {
+                        hasTransferableShift = true;
+                        break;
+                    }
+                }
+            }
+            if (!hasTransferableShift) {
+                return AjaxResult.error("记录ID=" + record.getId() + "没有可转移的班次计划（所有班次均已过或计划量为0）");
+            }
+
+            // 校验新机台唯一性（排程日期 + 新机台 + 胎胚 + 物料）
+            QueryWrapper<CxScheduleResult> uniqueCheck = new QueryWrapper<>();
+            uniqueCheck.eq("SCHEDULE_DATE", record.getScheduleDate());
+            uniqueCheck.eq("CX_MACHINE_CODE", vo.getNewMachineCode());
+            uniqueCheck.eq("EMBRYO_CODE", record.getEmbryoCode());
+            if (record.getMaterialCode() != null) {
+                uniqueCheck.eq("MATERIAL_CODE", record.getMaterialCode());
+            }
+            Long duplicateCount = cxScheduleResultMapper.selectCount(uniqueCheck);
+            if (duplicateCount > 0) {
+                return AjaxResult.error("新机台(" + vo.getNewMachineCode() + ")在排程日期"
+                        + DateUtil.formatDate(record.getScheduleDate()) + "已存在相同胎胚、物料的排程记录");
+            }
+
+            transferRecords.add(record);
+        }
+
+        // 产能校验（未确认时检查，已确认时跳过检查直接执行）
+        if (!Boolean.TRUE.equals(vo.getConfirmed())) {
+            AjaxResult capacityCheck = checkNewMachineCapacity(transferRecords, vo.getNewMachineCode());
+            if (capacityCheck != null) {
+                return capacityCheck;
+            }
+        } else {
+            log.info("用户已确认转机台，跳过产能校验直接执行");
+        }
+
+        // 执行转机台
+        for (CxScheduleResult record : transferRecords) {
+            LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
             String oldMachine = record.getCxMachineCode();
+
+            // 清空不可转移班次的计划量（历史班次+T日夜班保留在原机台）
+            for (int i = 1; i <= 8; i++) {
+                if (!isShiftTransferable(i, scheduleLocalDate, now)) {
+                    setClassPlanQty(record, i, BigDecimal.ZERO);
+                }
+            }
+
             record.setCxMachineCode(vo.getNewMachineCode());
             record.setCxMachineName(vo.getNewMachineName());
-            
-            // 更新备注
+
             String remark = record.getRemark() != null ? record.getRemark() : "";
             record.setRemark(remark + "【原机台：" + oldMachine + ",转入机台：" + vo.getNewMachineCode() + "】");
-            
-            // 设置为待发布
+
             record.setIsRelease("0");
-            
+
             cxScheduleResultMapper.updateById(record);
         }
 
-        log.info("转机台成功，记录数：{}", records.size());
+        log.info("转机台成功，记录数：{}", transferRecords.size());
         return AjaxResult.success("转机台成功");
+    }
+
+    /**
+     * 校验新机台是否有足够产能承接转移的计划量
+     * 按每台设备的日产能进行比较
+     */
+    private AjaxResult checkNewMachineCapacity(List<CxScheduleResult> records, String newMachineCode) {
+        MdmMoldingMachine newMachine = moldingMachineMapper.selectOne(
+                new QueryWrapper<MdmMoldingMachine>()
+                        .eq("CX_MACHINE_CODE", newMachineCode)
+                        .eq("IS_ACTIVE", 1));
+        if (newMachine == null) {
+            return AjaxResult.error("新机台(" + newMachineCode + ")不存在或未启用");
+        }
+
+        Integer maxDayCapacity = newMachine.getMaxDayCapacity();
+        if (maxDayCapacity == null) {
+            return null;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        BigDecimal existingTotal = BigDecimal.ZERO;
+        for (CxScheduleResult record : records) {
+            QueryWrapper<CxScheduleResult> existingQuery = new QueryWrapper<>();
+            existingQuery.eq("SCHEDULE_DATE", record.getScheduleDate());
+            existingQuery.eq("CX_MACHINE_CODE", newMachineCode);
+            List<CxScheduleResult> existingRecords = cxScheduleResultMapper.selectList(existingQuery);
+            for (CxScheduleResult existing : existingRecords) {
+                existingTotal = existingTotal
+                        .add(defaultZero(existing.getClass1PlanQty()))
+                        .add(defaultZero(existing.getClass2PlanQty()))
+                        .add(defaultZero(existing.getClass3PlanQty()))
+                        .add(defaultZero(existing.getClass4PlanQty()))
+                        .add(defaultZero(existing.getClass5PlanQty()))
+                        .add(defaultZero(existing.getClass6PlanQty()))
+                        .add(defaultZero(existing.getClass7PlanQty()))
+                        .add(defaultZero(existing.getClass8PlanQty()));
+            }
+        }
+
+        BigDecimal transferTotal = BigDecimal.ZERO;
+        for (CxScheduleResult record : records) {
+            LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
+            for (int i = 1; i <= 8; i++) {
+                if (isShiftTransferable(i, scheduleLocalDate, now)) {
+                    transferTotal = transferTotal.add(defaultZero(getClassPlanQty(record, i)));
+                }
+            }
+        }
+
+        BigDecimal totalAfterTransfer = existingTotal.add(transferTotal);
+        if (totalAfterTransfer.compareTo(BigDecimal.valueOf(maxDayCapacity)) > 0) {
+            return AjaxResult.error("新机台(" + newMachineCode + ")产能不足，"
+                    + "现有计划量(" + existingTotal + ")+转入计划量(" + transferTotal + ")="
+                    + totalAfterTransfer + "，超过机台最大日产(" + maxDayCapacity + ")，是否确认转机台？");
+        }
+
+        return null;
+    }
+
+    private BigDecimal defaultZero(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private BigDecimal getClassPlanQty(CxScheduleResult record, int classIndex) {
+        switch (classIndex) {
+            case 1: return record.getClass1PlanQty();
+            case 2: return record.getClass2PlanQty();
+            case 3: return record.getClass3PlanQty();
+            case 4: return record.getClass4PlanQty();
+            case 5: return record.getClass5PlanQty();
+            case 6: return record.getClass6PlanQty();
+            case 7: return record.getClass7PlanQty();
+            case 8: return record.getClass8PlanQty();
+            default: return BigDecimal.ZERO;
+        }
+    }
+
+    private void setClassPlanQty(CxScheduleResult record, int classIndex, BigDecimal value) {
+        switch (classIndex) {
+            case 1: record.setClass1PlanQty(value); break;
+            case 2: record.setClass2PlanQty(value); break;
+            case 3: record.setClass3PlanQty(value); break;
+            case 4: record.setClass4PlanQty(value); break;
+            case 5: record.setClass5PlanQty(value); break;
+            case 6: record.setClass6PlanQty(value); break;
+            case 7: record.setClass7PlanQty(value); break;
+            case 8: record.setClass8PlanQty(value); break;
+        }
     }
 
 }
