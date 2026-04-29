@@ -2,23 +2,28 @@ package com.zlt.aps.cx.service.engine;
 
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
+
 import com.zlt.aps.cx.service.engine.ScheduleDayTypeHelper.DayFlagInfo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
+import java.math.BigDecimal;
+import java.sql.Date;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
  * 续作任务处理器
- * 
+ *
  * <p>负责 S5.3 续作任务排产：
  * <ul>
  *   <li>按结构分组任务</li>
@@ -106,20 +111,29 @@ public class ContinueTaskProcessor {
             Set<String> historyEmbryos = historyEntry.getValue();
 
             for (String embryoCode : historyEmbryos) {
-                // 在续作任务列表中找到 demand > 0 的任务
+                // 在续作任务列表中找到有排产需求的任务（vulcanizeMachineCount>0 且 plannedProduction>0）
                 CoreScheduleAlgorithmService.DailyEmbryoTask matchedTask = null;
+                boolean foundAbandoned = false;
                 for (CoreScheduleAlgorithmService.DailyEmbryoTask task : continueTasks) {
                     if (embryoCode.equals(task.getEmbryoCode())) {
                         int demand = task.getVulcanizeMachineCount() != null ? task.getVulcanizeMachineCount() : 0;
-                        if (demand > 0) {
+                        Integer plannedProd = task.getPlannedProduction();
+                        if (demand > 0 && (plannedProd != null && plannedProd > 0)) {
                             matchedTask = task;
                             break;
+                        }
+                        if (plannedProd != null && plannedProd <= 0) {
+                            foundAbandoned = true;
                         }
                     }
                 }
 
                 if (matchedTask == null) {
-                    log.debug("机台 {} 的历史胎胚 {} 在续作任务中无剩余需求，跳过保底预留", machineCode, embryoCode);
+                    if (foundAbandoned) {
+                        log.info("机台 {} 的历史胎胚 {} 计划产量为0（已舍弃），跳过保底预留", machineCode, embryoCode);
+                    } else {
+                        log.debug("机台 {} 的历史胎胚 {} 在续作任务中无剩余需求，跳过保底预留", machineCode, embryoCode);
+                    }
                     continue;
                 }
 
@@ -435,17 +449,17 @@ public class ContinueTaskProcessor {
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
             ScheduleContextVo context,
             LocalDate scheduleDate) {
-        
+
         // 库存已在 TaskGroupService.buildSingleTask 中按物料需求比例分配好
         // 这里直接使用当前库存
         int currentStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
         task.setCurrentStock(currentStock);
         log.debug("胎胚 {} 当前库存：{}", task.getEmbryoCode(), currentStock);
     }
-    
 
 
-    
+
+
     /**
      * 处理开产日和停产日对任务计划量的影响
      *
@@ -475,22 +489,22 @@ public class ContinueTaskProcessor {
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
             ScheduleContextVo context,
             List<CxShiftConfig> dayShifts) {
-        
+
         LocalDate scheduleDate = context.getCurrentScheduleDate();
-        
+
         // Step 1: 从当前日期往前找最近一个有 dayFlag 标识的日期
         DayFlagInfo flagInfo = scheduleDayTypeHelper.findNearestDayFlag(scheduleDate, context.getFactoryCode());
-        
+
         if (flagInfo == null || flagInfo.dayFlag == null) {
             // 没有找到任何标识，按正常日期处理
             return;
         }
-        
+
         if ("0".equals(flagInfo.dayFlag)) {
             // 最近标识是「停」→ 停产标识日之后都是停产日
             // 停产标识日当天有量（最后一天生产），只有停产日之后才算停产
             task.setIsClosingDayTask(true);
-            
+
             if (scheduleDate.isAfter(flagInfo.nearestDate)) {
                 // 停产日之后：无法安排
                 task.setPlannedProduction(0);
@@ -525,16 +539,16 @@ public class ContinueTaskProcessor {
     public void handleEndingRemainder(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
             ScheduleContextVo context) {
-        
+
         if (!Boolean.TRUE.equals(task.getIsEndingTask()) && !Boolean.TRUE.equals(task.getIsNearEnding())) {
             return;
         }
-        
+
         Integer endingSurplus = task.getEndingSurplusQty();
         if (endingSurplus == null || endingSurplus <= 0) {
             return;
         }
-        
+
         int plannedProduction = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
         int currentStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
         int totalPlanned = plannedProduction + currentStock;
@@ -542,14 +556,14 @@ public class ContinueTaskProcessor {
         // 使用 ProductionCalculator 计算收尾计划量
         boolean isMainProduct = Boolean.TRUE.equals(task.getIsMainProduct());
         int remainingToProduce = Math.max(0, endingSurplus - currentStock);
-        
+
         ProductionCalculator.PlanQuantityResult endingResult = productionCalculator.calculateEndingQuantity(
                 remainingToProduce,
                 getTripCapacity(task.getStructureName(), context),
                 isMainProduct,
                 task.getEmbryoCode()
         );
-        
+
         // 更新任务状态
         if (endingResult.isAbandoned()) {
             // 非主销产品余量≤2条，舍弃
@@ -561,20 +575,20 @@ public class ContinueTaskProcessor {
             // 更新计划量
             int newPlanQuantity = endingResult.getPlanQuantity();
             task.setPlannedProduction(newPlanQuantity);
-            
+
             // 记录额外库存（主销产品多做的部分）
             if (endingResult.getExtraInventory() > 0) {
                 task.setEndingExtraInventory(endingResult.getExtraInventory());
-                log.info("收尾任务 {} 主销产品，多做 {} 条当库存", 
+                log.info("收尾任务 {} 主销产品，多做 {} 条当库存",
                         task.getEmbryoCode(), endingResult.getExtraInventory());
             }
-            
+
             // 标记是否为收尾最后一批
             if (totalPlanned >= endingSurplus || newPlanQuantity >= remainingToProduce) {
                 task.setIsLastEndingBatch(true);
             }
         }
-        
+
         // 保存班次分配
         if (endingResult.getShiftAllocation() != null) {
             task.setShiftAllocation(endingResult.getShiftAllocation());
