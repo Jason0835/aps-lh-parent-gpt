@@ -119,6 +119,11 @@ public class ProductionCxMachineCalculationHandler {
          */
         //粗算得到的机台
         BigDecimal needCount = groupPlanInfo.getNeedCxCapacityMachineCount();
+        //20260429+ 不需要机台时，表示在产分组没有需求量
+        Integer needWholeCount = needCount.setScale(BigDecimal.ZERO.intValue(), RoundingMode.UP).intValue();
+        if (needWholeCount <= BigDecimal.ZERO.intValue()) {
+            return Collections.emptyList();
+        }
         Integer productionCount = productionCxMachineCodeSet.size();
         //在产机台数<=在机结构所需机台数，则此时不用测算，机台直接分配
         if (needCount.compareTo(BigDecimal.valueOf(productionCount)) >= BigDecimal.ZERO.intValue()) {

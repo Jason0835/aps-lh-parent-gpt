@@ -24,4 +24,5 @@ public interface ICxPrecisionPlanService extends IDocService<CxPrecisionPlan> {
     boolean updateActualDate(Long mesSourceId, String actualDate);
 
 
+    AjaxResult autoCalculateCxPrecisionPlan(Integer year);
 }

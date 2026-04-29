@@ -86,7 +86,7 @@ public class LhTextMouldChangePlanGenerator {
         }
 
         Date targetScheduleDate = LhScheduleTimeUtil.clearTime(scheduleResult.getClass5StartTime());
-        List<LhMouldChangePlan> targetPlans = listTargetMiddleShiftPlans(scheduleResult.getFactoryCode(), targetScheduleDate);
+        List<LhMouldChangePlan> targetPlans = listTargetMiddleShiftPlans(scheduleResult.getFactoryCode(), scheduleResult.getScheduleDate());
 
         String releaseValidateMessage = validateTargetPlansCanInsert(targetPlans, scheduleResult.getLhMachineCode());
         if (StringUtils.isNotBlank(releaseValidateMessage)) {
@@ -244,7 +244,7 @@ public class LhTextMouldChangePlanGenerator {
         plan.setFactoryCode(scheduleResult.getFactoryCode());
         plan.setLhResultBatchNo(scheduleResult.getBatchNo());
         plan.setOrderNo(orderNoGenerator.generateMouldChangeOrderNo(targetScheduleDate));
-        plan.setScheduleDate(targetScheduleDate);
+        plan.setScheduleDate(scheduleResult.getScheduleDate());
         plan.setPlanDate(targetScheduleDate);
         plan.setPlanOrder(1);
         plan.setClassIndex(MIDDLE_SHIFT_CLASS_INDEX);
