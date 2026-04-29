@@ -209,8 +209,19 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
+        
+        // 将params对象序列化为JSON字符串
+        String paramsJson = null;
+        if (params != null) {
+            try {
+                paramsJson = com.alibaba.fastjson.JSON.toJSONString(params);
+            } catch (Exception e) {
+                log.warn("序列化params失败", e);
+            }
+        }
+        
         AjaxResult ajaxResult = iFactoryMonthPlanProductionFinalResultService.importSkuScheduleItems(context,
-                updateSupport, params);
+                updateSupport, paramsJson);
         return ajaxResult;
     }
 

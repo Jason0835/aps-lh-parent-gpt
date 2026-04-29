@@ -85,7 +85,7 @@ public interface IFactoryMonthPlanProductionFinalResultRemoteService {
      */
     @ApiOperation("导入定稿版本")
     @PostMapping("/factoryMonthPlanFinalResult/importSkuScheduleItems")
-    AjaxResult importSkuScheduleItems(@RequestBody ImportContext context, @RequestParam("updateSupport") boolean updateSupport, FactoryMonthPlanProductionFinalResult params);
+    AjaxResult importSkuScheduleItems(@RequestBody ImportContext context, @RequestParam("updateSupport") boolean updateSupport, @RequestParam(value = "paramsJson", required = false) String paramsJson);
     
     /**
      * 导入工厂月生产计划-最终排产计划定稿数据

@@ -270,11 +270,25 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @PostMapping("/importSkuScheduleItems")
     public AjaxResult importSkuScheduleItems(@RequestBody ImportContext importContext,
                                                     @RequestParam("updateSupport") boolean updateSupport,
-                                                    FactoryMonthPlanProductionFinalResult params)
+                                                    @RequestParam(value = "paramsJson", required = false) String paramsJson)
             throws IOException {
         if (importContext == null || importContext.getFileBytes() == null || importContext.getFileBytes().length == 0) {
             return AjaxResult.error("导入文件不能为空");
         }
+        
+        // 将JSON字符串反序列化为对象
+        FactoryMonthPlanProductionFinalResult params = null;
+        if (StringUtils.isNotBlank(paramsJson)) {
+            try {
+                params = com.alibaba.fastjson.JSON.parseObject(paramsJson, FactoryMonthPlanProductionFinalResult.class);
+            } catch (Exception e) {
+                log.warn("解析paramsJson失败", e);
+            }
+        }
+        if (params == null) {
+            params = new FactoryMonthPlanProductionFinalResult();
+        }
+        
         Date beginTime = DateUtils.getNowDate();
         byte[] fileBytes = importContext.getFileBytes();
 //        ImportLog importLog = new ImportLog();
