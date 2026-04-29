@@ -288,7 +288,7 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.cxScheduleResult.class4RecipeType")
     @ApiModelProperty(value = "四班示方书类型")
     @TableField("CLASS4_RECIPE_TYPE")
-    private String c;
+    private String class4RecipeType;
 
     //@Excel(name = "ui.data.column.cxScheduleResult.class4RecipeNo")
     @ApiModelProperty(value = "四班示方书编号")
