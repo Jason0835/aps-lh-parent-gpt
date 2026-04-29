@@ -47,6 +47,16 @@ public class LhParamsServiceImpl extends AbstractDocService<LhParams> implements
         return "0101";
     }
 
+    @Override
+    public int save(LhParams entity) {
+        if (entity.getId() != null) {
+            entity.setBaseVale(entity.getId());
+        } else {
+            entity.setBaseVale(null);
+        }
+        return super.save(entity);
+    }
+
 
     /**
      * 查询List
