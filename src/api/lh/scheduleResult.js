@@ -84,6 +84,25 @@ export function autoPlan(query) {
   })
 }
 /**
+ * 硫化插单校验（/validateInsertOrder）
+ * @param {Object} query
+ * @param {string} query.scheduleDate 排程日期
+ * @param {string} query.lhMachineCode 硫化机台编号
+ * @param {string} query.productCode 物料编号
+ * @returns
+ */
+export function validateInsertOrder(query) {
+  return request({
+    url: '/lh/lhScheduleResult/validateInsertOrder',
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+  })
+}
+
+/**
  * 硫化插单（/insertOrder）
  * @param {Object} query
  * @param {string} query.scheduleDate 排程日期
@@ -220,10 +239,11 @@ export function publishScheduleResult(query) {
   })
 }
 
-export function issueToMes() {
+export function issueToMes(query) {
   return request({
     url: '/lh/lhScheduleResult/issueToMes',
-    method: 'post'
+    method: 'post',
+    params: query
   })
 }
 /**

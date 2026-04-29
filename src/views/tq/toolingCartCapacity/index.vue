@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="tqMachineChuckMainTable"
+      tableRef="tqToolingCartCapacityMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -21,33 +21,33 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['tq:machineChuck:add']"
+          v-hasPermi="['tq:toolingCartCapacity:add']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
           type="danger"
           plain
-          v-hasPermi="['tq:machineChuck:remove']"
+          v-hasPermi="['tq:toolingCartCapacity:remove']"
           @click="handleBatchDelete"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <el-button
-          v-hasPermi="['tq:machineChuck:import']"
+          v-hasPermi="['tq:toolingCartCapacity:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
         <el-button
           @click="handleExport"
-          v-hasPermi="['tq:machineChuck:export']"
+          v-hasPermi="['tq:toolingCartCapacity:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
     </page-table>
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/tq/machineChuck/importTemplate"
-      uploadUrl="/tq/machineChuck/importData"
+      downloadUrl="/tq/toolingCartCapacity/importTemplate"
+      uploadUrl="/tq/toolingCartCapacity/importData"
       @uploadSuccess="getList"
     />
     <InfoDialog ref="infoRef" @success="getList" />
@@ -55,16 +55,16 @@
 </template>
 <script>
 import {
-  listMachineChuck,
-  removeMachineChuck,
-  exportMachineChuck,
-} from "@/api/tq/machineChuck";
-import { listEnabledMachines } from "@/api/tq/machine";
+  listToolingCartCapacity,
+  removeToolingCartCapacity,
+  exportToolingCartCapacity,
+} from "@/api/tq/toolingCartCapacity";
+import { listAllTooling } from "@/api/tq/tooling";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import InfoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TqMachineChuck",
+  name: "TqToolingCartCapacity",
   components: {
     tltUpload,
     InfoDialog,
@@ -72,9 +72,10 @@ export default {
   data() {
     return {
       loading: false,
-      machineLoading: false,
+      toolingLoading: false,
       data: [],
       selection: [],
+      toolingList: [],
       page: {
         current: 1,
         pageSize: 20,
@@ -83,20 +84,23 @@ export default {
       sort: {},
       search: {},
       query: {},
-      machineList: [],
     };
   },
   computed: {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.tq.machineChuck.column.machineCode"),
-          prop: "machineId",
+          label: this.$t("ui.tq.toolingCartCapacity.column.cartCode"),
+          prop: "cartCode",
           type: "select",
-          dictData: this.machineList,
-          labelKey: "machineName",
-          valueKey: "id",
+          dictData: this.toolingList,
+          labelKey: "toolingCode",
+          valueKey: "toolingCode",
           filterable: true,
+        },
+        {
+          label: this.$t("ui.tq.toolingCartCapacity.column.materialCode"),
+          prop: "materialCode",
         },
       ];
     },
@@ -104,31 +108,24 @@ export default {
       return [
         { type: "selection", fixed: "left" },
         {
-          prop: "machineName",
+          prop: "cartCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.specifyMachine.column.machineName"),
+          label: this.$t("ui.tq.toolingCartCapacity.column.cartCode"),
           minWidth: 120,
         },
         {
-          prop: "chuckCode",
+          prop: "materialCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.tq.machineChuck.column.chuckCode"),
+          label: this.$t("ui.tq.toolingCartCapacity.column.materialCode"),
           minWidth: 120,
         },
         {
-          prop: "chuckName",
+          prop: "cartCapacity",
           align: "center",
           halign: "center",
-          label: this.$t("ui.tq.machineChuck.column.chuckName"),
-          minWidth: 120,
-        },
-        {
-          prop: "inchSize",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.tq.machineChuck.column.inchSize"),
+          label: this.$t("ui.tq.toolingCartCapacity.column.cartCapacity"),
           minWidth: 100,
         },
         {
@@ -143,7 +140,7 @@ export default {
         {
           prop: "updateTime",
           halign: "center",
-          label: this.$t("ui.tq.machineChuck.column.updateTime"),
+          label: this.$t("ui.tq.toolingCartCapacity.column.updateTime"),
           minWidth: 150,
         },
         {
@@ -157,7 +154,7 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["tq:machineChuck:edit"]}
+                  v-hasPermi={["tq:toolingCartCapacity:edit"]}
                   class="minus"
                   type="primary"
                   onClick={() => this.handleEdit(row)}
@@ -165,7 +162,7 @@ export default {
                   {this.$t("ui.frame.btn.modify")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["tq:machineChuck:remove"]}
+                  v-hasPermi={["tq:toolingCartCapacity:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -195,7 +192,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeMachineChuck(ids).then((data) => {
+        removeToolingCartCapacity(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -213,7 +210,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = this.selection.map((row) => row.id).join(",");
-        removeMachineChuck(ids).then((data) => {
+        removeToolingCartCapacity(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -221,7 +218,7 @@ export default {
       });
     },
     handleExport() {
-      this.$confirm(this.$t("ui.tq.machineChuck.confirm.export"), {
+      this.$confirm(this.$t("ui.tq.toolingCartCapacity.confirm.export"), {
         type: "warning",
       }).then(() => {
         try {
@@ -232,7 +229,7 @@ export default {
             pageSize: undefined,
             pageNum: undefined,
           };
-          exportMachineChuck(params);
+          exportToolingCartCapacity(params);
         } catch (error) {
           console.error(error);
         } finally {
@@ -278,7 +275,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listMachineChuck(this.formatParams());
+        const data = await listToolingCartCapacity(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -287,35 +284,21 @@ export default {
         this.loading = false;
       }
     },
-    async loadMachineList() {
-      this.machineLoading = true;
+    async loadToolingList() {
+      this.toolingLoading = true;
       try {
-        const res = await listEnabledMachines();
-        this.machineList = Array.isArray(res) ? res : (res.data || res.rows || []);
+        const res = await listAllTooling();
+        this.toolingList = Array.isArray(res) ? res : (res.data || res.rows || []);
       } catch (error) {
         console.log(error);
       } finally {
-        this.machineLoading = false;
-      }
-    },
-    handleMachineFocus() {
-      if (this.machineList.length === 0) {
-        this.loadMachineList();
+        this.toolingLoading = false;
       }
     },
   },
   mounted() {
     this.getList();
-    this.loadMachineList();
-  },
-  activated() {
-    this.getList();
+    this.loadToolingList();
   },
 };
 </script>
-<style lang="scss" scoped>
-.more-btn {
-  margin: 2px 0;
-  width: 100%;
-}
-</style>

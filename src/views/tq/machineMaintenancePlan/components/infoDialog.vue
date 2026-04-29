@@ -29,10 +29,11 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { saveMachineChuck } from "@/api/tq/machineChuck";
+import { saveMachineMaintenancePlan } from "@/api/tq/machineMaintenancePlan";
 import { listEnabledMachines } from "@/api/tq/machine";
 
 export default {
+  dicts: ["class_num_three_plan"],
   components: { infoForm },
   data() {
     return {
@@ -43,6 +44,13 @@ export default {
       form: {},
       machineList: [],
       rules: {
+        downtimeDate: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
         machineId: [
           {
             required: true,
@@ -50,11 +58,11 @@ export default {
             trigger: "change",
           },
         ],
-        chuckCode: [
+        downtimeShift: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
+            message: this.$t("common.rule.select"),
+            trigger: "change",
           },
         ],
       },
@@ -66,13 +74,21 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.tq.machineChuck.column.modalName")
+        this.$t("ui.tq.machineMaintenancePlan.column.modalName")
       );
     },
     columns() {
       return [
         {
-          label: this.$t("ui.tq.machineChuck.column.machineCode"),
+          label: this.$t("ui.tq.machineMaintenancePlan.column.downtimeDate"),
+          prop: "downtimeDate",
+          span: 24,
+          required: true,
+          type: "date",
+          valueFormat: "yyyy-MM-dd",
+        },
+        {
+          label: this.$t("ui.tq.machineMaintenancePlan.column.machineName"),
           prop: "machineId",
           span: 24,
           required: true,
@@ -87,21 +103,17 @@ export default {
           onFocus: this.handleMachineFocus,
         },
         {
-          label: this.$t("ui.tq.machineChuck.column.chuckCode"),
-          prop: "chuckCode",
+          label: this.$t("ui.tq.machineMaintenancePlan.column.downtimeShift"),
+          prop: "downtimeShift",
           span: 24,
           required: true,
-          maxlength: "50",
+          type: "select",
+          dictData: this.dict.type.class_num_three_plan,
+          filterable: true,
         },
         {
-          label: this.$t("ui.tq.machineChuck.column.chuckName"),
-          prop: "chuckName",
-          span: 24,
-          maxlength: "100",
-        },
-        {
-          label: this.$t("ui.tq.machineChuck.column.inchSize"),
-          prop: "inchSize",
+          label: this.$t("ui.tq.machineMaintenancePlan.column.downtimeHours"),
+          prop: "downtimeHours",
           span: 24,
           type: "number",
         },
@@ -110,7 +122,7 @@ export default {
           prop: "remark",
           span: 24,
           type: "textarea",
-          maxlength: "500",
+          maxlength: "900",
         },
       ];
     },
@@ -119,7 +131,7 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        const res = await saveMachineChuck(params);
+        const res = await saveMachineMaintenancePlan(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -146,7 +158,7 @@ export default {
         this.loadMachineList();
       }
     },
-    async show(data) {
+    show(data) {
       this.visible = true;
       this.machineList = [];
       if (data) {
@@ -154,23 +166,17 @@ export default {
         this.form = {
           ...data,
         };
-        // 先加载所有机台列表
-        await this.loadMachineList();
-        // 如果当前机台不在列表中，添加到列表
         if (data.machineId && data.machineName) {
-          const exists = this.machineList.some(item => item.id === data.machineId);
-          if (!exists) {
-            this.machineList.unshift({
+          this.machineList = [
+            {
               id: data.machineId,
               machineName: data.machineName,
-            });
-          }
+            },
+          ];
         }
       } else {
         this.isEdit = false;
         this.form = {};
-        // 新增时预加载机台列表
-        await this.loadMachineList();
       }
     },
     hide() {

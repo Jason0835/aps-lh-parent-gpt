@@ -1,4 +1,4 @@
-﻿
+﻿﻿﻿﻿
 <template>
   <basic-container>
     <page-table
@@ -1146,7 +1146,7 @@ export default {
             scheduleDate: this.query.scheduleDate,
             ids: ids.join(),
           };
-          const valid = await issueToMes();
+          const valid = await issueToMes({ scheduleDate: this.query.scheduleDate });
           if (valid.msg == "0") {
             this.$confirm(
               this.$t("ui.data.column.scheduleResult.hasNullLhMachineCode")

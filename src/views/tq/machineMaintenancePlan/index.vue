@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="tqMachineChuckMainTable"
+      tableRef="tqMachineMaintenancePlanMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -21,33 +21,33 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['tq:machineChuck:add']"
+          v-hasPermi="['tq:machineMaintenancePlan:add']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
           type="danger"
           plain
-          v-hasPermi="['tq:machineChuck:remove']"
+          v-hasPermi="['tq:machineMaintenancePlan:remove']"
           @click="handleBatchDelete"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
         <el-button
-          v-hasPermi="['tq:machineChuck:import']"
+          v-hasPermi="['tq:machineMaintenancePlan:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
         <el-button
           @click="handleExport"
-          v-hasPermi="['tq:machineChuck:export']"
+          v-hasPermi="['tq:machineMaintenancePlan:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
     </page-table>
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/tq/machineChuck/importTemplate"
-      uploadUrl="/tq/machineChuck/importData"
+      downloadUrl="/tq/machineMaintenancePlan/importTemplate"
+      uploadUrl="/tq/machineMaintenancePlan/importData"
       @uploadSuccess="getList"
     />
     <InfoDialog ref="infoRef" @success="getList" />
@@ -55,16 +55,17 @@
 </template>
 <script>
 import {
-  listMachineChuck,
-  removeMachineChuck,
-  exportMachineChuck,
-} from "@/api/tq/machineChuck";
+  listMachineMaintenancePlan,
+  removeMachineMaintenancePlan,
+  exportMachineMaintenancePlan,
+} from "@/api/tq/machineMaintenancePlan";
 import { listEnabledMachines } from "@/api/tq/machine";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import InfoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TqMachineChuck",
+  name: "TqMachineMaintenancePlan",
+  dicts: ["class_num_three_plan"],
   components: {
     tltUpload,
     InfoDialog,
@@ -75,6 +76,7 @@ export default {
       machineLoading: false,
       data: [],
       selection: [],
+      machineList: [],
       page: {
         current: 1,
         pageSize: 20,
@@ -83,14 +85,18 @@ export default {
       sort: {},
       search: {},
       query: {},
-      machineList: [],
     };
   },
   computed: {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.tq.machineChuck.column.machineCode"),
+          label: this.$t("ui.tq.machineMaintenancePlan.column.downtimeDate"),
+          prop: "downtimeDate",
+          type: "daterange",
+        },
+        {
+          label: this.$t("ui.tq.machineMaintenancePlan.column.machineName"),
           prop: "machineId",
           type: "select",
           dictData: this.machineList,
@@ -104,32 +110,38 @@ export default {
       return [
         { type: "selection", fixed: "left" },
         {
+          prop: "downtimeDate",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.tq.machineMaintenancePlan.column.downtimeDate"),
+          minWidth: 120,
+          formatter: (row) => {
+            return row.downtimeDate || "-";
+          },
+        },
+        {
           prop: "machineName",
           align: "center",
           halign: "center",
-          label: this.$t("ui.specifyMachine.column.machineName"),
+          label: this.$t("ui.tq.machineMaintenancePlan.column.machineName"),
           minWidth: 120,
         },
         {
-          prop: "chuckCode",
+          prop: "downtimeShift",
           align: "center",
           halign: "center",
-          label: this.$t("ui.tq.machineChuck.column.chuckCode"),
-          minWidth: 120,
-        },
-        {
-          prop: "chuckName",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.tq.machineChuck.column.chuckName"),
-          minWidth: 120,
-        },
-        {
-          prop: "inchSize",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.tq.machineChuck.column.inchSize"),
+          label: this.$t("ui.tq.machineMaintenancePlan.column.downtimeShift"),
           minWidth: 100,
+          formatter: (row) => {
+            return this.selectDictLabel(this.dict.type.class_num_three_plan, row.downtimeShift) || "-";
+          },
+        },
+        {
+          prop: "downtimeHours",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.tq.machineMaintenancePlan.column.downtimeHours"),
+          minWidth: 120,
         },
         {
           prop: "remark",
@@ -143,7 +155,7 @@ export default {
         {
           prop: "updateTime",
           halign: "center",
-          label: this.$t("ui.tq.machineChuck.column.updateTime"),
+          label: this.$t("ui.tq.machineMaintenancePlan.column.updateDate"),
           minWidth: 150,
         },
         {
@@ -157,7 +169,7 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["tq:machineChuck:edit"]}
+                  v-hasPermi={["tq:machineMaintenancePlan:edit"]}
                   class="minus"
                   type="primary"
                   onClick={() => this.handleEdit(row)}
@@ -165,7 +177,7 @@ export default {
                   {this.$t("ui.frame.btn.modify")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["tq:machineChuck:remove"]}
+                  v-hasPermi={["tq:machineMaintenancePlan:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -195,7 +207,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeMachineChuck(ids).then((data) => {
+        removeMachineMaintenancePlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -213,7 +225,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = this.selection.map((row) => row.id).join(",");
-        removeMachineChuck(ids).then((data) => {
+        removeMachineMaintenancePlan(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -221,7 +233,7 @@ export default {
       });
     },
     handleExport() {
-      this.$confirm(this.$t("ui.tq.machineChuck.confirm.export"), {
+      this.$confirm(this.$t("ui.tq.machineMaintenancePlan.confirm.export"), {
         type: "warning",
       }).then(() => {
         try {
@@ -232,7 +244,7 @@ export default {
             pageSize: undefined,
             pageNum: undefined,
           };
-          exportMachineChuck(params);
+          exportMachineMaintenancePlan(params);
         } catch (error) {
           console.error(error);
         } finally {
@@ -242,6 +254,15 @@ export default {
     },
     handleSearch(data) {
       this.query = data;
+      if (data.downtimeDate && data.downtimeDate.length === 2) {
+        this.query.downtimeDateBegin = data.downtimeDate[0];
+        this.query.downtimeDateEnd = data.downtimeDate[1];
+        delete this.query.downtimeDate;
+      } else {
+        this.query.downtimeDateBegin = undefined;
+        this.query.downtimeDateEnd = undefined;
+        delete this.query.downtimeDate;
+      }
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -278,7 +299,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listMachineChuck(this.formatParams());
+        const data = await listMachineMaintenancePlan(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -313,9 +334,3 @@ export default {
   },
 };
 </script>
-<style lang="scss" scoped>
-.more-btn {
-  margin: 2px 0;
-  width: 100%;
-}
-</style>

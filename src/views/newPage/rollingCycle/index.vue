@@ -237,7 +237,7 @@
           <template v-slot="scope" v-if="item.prop == 'isLockSchedule' || item.editable">
             <div v-if="item.prop == 'isLockSchedule'">
               <el-select
-                v-if="showConfirmResult && scope.row.id"
+                v-if="scope.row.id"
                 v-model="scope.row.isLockSchedule"
                 @change="handleLockScheduleChange(scope.row, $event)"
                 size="mini"
@@ -730,7 +730,7 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  {!this.isTabChange && row.id && (
+                  {row.id && (
                     <el-select
                       v-model={row.isLockSchedule}
                       onChange={(val) =>
@@ -746,7 +746,7 @@ export default {
                       ))}
                     </el-select>
                   )}
-                  {this.isTabChange && (
+                  {!row.id && (
                     <span>
                       {this.selectDictLabel(
                         this.dict.type.biz_yes_no,
@@ -779,6 +779,26 @@ export default {
             prop: `day${i + 1}`,
             minWidth: "80px",
             type: "number",
+            render: ({ row }) => {
+              const prop = `day${i + 1}`;
+              return (
+                <div>
+                  {row.id ? (
+                    <el-input
+                      value={row[prop] || ""}
+                      size="mini"
+                      onInput={(value) => {
+                        row[prop] = (value || "").replace(/[^\d]/g, "");
+                      }}
+                      onFocus={() => this.onDayEditFocus(row, prop)}
+                      onBlur={() => this.handleResultDayEdit(row, prop)}
+                    ></el-input>
+                  ) : (
+                    <span>{row[prop] || ""}</span>
+                  )}
+                </div>
+              );
+            },
           });
         }
         return list;
@@ -1310,16 +1330,85 @@ export default {
       return String(val);
     },
 
+    //按后端规则本地重算开始/结束日期
+    recalculateBeginEndDay(row) {
+      if (!row) return;
+      const monthStartDay = 1;
+      const monthMaxDay = 31;
+      let realBeginDay = monthMaxDay + 1;
+      let realEndDay = 0;
+      for (let i = monthStartDay; i <= monthMaxDay; i++) {
+        const dayField = `day${i}`;
+        const dayVal = Number(row[dayField] || 0);
+        if (dayVal !== 0) {
+          if (realBeginDay > i) {
+            realBeginDay = i;
+          }
+          if (realEndDay < i) {
+            realEndDay = i;
+          }
+        }
+      }
+      row.beginDay = realBeginDay === monthMaxDay + 1 ? 0 : realBeginDay;
+      row.endDay = realEndDay;
+    },
+
+    //给调整结果列表回填 productTypeCode（源数据来自单结构列表 this.data）
+    enrichProductTypeCode(list = []) {
+      if (!Array.isArray(list) || list.length === 0) return list;
+      if (!Array.isArray(this.data) || this.data.length === 0) return list;
+      return list.map((item) => {
+        if (!item || !item.id || item.productTypeCode) return item;
+        const sourceItem = this.data.find(
+          (row) =>
+            row.materialCode === item.materialCode &&
+            row.structureName === item.structureName &&
+            row.productionVersion === item.productionVersion &&
+            row.version === item.version
+        );
+        if (sourceItem && sourceItem.productTypeCode) {
+          return { 
+            ...item, 
+            productTypeCode: sourceItem.productTypeCode,
+            dayVulcanizationQty: sourceItem.dayVulcanizationQty
+          };
+        }
+        return item;
+      });
+    },
+
     //修改结构每日计划量
     async handleOutResultDayEdit(row, prop) {
+      if (!row.id) return;
+      const sourceItem = this.data.find(item => item.materialCode === row.materialCode);
+      if (sourceItem && sourceItem.productTypeCode) {
+        row.productTypeCode = sourceItem.productTypeCode;
+      }
+      console.log('row', row);
+      console.log('this.data',this.data)
+      const oldVal = this.normalizeDayValue(this.dayEditOriginalValue);
+      const newVal = this.normalizeDayValue(row[prop]);
+      if (newVal === oldVal) return;
+      try {
+        this.recalculateBeginEndDay(row);
+        console.log("发送请求数据:", JSON.stringify(row));
+        await saveAdjustResult(row);
+        // this.getOutResultList(row.productionVersion, row.version);
+      } catch (err) {
+        console.log(err);
+      }
+    },
+
+    //修改调整结果tab每日计划量
+    async handleResultDayEdit(row, prop) {
       if (!row.id) return;
       const oldVal = this.normalizeDayValue(this.dayEditOriginalValue);
       const newVal = this.normalizeDayValue(row[prop]);
       if (newVal === oldVal) return;
       try {
-        await updateSkuScheduleItems(row);
-        this.$modal.msgSuccess("更新成功");
-        this.getOutResultList(row.productionVersion, row.version);
+        this.recalculateBeginEndDay(row);
+        await saveAdjustResult(row);
+        // 保持表格就地更新：接口成功后不重新拉取列表，避免闪动
       } catch (err) {
         console.log(err);
       }
@@ -1942,7 +2031,7 @@ export default {
         params.startDay = params.beginDay;
         params.scheduledMachines = params.cxMachineCode;
         let res = await autoAdjust(params);
-        this.outResultData = res;
+        this.outResultData = this.enrichProductTypeCode(res);
         if (res.length != 0) {
           this.getStatisticsResult(res[0],1);
           this.getSingleList({
@@ -2156,7 +2245,7 @@ export default {
         params.structureName = this.formInline.structureName;
         let res = await getStructureDetail(params);
         console.log("初始化结果");
-        this.outResultData = res.rows;
+        this.outResultData = this.enrichProductTypeCode(res.rows);
         if (res.rows.length != 0) {
           console.log("开始调用统计");
           this.getStatisticsResult(res.rows[0]);
@@ -2246,8 +2335,11 @@ export default {
       console.log(rows);
       this.selection = rows;
     },
+	// 结构间调整导出
     handleExport() {
-      downloadLink("/monthplan/factoryMonthPlanFinalResult/exportSkuScheduleItems", this.formatParams(false));
+	  const params = this.formatParams(false);
+	  params.structureName = this.formInline.structureName; // 只导出指定结构的数据
+      downloadLink("/monthplan/factoryMonthPlanFinalResult/exportSkuScheduleItems", params);
     },
 
     formatParams() {
@@ -2367,7 +2459,7 @@ export default {
         if (this.activeName == "three") {
           this.data = list;
         } else {
-          this.outResultData = list;
+          this.outResultData = this.enrichProductTypeCode(list);
         }
       } catch (err) {
         console.log(err);

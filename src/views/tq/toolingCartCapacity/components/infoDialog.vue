@@ -26,31 +26,30 @@
     </template>
   </el-dialog>
 </template>
-
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { saveMachineChuck } from "@/api/tq/machineChuck";
-import { listEnabledMachines } from "@/api/tq/machine";
+import { saveToolingCartCapacity } from "@/api/tq/toolingCartCapacity";
+import { listAllTooling } from "@/api/tq/tooling";
 
 export default {
   components: { infoForm },
   data() {
     return {
       loading: false,
-      machineLoading: false,
+      toolingLoading: false,
       visible: false,
       isEdit: false,
       form: {},
-      machineList: [],
+      toolingList: [],
       rules: {
-        machineId: [
+        cartCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
-        chuckCode: [
+        materialCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -66,44 +65,38 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.tq.machineChuck.column.modalName")
+        this.$t("ui.tq.toolingCartCapacity.column.modalName")
       );
     },
     columns() {
       return [
         {
-          label: this.$t("ui.tq.machineChuck.column.machineCode"),
-          prop: "machineId",
+          label: this.$t("ui.tq.toolingCartCapacity.column.cartCode"),
+          prop: "cartCode",
           span: 24,
           required: true,
           type: "select",
-          dictData: this.machineList,
+          dictData: this.toolingList,
           filterable: true,
-          loading: this.machineLoading,
+          loading: this.toolingLoading,
           props: {
-            label: "machineName",
-            value: "id",
+            label: "toolingCode",
+            value: "toolingCode",
           },
-          onFocus: this.handleMachineFocus,
         },
         {
-          label: this.$t("ui.tq.machineChuck.column.chuckCode"),
-          prop: "chuckCode",
+          label: this.$t("ui.tq.toolingCartCapacity.column.materialCode"),
+          prop: "materialCode",
           span: 24,
           required: true,
-          maxlength: "50",
+          maxlength: "60",
         },
         {
-          label: this.$t("ui.tq.machineChuck.column.chuckName"),
-          prop: "chuckName",
-          span: 24,
-          maxlength: "100",
-        },
-        {
-          label: this.$t("ui.tq.machineChuck.column.inchSize"),
-          prop: "inchSize",
+          label: this.$t("ui.tq.toolingCartCapacity.column.cartCapacity"),
+          prop: "cartCapacity",
           span: 24,
           type: "number",
+          defaultValue: 50,
         },
         {
           label: this.$t("ui.common.column.remark"),
@@ -119,7 +112,7 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        const res = await saveMachineChuck(params);
+        const res = await saveToolingCartCapacity(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -129,48 +122,40 @@ export default {
         this.loading = false;
       }
     },
-    async loadMachineList() {
-      this.machineLoading = true;
+    async loadToolingList() {
+      this.toolingLoading = true;
       try {
-        const res = await listEnabledMachines();
+        const res = await listAllTooling();
         const list = Array.isArray(res) ? res : (res.data || res.rows || []);
-        this.machineList = list;
+        this.toolingList = list;
       } catch (error) {
         console.log(error);
       } finally {
-        this.machineLoading = false;
-      }
-    },
-    handleMachineFocus() {
-      if (this.machineList.length === 0) {
-        this.loadMachineList();
+        this.toolingLoading = false;
       }
     },
     async show(data) {
       this.visible = true;
-      this.machineList = [];
+      await this.loadToolingList();
       if (data) {
         this.isEdit = true;
         this.form = {
           ...data,
         };
-        // 先加载所有机台列表
-        await this.loadMachineList();
-        // 如果当前机台不在列表中，添加到列表
-        if (data.machineId && data.machineName) {
-          const exists = this.machineList.some(item => item.id === data.machineId);
+        if (data.cartCode) {
+          const exists = this.toolingList.some(item => item.toolingCode === data.cartCode);
           if (!exists) {
-            this.machineList.unshift({
-              id: data.machineId,
-              machineName: data.machineName,
+            this.toolingList.unshift({
+              toolingCode: data.cartCode,
+              toolingName: data.cartCode,
             });
           }
         }
       } else {
         this.isEdit = false;
-        this.form = {};
-        // 新增时预加载机台列表
-        await this.loadMachineList();
+        this.form = {
+          cartCapacity: 50,
+        };
       }
     },
     hide() {
@@ -178,7 +163,6 @@ export default {
       this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
-      this.machineList = [];
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);

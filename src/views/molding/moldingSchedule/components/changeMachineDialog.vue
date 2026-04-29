@@ -9,54 +9,63 @@
     :append-to-body="true"
   >
     <div v-loading="loading">
-      <el-form :inline="true" label-position="right" class="mb10">
-        <el-form-item :label="$t('ui.data.column.unscheduleResult.scheduleDate')">
-          <el-date-picker
-            v-model="query.scheduleDate"
-            type="date"
-            value-format="yyyy-MM-dd"
-            class="w180"
-          />
-        </el-form-item>
-        <el-form-item :label="$t('ui.data.column.scheduleResult.oldMachine')">
-          <el-select
-            class="w180"
-            v-model="query.cxMachineCode"
-            filterable
-            clearable
-          >
-            <el-option
-              v-for="item in moldingMachines"
-              :key="item.cxMachineCode || item.moldingMachineCode"
-              :label="item.cxMachineCode || item.moldingMachineCode"
-              :value="item.cxMachineCode || item.moldingMachineCode"
+      <div class="toolbar-row mb10">
+        <el-form :inline="true" label-position="right" class="query-form">
+          <el-form-item :label="$t('ui.data.column.unscheduleResult.scheduleDate')">
+            <el-date-picker
+              v-model="query.scheduleDate"
+              type="date"
+              value-format="yyyy-MM-dd"
+              class="w180"
             />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">{{
-            $t("ui.frame.btn.search")
-          }}</el-button>
-        </el-form-item>
-      </el-form>
-
-      <el-form :inline="true" label-position="right" class="mb10">
-        <el-form-item :label="$t('ui.data.column.scheduleResult.newMachine')">
-          <el-select
-            class="w180"
-            v-model="form.newCxMachineCode"
-            filterable
-            clearable
+          </el-form-item>
+          <el-form-item :label="$t('ui.data.column.scheduleResult.oldMachine')">
+            <el-select
+              class="w180"
+              v-model="query.cxMachineCode"
+              filterable
+              clearable
+            >
+              <el-option
+                v-for="item in moldingMachines"
+                :key="item.cxMachineCode || item.moldingMachineCode"
+                :label="item.cxMachineCode || item.moldingMachineCode"
+                :value="item.cxMachineCode || item.moldingMachineCode"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleSearch">{{
+              $t("ui.frame.btn.search")
+            }}</el-button>
+          </el-form-item>
+        </el-form>
+        <el-form
+          v-if="selection.length"
+          :inline="true"
+          label-position="right"
+          class="new-machine-form"
+        >
+          <el-form-item
+            :label="$t('ui.data.column.scheduleResult.newMachine')"
+            class="new-machine-item"
           >
-            <el-option
-              v-for="item in moldingMachines"
-              :key="`new-${item.cxMachineCode || item.moldingMachineCode}`"
-              :label="item.cxMachineCode || item.moldingMachineCode"
-              :value="item.cxMachineCode || item.moldingMachineCode"
-            />
-          </el-select>
-        </el-form-item>
-      </el-form>
+            <el-select
+              class="w180"
+              v-model="form.newCxMachineCode"
+              filterable
+              clearable
+            >
+              <el-option
+                v-for="item in moldingMachines"
+                :key="`new-${item.cxMachineCode || item.moldingMachineCode}`"
+                :label="item.cxMachineCode || item.moldingMachineCode"
+                :value="item.cxMachineCode || item.moldingMachineCode"
+              />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </div>
 
       <page-table
         tableRef="MoldingChangeMachineTable"
@@ -73,16 +82,19 @@
 
     <template slot="footer">
       <el-button @click="hide">{{ $t("common.button.cancel") }}</el-button>
-      <el-button type="primary" :loading="loading" @click="handleConfirm">{{
-        $t("common.button.confirm")
-      }}</el-button>
+      <el-button
+        type="primary"
+        :loading="loading"
+        :disabled="!form.newCxMachineCode"
+        @click="handleConfirm"
+      >{{ $t("common.button.confirm") }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script>
 import { mapState } from "vuex";
-import { listCxScheduleResult, submitChangeMachineMock } from "@/api/cx/cxScheduleResult";
+import { changeMachine, listCxScheduleResult } from "@/api/cx/cxScheduleResult";
 import { getScheduleDate } from "@/api/lh/scheduleResult";
 
 export default {
@@ -223,6 +235,9 @@ export default {
     },
     handleSelectionChange(rows) {
       this.selection = rows;
+      if (!rows.length) {
+        this.form.newCxMachineCode = "";
+      }
     },
     handlePageChange(current, pageSize) {
       this.page.current = current;
@@ -258,6 +273,8 @@ export default {
         const res = await listCxScheduleResult(this.formatParams());
         this.data = res.rows || [];
         this.page.total = res.total || 0;
+        this.selection = [];
+        this.form.newCxMachineCode = "";
         await this.getDate();
       } catch (error) {
         console.error(error);
@@ -284,12 +301,10 @@ export default {
       }
       try {
         this.loading = true;
-        await submitChangeMachineMock({
-          scheduleDate: this.query.scheduleDate,
-          oldCxMachineCode: this.query.cxMachineCode,
-          newCxMachineCode: this.form.newCxMachineCode,
+        await changeMachine({
           ids: this.selection.map((row) => row.id),
-          rows: this.selection,
+          newMachineCode: this.form.newCxMachineCode,
+          newMachineName: this.getMachineName(this.form.newCxMachineCode),
         });
         this.$modal.msgSuccess(this.$t("common.msg.ajax.operation.success"));
         this.$emit("success");
@@ -298,6 +313,13 @@ export default {
         console.error(error);
         this.loading = false;
       }
+    },
+    getMachineName(machineCode) {
+      const machine = this.moldingMachines.find((item) => {
+        const code = item.cxMachineCode || item.moldingMachineCode;
+        return code === machineCode;
+      });
+      return (machine && (machine.machineName || machine.moldingMachineName)) || machineCode;
     },
   },
 };
@@ -309,5 +331,20 @@ export default {
 }
 .w180 {
   width: 180px;
+}
+.toolbar-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.query-form {
+  flex: 1;
+}
+.new-machine-form {
+  margin-left: auto;
+}
+.new-machine-item ::v-deep .el-form-item__label {
+  color: #f56c6c;
+  font-weight: 600;
 }
 </style>
