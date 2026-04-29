@@ -1042,7 +1042,12 @@ export default {
       downloadLink("/cx/cxScheduleResult/export", this.formatParams(false));
     },
     handleGotoMoldingScheduleSequence() {
-      this.$router.push("/moldingPlanManagement/moldingScheduleSequence");
+      this.$router.push({
+        path: "/moldingPlanManagement/moldingScheduleSequence",
+        query: {
+          queryParams: encodeURIComponent(JSON.stringify(this.query || {})),
+        },
+      });
     },
     handleProducingIssue() {
       this.$confirm(this.$t("ui.biz.alter.producingIssue")).then(async () => {
