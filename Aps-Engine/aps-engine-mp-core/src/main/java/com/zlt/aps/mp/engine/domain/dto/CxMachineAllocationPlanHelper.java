@@ -79,6 +79,12 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      * 备注说明
      */
     private String remark;
+    /**
+     * 初始备份--后续重排使用
+     */
+    private CxMachineAllocationPlanHelper cloneObject;
+    //拼接字符
+    private static final String TIME_EXTENSION_KEY_FORMAT = "%s|@|%s|@|%s";
 
     /**
      * 构造函数
@@ -103,6 +109,40 @@ public class CxMachineAllocationPlanHelper implements Serializable {
         this.endDay = endDay;
         this.timeExtensionFlag = false;
         this.realProductionPlanList = new ArrayList<>();
+        //20260428+ 备份使用
+        CxMachineAllocationPlanHelper cloneObject = new CxMachineAllocationPlanHelper();
+        cloneObject.cxMachineCode = cxMachineCode;
+        cloneObject.productionPlanInfo = productionPlanInfo;
+        cloneObject.maxRatio = lhRatio.getMaxLhMachineCount();
+        cloneObject.minRatio = productionPlanInfo.getClosureMinLhRatio();
+        cloneObject.maxEmbryoCodeCount = lhRatio.getMaxEmbryoCodeCount();
+        cloneObject.continueSkuMap = continueSkuMap;
+        cloneObject.allocationDay = allocationDay;
+        cloneObject.startDay = startDay;
+        cloneObject.endDay = endDay;
+        cloneObject.timeExtensionFlag = false;
+        cloneObject.realProductionPlanList = new ArrayList<>();
+        this.cloneObject = cloneObject;
+    }
+
+    /**
+     * 还原配置信息
+     */
+    public void restoreConfiguration() {
+        if (null == cloneObject) {
+            return;
+        }
+        this.cxMachineCode = cloneObject.getCxMachineCode();
+        this.productionPlanInfo = cloneObject.getProductionPlanInfo();
+        this.maxRatio = cloneObject.getMaxRatio();
+        this.minRatio = cloneObject.getMinRatio();
+        this.maxEmbryoCodeCount = cloneObject.getMaxEmbryoCodeCount();
+        this.continueSkuMap = cloneObject.getContinueSkuMap();
+        this.allocationDay = cloneObject.getAllocationDay();
+        this.startDay = cloneObject.getStartDay();
+        this.endDay = cloneObject.getEndDay();
+        this.timeExtensionFlag = cloneObject.timeExtensionFlag;
+        this.realProductionPlanList = cloneObject.getRealProductionPlanList();
     }
 
     /**
@@ -281,17 +321,16 @@ public class CxMachineAllocationPlanHelper implements Serializable {
 
     /**
      * 获取延长日信息
-     * 分组名|*|成型机编号|*|排产日
+     * 分组名|@|成型机编号|@|排产日
      *
      * @param timeExtensionEndDay 分组延长收尾日
      * @return
      */
     public String getTimeExtensionDayInfo(Integer timeExtensionEndDay) {
-        String timeExtensionKeyFormat = "%s|*|%s|*|%s";
         if (null == timeExtensionEndDay) {
             return "";
         }
-        return String.format(timeExtensionKeyFormat, getAllocationGroup(), cxMachineCode, timeExtensionEndDay);
+        return String.format(TIME_EXTENSION_KEY_FORMAT, getAllocationGroup(), cxMachineCode, timeExtensionEndDay);
     }
 
     /**
@@ -300,8 +339,24 @@ public class CxMachineAllocationPlanHelper implements Serializable {
      * @return
      */
     public String getTimeExtensionPrefix() {
-        String timeExtensionKeyFormat = "%s|*|%s|*|%s";
-        return String.format(timeExtensionKeyFormat, getAllocationGroup(), cxMachineCode, "");
+        return String.format(TIME_EXTENSION_KEY_FORMAT, getAllocationGroup(), cxMachineCode, "");
+    }
+
+    /**
+     * 20260427+
+     * 因在多机台时，得不到具体排产Sku
+     * 修改成从计划中获取
+     *
+     * @return
+     */
+    public List<MonthPlanProductionRequirePlanVo> getRealProductionPlanList() {
+        if (!CollectionUtils.isEmpty(realProductionPlanList)) {
+            return realProductionPlanList;
+        }
+        if (null == productionPlanInfo) {
+            return Collections.emptyList();
+        }
+        return productionPlanInfo.getGroupPlanData();
     }
 
     /**
@@ -337,4 +392,7 @@ public class CxMachineAllocationPlanHelper implements Serializable {
         this.releasePriority = releasePriority;
     }
 
+    private CxMachineAllocationPlanHelper() {
+
+    }
 }
