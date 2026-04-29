@@ -389,66 +389,82 @@ public class CxScheduleResult extends BaseEntity {
 
     // ==================== 非持久化字段 ====================
     @ApiModelProperty(value = "班次1开始时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class1StartTime;
 
     @ApiModelProperty(value = "班次1结束时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class1EndTime;
 
     @ApiModelProperty(value = "班次2开始时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class2StartTime;
 
     @ApiModelProperty(value = "班次2结束时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class2EndTime;
 
     @ApiModelProperty(value = "班次3开始时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class3StartTime;
 
     @ApiModelProperty(value = "班次3结束时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class3EndTime;
 
     @ApiModelProperty(value = "班次4开始时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class4StartTime;
 
     @ApiModelProperty(value = "班次4结束时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class4EndTime;
 
     @ApiModelProperty(value = "班次5开始时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class5StartTime;
 
     @ApiModelProperty(value = "班次5结束时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class5EndTime;
 
     @ApiModelProperty(value = "班次6开始时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class6StartTime;
 
     @ApiModelProperty(value = "班次6结束时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class6EndTime;
 
     @ApiModelProperty(value = "班次7开始时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class7StartTime;
 
     @ApiModelProperty(value = "班次7结束时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class7EndTime;
 
     @ApiModelProperty(value = "班次8开始时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class8StartTime;
 
     @ApiModelProperty(value = "班次8结束时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @TableField(exist = false)
     private Date class8EndTime;
 
