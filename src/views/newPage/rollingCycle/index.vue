@@ -1310,13 +1310,44 @@ export default {
       return String(val);
     },
 
+    //给调整结果列表回填 productTypeCode（源数据来自单结构列表 this.data）
+    enrichProductTypeCode(list = []) {
+      if (!Array.isArray(list) || list.length === 0) return list;
+      if (!Array.isArray(this.data) || this.data.length === 0) return list;
+      return list.map((item) => {
+        if (!item || !item.id || item.productTypeCode) return item;
+        const sourceItem = this.data.find(
+          (row) =>
+            row.materialCode === item.materialCode &&
+            row.structureName === item.structureName &&
+            row.productionVersion === item.productionVersion &&
+            row.version === item.version
+        );
+        if (sourceItem && sourceItem.productTypeCode) {
+          return { 
+            ...item, 
+            productTypeCode: sourceItem.productTypeCode,
+            dayVulcanizationQty: sourceItem.dayVulcanizationQty
+          };
+        }
+        return item;
+      });
+    },
+
     //修改结构每日计划量
     async handleOutResultDayEdit(row, prop) {
       if (!row.id) return;
+      const sourceItem = this.data.find(item => item.materialCode === row.materialCode);
+      if (sourceItem && sourceItem.productTypeCode) {
+        row.productTypeCode = sourceItem.productTypeCode;
+      }
+      console.log('row', row);
+      console.log('this.data',this.data)
       const oldVal = this.normalizeDayValue(this.dayEditOriginalValue);
       const newVal = this.normalizeDayValue(row[prop]);
       if (newVal === oldVal) return;
       try {
+        console.log("发送请求数据:", JSON.stringify(row));
         await updateSkuScheduleItems(row);
         this.$modal.msgSuccess("更新成功");
         this.getOutResultList(row.productionVersion, row.version);
@@ -1942,7 +1973,7 @@ export default {
         params.startDay = params.beginDay;
         params.scheduledMachines = params.cxMachineCode;
         let res = await autoAdjust(params);
-        this.outResultData = res;
+        this.outResultData = this.enrichProductTypeCode(res);
         if (res.length != 0) {
           this.getStatisticsResult(res[0],1);
           this.getSingleList({
@@ -2156,7 +2187,7 @@ export default {
         params.structureName = this.formInline.structureName;
         let res = await getStructureDetail(params);
         console.log("初始化结果");
-        this.outResultData = res.rows;
+        this.outResultData = this.enrichProductTypeCode(res.rows);
         if (res.rows.length != 0) {
           console.log("开始调用统计");
           this.getStatisticsResult(res.rows[0]);
@@ -2246,8 +2277,11 @@ export default {
       console.log(rows);
       this.selection = rows;
     },
+	// 结构间调整导出
     handleExport() {
-      downloadLink("/monthplan/factoryMonthPlanFinalResult/exportSkuScheduleItems", this.formatParams(false));
+	  const params = this.formatParams(false);
+	  params.structureName = this.formInline.structureName; // 只导出指定结构的数据
+      downloadLink("/monthplan/factoryMonthPlanFinalResult/exportSkuScheduleItems", params);
     },
 
     formatParams() {
@@ -2367,7 +2401,7 @@ export default {
         if (this.activeName == "three") {
           this.data = list;
         } else {
-          this.outResultData = list;
+          this.outResultData = this.enrichProductTypeCode(list);
         }
       } catch (err) {
         console.log(err);
