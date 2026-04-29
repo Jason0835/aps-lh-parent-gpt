@@ -165,13 +165,14 @@ public class DayCapacityLimitHelper implements Serializable {
 
     /**
      * 是否还有剩余产能可分配
-     * cxMachineAllocationQty < maxAllocationCapacity
+     * 20260429+ 成型分配暂时放开，因排产过程中会因换模等因素导致排产量不足
+     * 因此不需要采用：
+     * min(sumProductionCapacityQty,cxMachineAllocationQty) < maxAllocationCapacity
      *
      * @return
      */
     public boolean isAllocationCapacity() {
-        return sumProductionCapacityQty < maxAllocationCapacity;
-//        return cxMachineAllocationQty < maxAllocationCapacity;
+        return true;
     }
 
     /**
