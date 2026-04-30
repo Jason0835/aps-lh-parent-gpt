@@ -78,3 +78,11 @@ export function listLhMachineInfo(data) {
     data
   })
 }
+
+export function syncAndGenerateLhPrecisionPlan(year) {
+  return request({
+    url: '/lh/lhPrecisionPlan/syncAndGenerateLhPrecisionPlan',
+    method: 'post',
+    params: { year: year }
+  })
+}

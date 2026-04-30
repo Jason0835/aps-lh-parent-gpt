@@ -68,7 +68,7 @@ import { downloadLink } from "@/utils/request";
 import {
   listLhPrecisionPlan,
   removeLhPrecisionPlan,
-  syncFromMes,
+  syncAndGenerateLhPrecisionPlan,
   autoGeneratePlans,
   checkWarning
 } from "@/api/lh/lhPrecisionPlan";
@@ -322,7 +322,7 @@ export default {
         type: "warning",
       }).then(() => {
         this.loading = true;
-        syncFromMes(year).then((res) => {
+        syncAndGenerateLhPrecisionPlan(year).then((res) => {
           this.$modal.msgSuccess(res.msg || this.$t("common.success"));
           this.$set(this.page, "current", 1);
           this.getList();
