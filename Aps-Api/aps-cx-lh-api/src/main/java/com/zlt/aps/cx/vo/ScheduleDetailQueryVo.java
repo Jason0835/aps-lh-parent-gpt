@@ -25,6 +25,12 @@ public class ScheduleDetailQueryVo {
     @ApiModelProperty(value = "物料编码")
     private String materialCode;
 
+    @ApiModelProperty(value = "物料描述")
+    private String materialDesc;
+
+    @ApiModelProperty(value = "主要物料描述")
+    private String mainMaterialDesc;
+
     @ApiModelProperty(value = "工单号")
     private String orderNo;
 
