@@ -133,6 +133,19 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     }
 
 
+    /**
+     * 插单校验
+     *
+     * @param insertDTO 插单请求数据
+     * @return 校验结果
+     */
+    @ApiOperation("插单校验")
+    @PostMapping("/validateInsertOrder")
+    @ResponseBody
+    public AjaxResult validateInsertOrder(@RequestBody LhOrderInsertDTO insertDTO) {
+        return iLhScheduleResultRemoteService.validateInsertOrder(insertDTO);
+    }
+
     @ApiOperation("插单")
 //    @RequiresPermissions("lh:lhScheduleResult:insertOrder")
     @PostMapping("/insertOrder")

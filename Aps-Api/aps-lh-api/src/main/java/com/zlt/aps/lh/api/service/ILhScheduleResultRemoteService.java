@@ -44,6 +44,16 @@ public interface ILhScheduleResultRemoteService {
     List<LhMachineInfo> getScheduleMachineInfo(@RequestBody LhOrderInsertParamDTO insertParamDTO);
 
     /**
+     * 插单校验
+     *
+     * @param insertDTO 插单请求数据
+     * @return 校验结果
+     */
+    @ApiOperation("插单校验")
+    @PostMapping("/lhScheduleResult/validateInsertOrder")
+    AjaxResult validateInsertOrder(@RequestBody LhOrderInsertDTO insertDTO);
+
+    /**
      * 插单
      * @param insertDTO
      * @return
