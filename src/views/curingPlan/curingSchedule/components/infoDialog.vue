@@ -2,22 +2,24 @@
   <el-dialog
     :title="title"
     :visible="visible"
-    width="1000px"
+    width="1100px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
+    :append-to-body="true"
   >
-    <info-form
-      class="form-item-height"
-      ref="form"
-      :form="form"
-      :rules="rules"
-      :columns="columns"
-      label-position="right"
-      label-width="120px"
-      v-loading="loading"
-    >
-    </info-form>
+    <div class="curing-schedule-info-content" v-loading="loading">
+      <info-form
+        class="form-item-height"
+        ref="form"
+        :form="form"
+        :rules="rules"
+        :columns="columns"
+        label-position="right"
+        label-width="120px"
+      >
+      </info-form>
+    </div>
     <template slot="footer">
       <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
       <el-button type="primary" :loading="loading" @click="handleConfirm">{{
@@ -31,7 +33,7 @@
 import moment from "moment";
 import { mapState } from "vuex";
 
-import { editScheduleResult, changeQty } from "@/api/lh/scheduleResult";
+import { editScheduleResult, changeQty, getScheduleDate } from "@/api/lh/scheduleResult";
 
 import infoForm from "@/views/components/infoForm.vue";
 export default {
@@ -74,6 +76,16 @@ export default {
       plan1Disabled: false,
       nightDisabled: false,
       dayDisabled: false,
+      dateList: [
+        { shift: 1, shiftDate: "" },
+        { shift: 2, shiftDate: "" },
+        { shift: 3, shiftDate: "" },
+        { shift: 4, shiftDate: "" },
+        { shift: 5, shiftDate: "" },
+        { shift: 6, shiftDate: "" },
+        { shift: 7, shiftDate: "" },
+        { shift: 8, shiftDate: "" },
+      ],
       // columns:
     };
   },
@@ -92,13 +104,8 @@ export default {
     columns() {
       let tempColumns = [
         {
-          render: () => {
-            return (
-              <div class="line-header">
-                <span>{this.$t("ui.data.column.scheduleResult.baseInfo")}</span>
-              </div>
-            );
-          },
+          type: "title",
+          label: this.$t("ui.data.column.scheduleResult.baseInfo"),
         },
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
@@ -161,6 +168,12 @@ export default {
           span: 12,
         },
         {
+          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          prop: "materialDesc",
+          disabled: true,
+          span: 12,
+        },
+        {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
           type: "textarea",
@@ -168,24 +181,17 @@ export default {
           "show-word-limit": true,
         },
         {
-          render: () => {
-            return (
-              <div class="line-header">
-                <span>
-                  {this.$t("ui.data.column.scheduleResult.class11.lh")}
-                </span>
-              </div>
-            );
-          },
+          type: "title",
+          label: this.shiftBannerTitle(1),
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class1PlanQty"),
+          label: this.lhShiftInlineFieldLabel(1, "planQty"),
           prop: "class1PlanQty",
           disabled: this.isChangeQty ? this.plan1Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class1FinishQty.lh"),
+          label: this.lhShiftInlineFieldLabel(1, "finishQty"),
           prop: "class1FinishQty",
           disabled: true,
           span: 12,
@@ -227,31 +233,24 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class1Analysis.lh"),
+          label: this.lhShiftInlineFieldLabel(1, "analysis"),
           prop: "class1Analysis",
           type: "textarea",
           maxlength: 200,
           "show-word-limit": true,
         },
         {
-          render: () => {
-            return (
-              <div class="line-header">
-                <span>
-                  {this.$t("ui.data.column.scheduleResult.class22.lh")}
-                </span>
-              </div>
-            );
-          },
+          type: "title",
+          label: this.shiftBannerTitle(2),
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class2PlanQty"),
+          label: this.lhShiftInlineFieldLabel(2, "planQty"),
           prop: "class2PlanQty",
           disabled: this.isChangeQty ? this.plan2Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class2FinishQty"),
+          label: this.lhShiftInlineFieldLabel(2, "finishQty"),
           prop: "class2FinishQty",
           disabled: true,
           span: 12,
@@ -293,31 +292,24 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class2Analysis"),
+          label: this.lhShiftInlineFieldLabel(2, "analysis"),
           prop: "class2Analysis",
           type: "textarea",
           maxlength: 200,
           "show-word-limit": true,
         },
         {
-          render: () => {
-            return (
-              <div class="line-header">
-                <span>
-                  {this.$t("ui.data.column.scheduleResult.class33.lh")}
-                </span>
-              </div>
-            );
-          },
+          type: "title",
+          label: this.shiftBannerTitle(3),
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class3PlanQty"),
+          label: this.lhShiftInlineFieldLabel(3, "planQty"),
           prop: "class3PlanQty",
           disabled: this.isChangeQty ? this.plan2Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class3FinishQty"),
+          label: this.lhShiftInlineFieldLabel(3, "finishQty"),
           prop: "class3FinishQty",
           disabled: true,
           span: 12,
@@ -359,31 +351,24 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class3Analysis"),
+          label: this.lhShiftInlineFieldLabel(3, "analysis"),
           prop: "class3Analysis",
           type: "textarea",
           maxlength: 200,
           "show-word-limit": true,
         },
         {
-          render: () => {
-            return (
-              <div class="line-header">
-                <span>
-                  {this.$t("ui.data.column.scheduleResult.class44.lh")}
-                </span>
-              </div>
-            );
-          },
+          type: "title",
+          label: this.shiftBannerTitle(4),
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class4PlanQty"),
+          label: this.lhShiftInlineFieldLabel(4, "planQty"),
           prop: "class4PlanQty",
           disabled: this.isChangeQty ? this.plan4Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class4FinishQty"),
+          label: this.lhShiftInlineFieldLabel(4, "finishQty"),
           prop: "class4FinishQty",
           disabled: true,
           span: 12,
@@ -425,31 +410,24 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class4Analysis"),
+          label: this.lhShiftInlineFieldLabel(4, "analysis"),
           prop: "class4Analysis",
           type: "textarea",
           maxlength: 200,
           "show-word-limit": true,
         },
         {
-          render: () => {
-            return (
-              <div class="line-header">
-                <span>
-                  {this.$t("ui.data.column.scheduleResult.class55.lh")}
-                </span>
-              </div>
-            );
-          },
+          type: "title",
+          label: this.shiftBannerTitle(5),
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class5PlanQty"),
+          label: this.lhShiftInlineFieldLabel(5, "planQty"),
           prop: "class5PlanQty",
           disabled: this.isChangeQty ? this.plan5Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class5FinishQty"),
+          label: this.lhShiftInlineFieldLabel(5, "finishQty"),
           prop: "class5FinishQty",
           disabled: true,
           span: 12,
@@ -491,31 +469,24 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class5Analysis"),
+          label: this.lhShiftInlineFieldLabel(5, "analysis"),
           prop: "class5Analysis",
           type: "textarea",
           maxlength: 200,
           "show-word-limit": true,
         },
         {
-          render: () => {
-            return (
-              <div class="line-header">
-                <span>
-                  {this.$t("ui.data.column.scheduleResult.class66.lh")}
-                </span>
-              </div>
-            );
-          },
+          type: "title",
+          label: this.shiftBannerTitle(6),
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class6PlanQty"),
+          label: this.lhShiftInlineFieldLabel(6, "planQty"),
           prop: "class6PlanQty",
           disabled: this.isChangeQty ? this.plan5Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class6FinishQty"),
+          label: this.lhShiftInlineFieldLabel(6, "finishQty"),
           prop: "class6FinishQty",
           disabled: true,
           span: 12,
@@ -557,31 +528,24 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class6Analysis"),
+          label: this.lhShiftInlineFieldLabel(6, "analysis"),
           prop: "class6Analysis",
           type: "textarea",
           maxlength: 200,
           "show-word-limit": true,
         },
         {
-          render: () => {
-            return (
-              <div class="line-header">
-                <span>
-                  {this.$t("ui.data.column.scheduleResult.class77.lh")}
-                </span>
-              </div>
-            );
-          },
+          type: "title",
+          label: this.shiftBannerTitle(7),
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class7PlanQty"),
+          label: this.lhShiftInlineFieldLabel(7, "planQty"),
           prop: "class7PlanQty",
           disabled: this.isChangeQty ? this.plan5Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class7FinishQty"),
+          label: this.lhShiftInlineFieldLabel(7, "finishQty"),
           prop: "class7FinishQty",
           disabled: true,
           span: 12,
@@ -623,31 +587,24 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class7Analysis"),
+          label: this.lhShiftInlineFieldLabel(7, "analysis"),
           prop: "class7Analysis",
           type: "textarea",
           maxlength: 200,
           "show-word-limit": true,
         },
         {
-          render: () => {
-            return (
-              <div class="line-header">
-                <span>
-                  {this.$t("ui.data.column.scheduleResult.class88.lh")}
-                </span>
-              </div>
-            );
-          },
+          type: "title",
+          label: this.shiftBannerTitle(8),
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class8PlanQty"),
+          label: this.lhShiftInlineFieldLabel(8, "planQty"),
           prop: "class8PlanQty",
           disabled: this.isChangeQty ? this.plan5Disabled : true,
           span: 12,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class8FinishQty"),
+          label: this.lhShiftInlineFieldLabel(8, "finishQty"),
           prop: "class8FinishQty",
           disabled: true,
           span: 12,
@@ -689,7 +646,7 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.class8Analysis"),
+          label: this.lhShiftInlineFieldLabel(8, "analysis"),
           prop: "class8Analysis",
           type: "textarea",
           maxlength: 200,
@@ -701,6 +658,57 @@ export default {
     },
   },
   methods: {
+    /** class1～8 与列表同级：对应早/中/夜（无日期后缀） */
+    shiftPeriodShortKey(classIndex) {
+      const KEYS = [, "morningShift", "middleShift", "nightShift", "morningShift", "middleShift", "nightShift", "morningShift", "middleShift"];
+      return KEYS[classIndex];
+    },
+    shiftPeriodNameOnly(classIndex) {
+      return this.$t(`ui.data.column.scheduleResult.${this.shiftPeriodShortKey(classIndex)}`);
+    },
+    lhShiftInlineFieldLabel(classIndex, suffixKey) {
+      const shiftName = this.shiftPeriodNameOnly(classIndex);
+      const map = {
+        planQty: "ui.data.column.scheduleResult.lhDialogShiftPlanQty",
+        finishQty: "ui.data.column.scheduleResult.lhDialogShiftFinishQty",
+        analysis: "ui.data.column.scheduleResult.lhDialogShiftAnalysis",
+      };
+      return this.$t(map[suffixKey], { shift: shiftName });
+    },
+    /** 与列表页 curingSchedule/index 班次分组一致：早/中/夜 + listScheduleShiftDates 返回日期 */
+    shiftBannerTitle(classIndex) {
+      const i = classIndex - 1;
+      const dateStr = this.dateList[i]?.shiftDate ?? "";
+      const label = this.shiftPeriodNameOnly(classIndex);
+      return dateStr ? `${label} ${dateStr}` : label;
+    },
+    async fetchScheduleShiftDates(scheduleDate) {
+      const empty = [
+        { shift: 1, shiftDate: "" },
+        { shift: 2, shiftDate: "" },
+        { shift: 3, shiftDate: "" },
+        { shift: 4, shiftDate: "" },
+        { shift: 5, shiftDate: "" },
+        { shift: 6, shiftDate: "" },
+        { shift: 7, shiftDate: "" },
+        { shift: 8, shiftDate: "" },
+      ];
+      if (!scheduleDate) {
+        this.dateList = empty;
+        return;
+      }
+      try {
+        const res = await getScheduleDate({ scheduleDate });
+        if (Array.isArray(res) && res.length) {
+          this.dateList = res;
+        } else {
+          this.dateList = empty;
+        }
+      } catch (error) {
+        console.error(error);
+        this.dateList = empty;
+      }
+    },
     calcShiftIsEndFields(data) {
       const referenceQty = Math.max(data.mouldSurplusQty || 0, data.embryoStock || 0);
       for (let i = 1; i <= 8; i++) {
@@ -820,6 +828,7 @@ export default {
           class8FinishQty: data.class8FinishQty == null ? 0 : data.class8FinishQty,
         };
         this.calcShiftIsEndFields(data);
+        this.fetchScheduleShiftDates(data.scheduleDate);
 
         if (data.scheduleDate) {
           if (moment().isAfter(data.scheduleDate + " 19:00:00")) {
@@ -859,6 +868,16 @@ export default {
     },
     hide() {
       this.form = {};
+      this.dateList = [
+        { shift: 1, shiftDate: "" },
+        { shift: 2, shiftDate: "" },
+        { shift: 3, shiftDate: "" },
+        { shift: 4, shiftDate: "" },
+        { shift: 5, shiftDate: "" },
+        { shift: 6, shiftDate: "" },
+        { shift: 7, shiftDate: "" },
+        { shift: 8, shiftDate: "" },
+      ];
       this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;
@@ -883,12 +902,11 @@ export default {
   },
 };
 </script>
-<style scoped>
-.line-header {
-  border-bottom: 1px solid #dcdfe6;
-  padding-left: 15px;
-  padding-bottom: 15px;
-  margin-bottom: 15px;
-  font-size: 15px;
+<style scoped lang="scss">
+/** 对齐 moldingSchedule/changePlanDialog：可滚动内容区 */
+.curing-schedule-info-content {
+  width: 100%;
+  max-height: 70vh;
+  overflow: auto;
 }
 </style>
