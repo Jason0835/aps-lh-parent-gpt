@@ -2048,11 +2048,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return;
         }
 
-        // 调用 ScheduleServiceImpl 的 allocateStockByMaterialRatio 方法
-        // 注意：这里需要通过反射或者将逻辑提取到工具类中
-        // 暂时先创建一个简化版本
         Map<String, Integer> newMaterialStockMap = allocateStockByMaterialRatioSimple(
-                stocks, lhScheduleResults, dayShifts, scheduleDate, materialLhCapacityMap);
+                stocks, lhScheduleResults, dayShifts, scheduleDate, materialLhCapacityMap,
+                context.getMonthSurplusMap());
 
         // 更新 context
         context.setMaterialStockMap(newMaterialStockMap);
@@ -2062,13 +2060,16 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /**
      * 简化的按日硫化量比例分配库存方法
      * （从 ScheduleServiceImpl.allocateStockByMaterialRatio 复制而来）
+     *
+     * @param monthSurplusMap 月度硫化余量映射（硫化余量<=0的任务跳过分配）
      */
     private Map<String, Integer> allocateStockByMaterialRatioSimple(
             List<CxStock> stocks,
             List<LhScheduleResult> lhScheduleResults,
             List<CxShiftConfig> dayShifts,
             LocalDate scheduleDate,
-            Map<String, MonthPlanProductLhCapacityVo> materialLhCapacityMap) {
+            Map<String, MonthPlanProductLhCapacityVo> materialLhCapacityMap,
+            Map<String, MdmMonthSurplus> monthSurplusMap) {
 
         Map<String, Integer> materialStockMap = new HashMap<>();
 
@@ -2100,6 +2101,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 // 胎胚只对应一个硫化任务，直接分配全部库存
                 LhScheduleResult task = relatedTasks.get(0);
                 String taskKey = String.valueOf(task.getId());
+
+                // 检查硫化余量：如果已超产（<=0），跳过分配
+                if (isVulcanizeSurplusExhausted(task.getMaterialCode(), monthSurplusMap)) {
+                    log.debug("胎胚 {} 硫化任务 {} 硫化余量<=0，跳过库存分配", embryoCode, taskKey);
+                    continue;
+                }
+
                 materialStockMap.merge(taskKey, totalStock, Integer::sum);
                 log.debug("胎胚 {} 只对应硫化任务 {}，分配库存 {}", embryoCode, taskKey, totalStock);
             } else {
@@ -2110,6 +2118,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 for (LhScheduleResult lh : relatedTasks) {
                     String materialCode = lh.getMaterialCode();
                     int dayVulcanizationQty = 0;
+
+                    // 检查硫化余量：如果已超产（<=0），跳过分配
+                    if (isVulcanizeSurplusExhausted(materialCode, monthSurplusMap)) {
+                        log.debug("胎胚 {} 硫化任务 {} 物料 {} 硫化余量<=0，跳过库存分配",
+                                embryoCode, lh.getId(), materialCode);
+                        continue;
+                    }
 
                     // 优先用班次计划量来判断当前班次是否排产
                     ShiftPlanResultSimple shiftResult = getShiftPlanQtyWithShiftNameSimple(lh, dayShifts, scheduleDate);
@@ -2170,6 +2185,24 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         return materialStockMap;
+    }
+
+    /**
+     * 判断物料的硫化余量是否已耗尽（<=0）
+     *
+     * @param materialCode    物料编码
+     * @param monthSurplusMap 月度硫化余量映射
+     * @return true 表示硫化余量已耗尽，应跳过库存分配
+     */
+    private boolean isVulcanizeSurplusExhausted(String materialCode,
+                                                Map<String, MdmMonthSurplus> monthSurplusMap) {
+        if (materialCode == null || monthSurplusMap == null) {
+            return false;
+        }
+        MdmMonthSurplus monthSurplus = monthSurplusMap.get(materialCode);
+        return monthSurplus != null
+                && monthSurplus.getPlanSurplusQty() != null
+                && monthSurplus.getPlanSurplusQty().compareTo(BigDecimal.ZERO) <= 0;
     }
 
     /**
