@@ -69,7 +69,9 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     @Override
     public String[] getQueryFormulas() {
         return new String[]{
-                "lhMachineName->getcolvalue(T_LH_MACHINE_INFO, MACHINE_NAME, MACHINE_CODE, lhMachineCode)"
+                "lhMachineName->getcolvalue(T_LH_MACHINE_INFO, MACHINE_NAME, MACHINE_CODE, lhMachineCode)",
+                "beforeMaterialDesc->getcolvalue(T_MDM_MATERIAL_INFO, MATERIAL_DESC, MATERIAL_CODE, beforeMaterialCode)",
+                "afterMaterialDesc->getcolvalue(T_MDM_MATERIAL_INFO, MATERIAL_DESC, MATERIAL_CODE, afterMaterialCode)"
         };
     }
 
