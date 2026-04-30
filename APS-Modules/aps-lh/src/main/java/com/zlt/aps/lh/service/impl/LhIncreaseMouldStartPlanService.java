@@ -121,7 +121,7 @@ public class LhIncreaseMouldStartPlanService {
     private LhMouldChangePlan getCurrentMouldChangePlan(LhScheduleResult scheduleResult, String companyCode) {
         return mouldChangePlanMapper.selectOne(new LambdaQueryWrapper<LhMouldChangePlan>()
                 .eq(LhMouldChangePlan::getFactoryCode, scheduleResult.getFactoryCode())
-                .eq(LhMouldChangePlan::getScheduleDate, DateUtil.offsetDay(scheduleResult.getScheduleDate(), -1))
+                .eq(LhMouldChangePlan::getScheduleDate, scheduleResult.getScheduleDate())
                 .eq(LhMouldChangePlan::getLhMachineCode, scheduleResult.getLhMachineCode())
                 .eq(LhMouldChangePlan::getClassIndex, MIDDLE_SHIFT_CLASS_INDEX)
                 .eq(LhMouldChangePlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())

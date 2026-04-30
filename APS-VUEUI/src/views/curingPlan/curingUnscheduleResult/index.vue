@@ -21,6 +21,7 @@
 
 <script>
 import moment from "moment";
+import { listCuringUnscheduleResult } from "@/api/lh/lhUnscheduledResult";
 
 export default {
   name: "CuringUnscheduleResult",
@@ -57,52 +58,54 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.batchNo"),
+          label: this.$t("ui.data.column.lhUnscheduledResult.batchNo"),
           prop: "batchNo",
           width: 180,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
+          label: this.$t("ui.data.column.lhUnscheduledResult.scheduleDate"),
           prop: "scheduleDate",
           width: 160,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialCode"),
+          label: this.$t("ui.data.column.lhUnscheduledResult.materialCode"),
           prop: "materialCode",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          label: this.$t("ui.data.column.lhUnscheduledResult.materialDesc"),
           prop: "materialDesc",
           minWidth: 220,
           showOverflowTooltip: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.embryoDesc"),
+          label: this.$t("ui.data.column.lhUnscheduledResult.mainMaterialDesc"),
           prop: "mainMaterialDesc",
           minWidth: 220,
           showOverflowTooltip: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.specifications"),
-          prop: "specifications",
+          label: this.$t("ui.data.column.lhUnscheduledResult.specDesc"),
+          prop: "specDesc",
           minWidth: 180,
+          showOverflowTooltip: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.unscheduledPlanQty"),
-          prop: "unscheduledPlanQty",
+          label: this.$t("ui.data.column.lhUnscheduledResult.unscheduledQty"),
+          prop: "unscheduledQty",
           align: "right",
           minWidth: 120,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.unscheduledReason"),
+          label: this.$t("ui.data.column.lhUnscheduledResult.unscheduledReason"),
           prop: "unscheduledReason",
           minWidth: 220,
           showOverflowTooltip: true,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.updateTime"),
-          prop: "updateTime",
+          prop: "processedTime",
           minWidth: 160,
+          formatter: (row) => row.processedTime || row.updateTime,
         },
       ];
     },
@@ -116,7 +119,7 @@ export default {
           filterable: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
+          label: this.$t("ui.data.column.lhUnscheduledResult.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
           dateType: "date",
@@ -124,63 +127,21 @@ export default {
           clearable: false,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialCode"),
+          label: this.$t("ui.data.column.lhUnscheduledResult.materialCode"),
           prop: "materialCode",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          label: this.$t("ui.data.column.lhUnscheduledResult.materialDesc"),
           prop: "materialDesc",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.embryoDesc"),
+          label: this.$t("ui.data.column.lhUnscheduledResult.mainMaterialDesc"),
           prop: "mainMaterialDesc",
         },
       ];
     },
   },
   methods: {
-    getMockRows(scheduleDate) {
-      return [
-        {
-          factoryCode: "116",
-          batchNo: "LH20260430001",
-          scheduleDate,
-          materialCode: "MAT-0001",
-          materialDesc: "205/55R16 示例物料描述",
-          mainMaterialDesc: "胎胚A-示例",
-          specifications: "205/55R16",
-          unscheduledPlanQty: 120,
-          unscheduledReason: "机台负荷不足",
-          updateTime: "2026-04-30 15:00:00",
-        },
-        {
-          factoryCode: "116",
-          batchNo: "LH20260430001",
-          scheduleDate,
-          materialCode: "MAT-0002",
-          materialDesc: "225/45R17 示例物料描述",
-          mainMaterialDesc: "胎胚B-示例",
-          specifications: "225/45R17",
-          unscheduledPlanQty: 80,
-          unscheduledReason: "胎胚库存不足",
-          updateTime: "2026-04-30 15:00:00",
-        },
-      ];
-    },
-    queryMockList(params) {
-      const rows = this.getMockRows(params.scheduleDate).filter((item) => {
-        if (params.factoryCode && item.factoryCode !== params.factoryCode) return false;
-        if (params.scheduleDate && item.scheduleDate !== params.scheduleDate) return false;
-        if (params.materialCode && !item.materialCode.includes(params.materialCode)) return false;
-        if (params.materialDesc && !item.materialDesc.includes(params.materialDesc)) return false;
-        if (params.mainMaterialDesc && !item.mainMaterialDesc.includes(params.mainMaterialDesc)) return false;
-        return true;
-      });
-      return Promise.resolve({
-        rows,
-        total: rows.length,
-      });
-    },
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
@@ -213,8 +174,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        // 当前页面使用本地模拟数据，后续接口联调时替换为 API 调用。
-        const res = await this.queryMockList(this.formatParams());
+        const res = await listCuringUnscheduleResult(this.formatParams());
         this.data = res.rows || [];
         this.page.total = res.total || 0;
       } catch (error) {

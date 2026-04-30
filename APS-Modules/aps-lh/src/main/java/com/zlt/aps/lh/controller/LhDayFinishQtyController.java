@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -9,6 +10,7 @@ import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.service.ILhDayFinishQtyService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -120,6 +122,32 @@ public class LhDayFinishQtyController extends AbstractDocBizController<LhDayFini
     @PostMapping("/exportData")
     public List<LhDayFinishQty> exportDataList(@RequestBody LhDayFinishQty queryVO) {
         return lhDayFinishQtyService.selectList(queryVO);
+    }
+
+    /**
+     * 条件拼接
+     */
+    @Override
+    protected void builderCondition(QueryWrapper<LhDayFinishQty> queryWrapper, LhDayFinishQty queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("finishDate")), "FINISH_DATE", queryVO.getFieldValueByFieldName("finishDate"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("dayFinishQty")), "DAY_FINISH_QTY", queryVO.getFieldValueByFieldName("dayFinishQty"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("dataVersion")), "DATA_VERSION", queryVO.getFieldValueByFieldName("dataVersion"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("companyCode")), "COMPANY_CODE", queryVO.getFieldValueByFieldName("companyCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.exists(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), " SELECT 1 FROM T_MDM_MOULD_INFO WHERE" +
+                " T_MDM_MOULD_INFO.MATERIAL_CODE = T_LH_DAY_FINISH_QTY.MATERIAL_CODE AND MATERIAL_DESC = {0}", queryVO.getFieldValueByFieldName("materialDesc"));
+    }
+
+    /**
+     * 获取查询公式
+     */
+    @Override
+    public String[] getQueryFormulas() {
+        return new String[]{
+                "materialDesc->getcolvalue(T_MDM_MATERIAL_INFO, MATERIAL_DESC, MATERIAL_CODE, materialCode)",
+        };
     }
 
     @Override

@@ -148,15 +148,28 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
     @Override
     public List<CxScheduleDetailVo> listVoByQuery(ScheduleDetailQueryVo query) {
         QueryWrapper<CxScheduleResult> mainQuery = new QueryWrapper<>();
-        mainQuery.eq(query.getCxMachineCode() != null, "CX_MACHINE_CODE", query.getCxMachineCode());
-        mainQuery.eq(query.getCxMachineName() != null, "CX_MACHINE_NAME", query.getCxMachineName());
+        // 排程日期查询
         mainQuery.eq(query.getScheduleDate() != null, "SCHEDULE_DATE", query.getScheduleDate());
-        mainQuery.eq(query.getEmbryoCode() != null, "EMBRYO_CODE", query.getEmbryoCode());
-        mainQuery.eq(query.getMaterialCode() != null, "MATERIAL_CODE", query.getMaterialCode());
-        mainQuery.eq(query.getOrderNo() != null, "ORDER_NO", query.getOrderNo());
-        mainQuery.eq(query.getProductionStatus() != null, "PRODUCTION_STATUS", query.getProductionStatus());
-        mainQuery.eq(query.getIsRelease() != null, "IS_RELEASE", query.getIsRelease());
-        mainQuery.eq(query.getStructureName() != null, "STRUCTURE_NAME", query.getStructureName());
+        // 机台代码模糊查询
+        mainQuery.like(query.getCxMachineCode() != null && !query.getCxMachineCode().isEmpty(), "CX_MACHINE_CODE", query.getCxMachineCode());
+        // 物料代码模糊查询
+        mainQuery.like(query.getMaterialCode() != null && !query.getMaterialCode().isEmpty(), "MATERIAL_CODE", query.getMaterialCode());
+        // 物料描述模糊查询
+        mainQuery.like(query.getMaterialDesc() != null && !query.getMaterialDesc().isEmpty(), "MATERIAL_DESC", query.getMaterialDesc());
+        // 主要物料描述模糊查询
+        mainQuery.like(query.getMainMaterialDesc() != null && !query.getMainMaterialDesc().isEmpty(), "MAIN_MATERIAL_DESC", query.getMainMaterialDesc());
+        // 订单号精确查询
+        mainQuery.eq(query.getOrderNo() != null && !query.getOrderNo().isEmpty(), "ORDER_NO", query.getOrderNo());
+        // 生产状态精确查询
+        mainQuery.eq(query.getProductionStatus() != null && !query.getProductionStatus().isEmpty(), "PRODUCTION_STATUS", query.getProductionStatus());
+        // 发布状态精确查询
+        mainQuery.eq(query.getIsRelease() != null && !query.getIsRelease().isEmpty(), "IS_RELEASE", query.getIsRelease());
+        // 成型机台名称精确查询
+        mainQuery.eq(query.getCxMachineName() != null && !query.getCxMachineName().isEmpty(), "CX_MACHINE_NAME", query.getCxMachineName());
+        // 胎胚编码精确查询
+        mainQuery.eq(query.getEmbryoCode() != null && !query.getEmbryoCode().isEmpty(), "EMBRYO_CODE", query.getEmbryoCode());
+        // 结构名称精确查询
+        mainQuery.eq(query.getStructureName() != null && !query.getStructureName().isEmpty(), "STRUCTURE_NAME", query.getStructureName());
         mainQuery.orderByAsc("CX_MACHINE_CODE");
 
         List<CxScheduleResult> mainResults = cxScheduleResultMapper.selectList(mainQuery);
@@ -169,13 +182,13 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
                 .collect(Collectors.toList());
 
         List<CxScheduleDetail> details = list(new LambdaQueryWrapper<CxScheduleDetail>()
-                .in(CxScheduleDetail::getMainId, mainIds)
-                .orderByAsc(CxScheduleDetail::getClass1Sequence));
+                .in(CxScheduleDetail::getMainId, mainIds));
 
         Map<Long, CxScheduleResult> mainMap = mainResults.stream()
                 .collect(Collectors.toMap(CxScheduleResult::getId, r -> r));
 
-        return details.stream()
+        // 转换为VO并按成型机 + 胎胚 + 物料 + 车次排序
+        List<CxScheduleDetailVo> voList = details.stream()
                 .map(detail -> {
                     CxScheduleDetailVo vo = new CxScheduleDetailVo();
                     BeanUtils.copyProperties(detail, vo);
@@ -186,6 +199,31 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
                     return vo;
                 })
                 .collect(Collectors.toList());
+
+        // 按成型机 + 胎胚 + 物料 + 车次排序
+        voList.sort((a, b) -> {
+            // 1. 成型机代码升序
+            int machineCompare = compareStringAscending(a.getCxMachineCode(), b.getCxMachineCode());
+            if (machineCompare != 0) {
+                return machineCompare;
+            }
+            // 2. 胎胚编码升序
+            int embryoCompare = compareStringAscending(a.getEmbryoCode(), b.getEmbryoCode());
+            if (embryoCompare != 0) {
+                return embryoCompare;
+            }
+            // 3. 物料编码升序
+            int materialCompare = compareStringAscending(a.getMaterialCode(), b.getMaterialCode());
+            if (materialCompare != 0) {
+                return materialCompare;
+            }
+            // 4. 车次号升序（取第一个有车次号的班次）
+            String tripNoA = getFirstTripNo(a);
+            String tripNoB = getFirstTripNo(b);
+            return compareStringAscending(tripNoA, tripNoB);
+        });
+
+        return voList;
     }
 
     @Override
@@ -574,5 +612,37 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
         if (s1 == null) return 1;
         if (s2 == null) return -1;
         return s2.compareTo(s1); // 降序
+    }
+
+    /**
+     * 获取第一个有车次号的班次车次号
+     * 按班次顺序查找，返回第一个非空的车次号
+     */
+    private String getFirstTripNo(CxScheduleDetailVo vo) {
+        if (vo.getClass1TripNo() != null && !vo.getClass1TripNo().isEmpty()) {
+            return vo.getClass1TripNo();
+        }
+        if (vo.getClass2TripNo() != null && !vo.getClass2TripNo().isEmpty()) {
+            return vo.getClass2TripNo();
+        }
+        if (vo.getClass3TripNo() != null && !vo.getClass3TripNo().isEmpty()) {
+            return vo.getClass3TripNo();
+        }
+        if (vo.getClass4TripNo() != null && !vo.getClass4TripNo().isEmpty()) {
+            return vo.getClass4TripNo();
+        }
+        if (vo.getClass5TripNo() != null && !vo.getClass5TripNo().isEmpty()) {
+            return vo.getClass5TripNo();
+        }
+        if (vo.getClass6TripNo() != null && !vo.getClass6TripNo().isEmpty()) {
+            return vo.getClass6TripNo();
+        }
+        if (vo.getClass7TripNo() != null && !vo.getClass7TripNo().isEmpty()) {
+            return vo.getClass7TripNo();
+        }
+        if (vo.getClass8TripNo() != null && !vo.getClass8TripNo().isEmpty()) {
+            return vo.getClass8TripNo();
+        }
+        return null;
     }
 }
