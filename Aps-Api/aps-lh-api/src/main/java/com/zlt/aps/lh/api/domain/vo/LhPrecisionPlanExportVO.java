@@ -50,6 +50,11 @@ public class LhPrecisionPlanExportVO extends BaseEntity implements Serializable 
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date actualDate;
 
+    @Excel(name = "ui.data.column.lhPrecisionPlan.scheduleDate", dateFormat = "yyyy-MM-dd")
+    @ApiModelProperty(value = "计划排程精度日期")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private Date scheduleDate;
+
     @Excel(name = "ui.data.column.lhPrecisionPlan.daysToDue")
     @ApiModelProperty(value = "距离到期日剩余天数")
     private Integer daysToDue;

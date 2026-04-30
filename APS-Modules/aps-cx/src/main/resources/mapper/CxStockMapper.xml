@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.CxStockMapper">
+
+    <select id="selectByUniqueKeyList" resultType="com.zlt.aps.cx.api.domain.entity.CxStock">
+        SELECT
+            ID,
+            FACTORY_CODE,
+            STOCK_DATE,
+            EMBRYO_CODE,
+            DATA_SOURCE
+        FROM T_CX_STOCK
+        WHERE (FACTORY_CODE, STOCK_DATE, EMBRYO_CODE) IN
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.factoryCode}, #{item.stockDate}, #{item.embryoCode})
+        </foreach>
+    </select>
+
+    <delete id="deleteByFactoryCodeAndDataSource">
+        DELETE FROM T_CX_STOCK
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND DATA_SOURCE = #{dataSource}
+    </delete>
+
+    <select id="selectByFactoryCodeAndDataSource" resultType="com.zlt.aps.cx.api.domain.entity.CxStock">
+        SELECT
+            ID,
+            FACTORY_CODE,
+            STOCK_DATE,
+            EMBRYO_CODE,
+            DATA_SOURCE
+        FROM T_CX_STOCK
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND DATA_SOURCE = #{dataSource}
+    </select>
+
+</mapper>

@@ -63,6 +63,12 @@ public class LhPrecisionPlan extends BaseEntity implements Serializable {
     @TableField("ACTUAL_DATE")
     private Date actualDate;
 
+    @Excel(name = "ui.data.column.lhPrecisionPlan.scheduleDate", dateFormat = "yyyy-MM-dd")
+    @ApiModelProperty(value = "计划排程精度日期")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @TableField("SCHEDULE_DATE")
+    private Date scheduleDate;
+
     @Excel(name = "ui.data.column.lhPrecisionPlan.daysToDue")
     @ApiModelProperty(value = "距离到期日剩余天数")
     @TableField("DAYS_TO_DUE")

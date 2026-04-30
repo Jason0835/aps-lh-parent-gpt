@@ -12,6 +12,7 @@ import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.text.ParseException;
 import java.util.List;
@@ -327,4 +328,39 @@ public interface IMesItfService {
     @ApiOperation("查询出库未扫描订单")
     @PostMapping("/mesItf/getOutbountOrdersNotScan")
     public List<MdmOutbountOrdersNotScan> getOutbountOrdersNotScan(@RequestBody MdmOutbountOrdersNotScan outbountOrdersNotScan);
+
+    /**
+     * 同步MES硫化精度计划实际执行日期回填数据
+     *
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("同步MES硫化精度计划实际执行日期回填数据")
+    @PostMapping("/mesItf/syncLhPrecisionPlanActual")
+    public AjaxResult syncLhPrecisionPlanActual(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 下发硫化精度计划到MES
+     * 查询计划排程精度日期有值且实际执行日期为空的数据，下发到MES中间表
+     *
+     * @param factoryCode 分厂编码
+     * @return 下发结果
+     */
+    @ApiOperation("下发硫化精度计划到MES")
+    @PostMapping("/mesItf/issueLhPrecisionPlan")
+    public AjaxResult issueLhPrecisionPlan(@RequestParam("factoryCode") String factoryCode);
+
+    /**
+     * 同步MES数据并生成硫化精度计划（综合接口）
+     * 执行步骤：
+     * 1. 同步MES设备保养计划到APS
+     * 2. 同步MES硫化精度计划实际执行日期回填数据
+     * 3. 将回填MES实际执行日期的数据生成新的下一年度的硫化精度计划
+     *
+     * @param year 年度
+     * @return 执行结果
+     */
+    @ApiOperation("同步MES数据并生成硫化精度计划（综合接口）")
+    @PostMapping("/mesItf/syncAndGenerateLhPrecisionPlan")
+    public AjaxResult syncAndGenerateLhPrecisionPlan(@RequestParam("year") Integer year);
 }
