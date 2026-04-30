@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.text.ParseException;
@@ -632,5 +633,33 @@ public class MesItfController {
             outbountOrdersNotScan.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
         return mesItfService.getOutbountOrdersNotScan(outbountOrdersNotScan);
+    }
+
+    @ApiOperation("同步MES硫化精度计划实际执行日期回填数据")
+    @PostMapping("/syncLhPrecisionPlanActual")
+    public AjaxResult syncLhPrecisionPlanActual(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncLhPrecisionPlanActual(syncDataLogs);
+    }
+
+    @ApiOperation("下发硫化精度计划到MES")
+    @PostMapping("/issueLhPrecisionPlan")
+    public AjaxResult issueLhPrecisionPlan(@RequestParam("factoryCode") String factoryCode) {
+        if (StringUtils.isBlank(factoryCode)) {
+            factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+        }
+        return mesItfService.issueLhPrecisionPlan(factoryCode);
+    }
+
+    @ApiOperation("同步MES数据并生成硫化精度计划（综合接口）")
+    @PostMapping("/syncAndGenerateLhPrecisionPlan")
+    public AjaxResult syncAndGenerateLhPrecisionPlan(@RequestParam("year") Integer year) {
+        if (year == null) {
+            year = java.time.LocalDate.now().getYear();
+        }
+        return mesItfService.syncAndGenerateLhPrecisionPlan(year);
     }
 }

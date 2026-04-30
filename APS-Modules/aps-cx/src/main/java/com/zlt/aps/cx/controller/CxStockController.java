@@ -68,6 +68,7 @@ public class CxStockController extends AbstractDocBizController<CxStock> {
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody CxStock entity) {
+        entity.setDataSource("MANUAL");
         return super.save(entity);
     }
 
@@ -160,6 +161,8 @@ public class CxStockController extends AbstractDocBizController<CxStock> {
 		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
 		// 是否收尾SKU精确查询
 		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getIsEndingSku()), "IS_ENDING_SKU", queryVO.getIsEndingSku());
+		// 数据来源精确查询
+		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getDataSource()), "DATA_SOURCE", queryVO.getDataSource());
 		// 其他数字字段精确查询
 		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getStockNum()), "STOCK_NUM", queryVO.getStockNum());
 		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getOverTimeStock()), "OVER_TIME_STOCK", queryVO.getOverTimeStock());

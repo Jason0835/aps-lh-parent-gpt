@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.PrecisionPlanIssueMapper">
+
+    <insert id="batchInsertPrecisionPlan" parameterType="list">
+        INSERT INTO MES_PRECISION_PLAN (
+            ID, MACHINE_CODE, PRECISION_TYPE, SCHEDULE_DATE, PLAN_DATE,
+            DATA_VERSION, COMPANY_CODE, FACTORY_CODE
+        )
+        SELECT * FROM (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT
+            #{item.id} AS ID,
+            #{item.machineCode} AS MACHINE_CODE,
+            #{item.precisionType} AS PRECISION_TYPE,
+            #{item.scheduleDate} AS SCHEDULE_DATE,
+            #{item.planDate} AS PLAN_DATE,
+            #{item.dataVersion} AS DATA_VERSION,
+            #{item.companyCode} AS COMPANY_CODE,
+            #{item.factoryCode} AS FACTORY_CODE
+        </foreach>
+        ) AS t
+        WHERE NOT EXISTS (
+            SELECT 1 FROM MES_PRECISION_PLAN
+            WHERE MACHINE_CODE = t.MACHINE_CODE
+              AND PRECISION_TYPE = t.PRECISION_TYPE
+              AND FACTORY_CODE = t.FACTORY_CODE
+              AND DATA_VERSION = t.DATA_VERSION
+        )
+    </insert>
+
+    <update id="updateByMachineCodeAndPrecisionType" parameterType="com.zlt.aps.itf.vo.MesPrecisionPlan">
+        UPDATE MES_PRECISION_PLAN SET
+            SCHEDULE_DATE = #{scheduleDate},
+            PLAN_DATE = #{planDate},
+            DATA_VERSION = #{dataVersion}
+        WHERE MACHINE_CODE = #{machineCode}
+          AND PRECISION_TYPE = #{precisionType}
+          AND FACTORY_CODE = #{factoryCode}
+    </update>
+
+    <delete id="deleteByFactoryCodeAndPrecisionType">
+        DELETE FROM MES_PRECISION_PLAN
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND PRECISION_TYPE = #{precisionType}
+          AND DATA_VERSION = #{dataVersion}
+    </delete>
+
+</mapper>

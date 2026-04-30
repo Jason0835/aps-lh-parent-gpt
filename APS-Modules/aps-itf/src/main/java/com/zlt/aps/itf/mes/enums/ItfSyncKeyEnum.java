@@ -83,6 +83,16 @@ public enum ItfSyncKeyEnum {
      * 模具交替计划完成回报
      */
     MOLD_ALTER_PLAN_FINISH("MOLD_ALTER_PLAN_FINISH", "MES", "APS", "模具交替计划完成回报"),
+
+    /**
+     * 精度计划下发（成型精度和硫化精度统一）
+     */
+    SYNC_PRECISION_PLAN("PRECISION_PLAN_ISSUE", "APS", "MES", "精度计划下发接口"),
+
+    /**
+     * 硫化精度计划实际执行日期回填
+     */
+    LH_PRECISION_PLAN_ACTUAL("LH_PRECISION_PLAN_ACTUAL", "MES", "APS", "硫化精度计划实际执行日期回填"),
     ;
 	/**
 	 * 接口码

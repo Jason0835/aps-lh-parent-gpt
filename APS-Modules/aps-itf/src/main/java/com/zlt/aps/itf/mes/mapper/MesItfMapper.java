@@ -179,4 +179,13 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<LhMoldAlterPlanFinish> selectMoldAlterPlanFinishList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询MES设备保养计划中硫化精度实际执行日期回填数据
+     * 从DEV_MAINTENANCE_PLAN表获取FIRST_WASH_TIME不为空的硫化精度记录
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<DevMaintenancePlan> selectLhPrecisionPlanActualList(AuxReqSyncDataLogs syncDataLogs);
 }

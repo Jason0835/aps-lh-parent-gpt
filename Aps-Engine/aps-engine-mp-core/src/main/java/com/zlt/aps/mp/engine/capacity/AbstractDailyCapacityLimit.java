@@ -753,6 +753,17 @@ public abstract class AbstractDailyCapacityLimit {
     }
 
     /**
+     * 检查产能是否满足
+     * @param dailyCapacityLimitVo 日产能限制
+     * @return true-满足，false-不满足
+     */
+    public boolean checkCapacitySatisfyNoMouldChange(MpDailyCapacityLimitVo dailyCapacityLimitVo){
+        int maxLhMachines = dailyCapacityLimitVo.getRemainLhMachines() > dailyCapacityLimitVo.getMaxLhMachines() ? dailyCapacityLimitVo.getMaxLhMachines() : dailyCapacityLimitVo.getRemainLhMachines();
+        return dailyCapacityLimitVo.getUsedEmbryoTypes() <= dailyCapacityLimitVo.getMaxEmbryoTypes() &&
+                dailyCapacityLimitVo.getUsedLhMachines() <= maxLhMachines;
+    }
+
+    /**
      * 预检产能是否满足,
      * @param dailyCapacityLimitVo 日产能限制
      * @return true-满足，false-不满足

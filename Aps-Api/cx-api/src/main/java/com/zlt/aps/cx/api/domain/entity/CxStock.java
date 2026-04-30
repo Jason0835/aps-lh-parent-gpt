@@ -96,6 +96,12 @@ public class CxStock extends BaseEntity {
     @TableField(value = "IS_ENDING_SKU")
     private String isEndingSku;
 
+    /** 数据来源：MES-MES同步，MANUAL-手动录入 */
+    @Excel(name = "ui.data.column.cxStock.dataSource", dictType = "lh_precision_data_source")
+    @ApiModelProperty(value = "数据来源：MES-MES同步，MANUAL-手动录入", name = "dataSource")
+    @TableField(value = "DATA_SOURCE")
+    private String dataSource;
+
     // ============== 非数据库字段（用于业务计算） ==============
 
     /**

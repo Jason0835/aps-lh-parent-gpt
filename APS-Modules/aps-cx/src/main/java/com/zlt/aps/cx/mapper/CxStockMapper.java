@@ -1,11 +1,9 @@
 package com.zlt.aps.cx.mapper;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -15,23 +13,31 @@ import java.util.List;
  * @author APS Team
  */
 @Mapper
-public interface CxStockMapper extends BaseMapper<CxStock> {
+public interface CxStockMapper extends CommBaseMapper<CxStock> {
 
-//    /**
-//     * 查询所有库存
-//     */
-//    @Select("SELECT * FROM T_CX_STOCK ORDER BY MATERIAL_CODE")
-//    List<CxStock> selectAll();
-//
-//    /**
-//     * 根据物料编码查询库存
-//     */
-//    @Select("SELECT * FROM T_CX_STOCK WHERE MATERIAL_CODE = #{materialCode}")
-//    CxStock selectByMaterialCode(@Param("materialCode") String materialCode);
-//
-//    /**
-//     * 更新库存数量
-//     */
-//    @Update("UPDATE T_CX_STOCK SET CURRENT_STOCK = #{currentStock}, UPDATE_TIME = NOW() WHERE MATERIAL_CODE = #{materialCode}")
-//    int updateStock(@Param("materialCode") String materialCode, @Param("currentStock") Integer currentStock);
+    /**
+     * 根据唯一键查询已存在的数据
+     *
+     * @param list 唯一键列表
+     * @return 已存在的数据
+     */
+    List<CxStock> selectByUniqueKeyList(@Param("list") List<CxStock> list);
+
+    /**
+     * 根据分厂编号和数据来源删除成型库存
+     *
+     * @param factoryCode 分厂编号
+     * @param dataSource  数据来源
+     * @return 删除的记录数
+     */
+    int deleteByFactoryCodeAndDataSource(@Param("factoryCode") String factoryCode, @Param("dataSource") String dataSource);
+
+    /**
+     * 根据分厂编号和数据来源查询成型库存ID列表
+     *
+     * @param factoryCode 分厂编号
+     * @param dataSource  数据来源
+     * @return 库存列表（仅含ID和唯一键）
+     */
+    List<CxStock> selectByFactoryCodeAndDataSource(@Param("factoryCode") String factoryCode, @Param("dataSource") String dataSource);
 }

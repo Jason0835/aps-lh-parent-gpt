@@ -886,34 +886,29 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 contextDTO.getMpMonth(), contextDTO.getVersion(), contextDTO.getProductionVersion(),
                 contextDTO.getStructureName(), contextDTO.getScheduledMachines(), contextDTO.getStartDay(),
                 contextDTO.getEndDay(), contextDTO.getAdjustStartDay(), contextDTO.getAdjustEndDay());
-        try {
-            // 1、查询周程调整结果
-            queryAdjustResult(contextDTO);
-            // 根据优先级顺序分配生产数量
-            allocateProductionByPriority(contextDTO);
-            // 2、查询调整明细
-            queryAdjustDetailList(contextDTO);
-            // 3、查询月度生产计划
-            queryMonthPlanList(contextDTO);
-            // 4、更新试制量制计划
-            updateTrialPlanList(contextDTO);
-            // 5、更新调整明细
-            updateAdjustDetailList(contextDTO);
-            // 6、更新月度生产计划
-            updateMonthPlanList(contextDTO);
-            // 7、新增月度生产计划
-            insertMonthPlanList(contextDTO);
-            // 8、更新结构转产
-            updateStructureAllocationList(contextDTO);
-            // 9、处理月计划统计结果
-            handleMonthPlanStatistics(contextDTO);
-            // 10、发布月计划调整确认事件，异步推送SCM和MES
-            publishMonthPlanAdjustedEvent(contextDTO);
-            log.info("周程调整确认流程执行完成");
-        } catch (Exception e) {
-            log.error("周程调整确认流程执行异常", e);
-            throw new BusinessException("周程调整确认失败：" + e.getMessage());
-        }
+        // 1、查询周程调整结果
+        queryAdjustResult(contextDTO);
+        // 根据优先级顺序分配生产数量
+        allocateProductionByPriority(contextDTO);
+        // 2、查询调整明细
+        queryAdjustDetailList(contextDTO);
+        // 3、查询月度生产计划
+        queryMonthPlanList(contextDTO);
+        // 4、更新试制量制计划
+        updateTrialPlanList(contextDTO);
+        // 5、更新调整明细
+        updateAdjustDetailList(contextDTO);
+        // 6、更新月度生产计划
+        updateMonthPlanList(contextDTO);
+        // 7、新增月度生产计划
+        insertMonthPlanList(contextDTO);
+        // 8、更新结构转产
+        updateStructureAllocationList(contextDTO);
+        // 9、处理月计划统计结果
+        handleMonthPlanStatistics(contextDTO);
+        // 10、发布月计划调整确认事件，异步推送SCM和MES
+        publishMonthPlanAdjustedEvent(contextDTO);
+        log.info("周程调整确认流程执行完成");
     }
 
     /**
@@ -1101,6 +1096,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             productType = monthPlan.getProductTypeCode();
         }
 
+        contextDTO.setLogDetail(new StringBuilder());
         // 设置周程滚动参数
         contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), productType));
         // 设置工作日历
@@ -1207,7 +1203,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 获取当日型腔数量（主花纹模具相关校验使用，型腔/2 为机台数）
             int cavityQty = weekRollAdjustEngine.getNewCavityQty(contextDTO, mpFinalVo, m);
             // 检查：当前每日硫化机台数、当前每日胎胚种类数 符合性
-            if (!adjustDailyCapacityLimitObj.checkCapacitySatisfy(dailyCapacityLimitVoMap.get(m))) {
+            if (!adjustDailyCapacityLimitObj.checkCapacitySatisfyNoMouldChange(dailyCapacityLimitVoMap.get(m))) {
                 errorSb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.checkCapacitySatisfy"),
                         mpFinalVo.getMaterialCode(),m)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
                 break;
@@ -1219,11 +1215,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 break;
             }
             // 检查总产能限制（允许上下波动）
-            if (!weekRollAdjustEngine.checkTotalCapacityLimit(contextDTO, m, mpFinalVo, dailyCapacityLimitVoMap.get(m), targetMonthPlanList)) {
+            /*if (!weekRollAdjustEngine.checkTotalCapacityLimit(contextDTO, m, mpFinalVo, dailyCapacityLimitVoMap.get(m), targetMonthPlanList)) {
                 errorSb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.checkTotalCapacityLimit"),
                         mpFinalVo.getMaterialCode(),m)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
                 break;
-            }
+            }*/
         }
     }
 
@@ -2546,7 +2542,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
         try {
             List<MpAdjustResult> resultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
-
+            Set<String> structureNameSet = resultList.stream().map(x->x.getStructureName()).collect(Collectors.toSet());
+            if (structureNameSet != null && structureNameSet.size() == 1){
+                //若调整结果只有一个结果，直接设置为当前结构
+                contextDTO.setStructureName(structureNameSet.iterator().next());
+            }
             contextDTO.setAdjustResultList(resultList);
         } catch (Exception e) {
             log.error("查询周程调整结果异常，年份：{}，月份：{}，版本：{}", year, month, version, e);

@@ -81,6 +81,9 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
         for (MpAdjustResult adjustResult: mpAdjustResultList) {
             //记录主花纹的最大型腔数
             Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(adjustResult.getMainPattern(), 0);
+            if (adjustResult == null || adjustResult.getMainPattern() == null){
+                continue;
+            }
             maxMouldCavityQtyMap.put(adjustResult.getMainPattern(), Math.max(maxMouldCavityQty, adjustResult.getMouldCavityQty()));
         }
         mpAdjustResultList.stream().forEach(s -> { // 设置对应的最大型腔数和最大活块数
@@ -218,6 +221,8 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
      */
     @Override
     protected void builderCondition(QueryWrapper<MpAdjustResult> queryWrapper, MpAdjustResult queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustType")), "ADJUST_TYPE", queryVO.getFieldValueByFieldName("adjustType"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("cxMachineCode")), "CX_MACHINE_CODE", queryVO.getFieldValueByFieldName("cxMachineCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
