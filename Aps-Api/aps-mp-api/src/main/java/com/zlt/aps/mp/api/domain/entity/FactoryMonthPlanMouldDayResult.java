@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.google.common.collect.Lists;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.mp.api.constants.MonthPlanConstants;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -37,27 +38,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     private static final long serialVersionUID = 1L;
     // 正常需求计划
     private static final String NORMAL_PLAN_TYPE = "01";
-    /**
-     * 销售优先级：1-高优先级；
-     */
-    public static final String SAL_PRIORITY_HIGHT = "1";
-    /**
-     * 供应链订单类型：2-高优先级；
-     */
-    public static final String SAL_PRIORITY_CYCLE_STOCK_UP = "2";
 
-    /**
-     * 销售优先级：3-中优先级；
-     */
-    public static final String SAL_PRIORITY_MID = "3";
-    /**
-     * 供应链订单类型：4-常规储备；
-     */
-    public static final String SAL_PRIORITY_PRECEDENT_STOCK_UP = "4";
-    /**
-     *  销售优先级：5-暂缓订单
-     */
-    public static final String SAL_PRIORITY_POSTPONE = "5";
 
     /**
      * 工厂编号
@@ -793,44 +774,44 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
         if (this.heightLossQty != null && this.heightLossQty > 0) {
             this.heightProductionQty = Math.min(remainingQty, this.heightLossQty);
             remainingQty -= this.heightProductionQty;
-            scmPriorities.add(SAL_PRIORITY_HIGHT);
+            scmPriorities.add(MonthPlanConstants.SAL_PRIORITY_HIGHT);
         }
         // 2. 分配中优先级
         if (remainingQty > 0 && this.midLossQty != null && this.midLossQty > 0) {
             this.midProductionQty = Math.min(remainingQty, this.midLossQty);
             remainingQty -= this.midProductionQty;
-            scmPriorities.add(SAL_PRIORITY_MID);
+            scmPriorities.add(MonthPlanConstants.SAL_PRIORITY_MID);
         }
 
         // 3. 分配周期储备
         if (remainingQty > 0 && this.cycleReserveLossQty != null && this.cycleReserveLossQty > 0) {
             this.cycleProductionQty = Math.min(remainingQty, this.cycleReserveLossQty);
             remainingQty -= this.cycleProductionQty;
-            scmPriorities.add(SAL_PRIORITY_CYCLE_STOCK_UP);
+            scmPriorities.add(MonthPlanConstants.SAL_PRIORITY_CYCLE_STOCK_UP);
         }
 
 
         // 4. 分配暂缓优先级
         if (!NORMAL_PLAN_TYPE.equals(this.planType)  &&   remainingQty > 0 && this.postponeQty != null && this.postponeQty > 0) {
             this.postponeProductionQty = Math.min(remainingQty, this.postponeQty);
-            remainingQty -= this.postponeQty;
-            scmPriorities.add(SAL_PRIORITY_POSTPONE);
+            remainingQty -= this.postponeProductionQty;
+            scmPriorities.add(MonthPlanConstants.SAL_PRIORITY_POSTPONE);
         }
         // 如果设置了conventionReserveQty，则不超过该值
         if (remainingQty > 0 && this.conventionReserveQty != null && this.conventionReserveQty > 0) {
             this.conventionProductionQty = Math.min(remainingQty, this.conventionReserveQty);
             remainingQty -= this.conventionProductionQty;
-            scmPriorities.add(SAL_PRIORITY_PRECEDENT_STOCK_UP);
+            scmPriorities.add(MonthPlanConstants.SAL_PRIORITY_PRECEDENT_STOCK_UP);
         }
         if(remainingQty > 0 && !CollectionUtils.isEmpty(scmPriorities)) {
             String  scmPriority = scmPriorities.get(scmPriorities.size() - 1);
-            if(SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(scmPriority)) {
+            if(MonthPlanConstants.SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(scmPriority)) {
                 this.conventionProductionQty = (this.conventionProductionQty==null?0:this.conventionProductionQty) + remainingQty;
-            }else if(SAL_PRIORITY_POSTPONE.equals(scmPriority)) {
+            }else if(MonthPlanConstants.SAL_PRIORITY_POSTPONE.equals(scmPriority)) {
                 this.postponeProductionQty = this.postponeProductionQty + remainingQty;
-            }else if(SAL_PRIORITY_MID.equals(scmPriority)) {
+            }else if(MonthPlanConstants.SAL_PRIORITY_MID.equals(scmPriority)) {
                 this.midProductionQty = this.midProductionQty + remainingQty;
-            }else if(SAL_PRIORITY_CYCLE_STOCK_UP.equals(scmPriority)) {
+            }else if(MonthPlanConstants.SAL_PRIORITY_CYCLE_STOCK_UP.equals(scmPriority)) {
                 this.cycleProductionQty = this.cycleProductionQty + remainingQty;
             }else{
                 this.heightProductionQty = this.heightProductionQty + remainingQty;

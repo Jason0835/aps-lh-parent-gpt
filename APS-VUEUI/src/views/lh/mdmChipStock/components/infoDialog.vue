@@ -1,0 +1,231 @@
+<template>
+  <el-dialog
+    :title="title"
+    :visible="visible"
+    width="600px"
+    @close="hide"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :append-to-body="true"
+  >
+    <info-form
+      class="form-item-height"
+      ref="form"
+      :form="form"
+      :rules="rules"
+      :columns="columns"
+      label-position="right"
+      label-width="120px"
+      v-loading="loading"
+    >
+    </info-form>
+    <template slot="footer">
+      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
+      <el-button type="primary" :loading="loading" @click="handleConfirm">{{
+        this.$t("common.button.confirm")
+      }}</el-button>
+    </template>
+  </el-dialog>
+</template>
+
+<script>
+import {
+  checkLhChipStockUnique,
+  editLhChipStock,
+  mergeLhChipStock,
+} from "@/api/lh/lhChipStock";
+
+import infoForm from "@/views/components/infoForm.vue";
+
+export default {
+  components: { infoForm },
+  inject: ["parentDict"],
+  data() {
+    return {
+      loading: false,
+      visible: false,
+      isEdit: false,
+      form: {},
+      rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        chipCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+        ],
+        stockNum: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+          {
+            validator: (rule, value, callback) => {
+              if (value === undefined || value === null || value === "") {
+                callback(new Error(this.$t("common.rule.input")));
+              } else if (!/^\d{1,10}$/.test(String(value))) {
+                callback(new Error("库存量必须为非负整数，且最多10位"));
+              } else {
+                callback();
+              }
+            },
+            trigger: "blur",
+          },
+        ],
+      },
+    };
+  },
+  computed: {
+    title: function () {
+      return this.isEdit
+        ? this.$t("common.button.edit")
+        : this.$t("common.button.add");
+    },
+    columns() {
+      return [
+        {
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.lhChipStock.factoryCode"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
+          prop: "chipCode",
+          label: this.$t("ui.data.column.lhChipStock.chipCode"),
+          maxlength: 32,
+        },
+        {
+          prop: "stockNum",
+          label: this.$t("ui.data.column.lhChipStock.stockNum"),
+          type: "number",
+          min: 0,
+          precision: 0,
+        },
+        {
+          prop: "finishQty",
+          label: this.$t("ui.data.column.lhChipStock.finishQty"),
+          type: "number",
+          disabled: true,
+        },
+        {
+          prop: "remainStockNum",
+          label: this.$t("ui.data.column.lhChipStock.remainStockNum"),
+          type: "number",
+          disabled: true,
+        },
+        {
+          prop: "remark",
+          label: this.$t("ui.data.column.lhChipStock.remark"),
+          type: "textarea",
+          rows: 3,
+          maxlength: 500,
+        },
+      ];
+    },
+  },
+  watch: {
+    "form.stockNum"() {
+      this.calcRemainStockNum();
+    },
+    "form.finishQty"() {
+      this.calcRemainStockNum();
+    },
+  },
+  methods: {
+    calcRemainStockNum() {
+      const stockNum = Number(this.form.stockNum || 0);
+      const finishQty = Number(this.form.finishQty || 0);
+      this.$set(this.form, "remainStockNum", stockNum - finishQty);
+    },
+    // api
+    async save(params) {
+      try {
+        this.loading = true;
+
+        if (this.isEdit) {
+          params.finishQty = null;
+        }
+
+        const res = await editLhChipStock(params);
+        this.$modal.msgSuccess(res.msg);
+        this.$emit("success");
+        this.hide();
+      } catch (error) {
+        console.log(error);
+      } finally {
+        this.loading = false;
+      }
+    },
+    async merge(params) {
+      try {
+        this.loading = true;
+
+        const res = await mergeLhChipStock(params);
+        this.$modal.msgSuccess(res.msg);
+        this.$emit("success");
+        this.hide();
+      } catch (error) {
+        console.log(error);
+      } finally {
+        this.loading = false;
+      }
+    },
+    async checkUniqueAndSave(params) {
+      try {
+        const res = await checkLhChipStockUnique(params);
+        if (res === 0) {
+          await this.save(params);
+        } else {
+          await this.$confirm(this.$t("lhChipStock.chipCodeExistsConfirmMerge"), {
+            type: "warning",
+            confirmButtonText: this.$t("common.button.confirm"),
+            cancelButtonText: this.$t("common.button.cancel"),
+          });
+          await this.merge(params);
+        }
+      } catch (error) {
+        // ignore confirm cancel/close
+        if (error !== "cancel" && error !== "close") {
+          console.log(error);
+        }
+      }
+    },
+
+    // utils
+    show(data) {
+      this.visible = true;
+      if (data) {
+        this.isEdit = true;
+        this.form = { ...data };
+      } else {
+        this.isEdit = false;
+        this.form = {
+          factoryCode: "116",
+          id: undefined,
+          finishQty: 0,
+        };
+      }
+      this.calcRemainStockNum();
+    },
+    hide() {
+      this.form = {};
+      this.$refs.form && this.$refs.form.triggerResetForm();
+      this.isEdit = false;
+      this.visible = false;
+    },
+    handleConfirm() {
+      const callback = this.isEdit ? this.save : this.checkUniqueAndSave;
+      this.$refs.form.triggerConfirm(callback);
+    },
+  },
+};
+</script>

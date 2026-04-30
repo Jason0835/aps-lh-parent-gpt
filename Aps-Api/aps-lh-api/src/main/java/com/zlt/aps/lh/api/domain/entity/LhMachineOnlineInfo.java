@@ -38,17 +38,17 @@ public class LhMachineOnlineInfo extends BaseEntity implements Serializable {
     @TableField(value = "LH_CODE")
     private String lhCode;
 
-    @ApiModelProperty(value = "在机物料编码（NC）", name = "materialCode")
+    @ApiModelProperty(value = "物料编码", name = "materialCode")
     @Excel(name = "ui.data.column.lhMachineOnlineInfo.materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
-    @ApiModelProperty(value = "在机物料编码（MES）", name = "mesMaterialCode")
+    @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @Excel(name = "ui.data.column.lhMachineOnlineInfo.mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
 
-    @ApiModelProperty(value = "在机物料描述", name = "specDesc")
+    @ApiModelProperty(value = "物料描述", name = "specDesc")
     @Excel(name = "ui.data.column.lhMachineOnlineInfo.specDesc")
     @TableField(value = "SPEC_DESC")
     private String specDesc;

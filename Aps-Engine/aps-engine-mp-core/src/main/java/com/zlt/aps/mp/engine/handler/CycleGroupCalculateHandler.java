@@ -144,40 +144,8 @@ public class CycleGroupCalculateHandler {
         if (null == sumActualQuantity) {
             return BigDecimal.ZERO.intValue();
         }
-
-//        if (CollectionUtils.isEmpty(allSkuPlanList) || StringUtils.isBlank(materialDesc)) {
-//            return BigDecimal.ZERO.intValue();
-//        }
-//        List<MonthPlanProductionRequirePlanVo> skuPlanList = allSkuPlanList.stream().filter(single -> {
-//            if (YesOrNoEnum.NO.getCode().equals(single.getIsProduction())) {
-//                return false;
-//            }
-//            if (!materialDesc.equals(single.getMaterialDesc())) {
-//                return false;
-//            }
-//            return true;
-//        }).collect(Collectors.toList());
-//        if (CollectionUtils.isEmpty(skuPlanList)) {
-//            return BigDecimal.ZERO.intValue();
-//        }
-//        if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
-//            return BigDecimal.ZERO.intValue();
-//        }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         String isWriteLog = Optional.ofNullable(productionContext.getBaseDataContainer().getParamConfiguration().getIsWriteCycleLog()).orElse("N");
-//        //实单量 奇数+3 偶数+2
-//        Integer minQty = skuPlanList.get(BigDecimal.ZERO.intValue()).getMinProductionQty();
-//        Integer sumActualQuantity = skuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getActualQuantity).sum();
-//        if (sumActualQuantity > BigDecimal.ZERO.intValue()) {
-//            if ((sumActualQuantity & BigDecimal.ONE.intValue()) != BigDecimal.ZERO.intValue()) {
-//                sumActualQuantity = sumActualQuantity + ProductionConstant.ADD_LOSS_QTY_ODD_NUMBER;
-//            } else {
-//                sumActualQuantity = sumActualQuantity + ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER;
-//            }
-//        }
-//        if (sumActualQuantity < minQty) {
-//            sumActualQuantity = minQty;
-//        }
         String groupName = allSkuPlanList.get(BigDecimal.ZERO.intValue()).getStructureName();
         Map<Integer, Integer> dayProductionQtyMap = new HashMap<>();
         dayProductionLimitInfo.forEach((productionDay, dayLimitInfo) -> {

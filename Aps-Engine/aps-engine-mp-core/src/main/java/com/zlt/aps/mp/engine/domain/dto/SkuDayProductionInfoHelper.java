@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Sku日排产信息对象
+ * Sku日双模排产信息对象
  * 用以辅助判断 收尾时间点等信息
  *
  * @author ZLT

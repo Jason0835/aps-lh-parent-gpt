@@ -238,6 +238,24 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
+     * 判断物料的硫化余量是否已耗尽（<=0）
+     *
+     * @param materialCode    物料编码
+     * @param monthSurplusMap 月度硫化余量映射
+     * @return true 表示硫化余量已耗尽，应跳过库存分配
+     */
+    private boolean isVulcanizeSurplusExhausted(String materialCode,
+                                                Map<String, MdmMonthSurplus> monthSurplusMap) {
+        if (materialCode == null || monthSurplusMap == null) {
+            return false;
+        }
+        MdmMonthSurplus monthSurplus = monthSurplusMap.get(materialCode);
+        return monthSurplus != null
+                && monthSurplus.getPlanSurplusQty() != null
+                && monthSurplus.getPlanSurplusQty().compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    /**
      * 加载精度计划
      *
      * <p>查询条件：planDate < 当前班次所在日期 - 3天（可配置），且 actualDate 为空（未执行）
@@ -953,6 +971,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         Map<String, MdmMonthSurplus> monthSurplusMap = monthSurplusList.stream()
                 .collect(Collectors.toMap(MdmMonthSurplus::getMaterialCode, s -> s, (a, b) -> a));
         context.setMonthSurplusMap(monthSurplusMap);
+        context.setInitialMonthSurplusMap(monthSurplusList.stream()
+                .filter(s -> s.getMaterialCode() != null && s.getPlanSurplusQty() != null)
+                .collect(Collectors.toMap(MdmMonthSurplus::getMaterialCode, MdmMonthSurplus::getPlanSurplusQty, (a, b) -> a)));
         log.info("加载月度计划余量 {} 条", monthSurplusList.size());
 
         // 获取当前天的班次配置（用于获取硫化任务的班次计划量）
@@ -971,7 +992,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                 context.getScheduleDate(),
                 materialLhCapacityMap);
         context.setFormingRemainderMap(formingRemainderMap);
+        context.setInitialFormingRemainderMap(new HashMap<>(formingRemainderMap));
         context.setMaterialStockMap(materialStockMap);
+        context.setInitialMaterialStockMap(new HashMap<>(materialStockMap));
         log.info("计算成型余量映射 {} 条，物料库存分配 {} 条", formingRemainderMap.size(), materialStockMap.size());
     }
 
@@ -1236,7 +1259,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         try {
             // 按硫化任务维度分配库存，共用胎胚按日硫化量比例分配
-            materialStockMap = allocateStockByMaterialRatio(stocks, lhScheduleResults, dayShifts, scheduleDate, materialLhCapacityMap);
+            materialStockMap = allocateStockByMaterialRatio(stocks, lhScheduleResults, dayShifts, scheduleDate, materialLhCapacityMap, monthSurplusMap);
             log.debug("按硫化任务维度分配胎胚库存 {} 条", materialStockMap.size());
 
             // 按物料编码汇总库存（从 materialStockMap 按硫化任务汇总）
@@ -1431,6 +1454,7 @@ public class ScheduleServiceImpl implements ScheduleService {
      * @param dayShifts              当前天班次配置
      * @param scheduleDate           排程日期
      * @param materialLhCapacityMap  物料日硫化产能映射（用于获取日硫化量）
+     * @param monthSurplusMap        月度硫化余量映射（硫化余量<=0的任务跳过分配）
      * @return 硫化任务ID → 分配的库存数量
      */
     private Map<String, Integer> allocateStockByMaterialRatio(
@@ -1438,7 +1462,8 @@ public class ScheduleServiceImpl implements ScheduleService {
             List<LhScheduleResult> lhScheduleResults,
             List<CxShiftConfig> dayShifts,
             LocalDate scheduleDate,
-            Map<String, MonthPlanProductLhCapacityVo> materialLhCapacityMap) {
+            Map<String, MonthPlanProductLhCapacityVo> materialLhCapacityMap,
+            Map<String, MdmMonthSurplus> monthSurplusMap) {
 
         Map<String, Integer> materialStockMap = new HashMap<>();
 
@@ -1471,6 +1496,13 @@ public class ScheduleServiceImpl implements ScheduleService {
                 // 胎胚只对应一个硫化任务，直接分配全部库存
                 LhScheduleResult task = relatedTasks.get(0);
                 String taskKey = String.valueOf(task.getId());
+
+                // 检查硫化余量：如果已超产（<=0），跳过分配
+                if (isVulcanizeSurplusExhausted(task.getMaterialCode(), monthSurplusMap)) {
+                    log.debug("胎胚 {} 硫化任务 {} 硫化余量<=0，跳过库存分配", embryoCode, taskKey);
+                    continue;
+                }
+
                 materialStockMap.merge(taskKey, totalStock, Integer::sum);
                 log.debug("胎胚 {} 只对应硫化任务 {}，分配库存 {}", embryoCode, taskKey, totalStock);
             } else {
@@ -1481,6 +1513,13 @@ public class ScheduleServiceImpl implements ScheduleService {
                 for (LhScheduleResult lh : relatedTasks) {
                     String materialCode = lh.getMaterialCode();
                     int dayVulcanizationQty = 0;
+
+                    // 检查硫化余量：如果已超产（<=0），跳过分配
+                    if (isVulcanizeSurplusExhausted(materialCode, monthSurplusMap)) {
+                        log.debug("胎胚 {} 硫化任务 {} 物料 {} 硫化余量<=0，跳过库存分配",
+                                embryoCode, lh.getId(), materialCode);
+                        continue;
+                    }
 
                     // 优先用班次计划量来判断当前班次是否排产
                     ShiftPlanResult shiftResult = getShiftPlanQtyWithShiftName(lh, dayShifts, scheduleDate);

@@ -1,0 +1,170 @@
+<template>
+  <el-dialog
+    :title="title"
+    :visible="visible"
+    width="400px"
+    @close="hide"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+  >
+    <info-form
+      class="form-item-height"
+      ref="form"
+      :form="form"
+      :rules="rules"
+      :columns="columns"
+      label-position="right"
+      label-width="120px"
+      v-loading="loading"
+    >
+    </info-form>
+    <template slot="footer">
+      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
+      <el-button type="primary" :loading="loading" @click="handleConfirm">{{
+        this.$t("common.button.confirm")
+      }}</el-button>
+    </template>
+  </el-dialog>
+</template>
+
+<script>
+import moment from "moment";
+
+import infoForm from "@/views/components/infoForm.vue";
+import { lhValidateAutoPlan, autoPlan } from "@/api/lh/scheduleResult";
+
+export default {
+  components: { infoForm },
+  inject: ["parentDict"],
+  data() {
+    return {
+      loading: false,
+      visible: false,
+      isEdit: false,
+      form: {},
+      rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        scheduleDate: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
+      },
+      columns: [
+        {
+          label: this.$t("common.factory"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
+          prop: "scheduleDate",
+          type: "date",
+          dateType: "date",
+          valueFormat: "yyyy-MM-dd 00:00:00",
+          format: "yyyy-MM-dd",
+          clearable: false,
+        },
+      ],
+    };
+  },
+  computed: {
+    title: function () {
+      return this.$t("ui.data.column.cxScheduleResult.lhAutoPlan");
+    },
+  },
+  methods: {
+    // api
+    async handleAutoPlan(params) {
+      // console.log(params);
+      try {
+        this.loading = true;
+        // const result = await lhValidateAutoPlan(params);
+        // if (result.msg == "1") {
+        //   //已经生成，提示是否重新生成
+        //   this.$confirm(this.$t("ui.biz.alter.makeSureRecreate"))
+        //     .then(async () => {
+        //       try {
+        //         const data = await autoPlan(params);
+        //         this.$modal.msgSuccess(data.msg);
+        //         this.$emit("success", params);
+        //       } catch (error) {
+        //         console.error(error);
+        //       }
+        //     })
+        //     .catch(() => {
+        //       this.loading = false;
+        //     });
+        // } else if (result.msg == "2") {
+        //   //未生成，直接生成
+        //   const data = await autoPlan(params);
+        //   this.$modal.msgSuccess(data.msg);
+        //   this.$emit("success", params);
+        // } else if (result.msg == "3") {
+        //   //已发布，提示不能重新生成
+        //   this.$modal.msgError(this.$t("ui.biz.alter.CanNotRecreate"));
+        // }
+        const data = await autoPlan(params);
+        // 接口返回：{ success, message, batchNo, validationErrors }；兼容旧版 { msg }
+        const tip = data.message || data.msg || "";
+        if (data.success === false) {
+          const hasValidationDetails =
+            (data.validationErrors &&
+              Array.isArray(data.validationErrors) &&
+              data.validationErrors.length > 0) ||
+            (data.validationErrorDetails &&
+              Array.isArray(data.validationErrorDetails) &&
+              data.validationErrorDetails.length > 0);
+          if (hasValidationDetails) {
+            this.$emit("validationError", data);
+          } else {
+            this.$modal.msgError(
+              tip || this.$t("ui.data.btn.ajax.code.msg")
+            );
+          }
+          return;
+        }
+        this.$modal.msgSuccess(
+          tip || this.$t("common.msg.ajax.operation.success")
+        );
+        this.$emit("success", { ...params, batchNo: data.batchNo });
+        this.hide();
+      } catch (error) {
+        console.log(error);
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    //utils
+    show(data) {
+      this.visible = true;
+      // 与硫化排程管理列表查询条件一致：当前日期 + 2 天
+      this.form = {
+        factoryCode: "116",
+        scheduleDate: moment().add(2, "days").format("YYYY-MM-DD 00:00:00"),
+      };
+    },
+    hide() {
+      this.form = {};
+      this.$refs.form.triggerResetForm();
+      this.isEdit = false;
+      this.visible = false;
+    },
+
+    handleConfirm() {
+      this.$refs.form.triggerConfirm(this.handleAutoPlan);
+    },
+  },
+};
+</script>
