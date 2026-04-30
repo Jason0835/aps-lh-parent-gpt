@@ -75,7 +75,7 @@ public class LhDayFinishQtyUIController extends BaseUIController<LhDayFinishQty>
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("lh:lhDayFinishQty:list")
+    @RequiresPermissions("lh:lhScheduleResult:dayFinishQty")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(LhDayFinishQty lhDayFinishQty) {
