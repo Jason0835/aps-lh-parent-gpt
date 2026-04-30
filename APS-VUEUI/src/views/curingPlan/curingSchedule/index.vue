@@ -101,6 +101,14 @@
         >{{ $t("ui.data.btn.lhScheduleResult.increaseMouldStartPlan") }}</el-button
         >
         <el-button
+          v-hasPermi="['lh:lhScheduleResult:unscheduledResult']"
+          type="primary"
+          @click="handleUnschedule"
+          >{{
+          $t("ui.data.btn.scheduleResult.unscheduledResult")
+        }}</el-button
+        >
+        <el-button
           v-hasPermi="['monthplan:mouldingDayResult:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
@@ -1209,14 +1217,12 @@ export default {
     },
     handleUnschedule() {
       let query = {
+        factoryCode: this.query.factoryCode,
         scheduleDate: this.query.scheduleDate,
       };
-      if (this.data[0]) {
-        query.batchNo = this.data[0].batchNo;
-      }
 
       this.$router.push({
-        path: "./curingUnschedule",
+        path: "/curingPlan/curingUnscheduleResult",
         query: query,
       });
     },
