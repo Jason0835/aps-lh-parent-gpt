@@ -2,7 +2,7 @@
   <el-dialog
     :title="title"
     :visible="visible"
-    width="1500px"
+    width="1300px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
@@ -644,6 +644,19 @@ export default {
 .change-machine-dialog {
   .w100 {
     width: 100%;
+  }
+
+  /* 转机台弹窗表格：略增行高与单元格内边距，避免过密 */
+  ::v-deep .el-table {
+    th.el-table__cell,
+    td.el-table__cell {
+      padding-top: 14px;
+      padding-bottom: 14px;
+    }
+    .cell {
+      line-height: 24px;
+      min-height: 24px;
+    }
   }
 }
 </style>
