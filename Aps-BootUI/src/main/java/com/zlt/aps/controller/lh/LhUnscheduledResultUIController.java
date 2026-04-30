@@ -82,7 +82,7 @@ public class LhUnscheduledResultUIController extends BaseUIController<LhUnschedu
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("lh:lhUnscheduledResult:list")
+    @RequiresPermissions("lh:lhScheduleResult:unscheduledResult")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(LhUnscheduledResult lhUnscheduledResult) {
