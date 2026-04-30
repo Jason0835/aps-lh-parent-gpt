@@ -99,7 +99,7 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("ui.frame.btn.add") + this.$t("ui.data.column.lh.scheduleResult.modelName");
+      return this.$t("ui.data.column.scheduleResult.insertOrder");
     },
     columns() {
       const columns = [
