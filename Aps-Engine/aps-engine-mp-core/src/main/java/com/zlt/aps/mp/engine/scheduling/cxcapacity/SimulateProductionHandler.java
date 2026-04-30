@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
@@ -14,6 +15,7 @@ import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
+import com.zlt.aps.mp.engine.handler.GroupPreAllocationInfoHelper;
 import com.zlt.aps.mp.engine.handler.GroupPriorityProductionScheduler;
 import com.zlt.aps.mp.engine.handler.SupplementCxMachineDistributionHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
@@ -65,8 +67,8 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
 
     /**
      * 模拟排产计划
-     * //1、在机结构对在产成型机台进行模拟模具排产
-     * clearSimulateDataAndResetProductionContinue(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
+     * 1、在机结构对在产成型机台进行模拟模具排产
+     * //clearSimulateDataAndResetProductionContinue(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
      *
      * @param productionContext      排产上下文
      * @param allGroupPlanMap        所有排产分组计划
@@ -118,21 +120,46 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
     private void deliveryPriorityProduction(TbrProductionContext productionContext, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, List<CxMachineAllocationPlanHelper> continueAllocationList, Map<String, CxContinueInfoHelper> allContinueMap) {
         //1、按高优先级，获取预期排产的分组信息
         Set<String> preSelectedGroupSet = Sets.newHashSet();
+        Map<String, Set<CxMachineAllocationPlanHelper>> preSelectedGroupAllocationMap = Maps.newHashMap();
         log.info(TbrSimulateProductionLogRecorder.addStartDeliveryPriorityLog(productionContext));
-        groupPriorityProductionScheduler.allocationCxMachine(productionContext, Sets.newHashSet(), preSelectedGroupSet);
-        //2、判断预期排产分组中是是否有设置固定1~3的分组
+        groupPriorityProductionScheduler.allocationCxMachine(productionContext, Sets.newHashSet(), preSelectedGroupSet, preSelectedGroupAllocationMap, Sets.newHashSet());
+        //2、判断预期排产分组中是否有设置固定1~3的分组和排产间断的二次上机
         List<ProductionPlanGroupInfo> hasFixedPriorityCxMachineList = getGroupFixedCxMachine(productionContext, preSelectedGroupSet);
-        if (CollectionUtils.isEmpty(hasFixedPriorityCxMachineList)) {
+        if (CollectionUtils.isEmpty(hasFixedPriorityCxMachineList)){
             return;
         }
+        Set<String> discontinueGroupSet = Collections.emptySet();
+//        List<ProductionPlanGroupInfo> discontinueGroupList = getDiscontinuePreSelectedGroup(productionContext, preSelectedGroupAllocationMap);
+//        List<ProductionPlanGroupInfo> hasFixedPriorityCxMachineList = getGroupFixedCxMachine(productionContext, preSelectedGroupSet);
+//        if (CollectionUtils.isEmpty(hasFixedPriorityCxMachineList) && CollectionUtils.isEmpty(discontinueGroupList)) {
+//            return;
+//        }
+//        Set<String> discontinueGroupSet = discontinueGroupList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.toSet());
         //3、开始重排在产分组在产机台续作
         resetProduction(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         //4、对固定分组进行排产
         TbrSimulateProductionLogRecorder.addDeliveryPriorityFixedCxMachineGroupLog(productionContext);
-        groupPriorityProductionScheduler.productionGroupFixedCxMachine(productionContext, Sets.newHashSet(), hasFixedPriorityCxMachineList);
+        Set<String> multipleRangeGroupSet = getMultipleRangeGroup(preSelectedGroupAllocationMap);
+        //4.1、对有多段的固定最先排
+        List<ProductionPlanGroupInfo> multipleRangeFixedPriorityCxMachineList = hasFixedPriorityCxMachineList.stream().filter(singleGroup -> multipleRangeGroupSet.contains(singleGroup.getGroupName())).collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(multipleRangeFixedPriorityCxMachineList)) {
+            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), multipleRangeFixedPriorityCxMachineList, discontinueGroupSet, true);
+        }
+        //5.1 对有多段的非固定优先排产
+        List<ProductionPlanGroupInfo> multipleRangeNoFixedList = getMultipleNoFixedGroup(productionContext, hasFixedPriorityCxMachineList, multipleRangeGroupSet);
+        if (!CollectionUtils.isEmpty(multipleRangeNoFixedList)) {
+            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), multipleRangeNoFixedList, discontinueGroupSet, false);
+        }
+        //4.2、对其它固定先排
+        List<ProductionPlanGroupInfo> otherFixedPriorityCxMachineList = hasFixedPriorityCxMachineList.stream().filter(singleGroup -> !multipleRangeGroupSet.contains(singleGroup.getGroupName())).collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(otherFixedPriorityCxMachineList)) {
+            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), otherFixedPriorityCxMachineList, discontinueGroupSet, true);
+        }
         //5、在对剩余的进行Top3排产
         TbrSimulateProductionLogRecorder.addDeliveryPriorityLeftOverGroupLog(productionContext);
-        groupPriorityProductionScheduler.allocationCxMachine(productionContext, Sets.newHashSet(), Sets.newHashSet());
+
+        //5.2 剩余排产
+        groupPriorityProductionScheduler.allocationCxMachine(productionContext, Sets.newHashSet(), Sets.newHashSet(), Maps.newHashMap(), discontinueGroupSet);
     }
 
     /**
@@ -378,6 +405,145 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             return Collections.emptyList();
         }
         return priorityFixedGroupList;
+    }
+
+    /**
+     * 获取有多段排产的分组对象集合
+     *
+     * @param preSelectedGroupAllocationMap 预排分组的预分配信息集合
+     * @return
+     */
+    private Set<String> getMultipleRangeGroup(Map<String, Set<CxMachineAllocationPlanHelper>> preSelectedGroupAllocationMap) {
+        if (CollectionUtils.isEmpty(preSelectedGroupAllocationMap)) {
+            return Collections.emptySet();
+        }
+        Set<String> multipleRangeSet = Sets.newHashSet();
+        preSelectedGroupAllocationMap.forEach((groupName, preAllocationList) -> {
+            if (CollectionUtils.isEmpty(preAllocationList)) {
+                return;
+            }
+            if (preAllocationList.size() <= BigDecimal.ONE.intValue()) {
+                return;
+            }
+            multipleRangeSet.add(groupName);
+        });
+        return multipleRangeSet;
+    }
+
+    /**
+     * 获取非固定且多段的分组对象集合
+     *
+     * @param productionContext     排产上下文
+     * @param fixedPriorityList     固定机台分组对象集合
+     * @param multipleRangeGroupSet 预排中多段分组对象集合
+     * @return
+     */
+    private List<ProductionPlanGroupInfo> getMultipleNoFixedGroup(TbrProductionContext productionContext, List<ProductionPlanGroupInfo> fixedPriorityList, Set<String> multipleRangeGroupSet) {
+        if (CollectionUtils.isEmpty(multipleRangeGroupSet)) {
+            return Collections.emptyList();
+        }
+        Map<String, ProductionPlanGroupInfo> allGroupInfoMap = productionContext.getGroupProductionInfo();
+        if (CollectionUtils.isEmpty(allGroupInfoMap)) {
+            return Collections.emptyList();
+        }
+        Set<String> fixedGroupSet = CollectionUtils.isEmpty(fixedPriorityList) ? Collections.emptySet() : fixedPriorityList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.toSet());
+        List<ProductionPlanGroupInfo> noFixedMultipleList = Lists.newArrayList();
+        allGroupInfoMap.forEach((groupName, groupPlanInfo) -> {
+            if (!multipleRangeGroupSet.contains(groupName)) {
+                return;
+            }
+            if (fixedGroupSet.contains(groupName)) {
+                return;
+            }
+            noFixedMultipleList.add(groupPlanInfo);
+        });
+        return noFixedMultipleList;
+    }
+
+    /**
+     * 获取预排中有间断分配的分组对象集合
+     *
+     * @param productionContext             排产上下文
+     * @param preSelectedGroupAllocationMap 分组预排的预分配信息
+     * @return
+     */
+    private List<ProductionPlanGroupInfo> getDiscontinuePreSelectedGroup(TbrProductionContext productionContext, Map<String, Set<CxMachineAllocationPlanHelper>> preSelectedGroupAllocationMap) {
+        if (CollectionUtils.isEmpty(preSelectedGroupAllocationMap)) {
+            return Collections.emptyList();
+        }
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        if (CollectionUtils.isEmpty(allCxMachineInfo)) {
+            return Collections.emptyList();
+        }
+        Map<String, ProductionPlanGroupInfo> allGroupInfo = productionContext.getGroupProductionInfo();
+        if (CollectionUtils.isEmpty(allGroupInfo)) {
+            return Collections.emptyList();
+        }
+        List<GroupPreAllocationInfoHelper> preAllocationGroupInfoList = Lists.newArrayList();
+        //信息转化，分组排产日及对应机台的停产日信息
+        preSelectedGroupAllocationMap.forEach((groupName, preAllocationInfo) -> {
+            ProductionPlanGroupInfo groupInfo = allGroupInfo.get(groupName);
+            if (CollectionUtils.isEmpty(preAllocationInfo) || null == groupInfo) {
+                return;
+            }
+            Set<Integer> preProductionDaySet = Sets.newHashSet();
+            Set<Integer> stopDaySet = Sets.newHashSet();
+            setProductionAndStopDayInfo(productionContext, preProductionDaySet, stopDaySet, preAllocationInfo, allCxMachineInfo);
+            if (CollectionUtils.isEmpty(preProductionDaySet)) {
+                return;
+            }
+            preAllocationGroupInfoList.add(new GroupPreAllocationInfoHelper(groupName, groupInfo, preProductionDaySet, stopDaySet));
+        });
+        //从预分配信息集合中，挑选排产日有中断的分组对象集合
+        if (CollectionUtils.isEmpty(preAllocationGroupInfoList)) {
+            return Collections.emptyList();
+        }
+        List<GroupPreAllocationInfoHelper> discontinueList = preAllocationGroupInfoList.stream().filter(singleGroup -> singleGroup.hasDiscontinueProduction()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(discontinueList)) {
+            return Collections.emptyList();
+        }
+        return discontinueList.stream().map(GroupPreAllocationInfoHelper::getGroupInfo).collect(Collectors.toList());
+    }
+
+    /**
+     * 获取分组的所有可排产日以及各机台的停产日
+     * 将排产日信息加入到preProductionDaySet集合中
+     * 将机台的停产日加入到stopDaySet集合中
+     *
+     * @param productionContext   排产上下文
+     * @param preProductionDaySet 需要加入的排产日集合，初始为空集合
+     * @param stopDaySet          需要加入的停产日集合，初始为空集合
+     * @param preAllocationInfo   预分配信息
+     * @param allCxMachineInfo    所有机台信息
+     */
+    private void setProductionAndStopDayInfo(TbrProductionContext productionContext, Set<Integer> preProductionDaySet, Set<Integer> stopDaySet, Set<CxMachineAllocationPlanHelper> preAllocationInfo, Map<String, CxMachineBaseInfoVo> allCxMachineInfo) {
+        if (CollectionUtils.isEmpty(allCxMachineInfo) || null == preProductionDaySet || null == stopDaySet) {
+            return;
+        }
+        if (CollectionUtils.isEmpty(preAllocationInfo) || preAllocationInfo.size() <= BigDecimal.ONE.intValue()) {
+            return;
+        }
+        //设置全局停产日
+        if (!CollectionUtils.isEmpty(productionContext.getStopDays())) {
+            stopDaySet.addAll(productionContext.getStopDays());
+        }
+        //迭代 每个分配信息
+        preAllocationInfo.forEach(singlePreAllocation -> {
+            CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfo.get(singlePreAllocation.getCxMachineCode());
+            if (null == cxMachineInfo) {
+                return;
+            }
+            Set<Integer> singleStopDaySet = Optional.ofNullable(cxMachineInfo.getStopDayInfo()).orElse(Collections.emptySet());
+            Integer startDay = singlePreAllocation.getStartDay();
+            Integer endDay = singlePreAllocation.getEndDay();
+            for (int index = startDay; index <= endDay; index++) {
+                if (singleStopDaySet.contains(index)) {
+                    stopDaySet.add(index);
+                    continue;
+                }
+                preProductionDaySet.add(index);
+            }
+        });
     }
 
 }

@@ -81,6 +81,13 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
     private Integer stockQty;
 
     /**
+     * 调整优先级
+     */
+    @ApiModelProperty(value = "调整优先级")
+    @TableField(exist = false)
+    private Integer adjustPriority;
+
+    /**
      * 搭配量
      */
     private Integer matchQtyDay1;

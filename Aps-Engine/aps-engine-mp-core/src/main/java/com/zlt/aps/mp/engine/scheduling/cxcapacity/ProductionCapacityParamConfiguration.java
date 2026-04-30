@@ -184,37 +184,41 @@ public class ProductionCapacityParamConfiguration {
      */
     private String isWriteCycleLog;
     /**
-     * 参与排产的特殊原材料编码信息
+     * SYS0209005 参与排产的特殊原材料编码信息
      */
     private Set<String> specialMaterialCodeSet;
     /**
-     * 参与Sku排产竞争的优先级高的Sku列表个数
+     * SYS0207001 参与Sku排产竞争的优先级高的Sku列表个数
      */
     private Integer heightPrioritySkuPreCount;
     /**
-     * 正式排产优先级排产分段日
+     * SYS0209006 正式排产优先级排产分段日
      */
     private Integer formalFirstHalfDay;
     /**
-     * 模具分配比例调整周期日
+     * SYS0209007 模具分配比例调整周期日
      */
     private Integer moldAllocationRatioCycle;
     /**
-     * 实单最低硫化机台数最多可连续排产天数
-     */
-    private Integer minLhMachineContinueDays;
-    /**
-     * 结构硫化成型配比额外处理配置值
+     * SYS0209008 结构硫化成型配比额外处理配置值
      */
     private String cxLhRatioExtraValue;
-    /**
-     * 月计划排产模式 1 交付优先 非1则为效率优先
-     */
-    private Integer productionMode;
     /**
      * 结构硫化成型配比额外处理配置集合
      */
     private Map<String, Integer> extraMap;
+    /**
+     * SYS0209009 实单最低硫化机台数最多可连续排产天数
+     */
+    private Integer minLhMachineContinueDays;
+    /**
+     * SYS0209010 月计划排产模式 1 交付优先 非1则为效率优先
+     */
+    private Integer productionMode;
+    /**
+     * SYS0209011 分组高优先级先排产的占比
+     */
+    private BigDecimal heightPriorityProductionMode;
 
     /**
      * 设置额外处理的配比值

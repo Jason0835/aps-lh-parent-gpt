@@ -423,8 +423,9 @@ public class SkuPrioritySelector {
         if (CollectionUtils.isEmpty(doubleMouldList)) {
             return null;
         }
-        //计算需要排产的量
-        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(continueType, allSkuList, materialDesc, true);
+        //计算需要排产的量 20260430+ Sku是否一起排产
+        boolean isAllSum = allSkuList.get(BigDecimal.ZERO.intValue()).getIsAllSum();
+        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(continueType, allSkuList, materialDesc, isAllSum);
         if (null == needProductionInfo) {
             //todo 记录日志
             return null;
@@ -461,8 +462,9 @@ public class SkuPrioritySelector {
         if (CollectionUtils.isEmpty(doubleMouldList)) {
             return null;
         }
-        //计算需要排产的量
-        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(ContinueTypeEnum.NO_CONTINUE, allSkuList, materialDesc, true);
+        //计算需要排产的量 20260430+ Sku是否一起排产
+        boolean isAllSum = allSkuList.get(BigDecimal.ZERO.intValue()).getIsAllSum();
+        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(ContinueTypeEnum.NO_CONTINUE, allSkuList, materialDesc, isAllSum);
         if (null == needProductionInfo) {
             //todo 记录日志
             return null;

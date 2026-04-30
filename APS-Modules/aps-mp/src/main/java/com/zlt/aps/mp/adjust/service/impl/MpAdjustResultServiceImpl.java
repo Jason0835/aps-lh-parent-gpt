@@ -72,6 +72,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         String dayField;
         int realBeginDay = FactoryConstant.MONTH_MAX_DAY+1;
         int realEndDay = 0;
+        int totalQty = 0;
         for (int i = FactoryConstant.MONTH_START_DAY; i <= FactoryConstant.MONTH_MAX_DAY; i++){
             dayField = FactoryConstant.DAY_FIELD + i;
             if (entity.getFieldValueByFieldName(dayField) != null &&
@@ -82,10 +83,13 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
                 if (realEndDay < i){
                     realEndDay = i;
                 }
+
+                totalQty += (Integer) entity.getFieldValueByFieldName(dayField);
             }
         }
         entity.setBeginDay(realBeginDay==FactoryConstant.MONTH_MAX_DAY+1 ? 0:realBeginDay);
         entity.setEndDay(realEndDay);
+        entity.setTotalQty(totalQty);
         //2、更新每日调整值
         mpAdjustResultEntityMapper.forceUpdateById(entity);
     }

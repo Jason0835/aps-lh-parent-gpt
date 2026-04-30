@@ -35,6 +35,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -501,7 +502,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.MOLD_ALLOCATION_RATIO_CYCLE.getCode());
         paramCodeList.add(MonthPlanEnums.CX_LH_RATIO_EXTRA.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_LH_MACHINE_CONTINUE_DAYS.getCode());
-
+        paramCodeList.add(MonthPlanEnums.HEIGHT_PRIORITY_SKU_PRODUCTION_MODE.getCode());
         //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
         if (CollectionUtils.isEmpty(paramConfigurationMap)) {
@@ -602,6 +603,16 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         }
         //20260429+ 月计划排产模式 1 交付优先，非1则为效率优先
         configuration.setProductionMode((Integer) paramConfigurationMap.get(MonthPlanEnums.PRODUCTION_MODE.getCode()));
+        //202430+ 结构下Sku采用先高优先级排产
+        Object heightRequireRatioValue = paramConfigurationMap.get(MonthPlanEnums.HEIGHT_PRIORITY_SKU_PRODUCTION_MODE.getCode());
+        if (null == heightRequireRatioValue) {
+            configuration.setHeightPriorityProductionMode(BigDecimal.ONE);
+        } else {
+            BigDecimal heightRequireValue = (BigDecimal) heightRequireRatioValue;
+            BigDecimal heightRequireRatio = heightRequireValue.divide(BigDecimal.valueOf(ProductionConstant.PERCENTAGE), 2, RoundingMode.HALF_UP);
+            configuration.setHeightPriorityProductionMode(heightRequireRatio);
+        }
+
         return configuration;
     }
 

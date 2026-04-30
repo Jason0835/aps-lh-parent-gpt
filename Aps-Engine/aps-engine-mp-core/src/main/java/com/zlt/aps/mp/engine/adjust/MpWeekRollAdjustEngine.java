@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.adjust;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONValidator;
+import com.google.common.collect.Lists;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -15,12 +16,14 @@ import com.zlt.aps.enums.UrgencyTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.mp.api.constants.MonthPlanConstants;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.deduct.DailyScheduleVo;
 import com.zlt.aps.mp.api.domain.deduct.DeductMouldVo;
 import com.zlt.aps.mp.api.domain.dto.IncMouldContext;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
@@ -37,6 +40,7 @@ import com.zlt.common.utils.StringUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -1464,7 +1468,7 @@ public class MpWeekRollAdjustEngine {
      * @param checkDay 检查日
      * @return true-符合总产能，false-不符合总产能
      */
-    private boolean checkTotalCapacityLimit(MpRollAdjustContextDTO contextDTO,Integer checkDay,FactoryMonthPlanFinalAdjustVo mpFinalVo,MpDailyCapacityLimitVo limitVo,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
+    public boolean checkTotalCapacityLimit(MpRollAdjustContextDTO contextDTO,Integer checkDay,FactoryMonthPlanFinalAdjustVo mpFinalVo,MpDailyCapacityLimitVo limitVo,List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList){
         DayTotalCapacityChecker dayTotalCapacityChecker = new DayTotalCapacityChecker(mpProdFinalList,limitVo.getRemainMaxDayProductionQty(),checkDay);
         boolean bCheck = dayTotalCapacityChecker.doCheck();
         String hint = bCheck ? "满足":"不满足,退出！";
@@ -2160,7 +2164,7 @@ public class MpWeekRollAdjustEngine {
      * @param iDay 当前天
      * @return 型腔数量
      */
-    private int getNewCavityQty(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo,int iDay){
+    public int getNewCavityQty(MpRollAdjustContextDTO contextDTO,FactoryMonthPlanFinalAdjustVo mpFinalVo,int iDay){
         DailyMouldAvailabilityResult cavity2BlockVo = contextDTO.getCavity2BlockMap().get(iDay);
         if (cavity2BlockVo != null && cavity2BlockVo.getCavityResults() != null){
             Integer cavityQty = cavity2BlockVo.getCavityResults().get(mpFinalVo.getStructureName()+mpFinalVo.getMainPattern());
@@ -2388,7 +2392,7 @@ public class MpWeekRollAdjustEngine {
      * @param cavityQty 型腔数
      * @return true-满足，false-不满足
      */
-    private boolean checkMouldSatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo,int cavityQty){
+    public boolean checkMouldSatisfy(MpDailyCapacityLimitVo dailyCapacityLimitVo,int cavityQty){
         //型腔台数
         int patternCount = cavityQty /2;
         //主花纹向下所有SKU的模具数量 <= 主花纹.型腔数量
@@ -2715,6 +2719,72 @@ public class MpWeekRollAdjustEngine {
     }
 
     /**
+     * 根据优先级顺序分配生产数量
+     * 顺序：高优先级 -> 中优先级 -> 周期储备 -> 常规储备 -> 暂缓
+     */
+    public void allocateProductionByPriority(MpAdjustResult adjustResult) {
+        // 初始化所有生产数量为0
+        adjustResult.setHeightProductionQty(0);
+        adjustResult.setMidProductionQty(0);
+        adjustResult.setCycleProductionQty(0);
+        adjustResult.setConventionProductionQty(0);
+        adjustResult.setPostponeProductionQty(0);
+
+        if (adjustResult.getTotalQty() == null || adjustResult.getTotalQty() <= 0) {
+            return;
+        }
+
+        int remainingQty = adjustResult.getTotalQty();
+        List<String> scmPriorities = Lists.newArrayList();
+        // 1. 分配高优先级
+        if (adjustResult.getHeightQty() != null && adjustResult.getHeightQty() > 0) {
+            adjustResult.setHeightProductionQty(Math.min(remainingQty, adjustResult.getHeightQty()));
+            remainingQty -= adjustResult.getHeightProductionQty();
+            scmPriorities.add(MonthPlanConstants.SAL_PRIORITY_HIGHT);
+        }
+        // 2. 分配中优先级
+        if (remainingQty > 0 && adjustResult.getMidQty() != null && adjustResult.getMidQty() > 0) {
+            adjustResult.setMidProductionQty(Math.min(remainingQty, adjustResult.getMidQty()));
+            remainingQty -= adjustResult.getMidProductionQty();
+            scmPriorities.add(MonthPlanConstants.SAL_PRIORITY_MID);
+        }
+
+        // 3. 分配周期储备
+        if (remainingQty > 0 && adjustResult.getCycleReserveQty() != null && adjustResult.getCycleReserveQty() > 0) {
+            adjustResult.setCycleProductionQty(Math.min(remainingQty, adjustResult.getCycleReserveQty()));
+            remainingQty -= adjustResult.getCycleProductionQty();
+            scmPriorities.add(MonthPlanConstants.SAL_PRIORITY_CYCLE_STOCK_UP);
+        }
+
+        // 4. 分配暂缓优先级
+        if (adjustResult.getAdjustPriority() != null && adjustResult.getAdjustPriority() > 0   &&  remainingQty > 0 && adjustResult.getPostponeQty() != null && adjustResult.getPostponeQty() > 0) {
+            adjustResult.setPostponeProductionQty(Math.min(remainingQty, adjustResult.getPostponeQty()));
+            remainingQty -= adjustResult.getPostponeProductionQty();
+            scmPriorities.add(MonthPlanConstants.SAL_PRIORITY_POSTPONE);
+        }
+        // 如果设置了conventionReserveQty，则不超过该值
+        if (remainingQty > 0 && adjustResult.getConventionReserveQty() != null && adjustResult.getConventionReserveQty() > 0) {
+            adjustResult.setConventionProductionQty(Math.min(remainingQty, adjustResult.getConventionReserveQty()));
+            remainingQty -= adjustResult.getConventionProductionQty();
+            scmPriorities.add(MonthPlanConstants.SAL_PRIORITY_PRECEDENT_STOCK_UP);
+        }
+        if(remainingQty > 0 && !CollectionUtils.isEmpty(scmPriorities)) {
+            String  scmPriority = scmPriorities.get(scmPriorities.size() - 1);
+            if(MonthPlanConstants.SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(scmPriority)) {
+                adjustResult.setConventionProductionQty((adjustResult.getConventionProductionQty()==null ? 0:adjustResult.getConventionProductionQty()) + remainingQty);
+            }else if(MonthPlanConstants.SAL_PRIORITY_POSTPONE.equals(scmPriority)) {
+                adjustResult.setPostponeProductionQty(adjustResult.getPostponeProductionQty() + remainingQty);
+            }else if(MonthPlanConstants.SAL_PRIORITY_MID.equals(scmPriority)) {
+                adjustResult.setMidProductionQty(adjustResult.getMidProductionQty() + remainingQty);
+            }else if(MonthPlanConstants.SAL_PRIORITY_CYCLE_STOCK_UP.equals(scmPriority)) {
+                adjustResult.setCycleProductionQty(adjustResult.getCycleProductionQty() + remainingQty);
+            }else{
+                adjustResult.setHeightProductionQty(adjustResult.getHeightProductionQty() + remainingQty);
+            }
+        }
+    }
+
+    /**
      * 检查是否有排产
      * @param startDay 开始日
      * @param endDay 开始日
@@ -2936,7 +3006,7 @@ public class MpWeekRollAdjustEngine {
         }else {
             mpFinalVo.setOemFlag(YesOrNoEnum.NO.getCode());
         }
-
+        mpFinalVo.setAdjustPriority(adjustStructInVo.getAdjustPriority());
         mpFinalVo.setPostponeProductionQty( 0);
         mpFinalVo.setHeightProductionQty(0);
         mpFinalVo.setCycleProductionQty(0);
@@ -2996,6 +3066,7 @@ public class MpWeekRollAdjustEngine {
         }else {
             mpFinalVo.setOemFlag(YesOrNoEnum.NO.getCode());
         }
+        mpFinalVo.setAdjustPriority(adjustStructOutVo.getAdjustPriority());
         mpFinalVo.setPostponeProductionQty( 0);
         mpFinalVo.setHeightProductionQty(0);
         mpFinalVo.setCycleProductionQty(0);

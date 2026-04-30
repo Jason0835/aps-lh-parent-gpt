@@ -1,6 +1,5 @@
 package com.zlt.aps.mp.engine.domain.vo;
 
-import com.zlt.aps.common.core.enums.QualityStateEnum;
 import com.zlt.aps.enums.*;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.ProductionMonthPlanInit;
@@ -38,7 +37,14 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 配置的模具数量(SKU与模具关系中配置的数量)
      */
     private Integer configurationMouldQty;
-
+    /**
+     * 20260430+ 主花纹模具数量(SKU与模具关系中配置有主花纹数据的数量)
+     */
+    private Integer configurationMainPatternMouldQty;
+    /**
+     * 20260430+ 主花纹个数，理论一个Sku只有一个主花纹
+     */
+    private Integer mainPatternCount;
     /**
      * 有模具基础信息的模具数量(模具台账或是新模具到货计划)
      */
@@ -128,6 +134,10 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 搭配结束日期
      */
     private Integer matchEndDay;
+    /**
+     * 20260430+ 是否先高优先级排产
+     */
+    private Integer isPriorityHeight;
 
     /**
      * 根据需求Sku构建虚拟的续作计划对象
@@ -153,12 +163,25 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 总需求排量量
      */
     public void initProductionDataInfo() {
+        isPriorityHeight = YesOrNoEnum.NO.getValue();
         productionFlag = getIsProduction();
         heightProductionQty = getHeightLossQty();
         cxCapacityRequireQty = this.getCxCapacityRequireQty();
         productionQty = cxCapacityRequireQty;
         originHeightProductionQty = heightProductionQty;
         originProductionQty = productionQty;
+    }
+
+    /**
+     * 是否一起排产
+     *
+     * @return
+     */
+    public boolean getIsAllSum() {
+        if (null == isPriorityHeight) {
+            return true;
+        }
+        return !YesOrNoEnum.YES.getValue().equals(isPriorityHeight);
     }
 
     /**
@@ -475,6 +498,15 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return;
         }
         configurationMouldQty = mouldInfoList.size();
+        List<MonthPlanProductMouldInfoVo> hasMainPatternList = mouldInfoList.stream().filter(singleInfo -> StringUtils.isNotBlank(singleInfo.getMainPattern())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(hasMainPatternList)) {
+            configurationMainPatternMouldQty = BigDecimal.ZERO.intValue();
+            mainPatternCount = BigDecimal.ZERO.intValue();
+        } else {
+            Set<String> mainPatternSet = hasMainPatternList.stream().map(MonthPlanProductMouldInfoVo::getMainPattern).collect(Collectors.toSet());
+            mainPatternCount = mainPatternSet.size();
+            configurationMainPatternMouldQty = hasMainPatternList.size();
+        }
         //有基础数据的模具数量
         List<MonthPlanProductMouldInfoVo> baseMouldInfoList = mouldInfoList.stream().filter(mouldInfo -> StringUtils.isNotBlank(mouldInfo.getBaseMouldCode())).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(baseMouldInfoList)) {
@@ -912,6 +944,12 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             addNoProductionReason(noConfigurationMouldReason);
             return YesOrNoEnum.NO.getCode();
         }
+        //20260430+ Sku模具关系没有主花纹
+        if (configurationMainPatternMouldQty <= BigDecimal.ZERO.intValue()) {
+            String noConfigurationMainPatternMouldReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MAIN_PATTERN_MOULD_RELATION);
+            addNoProductionReason(noConfigurationMainPatternMouldReason);
+            return YesOrNoEnum.NO.getCode();
+        }
         //没有模具台账
         if (baseMouldQty <= BigDecimal.ZERO.intValue()) {
             String noBaseMouldReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_MOULD_INFO);
@@ -977,6 +1015,15 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     public int getCxCapacityRequireQty() {
         cxCapacityRequireQty = getFactProdReqQty();
         return cxCapacityRequireQty;
+    }
+
+    /**
+     * 高优先级需求量
+     *
+     * @return
+     */
+    public int getHeightCapacityRequireQty() {
+        return originHeightProductionQty;
     }
 
     /**
