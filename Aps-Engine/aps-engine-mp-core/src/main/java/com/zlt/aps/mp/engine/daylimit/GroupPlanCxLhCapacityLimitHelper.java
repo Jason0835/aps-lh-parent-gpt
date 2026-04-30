@@ -793,6 +793,8 @@ public class GroupPlanCxLhCapacityLimitHelper {
         if (CollectionUtils.isEmpty(skuProductionDetailInfo)) {
             return Collections.emptyMap();
         }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Integer changeTypeBlockQtyDiff = productionContext.getBaseDataContainer().getParamConfiguration().getChangeTypeBlockQtyDiff();
         Map<String, SkuUsedLhMachineInfo> skuUsedLhMachineDetailMap = new HashMap<>();
         skuProductionDetailInfo.forEach((materialDesc, skuProductionDetailList) -> {
             if (CollectionUtils.isEmpty(skuProductionDetailList)) {
@@ -801,9 +803,17 @@ public class GroupPlanCxLhCapacityLimitHelper {
             Integer wholeNumber = BigDecimal.ZERO.intValue();
             Integer remainder = BigDecimal.ZERO.intValue();
             for (SkuDayProductionInfoHelper lhDetail : skuProductionDetailList) {
-                //需要考虑开产日
-                Integer dayLhMachineQty = context.getOpenDayMaxQty(day, lhDetail.getDayLhMachineQty());
-                if (lhDetail.getSumProductionQty().equals(dayLhMachineQty)) {
+                Integer daySumProductionQty = lhDetail.getSumProductionQty();
+                Integer originDayLhMachineQty = lhDetail.getDayLhMachineQty();
+                Integer singleMoldLhMachineQty = lhDetail.getDayVulcanizationQty();
+                Integer diffValue = Math.abs(originDayLhMachineQty - daySumProductionQty);
+                //需要考虑开产日:
+                Integer dayLhMachineQty = context.getOpenDayMaxQty(day, originDayLhMachineQty);
+                if (daySumProductionQty >= dayLhMachineQty) {
+                    //满排
+                    wholeNumber = wholeNumber + BigDecimal.ONE.intValue();
+                } else if ((daySumProductionQty > singleMoldLhMachineQty) || (diffValue < changeTypeBlockQtyDiff)) {
+                    //满排：日排产量 > 一半 或是 差量值 < 换活字块差值
                     wholeNumber = wholeNumber + BigDecimal.ONE.intValue();
                 } else {
                     remainder = remainder + BigDecimal.ONE.intValue();
@@ -1021,8 +1031,6 @@ public class GroupPlanCxLhCapacityLimitHelper {
     private Integer getInitChangeLhMachineCount() {
         Integer realMaxLhMachineCount = Optional.ofNullable(maxLhMachineCount).orElse(BigDecimal.ZERO.intValue());
         Integer theoryMaxLhMachineCount = Optional.ofNullable(maxTheoryLhMachineCount).orElse(realMaxLhMachineCount);
-        //Integer realRemainMaxLhMachineCount = Optional.ofNullable(remainMaxLhMachineCount).orElse(BigDecimal.ZERO.intValue());
-        //theoryMaxLhMachineCount = theoryMaxLhMachineCount > realRemainMaxLhMachineCount ? realRemainMaxLhMachineCount : theoryMaxLhMachineCount;
         return realMaxLhMachineCount - theoryMaxLhMachineCount;
     }
 }
