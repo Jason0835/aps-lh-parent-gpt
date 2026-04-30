@@ -2328,7 +2328,7 @@
   "ui.data.column.lhRepairCapsule.materialCode": "物料编码",
   "ui.data.column.lhRepairCapsule.materialDesc": "物料描述",
   "ui.data.column.lhRepairCapsule.replaceCapsuleCount": "胶囊已使用次数（左）",
-  "ui.data.column.lhRepairCapsule.replaceCapsuleCount2": "胶囊已使用次数2（右）",
+  "ui.data.column.lhRepairCapsule.replaceCapsuleCount2": "胶囊已使用次数（右）",
   "ui.data.column.lhRepairCapsule.brand": "品牌",
   "ui.data.column.lhRepairCapsule.updateDate": "更新日期",
   "ui.data.column.mouldCleanPlan.modelName": "模具清洗计划",
