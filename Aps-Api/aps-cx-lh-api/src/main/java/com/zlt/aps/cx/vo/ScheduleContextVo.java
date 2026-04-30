@@ -66,6 +66,13 @@ public class ScheduleContextVo {
     private List<CxShiftConfig> currentShiftConfigs;
 
     /**
+     * 当日已分配的试制/量试胎胚编码集合（用于单日SKU上限控制）
+     * Key: 胎胚编码 (embryoCode)
+     * 单日最多2个试制+量试SKU，按天重置
+     */
+    private Set<String> dailyTrialAssignedEmbryoCodes;
+
+    /**
      * 所有班次配置列表（按排程天数分组）
      * 用于核心算法按天获取班次配置
      */
@@ -150,6 +157,13 @@ public class ScheduleContextVo {
      * Value: 分配给该物料的库存数量
      */
     private Map<String, Integer> materialStockMap;
+
+    /**
+     * 初始物料库存映射（排程开始前的库存快照，不会被后续班次更新影响）
+     * Key: 硫化任务ID (lhId -> String)
+     * Value: 分配给该硫化任务的初始库存数量
+     */
+    private Map<String, Integer> initialMaterialStockMap;
 
     /**
      * 结构硫化配比列表
@@ -237,6 +251,13 @@ public class ScheduleContextVo {
      * 用于收尾计算
      */
     private Map<String, Integer> formingRemainderMap;
+
+    /**
+     * 初始成型余量映射（排程开始前的快照，不会被后续班次更新影响）
+     * Key: 物料编码 (materialCode)
+     * Value: 初始成型余量
+     */
+    private Map<String, Integer> initialFormingRemainderMap;
 
     /**
      * 胎胚到物料映射（胎胚编码 -> 物料编码）
@@ -424,6 +445,13 @@ public class ScheduleContextVo {
      * 快速查询用
      */
     private Map<String, com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus> monthSurplusMap;
+
+    /**
+     * 初始月度计划余量映射（排程开始前的快照，不会被后续班次硫化消耗影响）
+     * Key: 物料编码 (materialCode)
+     * Value: 初始计划余量
+     */
+    private Map<String, java.math.BigDecimal> initialMonthSurplusMap;
 
     /**
      * SKU排产分类列表

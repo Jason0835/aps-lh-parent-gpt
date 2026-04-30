@@ -14,6 +14,7 @@ import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
+import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -169,7 +170,9 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     protected List<LhMouldChangePlan> listExportData(LhMouldChangePlan obj) {
         QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return lhMouldChangePlanMapper.selectList(wrapper);
+        List<LhMouldChangePlan> list = lhMouldChangePlanMapper.selectList(wrapper);
+        AppUtils.formatData(list, getQueryFormulas());
+        return list;
     }
 
     @Override

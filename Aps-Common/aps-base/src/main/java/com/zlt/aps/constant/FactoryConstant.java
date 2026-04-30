@@ -42,7 +42,6 @@ public class FactoryConstant {
      * 前日机台数阀值
      */
     public final static Integer FRONT_MACHINES_THRESHOLD = 3;
-
     /**
      * 小时对应的秒数 3600秒
      */

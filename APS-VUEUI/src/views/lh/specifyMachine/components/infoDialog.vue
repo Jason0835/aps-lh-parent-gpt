@@ -1,0 +1,215 @@
+<template>
+  <el-dialog
+    :title="title"
+    :visible="visible"
+    width="600px"
+    @close="hide"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :append-to-body="true"
+  >
+    <info-form
+      class="form-item-height"
+      ref="form"
+      :form="form"
+      :rules="rules"
+      :columns="columns"
+      label-position="right"
+      label-width="120px"
+      v-loading="loading"
+    >
+    </info-form>
+    <template slot="footer">
+      <el-button @click="hide">{{ this.$t("common.button.cancel") }}</el-button>
+      <el-button type="primary" :loading="loading" @click="handleConfirm">{{
+        this.$t("common.button.confirm")
+      }}</el-button>
+    </template>
+  </el-dialog>
+</template>
+
+<script>
+import { editLhSpecifyMachine } from "@/api/lh/lhSpecifyMachine";
+import { listMachine } from "@/api/lh/machine";
+
+import infoForm from "@/views/components/infoForm.vue";
+import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
+
+export default {
+  components: { infoForm, materialCodeSelect },
+  inject: ["parentDict"],
+  data() {
+    return {
+      loading: false,
+      visible: false,
+      isEdit: false,
+      form: {},
+      machineOptions: [],
+      rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        specCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        machineCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        jobType: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+      },
+    };
+  },
+  computed: {
+    title: function () {
+      return this.isEdit
+        ? this.$t("common.button.edit")
+        : this.$t("common.button.add");
+    },
+    columns() {
+      return [
+        {
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.factoryCode"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          filterable: true,
+        },
+        {
+          prop: "specCode",
+          label: this.$t("ui.data.column.lhSpecifyMachine.specCode"),
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.specCode}
+                v-model={form.specCode}
+                onChange={this.handleSpecCodeChange}
+              />
+            );
+          },
+        },
+        {
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.lhSpecifyMachine.materialDesc"),
+          disabled: true,
+        },
+        {
+          prop: "machineCode",
+          label: this.$t("ui.data.column.lhSpecifyMachine.machineCode"),
+          type: "select",
+          dictData: this.machineOptions,
+          filterable: true,
+        },
+        {
+          prop: "jobType",
+          label: this.$t("ui.data.column.lhSpecifyMachine.jobType"),
+          type: "select",
+          dictData: this.parentDict.type.JOB_TYPE,
+          filterable: true,
+        },
+        {
+          prop: "remark",
+          label: this.$t("ui.common.column.remark"),
+          type: "textarea",
+          rows: 3,
+          maxlength: 300,
+        },
+      ];
+    },
+  },
+  methods: {
+    async save(params) {
+      try {
+        this.loading = true;
+
+        const res = await editLhSpecifyMachine(params);
+        this.$modal.msgSuccess(res.msg);
+        this.$emit("success");
+        this.hide();
+      } catch (error) {
+        console.log(error);
+      } finally {
+        this.loading = false;
+      }
+    },
+    async getMachineList() {
+      try {
+        const res = await listMachine(this.form.factoryCode ? { factoryCode: this.form.factoryCode } : {});
+        const list = res.rows || [];
+        const map = new Map();
+        if (this.isEdit && this.form.machineCode) {
+          map.set(this.form.machineCode, {
+            label: this.form.machineCode,
+            value: this.form.machineCode,
+          });
+        }
+        list.forEach((item) => {
+          if (item && item.machineCode) {
+            map.set(item.machineCode, {
+              label: item.machineCode,
+              value: item.machineCode,
+            });
+          }
+        });
+        this.machineOptions = Array.from(map.values());
+      } catch (error) {
+        this.machineOptions = [];
+        console.log(error);
+      }
+    },
+    handleSpecCodeChange(value, row) {
+      this.$set(this.form, "specCode", value);
+      this.$set(this.form, "materialDesc", (row && row.materialDesc) || "");
+    },
+    show(data) {
+      this.visible = true;
+      if (data) {
+        this.isEdit = true;
+        this.form = { ...data };
+        if (data.machineCode) {
+          this.machineOptions = [
+            {
+              label: data.machineCode,
+              value: data.machineCode,
+            },
+          ];
+        }
+      } else {
+        this.form = {
+          factoryCode: "116",
+          materialDesc: "",
+        };
+        this.machineOptions = [];
+      }
+      this.getMachineList();
+    },
+    hide() {
+      this.form = {};
+      this.machineOptions = [];
+      this.$refs.form && this.$refs.form.triggerResetForm();
+      this.isEdit = false;
+      this.visible = false;
+    },
+    handleConfirm() {
+      this.$refs.form.triggerConfirm(this.save);
+    },
+  },
+};
+</script>
