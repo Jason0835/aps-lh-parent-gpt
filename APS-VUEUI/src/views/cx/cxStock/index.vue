@@ -57,7 +57,7 @@ import infoDialog from './components/infoDialog.vue'
 export default {
   name: 'CxStock',
   components: { TltUploadForm, infoDialog },
-  dicts: ['biz_factory_name'],
+  dicts: ['biz_factory_name', 'lh_precision_data_source'],
   provide() {
     return { parentDict: this.dict }
   },
@@ -122,6 +122,14 @@ export default {
           placeholder: this.$t('common.rule.input'),
           type: 'input'
         },
+        {
+          prop: 'dataSource',
+          label: this.$t('ui.data.column.cxStock.dataSource'),
+          type: 'select',
+          dictData: this.dict.type.lh_precision_data_source,
+          filterable: true,
+          clearable: true
+        },
 
       ]
     },
@@ -165,6 +173,16 @@ export default {
           halign: 'center',
           label: this.$t('ui.data.column.cxStock.stockNum'),
           minWidth: 120
+        },
+        {
+          prop: 'dataSource',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxStock.dataSource'),
+          minWidth: 120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.lh_precision_data_source, value);
+          }
         },
         {
           prop: 'updateTime',

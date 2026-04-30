@@ -1,6 +1,7 @@
 package com.zlt.aps.job.task;
 
 import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
+import com.zlt.aps.itf.mes.IMesItfService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,9 @@ public class LhPrecisionPlanTask {
 
     @Autowired
     private ILhPrecisionPlanRemoteService lhPrecisionPlanRemoteService;
+
+    @Autowired
+    private IMesItfService iMesItfService;
 
     /**
      * 从MES同步数据生成硫化精度计划
@@ -73,6 +77,20 @@ public class LhPrecisionPlanTask {
         log.info("定时任务：批量更新到期天数");
         try {
             AjaxResult result = lhPrecisionPlanRemoteService.batchUpdateDaysToDue();
+            log.info("定时任务执行结果：{}", result.get("msg"));
+        } catch (Exception e) {
+            log.error("定时任务执行失败", e);
+        }
+    }
+
+    /**
+     * 下发硫化精度计划到MES
+     * 每天定时查询计划排程精度日期有值且实际执行日期为空的数据，下发到MES中间表并通知MES
+     */
+    public void issueLhPrecisionPlanToMes() {
+        log.info("定时任务：下发硫化精度计划到MES");
+        try {
+            AjaxResult result = iMesItfService.issueLhPrecisionPlan(null);
             log.info("定时任务执行结果：{}", result.get("msg"));
         } catch (Exception e) {
             log.error("定时任务执行失败", e);

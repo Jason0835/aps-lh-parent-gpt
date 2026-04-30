@@ -132,4 +132,12 @@ public class MesTask {
     public void syncMoldAlterPlanFinish() {
         iMesItfService.syncMoldAlterPlanFinish(new AuxReqSyncDataLogs());
     }
+
+    /**
+     * 同步MES硫化精度计划实际执行日期回填数据
+     */
+    @ApiOperation("同步MES硫化精度计划实际执行日期回填数据")
+    public void syncLhPrecisionPlanActual() {
+        iMesItfService.syncLhPrecisionPlanActual(new AuxReqSyncDataLogs());
+    }
 }

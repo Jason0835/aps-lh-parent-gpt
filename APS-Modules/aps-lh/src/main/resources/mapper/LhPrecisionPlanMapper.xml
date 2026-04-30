@@ -10,6 +10,7 @@
         <result property="precisionType" column="PRECISION_TYPE"/>
         <result property="planDate" column="PLAN_DATE"/>
         <result property="actualDate" column="ACTUAL_DATE"/>
+        <result property="scheduleDate" column="SCHEDULE_DATE"/>
         <result property="dueDate" column="DUE_DATE"/>
         <result property="daysToDue" column="DAYS_TO_DUE"/>
         <result property="lastMaintenanceDate" column="LAST_MAINTENANCE_DATE"/>
@@ -36,6 +37,7 @@
                PRECISION_TYPE,
                PLAN_DATE,
                ACTUAL_DATE,
+               SCHEDULE_DATE,
                DUE_DATE,
                DAYS_TO_DUE,
                LAST_MAINTENANCE_DATE,
@@ -129,5 +131,104 @@
         where IS_DELETE = 0
           and COMPLETION_STATUS = '0'
     </update>
+
+    <select id="selectNearestScheduleDatePlan" resultMap="LhPrecisionPlanResult">
+        <include refid="selectLhPrecisionPlanVo"/>
+        where MACHINE_CODE = #{machineCode}
+        and FACTORY_CODE = #{factoryCode}
+        and ACTUAL_DATE is null
+        and SCHEDULE_DATE is not null
+        and IS_DELETE = 0
+        order by ABS(DATEDIFF(SCHEDULE_DATE, #{actualDate})) asc
+        limit 1
+    </select>
+
+    <select id="selectByMesSourceId" resultMap="LhPrecisionPlanResult">
+        <include refid="selectLhPrecisionPlanVo"/>
+        where MES_SOURCE_ID = #{mesSourceId}
+        and IS_DELETE = 0
+        limit 1
+    </select>
+
+    <select id="selectByMesSourceIdBatch" resultMap="LhPrecisionPlanResult">
+        <include refid="selectLhPrecisionPlanVo"/>
+        where IS_DELETE = 0
+        and MES_SOURCE_ID in
+        <foreach collection="mesSourceIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="selectByMachineCodesAndYear" resultMap="LhPrecisionPlanResult">
+        <include refid="selectLhPrecisionPlanVo"/>
+        where IS_DELETE = 0
+        and YEAR = #{year}
+        and MACHINE_CODE in
+        <foreach collection="machineCodes" item="code" open="(" separator="," close=")">
+            #{code}
+        </foreach>
+    </select>
+
+    <select id="selectPendingActualDatePlans" resultMap="LhPrecisionPlanResult">
+        <include refid="selectLhPrecisionPlanVo"/>
+        where IS_DELETE = 0
+        and ACTUAL_DATE is null
+        and SCHEDULE_DATE is not null
+        <if test="machineCodes != null and machineCodes.size() > 0">
+            and MACHINE_CODE in
+            <foreach collection="machineCodes" item="code" open="(" separator="," close=")">
+                #{code}
+            </foreach>
+        </if>
+        <if test="factoryCodes != null and factoryCodes.size() > 0">
+            and FACTORY_CODE in
+            <foreach collection="factoryCodes" item="code" open="(" separator="," close=")">
+                #{code}
+            </foreach>
+        </if>
+        order by MACHINE_CODE, FACTORY_CODE, SCHEDULE_DATE
+    </select>
+
+    <select id="selectPendingScheduleDatePlans" resultMap="LhPrecisionPlanResult">
+        <include refid="selectLhPrecisionPlanVo"/>
+        where IS_DELETE = 0
+        and ACTUAL_DATE is null
+        <if test="machineCodes != null and machineCodes.size() > 0">
+            and MACHINE_CODE in
+            <foreach collection="machineCodes" item="code" open="(" separator="," close=")">
+                #{code}
+            </foreach>
+        </if>
+        <if test="factoryCodes != null and factoryCodes.size() > 0">
+            and FACTORY_CODE in
+            <foreach collection="factoryCodes" item="code" open="(" separator="," close=")">
+                #{code}
+            </foreach>
+        </if>
+        order by MACHINE_CODE, FACTORY_CODE
+    </select>
+
+    <select id="selectByFactoryMachinePlanBatch" resultMap="LhPrecisionPlanResult">
+        <include refid="selectLhPrecisionPlanVo"/>
+        where IS_DELETE = 0
+        <if test="factoryCodes != null and factoryCodes.size() > 0">
+            and FACTORY_CODE in
+            <foreach collection="factoryCodes" item="code" open="(" separator="," close=")">
+                #{code}
+            </foreach>
+        </if>
+        <if test="machineCodes != null and machineCodes.size() > 0">
+            and MACHINE_CODE in
+            <foreach collection="machineCodes" item="code" open="(" separator="," close=")">
+                #{code}
+            </foreach>
+        </if>
+        <if test="planDates != null and planDates.size() > 0">
+            and PLAN_DATE in
+            <foreach collection="planDates" item="date" open="(" separator="," close=")">
+                #{date}
+            </foreach>
+        </if>
+    </select>
 
 </mapper>

@@ -12,6 +12,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.zlt.aps.common.utils.ExportUtil;
 import com.zlt.aps.common.utils.ImportUtil;
+import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanExportVO;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanImportVO;
@@ -50,6 +51,8 @@ public class LhPrecisionPlanUIController extends BaseController {
 
     @Resource
     private ILhPrecisionPlanRemoteService lhPrecisionPlanRemoteService;
+    @Resource
+    private IMesItfService mesItfService;
     @Resource
     private IExportLogService iExportLogService;
     @Resource
@@ -192,5 +195,13 @@ public class LhPrecisionPlanUIController extends BaseController {
     @ResponseBody
     public String checkUnique(LhPrecisionPlan lhPrecisionPlan) {
         return lhPrecisionPlanRemoteService.checkUnique(lhPrecisionPlan);
+    }
+
+    @ApiOperation("同步MES数据并生成硫化精度计划（综合接口）")
+    @RequiresPermissions("lh:lhPrecisionPlan:sync")
+    @PostMapping("/syncAndGenerateLhPrecisionPlan")
+    @ResponseBody
+    public AjaxResult syncAndGenerateLhPrecisionPlan(@RequestParam("year") Integer year) {
+        return mesItfService.syncAndGenerateLhPrecisionPlan(year);
     }
 }

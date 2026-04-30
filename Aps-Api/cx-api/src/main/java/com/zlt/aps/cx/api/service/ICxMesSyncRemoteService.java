@@ -6,6 +6,7 @@ import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.cx.api.domain.entity.CxMesStock;
 import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -58,4 +59,24 @@ public interface ICxMesSyncRemoteService {
     @ApiOperation("查询成型排程日完成量已存在数据")
     @PostMapping("/mesSync/selectDayFinishQtyExists")
     List<CxDayFinishQty> selectDayFinishQtyExists(@RequestBody List<CxDayFinishQty> list);
+
+    @ApiOperation("查询成型库存已存在数据（按唯一键）")
+    @PostMapping("/mesSync/selectCxStockExists")
+    List<CxStock> selectCxStockExists(@RequestBody List<CxStock> list);
+
+    @ApiOperation("批量保存或更新成型库存（UPSERT）")
+    @PostMapping("/mesSync/saveCxStockBatch")
+    AjaxResult saveCxStockBatch(@RequestBody List<CxStock> list);
+
+    @ApiOperation("根据分厂编号和数据来源删除成型库存")
+    @PostMapping("/mesSync/deleteCxStockByDataSource")
+    AjaxResult deleteCxStockByDataSource(@RequestParam("factoryCode") String factoryCode, @RequestParam("dataSource") String dataSource);
+
+    @ApiOperation("根据分厂编号和数据来源查询成型库存")
+    @PostMapping("/mesSync/selectCxStockByDataSource")
+    List<CxStock> selectCxStockByDataSource(@RequestParam("factoryCode") String factoryCode, @RequestParam("dataSource") String dataSource);
+
+    @ApiOperation("根据ID列表批量删除成型库存")
+    @PostMapping("/mesSync/deleteCxStockByIds")
+    AjaxResult deleteCxStockByIds(@RequestBody List<Long> ids);
 }

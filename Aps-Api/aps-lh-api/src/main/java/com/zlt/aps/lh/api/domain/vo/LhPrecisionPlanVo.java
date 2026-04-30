@@ -62,6 +62,10 @@ public class LhPrecisionPlanVo implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date actualDate;
 
+    @ApiModelProperty(value = "计划排程精度日期")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private Date scheduleDate;
+
     @ApiModelProperty(value = "到期日期")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date dueDate;

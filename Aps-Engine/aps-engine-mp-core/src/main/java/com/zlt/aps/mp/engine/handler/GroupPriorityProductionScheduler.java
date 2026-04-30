@@ -72,21 +72,23 @@ public class GroupPriorityProductionScheduler {
      * 优先级按Top中的优先级规则
      * 4、依次类推，迭代轮询，最终得到预排的分组
      *
-     * @param context             排产上下文
-     * @param excludeGroupPlan    需要剔除的分组(中间过程中找不到机台等情形)-初始空集合
-     * @param preSelectedGroupMap 计划可分配产能的分组-初始空集合
+     * @param context                       排产上下文
+     * @param excludeGroupPlan              需要剔除的分组(中间过程中找不到机台等情形)-初始空集合
+     * @param preSelectedGroupSet           计划可分配产能的分组-初始空集合
+     * @param preSelectedGroupAllocationMap 计划可分配产能的分组分配情况-初始空集合
+     * @param discontinueGroupSet           有间断的分组对象集合
      */
-    public void allocationCxMachine(Context context, Set<String> excludeGroupPlan, Set<String> preSelectedGroupMap) {
+    public void allocationCxMachine(Context context, Set<String> excludeGroupPlan, Set<String> preSelectedGroupSet, Map<String, Set<CxMachineAllocationPlanHelper>> preSelectedGroupAllocationMap, Set<String> discontinueGroupSet) {
         //1、获取还需排产分组的当前Top列表
         List<ProductionPlanGroupInfo> topList = getTopList(context, excludeGroupPlan);
         if (CollectionUtils.isEmpty(topList)) {
             return;
         }
         //2、获取各分组对应匹配的合适机台
-        List<GroupPrioritySchedulerResultHelper> topSelectedCxMachineList = getGroupSelectedCxMachine(context, topList, false);
+        List<GroupPrioritySchedulerResultHelper> topSelectedCxMachineList = getGroupSelectedCxMachine(context, topList, false, discontinueGroupSet);
         if (CollectionUtils.isEmpty(topSelectedCxMachineList)) {
             excludeGroupPlan.addAll(topList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.toSet()));
-            allocationCxMachine(context, excludeGroupPlan, preSelectedGroupMap);
+            allocationCxMachine(context, excludeGroupPlan, preSelectedGroupSet, preSelectedGroupAllocationMap, discontinueGroupSet);
             return;
         }
         Map<ProductionPlanGroupInfo, GroupPrioritySchedulerResultHelper> selectedCxMachineMap = topSelectedCxMachineList.stream().collect(Collectors.toMap(GroupPrioritySchedulerResultHelper::getSelectedGroup, Function.identity()));
@@ -110,7 +112,7 @@ public class GroupPriorityProductionScheduler {
         CxMachineAllocationPlanHelper addHelper = buildAllocationDetailInfo(productionContext, finalSelected);
         if (null == addHelper) {
             excludeGroupPlan.add(groupName);
-            allocationCxMachine(context, excludeGroupPlan, preSelectedGroupMap);
+            allocationCxMachine(context, excludeGroupPlan, preSelectedGroupSet, preSelectedGroupAllocationMap, discontinueGroupSet);
             return;
         }
         //5、对成型机台进行模拟模具排产
@@ -120,36 +122,45 @@ public class GroupPriorityProductionScheduler {
         if (newNeedAllocationDaysByGroupPlan.equals(originNeedAllocationDaysByGroupPlan)) {
             excludeGroupPlan.add(groupName);
         } else {
-            preSelectedGroupMap.add(groupName);
+            preSelectedGroupSet.add(groupName);
+            Set<CxMachineAllocationPlanHelper> preAllocationSet = preSelectedGroupAllocationMap.get(groupName);
+            if (null == preAllocationSet) {
+                preAllocationSet = Sets.newHashSet();
+                preSelectedGroupAllocationMap.put(groupName, preAllocationSet);
+            }
+            preAllocationSet.add(addHelper);
             excludeGroupPlan.clear();
         }
         //20260429+ 前分组分配是否需要延长处理
         cxMouldProductionHandler.handlerTimeExtensionDayConclusionByBeforeGroup(productionContext, addHelper);
         //下一批
-        allocationCxMachine(context, excludeGroupPlan, preSelectedGroupMap);
+        allocationCxMachine(context, excludeGroupPlan, preSelectedGroupSet, preSelectedGroupAllocationMap, discontinueGroupSet);
     }
 
     /**
      * 对预期排产分组中的固定机台分组进行排产选机台
      *
-     * @param context                排产上下文
-     * @param priorityFixedGroupList Top之后固定机台优先排产
+     * @param context                  排产上下文
+     * @param excludeGroupPlan         需要剔除的分组
+     * @param appointPriorityGroupList 指定的优先级分组对象集合
+     * @param discontinueGroupSet      有间断排产的分组对象集合
+     * @param isFixed                  是否固定选机台
      * @return
      */
-    public void productionGroupFixedCxMachine(Context context, Set<String> excludeGroupPlan, List<ProductionPlanGroupInfo> priorityFixedGroupList) {
-        if (CollectionUtils.isEmpty(priorityFixedGroupList)) {
+    public void productionAppointGroupCxMachine(Context context, Set<String> excludeGroupPlan, List<ProductionPlanGroupInfo> appointPriorityGroupList, Set<String> discontinueGroupSet, boolean isFixed) {
+        if (CollectionUtils.isEmpty(appointPriorityGroupList)) {
             return;
         }
         //1、获取还需排产分组的当前Top列表
-        List<ProductionPlanGroupInfo> topFixedCxMachineList = getTopListByRange(context, priorityFixedGroupList, excludeGroupPlan);
+        List<ProductionPlanGroupInfo> topFixedCxMachineList = getTopListByRange(context, appointPriorityGroupList, excludeGroupPlan);
         if (CollectionUtils.isEmpty(topFixedCxMachineList)) {
             return;
         }
-        //2、获取对应的指定机台
-        List<GroupPrioritySchedulerResultHelper> topSelectedCxMachineList = getGroupSelectedCxMachine(context, topFixedCxMachineList, true);
+        //2、获取对应的指定机台i
+        List<GroupPrioritySchedulerResultHelper> topSelectedCxMachineList = getGroupSelectedCxMachine(context, topFixedCxMachineList, isFixed, discontinueGroupSet);
         if (CollectionUtils.isEmpty(topSelectedCxMachineList)) {
             excludeGroupPlan.addAll(topFixedCxMachineList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.toSet()));
-            productionGroupFixedCxMachine(context, excludeGroupPlan, priorityFixedGroupList);
+            productionAppointGroupCxMachine(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, isFixed);
             return;
         }
         Map<ProductionPlanGroupInfo, GroupPrioritySchedulerResultHelper> selectedCxMachineMap = topSelectedCxMachineList.stream().collect(Collectors.toMap(GroupPrioritySchedulerResultHelper::getSelectedGroup, Function.identity()));
@@ -173,7 +184,7 @@ public class GroupPriorityProductionScheduler {
         CxMachineAllocationPlanHelper addHelper = buildAllocationDetailInfo(productionContext, finalSelected);
         if (null == addHelper) {
             excludeGroupPlan.add(groupName);
-            productionGroupFixedCxMachine(context, excludeGroupPlan, priorityFixedGroupList);
+            productionAppointGroupCxMachine(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, isFixed);
             return;
         }
         //5、对成型机台进行模拟模具排产
@@ -188,7 +199,7 @@ public class GroupPriorityProductionScheduler {
         //20260429+ 前分组分配是否需要延长处理
         cxMouldProductionHandler.handlerTimeExtensionDayConclusionByBeforeGroup(productionContext, addHelper);
         //下一批
-        productionGroupFixedCxMachine(context, excludeGroupPlan, priorityFixedGroupList);
+        productionAppointGroupCxMachine(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, isFixed);
     }
 
     /**
@@ -261,6 +272,7 @@ public class GroupPriorityProductionScheduler {
      * 优先级挑选：结构优先优先->高优先级有量的Sku个数多的优先->模具受限的Sku个数多的优先->结构需求量大的优先
      *
      * @param context          排产上下文
+     * @param groupRange       指定的排产分组
      * @param excludeGroupPlan 需要排产的分组
      * @return
      */
@@ -320,18 +332,23 @@ public class GroupPriorityProductionScheduler {
     /**
      * 按GroupCxMachinePriorityEnum中的顺序获取Top3对应的选中的排产机台
      *
-     * @param context 排产上下文
-     * @param topList 预排分组信息
-     * @param isFixed 是否固定
+     * @param context             排产上下文
+     * @param topList             预排分组信息
+     * @param isFixed             是否固定
+     * @param discontinueGroupSet 有间断的分组对象集合
      * @return
+     * @pa
      */
-    private List<GroupPrioritySchedulerResultHelper> getGroupSelectedCxMachine(Context context, List<ProductionPlanGroupInfo> topList, boolean isFixed) {
+    private List<GroupPrioritySchedulerResultHelper> getGroupSelectedCxMachine(Context context, List<ProductionPlanGroupInfo> topList, boolean isFixed, Set<String> discontinueGroupSet) {
         if (CollectionUtils.isEmpty(topList)) {
             return Collections.emptyList();
         }
+        Set<String> realDiscontinueGroupSet = null == discontinueGroupSet ? Collections.emptySet() : discontinueGroupSet;
         List<GroupPrioritySchedulerResultHelper> resultList = Lists.newArrayList();
         topList.forEach(topGroup -> {
-            CxMachineBaseInfoVo preSelectedCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlanAppoint(context, topGroup, null, isFixed);
+            //如果是间断，则选时间最长的机台
+            boolean isMoreProductionDay = realDiscontinueGroupSet.contains(topGroup.getGroupName());
+            CxMachineBaseInfoVo preSelectedCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlanAppoint(context, topGroup, isMoreProductionDay, isFixed);
             if (null != preSelectedCxMachine) {
                 GroupPrioritySchedulerResultHelper singleResult = new GroupPrioritySchedulerResultHelper(topGroup, preSelectedCxMachine);
                 resultList.add(singleResult);

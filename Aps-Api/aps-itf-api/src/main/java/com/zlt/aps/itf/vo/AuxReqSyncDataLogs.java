@@ -49,4 +49,7 @@ public class AuxReqSyncDataLogs extends SyncBaseEntity {
 
     @ApiModelProperty(value = "厂别")
     private String factoryCode; //厂别
+
+    @ApiModelProperty(value = "精度类型")
+    private String precisionType; //精度类型（硫化精度/成型精度15天），为空时同步所有类型
 }

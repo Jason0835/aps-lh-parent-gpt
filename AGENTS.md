@@ -17,20 +17,15 @@ utf-8 no bom
 - Date类的运算可以使用cn.hutool.core内的Date相关方法
 - 有条件的话尽可能使用stream流来处理数据
 - 导入业务数据importData见@docs/importdoc.md
-- importData实现规则：
-  1. 第一轮先执行 `ImportExcelValidatedUtils.validated(...)` 注解必填校验，以及 `validatedRepeat(...)` 的 Excel 内重复校验；第一轮失败的行直接标记跳过，后续不再参与业务校验。
-  2. 第二轮再执行业务字段校验、关联主数据存在性校验、字段反显等处理；允许用 `isCan` 一次性收集当前行所有业务字段问题。
-  3. 业务字段校验阶段如果当前行存在错误，应统一 `failureNum++` 后 `continue`，不要再进入 `checkUnique(...)`、更新已存在数据、插入数据等后续逻辑。
-  4. 已通过实体类 `@ImportExcelValidated(required = true)` 声明的必填字段，在业务校验阶段无需再次单独做“判空后立即失败”的重复处理，除非该字段还存在额外业务规则。
 - 遇到字段反显、导出补反显字段、非数据库字段需要反显时，必须先阅读并遵循@字段反显.md
 - 使用LambdaQueryWrapper、LambdaUpdateWrapper
-
 - 尽可能使用Lambda写法（例如：LambdaQueryWrapper、LambdaUpdateWrapper、LambdaQueryChainWrapper、LambdaUpdateChainWrapper），减少字符串字段名硬编码
-
 ### 注释规范
-注释用中文，尽可能的详细
-实体类的字段需要加注释
-不在数据库的字段要求反显时，参考@字段反显.md
+- 注释用中文，尽可能的详细
+- 实体类的字段需要加注释
+- 方法需要加注释，方法参数需要加注释
+- 方法内部逻辑需要加注释
+
 ### 必须遵循的继承结构：
 ```
 Controller  extends AbstractDocBizController<Entity>
@@ -41,6 +36,7 @@ UIController extends BaseUIController<Entity>
 ### 数据库相关：
 - BaseEntity已经定义了 `id,createBy,createTime,updateBy,updateTime,isDelete,remark`，实体类不需要重复定义
 - 非数据库字段必须添加 `@TableField(exist = false)`
+- 不在数据库的字段要求反显时，参考@docs/字段反显.md
 - 唯一性校验返回值：`UserConstants.NOT_UNIQUE = "1"` 不唯一，`UserConstants.UNIQUE = "0"` 唯一
 
 ### Excel导入导出：
@@ -50,9 +46,10 @@ UIController extends BaseUIController<Entity>
 ## 多语言
 
 ### 后端：
-- 文件位置: `jy_aps_admin/Aps-Common/aps-common-core/src/main/resources/i18n/apsui_zh_CN.properties`
+- 文件位置: `Aps-Common/aps-common-core/src/main/resources/i18n/apsui_zh_CN.properties`
 - 格式: `ui.data.column.cxEntityName.fieldName=中文名称`
 
+
 ### 前端：
-- 文件位置: `jy_aps_ui/src/lang/zh/ui_zh_CN.json`
+- 文件位置: `APS-VUEUI/src/lang/zh/ui_zh_CN.json`
 - 格式: `"ui.data.column.cxEntityName.fieldName": "中文名称"`
