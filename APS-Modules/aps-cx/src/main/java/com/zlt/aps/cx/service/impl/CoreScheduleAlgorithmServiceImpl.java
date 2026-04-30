@@ -95,6 +95,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /** 排程起始偏移天数：前端传入最后一天，需要往前推2天开始排产 */
     private static final int SCHEDULE_START_OFFSET_DAYS = 2;
 
+    /** 单日试制+量试SKU上限（按胎胚编码计，跨班次跨机台统一上限） */
+    private static final int MAX_TRIAL_SKU_PER_DAY = 2;
+
     @Override
     public List<CxScheduleResult> executeSchedule(ScheduleContextVo context) {
         log.info("开始执行排程算法，日期: {}", context.getScheduleDate());
@@ -169,6 +172,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             context.setCurrentScheduleDate(currentScheduleDate);
             context.setCurrentShiftConfigs(singleShiftList);
 
+            // 跨天时重置试制/量试单日SKU上限计数（单日最多2个试制+量试SKU）
+            if (day != lastDay) {
+                context.setDailyTrialAssignedEmbryoCodes(new HashSet<>());
+            }
 
             // 执行该班次的排程
             ShiftScheduleResult shiftResult = executeShiftSchedule(
@@ -270,6 +277,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 taskGroup.getContinueTasks().size(),
                 taskGroup.getTrialTasks().size(),
                 taskGroup.getNewTasks().size());
+
+        // ==================== 第一步附加：单日试制/量试SKU上限过滤（单日最多2个） ====================
+        applyDailyTrialSkuLimit(context, taskGroup);
 
         // ==================== 第二步：S5.3 处理续作任务 ====================
         List<MachineAllocationResult> continueAllocations = continueTaskProcessor.processContinueTasks(
@@ -378,6 +388,61 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         log.info("========== 班次排程完成，天={}, 班次={} ==========\n", day, shiftConfig.getShiftCode());
         return shiftResult;
+    }
+
+    /**
+     * 单日试制/量试SKU上限过滤
+     *
+     * <p>单日最多 {@value #MAX_TRIAL_SKU_PER_DAY} 个试制+量试SKU（按胎胚编码计），
+     * 跨机台、跨班次统一上限。超过上限的试制/量试任务直接跳过不排产。
+     *
+     * @param context   排程上下文（含当日已分配SKU集合）
+     * @param taskGroup 任务分组结果（直接修改列表）
+     */
+    private void applyDailyTrialSkuLimit(ScheduleContextVo context, TaskGroupService.TaskGroupResult taskGroup) {
+        Set<String> dailySet = context.getDailyTrialAssignedEmbryoCodes();
+        if (dailySet == null) {
+            dailySet = new HashSet<>();
+            context.setDailyTrialAssignedEmbryoCodes(dailySet);
+        }
+
+        int initialSize = dailySet.size();
+
+        // 过滤试制任务
+        List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredTrialTasks = new ArrayList<>();
+        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getTrialTasks()) {
+            String ec = task.getEmbryoCode();
+            if (dailySet.contains(ec) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
+                dailySet.add(ec);
+                filteredTrialTasks.add(task);
+            } else {
+                log.warn("试制任务 {} 已超过单日上限{}个SKU，跳过", ec, MAX_TRIAL_SKU_PER_DAY);
+            }
+        }
+        taskGroup.getTrialTasks().clear();
+        taskGroup.getTrialTasks().addAll(filteredTrialTasks);
+
+        // 过滤量试任务（在newTasks中）
+        List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredNewTasks = new ArrayList<>();
+        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getNewTasks()) {
+            if (Boolean.TRUE.equals(task.getIsProductionTrial())) {
+                String ec = task.getEmbryoCode();
+                if (dailySet.contains(ec) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
+                    dailySet.add(ec);
+                    filteredNewTasks.add(task);
+                } else {
+                    log.warn("量试任务 {} 已超过单日上限{}个SKU，跳过", ec, MAX_TRIAL_SKU_PER_DAY);
+                }
+            } else {
+                filteredNewTasks.add(task);
+            }
+        }
+        taskGroup.getNewTasks().clear();
+        taskGroup.getNewTasks().addAll(filteredNewTasks);
+
+        if (dailySet.size() > initialSize) {
+            log.info("单日试制/量试SKU上限过滤: 当日已分配 {} / {} 个SKU", dailySet.size(), MAX_TRIAL_SKU_PER_DAY);
+        }
     }
 
     /**

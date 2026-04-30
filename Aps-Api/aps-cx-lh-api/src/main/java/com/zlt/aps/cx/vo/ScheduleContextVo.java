@@ -66,6 +66,13 @@ public class ScheduleContextVo {
     private List<CxShiftConfig> currentShiftConfigs;
 
     /**
+     * 当日已分配的试制/量试胎胚编码集合（用于单日SKU上限控制）
+     * Key: 胎胚编码 (embryoCode)
+     * 单日最多2个试制+量试SKU，按天重置
+     */
+    private Set<String> dailyTrialAssignedEmbryoCodes;
+
+    /**
      * 所有班次配置列表（按排程天数分组）
      * 用于核心算法按天获取班次配置
      */
