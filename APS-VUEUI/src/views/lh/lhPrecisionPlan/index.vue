@@ -164,6 +164,10 @@ export default {
           label: this.$t("ui.lh.precision.plan.actual.date"),
         },
         {
+          prop: "scheduleDate",
+          label: this.$t("ui.data.column.lhPrecisionPlan.scheduleDate"),
+        },
+        {
           prop: "daysToDue",
           label: this.$t("ui.lh.precision.plan.days.to.due"),
           formatter: (row, column, value) => {
