@@ -33,7 +33,7 @@ import { saveMachineMaintenancePlan } from "@/api/tq/machineMaintenancePlan";
 import { listEnabledMachines } from "@/api/tq/machine";
 
 export default {
-  dicts: ["biz_class_type"],
+  dicts: ["class_num_three_plan"],
   components: { infoForm },
   data() {
     return {
@@ -108,7 +108,7 @@ export default {
           span: 24,
           required: true,
           type: "select",
-          dictData: this.dict.type.biz_class_type,
+          dictData: this.dict.type.class_num_three_plan,
           filterable: true,
         },
         {

@@ -87,6 +87,18 @@ export function validateAdd(query) {
   })
 }
 
+// 成型插单新增
+export function insertOrder(query) {
+  return request({
+    url: '/cx/cxScheduleResult/insertOrder',
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    }
+  })
+}
+
 export function cxScheduleResultEdit(query) {
   return request({
     url: '/cx/cxScheduleResult/save',
@@ -94,11 +106,14 @@ export function cxScheduleResultEdit(query) {
     data: query
   })
 }
-export function insertOrder(query) {
+export function adjustQty(query) {
   return request({
     url: '/cx/cxScheduleResult/adjustQty',
     method: 'post',
-    data: query
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    }
   })
 }
 

@@ -40,13 +40,13 @@
           @click="handleAdd"
           >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button
         >
-        <el-button
+        <!-- <el-button
           v-hasPermi="['cx:cxScheduleResult:edit']"
           type="warning"
           :disabled="!canModifySelection"
           @click="() => handleEdit(selection[0])"
           >{{ $t("ui.frame.btn.modify") }}</el-button
-        >
+        > -->
         <el-button
           v-hasPermi="['cx:cxScheduleResult:remove']"
           type="danger"
@@ -209,6 +209,8 @@ export default {
     "PRODUCTION_STATUS",
     "biz_factory_name",
     "MACHINE_TYPE",
+    "trial_status",
+    "biz_yes_no",
   ],
   provide() {
     return {
@@ -848,13 +850,10 @@ export default {
   },
   methods: {
     handleAdd() {
-      if (this.$refs.editRef) {
-        this.$refs.editRef.show(
-          {
-            scheduleDate: this.query.scheduleDate,
-          },
-          "insert"
-        );
+      if (this.$refs.addRef) {
+        this.$refs.addRef.show({
+          scheduleDate: this.query.scheduleDate,
+        });
       }
     },
     handleEdit(row) {
@@ -1043,7 +1042,12 @@ export default {
       downloadLink("/cx/cxScheduleResult/export", this.formatParams(false));
     },
     handleGotoMoldingScheduleSequence() {
-      this.$router.push("/moldingPlanManagement/moldingScheduleSequence");
+      this.$router.push({
+        path: "/moldingPlanManagement/moldingScheduleSequence",
+        query: {
+          queryParams: encodeURIComponent(JSON.stringify(this.query || {})),
+        },
+      });
     },
     handleProducingIssue() {
       this.$confirm(this.$t("ui.biz.alter.producingIssue")).then(async () => {

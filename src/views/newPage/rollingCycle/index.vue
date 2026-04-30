@@ -237,7 +237,7 @@
           <template v-slot="scope" v-if="item.prop == 'isLockSchedule' || item.editable">
             <div v-if="item.prop == 'isLockSchedule'">
               <el-select
-                v-if="showConfirmResult && scope.row.id"
+                v-if="scope.row.id"
                 v-model="scope.row.isLockSchedule"
                 @change="handleLockScheduleChange(scope.row, $event)"
                 size="mini"
@@ -730,7 +730,7 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  {!this.isTabChange && row.id && (
+                  {row.id && (
                     <el-select
                       v-model={row.isLockSchedule}
                       onChange={(val) =>
@@ -746,7 +746,7 @@ export default {
                       ))}
                     </el-select>
                   )}
-                  {this.isTabChange && (
+                  {!row.id && (
                     <span>
                       {this.selectDictLabel(
                         this.dict.type.biz_yes_no,
@@ -779,6 +779,26 @@ export default {
             prop: `day${i + 1}`,
             minWidth: "80px",
             type: "number",
+            render: ({ row }) => {
+              const prop = `day${i + 1}`;
+              return (
+                <div>
+                  {row.id ? (
+                    <el-input
+                      value={row[prop] || ""}
+                      size="mini"
+                      onInput={(value) => {
+                        row[prop] = (value || "").replace(/[^\d]/g, "");
+                      }}
+                      onFocus={() => this.onDayEditFocus(row, prop)}
+                      onBlur={() => this.handleResultDayEdit(row, prop)}
+                    ></el-input>
+                  ) : (
+                    <span>{row[prop] || ""}</span>
+                  )}
+                </div>
+              );
+            },
           });
         }
         return list;
@@ -1310,6 +1330,29 @@ export default {
       return String(val);
     },
 
+    //按后端规则本地重算开始/结束日期
+    recalculateBeginEndDay(row) {
+      if (!row) return;
+      const monthStartDay = 1;
+      const monthMaxDay = 31;
+      let realBeginDay = monthMaxDay + 1;
+      let realEndDay = 0;
+      for (let i = monthStartDay; i <= monthMaxDay; i++) {
+        const dayField = `day${i}`;
+        const dayVal = Number(row[dayField] || 0);
+        if (dayVal !== 0) {
+          if (realBeginDay > i) {
+            realBeginDay = i;
+          }
+          if (realEndDay < i) {
+            realEndDay = i;
+          }
+        }
+      }
+      row.beginDay = realBeginDay === monthMaxDay + 1 ? 0 : realBeginDay;
+      row.endDay = realEndDay;
+    },
+
     //给调整结果列表回填 productTypeCode（源数据来自单结构列表 this.data）
     enrichProductTypeCode(list = []) {
       if (!Array.isArray(list) || list.length === 0) return list;
@@ -1347,10 +1390,25 @@ export default {
       const newVal = this.normalizeDayValue(row[prop]);
       if (newVal === oldVal) return;
       try {
+        this.recalculateBeginEndDay(row);
         console.log("发送请求数据:", JSON.stringify(row));
-        await updateSkuScheduleItems(row);
-        this.$modal.msgSuccess("更新成功");
-        this.getOutResultList(row.productionVersion, row.version);
+        await saveAdjustResult(row);
+        // this.getOutResultList(row.productionVersion, row.version);
+      } catch (err) {
+        console.log(err);
+      }
+    },
+
+    //修改调整结果tab每日计划量
+    async handleResultDayEdit(row, prop) {
+      if (!row.id) return;
+      const oldVal = this.normalizeDayValue(this.dayEditOriginalValue);
+      const newVal = this.normalizeDayValue(row[prop]);
+      if (newVal === oldVal) return;
+      try {
+        this.recalculateBeginEndDay(row);
+        await saveAdjustResult(row);
+        // 保持表格就地更新：接口成功后不重新拉取列表，避免闪动
       } catch (err) {
         console.log(err);
       }

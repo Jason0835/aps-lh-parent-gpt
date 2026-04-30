@@ -54,7 +54,15 @@
               :label="$t('ui.data.column.cxScheduleResult.cxMachineCode')"
               prop="cxMachineCode"
             >
-              <el-input v-model="form.cxMachineName" disabled></el-input>
+              <el-input v-model="form.cxMachineCode" disabled></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.cxScheduleResult.lhMachineCode')"
+              prop="lhMachineCode"
+            >
+              <el-input v-model="form.lhMachineCode" disabled></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -87,23 +95,23 @@
               :label="$t('合计余量')"
               prop="mouldSurplusQty"
             >
-              <el-input v-model="form.mouldSurplusQty" disabled></el-input>
+              <el-input :value="displayMouldSurplusQty" disabled></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item
               :label="$t('胎胚库存')"
-              prop="embryoStock"
+              prop="totalStock"
             >
-              <el-input v-model="form.materialDesc" disabled></el-input>
+              <el-input v-model="form.totalStock" disabled></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item
               :label="$t('硫化班产')"
-              prop="mouldSurplusQty"
+              prop="lhClassQty"
             >
-              <el-input v-model="form.mouldSurplusQty" disabled></el-input>
+              <el-input v-model="form.lhClassQty" disabled></el-input>
             </el-form-item>
           </el-col>
 
@@ -118,7 +126,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("夜班") + dateList[0].shiftDate }}
+              {{ getShiftTitle($t("早班"), 0) }}
             </h4>
           </el-col>
 
@@ -161,9 +169,29 @@
               <el-input v-model="form.class1Analysis" disabled></el-input>
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方编号')" prop="class1RecipeNo">
+              <embryoNoSelect
+                :key="`class1RecipeNo-${form.class1RecipeNo || ''}`"
+                v-model="form.class1RecipeNo"
+                :materialCode="form.materialCode"
+                :disabled="isShiftLocked(1)"
+                @change="(val, row) => handleRecipeNoChange(1, val, row)"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方类型')" prop="class1RecipeType">
+              <dict-select
+                v-model="form.class1RecipeType"
+                :options="parentDict.type.trial_status"
+                disabled
+              />
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("早班") + dateList[1].shiftDate }}
+              {{ getShiftTitle($t("中班"), 1) }}
             </h4>
           </el-col>
 
@@ -209,9 +237,29 @@
               <el-input v-model="form.class2Analysis" disabled></el-input>
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方编号')" prop="class2RecipeNo">
+              <embryoNoSelect
+                :key="`class2RecipeNo-${form.class2RecipeNo || ''}`"
+                v-model="form.class2RecipeNo"
+                :materialCode="form.materialCode"
+                :disabled="isShiftLocked(2)"
+                @change="(val, row) => handleRecipeNoChange(2, val, row)"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方类型')" prop="class2RecipeType">
+              <dict-select
+                v-model="form.class2RecipeType"
+                :options="parentDict.type.trial_status"
+                disabled
+              />
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("中班") + dateList[2].shiftDate }}
+              {{ getShiftTitle($t("夜班"), 2) }}
             </h4>
           </el-col>
 
@@ -257,9 +305,29 @@
               <el-input v-model="form.class3Analysis" disabled></el-input>
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方编号')" prop="class3RecipeNo">
+              <embryoNoSelect
+                :key="`class3RecipeNo-${form.class3RecipeNo || ''}`"
+                v-model="form.class3RecipeNo"
+                :materialCode="form.materialCode"
+                :disabled="isShiftLocked(3)"
+                @change="(val, row) => handleRecipeNoChange(3, val, row)"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方类型')" prop="class3RecipeType">
+              <dict-select
+                v-model="form.class3RecipeType"
+                :options="parentDict.type.trial_status"
+                disabled
+              />
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("夜班") + dateList[3].shiftDate }}
+              {{ getShiftTitle($t("早班"), 3) }}
             </h4>
           </el-col>
 
@@ -305,9 +373,29 @@
               <el-input v-model="form.class4Analysis" disabled></el-input>
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方编号')" prop="class4RecipeNo">
+              <embryoNoSelect
+                :key="`class4RecipeNo-${form.class4RecipeNo || ''}`"
+                v-model="form.class4RecipeNo"
+                :materialCode="form.materialCode"
+                :disabled="isShiftLocked(4)"
+                @change="(val, row) => handleRecipeNoChange(4, val, row)"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方类型')" prop="class4RecipeType">
+              <dict-select
+                v-model="form.class4RecipeType"
+                :options="parentDict.type.trial_status"
+                disabled
+              />
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("早班") + dateList[4].shiftDate }}
+              {{ getShiftTitle($t("中班"), 4) }}
             </h4>
           </el-col>
 
@@ -353,9 +441,29 @@
               <el-input v-model="form.class5Analysis" disabled></el-input>
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方编号')" prop="class5RecipeNo">
+              <embryoNoSelect
+                :key="`class5RecipeNo-${form.class5RecipeNo || ''}`"
+                v-model="form.class5RecipeNo"
+                :materialCode="form.materialCode"
+                :disabled="isShiftLocked(5)"
+                @change="(val, row) => handleRecipeNoChange(5, val, row)"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方类型')" prop="class5RecipeType">
+              <dict-select
+                v-model="form.class5RecipeType"
+                :options="parentDict.type.trial_status"
+                disabled
+              />
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("中班") + dateList[5].shiftDate }}
+              {{ getShiftTitle($t("夜班"), 5) }}
             </h4>
           </el-col>
 
@@ -401,11 +509,31 @@
               <el-input v-model="form.class6Analysis" disabled></el-input>
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方编号')" prop="class6RecipeNo">
+              <embryoNoSelect
+                :key="`class6RecipeNo-${form.class6RecipeNo || ''}`"
+                v-model="form.class6RecipeNo"
+                :materialCode="form.materialCode"
+                :disabled="isShiftLocked(6)"
+                @change="(val, row) => handleRecipeNoChange(6, val, row)"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方类型')" prop="class6RecipeType">
+              <dict-select
+                v-model="form.class6RecipeType"
+                :options="parentDict.type.trial_status"
+                disabled
+              />
+            </el-form-item>
+          </el-col>
 
 
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("夜班") + dateList[6].shiftDate }}
+              {{ getShiftTitle($t("早班"), 6) }}
             </h4>
           </el-col>
 
@@ -451,10 +579,30 @@
               <el-input v-model="form.class7Analysis" disabled></el-input>
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方编号')" prop="class7RecipeNo">
+              <embryoNoSelect
+                :key="`class7RecipeNo-${form.class7RecipeNo || ''}`"
+                v-model="form.class7RecipeNo"
+                :materialCode="form.materialCode"
+                :disabled="isShiftLocked(7)"
+                @change="(val, row) => handleRecipeNoChange(7, val, row)"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方类型')" prop="class7RecipeType">
+              <dict-select
+                v-model="form.class7RecipeType"
+                :options="parentDict.type.trial_status"
+                disabled
+              />
+            </el-form-item>
+          </el-col>
 
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("早班") + dateList[7].shiftDate }}
+              {{ getShiftTitle($t("中班"), 7) }}
             </h4>
           </el-col>
 
@@ -500,6 +648,26 @@
               <el-input v-model="form.class8Analysis" disabled></el-input>
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方编号')" prop="class8RecipeNo">
+              <embryoNoSelect
+                :key="`class8RecipeNo-${form.class8RecipeNo || ''}`"
+                v-model="form.class8RecipeNo"
+                :materialCode="form.materialCode"
+                :disabled="isShiftLocked(8)"
+                @change="(val, row) => handleRecipeNoChange(8, val, row)"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方类型')" prop="class8RecipeType">
+              <dict-select
+                v-model="form.class8RecipeType"
+                :options="parentDict.type.trial_status"
+                disabled
+              />
+            </el-form-item>
+          </el-col>
         </el-row>
       </el-form>
     </div>
@@ -516,15 +684,17 @@
 import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
+import embryoNoSelect from "@/views/components/embryoNoSelect.vue";
 
 import {
   validateChangeQty,
-  insertOrder,
+  adjustQty,
   getInfoChangePlan,
 } from "@/api/cx/cxScheduleResult";
+import { getScheduleDate } from "@/api/lh/scheduleResult";
 
 export default {
-  components: { infoForm },
+  components: { infoForm, embryoNoSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -593,6 +763,18 @@ export default {
   computed: {
     title: function () {
       return this.$t("调量");
+    },
+    displayMouldSurplusQty() {
+      if (this.form.mouldSurplusQty !== undefined && this.form.mouldSurplusQty !== null) {
+        return this.form.mouldSurplusQty;
+      }
+      if (this.form.cxRemainQty !== undefined && this.form.cxRemainQty !== null) {
+        return this.form.cxRemainQty;
+      }
+      if (this.form.lhRemainQty !== undefined && this.form.lhRemainQty !== null) {
+        return this.form.lhRemainQty;
+      }
+      return "";
     },
     columns() {
       return [
@@ -1016,8 +1198,61 @@ export default {
     },
   },
   methods: {
+    buildAdjustQtyParams(form = {}) {
+      const params = {
+        id: Number(form.id) || 0,
+      };
+      for (let index = 1; index <= 8; index += 1) {
+        params[`class${index}AnalysisInput`] = form[`class${index}AnalysisInput`] || "";
+        params[`class${index}FinishQty`] = Number(form[`class${index}FinishQty`]) || 0;
+        params[`class${index}PlanQty`] = Number(form[`class${index}PlanQty`]) || 0;
+        params[`class${index}RecipeNo`] = form[`class${index}RecipeNo`] || "";
+        params[`class${index}RecipeType`] = form[`class${index}RecipeType`] || "";
+      }
+      return params;
+    },
+    async getShiftDates(scheduleDate) {
+      if (!scheduleDate) {
+        return;
+      }
+      try {
+        const res = await getScheduleDate({ scheduleDate });
+        if (Array.isArray(res) && res.length) {
+          this.dateList = res;
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    getShiftTitle(label, shiftIndex) {
+      const shiftDate = this.getShiftDateByIndex(shiftIndex);
+      return shiftDate ? `${label} ${shiftDate}` : label;
+    },
+    getShiftDateByIndex(shiftIndex) {
+      return this.formatShiftDate(this.dateList?.[shiftIndex]?.shiftDate);
+    },
+    formatShiftDate(date) {
+      if (!date) {
+        return "";
+      }
+      if (/^\d{2}\/\d{2}$/.test(date)) {
+        return date;
+      }
+      return moment(date).format("MM/DD");
+    },
     isShiftLocked(shift) {
-      return Number(this.form[`class${shift}FinishQty`] || 0) !== 0;
+      const hasFinished = Number(this.form[`class${shift}FinishQty`] || 0) !== 0;
+      const endTime = this.form[`class${shift}EndTime`];
+      const timeLocked = endTime ? moment().isAfter(moment(endTime)) : false;
+      return hasFinished || timeLocked;
+    },
+    handleRecipeNoChange(shift, val, row) {
+      const recipeTypeField = `class${shift}RecipeType`;
+      if (val && row) {
+        this.$set(this.form, recipeTypeField, row.trialStatus);
+      } else {
+        this.$set(this.form, recipeTypeField, "");
+      }
     },
     // api
     async getInfo(id) {
@@ -1054,10 +1289,11 @@ export default {
       });
     },
 
-    async save(params) {
+    async save(form) {
       try {
         this.loading = true;
-        const res = await insertOrder(params);
+        const params = this.buildAdjustQtyParams(form);
+        const res = await adjustQty(params);
         this.loading = false;
         this.$modal.msgSuccess(
           this.$t("common.msg.ajax.operation.success")
@@ -1079,6 +1315,7 @@ export default {
           ...data,
         };
         // this.getInfo(data.id);
+        this.getShiftDates(data.scheduleDate);
 
         if (data.scheduleDate) {
           if (moment().isAfter(data.scheduleDate)) {
@@ -1117,6 +1354,10 @@ export default {
     },
     hide() {
       this.form = {};
+      this.dateList = Array.from({ length: 8 }, (_, index) => ({
+        shift: index + 1,
+        shiftDate: "",
+      }));
       // this.$refs.form.triggerResetForm();
       // this.resetForm("infoForm");
       this.isEdit = false;

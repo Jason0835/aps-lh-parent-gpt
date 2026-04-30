@@ -7,12 +7,11 @@
       :columns="columns"
       :searchColumns="searchColumns"
       :data="data"
-      :page="page"
+      :page="null"
       :search="search"
       @refresh="getList"
       @search="handleSearch"
       @reset="handleReset"
-      @pageChange="handlePageChange"
       @sort-change="handleSortChange"
       :showSummary="false"
       :selectArea="false"
@@ -20,12 +19,12 @@
       :cell-style="cellStyle"
     >
       <template slot="header">
-        <el-button
+        <!-- <el-button
           v-hasPermi="['cx:cxScheduleResult:add']"
           type="warning"
           @click="handleAdd"
           >{{ $t("common.button.add") }}</el-button
-        >
+        > -->
         <el-button v-if="hasDirtyData" type="primary" @click="handleSubmit"
           >{{ $t("ui.frame.btn.submit") }}</el-button
         >
@@ -40,21 +39,24 @@ import moment from "moment";
 import { mapState } from "vuex";
 import {
   addMoldingScheduleSequence,
-  listCxScheduleResult,
-  submitMoldingScheduleSequence,
 } from "@/api/cx/cxScheduleResult";
+import {
+  listCxScheduleDetailByQuery,
+  updateCxScheduleDetailPlanQty,
+} from "@/api/cx/cxScheduleDetail";
+import { listStructureName } from "@/api/mdm/mdmStructureName";
 import { getScheduleDate } from "@/api/lh/scheduleResult";
 import editDialog from "./components/editDialog.vue";
 
 const SHIFT_COUNT = 8;
-const EDIT_FIELDS = ["PlanQty", "FinishQty", "Analysis", "RecipeType"];
+const EDIT_FIELDS = ["PlanQty", "Analysis", "RecipeType"];
 
 export default {
   name: "MoldingScheduleSequence",
   components: {
     editDialog,
   },
-  dicts: ["IS_RELEASE", "biz_factory_name", "MACHINE_TYPE"],
+  dicts: ["IS_RELEASE", "biz_factory_name", "MACHINE_TYPE", "trial_status"],
   data() {
     return {
       loading: false,
@@ -67,6 +69,7 @@ export default {
       sort: {},
       search: {},
       query: {},
+      newStructureList: [],
       dateList: Array.from({ length: SHIFT_COUNT }, (_, i) => ({
         shift: i + 1,
         shiftDate: "",
@@ -101,13 +104,21 @@ export default {
 
       const shiftColumns = Array.from({ length: SHIFT_COUNT }, (_, idx) => {
         const shift = idx + 1;
+        const sequenceProp = `class${shift}Sequence`;
         return {
           label: `${this.$t(this.getShiftLabel(shift))} ${this.dateList[idx].shiftDate}`,
           children: [
+            {
+              prop: sequenceProp,
+              label: "顺位",
+              align: "center",
+              minWidth: 120,
+              render: ({ row }) => <span>{row[sequenceProp] ?? ""}</span>,
+            },
             this.createEditableColumn(`class${shift}PlanQty`, this.$t("ui.data.column.scheduleResult.plan"), "number"),
             this.createEditableColumn(`class${shift}FinishQty`, this.$t("实际"), "number"),
             this.createEditableColumn(`class${shift}Analysis`, this.$t("ui.data.column.scheduleResult.analysis"), "text"),
-            this.createEditableColumn(`class${shift}RecipeType`, this.$t("示方类型"), "text"),
+            this.createEditableColumn(`class${shift}RecipeType`, this.$t("示方类型"), "select"),
           ],
         };
       });
@@ -135,6 +146,13 @@ export default {
           prop: "mainMaterialDesc",
         },
         {
+          prop: "structureName",
+          label: this.$t("ui.data.column.finishStock.structureName"),
+          type: "select",
+          dictData: this.newStructureList,
+          filterable: true,
+        },
+        {
           label: this.$t("ui.data.column.cxScheduleResult.cxMachineCode"),
           prop: "cxMachineCode",
           type: "select",
@@ -147,6 +165,20 @@ export default {
     },
   },
   methods: {
+    getRouteQueryParams() {
+      const { queryParams, ...restQuery } = this.$route.query || {};
+      if (queryParams) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(queryParams));
+          if (parsed && typeof parsed === "object") {
+            return parsed;
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      }
+      return restQuery;
+    },
     handleAdd() {
       if (this.$refs.editRef) {
         this.$refs.editRef.show(
@@ -161,7 +193,8 @@ export default {
       }
     },
     getShiftLabel(shift) {
-      const labels = ["一班", "二班", "三班", "四班", "五班", "六班", "七班", "八班"];
+      // 表头班次顺序：早班、中班、晚班、早班、中班、晚班、早班、中班
+      const labels = ["早班", "中班", "晚班", "早班", "中班", "晚班", "早班", "中班"];
       return labels[shift - 1] || "";
     },
     createEditableColumn(prop, label, type) {
@@ -180,13 +213,33 @@ export default {
                 value={Number(row[prop] || 0)}
                 min={0}
                 controls={false}
+                style="width: 100%;"
                 onInput={(value) => this.handleFieldChange(row, prop, value)}
               />
+            );
+          }
+          if (type === "select") {
+            return (
+              <el-select
+                value={row[prop]}
+                clearable
+                filterable
+                onInput={(value) => this.handleFieldChange(row, prop, value)}
+              >
+                {(this.dict?.type?.trial_status || []).map((item) => (
+                  <el-option
+                    key={item.value ?? item.dictValue}
+                    label={item.label ?? item.dictLabel}
+                    value={item.value ?? item.dictValue}
+                  />
+                ))}
+              </el-select>
             );
           }
           return (
             <el-input
               value={row[prop]}
+              style="width: 100%;"
               clearable
               onInput={(value) => this.handleFieldChange(row, prop, value)}
             />
@@ -270,11 +323,20 @@ export default {
     async handleSubmit() {
       if (!this.hasDirtyData) return;
       const changedRows = this.data.filter((row) => this.dirtyRowIds.includes(row.id || row.mainId || row.scheduleMainId));
-      await submitMoldingScheduleSequence({
-        scheduleDate: this.query.scheduleDate,
-        rows: changedRows,
+      const payload = changedRows.map((row) => {
+        const item = {
+          detailId: row.id || row.detailId || 0,
+        };
+        for (let i = 1; i <= SHIFT_COUNT; i += 1) {
+          item[`class${i}PlanQty`] = Number(row[`class${i}PlanQty`] || 0);
+          item[`class${i}AnalysisInput`] = row[`class${i}AnalysisInput`] ?? row[`class${i}Analysis`] ?? "";
+          item[`class${i}RecipeNo`] = row[`class${i}RecipeNo`] ?? "";
+          item[`class${i}RecipeType`] = row[`class${i}RecipeType`] ?? "";
+        }
+        return item;
       });
-      this.$modal.msgSuccess(this.$t("操作成功"));
+      const res = await updateCxScheduleDetailPlanQty(payload);
+      this.$modal.msgSuccess(res.msg || this.$t("操作成功"));
       this.getList();
     },
     rowStyle({ row }) {
@@ -288,7 +350,7 @@ export default {
       }
       return {};
     },
-    formatParams(hasPage = true) {
+    formatParams(hasPage = false) {
       const params = {
         ...this.query,
         ...this.sort,
@@ -314,9 +376,12 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const res = await listCxScheduleResult(this.formatParams());
-        this.data = res.rows || [];
-        this.page.total = res.total || 0;
+        const res = await listCxScheduleDetailByQuery(this.formatParams(false));
+        const rows = Array.isArray(res)
+          ? res
+          : res?.rows || res?.data?.rows || res?.data || [];
+        this.data = Array.isArray(rows) ? rows : [];
+        this.page.total = this.data.length;
         this.originEditMap = {};
         this.data.forEach((row) => {
           const rowId = row.id || row.mainId || row.scheduleMainId;
@@ -332,14 +397,34 @@ export default {
         this.getDate();
       }
     },
+    async getNewList() {
+      try {
+        const res = await listStructureName({});
+        const rows = res?.rows || [];
+        this.newStructureList = rows.map((item) => ({
+          label: item.structureName,
+          value: item.structureName,
+        }));
+      } catch (error) {
+        console.error(error);
+      }
+    },
   },
   created() {
     const date = moment().add(2, "days").format("YYYY-MM-DD");
-    this.query.scheduleDate = date;
-    this.search.scheduleDate = date;
+    const routeQuery = this.getRouteQueryParams();
+    this.query = Object.keys(routeQuery || {}).length > 0
+      ? { ...routeQuery }
+      : { scheduleDate: date };
+    this.search = { ...this.query };
+    if (!this.query.scheduleDate) {
+      this.query.scheduleDate = date;
+      this.search.scheduleDate = date;
+    }
     this.$store.dispatch("molding/getMachineList");
   },
   mounted() {
+    this.getNewList();
     this.getList();
   },
 };

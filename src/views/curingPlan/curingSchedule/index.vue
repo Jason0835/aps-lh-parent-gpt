@@ -373,10 +373,14 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.materialDesc"),
           prop: "materialDesc",
+          minWidth: 320,
+          showOverflowTooltip: true,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.embryoDesc"),
           prop: "mainMaterialDesc",
+          minWidth: 320,
+          showOverflowTooltip: true,
         },
         {
           prop: "scheduleType",
@@ -388,8 +392,16 @@ export default {
         },
 
         {
+          label: this.$t("ui.data.column.scheduleResult.finishQty"),
+          prop: "finishQty",
+          minWidth: 100,
+          align: "right",
+        },
+        {
           label: this.$t("ui.data.column.scheduleResult.totalSurplusQty"),
           prop: "mouldSurplusQty",
+          minWidth: 100,
+          align: "right",
         },
         {
           label: this.$t("ui.data.column.scheduleResult.embryoStock"),
@@ -408,16 +420,6 @@ export default {
           },
         },
 
-        {
-          label: this.$t("ui.data.column.scheduleResult.batchNo"),
-          prop: "batchNo",
-          width: 180,
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.orderNo"),
-          prop: "orderNo",
-          width: 180,
-        },
         {
           label: this.$t("ui.data.column.scheduleResult.morningShift") + " " + (this.dateList[0]?.shiftDate ?? ""),
           children: [
@@ -708,6 +710,16 @@ export default {
         {
           prop: "remark",
           label: this.$t("ui.data.column.remark"),
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.batchNo"),
+          prop: "batchNo",
+          width: 180,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.orderNo"),
+          prop: "orderNo",
+          width: 180,
         },
         {
           prop: "updateTime",
