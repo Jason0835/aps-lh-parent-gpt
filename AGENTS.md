@@ -20,7 +20,6 @@ utf-8 no bom
 - 遇到字段反显、导出补反显字段、非数据库字段需要反显时，必须先阅读并遵循@字段反显.md
 - 使用LambdaQueryWrapper、LambdaUpdateWrapper
 - 尽可能使用Lambda写法（例如：LambdaQueryWrapper、LambdaUpdateWrapper、LambdaQueryChainWrapper、LambdaUpdateChainWrapper），减少字符串字段名硬编码
-- 不在数据库的字段要求反显时，参考@字段反显.md
 ### 注释规范
 - 注释用中文，尽可能的详细
 - 实体类的字段需要加注释
@@ -37,6 +36,7 @@ UIController extends BaseUIController<Entity>
 ### 数据库相关：
 - BaseEntity已经定义了 `id,createBy,createTime,updateBy,updateTime,isDelete,remark`，实体类不需要重复定义
 - 非数据库字段必须添加 `@TableField(exist = false)`
+- 不在数据库的字段要求反显时，参考@docs/字段反显.md
 - 唯一性校验返回值：`UserConstants.NOT_UNIQUE = "1"` 不唯一，`UserConstants.UNIQUE = "0"` 唯一
 
 ### Excel导入导出：
