@@ -2,7 +2,7 @@
   <el-dialog
     :title="title"
     :visible="visible"
-    width="1100px"
+    width="800px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
@@ -27,7 +27,7 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('硫化机台')"
+              :label="$t('ui.data.column.scheduleResult.lhMachineCode')"
               prop="lhMachineCode"
             >
               <el-input v-model="form.lhMachineCode" disabled></el-input>
@@ -36,7 +36,7 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('物料编码')"
+              :label="$t('ui.data.column.scheduleResult.materialCode')"
               prop="materialCode"
             >
               <el-input v-model="form.materialCode" disabled></el-input>
@@ -65,7 +65,7 @@
               </el-col> -->
           <el-col :span="12">
             <el-form-item
-              :label="$t('物料描述')"
+              :label="$t('ui.data.column.scheduleResult.materialDesc')"
               prop="materialDesc"
             >
             <el-input v-model="form.materialDesc" disabled></el-input>
@@ -73,7 +73,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item
-              :label="$t('胎胚描述')"
+              :label="$t('ui.data.column.scheduleResult.embryoDesc')"
               prop="mainMaterialDesc"
             >
               <el-input v-model="form.mainMaterialDesc" disabled></el-input>
@@ -82,7 +82,7 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('合计余量')"
+              :label="$t('ui.data.column.scheduleResult.totalSurplusQty')"
               prop="mouldSurplusQty"
             >
               <el-input v-model="form.mouldSurplusQty" disabled></el-input>
@@ -90,7 +90,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item
-              :label="$t('胎胚库存')"
+              :label="$t('ui.data.column.scheduleResult.embryoStock')"
               prop="embryoStock"
             >
               <el-input v-model="form.embryoStock" disabled></el-input>
@@ -98,7 +98,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item
-              :label="$t('硫化班产')"
+              :label="$t('ui.data.column.scheduleResult.lhShiftQty')"
               prop="singleMouldShiftQty"
             >
               <el-input v-model="form.singleMouldShiftQty" disabled></el-input>
@@ -178,7 +178,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("早班") +dateList[0].shiftDate }}
+              {{ $t("ui.data.column.scheduleResult.morningShift") + dateList[0].shiftDate }}
             </h4>
           </el-col>
 
@@ -227,7 +227,7 @@
           </el-col> -->
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("中班")+dateList[1].shiftDate }}
+              {{ $t("ui.data.column.scheduleResult.middleShift") + dateList[1].shiftDate }}
             </h4>
           </el-col>
 
@@ -276,7 +276,7 @@
           </el-col> -->
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("晚班")+dateList[2].shiftDate }}
+              {{ $t("ui.data.column.scheduleResult.nightShift") + dateList[2].shiftDate }}
             </h4>
           </el-col>
 
@@ -325,7 +325,7 @@
           </el-col> -->
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("早") +dateList[3].shiftDate }}
+              {{ $t("ui.data.column.scheduleResult.morningShift") + dateList[3].shiftDate }}
             </h4>
           </el-col>
 
@@ -374,7 +374,7 @@
           </el-col> -->
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("中班"+dateList[4].shiftDate) }}
+              {{ $t("ui.data.column.scheduleResult.middleShift") + dateList[4].shiftDate }}
             </h4>
           </el-col>
 
@@ -423,7 +423,7 @@
           </el-col> -->
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("晚班"+dateList[5].shiftDate) }}
+              {{ $t("ui.data.column.scheduleResult.nightShift") + dateList[5].shiftDate }}
             </h4>
           </el-col>
 
@@ -474,7 +474,7 @@
 
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("早班"+dateList[6].shiftDate) }}
+              {{ $t("ui.data.column.scheduleResult.morningShift") + dateList[6].shiftDate }}
             </h4>
           </el-col>
 
@@ -524,7 +524,7 @@
 
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ $t("中班"+dateList[7].shiftDate) }}
+              {{ $t("ui.data.column.scheduleResult.middleShift") + dateList[7].shiftDate }}
             </h4>
           </el-col>
 
@@ -671,7 +671,7 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("调量");
+      return this.$t("ui.data.column.scheduleResult.changePlan");
     },
     columns() {
       return [
