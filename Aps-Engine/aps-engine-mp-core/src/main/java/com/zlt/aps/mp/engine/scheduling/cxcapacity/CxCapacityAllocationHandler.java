@@ -13,7 +13,6 @@ import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
-import com.zlt.aps.mp.engine.enums.GroupCxMachinePriorityEnum;
 import com.zlt.aps.mp.engine.handler.CxMachinePrioritySelector;
 import com.zlt.aps.mp.engine.handler.GroupPlanCxMachineSelector;
 import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
@@ -437,13 +436,13 @@ public class CxCapacityAllocationHandler {
      * 11、历史超出覆盖
      * 12、历史不覆盖
      *
-     * @param context       排产上下文
-     * @param selectedGroup 选中的排产计划
-     * @param priority      优先级类型
-     * @param isFixed       是否指定优先
+     * @param context             排产上下文
+     * @param selectedGroup       选中的排产计划
+     * @param isMoreProductionDay 按成型机台排产天数最长选
+     * @param isFixed             是否指定优先
      * @return
      */
-    public CxMachineBaseInfoVo selectedCxMachineForGroupPlanAppoint(Context context, ProductionPlanGroupInfo selectedGroup, GroupCxMachinePriorityEnum priority, boolean isFixed) {
+    public CxMachineBaseInfoVo selectedCxMachineForGroupPlanAppoint(Context context, ProductionPlanGroupInfo selectedGroup, boolean isMoreProductionDay, boolean isFixed) {
         if (null == selectedGroup) {
             return null;
         }
@@ -468,6 +467,11 @@ public class CxCapacityAllocationHandler {
             singleMachine.setFixedPriority(singleMachine.getFixedPriorityValue(selectedGroup));
             singleMachine.setSelectedPriorityValue(context, selectedGroup, diffValue);
         });
+        //按生产最长时间优先
+        if (isMoreProductionDay) {
+            hasProductionDayList.sort(Comparator.comparing(CxMachineBaseInfoVo::getSelectedProductionDays, Comparator.reverseOrder()));
+            return hasProductionDayList.get(BigDecimal.ZERO.intValue());
+        }
         //排序：优先级级别(值越低越在前)->差值小的
         Comparator sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSelectedPriorityValue)
                 .thenComparing(CxMachineBaseInfoVo::getSelectedPriorityDiffValue);
