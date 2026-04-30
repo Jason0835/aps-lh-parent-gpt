@@ -1634,7 +1634,7 @@ public class BalancingService {
         if (context.getParamConfigMap() != null) {
             CxParamConfig config = context.getParamConfigMap().get(PARAM_FORCE_KEEP_HISTORY);
             if (config != null && config.getParamValue() != null) {
-                return "1".equals(config.getParamValue()) || "true".equalsIgnoreCase(config.getParamValue());
+                return "Y".equalsIgnoreCase(config.getParamValue()) || "true".equalsIgnoreCase(config.getParamValue());
             }
         }
         return false;

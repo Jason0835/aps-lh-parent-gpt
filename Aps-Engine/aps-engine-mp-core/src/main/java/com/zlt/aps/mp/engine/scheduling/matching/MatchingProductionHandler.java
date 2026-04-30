@@ -513,8 +513,8 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                         Integer totalProductionQty = this.matchingScheduleNextDayContinue(productionContext,
                                 materialDesc, newSkuQtyMap, groupInfo, productionPlanList, productionQty, isBoost,
                                 realMaxProductionQty, usedBeginDate, usedEndDate, continueMouldList);
-                        // 5.5.3、更新计划的剩余排产量
-                        this.updatePlanRemainQty(productionPlanList, totalProductionQty);
+                        // 5.5.3、更新计划的已排产量
+                        this.updateProducedQty(productionPlanList, totalProductionQty);
                         productionQty = productionQty > totalProductionQty ? productionQty - totalProductionQty : 0;
                         limitHelper.setPlanQty(limitHelper.getPlanQty() + totalProductionQty);
                         if (totalProductionQty > 0) {
@@ -522,7 +522,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                             String mainPattern = CollectionUtils.firstElement(productionPlanList).getMainPattern(); // 主花纹
                             String embryoCode = CollectionUtils.firstElement(productionPlanList).getEmbryoCode(); // 胎胚号
                             groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern,embryoCode); // 重新计算统计产能
-                            this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
+//                            this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
                             if (plan.getMatchEndDay() == realEndDay) { // 如果区间最后一天有排产，且往后结构还没有结束，则继续尝试往后延一天
                                 Integer nextEndDay = this.getNextDay(productionContext, realEndDay, endDay);
                                 if (nextEndDay > 0 && nextEndDay <= endDay) {
@@ -590,7 +590,14 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         if (isNewMod) {
             Integer lastDayPlanQty = null;
             for (int day = beginDay; day < realEndDay; day ++) {
+                if (productionContext.getStopDays().contains(day)) {
+                    continue;
+                }
                 GroupPlanCxLhCapacityLimitHelper capacityLimitHelper = groupInfo.getDayProductionLimitInfo().get(day);
+                if (capacityLimitHelper == null) {
+                    lastDayPlanQty = 0;
+                    continue;
+                }
                 Map<String, SkuDayProductionInfoHelper> productionSkuQtyMap = capacityLimitHelper.getProductionSkuQtyInfo();
                 Integer planQty = 0;
                 inner: {
@@ -870,26 +877,14 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
     }
 
     /**
-     * 更新计划的剩余排产量
+     * 更新计划的已排产量
      * @param productionPlanList
      * @param totalProductionQty
      */
-    private void updatePlanRemainQty(List<MonthPlanProductionRequirePlanVo> productionPlanList, Integer totalProductionQty) {
+    private void updateProducedQty(List<MonthPlanProductionRequirePlanVo> productionPlanList, Integer totalProductionQty) {
         Integer unProductQty = totalProductionQty;
-        for (MonthPlanProductionRequirePlanVo plan : productionPlanList) {
-            Integer remainQty = plan.getProductionQty();
-            if (remainQty > unProductQty) {
-                remainQty -= unProductQty;
-                unProductQty = 0;
-            } else {
-                remainQty = 0;
-                unProductQty -= remainQty;
-            }
-            plan.setProductionQty(remainQty);
-            if (unProductQty == 0) {
-                break;
-            }
-        }
+        MonthPlanProductionRequirePlanVo plan = CollectionUtils.firstElement(productionPlanList);
+        plan.setProducedQty(safeAdd(plan.getProducedQty(), unProductQty));
     }
 
     /**
@@ -1196,6 +1191,10 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             if (realEndDay <= usedBeginDate) {
                 continue;
             }
+            // 8、如果需求量不足一天产能，不加模具
+            if (productionQty < needProductionInfo.getDayMaxProductionQty()) {
+                continue;
+            }
             
             
             // 根据剩余可排模具限制模具数量
@@ -1260,9 +1259,9 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                     // 更新换模数
                     Set<String> mouldCodeSet = newDoubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).distinct().collect(Collectors.toSet());
                     productionContext.getBaseDataContainer().getDayCapacityLimit().addChangeMouldUsedQty(productionContext, usedBeginDate, materialDesc, mouldCodeSet);
-                    this.updatePlanRemainQty(productionPlanList, realProductionQty); // 更新需求计划的未排产量
+                    this.updateProducedQty(productionPlanList, realProductionQty); // 更新需求计划的已排产量
                     newSkuQtyMap.put(materialDesc, lhProductionQtyHelper.getRealSumProductionQty()); // 累计已排量
-                    this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
+//                    this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
                     // 更新模具与排产量的累计量
                     limitHelper.setMouldQty(limitHelper.getMouldQty() + newDoubleMouldList.size());
                     limitHelper.setPlanQty(limitHelper.getPlanQty() + realProductionQty);

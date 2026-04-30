@@ -95,6 +95,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /** 排程起始偏移天数：前端传入最后一天，需要往前推2天开始排产 */
     private static final int SCHEDULE_START_OFFSET_DAYS = 2;
 
+    /** 单日试制+量试SKU上限（按胎胚编码计，跨班次跨机台统一上限） */
+    private static final int MAX_TRIAL_SKU_PER_DAY = 2;
+
     @Override
     public List<CxScheduleResult> executeSchedule(ScheduleContextVo context) {
         log.info("开始执行排程算法，日期: {}", context.getScheduleDate());
@@ -169,6 +172,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             context.setCurrentScheduleDate(currentScheduleDate);
             context.setCurrentShiftConfigs(singleShiftList);
 
+            // 跨天时重置试制/量试单日SKU上限计数（单日最多2个试制+量试SKU）
+            if (day != lastDay) {
+                context.setDailyTrialAssignedEmbryoCodes(new HashSet<>());
+            }
 
             // 执行该班次的排程
             ShiftScheduleResult shiftResult = executeShiftSchedule(
@@ -270,6 +277,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 taskGroup.getContinueTasks().size(),
                 taskGroup.getTrialTasks().size(),
                 taskGroup.getNewTasks().size());
+
+        // ==================== 第一步附加：单日试制/量试SKU上限过滤（单日最多2个） ====================
+        applyDailyTrialSkuLimit(context, taskGroup);
 
         // ==================== 第二步：S5.3 处理续作任务 ====================
         List<MachineAllocationResult> continueAllocations = continueTaskProcessor.processContinueTasks(
@@ -378,6 +388,61 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         log.info("========== 班次排程完成，天={}, 班次={} ==========\n", day, shiftConfig.getShiftCode());
         return shiftResult;
+    }
+
+    /**
+     * 单日试制/量试SKU上限过滤
+     *
+     * <p>单日最多 {@value #MAX_TRIAL_SKU_PER_DAY} 个试制+量试SKU（按胎胚编码计），
+     * 跨机台、跨班次统一上限。超过上限的试制/量试任务直接跳过不排产。
+     *
+     * @param context   排程上下文（含当日已分配SKU集合）
+     * @param taskGroup 任务分组结果（直接修改列表）
+     */
+    private void applyDailyTrialSkuLimit(ScheduleContextVo context, TaskGroupService.TaskGroupResult taskGroup) {
+        Set<String> dailySet = context.getDailyTrialAssignedEmbryoCodes();
+        if (dailySet == null) {
+            dailySet = new HashSet<>();
+            context.setDailyTrialAssignedEmbryoCodes(dailySet);
+        }
+
+        int initialSize = dailySet.size();
+
+        // 过滤试制任务
+        List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredTrialTasks = new ArrayList<>();
+        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getTrialTasks()) {
+            String ec = task.getEmbryoCode();
+            if (dailySet.contains(ec) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
+                dailySet.add(ec);
+                filteredTrialTasks.add(task);
+            } else {
+                log.warn("试制任务 {} 已超过单日上限{}个SKU，跳过", ec, MAX_TRIAL_SKU_PER_DAY);
+            }
+        }
+        taskGroup.getTrialTasks().clear();
+        taskGroup.getTrialTasks().addAll(filteredTrialTasks);
+
+        // 过滤量试任务（在newTasks中）
+        List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredNewTasks = new ArrayList<>();
+        for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getNewTasks()) {
+            if (Boolean.TRUE.equals(task.getIsProductionTrial())) {
+                String ec = task.getEmbryoCode();
+                if (dailySet.contains(ec) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
+                    dailySet.add(ec);
+                    filteredNewTasks.add(task);
+                } else {
+                    log.warn("量试任务 {} 已超过单日上限{}个SKU，跳过", ec, MAX_TRIAL_SKU_PER_DAY);
+                }
+            } else {
+                filteredNewTasks.add(task);
+            }
+        }
+        taskGroup.getNewTasks().clear();
+        taskGroup.getNewTasks().addAll(filteredNewTasks);
+
+        if (dailySet.size() > initialSize) {
+            log.info("单日试制/量试SKU上限过滤: 当日已分配 {} / {} 个SKU", dailySet.size(), MAX_TRIAL_SKU_PER_DAY);
+        }
     }
 
     /**
@@ -901,11 +966,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
             }
 
-            // ---- 库存信息（求和合并多个lhId的库存） ----
+            // ---- 库存信息（求和合并多个lhId的库存，使用初始库存快照） ----
             List<Long> lhIdList = taskLhIdListMap.get(taskKey);
             int totalStock = 0;
             if (lhIdList != null && !lhIdList.isEmpty()) {
-                Map<String, Integer> stockMap = context.getMaterialStockMap();
+                Map<String, Integer> stockMap = context.getInitialMaterialStockMap();
                 for (Long lhId : lhIdList) {
                     if (stockMap != null) {
                         Integer stock = stockMap.get(String.valueOf(lhId));
@@ -973,13 +1038,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     result.setLhClassQty(new BigDecimal(primaryLh.getSingleMouldShiftQty()));
                 }
 
-                // lhRemainQty: 只取第一个
-                Map<String, MdmMonthSurplus> monthSurplusMap = context.getMonthSurplusMap();
-                if (monthSurplusMap != null && primaryLh != null) {
+                // lhRemainQty: 使用初始快照（排程开始前的硫化余量）
+                Map<String, BigDecimal> initialMonthSurplusMap = context.getInitialMonthSurplusMap();
+                if (initialMonthSurplusMap != null && primaryLh != null) {
                     String surplusKey = materialCode != null ? materialCode : embryoCode;
-                    MdmMonthSurplus surplus = monthSurplusMap.get(surplusKey);
-                    if (surplus != null && surplus.getPlanSurplusQty() != null) {
-                        result.setLhRemainQty(surplus.getPlanSurplusQty());
+                    BigDecimal surplus = initialMonthSurplusMap.get(surplusKey);
+                    if (surplus != null) {
+                        result.setLhRemainQty(surplus);
                     }
                 }
             }
@@ -989,10 +1054,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             if (lhRemainQty != null) {
                 result.setCxRemainQty(lhRemainQty.subtract(result.getTotalStock()));
             } else {
-                // 如果没有lhRemainQty，尝试从formingRemainderMap获取
-                Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
-                if (formingRemainderMap != null && materialCode != null) {
-                    Integer cxRemain = formingRemainderMap.get(materialCode);
+                // 如果没有lhRemainQty，尝试从initialFormingRemainderMap获取
+                Map<String, Integer> initialFormingRemainderMap = context.getInitialFormingRemainderMap();
+                if (initialFormingRemainderMap != null && materialCode != null) {
+                    Integer cxRemain = initialFormingRemainderMap.get(materialCode);
                     if (cxRemain != null) {
                         result.setCxRemainQty(new BigDecimal(cxRemain));
                     }
@@ -1559,23 +1624,23 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         BigDecimal planQty = spr.getQuantity() != null ? new BigDecimal(spr.getQuantity()) : BigDecimal.ZERO;
         // 完成量默认给0
         BigDecimal finishQty = BigDecimal.ZERO;
-        // 示方书编号：取硫化任务的lhNo
-        String recipeNo = (primaryLh != null) ? primaryLh.getLhNo() : null;
-        // 示方书类型：通过基础表 MdmSkuConstructionRef 查询 lhType
+        // 示方书编号：取硫化任务的制造示方书号
+        String recipeNo = (primaryLh != null) ? primaryLh.getEmbryoNo() : null;
+        // 示方书类型：通过基础表 MdmSkuConstructionRef 查询 embryoType
         String recipeType = null;
         if (materialCode != null && recipeNo != null) {
             try {
-                MdmSkuConstructionRef ref = skuConstructionRefMapper.selectByMaterialCodeAndLhNo(materialCode, recipeNo);
+                MdmSkuConstructionRef ref = skuConstructionRefMapper.selectByMaterialCodeAndEmbryoNo(materialCode, recipeNo);
                 if (ref != null) {
-                    recipeType = ref.getLhType();
+                    recipeType = ref.getEmbryoType();
                 }
             } catch (Exception e) {
-                log.debug("查询示方书类型失败: materialCode={}, lhNo={}", materialCode, recipeNo);
+                log.debug("查询示方书类型失败: materialCode={}, embryoNo={}", materialCode, recipeNo);
             }
         }
-        // 兜底：如果查询不到 recipeType 但分析结果是收尾，设置 recipeType 为"收尾"
-        if (recipeType == null && analysis != null && analysis.contains("收尾")) {
-            recipeType = "收尾";
+        // 兜底：查不到类型时设置为"无"
+        if (recipeType == null) {
+            recipeType = "无";
         }
 
         switch (classField) {
