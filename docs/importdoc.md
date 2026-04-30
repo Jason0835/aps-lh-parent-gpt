@@ -122,7 +122,10 @@ public AjaxResult importData(@RequestBody ImportContext importContext,
 - `@Log` 的 `title` 使用多语言 key。
 
 ## 六、ServiceImpl 标准流程
-
+1. 第一轮先执行 `ImportExcelValidatedUtils.validated(...)` 注解必填校验，以及 `validatedRepeat(...)` 的 Excel 内重复校验；第一轮失败的行直接标记跳过，后续不再参与业务校验。
+2. 第二轮再执行业务字段校验、关联主数据存在性校验、字段反显等处理；允许用 `isCan` 一次性收集当前行所有业务字段问题。
+3. 业务字段校验阶段如果当前行存在错误，应统一 `failureNum++` 后 `continue`，不要再进入 `checkUnique(...)`、更新已存在数据、插入数据等后续逻辑。
+4. 已通过实体类 `@ImportExcelValidated(required = true)` 声明的必填字段，在业务校验阶段无需再次单独做“判空后立即失败”的重复处理，除非该字段还存在额外业务规则。
 `ServiceImpl#importData` 是导入业务规则的唯一实现位置。推荐整体流程如下：
 
 ```java
