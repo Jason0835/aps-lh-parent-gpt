@@ -3,6 +3,7 @@ package com.zlt.aps.itf.mes.service.impl;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -1020,21 +1021,25 @@ public class MesItfServiceImpl implements MesItfService {
 
                     if (StringUtils.isBlank(filterPrecisionType) || "硫化精度".equals(filterPrecisionType)) {
                         if (!lhIds.isEmpty()) {
-                            try {
-                                lhPrecisionPlanRemoteService.generateFromMaintenancePlan(lhIds);
-                            } catch (Exception e) {
-                                log.error("自动生成并推算硫化精度计划失败", e);
-                            }
+                            FeignTokenHelper.runWithToken(() -> {
+                                try {
+                                    lhPrecisionPlanRemoteService.generateFromMaintenancePlan(lhIds);
+                                } catch (Exception e) {
+                                    log.error("自动生成并推算硫化精度计划失败", e);
+                                }
+                            });
                         }
                     }
 
                     if (StringUtils.isBlank(filterPrecisionType) || "成型精度15天".equals(filterPrecisionType)) {
                         if (!cx15Ids.isEmpty()) {
-                            try {
-                                cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx15Ids, 15);
-                            } catch (Exception e) {
-                                log.error("自动生成并推算成型精度计划（15天）失败", e);
-                            }
+                            FeignTokenHelper.runWithToken(() -> {
+                                try {
+                                    cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx15Ids, 15);
+                                } catch (Exception e) {
+                                    log.error("自动生成并推算成型精度计划（15天）失败", e);
+                                }
+                            });
                         }
                     }
                 } catch (Exception e) {
