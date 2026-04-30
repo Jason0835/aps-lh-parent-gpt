@@ -156,6 +156,7 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             CxPrecisionPlan docEntity = list.get(i);
+            docEntity.setDataSource(DATA_SOURCE_AUTO);
             if (docEntity.getId() != null && docEntity.getId() == -999L) {
                 continue;
             }
@@ -322,33 +323,40 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
                 return 0;
             }
 
-            // 按机台增量处理：先锁定本次变更涉及的机台，再查询每个机台最新的一条MES记录，避免“旧记录被更新”导致计划回退
-            Set<String> machineCodes = new HashSet<>();
+            // 按工厂、机台、精度类型增量处理，避免不同周期的 MES 记录互相覆盖。
+            Set<String> mesPlanKeys = new HashSet<>();
             for (MdmDevMaintenancePlan mesPlan : mesPlans) {
-                if (StringUtils.hasText(mesPlan.getDevCode())) {
-                    machineCodes.add(mesPlan.getDevCode());
+                if (StringUtils.hasText(mesPlan.getDevCode()) && StringUtils.hasText(mesPlan.getPrecisionType())) {
+                    mesPlanKeys.add(buildMesPlanGroupKey(mesPlan));
                 }
             }
 
             Map<String, MdmDevMaintenancePlan> latestMesPlanMap = new HashMap<>();
-            for (String machineCode : machineCodes) {
+            for (MdmDevMaintenancePlan mesPlan : mesPlans) {
+                String mesPlanKey = buildMesPlanGroupKey(mesPlan);
+                if (!mesPlanKeys.remove(mesPlanKey)) {
+                    continue;
+                }
                 LambdaQueryWrapper<MdmDevMaintenancePlan> latestWrapper = new LambdaQueryWrapper<>();
-                latestWrapper.eq(MdmDevMaintenancePlan::getDevCode, machineCode)
-                    .like(MdmDevMaintenancePlan::getPrecisionType, PRECISION_TYPE_CX)
+                latestWrapper.eq(MdmDevMaintenancePlan::getDevCode, mesPlan.getDevCode())
+                    .eq(MdmDevMaintenancePlan::getPrecisionType, mesPlan.getPrecisionType())
                     .eq(MdmDevMaintenancePlan::getIsDelete, 0)
                     .isNotNull(MdmDevMaintenancePlan::getFirstWashTime)
                     .orderByDesc(MdmDevMaintenancePlan::getFirstWashTime)
                     .orderByDesc(MdmDevMaintenancePlan::getUpdateTime)
                     .last("limit 1");
+                if (StringUtils.hasText(mesPlan.getFactoryCode())) {
+                    latestWrapper.eq(MdmDevMaintenancePlan::getFactoryCode, mesPlan.getFactoryCode());
+                }
                 MdmDevMaintenancePlan latest = mdmDevMaintenancePlanEntityMapper.selectOne(latestWrapper);
                 if (latest != null && StringUtils.hasText(latest.getDevCode())) {
-                    latestMesPlanMap.put(latest.getDevCode(), latest);
+                    latestMesPlanMap.put(mesPlanKey, latest);
                 }
             }
 
             int affected = 0;
             for (Map.Entry<String, MdmDevMaintenancePlan> entry : latestMesPlanMap.entrySet()) {
-                CxPrecisionPlan plan = createPlanFromMes(entry.getKey(), entry.getValue(), targetYear);
+                CxPrecisionPlan plan = createPlanFromMes(entry.getValue().getDevCode(), entry.getValue(), targetYear);
                 if (plan != null) {
                     affected += upsertByMesSourceId(plan);
                 }
@@ -356,8 +364,7 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
             // 取 mesPlans 有实际日期的数据
             Map<String, List<MdmDevMaintenancePlan>> mesPlansWithImplementDate = mesPlans.stream()
                     .filter(i -> i.getFirstWashTime() != null)
-                    .collect(Collectors.groupingBy(x -> String.valueOf(x.getFactoryCode()) + "|"
-                        + String.valueOf(x.getDevCode()) + "|" + String.valueOf(x.getPrecisionType())));
+                    .collect(Collectors.groupingBy(this::buildMesPlanGroupKey));
 
             for (Map.Entry<String, List<MdmDevMaintenancePlan>> entry : mesPlansWithImplementDate.entrySet()) {
                 List<MdmDevMaintenancePlan> list = entry.getValue().stream()
@@ -487,7 +494,7 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         plan.setCompanyCode(mesPlan.getCompanyCode());
         plan.setFactoryCode(mesPlan.getFactoryCode());
         plan.setMesSourceId(mesPlan.getId());
-        plan.setDataSource(DATA_SOURCE_AUTO);
+        plan.setDataSource(DATA_SOURCE_MES);
         plan.setSyncTime(mesPlan.getUpdateTime());
         plan.setActualDate(actualDate);
         plan.setLastMaintenanceDate(actualDate);
@@ -496,7 +503,10 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         if (cycleDays == null) {
             return null;
         }
-        Date planDate = DateUtil.offsetDay(actualDate, cycleDays);
+        Date planDate = parseDate(mesPlan.getOperTime());
+        if (planDate == null) {
+            planDate = DateUtil.offsetDay(actualDate, cycleDays);
+        }
         plan.setPlanDate(planDate);
         plan.setDueDate(planDate);
         plan.setYear(new BigDecimal(year));
@@ -561,6 +571,15 @@ public class CxPrecisionPlanServiceImpl extends AbstractDocService<CxPrecisionPl
         }
         return precisionType.replaceAll("[^0-9]", "");
     }
+
+    /**
+     * 生成 MES 精度计划分组键，按工厂、机台、精度类型区分不同周期计划。
+     */
+    private String buildMesPlanGroupKey(MdmDevMaintenancePlan mesPlan) {
+        return String.valueOf(mesPlan.getFactoryCode()) + "|" + String.valueOf(mesPlan.getDevCode()) + "|"
+            + String.valueOf(mesPlan.getPrecisionType());
+    }
+
     /**
      * 获取计划间隔天数。
      */

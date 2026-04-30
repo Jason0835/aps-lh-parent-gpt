@@ -12,6 +12,7 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
@@ -62,6 +63,9 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
     @Autowired
     private IMesItfService mesItfService;
 
+    @Autowired
+    private OrderNoGenerator orderNoGenerator;
+
     @Override
     public String[] getQueryFormulas() {
         return new String[]{
@@ -87,6 +91,8 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
         // 0.初始化
         int successNum = 0;
         int failureNum = 0;
+        int insertNum = 0;
+        int updateNum = 0;
         List<LhMouldChangePlan> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         String uniqueMsg = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.unique");
@@ -234,8 +240,11 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 if (StringUtil.isBlank(docEntity.getFactoryCode())) {
                     docEntity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
                 }
+                Date orderDate = docEntity.getScheduleDate() != null ? docEntity.getScheduleDate() : new Date();
+                docEntity.setOrderNo(orderNoGenerator.generateMouldChangeOrderNo(orderDate));
+                docEntity.setIsRelease(ApsConstant.NO_RELEASE);
+                docEntity.setMouldStatus(ApsConstant.FALSE);
                 importList.add(docEntity);
-                successNum++;
             } else if (updateSupport) {
                 LambdaQueryWrapper<LhMouldChangePlan> queryWrapper = new LambdaQueryWrapper<>();
                 queryWrapper.eq(LhMouldChangePlan::getFactoryCode, docEntity.getFactoryCode());
@@ -249,8 +258,11 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                     continue;
                 }
                 docEntity.setId(exist.getId());
+                docEntity.setOrderNo(exist.getOrderNo());
+                docEntity.setIsRelease(exist.getIsRelease());
+                docEntity.setMouldStatus(exist.getMouldStatus());
                 lhMouldChangePlanMapper.updateById(docEntity);
-                successNum++;
+                updateNum++;
             } else {
                 failureNum++;
                 // 数据库已经存在,不允许插入
@@ -259,13 +271,14 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
             }
         }
 
-        if (CollectionUtils.isEmpty(importList) && successNum == 0) {
+        if (CollectionUtils.isEmpty(importList) && updateNum == 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         }
 
         if (CollectionUtils.isNotEmpty(importList)) {
-            successNum += baseDao.saveBatch(importList);
+            insertNum = baseDao.saveBatch(importList);
         }
+        successNum = insertNum + updateNum;
 
         // 返回提示信息及错误集合
         if (failureNum > 0) {

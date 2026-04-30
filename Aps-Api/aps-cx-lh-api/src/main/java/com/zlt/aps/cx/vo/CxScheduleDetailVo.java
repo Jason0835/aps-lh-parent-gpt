@@ -93,6 +93,34 @@ public class CxScheduleDetailVo {
     private LocalDateTime class7PlanEndTime;
     private LocalDateTime class8PlanEndTime;
 
+    // ==================== 主表字段（示方书/原因分析 - 可编辑） ====================
+    private String class1RecipeType;
+    private String class2RecipeType;
+    private String class3RecipeType;
+    private String class4RecipeType;
+    private String class5RecipeType;
+    private String class6RecipeType;
+    private String class7RecipeType;
+    private String class8RecipeType;
+
+    private String class1RecipeNo;
+    private String class2RecipeNo;
+    private String class3RecipeNo;
+    private String class4RecipeNo;
+    private String class5RecipeNo;
+    private String class6RecipeNo;
+    private String class7RecipeNo;
+    private String class8RecipeNo;
+
+    private String class1AnalysisInput;
+    private String class2AnalysisInput;
+    private String class3AnalysisInput;
+    private String class4AnalysisInput;
+    private String class5AnalysisInput;
+    private String class6AnalysisInput;
+    private String class7AnalysisInput;
+    private String class8AnalysisInput;
+
     // ==================== 主表字段（关联信息） ====================
     /** 成型机台编号 */
     private String cxMachineCode;
