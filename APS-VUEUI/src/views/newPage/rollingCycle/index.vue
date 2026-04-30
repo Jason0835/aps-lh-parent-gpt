@@ -405,6 +405,8 @@ export default {
       actionDate: {},
 
       dayList: 31,
+      // 调整结果页日计划量是否可编辑：仅自动调整后可编辑
+      resultDayEditable: false,
     };
   },
   computed: {
@@ -784,15 +786,19 @@ export default {
               return (
                 <div>
                   {row.id ? (
-                    <el-input
-                      value={row[prop] || ""}
-                      size="mini"
-                      onInput={(value) => {
-                        row[prop] = (value || "").replace(/[^\d]/g, "");
-                      }}
-                      onFocus={() => this.onDayEditFocus(row, prop)}
-                      onBlur={() => this.handleResultDayEdit(row, prop)}
-                    ></el-input>
+                    this.resultDayEditable ? (
+                      <el-input
+                        value={row[prop] || ""}
+                        size="mini"
+                        onInput={(value) => {
+                          row[prop] = (value || "").replace(/[^\d]/g, "");
+                        }}
+                        onFocus={() => this.onDayEditFocus(row, prop)}
+                        onBlur={() => this.handleResultDayEdit(row, prop)}
+                      ></el-input>
+                    ) : (
+                      <span>{row[prop] || ""}</span>
+                    )
                   ) : (
                     <span>{row[prop] || ""}</span>
                   )}
@@ -1723,6 +1729,7 @@ export default {
     backPlan() {
       this.show = false;
       this.showConfirmResult = false;
+      this.resultDayEditable = false;
       if (this.adjustType == "01") {
         this.activeName = "first";
       } else {
@@ -1893,6 +1900,7 @@ export default {
       // this.loading = true;
       this.loadText = this.$t("正在加载中，请稍候");
       this.showConfirmResult = false;
+      this.resultDayEditable = false;
       this.show = false;
       this.isShowResult = false;
       this.isShowFoot = false;
@@ -1974,6 +1982,7 @@ export default {
         this.isTabChange = false;
         this.isShowFoot = true;
         this.activeName = "three";
+        this.resultDayEditable = true;
         this.versionList = [];
         this.$set(this.search, "version", "");
         this.$set(this.query, "version", "");

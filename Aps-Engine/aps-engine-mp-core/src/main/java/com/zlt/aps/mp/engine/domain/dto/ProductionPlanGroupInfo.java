@@ -1,6 +1,5 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
-import com.google.common.collect.Sets;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.MonthPlanNoProductionReasonEnum;
 import com.zlt.aps.enums.ProductTypeEnum;
@@ -180,6 +179,10 @@ public class ProductionPlanGroupInfo {
      * 根据模具数计算的硫化机台数（用于特殊材料粗算天数）
      */
     private Integer minLhMachineCountByMould;
+    /**
+     * 高优先级需求量总值
+     */
+    private Integer sumHeightRequireQty;
 
     /**
      * 构建初始化分组信息对象
@@ -353,6 +356,21 @@ public class ProductionPlanGroupInfo {
      */
     public Integer getThreshold() {
         return Math.min(minLhMachineCount, minLhMachineCountByMould) * getDayCapacityBySingleLh();
+    }
+
+    /**
+     * 获取高优先级需求量的占比
+     *
+     * @return
+     */
+    public BigDecimal getHeightRequireRatio() {
+        if (null == sumHeightRequireQty || null == sumPlanQty) {
+            return BigDecimal.ZERO;
+        }
+        if (sumPlanQty <= BigDecimal.ZERO.intValue()) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(sumHeightRequireQty).divide(BigDecimal.valueOf(sumPlanQty), 3, RoundingMode.HALF_UP);
     }
 
     /**

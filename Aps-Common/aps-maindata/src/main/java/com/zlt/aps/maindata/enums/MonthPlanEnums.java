@@ -272,15 +272,19 @@ public enum MonthPlanEnums {
     /**
      * SYS0209008 结构日分配多台成型机时，需要额外增加的硫化机台数配置
      */
-    CX_LH_RATIO_EXTRA("SYS0209008","结构日分配多台成型机时，需要额外增加的硫化机台数配置"),
+    CX_LH_RATIO_EXTRA("SYS0209008", "结构日分配多台成型机时，需要额外增加的硫化机台数配置"),
     /**
      * SYS0209009 结构实单最低硫化机台数可连续排产天数，超出则强制收尾
      */
-    MIN_LH_MACHINE_CONTINUE_DAYS("SYS0209009","结构实单最低硫化机台数可连续排产天数，超出则强制收尾"),
+    MIN_LH_MACHINE_CONTINUE_DAYS("SYS0209009", "结构实单最低硫化机台数可连续排产天数，超出则强制收尾"),
     /**
      * SYS0209010 月计划排产模式 1 交付优先 非1则为效率优先
      */
-    PRODUCTION_MODE("SYS0209010","月计划排产模式 1 交付优先 非1则为效率优先");
+    PRODUCTION_MODE("SYS0209010", "月计划排产模式 1 交付优先 非1则为效率优先"),
+    /**
+     * SYS0209011 结构采用高优先先排策略条件：结构高优先级需求量占比超过
+     */
+    HEIGHT_PRIORITY_SKU_PRODUCTION_MODE("SYS0209011", "结构采用高优先先排策略条件：结构高优先级需求量占比超过");
 
     private final String code;
     private final String name;

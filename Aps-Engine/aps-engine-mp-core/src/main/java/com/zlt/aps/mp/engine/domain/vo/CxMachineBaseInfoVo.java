@@ -548,6 +548,18 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 获取选择的排产日天数
+     *
+     * @return
+     */
+    public Integer getSelectedProductionDays() {
+        if (null == priorityValue) {
+            return BigDecimal.ZERO.intValue();
+        }
+        return Math.min(priorityValue.getNeedDays(), priorityValue.getCapacityDays());
+    }
+
+    /**
      * 选择优先级-值
      *
      * @return

@@ -2,6 +2,7 @@ package com.zlt.aps.lh.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import io.swagger.annotations.ApiModel;
@@ -52,7 +53,8 @@ public class LhUnscheduledResult extends BaseEntity implements Serializable {
     /**
      * 排程日期
      */
-    @Excel(name = "ui.data.column.lhUnscheduledResult.scheduleDate")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.lhUnscheduledResult.scheduleDate", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "排程日期", name = "scheduleDate")
     @TableField(value = "SCHEDULE_DATE")
     private Date scheduleDate;
@@ -164,16 +166,9 @@ public class LhUnscheduledResult extends BaseEntity implements Serializable {
     /**
      * 处理时间
      */
-    @Excel(name = "ui.data.column.lhUnscheduledResult.processedTime")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.lhUnscheduledResult.processedTime", width = 30, dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "处理时间", name = "processedTime")
     @TableField(value = "PROCESSED_TIME")
     private Date processedTime;
-
-    /**
-     * 删除标识（0未删除；1已删除）
-     */
-    @Excel(name = "ui.data.column.lhUnscheduledResult.isDelete")
-    @ApiModelProperty(value = "删除标识（0未删除；1已删除）", name = "isDelete")
-    @TableField(value = "IS_DELETE")
-    private Integer isDelete;
 }

@@ -104,6 +104,10 @@ public enum MonthPlanNoProductionReasonEnum {
      */
     MOULD_STATUS_DISABLE("MP1403", "模具状态禁用", "alg.data.initCheck.mouldStatusDisable"),
     /**
+     * MP1404 模具关系没有配置主花纹
+     */
+    NO_MAIN_PATTERN_MOULD_RELATION("MP1404", "模具关系没有配置主花纹", "alg.data.initCheck.noMainPatternMouldRelation"),
+    /**
      * MP1501 超出模具产能
      */
     EXCEED_MOULD_CAPACITY("MP1501", "超出模具产能", "alg.data.initCheck.exceedMouldCapacity"),

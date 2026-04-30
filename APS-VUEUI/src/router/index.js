@@ -619,6 +619,13 @@ constantRoutes.push(
         meta: { title: "硫化未排程结果" },
       },
       {
+        path: "curingUnscheduleResult",
+        component: () => import("@/views/curingPlan/curingUnscheduleResult/index"),
+        name: "CuringUnscheduleResult",
+        hidden: true,
+        meta: { title: "未排结果" },
+      },
+      {
         path: "machineGantChart",
         component: () => import("@/views/curingPlan/curingSchedule/machineGantChart"),
         name: "MachineGantChart",
