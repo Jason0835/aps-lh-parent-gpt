@@ -1261,10 +1261,29 @@ export default {
       this.two1PlanTimeDisabled = false;
       this.two2PlanTimeDisabled = false;
     },
+    validatePlanQtyByFinishQty() {
+      for (let i = 1; i <= 8; i++) {
+        const planQty = Number(this.form[`class${i}PlanQty`] || 0);
+        const finishQty = Number(this.form[`class${i}FinishQty`] || 0);
+        if (finishQty > 0 && planQty <= finishQty) {
+          this.$modal.msgError(
+            this.$t(
+              "ui.data.column.scheduleResult.planGreaterThanFinishWhenFinishPositive",
+              { shift: i }
+            )
+          );
+          return false;
+        }
+      }
+      return true;
+    },
 
     handleConfirm() {
       this.$refs.form.validate((valid) => {
         if (valid) {
+          if (!this.validatePlanQtyByFinishQty()) {
+            return;
+          }
           this.save(this.form);
         }
       });

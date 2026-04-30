@@ -666,6 +666,7 @@
   "ui.data.column.scheduleResult.confirmExportLhScheduleResult": "确定导出所有硫化排程结果信息？",
   "ui.data.column.scheduleResult.already.exists": "已存在重复机台！",
   "ui.data.column.scheduleResult.qty.zero": "各班计划量总和为0，请重新调整计划量！",
+  "ui.data.column.scheduleResult.planGreaterThanFinishWhenFinishPositive": "第{shift}班次完成量大于0时，计划量必须大于完成量",
   "ui.data.column.scheduleResult.productionStatus": "生产状态",
   "ui.data.column.scheduleResult.changePlan": "调量",
   "ui.data.column.scheduleResult.machine.gantt": "机台甘特图",

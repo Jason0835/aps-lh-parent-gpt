@@ -139,7 +139,7 @@
     />
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/cx/cxScheduleResult/importTemplate"
+      downloadUrl=""
       uploadUrl="/cx/cxScheduleResult/importData"
       @uploadSuccess="getList"
     />
