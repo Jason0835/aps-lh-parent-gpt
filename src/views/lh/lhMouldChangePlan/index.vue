@@ -70,6 +70,19 @@ import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule, issueSch
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
+const formatDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getOffsetDate = (offsetDay) => {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDay);
+  return formatDate(date);
+};
+
 export default {
   name: "LhMouldChangePlan",
   components: {
@@ -111,11 +124,11 @@ export default {
       sort: {},
       search: {
         factoryCode: "116",
-        scheduleDate: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+        scheduleDate: getOffsetDate(2),
       },
       query: {
         factoryCode: "116",
-        scheduleDate: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+        scheduleDate: getOffsetDate(2),
       },
     };
   },
@@ -132,20 +145,6 @@ export default {
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
-        },
-        {
-          prop: "lhResultBatchNo",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.lhMouldChangePlan.lhResultBatchNo"),
-          minWidth: 140,
-        },
-        {
-          prop: "orderNo",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.lhMouldChangePlan.orderNo"),
-          minWidth: 140,
         },
         {
           prop: "planDate",
@@ -204,10 +203,26 @@ export default {
         },
         {
           prop: "beforeMaterialDesc",
-          align: "center",
+          align: "left",
           halign: "center",
           label: this.$t("ui.data.column.lhMouldChangePlan.beforeMaterialDesc"),
-          minWidth: 180,
+          width: 300,
+          render: ({ row }) => this.renderMaterialDesc(row.beforeMaterialDesc),
+        },
+        {
+          prop: "afterMaterialCode",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhMouldChangePlan.afterMaterialCode"),
+          minWidth: 150,
+        },
+        {
+          prop: "afterMaterialDesc",
+          align: "left",
+          halign: "center",
+          label: this.$t("ui.data.column.lhMouldChangePlan.afterMaterialDesc"),
+          width: 300,
+          render: ({ row }) => this.renderMaterialDesc(row.afterMaterialDesc),
         },
         {
           prop: "changeMouldType",
@@ -231,7 +246,7 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.lhMouldChangePlan.mouldCode"),
-          minWidth: 120,
+          width: 250,
         },
         {
           prop: "isRelease",
@@ -252,6 +267,20 @@ export default {
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.finish_completion, value);
           },
+        },
+        {
+          prop: "lhResultBatchNo",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhMouldChangePlan.lhResultBatchNo"),
+          minWidth: 140,
+        },
+        {
+          prop: "orderNo",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhMouldChangePlan.orderNo"),
+          minWidth: 140,
         },
         {
           prop: "updateTime",
@@ -359,11 +388,14 @@ export default {
   },
   methods: {
     getTodayDate() {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const day = String(now.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
+      return getOffsetDate(0);
+    },
+    renderMaterialDesc(value) {
+      return (
+        <div style="white-space: normal; word-break: break-all; line-height: 20px; text-align: left;">
+          {value}
+        </div>
+      );
     },
     handleAdd() {
       if (this.$refs.infoRef) {

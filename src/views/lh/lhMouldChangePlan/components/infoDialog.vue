@@ -15,7 +15,7 @@
       :rules="rules"
       :columns="columns"
       label-position="right"
-      label-width="120px"
+      label-width="150px"
       v-loading="loading"
     >
     </info-form>
@@ -265,7 +265,6 @@ export default {
           type: "select",
           dictData: this.parentDict.type.finish_completion,
           filterable: true,
-          labelWidth: "150px",
           disabled: true,
         },
         {

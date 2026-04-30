@@ -133,10 +133,10 @@ export default {
         },
         {
           prop: "materialDesc",
-          align: "center",
+          align: "left",
           halign: "center",
           label: this.$t("ui.data.column.lhSpecifyMachine.materialDesc"),
-          minWidth: 180,
+          minWidth: 250,
         },
         {
           prop: "machineCode",

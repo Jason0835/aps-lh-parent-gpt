@@ -100,10 +100,10 @@ export default {
         },
         {
           prop: 'specDesc',
-          align: 'center',
-          halign: 'center',
+          align: 'left',
+          halign: 'left',
           label: this.$t('ui.data.column.lhMachineOnlineInfo.specDesc'),
-          minWidth: 180
+          minWidth: 300
         },
         {
           prop: 'lrMolds',
