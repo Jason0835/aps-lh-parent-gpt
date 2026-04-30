@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 硫化精度计划Controller
@@ -307,5 +308,69 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
     @PostMapping("/generateFromMaintenance")
     public AjaxResult generateFromMaintenancePlan(@RequestBody List<Long> maintenancePlanIds) {
         return precisionPlanAutoCalculateService.generateFromMaintenancePlanByIds(maintenancePlanIds, "硫化精度");
+    }
+
+    @ApiOperation("硫化排程回填计划排程精度日期")
+    @PostMapping("/fillScheduleDate")
+    public AjaxResult fillScheduleDate(@RequestParam("machineCode") String machineCode,
+                                       @RequestParam("factoryCode") String factoryCode,
+                                       @RequestParam("scheduleDate") java.util.Date scheduleDate) {
+        try {
+            int count = lhPrecisionPlanService.fillScheduleDate(machineCode, factoryCode, scheduleDate);
+            return AjaxResult.success("回填成功", count);
+        } catch (Exception e) {
+            log.error("硫化排程回填计划排程精度日期失败", e);
+            return AjaxResult.error("回填失败：" + e.getMessage());
+        }
+    }
+
+    @ApiOperation("批量硫化排程回填计划排程精度日期")
+    @PostMapping("/batchFillScheduleDate")
+    public AjaxResult batchFillScheduleDate(@RequestBody List<Map<String, Object>> fillList) {
+        try {
+            int count = lhPrecisionPlanService.batchFillScheduleDate(fillList);
+            return AjaxResult.success("批量回填成功", count);
+        } catch (Exception e) {
+            log.error("批量硫化排程回填计划排程精度日期失败", e);
+            return AjaxResult.error("批量回填失败：" + e.getMessage());
+        }
+    }
+
+    @ApiOperation("MES回填实际精度执行日期并生成下一次计划")
+    @PostMapping("/fillActualDateAndGenerateNext")
+    public AjaxResult fillActualDateAndGenerateNext(@RequestParam("machineCode") String machineCode,
+                                                     @RequestParam("factoryCode") String factoryCode,
+                                                     @RequestParam("actualDate") java.util.Date actualDate) {
+        try {
+            boolean result = lhPrecisionPlanService.fillActualDateAndGenerateNext(machineCode, factoryCode, actualDate);
+            return result ? AjaxResult.success("回填成功并已生成下一次计划") : AjaxResult.error("回填失败");
+        } catch (Exception e) {
+            log.error("MES回填实际精度执行日期失败", e);
+            return AjaxResult.error("回填失败：" + e.getMessage());
+        }
+    }
+
+    @ApiOperation("批量MES回填实际精度执行日期并生成下一次计划")
+    @PostMapping("/batchFillActualDateAndGenerateNext")
+    public AjaxResult batchFillActualDateAndGenerateNext(@RequestBody List<java.util.Map<String, Object>> fillList) {
+        try {
+            int count = lhPrecisionPlanService.batchFillActualDateAndGenerateNext(fillList);
+            return AjaxResult.success("批量回填成功", count);
+        } catch (Exception e) {
+            log.error("批量MES回填实际精度执行日期失败", e);
+            return AjaxResult.error("批量回填失败：" + e.getMessage());
+        }
+    }
+
+    @ApiOperation("查询待下发的硫化精度计划列表")
+    @PostMapping("/listPendingIssue")
+    public AjaxResult listPendingIssuePlans(@RequestParam("factoryCode") String factoryCode) {
+        try {
+            List<com.zlt.aps.lh.api.domain.entity.LhPrecisionPlanIssue> list = lhPrecisionPlanService.listPendingIssuePlans(factoryCode);
+            return AjaxResult.success(list);
+        } catch (Exception e) {
+            log.error("查询待下发的硫化精度计划列表失败", e);
+            return AjaxResult.error("查询失败：" + e.getMessage());
+        }
     }
 }

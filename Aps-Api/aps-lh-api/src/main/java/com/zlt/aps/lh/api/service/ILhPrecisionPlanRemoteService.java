@@ -11,6 +11,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 硫化精度计划远程服务接口
@@ -104,12 +105,12 @@ public interface ILhPrecisionPlanRemoteService {
      * MES回传实际完成时间
      *
      * @param mesSourceId MES来源ID
-     * @param actualDate 实际日期
+     * @param actualDate  实际日期
      * @return 是否成功
      */
     @ApiOperation("MES回传实际完成时间")
     @PostMapping("/lhPrecisionPlan/updateActualDate")
-    AjaxResult updateActualDate(@RequestParam("mesSourceId") Long mesSourceId, 
+    AjaxResult updateActualDate(@RequestParam("mesSourceId") Long mesSourceId,
                                 @RequestParam("actualDate") String actualDate);
 
     /**
@@ -141,4 +142,57 @@ public interface ILhPrecisionPlanRemoteService {
     @ApiOperation("校验唯一性")
     @PostMapping("/lhPrecisionPlan/checkUnique")
     String checkUnique(@RequestBody LhPrecisionPlan lhPrecisionPlan);
+
+    /**
+     * 硫化排程回填计划排程精度日期
+     *
+     * @param machineCode  机台编码
+     * @param factoryCode  分厂编码
+     * @param scheduleDate 计划排程精度日期
+     * @return 回填数量
+     */
+    @ApiOperation("硫化排程回填计划排程精度日期")
+    @PostMapping("/lhPrecisionPlan/fillScheduleDate")
+    AjaxResult fillScheduleDate(@RequestParam("machineCode") String machineCode,
+                                @RequestParam("factoryCode") String factoryCode,
+                                @RequestParam("scheduleDate") String scheduleDate);
+
+    @ApiOperation("批量硫化排程回填计划排程精度日期")
+    @PostMapping("/lhPrecisionPlan/batchFillScheduleDate")
+    public AjaxResult batchFillScheduleDate(@RequestBody List<Map<String, Object>> fillList);
+
+    /**
+     * MES回填实际执行日期并生成下一次精度计划（闭环）
+     *
+     * @param machineCode 机台编码
+     * @param factoryCode 分厂编码
+     * @param actualDate  实际执行日期
+     * @return 回填结果
+     */
+    @ApiOperation("MES回填实际执行日期并生成下一次精度计划")
+    @PostMapping("/lhPrecisionPlan/fillActualDateAndGenerateNext")
+    AjaxResult fillActualDateAndGenerateNext(@RequestParam("machineCode") String machineCode,
+                                             @RequestParam("factoryCode") String factoryCode,
+                                             @RequestParam("actualDate") java.util.Date actualDate);
+
+    /**
+     * 批量MES回填实际执行日期并生成下一次精度计划（闭环）
+     * 优化：将循环内逐条DB查询改为外层批量查询+内存过滤，逐条insert/update改为批量操作
+     *
+     * @param fillList 回填数据列表，每项包含machineCode、factoryCode、actualDate
+     * @return 成功回填数量
+     */
+    @ApiOperation("批量MES回填实际执行日期并生成下一次精度计划")
+    @PostMapping("/lhPrecisionPlan/batchFillActualDateAndGenerateNext")
+    AjaxResult batchFillActualDateAndGenerateNext(@RequestBody List<java.util.Map<String, Object>> fillList);
+
+    /**
+     * 查询待下发的硫化精度计划列表（计划排程精度日期有值且实际执行日期为空）
+     *
+     * @param factoryCode 分厂编码
+     * @return 待下发计划列表
+     */
+    @ApiOperation("查询待下发的硫化精度计划列表")
+    @PostMapping("/lhPrecisionPlan/listPendingIssue")
+    AjaxResult listPendingIssuePlans(@RequestParam("factoryCode") String factoryCode);
 }

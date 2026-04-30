@@ -14,6 +14,7 @@ import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
 import com.zlt.aps.itf.mes.mapper.MesViewMapper;
+import com.zlt.aps.itf.mes.service.IPrecisionPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.mes.vo.MoldAlterPlanIssue;
 import com.zlt.aps.itf.scm.service.ScmItfService;
@@ -29,6 +30,7 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.api.domain.entity.CxMesStock;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
 import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
@@ -96,6 +98,9 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private ILhPrecisionPlanRemoteService lhPrecisionPlanRemoteService;
+
+    @Autowired
+    private IPrecisionPlanIssueService precisionPlanIssueService;
 
     @Autowired
     private ICxPrecisionPlanRemoteService cxPrecisionPlanRemoteService;
@@ -1005,44 +1010,37 @@ public class MesItfServiceImpl implements MesItfService {
 
             if (!insertOrUpdateList.isEmpty()) {
                 try {
-                    cxPrecisionPlanRemoteService.generateFromMaintenancePlan(new ArrayList<>(), 15);
-//                    List<Long> lhIds = new ArrayList<>();
-//                    List<Long> cx15Ids = new ArrayList<>();
-//                    List<Long> cx60Ids = new ArrayList<>();
-//
-//                    for (MdmDevMaintenancePlan plan : insertOrUpdateList) {
-//                        if ("硫化精度".equals(plan.getPrecisionType()) && plan.getId() != null) {
-//                            lhIds.add(plan.getId());
-//                        } else if ("成型精度15天".equals(plan.getPrecisionType()) && plan.getId() != null) {
-//                            cx15Ids.add(plan.getId());
-//                        } else if ("成型精度60天".equals(plan.getPrecisionType()) && plan.getId() != null) {
-//                            cx60Ids.add(plan.getId());
-//                        }
-//                    }
-//
-//                    if (!lhIds.isEmpty()) {
-//                        try {
-//                            lhPrecisionPlanRemoteService.generateFromMaintenancePlan(lhIds);
-//                        } catch (Exception e) {
-//                            log.error("自动生成并推算硫化精度计划失败", e);
-//                        }
-//                    }
-//
-//                    if (!cx15Ids.isEmpty()) {
-//                        try {
-//                            cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx15Ids, 15);
-//                        } catch (Exception e) {
-//                            log.error("自动生成并推算成型精度计划（15天）失败", e);
-//                        }
-//                    }
+                    List<Long> lhIds = new ArrayList<>();
+                    List<Long> cx15Ids = new ArrayList<>();
+                    String filterPrecisionType = syncDataLogs.getPrecisionType();
 
-//                    if (!cx60Ids.isEmpty()) {
-//                        try {
-//                            cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx60Ids, 60);
-//                        } catch (Exception e) {
-//                            log.error("自动生成并推算成型精度计划（60天）失败", e);
-//                        }
-//                    }
+                    for (MdmDevMaintenancePlan plan : insertOrUpdateList) {
+                        if ("硫化精度".equals(plan.getPrecisionType()) && plan.getId() != null) {
+                            lhIds.add(plan.getId());
+                        } else if ("成型精度15天".equals(plan.getPrecisionType()) && plan.getId() != null) {
+                            cx15Ids.add(plan.getId());
+                        }
+                    }
+
+                    if (StringUtils.isBlank(filterPrecisionType) || "硫化精度".equals(filterPrecisionType)) {
+                        if (!lhIds.isEmpty()) {
+                            try {
+                                lhPrecisionPlanRemoteService.generateFromMaintenancePlan(lhIds);
+                            } catch (Exception e) {
+                                log.error("自动生成并推算硫化精度计划失败", e);
+                            }
+                        }
+                    }
+
+                    if (StringUtils.isBlank(filterPrecisionType) || "成型精度15天".equals(filterPrecisionType)) {
+                        if (!cx15Ids.isEmpty()) {
+                            try {
+                                cxPrecisionPlanRemoteService.generateFromMaintenancePlan(cx15Ids, 15);
+                            } catch (Exception e) {
+                                log.error("自动生成并推算成型精度计划（15天）失败", e);
+                            }
+                        }
+                    }
                 } catch (Exception e) {
                     log.error("自动生成并推算精度计划失败", e);
                 }
@@ -1273,7 +1271,12 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步生胎库存
-     * 采用先删后插模式
+     * T_CX_MES_STOCK：保持先删后插模式（MES原始数据全量覆盖）
+     * T_CX_STOCK：采用混合方案（数据来源标识 + UPSERT + 按来源清理）
+     *   1. MES有 & APS有(任意来源) → 更新stockNum，保留手动维护的字段，dataSource标记为MES
+     *   2. MES有 & APS没有 → 新增，dataSource=MES
+     *   3. MES没有 & APS有(dataSource=MES) → 删除（MES不再推送的过期数据）
+     *   4. APS有(dataSource=MANUAL) → 完全不动
      * @param syncDataLogs 同步参数
      * @return 结果
      */
@@ -1292,6 +1295,7 @@ public class MesItfServiceImpl implements MesItfService {
         syncList = new ArrayList<>(groupMap.values());
 
         if (CollectionUtils.isNotEmpty(syncList)) {
+            // 先删后插 T_CX_MES_STOCK（MES原始数据全量覆盖）
             cxMesSyncRemoteService.deleteMesStock(syncDataLogs.getFactoryCode());
 
             List<CxMesStock> insertList = new ArrayList<>();
@@ -1308,6 +1312,77 @@ public class MesItfServiceImpl implements MesItfService {
             List<List<CxMesStock>> splitList = ScmListUtils.getSplitList(insertList, 1000);
             for (List<CxMesStock> importList : splitList) {
                 cxMesSyncRemoteService.saveMesStockBatch(importList);
+            }
+
+            // T_CX_STOCK：混合方案同步
+            List<CxStock> cxStockInsertList = syncList.stream().map(item -> {
+                CxStock cxStock = new CxStock();
+                cxStock.setFactoryCode(item.getFactoryCode());
+                cxStock.setStockDate(item.getStockDate());
+                cxStock.setEmbryoCode(item.getEmbryoCode());
+                cxStock.setStockNum(item.getStockNum() != null ? item.getStockNum().intValue() : 0);
+                cxStock.setDataSource("MES");
+                cxStock.setCreateBy("MES");
+                cxStock.setUpdateBy("MES");
+                cxStock.setCreateTime(DateUtils.getNowDate());
+                cxStock.setUpdateTime(DateUtils.getNowDate());
+                return cxStock;
+            }).collect(Collectors.toList());
+
+            // 步骤1：查询MES推送数据中已存在的记录（按唯一键匹配，不区分dataSource）
+            List<CxStock> existsList = cxMesSyncRemoteService.selectCxStockExists(cxStockInsertList);
+            Map<String, CxStock> existsMap = new HashMap<>(16);
+            if (CollectionUtils.isNotEmpty(existsList)) {
+                existsMap = existsList.stream()
+                        .collect(Collectors.toMap(
+                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getEmbryoCode()),
+                                Function.identity(),
+                                (v1, v2) -> v1
+                        ));
+            }
+
+            // 步骤2：对MES推送数据设置ID（已存在则更新，不存在则新增）
+            for (CxStock entity : cxStockInsertList) {
+                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getStockDate()), entity.getEmbryoCode());
+                if (existsMap.containsKey(mapKey)) {
+                    CxStock existsData = existsMap.get(mapKey);
+                    entity.setId(existsData.getId());
+                }
+            }
+
+            // 步骤3：批量保存或更新（saveBatch有ID则更新，无ID则新增）
+            List<List<CxStock>> cxStockSplitList = ScmListUtils.getSplitList(cxStockInsertList, 1000);
+            for (List<CxStock> importList : cxStockSplitList) {
+                cxMesSyncRemoteService.saveCxStockBatch(importList);
+            }
+
+            // 步骤4：清理MES不再推送的过期数据
+            // 查询当前分厂下dataSource=MES的所有记录
+            List<CxStock> mesSourceList = cxMesSyncRemoteService.selectCxStockByDataSource(syncDataLogs.getFactoryCode(), "MES");
+            if (CollectionUtils.isNotEmpty(mesSourceList)) {
+                // 构建MES本次推送数据的唯一键集合
+                Map<String, CxStock> mesPushMap = cxStockInsertList.stream()
+                        .collect(Collectors.toMap(
+                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getEmbryoCode()),
+                                Function.identity(),
+                                (v1, v2) -> v1
+                        ));
+
+                // 找出MES不再推送的记录ID（在库但不在本次推送中）
+                List<Long> obsoleteIds = mesSourceList.stream()
+                        .filter(item -> !mesPushMap.containsKey(
+                                GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getEmbryoCode())))
+                        .map(CxStock::getId)
+                        .collect(Collectors.toList());
+
+                // 按ID批量删除过期数据（不影响本次同步的数据和手动录入的数据）
+                if (CollectionUtils.isNotEmpty(obsoleteIds)) {
+                    log.info("清理MES不再推送的成型库存数据，factoryCode={}，数量={}", syncDataLogs.getFactoryCode(), obsoleteIds.size());
+                    List<List<Long>> idSplitList = ScmListUtils.getSplitList(obsoleteIds, 1000);
+                    for (List<Long> idList : idSplitList) {
+                        cxMesSyncRemoteService.deleteCxStockByIds(idList);
+                    }
+                }
             }
         }
         return AjaxResult.success();
@@ -1795,5 +1870,124 @@ public class MesItfServiceImpl implements MesItfService {
             DynamicDataSourceContextHolder.poll();
         }
         return AjaxResult.success();
+    }
+
+    @Override
+    public AjaxResult syncLhPrecisionPlanActual(AuxReqSyncDataLogs syncDataLogs) {
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<DevMaintenancePlan> syncList = mesItfMapper.selectLhPrecisionPlanActualList(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            return AjaxResult.success("没有需要同步的硫化精度计划实际执行日期数据");
+        }
+
+        List<java.util.Map<String, Object>> fillList = new ArrayList<>();
+        for (DevMaintenancePlan mesPlan : syncList) {
+            if (StringUtils.isBlank(mesPlan.getFirstWashTime()) || StringUtils.isBlank(mesPlan.getDevCode())) {
+                continue;
+            }
+
+            try {
+                java.util.Date actualDate = DateUtils.parseDate(mesPlan.getFirstWashTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd");
+                java.util.Map<String, Object> item = new java.util.HashMap<>();
+                item.put("machineCode", mesPlan.getDevCode());
+                item.put("factoryCode", mesPlan.getFactoryCode());
+                item.put("actualDate", actualDate);
+                fillList.add(item);
+            } catch (Exception e) {
+                log.error("解析实际执行日期失败：机台={}, 日期={}", mesPlan.getDevCode(), mesPlan.getFirstWashTime(), e);
+            }
+        }
+
+        if (!fillList.isEmpty()) {
+            try {
+                lhPrecisionPlanRemoteService.batchFillActualDateAndGenerateNext(fillList);
+            } catch (Exception e) {
+                log.error("批量MES回填硫化精度计划实际执行日期失败", e);
+                return AjaxResult.error("批量回填失败：" + e.getMessage());
+            }
+        }
+        return AjaxResult.success();
+    }
+
+    @Override
+    public AjaxResult issueLhPrecisionPlan(String factoryCode) {
+        log.info("开始下发硫化精度计划到MES：分厂={}", factoryCode);
+
+        try {
+            String queryFactoryCode = factoryCode;
+            if (org.apache.commons.lang.StringUtils.isBlank(queryFactoryCode)) {
+                queryFactoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
+            }
+            AjaxResult pendingResult = lhPrecisionPlanRemoteService.listPendingIssuePlans(queryFactoryCode);
+            if (pendingResult == null || pendingResult.get("data") == null) {
+                log.info("没有待下发的硫化精度计划数据");
+                return AjaxResult.success("没有待下发的硫化精度计划数据");
+            }
+
+            List<com.zlt.aps.lh.api.domain.entity.LhPrecisionPlanIssue> pendingList =
+                    com.alibaba.fastjson.JSONObject.parseArray(
+                            com.alibaba.fastjson.JSONObject.toJSONString(pendingResult.get("data")),
+                            com.zlt.aps.lh.api.domain.entity.LhPrecisionPlanIssue.class
+                    );
+
+            if (org.apache.commons.collections4.CollectionUtils.isEmpty(pendingList)) {
+                log.info("没有待下发的硫化精度计划数据");
+                return AjaxResult.success("没有待下发的硫化精度计划数据");
+            }
+
+            String companyCode = pendingList.get(0).getCompanyCode();
+            return precisionPlanIssueService.issueLhPrecisionPlan(pendingList, factoryCode, companyCode);
+        } catch (Exception e) {
+            log.error("下发硫化精度计划到MES失败", e);
+            return AjaxResult.error("下发失败：" + e.getMessage());
+        }
+    }
+
+    @Override
+    public AjaxResult syncAndGenerateLhPrecisionPlan(Integer year) {
+        log.info("开始执行同步MES数据并生成硫化精度计划（综合接口），年度={}", year);
+
+        StringBuilder resultMsg = new StringBuilder();
+        int totalGenerated = 0;
+
+        log.info("同步MES设备保养计划到APS（仅硫化精度）");
+        try {
+            AuxReqSyncDataLogs lhSyncParam = new AuxReqSyncDataLogs();
+            lhSyncParam.setPrecisionType("硫化精度");
+            AjaxResult syncResult = syncDevMaintenancePlan(lhSyncParam);
+            log.info("同步设备保养计划结果：{}", syncResult.get("msg"));
+            resultMsg.append("同步硫化设备保养计划完成；");
+        } catch (Exception e) {
+            log.error("同步硫化设备保养计划失败", e);
+            resultMsg.append("同步硫化设备保养计划失败：").append(e.getMessage()).append("；");
+        }
+//
+//        log.info("步骤2：同步MES硫化精度计划实际执行日期回填数据");
+//        try {
+//            AjaxResult actualResult = syncLhPrecisionPlanActual(new AuxReqSyncDataLogs());
+//            log.info("同步实际执行日期结果：{}", actualResult.get("msg"));
+//            resultMsg.append("同步实际执行日期完成；");
+//        } catch (Exception e) {
+//            log.error("同步实际执行日期失败", e);
+//            resultMsg.append("同步实际执行日期失败：").append(e.getMessage()).append("；");
+//        }
+//
+//        log.info("步骤3：将回填MES实际执行日期的数据生成新的下一年度的硫化精度计划");
+//        try {
+//            AjaxResult generateResult = lhPrecisionPlanRemoteService.autoGenerateYearlyPlans(year + 1);
+//            Object data = generateResult.get("data");
+//            int count = data != null ? Integer.parseInt(data.toString()) : 0;
+//            totalGenerated += count;
+//            log.info("生成下一年度硫化精度计划{}条", count);
+//            resultMsg.append("生成下一年度硫化精度计划").append(count).append("条；");
+//        } catch (Exception e) {
+//            log.error("生成下一年度硫化精度计划失败", e);
+//            resultMsg.append("生成下一年度硫化精度计划失败：").append(e.getMessage()).append("；");
+//        }
+
+        log.info("同步MES数据并生成硫化精度计划执行完成");
+        return AjaxResult.success(resultMsg.toString(), totalGenerated);
     }
 }

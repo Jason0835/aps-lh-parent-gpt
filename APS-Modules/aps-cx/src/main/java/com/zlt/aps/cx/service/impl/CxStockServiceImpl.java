@@ -222,6 +222,7 @@ public class CxStockServiceImpl extends AbstractDocService<CxStock> implements C
         }
 
         for (CxStock entity : importList) {
+            entity.setDataSource("MANUAL");
             if (entity.getId() != null) {
                 cxStockMapper.updateById(entity);
             } else {

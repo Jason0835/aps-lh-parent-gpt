@@ -8,6 +8,7 @@ import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 硫化精度计划Service接口
@@ -88,4 +89,62 @@ public interface ILhPrecisionPlanService extends IDocService<LhPrecisionPlan> {
      * @return 导入结果
      */
     AjaxResult importDataFeign(List<LhPrecisionPlanImportVO> list, boolean updateSupport, Long importLogId);
+
+    /**
+     * 硫化排程回填计划排程精度日期
+     * 找到对应机台且实际执行日期还没值的数据回填计划排程精度日期
+     *
+     * @param machineCode 机台编号
+     * @param factoryCode 分厂编码
+     * @param scheduleDate 计划排程精度日期
+     * @return 回填数量
+     */
+    int fillScheduleDate(String machineCode, String factoryCode, java.util.Date scheduleDate);
+
+    /**
+     * 批量硫化排程回填计划排程精度日期
+     * 将循环内的逐条DB查询优化为外层批量查询+内存分组匹配，逐条update优化为批量操作
+     *
+     * @param fillList 回填数据列表，每项包含machineCode、factoryCode、scheduleDate
+     * @return 成功回填的数量
+     */
+    int batchFillScheduleDate(List<java.util.Map<String, Object>> fillList);
+
+    /**
+     * MES回填实际精度执行日期
+     * 匹配最接近的计划排程精度日期且实际执行时间为空的硫化精度计划
+     * 回填后立马推算生成下一次硫化精度计划
+     *
+     * @param machineCode 机台编号
+     * @param factoryCode 分厂编码
+     * @param actualDate 实际执行日期
+     * @return 是否成功
+     */
+    boolean fillActualDateAndGenerateNext(String machineCode, String factoryCode, java.util.Date actualDate);
+
+    /**
+     * 批量MES回填实际精度执行日期并生成下一次计划
+     * 将循环内的逐条DB查询优化为外层批量查询+内存过滤，逐条insert/update优化为批量操作
+     *
+     * @param fillList 回填数据列表，每项包含machineCode、factoryCode、actualDate
+     * @return 成功回填的数量
+     */
+    int batchFillActualDateAndGenerateNext(List<java.util.Map<String, Object>> fillList);
+
+    /**
+     * 查询待下发的硫化精度计划列表
+     * 计划排程精度日期有值且实际执行日期为空且未下发的数据
+     *
+     * @return 待下发计划列表
+     */
+    List<LhPrecisionPlan> selectPendingIssuePlans();
+
+    /**
+     * 查询待下发的硫化精度计划列表（转换为下发实体）
+     * 计划排程精度日期有值且实际执行日期为空的数据
+     *
+     * @param factoryCode 分厂编码
+     * @return 待下发计划列表
+     */
+    List<com.zlt.aps.lh.api.domain.entity.LhPrecisionPlanIssue> listPendingIssuePlans(String factoryCode);
 }
