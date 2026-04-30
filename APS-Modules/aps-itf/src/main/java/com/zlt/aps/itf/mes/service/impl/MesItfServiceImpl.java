@@ -1,5 +1,6 @@
 package com.zlt.aps.itf.mes.service.impl;
 
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -19,6 +20,7 @@ import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.mes.vo.MoldAlterPlanIssue;
 import com.zlt.aps.itf.scm.service.ScmItfService;
 import com.zlt.aps.itf.vo.*;
+import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -33,12 +35,6 @@ import com.zlt.aps.cx.api.domain.entity.CxMesStock;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
 import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
-import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
-import com.zlt.aps.lh.api.domain.entity.LhMouldCleanWarn;
-import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
-import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
-import com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish;
 import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
 import com.zlt.aps.lh.api.service.ILhMesSyncRemoteService;
 import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
@@ -1926,13 +1922,13 @@ public class MesItfServiceImpl implements MesItfService {
                 return AjaxResult.success("没有待下发的硫化精度计划数据");
             }
 
-            List<com.zlt.aps.lh.api.domain.entity.LhPrecisionPlanIssue> pendingList =
-                    com.alibaba.fastjson.JSONObject.parseArray(
-                            com.alibaba.fastjson.JSONObject.toJSONString(pendingResult.get("data")),
-                            com.zlt.aps.lh.api.domain.entity.LhPrecisionPlanIssue.class
+            List<LhPrecisionPlanIssue> pendingList =
+                    JSONObject.parseArray(
+                            JSONObject.toJSONString(pendingResult.get("data")),
+                            LhPrecisionPlanIssue.class
                     );
 
-            if (org.apache.commons.collections4.CollectionUtils.isEmpty(pendingList)) {
+            if (CollectionUtils.isEmpty(pendingList)) {
                 log.info("没有待下发的硫化精度计划数据");
                 return AjaxResult.success("没有待下发的硫化精度计划数据");
             }
