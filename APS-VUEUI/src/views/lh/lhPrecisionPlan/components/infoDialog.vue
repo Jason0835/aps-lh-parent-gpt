@@ -113,6 +113,13 @@ export default {
           required: true
         },
         {
+          prop: 'scheduleDate',
+          label: this.$t('ui.data.column.lhPrecisionPlan.scheduleDate'),
+          type: 'date',
+          valueFormat: 'yyyy-MM-dd',
+          disabled: true
+        },
+        {
           prop: 'dataSource',
           label: this.$t('ui.lh.precision.plan.data.source'),
           type: 'select',
