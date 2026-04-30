@@ -42,6 +42,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             DAY_30 = #{day30},
             DAY_31 = #{day31},
             IS_LOCK_SCHEDULE = #{isLockSchedule},
+            TOTAL_QTY = #{totalQty},
             UPDATE_BY = #{updateBy},
             UPDATE_TIME = NOW()
         WHERE ID = #{id}

@@ -1,6 +1,8 @@
 package com.zlt.aps.mp.api.domain.entity;
 
+import com.google.common.collect.Lists;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.mp.api.constants.MonthPlanConstants;
 import com.zlt.common.utils.StringUtil;
 import lombok.Data;
 import com.ruoyi.common.core.annotation.Excel;
@@ -8,7 +10,9 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import org.springframework.util.CollectionUtils;
 
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -545,6 +549,12 @@ public class MpAdjustResult extends BaseEntity {
     @ApiModelProperty(value = "施工阶段 0 无工艺 1 试制 2 量试 3 正式", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
+
+    /** 调整优先级            2、针对增量            2.1）在产SKU增量，先补；            2.2）新增SKU，按调整优先级1.2.3…            3、该列默认空，允许编辑； */
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.adjustPriority", dictType = "adjust_priority")
+    @ApiModelProperty(value = "调整优先级            2、针对增量            2.1）在产SKU增量，先补；            2.2）新增SKU，按调整优先级1.2.3…            3、该列默认空，允许编辑；", name = "adjustPriority")
+    @TableField(value = "ADJUST_PRIORITY")
+    private Integer adjustPriority;
 
     /**
      * 最大的型腔数，用于排序
