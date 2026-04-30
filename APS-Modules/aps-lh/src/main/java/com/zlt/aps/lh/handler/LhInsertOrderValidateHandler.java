@@ -35,10 +35,7 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -132,7 +129,7 @@ public class LhInsertOrderValidateHandler {
         wrapper.last("LIMIT 1");
         MdmMaterialInfo materialInfo = mdmMaterialInfoMapper.selectOne(wrapper);
         if (Objects.isNull(materialInfo)) {
-            result.addError(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.materialCodeNotFound", materialCode));
+            result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.materialCodeNotFound"), materialCode));
         }
     }
 
@@ -181,7 +178,7 @@ public class LhInsertOrderValidateHandler {
         }
         Long count = lhScheduleResultMapper.selectCount(wrapper);
         if (count != null && count > 0) {
-            result.addError(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.duplicateInsert", materialCode, dto.getLhMachineCode()));
+            result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.duplicateInsert"), materialCode, dto.getLhMachineCode()));
         }
     }
 
@@ -207,7 +204,7 @@ public class LhInsertOrderValidateHandler {
         }
 
         if (scheduleDay.before(today)) {
-            result.addError(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.historicalDate", DateUtil.formatDate(scheduleDate)));
+            result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.historicalDate", Locale.forLanguageTag(DateUtil.formatDate(scheduleDate)))));
             return;
         }
 
@@ -222,8 +219,8 @@ public class LhInsertOrderValidateHandler {
             Integer planQty = getPlanQtyByShiftIndex(dto, i);
             if (planQty != null && planQty > 0) {
                 LhShiftConfigVO shift = findShiftByIndex(shifts, i);
-                String shiftName = shift != null ? shift.getShiftName() : ("第" + i + "班");
-                result.addError(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.historicalShift", shiftName));
+                String shiftName = shift != null ? shift.getShiftName() : String.format("第%d班", i);
+                result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.historicalShift"), shiftName));
             }
         }
     }
@@ -248,12 +245,12 @@ public class LhInsertOrderValidateHandler {
         LhMachineInfo machineInfo = lhMachineInfoMapper.selectOne(machineWrapper);
 
         if (Objects.isNull(machineInfo)) {
-            result.addWarning(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.machineNotExist", dto.getLhMachineCode()));
+            result.addWarning(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.machineNotExist"), dto.getLhMachineCode()));
             return;
         }
 
         if (!"0".equals(machineInfo.getStatus())) {
-            result.addWarning(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.machineUnavailable", dto.getLhMachineCode()));
+            result.addWarning(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.machineUnavailable"), dto.getLhMachineCode()));
         }
 
         Integer machineQuota = machineInfo.getQuota();
@@ -313,7 +310,7 @@ public class LhInsertOrderValidateHandler {
             Integer insertQty = getPlanQtyByShiftIndex(dto, i);
             if (insertQty != null && insertQty > 0 && remaining < insertQty) {
                 String shiftName = getShiftName(shifts, i);
-                result.addWarning(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.capacityInsufficient", shiftName, shiftCapacity, scheduledQty, remaining, insertQty));
+                result.addWarning(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.capacityInsufficient"), shiftName, shiftCapacity, scheduledQty, remaining, insertQty));
             }
 
             LhInsertOrderValidateResultDTO.ShiftCapacityInfo capacityInfo =
@@ -363,7 +360,7 @@ public class LhInsertOrderValidateHandler {
 
         int totalInsertQty = calculateTotalInsertQty(dto);
         if (surplusQty > 0 && totalInsertQty > surplusQty) {
-            result.addWarning(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldSurplusExceeded", surplusQty, totalInsertQty, (totalInsertQty - surplusQty)));
+            result.addWarning(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldSurplusExceeded"), surplusQty, totalInsertQty, (totalInsertQty - surplusQty)));
         }
     }
 
@@ -387,7 +384,7 @@ public class LhInsertOrderValidateHandler {
         List<MdmSkuMouldRel> mouldRelList = mdmSkuMouldRelMapper.selectList(wrapper);
 
         if (CollectionUtils.isEmpty(mouldRelList)) {
-            result.addWarning(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldRelNotConfigured", materialCode));
+            result.addWarning(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldRelNotConfigured"), materialCode));
             return;
         }
 
@@ -399,7 +396,7 @@ public class LhInsertOrderValidateHandler {
                 .collect(Collectors.toList());
 
         if (CollectionUtils.isNotEmpty(unavailableMoulds)) {
-            result.addWarning(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldUnavailable", materialCode, String.join(",", unavailableMoulds)));
+            result.addWarning(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldUnavailable"), materialCode, String.join(",", unavailableMoulds)));
         }
     }
 
@@ -499,6 +496,6 @@ public class LhInsertOrderValidateHandler {
         if (shift != null && StringUtils.isNotBlank(shift.getShiftName())) {
             return shift.getShiftName();
         }
-        return "第" + shiftIndex + "班";
+        return String.format("第%d班", shiftIndex);
     }
 }

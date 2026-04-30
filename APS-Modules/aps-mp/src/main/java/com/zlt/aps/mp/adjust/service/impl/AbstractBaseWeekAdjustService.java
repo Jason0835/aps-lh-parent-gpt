@@ -66,6 +66,7 @@ import com.zlt.msg.message.domain.vo.MessageContext;
 import com.zlt.msg.message.enums.MsgTypeEnums;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
