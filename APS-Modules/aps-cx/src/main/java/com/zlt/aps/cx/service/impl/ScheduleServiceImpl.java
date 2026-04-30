@@ -971,6 +971,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         Map<String, MdmMonthSurplus> monthSurplusMap = monthSurplusList.stream()
                 .collect(Collectors.toMap(MdmMonthSurplus::getMaterialCode, s -> s, (a, b) -> a));
         context.setMonthSurplusMap(monthSurplusMap);
+        context.setInitialMonthSurplusMap(monthSurplusList.stream()
+                .filter(s -> s.getMaterialCode() != null && s.getPlanSurplusQty() != null)
+                .collect(Collectors.toMap(MdmMonthSurplus::getMaterialCode, MdmMonthSurplus::getPlanSurplusQty, (a, b) -> a)));
         log.info("加载月度计划余量 {} 条", monthSurplusList.size());
 
         // 获取当前天的班次配置（用于获取硫化任务的班次计划量）
@@ -989,7 +992,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                 context.getScheduleDate(),
                 materialLhCapacityMap);
         context.setFormingRemainderMap(formingRemainderMap);
+        context.setInitialFormingRemainderMap(new HashMap<>(formingRemainderMap));
         context.setMaterialStockMap(materialStockMap);
+        context.setInitialMaterialStockMap(new HashMap<>(materialStockMap));
         log.info("计算成型余量映射 {} 条，物料库存分配 {} 条", formingRemainderMap.size(), materialStockMap.size());
     }
 

@@ -901,11 +901,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
             }
 
-            // ---- 库存信息（求和合并多个lhId的库存） ----
+            // ---- 库存信息（求和合并多个lhId的库存，使用初始库存快照） ----
             List<Long> lhIdList = taskLhIdListMap.get(taskKey);
             int totalStock = 0;
             if (lhIdList != null && !lhIdList.isEmpty()) {
-                Map<String, Integer> stockMap = context.getMaterialStockMap();
+                Map<String, Integer> stockMap = context.getInitialMaterialStockMap();
                 for (Long lhId : lhIdList) {
                     if (stockMap != null) {
                         Integer stock = stockMap.get(String.valueOf(lhId));
@@ -973,13 +973,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     result.setLhClassQty(new BigDecimal(primaryLh.getSingleMouldShiftQty()));
                 }
 
-                // lhRemainQty: 只取第一个
-                Map<String, MdmMonthSurplus> monthSurplusMap = context.getMonthSurplusMap();
-                if (monthSurplusMap != null && primaryLh != null) {
+                // lhRemainQty: 使用初始快照（排程开始前的硫化余量）
+                Map<String, BigDecimal> initialMonthSurplusMap = context.getInitialMonthSurplusMap();
+                if (initialMonthSurplusMap != null && primaryLh != null) {
                     String surplusKey = materialCode != null ? materialCode : embryoCode;
-                    MdmMonthSurplus surplus = monthSurplusMap.get(surplusKey);
-                    if (surplus != null && surplus.getPlanSurplusQty() != null) {
-                        result.setLhRemainQty(surplus.getPlanSurplusQty());
+                    BigDecimal surplus = initialMonthSurplusMap.get(surplusKey);
+                    if (surplus != null) {
+                        result.setLhRemainQty(surplus);
                     }
                 }
             }
@@ -989,10 +989,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             if (lhRemainQty != null) {
                 result.setCxRemainQty(lhRemainQty.subtract(result.getTotalStock()));
             } else {
-                // 如果没有lhRemainQty，尝试从formingRemainderMap获取
-                Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
-                if (formingRemainderMap != null && materialCode != null) {
-                    Integer cxRemain = formingRemainderMap.get(materialCode);
+                // 如果没有lhRemainQty，尝试从initialFormingRemainderMap获取
+                Map<String, Integer> initialFormingRemainderMap = context.getInitialFormingRemainderMap();
+                if (initialFormingRemainderMap != null && materialCode != null) {
+                    Integer cxRemain = initialFormingRemainderMap.get(materialCode);
                     if (cxRemain != null) {
                         result.setCxRemainQty(new BigDecimal(cxRemain));
                     }
@@ -1559,23 +1559,23 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         BigDecimal planQty = spr.getQuantity() != null ? new BigDecimal(spr.getQuantity()) : BigDecimal.ZERO;
         // 完成量默认给0
         BigDecimal finishQty = BigDecimal.ZERO;
-        // 示方书编号：取硫化任务的lhNo
-        String recipeNo = (primaryLh != null) ? primaryLh.getLhNo() : null;
-        // 示方书类型：通过基础表 MdmSkuConstructionRef 查询 lhType
+        // 示方书编号：取硫化任务的制造示方书号
+        String recipeNo = (primaryLh != null) ? primaryLh.getEmbryoNo() : null;
+        // 示方书类型：通过基础表 MdmSkuConstructionRef 查询 embryoType
         String recipeType = null;
         if (materialCode != null && recipeNo != null) {
             try {
-                MdmSkuConstructionRef ref = skuConstructionRefMapper.selectByMaterialCodeAndLhNo(materialCode, recipeNo);
+                MdmSkuConstructionRef ref = skuConstructionRefMapper.selectByMaterialCodeAndEmbryoNo(materialCode, recipeNo);
                 if (ref != null) {
-                    recipeType = ref.getLhType();
+                    recipeType = ref.getEmbryoType();
                 }
             } catch (Exception e) {
-                log.debug("查询示方书类型失败: materialCode={}, lhNo={}", materialCode, recipeNo);
+                log.debug("查询示方书类型失败: materialCode={}, embryoNo={}", materialCode, recipeNo);
             }
         }
-        // 兜底：如果查询不到 recipeType 但分析结果是收尾，设置 recipeType 为"收尾"
-        if (recipeType == null && analysis != null && analysis.contains("收尾")) {
-            recipeType = "收尾";
+        // 兜底：查不到类型时设置为"无"
+        if (recipeType == null) {
+            recipeType = "无";
         }
 
         switch (classField) {

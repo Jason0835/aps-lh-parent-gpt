@@ -15,8 +15,8 @@ import org.apache.ibatis.annotations.Select;
 public interface MdmSkuConstructionRefMapper extends BaseMapper<MdmSkuConstructionRef> {
 
     /**
-     * 根据物料编码和硫化示方书号查询记录
+     * 根据物料编码和制造示方书号查询记录
      */
-    @Select("SELECT * FROM T_MDM_SKU_CONSTRUCTION_REF WHERE MATERIAL_CODE = #{materialCode} AND LH_NO = #{lhNo} AND IS_DELETE = '0' LIMIT 1")
-    MdmSkuConstructionRef selectByMaterialCodeAndLhNo(@Param("materialCode") String materialCode, @Param("lhNo") String lhNo);
+    @Select("SELECT * FROM T_MDM_SKU_CONSTRUCTION_REF WHERE MATERIAL_CODE = #{materialCode} AND EMBRYO_NO = #{embryoNo} AND IS_DELETE = '0' LIMIT 1")
+    MdmSkuConstructionRef selectByMaterialCodeAndEmbryoNo(@Param("materialCode") String materialCode, @Param("embryoNo") String embryoNo);
 }
