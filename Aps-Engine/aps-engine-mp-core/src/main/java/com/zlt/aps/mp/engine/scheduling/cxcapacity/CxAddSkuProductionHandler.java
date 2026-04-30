@@ -141,8 +141,9 @@ public class CxAddSkuProductionHandler {
             productionAddSkuByContinueCxMachine(context, productionStage, formalRound, groupPlanInfo, excludeDays);
             return;
         }
-        //计算需要排产的量
-        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(ContinueTypeEnum.NO_CONTINUE, leftOverHasProductionList, materialDesc, true);
+        //计算需要排产的量 20260430+ Sku是否一起排产
+        boolean isAllSum = groupPlanData.get(BigDecimal.ZERO.intValue()).getIsAllSum();
+        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(ContinueTypeEnum.NO_CONTINUE, leftOverHasProductionList, materialDesc, isAllSum);
         if (null == needProductionInfo) {
             //todo 记录日志
             return;
@@ -236,8 +237,9 @@ public class CxAddSkuProductionHandler {
             productionAddSku(context, cxMachineCode, productionPlanList, productionPlan, mouldShellMap, excludeDays);
             return;
         }
-        //计算需要排产的量
-        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(ContinueTypeEnum.NO_CONTINUE, productionPlanList, materialDesc, true);
+        //计算需要排产的量 20260430+ Sku是否一起排产
+        boolean isAllSum = productionPlanList.get(BigDecimal.ZERO.intValue()).getIsAllSum();
+        SkuNeedProductionInfo needProductionInfo = SkuProductionQtySelector.getNeedProductionQty(ContinueTypeEnum.NO_CONTINUE, productionPlanList, materialDesc, isAllSum);
         if (null == needProductionInfo) {
             //记录日志
             log.info(TbrMouldProductionLogRecorder.addLhGroupSkuNoProductionQtyLog(context, groupName, cxMachineCode, materialDesc));

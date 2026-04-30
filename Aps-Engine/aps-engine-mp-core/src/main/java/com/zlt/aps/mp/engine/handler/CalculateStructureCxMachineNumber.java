@@ -72,6 +72,7 @@ public class CalculateStructureCxMachineNumber {
         if (CollectionUtils.isEmpty(mapGroupByStructureName)) {
             return Collections.emptyMap();
         }
+        BigDecimal heightPrioritySkuProductionRatio = productionContext.getBaseDataContainer().getParamConfiguration().getHeightPriorityProductionMode();
         //得到结构主花纹下最大可用模具数-按物料描述分组取最大
         Map<String, Integer> maxEnableMouldNumberMap = calculateMaxEnableMouldNumber(productionContext);
         Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioMap(productionContext);
@@ -90,6 +91,13 @@ public class CalculateStructureCxMachineNumber {
             groupInfo.setCxMachineLhRationMap(cxMachineLhRationMap);
             // 计算结构净需求量
             groupInfo.setSumPlanQty(calculateMaxMouldCapacity(groupInfo, groupDatas, maxEnableMouldNumberMap, productionContext));
+            //20260430+ 设置是否按高优先级先排产，按结构高优先级需求占比
+            BigDecimal groupHeightRequireRatio = groupInfo.getHeightRequireRatio();
+            groupDatas.forEach(singlePlan -> {
+                if (groupHeightRequireRatio.compareTo(heightPrioritySkuProductionRatio) >= BigDecimal.ZERO.intValue()) {
+                    singlePlan.setIsPriorityHeight(YesOrNoEnum.YES.getValue());
+                }
+            });
             //（4）粗算每个结构需要的成型机台数，公式核算：成型机台数 = 结构净需求量/硫化机数*日硫化量<取最小>*月度天数<工作日历>；
             if (!minLhRatioMap.containsKey(structureName)) {
                 groupInfo.setNeedCxCapacityMachineCount(BigDecimal.ZERO);
@@ -303,6 +311,8 @@ public class CalculateStructureCxMachineNumber {
             return BigDecimal.ZERO.intValue();
         }
         List<Integer> totalMaxMouldCapacity = Lists.newArrayList();
+        //20260430+ 高优先级量对需求量的占比计算需要
+        List<Integer> totalHeightRequire = Lists.newArrayList();
         groupMap.forEach((groupKey, requirePlanList) -> {
             if (!maxEnableMouldNumberMap.containsKey(groupKey)) {
                 return;
@@ -321,7 +331,18 @@ public class CalculateStructureCxMachineNumber {
             PlanRequireLogRecorder.addRequireEstimateInfoLog(productionContext, groupKey, sumActualQuantity, sumNetQty, maxMouldCapacity);
             // （2）计算结构向下主花纹模具的最大可排产量 = MIN { SUM（结构向下主花纹对应的所有SKU的净需求量），主花纹模具的最大产能}；
             totalMaxMouldCapacity.add(Math.min(maxMouldCapacity, sumNetQty));
+            //20260430+ 高优先级需求量
+            Integer sumHeightQty = requirePlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightCapacityRequireQty).sum();
+            totalHeightRequire.add(Math.min(sumHeightQty, maxMouldCapacity));
         });
+        //20260430+ 增加高优先级需求量
+        if (!CollectionUtils.isEmpty(totalHeightRequire)) {
+            Integer sumHeightRequireQty = totalHeightRequire.stream().mapToInt(Integer::intValue).sum();
+            groupInfo.setSumHeightRequireQty(sumHeightRequireQty);
+        } else {
+            groupInfo.setSumHeightRequireQty(BigDecimal.ZERO.intValue());
+        }
+
         if (CollectionUtils.isEmpty(totalMaxMouldCapacity)) {
             return BigDecimal.ZERO.intValue();
         }
