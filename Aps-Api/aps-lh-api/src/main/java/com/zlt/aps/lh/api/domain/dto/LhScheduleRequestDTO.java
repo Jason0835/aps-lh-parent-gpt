@@ -15,7 +15,7 @@ public class LhScheduleRequestDTO {
 
     /** 分厂编号 */
     private String factoryCode;
-    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     /** 排程目标日期(默认T+2) */
     private Date scheduleDate;
     /** 月计划需求版本 */
