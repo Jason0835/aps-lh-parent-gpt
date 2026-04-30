@@ -19,13 +19,14 @@ utf-8 no bom
 - 导入业务数据importData见@docs/importdoc.md
 - 遇到字段反显、导出补反显字段、非数据库字段需要反显时，必须先阅读并遵循@字段反显.md
 - 使用LambdaQueryWrapper、LambdaUpdateWrapper
-
 - 尽可能使用Lambda写法（例如：LambdaQueryWrapper、LambdaUpdateWrapper、LambdaQueryChainWrapper、LambdaUpdateChainWrapper），减少字符串字段名硬编码
-
+- 不在数据库的字段要求反显时，参考@字段反显.md
 ### 注释规范
-注释用中文，尽可能的详细
-实体类的字段需要加注释
-不在数据库的字段要求反显时，参考@字段反显.md
+- 注释用中文，尽可能的详细
+- 实体类的字段需要加注释
+- 方法需要加注释，方法参数需要加注释
+- 方法内部逻辑需要加注释
+
 ### 必须遵循的继承结构：
 ```
 Controller  extends AbstractDocBizController<Entity>
