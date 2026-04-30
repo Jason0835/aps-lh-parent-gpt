@@ -54,6 +54,6 @@ cache:
     # 开启缓存
     cache-enabled: true
 
-debug:
-  ignorSkip:
-    matching: true
+#debug:
+#  ignorSkip:
+#    matching: true
