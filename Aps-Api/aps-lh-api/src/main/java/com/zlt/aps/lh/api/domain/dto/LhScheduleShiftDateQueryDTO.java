@@ -17,7 +17,7 @@ public class LhScheduleShiftDateQueryDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** 排程日期（窗口结束日），格式 yyyy-MM-dd */
-    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private Date scheduleDate;
 
 }
