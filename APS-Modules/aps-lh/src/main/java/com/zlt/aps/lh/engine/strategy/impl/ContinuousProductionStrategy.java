@@ -1890,6 +1890,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (sku != null) {
             unscheduled.setMaterialDesc(sku.getMaterialDesc());
             unscheduled.setStructureName(sku.getStructureName());
+            unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
             unscheduled.setSpecCode(sku.getSpecCode());
             unscheduled.setEmbryoCode(sku.getEmbryoCode());
             unscheduled.setMouldQty(sku.getMouldQty());

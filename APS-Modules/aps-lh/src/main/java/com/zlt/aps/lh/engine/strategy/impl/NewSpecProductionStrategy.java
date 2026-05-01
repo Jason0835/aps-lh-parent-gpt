@@ -982,6 +982,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         unscheduled.setUnscheduledReason(reason);
         unscheduled.setUnscheduledQty(sku.resolveTargetScheduleQty());
         unscheduled.setStructureName(sku.getStructureName());
+        unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
         unscheduled.setSpecCode(sku.getSpecCode());
         unscheduled.setEmbryoCode(sku.getEmbryoCode());
         unscheduled.setMouldQty(sku.getMouldQty());
@@ -1115,6 +1116,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         unscheduled.setMaterialCode(materialCode);
         unscheduled.setMaterialDesc(sku.getMaterialDesc());
         unscheduled.setStructureName(sku.getStructureName());
+        unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
         unscheduled.setSpecCode(sku.getSpecCode());
         unscheduled.setEmbryoCode(sku.getEmbryoCode());
         unscheduled.setMouldQty(sku.getMouldQty());
