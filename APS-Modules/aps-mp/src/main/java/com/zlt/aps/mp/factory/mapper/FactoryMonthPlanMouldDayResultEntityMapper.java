@@ -33,5 +33,5 @@ public interface FactoryMonthPlanMouldDayResultEntityMapper extends CommBaseMapp
      */
     List<FactoryMonthPlanMouldDayResultExportVo> getExportList(@Param("dayResult") FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult,
                                                                @Param("isAllMaterial") Boolean isAllMaterial,
-                                                               @Param("isFinal") Boolean isFinal);
+                                                               @Param("isAdjuest") Boolean isAdjuest);
 }

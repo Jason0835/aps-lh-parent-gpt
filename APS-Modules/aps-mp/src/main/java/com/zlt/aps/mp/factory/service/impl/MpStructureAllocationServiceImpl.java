@@ -2343,6 +2343,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     insertItem.setEmbryoNo(constructionInfo.getEmbryoNo());
                     insertItem.setTextNo(constructionInfo.getTextNo());
                     insertItem.setLhNo(constructionInfo.getLhNo());
+                    insertItem.setProductStatus(constructionInfo.getProductStatus());
                 } else {
                     insertItem.setConstructionStage(ConstructionStageEnum.NO_CONSTRUCTION.getStage());
                 }

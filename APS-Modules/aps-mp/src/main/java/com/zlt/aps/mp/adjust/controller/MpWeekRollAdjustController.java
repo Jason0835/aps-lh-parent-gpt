@@ -1,22 +1,29 @@
 package com.zlt.aps.mp.adjust.controller;
 
 import cn.hutool.core.bean.BeanUtil;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.ServletUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.log.annotation.Log;
+import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.redis.service.RedisService;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.exception.BusinessException;
+import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.mp.adjust.service.impl.MpWeekAdjustFactory;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
-import com.zlt.aps.mp.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingAdjuestProductionHandler;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
@@ -28,15 +35,19 @@ import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.dto.MpWeekRollAdjustDTO;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
+import com.zlt.common.utils.ExcelReadUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.msg.message.api.IMsgTemplateRemoteService;
 import com.zlt.msg.message.domain.entity.MsgTemplate;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -50,6 +61,8 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import javax.servlet.http.HttpServletResponse;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -87,7 +100,10 @@ public class MpWeekRollAdjustController extends BaseController {
 
     @Autowired
     private MatchingAdjuestProductionHandler matchingAdjuestProductionHandler;
-
+    @Autowired
+    private MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
+    @Autowired
+    private IExportLogService iExportLogService;
 
     /**
      * 获取调整明细列表
@@ -155,6 +171,41 @@ public class MpWeekRollAdjustController extends BaseController {
         }finally {
             redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
         }
+    }
+
+    /**
+     * 导出结构间调整记录列表
+     */
+    @Log(title = "ui.data.alert.mpWeekRollAdjust.yearMonthEmpty", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出结构间调整记录列表")
+    @PostMapping("/exportData/{fileName}")
+    public byte[] exportData(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        Date beginTime = DateUtils.getNowDate();
+        // 加载导出数据
+        LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MpAdjustResult::getFactoryCode, weekRollAdjustDTO.getFactoryCode());
+        queryWrapper.eq(MpAdjustResult::getVersion, weekRollAdjustDTO.getVersion());
+        List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
+        // 2、调用导出实例
+        ExcelUtil<MpAdjustResult> util = new ExcelUtil<>(MpAdjustResult.class);
+        Workbook workbook = util.exportExcel2(response, mpAdjustResultList, fileName);
+        byte[] resultBytes =  ExcelReadUtils.writeExcel(workbook);
+        
+        Date endTime = DateUtils.getNowDate();
+        ExportLog exportLog = new ExportLog();
+        exportLog.setProcedureCode("0");
+        exportLog.setExportParams(weekRollAdjustDTO.toString());
+        String uri = ServletUtils.getRequest().getRequestURI();
+        exportLog.setFunctionCode(uri.split("/")[1]);
+        exportLog.setFunctionName(fileName);
+        exportLog.setFileName(fileName + ".xlsx");
+        exportLog.setRowCount(mpAdjustResultList.size());
+        exportLog.setBeginTime(beginTime);
+        exportLog.setEndTime(endTime);
+        exportLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        this.iExportLogService.add(exportLog);
+        return resultBytes;
     }
 
     /**

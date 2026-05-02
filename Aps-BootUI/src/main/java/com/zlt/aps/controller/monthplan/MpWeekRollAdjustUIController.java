@@ -1,13 +1,28 @@
 package com.zlt.aps.controller.monthplan;
 
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.mp.api.domain.dto.MpWeekRollAdjustDTO;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.service.IFactoryMonthPlanMouldDayResultRemoteService;
 import com.zlt.aps.mp.api.service.IMpWeekRollAdjustRemoteService;
+
+import cn.hutool.core.date.DateUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.time.LocalDateTime;
+
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -34,6 +49,8 @@ public class MpWeekRollAdjustUIController extends BaseController {
 
     @Autowired
     private IMpWeekRollAdjustRemoteService mpWeekRollAdjustRemoteService;
+    @Autowired
+    private IFactoryMonthPlanMouldDayResultRemoteService iFactoryMonthPlanMouldDayResultService;
 
     /**
      * 获取调整明细列表
@@ -67,5 +84,23 @@ public class MpWeekRollAdjustUIController extends BaseController {
         return mpWeekRollAdjustRemoteService.confirmAdjust(weekRollAdjustDTO);
     }
 
+    @ApiOperation("导出调整版本")
+    @RequiresPermissions("monthplan:mpWeekRollAdjust:export")
+    @GetMapping({"/export"})
+    @ResponseBody
+    public void export(HttpServletResponse response, FactoryMonthPlanProductionFinalResult entity) throws IOException {
+        String fileName = I18nUtil.getMessage("ui.data.column.mpWeekRollAdjust.modelName") + DateUtil.format(LocalDateTime.now(),"yyyyMMdd");
+        FactoryMonthPlanMouldDayResult result = new FactoryMonthPlanMouldDayResult();
+        result.setFactoryCode(entity.getFactoryCode());
+        result.setProductionVersion(entity.getProductionVersion());
+        result.setStructureName(entity.getStructureName());
+        result.setYear(entity.getYear());
+        result.setMonth(entity.getMonth());
+        byte[] excelBytes = iFactoryMonthPlanMouldDayResultService.exportAdjuest(result, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
+    }
 
 }

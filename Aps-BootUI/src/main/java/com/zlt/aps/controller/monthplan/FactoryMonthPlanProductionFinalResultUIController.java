@@ -166,25 +166,6 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
         response.flushBuffer();
     }
 
-    @ApiOperation("导出SKU排产明细")
-    @RequiresPermissions("monthplan:factoryMonthPlanFinalResult:export")
-    @GetMapping({"/exportSkuScheduleItems"})
-    @ResponseBody
-    public void exportSkuScheduleItems(HttpServletResponse response, FactoryMonthPlanProductionFinalResult entity) throws IOException {
-        String fileName = I18nUtil.getMessage("ui.data.column.factoryMonthPlanProdFinal.modelName") + DateUtil.format(LocalDateTime.now(),"yyyyMMdd");
-        FactoryMonthPlanMouldDayResult result = new FactoryMonthPlanMouldDayResult();
-        result.setFactoryCode(entity.getFactoryCode());
-        result.setProductionVersion(entity.getProductionVersion());
-        result.setStructureName(entity.getStructureName());
-        result.setYear(entity.getYear());
-        result.setMonth(entity.getMonth());
-        byte[] excelBytes = iFactoryMonthPlanMouldDayResultService.exportFinalData(result, fileName);
-        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
-        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
-        IOUtils.copy(in, response.getOutputStream());
-        response.flushBuffer();
-    }
-
     /**
      * 导入
      * 

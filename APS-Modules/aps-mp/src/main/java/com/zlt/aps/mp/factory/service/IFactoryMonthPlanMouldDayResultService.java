@@ -25,15 +25,16 @@ public interface IFactoryMonthPlanMouldDayResultService extends IDocService<Fact
      * 查询导出列表
      * @param factoryMonthPlanMouldDayResult
      * @param isAllMaterial
+     * @param isAdjuest
      * @return
      */
     List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult,
-                                                               boolean isAllMaterial, boolean isFinal);
+                                                               boolean isAllMaterial, boolean isAdjuest);
 
     /**
      * 导出数据
      * @param list
      * @return
      */
-    byte[] getFactoryMonthPlanMouldDayResultExportByte(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult, List<FactoryMonthPlanMouldDayResultExportVo> list, boolean isFinal);
+    byte[] getFactoryMonthPlanMouldDayResultExportByte(FactoryMonthPlanMouldDayResult factoryMonthPlanMouldDayResult, List<FactoryMonthPlanMouldDayResultExportVo> list, boolean isAdjuest);
 }
