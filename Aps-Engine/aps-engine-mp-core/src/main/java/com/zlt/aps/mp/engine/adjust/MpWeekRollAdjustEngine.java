@@ -1782,7 +1782,8 @@ public class MpWeekRollAdjustEngine {
                 //恢复多清的实单量(从备份中获取原始)
                 String dayField = FactoryConstant.DAY_FIELD + endDay;
                 if (bakOptimalFinalVo.getFieldValueByFieldName(dayField) != null){
-                    int remainRealQty = (Integer) bakOptimalFinalVo.getFieldValueByFieldName(dayField) - deductMatchQty;
+                    //int remainRealQty = (Integer) bakOptimalFinalVo.getFieldValueByFieldName(dayField) - deductMatchQty;
+                    int remainRealQty = clearDayValue - deductMatchQty;
                     optimalFinalVo.setFieldValueByFieldName(dayField,remainRealQty);
                 }
                 if (isConvertionProd(optimalFinalVo)){
