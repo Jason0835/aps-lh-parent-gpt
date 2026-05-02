@@ -10,8 +10,12 @@ import com.zlt.aps.cx.mapper.CxKeyProductMapper;
 import com.zlt.aps.cx.service.CxKeyProductService;
 import com.zlt.aps.maindata.mapper.MdmConstructionInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmStructureNameEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef;
+import com.zlt.aps.mp.api.domain.entity.MdmStructureName;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -42,10 +46,10 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
     private CxKeyProductMapper cxKeyProductMapper;
 
     @Autowired
-    private MdmConstructionInfoEntityMapper mdmConstructionInfoEntityMapper;
+    private MdmStructureNameEntityMapper mdmStructureNameEntityMapper;
 
     @Autowired
-    private MdmSkuConstructionRefEntityMapper mdmSkuConstructionRefEntityMapper;
+    private MdmSkuStructureRefEntityMapper mdmSkuStructureRefEntityMapper;
 
     @Override
     public AjaxResult importData(List<CxKeyProduct> list, boolean updateSupport, Long importLogId) {
@@ -118,23 +122,25 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
                 }
 
                 // 校验结构是否存在（structureName对应MdmConstructionInfo的specCode）
-                if (StringUtil.isNotBlank(docEntity.getStructureName())) {
-                    QueryWrapper<MdmConstructionInfo> constructionQueryWrapper = new QueryWrapper<>();
-                    constructionQueryWrapper.eq("SPEC_CODE", docEntity.getStructureName());
-                    if (mdmConstructionInfoEntityMapper.selectCount(constructionQueryWrapper) == 0) {
+               /* if (StringUtil.isNotBlank(docEntity.getStructureName())) {
+                    QueryWrapper<MdmStructureName> constructionQueryWrapper = new QueryWrapper<>();
+                    constructionQueryWrapper.eq("STRUCTURE_NAME", docEntity.getStructureName());
+                    if (mdmStructureNameEntityMapper.selectCount(constructionQueryWrapper) == 0) {
                         isCan = false;
                         String message = String.format(I18nUtil.getMessage("ui.data.alert.cxKeyProduct.structureNotExist"), errorNum, docEntity.getStructureName());
                         ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                                 errorNum, message, importErrorLogs);
                     }
-                }
+                }*/
 
                 // 校验胎胚编码是否在该结构下（embryoCode对应constructionCode，structureName对应specCode）
-                if (StringUtil.isNotBlank(docEntity.getEmbryoCode()) && StringUtil.isNotBlank(docEntity.getStructureName())) {
-                    QueryWrapper<MdmSkuConstructionRef> skuConstructionQueryWrapper = new QueryWrapper<>();
-                    skuConstructionQueryWrapper.eq("CONSTRUCTION_CODE", docEntity.getEmbryoCode());
-                    skuConstructionQueryWrapper.eq("SPEC_CODE", docEntity.getStructureName());
-                    if (mdmSkuConstructionRefEntityMapper.selectCount(skuConstructionQueryWrapper) == 0) {
+                if (StringUtil.isNotBlank(docEntity.getEmbryoCode())
+                        && StringUtil.isNotBlank(docEntity.getEmbryoDesc())
+                        && StringUtil.isNotBlank(docEntity.getStructureName())) {
+                    QueryWrapper<MdmSkuStructureRef> skuStructureQueryWrapper = new QueryWrapper<>();
+                    skuStructureQueryWrapper.eq("MAIN_MATERIAL_DESC", docEntity.getEmbryoDesc());
+                    skuStructureQueryWrapper.eq("STRUCTURE_NAME", docEntity.getStructureName());
+                    if (mdmSkuStructureRefEntityMapper.selectCount(skuStructureQueryWrapper) == 0) {
                         isCan = false;
                         String message = String.format(I18nUtil.getMessage("ui.data.alert.cxKeyProduct.embryoNotInStructure"), errorNum, docEntity.getEmbryoCode(), docEntity.getStructureName());
                         ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
