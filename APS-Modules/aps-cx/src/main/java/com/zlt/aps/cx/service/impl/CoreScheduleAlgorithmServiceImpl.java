@@ -338,6 +338,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setIsContinueTask(taskAlloc.getIsContinueTask());
                 task.setIsLastEndingBatch(taskAlloc.getIsLastEndingBatch());  // 设置是否收尾最后一批
                 task.setIsEndProduction(taskAlloc.getIsEndProduction());  // 设置是否结束生产
+                task.setEndingAbandoned(taskAlloc.getEndingAbandoned());  // 设置收尾是否被舍弃
                 // 优先保留 TaskGroupService 设置的标记，仅 null 时用班次类型兜底
                 task.setIsOpeningDayTask(taskAlloc.getIsOpeningDayTask());
                 task.setIsClosingDayTask(taskAlloc.getIsClosingDayTask());
@@ -872,6 +873,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                                 // ---- 合并 isEndProduction：任一记录有 isEndProduction=true 则保留 ----
                                 mergedTask.setIsEndProduction((existingTask != null && Boolean.TRUE.equals(existingTask.getIsEndProduction()))
                                         || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsEndProduction())));
+                                // ---- 合并 endingAbandoned：任一记录有 endingAbandoned=true 则保留 ----
+                                mergedTask.setEndingAbandoned((existingTask != null && Boolean.TRUE.equals(existingTask.getEndingAbandoned()))
+                                        || (sprTask != null && Boolean.TRUE.equals(sprTask.getEndingAbandoned())));
                                 // ---- 合并 isLastEndingBatch：任一记录有 isLastEndingBatch=true 则保留 ----
                                 mergedTask.setIsLastEndingBatch(
                                         Boolean.TRUE.equals(existingTask != null ? existingTask.getIsLastEndingBatch() : null)
@@ -1822,6 +1826,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
             // 兜底：合并记录的 spr.getIsLastEndingBatch 可能为null，但 sourceTask.getIsEndingTask 可能为true
             if (Boolean.TRUE.equals(task.getIsEndingTask()) && !reasons.contains("收尾")) {
+                reasons.add("收尾");
+            }
+            // 舍弃标记兜底：非主销余量≤2舍弃时，强制标记收尾
+            if (Boolean.TRUE.equals(task.getEndingAbandoned()) && !reasons.contains("收尾")) {
                 reasons.add("收尾");
             }
             if (Boolean.TRUE.equals(task.getIsOpeningDayTask())) {

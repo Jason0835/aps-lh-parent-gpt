@@ -235,6 +235,8 @@ public interface CoreScheduleAlgorithmService {
         private Boolean isLastEndingBatch;
         /** 是否结束生产（反推需求-库存<=0，无需再排产） */
         private Boolean isEndProduction;
+        /** 收尾是否被舍弃（非主销产品余量<=2条） */
+        private Boolean endingAbandoned;
         /** 是否开产日任务 */
         private Boolean isOpeningDayTask;
         /** 是否停产日任务 */

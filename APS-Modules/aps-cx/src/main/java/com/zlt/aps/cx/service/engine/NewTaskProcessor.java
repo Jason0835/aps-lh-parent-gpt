@@ -258,6 +258,7 @@ public class NewTaskProcessor {
                     taskAlloc.setLhId(task.getLhId());
                     taskAlloc.setIsLastEndingBatch(task.getIsLastEndingBatch());
                     taskAlloc.setIsEndProduction(task.getIsEndProduction());
+                    taskAlloc.setEndingAbandoned(task.getEndingAbandoned());
                     taskAlloc.setIsOpeningDayTask(task.getIsOpeningDayTask());
                     taskAlloc.setIsClosingDayTask(task.getIsClosingDayTask());
 
