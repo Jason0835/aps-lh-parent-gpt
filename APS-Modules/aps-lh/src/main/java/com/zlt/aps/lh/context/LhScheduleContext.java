@@ -8,6 +8,7 @@ import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
+import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleProcessLog;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -22,7 +23,6 @@ import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -118,8 +118,8 @@ public class LhScheduleContext {
     private Map<String, List<LhSpecifyMachine>> specifyMachineMap = new HashMap<>();
     /** 硫化机胶囊已使用次数Map, key=machineCode */
     private Map<String, LhRepairCapsule> capsuleUsageMap = new HashMap<>();
-    /** 设备保养计划Map, key=devCode */
-    private Map<String, MdmDevMaintenancePlan> maintenancePlanMap = new HashMap<>();
+    /** 硫化精度保养计划Map, key=machineCode */
+    private Map<String, LhPrecisionPlan> maintenancePlanMap = new HashMap<>();
 
     // ========== 中间计算结果(S4.3) ==========
 
@@ -160,6 +160,8 @@ public class LhScheduleContext {
     private Map<String, int[]> dailyMouldChangeCountMap = new LinkedHashMap<>();
     /** 每日首检计数, key=dateString, value=[早班首检数, 中班首检数] */
     private Map<String, int[]> dailyFirstInspectionCountMap = new LinkedHashMap<>();
+    /** 每日精度保养计数, key=dateString, value=已安排保养机台数 */
+    private Map<String, Integer> dailyMaintenanceCountMap = new LinkedHashMap<>();
 
     // ========== 排程输出结果 ==========
 

@@ -9,6 +9,7 @@ import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
+import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
@@ -24,11 +25,11 @@ import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhMouldCleanPlanMapper;
+import com.zlt.aps.lh.mapper.LhPrecisionPlanMapper;
 import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhSpecifyMachineMapper;
 import com.zlt.aps.lh.mapper.MdmCapsuleChuckMapper;
-import com.zlt.aps.lh.mapper.MdmDevMaintenancePlanMapper;
 import com.zlt.aps.lh.mapper.MdmDevicePlanShutMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.lh.mapper.MdmModelInfoMapper;
@@ -50,7 +51,6 @@ import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmCapsuleChuck;
-import com.zlt.aps.mp.api.domain.entity.MdmDevMaintenancePlan;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
@@ -139,7 +139,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     private LhRepairCapsuleMapper lhRepairCapsuleMapper;
 
     @Resource
-    private MdmDevMaintenancePlanMapper devMaintenancePlanMapper;
+    private LhPrecisionPlanMapper lhPrecisionPlanMapper;
 
     @Resource
     private LhScheduleResultMapper lhScheduleResultMapper;
@@ -628,7 +628,8 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                             .lt(LhMouldCleanPlan::getCleanTime, endDate)
                             .and(w -> w.eq(LhMouldCleanPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
                                     .or()
-                                    .isNull(LhMouldCleanPlan::getIsDelete)));
+                                    .isNull(LhMouldCleanPlan::getIsDelete))
+                            .orderByAsc(LhMouldCleanPlan::getCleanTime));
         }
         context.setCleaningPlanList(cleaningPlanList != null ? cleaningPlanList : context.getCleaningPlanList());
         log.debug("模具清洗计划加载完成, 数量: {}", context.getCleaningPlanList().size());
@@ -999,26 +1000,42 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
     }
 
     /**
-     * 加载设备保养计划，按机台编号建立Map
+     * 加载硫化精度保养计划，按机台编号建立Map
      *
      * @param context     排程上下文
      * @param factoryCode 分厂编号
      */
     private void loadMaintenancePlan(LhScheduleContext context, String factoryCode) {
-        List<MdmDevMaintenancePlan> maintenancePlanList = devMaintenancePlanMapper.selectList(
-                new LambdaQueryWrapper<MdmDevMaintenancePlan>()
-                        .eq(MdmDevMaintenancePlan::getFactoryCode, factoryCode)
-                        .eq(MdmDevMaintenancePlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
-        Map<String, MdmDevMaintenancePlan> maintenancePlanMap = new HashMap<>(32);
+        int scheduleYear = resolveScheduleYear(context);
+        List<LhPrecisionPlan> maintenancePlanList = lhPrecisionPlanMapper.selectList(
+                new LambdaQueryWrapper<LhPrecisionPlan>()
+                        .eq(LhPrecisionPlan::getFactoryCode, factoryCode)
+                        .eq(LhPrecisionPlan::getYear, BigDecimal.valueOf(scheduleYear))
+                        .eq(LhPrecisionPlan::getCompletionStatus, "0")
+                        .eq(LhPrecisionPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        Map<String, LhPrecisionPlan> maintenancePlanMap = new HashMap<>(32);
         if (maintenancePlanList != null) {
-            for (MdmDevMaintenancePlan plan : maintenancePlanList) {
-                if (plan.getDevCode() != null) {
-                    maintenancePlanMap.put(plan.getDevCode(), plan);
+            for (LhPrecisionPlan plan : maintenancePlanList) {
+                if (StringUtils.isNotEmpty(plan.getMachineCode())) {
+                    maintenancePlanMap.put(plan.getMachineCode(), plan);
                 }
             }
         }
         context.setMaintenancePlanMap(maintenancePlanMap);
-        log.debug("设备保养计划加载完成, 数量: {}", maintenancePlanMap.size());
+        log.debug("硫化精度保养计划加载完成, 年度: {}, 数量: {}", scheduleYear, maintenancePlanMap.size());
+    }
+
+    /**
+     * 解析排程年度。
+     *
+     * @param context 排程上下文
+     * @return 年度
+     */
+    private int resolveScheduleYear(LhScheduleContext context) {
+        Date baseDate = context.getScheduleTargetDate() != null ? context.getScheduleTargetDate() : context.getScheduleDate();
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(baseDate != null ? baseDate : new Date());
+        return calendar.get(Calendar.YEAR);
     }
 
 }
