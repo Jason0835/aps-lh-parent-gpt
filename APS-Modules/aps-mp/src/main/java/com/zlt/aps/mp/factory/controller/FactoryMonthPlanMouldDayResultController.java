@@ -215,9 +215,9 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
      * 导出定稿版本列表
      */
     @Log(title = "ui.data.column.factoryMonthPlanMouldDayResult.modelName", businessType = BusinessType.EXPORT)
-    @ApiOperation("导出定稿版本数据")
-    @PostMapping("/exportFinalData/{fileName}")
-    public byte[] exportFinalData(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
+    @ApiOperation("导出调整版本数据")
+    @PostMapping("/exportAdjuest/{fileName}")
+    public byte[] exportAdjuest(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         // 组装月计划导出excel
         Date beginTime = DateUtils.getNowDate();

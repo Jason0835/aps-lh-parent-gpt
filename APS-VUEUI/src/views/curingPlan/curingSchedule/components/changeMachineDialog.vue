@@ -103,10 +103,12 @@ export default {
         {
           label: this.$t("物料编码"),
           prop: "materialCode",
+          width: 200
         },
         {
           label: this.$t("物料描述"),
           prop: "materialDesc",
+          width: 200
         },
         {
           label: this.$t("胎胚描述"),
@@ -126,6 +128,10 @@ export default {
         {
           label: this.$t("合计余量"),
           prop: "mouldSurplusQty",
+        },
+        {
+          label: this.$t("完成量"),
+          prop: "finishQty",
         },
         {
           label: this.$t("胎胚库存"),

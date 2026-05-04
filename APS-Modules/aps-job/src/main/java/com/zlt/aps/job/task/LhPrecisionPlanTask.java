@@ -1,5 +1,6 @@
 package com.zlt.aps.job.task;
 
+import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -29,16 +30,18 @@ public class LhPrecisionPlanTask {
      */
     public void generateFromMes() {
         log.info("定时任务：从MES同步数据生成硫化精度计划");
-        try {
-            Integer currentYear = LocalDate.now().getYear();
-            AjaxResult result = lhPrecisionPlanRemoteService.generatePlansFromMes(currentYear);
-            log.info("定时任务执行结果：{}", result.get("msg"));
+        FeignTokenHelper.runWithToken(() -> {
+            try {
+                Integer currentYear = LocalDate.now().getYear();
+                AjaxResult result = lhPrecisionPlanRemoteService.generatePlansFromMes(currentYear);
+                log.info("定时任务执行结果：{}", result.get("msg"));
 
-            AjaxResult calculateResult = lhPrecisionPlanRemoteService.autoCalculateLhPrecisionPlan(currentYear + 1);
-            log.info("自动推算结果：{}", calculateResult.get("msg"));
-        } catch (Exception e) {
-            log.error("定时任务执行失败", e);
-        }
+                AjaxResult calculateResult = lhPrecisionPlanRemoteService.autoCalculateLhPrecisionPlan(currentYear + 1);
+                log.info("自动推算结果：{}", calculateResult.get("msg"));
+            } catch (Exception e) {
+                log.error("定时任务执行失败", e);
+            }
+        });
     }
 
     /**
@@ -48,13 +51,15 @@ public class LhPrecisionPlanTask {
      */
     public void autoGenerateYearly(String year) {
         log.info("定时任务：自动生成{}年度硫化精度计划", year);
-        try {
-            Integer yearInt = Integer.parseInt(year);
-            AjaxResult result = lhPrecisionPlanRemoteService.autoCalculateLhPrecisionPlan(yearInt);
-            log.info("定时任务执行结果：{}", result.get("msg"));
-        } catch (Exception e) {
-            log.error("定时任务执行失败", e);
-        }
+        FeignTokenHelper.runWithToken(() -> {
+            try {
+                Integer yearInt = Integer.parseInt(year);
+                AjaxResult result = lhPrecisionPlanRemoteService.autoCalculateLhPrecisionPlan(yearInt);
+                log.info("定时任务执行结果：{}", result.get("msg"));
+            } catch (Exception e) {
+                log.error("定时任务执行失败", e);
+            }
+        });
     }
 
     /**
@@ -62,12 +67,14 @@ public class LhPrecisionPlanTask {
      */
     public void checkWarning() {
         log.info("定时任务：执行30天预警检查");
-        try {
-            AjaxResult result = lhPrecisionPlanRemoteService.checkWarning();
-            log.info("定时任务执行结果：{}", result.get("msg"));
-        } catch (Exception e) {
-            log.error("定时任务执行失败", e);
-        }
+        FeignTokenHelper.runWithToken(() -> {
+            try {
+                AjaxResult result = lhPrecisionPlanRemoteService.checkWarning();
+                log.info("定时任务执行结果：{}", result.get("msg"));
+            } catch (Exception e) {
+                log.error("定时任务执行失败", e);
+            }
+        });
     }
 
     /**
@@ -75,12 +82,14 @@ public class LhPrecisionPlanTask {
      */
     public void batchUpdateDaysToDue() {
         log.info("定时任务：批量更新到期天数");
-        try {
-            AjaxResult result = lhPrecisionPlanRemoteService.batchUpdateDaysToDue();
-            log.info("定时任务执行结果：{}", result.get("msg"));
-        } catch (Exception e) {
-            log.error("定时任务执行失败", e);
-        }
+        FeignTokenHelper.runWithToken(() -> {
+            try {
+                AjaxResult result = lhPrecisionPlanRemoteService.batchUpdateDaysToDue();
+                log.info("定时任务执行结果：{}", result.get("msg"));
+            } catch (Exception e) {
+                log.error("定时任务执行失败", e);
+            }
+        });
     }
 
     /**
@@ -89,11 +98,13 @@ public class LhPrecisionPlanTask {
      */
     public void issueLhPrecisionPlanToMes() {
         log.info("定时任务：下发硫化精度计划到MES");
-        try {
-            AjaxResult result = iMesItfService.issueLhPrecisionPlan(null);
-            log.info("定时任务执行结果：{}", result.get("msg"));
-        } catch (Exception e) {
-            log.error("定时任务执行失败", e);
-        }
+        FeignTokenHelper.runWithToken(() -> {
+            try {
+                AjaxResult result = iMesItfService.issueLhPrecisionPlan(null);
+                log.info("定时任务执行结果：{}", result.get("msg"));
+            } catch (Exception e) {
+                log.error("定时任务执行失败", e);
+            }
+        });
     }
 }

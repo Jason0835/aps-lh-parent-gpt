@@ -10,10 +10,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.MATERIAL_DESC,
 		    m.STRUCTURE_NAME,
             MAX(IF(C.ID IS NULL, '02', '01')) STRUCTURE_TYPE,
-		    i.PRODUCT_STATUS,
+        <choose>
+            <when test="isAdjuest">
+            MAX(IFNULL(i.PRODUCT_STATUS, CASE WHEN REF.CONSTRUCTION_STAGE = '03' THEN 'S' 
+					                          WHEN REF.CONSTRUCTION_STAGE = '02' THEN 'T' 
+					                          WHEN REF.CONSTRUCTION_STAGE = '01' THEN 'X'
+					                          ELSE null END )) PRODUCT_STATUS,
+            </when>
+            <otherwise>
+            MAX(IFNULL(i.PRODUCT_STATUS, IFNULL(r.PRODUCT_STATUS, CASE WHEN REF.CONSTRUCTION_STAGE = '03' THEN 'S' 
+                                                                       WHEN REF.CONSTRUCTION_STAGE = '02' THEN 'T' 
+                                                                       WHEN REF.CONSTRUCTION_STAGE = '01' THEN 'X'
+                                                                       ELSE null END ))) PRODUCT_STATUS,
+            </otherwise>
+        </choose>
             m.EMBRYO_CODE,
             m.EMBRYO_DESC MAIN_MATERIAL_DESC,
-		    i.CONSTRUCTION_STAGE,
+		    MAX(IFNULL(i.CONSTRUCTION_STAGE, IFNULL(r.CONSTRUCTION_STAGE, REF.CONSTRUCTION_STAGE))) CONSTRUCTION_STAGE,
 		    m.BRAND,
 		    m.SPECIFICATIONS,
 		    m.MAIN_PATTERN,
@@ -25,8 +38,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    r.MOULD_CAVITY_QTY,
 		    r.TYPE_BLOCK_QTY,
 		    max( d.AVERAGE_SALE_QTY ) AVERAGE_SALE_QTY,
-            IFNULL(r.INVENTORY_SALES_RATIO, if(max(d.AVERAGE_SALE_QTY) > 0, round(max(d.STOCK_QTY) / max(d.AVERAGE_SALE_QTY), 1), 0)) INVENTORY_SALES_RATIO,
-		    r.DAY_VULCANIZATION_QTY,
+            if(max(d.AVERAGE_SALE_QTY) > 0, round(max(d.STOCK_QTY) / max(d.AVERAGE_SALE_QTY), 1), 0) INVENTORY_SALES_RATIO,
+		    max( IFNULL(r.DAY_VULCANIZATION_QTY, CASE WHEN IFNULL(FP.PARAM_VALUE, FP.DEFAULE_VALUE) = 'M' THEN lc.MES_CAPACITY / 2
+		                                              WHEN IFNULL(FP.PARAM_VALUE, FP.DEFAULE_VALUE) = 'A' THEN lc.APS_CAPACITY / 2
+		                                              ELSE lc.STANDARD_CAPACITY END)
+		    ) DAY_VULCANIZATION_QTY,
 		    sum( d.HEIGHT_QTY ) HEIGHT_QTY,
 		    sum( d.MID_QTY ) MID_QTY,
 		    sum( d.CYCLE_RESERVE_QTY ) CYCLE_RESERVE_QTY,
@@ -94,8 +110,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND i.PRODUCTION_VERSION = #{dayResult.productionVersion}
             AND i.IS_DELETE = 0 
         <choose>
-	        <when test="isFinal">
-            LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL r ON m.MATERIAL_CODE = r.MATERIAL_CODE
+	        <when test="isAdjuest">
+            LEFT JOIN T_MP_ADJUST_RESULT r ON m.MATERIAL_CODE = r.MATERIAL_CODE
 	        </when>
 	        <otherwise>
             LEFT JOIN T_MP_MOULDING_DAY_RESULT r ON m.MATERIAL_CODE = r.MATERIAL_CODE
@@ -109,12 +125,26 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             AND f.`YEAR_MONTH` = DATE_FORMAT(DATE_SUB(concat(#{dayResult.year},'-',#{dayResult.month},'-1'),INTERVAL 1 month), '%Y%m')
             LEFT JOIN T_DP_CYCLE_STRUCT_CONFIG C ON C.STRUCTURE_NAME = M.STRUCTURE_NAME
             AND C.IS_DELETE = 0
+            LEFT JOIN T_MDM_SKU_LH_CAPACITY lc ON lc.IS_DELETE = 0
+            AND lc.MATERIAL_CODE = m.MATERIAL_CODE
+            LEFT JOIN T_MP_FACTORY_PARAM FP ON FP.IS_DELETE = 0
+            AND PARAM_CODE = 'SYS0202002'
+            LEFT JOIN (
+	            SELECT MATERIAL_CODE,
+			    MAX(CASE WHEN t.TRIAL_STATUS = 'S' THEN '03' 
+			             WHEN t.TRIAL_STATUS = 'T' THEN '02' 
+			             WHEN t.TRIAL_STATUS = 'X' THEN '01'
+			             ELSE '00' END ) CONSTRUCTION_STAGE
+			    FROM t_mdm_sku_construction_ref t 
+			    WHERE is_delete = 0 
+			    GROUP BY material_code
+		    ) REF ON REF.MATERIAL_CODE = m.MATERIAL_CODE
 		WHERE
 		    m.FACTORY_CODE = #{dayResult.factoryCode}
 		    AND m.IS_DELETE = 0 
 		    AND m.STRUCTURE_NAME IS NOT NULL 
             AND (QUALITY_STATE_CODE != '2' or QUALITY_STATE_CODE is null or d.FACTORY_CODE = m.FACTORY_CODE)
-        <if test="isFinal">
+        <if test="isAdjuest">
             AND m.FACTORY_CODE = r.FACTORY_CODE
         </if>
         <if test="!isAllMaterial">
@@ -130,10 +160,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.MATERIAL_DESC,
 		    m.STRUCTURE_NAME,
 		    d.STRUCTURE_TYPE,
-		    i.PRODUCT_STATUS,
             m.EMBRYO_CODE,
             m.EMBRYO_DESC,
-		    i.CONSTRUCTION_STAGE,
 		    m.BRAND,
 		    m.SPECIFICATIONS,
 		    m.MAIN_PATTERN,
@@ -144,8 +172,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             m.SECTION_WIDTH,
 		    r.MOULD_CAVITY_QTY,
 		    r.TYPE_BLOCK_QTY,
-		    r.INVENTORY_SALES_RATIO,
-		    r.DAY_VULCANIZATION_QTY,
 		    r.TOTAL_QTY,
 		    r.HEIGHT_PRODUCTION_QTY,
 		    r.MID_PRODUCTION_QTY,

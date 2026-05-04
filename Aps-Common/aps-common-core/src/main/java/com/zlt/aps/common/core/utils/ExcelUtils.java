@@ -241,9 +241,6 @@ public class ExcelUtils {
                                     matcher.find();
                                     String key = matcher.group(1);// 获取key
                                     Object newValue = map.get(key);
-                                    if (newValue == null) {
-                                        newValue = "";
-                                    }
                                     if(map.containsKey("height")){
                                         newRow.setHeightInPoints(Float.parseFloat(map.get("height").toString())); // 设置行高为30个点
 
@@ -445,7 +442,7 @@ public class ExcelUtils {
             cell.setCellValue((String) value);
         } else if (value instanceof Boolean) {
             cell.setCellValue((Boolean) value);
-        } else {
+        } else if (value != null) {
             cell.setCellValue(value.toString());
         }
     }

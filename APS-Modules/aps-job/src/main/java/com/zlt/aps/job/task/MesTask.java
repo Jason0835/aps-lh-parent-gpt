@@ -1,11 +1,13 @@
 package com.zlt.aps.job.task;
 
+import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Component;
  * @author Chen
  * @since 2025/12/22
  */
+@Slf4j
 @Component("mesTask")
 public class MesTask {
 
@@ -26,7 +29,7 @@ public class MesTask {
      */
     @ApiOperation("同步成品库存-默认当前年月")
     public void syncProductStock() {
-        iMesItfService.syncProductStock(new MdmProductStock());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncProductStock(new MdmProductStock()));
     }
 
     /**
@@ -34,7 +37,7 @@ public class MesTask {
      */
     @ApiOperation("同步出库未扫描订单-默认当前年月")
     public void syncOutboundOrdersNotScan() {
-        iMesItfService.syncOutbountOrdersNotScan(new MdmOutbountOrdersNotScan());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncOutbountOrdersNotScan(new MdmOutbountOrdersNotScan()));
     }
 
     /**
@@ -42,7 +45,7 @@ public class MesTask {
      */
     @ApiOperation("同步不合格库存-默认当前日期")
     public void syncUnqualifiedStock() {
-        iMesItfService.syncUnqualifiedStock(new MdmUnqualifiedStock());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncUnqualifiedStock(new MdmUnqualifiedStock()));
     }
 
     /**
@@ -50,7 +53,7 @@ public class MesTask {
      */
     @ApiOperation("同步特殊材料库存-默认当前日期")
     public void syncRawSpecialMaterialStock() {
-        iMesItfService.syncRawSpecialMaterialStock(new RawSpecialMaterialStock());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncRawSpecialMaterialStock(new RawSpecialMaterialStock()));
     }
 
     /**
@@ -58,7 +61,7 @@ public class MesTask {
      */
     @ApiOperation("同步成型在机数据")
     public void syncMachineOnlineInfo() {
-        iMesItfService.syncMachineOnlineInfo(new CxMachineOnlineInfo());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncMachineOnlineInfo(new CxMachineOnlineInfo()));
     }
 
     /**
@@ -66,7 +69,7 @@ public class MesTask {
      */
     @ApiOperation("同步硫化在机数据")
     public void syncLhMachineOnlineInfo() {
-        iMesItfService.syncLhMachineOnlineInfo(new LhMachineOnlineInfo());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncLhMachineOnlineInfo(new LhMachineOnlineInfo()));
     }
 
     /**
@@ -74,7 +77,7 @@ public class MesTask {
      */
     @ApiOperation("同步设备保养计划")
     public void syncDevMaintenancePlan() {
-        iMesItfService.syncDevMaintenancePlan(new AuxReqSyncDataLogs());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncDevMaintenancePlan(new AuxReqSyncDataLogs()));
     }
 
     /**
@@ -82,7 +85,7 @@ public class MesTask {
      */
     @ApiOperation("同步模具清洗预警计划")
     public void syncMouldCleanWarn() {
-        iMesItfService.syncMouldCleanWarn(new AuxReqSyncDataLogs());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncMouldCleanWarn(new AuxReqSyncDataLogs()));
     }
 
     /**
@@ -90,7 +93,7 @@ public class MesTask {
      */
     @ApiOperation("同步结构整车胎面配置")
     public void syncStructureTreadConfig() {
-        iMesItfService.syncStructureTreadConfig(new AuxReqSyncDataLogs());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncStructureTreadConfig(new AuxReqSyncDataLogs()));
     }
 
     /**
@@ -98,7 +101,7 @@ public class MesTask {
      */
     @ApiOperation("同步成型排程完成量")
     public void syncCxClassShiftFinishQty() {
-        iMesItfService.syncCxClassShiftFinishQty(new AuxReqSyncDataLogs());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncCxClassShiftFinishQty(new AuxReqSyncDataLogs()));
     }
 
     /**
@@ -106,7 +109,7 @@ public class MesTask {
      */
     @ApiOperation("同步硫化排程完成量")
     public void syncLhClassShiftFinishQty() {
-        iMesItfService.syncLhClassShiftFinishQty(new AuxReqSyncDataLogs());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncLhClassShiftFinishQty(new AuxReqSyncDataLogs()));
     }
 
     /**
@@ -114,7 +117,7 @@ public class MesTask {
      */
     @ApiOperation("同步成型排程日完成量")
     public void syncCxScheDayFinishQty() {
-        iMesItfService.syncCxScheDayFinishQty(new AuxReqSyncDataLogs());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncCxScheDayFinishQty(new AuxReqSyncDataLogs()));
     }
 
     /**
@@ -122,7 +125,7 @@ public class MesTask {
      */
     @ApiOperation("同步硫化排程日完成量")
     public void syncLhScheDayFinishQty() {
-        iMesItfService.syncLhScheDayFinishQty(new AuxReqSyncDataLogs());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncLhScheDayFinishQty(new AuxReqSyncDataLogs()));
     }
 
     /**
@@ -130,7 +133,7 @@ public class MesTask {
      */
     @ApiOperation("同步模具交替计划完成回报")
     public void syncMoldAlterPlanFinish() {
-        iMesItfService.syncMoldAlterPlanFinish(new AuxReqSyncDataLogs());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncMoldAlterPlanFinish(new AuxReqSyncDataLogs()));
     }
 
     /**
@@ -138,6 +141,6 @@ public class MesTask {
      */
     @ApiOperation("同步MES硫化精度计划实际执行日期回填数据")
     public void syncLhPrecisionPlanActual() {
-        iMesItfService.syncLhPrecisionPlanActual(new AuxReqSyncDataLogs());
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncLhPrecisionPlanActual(new AuxReqSyncDataLogs()));
     }
 }

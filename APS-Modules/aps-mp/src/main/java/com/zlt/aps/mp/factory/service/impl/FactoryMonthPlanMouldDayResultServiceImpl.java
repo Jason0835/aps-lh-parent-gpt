@@ -38,7 +38,6 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.utils.ApsNumberUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
@@ -48,10 +47,10 @@ import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialStockEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
-import com.zlt.aps.mp.api.domain.entity.MpMonthPlanProdFinal;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
@@ -61,12 +60,10 @@ import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.common.utils.PubUtil;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
-import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanSpecialMaterialInfoMapper;
 import com.zlt.aps.mp.engine.mapper.MpStructureAllocationMapper;
 import com.zlt.aps.mp.enums.MonthPlanExportDataTypeEnum;
 import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
-import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.SpecialMaterialResultEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -94,8 +91,6 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     @Autowired
     private FactoryMonthPlanMouldDayResultEntityMapper factoryMonthPlanMouldDayResultEntityMapper;
     @Autowired
-    private FactoryMonthPlanProductionFinalResultEntityMapper factoryMonthPlanProductionFinalResultEntityMapper;
-    @Autowired
     private MpMonthPlanStatisticsEntityMapper mpMonthPlanStatisticsEntityMapper;
     @Autowired
     private MpStructureAllocationMapper mpStructureAllocationMapper;
@@ -103,6 +98,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     private MoldCavityInsertMaxValueCalculatorImpl moldCavityInsertMaxValueCalculator;
     @Autowired
     private SpecialMaterialResultEntityMapper specialMaterialResultEntityMapper;
+    @Autowired
+    private MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
     @Autowired
     protected RawSpecialMaterialRecordEntityMapper rawSpecialMaterialRecordMapper;
     @Autowired
@@ -158,17 +155,17 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      */
     @Override
     public List<FactoryMonthPlanMouldDayResultExportVo> getExportList(FactoryMonthPlanMouldDayResult params,
-                                                                      boolean isAllMaterial, boolean isFinal) {
+                                                                      boolean isAllMaterial, boolean isAdjuest) {
         // 1、加载构建导出列表的各项数据
         // 1.1、加载月计划表头信息
-        if (isFinal) { // 按是否定稿版本取对应表格的数据
+        if (isAdjuest) { // 按是否调整版本取对应表格的数据
             this.loadFinalExportTableData(params);
         } else {
             this.loadExportTableData(params);
         }
         // 1.2、加载月计划模具排产明细
         List<FactoryMonthPlanMouldDayResultExportVo> recordList = factoryMonthPlanMouldDayResultEntityMapper
-                .getExportList(params, isAllMaterial, isFinal);
+                .getExportList(params, isAllMaterial, isAdjuest);
         if (CollectionUtils.isEmpty(recordList)) {
             return recordList;
         }
@@ -356,17 +353,16 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      * @param params
      */
     private void loadFinalExportTableData(FactoryMonthPlanMouldDayResult params) {
-        QueryWrapper<FactoryMonthPlanProductionFinalResult> resultQueryWrapper = new QueryWrapper<>();
-        resultQueryWrapper.select("YEAR", "MONTH", "`YEAR_MONTH`", "MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE");
-        resultQueryWrapper.groupBy("YEAR", "MONTH", "`YEAR_MONTH`", "MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE");
+        QueryWrapper<MpAdjustResult> resultQueryWrapper = new QueryWrapper<>();
+        resultQueryWrapper.select("YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE");
+        resultQueryWrapper.groupBy("YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE");
         resultQueryWrapper.eq("FACTORY_CODE", params.getFactoryCode());
         resultQueryWrapper.eq("PRODUCTION_VERSION", params.getProductionVersion());
-        List<FactoryMonthPlanProductionFinalResult> headList = factoryMonthPlanProductionFinalResultEntityMapper.selectList(resultQueryWrapper);
+        List<MpAdjustResult> headList = mpAdjustResultEntityMapper.selectList(resultQueryWrapper);
         if (!CollectionUtils.isEmpty(headList)) {
-            FactoryMonthPlanProductionFinalResult head = headList.get(0);
+            MpAdjustResult head = headList.get(0);
             params.setYear(head.getYear());
             params.setMonth(head.getMonth());
-            params.setYearMonth(head.getYearMonth());
             params.setProductTypeCode(head.getProductTypeCode());
             params.setMonthPlanVersion(head.getMonthPlanVersion());
         }

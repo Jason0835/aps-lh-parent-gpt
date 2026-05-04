@@ -79,17 +79,18 @@ public class FactoryConsoleServiceImpl implements IFactoryConsoleService {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.requireVersionNoEmpty"));
         }
         QueryWrapper<MpFactoryProductionVersion> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("FACTORY_CODE", factoryCode);
-        queryWrapper.eq("YEAR", year);
-        queryWrapper.eq("MONTH", month);
-        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        queryWrapper.eq("IS_FINAL", YesOrNoEnum.YES.getCode());
-        MpFactoryProductionVersion version = factoryProductionVersionMapper.selectOne(queryWrapper);
-        if (null != version) {
-            //分厂在%s-%s年月已定稿，不可重新排产
-            String factoryIsFinalVersion = I18nUtil.getMessage("ui.data.query.param.factoryIsFinalVersion");
-            return AjaxResult.error(String.format(factoryIsFinalVersion, year, month));
-        }
+        // 定稿不允许再次生成月计划的限制先取消，用于前期比对 20260504 hak
+//        queryWrapper.eq("FACTORY_CODE", factoryCode);
+//        queryWrapper.eq("YEAR", year);
+//        queryWrapper.eq("MONTH", month);
+//        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+//        queryWrapper.eq("IS_FINAL", YesOrNoEnum.YES.getCode());
+//        MpFactoryProductionVersion version = factoryProductionVersionMapper.selectOne(queryWrapper);
+//        if (null != version) {
+//            //分厂在%s-%s年月已定稿，不可重新排产
+//            String factoryIsFinalVersion = I18nUtil.getMessage("ui.data.query.param.factoryIsFinalVersion");
+//            return AjaxResult.error(String.format(factoryIsFinalVersion, year, month));
+//        }
         queryWrapper.clear();
         queryWrapper.eq("FACTORY_CODE", factoryCode);
         queryWrapper.eq("YEAR", year);

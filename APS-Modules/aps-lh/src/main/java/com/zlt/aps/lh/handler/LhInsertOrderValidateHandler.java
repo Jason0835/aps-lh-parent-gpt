@@ -204,7 +204,7 @@ public class LhInsertOrderValidateHandler {
         }
 
         if (scheduleDay.before(today)) {
-            result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.historicalDate", Locale.forLanguageTag(DateUtil.formatDate(scheduleDate)))));
+            result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.historicalDate"), DateUtil.formatDate(scheduleDate)));
             return;
         }
 
