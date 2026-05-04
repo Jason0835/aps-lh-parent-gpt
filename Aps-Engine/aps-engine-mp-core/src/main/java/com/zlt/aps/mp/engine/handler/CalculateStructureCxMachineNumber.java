@@ -333,6 +333,7 @@ public class CalculateStructureCxMachineNumber {
             totalMaxMouldCapacity.add(Math.min(maxMouldCapacity, sumNetQty));
             //20260430+ 高优先级需求量
             Integer sumHeightQty = requirePlanList.stream().filter(x->x.getHeightCapacityRequireQty() != null).mapToInt(MonthPlanProductionRequirePlanVo::getHeightCapacityRequireQty).sum();
+
             totalHeightRequire.add(Math.min(sumHeightQty, maxMouldCapacity));
         });
         //20260430+ 增加高优先级需求量
