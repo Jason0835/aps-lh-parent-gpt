@@ -839,6 +839,15 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                                         || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsEndingTask())));
                                 mergedTask.setIsTrialTask((existingTask != null && Boolean.TRUE.equals(existingTask.getIsTrialTask()))
                                         || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsTrialTask())));
+                                // ---- 合并 isOpeningDayTask：任一记录有 isOpeningDayTask=true 则保留 ----
+                                mergedTask.setIsOpeningDayTask((existingTask != null && Boolean.TRUE.equals(existingTask.getIsOpeningDayTask()))
+                                        || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsOpeningDayTask())));
+                                // ---- 合并 isClosingDayTask：任一记录有 isClosingDayTask=true 则保留 ----
+                                mergedTask.setIsClosingDayTask((existingTask != null && Boolean.TRUE.equals(existingTask.getIsClosingDayTask()))
+                                        || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsClosingDayTask())));
+                                // ---- 合并 isProductionTrial：任一记录有 isProductionTrial=true 则保留 ----
+                                mergedTask.setIsProductionTrial((existingTask != null && Boolean.TRUE.equals(existingTask.getIsProductionTrial()))
+                                        || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsProductionTrial())));
                                 // ---- 合并 isLastEndingBatch：任一记录有 isLastEndingBatch=true 则保留 ----
                                 mergedTask.setIsLastEndingBatch(
                                         Boolean.TRUE.equals(existingTask != null ? existingTask.getIsLastEndingBatch() : null)
