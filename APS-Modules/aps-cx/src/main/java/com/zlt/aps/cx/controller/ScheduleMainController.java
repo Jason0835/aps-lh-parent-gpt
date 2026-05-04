@@ -19,6 +19,7 @@ import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
 import com.zlt.aps.cx.mapper.CxShiftConfigMapper;
+import com.zlt.aps.cx.mapper.MdmCxMachineFixedMapper;
 import com.zlt.aps.cx.mapper.MdmMoldingMachineMapper;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.service.ScheduleService;
@@ -32,6 +33,7 @@ import com.zlt.aps.cx.vo.CxScheduleImportDTO;
 import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.mp.api.domain.entity.CxScheduleResultIssue;
+import com.zlt.aps.mp.api.domain.entity.MdmCxMachineFixed;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -88,6 +90,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
     @Autowired
     private CxShiftConfigMapper cxShiftConfigMapper;
+
+    @Resource
+    private MdmCxMachineFixedMapper mdmCxMachineFixedMapper;
 
     /**
      * 查询成型排程结果列表，同时填充各班次的开始/结束时间
@@ -775,18 +780,38 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
         Date scheduleDate = DateUtil.parse(vo.getScheduleDate());
 
-        // 校验唯一性：排程日期 + 机台编号 + 胎胚编号 + 物料编码 + 示方书版本
-        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("SCHEDULE_DATE", scheduleDate);
-        queryWrapper.eq("CX_MACHINE_CODE", vo.getCxMachineCode());
-        queryWrapper.eq("EMBRYO_CODE", vo.getEmbryoCode());
-        queryWrapper.eq("MATERIAL_CODE", vo.getMaterialCode());
-        if (vo.getExampleNo() != null) {
-            queryWrapper.eq("BOM_DATA_VERSION", vo.getExampleNo());
+        // 校验唯一性：排程日期 + 机台编号 + 胎胚编号 + 物料编码
+        // 使用 LambdaQueryWrapper 避免 SQL NULL 比较问题（= null 永远匹配不到 IS NULL 的行）
+        LambdaQueryWrapper<CxScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(CxScheduleResult::getScheduleDate, scheduleDate);
+        queryWrapper.eq(CxScheduleResult::getCxMachineCode, vo.getCxMachineCode());
+        queryWrapper.eq(CxScheduleResult::getEmbryoCode, vo.getEmbryoCode());
+        if (vo.getMaterialCode() != null && !vo.getMaterialCode().isEmpty()) {
+            queryWrapper.eq(CxScheduleResult::getMaterialCode, vo.getMaterialCode());
+        } else {
+            queryWrapper.isNull(CxScheduleResult::getMaterialCode);
         }
+
         Long count = cxScheduleResultMapper.selectCount(queryWrapper);
         if (count > 0) {
-            return AjaxResult.error("插单失败：该日已存在相同机台、胎胚、物料、示方书版本的排程记录");
+            return AjaxResult.error("插单失败：该日已存在相同机台、胎胚、物料的排程记录");
+        }
+
+        // 校验该机台是否配置了不可作业规格/物料
+        MdmCxMachineFixed machineFixed = mdmCxMachineFixedMapper.selectOne(
+                new LambdaQueryWrapper<MdmCxMachineFixed>()
+                        .eq(MdmCxMachineFixed::getCxMachineCode, vo.getCxMachineCode()));
+        if (machineFixed != null) {
+            // 检查不可作业结构
+            if (vo.getStructureName() != null
+                    && machineFixed.getSplitDisableStructure().contains(vo.getStructureName())) {
+                return AjaxResult.error("当前插单规格不可在" + vo.getCxMachineCode() + "机台生产");
+            }
+            // 检查不可作业SKU（物料编码）
+            if (vo.getMaterialCode() != null
+                    && machineFixed.getSplitDisableMaterialCode().contains(vo.getMaterialCode())) {
+                return AjaxResult.error("当前插单规格不可在" + vo.getCxMachineCode() + "机台生产");
+            }
         }
 
         // 校验各班计划量不能超过机台最大日产能（按天分组，排程记录scheduleDate=T+2日）
@@ -824,10 +849,51 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         newRecord.setMaterialCode(vo.getMaterialCode());
         newRecord.setMaterialDesc(vo.getSpecDesc());
         newRecord.setMainMaterialDesc(vo.getMainMaterialDesc());
-        newRecord.setOrderNo(vo.getMaterialCode());
+
+        // 生成工单号：CXGD + 日期(yyyyMMdd) + 自增序号(3位)
+        // 查询当天已有最大工单号序号，递增生成新工单号
+        String dateStr = DateUtil.format(scheduleDate, "yyyyMMdd");
+        String orderNoPrefix = "CXGD" + dateStr;
+        LambdaQueryWrapper<CxScheduleResult> maxOrderNoQuery = new LambdaQueryWrapper<>();
+        maxOrderNoQuery.eq(CxScheduleResult::getScheduleDate, scheduleDate)
+                .orderByDesc(CxScheduleResult::getOrderNo)
+                .last("LIMIT 1");
+        CxScheduleResult lastRecord = cxScheduleResultMapper.selectOne(maxOrderNoQuery);
+        int seq = 1;
+        if (lastRecord != null && lastRecord.getOrderNo() != null
+                && lastRecord.getOrderNo().startsWith(orderNoPrefix)) {
+            try {
+                seq = Integer.parseInt(lastRecord.getOrderNo().substring(orderNoPrefix.length())) + 1;
+            } catch (NumberFormatException e) {
+                log.warn("解析工单号序号失败，使用默认序号1：{}", lastRecord.getOrderNo());
+            }
+        }
+        newRecord.setOrderNo(orderNoPrefix + String.format("%03d", seq));
+
+        // 成型批次号：若用户未提供则自动生成 CXPC + 日期 + 序号
+        if (vo.getCxBatchNo() != null && !vo.getCxBatchNo().isEmpty()) {
+            newRecord.setCxBatchNo(vo.getCxBatchNo());
+        } else {
+            String batchNoPrefix = "CXPC" + dateStr;
+            LambdaQueryWrapper<CxScheduleResult> maxBatchNoQuery = new LambdaQueryWrapper<>();
+            maxBatchNoQuery.eq(CxScheduleResult::getScheduleDate, scheduleDate)
+                    .orderByDesc(CxScheduleResult::getCxBatchNo)
+                    .last("LIMIT 1");
+            CxScheduleResult lastBatchRecord = cxScheduleResultMapper.selectOne(maxBatchNoQuery);
+            int batchSeq = 1;
+            if (lastBatchRecord != null && lastBatchRecord.getCxBatchNo() != null
+                    && lastBatchRecord.getCxBatchNo().startsWith(batchNoPrefix)) {
+                try {
+                    batchSeq = Integer.parseInt(lastBatchRecord.getCxBatchNo().substring(batchNoPrefix.length())) + 1;
+                } catch (NumberFormatException e) {
+                    log.warn("解析批次号序号失败，使用默认序号1：{}", lastBatchRecord.getCxBatchNo());
+                }
+            }
+            newRecord.setCxBatchNo(batchNoPrefix + String.format("%03d", batchSeq));
+        }
+
         newRecord.setBomDataVersion(vo.getExampleNo());
         newRecord.setStructureName(vo.getStructureName());
-        newRecord.setCxBatchNo(vo.getCxBatchNo());
         newRecord.setTotalStock(vo.getTotalStock());
         newRecord.setLhMachineCode(vo.getLhMachineCode());
         newRecord.setLhMachineQty(vo.getLhMachineQty());
@@ -1009,12 +1075,14 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             }
 
             // 校验新机台唯一性（排程日期 + 新机台 + 胎胚 + 物料）
-            QueryWrapper<CxScheduleResult> uniqueCheck = new QueryWrapper<>();
-            uniqueCheck.eq("SCHEDULE_DATE", record.getScheduleDate());
-            uniqueCheck.eq("CX_MACHINE_CODE", vo.getNewMachineCode());
-            uniqueCheck.eq("EMBRYO_CODE", record.getEmbryoCode());
-            if (record.getMaterialCode() != null) {
-                uniqueCheck.eq("MATERIAL_CODE", record.getMaterialCode());
+            LambdaQueryWrapper<CxScheduleResult> uniqueCheck = new LambdaQueryWrapper<>();
+            uniqueCheck.eq(CxScheduleResult::getScheduleDate, record.getScheduleDate());
+            uniqueCheck.eq(CxScheduleResult::getCxMachineCode, vo.getNewMachineCode());
+            uniqueCheck.eq(CxScheduleResult::getEmbryoCode, record.getEmbryoCode());
+            if (record.getMaterialCode() != null && !record.getMaterialCode().isEmpty()) {
+                uniqueCheck.eq(CxScheduleResult::getMaterialCode, record.getMaterialCode());
+            } else {
+                uniqueCheck.isNull(CxScheduleResult::getMaterialCode);
             }
             Long duplicateCount = cxScheduleResultMapper.selectCount(uniqueCheck);
             if (duplicateCount > 0) {
