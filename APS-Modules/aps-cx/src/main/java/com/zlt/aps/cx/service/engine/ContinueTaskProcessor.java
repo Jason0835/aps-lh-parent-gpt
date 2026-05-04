@@ -194,6 +194,9 @@ public class ContinueTaskProcessor {
         taskAllocation.setEndingSurplusQty(task.getEndingSurplusQty());
         taskAllocation.setEndingExtraInventory(task.getEndingExtraInventory());  // 设置收尾额外库存
         taskAllocation.setIsLastEndingBatch(task.getIsLastEndingBatch());  // 设置是否收尾最后一批
+        taskAllocation.setIsEndProduction(task.getIsEndProduction());  // 设置是否结束生产
+        taskAllocation.setIsOpeningDayTask(task.getIsOpeningDayTask());  // 设置是否开产日任务
+        taskAllocation.setIsClosingDayTask(task.getIsClosingDayTask());  // 设置是否停产日任务
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
         taskAllocation.setIsContinueTask(true);  // 标记为续作预留
         taskAllocation.setLhId(task.getLhId());
@@ -620,6 +623,9 @@ public class ContinueTaskProcessor {
         taskAllocation.setEndingSurplusQty(task.getEndingSurplusQty());
         taskAllocation.setEndingExtraInventory(task.getEndingExtraInventory());  // 设置收尾额外库存
         taskAllocation.setIsLastEndingBatch(task.getIsLastEndingBatch());  // 设置是否收尾最后一批
+        taskAllocation.setIsEndProduction(task.getIsEndProduction());  // 设置是否结束生产
+        taskAllocation.setIsOpeningDayTask(task.getIsOpeningDayTask());  // 设置是否开产日任务
+        taskAllocation.setIsClosingDayTask(task.getIsClosingDayTask());  // 设置是否停产日任务
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
         taskAllocation.setLhId(task.getLhId());
 

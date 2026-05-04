@@ -341,6 +341,10 @@ public class TrialTaskProcessor {
         taskAllocation.setIsProductionTrial(task.getIsProductionTrial());
         taskAllocation.setIsEndingTask(task.getIsEndingTask());
         taskAllocation.setEndingSurplusQty(task.getEndingSurplusQty());
+        taskAllocation.setIsLastEndingBatch(task.getIsLastEndingBatch());
+        taskAllocation.setIsEndProduction(task.getIsEndProduction());
+        taskAllocation.setIsOpeningDayTask(task.getIsOpeningDayTask());
+        taskAllocation.setIsClosingDayTask(task.getIsClosingDayTask());
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
         taskAllocation.setLhId(task.getLhId());
 

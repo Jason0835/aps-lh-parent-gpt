@@ -23,6 +23,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -336,11 +337,20 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setIsEndingTask(taskAlloc.getIsEndingTask());
                 task.setIsContinueTask(taskAlloc.getIsContinueTask());
                 task.setIsLastEndingBatch(taskAlloc.getIsLastEndingBatch());  // 设置是否收尾最后一批
-                // 使用新逻辑：根据班次级别判断开产/停产/停产前一天
-                int shiftOrder = shiftConfig.getDayShiftOrder() != null ? shiftConfig.getDayShiftOrder() : 1;
-                ScheduleDayTypeHelper.ShiftType shiftType = scheduleDayTypeHelper.determineShiftType(scheduleDate, shiftOrder, factoryCode);
-                task.setIsOpeningDayTask(shiftType == ScheduleDayTypeHelper.ShiftType.OPEN_START);
-                task.setIsClosingDayTask(shiftType == ScheduleDayTypeHelper.ShiftType.CLOSED);
+                task.setIsEndProduction(taskAlloc.getIsEndProduction());  // 设置是否结束生产
+                // 优先保留 TaskGroupService 设置的标记，仅 null 时用班次类型兜底
+                task.setIsOpeningDayTask(taskAlloc.getIsOpeningDayTask());
+                task.setIsClosingDayTask(taskAlloc.getIsClosingDayTask());
+                if (task.getIsOpeningDayTask() == null || task.getIsClosingDayTask() == null) {
+                    int shiftOrder = shiftConfig.getDayShiftOrder() != null ? shiftConfig.getDayShiftOrder() : 1;
+                    ScheduleDayTypeHelper.ShiftType shiftType = scheduleDayTypeHelper.determineShiftType(scheduleDate, shiftOrder, factoryCode);
+                    if (task.getIsOpeningDayTask() == null) {
+                        task.setIsOpeningDayTask(shiftType == ScheduleDayTypeHelper.ShiftType.OPEN_START);
+                    }
+                    if (task.getIsClosingDayTask() == null) {
+                        task.setIsClosingDayTask(shiftType == ScheduleDayTypeHelper.ShiftType.CLOSED);
+                    }
+                }
                 task.setStockHours(taskAlloc.getStockHours());
                 task.setPriority(taskAlloc.getPriority());
                 task.setLhId(taskAlloc.getLhId());
@@ -403,6 +413,17 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * @param taskGroup 任务分组结果（直接修改列表）
      */
     private void applyDailyTrialSkuLimit(ScheduleContextVo context, TaskGroupService.TaskGroupResult taskGroup) {
+        // ==================== 周日不安排试制/量试 ====================
+        LocalDate scheduleDate = context.getCurrentScheduleDate();
+        if (scheduleDate != null && scheduleDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
+            log.info("周日不安排试制/量试，移除全部试制任务和量试任务: 试制{}个, 量试{}个",
+                    taskGroup.getTrialTasks().size(),
+                    taskGroup.getNewTasks().stream().filter(t -> Boolean.TRUE.equals(t.getIsProductionTrial())).count());
+            taskGroup.getTrialTasks().clear();
+            taskGroup.getNewTasks().removeIf(t -> Boolean.TRUE.equals(t.getIsProductionTrial()));
+            return;
+        }
+
         Set<String> dailySet = context.getDailyTrialAssignedEmbryoCodes();
         if (dailySet == null) {
             dailySet = new HashSet<>();
@@ -848,6 +869,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                                 // ---- 合并 isProductionTrial：任一记录有 isProductionTrial=true 则保留 ----
                                 mergedTask.setIsProductionTrial((existingTask != null && Boolean.TRUE.equals(existingTask.getIsProductionTrial()))
                                         || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsProductionTrial())));
+                                // ---- 合并 isEndProduction：任一记录有 isEndProduction=true 则保留 ----
+                                mergedTask.setIsEndProduction((existingTask != null && Boolean.TRUE.equals(existingTask.getIsEndProduction()))
+                                        || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsEndProduction())));
                                 // ---- 合并 isLastEndingBatch：任一记录有 isLastEndingBatch=true 则保留 ----
                                 mergedTask.setIsLastEndingBatch(
                                         Boolean.TRUE.equals(existingTask != null ? existingTask.getIsLastEndingBatch() : null)
@@ -1805,6 +1829,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
             if (Boolean.TRUE.equals(task.getIsClosingDayTask())) {
                 reasons.add("停产");
+            }
+            if (Boolean.TRUE.equals(task.getIsEndProduction())) {
+                reasons.add("结束生产");
             }
             if (Boolean.TRUE.equals(task.getIsFirstTask()) && !Boolean.TRUE.equals(task.getIsContinueTask())) {
                 // 新增任务（非续作的首次任务）

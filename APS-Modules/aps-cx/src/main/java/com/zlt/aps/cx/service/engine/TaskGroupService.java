@@ -1232,6 +1232,9 @@ public class TaskGroupService {
                 int closingRequiredStock = calculateClosingRequiredStockV2(task, context, scheduleDate, currentDayShiftOrder, dayShifts);
                 int currentStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
                 int thisShiftNeeded = Math.max(0, closingRequiredStock - currentStock);
+                if (thisShiftNeeded <= 0) {
+                    task.setIsEndProduction(true);
+                }
                 int normalDemand = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
                 int cappedProduction = Math.min(normalDemand, thisShiftNeeded);
                 log.info("跨天封顶(明天{}有停产,开产日): 胎胚={}, 反推需求={}, 库存={}, 还需={}, 正常需求={}, 封顶={}",
@@ -1250,6 +1253,9 @@ public class TaskGroupService {
             int closingRequiredStock = calculateClosingRequiredStockV2(task, context, scheduleDate, currentDayShiftOrder, dayShifts);
             int currentStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
             int thisShiftNeeded = Math.max(0, closingRequiredStock - currentStock);
+            if (thisShiftNeeded <= 0) {
+                task.setIsEndProduction(true);
+            }
             int normalDemand = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
             int cappedProduction = Math.min(normalDemand, thisShiftNeeded);
             log.info("跨天封顶(明天{}有停产): 胎胚={}, 反推需求={}, 库存={}, 还需={}, 正常需求={}, 封顶={}",
@@ -1336,6 +1342,11 @@ public class TaskGroupService {
 
         // 当前班次到停机时间还需的量
         int thisShiftNeeded = Math.max(0, closingRequiredStock - currentStock);
+
+        // 反推需求已满足，标记结束生产
+        if (thisShiftNeeded <= 0) {
+            task.setIsEndProduction(true);
+        }
 
         // 封顶：取 endingExtraInventory（收尾/试制调整后的量）和反推需求中的较小值
         // 如果 endingExtraInventory < 反推需求，说明收尾已经在限制了，停产不放大

@@ -136,6 +136,8 @@ public interface CoreScheduleAlgorithmService {
         private Boolean isOpeningDayTask;
         /** 是否停产日任务 */
         private Boolean isClosingDayTask;
+        /** 是否结束生产（反推需求-库存<=0，无需再排产） */
+        private Boolean isEndProduction;
         /** 是否关键产品开产（首班不排） */
         private Boolean isKeyProductOnOpening;
         /** 是否收尾最后一批 */
@@ -231,6 +233,12 @@ public interface CoreScheduleAlgorithmService {
         private Integer endingExtraInventory;
         /** 是否收尾最后一批（不补整车） */
         private Boolean isLastEndingBatch;
+        /** 是否结束生产（反推需求-库存<=0，无需再排产） */
+        private Boolean isEndProduction;
+        /** 是否开产日任务 */
+        private Boolean isOpeningDayTask;
+        /** 是否停产日任务 */
+        private Boolean isClosingDayTask;
     }
 
     /**

@@ -1187,6 +1187,8 @@ public class ShiftScheduleService {
         result.setIsLastEndingBatch(task.getIsLastEndingBatch());
         // 保存来源任务（用于均衡计算时获取 vulcanizeMachineCount）
         result.setSourceTask(task);
+        // 传递结束生产标记
+        result.setIsEndProduction(task.getIsEndProduction());
 
         return result;
     }
@@ -1242,5 +1244,7 @@ public class ShiftScheduleService {
         private Boolean isLastEndingBatch;
         /** 来源任务（用于均衡计算：获取硫化机数 vulcanizeMachineCount） */
         private CoreScheduleAlgorithmService.DailyEmbryoTask sourceTask;
+        /** 是否结束生产（反推需求-库存<=0，无需再排产） */
+        private Boolean isEndProduction;
     }
 }
