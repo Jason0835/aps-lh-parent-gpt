@@ -332,7 +332,7 @@ public class CalculateStructureCxMachineNumber {
             // （2）计算结构向下主花纹模具的最大可排产量 = MIN { SUM（结构向下主花纹对应的所有SKU的净需求量），主花纹模具的最大产能}；
             totalMaxMouldCapacity.add(Math.min(maxMouldCapacity, sumNetQty));
             //20260430+ 高优先级需求量
-            Integer sumHeightQty = requirePlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightCapacityRequireQty).sum();
+            Integer sumHeightQty = requirePlanList.stream().filter(x->x.getHeightCapacityRequireQty() != null).mapToInt(MonthPlanProductionRequirePlanVo::getHeightCapacityRequireQty).sum();
             totalHeightRequire.add(Math.min(sumHeightQty, maxMouldCapacity));
         });
         //20260430+ 增加高优先级需求量

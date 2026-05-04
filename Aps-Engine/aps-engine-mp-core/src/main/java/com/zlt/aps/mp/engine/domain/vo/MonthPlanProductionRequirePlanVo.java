@@ -1022,7 +1022,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      *
      * @return
      */
-    public int getHeightCapacityRequireQty() {
+    public Integer getHeightCapacityRequireQty() {
         return originHeightProductionQty;
     }
 
