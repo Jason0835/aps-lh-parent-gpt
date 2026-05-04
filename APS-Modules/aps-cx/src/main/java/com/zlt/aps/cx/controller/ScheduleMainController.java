@@ -105,18 +105,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
         List<CxScheduleResult> results = (List<CxScheduleResult>) rows;
 
-        List<CxShiftConfig> shiftConfigs = cxShiftConfigMapper.selectList(
-                new LambdaQueryWrapper<CxShiftConfig>()
-                        .eq(CxShiftConfig::getIsActive, 1)
-                        .orderByAsc(CxShiftConfig::getScheduleDay)
-                        .orderByAsc(CxShiftConfig::getDayShiftOrder));
-
-        Map<String, CxShiftConfig> classFieldMap = new HashMap<>();
-        for (CxShiftConfig config : shiftConfigs) {
-            if (config.getClassField() != null) {
-                classFieldMap.put(config.getClassField(), config);
-            }
-        }
+        Map<String, CxShiftConfig> classFieldMap = getShiftConfigClassMap();
 
         for (CxScheduleResult record : results) {
             if (record.getScheduleDate() == null) {
@@ -581,8 +570,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
         LocalDateTime now = LocalDateTime.now();
 
+        // 加载班次配置，用于校验班次是否已过
+        Map<String, CxShiftConfig> shiftConfigMap = getShiftConfigClassMap();
+
         // 校验每个班次的计划量
-        AjaxResult validationResult = validateAdjustQtyShifts(vo, record, scheduleLocalDate, now);
+        AjaxResult validationResult = validateAdjustQtyShifts(vo, record, scheduleLocalDate, now, shiftConfigMap);
         if (validationResult != null) {
             return validationResult;
         }
@@ -647,7 +639,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      * - 修改后的计划量不能低于已完成量
      */
     private AjaxResult validateAdjustQtyShifts(ScheduleAdjustVo vo, CxScheduleResult record,
-                                                LocalDate scheduleLocalDate, LocalDateTime now) {
+                                                LocalDate scheduleLocalDate, LocalDateTime now,
+                                                Map<String, CxShiftConfig> configMap) {
         String[] shiftNames = {"", "早班(D1)", "中班(D1)", "夜班(D2)", "早班(D2)", "中班(D2)", "夜班(D3)", "早班(D3)", "中班(D3)"};
 
         BigDecimal[] planQtys = {null, vo.getClass1PlanQty(), vo.getClass2PlanQty(), vo.getClass3PlanQty(),
@@ -662,7 +655,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                 continue;
             }
 
-            if (isShiftPast(i, scheduleLocalDate, now)) {
+            if (isShiftPast(i, scheduleLocalDate, now, configMap)) {
                 return AjaxResult.error(shiftNames[i] + "计划量不可调整：该班次已过");
             }
 
@@ -675,34 +668,76 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
-     * 判断指定班次是否为历史班次（已结束）
-     * 注：record.getScheduleDate() 存储的是 T+2日（8班的最后一天），需要反推T日和T+1日
-     *   CLASS1: D1早班 T日=scheduleDate-2, 06:00-13:59 -> 结束于 scheduleDate-2 14:00
-     *   CLASS2: D1中班 T日=scheduleDate-2, 14:00-21:59 -> 结束于 scheduleDate-2 22:00
-     *   CLASS3: D2夜班 T+1日=scheduleDate-1(跨天), 22:00-05:59 -> 结束于 scheduleDate-1 06:00
-     *   CLASS4: D2早班 T+1日=scheduleDate-1, 06:00-13:59 -> 结束于 scheduleDate-1 14:00
-     *   CLASS5: D2中班 T+1日=scheduleDate-1, 14:00-21:59 -> 结束于 scheduleDate-1 22:00
-     *   CLASS6: D3夜班 T+2日=scheduleDate(跨天), 22:00-05:59 -> 结束于 scheduleDate+1 06:00
-     *   CLASS7: D3早班 T+2日=scheduleDate, 06:00-13:59 -> 结束于 scheduleDate 14:00
-     *   CLASS8: D3中班 T+2日=scheduleDate, 14:00-21:59 -> 结束于 scheduleDate 22:00
+     * 查询启用状态的班次配置，按 classField(CLASS1~CLASS8) 构建映射
+     * 供各方法复用，避免硬编码班次时间
+     *
+     * @return Map<"CLASS1"~"CLASS8", CxShiftConfig>
      */
-    private boolean isShiftPast(int classIndex, LocalDate scheduleDate, LocalDateTime now) {
-        LocalDate endDate;
-        int endHour;
-
-        switch (classIndex) {
-            case 1: endDate = scheduleDate.minusDays(2); endHour = 14; break;
-            case 2: endDate = scheduleDate.minusDays(2); endHour = 22; break;
-            case 3: endDate = scheduleDate.minusDays(1); endHour = 6; break;
-            case 4: endDate = scheduleDate.minusDays(1); endHour = 14; break;
-            case 5: endDate = scheduleDate.minusDays(1); endHour = 22; break;
-            case 6: endDate = scheduleDate; endHour = 6; break;
-            case 7: endDate = scheduleDate; endHour = 14; break;
-            case 8: endDate = scheduleDate; endHour = 22; break;
-            default: return false;
+    private Map<String, CxShiftConfig> getShiftConfigClassMap() {
+        List<CxShiftConfig> shiftConfigs = cxShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<CxShiftConfig>()
+                        .eq(CxShiftConfig::getIsActive, 1)
+                        .orderByAsc(CxShiftConfig::getScheduleDay)
+                        .orderByAsc(CxShiftConfig::getDayShiftOrder));
+        Map<String, CxShiftConfig> classFieldMap = new HashMap<>();
+        for (CxShiftConfig config : shiftConfigs) {
+            if (config.getClassField() != null) {
+                classFieldMap.put(config.getClassField(), config);
+            }
         }
+        return classFieldMap;
+    }
 
-        LocalDateTime shiftEnd = endDate.atTime(endHour, 0);
+    /**
+     * 根据班次配置和排程日期，计算该班次的结束时间
+     * 与 list() 中填充班次开始/结束时间的逻辑完全一致
+     *
+     * @param classIndex 班次序号 1~8
+     * @param scheduleDate 排程日期（T+2日，即8班的最后一天）
+     * @param config 对应班次的配置
+     * @return 班次结束时间，若 config 为 null 则返回 null
+     */
+    private LocalDateTime getShiftEndDateTime(int classIndex, LocalDate scheduleDate, CxShiftConfig config) {
+        if (config == null) {
+            return null;
+        }
+        int dayOffset;
+        if (config.getScheduleDay() == 1) {
+            dayOffset = -2;
+        } else if (config.getScheduleDay() == 2) {
+            dayOffset = -1;
+        } else {
+            dayOffset = 0;
+        }
+        LocalTime endLocalTime = config.getShiftEndTime();
+        LocalDate endDate;
+        if (config.getIsCrossDay() != null && config.getIsCrossDay() == 1) {
+            endDate = scheduleDate.plusDays(dayOffset);
+        } else {
+            endDate = scheduleDate.plusDays(dayOffset);
+        }
+        return endDate.atTime(endLocalTime);
+    }
+
+    /**
+     * 判断指定班次是否为历史班次（已结束）
+     * 基于 CxShiftConfig 配置表的实际班次时间判断，不再硬编码
+     *
+     * @param classIndex 班次序号 1~8
+     * @param scheduleDate 排程日期
+     * @param now 当前时间
+     * @param configMap 班次配置映射（key=CLASS1~CLASS8）
+     */
+    private boolean isShiftPast(int classIndex, LocalDate scheduleDate, LocalDateTime now,
+                                Map<String, CxShiftConfig> configMap) {
+        CxShiftConfig config = configMap.get("CLASS" + classIndex);
+        if (config == null) {
+            return false;
+        }
+        LocalDateTime shiftEnd = getShiftEndDateTime(classIndex, scheduleDate, config);
+        if (shiftEnd == null) {
+            return false;
+        }
         return !now.isBefore(shiftEnd);
     }
 
@@ -711,8 +746,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      * 1. 已结束的班次不可转移（基于 isShiftPast 时间判断）
      * 2. T日夜班(CLASS3)即使未到结束时间也不转移（业务规则）
      */
-    private boolean isShiftTransferable(int classIndex, LocalDate scheduleDate, LocalDateTime now) {
-        if (isShiftPast(classIndex, scheduleDate, now)) {
+    private boolean isShiftTransferable(int classIndex, LocalDate scheduleDate, LocalDateTime now,
+                                         Map<String, CxShiftConfig> configMap) {
+        if (isShiftPast(classIndex, scheduleDate, now, configMap)) {
             return false;
         }
         if (classIndex == 3) {
@@ -946,6 +982,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
         LocalDateTime now = LocalDateTime.now();
 
+        // 加载班次配置，用于判断班次是否可转移
+        Map<String, CxShiftConfig> shiftConfigMap = getShiftConfigClassMap();
+
         // 校验并收集每个记录的转移数据
         List<CxScheduleResult> transferRecords = new ArrayList<>();
         for (CxScheduleResult record : records) {
@@ -957,7 +996,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
             boolean hasTransferableShift = false;
             for (int i = 1; i <= 8; i++) {
-                if (isShiftTransferable(i, scheduleLocalDate, now)) {
+                if (isShiftTransferable(i, scheduleLocalDate, now, shiftConfigMap)) {
                     BigDecimal planQty = getClassPlanQty(record, i);
                     if (planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0) {
                         hasTransferableShift = true;
@@ -988,7 +1027,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
         // 产能校验（未确认时检查，已确认时跳过检查直接执行）
         if (!Boolean.TRUE.equals(vo.getConfirmed())) {
-            AjaxResult capacityCheck = checkNewMachineCapacity(transferRecords, vo.getNewMachineCode());
+            AjaxResult capacityCheck = checkNewMachineCapacity(transferRecords, vo.getNewMachineCode(), shiftConfigMap);
             if (capacityCheck != null) {
                 return capacityCheck;
             }
@@ -1003,7 +1042,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
             // 清空不可转移班次的计划量（历史班次+T日夜班保留在原机台）
             for (int i = 1; i <= 8; i++) {
-                if (!isShiftTransferable(i, scheduleLocalDate, now)) {
+                if (!isShiftTransferable(i, scheduleLocalDate, now, shiftConfigMap)) {
                     setClassPlanQty(record, i, BigDecimal.ZERO);
                 }
             }
@@ -1027,7 +1066,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      * 校验新机台是否有足够产能承接转移的计划量
      * 按每台设备的日产能进行比较
      */
-    private AjaxResult checkNewMachineCapacity(List<CxScheduleResult> records, String newMachineCode) {
+    private AjaxResult checkNewMachineCapacity(List<CxScheduleResult> records, String newMachineCode,
+                                                Map<String, CxShiftConfig> configMap) {
         MdmMoldingMachine newMachine = moldingMachineMapper.selectOne(
                 new QueryWrapper<MdmMoldingMachine>()
                         .eq("CX_MACHINE_CODE", newMachineCode)
@@ -1066,7 +1106,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         for (CxScheduleResult record : records) {
             LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
             for (int i = 1; i <= 8; i++) {
-                if (isShiftTransferable(i, scheduleLocalDate, now)) {
+                if (isShiftTransferable(i, scheduleLocalDate, now, configMap)) {
                     transferTotal = transferTotal.add(defaultZero(getClassPlanQty(record, i)));
                 }
             }

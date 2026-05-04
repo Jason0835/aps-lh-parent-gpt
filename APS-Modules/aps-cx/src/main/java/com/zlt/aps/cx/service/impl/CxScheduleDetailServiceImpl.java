@@ -5,10 +5,12 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.mapper.CxScheduleDetailMapper;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
+import com.zlt.aps.cx.mapper.CxShiftConfigMapper;
 import com.zlt.aps.cx.service.CxScheduleDetailService;
 import com.zlt.aps.cx.vo.CxScheduleDetailVo;
 import com.zlt.aps.cx.vo.ScheduleDetailQueryVo;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,6 +39,9 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
 
     @javax.annotation.Resource
     private CxScheduleResultMapper cxScheduleResultMapper;
+
+    @javax.annotation.Resource
+    private CxShiftConfigMapper cxShiftConfigMapper;
 
     @Override
     public List<CxScheduleDetailVo> listVoByMainId(Long mainId) {
@@ -252,7 +258,20 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
 
         LocalDateTime now = LocalDateTime.now();
 
-        // 校验1：历史班次不可修改（复用adjustQty的isShiftPast规则）
+        // 加载班次配置，用于判断班次是否已过
+        List<CxShiftConfig> shiftConfigs = cxShiftConfigMapper.selectList(
+                new LambdaQueryWrapper<CxShiftConfig>()
+                        .eq(CxShiftConfig::getIsActive, 1)
+                        .orderByAsc(CxShiftConfig::getScheduleDay)
+                        .orderByAsc(CxShiftConfig::getDayShiftOrder));
+        Map<String, CxShiftConfig> shiftConfigMap = new HashMap<>();
+        for (CxShiftConfig config : shiftConfigs) {
+            if (config.getClassField() != null) {
+                shiftConfigMap.put(config.getClassField(), config);
+            }
+        }
+
+        // 校验1：历史班次不可修改（基于 CxShiftConfig 配置表的实际班次时间判断）
         BigDecimal[] newPlanQtys = {null, vo.getClass1PlanQty(), vo.getClass2PlanQty(), vo.getClass3PlanQty(),
                 vo.getClass4PlanQty(), vo.getClass5PlanQty(), vo.getClass6PlanQty(),
                 vo.getClass7PlanQty(), vo.getClass8PlanQty()};
@@ -266,7 +285,7 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
             if (newPlanQtys[i] == null) {
                 continue;
             }
-            if (isShiftPast(i, scheduleLocalDate, now)) {
+            if (isShiftPast(i, scheduleLocalDate, now, shiftConfigMap)) {
                 return AjaxResult.error(shiftNames[i] + "计划量不可修改：该班次已过");
             }
             if (finishQtys[i] != null && newPlanQtys[i].compareTo(finishQtys[i]) < 0) {
@@ -424,22 +443,36 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
         cxScheduleResultMapper.updateById(main);
     }
 
-    /** 判断班次是否已过（与ScheduleMainController.isShiftPast逻辑一致） */
-    private boolean isShiftPast(int classIndex, LocalDate scheduleDate, LocalDateTime now) {
-        LocalDate endDate;
-        int endHour;
-        switch (classIndex) {
-            case 1: endDate = scheduleDate.minusDays(2); endHour = 14; break;
-            case 2: endDate = scheduleDate.minusDays(2); endHour = 22; break;
-            case 3: endDate = scheduleDate.minusDays(1); endHour = 6; break;
-            case 4: endDate = scheduleDate.minusDays(1); endHour = 14; break;
-            case 5: endDate = scheduleDate.minusDays(1); endHour = 22; break;
-            case 6: endDate = scheduleDate; endHour = 6; break;
-            case 7: endDate = scheduleDate; endHour = 14; break;
-            case 8: endDate = scheduleDate; endHour = 22; break;
-            default: return false;
+    /**
+     * 判断班次是否已过（基于 CxShiftConfig 配置表的实际班次时间判断）
+     * @param classIndex 班次序号 1~8
+     * @param scheduleDate 排程日期（T+2日）
+     * @param now 当前时间
+     * @param configMap 班次配置映射（key=CLASS1~CLASS8）
+     */
+    private boolean isShiftPast(int classIndex, LocalDate scheduleDate, LocalDateTime now,
+                                Map<String, CxShiftConfig> configMap) {
+        CxShiftConfig config = configMap.get("CLASS" + classIndex);
+        if (config == null) {
+            return false;
         }
-        return !now.isBefore(endDate.atTime(endHour, 0));
+        int dayOffset;
+        if (config.getScheduleDay() == 1) {
+            dayOffset = -2;
+        } else if (config.getScheduleDay() == 2) {
+            dayOffset = -1;
+        } else {
+            dayOffset = 0;
+        }
+        LocalTime endLocalTime = config.getShiftEndTime();
+        LocalDate endDate;
+        if (config.getIsCrossDay() != null && config.getIsCrossDay() == 1) {
+            endDate = scheduleDate.plusDays(dayOffset);
+        } else {
+            endDate = scheduleDate.plusDays(dayOffset);
+        }
+        LocalDateTime shiftEnd = endDate.atTime(endLocalTime);
+        return !now.isBefore(shiftEnd);
     }
 
     @Override
