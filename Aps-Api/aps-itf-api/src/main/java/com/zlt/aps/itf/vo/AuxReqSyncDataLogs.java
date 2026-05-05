@@ -1,5 +1,8 @@
 package com.zlt.aps.itf.vo;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Getter;
@@ -52,4 +55,6 @@ public class AuxReqSyncDataLogs extends SyncBaseEntity {
 
     @ApiModelProperty(value = "精度类型")
     private String precisionType; //精度类型（硫化精度/成型精度15天），为空时同步所有类型
+    
+    private Map<String, Object> queryParams; // 查询参数
 }
