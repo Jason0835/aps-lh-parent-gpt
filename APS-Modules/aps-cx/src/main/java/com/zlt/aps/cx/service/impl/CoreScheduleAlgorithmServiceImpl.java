@@ -1149,9 +1149,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 result.setMarkCloseOutTip("1");
             }
 
+            // ---- 查询示方书类型（每条结果查一次，避免 CLASS1~8 重复查库） ----
+            String recipeType = resolveRecipeType(primaryLh, materialCode);
+
             // ---- 映射班次排量到 CLASS1~8 ----
             for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
-                setClassFieldValue(result, classEntry.getKey(), classEntry.getValue(), primaryLh, materialCode);
+                setClassFieldValue(result, classEntry.getKey(), classEntry.getValue(), primaryLh, recipeType);
             }
 
             // ---- 班次未排量的栏位补零 ----
@@ -1704,7 +1707,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * @param spr       班次排产结果
      */
     private void setClassFieldValue(CxScheduleResult result, String classField, ShiftScheduleService.ShiftProductionResult spr,
-                                    LhScheduleResult primaryLh, String materialCode) {
+                                    LhScheduleResult primaryLh, String recipeType) {
         if (classField == null || spr == null) {
             return;
         }
@@ -1718,19 +1721,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         BigDecimal finishQty = BigDecimal.ZERO;
         // 示方书编号：取硫化任务的制造示方书号
         String recipeNo = (primaryLh != null) ? primaryLh.getEmbryoNo() : null;
-        // 示方书类型：通过基础表 MdmSkuConstructionRef 查询 embryoType
-        String recipeType = null;
-        if (materialCode != null && recipeNo != null) {
-            try {
-                MdmSkuConstructionRef ref = skuConstructionRefMapper.selectByMaterialCodeAndEmbryoNo(materialCode, recipeNo);
-                if (ref != null) {
-                    recipeType = ref.getEmbryoType();
-                }
-            } catch (Exception e) {
-                log.debug("查询示方书类型失败: materialCode={}, embryoNo={}", materialCode, recipeNo);
-            }
-        }
-        // 查不到类型时留空
 
         switch (classField) {
             case "CLASS1":
@@ -1797,6 +1787,32 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /**
      * 填充未排产班次的默认值（PLAN_QTY=0, FINISH_QTY=0）
      */
+    /**
+     * 查询示方书类型（每条结果查询一次，供 CLASS1~8 复用）
+     * @param primaryLh    主硫化任务
+     * @param materialCode 物料编码
+     * @return 示方书类型，查不到返回 null
+     */
+    private String resolveRecipeType(LhScheduleResult primaryLh, String materialCode) {
+        if (materialCode == null) {
+            return null;
+        }
+        String recipeNo = (primaryLh != null) ? primaryLh.getEmbryoNo() : null;
+        if (recipeNo == null) {
+            return null;
+        }
+        try {
+            MdmSkuConstructionRef ref = skuConstructionRefMapper.selectByMaterialCodeAndEmbryoNo(materialCode, recipeNo);
+            if (ref != null && ref.getEmbryoType() != null) {
+                return ref.getEmbryoType();
+            }
+            log.warn("未查到示方书类型: materialCode={}, embryoNo={}", materialCode, recipeNo);
+        } catch (Exception e) {
+            log.warn("查询示方书类型异常: materialCode={}, embryoNo={}", materialCode, recipeNo, e);
+        }
+        return null;
+    }
+
     private void fillDefaultClassValues(CxScheduleResult result, Set<String> filledClasses) {
         BigDecimal zero = BigDecimal.ZERO;
         if (!filledClasses.contains("CLASS1")) { result.setClass1PlanQty(zero); result.setClass1FinishQty(zero); }
