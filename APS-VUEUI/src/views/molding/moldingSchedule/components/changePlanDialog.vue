@@ -1241,10 +1241,8 @@ export default {
       return moment(date).format("MM/DD");
     },
     isShiftLocked(shift) {
-      const hasFinished = Number(this.form[`class${shift}FinishQty`] || 0) !== 0;
       const endTime = this.form[`class${shift}EndTime`];
-      const timeLocked = endTime ? moment().isAfter(moment(endTime)) : false;
-      return hasFinished || timeLocked;
+      return endTime ? moment().isAfter(moment(endTime)) : false;
     },
     handleRecipeNoChange(shift, val, row) {
       const recipeTypeField = `class${shift}RecipeType`;
