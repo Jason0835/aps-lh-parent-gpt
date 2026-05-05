@@ -53,17 +53,7 @@
             </el-form-item>
           </el-col>
 
-          <el-col :span="12">
-            <el-form-item
-              :label="$t('ui.data.column.cxScheduleResult.embryoCode')"
-              prop="embryoCode"
-            >
-              <el-input
-                v-model="form.embryoCode"
-                placeholder=""
-              ></el-input>
-            </el-form-item>
-          </el-col>
+
 
           <el-col :span="12">
             <el-form-item
@@ -125,6 +115,18 @@
           <el-col :span="12">
             <el-form-item :label="$t('物料描述')" prop="materialDesc">
               <el-input v-model="form.materialDesc" disabled></el-input>
+            </el-form-item>
+          </el-col>
+
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.cxScheduleResult.embryoCode')"
+              prop="embryoCode"
+            >
+              <el-input
+                v-model="form.embryoCode"
+                placeholder=""
+              ></el-input>
             </el-form-item>
           </el-col>
 
