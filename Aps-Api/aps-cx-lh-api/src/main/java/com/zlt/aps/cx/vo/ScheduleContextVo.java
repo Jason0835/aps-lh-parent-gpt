@@ -421,8 +421,20 @@ public class ScheduleContextVo {
     private LocalDateTime vulcanizingOpenDateTime;
 
     /**
-     * H15开头机台最大胎胚种类数（未配置则按配比默认值，配置后覆盖配比值）
+     * 自定义最大胎胚种类数（从参数 MAX_EMBRYO_TYPES_VALUE 加载，未配置则按配比默认值）
      */
+    private Integer maxEmbryoTypesValue;
+
+    /**
+     * 自定义最大胎胚种类数适用的机台前缀（从参数 MAX_EMBRYO_TYPES_MACHINE_PREFIX 加载，默认 "H15"）
+     */
+    private String maxEmbryoTypesMachinePrefix;
+
+    /**
+     * H15开头机台最大胎胚种类数（已废弃，由 maxEmbryoTypesValue + maxEmbryoTypesMachinePrefix 替代）
+     * @deprecated 保留仅用于兼容旧参数 H15_MAX_EMBRYO_TYPES
+     */
+    @Deprecated
     private Integer h15MaxEmbryoTypes;
 
     /**

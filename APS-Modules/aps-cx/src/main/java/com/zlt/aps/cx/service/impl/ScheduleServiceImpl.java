@@ -93,8 +93,12 @@ public class ScheduleServiceImpl implements ScheduleService {
     /** 参数编码：预留消化时间（小时，成型停机早于硫化停锅的时长） */
     private static final String PARAM_CODE_RESERVED_DIGEST_HOURS = "RESERVED_DIGEST_HOURS";
 
-    /** 参数编码：H15开头机台最大胎胚种类数（未配置则按配比默认值） */
+    /** 参数编码：自定义最大胎胚种类数（旧参数，保留兼容） */
     private static final String PARAM_CODE_H15_MAX_EMBRYO_TYPES = "H15_MAX_EMBRYO_TYPES";
+    /** 参数编码：自定义最大胎胚种类数（新参数，未配置则回退到 H15_MAX_EMBRYO_TYPES） */
+    private static final String PARAM_CODE_MAX_EMBRYO_TYPES_VALUE = "MAX_EMBRYO_TYPES_VALUE";
+    /** 参数编码：自定义最大胎胚种类数适用的机台前缀（默认 "H15"） */
+    private static final String PARAM_CODE_MAX_EMBRYO_TYPES_MACHINE_PREFIX = "MAX_EMBRYO_TYPES_MACHINE_PREFIX";
 
     /** 默认损耗率 */
     private static final BigDecimal DEFAULT_LOSS_RATE = new BigDecimal("0.02");
@@ -825,15 +829,28 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
         }
 
-        // 加载H15开头机台最大胎胚种类数
-        CxParamConfig h15MaxTypesConfig = paramConfigMap.get(PARAM_CODE_H15_MAX_EMBRYO_TYPES);
-        if (h15MaxTypesConfig != null && h15MaxTypesConfig.getParamValue() != null) {
+        // 加载自定义最大胎胚种类数：优先从新参数 MAX_EMBRYO_TYPES_VALUE 读取，未配置则回退到旧参数 H15_MAX_EMBRYO_TYPES
+        CxParamConfig maxEmbryoTypesConfig = paramConfigMap.get(PARAM_CODE_MAX_EMBRYO_TYPES_VALUE);
+        if (maxEmbryoTypesConfig == null) {
+            maxEmbryoTypesConfig = paramConfigMap.get(PARAM_CODE_H15_MAX_EMBRYO_TYPES);
+        }
+        if (maxEmbryoTypesConfig != null && maxEmbryoTypesConfig.getParamValue() != null) {
             try {
-                context.setH15MaxEmbryoTypes(Integer.parseInt(h15MaxTypesConfig.getParamValue()));
-                log.info("H15机台最大胎胚种类数配置：{}", h15MaxTypesConfig.getParamValue());
+                context.setMaxEmbryoTypesValue(Integer.parseInt(maxEmbryoTypesConfig.getParamValue()));
+                log.info("自定义最大胎胚种类数：{}", maxEmbryoTypesConfig.getParamValue());
             } catch (NumberFormatException e) {
-                log.warn("解析H15机台最大胎胚种类数配置失败: {}", h15MaxTypesConfig.getParamValue());
+                log.warn("解析最大胎胚种类数配置失败: {}", maxEmbryoTypesConfig.getParamValue());
             }
+        }
+
+        // 加载自定义最大胎胚种类数适用的机台前缀（默认 "H15"）
+        CxParamConfig machinePrefixConfig = paramConfigMap.get(PARAM_CODE_MAX_EMBRYO_TYPES_MACHINE_PREFIX);
+        if (machinePrefixConfig != null && machinePrefixConfig.getParamValue() != null) {
+            context.setMaxEmbryoTypesMachinePrefix(machinePrefixConfig.getParamValue().trim());
+            log.info("自定义最大胎胚种类数机台前缀：{}", machinePrefixConfig.getParamValue().trim());
+        } else {
+            context.setMaxEmbryoTypesMachinePrefix("H15");
+            log.info("未配置自定义最大胎胚种类数机台前缀，使用默认值：H15");
         }
 
         // 加载库存可供硫化时长预警阈值（默认18小时）

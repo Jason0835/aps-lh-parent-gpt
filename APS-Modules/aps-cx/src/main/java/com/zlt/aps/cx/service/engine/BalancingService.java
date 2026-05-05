@@ -311,17 +311,20 @@ public class BalancingService {
             log.warn("  配比数据为空，所有机台将使用默认值");
         }
 
-        Integer h15MaxEmbryoTypes = context.getH15MaxEmbryoTypes();
+        Integer maxEmbryoTypesValue = context.getMaxEmbryoTypesValue();
+        String maxEmbryoTypesMachinePrefix = context.getMaxEmbryoTypesMachinePrefix();
 
         for (MdmMoldingMachine machine : machines) {
             String machineCode = machine.getCxMachineCode();
             String machineType = machineTypeMap.get(machineCode);
 
-            // H15开头机台：如果有专用配置则优先使用，否则走配比逻辑
+            // 自定义机台前缀匹配：使用专用最大胎胚种类数
             Integer maxTypes = null;
-            if (h15MaxEmbryoTypes != null && machineCode != null && machineCode.startsWith("H15")) {
-                maxTypes = h15MaxEmbryoTypes;
-                log.info("  机台 {} (机型={}): 使用H15专用最大胎胚种类数={}", machineCode, machineType, maxTypes);
+            if (maxEmbryoTypesValue != null && machineCode != null
+                    && maxEmbryoTypesMachinePrefix != null
+                    && machineCode.startsWith(maxEmbryoTypesMachinePrefix)) {
+                maxTypes = maxEmbryoTypesValue;
+                log.info("  机台 {} (机型={}): 使用{}专用最大胎胚种类数={}", machineCode, machineType, maxEmbryoTypesMachinePrefix, maxTypes);
                 result.put(machineCode, maxTypes);
                 continue;
             }
