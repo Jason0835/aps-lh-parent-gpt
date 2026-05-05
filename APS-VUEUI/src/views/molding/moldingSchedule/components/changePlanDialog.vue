@@ -1298,6 +1298,21 @@ export default {
       return true;
     },
 
+    async save(form) {
+      try {
+        this.loading = true;
+        const params = this.buildAdjustQtyParams(form);
+        await adjustQty(params);
+        this.loading = false;
+        this.$modal.msgSuccess(this.$t("common.msg.ajax.operation.success"));
+        this.$emit("success");
+        this.hide();
+      } catch (error) {
+        console.error(error);
+        this.loading = false;
+      }
+    },
+
     //utils
     show(data) {
       this.visible = true;
