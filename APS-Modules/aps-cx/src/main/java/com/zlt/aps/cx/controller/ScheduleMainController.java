@@ -17,10 +17,13 @@ import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.mapper.CxParamConfigMapper;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
 import com.zlt.aps.cx.mapper.CxShiftConfigMapper;
 import com.zlt.aps.cx.mapper.MdmCxMachineFixedMapper;
+import com.zlt.aps.cx.mapper.MdmMonthPlanProductLhCapacityMapper;
 import com.zlt.aps.cx.mapper.MdmMoldingMachineMapper;
+import com.zlt.aps.cx.mapper.MdmStructureLhRatioMapper;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.service.ScheduleService;
 import com.zlt.aps.cx.api.domain.vo.ScheduleAdjustVo;
@@ -28,13 +31,16 @@ import com.zlt.aps.cx.api.domain.vo.ScheduleGenerateVo;
 import com.zlt.aps.cx.api.domain.vo.ScheduleInsertVo;
 import com.zlt.aps.cx.api.domain.vo.ScheduleTransferMachineVo;
 import com.zlt.aps.cx.api.domain.vo.ScheduleUpdateRemarkVo;
+import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.cx.vo.ScheduleRequestVo;
 import com.zlt.aps.cx.vo.CxScheduleImportDTO;
 import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
+import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.mp.api.domain.entity.CxScheduleResultIssue;
 import com.zlt.aps.mp.api.domain.entity.MdmCxMachineFixed;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
+import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -50,6 +56,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -91,8 +98,17 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     @Autowired
     private CxShiftConfigMapper cxShiftConfigMapper;
 
+    @Autowired
+    private CxParamConfigMapper cxParamConfigMapper;
+
     @Resource
     private MdmCxMachineFixedMapper mdmCxMachineFixedMapper;
+
+    @Resource
+    private MdmStructureLhRatioMapper structureLhRatioMapper;
+
+    @Resource
+    private MdmMonthPlanProductLhCapacityMapper monthPlanProductLhCapacityMapper;
 
     /**
      * 查询成型排程结果列表，同时填充各班次的开始/结束时间
@@ -584,6 +600,50 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             return validationResult;
         }
 
+        // 校验调量后是否超出机台产能
+        MdmMoldingMachine adjMachine = moldingMachineMapper.selectOne(
+                new QueryWrapper<MdmMoldingMachine>()
+                        .eq("CX_MACHINE_CODE", record.getCxMachineCode())
+                        .eq("IS_ACTIVE", 1));
+        if (adjMachine != null && adjMachine.getMaxDayCapacity() != null && adjMachine.getMaxDayCapacity() > 0) {
+            Object[] capData = loadCapacityData(record.getFactoryCode());
+            @SuppressWarnings("unchecked")
+            List<MonthPlanProductLhCapacityVo> capacityList = (List<MonthPlanProductLhCapacityVo>) capData[0];
+            DayVulcanizationModeEnum mode = (DayVulcanizationModeEnum) capData[1];
+
+            int dailyLh = getDailyLhCapacity(capacityList, mode, record.getMaterialCode(), adjMachine.getMaxDayCapacity());
+            BigDecimal singleTireTime = calcSingleTireTime(adjMachine, record.getStructureName(), dailyLh);
+
+            // 查询该机台当天所有记录（含当前记录自身）
+            List<CxScheduleResult> allRecords = cxScheduleResultMapper.selectList(
+                    new LambdaQueryWrapper<CxScheduleResult>()
+                            .eq(CxScheduleResult::getScheduleDate, new java.sql.Date(record.getScheduleDate().getTime()))
+                            .eq(CxScheduleResult::getCxMachineCode, record.getCxMachineCode()));
+            BigDecimal[] existingTime = calcShiftTimeConsumed(adjMachine, record.getScheduleDate(),
+                    allRecords, capacityList, mode, adjMachine.getMaxDayCapacity());
+
+            // 对每个变更的班次，扣除旧计划的时间+加上新计划的时间，检查是否超产能
+            BigDecimal[] newPlanQtys = {null, vo.getClass1PlanQty(), vo.getClass2PlanQty(), vo.getClass3PlanQty(),
+                    vo.getClass4PlanQty(), vo.getClass5PlanQty(), vo.getClass6PlanQty(),
+                    vo.getClass7PlanQty(), vo.getClass8PlanQty()};
+            BigDecimal[] oldPlanQtys = {null, record.getClass1PlanQty(), record.getClass2PlanQty(), record.getClass3PlanQty(),
+                    record.getClass4PlanQty(), record.getClass5PlanQty(), record.getClass6PlanQty(),
+                    record.getClass7PlanQty(), record.getClass8PlanQty()};
+            BigDecimal shiftTotalSeconds = BigDecimal.valueOf(28800L);
+            String[] shiftNames = {"", "早班(D1)", "中班(D1)", "夜班(D2)", "早班(D2)", "中班(D2)", "夜班(D3)", "早班(D3)", "中班(D3)"};
+            for (int i = 1; i <= 8; i++) {
+                if (newPlanQtys[i] == null || (oldPlanQtys[i] != null && newPlanQtys[i].compareTo(oldPlanQtys[i]) == 0)) continue;
+                // 扣除旧时间，加上新时间
+                BigDecimal oldTime = oldPlanQtys[i] != null ? oldPlanQtys[i].multiply(singleTireTime) : BigDecimal.ZERO;
+                BigDecimal newTime = newPlanQtys[i].multiply(singleTireTime);
+                BigDecimal adjustedTotal = existingTime[i].subtract(oldTime).add(newTime);
+                if (adjustedTotal.compareTo(shiftTotalSeconds) > 0) {
+                    return AjaxResult.error("调量失败：" + shiftNames[i] + "调整后总耗时(" + adjustedTotal.setScale(1, RoundingMode.HALF_UP)
+                            + "s)超过每班8h(" + shiftTotalSeconds + "s)");
+                }
+            }
+        }
+
         // 更新计划量
         if (vo.getClass1PlanQty() != null) record.setClass1PlanQty(vo.getClass1PlanQty());
         if (vo.getClass2PlanQty() != null) record.setClass2PlanQty(vo.getClass2PlanQty());
@@ -821,29 +881,38 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             }
         }
 
-        // 校验各班计划量不能超过机台最大日产能（按天分组，排程记录scheduleDate=T+2日）
-        //   CLASS1(D1早班=T日) + CLASS2(D1中班=T日)  -> 一天
-        //   CLASS3(D2夜班=T+1日)                      -> 一天
-        int maxDayCapacity = 0;
+        // 校验各班计划量是否超过机台产能（按单条胎时间计算剩余产能）
         MdmMoldingMachine machine = moldingMachineMapper.selectOne(
                 new QueryWrapper<MdmMoldingMachine>()
                         .eq("CX_MACHINE_CODE", vo.getCxMachineCode())
                         .eq("IS_ACTIVE", 1));
-        if (machine != null && machine.getMaxDayCapacity() != null) {
-            maxDayCapacity = machine.getMaxDayCapacity();
-        }
-        if (maxDayCapacity > 0) {
-            BigDecimal day1Total = BigDecimal.ZERO;
-            BigDecimal day2Total = BigDecimal.ZERO;
-            if (vo.getClass1PlanQty() != null) day1Total = day1Total.add(vo.getClass1PlanQty());
-            if (vo.getClass2PlanQty() != null) day1Total = day1Total.add(vo.getClass2PlanQty());
-            if (vo.getClass3PlanQty() != null) day2Total = day2Total.add(vo.getClass3PlanQty());
+        if (machine != null && machine.getMaxDayCapacity() != null && machine.getMaxDayCapacity() > 0) {
+            // 加载该工厂所有物料日硫化量
+            Object[] capData = loadCapacityData(vo.getFactoryCode());
+            @SuppressWarnings("unchecked")
+            List<MonthPlanProductLhCapacityVo> capacityList = (List<MonthPlanProductLhCapacityVo>) capData[0];
+            DayVulcanizationModeEnum mode = (DayVulcanizationModeEnum) capData[1];
 
-            if (day1Total.compareTo(BigDecimal.valueOf(maxDayCapacity)) > 0) {
-                return AjaxResult.error("插单失败：T日(早班+中班)计划量(" + day1Total + ")超过机台最大日产(" + maxDayCapacity + ")");
-            }
-            if (day2Total.compareTo(BigDecimal.valueOf(maxDayCapacity)) > 0) {
-                return AjaxResult.error("插单失败：T+1日(夜班)计划量(" + day2Total + ")超过机台最大日产(" + maxDayCapacity + ")");
+            int dailyLhCapacity = getDailyLhCapacity(capacityList, mode, vo.getMaterialCode(), machine.getMaxDayCapacity());
+
+            // 查询该机台当天已有排程记录，计算各班次时间占用
+            BigDecimal[] existingTimeSeconds = calcShiftTimeConsumed(machine, scheduleDate,
+                    cxScheduleResultMapper.selectList(new LambdaQueryWrapper<CxScheduleResult>()
+                            .eq(CxScheduleResult::getScheduleDate, new java.sql.Date(scheduleDate.getTime()))
+                            .eq(CxScheduleResult::getCxMachineCode, vo.getCxMachineCode())),
+                    capacityList, mode, machine.getMaxDayCapacity());
+
+            // 插单物料单条胎耗时
+            BigDecimal insertSingleTireTime = calcSingleTireTime(machine, vo.getStructureName(), dailyLhCapacity);
+
+            // 逐班校验
+            BigDecimal[] planQtys = {null, vo.getClass1PlanQty(), vo.getClass2PlanQty(), vo.getClass3PlanQty(),
+                    vo.getClass4PlanQty(), vo.getClass5PlanQty(), vo.getClass6PlanQty(),
+                    vo.getClass7PlanQty(), vo.getClass8PlanQty()};
+            String[] shiftNames = {"", "早班(D1)", "中班(D1)", "夜班(D2)", "早班(D2)", "中班(D2)", "夜班(D3)", "早班(D3)", "中班(D3)"};
+            String capErr = checkPerShiftCapacity(planQtys, existingTimeSeconds, insertSingleTireTime, shiftNames);
+            if (capErr != null) {
+                return AjaxResult.error("插单失败：" + capErr);
             }
         }
 
@@ -1113,15 +1182,13 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         }
 
         // 产能校验（未确认时返回提示不强制拦截，已确认时跳过直接执行）
-        String capacityWarning = checkNewMachineCapacity(transferRecords, vo.getNewMachineCode(), newMachine.getMaxDayCapacity(), shiftConfigMap);
+        String capacityWarning = checkNewMachineCapacityTimeBased(transferRecords, vo.getNewMachineCode(), newMachine, shiftConfigMap);
         if (capacityWarning != null) {
             if (!Boolean.TRUE.equals(vo.getConfirmed())) {
-                // 首次调用，产能不足时返回提示（不强制拦截），前端弹出确认框
                 AjaxResult result = AjaxResult.success(capacityWarning);
                 result.put("needConfirm", true);
                 return result;
             }
-            // 用户已确认，跳过产能校验继续执行
             log.info("用户已确认转机台，跳过产能校验直接执行");
         }
 
@@ -1153,53 +1220,69 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
-     * 校验新机台是否有足够产能承接转移的计划量
-     * 按每台设备的日产能进行比较
-     * @param maxDayCapacity 机台最大日产能，为 null 时跳过校验
-     * @return 产能不足时返回提示消息，产能充足时返回 null
+     * 校验新机台是否有足够产能承接转移的计划量（按单条胎时间计算）
      */
-    private String checkNewMachineCapacity(List<CxScheduleResult> records, String newMachineCode,
-                                                Integer maxDayCapacity, Map<String, CxShiftConfig> configMap) {
-        if (maxDayCapacity == null) {
-            return null;
+    private String checkNewMachineCapacityTimeBased(List<CxScheduleResult> transferRecords, String newMachineCode,
+                                                     MdmMoldingMachine newMachine, Map<String, CxShiftConfig> configMap) {
+        // 按排程日期分组转移记录
+        Map<Date, List<CxScheduleResult>> recordsByDate = new HashMap<>();
+        for (CxScheduleResult record : transferRecords) {
+            recordsByDate.computeIfAbsent(record.getScheduleDate(), k -> new ArrayList<>()).add(record);
         }
+
+        // 加载产能数据（用第一条记录的工厂编码）
+        String factoryCode = transferRecords.isEmpty() ? null : transferRecords.get(0).getFactoryCode();
+        Object[] capData = loadCapacityData(factoryCode);
+        @SuppressWarnings("unchecked")
+        List<MonthPlanProductLhCapacityVo> capacityList = (List<MonthPlanProductLhCapacityVo>) capData[0];
+        DayVulcanizationModeEnum mode = (DayVulcanizationModeEnum) capData[1];
+        int fallbackDailyLh = newMachine.getMaxDayCapacity() != null ? newMachine.getMaxDayCapacity() : 1;
 
         LocalDateTime now = LocalDateTime.now();
+        BigDecimal shiftTotalSeconds = BigDecimal.valueOf(28800L);
 
-        BigDecimal existingTotal = BigDecimal.ZERO;
-        for (CxScheduleResult record : records) {
-            QueryWrapper<CxScheduleResult> existingQuery = new QueryWrapper<>();
-            existingQuery.eq("SCHEDULE_DATE", record.getScheduleDate());
-            existingQuery.eq("CX_MACHINE_CODE", newMachineCode);
-            List<CxScheduleResult> existingRecords = cxScheduleResultMapper.selectList(existingQuery);
-            for (CxScheduleResult existing : existingRecords) {
-                existingTotal = existingTotal
-                        .add(defaultZero(existing.getClass1PlanQty()))
-                        .add(defaultZero(existing.getClass2PlanQty()))
-                        .add(defaultZero(existing.getClass3PlanQty()))
-                        .add(defaultZero(existing.getClass4PlanQty()))
-                        .add(defaultZero(existing.getClass5PlanQty()))
-                        .add(defaultZero(existing.getClass6PlanQty()))
-                        .add(defaultZero(existing.getClass7PlanQty()))
-                        .add(defaultZero(existing.getClass8PlanQty()));
-            }
-        }
+        for (Map.Entry<Date, List<CxScheduleResult>> entry : recordsByDate.entrySet()) {
+            Date scheduleDate = entry.getKey();
+            List<CxScheduleResult> sameDateRecords = entry.getValue();
 
-        BigDecimal transferTotal = BigDecimal.ZERO;
-        for (CxScheduleResult record : records) {
-            LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
-            for (int i = 1; i <= 8; i++) {
-                if (isShiftTransferable(i, scheduleLocalDate, now, configMap)) {
-                    transferTotal = transferTotal.add(defaultZero(getClassPlanQty(record, i)));
+            // 查询新机台当天已有记录
+            List<CxScheduleResult> existingRecords = cxScheduleResultMapper.selectList(
+                    new LambdaQueryWrapper<CxScheduleResult>()
+                            .eq(CxScheduleResult::getScheduleDate, new java.sql.Date(scheduleDate.getTime()))
+                            .eq(CxScheduleResult::getCxMachineCode, newMachineCode));
+            // 排除正在转移的记录（它们还在旧机台上，不在新机台已有记录中，但为了安全也过滤）
+            BigDecimal[] existingTime = calcShiftTimeConsumed(newMachine, scheduleDate, existingRecords,
+                    capacityList, mode, fallbackDailyLh);
+
+            // 按班次汇总转入计划量的耗时
+            BigDecimal[] transferTime = new BigDecimal[9];
+            for (int i = 1; i <= 8; i++) transferTime[i] = BigDecimal.ZERO;
+            for (CxScheduleResult record : sameDateRecords) {
+                int dailyLh = getDailyLhCapacity(capacityList, mode, record.getMaterialCode(), fallbackDailyLh);
+                BigDecimal singleTireTime = calcSingleTireTime(newMachine, record.getStructureName(), dailyLh);
+                LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
+                for (int i = 1; i <= 8; i++) {
+                    if (isShiftTransferable(i, scheduleLocalDate, now, configMap)) {
+                        BigDecimal planQty = getClassPlanQty(record, i);
+                        if (planQty != null) {
+                            transferTime[i] = transferTime[i].add(planQty.multiply(singleTireTime));
+                        }
+                    }
                 }
             }
-        }
 
-        BigDecimal totalAfterTransfer = existingTotal.add(transferTotal);
-        if (totalAfterTransfer.compareTo(BigDecimal.valueOf(maxDayCapacity)) > 0) {
-            return "新机台(" + newMachineCode + ")产能不足，"
-                    + "现有计划量(" + existingTotal + ")+转入计划量(" + transferTotal + ")="
-                    + totalAfterTransfer + "，超过机台最大日产(" + maxDayCapacity + ")，是否确认转机台？";
+            // 逐班检查
+            for (int i = 1; i <= 8; i++) {
+                BigDecimal totalTime = existingTime[i].add(transferTime[i]);
+                if (totalTime.compareTo(shiftTotalSeconds) > 0) {
+                    return "新机台(" + newMachineCode + ")排程日期"
+                            + DateUtil.formatDate(scheduleDate) + "第" + i + "班次产能不足，"
+                            + "已有耗时(" + existingTime[i].setScale(0, RoundingMode.HALF_UP)
+                            + "s)+转入耗时(" + transferTime[i].setScale(0, RoundingMode.HALF_UP)
+                            + "s)=" + totalTime.setScale(0, RoundingMode.HALF_UP)
+                            + "s，超过每班8h(" + shiftTotalSeconds + "s)，是否确认转机台？";
+                }
+            }
         }
 
         return null;
@@ -1270,6 +1353,121 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         List<CxScheduleResultTemplateImportVO> list = util.importExcel(
                 sheetName, new java.io.ByteArrayInputStream(fileBytes), 0);
         return cxScheduleResultService.importScheduleTemplate(list, scheduleResult, updateSupport, null);
+    }
+
+    /**
+     * 计算机台对指定物料的单条胎耗时（秒）
+     * 1. 从结构-硫化配比表获取该机型+结构的配比
+     * 2. 单条胎耗时(s) = 86400 / (配比 × 日硫化量)
+     */
+    private BigDecimal calcSingleTireTime(MdmMoldingMachine machine, String structureName,
+                                           int dailyLhCapacity) {
+        if (machine == null || structureName == null) {
+            return BigDecimal.valueOf(86400L); // 无法获取配比时默认24h一条
+        }
+        int ratio = 1;
+        MdmStructureLhRatio lhRatio = structureLhRatioMapper.selectOne(
+                new LambdaQueryWrapper<MdmStructureLhRatio>()
+                        .eq(MdmStructureLhRatio::getCxMachineTypeCode, machine.getCxMachineTypeCode())
+                        .eq(MdmStructureLhRatio::getStructureName, structureName));
+        if (lhRatio != null && lhRatio.getLhMachineMaxQty() != null && lhRatio.getLhMachineMaxQty() > 0) {
+            ratio = lhRatio.getLhMachineMaxQty();
+        }
+        if (dailyLhCapacity <= 0) dailyLhCapacity = 1;
+
+        // 单条胎耗时(s) = 86400 / (配比 × 日硫化量)
+        BigDecimal timePerTire = BigDecimal.valueOf(86400L)
+                .divide(BigDecimal.valueOf((long) ratio * dailyLhCapacity), 2, RoundingMode.HALF_UP);
+        log.info("机台{}结构{}单条胎耗时: 配比={}, 日硫化量={}, 耗时={}s",
+                machine.getCxMachineCode(), structureName, ratio, dailyLhCapacity, timePerTire);
+        return timePerTire;
+    }
+
+    /**
+     * 加载工厂的日硫化量数据
+     * @return [capacityList, mode]
+     */
+    private Object[] loadCapacityData(String factoryCode) {
+        List<MonthPlanProductLhCapacityVo> capacityList = null;
+        DayVulcanizationModeEnum mode = DayVulcanizationModeEnum.STANDARD_CAPACITY;
+        if (factoryCode != null) {
+            CxParamConfig modeConfig = cxParamConfigMapper.selectOne(
+                    new LambdaQueryWrapper<CxParamConfig>()
+                            .eq(CxParamConfig::getParamCode, "DAY_VULCANIZATION_MODE")
+                            .eq(CxParamConfig::getIsActive, 1));
+            if (modeConfig != null && modeConfig.getParamValue() != null) {
+                mode = DayVulcanizationModeEnum.getByCode(modeConfig.getParamValue());
+                if (mode == null) mode = DayVulcanizationModeEnum.STANDARD_CAPACITY;
+            }
+            capacityList = monthPlanProductLhCapacityMapper.selectByFactoryCode(factoryCode);
+        }
+        return new Object[]{capacityList, mode};
+    }
+
+    /**
+     * 从产能列表中获取指定物料的日硫化量（按模式计算）
+     */
+    private int getDailyLhCapacity(List<MonthPlanProductLhCapacityVo> capacityList,
+                                    DayVulcanizationModeEnum mode, String materialCode, int fallbackValue) {
+        if (capacityList != null && materialCode != null) {
+            for (MonthPlanProductLhCapacityVo capVo : capacityList) {
+                if (materialCode.equals(capVo.getMaterialCode())) {
+                    capVo.calculateDayVulcanizationQty(mode);
+                    int val = capVo.getDayVulcanizationQty();
+                    if (val > 0) return val;
+                }
+            }
+        }
+        return fallbackValue > 0 ? fallbackValue : 1;
+    }
+
+    /**
+     * 计算机台+日期下的已有记录在各班次的时间占用（秒）
+     * 每个物料按自身的单条胎耗时独立计算
+     */
+    private BigDecimal[] calcShiftTimeConsumed(MdmMoldingMachine machine, Date scheduleDate,
+                                                List<CxScheduleResult> records,
+                                                List<MonthPlanProductLhCapacityVo> capacityList,
+                                                DayVulcanizationModeEnum mode, int fallbackDailyLh) {
+        BigDecimal[] shiftTime = new BigDecimal[9];
+        for (int i = 1; i <= 8; i++) shiftTime[i] = BigDecimal.ZERO;
+        for (CxScheduleResult record : records) {
+            int dailyLh = getDailyLhCapacity(capacityList, mode, record.getMaterialCode(), fallbackDailyLh);
+            BigDecimal singleTireTime = calcSingleTireTime(machine, record.getStructureName(), dailyLh);
+            if (record.getClass1PlanQty() != null) shiftTime[1] = shiftTime[1].add(record.getClass1PlanQty().multiply(singleTireTime));
+            if (record.getClass2PlanQty() != null) shiftTime[2] = shiftTime[2].add(record.getClass2PlanQty().multiply(singleTireTime));
+            if (record.getClass3PlanQty() != null) shiftTime[3] = shiftTime[3].add(record.getClass3PlanQty().multiply(singleTireTime));
+            if (record.getClass4PlanQty() != null) shiftTime[4] = shiftTime[4].add(record.getClass4PlanQty().multiply(singleTireTime));
+            if (record.getClass5PlanQty() != null) shiftTime[5] = shiftTime[5].add(record.getClass5PlanQty().multiply(singleTireTime));
+            if (record.getClass6PlanQty() != null) shiftTime[6] = shiftTime[6].add(record.getClass6PlanQty().multiply(singleTireTime));
+            if (record.getClass7PlanQty() != null) shiftTime[7] = shiftTime[7].add(record.getClass7PlanQty().multiply(singleTireTime));
+            if (record.getClass8PlanQty() != null) shiftTime[8] = shiftTime[8].add(record.getClass8PlanQty().multiply(singleTireTime));
+        }
+        return shiftTime;
+    }
+
+    /**
+     * 校验指定班次的计划量是否超出机台剩余产能
+     * @return 产能不足时返回错误信息，充足时返回 null
+     */
+    private String checkPerShiftCapacity(BigDecimal[] planQtys, BigDecimal[] existingTimeSeconds,
+                                          BigDecimal insertSingleTireTime, String[] shiftNames) {
+        BigDecimal shiftTotalSeconds = BigDecimal.valueOf(28800L);
+        for (int i = 1; i <= 8; i++) {
+            if (planQtys[i] == null) continue;
+            BigDecimal remainingSeconds = shiftTotalSeconds.subtract(existingTimeSeconds[i]);
+            if (remainingSeconds.compareTo(BigDecimal.ZERO) < 0) remainingSeconds = BigDecimal.ZERO;
+            BigDecimal maxInsertQty = BigDecimal.ZERO;
+            if (insertSingleTireTime.compareTo(BigDecimal.ZERO) > 0) {
+                maxInsertQty = remainingSeconds.divide(insertSingleTireTime, 0, RoundingMode.FLOOR);
+            }
+            if (planQtys[i].compareTo(maxInsertQty) > 0) {
+                return shiftNames[i] + "已有耗时(" + existingTimeSeconds[i].setScale(1, RoundingMode.HALF_UP)
+                        + "s)，剩余时间(" + remainingSeconds.setScale(1, RoundingMode.HALF_UP)
+                        + "s)，最多可生产(" + maxInsertQty + ")条，计划量(" + planQtys[i] + ")超出产能";
+            }
+        }
+        return null;
     }
 
 }
