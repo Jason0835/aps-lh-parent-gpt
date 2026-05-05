@@ -776,8 +776,8 @@ export default {
 
         // 尽量从 productinfo 行字段映射到插单需要的字段
         const embryoCode = row.mesMaterialCode || row.embryoCode || val;
-        this.$set(this.form, "embryoCode", embryoCode ? String(embryoCode) : "");
-        this.$set(this.form, "mainMaterialDesc", row.mainMaterialDesc || row.mainMaterialDesc || "");
+        // this.$set(this.form, "embryoCode", embryoCode ? String(embryoCode) : "");
+        // this.$set(this.form, "mainMaterialDesc", row.mainMaterialDesc || row.mainMaterialDesc || "");
         this.$set(this.form, "specDesc", row.specifications || row.specDesc || "");
 
         const dim = row.proSize ?? row.specDimension;
