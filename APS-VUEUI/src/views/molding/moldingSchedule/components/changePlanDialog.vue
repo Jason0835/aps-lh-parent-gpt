@@ -1286,22 +1286,16 @@ export default {
           });
       });
     },
-
-    async save(form) {
-      try {
-        this.loading = true;
-        const params = this.buildAdjustQtyParams(form);
-        const res = await adjustQty(params);
-        this.loading = false;
-        this.$modal.msgSuccess(
-          this.$t("common.msg.ajax.operation.success")
-        );
-        this.$emit("success");
-        this.hide();
-      } catch (error) {
-        console.error(error);
-        this.loading = false;
+    validatePlanQtyByFinishQty() {
+      for (let i = 1; i <= 8; i++) {
+        const planQty = Number(this.form[`class${i}PlanQty`] || 0);
+        const finishQty = Number(this.form[`class${i}FinishQty`] || 0);
+        if (finishQty > 0 && planQty < finishQty) {
+          this.$modal.msgError(`第${i}班次计划量（${planQty}）不能低于已完成量（${finishQty}）`);
+          return false;
+        }
       }
+      return true;
     },
 
     //utils
@@ -1375,6 +1369,9 @@ export default {
     handleConfirm() {
       this.$refs.form.validate((valid) => {
         if (valid) {
+          if (!this.validatePlanQtyByFinishQty()) {
+            return;
+          }
           this.save(this.form);
         }
       });
