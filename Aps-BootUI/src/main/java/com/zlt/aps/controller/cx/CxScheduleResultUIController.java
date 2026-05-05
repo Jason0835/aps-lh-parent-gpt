@@ -11,6 +11,7 @@ import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.cx.vo.CxScheduleImportDTO;
+import com.zlt.aps.cx.vo.ScheduleInsertVo;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -204,7 +205,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @RequiresPermissions("cx:cxScheduleResult:insert")
     @PostMapping("/insertOrder")
     @ResponseBody
-    public AjaxResult insertOrder(@RequestBody com.zlt.aps.cx.vo.ScheduleInsertVo vo) {
+    public AjaxResult insertOrder(@RequestBody ScheduleInsertVo vo) {
         return iCxScheduleResultService.insertOrder(vo);
     }
 
