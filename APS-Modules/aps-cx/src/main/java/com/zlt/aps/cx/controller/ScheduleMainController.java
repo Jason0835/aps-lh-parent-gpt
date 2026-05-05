@@ -554,8 +554,45 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getProductionStatus()), "PRODUCTION_STATUS", queryVO.getProductionStatus());
 		// 发布状态精确查询
 		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getIsRelease()), "IS_RELEASE", queryVO.getIsRelease());
-	}
+    }
 
+    /**
+     * 按排程日期生成班次名称（含日期），便于用户在提示信息中理解
+     * scheduleDate 为 T+2 日（D3日），反推 D1~D3 各天
+     * 例如 scheduleDate=2026-05-20 → 早班(05-18), 中班(05-18), 夜班(05-19), ...
+     */
+    private String[] buildShiftNames(LocalDate scheduleDate) {
+        LocalDate d1 = scheduleDate.minusDays(2);
+        LocalDate d2 = scheduleDate.minusDays(1);
+        LocalDate d3 = scheduleDate;
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("MM-dd");
+        return new String[]{"",
+                "早班(" + d1.format(fmt) + ")",
+                "中班(" + d1.format(fmt) + ")",
+                "夜班(" + d2.format(fmt) + ")",
+                "早班(" + d2.format(fmt) + ")",
+                "中班(" + d2.format(fmt) + ")",
+                "夜班(" + d3.format(fmt) + ")",
+                "早班(" + d3.format(fmt) + ")",
+                "中班(" + d3.format(fmt) + ")"};
+    }
+
+    /**
+     * 将秒数格式化为可读时间（h/min/s）
+     */
+    private String formatSeconds(BigDecimal seconds) {
+        if (seconds == null) return "0s";
+        long totalSecs = seconds.longValue();
+        long hours = totalSecs / 3600;
+        long mins = (totalSecs % 3600) / 60;
+        long secs = totalSecs % 60;
+        if (hours > 0) {
+            return hours + "h" + (mins > 0 ? mins + "min" : "") + (secs > 0 ? secs + "s" : "");
+        } else if (mins > 0) {
+            return mins + "min" + (secs > 0 ? secs + "s" : "");
+        }
+        return secs + "s";
+    }
 
     @Override
     protected String getTypeCode() {
@@ -630,7 +667,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                     record.getClass4PlanQty(), record.getClass5PlanQty(), record.getClass6PlanQty(),
                     record.getClass7PlanQty(), record.getClass8PlanQty()};
             BigDecimal shiftTotalSeconds = BigDecimal.valueOf(28800L);
-            String[] shiftNames = {"", "早班(D1)", "中班(D1)", "夜班(D2)", "早班(D2)", "中班(D2)", "夜班(D3)", "早班(D3)", "中班(D3)"};
+            String[] shiftNames = buildShiftNames(scheduleLocalDate);
             for (int i = 1; i <= 8; i++) {
                 if (newPlanQtys[i] == null || (oldPlanQtys[i] != null && newPlanQtys[i].compareTo(oldPlanQtys[i]) == 0)) continue;
                 // 扣除旧时间，加上新时间
@@ -638,8 +675,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                 BigDecimal newTime = newPlanQtys[i].multiply(singleTireTime);
                 BigDecimal adjustedTotal = existingTime[i].subtract(oldTime).add(newTime);
                 if (adjustedTotal.compareTo(shiftTotalSeconds) > 0) {
-                    return AjaxResult.error("调量失败：" + shiftNames[i] + "调整后总耗时(" + adjustedTotal.setScale(1, RoundingMode.HALF_UP)
-                            + "s)超过每班8h(" + shiftTotalSeconds + "s)");
+                    return AjaxResult.error("调量失败：" + shiftNames[i] + "调整后总耗时(" + formatSeconds(adjustedTotal)
+                            + ")超过每班8h");
                 }
             }
         }
@@ -705,8 +742,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      */
     private AjaxResult validateAdjustQtyShifts(ScheduleAdjustVo vo, CxScheduleResult record,
                                                 LocalDate scheduleLocalDate, LocalDateTime now,
-                                                Map<String, CxShiftConfig> configMap) {
-        String[] shiftNames = {"", "早班(D1)", "中班(D1)", "夜班(D2)", "早班(D2)", "中班(D2)", "夜班(D3)", "早班(D3)", "中班(D3)"};
+                                                 Map<String, CxShiftConfig> configMap) {
+        String[] shiftNames = buildShiftNames(scheduleLocalDate);
 
         BigDecimal[] planQtys = {null, vo.getClass1PlanQty(), vo.getClass2PlanQty(), vo.getClass3PlanQty(),
                 vo.getClass4PlanQty(), vo.getClass5PlanQty(), vo.getClass6PlanQty(),
@@ -909,7 +946,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             BigDecimal[] planQtys = {null, vo.getClass1PlanQty(), vo.getClass2PlanQty(), vo.getClass3PlanQty(),
                     vo.getClass4PlanQty(), vo.getClass5PlanQty(), vo.getClass6PlanQty(),
                     vo.getClass7PlanQty(), vo.getClass8PlanQty()};
-            String[] shiftNames = {"", "早班(D1)", "中班(D1)", "夜班(D2)", "早班(D2)", "中班(D2)", "夜班(D3)", "早班(D3)", "中班(D3)"};
+            String[] shiftNames = buildShiftNames(DateUtil.toLocalDateTime(scheduleDate).toLocalDate());
             String capErr = checkPerShiftCapacity(planQtys, existingTimeSeconds, insertSingleTireTime, shiftNames);
             if (capErr != null) {
                 return AjaxResult.error("插单失败：" + capErr);
@@ -1272,15 +1309,16 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             }
 
             // 逐班检查
+            String[] shiftNames = buildShiftNames(DateUtil.toLocalDateTime(scheduleDate).toLocalDate());
             for (int i = 1; i <= 8; i++) {
                 BigDecimal totalTime = existingTime[i].add(transferTime[i]);
                 if (totalTime.compareTo(shiftTotalSeconds) > 0) {
                     return "新机台(" + newMachineCode + ")排程日期"
-                            + DateUtil.formatDate(scheduleDate) + "第" + i + "班次产能不足，"
-                            + "已有耗时(" + existingTime[i].setScale(0, RoundingMode.HALF_UP)
-                            + "s)+转入耗时(" + transferTime[i].setScale(0, RoundingMode.HALF_UP)
-                            + "s)=" + totalTime.setScale(0, RoundingMode.HALF_UP)
-                            + "s，超过每班8h(" + shiftTotalSeconds + "s)，是否确认转机台？";
+                            + DateUtil.formatDate(scheduleDate) + shiftNames[i] + "产能不足，"
+                            + "已有耗时(" + formatSeconds(existingTime[i])
+                            + ")+转入耗时(" + formatSeconds(transferTime[i])
+                            + ")=" + formatSeconds(totalTime)
+                            + "，超过每班8h，是否确认转机台？";
                 }
             }
         }
@@ -1462,9 +1500,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                 maxInsertQty = remainingSeconds.divide(insertSingleTireTime, 0, RoundingMode.FLOOR);
             }
             if (planQtys[i].compareTo(maxInsertQty) > 0) {
-                return shiftNames[i] + "已有耗时(" + existingTimeSeconds[i].setScale(1, RoundingMode.HALF_UP)
-                        + "s)，剩余时间(" + remainingSeconds.setScale(1, RoundingMode.HALF_UP)
-                        + "s)，最多可生产(" + maxInsertQty + ")条，计划量(" + planQtys[i] + ")超出产能";
+                return shiftNames[i] + "已有耗时(" + formatSeconds(existingTimeSeconds[i])
+                        + ")，剩余时间(" + formatSeconds(remainingSeconds)
+                        + ")，最多可生产(" + maxInsertQty + ")条，计划量(" + planQtys[i] + ")超出产能";
             }
         }
         return null;

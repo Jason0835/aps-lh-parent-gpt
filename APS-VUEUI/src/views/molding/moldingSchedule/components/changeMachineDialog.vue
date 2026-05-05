@@ -310,7 +310,7 @@ export default {
         const res = await changeMachine({ ...params, confirmed: false });
         // 产能不足时需要用户确认后再次调用
         if (res.needConfirm) {
-          await this.$confirm(res.msg, this.$t("ui.frame.btn.warning"), {
+          await this.$confirm(res.msg, this.$t("common.prompt"), {
             confirmButtonText: this.$t("common.button.confirm"),
             cancelButtonText: this.$t("common.button.cancel"),
             type: "warning",
