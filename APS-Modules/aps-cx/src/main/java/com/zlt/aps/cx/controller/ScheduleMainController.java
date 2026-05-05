@@ -851,13 +851,13 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         newRecord.setMainMaterialDesc(vo.getMainMaterialDesc());
 
         // 生成工单号：CXGD + 日期(yyyyMMdd) + 自增序号(3位)
-        // 查询当天已有最大工单号序号，递增生成新工单号
+        // 用工单号前缀 LIKE 匹配当天已有记录，避免 Date 字段比较的精度/时区问题
         String dateStr = DateUtil.format(scheduleDate, "yyyyMMdd");
         String orderNoPrefix = "CXGD" + dateStr;
         int seq = 1;
         List<CxScheduleResult> orderList = cxScheduleResultMapper.selectList(
                 new LambdaQueryWrapper<CxScheduleResult>()
-                        .eq(CxScheduleResult::getScheduleDate, scheduleDate)
+                        .likeRight(CxScheduleResult::getOrderNo, orderNoPrefix)
                         .orderByDesc(CxScheduleResult::getOrderNo));
         if (!orderList.isEmpty()) {
             CxScheduleResult lastRecord = orderList.get(0);
@@ -879,7 +879,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             int batchSeq = 1;
             List<CxScheduleResult> batchList = cxScheduleResultMapper.selectList(
                     new LambdaQueryWrapper<CxScheduleResult>()
-                            .eq(CxScheduleResult::getScheduleDate, scheduleDate)
+                            .likeRight(CxScheduleResult::getCxBatchNo, batchNoPrefix)
                             .orderByDesc(CxScheduleResult::getCxBatchNo));
             if (!batchList.isEmpty()) {
                 CxScheduleResult lastBatchRecord = batchList.get(0);
