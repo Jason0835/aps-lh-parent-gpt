@@ -2,6 +2,7 @@ package com.zlt.aps.cx.service.impl;
 
 import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
@@ -192,6 +193,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
             // 更新库存和硫化余量，供下一个班次排程使用
             updateContextForNextShift(context, shiftResult.getAllAllocations(), singleShiftList, shiftConfig, shiftResult.getShiftProductionResults());
+
+            // 提前检测：剩余成型余量在下一班次会被舍弃（≤2条且非主销），提前在本班次标识
+            detectEarlyAbandonment(context, shiftResult);
 
             lastDay = day;
             processedDays.add(day);
@@ -2301,12 +2305,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     totalDemand += dayVulcanizationQty;
                 }
 
+                if (taskDemands.isEmpty()) {
+                    log.debug("胎胚 {} 所有硫化任务均被过滤，跳过分配", embryoCode);
+                    continue;
+                }
+
                 if (totalDemand == 0) {
                     // 总需求为0，平均分配
-                    if (taskDemands.isEmpty()) {
-                        log.debug("胎胚 {} 对应多个硫化任务但所有任务都被跳过（硫化余量耗尽/计划量为0/日硫化量为0），无法分配库存", embryoCode);
-                        continue;
-                    }
                     int avgStock = totalStock / taskDemands.size();
                     for (TaskDemandSimple td : taskDemands) {
                         materialStockMap.merge(td.taskKey, avgStock, Integer::sum);
@@ -2743,5 +2748,113 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         context.setFormingRemainderMap(newFormingRemainderMap);
         log.info("  formingRemainderMap 重算完成，共 {} 条记录", newFormingRemainderMap.size());
+    }
+
+    /**
+     * 提前检测：当前班次排程后，剩余成型余量在下一班次会被舍弃（非主销+≤2条），
+     * 提前在当前班次结果中标识出来，避免下一班次舍弃时数据丢失。
+     */
+    private void detectEarlyAbandonment(ScheduleContextVo context, ShiftScheduleResult shiftResult) {
+        Map<String, Integer> formingRemainderMap = context.getFormingRemainderMap();
+        if (formingRemainderMap == null || formingRemainderMap.isEmpty()) {
+            return;
+        }
+
+        Set<String> mainProductCodes = context.getMainProductCodes();
+        int discardThreshold = getEndingDiscardThresholdFromContext(context);
+
+        List<MachineAllocationResult> allAllocations = shiftResult.getAllAllocations();
+        if (allAllocations == null || allAllocations.isEmpty()) {
+            return;
+        }
+
+        List<ShiftScheduleService.ShiftProductionResult> productionResults = shiftResult.getShiftProductionResults();
+        if (productionResults == null) {
+            return;
+        }
+
+        for (Map.Entry<String, Integer> entry : formingRemainderMap.entrySet()) {
+            String materialCode = entry.getKey();
+            Integer remainder = entry.getValue();
+            if (remainder == null || remainder <= 0 || remainder > discardThreshold) {
+                continue;
+            }
+            // 主销产品不舍弃
+            if (mainProductCodes != null && mainProductCodes.contains(materialCode)) {
+                continue;
+            }
+
+            // 在当前班次的分配结果中查找该物料对应的任务
+            TaskAllocation foundTask = null;
+            String foundMachineCode = null;
+            for (MachineAllocationResult ma : allAllocations) {
+                if (ma.getTaskAllocations() != null) {
+                    for (TaskAllocation ta : ma.getTaskAllocations()) {
+                        if (materialCode.equals(ta.getMaterialCode())) {
+                            foundTask = ta;
+                            foundMachineCode = ma.getMachineCode();
+                            break;
+                        }
+                    }
+                }
+                if (foundTask != null) {
+                    break;
+                }
+            }
+
+            if (foundTask == null) {
+                log.debug("物料 {} 剩余成型余量={}（≤{}且非主销），但本班次未分配此物料，跳过提前标识",
+                        materialCode, remainder, discardThreshold);
+                continue;
+            }
+
+            // 创建占位记录，标识该物料的剩余余量被舍弃
+            ShiftScheduleService.ShiftProductionResult spr = new ShiftScheduleService.ShiftProductionResult();
+            spr.setMachineCode(foundMachineCode);
+            spr.setEmbryoCode(foundTask.getEmbryoCode());
+            spr.setMaterialCode(materialCode);
+            spr.setMaterialDesc(foundTask.getMaterialDesc());
+            spr.setMainMaterialDesc(foundTask.getMainMaterialDesc());
+            spr.setStructureName(foundTask.getStructureName());
+            spr.setQuantity(0);
+            spr.setIsEndingTask(true);
+            spr.setIsLastEndingBatch(true);
+
+            // 设置 sourceTask 用于 buildTaskAnalysis 构建
+            CoreScheduleAlgorithmService.DailyEmbryoTask sourceTask = new CoreScheduleAlgorithmService.DailyEmbryoTask();
+            sourceTask.setEmbryoCode(foundTask.getEmbryoCode());
+            sourceTask.setMaterialCode(materialCode);
+            sourceTask.setIsEndingTask(true);
+            sourceTask.setIsLastEndingBatch(true);
+            sourceTask.setEndingAbandoned(true);
+            sourceTask.setEndingAbandonedQty(remainder);
+            spr.setSourceTask(sourceTask);
+
+            productionResults.add(spr);
+
+            // 将成型余量设为0，避免未来班次重复处理
+            entry.setValue(0);
+
+            log.info("班次 {} 提前标识舍弃: 物料={}, 胎胚={}, 剩余余量={}条（非主销+≤{}）",
+                    shiftResult.getShiftConfig() != null ? shiftResult.getShiftConfig().getShiftCode() : "未知",
+                    materialCode, foundTask.getEmbryoCode(), remainder, discardThreshold);
+        }
+    }
+
+    /**
+     * 从参数配置中获取收尾舍弃阈值（默认为2）
+     */
+    private int getEndingDiscardThresholdFromContext(ScheduleContextVo context) {
+        if (context.getParamConfigMap() != null) {
+            CxParamConfig config = context.getParamConfigMap().get("ENDING_DISCARD_THRESHOLD");
+            if (config != null && config.getParamValue() != null) {
+                try {
+                    return Integer.parseInt(config.getParamValue());
+                } catch (NumberFormatException e) {
+                    log.warn("解析收尾舍弃阈值配置失败: {}", config.getParamValue());
+                }
+            }
+        }
+        return 2;
     }
 }
