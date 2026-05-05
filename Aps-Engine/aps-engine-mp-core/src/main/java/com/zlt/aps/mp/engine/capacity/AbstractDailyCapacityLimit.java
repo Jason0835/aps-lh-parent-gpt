@@ -307,7 +307,7 @@ public abstract class AbstractDailyCapacityLimit {
             dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
             if (mpFinalVo.getFieldValueByFieldName("materialCode") != null){
                 String materialCode = (String) mpFinalVo.getFieldValueByFieldName("materialCode") ;
-                if (materialCode.equals("3302000465") && iDay == 25){
+                if (materialCode.equals("3302001651") && iDay == 3){
                     System.out.println("materialCode = " + materialCode + ", iDay = " + iDay);
                 }
             }
@@ -601,7 +601,7 @@ public abstract class AbstractDailyCapacityLimit {
             //没有余量，直接退回
             return resultArr;
         }
-        if (mpFinalVo.getFieldValueByFieldName(day1Field) != null){
+        if (mpFinalVo.getFieldValueByFieldName(day1Field) != null && !day1Field.equals(dayField)){
             //例子：
             //108 2
             //54 118 140 108，对于118换模2次（54+32+32）
@@ -612,6 +612,10 @@ public abstract class AbstractDailyCapacityLimit {
             int iDiffValue = dayPlanQty - prePlanQty;
             //解析差异机台数
             analysisDiffMachines(iDiffCount, iDiffValue, changeMouldBlockQty, changeMouldFirstQty, resultArr);
+            if (iDiffCount ==0 && curMachines == 1 && dayPlanQty < dailyLhQty ){
+                //例子：32 	42
+                resultArr[0] = 1;
+            }
             //设置换模次数
             resultArr[2] = iDiffCount;
             return resultArr;
@@ -621,9 +625,11 @@ public abstract class AbstractDailyCapacityLimit {
             //若余数 == 换活字块20条
             resultArr[1] = 1;
             resultArr[2] = 1;
-        }else {
+        }else if (remainQty == changeMouldFirstQty) {
             resultArr[0] = 1;
             resultArr[2] = 1;
+        }else {
+            resultArr[0] = 1;
         }
 
         if (mpFinalVo.getFieldValueByFieldName(day1Field) != null &&
