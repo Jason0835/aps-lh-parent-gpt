@@ -950,6 +950,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         // ==================== 构建最终的 CxScheduleResult 列表 ====================
         List<CxScheduleResult> results = new ArrayList<>();
         LocalDate startDate = context.getScheduleDate();
+        String dateStr = startDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String cxBatchNo = "CXPC" + dateStr;  // 同一批次共用批次号
+        int orderSeq = 0;
 
         for (Map.Entry<String, Map<String, ShiftScheduleService.ShiftProductionResult>> entry : taskClassSprMap.entrySet()) {
             String taskKey = entry.getKey();
@@ -1112,12 +1115,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             result.setProductionStatus("0");
             result.setIsRelease("0");
             result.setDataSource("0");
+            result.setFactoryCode(context.getFactoryCode());
             result.setCreateTime(new Date());
 
             // ---- 成型批次号 & 工单号 ----
-            String dateStr = startDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
-            String cxBatchNo = "CXPC" + dateStr + String.format("%03d", results.size() + 1);
-            String orderNo = "CXGD" + dateStr + String.format("%03d", results.size() + 1);
+            orderSeq++;
+            String orderNo = "CXGD" + dateStr + String.format("%03d", orderSeq);
             result.setCxBatchNo(cxBatchNo);
             result.setOrderNo(orderNo);
 
@@ -1716,10 +1719,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 log.debug("查询示方书类型失败: materialCode={}, embryoNo={}", materialCode, recipeNo);
             }
         }
-        // 兜底：查不到类型时设置为"无"
-        if (recipeType == null) {
-            recipeType = "无";
-        }
+        // 查不到类型时留空
 
         switch (classField) {
             case "CLASS1":
@@ -1963,13 +1963,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         log.info("【步骤2.5】更新胎胚库存表（CxStock），计算新库存...");
         updateCxStockEntities(context, formingOutputMap, vulcanizingConsumptionByEmbryo);
 
-        // 3. 重新按日硫化量比例分配库存给硫化任务（使用更新后的库存）
-        log.info("【步骤3】按日硫化量比例重新分配库存（materialStockMap）...");
-        reallocateStockByDayVulcanizationCapacity(context, dayShifts, scheduleDate);
-
-        // 5. 更新 monthSurplusMap（硫化余量 -= 当天硫化消耗）
-        log.info("【步骤4】更新硫化余量（monthSurplusMap）...");
+        // 4. 先更新硫化余量，确保分配库存时使用最新余量（余量<=0时跳过分配）
+        log.info("【步骤3】更新硫化余量（monthSurplusMap）...");
         updateMonthSurplus(context, vulcanizingConsumptionByMaterial);
+
+        // 3. 重新按日硫化量比例分配库存给硫化任务（使用更新后的库存和硫化余量）
+        log.info("【步骤4】按日硫化量比例重新分配库存（materialStockMap）...");
+        reallocateStockByDayVulcanizationCapacity(context, dayShifts, scheduleDate);
 
         // 6. 重算 formingRemainderMap（成型余量 = 硫化余量 - 库存）
         log.info("【步骤5】重算成型余量（formingRemainderMap）...");

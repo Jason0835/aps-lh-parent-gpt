@@ -56,6 +56,12 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
+    /** 分厂编码 */
+    @Excel(name = "ui.data.column.cxPrecisionPlan.factoryCode", dictType = "biz_factory_name")
+    @ApiModelProperty(value = "分厂编码")
+    @TableField("FACTORY_CODE")
+    private String factoryCode;
+
     @Excel(name = "ui.data.column.cxScheduleResult.cxBatchNo")
     @ApiModelProperty(value = "成型批次号")
     @TableField("CX_BATCH_NO")
