@@ -353,6 +353,11 @@ export default {
           prop: "lhClassQty",
           align: "center",
         },
+        {
+          label: this.$t("备注"),
+          prop: "remark",
+          align: "center",
+        },
         // {
         //   label: this.$t("ui.data.column.scheduleResult.baseInfo"),
         //   visible: true,
