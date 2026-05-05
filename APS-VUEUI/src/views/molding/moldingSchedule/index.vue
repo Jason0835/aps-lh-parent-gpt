@@ -432,6 +432,9 @@ export default {
               prop: "class1RecipeType",
               label: this.$t("示方类型"),
               align: "center",
+              formatter: (row, column, value) => {
+                return this.selectDictLabel(this.dict.type.trial_status, value);
+              },
             },
 
           ],
@@ -466,6 +469,9 @@ export default {
               prop: "class2RecipeType",
               label: this.$t("示方类型"),
               align: "center",
+              formatter: (row, column, value) => {
+                return this.selectDictLabel(this.dict.type.trial_status, value);
+              },
             },
 
           ],
@@ -500,6 +506,9 @@ export default {
               prop: "class3RecipeType",
               label: this.$t("示方类型"),
               align: "center",
+              formatter: (row, column, value) => {
+                return this.selectDictLabel(this.dict.type.trial_status, value);
+              },
             },
 
           ],
@@ -534,6 +543,9 @@ export default {
               prop: "class4RecipeType",
               label: this.$t("示方类型"),
               align: "center",
+              formatter: (row, column, value) => {
+                return this.selectDictLabel(this.dict.type.trial_status, value);
+              },
             },
 
           ],
@@ -568,6 +580,9 @@ export default {
               prop: "class5RecipeType",
               label: this.$t("示方类型"),
               align: "center",
+              formatter: (row, column, value) => {
+                return this.selectDictLabel(this.dict.type.trial_status, value);
+              },
             },
 
           ],
@@ -602,6 +617,9 @@ export default {
               prop: "class6RecipeType",
               label: this.$t("示方类型"),
               align: "center",
+              formatter: (row, column, value) => {
+                return this.selectDictLabel(this.dict.type.trial_status, value);
+              },
             },
 
           ],
@@ -636,6 +654,9 @@ export default {
               prop: "class7RecipeType",
               label: this.$t("示方类型"),
               align: "center",
+              formatter: (row, column, value) => {
+                return this.selectDictLabel(this.dict.type.trial_status, value);
+              },
             },
 
           ],
@@ -670,6 +691,9 @@ export default {
               prop: "class8RecipeType",
               label: this.$t("示方类型"),
               align: "center",
+              formatter: (row, column, value) => {
+                return this.selectDictLabel(this.dict.type.trial_status, value);
+              },
             },
 
           ],
