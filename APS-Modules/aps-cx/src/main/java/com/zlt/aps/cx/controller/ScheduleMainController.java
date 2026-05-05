@@ -843,6 +843,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         // 创建新记录
         CxScheduleResult newRecord = new CxScheduleResult();
         newRecord.setScheduleDate(scheduleDate);
+        newRecord.setFactoryCode(vo.getFactoryCode());
         newRecord.setCxMachineCode(vo.getCxMachineCode());
         newRecord.setCxMachineName(vo.getCxMachineName());
         newRecord.setEmbryoCode(vo.getEmbryoCode());

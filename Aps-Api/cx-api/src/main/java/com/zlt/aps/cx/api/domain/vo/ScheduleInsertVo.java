@@ -18,6 +18,9 @@ public class ScheduleInsertVo {
     @ApiModelProperty(value = "排程日期", required = true)
     private String scheduleDate;
 
+    @ApiModelProperty(value = "工厂编号")
+    private String factoryCode;
+
     @ApiModelProperty(value = "机台编码", required = true)
     private String cxMachineCode;
 
