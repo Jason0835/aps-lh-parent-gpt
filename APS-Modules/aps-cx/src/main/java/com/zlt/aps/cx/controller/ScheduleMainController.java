@@ -1093,13 +1093,25 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             transferRecords.add(record);
         }
 
-        // 产能校验（未确认时检查，已确认时跳过检查直接执行）
-        if (!Boolean.TRUE.equals(vo.getConfirmed())) {
-            AjaxResult capacityCheck = checkNewMachineCapacity(transferRecords, vo.getNewMachineCode(), shiftConfigMap);
-            if (capacityCheck != null) {
-                return capacityCheck;
+        // 校验新机台是否存在
+        MdmMoldingMachine newMachine = moldingMachineMapper.selectOne(
+                new QueryWrapper<MdmMoldingMachine>()
+                        .eq("CX_MACHINE_CODE", vo.getNewMachineCode())
+                        .eq("IS_ACTIVE", 1));
+        if (newMachine == null) {
+            return AjaxResult.error("新机台(" + vo.getNewMachineCode() + ")不存在或未启用");
+        }
+
+        // 产能校验（未确认时返回提示不强制拦截，已确认时跳过直接执行）
+        String capacityWarning = checkNewMachineCapacity(transferRecords, vo.getNewMachineCode(), newMachine.getMaxDayCapacity(), shiftConfigMap);
+        if (capacityWarning != null) {
+            if (!Boolean.TRUE.equals(vo.getConfirmed())) {
+                // 首次调用，产能不足时返回提示（不强制拦截），前端弹出确认框
+                AjaxResult result = AjaxResult.success(capacityWarning);
+                result.put("needConfirm", true);
+                return result;
             }
-        } else {
+            // 用户已确认，跳过产能校验继续执行
             log.info("用户已确认转机台，跳过产能校验直接执行");
         }
 
@@ -1133,18 +1145,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     /**
      * 校验新机台是否有足够产能承接转移的计划量
      * 按每台设备的日产能进行比较
+     * @param maxDayCapacity 机台最大日产能，为 null 时跳过校验
+     * @return 产能不足时返回提示消息，产能充足时返回 null
      */
-    private AjaxResult checkNewMachineCapacity(List<CxScheduleResult> records, String newMachineCode,
-                                                Map<String, CxShiftConfig> configMap) {
-        MdmMoldingMachine newMachine = moldingMachineMapper.selectOne(
-                new QueryWrapper<MdmMoldingMachine>()
-                        .eq("CX_MACHINE_CODE", newMachineCode)
-                        .eq("IS_ACTIVE", 1));
-        if (newMachine == null) {
-            return AjaxResult.error("新机台(" + newMachineCode + ")不存在或未启用");
-        }
-
-        Integer maxDayCapacity = newMachine.getMaxDayCapacity();
+    private String checkNewMachineCapacity(List<CxScheduleResult> records, String newMachineCode,
+                                                Integer maxDayCapacity, Map<String, CxShiftConfig> configMap) {
         if (maxDayCapacity == null) {
             return null;
         }
@@ -1182,9 +1187,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
         BigDecimal totalAfterTransfer = existingTotal.add(transferTotal);
         if (totalAfterTransfer.compareTo(BigDecimal.valueOf(maxDayCapacity)) > 0) {
-            return AjaxResult.error("新机台(" + newMachineCode + ")产能不足，"
+            return "新机台(" + newMachineCode + ")产能不足，"
                     + "现有计划量(" + existingTotal + ")+转入计划量(" + transferTotal + ")="
-                    + totalAfterTransfer + "，超过机台最大日产(" + maxDayCapacity + ")，是否确认转机台？");
+                    + totalAfterTransfer + "，超过机台最大日产(" + maxDayCapacity + ")，是否确认转机台？";
         }
 
         return null;

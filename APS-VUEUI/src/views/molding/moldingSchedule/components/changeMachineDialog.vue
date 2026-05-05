@@ -301,11 +301,23 @@ export default {
       }
       try {
         this.loading = true;
-        await changeMachine({
+        const params = {
           ids: this.selection.map((row) => row.id),
           newMachineCode: this.form.newCxMachineCode,
           newMachineName: this.getMachineName(this.form.newCxMachineCode),
-        });
+        };
+        // 第一次调用：校验产能（confirmed=false）
+        const res = await changeMachine({ ...params, confirmed: false });
+        // 产能不足时需要用户确认后再次调用
+        if (res.needConfirm) {
+          await this.$confirm(res.msg, this.$t("ui.frame.btn.warning"), {
+            confirmButtonText: this.$t("common.button.confirm"),
+            cancelButtonText: this.$t("common.button.cancel"),
+            type: "warning",
+          });
+          // 用户确认后，第二次调用：正式执行（confirmed=true）
+          await changeMachine({ ...params, confirmed: true });
+        }
         this.$modal.msgSuccess(this.$t("common.msg.ajax.operation.success"));
         this.$emit("success");
         this.hide();
