@@ -287,7 +287,9 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
 
         for (int i = 1; i <= 8; i++) {
             // 前端未传值 或 值未变化（前端置灰未修改）→ 跳过校验
-            if (newPlanQtys[i] == null || newPlanQtys[i].equals(origPlans[i])) {
+            // 用 compareTo 代替 equals，避免 BigDecimal 精度/scale 差异导致误判
+            if (newPlanQtys[i] == null
+                    || (origPlans[i] != null && newPlanQtys[i].compareTo(origPlans[i]) == 0)) {
                 continue;
             }
             if (isShiftPast(i, scheduleLocalDate, now, shiftConfigMap)) {
