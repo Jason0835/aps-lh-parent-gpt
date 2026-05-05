@@ -788,9 +788,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         Date scheduleDate = DateUtil.parse(vo.getScheduleDate());
 
         // 校验唯一性：排程日期 + 机台编号 + 胎胚编号 + 物料编码
-        // 使用 LambdaQueryWrapper 避免 SQL NULL 比较问题（= null 永远匹配不到 IS NULL 的行）
+        // 转为 java.sql.Date 避免 java.util.Date 精度/时区导致 = 比较失败
         LambdaQueryWrapper<CxScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(CxScheduleResult::getScheduleDate, scheduleDate);
+        queryWrapper.eq(CxScheduleResult::getScheduleDate, new java.sql.Date(scheduleDate.getTime()));
         queryWrapper.eq(CxScheduleResult::getCxMachineCode, vo.getCxMachineCode());
         queryWrapper.eq(CxScheduleResult::getEmbryoCode, vo.getEmbryoCode());
         if (vo.getMaterialCode() != null && !vo.getMaterialCode().isEmpty()) {
