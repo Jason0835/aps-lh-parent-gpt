@@ -40,6 +40,21 @@
 
           <el-col :span="12">
             <el-form-item
+              :label="$t('common.factory')"
+              prop="factoryCode"
+            >
+              <dict-select
+                style="width: 100%"
+                v-model="form.factoryCode"
+                :options="parentDict.type.biz_factory_name"
+                filterable
+                clearable
+              />
+            </el-form-item>
+          </el-col>
+
+          <el-col :span="12">
+            <el-form-item
               :label="$t('ui.data.column.cxScheduleResult.cxMachineCode')"
               prop="cxMachineCode"
             >
@@ -816,6 +831,7 @@ export default {
       this.form = {
         scheduleDate,
 
+        factoryCode: "116",
         cxMachineCode: "",
         cxMachineName: "",
         cxBatchNo: "",
