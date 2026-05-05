@@ -28,4 +28,11 @@ public interface MpMonthPlanMonitorEntityMapper extends CommBaseMapper<MpMonthPl
      * @return
      */
     List<MpMonthPlanMonitor> listReport(MpMonthPlanMonitor queryVo);
+    
+    /**
+     * 更新监控表完成量
+     * @param queryVo
+     * @return
+     */
+    int updateByDayFinish(MpMonthPlanMonitor paramVo);
 }

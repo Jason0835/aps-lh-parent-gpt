@@ -115,6 +115,9 @@ public class MesItfServiceImpl implements MesItfService {
     @Autowired
     private ScmItfService scmItfService;
 
+    @Autowired
+    private MpMonthPlanMonitorEntityMapper mpMonthPlanMonitorEntityMapper;
+
     /**
      * 同步SKU与模具关系
      *
@@ -1591,10 +1594,11 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncLhScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
+        Date nowDate = DateUtils.truncate(DateUtils.getNowDate(), Calendar.DATE); // 当日0点
+        Date lastDate = DateUtils.addDays(nowDate, -1);
         if (StringUtils.isEmpty(syncDataLogs.getDataVersion())) { // 如果没有数据版本，则取完成日期为上一天的数据
             syncDataLogs.setQueryParams(new HashMap<>());
-            Date nowDate = DateUtils.truncate(DateUtils.getNowDate(), Calendar.DATE); // 当日0点
-            syncDataLogs.getQueryParams().put("finishDate", DateUtils.addDays(nowDate, -1)); // 取上一天的日期
+            syncDataLogs.getQueryParams().put("finishDate", lastDate); // 取上一天的日期
         }
         List<LhDayFinishQty> syncList = mesItfMapper.selectLhScheDayFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
@@ -1644,6 +1648,17 @@ public class MesItfServiceImpl implements MesItfService {
             List<List<LhDayFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
             for (List<LhDayFinishQty> saveList : splitList) {
                 lhMesSyncRemoteService.saveDayFinishQtyBatch(saveList);
+            }
+
+            try {
+                MpMonthPlanMonitor paramVo = new MpMonthPlanMonitor();
+                paramVo.setFactoryCode(syncDataLogs.getFactoryCode());
+                paramVo.setYear(DateUtils.getYear(lastDate));
+                paramVo.setMonth(DateUtils.getMonth(lastDate));
+                DynamicDataSourceContextHolder.push(DataSource.APS);
+                mpMonthPlanMonitorEntityMapper.updateByDayFinish(paramVo);
+            } finally {
+                DynamicDataSourceContextHolder.poll();
             }
         }
         return AjaxResult.success();

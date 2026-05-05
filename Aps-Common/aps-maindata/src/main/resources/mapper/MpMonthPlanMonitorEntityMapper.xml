@@ -76,4 +76,35 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			   v.YEAR_MONTH,
 		       r.CX_MACHINE_CODE
     </select>
+    
+    <update id="updateByDayFinish">
+        UPDATE T_MP_MONTH_PLAN_MONITOR t
+		INNER JOIN (
+		    SELECT
+		        f.MATERIAL_CODE,
+		        f.production_version,
+		        sum( q.DAY_FINISH_QTY ) production_qty 
+		    FROM
+		        T_MP_MONTH_PLAN_PROD_FINAL f
+		        INNER JOIN t_lh_day_finish_qty q ON f.FACTORY_CODE = q.FACTORY_CODE 
+		        AND f.MATERIAL_CODE = q.MATERIAL_CODE 
+		        AND q.FINISH_DATE BETWEEN concat( #{year}, '-', #{month}, '-1' ) 
+		        AND DATE_SUB( DATE_ADD( concat( #{year}, '-', #{month}, '-1' ), INTERVAL 1 MONTH ), INTERVAL 1 DAY ) 
+		    WHERE
+		        f.IS_DELETE = 0 
+		        AND f.FACTORY_CODE = #{factoryCode}
+		        AND f.YEAR = #{year} 
+		        AND f.MONTH = #{month} 
+		    GROUP BY
+		        f.MATERIAL_CODE,
+		        f.production_version 
+		    ) f ON f.production_version = t.production_version 
+		    AND f.MATERIAL_CODE = t.MATERIAL_CODE 
+		    SET t.PRODUCTION_QTY = f.production_qty 
+		WHERE
+		    t.is_delete = 0 
+		    AND t.FACTORY_CODE = #{factoryCode}
+		    AND t.YEAR = #{year} 
+		    AND t.MONTH = #{month}
+    </update>
 </mapper>
