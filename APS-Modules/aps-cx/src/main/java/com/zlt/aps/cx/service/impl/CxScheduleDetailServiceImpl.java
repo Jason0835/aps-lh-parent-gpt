@@ -275,6 +275,10 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
         BigDecimal[] newPlanQtys = {null, vo.getClass1PlanQty(), vo.getClass2PlanQty(), vo.getClass3PlanQty(),
                 vo.getClass4PlanQty(), vo.getClass5PlanQty(), vo.getClass6PlanQty(),
                 vo.getClass7PlanQty(), vo.getClass8PlanQty()};
+        // 明细表原始值，用于判断用户是否实际修改
+        BigDecimal[] origPlans = {null, detail.getClass1PlanQty(), detail.getClass2PlanQty(), detail.getClass3PlanQty(),
+                detail.getClass4PlanQty(), detail.getClass5PlanQty(), detail.getClass6PlanQty(),
+                detail.getClass7PlanQty(), detail.getClass8PlanQty()};
         BigDecimal[] finishQtys = {null, main.getClass1FinishQty(), main.getClass2FinishQty(),
                 main.getClass3FinishQty(), main.getClass4FinishQty(), main.getClass5FinishQty(),
                 main.getClass6FinishQty(), main.getClass7FinishQty(), main.getClass8FinishQty()};
@@ -282,7 +286,8 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
                 "五班(中班D2)", "六班(夜班D3)", "七班(早班D3)", "八班(中班D3)"};
 
         for (int i = 1; i <= 8; i++) {
-            if (newPlanQtys[i] == null) {
+            // 前端未传值 或 值未变化（前端置灰未修改）→ 跳过校验
+            if (newPlanQtys[i] == null || newPlanQtys[i].equals(origPlans[i])) {
                 continue;
             }
             if (isShiftPast(i, scheduleLocalDate, now, shiftConfigMap)) {

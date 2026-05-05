@@ -651,12 +651,17 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         BigDecimal[] planQtys = {null, vo.getClass1PlanQty(), vo.getClass2PlanQty(), vo.getClass3PlanQty(),
                 vo.getClass4PlanQty(), vo.getClass5PlanQty(), vo.getClass6PlanQty(),
                 vo.getClass7PlanQty(), vo.getClass8PlanQty()};
+        // 原始数据库值，用于判断用户是否实际修改
+        BigDecimal[] origPlans = {null, record.getClass1PlanQty(), record.getClass2PlanQty(), record.getClass3PlanQty(),
+                record.getClass4PlanQty(), record.getClass5PlanQty(), record.getClass6PlanQty(),
+                record.getClass7PlanQty(), record.getClass8PlanQty()};
         BigDecimal[] finishQtys = {null, record.getClass1FinishQty(), record.getClass2FinishQty(),
                 record.getClass3FinishQty(), record.getClass4FinishQty(), record.getClass5FinishQty(),
                 record.getClass6FinishQty(), record.getClass7FinishQty(), record.getClass8FinishQty()};
 
         for (int i = 1; i <= 8; i++) {
-            if (planQtys[i] == null) {
+            // 前端未传值 或 值未变化（前端置灰未修改）→ 跳过校验
+            if (planQtys[i] == null || planQtys[i].equals(origPlans[i])) {
                 continue;
             }
 
