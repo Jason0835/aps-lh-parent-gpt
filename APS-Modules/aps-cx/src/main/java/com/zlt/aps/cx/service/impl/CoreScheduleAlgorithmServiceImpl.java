@@ -2303,6 +2303,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
                 if (totalDemand == 0) {
                     // 总需求为0，平均分配
+                    if (taskDemands.isEmpty()) {
+                        log.debug("胎胚 {} 对应多个硫化任务但所有任务都被跳过（硫化余量耗尽/计划量为0/日硫化量为0），无法分配库存", embryoCode);
+                        continue;
+                    }
                     int avgStock = totalStock / taskDemands.size();
                     for (TaskDemandSimple td : taskDemands) {
                         materialStockMap.merge(td.taskKey, avgStock, Integer::sum);
