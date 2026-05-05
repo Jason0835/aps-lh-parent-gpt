@@ -421,11 +421,18 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         // ==================== 周日不安排试制/量试 ====================
         LocalDate scheduleDate = context.getCurrentScheduleDate();
         if (scheduleDate != null && scheduleDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
-            log.info("周日不安排试制/量试，移除全部试制任务和量试任务: 试制{}个, 量试{}个",
-                    taskGroup.getTrialTasks().size(),
-                    taskGroup.getNewTasks().stream().filter(t -> Boolean.TRUE.equals(t.getIsProductionTrial())).count());
+            int continueTrialCount = (int) taskGroup.getContinueTasks().stream()
+                    .filter(t -> Boolean.TRUE.equals(t.getIsTrialTask()) || Boolean.TRUE.equals(t.getIsProductionTrial()))
+                    .count();
+            int trialCount = taskGroup.getTrialTasks().size();
+            int productionTrialCount = (int) taskGroup.getNewTasks().stream()
+                    .filter(t -> Boolean.TRUE.equals(t.getIsProductionTrial())).count();
+            log.info("周日不安排试制/量试，移除全部试制任务和量试任务: 试制{}个, 量试{}个, 续作试制{}个",
+                    trialCount, productionTrialCount, continueTrialCount);
             taskGroup.getTrialTasks().clear();
             taskGroup.getNewTasks().removeIf(t -> Boolean.TRUE.equals(t.getIsProductionTrial()));
+            taskGroup.getContinueTasks().removeIf(t ->
+                    Boolean.TRUE.equals(t.getIsTrialTask()) || Boolean.TRUE.equals(t.getIsProductionTrial()));
             return;
         }
 
