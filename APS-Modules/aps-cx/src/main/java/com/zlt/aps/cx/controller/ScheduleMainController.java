@@ -854,18 +854,19 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         // 查询当天已有最大工单号序号，递增生成新工单号
         String dateStr = DateUtil.format(scheduleDate, "yyyyMMdd");
         String orderNoPrefix = "CXGD" + dateStr;
-        LambdaQueryWrapper<CxScheduleResult> maxOrderNoQuery = new LambdaQueryWrapper<>();
-        maxOrderNoQuery.eq(CxScheduleResult::getScheduleDate, scheduleDate)
-                .orderByDesc(CxScheduleResult::getOrderNo)
-                .last("LIMIT 1");
-        CxScheduleResult lastRecord = cxScheduleResultMapper.selectOne(maxOrderNoQuery);
         int seq = 1;
-        if (lastRecord != null && lastRecord.getOrderNo() != null
-                && lastRecord.getOrderNo().startsWith(orderNoPrefix)) {
-            try {
-                seq = Integer.parseInt(lastRecord.getOrderNo().substring(orderNoPrefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("解析工单号序号失败，使用默认序号1：{}", lastRecord.getOrderNo());
+        List<CxScheduleResult> orderList = cxScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<CxScheduleResult>()
+                        .eq(CxScheduleResult::getScheduleDate, scheduleDate)
+                        .orderByDesc(CxScheduleResult::getOrderNo));
+        if (!orderList.isEmpty()) {
+            CxScheduleResult lastRecord = orderList.get(0);
+            if (lastRecord.getOrderNo() != null && lastRecord.getOrderNo().startsWith(orderNoPrefix)) {
+                try {
+                    seq = Integer.parseInt(lastRecord.getOrderNo().substring(orderNoPrefix.length())) + 1;
+                } catch (NumberFormatException e) {
+                    log.warn("解析工单号序号失败，使用默认序号1：{}", lastRecord.getOrderNo());
+                }
             }
         }
         newRecord.setOrderNo(orderNoPrefix + String.format("%03d", seq));
@@ -875,18 +876,19 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             newRecord.setCxBatchNo(vo.getCxBatchNo());
         } else {
             String batchNoPrefix = "CXPC" + dateStr;
-            LambdaQueryWrapper<CxScheduleResult> maxBatchNoQuery = new LambdaQueryWrapper<>();
-            maxBatchNoQuery.eq(CxScheduleResult::getScheduleDate, scheduleDate)
-                    .orderByDesc(CxScheduleResult::getCxBatchNo)
-                    .last("LIMIT 1");
-            CxScheduleResult lastBatchRecord = cxScheduleResultMapper.selectOne(maxBatchNoQuery);
             int batchSeq = 1;
-            if (lastBatchRecord != null && lastBatchRecord.getCxBatchNo() != null
-                    && lastBatchRecord.getCxBatchNo().startsWith(batchNoPrefix)) {
-                try {
-                    batchSeq = Integer.parseInt(lastBatchRecord.getCxBatchNo().substring(batchNoPrefix.length())) + 1;
-                } catch (NumberFormatException e) {
-                    log.warn("解析批次号序号失败，使用默认序号1：{}", lastBatchRecord.getCxBatchNo());
+            List<CxScheduleResult> batchList = cxScheduleResultMapper.selectList(
+                    new LambdaQueryWrapper<CxScheduleResult>()
+                            .eq(CxScheduleResult::getScheduleDate, scheduleDate)
+                            .orderByDesc(CxScheduleResult::getCxBatchNo));
+            if (!batchList.isEmpty()) {
+                CxScheduleResult lastBatchRecord = batchList.get(0);
+                if (lastBatchRecord.getCxBatchNo() != null && lastBatchRecord.getCxBatchNo().startsWith(batchNoPrefix)) {
+                    try {
+                        batchSeq = Integer.parseInt(lastBatchRecord.getCxBatchNo().substring(batchNoPrefix.length())) + 1;
+                    } catch (NumberFormatException e) {
+                        log.warn("解析批次号序号失败，使用默认序号1：{}", lastBatchRecord.getCxBatchNo());
+                    }
                 }
             }
             newRecord.setCxBatchNo(batchNoPrefix + String.format("%03d", batchSeq));
