@@ -151,6 +151,7 @@
                 class="w100"
                 v-model="form.class1PlanQty"
                 :min="0"
+                :disabled="isClassPast(1)"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -220,6 +221,7 @@
                 class="w100"
                 v-model="form.class2PlanQty"
                 :min="0"
+                :disabled="isClassPast(2)"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -289,6 +291,7 @@
                 class="w100"
                 v-model="form.class3PlanQty"
                 :min="0"
+                :disabled="isClassPast(3)"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -358,6 +361,7 @@
                 class="w100"
                 v-model="form.class4PlanQty"
                 :min="0"
+                :disabled="isClassPast(4)"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -427,6 +431,7 @@
                 class="w100"
                 v-model="form.class5PlanQty"
                 :min="0"
+                :disabled="isClassPast(5)"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -496,6 +501,7 @@
                 class="w100"
                 v-model="form.class6PlanQty"
                 :min="0"
+                :disabled="isClassPast(6)"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -565,6 +571,7 @@
                 class="w100"
                 v-model="form.class7PlanQty"
                 :min="0"
+                :disabled="isClassPast(7)"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -634,6 +641,7 @@
                 class="w100"
                 v-model="form.class8PlanQty"
                 :min="0"
+                :disabled="isClassPast(8)"
                 controls-position="right"
               ></el-input-number>
             </el-form-item>
@@ -740,6 +748,31 @@ export default {
     getShiftDateByIndex(shiftIndex) {
       // 跟 moldingSchedule/index.vue 一致：直接使用接口返回的 shiftDate 展示
       return this.dateList?.[shiftIndex]?.shiftDate || "";
+    },
+    /**
+     * 判断班次是否已过（插单时置灰不可输入）
+     * scheduleDate 为 T+2 日，CLASS1~8 分别对应 D1早~D3中
+     */
+    isClassPast(classIndex) {
+      if (!this.form.scheduleDate) return false;
+      const scheduleDate = moment(this.form.scheduleDate, "YYYY-MM-DD");
+      if (!scheduleDate.isValid()) return false;
+      const now = moment();
+      // 各班的结束时间（时:分）
+      const shifts = {
+        1: { dayOffset: -2, hour: 14, min: 0 },   // D1早班
+        2: { dayOffset: -2, hour: 22, min: 0 },   // D1中班
+        3: { dayOffset: -1, hour: 6, min: 0 },    // D2夜班
+        4: { dayOffset: -1, hour: 14, min: 0 },   // D2早班
+        5: { dayOffset: -1, hour: 22, min: 0 },   // D2中班
+        6: { dayOffset: 0, hour: 6, min: 0 },     // D3夜班
+        7: { dayOffset: 0, hour: 14, min: 0 },    // D3早班
+        8: { dayOffset: 0, hour: 22, min: 0 },    // D3中班
+      };
+      const s = shifts[classIndex];
+      if (!s) return false;
+      const end = scheduleDate.clone().add(s.dayOffset, "days").hour(s.hour).minute(s.min).second(0);
+      return now.isSameOrAfter(end);
     },
     formatShiftDate(date) {
       if (!date) return "";
