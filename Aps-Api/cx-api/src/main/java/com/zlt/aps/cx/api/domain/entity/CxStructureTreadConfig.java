@@ -38,6 +38,18 @@ public class CxStructureTreadConfig extends BaseEntity implements Serializable {
     @TableField(value = "STRUCTURE_CODE")
     private String structureCode;
 
+    /** 胎胚编码 */
+    @ApiModelProperty(value = "胎胚编码")
+    @Excel(name = "ui.data.column.cxStructureTreadConfig.embryoCode")
+    @TableField(value = "EMBRYO_CODE")
+    private String embryoCode;
+
+    /** 胎胚描述 */
+    @ApiModelProperty(value = "胎胚描述")
+    @Excel(name = "ui.data.column.cxStructureTreadConfig.mainMaterialDesc", width = 60, align = Excel.Align.LEFT)
+    @TableField(value = "MAIN_MATERIAL_DESC")
+    private String mainMaterialDesc;
+
     @ApiModelProperty(value = "整车胎面(条)")
     @Excel(name = "ui.data.column.cxStructureTreadConfig.treadCount")
     @ImportExcelValidated(required = true,digits=true)

@@ -52,4 +52,11 @@ public interface MdmSkuStructureRefEntityMapper extends CommBaseMapper<MdmSkuStr
      * @return 结果
      */
     int insertMainMaterialDesc4SkuConstructionRef(MdmSkuConstructionRef queryVO);
+
+    /**
+     * 查询结构选择列表（带描述）
+     * @param queryVO
+     * @return
+     */
+    List<MdmSkuStructureRef> getStructureSelectWithDescList(MdmSkuStructureRef queryVO);
 }

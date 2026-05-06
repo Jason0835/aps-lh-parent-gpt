@@ -27,9 +27,9 @@
         <el-button type="danger" v-hasPermi="['cx:cxStructureTreadConfig:remove']" :disabled="selection.length === 0" @click="handleDelete">
           {{ $t('ui.frame.btn.delete') }}
         </el-button>
-        <el-button v-hasPermi="['cx:cxStructureTreadConfig:import']" @click="$refs.uploadRef.handleImport()">
-          {{ $t('ui.frame.btn.import') }}
-        </el-button>
+<!--        <el-button v-hasPermi="['cx:cxStructureTreadConfig:import']" @click="$refs.uploadRef.handleImport()">-->
+<!--          {{ $t('ui.frame.btn.import') }}-->
+<!--        </el-button>-->
         <el-button v-hasPermi="['cx:cxStructureTreadConfig:export']" @click="handleExport">
           {{ $t('ui.frame.btn.export') }}
         </el-button>
@@ -53,11 +53,11 @@ import { downloadLink } from '@/utils/request'
 import { listCxStructureTreadConfig, removeCxStructureTreadConfig } from '@/api/cx/cxStructureTreadConfig'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import infoDialog from './components/infoDialog.vue'
-import { mapGetters } from 'vuex'
+import structureSelectWithDesc from '@/views/components/structureSelectWithDesc.vue'
 
 export default {
   name: 'CxStructureTreadConfig',
-  components: { TltUploadForm, infoDialog },
+  components: { TltUploadForm, infoDialog, structureSelectWithDesc },
   dicts: ['biz_factory_name'],
   provide() {
     return { parentDict: this.dict }
@@ -87,7 +87,6 @@ export default {
     }
   },
   computed: {
-    ...mapGetters('globalList', ['structureList']),
     searchColumns() {
       return [
         {
@@ -101,9 +100,26 @@ export default {
         {
           prop: 'structureCode',
           label: this.$t('ui.data.column.cxStructureTreadConfig.structureCode'),
-          type: 'select',
-          dictData: this.structureList,
-          filterable: true,
+          render: (form) => {
+            return (
+              <structureSelectWithDesc
+                key={`${form.factoryCode || ''}-${form.structureCode || ''}`}
+                factoryCode={form.factoryCode}
+                v-model={form.structureCode}
+                onChange={(value) => this.handleSearchStructureChange(form, value)}
+                onClear={() => this.handleSearchStructureClear(form)}
+              />
+            )
+          }
+        },
+        {
+          prop: 'embryoCode',
+          label: this.$t('ui.data.column.cxStructureTreadConfig.embryoCode'),
+          clearable: true
+        },
+        {
+          prop: 'mainMaterialDesc',
+          label: this.$t('ui.data.column.cxStructureTreadConfig.mainMaterialDesc'),
           clearable: true
         }
       ]
@@ -127,6 +143,20 @@ export default {
           halign: 'center',
           label: this.$t('ui.data.column.cxStructureTreadConfig.structureCode'),
           minWidth: 140
+        },
+        {
+          prop: 'embryoCode',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxStructureTreadConfig.embryoCode'),
+          minWidth: 140
+        },
+        {
+          prop: 'mainMaterialDesc',
+          align: 'left',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxStructureTreadConfig.mainMaterialDesc'),
+          minWidth: 250
         },
         {
           prop: 'treadCount',
@@ -226,6 +256,12 @@ export default {
     },
     handleSelectionChange(rows) {
       this.selection = rows
+    },
+    handleSearchStructureChange(form, value) {
+      this.$set(form, 'structureCode', value)
+    },
+    handleSearchStructureClear(form) {
+      this.$set(form, 'structureCode', undefined)
     },
     formatParams(hasPage = true) {
       const params = {

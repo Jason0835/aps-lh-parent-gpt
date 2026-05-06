@@ -27,6 +27,32 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                  LEFT JOIN T_MDM_MATERIAL_INFO b ON a.MATERIAL_CODE = b.MATERIAL_CODE
             ${ew.customSqlSegment}
     </select>
+    <select id="getStructureSelectWithDescList"
+            resultType="com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef">
+        SELECT DISTINCT
+        TMSSR.STRUCTURE_NAME,
+        TMSSR.MAIN_MATERIAL_DESC,
+        tmi.EMBRYO_CODE
+        FROM
+        T_MDM_SKU_STRUCTURE_REF TMSSR
+        LEFT JOIN T_MDM_MATERIAL_INFO tmi ON tmi.EMBRYO_DESC = TMSSR.MAIN_MATERIAL_DESC
+        WHERE
+        TMSSR.IS_DELETE = 0 AND TMSSR.STRUCTURE_NAME IS NOT NULL
+        <if test="factoryCode != null and factoryCode != ''">AND TMSSR.FACTORY_CODE = #{factoryCode}</if>
+        <if test="materialCode != null and materialCode != ''">AND TMSSR.MATERIAL_CODE = #{materialCode}</if>
+        <if test="mainMaterialDesc != null and mainMaterialDesc != ''">AND TMSSR.MAIN_MATERIAL_DESC LIKE
+            concat(concat('%',#{mainMaterialDesc}), '%')
+        </if>
+        <if test="embryoCode != null and embryoCode != ''">AND tmi.EMBRYO_CODE LIKE
+            concat(concat('%',#{embryoCode}), '%')
+        </if>
+        <if test="structureName != null and structureName != ''">AND TMSSR.STRUCTURE_NAME like
+            concat(concat('%',#{structureName}), '%')
+        </if>
+        GROUP BY TMSSR.STRUCTURE_NAME,
+        TMSSR.MAIN_MATERIAL_DESC,
+        tmi.EMBRYO_CODE
+    </select>
 
     <update id="updateStructureToMaterial">
         UPDATE T_MDM_MATERIAL_INFO t1

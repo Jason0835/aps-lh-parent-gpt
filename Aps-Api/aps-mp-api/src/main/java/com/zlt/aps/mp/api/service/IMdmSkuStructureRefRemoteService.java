@@ -101,4 +101,11 @@ public interface IMdmSkuStructureRefRemoteService {
     @ApiOperation("更新结构到物料表")
     @PostMapping("/mdmSkuStructureRef/updateStructureToMaterial")
     public AjaxResult updateStructureToMaterial(@RequestBody MdmSkuStructureRef queryVO);
+
+    /**
+     * 获取结构选择列表（带胎胚描述）
+     */
+    @ApiOperation("查询结构选择列表")
+    @PostMapping("/mdmSkuStructureRef/getStructureSelectWithDescList")
+    TableDataInfo getStructureSelectWithDescList(MdmSkuStructureRef queryVO);
 }

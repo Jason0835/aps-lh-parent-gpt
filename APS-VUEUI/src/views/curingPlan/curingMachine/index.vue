@@ -164,15 +164,11 @@ export default {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",
           minWidth: 150,
-          // width: 150,
-          // sortable: "custom",
         },
         {
-          label: this.$t("ui.data.column.machine.machineName"),
-          prop: "machineName",
+          label: this.$t("ui.data.column.machine.manufacturer"),
+          prop: "manufacturer",
           minWidth: 100,
-          width: 180,
-          // sortable: "custom",
         },
         {
           label: this.$t("ui.data.column.machine.lhMachineType"),
@@ -181,102 +177,82 @@ export default {
             return this.selectDictLabel(this.dict.type.LH_MACHINE_TYPE, value);
           },
         },
-        // {
-        //   label: this.$t("ui.data.column.machine.dimension"),
-        //   prop: "dimension",
-        //   minWidth: 100,
-        //   // sortable: "custom",
-        // },
+        {
+          label: this.$t("ui.data.column.machine.dimensionSize"),
+          prop: "dimensionSize",
+          minWidth: 100,
+        },
+        {
+          label: this.$t("ui.data.column.machine.hotPlateDiameter"),
+          prop: "hotPlateDiameter",
+          minWidth: 100,
+        },
+        {
+          label: this.$t("ui.data.column.machine.mouldSetCode"),
+          prop: "mouldSetCode",
+          minWidth: 100,
+        },
         {
           label: this.$t("ui.data.column.machine.dimensionMinmum"),
           prop: "dimensionMinimum",
           minWidth: 100,
-          // sortable: "custom",
         },
         {
           label: this.$t("ui.data.column.machine.dimensionMaximum"),
           prop: "dimensionMaximum",
           minWidth: 100,
-          // sortable: "custom",
         },
-        // {
-        //   label: this.$t("ui.data.column.machine.centripetalMechanism"),
-        //   prop: "centripetalMechanism",
-        //   minWidth: 100,
-        //   // sortable: "custom",
-        //   formatter: (row) => {
-        //     return this.selectDictLabel(
-        //       this.dict.type.CENTRIPETAL_MECHANISM,
-        //       row.centripetalMechanism
-        //     );
-        //   },
-        // },
+        {
+          label: this.$t("ui.data.column.machine.support195WideBase"),
+          prop: "support195WideBase",
+          minWidth: 120,
+          formatter: (row) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, row.support195WideBase);
+          },
+        },
+        {
+          label: this.$t("ui.data.column.machine.support225WideBase"),
+          prop: "support225WideBase",
+          minWidth: 120,
+          formatter: (row) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, row.support225WideBase);
+          },
+        },
+        {
+          label: this.$t("ui.data.column.machine.supportChipTire"),
+          prop: "supportChipTire",
+          minWidth: 120,
+          formatter: (row) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, row.supportChipTire);
+          },
+        },
+        {
+          label: this.$t("ui.data.column.machine.singleDoubleMode"),
+          prop: "singleDoubleMode",
+          minWidth: 100,
+        },
         {
           label: this.$t("ui.data.column.machine.mouldNum"),
           prop: "maxMoldNum",
           minWidth: 100,
-          // sortable: "custom",
           type: "number",
         },
         {
           label: this.$t("ui.data.column.machine.quata"),
           prop: "quota",
           minWidth: 100,
-          // sortable: "custom",
           type: "number",
         },
         {
           label: this.$t("ui.data.column.machine.machineOrder"),
           prop: "machineOrder",
           minWidth: 100,
-          // sortable: "custom",
           type: "number",
         },
-        // {
-        //   label: this.$t("ui.data.column.machine.classShift"),
-        //   prop: "classShift",
-        //   minWidth: 100,
-        //   // sortable: "custom",
-        //   formatter: (row) => {
-        //     return this.selectDictLabel(
-        //       this.dict.type.CLASS_SHIFT,
-        //       row.classShift
-        //     );
-        //   },
-        // },
-        // {
-        //   label: this.$t("ui.data.column.machine.openMachineClass"),
-        //   prop: "openMachineClass",
-        //   minWidth: 100,
-        //   // sortable: "custom",
-        //   render: ({ row }) => {
-        //     let value = row.openMachineClass;
-        //     if (this.isEmpty(value)) {
-        //       return "";
-        //     }
-        //     if (row.classShift === "3") {
-        //       return this.selectDictLabels(
-        //         this.dict.type.CLASS_NUM_THREE,
-        //         value
-        //       );
-        //     }
-        //     return this.selectDictLabels(this.dict.type.CLASS_NUM, value);
-        //   },
-        // },
-
-        // {
-        //   label: this.$t("ui.data.column.machine.single"),
-        //   prop: "single",
-        //   type: "select",
-        //   formatter: (row) => {
-        //     return this.selectDictLabel(this.dict.type.biz_yes_no, row.single);
-        //   },
-        // },
         {
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           minWidth: 100,
-          // sortable: "custom",
           render: ({ row }) => {
             return (
               <el-switch
@@ -295,7 +271,6 @@ export default {
                           status: val,
                         });
                         this.$modal.msgSuccess(data.msg);
-                        // this.$set(this.page, "current", 1);
                         this.getList();
                       } catch (error) {
                         console.error(error);
@@ -313,7 +288,6 @@ export default {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
           minWidth: 100,
-          // sortable: "custom",
           formatter: (row) => {
             return row.remark || "-";
           },

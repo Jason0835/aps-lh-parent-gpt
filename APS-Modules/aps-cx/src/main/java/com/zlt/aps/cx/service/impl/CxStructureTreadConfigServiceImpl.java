@@ -70,7 +70,7 @@ public class CxStructureTreadConfigServiceImpl extends AbstractDocService<CxStru
 //            fillDefaultFactoryCode(docEntity);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated,
-                    "factoryCode", "structureCode");
+                    "factoryCode", "structureCode", "embryoCode");
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
                 docEntity.setId(-999L);
@@ -146,13 +146,14 @@ public class CxStructureTreadConfigServiceImpl extends AbstractDocService<CxStru
                 CxStructureTreadConfig::getId, entity.getFieldValueByFieldName("id"));
         queryWrapper.eq(CxStructureTreadConfig::getFactoryCode, entity.getFactoryCode());
         queryWrapper.eq(CxStructureTreadConfig::getStructureCode, entity.getStructureCode());
+        queryWrapper.eq(CxStructureTreadConfig::getEmbryoCode, entity.getEmbryoCode());
         return cxStructureTreadConfigMapper.selectCount(queryWrapper) > 0
                 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
     }
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("factoryCode", "structureCode");
+        return Arrays.asList("factoryCode", "structureCode", "embryoCode");
     }
 
     @Override
@@ -204,6 +205,7 @@ public class CxStructureTreadConfigServiceImpl extends AbstractDocService<CxStru
         LambdaQueryWrapper<CxStructureTreadConfig> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(CxStructureTreadConfig::getFactoryCode, entity.getFactoryCode());
         queryWrapper.eq(CxStructureTreadConfig::getStructureCode, entity.getStructureCode());
+        queryWrapper.eq(CxStructureTreadConfig::getEmbryoCode, entity.getEmbryoCode());
         return cxStructureTreadConfigMapper.selectList(queryWrapper).stream().findFirst().orElse(null);
     }
 
