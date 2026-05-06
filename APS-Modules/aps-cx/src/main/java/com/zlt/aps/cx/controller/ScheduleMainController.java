@@ -1,41 +1,26 @@
 package com.zlt.aps.cx.controller;
 
 import cn.hutool.core.date.DateUtil;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.core.utils.DateUtils;
-import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.aps.cx.api.domain.vo.*;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
-import com.zlt.aps.cx.mapper.CxParamConfigMapper;
-import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
-import com.zlt.aps.cx.mapper.CxShiftConfigMapper;
-import com.zlt.aps.cx.mapper.MdmCxMachineFixedMapper;
-import com.zlt.aps.cx.mapper.MdmMonthPlanProductLhCapacityMapper;
-import com.zlt.aps.cx.mapper.MdmMoldingMachineMapper;
-import com.zlt.aps.cx.mapper.MdmStructureLhRatioMapper;
+import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
+import com.zlt.aps.cx.mapper.*;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.service.ScheduleService;
-import com.zlt.aps.cx.api.domain.vo.ScheduleAdjustVo;
-import com.zlt.aps.cx.api.domain.vo.ScheduleGenerateVo;
-import com.zlt.aps.cx.api.domain.vo.ScheduleInsertVo;
-import com.zlt.aps.cx.api.domain.vo.ScheduleTransferMachineVo;
-import com.zlt.aps.cx.api.domain.vo.ScheduleUpdateRemarkVo;
-import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
-import com.zlt.aps.cx.vo.ScheduleRequestVo;
 import com.zlt.aps.cx.vo.CxScheduleImportDTO;
 import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
+import com.zlt.aps.cx.vo.ScheduleRequestVo;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.mp.api.domain.entity.CxScheduleResultIssue;
 import com.zlt.aps.mp.api.domain.entity.MdmCxMachineFixed;
@@ -45,7 +30,6 @@ import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiModelProperty;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,7 +37,6 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -61,13 +44,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.*;
 
 /**
  * 排程管理Controller
@@ -237,6 +214,20 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     public byte[] exportData(@RequestBody CxScheduleResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         return super.exportData(queryVO, fileName, response);
+    }
+
+    /**
+     * 导出成型余量数据。
+     *
+     * @param queryVO 查询条件，按成型排程结果列表查询口径筛选数据
+     * @param fileName 导出文件名
+     * @return 成型余量Excel文件字节数组
+     */
+    @Log(title = "成型余量数据", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出成型余量数据")
+    @PostMapping("/exportCxRemainQty/{fileName}")
+    public byte[] exportCxRemainQty(@RequestBody CxScheduleResult queryVO, @PathVariable("fileName") String fileName) {
+        return cxScheduleResultService.exportCxRemainQty(queryVO, fileName);
     }
 
     @ApiOperation(value = "生成排程", notes = "根据日期和天数生成排程")
