@@ -773,6 +773,7 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 真实换模开始时间，用于本次排程运行期生成换模计划
      */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.lhScheduleResult.mouldChangeStartTime")
     @ApiModelProperty(value = "换模开始时间", name = "mouldChangeStartTime")
     @TableField(value = "MOULD_CHANGE_START_TIME")
