@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="lhSpecifyMachineMainTable"
+      tableRef="LhSpecialMaterialBomMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -20,36 +20,35 @@
       <template slot="header">
         <el-button
           type="primary"
-          plain
-          v-hasPermi="['lh:lhSpecifyMachine:add']"
+          v-hasPermi="['lh:lhSpecialMaterialBom:add']"
           @click="handleAdd"
         >{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button
-          v-hasPermi="['lh:lhSpecifyMachine:edit']"
+          v-hasPermi="['lh:lhSpecialMaterialBom:edit']"
           @click="handleBatchEdit"
           :disabled="selection.length !== 1"
         >{{ $t("ui.frame.btn.update") }}</el-button>
         <el-button
           type="danger"
-          v-hasPermi="['lh:lhSpecifyMachine:remove']"
+          v-hasPermi="['lh:lhSpecialMaterialBom:remove']"
           :disabled="selection.length == 0"
           @click="handleBatchDelete"
         >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
-          v-hasPermi="['lh:lhSpecifyMachine:import']"
+          v-hasPermi="['lh:lhSpecialMaterialBom:import']"
           @click="$refs.tltUpload.handleImport()"
         >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           @click="handleExport"
-          v-hasPermi="['lh:lhSpecifyMachine:export']"
+          v-hasPermi="['lh:lhSpecialMaterialBom:export']"
         >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-      downloadUrl="/lh/lhSpecifyMachine/importTemplate"
-      uploadUrl="/lh/lhSpecifyMachine/importData"
+      downloadUrl="/lh/lhSpecialMaterialBom/importTemplate"
+      uploadUrl="/lh/lhSpecialMaterialBom/importData"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
@@ -59,17 +58,17 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listLhSpecifyMachine, removeLhSpecifyMachine } from "@/api/lh/lhSpecifyMachine";
+import { listSpecialMaterialBom, removeSpecialMaterialBom } from "@/api/lh/specialMaterialBom";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "LhSpecifyMachine",
+  name: "LhSpecialMaterialBom",
   components: {
     TltUploadForm,
     infoDialog,
   },
-  dicts: ["biz_factory_name", "LINE_TYPE", "JOB_TYPE"],
+  dicts: ["biz_factory_name", "lh_special_material_category"],
   provide() {
     return {
       parentDict: this.dict,
@@ -125,44 +124,34 @@ export default {
           },
         },
         {
-          prop: "specCode",
+          prop: "structureName",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.lhSpecifyMachine.specCode"),
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.structureName"),
+          minWidth: 200,
+        },
+        {
+          prop: "materialCode",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.materialCode"),
           minWidth: 150,
         },
         {
           prop: "materialDesc",
           align: "left",
           halign: "center",
-          label: this.$t("ui.data.column.lhSpecifyMachine.materialDesc"),
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.materialDesc"),
           minWidth: 250,
         },
         {
-          prop: "machineCode",
+          prop: "category",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.lhSpecifyMachine.machineCode"),
-          minWidth: 150,
-        },
-        // {
-        //   prop: "lineType",
-        //   align: "center",
-        //   halign: "center",
-        //   label: this.$t("ui.data.column.lhSpecifyMachine.lineType"),
-        //   minWidth: 120,
-        //   formatter: (row, column, value, index) => {
-        //     return this.selectDictLabel(this.dict.type.LINE_TYPE, value);
-        //   },
-        // },
-        {
-          prop: "jobType",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.lhSpecifyMachine.jobType"),
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.category"),
           minWidth: 120,
           formatter: (row, column, value, index) => {
-            return this.selectDictLabel(this.dict.type.JOB_TYPE, value);
+            return this.selectDictLabel(this.dict.type.lh_special_material_category, value);
           },
         },
         {
@@ -171,13 +160,6 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.updateTime"),
           minWidth: 160,
-        },
-        {
-          prop: "remark",
-          halign: "center",
-          label: this.$t("ui.common.column.remark"),
-          sortable: true,
-          minWidth: 100,
         },
         {
           align: "center",
@@ -189,7 +171,7 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["lh:lhSpecifyMachine:edit"]}
+                  v-hasPermi={["lh:lhSpecialMaterialBom:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
@@ -197,7 +179,7 @@ export default {
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["lh:lhSpecifyMachine:remove"]}
+                  v-hasPermi={["lh:lhSpecialMaterialBom:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -221,28 +203,22 @@ export default {
           filterable: true,
         },
         {
-          label: this.$t("ui.data.column.lhSpecifyMachine.specCode"),
-          prop: "specCode",
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.structureName"),
+          prop: "structureName",
         },
         {
-          label: this.$t("ui.data.column.lhSpecifyMachine.materialDesc"),
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.materialCode"),
+          prop: "materialCode",
+        },
+        {
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.materialDesc"),
           prop: "materialDesc",
         },
         {
-          label: this.$t("ui.data.column.lhSpecifyMachine.machineCode"),
-          prop: "machineCode",
-        },
-        // {
-        //   label: this.$t("ui.data.column.lhSpecifyMachine.lineType"),
-        //   prop: "lineType",
-        //   type: "select",
-        //   dictData: this.dict.type.LINE_TYPE,
-        // },
-        {
-          label: this.$t("ui.data.column.lhSpecifyMachine.jobType"),
-          prop: "jobType",
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.category"),
+          prop: "category",
           type: "select",
-          dictData: this.dict.type.JOB_TYPE,
+          dictData: this.dict.type.lh_special_material_category,
           filterable: true,
         },
       ];
@@ -256,7 +232,6 @@ export default {
     },
     handleEdit(row) {
       if (this.$refs.infoRef) {
-	  
         this.$refs.infoRef.show(row);
       }
     },
@@ -265,7 +240,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeLhSpecifyMachine({ ids }).then((data) => {
+        removeSpecialMaterialBom({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -285,7 +260,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = this.selection.map((item) => item.id).join(",");
-        removeLhSpecifyMachine({ ids }).then((data) => {
+        removeSpecialMaterialBom({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.selection = [];
           this.$set(this.page, "current", 1);
@@ -318,7 +293,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/lh/lhSpecifyMachine/export", this.formatParams(false));
+      downloadLink("/lh/lhSpecialMaterialBom/export", this.formatParams(false));
     },
     formatParams(hasPage = true) {
       const params = {
@@ -334,7 +309,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listLhSpecifyMachine(this.formatParams());
+        const data = await listSpecialMaterialBom(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {

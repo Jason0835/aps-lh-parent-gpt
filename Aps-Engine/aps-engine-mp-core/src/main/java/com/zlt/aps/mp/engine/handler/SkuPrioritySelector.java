@@ -7,7 +7,11 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.EarliestConclusionLhGroupHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
-import com.zlt.aps.mp.engine.domain.vo.*;
+import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.ProductionSkuPriorityVo;
+import com.zlt.aps.mp.engine.domain.vo.SkuPriorityInfo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
@@ -17,7 +21,15 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -50,6 +62,9 @@ public class SkuPrioritySelector {
      * @return
      */
     public static String getHighestPrioritySku(Context context, ProductionStageEnum productionStage, FormalRoundEnum formalRound, ProductionPlanGroupInfo groupPlanInfo, EarliestConclusionLhGroupHelper lhGroup, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> allSkuList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
+        /*if (groupPlanInfo != null && groupPlanInfo.getGroupName().equals("215/75R17.5")){
+            System.out.println("215/75R17.5");
+        }*/
         List<MonthPlanProductionRequirePlanVo> effectiveSkuList = getEffectiveSkuList(allSkuList, excludeSkuSet);
         if (CollectionUtils.isEmpty(effectiveSkuList)) {
             return StringUtils.EMPTY;
@@ -318,7 +333,7 @@ public class SkuPrioritySelector {
             if (CollectionUtils.isEmpty(matchList)) {
                 break;
             }
-            //排序：供应链优先 -> 先高优先级(模具受限优先 -> 库销比优先 -> 小批量优先 -> 量大优先) -> 再其他(模具受限优先 -> 库销比优先 -> 小批量优先 -> 量大优先)
+            //排序：供应链优先 -> 先高优先级(量大优先 -> 模具受限优先 -> 库销比优先 -> 小批量优先) -> 再其他(量大优先 -> 模具受限优先 -> 库销比优先 -> 小批量优先 )
             SkuPriorityInfo highestPriority = getHighestPrioritySku(matchList);
             if (null == highestPriority) {
                 break;
@@ -523,22 +538,22 @@ public class SkuPrioritySelector {
             currentList = heightPrioritySkus;
         }
 
-        // 第3级：模具产能受限约束
-        List<SkuPriorityInfo> moldCapacityLimitSkus = filterByMoldCapacityLimit(currentList);
-        if (!CollectionUtils.isEmpty(moldCapacityLimitSkus)) {
-            if (moldCapacityLimitSkus.size() == 1) {
-                return moldCapacityLimitSkus;
-            }
-            currentList = moldCapacityLimitSkus;
-        }
-
-        // 第4级：净需求大约束
+        // 第3级：净需求大约束
         List<SkuPriorityInfo> requireCapacityLimitSkus = filterByNetRequirement(currentList);
         if (!CollectionUtils.isEmpty(requireCapacityLimitSkus)) {
             if (requireCapacityLimitSkus.size() == 1) {
                 return requireCapacityLimitSkus;
             }
             currentList = requireCapacityLimitSkus;
+        }
+
+        // 第4级：模具产能受限约束
+        List<SkuPriorityInfo> moldCapacityLimitSkus = filterByMoldCapacityLimit(currentList);
+        if (!CollectionUtils.isEmpty(moldCapacityLimitSkus)) {
+            if (moldCapacityLimitSkus.size() == 1) {
+                return moldCapacityLimitSkus;
+            }
+            currentList = moldCapacityLimitSkus;
         }
 
         // 第5级：库销比约束
@@ -588,7 +603,7 @@ public class SkuPrioritySelector {
     }
 
     /**
-     * 第3级过滤器：模具产能受限约束
+     * 第4级过滤器：模具产能受限约束
      */
     private static List<SkuPriorityInfo> filterByMoldCapacityLimit(List<SkuPriorityInfo> skuInfos) {
         // 找出所有有模具产能受限的SKU
@@ -611,7 +626,7 @@ public class SkuPrioritySelector {
     }
 
     /**
-     * 第4级过滤器：小于50条约束
+     * 第6级过滤器：小于50条约束
      */
     private static List<SkuPriorityInfo> filterByLessMinQty(List<SkuPriorityInfo> skuInfos) {
         // 找出计划数小于50的SKU
@@ -638,7 +653,7 @@ public class SkuPrioritySelector {
     }
 
     /**
-     * 第6级过滤器：净需求大约束
+     * 第3级过滤器：净需求大约束
      */
     private static List<SkuPriorityInfo> filterByNetRequirement(List<SkuPriorityInfo> skuInfos) {
         // 找出净需求最大的SKU
@@ -716,8 +731,8 @@ public class SkuPrioritySelector {
 
         if (info.isHasMoldCapacityLimit()) {
             // 3. 模具受限的净需求量总和
-            int moldLimitedNetRequirement = plans.stream().filter(plan -> null != plan.getVirtualProductionQty())
-                    .mapToInt(MonthPlanProductionRequirePlanVo::getVirtualProductionQty)
+            int moldLimitedNetRequirement = plans.stream().filter(plan -> null != plan.getNetQty())
+                    .mapToInt(MonthPlanProductionRequirePlanVo::getNetQty)
                     .sum();
             info.setMoldLimitedNetRequirement(moldLimitedNetRequirement);
         } else {
@@ -736,21 +751,31 @@ public class SkuPrioritySelector {
         // 5. 小于最小批量
         info.setLessMinQty(hasLessMinQty);
         // 6. 净需求总量
-        int totalNetRequirement = plans.stream().filter(plan -> plan.getVirtualProductionQty() != null)
-                .mapToInt(MonthPlanProductionRequirePlanVo::getVirtualProductionQty)
-                .sum();
+        int totalNetRequirement = 0;
+        if (hasHeightPriority){
+            // 高优先级的数量要拆出来独立，防止混搭，影响优先级的排序 sandy+ 2026.5.6
+            totalNetRequirement = plans.stream().filter(plan -> plan.getHeightProductionQty() != null)
+                    .mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty)
+                    .sum();
+        }else{
+            totalNetRequirement = plans.stream().filter(plan -> plan.getVirtualProductionQty() != null)
+                    .mapToInt(MonthPlanProductionRequirePlanVo::getVirtualProductionQty)
+                    .sum();
+        }
+
         info.setTotalNetRequirement(totalNetRequirement);
         // 7. 其他可能需要的信息
         info.setPlans(new ArrayList<>(plans));
     }
 
     private static boolean hasMoldCapacityLimitBySku(SkuPriorityInfo singlePriority, List<MonthPlanProductionRequirePlanVo> plans, TbrProductionContext productionContext, Integer startDay, Integer endDay) {
+        //模具受限是指：两幅共用模具下，按照模具数整月在机计算模具产能，与所有用此模具SKU的净需求总和（取数当日）进行对比，如果净需求大于模具产能，则认为模具受限）
         // 2. 模具产能受限情况 是否共用模具受限？--最后两副
         Set<String> limitShareMouldSet = productionContext.getLimitShareMouldOtherSku(singlePriority.getSku(), startDay, endDay);
         if(CollectionUtils.isEmpty(limitShareMouldSet)) {
             return false;
         }
-        String materialDesc = singlePriority.getSku();
+        /*String materialDesc = singlePriority.getSku();
         //选择模具
         List<ProductionMouldInfoVo> doubleMouldList = SkuMouldSelector.selectedDoubleMouldByRange(productionContext, materialDesc, startDay, endDay);
         if(CollectionUtils.isEmpty(doubleMouldList)) {
@@ -773,10 +798,11 @@ public class SkuPrioritySelector {
         });
         if (CollectionUtils.isEmpty(enableMouldList) || CollectionUtils.isEmpty(hasLeftOverDaySet)) {
             return false;
-        }
-        if (enableMouldList.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+        }*/
+       /* if (enableMouldList.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
             return false;
-        }
+        }*/
+
         // 共用模且只有两副，检查主花纹下所有SKU需求量
         String mainPattern = plans.get(0).getMainPattern();
         if(StringUtils.isBlank(mainPattern)) {
@@ -791,8 +817,8 @@ public class SkuPrioritySelector {
         for (List<MonthPlanProductionRequirePlanVo> skuPlans : allSkuPlans.values()) {
             if (!CollectionUtils.isEmpty(skuPlans) && mainPattern.equals(skuPlans.get(0).getMainPattern())) {
                 totalMainPatternRequirement += skuPlans.stream()
-                        .filter(plan -> plan.getVirtualProductionQty() != null)
-                        .mapToInt(MonthPlanProductionRequirePlanVo::getVirtualProductionQty)
+                        .filter(plan -> plan.getNetQty() != null)
+                        .mapToInt(MonthPlanProductionRequirePlanVo::getNetQty)
                         .sum();
             }
         }
@@ -804,8 +830,10 @@ public class SkuPrioritySelector {
         if (null == dayVulcanizationQty) {
            return false;
         }
+
+        YearMonth yearMonth = YearMonth.of(productionContext.getYear(), productionContext.getMonth());
         // 两副模具即一对，总产能 = 1对 * (单模产能 * 2) * 天数
-        int totalMoldCapacity = (dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION) * hasLeftOverDaySet.size();
+        int totalMoldCapacity = (dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION) * yearMonth.lengthOfMonth();
         return totalMainPatternRequirement > totalMoldCapacity;
     }
 
