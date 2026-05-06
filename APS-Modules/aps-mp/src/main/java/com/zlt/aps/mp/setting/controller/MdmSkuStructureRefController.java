@@ -212,6 +212,19 @@ public class MdmSkuStructureRefController extends AbstractDocBizController<MdmSk
         return this.getDataTable(list);
     }
 
+
+    /**
+     * 查询结构选择列表（带胎胚描述）
+     */
+    @ApiOperation("查询结构选择列表")
+    @PostMapping("/getStructureSelectWithDescList")
+    public TableDataInfo getStructureSelectWithDescList(@RequestBody MdmSkuStructureRef queryVO) {
+        this.startPage();
+        List<MdmSkuStructureRef> list = entityMapper.getStructureSelectWithDescList(queryVO);
+        this.clearPage();
+        return this.getDataTable(list);
+    }
+
     /**
      * 更新结构到物料表
      * @param queryVO 参数

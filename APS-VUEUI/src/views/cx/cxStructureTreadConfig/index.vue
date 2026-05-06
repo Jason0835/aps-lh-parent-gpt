@@ -24,12 +24,18 @@
         <el-button v-hasPermi="['cx:cxStructureTreadConfig:edit']" :disabled="selection.length !== 1" @click="handleEdit(selection[0])">
           {{ $t('ui.frame.btn.update') }}
         </el-button>
+        <el-button v-hasPermi="['cx:cxStructureTreadConfig:updateSameStructureTreadCount']" :disabled="selection.length !== 1" @click="handleSameStructureTreadCount(selection[0])">
+          {{ $t('ui.data.column.cxStructureTreadConfig.sameStructureTreadCount') }}
+        </el-button>
         <el-button type="danger" v-hasPermi="['cx:cxStructureTreadConfig:remove']" :disabled="selection.length === 0" @click="handleDelete">
           {{ $t('ui.frame.btn.delete') }}
         </el-button>
-        <el-button v-hasPermi="['cx:cxStructureTreadConfig:import']" @click="$refs.uploadRef.handleImport()">
-          {{ $t('ui.frame.btn.import') }}
+        <el-button v-hasPermi="['cx:cxStructureTreadConfig:generate']" :loading="generateLoading" @click="handleGenerate">
+          {{ $t('ui.data.column.cxStructureTreadConfig.generate') }}
         </el-button>
+<!--        <el-button v-hasPermi="['cx:cxStructureTreadConfig:import']" @click="$refs.uploadRef.handleImport()">-->
+<!--          {{ $t('ui.frame.btn.import') }}-->
+<!--        </el-button>-->
         <el-button v-hasPermi="['cx:cxStructureTreadConfig:export']" @click="handleExport">
           {{ $t('ui.frame.btn.export') }}
         </el-button>
@@ -45,20 +51,57 @@
       :columns="importColumns"
     />
     <info-dialog ref="infoRef" @success="getList" />
+    <el-dialog
+      :title="$t('ui.data.column.cxStructureTreadConfig.sameStructureTreadCount')"
+      :visible.sync="sameStructureDialog.visible"
+      width="520px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :append-to-body="true"
+      @close="resetSameStructureDialog"
+    >
+      <el-form
+        ref="sameStructureForm"
+        :model="sameStructureDialog.form"
+        :rules="sameStructureRules"
+        label-position="right"
+        label-width="160px"
+        v-loading="sameStructureDialog.loading"
+      >
+        <el-form-item :label="$t('ui.data.column.cxStructureTreadConfig.structureCode')" prop="structureCode">
+          <el-input v-model="sameStructureDialog.form.structureCode" disabled />
+        </el-form-item>
+        <el-form-item :label="$t('ui.data.column.cxStructureTreadConfig.treadCount')" prop="treadCount">
+          <el-input-number
+            v-model="sameStructureDialog.form.treadCount"
+            :max="999"
+            :precision="0"
+            controls-position="right"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template slot="footer">
+        <el-button @click="sameStructureDialog.visible = false">{{ $t('common.button.cancel') }}</el-button>
+        <el-button type="primary" :loading="sameStructureDialog.loading" @click="confirmSameStructureTreadCount">
+          {{ $t('common.button.confirm') }}
+        </el-button>
+      </template>
+    </el-dialog>
   </basic-container>
 </template>
 
 <script>
 import { downloadLink } from '@/utils/request'
-import { listCxStructureTreadConfig, removeCxStructureTreadConfig } from '@/api/cx/cxStructureTreadConfig'
+import { generateCxStructureTreadConfig, listCxStructureTreadConfig, removeCxStructureTreadConfig, updateSameStructureTreadCount } from '@/api/cx/cxStructureTreadConfig'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import infoDialog from './components/infoDialog.vue'
-import { mapGetters } from 'vuex'
+import structureSelectWithDesc from '@/views/components/structureSelectWithDesc.vue'
 
 export default {
   name: 'CxStructureTreadConfig',
-  components: { TltUploadForm, infoDialog },
-  dicts: ['biz_factory_name'],
+  components: { TltUploadForm, infoDialog, structureSelectWithDesc },
+  dicts: ['biz_factory_name', 'biz_yes_no'],
   provide() {
     return { parentDict: this.dict }
   },
@@ -78,6 +121,12 @@ export default {
         }
       ],
       loading: false,
+      generateLoading: false,
+      sameStructureDialog: {
+        visible: false,
+        loading: false,
+        form: {}
+      },
       data: [],
       selection: [],
       page: { current: 1, pageSize: 20, total: 0 },
@@ -87,7 +136,27 @@ export default {
     }
   },
   computed: {
-    ...mapGetters('globalList', ['structureList']),
+    sameStructureRules() {
+      const validateTreadCount = (rule, value, callback) => {
+        if (value === null || value === undefined || value === '') {
+          callback(new Error(this.$t('common.rule.input')))
+          return
+        }
+        if (!Number.isInteger(value) || value <= 0) {
+          callback(new Error(this.$t('common.rule.input')))
+          return
+        }
+        callback()
+      }
+      return {
+        treadCount: [
+          {
+            validator: validateTreadCount,
+            trigger: ['blur', 'change']
+          }
+        ]
+      }
+    },
     searchColumns() {
       return [
         {
@@ -101,8 +170,33 @@ export default {
         {
           prop: 'structureCode',
           label: this.$t('ui.data.column.cxStructureTreadConfig.structureCode'),
+          render: (form) => {
+            return (
+              <structureSelectWithDesc
+                key={`${form.factoryCode || ''}-${form.structureCode || ''}`}
+                factoryCode={form.factoryCode}
+                v-model={form.structureCode}
+                onChange={(value) => this.handleSearchStructureChange(form, value)}
+                onClear={() => this.handleSearchStructureClear(form)}
+              />
+            )
+          }
+        },
+        {
+          prop: 'embryoCode',
+          label: this.$t('ui.data.column.cxStructureTreadConfig.embryoCode'),
+          clearable: true
+        },
+        {
+          prop: 'mainMaterialDesc',
+          label: this.$t('ui.data.column.cxStructureTreadConfig.mainMaterialDesc'),
+          clearable: true
+        },
+        {
+          prop: 'unconfiguredTreadCount',
+          label: this.$t('ui.data.column.cxStructureTreadConfig.unconfiguredTreadCount'),
           type: 'select',
-          dictData: this.structureList,
+          dictData: this.dict.type.biz_yes_no,
           filterable: true,
           clearable: true
         }
@@ -129,6 +223,20 @@ export default {
           minWidth: 140
         },
         {
+          prop: 'embryoCode',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxStructureTreadConfig.embryoCode'),
+          minWidth: 140
+        },
+        {
+          prop: 'mainMaterialDesc',
+          align: 'left',
+          halign: 'center',
+          label: this.$t('ui.data.column.cxStructureTreadConfig.mainMaterialDesc'),
+          minWidth: 250
+        },
+        {
           prop: 'treadCount',
           align: 'center',
           halign: 'center',
@@ -146,7 +254,7 @@ export default {
           align: 'center',
           halign: 'center',
           label: this.$t('ui.data.btn.option'),
-          minWidth: 150,
+          minWidth: 260,
           render: ({ row }) => {
             return (
               <div>
@@ -157,6 +265,14 @@ export default {
                   onClick={() => this.handleEdit(row)}
                 >
                   {this.$t('ui.frame.btn.update')}
+                </el-button>
+                <el-button
+                  v-hasPermi={['cx:cxStructureTreadConfig:updateSameStructureTreadCount']}
+                  class="minus"
+                  type="primary"
+                  onClick={() => this.handleSameStructureTreadCount(row)}
+                >
+                  {this.$t('ui.data.column.cxStructureTreadConfig.sameStructureTreadCount')}
                 </el-button>
                 <el-button
                   v-hasPermi={['cx:cxStructureTreadConfig:remove']}
@@ -180,6 +296,39 @@ export default {
     handleEdit(row) {
       if (row) this.$refs.infoRef.show(row)
     },
+    handleSameStructureTreadCount(row) {
+      if (!row) return
+      const treadCount = row.treadCount === null || row.treadCount === undefined || row.treadCount === '' ? null : row.treadCount
+      this.sameStructureDialog.form = {
+        id: row.id,
+        factoryCode: row.factoryCode,
+        structureCode: row.structureCode,
+        treadCount
+      }
+      this.sameStructureDialog.visible = true
+    },
+    resetSameStructureDialog() {
+      this.$refs.sameStructureForm && this.$refs.sameStructureForm.resetFields()
+      this.sameStructureDialog.form = {}
+    },
+    confirmSameStructureTreadCount() {
+      this.$refs.sameStructureForm.validate(valid => {
+        if (!valid) return
+        this.$confirm(this.$t('ui.data.alert.cxStructureTreadConfig.sameStructureTreadCount.confirm'), { type: 'warning' })
+          .then(async () => {
+            try {
+              this.sameStructureDialog.loading = true
+              const res = await updateSameStructureTreadCount(this.sameStructureDialog.form)
+              this.$modal.msgSuccess(res.msg)
+              this.sameStructureDialog.visible = false
+              this.page.current = 1
+              this.getList()
+            } finally {
+              this.sameStructureDialog.loading = false
+            }
+          })
+      })
+    },
     handleDelete(row) {
       this.$confirm(this.$t('common.confirm.delete'), { type: 'warning' }).then(() => {
         const ids = row && row.id ? [row.id] : this.selection.map(r => r.id)
@@ -195,6 +344,19 @@ export default {
     },
     handleExport() {
       downloadLink('/cx/cxStructureTreadConfig/export', this.formatParams(false))
+    },
+    handleGenerate() {
+      this.$confirm(this.$t('ui.data.alert.cxStructureTreadConfig.generate.confirm'), { type: 'warning' }).then(async () => {
+        try {
+          this.generateLoading = true
+          const res = await generateCxStructureTreadConfig()
+          this.$modal.msgSuccess(res.msg)
+          this.page.current = 1
+          this.getList()
+        } finally {
+          this.generateLoading = false
+        }
+      })
     },
     handleSearch(data) {
       this.query = { ...data }
@@ -226,6 +388,12 @@ export default {
     },
     handleSelectionChange(rows) {
       this.selection = rows
+    },
+    handleSearchStructureChange(form, value) {
+      this.$set(form, 'structureCode', value)
+    },
+    handleSearchStructureClear(form) {
+      this.$set(form, 'structureCode', undefined)
     },
     formatParams(hasPage = true) {
       const params = {

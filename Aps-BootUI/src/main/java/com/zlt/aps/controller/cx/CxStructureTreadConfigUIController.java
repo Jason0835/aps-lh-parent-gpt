@@ -127,6 +127,28 @@ public class CxStructureTreadConfigUIController extends BaseUIController<CxStruc
     }
 
     /**
+     * 生成胎面整车配置
+     */
+    @ApiOperation("生成胎面整车配置")
+    @RequiresPermissions("cx:cxStructureTreadConfig:generate")
+    @PostMapping("/generateTreadConfig")
+    @ResponseBody
+    public AjaxResult generateTreadConfig() {
+        return iCxStructureTreadConfigService.generateTreadConfig();
+    }
+
+    /**
+     * 批量更新相同工厂相同结构整车胎面条数
+     */
+    @ApiOperation("批量更新相同工厂相同结构整车胎面条数")
+    @RequiresPermissions("cx:cxStructureTreadConfig:updateSameStructureTreadCount")
+    @PostMapping("/updateSameStructureTreadCount")
+    @ResponseBody
+    public AjaxResult updateSameStructureTreadCount(CxStructureTreadConfig cxStructureTreadConfig) {
+        return iCxStructureTreadConfigService.updateSameStructureTreadCount(cxStructureTreadConfig);
+    }
+
+    /**
      * 导出模板文件的文件名，派生类重写名称。
      * 示例：支持多语言写法： String fileName = I18nUtil.getMessage("ui.cd90.machine.export.fileName");
      * @return

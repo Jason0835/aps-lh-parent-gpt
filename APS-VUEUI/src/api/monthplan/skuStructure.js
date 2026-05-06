@@ -27,6 +27,13 @@ export function selectSkuStructure(query) {
     data: query
   })
 }
+export function selectSkuStructureWithDesc(query) {
+  return request({
+    url: '/monthplan/mdmSkuStructureRef/getStructureSelectWithDescList',
+    method: 'post',
+    data: query
+  })
+}
 export function updateMaterial(query) {
   return request({
     url: '/monthplan/mdmSkuStructureRef/updateStructureToMaterial',

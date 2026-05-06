@@ -75,4 +75,18 @@ public interface ICxStructureTreadConfigRemoteService {
     @ApiOperation("导入数据")
     @PostMapping("/cxStructureTreadConfig/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    /**
+     * 生成胎面整车配置
+     */
+    @ApiOperation("生成胎面整车配置")
+    @PostMapping("/cxStructureTreadConfig/generateTreadConfig")
+    AjaxResult generateTreadConfig();
+
+    /**
+     * 批量更新相同工厂相同结构整车胎面条数
+     */
+    @ApiOperation("批量更新相同工厂相同结构整车胎面条数")
+    @PostMapping("/cxStructureTreadConfig/updateSameStructureTreadCount")
+    AjaxResult updateSameStructureTreadCount(@RequestBody CxStructureTreadConfig cxStructureTreadConfig);
 }
