@@ -22,7 +22,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,7 +30,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -158,6 +156,25 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     public void export(HttpServletResponse response, CxScheduleResult entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
         byte[] excelBytes = iCxScheduleResultService.exportData(entity, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
+    }
+
+    /**
+     * 导出成型余量数据。
+     *
+     * @param response HTTP响应对象，用于写出Excel文件流
+     * @param entity 查询条件，按成型排程结果列表查询口径筛选数据
+     * @throws IOException 写出Excel文件流失败时抛出
+     */
+    @ApiOperation("导出成型余量数据")
+    @GetMapping({"/exportCxRemainQty"})
+    @ResponseBody
+    public void exportCxRemainQty(HttpServletResponse response, CxScheduleResult entity) throws IOException {
+        String fileName = this.getExportTemplateFileName();
+        byte[] excelBytes = iCxScheduleResultService.exportCxRemainQty(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());

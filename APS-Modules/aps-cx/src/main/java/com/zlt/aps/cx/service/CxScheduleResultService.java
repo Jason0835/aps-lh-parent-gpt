@@ -1,13 +1,8 @@
 package com.zlt.aps.cx.service;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
-import com.zlt.aps.cx.vo.ScheduleQueryVo;
-import com.zlt.aps.cx.vo.ScheduleResultVo;
 import com.zlt.bill.common.service.IDocService;
 
 import java.time.LocalDate;
@@ -37,6 +32,15 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @return 模板 Excel 字节数据
      */
     byte[] exportData(List<CxScheduleResult> list, Date scheduleDate);
+
+    /**
+     * 导出成型余量数据。
+     *
+     * @param queryVO 查询条件，按成型排程结果列表查询口径筛选数据
+     * @param fileName 导出文件名
+     * @return 成型余量Excel文件字节数组
+     */
+    byte[] exportCxRemainQty(CxScheduleResult queryVO, String fileName);
 
     /**
      * 基于模板导入数据

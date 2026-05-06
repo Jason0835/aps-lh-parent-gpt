@@ -13,6 +13,7 @@ import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleProcessLog;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
 import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
@@ -140,8 +141,12 @@ public class LhScheduleContext {
     private Map<String, LhRepairCapsule> capsuleUsageMap = new HashMap<>();
     /** 硫化精度保养计划Map, key=machineCode */
     private Map<String, LhPrecisionPlan> maintenancePlanMap = new HashMap<>();
-    /** 特殊材料胎胚编码集合 */
-    private Set<String> specialMaterialEmbryoCodeSet = new HashSet<>();
+    /** 特殊物料清单配置列表 */
+    private List<LhSpecialMaterialBom> specialMaterialBomList = new ArrayList<>();
+    /** 特殊物料分类Map, key=物料编码, value=分类 */
+    private Map<String, String> specialMaterialCategoryByMaterialCode = new HashMap<>();
+    /** 特殊物料分类Map, key=结构名称, value=分类 */
+    private Map<String, String> specialMaterialCategoryByStructureName = new HashMap<>();
 
     // ========== 中间计算结果(S4.3) ==========
 

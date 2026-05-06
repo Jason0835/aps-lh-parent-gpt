@@ -8,8 +8,10 @@ import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.vo.*;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
-
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -117,6 +119,16 @@ public interface ICxScheduleResultService {
      */
     @PostMapping("/cxScheduleResult/exportData/{fileName}")
     byte[] exportData(@RequestBody CxScheduleResult cxScheduleResult, @PathVariable("fileName") String fileName);
+
+    /**
+     * 导出成型余量数据。
+     *
+     * @param cxScheduleResult 查询条件，按成型排程结果列表查询口径筛选数据
+     * @param fileName 导出文件名
+     * @return 成型余量Excel文件字节数组
+     */
+    @PostMapping("/cxScheduleResult/exportCxRemainQty/{fileName}")
+    byte[] exportCxRemainQty(@RequestBody CxScheduleResult cxScheduleResult, @PathVariable("fileName") String fileName);
 
     /**
      * 导入数据（UI标准格式）
