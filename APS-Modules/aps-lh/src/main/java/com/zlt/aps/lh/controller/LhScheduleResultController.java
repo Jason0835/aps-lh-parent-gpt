@@ -408,7 +408,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         first.setMachineOrder(10);
         first.setManufacturer("示例制造A");
         first.setHotPlateDiameter("1800");
-        first.setMouldSetCode("通用");
+//        first.setMouldSetCode("通用");
         list.add(first);
 
         LhMachineInfo second = new LhMachineInfo();
@@ -428,7 +428,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         second.setMachineOrder(20);
         second.setManufacturer("示例制造B");
         second.setHotPlateDiameter("1650");
-        second.setMouldSetCode("通用");
+//        second.setMouldSetCode("通用");
         list.add(second);
 
         return list;
