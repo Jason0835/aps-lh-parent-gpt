@@ -1024,8 +1024,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             List<Long> lhIdList = taskLhIdListMap.get(taskKey);
             int totalStock = 0;
             if (lhIdList != null && !lhIdList.isEmpty()) {
+                // 去重：同一个lhId可能在多个班次分配中重复出现
+                List<Long> distinctLhIdList = lhIdList.stream().distinct().collect(Collectors.toList());
                 Map<String, Integer> stockMap = context.getInitialMaterialStockMap();
-                for (Long lhId : lhIdList) {
+                for (Long lhId : distinctLhIdList) {
                     if (stockMap != null) {
                         Integer stock = stockMap.get(String.valueOf(lhId));
                         totalStock += (stock != null ? stock : 0);
@@ -1037,7 +1039,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             // ---- 硫化信息（合并多个硫化任务） ----
             List<LhScheduleResult> allLhResults = new ArrayList<>();
             if (lhIdList != null && !lhIdList.isEmpty()) {
-                for (Long lhId : lhIdList) {
+                // 去重：同一个lhId可能在多个班次分配中重复出现
+                List<Long> distinctLhIdList = lhIdList.stream().distinct().collect(Collectors.toList());
+                for (Long lhId : distinctLhIdList) {
                     LhScheduleResult lh = lhByIdMap.get(lhId);
                     if (lh != null) {
                         allLhResults.add(lh);
@@ -1056,8 +1060,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             LhScheduleResult primaryLh = allLhResults.isEmpty() ? null : allLhResults.get(0);
 
             if (!allLhResults.isEmpty()) {
-                // lhScheduleIds: 逗号分隔合并
+                // lhScheduleIds: 去重后逗号分隔合并
                 String lhIds = lhIdList != null ? lhIdList.stream()
+                        .distinct()
                         .map(String::valueOf)
                         .collect(Collectors.joining(",")) : null;
                 result.setLhScheduleIds(lhIds);
@@ -1799,6 +1804,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
         String recipeNo = (primaryLh != null) ? primaryLh.getEmbryoNo() : null;
         if (recipeNo == null) {
+            return null;
+        }
+        recipeNo = recipeNo.trim();
+        if (recipeNo.isEmpty()) {
             return null;
         }
         try {
