@@ -783,6 +783,9 @@ export default {
           prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
+          listeners: {
+            change: this.handleYearMonthChange,
+          },
         },
         {
           label: this.$t("ui.data.column.scheduleResult.orderNo"),
@@ -829,6 +832,17 @@ export default {
     },
   },
   methods: {
+    handleYearMonthChange(val) {
+      this.search = {
+        ...this.search,
+        scheduleDate: val,
+      };
+      this.query = {
+        ...this.search,
+        scheduleDate: val,
+      };
+      this.getList();
+    },
     async handleIncreaseMouldStartPlan() {
       try {
         const row = this.selection[0];
@@ -1016,7 +1030,7 @@ export default {
     },
     handleAutoPlan() {
       if (this.$refs.autoPlanDialogRef) {
-        this.$refs.autoPlanDialogRef.show();
+        this.$refs.autoPlanDialogRef.show(this.query);
       }
     },
     handleAutoPlanSuccess(params) {
