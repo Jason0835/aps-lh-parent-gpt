@@ -73,10 +73,10 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     @TableField(value = "CLASS_SHIFT")
     private String classShift;
 
-    /** 最大使用模具数量，范围 0-255 */
+    /** 最大使用模具数量，范围 0-255 单双模*/
     @ImportExcelValidated(required = true, digits = true, min = 0, max = 255)
     @Excel(name = "ui.data.column.info.maxMoldNum", cellType = Excel.ColumnType.NUMERIC, sort = 80)
-    @ApiModelProperty(value = "模台数", name = "maxMoldNum")
+    @ApiModelProperty(value = "模台数 单双模", name = "maxMoldNum")
     @TableField(value = "MAX_MOLD_NUM")
     private Integer maxMoldNum;
 
@@ -185,14 +185,7 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     @TableField(value = "SINGLE_DOUBLE_MODE")
     private Integer singleDoubleMode;
 
-    /**
-     * 模台数
-     */
-    @ImportExcelValidated(required = true, digits = true, min = 1, max = 9999)
-    @Excel(name = "ui.data.column.info.singleDoubleMode", cellType = Excel.ColumnType.NUMERIC, sort = 85)
-    @ApiModelProperty(value = "模台数", name = "mouldNum")
-    @TableField(value = "MOULD_NUM")
-    private Integer mouldNum;
+
 
 
 }

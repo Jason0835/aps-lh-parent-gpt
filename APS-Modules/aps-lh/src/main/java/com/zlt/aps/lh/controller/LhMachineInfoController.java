@@ -191,7 +191,7 @@ public class LhMachineInfoController extends AbstractDocBizController<LhMachineI
 
     @Override
     protected String getOrderBy() {
-        return "create_time, id desc";
+        return "MACHINE_CODE asc";
     }
 
 }

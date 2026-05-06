@@ -231,11 +231,6 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.machine.singleDoubleMode"),
-          prop: "singleDoubleMode",
-          minWidth: 100,
-        },
-        {
           label: this.$t("ui.data.column.machine.mouldNum"),
           prop: "maxMoldNum",
           minWidth: 100,
