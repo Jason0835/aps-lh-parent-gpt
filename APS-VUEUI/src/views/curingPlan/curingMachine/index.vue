@@ -139,8 +139,12 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {},
-      query: {},
+      search: {
+        factoryCode: "116",
+      },
+      query: {
+        factoryCode: "116",
+      },
       selection: [],
     };
   },
@@ -328,6 +332,13 @@ export default {
     },
     searchColumns() {
       return [
+        {
+          label: this.$t("common.factory"),
+          prop: "factoryCode",
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          filterable: true,
+        },
         {
           label: this.$t("ui.data.column.machine.machineCode"),
           prop: "machineCode",

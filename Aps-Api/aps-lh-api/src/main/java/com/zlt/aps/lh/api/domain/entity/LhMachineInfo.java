@@ -185,4 +185,14 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     @TableField(value = "SINGLE_DOUBLE_MODE")
     private Integer singleDoubleMode;
 
+    /**
+     * 模台数
+     */
+    @ImportExcelValidated(required = true, digits = true, min = 1, max = 9999)
+    @Excel(name = "ui.data.column.info.singleDoubleMode", cellType = Excel.ColumnType.NUMERIC, sort = 85)
+    @ApiModelProperty(value = "模台数", name = "mouldNum")
+    @TableField(value = "MOULD_NUM")
+    private Integer mouldNum;
+
+
 }
