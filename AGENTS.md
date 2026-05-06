@@ -38,6 +38,7 @@ UIController extends BaseUIController<Entity>
 - 非数据库字段必须添加 `@TableField(exist = false)`
 - 不在数据库的字段要求反显时，参考@docs/字段反显.md
 - 唯一性校验返回值：`UserConstants.NOT_UNIQUE = "1"` 不唯一，`UserConstants.UNIQUE = "0"` 唯一
+- 如果要生成sql语，创建一个sql文件，放到@docs/sql
 
 ### Excel导入导出：
 - 所有导出字段必须添加 `@Excel` 注解

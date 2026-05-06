@@ -73,6 +73,20 @@ public class CxStructureTreadConfigController extends AbstractDocBizController<C
         return super.importData(importContext, updateSupport);
     }
 
+    @Log(title = "ui.data.column.cxStructureTreadConfig.generate", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("生成胎面整车配置")
+    @PostMapping("/generateTreadConfig")
+    public AjaxResult generateTreadConfig() {
+        return cxStructureTreadConfigService.generateTreadConfig();
+    }
+
+    @Log(title = "ui.data.column.cxStructureTreadConfig.sameStructureTreadCount", businessType = BusinessType.UPDATE)
+    @ApiOperation("批量更新相同工厂相同结构整车胎面条数")
+    @PostMapping("/updateSameStructureTreadCount")
+    public AjaxResult updateSameStructureTreadCount(@RequestBody CxStructureTreadConfig entity) {
+        return cxStructureTreadConfigService.updateSameStructureTreadCount(entity);
+    }
+
     @Log(title = "胎面整车配置", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
@@ -102,6 +116,7 @@ public class CxStructureTreadConfigController extends AbstractDocBizController<C
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainMaterialDesc")), "MAIN_MATERIAL_DESC", queryVO.getFieldValueByFieldName("mainMaterialDesc"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("treadCount")), "TREAD_COUNT", queryVO.getFieldValueByFieldName("treadCount"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("dataVersion")), "DATA_VERSION", queryVO.getFieldValueByFieldName("dataVersion"));
+        queryWrapper.and("1".equals(queryVO.getUnconfiguredTreadCount()), wrapper -> wrapper.eq("TREAD_COUNT", 0).or().isNull("TREAD_COUNT"));
     }
 
     @Override
@@ -111,6 +126,6 @@ public class CxStructureTreadConfigController extends AbstractDocBizController<C
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "STRUCTURE_CODE desc,create_time desc";
     }
 }

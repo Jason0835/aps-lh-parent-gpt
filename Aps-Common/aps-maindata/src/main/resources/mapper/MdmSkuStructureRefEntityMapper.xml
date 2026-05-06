@@ -30,6 +30,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="getStructureSelectWithDescList"
             resultType="com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef">
         SELECT DISTINCT
+        TMSSR.FACTORY_CODE,
         TMSSR.STRUCTURE_NAME,
         TMSSR.MAIN_MATERIAL_DESC,
         tmi.EMBRYO_CODE
@@ -49,7 +50,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="structureName != null and structureName != ''">AND TMSSR.STRUCTURE_NAME like
             concat(concat('%',#{structureName}), '%')
         </if>
-        GROUP BY TMSSR.STRUCTURE_NAME,
+        GROUP BY TMSSR.FACTORY_CODE,
+        TMSSR.STRUCTURE_NAME,
         TMSSR.MAIN_MATERIAL_DESC,
         tmi.EMBRYO_CODE
     </select>

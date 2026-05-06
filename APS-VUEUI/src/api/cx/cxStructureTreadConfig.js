@@ -64,3 +64,18 @@ export function importTemplateCxStructureTreadConfig() {
     responseType: 'blob'
   })
 }
+
+export function generateCxStructureTreadConfig() {
+  return request({
+    url: '/cx/cxStructureTreadConfig/generateTreadConfig',
+    method: 'post'
+  })
+}
+
+export function updateSameStructureTreadCount(data) {
+  return request({
+    url: '/cx/cxStructureTreadConfig/updateSameStructureTreadCount',
+    method: 'post',
+    data
+  })
+}

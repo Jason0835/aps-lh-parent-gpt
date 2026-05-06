@@ -64,4 +64,9 @@ public class CxStructureTreadConfig extends BaseEntity implements Serializable {
     @TableField(value = "COMPANY_CODE")
     private String companyCode;
 
+    /** 未配置整车胎面 */
+    @ApiModelProperty(value = "未配置整车胎面")
+    @TableField(exist = false)
+    private String unconfiguredTreadCount;
+
 }

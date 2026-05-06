@@ -39,4 +39,19 @@ public interface ICxStructureTreadConfigService extends IDocService<CxStructureT
      * @return 结果
      */
     int saveOrUpdateBatch(List<CxStructureTreadConfig> list);
+
+    /**
+     * 从SKU与结构关系生成胎面整车配置。
+     *
+     * @return 生成结果
+     */
+    AjaxResult generateTreadConfig();
+
+    /**
+     * 按工厂+结构批量更新整车胎面条数。
+     *
+     * @param entity 更新参数
+     * @return 更新结果
+     */
+    AjaxResult updateSameStructureTreadCount(CxStructureTreadConfig entity);
 }

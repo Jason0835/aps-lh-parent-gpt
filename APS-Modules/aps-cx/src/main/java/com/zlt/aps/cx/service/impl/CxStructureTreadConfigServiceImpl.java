@@ -1,6 +1,7 @@
 package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -163,6 +164,69 @@ public class CxStructureTreadConfigServiceImpl extends AbstractDocService<CxStru
     }
 
     /**
+     * 从SKU与结构关系一次性同步生成胎面整车配置。
+     */
+    @Override
+    public AjaxResult generateTreadConfig() {
+        MdmSkuStructureRef queryVO = new MdmSkuStructureRef();
+        List<MdmSkuStructureRef> structureRefList = mdmSkuStructureRefEntityMapper.getStructureSelectWithDescList(queryVO);
+        if (CollectionUtils.isEmpty(structureRefList)) {
+            return AjaxResult.success(String.format(I18nUtil.getMessage("ui.data.alert.cxStructureTreadConfig.generate.success"), 0), 0);
+        }
+        // 原有配置列表
+        List<CxStructureTreadConfig> existsList = cxStructureTreadConfigMapper.selectList(new LambdaQueryWrapper<>());
+        Set<String> existsKeySet = existsList.stream()
+                .map(this::buildUniqueMatchKey)
+                .filter(StringUtil::isNotBlank)
+                .collect(Collectors.toSet());
+
+        int generateCount = 0;
+        for (MdmSkuStructureRef structureRef : structureRefList) {
+            if (StringUtil.isBlank(structureRef.getFactoryCode())
+                    || StringUtil.isBlank(structureRef.getStructureName())
+                    || StringUtil.isBlank(structureRef.getMainMaterialDesc())
+                    || StringUtil.isBlank(structureRef.getEmbryoCode())) {
+                continue;
+            }
+
+            String matchKey = buildUniqueMatchKey(structureRef.getFactoryCode(), structureRef.getStructureName(),
+                    structureRef.getMainMaterialDesc(), structureRef.getEmbryoCode());
+            if (existsKeySet.contains(matchKey)) {
+                continue;
+            }
+
+            CxStructureTreadConfig entity = new CxStructureTreadConfig();
+            entity.setFactoryCode(structureRef.getFactoryCode());
+            entity.setStructureCode(structureRef.getStructureName());
+            entity.setMainMaterialDesc(structureRef.getMainMaterialDesc());
+            entity.setEmbryoCode(structureRef.getEmbryoCode());
+            cxStructureTreadConfigMapper.insert(entity);
+            existsKeySet.add(matchKey);
+            generateCount++;
+        }
+
+        return AjaxResult.success(String.format(I18nUtil.getMessage("ui.data.alert.cxStructureTreadConfig.generate.success"), generateCount), generateCount);
+    }
+
+    /**
+     * 按工厂+结构批量更新整车胎面条数。
+     */
+    @Override
+    public AjaxResult updateSameStructureTreadCount(CxStructureTreadConfig entity) {
+        if (entity == null || StringUtil.isBlank(entity.getFactoryCode())
+                || StringUtil.isBlank(entity.getStructureCode()) || entity.getTreadCount() == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.cxStructureTreadConfig.sameStructureTreadCount.required"));
+        }
+        LambdaUpdateWrapper<CxStructureTreadConfig> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(CxStructureTreadConfig::getFactoryCode, entity.getFactoryCode());
+        updateWrapper.eq(CxStructureTreadConfig::getStructureCode, entity.getStructureCode());
+        updateWrapper.eq(CxStructureTreadConfig::getIsDelete, 0);
+        updateWrapper.set(CxStructureTreadConfig::getTreadCount, entity.getTreadCount());
+        int updateCount = cxStructureTreadConfigMapper.update(null, updateWrapper);
+        return AjaxResult.success(String.format(I18nUtil.getMessage("ui.data.alert.cxStructureTreadConfig.sameStructureTreadCount.success"), updateCount), updateCount);
+    }
+
+    /**
      * 按工厂批量预取结构名称，避免导入时逐行查询SKU与结构关系。
      */
     private Map<String, Set<String>> getStructureNameMap(List<CxStructureTreadConfig> list) {
@@ -207,6 +271,28 @@ public class CxStructureTreadConfigServiceImpl extends AbstractDocService<CxStru
         queryWrapper.eq(CxStructureTreadConfig::getStructureCode, entity.getStructureCode());
         queryWrapper.eq(CxStructureTreadConfig::getEmbryoCode, entity.getEmbryoCode());
         return cxStructureTreadConfigMapper.selectList(queryWrapper).stream().findFirst().orElse(null);
+    }
+
+    /**
+     * 生成工厂+结构+胎胚描述+胎胚编码匹配键。
+     */
+    private String buildUniqueMatchKey(CxStructureTreadConfig entity) {
+        if (entity == null) {
+            return "";
+        }
+        return buildUniqueMatchKey(entity.getFactoryCode(), entity.getStructureCode(),
+                entity.getMainMaterialDesc(), entity.getEmbryoCode());
+    }
+
+    /**
+     * 生成工厂+结构+胎胚描述+胎胚编码匹配键。
+     */
+    private String buildUniqueMatchKey(String factoryCode, String structureCode, String mainMaterialDesc, String embryoCode) {
+        if (StringUtil.isBlank(factoryCode) || StringUtil.isBlank(structureCode)
+                || StringUtil.isBlank(mainMaterialDesc) || StringUtil.isBlank(embryoCode)) {
+            return "";
+        }
+        return factoryCode.trim() + "|" + structureCode.trim() + "|" + mainMaterialDesc.trim() + "|" + embryoCode.trim();
     }
 
     private void fillDefaultFactoryCode(CxStructureTreadConfig entity) {
