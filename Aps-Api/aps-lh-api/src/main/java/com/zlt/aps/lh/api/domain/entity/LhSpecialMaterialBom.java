@@ -40,15 +40,6 @@ public class LhSpecialMaterialBom extends BaseEntity implements Serializable {
     private String factoryCode;
 
     /**
-     * 结构编码
-     */
-    @Excel(name = "ui.data.column.lhSpecialMaterialBom.structureCode")
-    @ApiModelProperty(value = "结构编码")
-    @TableField(value = "STRUCTURE_CODE")
-    @ImportExcelValidated(maxLength = 50)
-    private String structureCode;
-
-    /**
      * 结构名称
      */
     @Excel(name = "ui.data.column.lhSpecialMaterialBom.structureName", width = 40, align = Excel.Align.LEFT)

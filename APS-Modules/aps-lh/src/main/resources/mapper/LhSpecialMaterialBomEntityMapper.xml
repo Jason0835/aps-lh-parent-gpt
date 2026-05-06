@@ -7,7 +7,6 @@
     <resultMap type="com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom" id="LhSpecialMaterialBomResult">
         <result property="id" column="ID"/>
         <result property="factoryCode" column="FACTORY_CODE"/>
-        <result property="structureCode" column="STRUCTURE_CODE"/>
         <result property="structureName" column="STRUCTURE_NAME"/>
         <result property="materialCode" column="MATERIAL_CODE"/>
         <result property="materialDesc" column="MATERIAL_DESC"/>
@@ -22,7 +21,7 @@
     </resultMap>
 
     <sql id="selectLhSpecialMaterialBomVo">
-        SELECT ID, FACTORY_CODE, STRUCTURE_CODE, STRUCTURE_NAME, MATERIAL_CODE, MATERIAL_DESC,
+        SELECT ID, FACTORY_CODE, STRUCTURE_NAME, MATERIAL_CODE, MATERIAL_DESC,
                CATEGORY, COMPANY_CODE, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE, REMARK
         FROM T_LH_SPECIAL_MATERIAL_BOM
     </sql>
@@ -30,7 +29,6 @@
     <insert id="insertBatch">
         INSERT INTO T_LH_SPECIAL_MATERIAL_BOM (
             FACTORY_CODE,
-            STRUCTURE_CODE,
             STRUCTURE_NAME,
             MATERIAL_CODE,
             MATERIAL_DESC,
@@ -45,7 +43,6 @@
         <foreach collection="list" item="item" separator=",">
             (
                 #{item.factoryCode},
-                #{item.structureCode},
                 #{item.structureName},
                 #{item.materialCode},
                 #{item.materialDesc},
@@ -65,7 +62,6 @@
             UPDATE T_LH_SPECIAL_MATERIAL_BOM
             <set>
                 FACTORY_CODE = #{item.factoryCode},
-                STRUCTURE_CODE = #{item.structureCode},
                 STRUCTURE_NAME = #{item.structureName},
                 MATERIAL_CODE = #{item.materialCode},
                 MATERIAL_DESC = #{item.materialDesc},

@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  * 特殊物料清单配置服务实现类
  * <p>
  * 参考成型关键产品配置(CxKeyProduct)实现，
- * 唯一性校验逻辑：结构编码+分类 或 物料编码+分类 不能重复
+ * 唯一性校验逻辑：结构+分类 或 物料编码+分类 不能重复
  * 结构与物料可以只填1个
  *
  * @author zlt
@@ -109,8 +109,8 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
         if (CollectionUtils.isNotEmpty(validList)) {
             // 2.1 按结构编码+分类分组
             Map<String, List<LhSpecialMaterialBom>> structureCategoryRepeatMap = validList.stream()
-                    .filter(item -> StringUtil.isNotBlank(item.getStructureCode()) && StringUtil.isNotBlank(item.getCategory()))
-                    .collect(Collectors.groupingBy(item -> item.getStructureCode() + "_" + item.getCategory()));
+                    .filter(item -> StringUtil.isNotBlank(item.getStructureName()) && StringUtil.isNotBlank(item.getCategory()))
+                    .collect(Collectors.groupingBy(item -> item.getStructureName() + "_" + item.getCategory()));
 
             // 2.2 按物料编码+分类分组
             Map<String, List<LhSpecialMaterialBom>> materialCategoryRepeatMap = validList.stream()
@@ -124,7 +124,7 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
                 boolean isCan = true;
 
                 // 必填字段校验 - 结构编码和物料编码至少填1个
-                if (StringUtil.isBlank(docEntity.getStructureCode()) && StringUtil.isBlank(docEntity.getMaterialCode())) {
+                if (StringUtil.isBlank(docEntity.getStructureName()) && StringUtil.isBlank(docEntity.getMaterialCode())) {
                     isCan = false;
                     String message = String.format(I18nUtil.getMessage("ui.data.alert.lhSpecialMaterialBom.structureOrMaterialRequired"), errorNum);
                     ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
@@ -148,8 +148,8 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
                 }
 
                 // Excel内重复校验 - 结构编码+分类
-                if (StringUtil.isNotBlank(docEntity.getStructureCode()) && StringUtil.isNotBlank(docEntity.getCategory())) {
-                    String structureCategoryKey = docEntity.getStructureCode() + "_" + docEntity.getCategory();
+                if (StringUtil.isNotBlank(docEntity.getStructureName()) && StringUtil.isNotBlank(docEntity.getCategory())) {
+                    String structureCategoryKey = docEntity.getStructureName() + "_" + docEntity.getCategory();
                     List<LhSpecialMaterialBom> repeatList = structureCategoryRepeatMap.get(structureCategoryKey);
                     if (CollectionUtils.isNotEmpty(repeatList) && repeatList.size() > 1) {
                         isCan = false;
@@ -187,8 +187,8 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
                         if (updateSupport) {
                             // 查询已存在记录进行更新
                             QueryWrapper<LhSpecialMaterialBom> queryWrapper = new QueryWrapper<>();
-                            if (StringUtil.isNotBlank(docEntity.getStructureCode())) {
-                                queryWrapper.eq("STRUCTURE_CODE", docEntity.getStructureCode());
+                            if (StringUtil.isNotBlank(docEntity.getStructureName())) {
+                                queryWrapper.eq("STRUCTURE_NAME", docEntity.getStructureName());
                             }
                             if (StringUtil.isNotBlank(docEntity.getMaterialCode())) {
                                 queryWrapper.eq("MATERIAL_CODE", docEntity.getMaterialCode());
@@ -250,8 +250,8 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
     /**
      * 校验唯一性
      * <p>
-     * 唯一性规则：结构编码+分类 或 物料编码+分类 不能重复
-     * 结构与物料可以只填1个，当填了结构编码时校验结构编码+分类唯一，
+     * 唯一性规则：结构+分类 或 物料编码+分类 不能重复
+     * 结构与物料可以只填1个，当填了结构时校验结构+分类唯一，
      * 当填了物料编码时校验物料编码+分类唯一
      *
      * @param entity 校验对象
@@ -264,10 +264,10 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
         }
 
         // 校验结构编码+分类唯一性
-        if (StringUtil.isNotBlank(entity.getStructureCode()) && StringUtil.isNotBlank(entity.getCategory())) {
+        if (StringUtil.isNotBlank(entity.getStructureName()) && StringUtil.isNotBlank(entity.getCategory())) {
             LambdaQueryWrapper<LhSpecialMaterialBom> wrapper = Wrappers.lambdaQuery();
             wrapper.ne(entity.getId() != null, LhSpecialMaterialBom::getId, entity.getId());
-            wrapper.eq(LhSpecialMaterialBom::getStructureCode, entity.getStructureCode());
+            wrapper.eq(LhSpecialMaterialBom::getStructureName, entity.getStructureName());
             wrapper.eq(LhSpecialMaterialBom::getCategory, entity.getCategory());
             Long count = lhSpecialMaterialBomEntityMapper.selectCount(wrapper);
             if (count > 0) {
@@ -292,6 +292,6 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("structureCode", "materialCode", "category");
+        return Arrays.asList("structureName", "materialCode", "category");
     }
 }

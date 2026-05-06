@@ -2355,7 +2355,6 @@
   "ui.alert.lhSpecifyMachine.specCodeNotExist": "未找到对应的物料编码！",
   "ui.data.column.lhSpecialMaterialBom.modelName": "特殊物料清单配置",
   "ui.data.column.lhSpecialMaterialBom.factoryCode": "分厂",
-  "ui.data.column.lhSpecialMaterialBom.structureCode": "结构编码",
   "ui.data.column.lhSpecialMaterialBom.structureName": "结构",
   "ui.data.column.lhSpecialMaterialBom.materialCode": "物料编码",
   "ui.data.column.lhSpecialMaterialBom.materialDesc": "物料描述",
