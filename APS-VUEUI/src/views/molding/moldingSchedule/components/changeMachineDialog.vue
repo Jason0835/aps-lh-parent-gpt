@@ -229,12 +229,17 @@ export default {
       // 如果传入了机台编码，自动查询并全选
       if (this.query.cxMachineCode) {
         await this.getList();
-        this.$nextTick(() => {
-          const tableRef = this.$refs.MoldingChangeMachineTable?.getTableRef?.();
-          if (tableRef && this.data.length > 0) {
-            this.data.forEach((row) => tableRef.toggleRowSelection(row, true));
-          }
-        });
+        if (this.data.length > 0) {
+          this.$nextTick(() => {
+            const tableRef = this.$refs.MoldingChangeMachineTable?.getTableRef?.();
+            if (tableRef) {
+              this.data.forEach((row) => tableRef.toggleRowSelection(row, true));
+            } else {
+              // 回退：直接设置 selection 数组
+              this.selection = [...this.data];
+            }
+          });
+        }
       }
     },
     hide() {
