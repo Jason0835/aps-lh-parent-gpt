@@ -1,17 +1,32 @@
 package com.zlt.aps.lh.controller;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.IExportLogService;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.ServletUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.domain.ExcelStyleVo;
+import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
-import com.zlt.aps.lh.component.OrderNoGenerator;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
+import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
+import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.utils.AppUtils;
@@ -22,17 +37,17 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import jodd.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.poi.ss.usermodel.IndexedColors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.io.InputStream;
+import java.util.*;
 import java.util.stream.Collectors;
-import org.apache.commons.collections4.CollectionUtils;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -60,6 +75,53 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     private LhMouldChangePlanEntityMapper lhMouldChangePlanMapper;
     @Resource
     private OrderNoGenerator orderNoGenerator;
+
+    @Autowired
+    private IExportLogService iExportLogService;
+
+    @Autowired
+    private IImportErrorLogService iImportErrorLogService;
+
+    @Autowired
+    private IImportLogService iImportLogService;
+
+    private final List<String> redMouldNoList = Arrays.asList(
+            "HM20220503621",
+            "HM20220603637",
+            "HM20220503622",
+            "HM20220603638",
+            "HM20220603637",
+            "HM20220603638",
+            "HM20240503973",
+            "HM20240503974",
+            "HM2019102208",
+            "HM2019102209",
+            "HM20240503973",
+            "HM20251104115",
+            "HM20240503974",
+            "HM20251104116",
+            "HM2019102208",
+            "HM20251104113",
+            "HM2019102209",
+            "HM20251104114",
+            "HM20201102281",
+            "HM20201102282",
+            "HM20240203941",
+            "HM20240203942",
+            "HM20201102281",
+            "HM20251104117",
+            "HM20201102282",
+            "HM20251104118",
+            "HM20240203941",
+            "HM20240203942",
+            "HM20251104119",
+            "HM20251104120",
+            "HM20230503799",
+            "HM20230503800",
+            "HM2019102222",
+            "HM2019102223",
+            "HM20251104109",
+            "HM20251104110", "HM20201102273");
 
     /**
      * 查询模具交替计划列表
@@ -173,6 +235,125 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         List<LhMouldChangePlan> list = lhMouldChangePlanMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;
+    }
+
+    /**
+     * 导出模具交替计划模板数据
+     */
+    @Log(title = "模具交替计划", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出模具交替计划模板数据")
+    @PostMapping("/exportDataChangePlan/{fileName}")
+    public byte[] exportDataChangePlan(@RequestBody LhMouldChangePlan queryVO, @PathVariable("fileName") String fileName) {
+        Date beginTime = DateUtils.getNowDate();
+
+        InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("excelModel/lhhmjh.xlsx");
+        if (Objects.isNull(inputStream)) {
+            throw new ServiceException("硫化计划导出模板不存在");
+        }
+
+        //1.获取导出数据
+        List<LhMouldChangePlan> list = this.listExportData(queryVO);
+        List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list);
+        Map<String, Object> tableMap = buildExportTableMap(exportList, queryVO.getScheduleDate());
+        List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
+        excelDataList.add(buildExportDataList(exportList));
+
+        byte[] resultBytes =  ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
+        Date endTime = DateUtils.getNowDate();
+
+        //3.组装导出日志
+        ExportLog exportLog = new ExportLog();
+        exportLog.setProcedureCode("0");
+        exportLog.setExportParams(queryVO.toString());
+        String uri = ServletUtils.getRequest().getRequestURI();
+        exportLog.setFunctionCode(uri.split("/")[1]);
+        exportLog.setFunctionName(fileName);
+        exportLog.setFileName(fileName + ExcelUtil.XLSX_FILE);
+        exportLog.setRowCount(list.size());
+        exportLog.setBeginTime(beginTime);
+        exportLog.setEndTime(endTime);
+        exportLog.setSpendTime(DateUtils.getDiffTime(endTime,beginTime));
+        iExportLogService.add(exportLog);
+        return resultBytes;
+    }
+
+    /**
+     * 构建模板表头数据
+     *
+     * @param list 排程结果列表
+     * @param scheduleDate 排程日期
+     * @return 模板表头数据
+     */
+    private Map<String, Object> buildExportTableMap(List<LhMouldChangePlanVo> list, Date scheduleDate) {
+        Map<String, Object> tableMap = new HashMap<>(16);
+        String cnFormatDate = DateUtil.format(scheduleDate, "yyyy年MM月dd日");
+        String vnFormatDate = DateUtil.format(scheduleDate, "dd/MM/yyyy");
+        String titleFormat = cnFormatDate + "全钢硫化工程模具交替计划\n" +
+                "KẾ HOẠCH THAY KHUÔN TOÀN THÉP NGÀY " + vnFormatDate;
+        tableMap.put("title", titleFormat);
+        tableMap.put("version", "版本phiên bản：" + DateUtils.parseDateToStr("yyyyMMddHHmmss", new Date()));
+        return tableMap;
+    }
+
+    private List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list) {
+        List<Map<String, Object>> dataList = new ArrayList<>();
+        for (int i = 0; i < list.size(); i++) {
+            LhMouldChangePlanVo item = list.get(i);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("seq", i + 1);
+            row.put("planDate", item.getPlanDate());
+            row.put("classIndex", item.getClassIndex());
+            row.put("lhMachineCode", item.getLhMachineCode());
+            row.put("planOrder", item.getPlanOrder());
+            row.put("leftRightMould", item.getLeftRightMould());
+            row.put("beforeMaterialCode", item.getBeforeMaterialCode());
+            row.put("beforeMaterialDesc", item.getBeforeMaterialDesc());
+            row.put("afterMaterialCode", item.getAfterMaterialCode());
+            row.put("afterMaterialDesc", item.getAfterMaterialDesc());
+            row.put("changeType", item.getChangeType());
+            row.put("isDryIceClean", item.getIsDryIceClean());
+            row.put("isSandblastingClean", item.getIsSandblastingClean());
+            row.put("isReplaceBlock", item.getIsReplaceBlock());
+            String mouldCodeStr = item.getMouldCode();
+            row.put("mouldCode", mouldCodeStr);
+            row.put("remark", item.getRemark());
+
+            String[] mouldCodeArr = mouldCodeStr.split(",");
+            for (String mouldCode : mouldCodeArr) {
+                if (redMouldNoList.contains(mouldCode)) {
+                    ExcelStyleVo excelStyleVo = new ExcelStyleVo();
+                    excelStyleVo.setColor(IndexedColors.RED.index);
+                    row.put("style", excelStyleVo);
+                }
+            }
+
+            dataList.add(row);
+        }
+        return dataList;
+    }
+
+    private List<LhMouldChangePlanVo> buildLhMouldChangePlanVoList(List<LhMouldChangePlan> list) {
+        List<LhMouldChangePlanVo> resultList = new ArrayList<>();
+        int seq = 1;
+        for (LhMouldChangePlan lhMouldChangePlan : list) {
+            LhMouldChangePlanVo lhMouldChangePlanVo = new LhMouldChangePlanVo();
+            BeanUtil.copyProperties(lhMouldChangePlan, lhMouldChangePlanVo);
+
+            lhMouldChangePlanVo.setSeq(seq++);
+
+            String changeMouldType = lhMouldChangePlan.getChangeMouldType();
+            if (MouldChangeTypeEnum.TYPE_BLOCK.getCode().equals(changeMouldType)) {
+                lhMouldChangePlanVo.setIsReplaceBlock(YesOrNoEnum.YES.getValue());
+            }
+            if (MouldChangeTypeEnum.SAND_BLAST.getCode().equals(changeMouldType)) {
+                lhMouldChangePlanVo.setIsSandblastingClean(YesOrNoEnum.YES.getValue());
+            }
+            if (MouldChangeTypeEnum.DRY_ICE.getCode().equals(changeMouldType)) {
+                lhMouldChangePlanVo.setIsDryIceClean(YesOrNoEnum.YES.getValue());
+            }
+            resultList.add(lhMouldChangePlanVo);
+        }
+        return resultList;
     }
 
     @Override
