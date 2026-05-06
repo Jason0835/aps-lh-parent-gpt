@@ -115,6 +115,11 @@ public class MonthPlanFinalizedChangeEventListeners {
     public void handleMonthPlanAdjustedEvent(MonthPlanAdjustedEvent event) {
         try {
             MonthPlanFinalizedEventDto eventDto = event.getEventDto();
+            // 写入月度硫化监控表
+            // t_mp_month_plan_monitor
+            // 上机日期 = 排产周期的开始日 +  (startDay -1 )
+            List<FactoryMonthPlanProductionFinalResult> finalList = eventDto.getFinalList();
+            mpMonthPlanMonitorService.insertMonitorByFinalList(eventDto.getParam(), finalList);
             log.info("月计划调整事件开始执行，事件ID：{}，事件参数：{}", event.getEventId(), JSONObject.toJSONString(eventDto));
             syncMonthPlanToScmAndMes(eventDto, "月计划调整事件", Boolean.TRUE);
             log.info("月计划调整事件执行完成");
