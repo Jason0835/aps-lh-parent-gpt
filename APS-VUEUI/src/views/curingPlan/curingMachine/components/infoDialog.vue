@@ -30,7 +30,7 @@
 <script>
 import infoForm from "@/views/components/infoForm.vue";
 import { editMachine, checkMachineCodeUnique } from "@/api/lh/machine";
-import { listMdmModelInfo } from "@/api/mdm/mdmModelInfo";
+import { listMouldSleeve } from "@/api/mdm/mdmModelInfo";
 import { status } from "nprogress";
 
 export default {
@@ -208,8 +208,8 @@ export default {
           maxlength:20,
         },
         {
-          label: this.$t("ui.data.column.machine.mouldSetCode"),
-          prop: "mouldSetCode",
+          label: this.$t("ui.data.column.machine.shellStandard"),
+          prop: "shellStandard",
           type: "select",
           options: this.mouldSleeveOptions,
           attrs: {
@@ -338,11 +338,8 @@ export default {
     //utils
     async getMouldSleeveOptions() {
       try {
-        const res = await listMdmModelInfo({});
-        const mouldSleeves = res.rows
-          .map(item => item.mouldSleeve)
-          .filter(item => item && item.trim() !== "");
-        this.mouldSleeveOptions = [...new Set(mouldSleeves)].map(item => ({
+        const res = await listMouldSleeve();
+        this.mouldSleeveOptions = res.map(item => ({
           label: item,
           value: item,
         }));
@@ -367,7 +364,7 @@ export default {
           openMachineClass: data.openMachineClass
             ? data.openMachineClass.split(",")
             : [],
-          mouldSetCode: data.mouldSetCode ? data.mouldSetCode.split(",") : [],
+          shellStandard: data.shellStandard ? data.shellStandard.split(",") : [],
           status: data.status == "1" ? true : false,
         };
         console.log(this.form);
@@ -376,7 +373,7 @@ export default {
           classShift: "2",
           openMachineClass: [],
           factoryCode: "116",
-          mouldSetCode: [],
+          shellStandard: [],
         };
       }
     },
@@ -437,8 +434,8 @@ export default {
         if (params.openMachineClass) {
           params.openMachineClass = params.openMachineClass.join(",");
         }
-        if (params.mouldSetCode && Array.isArray(params.mouldSetCode)) {
-          params.mouldSetCode = params.mouldSetCode.join(",");
+        if (params.shellStandard && Array.isArray(params.shellStandard)) {
+          params.shellStandard = params.shellStandard.join(",");
         }
         Object.keys(params).forEach((key) => {
           if (this.isEmpty(params[key])) {

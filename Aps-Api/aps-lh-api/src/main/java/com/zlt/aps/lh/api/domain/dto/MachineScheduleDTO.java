@@ -29,7 +29,7 @@ public class MachineScheduleDTO {
     /** 寸口范围上限 */
     private BigDecimal dimensionMaximum;
     /** 模套型号 */
-    private String mouldSetCode;
+    private String shellStandard;
     /** 机台排序号 */
     private int machineOrder;
 

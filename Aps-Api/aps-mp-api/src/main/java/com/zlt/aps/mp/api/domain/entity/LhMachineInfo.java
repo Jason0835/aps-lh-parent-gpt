@@ -156,8 +156,8 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     /**
      * 模套型号，默认值：通用
      */
-    @ApiModelProperty(value = "模套型号", name = "mouldSetCode")
-    @TableField("MOULD_SET_CODE")
-    private String mouldSetCode;
+    @ApiModelProperty(value = "模套型号", name = "shellStandard")
+    @TableField("SHELL_STANDARD")
+    private String shellStandard;
 
 }

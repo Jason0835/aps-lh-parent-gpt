@@ -1,9 +1,8 @@
 import request from '@/utils/request'
 
-export function listMdmModelInfo(query) {
+export function listMouldSleeve() {
   return request({
-    url: '/mdm/mdmModelInfo/list',
-    method: 'post',
-    data: query
+    url: '/lh/lhMachineInfo/mouldSleeve/list',
+    method: 'get'
   })
 }

@@ -147,10 +147,10 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     /**
      * 模套型号，默认值：通用
      */
-    @Excel(name = "ui.data.column.info.mouldSetCode", sort = 52)
-    @ApiModelProperty(value = "模套型号", name = "mouldSetCode")
-    @TableField("MOULD_SET_CODE")
-    private String mouldSetCode;
+    @Excel(name = "ui.data.column.info.shellStandard", sort = 52)
+    @ApiModelProperty(value = "模套型号", name = "shellStandard")
+    @TableField("SHELL_STANDARD")
+    private String shellStandard;
 
     /**
      * 支持19.5寸宽基 0-否，1-是

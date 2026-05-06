@@ -339,7 +339,7 @@
   "ui.data.column.machine.manufacturer": "厂家",
   "ui.data.column.machine.dimensionSize": "尺寸",
   "ui.data.column.machine.hotPlateDiameter": "热板直径",
-  "ui.data.column.machine.mouldSetCode": "适用的模套型号",
+  "ui.data.column.machine.shellStandard": "适用的模套型号",
   "ui.data.column.machine.support195WideBase": "支持19.5寸宽基",
   "ui.data.column.machine.support225WideBase": "支持22.5寸宽基",
   "ui.data.column.machine.supportChipTire": "支持芯片胎",
