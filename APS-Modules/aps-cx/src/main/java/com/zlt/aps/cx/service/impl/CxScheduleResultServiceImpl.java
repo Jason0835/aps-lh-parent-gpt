@@ -1,23 +1,21 @@
 package com.zlt.aps.cx.service.impl;
 
-import com.ruoyi.common.utils.StringUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
+import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
 import com.zlt.aps.cx.service.CxScheduleDetailService;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
 import com.zlt.bill.common.service.AbstractDocService;
-import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.common.enums.ImportErrorTypeEnums;
-import com.ruoyi.common.exception.ServiceException;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -26,9 +24,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -177,6 +175,29 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         excelDataList.add(buildExportDataList(exportList));
         return ExcelUtils.writeMultiList(inputStream, 1, tableMap, excelDataList);
+    }
+
+    /**
+     * 导出成型余量数据。
+     *
+     * @param queryVO 查询条件，按成型排程结果列表查询口径筛选数据
+     * @param fileName 导出文件名，保留用于对齐远程调用契约
+     * @return 成型余量Excel文件字节数组
+     */
+    @Override
+    public byte[] exportCxRemainQty(CxScheduleResult queryVO, String fileName) {
+        InputStream inputStream = this.getClass().getClassLoader()
+                .getResourceAsStream("excelModel/cxyl.xlsx");
+        if (Objects.isNull(inputStream)) {
+            throw new ServiceException("成型余量导出模板不存在");
+        }
+
+        // 按成型排程结果列表的查询口径查询明细数据，再按机台+物料合并余量。
+        List<CxScheduleResult> list = cxScheduleResultMapper.selectList(buildCxRemainQtyQueryWrapper(queryVO));
+        Map<String, Object> tableMap = new HashMap<>(16);
+        List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
+        excelDataList.add(buildCxRemainQtyExportDataList(list));
+        return ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
     }
 
     @Override
@@ -372,6 +393,113 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         return StringUtils.defaultString(cxMachineCode).trim() + "|"
                 + cn.hutool.core.date.DateUtil.format(cn.hutool.core.date.DateUtil.beginOfDay(scheduleDate), "yyyy-MM-dd") + "|"
                 + StringUtils.defaultString(materialCode).trim();
+    }
+
+    /**
+     * 构建成型余量导出查询条件。
+     *
+     * @param queryVO 查询条件，来源于UI导出请求
+     * @return 成型排程结果Lambda查询条件
+     */
+    private LambdaQueryWrapper<CxScheduleResult> buildCxRemainQtyQueryWrapper(CxScheduleResult queryVO) {
+        CxScheduleResult query = Objects.isNull(queryVO) ? new CxScheduleResult() : queryVO;
+        return new LambdaQueryWrapper<CxScheduleResult>()
+                .eq(PubUtil.isNotEmpty(query.getScheduleDate()), CxScheduleResult::getScheduleDate, query.getScheduleDate())
+                .like(PubUtil.isNotEmpty(query.getCxMachineCode()), CxScheduleResult::getCxMachineCode, query.getCxMachineCode())
+                .like(PubUtil.isNotEmpty(query.getMaterialCode()), CxScheduleResult::getMaterialCode, query.getMaterialCode())
+                .like(PubUtil.isNotEmpty(query.getMaterialDesc()), CxScheduleResult::getMaterialDesc, query.getMaterialDesc())
+                .like(PubUtil.isNotEmpty(query.getMainMaterialDesc()), CxScheduleResult::getMainMaterialDesc, query.getMainMaterialDesc())
+                .eq(PubUtil.isNotEmpty(query.getOrderNo()), CxScheduleResult::getOrderNo, query.getOrderNo())
+                .eq(PubUtil.isNotEmpty(query.getProductionStatus()), CxScheduleResult::getProductionStatus, query.getProductionStatus())
+                .eq(PubUtil.isNotEmpty(query.getIsRelease()), CxScheduleResult::getIsRelease, query.getIsRelease())
+                .orderByAsc(CxScheduleResult::getCxMachineCode)
+                .orderByAsc(CxScheduleResult::getMaterialCode);
+    }
+
+    /**
+     * 构建成型余量模板列表数据。
+     *
+     * @param list 成型排程结果明细列表
+     * @return 模板列表行数据，字段名与cxyl.xlsx中的列表占位符保持一致
+     */
+    private List<Map<String, Object>> buildCxRemainQtyExportDataList(List<CxScheduleResult> list) {
+        List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
+        Map<String, List<CxScheduleResult>> groupMap = exportList.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(this::buildCxRemainQtyGroupKey, LinkedHashMap::new, Collectors.toList()));
+
+        List<Map<String, Object>> dataList = new ArrayList<>();
+        for (List<CxScheduleResult> groupList : groupMap.values()) {
+            if (CollectionUtils.isEmpty(groupList)) {
+                continue;
+            }
+            CxScheduleResult first = groupList.get(0);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("cxMachineCode", first.getCxMachineCode());
+            row.put("materialCode", first.getMaterialCode());
+            row.put("mainMaterialDesc", firstNonBlank(groupList, "mainMaterialDesc"));
+            // 小胶种暂未明确来源，按需求先导出空值，避免误用其他业务字段。
+            row.put("smallGlue", "");
+            row.put("cxRemainQty", sumCxRemainQty(groupList));
+            row.put("remark", buildCxRemainQtyRemark(groupList));
+            dataList.add(row);
+        }
+        return dataList;
+    }
+
+    /**
+     * 构建成型余量导出分组键。
+     *
+     * @param item 成型排程结果明细
+     * @return 机台编号和物料编码组成的唯一分组键
+     */
+    private String buildCxRemainQtyGroupKey(CxScheduleResult item) {
+        return StringUtils.defaultString(item.getCxMachineCode()).trim() + "|"
+                + StringUtils.defaultString(item.getMaterialCode()).trim();
+    }
+
+    /**
+     * 获取分组内第一个非空文本字段。
+     *
+     * @param list 分组明细列表
+     * @param fieldName 字段名称，目前用于胎胚描述取值
+     * @return 第一个非空字段值，没有则返回空字符串
+     */
+    private String firstNonBlank(List<CxScheduleResult> list, String fieldName) {
+        for (CxScheduleResult item : list) {
+            if ("mainMaterialDesc".equals(fieldName) && StringUtils.isNotBlank(item.getMainMaterialDesc())) {
+                return item.getMainMaterialDesc();
+            }
+        }
+        return "";
+    }
+
+    /**
+     * 合计分组内成型余量。
+     *
+     * @param list 分组明细列表
+     * @return 成型余量合计，空值按0处理
+     */
+    private BigDecimal sumCxRemainQty(List<CxScheduleResult> list) {
+        return list.stream()
+                .map(CxScheduleResult::getCxRemainQty)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * 构建分组备注。
+     *
+     * @param list 分组明细列表
+     * @return 去重后的备注文本，多个备注使用中文分号拼接
+     */
+    private String buildCxRemainQtyRemark(List<CxScheduleResult> list) {
+        return list.stream()
+                .map(CxScheduleResult::getRemark)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.joining("；"));
     }
 
     private Map<String, Object> buildExportTableMap(List<CxScheduleResult> list, Date scheduleDate) {
