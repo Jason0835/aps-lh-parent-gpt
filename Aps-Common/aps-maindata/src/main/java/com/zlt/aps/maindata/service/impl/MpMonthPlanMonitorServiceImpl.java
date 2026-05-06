@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -133,8 +134,16 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
                                     item.getMaterialCode()),
                             MdmUnqualifiedStock::getStockQty, Integer::sum));
         }
+        
+        // 查询当前版本是否已经有生成监控记录
+        LambdaQueryWrapper<MpMonthPlanMonitor> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MpMonthPlanMonitor::getProductionVersion, param.getProductionVersion());
+        Map<String, MpMonthPlanMonitor> oldMoniterMap = mpMonthPlanMonitorEntityMapper.selectList(queryWrapper).stream()
+                .collect(Collectors.toMap(MpMonthPlanMonitor::getProductionVersion, Function.identity(),
+                        (m1, m2) -> m1));
+        
         for (FactoryMonthPlanProductionFinalResult finalResult : finalList) {
-            MpMonthPlanMonitor monitor = new MpMonthPlanMonitor();
+            MpMonthPlanMonitor monitor = oldMoniterMap.computeIfAbsent(finalResult.getMaterialCode(), k -> new MpMonthPlanMonitor());
             monitor.setFactoryCode(finalResult.getFactoryCode());
             Integer year = finalResult.getYear();
             monitor.setYear(year);
@@ -182,6 +191,6 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
             monitor.setFinalResultId(finalResult.getId());
             list.add(monitor);
         }
-        baseDao.insertBatch(list);
+        baseDao.saveBatch(list);
     }
 }
