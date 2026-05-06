@@ -2618,5 +2618,6 @@
   "ui.lh.precisionPlan.generate.confirm": "确认生成{0}年度的硫化机保养计划吗？",
   "ui.lh.precisionPlan.generate.success": "生成成功，共生成{0}条数据",
   "ui.lh.precisionPlan.generate.fail": "生成失败",
-  "ui.lh.precisionPlan.generate.in.progress": "正在生成中，请稍后再试"
+  "ui.lh.precisionPlan.generate.in.progress": "正在生成中，请稍后再试",
+  "ui.data.column.cxStock.dataSource": "数据来源"
 }
