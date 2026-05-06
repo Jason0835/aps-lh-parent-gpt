@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.aps.lh.api.handler.LhMouldChangePlanExcelHandler;
 import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -114,7 +113,7 @@ public class LhMouldChangePlanVo extends BaseEntity implements Serializable {
     private Integer isReplaceBlock;
 
     @ApiModelProperty(value = "模具号")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.mouldCode", handler = LhMouldChangePlanExcelHandler.class)
+    @Excel(name = "ui.data.column.lhMouldChangePlan.mouldCode")
     @ImportExcelValidated(required = true, maxLength = 250)
     @TableField(value = "MOULD_CODE")
     private String mouldCode;
