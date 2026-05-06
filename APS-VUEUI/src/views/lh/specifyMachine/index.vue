@@ -256,6 +256,7 @@ export default {
     },
     handleEdit(row) {
       if (this.$refs.infoRef) {
+	  
         this.$refs.infoRef.show(row);
       }
     },

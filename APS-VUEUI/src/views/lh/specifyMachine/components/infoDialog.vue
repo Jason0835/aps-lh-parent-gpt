@@ -201,6 +201,7 @@ export default {
       this.getMachineList();
     },
     hide() {
+	
       this.form = {};
       this.machineOptions = [];
       this.$refs.form && this.$refs.form.triggerResetForm();
