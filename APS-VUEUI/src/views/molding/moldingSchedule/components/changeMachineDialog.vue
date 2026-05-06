@@ -217,15 +217,24 @@ export default {
     },
   },
   methods: {
-    show(payload = {}) {
+    async show(payload = {}) {
       this.visible = true;
       this.selection = [];
       this.form.newCxMachineCode = "";
       this.query.scheduleDate = payload.scheduleDate || "";
-      this.query.cxMachineCode = "";
+      this.query.cxMachineCode = payload.cxMachineCode || "";
       this.page.current = 1;
       this.data = [];
       this.page.total = 0;
+      // 如果传入了机台编码，自动查询并全选
+      if (this.query.cxMachineCode) {
+        await this.getList();
+        this.$nextTick(() => {
+          if (this.data.length > 0) {
+          this.$refs.MoldingChangeMachineTable?.toggleAllSelection();
+          }
+        });
+      }
     },
     hide() {
       this.visible = false;
