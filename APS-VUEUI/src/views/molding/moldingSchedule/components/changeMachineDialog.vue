@@ -230,8 +230,9 @@ export default {
       if (this.query.cxMachineCode) {
         await this.getList();
         this.$nextTick(() => {
-          if (this.data.length > 0) {
-          this.$refs.MoldingChangeMachineTable?.toggleAllSelection();
+          const tableRef = this.$refs.MoldingChangeMachineTable?.getTableRef?.();
+          if (tableRef && this.data.length > 0) {
+            this.data.forEach((row) => tableRef.toggleRowSelection(row, true));
           }
         });
       }

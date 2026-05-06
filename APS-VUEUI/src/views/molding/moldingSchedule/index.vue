@@ -57,7 +57,7 @@
         <el-button
           v-hasPermi="['cx:cxScheduleResult:changeMachine']"
           type="primary"
-          :disabled="selection.length !== 1"
+          :disabled="selection.length != 1"
           @click="handleChangeMachine"
           >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button
         >
