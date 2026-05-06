@@ -206,4 +206,14 @@ public class LhMachineInfoUIController extends BaseUIController<LhMachineInfo> {
         AjaxResult ajaxResult = iLhMachineInfoService.importData(context,false);
         return ajaxResult;
     }
+
+    /**
+     * 查询去重后的模套型号列表
+     */
+    @ApiOperation("查询去重后的模套型号列表")
+    @GetMapping("/mouldSleeve/list")
+    @ResponseBody
+    public AjaxResult listMouldSleeve() {
+        return iLhMachineInfoService.listMouldSleeve();
+    }
 }

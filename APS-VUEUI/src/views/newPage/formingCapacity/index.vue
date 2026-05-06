@@ -220,6 +220,9 @@ export default {
         },
       ];
 
+      const optionColumn = columns.pop();
+      columns.push(...this.buildMonthStructureColumns());
+      columns.push(optionColumn);
       return columns;
     },
     searchColumns() {
@@ -228,6 +231,7 @@ export default {
           prop: "factoryCode",
           label: this.$t("common.factory"),
           type: "select",
+          filterable: true,
           dictData: this.dict.type.biz_factory_name,
         },
 
@@ -239,12 +243,14 @@ export default {
           prop: "isZeroRack",
           label: this.$t("ui.data.column.capsuleChuck.isZeroRack"),
           type: "select",
+          filterable: true,
           dictData: this.dict.type.biz_yes_no,
         },
         {
           prop: "cxMachineTypeCode",
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
           type: "select",
+          filterable: true,
           dictData: this.dict.type.cx_machine_type_code,
         },
       ];
@@ -323,6 +329,23 @@ export default {
     },
     handleExport() {
       downloadLink("/monthplan/mdmMoldingMachine/export", this.formatParams(false));
+    },
+    buildMonthStructureColumns() {
+      const columns = [];
+      const current = new Date();
+      for (let i = 1; i <= 12; i++) {
+        const date = new Date(current.getFullYear(), current.getMonth() - i, 1);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const shortYear = String(year).slice(2);
+        columns.push({
+          prop: `monthStructureNameMap.${year}-${month}`,
+          label: `${shortYear}-${month}`,
+          minWidth: 180,
+          align: "left",
+        });
+      }
+      return columns;
     },
 
     formatParams(hasPage = true) {

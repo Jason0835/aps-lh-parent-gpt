@@ -83,4 +83,11 @@ public interface ILhMachineInfoRemoteService {
     @PostMapping("/lhMachineInfo/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
+    /**
+     * 查询去重后的模套型号列表
+     */
+    @ApiOperation("查询去重后的模套型号列表")
+    @GetMapping("/lhMachineInfo/mouldSleeve/list")
+    AjaxResult listMouldSleeve();
+
 }

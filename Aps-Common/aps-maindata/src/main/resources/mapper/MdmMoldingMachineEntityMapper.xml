@@ -4,4 +4,42 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.maindata.mapper.MdmMoldingMachineEntityMapper">
 
+    <select id="selectMachineMonthStructureNames"
+            resultType="com.zlt.aps.maindata.mapper.MdmMoldingMachineEntityMapper$MachineMonthStructureName">
+        SELECT DISTINCT
+               r.`YEAR` AS year,
+               r.`MONTH` AS month,
+               CONCAT(r.`YEAR`, '-', LPAD(r.`MONTH`, 2, '0')) AS yearMonth,
+               r.CX_MACHINE_CODE AS cxMachineCode,
+               s.STRUCTURE_NAME AS structureName
+          FROM t_mp_moulding_day_result r
+          JOIN t_mp_proc_version pv
+            ON pv.PRODUCTION_VERSION = r.PRODUCTION_VERSION
+           AND pv.FACTORY_CODE = r.FACTORY_CODE
+           AND pv.`YEAR` = r.`YEAR`
+           AND pv.`MONTH` = r.`MONTH`
+           AND pv.IS_DELETE = 0
+           AND pv.IS_FINAL = '1'
+          JOIN t_mdm_sku_structure_ref s
+            ON s.MAIN_MATERIAL_DESC = r.MAIN_MATERIAL_DESC
+           AND s.FACTORY_CODE = r.FACTORY_CODE
+           AND s.IS_DELETE = 0
+         WHERE r.IS_DELETE = 0
+           AND r.CX_MACHINE_CODE IS NOT NULL
+           AND r.CX_MACHINE_CODE != ''
+           AND s.STRUCTURE_NAME IS NOT NULL
+           AND s.STRUCTURE_NAME != ''
+        <if test="factoryCode != null and factoryCode != ''">
+           AND r.FACTORY_CODE = #{factoryCode}
+           AND s.FACTORY_CODE = #{factoryCode}
+           AND pv.FACTORY_CODE = #{factoryCode}
+        </if>
+        <if test="yearMonths != null and yearMonths.size() > 0">
+           AND CONCAT(r.`YEAR`, '-', LPAD(r.`MONTH`, 2, '0')) IN
+           <foreach collection="yearMonths" item="yearMonth" open="(" separator="," close=")">
+               #{yearMonth}
+           </foreach>
+        </if>
+    </select>
+
 </mapper>

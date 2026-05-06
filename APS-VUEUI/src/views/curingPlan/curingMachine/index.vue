@@ -192,8 +192,8 @@ export default {
           minWidth: 100,
         },
         {
-          label: this.$t("ui.data.column.machine.mouldSetCode"),
-          prop: "mouldSetCode",
+          label: this.$t("ui.data.column.machine.shellStandard"),
+          prop: "shellStandard",
           minWidth: 100,
         },
         {
