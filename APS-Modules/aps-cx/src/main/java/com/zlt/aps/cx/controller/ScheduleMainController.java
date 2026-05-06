@@ -1220,6 +1220,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
         // 产能校验（未确认时返回提示不强制拦截，已确认时跳过直接执行）
         if (!Boolean.TRUE.equals(vo.getConfirmed())) {
+            log.info("转机台首次调用 confirmed=false，执行产能校验");
             String capacityWarning = checkNewMachineCapacityTimeBased(transferRecords, vo.getNewMachineCode(), newMachine, shiftConfigMap);
             if (capacityWarning != null) {
                 AjaxResult result = AjaxResult.success(capacityWarning);
@@ -1227,7 +1228,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                 return result;
             }
         } else {
-            log.info("用户已确认转机台，跳过产能校验直接执行");
+            log.info("转机台二次调用 confirmed=true，跳过产能校验直接执行");
         }
 
         // 执行转机台
