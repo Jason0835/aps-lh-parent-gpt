@@ -265,6 +265,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 s.setMaxTypeBlockQty(maxTypeBlockQtyMap.getOrDefault(s.getMaterialDesc(), 0));
             });
             structureList.sort(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMaxMouldCavityQty, Comparator.reverseOrder()) // 最大型腔数倒序
+                    .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMainMaterialDesc)) // 胎胚描述
                     .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMainPattern, Comparator.nullsLast(String::compareTo))) // 主花纹
                     .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMaxTypeBlockQty, Comparator.reverseOrder())) // 最大活块数倒序
                     .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMaterialDesc, Comparator.nullsLast(String::compareTo))) // 物料描述

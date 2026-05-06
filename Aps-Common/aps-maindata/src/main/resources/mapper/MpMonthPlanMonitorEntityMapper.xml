@@ -33,9 +33,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		      ON lh.MONTH_PLAN_VERSION = v.PRODUCTION_VERSION
 		     AND lh.MATERIAL_CODE = v.MATERIAL_CODE
 		     AND lh.IS_DELETE = 0
-		 WHERE v.year = #{year}
+		 WHERE v.IS_DELETE = 0
+		   AND v.year = #{year}
 		   AND v.month = #{month}
 		   AND v.factory_code = #{factoryCode}
+		   AND EXISTS (
+		       SELECT 0 
+		         FROM T_MP_MONTH_PLAN_PROD_FINAL f
+                WHERE f.IS_DELETE = 0
+                  AND f.PRODUCTION_VERSION = v.PRODUCTION_VERSION
+                  AND f.MATERIAL_CODE = v.MATERIAL_CODE
+                  AND f.YEAR = v.YEAR
+                  AND f.MONTH = v.MONTH
+                  AND f.FACTORY_CODE = v.FACTORY_CODE
+		   )
            <if test="cxMachine != null and cxMachine != ''">
            AND r.CX_MACHINE_CODE like concat('%', #{cxMachine}, '%')
            </if>
@@ -55,7 +66,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
            AND v.MAIN_MATERIAL_DESC like concat('%', #{mainMaterialDesc}, '%')
            </if>
 
-		   AND v.IS_DELETE = 0
 		 GROUP BY v.STRUCTURE_NAME,
 		       v.MATERIAL_CODE,
 		       v.MATERIAL_DESC,

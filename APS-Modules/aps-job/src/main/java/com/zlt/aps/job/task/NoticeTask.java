@@ -10,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.Resource;
 import java.util.Date;
 
 /**
@@ -21,13 +20,27 @@ import java.util.Date;
 @Component("noticeTask")
 @Slf4j
 public class NoticeTask {
-    @Resource
+    @Autowired(required = false)
     private INoticeService iNoticeService;
+
+    /**
+     * 检查aps-mps服务是否可用
+     * aps-mps服务未部署时，Feign客户端不会注入，返回false
+     * @return true-可用 false-不可用
+     */
+    private boolean isMpsAvailable() {
+        if (iNoticeService == null) {
+            log.warn("aps-mps服务未启动，跳过消息通知");
+            return false;
+        }
+        return true;
+    }
 
     /**
      * 完成生产结果通知
      */
     public void unfinishedSchedule() {
+        if (!isMpsAvailable()) return;
         iNoticeService.unfinishedSchedule();
     }
 

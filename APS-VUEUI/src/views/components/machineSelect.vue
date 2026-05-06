@@ -55,6 +55,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    status:{
+      type: String | Number,
+      default: 0
+    }
   },
   data() {
     return {
@@ -164,7 +168,7 @@ export default {
         machineType: this.machineType,
         ...this.query,
         // userName: this.filterKey,
-        status: 0, //过滤，只显示启用的用户
+        status: this.machineType === '01'?'':this.status, //硫化，不过滤，其他过滤，只显示启用的用户
       };
     },
     getTitle() {
