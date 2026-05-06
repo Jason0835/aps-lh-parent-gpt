@@ -74,7 +74,7 @@ export default {
         {
           label: this.$t("ui.data.column.lhUnscheduledResult.materialDesc"),
           prop: "materialDesc",
-          minWidth: 220,
+          minWidth: 360,
           showOverflowTooltip: true,
         },
         {
