@@ -30,8 +30,8 @@
 <script>
 import infoForm from "@/views/components/infoForm.vue";
 import { editMachine, checkMachineCodeUnique } from "@/api/lh/machine";
+import { listMdmModelInfo } from "@/api/mdm/mdmModelInfo";
 import { status } from "nprogress";
-// import { editVulcanizingMachine } from "@/api/mdm/vulcanizingMachine";
 
 export default {
   components: { infoForm },
@@ -46,14 +46,12 @@ export default {
       }
       const strValue = String(value).trim();
 
-      // 检查是否只包含数字
       if (!/^\d+$/.test(strValue)) {
         return callback(
           new Error(this.$t("common.rule.noPoint"))
         );
       }
 
-      // 转换为数字
       const numValue = Number(strValue);
       if (numValue > 999999) {
         return callback(new Error(this.$t("common.rule.inoutMax")));
@@ -69,6 +67,7 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
+      mouldSleeveOptions: [],
       form: {
         classShift: "2",
         openMachineClass: [],
@@ -110,13 +109,6 @@ export default {
             trigger: "change",
           },
         ],
-        dimensionMinimum: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "change",
-          },
-        ],
         maxMoldNum: [
           {
             required: true,
@@ -125,6 +117,27 @@ export default {
           },
         ],
         single: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        support195WideBase: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        support225WideBase: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
+        supportChipTire: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -197,7 +210,11 @@ export default {
         {
           label: this.$t("ui.data.column.machine.mouldSetCode"),
           prop: "mouldSetCode",
-          maxlength:50,
+          type: "select",
+          options: this.mouldSleeveOptions,
+          attrs: {
+            multiple: true,
+          },
         },
         {
           label: this.$t("ui.data.column.machine.dimensionMinmum"),
@@ -240,19 +257,6 @@ export default {
           prop: "supportChipTire",
           type: "select",
           dictData: this.parentDict.type.biz_yes_no,
-        },
-        {
-          label: this.$t("ui.data.column.machine.singleDoubleMode"),
-          prop: "singleDoubleMode",
-          type: "number",
-          attrs: {
-            class: "w100",
-            controls: true,
-            "controls-position": "right",
-            precision: 0,
-            min: 1,
-            max: 9999,
-          },
         },
         {
           label: this.$t("ui.data.column.machine.mouldNum"),
@@ -332,8 +336,22 @@ export default {
     },
 
     //utils
-    show(data) {
-
+    async getMouldSleeveOptions() {
+      try {
+        const res = await listMdmModelInfo({});
+        const mouldSleeves = res.rows
+          .map(item => item.mouldSleeve)
+          .filter(item => item && item.trim() !== "");
+        this.mouldSleeveOptions = [...new Set(mouldSleeves)].map(item => ({
+          label: item,
+          value: item,
+        }));
+      } catch (error) {
+        console.error("获取模套型号失败:", error);
+      }
+    },
+    async show(data) {
+      await this.getMouldSleeveOptions();
       this.visible = true;
       if (data) {
         this.isEdit = true;
@@ -349,15 +367,16 @@ export default {
           openMachineClass: data.openMachineClass
             ? data.openMachineClass.split(",")
             : [],
-            status:data.status=='1'?true:false
-          // mouldType: data.mouldType ? data.mouldType.split(",") : [],
+          mouldSetCode: data.mouldSetCode ? data.mouldSetCode.split(",") : [],
+          status: data.status == "1" ? true : false,
         };
-        console.log( this.form)
+        console.log(this.form);
       } else {
         this.form = {
           classShift: "2",
           openMachineClass: [],
-          factoryCode:'116'
+          factoryCode: "116",
+          mouldSetCode: [],
         };
       }
     },
@@ -415,11 +434,11 @@ export default {
 
     handleConfirm() {
       this.$refs.form.triggerConfirm(async (params) => {
-        // if (params.mouldType) {
-        //   params.mouldType = params.mouldType.join(",");
-        // }
         if (params.openMachineClass) {
           params.openMachineClass = params.openMachineClass.join(",");
+        }
+        if (params.mouldSetCode && Array.isArray(params.mouldSetCode)) {
+          params.mouldSetCode = params.mouldSetCode.join(",");
         }
         Object.keys(params).forEach((key) => {
           if (this.isEmpty(params[key])) {
@@ -427,16 +446,6 @@ export default {
           }
         });
         this.save(params);
-        // try {
-        //   this.loading = true;
-        //   await this.checkMachineCode();
-        //   await this.checkMachineName();
-        //   this.save(params);
-        // } catch (error) {
-        //   console.error(error);
-        //   this.$modal.msgError(error.message);
-        //   this.loading = false;
-        // }
       });
     },
   },

@@ -159,6 +159,7 @@ public class LhMachineInfoController extends AbstractDocBizController<LhMachineI
      */
     @Override
     protected void builderCondition(QueryWrapper<LhMachineInfo> queryWrapper, LhMachineInfo queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineName")), "MACHINE_NAME", queryVO.getFieldValueByFieldName("machineName"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("dimension")), "DIMENSION", queryVO.getFieldValueByFieldName("dimension"));
@@ -190,7 +191,7 @@ public class LhMachineInfoController extends AbstractDocBizController<LhMachineI
 
     @Override
     protected String getOrderBy() {
-        return "create_time, id desc";
+        return "MACHINE_CODE asc";
     }
 
 }

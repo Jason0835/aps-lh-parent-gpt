@@ -341,7 +341,7 @@ import result from "./components/result.vue";
 import special from "./components/special.vue";
 import addModal from "./components/addModal.vue";
 export default {
-  name: "MoldingClosingStageProgress",
+  name: "RollingCycle",
   components: {
     tltUpload,
     infoDialog,

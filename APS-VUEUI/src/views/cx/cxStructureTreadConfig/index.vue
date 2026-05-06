@@ -24,14 +24,15 @@
         <el-button v-hasPermi="['cx:cxStructureTreadConfig:edit']" :disabled="selection.length !== 1" @click="handleEdit(selection[0])">
           {{ $t('ui.frame.btn.update') }}
         </el-button>
-        <el-button v-hasPermi="['cx:cxStructureTreadConfig:updateSameStructureTreadCount']" :disabled="selection.length !== 1" @click="handleSameStructureTreadCount(selection[0])">
-          {{ $t('ui.data.column.cxStructureTreadConfig.sameStructureTreadCount') }}
-        </el-button>
+
         <el-button type="danger" v-hasPermi="['cx:cxStructureTreadConfig:remove']" :disabled="selection.length === 0" @click="handleDelete">
           {{ $t('ui.frame.btn.delete') }}
         </el-button>
-        <el-button v-hasPermi="['cx:cxStructureTreadConfig:generate']" :loading="generateLoading" @click="handleGenerate">
+        <el-button type="primary" plain v-hasPermi="['cx:cxStructureTreadConfig:generate']" :loading="generateLoading" @click="handleGenerate">
           {{ $t('ui.data.column.cxStructureTreadConfig.generate') }}
+        </el-button>
+        <el-button v-hasPermi="['cx:cxStructureTreadConfig:updateSameStructureTreadCount']" :disabled="selection.length !== 1" @click="handleSameStructureTreadCount(selection[0])">
+          {{ $t('ui.data.column.cxStructureTreadConfig.sameStructureTreadCount') }}
         </el-button>
 <!--        <el-button v-hasPermi="['cx:cxStructureTreadConfig:import']" @click="$refs.uploadRef.handleImport()">-->
 <!--          {{ $t('ui.frame.btn.import') }}-->
@@ -106,6 +107,9 @@ export default {
     return { parentDict: this.dict }
   },
   data() {
+    const defaultQuery = {
+      factoryCode: '116'
+    }
     return {
       importColumns: [
         {
@@ -131,8 +135,8 @@ export default {
       selection: [],
       page: { current: 1, pageSize: 20, total: 0 },
       sort: {},
-      search: {},
-      query: {}
+      search: { ...defaultQuery },
+      query: { ...defaultQuery }
     }
   },
   computed: {
@@ -359,7 +363,10 @@ export default {
       })
     },
     handleSearch(data) {
-      this.query = { ...data }
+      this.query = {
+        factoryCode: '116',
+        ...data
+      }
       if (data.stockDateRange && data.stockDateRange.length === 2) {
         this.query.stockDateBegin = data.stockDateRange[0]
         this.query.stockDateEnd = data.stockDateRange[1]

@@ -364,7 +364,7 @@
   "ui.data.column.machine.dimensionMaximum": "生产范围寸口上限",
   "ui.data.column.machine.centripetalMechanism": "向心机构",
   "ui.data.column.machine.efficiency": "效率",
-  "ui.data.column.machine.mouldNum": "模台数",
+  "ui.data.column.machine.mouldNum": "单双模",
   "ui.data.column.machine.mouldType": "模台类型",
   "ui.data.column.machine.single": "是否受控",
   "ui.data.column.machine.isClosed": "是否封存",
