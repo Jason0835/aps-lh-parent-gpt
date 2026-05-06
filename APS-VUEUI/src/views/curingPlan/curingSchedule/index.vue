@@ -376,6 +376,7 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.materialCode"),
+          width:120,
           prop: "materialCode",
         },
         {

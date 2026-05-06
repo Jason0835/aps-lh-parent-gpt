@@ -70,6 +70,7 @@ export default {
         {
           label: this.$t("ui.data.column.lhUnscheduledResult.materialCode"),
           prop: "materialCode",
+          minWidth: 130,
         },
         {
           label: this.$t("ui.data.column.lhUnscheduledResult.materialDesc"),
@@ -80,12 +81,12 @@ export default {
         {
           label: this.$t("ui.data.column.lhUnscheduledResult.mainMaterialDesc"),
           prop: "mainMaterialDesc",
-          minWidth: 220,
+          minWidth: 330,
           showOverflowTooltip: true,
         },
         {
           label: this.$t("ui.data.column.lhUnscheduledResult.specDesc"),
-          prop: "specDesc",
+          prop: "specCode",
           minWidth: 180,
           showOverflowTooltip: true,
         },
