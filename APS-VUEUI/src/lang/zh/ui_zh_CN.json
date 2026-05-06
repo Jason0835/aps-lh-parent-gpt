@@ -2355,7 +2355,6 @@
   "ui.alert.lhSpecifyMachine.specCodeNotExist": "未找到对应的物料编码！",
   "ui.data.column.lhSpecialMaterialBom.modelName": "特殊物料清单配置",
   "ui.data.column.lhSpecialMaterialBom.factoryCode": "分厂",
-  "ui.data.column.lhSpecialMaterialBom.structureCode": "结构编码",
   "ui.data.column.lhSpecialMaterialBom.structureName": "结构",
   "ui.data.column.lhSpecialMaterialBom.materialCode": "物料编码",
   "ui.data.column.lhSpecialMaterialBom.materialDesc": "物料描述",
@@ -2619,5 +2618,6 @@
   "ui.lh.precisionPlan.generate.confirm": "确认生成{0}年度的硫化机保养计划吗？",
   "ui.lh.precisionPlan.generate.success": "生成成功，共生成{0}条数据",
   "ui.lh.precisionPlan.generate.fail": "生成失败",
-  "ui.lh.precisionPlan.generate.in.progress": "正在生成中，请稍后再试"
+  "ui.lh.precisionPlan.generate.in.progress": "正在生成中，请稍后再试",
+  "ui.data.column.cxStock.dataSource": "数据来源"
 }

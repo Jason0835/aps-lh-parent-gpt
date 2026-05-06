@@ -54,11 +54,11 @@ public class CxPrecisionPlan extends BaseEntity implements Serializable {
     private String precisionCycle;
 
     /** 计划日期 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.planDate", dateFormat = "yyyy-MM-dd")
+    @Excel(name = "ui.data.column.cxPrecisionPlan.planDate", dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "计划日期")
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("PLAN_DATE")
     private Date planDate;
 
@@ -93,7 +93,7 @@ public class CxPrecisionPlan extends BaseEntity implements Serializable {
     private Date scheduleDate;
 
     /** 上次保养日期 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.lastMaintenanceDate", dateFormat = "yyyy-MM-dd")
+//    @Excel(name = "ui.data.column.cxPrecisionPlan.lastMaintenanceDate", dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "上次保养日期")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
