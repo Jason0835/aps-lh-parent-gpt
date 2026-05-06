@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.handler;
 
 import com.google.common.collect.Sets;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.EarliestConclusionLhGroupHelper;
@@ -710,10 +711,8 @@ public class SkuPrioritySelector {
         //1.1 高优先级量标记
         boolean hasHeightPriority = plans.stream().anyMatch(SkuPrioritySelector::hasHeightQtyPriority);
         info.setHasHeightPriority(hasHeightPriority);
-
-        // 2. 模具产能受限情况 是否共用模具受限？--最后两副
-        Set<String> limitShareMouldSet = productionContext.getLimitShareMouldOtherSku(info.getSku(), startDay, endDay);
-        info.setHasMoldCapacityLimit(!CollectionUtils.isEmpty(limitShareMouldSet));
+        boolean hasMoldCapacityLimit = hasMoldCapacityLimitBySku(info,plans,productionContext,startDay,endDay);
+        info.setHasMoldCapacityLimit(hasMoldCapacityLimit);
 
         if (info.isHasMoldCapacityLimit()) {
             // 3. 模具受限的净需求量总和
@@ -743,6 +742,71 @@ public class SkuPrioritySelector {
         info.setTotalNetRequirement(totalNetRequirement);
         // 7. 其他可能需要的信息
         info.setPlans(new ArrayList<>(plans));
+    }
+
+    private static boolean hasMoldCapacityLimitBySku(SkuPriorityInfo singlePriority, List<MonthPlanProductionRequirePlanVo> plans, TbrProductionContext productionContext, Integer startDay, Integer endDay) {
+        // 2. 模具产能受限情况 是否共用模具受限？--最后两副
+        Set<String> limitShareMouldSet = productionContext.getLimitShareMouldOtherSku(singlePriority.getSku(), startDay, endDay);
+        if(CollectionUtils.isEmpty(limitShareMouldSet)) {
+            return false;
+        }
+        String materialDesc = singlePriority.getSku();
+        //选择模具
+        List<ProductionMouldInfoVo> doubleMouldList = SkuMouldSelector.selectedDoubleMouldByRange(productionContext, materialDesc, startDay, endDay);
+        if(CollectionUtils.isEmpty(doubleMouldList)) {
+            return false;
+        }
+        List<ProductionMouldInfoVo> enableMouldList = new ArrayList<>();
+        Set<Integer> hasLeftOverDaySet = new HashSet<>();
+        doubleMouldList.forEach(mouldInfo -> {
+            if (!mouldInfo.hasCapacity()) {
+                return;
+            }
+            Set<Integer> finishDaySet = mouldInfo.getFinishDaySet();
+            mouldInfo.getProductionDaySet().forEach(productionDay -> {
+                if (!CollectionUtils.isEmpty(finishDaySet) && finishDaySet.contains(productionDay)) {
+                    return;
+                }
+                hasLeftOverDaySet.add(productionDay);
+            });
+            enableMouldList.add(mouldInfo);
+        });
+        if (CollectionUtils.isEmpty(enableMouldList) || CollectionUtils.isEmpty(hasLeftOverDaySet)) {
+            return false;
+        }
+        if (enableMouldList.size() < ProductionConstant.DOUBLE_MOULD_PRODUCTION) {
+            return false;
+        }
+        // 共用模且只有两副，检查主花纹下所有SKU需求量
+        String mainPattern = plans.get(0).getMainPattern();
+        if(StringUtils.isBlank(mainPattern)) {
+            return false;
+        }
+        Map<String, List<MonthPlanProductionRequirePlanVo>> allSkuPlans = productionContext.getAllSkuProductionPlan();
+        if(CollectionUtils.isEmpty(allSkuPlans)) {
+            return false;
+        }
+        // 汇总主花纹下所有SKU的需求量
+        int totalMainPatternRequirement = 0;
+        for (List<MonthPlanProductionRequirePlanVo> skuPlans : allSkuPlans.values()) {
+            if (!CollectionUtils.isEmpty(skuPlans) && mainPattern.equals(skuPlans.get(0).getMainPattern())) {
+                totalMainPatternRequirement += skuPlans.stream()
+                        .filter(plan -> plan.getVirtualProductionQty() != null)
+                        .mapToInt(MonthPlanProductionRequirePlanVo::getVirtualProductionQty)
+                        .sum();
+            }
+        }
+        if(totalMainPatternRequirement == 0) {
+            return false;
+        }
+        // 计算模具剩余产能
+        Integer dayVulcanizationQty = plans.get(0).getDayVulcanizationQty();
+        if (null == dayVulcanizationQty) {
+           return false;
+        }
+        // 两副模具即一对，总产能 = 1对 * (单模产能 * 2) * 天数
+        int totalMoldCapacity = (dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION) * hasLeftOverDaySet.size();
+        return totalMainPatternRequirement > totalMoldCapacity;
     }
 
     /**
