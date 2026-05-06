@@ -531,7 +531,16 @@ public class SkuPrioritySelector {
             currentList = moldCapacityLimitSkus;
         }
 
-        // 第4级：库销比约束
+        // 第4级：净需求大约束
+        List<SkuPriorityInfo> requireCapacityLimitSkus = filterByNetRequirement(currentList);
+        if (!CollectionUtils.isEmpty(requireCapacityLimitSkus)) {
+            if (requireCapacityLimitSkus.size() == 1) {
+                return requireCapacityLimitSkus;
+            }
+            currentList = requireCapacityLimitSkus;
+        }
+
+        // 第5级：库销比约束
         List<SkuPriorityInfo> inventorySaleRatioSkus = filterByInventorySaleRatio(currentList);
         if (!CollectionUtils.isEmpty(inventorySaleRatioSkus)) {
             if (inventorySaleRatioSkus.size() == 1) {
@@ -540,7 +549,7 @@ public class SkuPrioritySelector {
             currentList = inventorySaleRatioSkus;
         }
 
-        // 第5级：小于50条约束
+        // 第6级：小于50条约束
         List<SkuPriorityInfo> lessMinQtySkus = filterByLessMinQty(currentList);
         if (!CollectionUtils.isEmpty(lessMinQtySkus)) {
             if (lessMinQtySkus.size() == 1) {
@@ -549,7 +558,8 @@ public class SkuPrioritySelector {
             currentList = lessMinQtySkus;
         }
         // 第6级：净需求大约束
-        return filterByNetRequirement(currentList);
+        //return filterByNetRequirement(currentList);
+        return currentList;
     }
 
     /**
