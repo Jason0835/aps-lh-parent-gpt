@@ -8,6 +8,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
+import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftRuntimeState;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -28,10 +29,12 @@ import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.LhSpecialMaterialUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.lh.util.ShiftProductionControlUtil;
 import com.zlt.aps.lh.util.SingleMouldShiftQtyUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -83,11 +86,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     @Override
     public String getStrategyName() {
         return "newSpecProductionStrategy";
-    }
-
-    @Override
-    public void scheduleTypeBlockChange(LhScheduleContext context) {
-        // 新增策略不处理活字块，空实现
     }
 
     @Override
@@ -252,8 +250,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 // 时间链路固定为：机台可开工 -> 换模开始 -> 换模/首检结束 -> 实际开产。
                 Date productionStartTime = inspectionTime;
                 int machineMouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(candidateMachine);
-                Date firstProductionStartTime = ShiftCapacityResolverUtil.resolveFirstSchedulableStartIgnoringCleaning(
-                        context.getDevicePlanShutList(),
+                Date firstProductionStartTime = ShiftProductionControlUtil.resolveFirstSchedulableStartIgnoringCleaning(
+                        context,
                         machineCode,
                         productionStartTime,
                         shifts,
@@ -543,6 +541,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         result.setRealScheduleDate(context.getScheduleDate());
         result.setProductionStatus("0");
         result.setMouldCode(resolveMouldCode(context, sku.getMaterialCode()));
+        result.setHasSpecialMaterial(LhSpecialMaterialUtil.resolveHasSpecialMaterial(context, sku));
         // 保存真实换模开始时间，供下游换模计划表直接复用。
         result.setMouldChangeStartTime(mouldChangeStartTime);
 
@@ -697,10 +696,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 }
             }
 
-            Date effectiveStart = startTime.after(shift.getShiftStartDateTime()) ? startTime : shift.getShiftStartDateTime();
-            if (!effectiveStart.before(shift.getShiftEndDateTime())) {
+            ShiftProductionControlDTO control = ShiftProductionControlUtil.resolveEffectiveControl(context, shift, startTime);
+            if (control == null || !control.isCanSchedule()) {
                 continue;
             }
+            Date effectiveStart = control.getEffectiveStartTime();
+            Date effectiveEnd = control.getEffectiveEndTime();
 
             int shiftMaxQty = ShiftCapacityResolverUtil.resolveShiftCapacityWithDowntime(
                     context.getDevicePlanShutList(),
@@ -708,13 +709,14 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     maintenanceWindowList,
                     result.getLhMachineCode(),
                     effectiveStart,
-                    shift.getShiftEndDateTime(),
+                    effectiveEnd,
                     shiftCapacity,
                     lhTimeSeconds,
                     mouldQty,
                     ShiftCapacityResolverUtil.resolveShiftDurationSeconds(shift),
                     dryIceLossQty,
                     dryIceDurationHours);
+            shiftMaxQty = ShiftProductionControlUtil.deductCapacityByControl(control, shiftMaxQty, mouldQty);
             if (shiftMaxQty <= 0) {
                 continue;
             }
@@ -728,12 +730,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         maintenanceWindowList,
                         result.getLhMachineCode(),
                         effectiveStart,
-                        shift.getShiftEndDateTime(),
+                        effectiveEnd,
                         shiftQty,
                         shiftMaxQty);
                 setShiftPlanQty(result, shift.getShiftIndex(), shiftQty, effectiveStart, shiftPlanEndTime);
                 remaining -= shiftQty;
-                startTime = shift.getShiftEndDateTime();
+                startTime = effectiveEnd;
 
                 if (!CollectionUtils.isEmpty(stateMap)) {
                     ShiftRuntimeState st = stateMap.get(shift.getShiftIndex());

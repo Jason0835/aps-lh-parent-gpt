@@ -3,6 +3,7 @@ package com.zlt.aps.lh.util;
 import cn.hutool.core.date.DatePattern;
 import cn.hutool.core.date.DateUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
+import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftRuntimeState;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
@@ -793,6 +794,13 @@ public final class LhScheduleTimeUtil {
             s.setAvailable(true);
             s.setRemainingCapacity(0);
             s.setUnavailableReason(null);
+            if (context.getShiftProductionControlMap() != null) {
+                ShiftProductionControlDTO control = context.getShiftProductionControlMap().get(shift.getShiftIndex());
+                if (control != null) {
+                    s.setAvailable(control.isCanSchedule());
+                    s.setUnavailableReason(control.getUnavailableReason());
+                }
+            }
             map.put(shift.getShiftIndex(), s);
         }
         context.setShiftRuntimeStateMap(map);
