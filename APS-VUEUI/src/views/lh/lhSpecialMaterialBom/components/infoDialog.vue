@@ -29,14 +29,14 @@
 </template>
 
 <script>
-import { editLhSpecifyMachine } from "@/api/lh/lhSpecifyMachine";
-import { listMachine } from "@/api/lh/machine";
-
 import infoForm from "@/views/components/infoForm.vue";
+import structureSelect from "@/views/components/structureSelect.vue";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 
+import { editSpecialMaterialBom, checkUniqueSpecialMaterialBom } from "@/api/lh/specialMaterialBom";
+
 export default {
-  components: { infoForm, materialCodeSelect },
+  components: { infoForm, structureSelect, materialCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -44,7 +44,6 @@ export default {
       visible: false,
       isEdit: false,
       form: {},
-      machineOptions: [],
       rules: {
         factoryCode: [
           {
@@ -53,21 +52,7 @@ export default {
             trigger: "change",
           },
         ],
-        specCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        machineCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
-        jobType: [
+        category: [
           {
             required: true,
             message: this.$t("common.rule.select"),
@@ -93,35 +78,48 @@ export default {
           filterable: true,
         },
         {
-          prop: "specCode",
-          label: this.$t("ui.data.column.lhSpecifyMachine.specCode"),
+          prop: "structureName",
+          align: "center",
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.structureName"),
+          render: (form) => {
+            return (
+              <structureSelect
+                key={form.structureName}
+                v-model={form.structureName}
+                factoryCode={form.factoryCode || "116"}
+                machineType="CX"
+                clearable
+                onChange={this.handleStructureChange}
+              />
+            );
+          },
+        },
+        {
+          prop: "materialCode",
+          align: "center",
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.materialCode"),
           render: (form) => {
             return (
               <materialCodeSelect
-                key={form.specCode}
-                v-model={form.specCode}
-                onChange={this.handleSpecCodeChange}
+                key={form.materialCode}
+                v-model={form.materialCode}
+                onChange={this.handleMaterialCodeChange}
               />
             );
           },
         },
         {
           prop: "materialDesc",
-          label: this.$t("ui.data.column.lhSpecifyMachine.materialDesc"),
+          align: "center",
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.materialDesc"),
           disabled: true,
         },
         {
-          prop: "machineCode",
-          label: this.$t("ui.data.column.lhSpecifyMachine.machineCode"),
+          prop: "category",
+          align: "center",
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.category"),
           type: "select",
-          dictData: this.machineOptions,
-          filterable: true,
-        },
-        {
-          prop: "jobType",
-          label: this.$t("ui.data.column.lhSpecifyMachine.jobType"),
-          type: "select",
-          dictData: this.parentDict.type.JOB_TYPE,
+          dictData: this.parentDict.type.lh_special_material_category,
           filterable: true,
         },
         {
@@ -135,11 +133,26 @@ export default {
     },
   },
   methods: {
+    handleStructureChange(val, row) {
+      if (val && row) {
+        this.$set(this.form, "structureName", row.structureName);
+      } else {
+        this.$set(this.form, "structureName", "");
+      }
+    },
+    handleMaterialCodeChange(val, row) {
+      if (val && row) {
+        this.$set(this.form, "materialCode", row.materialCode);
+        this.$set(this.form, "materialDesc", row.materialDesc || "");
+      } else {
+        this.$set(this.form, "materialCode", "");
+        this.$set(this.form, "materialDesc", "");
+      }
+    },
     async save(params) {
       try {
         this.loading = true;
-
-        const res = await editLhSpecifyMachine(params);
+        const res = await editSpecialMaterialBom(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -149,66 +162,43 @@ export default {
         this.loading = false;
       }
     },
-    async getMachineList() {
-      try {
-        const res = await listMachine(this.form.factoryCode ? { factoryCode: this.form.factoryCode } : {});
-        const list = res.rows || [];
-        const map = new Map();
-        if (this.isEdit && this.form.machineCode) {
-          map.set(this.form.machineCode, {
-            label: this.form.machineCode,
-            value: this.form.machineCode,
-          });
-        }
-        list.forEach((item) => {
-          if (item && item.machineCode) {
-            map.set(item.machineCode, {
-              label: item.machineCode,
-              value: item.machineCode,
-            });
-          }
-        });
-        this.machineOptions = Array.from(map.values());
-      } catch (error) {
-        this.machineOptions = [];
-        console.log(error);
-      }
-    },
-    handleSpecCodeChange(value, row) {
-      this.$set(this.form, "specCode", value);
-      this.$set(this.form, "materialDesc", (row && row.materialDesc) || "");
-    },
     show(data) {
       this.visible = true;
       if (data) {
         this.isEdit = true;
         this.form = { ...data };
-        if (data.machineCode) {
-          this.machineOptions = [
-            {
-              label: data.machineCode,
-              value: data.machineCode,
-            },
-          ];
-        }
       } else {
+        this.isEdit = false;
         this.form = {
           factoryCode: "116",
-          materialDesc: "",
         };
-        this.machineOptions = [];
       }
-      this.getMachineList();
     },
     hide() {
       this.form = {};
-      this.machineOptions = [];
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
     },
     handleConfirm() {
-      this.$refs.form.triggerConfirm(this.save);
+      this.$refs.form.triggerConfirm(async (params) => {
+        if (!params.structureName && !params.materialCode) {
+          this.$modal.msgError(this.$t("ui.data.alert.lhSpecialMaterialBom.needOne"));
+          return;
+        }
+        const checkData = {
+          structureCode: params.structureName,
+          materialCode: params.materialCode,
+          category: params.category,
+          id: this.form.id || null,
+        };
+        const checkRes = await checkUniqueSpecialMaterialBom(checkData);
+        if (checkRes.data && checkRes.data.exist) {
+          this.$modal.msgError(this.$t("ui.data.alert.lhSpecialMaterialBom.notUnique"));
+          return;
+        }
+        this.save(params);
+      });
     },
   },
 };
