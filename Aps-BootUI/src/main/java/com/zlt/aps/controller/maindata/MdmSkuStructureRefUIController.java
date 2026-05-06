@@ -221,6 +221,16 @@ public class MdmSkuStructureRefUIController extends BaseUIController<MdmSkuStruc
     }
 
     /**
+     * 查询结构选择列表 带描述
+     */
+    @ApiOperation("查询结构选择列表 带描述")
+    @PostMapping("/getStructureSelectWithDescList")
+    @ResponseBody
+    public TableDataInfo getStructureSelectWithDescList(MdmSkuStructureRef queryVO) {
+        return iMdmSkuStructureRefService.getStructureSelectWithDescList(queryVO);
+    }
+
+    /**
      * 更新结构到物料表
      * @param queryVO 参数
      * @return 结果

@@ -90,4 +90,11 @@ public interface ILhMouldChangePlanRemoteService {
     @PostMapping("/lhMouldChangePlan/issueScheduleByQuery")
     AjaxResult issueScheduleByQuery(@RequestBody LhMouldChangePlan queryVO);
 
+    /**
+     * 导出模具交替计划模板数据
+     */
+    @ApiOperation("导出模具交替计划模板数据")
+    @PostMapping("/lhMouldChangePlan/exportDataChangePlan/{fileName}")
+    byte[] exportDataChangePlan(@RequestBody LhMouldChangePlan queryVO, @PathVariable("fileName") String fileName);
+
 }

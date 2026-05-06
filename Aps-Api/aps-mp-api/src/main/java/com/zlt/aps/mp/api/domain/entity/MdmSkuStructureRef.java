@@ -67,4 +67,12 @@ public class MdmSkuStructureRef extends BaseEntity {
     private String materialDesc;
 
 
+    /**
+     * 胎胚编码
+     */
+    @ApiModelProperty(value = "胎胚编码")
+    @TableField(exist = false)
+    private String embryoCode;
+
+
 }

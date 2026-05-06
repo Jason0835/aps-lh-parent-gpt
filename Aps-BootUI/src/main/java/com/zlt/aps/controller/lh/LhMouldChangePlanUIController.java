@@ -11,8 +11,8 @@ import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanImportVo;
-import com.zlt.aps.lh.api.service.ILhMouldChangePlanRemoteService;
 import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
+import com.zlt.aps.lh.api.service.ILhMouldChangePlanRemoteService;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.service.IMdmMaterialInfoRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
@@ -32,7 +32,6 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -214,8 +213,7 @@ public class LhMouldChangePlanUIController extends BaseUIController<LhMouldChang
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iLhMouldChangePlanService.importData(context,updateSupport);
-        return ajaxResult;
+        return iLhMouldChangePlanService.importData(context,updateSupport);
     }
 
     @ApiOperation("获取机台下拉列表 - 支持搜索筛选")
@@ -257,5 +255,17 @@ public class LhMouldChangePlanUIController extends BaseUIController<LhMouldChang
     @ResponseBody
     public AjaxResult issueScheduleByQuery(LhMouldChangePlan lhMouldChangePlan) {
         return iLhMouldChangePlanService.issueScheduleByQuery(lhMouldChangePlan);
+    }
+
+    @ApiOperation("导出模具交替计划模板数据")
+    @GetMapping({"/exportDataChangePlan"})
+    @ResponseBody
+    public void exportDataChangePlan(HttpServletResponse response, LhMouldChangePlan entity) throws IOException {
+        String fileName = this.getExportTemplateFileName();
+        byte[] excelBytes = iLhMouldChangePlanService.exportDataChangePlan(entity, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
     }
 }

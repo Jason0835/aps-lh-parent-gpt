@@ -30,11 +30,11 @@
 
 <script>
 import { saveCxStructureTreadConfig } from "@/api/cx/cxStructureTreadConfig";
-import structureSelect from "@/views/components/structureSelect.vue";
+import structureSelectWithDesc from "@/views/components/structureSelectWithDesc.vue";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
-  components: { infoForm, structureSelect },
+  components: { infoForm, structureSelectWithDesc },
   inject: ["parentDict"],
   data() {
     const validateInteger = (rule, value, callback) => {
@@ -112,13 +112,30 @@ export default {
           maxlength: 50,
           render: (form) => {
             return (
-              <structureSelect
-                key={form.structureCode}
+              <structureSelectWithDesc
+                key={`${form.factoryCode || ""}-${form.structureCode || ""}`}
+                factoryCode={form.factoryCode}
                 multiple={false}
                 v-model={form.structureCode}
+                onChange={(value, row) => this.handleStructureChange(form, value, row)}
+                onClear={() => this.handleStructureClear(form)}
               />
             );
           },
+        },
+        {
+          label: this.$t("ui.data.column.cxStructureTreadConfig.embryoCode"),
+          prop: "embryoCode",
+          span: 24,
+          disabled: true,
+          maxlength: 20,
+        },
+        {
+          label: this.$t("ui.data.column.cxStructureTreadConfig.mainMaterialDesc"),
+          prop: "mainMaterialDesc",
+          span: 24,
+          disabled: true,
+          maxlength: 64,
         },
         {
           label: this.$t("ui.data.column.cxStructureTreadConfig.treadCount"),
@@ -160,6 +177,16 @@ export default {
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
+    },
+    handleStructureChange(form, value, row) {
+      this.$set(form, "structureCode", value);
+      this.$set(form, "embryoCode", row ? row.embryoCode : undefined);
+      this.$set(form, "mainMaterialDesc", row ? row.mainMaterialDesc : undefined);
+    },
+    handleStructureClear(form) {
+      this.$set(form, "structureCode", undefined);
+      this.$set(form, "embryoCode", undefined);
+      this.$set(form, "mainMaterialDesc", undefined);
     },
     async save(payload) {
       try {

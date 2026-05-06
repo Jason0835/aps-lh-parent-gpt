@@ -174,24 +174,31 @@ export default {
           maxlength:20,
         },
         {
+          label: this.$t("ui.data.column.machine.manufacturer"),
+          prop: "manufacturer",
+          maxlength:50,
+        },
+        {
           label: this.$t("ui.data.column.machine.lhMachineType"),
           prop: "machineType",
           type: "select",
           dictData: this.parentDict.type.LH_MACHINE_TYPE,
         },
-
-        // {
-        //   label: this.$t("ui.data.column.machine.dimension"),
-        //   prop: "dimension",
-        //   type: "number",
-        //   attrs: {
-        //     class: "w100",
-        //     controls: false,
-        //     precision: 2,
-        //     min: 0,
-        //     max: 9999.99,
-        //   },
-        // },
+        {
+          label: this.$t("ui.data.column.machine.dimensionSize"),
+          prop: "dimensionSize",
+          maxlength:20,
+        },
+        {
+          label: this.$t("ui.data.column.machine.hotPlateDiameter"),
+          prop: "hotPlateDiameter",
+          maxlength:20,
+        },
+        {
+          label: this.$t("ui.data.column.machine.mouldSetCode"),
+          prop: "mouldSetCode",
+          maxlength:50,
+        },
         {
           label: this.$t("ui.data.column.machine.dimensionMinmum"),
           prop: "dimensionMinimum",
@@ -214,6 +221,37 @@ export default {
             precision: 2,
             min: 0,
             max: 9999.99,
+          },
+        },
+        {
+          label: this.$t("ui.data.column.machine.support195WideBase"),
+          prop: "support195WideBase",
+          type: "select",
+          dictData: this.parentDict.type.biz_yes_no,
+        },
+        {
+          label: this.$t("ui.data.column.machine.support225WideBase"),
+          prop: "support225WideBase",
+          type: "select",
+          dictData: this.parentDict.type.biz_yes_no,
+        },
+        {
+          label: this.$t("ui.data.column.machine.supportChipTire"),
+          prop: "supportChipTire",
+          type: "select",
+          dictData: this.parentDict.type.biz_yes_no,
+        },
+        {
+          label: this.$t("ui.data.column.machine.singleDoubleMode"),
+          prop: "singleDoubleMode",
+          type: "number",
+          attrs: {
+            class: "w100",
+            controls: true,
+            "controls-position": "right",
+            precision: 0,
+            min: 1,
+            max: 9999,
           },
         },
         {
@@ -306,6 +344,7 @@ export default {
           dimensionMinimum: this.numberEmpty(data.dimensionMinimum),
           dimensionMaximum: this.numberEmpty(data.dimensionMaximum),
           maxMoldNum: this.numberEmpty(data.maxMoldNum),
+          singleDoubleMode: this.numberEmpty(data.singleDoubleMode),
           quota: this.numberEmpty(data.quota),
           openMachineClass: data.openMachineClass
             ? data.openMachineClass.split(",")
