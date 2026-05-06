@@ -12,6 +12,7 @@ import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.cx.vo.CxScheduleImportDTO;
 import com.zlt.aps.cx.vo.ScheduleInsertVo;
+import com.zlt.aps.cx.vo.ScheduleTransferMachineVo;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -227,7 +228,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @RequiresPermissions("cx:cxScheduleResult:transferMachine")
     @PostMapping("/transferMachine")
     @ResponseBody
-    public AjaxResult transferMachine(@RequestBody com.zlt.aps.cx.vo.ScheduleTransferMachineVo vo) {
+    public AjaxResult transferMachine(@RequestBody ScheduleTransferMachineVo vo) {
         return iCxScheduleResultService.transferMachine(vo);
     }
 
