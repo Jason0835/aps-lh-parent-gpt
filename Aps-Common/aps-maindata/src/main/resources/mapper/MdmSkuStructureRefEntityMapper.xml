@@ -47,7 +47,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="embryoCode != null and embryoCode != ''">AND tmi.EMBRYO_CODE LIKE
             concat(concat('%',#{embryoCode}), '%')
         </if>
-        <if test="structureName != null and structureName != ''">AND TMSSR.STRUCTURE_NAME = #{structureName}
+        <if test="structureName != null and structureName != ''">AND TMSSR.STRUCTURE_NAME like
+            concat(concat('%',#{structureName}), '%')
         </if>
         GROUP BY TMSSR.FACTORY_CODE,
         TMSSR.STRUCTURE_NAME,
