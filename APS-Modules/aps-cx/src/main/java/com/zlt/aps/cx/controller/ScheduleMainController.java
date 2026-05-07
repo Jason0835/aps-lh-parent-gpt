@@ -923,12 +923,34 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
             int dailyLhCapacity = getDailyLhCapacity(capacityList, mode, vo.getMaterialCode(), machine.getMaxDayCapacity());
 
-            // 查询该机台当天已有排程记录，计算各班次时间占用
-            BigDecimal[] existingTimeSeconds = calcShiftTimeConsumed(machine, scheduleDate,
-                    cxScheduleResultMapper.selectList(new LambdaQueryWrapper<CxScheduleResult>()
+            // 查询该机台当天已有排程记录
+            List<CxScheduleResult> existingRecords = cxScheduleResultMapper.selectList(
+                    new LambdaQueryWrapper<CxScheduleResult>()
                             .eq(CxScheduleResult::getScheduleDate, new java.sql.Date(scheduleDate.getTime()))
-                            .eq(CxScheduleResult::getCxMachineCode, vo.getCxMachineCode())),
-                    capacityList, mode, machine.getMaxDayCapacity());
+                            .eq(CxScheduleResult::getCxMachineCode, vo.getCxMachineCode()));
+
+            // 计算各班次时间占用，同时收集每条记录耗时明细
+            StringBuilder detailSb = new StringBuilder();
+            BigDecimal[] existingTimeSeconds = new BigDecimal[9];
+            for (int i = 1; i <= 8; i++) existingTimeSeconds[i] = BigDecimal.ZERO;
+            for (CxScheduleResult er : existingRecords) {
+                int erDailyLh = getDailyLhCapacity(capacityList, mode, er.getMaterialCode(), machine.getMaxDayCapacity());
+                BigDecimal erSingleTireTime = calcSingleTireTime(machine, er.getStructureName(), erDailyLh);
+                BigDecimal recordTotal = BigDecimal.ZERO;
+                for (int i = 1; i <= 8; i++) {
+                    BigDecimal pq = getClassPlanQty(er, i);
+                    if (pq != null) {
+                        BigDecimal time = pq.multiply(erSingleTireTime);
+                        existingTimeSeconds[i] = existingTimeSeconds[i].add(time);
+                        recordTotal = recordTotal.add(time);
+                    }
+                }
+                detailSb.append("  ").append(er.getMaterialCode()).append("(").append(er.getMaterialDesc()).append(")")
+                        .append(" 结构:").append(er.getStructureName())
+                        .append(" 单条:").append(formatSeconds(erSingleTireTime))
+                        .append(" 总耗时:").append(formatSeconds(recordTotal)).append("\n");
+            }
+            log.info("机台{} 已有记录明细:\n{}", vo.getCxMachineCode(), detailSb.toString());
 
             // 插单物料单条胎耗时
             BigDecimal insertSingleTireTime = calcSingleTireTime(machine, vo.getStructureName(), dailyLhCapacity);
@@ -940,7 +962,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             String[] shiftNames = buildShiftNames(DateUtil.toLocalDateTime(scheduleDate).toLocalDate());
             String capErr = checkPerShiftCapacity(planQtys, existingTimeSeconds, insertSingleTireTime, shiftNames);
             if (capErr != null) {
-                return AjaxResult.error("插单失败：" + capErr);
+                return AjaxResult.error("插单失败：" + capErr + "\n机台已有记录耗时明细:\n" + detailSb.toString());
             }
         }
 
