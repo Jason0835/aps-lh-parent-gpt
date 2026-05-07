@@ -4,7 +4,7 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
@@ -82,5 +82,12 @@ public interface ILhMachineInfoRemoteService {
     @ApiOperation("导入硫化机台信息")
     @PostMapping("/lhMachineInfo/importData")
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+
+    /**
+     * 查询去重后的模套型号列表
+     */
+    @ApiOperation("查询去重后的模套型号列表")
+    @GetMapping("/lhMachineInfo/mouldSleeve/list")
+    AjaxResult listMouldSleeve();
 
 }

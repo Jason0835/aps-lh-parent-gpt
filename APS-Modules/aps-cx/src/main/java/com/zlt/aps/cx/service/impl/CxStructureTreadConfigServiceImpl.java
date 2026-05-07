@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
@@ -167,14 +168,19 @@ public class CxStructureTreadConfigServiceImpl extends AbstractDocService<CxStru
      * 从SKU与结构关系一次性同步生成胎面整车配置。
      */
     @Override
-    public AjaxResult generateTreadConfig() {
+    public AjaxResult generateTreadConfig(String factoryCode) {
+        if (StringUtil.isBlank(factoryCode)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.cxStructureTreadConfig.generate.factoryCodeRequired"));
+        }
         MdmSkuStructureRef queryVO = new MdmSkuStructureRef();
+        queryVO.setFactoryCode(factoryCode);
         List<MdmSkuStructureRef> structureRefList = mdmSkuStructureRefEntityMapper.getStructureSelectWithDescList(queryVO);
         if (CollectionUtils.isEmpty(structureRefList)) {
             return AjaxResult.success(String.format(I18nUtil.getMessage("ui.data.alert.cxStructureTreadConfig.generate.success"), 0), 0);
         }
         // 原有配置列表
-        List<CxStructureTreadConfig> existsList = cxStructureTreadConfigMapper.selectList(new LambdaQueryWrapper<>());
+        List<CxStructureTreadConfig> existsList = cxStructureTreadConfigMapper.selectList(
+                new LambdaQueryWrapper<CxStructureTreadConfig>().eq(CxStructureTreadConfig::getFactoryCode, factoryCode));
         Set<String> existsKeySet = existsList.stream()
                 .map(this::buildUniqueMatchKey)
                 .filter(StringUtil::isNotBlank)

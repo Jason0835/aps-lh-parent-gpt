@@ -30,7 +30,7 @@
 <script>
 import infoForm from "@/views/components/infoForm.vue";
 import { editMachine, checkMachineCodeUnique } from "@/api/lh/machine";
-import { listMdmModelInfo } from "@/api/mdm/mdmModelInfo";
+import { listMouldSleeve } from "@/api/mdm/mdmModelInfo";
 import { status } from "nprogress";
 
 export default {
@@ -208,10 +208,11 @@ export default {
           maxlength:20,
         },
         {
-          label: this.$t("ui.data.column.machine.mouldSetCode"),
-          prop: "mouldSetCode",
+          label: this.$t("ui.data.column.machine.shellStandard"),
+          prop: "shellStandard",
           type: "select",
           options: this.mouldSleeveOptions,
+          filterable: true,
           attrs: {
             multiple: true,
           },
@@ -338,11 +339,8 @@ export default {
     //utils
     async getMouldSleeveOptions() {
       try {
-        const res = await listMdmModelInfo({});
-        const mouldSleeves = res.rows
-          .map(item => item.mouldSleeve)
-          .filter(item => item && item.trim() !== "");
-        this.mouldSleeveOptions = [...new Set(mouldSleeves)].map(item => ({
+        const res = await listMouldSleeve();
+        this.mouldSleeveOptions = res.map(item => ({
           label: item,
           value: item,
         }));
@@ -367,7 +365,7 @@ export default {
           openMachineClass: data.openMachineClass
             ? data.openMachineClass.split(",")
             : [],
-          mouldSetCode: data.mouldSetCode ? data.mouldSetCode.split(",") : [],
+          shellStandard: this.formatShellStandardForForm(data.shellStandard),
           status: data.status == "1" ? true : false,
         };
         console.log(this.form);
@@ -376,7 +374,7 @@ export default {
           classShift: "2",
           openMachineClass: [],
           factoryCode: "116",
-          mouldSetCode: [],
+          shellStandard: [],
         };
       }
     },
@@ -388,6 +386,26 @@ export default {
     },
     numberEmpty(val) {
       return this.isEmpty(val) ? undefined : val;
+    },
+    // 将后端逗号分隔的模套型号转换为多选组件需要的数组，兼容接口直接返回数组的场景。
+    formatShellStandardForForm(value) {
+      if (Array.isArray(value)) {
+        return value;
+      }
+      if (this.isEmpty(value)) {
+        return [];
+      }
+      return String(value)
+        .split(",")
+        .map((item) => item.trim())
+        .filter((item) => item);
+    },
+    // 将多选数组转换为后端需要的逗号分隔字符串，兼容表单中已经是字符串的场景。
+    formatShellStandardForSubmit(value) {
+      if (Array.isArray(value)) {
+        return value.join(",");
+      }
+      return this.isEmpty(value) ? "" : value;
     },
     checkMachineCode(rule, value, callback) {
       return new Promise((resolve, reject) => {
@@ -437,9 +455,9 @@ export default {
         if (params.openMachineClass) {
           params.openMachineClass = params.openMachineClass.join(",");
         }
-        if (params.mouldSetCode && Array.isArray(params.mouldSetCode)) {
-          params.mouldSetCode = params.mouldSetCode.join(",");
-        }
+        params.shellStandard = this.formatShellStandardForSubmit(
+          params.shellStandard
+        );
         Object.keys(params).forEach((key) => {
           if (this.isEmpty(params[key])) {
             params[key] = "";

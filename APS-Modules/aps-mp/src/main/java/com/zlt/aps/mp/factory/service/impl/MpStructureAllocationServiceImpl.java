@@ -32,6 +32,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.adjust.service.impl.MpMonthPlanStaticService;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
@@ -146,9 +147,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
     private Map<String, String> getImportMachineMap(Long importLogId) {
         if (importLogId == null) {
-            return Collections.emptyMap();
+            return new HashMap<>();
         }
-        return importMachineMapCache.getOrDefault(importLogId, Collections.emptyMap());
+        return importMachineMapCache.getOrDefault(importLogId, new HashMap<>());
     }
 
     private void clearImportMachineMap(Long importLogId) {
@@ -2038,7 +2039,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      */
     private Map<String, MpStructureAllocation> getLastMachineStructureMap(String factoryCode, Integer year, Integer month) {
         if (StringUtils.isBlank(factoryCode) || year == null || month == null) {
-            return Collections.emptyMap();
+            return new HashMap<>();
         }
         // 1、获取上个月日历
         Calendar calendar = Calendar.getInstance();
@@ -2057,7 +2058,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 .filter(c -> ApsConstant.APS_ZERO_1.equals(c.getProcCode())
                         && YesOrNoEnum.YES.getCode().equals(c.getDayFlag())).max(Comparator.comparing(MdmWorkCalendar::getDay)).orElse(null);
         if (lastMdmWorkCalendar == null) {
-            return Collections.emptyMap();
+            return new HashMap<>();
         }
         Integer lastDay = lastMdmWorkCalendar.getDay();
 
@@ -2070,7 +2071,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         versionQueryWrapper.eq(MpFactoryProductionVersion::getIsFinal, YesOrNoEnum.YES.getCode());
         MpFactoryProductionVersion procVersion = CollectionUtils.firstElement(mpFactoryProductionVersionMapper.selectList(versionQueryWrapper));
         if (procVersion == null || StringUtils.isEmpty(procVersion.getProductionVersion())) {
-            return Collections.emptyMap();
+            return new HashMap<>();
         }
         // 2.2、获取上个月定稿版本对应的结构转产表
         String productionVersion = procVersion.getProductionVersion();
@@ -2079,7 +2080,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         structureQueryWrapper.eq(MpStructureAllocation::getProductionVersion, productionVersion);
         List<MpStructureAllocation> lastMonthFinalList = entityMapper.selectList(structureQueryWrapper);
         if (CollUtil.isEmpty(lastMonthFinalList)) {
-            return Collections.emptyMap();
+            return new HashMap<>();
         }
         // 2.3、加载上个月定稿版本的统计记录
         LambdaQueryWrapper<MpMonthPlanStatistics> queryWrapper = new LambdaQueryWrapper<>();

@@ -235,22 +235,9 @@
         SELECT
         STOCK_DATE,
         EMBRYO_CODE,
-        STOCK_NUM,
-        LITI_STOCK,
-        EMBRYO_CAR,
-        LH_STOCK,
-        AVAILABLE_STOCK,
-        BOM_DATA_VERSION,
-        EXAMPLE_TYPE,
-        UNAVAILABLE_STOCK,
-        DATA_VERSION,
-        COMPANY_CODE,
-        FACTORY_CODE
+        STOCK_NUM
         FROM MES_CX_STOCK
         WHERE 1 = 1
-        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
-        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
-        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
 
     <select id="selectCxClassShiftFinishQtyList" resultType="com.zlt.aps.cx.api.domain.entity.CxScheFinishQty">

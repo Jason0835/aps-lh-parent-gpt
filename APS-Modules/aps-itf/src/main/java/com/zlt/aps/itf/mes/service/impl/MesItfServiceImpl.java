@@ -865,23 +865,25 @@ public class MesItfServiceImpl implements MesItfService {
         DynamicDataSourceContextHolder.poll();
 
         if (CollectionUtils.isNotEmpty(syncList)) {
-            cxMesSyncRemoteService.deleteMachineOnlineInfo(cxMachineOnlineInfo.getFactoryCode());
+            FeignTokenHelper.runWithToken(() -> {
+                cxMesSyncRemoteService.deleteMachineOnlineInfo(cxMachineOnlineInfo.getFactoryCode());
 
-            List<CxMachineOnlineInfo> insertList = new ArrayList<>();
-            for (CxMachineOnlineInfo info : syncList) {
-                CxMachineOnlineInfo entity = new CxMachineOnlineInfo();
-                BeanUtils.copyProperties(info, entity);
-                entity.setCreateBy("MES");
-                entity.setUpdateBy("MES");
-                entity.setCreateTime(DateUtils.getNowDate());
-                entity.setUpdateTime(DateUtils.getNowDate());
-                insertList.add(entity);
-            }
+                List<CxMachineOnlineInfo> insertList = new ArrayList<>();
+                for (CxMachineOnlineInfo info : syncList) {
+                    CxMachineOnlineInfo entity = new CxMachineOnlineInfo();
+                    BeanUtils.copyProperties(info, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+                    entity.setCreateTime(DateUtils.getNowDate());
+                    entity.setUpdateTime(DateUtils.getNowDate());
+                    insertList.add(entity);
+                }
 
-            List<List<CxMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(insertList, 1000);
-            for (List<CxMachineOnlineInfo> importList : splitList) {
-                cxMesSyncRemoteService.saveMachineOnlineInfoBatch(importList);
-            }
+                List<List<CxMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(insertList, 1000);
+                for (List<CxMachineOnlineInfo> importList : splitList) {
+                    cxMesSyncRemoteService.saveMachineOnlineInfoBatch(importList);
+                }
+            });
         }
         return AjaxResult.success();
     }
@@ -898,23 +900,25 @@ public class MesItfServiceImpl implements MesItfService {
         DynamicDataSourceContextHolder.poll();
 
         if (CollectionUtils.isNotEmpty(syncList)) {
-            lhMesSyncRemoteService.deleteMachineOnlineInfo(lhMachineOnlineInfo.getFactoryCode());
+            FeignTokenHelper.runWithToken(() -> {
+                lhMesSyncRemoteService.deleteMachineOnlineInfo(lhMachineOnlineInfo.getFactoryCode());
 
-            List<LhMachineOnlineInfo> insertList = new ArrayList<>();
-            for (LhMachineOnlineInfo info : syncList) {
-                LhMachineOnlineInfo entity = new LhMachineOnlineInfo();
-                BeanUtils.copyProperties(info, entity);
-                entity.setCreateBy("MES");
-                entity.setUpdateBy("MES");
-                entity.setCreateTime(DateUtils.getNowDate());
-                entity.setUpdateTime(DateUtils.getNowDate());
-                insertList.add(entity);
-            }
+                List<LhMachineOnlineInfo> insertList = new ArrayList<>();
+                for (LhMachineOnlineInfo info : syncList) {
+                    LhMachineOnlineInfo entity = new LhMachineOnlineInfo();
+                    BeanUtils.copyProperties(info, entity);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+                    entity.setCreateTime(DateUtils.getNowDate());
+                    entity.setUpdateTime(DateUtils.getNowDate());
+                    insertList.add(entity);
+                }
 
-            List<List<LhMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(insertList, 1000);
-            for (List<LhMachineOnlineInfo> importList : splitList) {
-                lhMesSyncRemoteService.saveMachineOnlineInfoBatch(importList);
-            }
+                List<List<LhMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(insertList, 1000);
+                for (List<LhMachineOnlineInfo> importList : splitList) {
+                    lhMesSyncRemoteService.saveMachineOnlineInfoBatch(importList);
+                }
+            });
         }
         return AjaxResult.success();
     }
@@ -1121,29 +1125,31 @@ public class MesItfServiceImpl implements MesItfService {
         }
 
         if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
-            List<LhMouldCleanWarn> existsList = lhMesSyncRemoteService.selectMouldCleanWarnExists(insertOrUpdateList);
-            Map<String, LhMouldCleanWarn> existsMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream()
-                        .collect(Collectors.toMap(
-                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhCode()),
-                                Function.identity(),
-                                (v1, v2) -> v1
-                        ));
-            }
-
-            for (LhMouldCleanWarn entity : insertOrUpdateList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhCode());
-                if (existsMap.containsKey(mapKey)) {
-                    LhMouldCleanWarn existsData = existsMap.get(mapKey);
-                    entity.setId(existsData.getId());
+            FeignTokenHelper.runWithToken(() -> {
+                List<LhMouldCleanWarn> existsList = lhMesSyncRemoteService.selectMouldCleanWarnExists(insertOrUpdateList);
+                Map<String, LhMouldCleanWarn> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
                 }
-            }
 
-            List<List<LhMouldCleanWarn>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
-            for (List<LhMouldCleanWarn> saveList : splitList) {
-                lhMesSyncRemoteService.saveMouldCleanWarnBatch(saveList);
-            }
+                for (LhMouldCleanWarn entity : insertOrUpdateList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        LhMouldCleanWarn existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                }
+
+                List<List<LhMouldCleanWarn>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+                for (List<LhMouldCleanWarn> saveList : splitList) {
+                    lhMesSyncRemoteService.saveMouldCleanWarnBatch(saveList);
+                }
+            });
         }
         return AjaxResult.success();
     }
@@ -1169,38 +1175,41 @@ public class MesItfServiceImpl implements MesItfService {
         syncList = new ArrayList<>(groupMap.values());
 
         if (CollectionUtils.isNotEmpty(syncList)) {
-            lhMesSyncRemoteService.deleteRepairCapsule(syncDataLogs.getFactoryCode());
+            List<LhRepairCapsuleVo> finalSyncList = syncList;
+            FeignTokenHelper.runWithToken(() -> {
+                lhMesSyncRemoteService.deleteRepairCapsule(syncDataLogs.getFactoryCode());
 
-            List<LhRepairCapsule> insertList = new ArrayList<>();
-            for (LhRepairCapsuleVo item : syncList) {
-                LhRepairCapsule entity = new LhRepairCapsule();
-                entity.setLhCode(item.getLhCode());
-                entity.setMaterialCode(item.getMaterialCode());
-                entity.setReplaceCapsuleCount(item.getReplaceCapsuleCount());
-                entity.setReplaceCapsuleCount2(item.getReplaceCapsuleCount2());
-                entity.setBrand(item.getBrand());
-                entity.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-                entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-                entity.setCreateBy("MES");
-                entity.setUpdateBy("MES");
-                entity.setCreateTime(DateUtils.getNowDate());
-                entity.setUpdateTime(DateUtils.getNowDate());
+                List<LhRepairCapsule> insertList = new ArrayList<>();
+                for (LhRepairCapsuleVo item : finalSyncList) {
+                    LhRepairCapsule entity = new LhRepairCapsule();
+                    entity.setLhCode(item.getLhCode());
+                    entity.setMaterialCode(item.getMaterialCode());
+                    entity.setReplaceCapsuleCount(item.getReplaceCapsuleCount());
+                    entity.setReplaceCapsuleCount2(item.getReplaceCapsuleCount2());
+                    entity.setBrand(item.getBrand());
+                    entity.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+                    entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+                    entity.setCreateTime(DateUtils.getNowDate());
+                    entity.setUpdateTime(DateUtils.getNowDate());
 
-                if (StringUtils.isNotBlank(item.getObtainTime())) {
-                    try {
-                        entity.setObtainTime(DateUtils.parseDate(item.getObtainTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"));
-                    } catch (Exception e) {
-                        log.error("解析获取日期失败：{}", item.getObtainTime(), e);
+                    if (StringUtils.isNotBlank(item.getObtainTime())) {
+                        try {
+                            entity.setObtainTime(DateUtils.parseDate(item.getObtainTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"));
+                        } catch (Exception e) {
+                            log.error("解析获取日期失败：{}", item.getObtainTime(), e);
+                        }
                     }
+
+                    insertList.add(entity);
                 }
 
-                insertList.add(entity);
-            }
-
-            List<List<LhRepairCapsule>> splitList = ScmListUtils.getSplitList(insertList, 1000);
-            for (List<LhRepairCapsule> importList : splitList) {
-                lhMesSyncRemoteService.saveRepairCapsuleBatch(importList);
-            }
+                List<List<LhRepairCapsule>> splitList = ScmListUtils.getSplitList(insertList, 1000);
+                for (List<LhRepairCapsule> importList : splitList) {
+                    lhMesSyncRemoteService.saveRepairCapsuleBatch(importList);
+                }
+            });
         }
         return AjaxResult.success();
     }
@@ -1246,29 +1255,31 @@ public class MesItfServiceImpl implements MesItfService {
         }
 
         if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
-            List<CxStructureTreadConfig> existsList = cxMesSyncRemoteService.selectStructureTreadConfigExists(insertOrUpdateList);
-            Map<String, CxStructureTreadConfig> existsMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream()
-                        .collect(Collectors.toMap(
-                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getStructureCode()),
-                                Function.identity(),
-                                (v1, v2) -> v1
-                        ));
-            }
-
-            for (CxStructureTreadConfig entity : insertOrUpdateList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getStructureCode());
-                if (existsMap.containsKey(mapKey)) {
-                    CxStructureTreadConfig existsData = existsMap.get(mapKey);
-                    entity.setId(existsData.getId());
+            FeignTokenHelper.runWithToken(() -> {
+                List<CxStructureTreadConfig> existsList = cxMesSyncRemoteService.selectStructureTreadConfigExists(insertOrUpdateList);
+                Map<String, CxStructureTreadConfig> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getStructureCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
                 }
-            }
 
-            List<List<CxStructureTreadConfig>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
-            for (List<CxStructureTreadConfig> saveList : splitList) {
-                cxMesSyncRemoteService.saveStructureTreadConfigBatch(saveList);
-            }
+                for (CxStructureTreadConfig entity : insertOrUpdateList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getStructureCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        CxStructureTreadConfig existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                }
+
+                List<List<CxStructureTreadConfig>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+                for (List<CxStructureTreadConfig> saveList : splitList) {
+                    cxMesSyncRemoteService.saveStructureTreadConfigBatch(saveList);
+                }
+            });
         }
         return AjaxResult.success();
     }
@@ -1299,24 +1310,24 @@ public class MesItfServiceImpl implements MesItfService {
         syncList = new ArrayList<>(groupMap.values());
 
         if (CollectionUtils.isNotEmpty(syncList)) {
-            // 先删后插 T_CX_MES_STOCK（MES原始数据全量覆盖）
-            cxMesSyncRemoteService.deleteMesStock(syncDataLogs.getFactoryCode());
-
-            List<CxMesStock> insertList = new ArrayList<>();
-            for (CxMesStock item : syncList) {
-                CxMesStock entity = new CxMesStock();
-                BeanUtils.copyProperties(item, entity);
-                entity.setCreateBy("MES");
-                entity.setUpdateBy("MES");
-                entity.setCreateTime(DateUtils.getNowDate());
-                entity.setUpdateTime(DateUtils.getNowDate());
-                insertList.add(entity);
-            }
-
-            List<List<CxMesStock>> splitList = ScmListUtils.getSplitList(insertList, 1000);
-            for (List<CxMesStock> importList : splitList) {
-                cxMesSyncRemoteService.saveMesStockBatch(importList);
-            }
+//            // 先删后插 T_CX_MES_STOCK（MES原始数据全量覆盖）
+//            cxMesSyncRemoteService.deleteMesStock(syncDataLogs.getFactoryCode());
+//
+//            List<CxMesStock> insertList = new ArrayList<>();
+//            for (CxMesStock item : syncList) {
+//                CxMesStock entity = new CxMesStock();
+//                BeanUtils.copyProperties(item, entity);
+//                entity.setCreateBy("MES");
+//                entity.setUpdateBy("MES");
+//                entity.setCreateTime(DateUtils.getNowDate());
+//                entity.setUpdateTime(DateUtils.getNowDate());
+//                insertList.add(entity);
+//            }
+//
+//            List<List<CxMesStock>> splitList = ScmListUtils.getSplitList(insertList, 1000);
+//            for (List<CxMesStock> importList : splitList) {
+//                cxMesSyncRemoteService.saveMesStockBatch(importList);
+//            }
 
             // T_CX_STOCK：混合方案同步
             List<CxStock> cxStockInsertList = syncList.stream().map(item -> {
@@ -1333,61 +1344,59 @@ public class MesItfServiceImpl implements MesItfService {
                 return cxStock;
             }).collect(Collectors.toList());
 
-            // 步骤1：查询MES推送数据中已存在的记录（按唯一键匹配，不区分dataSource）
-            List<CxStock> existsList = cxMesSyncRemoteService.selectCxStockExists(cxStockInsertList);
-            Map<String, CxStock> existsMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream()
-                        .collect(Collectors.toMap(
-                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getEmbryoCode()),
-                                Function.identity(),
-                                (v1, v2) -> v1
-                        ));
-            }
-
-            // 步骤2：对MES推送数据设置ID（已存在则更新，不存在则新增）
-            for (CxStock entity : cxStockInsertList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getStockDate()), entity.getEmbryoCode());
-                if (existsMap.containsKey(mapKey)) {
-                    CxStock existsData = existsMap.get(mapKey);
-                    entity.setId(existsData.getId());
+            // 步骤1~3：查询已存在记录、设置ID、批量保存或更新
+            FeignTokenHelper.runWithToken(() -> {
+                List<CxStock> existsList = cxMesSyncRemoteService.selectCxStockExists(cxStockInsertList);
+                Map<String, CxStock> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getEmbryoCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
                 }
-            }
 
-            // 步骤3：批量保存或更新（saveBatch有ID则更新，无ID则新增）
-            List<List<CxStock>> cxStockSplitList = ScmListUtils.getSplitList(cxStockInsertList, 1000);
-            for (List<CxStock> importList : cxStockSplitList) {
-                cxMesSyncRemoteService.saveCxStockBatch(importList);
-            }
-
-            // 步骤4：清理MES不再推送的过期数据
-            // 查询当前分厂下dataSource=MES的所有记录
-            List<CxStock> mesSourceList = cxMesSyncRemoteService.selectCxStockByDataSource(syncDataLogs.getFactoryCode(), "MES");
-            if (CollectionUtils.isNotEmpty(mesSourceList)) {
-                // 构建MES本次推送数据的唯一键集合
-                Map<String, CxStock> mesPushMap = cxStockInsertList.stream()
-                        .collect(Collectors.toMap(
-                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getEmbryoCode()),
-                                Function.identity(),
-                                (v1, v2) -> v1
-                        ));
-
-                // 找出MES不再推送的记录ID（在库但不在本次推送中）
-                List<Long> obsoleteIds = mesSourceList.stream()
-                        .filter(item -> !mesPushMap.containsKey(
-                                GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getEmbryoCode())))
-                        .map(CxStock::getId)
-                        .collect(Collectors.toList());
-
-                // 按ID批量删除过期数据（不影响本次同步的数据和手动录入的数据）
-                if (CollectionUtils.isNotEmpty(obsoleteIds)) {
-                    log.info("清理MES不再推送的成型库存数据，factoryCode={}，数量={}", syncDataLogs.getFactoryCode(), obsoleteIds.size());
-                    List<List<Long>> idSplitList = ScmListUtils.getSplitList(obsoleteIds, 1000);
-                    for (List<Long> idList : idSplitList) {
-                        cxMesSyncRemoteService.deleteCxStockByIds(idList);
+                for (CxStock entity : cxStockInsertList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getStockDate()), entity.getEmbryoCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        CxStock existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
                     }
                 }
-            }
+
+                List<List<CxStock>> cxStockSplitList = ScmListUtils.getSplitList(cxStockInsertList, 1000);
+                for (List<CxStock> importList : cxStockSplitList) {
+                    cxMesSyncRemoteService.saveCxStockBatch(importList);
+                }
+            });
+
+            // 步骤4：清理MES不再推送的过期数据
+            FeignTokenHelper.runWithToken(() -> {
+                List<CxStock> mesSourceList = cxMesSyncRemoteService.selectCxStockByDataSource(syncDataLogs.getFactoryCode(), "MES");
+                if (CollectionUtils.isNotEmpty(mesSourceList)) {
+                    Map<String, CxStock> mesPushMap = cxStockInsertList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getEmbryoCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+
+                    List<Long> obsoleteIds = mesSourceList.stream()
+                            .filter(item -> !mesPushMap.containsKey(
+                                    GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getEmbryoCode())))
+                            .map(CxStock::getId)
+                            .collect(Collectors.toList());
+
+                    if (CollectionUtils.isNotEmpty(obsoleteIds)) {
+                        log.info("清理MES不再推送的成型库存数据，factoryCode={}，数量={}", syncDataLogs.getFactoryCode(), obsoleteIds.size());
+                        List<List<Long>> idSplitList = ScmListUtils.getSplitList(obsoleteIds, 1000);
+                        for (List<Long> idList : idSplitList) {
+                            cxMesSyncRemoteService.deleteCxStockByIds(idList);
+                        }
+                    }
+                }
+            });
         }
         return AjaxResult.success();
     }
@@ -1427,29 +1436,31 @@ public class MesItfServiceImpl implements MesItfService {
         }
 
         if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
-            List<CxScheFinishQty> existsList = cxMesSyncRemoteService.selectScheFinishQtyExists(insertOrUpdateList);
-            Map<String, CxScheFinishQty> existsMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream()
-                        .collect(Collectors.toMap(
-                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getCxMachineCode()),
-                                Function.identity(),
-                                (v1, v2) -> v1
-                        ));
-            }
-
-            for (CxScheFinishQty entity : insertOrUpdateList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getCxMachineCode());
-                if (existsMap.containsKey(mapKey)) {
-                    CxScheFinishQty existsData = existsMap.get(mapKey);
-                    entity.setId(existsData.getId());
+            FeignTokenHelper.runWithToken(() -> {
+                List<CxScheFinishQty> existsList = cxMesSyncRemoteService.selectScheFinishQtyExists(insertOrUpdateList);
+                Map<String, CxScheFinishQty> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getCxMachineCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
                 }
-            }
 
-            List<List<CxScheFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
-            for (List<CxScheFinishQty> saveList : splitList) {
-                cxMesSyncRemoteService.saveScheFinishQtyBatch(saveList);
-            }
+                for (CxScheFinishQty entity : insertOrUpdateList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getCxMachineCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        CxScheFinishQty existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                }
+
+                List<List<CxScheFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+                for (List<CxScheFinishQty> saveList : splitList) {
+                    cxMesSyncRemoteService.saveScheFinishQtyBatch(saveList);
+                }
+            });
         }
         return AjaxResult.success();
     }
@@ -1489,36 +1500,37 @@ public class MesItfServiceImpl implements MesItfService {
         }
 
         if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
-            List<LhScheFinishQty> existsList = lhMesSyncRemoteService.selectScheFinishQtyExists(insertOrUpdateList);
-            Map<String, LhScheFinishQty> existsMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream()
-                        .collect(Collectors.toMap(
-                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode()),
-                                Function.identity(),
-                                (v1, v2) -> v1
-                        ));
-            }
-
-            for (LhScheFinishQty entity : insertOrUpdateList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode());
-                if (existsMap.containsKey(mapKey)) {
-                    LhScheFinishQty existsData = existsMap.get(mapKey);
-                    entity.setId(existsData.getId());
+            FeignTokenHelper.runWithToken(() -> {
+                List<LhScheFinishQty> existsList = lhMesSyncRemoteService.selectScheFinishQtyExists(insertOrUpdateList);
+                Map<String, LhScheFinishQty> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
                 }
-            }
 
-            List<List<LhScheFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
-            for (List<LhScheFinishQty> saveList : splitList) {
-                lhMesSyncRemoteService.saveScheFinishQtyBatch(saveList);
-            }
+                for (LhScheFinishQty entity : insertOrUpdateList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        LhScheFinishQty existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                }
 
-            // 硫化排程完成量回写硫化排程结果表各班次完成量
-            try {
-                lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertOrUpdateList);
-            } catch (Exception e) {
-                log.error("【硫化排程完成量回写】回写硫化排程结果表完成量异常", e);
-            }
+                List<List<LhScheFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+                for (List<LhScheFinishQty> saveList : splitList) {
+                    lhMesSyncRemoteService.saveScheFinishQtyBatch(saveList);
+                }
+
+                try {
+                    lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertOrUpdateList);
+                } catch (Exception e) {
+                    log.error("【硫化排程完成量回写】回写硫化排程结果表完成量异常", e);
+                }
+            });
         }
         return AjaxResult.success();
     }
@@ -1558,29 +1570,31 @@ public class MesItfServiceImpl implements MesItfService {
         }
 
         if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
-            List<CxDayFinishQty> existsList = cxMesSyncRemoteService.selectDayFinishQtyExists(insertOrUpdateList);
-            Map<String, CxDayFinishQty> existsMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream()
-                        .collect(Collectors.toMap(
-                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getEmbryoCode(), item.getBomDataVersion()),
-                                Function.identity(),
-                                (v1, v2) -> v1
-                        ));
-            }
-
-            for (CxDayFinishQty entity : insertOrUpdateList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getEmbryoCode(), entity.getBomDataVersion());
-                if (existsMap.containsKey(mapKey)) {
-                    CxDayFinishQty existsData = existsMap.get(mapKey);
-                    entity.setId(existsData.getId());
+            FeignTokenHelper.runWithToken(() -> {
+                List<CxDayFinishQty> existsList = cxMesSyncRemoteService.selectDayFinishQtyExists(insertOrUpdateList);
+                Map<String, CxDayFinishQty> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getEmbryoCode(), item.getBomDataVersion()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
                 }
-            }
 
-            List<List<CxDayFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
-            for (List<CxDayFinishQty> saveList : splitList) {
-                cxMesSyncRemoteService.saveDayFinishQtyBatch(saveList);
-            }
+                for (CxDayFinishQty entity : insertOrUpdateList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getEmbryoCode(), entity.getBomDataVersion());
+                    if (existsMap.containsKey(mapKey)) {
+                        CxDayFinishQty existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                }
+
+                List<List<CxDayFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+                for (List<CxDayFinishQty> saveList : splitList) {
+                    cxMesSyncRemoteService.saveDayFinishQtyBatch(saveList);
+                }
+            });
         }
         return AjaxResult.success();
     }
@@ -1626,29 +1640,31 @@ public class MesItfServiceImpl implements MesItfService {
         }
 
         if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
-            List<LhDayFinishQty> existsList = lhMesSyncRemoteService.selectDayFinishQtyExists(insertOrUpdateList);
-            Map<String, LhDayFinishQty> existsMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream()
-                        .collect(Collectors.toMap(
-                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getMaterialCode(), item.getMesMaterialCode()),
-                                Function.identity(),
-                                (v1, v2) -> v1
-                        ));
-            }
-
-            for (LhDayFinishQty entity : insertOrUpdateList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getMaterialCode(), entity.getMesMaterialCode());
-                if (existsMap.containsKey(mapKey)) {
-                    LhDayFinishQty existsData = existsMap.get(mapKey);
-                    entity.setId(existsData.getId());
+            FeignTokenHelper.runWithToken(() -> {
+                List<LhDayFinishQty> existsList = lhMesSyncRemoteService.selectDayFinishQtyExists(insertOrUpdateList);
+                Map<String, LhDayFinishQty> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getMaterialCode(), item.getMesMaterialCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
                 }
-            }
 
-            List<List<LhDayFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
-            for (List<LhDayFinishQty> saveList : splitList) {
-                lhMesSyncRemoteService.saveDayFinishQtyBatch(saveList);
-            }
+                for (LhDayFinishQty entity : insertOrUpdateList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getMaterialCode(), entity.getMesMaterialCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        LhDayFinishQty existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                }
+
+                List<List<LhDayFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+                for (List<LhDayFinishQty> saveList : splitList) {
+                    lhMesSyncRemoteService.saveDayFinishQtyBatch(saveList);
+                }
+            });
 
             try {
                 MpMonthPlanMonitor paramVo = new MpMonthPlanMonitor();
@@ -1731,29 +1747,31 @@ public class MesItfServiceImpl implements MesItfService {
         }
 
         if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
-            List<LhMoldAlterPlanFinish> existsList = lhMesSyncRemoteService.selectMoldAlterPlanFinishExists(insertOrUpdateList);
-            Map<String, LhMoldAlterPlanFinish> existsMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(existsList)) {
-                existsMap = existsList.stream()
-                        .collect(Collectors.toMap(
-                                item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhBatchNo(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode(), item.getLeftRightMold()),
-                                Function.identity(),
-                                (v1, v2) -> v1
-                        ));
-            }
-
-            for (LhMoldAlterPlanFinish entity : insertOrUpdateList) {
-                String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhBatchNo(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode(), entity.getLeftRightMold());
-                if (existsMap.containsKey(mapKey)) {
-                    LhMoldAlterPlanFinish existsData = existsMap.get(mapKey);
-                    entity.setId(existsData.getId());
+            FeignTokenHelper.runWithToken(() -> {
+                List<LhMoldAlterPlanFinish> existsList = lhMesSyncRemoteService.selectMoldAlterPlanFinishExists(insertOrUpdateList);
+                Map<String, LhMoldAlterPlanFinish> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhBatchNo(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode(), item.getLeftRightMold()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
                 }
-            }
 
-            List<List<LhMoldAlterPlanFinish>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
-            for (List<LhMoldAlterPlanFinish> saveList : splitList) {
-                lhMesSyncRemoteService.saveMoldAlterPlanFinishBatch(saveList);
-            }
+                for (LhMoldAlterPlanFinish entity : insertOrUpdateList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhBatchNo(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode(), entity.getLeftRightMold());
+                    if (existsMap.containsKey(mapKey)) {
+                        LhMoldAlterPlanFinish existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                }
+
+                List<List<LhMoldAlterPlanFinish>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+                for (List<LhMoldAlterPlanFinish> saveList : splitList) {
+                    lhMesSyncRemoteService.saveMoldAlterPlanFinishBatch(saveList);
+                }
+            });
         }
         return AjaxResult.success();
     }
@@ -1923,7 +1941,9 @@ public class MesItfServiceImpl implements MesItfService {
 
         if (!fillList.isEmpty()) {
             try {
-                lhPrecisionPlanRemoteService.batchFillActualDateAndGenerateNext(fillList);
+                FeignTokenHelper.runWithToken(() -> {
+                    lhPrecisionPlanRemoteService.batchFillActualDateAndGenerateNext(fillList);
+                });
             } catch (Exception e) {
                 log.error("批量MES回填硫化精度计划实际执行日期失败", e);
                 return AjaxResult.error("批量回填失败：" + e.getMessage());
@@ -1941,7 +1961,8 @@ public class MesItfServiceImpl implements MesItfService {
             if (org.apache.commons.lang.StringUtils.isBlank(queryFactoryCode)) {
                 queryFactoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
             }
-            AjaxResult pendingResult = lhPrecisionPlanRemoteService.listPendingIssuePlans(queryFactoryCode);
+            String finalQueryFactoryCode = queryFactoryCode;
+            AjaxResult pendingResult = FeignTokenHelper.callWithToken(() -> lhPrecisionPlanRemoteService.listPendingIssuePlans(finalQueryFactoryCode));
             if (pendingResult == null || pendingResult.get("data") == null) {
                 log.info("没有待下发的硫化精度计划数据");
                 return AjaxResult.success("没有待下发的硫化精度计划数据");

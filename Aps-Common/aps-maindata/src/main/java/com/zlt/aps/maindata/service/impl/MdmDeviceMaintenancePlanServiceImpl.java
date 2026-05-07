@@ -16,7 +16,7 @@ import com.zlt.aps.maindata.mapper.MdmModelInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMoldingMachineEntityMapper;
 import com.zlt.aps.maindata.service.IMdmDeviceMaintenancePlanService;
 import com.zlt.aps.maindata.utils.LambdaWrapperBuilder;
-import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmDeviceMaintenancePlan;
 import com.zlt.aps.mp.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;

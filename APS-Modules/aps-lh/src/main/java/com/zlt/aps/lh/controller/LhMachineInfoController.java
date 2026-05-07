@@ -13,8 +13,9 @@ import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.lh.service.ILhMachineInfoService;
+import com.zlt.aps.lh.mapper.MdmModelInfoMapper;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
-import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -56,6 +57,9 @@ public class LhMachineInfoController extends AbstractDocBizController<LhMachineI
 
     @Resource
     private LhMachineInfoEntityMapper lhMachineInfoEntityMapper;
+
+    @Resource
+    private MdmModelInfoMapper mdmModelInfoMapper;
 
     /**
      * 查询硫化机台信息列表
@@ -192,6 +196,16 @@ public class LhMachineInfoController extends AbstractDocBizController<LhMachineI
     @Override
     protected String getOrderBy() {
         return "MACHINE_CODE asc";
+    }
+
+    /**
+     * 查询去重后的模套型号列表
+     */
+    @ApiOperation("查询去重后的模套型号列表")
+    @GetMapping("/mouldSleeve/list")
+    public AjaxResult listMouldSleeve() {
+        List<String> mouldSleeveList = mdmModelInfoMapper.listDistinctMouldSleeve();
+        return AjaxResult.success(mouldSleeveList);
     }
 
 }

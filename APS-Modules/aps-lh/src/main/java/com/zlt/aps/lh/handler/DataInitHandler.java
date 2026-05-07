@@ -6,7 +6,7 @@ import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
 import com.zlt.aps.lh.api.domain.dto.ValidationResult;
-import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
@@ -207,7 +207,10 @@ public class DataInitHandler extends AbsScheduleStepHandler {
             dto.setDimensionMinimum(machineInfo.getDimensionMinimum());
             dto.setDimensionMaximum(machineInfo.getDimensionMaximum());
             dto.setMachineOrder(machineInfo.getMachineOrder() != null ? machineInfo.getMachineOrder() : 0);
-            dto.setMouldSetCode(machineInfo.getMouldSetCode());
+            dto.setShellStandard(machineInfo.getShellStandard());
+            dto.setSupport195WideBase(machineInfo.getSupport195WideBase());
+            dto.setSupport225WideBase(machineInfo.getSupport225WideBase());
+            dto.setSupportChipTire(machineInfo.getSupportChipTire());
 
             // 初始化在产规格（来自MES在机信息）
             dto.setCurrentMaterialCode(null);

@@ -22,7 +22,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.lh.api.domain.dto.*;
-import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
@@ -408,7 +408,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         first.setMachineOrder(10);
         first.setManufacturer("示例制造A");
         first.setHotPlateDiameter("1800");
-        first.setMouldSetCode("通用");
+//        first.setMouldSetCode("通用");
         list.add(first);
 
         LhMachineInfo second = new LhMachineInfo();
@@ -428,7 +428,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         second.setMachineOrder(20);
         second.setManufacturer("示例制造B");
         second.setHotPlateDiameter("1650");
-        second.setMouldSetCode("通用");
+//        second.setMouldSetCode("通用");
         list.add(second);
 
         return list;

@@ -9,6 +9,8 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.util.Map;
+
 /**
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MdmMoldingMachine.java
@@ -91,6 +93,13 @@ public class MdmMoldingMachine extends BaseEntity {
     @ApiModelProperty(value = "展示机台名称", name = "machineCode")
     @TableField(exist = false)
     private String machineName;
+
+    /**
+     * 最近12个月结构名称，key为yyyy-MM，value为去重后逗号拼接的结构名称。
+     */
+    @ApiModelProperty(value = "最近12个月结构名称", name = "monthStructureNameMap")
+    @TableField(exist = false)
+    private Map<String, String> monthStructureNameMap;
 
     @ImportExcelValidated(maxLength = 500)
     @Excel(name = "ui.common.column.remark")

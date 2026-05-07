@@ -177,6 +177,9 @@ export default {
             remote-method={item.remoteMethod}
             popper-class={item.popperClass}
             loading={item.loading}
+            props={{
+              ...item.attrs,
+            }}
             on={{
               ...item.listeners,
               ...(item.onFocus && { focus: item.onFocus }),
@@ -215,6 +218,9 @@ export default {
             remote-method={item.remoteMethod}
             popper-class={item.popperClass}
             loading={item.loading}
+            props={{
+              ...item.attrs,
+            }}
             on={{
               ...item.listeners,
               ...(item.onFocus && { focus: item.onFocus }),

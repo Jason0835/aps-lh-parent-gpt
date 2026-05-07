@@ -6,10 +6,9 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
-import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
-import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
@@ -22,7 +21,6 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import org.apache.commons.io.IOUtils;
 import java.util.Arrays;
-import java.util.List;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
 
@@ -205,5 +203,15 @@ public class LhMachineInfoUIController extends BaseUIController<LhMachineInfo> {
         context.setFileBytes(data);
         AjaxResult ajaxResult = iLhMachineInfoService.importData(context,false);
         return ajaxResult;
+    }
+
+    /**
+     * 查询去重后的模套型号列表
+     */
+    @ApiOperation("查询去重后的模套型号列表")
+    @GetMapping("/mouldSleeve/list")
+    @ResponseBody
+    public AjaxResult listMouldSleeve() {
+        return iLhMachineInfoService.listMouldSleeve();
     }
 }
