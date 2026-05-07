@@ -219,6 +219,10 @@ public class ProductionCapacityParamConfiguration {
      * SYS0209011 分组高优先级先排产的占比
      */
     private BigDecimal heightPriorityProductionMode;
+    /**
+     * SYS0209012 高优先级最小排产机数
+     */
+    private Integer minHeightPriorityLhMachineCount;
 
     /**
      * 设置额外处理的配比值
