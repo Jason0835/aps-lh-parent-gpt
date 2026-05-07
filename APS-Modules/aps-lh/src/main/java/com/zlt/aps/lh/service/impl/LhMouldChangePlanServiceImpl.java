@@ -248,11 +248,12 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 docEntity.setMouldStatus(ApsConstant.FALSE);
                 importList.add(docEntity);
             } else if (updateSupport) {
-                LambdaQueryWrapper<LhMouldChangePlan> queryWrapper = new LambdaQueryWrapper<>();
-                queryWrapper.eq(LhMouldChangePlan::getFactoryCode, docEntity.getFactoryCode());
-                queryWrapper.eq(LhMouldChangePlan::getLhMachineCode, docEntity.getLhMachineCode());
-                queryWrapper.eq(LhMouldChangePlan::getPlanDate, docEntity.getPlanDate());
-                LhMouldChangePlan exist = lhMouldChangePlanMapper.selectOne(queryWrapper);
+           LambdaQueryWrapper<LhMouldChangePlan> queryWrapper = new LambdaQueryWrapper<>();
+           queryWrapper.eq(LhMouldChangePlan::getFactoryCode, docEntity.getFactoryCode());
+           queryWrapper.eq(LhMouldChangePlan::getLhMachineCode, docEntity.getLhMachineCode());
+           queryWrapper.eq(LhMouldChangePlan::getPlanDate, docEntity.getPlanDate());
+           queryWrapper.eq(LhMouldChangePlan::getScheduleDate, docEntity.getScheduleDate());
+           LhMouldChangePlan exist = lhMouldChangePlanMapper.selectOne(queryWrapper);
                 if (exist == null) {
                     failureNum++;
                     ImportExcelValidatedUtils.addImportErrorLog(importLogId, errorNum,
@@ -295,13 +296,14 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
      */
     @Override
     public String checkUnique(LhMouldChangePlan docEntityVO) {
-        // 唯一性判断维度：工厂 + 机台编码 + 计划日期
+        // 唯一性判断维度：工厂 + 机台编码 + 计划日期 + 排程日期
         LambdaQueryWrapper<LhMouldChangePlan> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.ne(PubUtil.isNotEmpty(docEntityVO.getFieldValueByFieldName("id")),
                 LhMouldChangePlan::getId, docEntityVO.getFieldValueByFieldName("id"));
         queryWrapper.eq(LhMouldChangePlan::getFactoryCode, docEntityVO.getFactoryCode());
         queryWrapper.eq(LhMouldChangePlan::getLhMachineCode, docEntityVO.getLhMachineCode());
         queryWrapper.eq(LhMouldChangePlan::getPlanDate, docEntityVO.getPlanDate());
+        queryWrapper.eq(LhMouldChangePlan::getScheduleDate, docEntityVO.getScheduleDate());
 
         if (lhMouldChangePlanMapper.selectCount(queryWrapper) > 0) {
             return UserConstants.NOT_UNIQUE;
@@ -312,7 +314,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("factoryCode", "lhMachineCode", "planDate");
+        return Arrays.asList("factoryCode", "lhMachineCode", "planDate", "scheduleDate");
     }
 
     /**

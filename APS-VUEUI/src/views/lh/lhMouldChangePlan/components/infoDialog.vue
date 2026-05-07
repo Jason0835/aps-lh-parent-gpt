@@ -2,7 +2,7 @@
   <el-dialog
     :title="title"
     :visible="visible"
-    width="1200px"
+    width="800px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
@@ -271,15 +271,11 @@ export default {
           prop: "remark",
           label: this.$t("common.remark"),
           type: "textarea",
-          span: 24,
           rows: 3,
           maxlength: 500,
         },
       ];
-      return columns.map((item) => ({
-        span: 12,
-        ...item,
-      }));
+      return columns;
     },
   },
   methods: {

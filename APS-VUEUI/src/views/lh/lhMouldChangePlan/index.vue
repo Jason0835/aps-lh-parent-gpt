@@ -206,7 +206,7 @@ export default {
           align: "left",
           halign: "center",
           label: this.$t("ui.data.column.lhMouldChangePlan.beforeMaterialDesc"),
-          width: 300,
+          width: 350,
           render: ({ row }) => this.renderMaterialDesc(row.beforeMaterialDesc),
         },
         {
@@ -221,7 +221,7 @@ export default {
           align: "left",
           halign: "center",
           label: this.$t("ui.data.column.lhMouldChangePlan.afterMaterialDesc"),
-          width: 300,
+          width: 350,
           render: ({ row }) => this.renderMaterialDesc(row.afterMaterialDesc),
         },
         {
