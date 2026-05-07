@@ -23,6 +23,7 @@
               {{ $t("ui.data.column.scheduleResult.baseInfo") }}
             </h4>
           </el-col>
+
           <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.scheduleDate')"
@@ -43,17 +44,9 @@
               :label="$t('common.factory')"
               prop="factoryCode"
             >
-              <dict-select
-                style="width: 100%"
-                v-model="form.factoryCode"
-                :options="parentDict.type.biz_factory_name"
-                filterable
-                clearable
-                disabled
-              />
+              <el-input v-model="form.factoryCode" disabled></el-input>
             </el-form-item>
           </el-col>
-
 
           <el-col :span="12">
             <el-form-item
@@ -96,6 +89,7 @@
               <el-input v-model="form.embryoCode" disabled></el-input>
             </el-form-item>
           </el-col>
+
           <el-col :span="12">
             <el-form-item
               :label="$t('胎胚描述')"
