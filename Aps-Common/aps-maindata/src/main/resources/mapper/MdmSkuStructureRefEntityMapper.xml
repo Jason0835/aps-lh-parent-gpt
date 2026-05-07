@@ -38,7 +38,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         T_MDM_SKU_STRUCTURE_REF TMSSR
         LEFT JOIN T_MDM_MATERIAL_INFO tmi ON tmi.EMBRYO_DESC = TMSSR.MAIN_MATERIAL_DESC
         WHERE
-        TMSSR.IS_DELETE = 0 AND TMSSR.STRUCTURE_NAME IS NOT NULL
+        TMSSR.IS_DELETE = 0 and tmi.IS_DELETE = 0 AND TMSSR.STRUCTURE_NAME IS NOT NULL
         <if test="factoryCode != null and factoryCode != ''">AND TMSSR.FACTORY_CODE = #{factoryCode}</if>
         <if test="materialCode != null and materialCode != ''">AND TMSSR.MATERIAL_CODE = #{materialCode}</if>
         <if test="mainMaterialDesc != null and mainMaterialDesc != ''">AND TMSSR.MAIN_MATERIAL_DESC LIKE
@@ -47,8 +47,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="embryoCode != null and embryoCode != ''">AND tmi.EMBRYO_CODE LIKE
             concat(concat('%',#{embryoCode}), '%')
         </if>
-        <if test="structureName != null and structureName != ''">AND TMSSR.STRUCTURE_NAME like
-            concat(concat('%',#{structureName}), '%')
+        <if test="structureName != null and structureName != ''">AND TMSSR.STRUCTURE_NAME = #{structureName}
         </if>
         GROUP BY TMSSR.FACTORY_CODE,
         TMSSR.STRUCTURE_NAME,
