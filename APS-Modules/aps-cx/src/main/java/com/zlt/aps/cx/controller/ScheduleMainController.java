@@ -962,7 +962,28 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             String[] shiftNames = buildShiftNames(DateUtil.toLocalDateTime(scheduleDate).toLocalDate());
             String capErr = checkPerShiftCapacity(planQtys, existingTimeSeconds, insertSingleTireTime, shiftNames);
             if (capErr != null) {
-                return AjaxResult.error("插单失败：" + capErr + "\n机台已有记录耗时明细:\n" + detailSb.toString());
+                StringBuilder msg = new StringBuilder();
+                msg.append("<b>⚠ 插单产能校验不通过</b><br/>");
+                msg.append("排程日期：").append(DateUtil.format(scheduleDate, "yyyy-MM-dd")).append("<br/>");
+                msg.append("机台：").append(vo.getCxMachineCode()).append("<br/>");
+                msg.append("插单物料：").append(vo.getMaterialCode()).append("(").append(vo.getSpecDesc()).append(")<br/>");
+                msg.append("插单结构：").append(vo.getStructureName()).append("<br/>");
+                msg.append("单条耗时：").append(formatSeconds(insertSingleTireTime)).append("<br/>");
+                msg.append("单班产能：").append(formatSeconds(BigDecimal.valueOf(28800L))).append("<br/><br/>");
+                msg.append("<b>错误：</b><br/>");
+                String capErrText = capErr.replace("已有耗时", "<br/>已有耗时")
+                        .replace("剩余时间", "<br/>剩余时间")
+                        .replace("最多可生产", "<br/>最多可生产")
+                        .replace("计划量", "<br/>计划量");
+                msg.append("  ").append(capErrText).append("<br/><br/>");
+                msg.append("<b>该机台当天已有记录耗时明细：</b><br/>");
+                for (String line : detailSb.toString().split("\n")) {
+                    if (!line.trim().isEmpty()) {
+                        msg.append("  ").append(line).append("<br/>");
+                    }
+                }
+                msg.append("<br/>💡 提示：请减少插单计划量或清理该机台已有记录");
+                return AjaxResult.error(msg.toString());
             }
         }
 
