@@ -22,7 +22,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.lh.api.domain.dto.*;
-import com.zlt.aps.lh.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;

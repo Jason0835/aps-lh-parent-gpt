@@ -95,13 +95,13 @@
 <script>
 import { downloadLink } from '@/utils/request'
 import { generateCxStructureTreadConfig, listCxStructureTreadConfig, removeCxStructureTreadConfig, updateSameStructureTreadCount } from '@/api/cx/cxStructureTreadConfig'
+import { selectSkuStructureWithDesc } from '@/api/monthplan/skuStructure'
 import TltUploadForm from '@/views/components/tltUploadForm.vue'
 import infoDialog from './components/infoDialog.vue'
-import structureSelectWithDesc from '@/views/components/structureSelectWithDesc.vue'
 
 export default {
   name: 'CxStructureTreadConfig',
-  components: { TltUploadForm, infoDialog, structureSelectWithDesc },
+  components: { TltUploadForm, infoDialog },
   dicts: ['biz_factory_name', 'biz_yes_no'],
   provide() {
     return { parentDict: this.dict }
@@ -131,6 +131,8 @@ export default {
         loading: false,
         form: {}
       },
+      structureSearchLoading: false,
+      structureSearchOptions: [],
       data: [],
       selection: [],
       page: { current: 1, pageSize: 20, total: 0 },
@@ -166,23 +168,56 @@ export default {
         {
           prop: 'factoryCode',
           label: this.$t('ui.data.column.cxStructureTreadConfig.factoryCode'),
-          type: 'select',
-          dictData: this.dict.type.biz_factory_name,
-          filterable: true,
-          clearable: true
+          render: (form) => {
+            return (
+              <el-select
+                v-model={form.factoryCode}
+                style="width:100%;"
+                clearable
+                filterable
+                placeholder={this.$t('common.rule.select')}
+                onChange={() => this.handleSearchFactoryChange(form)}
+                onClear={() => this.handleSearchFactoryChange(form)}
+              >
+                {(this.dict.type.biz_factory_name || []).map(item => (
+                  <el-option
+                    key={item.value}
+                    value={item.value}
+                    label={item.label}
+                  />
+                ))}
+              </el-select>
+            )
+          }
         },
         {
           prop: 'structureCode',
           label: this.$t('ui.data.column.cxStructureTreadConfig.structureCode'),
           render: (form) => {
             return (
-              <structureSelectWithDesc
-                key={`${form.factoryCode || ''}-${form.structureCode || ''}`}
-                factoryCode={form.factoryCode}
+              <el-select
                 v-model={form.structureCode}
-                onChange={(value) => this.handleSearchStructureChange(form, value)}
-                onClear={() => this.handleSearchStructureClear(form)}
-              />
+                style="width:100%;"
+                clearable
+                filterable
+                remote
+                loading={this.structureSearchLoading}
+                placeholder={this.$t('common.rule.select')}
+                remote-method={(keyword) => this.loadStructureSearchOptions(keyword, form.factoryCode)}
+                on={{
+                  'visible-change': (visible) => this.handleStructureSearchVisibleChange(visible, form),
+                  change: () => this.handleSearchStructureChange(form),
+                  clear: () => this.handleSearchStructureClear(form)
+                }}
+              >
+                {this.structureSearchOptions.map(item => (
+                  <el-option
+                    key={item.structureName}
+                    value={item.structureName}
+                    label={item.structureName}
+                  />
+                ))}
+              </el-select>
             )
           }
         },
@@ -398,11 +433,54 @@ export default {
     handleSelectionChange(rows) {
       this.selection = rows
     },
-    handleSearchStructureChange(form, value) {
-      this.$set(form, 'structureCode', value)
+    handleSearchFactoryChange(form) {
+      this.$set(form, 'structureCode', undefined)
+      this.structureSearchOptions = []
+    },
+    handleSearchStructureChange(form) {
+      if (!form.factoryCode) {
+        this.$set(form, 'structureCode', undefined)
+      }
     },
     handleSearchStructureClear(form) {
       this.$set(form, 'structureCode', undefined)
+    },
+    handleStructureSearchVisibleChange(visible, form) {
+      if (!visible) {
+        return
+      }
+      this.loadStructureSearchOptions('', form.factoryCode)
+    },
+    async loadStructureSearchOptions(keyword, factoryCode) {
+      if (!factoryCode) {
+        this.structureSearchOptions = []
+        return
+      }
+      try {
+        this.structureSearchLoading = true
+        const res = await selectSkuStructureWithDesc({
+          factoryCode,
+          structureName: keyword,
+          status: 0,
+          pageNum: 1,
+          pageSize: 50
+        })
+        const rows = res.rows || []
+        const optionMap = new Map()
+        rows.forEach(item => {
+          if (!item || !item.structureName) {
+            return
+          }
+          if (!optionMap.has(item.structureName)) {
+            optionMap.set(item.structureName, {
+              structureName: item.structureName
+            })
+          }
+        })
+        this.structureSearchOptions = Array.from(optionMap.values())
+      } finally {
+        this.structureSearchLoading = false
+      }
     },
     formatParams(hasPage = true) {
       const params = {
