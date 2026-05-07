@@ -1207,23 +1207,22 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
 
             if (scheduleLocalDate.isBefore(now.toLocalDate())) {
-                return AjaxResult.error("<b>转机台失败</b><br/>记录ID=" + record.getId() + "<br/>排程日期("
-                        + DateUtil.formatDate(record.getScheduleDate()) + ")为历史日期，不可转机台");
+                return AjaxResult.error("<b>转机台失败</b><br/>胎胚：" + record.getEmbryoCode()
+                        + "<br/>物料：" + (record.getMaterialCode() != null ? record.getMaterialCode() : "")
+                        + "<br/>排程日期(" + DateUtil.formatDate(record.getScheduleDate()) + ")为历史日期，不可转机台");
             }
 
             boolean hasTransferableShift = false;
             for (int i = 1; i <= 8; i++) {
                 if (isShiftTransferable(i, scheduleLocalDate, now, shiftConfigMap)) {
-                    BigDecimal planQty = getClassPlanQty(record, i);
-                    if (planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0) {
-                        hasTransferableShift = true;
-                        break;
-                    }
+                    hasTransferableShift = true;
+                    break;
                 }
             }
             if (!hasTransferableShift) {
-                return AjaxResult.error("<b>转机台失败</b><br/>记录ID=" + record.getId() + "<br/>排程日期("
-                        + DateUtil.formatDate(record.getScheduleDate()) + ")没有可转移的班次计划<br/>所有班次均已过或计划量为0");
+                return AjaxResult.error("<b>转机台失败</b><br/>胎胚：" + record.getEmbryoCode()
+                        + "<br/>物料：" + (record.getMaterialCode() != null ? record.getMaterialCode() : "")
+                        + "<br/>排程日期(" + DateUtil.formatDate(record.getScheduleDate()) + ")没有可转移的班次计划");
             }
 
             // 校验新机台唯一性（排程日期 + 新机台 + 胎胚 + 物料）
