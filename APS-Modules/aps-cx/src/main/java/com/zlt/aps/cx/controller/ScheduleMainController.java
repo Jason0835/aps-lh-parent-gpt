@@ -1207,7 +1207,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
 
             if (scheduleLocalDate.isBefore(now.toLocalDate())) {
-                return AjaxResult.error("记录ID=" + record.getId() + "的排程日期为历史日期，不可转机台");
+                return AjaxResult.error("<b>转机台失败</b><br/>记录ID=" + record.getId() + "<br/>排程日期("
+                        + DateUtil.formatDate(record.getScheduleDate()) + ")为历史日期，不可转机台");
             }
 
             boolean hasTransferableShift = false;
@@ -1221,7 +1222,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                 }
             }
             if (!hasTransferableShift) {
-                return AjaxResult.error("记录ID=" + record.getId() + "没有可转移的班次计划（所有班次均已过或计划量为0）");
+                return AjaxResult.error("<b>转机台失败</b><br/>记录ID=" + record.getId() + "<br/>排程日期("
+                        + DateUtil.formatDate(record.getScheduleDate()) + ")没有可转移的班次计划<br/>所有班次均已过或计划量为0");
             }
 
             // 校验新机台唯一性（排程日期 + 新机台 + 胎胚 + 物料）
@@ -1236,8 +1238,12 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             }
             Long duplicateCount = cxScheduleResultMapper.selectCount(uniqueCheck);
             if (duplicateCount > 0) {
-                return AjaxResult.error("新机台(" + vo.getNewMachineCode() + ")在排程日期"
-                        + DateUtil.formatDate(record.getScheduleDate()) + "已存在相同胎胚、物料的排程记录");
+                return AjaxResult.error("<b>转机台失败</b><br/>"
+                        + "新机台(" + vo.getNewMachineCode() + ")<br/>"
+                        + "排程日期：" + DateUtil.formatDate(record.getScheduleDate()) + "<br/>"
+                        + "胎胚：" + record.getEmbryoCode() + "<br/>"
+                        + "物料：" + record.getMaterialCode() + "<br/>"
+                        + "<br/>该机台当天已存在相同胎胚、物料的排程记录");
             }
 
             transferRecords.add(record);
