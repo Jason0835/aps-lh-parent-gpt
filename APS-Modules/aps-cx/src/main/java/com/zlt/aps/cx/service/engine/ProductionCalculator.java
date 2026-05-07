@@ -116,7 +116,7 @@ public class ProductionCalculator {
         int productionWithLoss = (int) Math.ceil(baseProduction * (1 + lossRate.doubleValue()));
 
         // Step 5: 整车换算
-        int tripCapacity = getTripCapacity(structureName, context);
+        int tripCapacity = getTripCapacity(structureName, embryoCode, context);
         int trips = calculateTrips(productionWithLoss, tripCapacity);
         int planQuantity = trips * tripCapacity;
 
@@ -506,7 +506,7 @@ public class ProductionCalculator {
         int remainingToProduce = Math.max(0, endingSurplus - formingRemainder);
 
         // 获取整车容量
-        int tripCapacity = getTripCapacity(structureName, context);
+        int tripCapacity = getTripCapacity(structureName, embryoCode, context);
 
         // 调用基础收尾计算
         PlanQuantityResult result = calculateEndingQuantity(
@@ -633,12 +633,13 @@ public class ProductionCalculator {
     // ==================== 辅助方法 ====================
 
     /**
-     * 获取整车容量
+     * 获取整车容量（按结构+胎胚匹配）
      */
-    public int getTripCapacity(String structureName, ScheduleContextVo context) {
+    public int getTripCapacity(String structureName, String embryoCode, ScheduleContextVo context) {
         if (context.getStructureShiftCapacities() != null && structureName != null) {
             for (CxStructureTreadConfig capacity : context.getStructureShiftCapacities()) {
-                if (structureName.equals(capacity.getStructureCode())) {
+                if (structureName.equals(capacity.getStructureCode())
+                        && (embryoCode == null || embryoCode.equals(capacity.getEmbryoCode()))) {
                     if (capacity.getTreadCount() != null && capacity.getTreadCount() > 0) {
                         return capacity.getTreadCount();
                     }
@@ -838,7 +839,7 @@ public class ProductionCalculator {
 
         // Step 1: 判断是否试制任务
         if (trialDemand != null && trialDemand > 0) {
-            int tripCapacity = getTripCapacity(structureName, context);
+            int tripCapacity = getTripCapacity(structureName, embryoCode, context);
             PlanQuantityResult trialResult = calculateTrialQuantity(trialDemand, tripCapacity);
             trialResult.setEmbryoCode(embryoCode);
             trialResult.setStructureName(structureName);
