@@ -128,6 +128,8 @@ public class LhMachineInfoServiceImpl extends AbstractDocService<LhMachineInfo> 
             messageKey = "ui.data.import.count.exceed",
             params = {"#list.size()", "2000"}
     )
+
+
     @Override
     public AjaxResult importData(List<LhMachineInfo> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
