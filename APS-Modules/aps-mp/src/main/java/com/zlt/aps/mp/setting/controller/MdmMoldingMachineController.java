@@ -70,7 +70,7 @@ public class MdmMoldingMachineController extends AbstractDocBizController<MdmMol
 
     @Override
     protected String getOrderBy() {
-        return "create_time, id desc";
+        return "CX_MACHINE_CODE ASC";
     }
 
     /**
@@ -136,7 +136,9 @@ public class MdmMoldingMachineController extends AbstractDocBizController<MdmMol
     @Override
     protected List<MdmMoldingMachine> listExportData(MdmMoldingMachine obj) {
         QueryWrapper<MdmMoldingMachine> wrapper = new QueryWrapper<>();
+        startPage(getOrderBy());
         this.builderCondition(wrapper, obj);
+        clearPage();
         return entityMapper.selectList(wrapper);
     }
 
