@@ -1,5 +1,6 @@
 package com.zlt.aps.controller.monthplan;
 
+import cn.hutool.core.date.DateUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -8,13 +9,10 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.ruoyi.common4ui.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.dto.FactoryMonthPlanProductionFinalResultParam;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.service.IFactoryMonthPlanMouldDayResultRemoteService;
 import com.zlt.aps.mp.api.service.IFactoryMonthPlanProductionFinalResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
-
-import cn.hutool.core.date.DateUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
@@ -24,12 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
@@ -60,7 +53,7 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
 
     private final IFactoryMonthPlanProductionFinalResultRemoteService iFactoryMonthPlanProductionFinalResultService;
     private final IFactoryMonthPlanMouldDayResultRemoteService iFactoryMonthPlanMouldDayResultService;
-    
+
     /**
      * 根据条件查询主表数据
      */
@@ -168,7 +161,7 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
 
     /**
      * 导入
-     * 
+     *
      * @param file          文件
      * @param updateSupport 是否覆盖
      * @return 结果
@@ -203,6 +196,20 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
     @ResponseBody
     public TableDataInfo getVersionList(FactoryMonthPlanProductionFinalResult queryVO) {
         return iFactoryMonthPlanProductionFinalResultService.getVersionList(queryVO);
+    }
+
+    /**
+     * 同步月计划调整后数据到SCM和MES
+     *
+     * @param queryVO 月计划查询参数
+     * @return 推送结果
+     */
+    @RequiresPermissions("monthplan:factoryMonthPlanFinalResult:sync")
+    @ApiOperation("同步月计划调整后数据到SCM和MES")
+    @PostMapping("/syncAdjustedMonthPlanToScmAndMes")
+    @ResponseBody
+    public AjaxResult syncAdjustedMonthPlanToScmAndMes(FactoryMonthPlanProductionFinalResult queryVO) {
+        return iFactoryMonthPlanProductionFinalResultService.syncAdjustedMonthPlanToScmAndMes(queryVO);
     }
 
 }
