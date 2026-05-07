@@ -45,7 +45,7 @@ public interface ICxStructureTreadConfigService extends IDocService<CxStructureT
      *
      * @return 生成结果
      */
-    AjaxResult generateTreadConfig();
+    AjaxResult generateTreadConfig(String factoryCode);
 
     /**
      * 按工厂+结构批量更新整车胎面条数。

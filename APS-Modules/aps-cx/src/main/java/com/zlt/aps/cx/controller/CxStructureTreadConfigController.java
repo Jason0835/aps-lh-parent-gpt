@@ -76,8 +76,8 @@ public class CxStructureTreadConfigController extends AbstractDocBizController<C
     @Log(title = "ui.data.column.cxStructureTreadConfig.generate", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("生成胎面整车配置")
     @PostMapping("/generateTreadConfig")
-    public AjaxResult generateTreadConfig() {
-        return cxStructureTreadConfigService.generateTreadConfig();
+    public AjaxResult generateTreadConfig(@RequestParam("factoryCode") String factoryCode) {
+        return cxStructureTreadConfigService.generateTreadConfig(factoryCode);
     }
 
     @Log(title = "ui.data.column.cxStructureTreadConfig.sameStructureTreadCount", businessType = BusinessType.UPDATE)

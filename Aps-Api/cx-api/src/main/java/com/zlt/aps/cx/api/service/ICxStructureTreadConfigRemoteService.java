@@ -81,7 +81,7 @@ public interface ICxStructureTreadConfigRemoteService {
      */
     @ApiOperation("生成胎面整车配置")
     @PostMapping("/cxStructureTreadConfig/generateTreadConfig")
-    AjaxResult generateTreadConfig();
+    AjaxResult generateTreadConfig(@RequestParam("factoryCode") String factoryCode);
 
     /**
      * 批量更新相同工厂相同结构整车胎面条数

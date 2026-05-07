@@ -350,10 +350,15 @@ export default {
       downloadLink('/cx/cxStructureTreadConfig/export', this.formatParams(false))
     },
     handleGenerate() {
+      const factoryCode = this.search.factoryCode !== undefined ? this.search.factoryCode : this.query.factoryCode
+      if (!factoryCode) {
+        this.$modal.msgError(this.$t('ui.data.alert.cxStructureTreadConfig.generate.factoryCodeRequired'))
+        return
+      }
       this.$confirm(this.$t('ui.data.alert.cxStructureTreadConfig.generate.confirm'), { type: 'warning' }).then(async () => {
         try {
           this.generateLoading = true
-          const res = await generateCxStructureTreadConfig()
+          const res = await generateCxStructureTreadConfig(factoryCode)
           this.$modal.msgSuccess(res.msg)
           this.page.current = 1
           this.getList()
@@ -363,10 +368,7 @@ export default {
       })
     },
     handleSearch(data) {
-      this.query = {
-        factoryCode: '116',
-        ...data
-      }
+      this.query = { ...data }
       if (data.stockDateRange && data.stockDateRange.length === 2) {
         this.query.stockDateBegin = data.stockDateRange[0]
         this.query.stockDateEnd = data.stockDateRange[1]

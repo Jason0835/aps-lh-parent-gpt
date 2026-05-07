@@ -133,8 +133,8 @@ public class CxStructureTreadConfigUIController extends BaseUIController<CxStruc
     @RequiresPermissions("cx:cxStructureTreadConfig:generate")
     @PostMapping("/generateTreadConfig")
     @ResponseBody
-    public AjaxResult generateTreadConfig() {
-        return iCxStructureTreadConfigService.generateTreadConfig();
+    public AjaxResult generateTreadConfig(String factoryCode) {
+        return iCxStructureTreadConfigService.generateTreadConfig(factoryCode);
     }
 
     /**

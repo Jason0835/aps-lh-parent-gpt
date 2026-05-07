@@ -65,10 +65,11 @@ export function importTemplateCxStructureTreadConfig() {
   })
 }
 
-export function generateCxStructureTreadConfig() {
+export function generateCxStructureTreadConfig(factoryCode) {
   return request({
     url: '/cx/cxStructureTreadConfig/generateTreadConfig',
-    method: 'post'
+    method: 'post',
+    params: { factoryCode }
   })
 }
 
