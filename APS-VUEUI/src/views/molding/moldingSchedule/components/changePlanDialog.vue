@@ -181,17 +181,6 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方编号')" prop="class2RecipeNo">
-              <embryoNoSelect
-                :key="`class2RecipeNo-${form.class2RecipeNo || ''}`"
-                v-model="form.class2RecipeNo"
-                :materialCode="form.materialCode"
-                disabled
-                @change="(val, row) => handleRecipeNoChange(2, val, row)"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
             <el-form-item :label="$t('示方类型')" prop="class1RecipeType">
               <dict-select
                 v-model="form.class1RecipeType"
@@ -254,7 +243,7 @@
                 :key="`class2RecipeNo-${form.class2RecipeNo || ''}`"
                 v-model="form.class2RecipeNo"
                 :materialCode="form.materialCode"
-                :disabled="isShiftLocked(2)"
+                disabled
                 @change="(val, row) => handleRecipeNoChange(2, val, row)"
               />
             </el-form-item>
