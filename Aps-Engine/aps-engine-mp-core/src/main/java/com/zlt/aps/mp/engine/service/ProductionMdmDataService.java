@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.service;
 
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.ProductALevelVo;
 import com.zlt.aps.mp.engine.daylimit.MouldAllocationInfoVo;

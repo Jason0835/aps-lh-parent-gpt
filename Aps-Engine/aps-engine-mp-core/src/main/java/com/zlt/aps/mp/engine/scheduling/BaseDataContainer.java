@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.engine.scheduling;
 
 import com.zlt.aps.constant.StringConstant;
-import com.zlt.aps.mp.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.enums.WorkWearTypeEnum;
 import com.zlt.aps.mp.engine.basedata.assemble.history.CxMachineProductionHistoryInfo;
