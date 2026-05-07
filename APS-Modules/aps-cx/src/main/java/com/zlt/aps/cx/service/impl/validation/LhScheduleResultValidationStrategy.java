@@ -325,16 +325,20 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
             return;
         }
 
-        // 构建结构名称集合（支持STRUCTURE_CODE和STRUCTURE_NAME两种方式匹配）
+        // 构建结构+胎胚配置集合（支持 STRUCTURE_CODE + EMBRYO_CODE 组合匹配）
         Set<String> configuredStructures = structureTreadConfigs.stream()
-                .map(CxStructureTreadConfig::getStructureCode)
+                .map(config -> {
+                    String structure = config.getStructureCode();
+                    String embryo = config.getEmbryoCode();
+                    return structure + "|" + embryo;
+                })
                 .filter(Objects::nonNull)
                 .filter(s -> !s.trim().isEmpty())
                 .collect(Collectors.toSet());
 
-        // 获取硫化任务中出现的所有结构
+        // 获取硫化任务中出现的所有结构+胎胚
         Set<String> lhStructures = lhResults.stream()
-                .map(LhScheduleResult::getStructureName)
+                .map(lh -> lh.getStructureName() + "|" + lh.getEmbryoCode())
                 .filter(Objects::nonNull)
                 .filter(s -> !s.trim().isEmpty())
                 .collect(Collectors.toSet());
@@ -353,7 +357,7 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
                     "硫化排程结果中有 %d 个结构在【T_CX_STRUCTURE_TREAD_CONFIG】表中没有配置：%s",
                     missingStructures.size(), String.join(", ", missingStructures));
             addError(result, message,
-                    "请在 T_CX_STRUCTURE_TREAD_CONFIG 表中为这些结构添加配置（STRUCTURE_CODE、TREAD_COUNT）");
+                    "请在 T_CX_STRUCTURE_TREAD_CONFIG 表中为这些结构+胎胚组合添加配置（STRUCTURE_CODE、EMBRYO_CODE、TREAD_COUNT）");
         } else {
             addInfo(result,
                     String.format("结构整车配置完整，共 %d 个配置，硫化任务中的 %d 个结构均有配置",

@@ -361,7 +361,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setLhId(taskAlloc.getLhId());
 
                 // 计算需要的车数（使用实际待排产量）
-                int tripCapacity = productionCalculator.getTripCapacity(taskAlloc.getStructureName(), context);
+                int tripCapacity = productionCalculator.getTripCapacity(taskAlloc.getStructureName(), taskAlloc.getEmbryoCode(), context);
                 int actualQty = taskAlloc.getEndingExtraInventory() != null ? taskAlloc.getEndingExtraInventory() : taskAlloc.getQuantity();
                 int cars = tripCapacity > 0 ? (int) Math.ceil((double) actualQty / tripCapacity) : 0;
                 task.setRequiredCars(cars);
