@@ -5,7 +5,7 @@
     <select id="listDistinctMouldSleeve" resultType="java.lang.String">
         SELECT DISTINCT SHELL_STANDARD
         FROM t_mdm_mould_info
-        WHERE SHELL_STANDARD IS NOT NULL AND TRIM(SHELL_STANDARD) != ''
+        WHERE SHELL_STANDARD IS NOT NULL AND TRIM(SHELL_STANDARD) != '' and IS_DELETE = 0
     </select>
 
 </mapper>
