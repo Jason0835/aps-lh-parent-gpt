@@ -56,7 +56,8 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     private String machineName;
 
     /** 寸口信息 */
-//    @Excel(name = "ui.data.column.info.dimension",sort = 50)
+    @ImportExcelValidated(required = true, number = true, min = 0, max = 9999)
+    @Excel(name = "ui.data.column.info.dimension", cellType = Excel.ColumnType.NUMERIC, sort = 50)
     @ApiModelProperty(value = "寸口信息", name = "dimension")
     @TableField(value = "DIMENSION")
     private BigDecimal dimension;
@@ -74,7 +75,7 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     private BigDecimal dimensionMinimum;
 
     /** 生产寸口范围上限，单位：英寸 */
-    @ImportExcelValidated(required = true, number = true, min = 1, max = 9999)
+    @ImportExcelValidated(number = true, min = 1, max = 9999)
     @Excel(name = "ui.data.column.info.dimensionMaximum", cellType = Excel.ColumnType.NUMERIC, sort = 70)
     @ApiModelProperty(value = "生产寸口范围上限，单位：英寸", name = "dimensionMaximum")
     @TableField(value = "DIMENSION_MAXIMUM")
@@ -106,13 +107,11 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
 
     /** 是否启用 */
     @Excel(name = "ui.data.column.info.status",sort = 100,dictType = "sys_enable_disable")
-    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "是否启用，字典：sys_enable_disable", name = "status")
     @TableField(value = "STATUS")
     private String status;
 
     @Excel(name = "ui.data.column.info.machineType",sort = 40,dictType = "LH_MACHINE_TYPE")
-    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "机台类型，字典：LH_MACHINE_TYPE", name = "machineType")
     @TableField(value = "MACHINE_TYPE")
     private String machineType;
@@ -168,6 +167,7 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
      * 支持19.5寸宽基 0-否，1-是
      */
     @Excel(name = "ui.data.column.info.support195WideBase", dictType = "biz_yes_no", sort = 75)
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "支持19.5寸宽基 0-否，1-是，字典：biz_yes_no", name = "support195WideBase")
     @TableField("SUPPORT195_WIDE_BASE")
     private String support195WideBase;
@@ -176,6 +176,7 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
      * 支持22.5寸宽基 0-否，1-是
      */
     @Excel(name = "ui.data.column.info.support225WideBase", dictType = "biz_yes_no", sort = 77)
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "支持22.5寸宽基 0-否，1-是，字典：biz_yes_no", name = "support225WideBase")
     @TableField("SUPPORT225_WIDE_BASE")
     private String support225WideBase;
@@ -184,6 +185,7 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
      * 支持芯片胎 0-否，1-是
      */
     @Excel(name = "ui.data.column.info.supportChipTire", dictType = "biz_yes_no", sort = 79)
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "支持芯片胎 0-否，1-是，字典：biz_yes_no", name = "supportChipTire")
     @TableField("SUPPORT_CHIP_TIRE")
     private String supportChipTire;
