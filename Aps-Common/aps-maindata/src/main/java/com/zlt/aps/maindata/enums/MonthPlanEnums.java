@@ -284,7 +284,11 @@ public enum MonthPlanEnums {
     /**
      * SYS0209011 结构采用高优先先排策略条件：结构高优先级需求量占比超过
      */
-    HEIGHT_PRIORITY_SKU_PRODUCTION_MODE("SYS0209011", "结构采用高优先先排策略条件：结构高优先级需求量占比超过");
+    HEIGHT_PRIORITY_SKU_PRODUCTION_MODE("SYS0209011", "结构采用高优先先排策略条件：结构高优先级需求量占比超过"),
+    /**
+     * SYS0209012 单个成型机台高优先级占当日排产的硫化机台数 小于 参数值强制收尾
+     */
+    MIN_HEIGHT_PRIORITY_LH_MACHINE_COUNT("SYS0209012", "单个成型机台高优先级占当日排产的硫化机台数小于参数值强制收尾");
 
     private final String code;
     private final String name;

@@ -66,6 +66,10 @@ public class ProductionPlanGroupInfo {
      */
     private Integer minLhMachineCount;
     /**
+     * 最小高优先级硫化机台数（参数配置）
+     */
+    private Integer minHeightPriorityLhMachineCount;
+    /**
      * 结构的SKU中最小的日硫化产能
      */
     private Integer minLhDayCapacityQty;
@@ -232,6 +236,9 @@ public class ProductionPlanGroupInfo {
                 break;
             }
         }
+        // 高优先级最小排产机台
+        Integer minHeightPriorityLhMachineCount = productionContext.getBaseDataContainer().getParamConfiguration().getMinHeightPriorityLhMachineCount();
+        groupInfo.setMinHeightPriorityLhMachineCount(minHeightPriorityLhMachineCount);
         if (CollectionUtils.isEmpty(materialMap)) {
             return groupInfo;
         }
