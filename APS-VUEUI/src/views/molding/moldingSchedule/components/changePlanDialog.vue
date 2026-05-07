@@ -25,30 +25,20 @@
           </el-col>
           <el-col :span="12">
             <el-form-item
-              :label="$t('ui.data.column.scheduleResult.scheduleDate')"
-              prop="scheduleDate"
+              :label="$t('common.factory')"
+              prop="factoryCode"
             >
-              <el-date-picker
-                class="w100"
-                v-model="form.scheduleDate"
-                type="date"
-                value-format="yyyy-MM-dd"
-                disabled
-              ></el-date-picker>
+              <el-input v-model="form.factoryCode" disabled></el-input>
             </el-form-item>
           </el-col>
-          <!-- <el-col :span="12">
-                <el-form-item
-                  :label="$t('ui.data.column.cxScheduleResult.taskType')"
-                  prop="taskType"
-                >
-                  <dict-select
-                    v-model="form.taskType"
-                    :options="parentDict.type.TASK_TYPE"
-                    disabled
-                  />
-                </el-form-item>
-              </el-col> -->
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.cxScheduleResult.embryoCode')"
+              prop="embryoCode"
+            >
+              <el-input v-model="form.embryoCode" disabled></el-input>
+            </el-form-item>
+          </el-col>
           <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.cxScheduleResult.cxMachineCode')"
