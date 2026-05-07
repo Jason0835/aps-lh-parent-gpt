@@ -106,6 +106,13 @@ public interface IFactoryMonthPlanProductionFinalResultRemoteService {
     TableDataInfo getVersionList(@RequestBody FactoryMonthPlanProductionFinalResult queryVO);
 
     /**
+     * 同步月计划调整后数据到SCM和MES
+     */
+    @ApiOperation("同步月计划调整后数据到SCM和MES")
+    @PostMapping("/factoryMonthPlanFinalResult/syncAdjustedMonthPlanToScmAndMes")
+    AjaxResult syncAdjustedMonthPlanToScmAndMes(@RequestBody FactoryMonthPlanProductionFinalResult queryVO);
+
+    /**
      * 查询列表
      */
     @ApiOperation("查询列表")

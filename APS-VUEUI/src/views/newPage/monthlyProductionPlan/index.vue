@@ -31,6 +31,12 @@
           v-hasPermi="['monthplan:mpStructureAllocation:list']"
           >{{ $t("查看结构排产") }}</el-button
         >
+        <el-button
+          :loading="syncLoading"
+          @click="handleSyncAdjustedMonthPlan"
+          v-hasPermi="['monthplan:factoryMonthPlanFinalResult:sync']"
+          >{{ $t("下发SCM/MES") }}</el-button
+        >
       </template>
       <template slot="headerRight"> </template>
     </page-table>
@@ -40,17 +46,12 @@
 //lib
 import moment from "moment";
 import Big from "big.js";
-import { mapGetters } from "vuex";
+import {mapGetters} from "vuex";
 //utils
-import { downloadLink } from "@/utils/request";
+import {downloadLink} from "@/utils/request";
 //interface
-import {
-  listProduction,
-  getProductionMonthType,
-} from "@/api/monthplan/monthlyProductionPlan";
-import {
-  statisticsResult,
-} from "@/api/monthplan/adjustStructure";
+import {getProductionMonthType, listProduction, syncAdjustedMonthPlanToScmAndMes,} from "@/api/monthplan/monthlyProductionPlan";
+import {statisticsResult,} from "@/api/monthplan/adjustStructure";
 //components
 
 export default {
@@ -74,6 +75,7 @@ export default {
       createLoading: false,
       productionStartDate: "",
       loading: false,
+      syncLoading: false,
       data: [],
       selection: [],
       page: {
@@ -539,6 +541,62 @@ export default {
         "/monthplan/factoryMonthPlanFinalResult/export",
         this.formatParams(false)
       );
+    },
+    // 同步推送确认调整后的月计划到SCM和MES
+    handleSyncAdjustedMonthPlan() {
+      const params = this.getSyncAdjustedMonthPlanParams();
+      if (!params) {
+        return;
+      }
+      this.$confirm(this.$t("确定推送调整后的月计划到SCM/MES？"), {
+        type: "warning",
+      }).then(async () => {
+        try {
+          this.syncLoading = true;
+          const res = await syncAdjustedMonthPlanToScmAndMes(params);
+          this.$modal.msgSuccess(res.msg);
+          await this.getList();
+        } catch (error) {
+          console.error(error);
+        } finally {
+          this.syncLoading = false;
+        }
+      });
+    },
+    // 从当前列表中提取手动推送所需的年月、工厂和版本参数
+    getSyncAdjustedMonthPlanParams() {
+      const rows = this.data.filter((item) => {
+        return (
+          item &&
+          item.factoryCode &&
+          item.year &&
+          item.month &&
+          item.monthPlanVersion &&
+          item.productionVersion
+        );
+      });
+      if (rows.length === 0) {
+        this.$modal.msgWarning("暂无可推送数据");
+        return null;
+      }
+      const plan = rows.find((item) => {
+        return (
+          item.lastMonthPlanVersion &&
+          item.lastMonthPlanVersion !== item.monthPlanVersion
+        );
+      });
+      if (!plan) {
+        this.$modal.msgWarning("未找到调整后的最新需求计划版本，无法推送");
+        return null;
+      }
+      return {
+        factoryCode: plan.factoryCode,
+        year: plan.year,
+        month: plan.month,
+        monthPlanVersion: plan.monthPlanVersion,
+        lastMonthPlanVersion: plan.lastMonthPlanVersion,
+        productionVersion: plan.productionVersion,
+      };
     },
 
     // utils

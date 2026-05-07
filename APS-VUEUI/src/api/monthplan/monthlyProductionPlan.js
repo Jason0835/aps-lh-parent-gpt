@@ -16,6 +16,14 @@ export function listProduction(query) {
     data: query
   })
 }
+
+export function syncAdjustedMonthPlanToScmAndMes(query) {
+  return request({
+    url: '/monthplan/factoryMonthPlanFinalResult/syncAdjustedMonthPlanToScmAndMes',
+    method: 'post',
+    data: query
+  })
+}
 export function getProductionMonthType(query) {
   return request({
     url: '/factory/console/getProductionMonthType',

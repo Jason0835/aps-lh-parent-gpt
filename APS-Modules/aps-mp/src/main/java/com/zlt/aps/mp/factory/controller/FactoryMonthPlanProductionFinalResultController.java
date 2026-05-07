@@ -22,32 +22,29 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
+import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
 import com.zlt.aps.maindata.service.IBatchMpMonthPlanStatisticsService;
 import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.mp.adjust.service.impl.MpAdjustStructureOutStrategy;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
+import com.zlt.aps.mp.api.domain.dto.FactoryMonthPlanProductionFinalResultParam;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
-import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
-import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustExportVo;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
 import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.check.DayTotalCapacityChecker;
 import com.zlt.aps.mp.engine.check.OemTotalCapacityChecker;
-import com.zlt.aps.utils.SpringContextSupplierUtil;
-import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
-import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
-import com.zlt.aps.mp.api.domain.dto.FactoryMonthPlanProductionFinalResultParam;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
-import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
-import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustExportVo;
-import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
+import com.zlt.aps.mp.factory.service.MonthPlanSyncService;
+import com.zlt.aps.utils.SpringContextSupplierUtil;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.ExcelReadUtils;
@@ -68,17 +65,10 @@ import org.springframework.util.StopWatch;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
@@ -105,6 +95,9 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 
     @Autowired
     private IFactoryMonthPlanProductionFinalResultService factoryMonthPlanProductionFinalResultService;
+
+    @Autowired
+    private MonthPlanSyncService monthPlanSyncService;
 
     @Autowired
     private FactoryMonthPlanProductionFinalResultEntityMapper entityMapper;
@@ -261,7 +254,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         iExportLogService.add(exportLog);
         return resultBytes;
     }
-    
+
     /**
      * 导入数据
      */
@@ -283,7 +276,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         params.setFactoryCode(factoryCode);
         params.setStructureName(structureName);
         params.setProductionVersion(productionVersion);
-        
+
         Date beginTime = DateUtils.getNowDate();
         byte[] fileBytes = importContext.getFileBytes();
 //        ImportLog importLog = new ImportLog();
@@ -298,7 +291,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
             List<FactoryMonthPlanProductionFinalResult> finalList = util4DayResult.importExcel(sheet.getSheetName(), input, 3, 1, -1);
             // 月计划排产导入
             AjaxResult ajaxResult = factoryMonthPlanProductionFinalResultService.importDataFinalResult(finalList, updateSupport, importLog.getId(), params);
-            
+
             Date endTime = DateUtils.getNowDate();
             importLog.setRowCount(finalList == null ? 0 : finalList.size());
             importLog.setBeginTime(beginTime);
@@ -315,7 +308,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         }
 
     }
-    
+
     @Override
     protected List<FactoryMonthPlanProductionFinalResult> listExportData(FactoryMonthPlanProductionFinalResult obj) {
         return factoryMonthPlanProductionFinalResultService.getDataList(obj);
@@ -483,7 +476,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
                 Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO);
                 weekRollAdjustEngine.initDayProductionInfo(contextDTO, dailyCapacityLimitVoMap);
                 // 设置日产能限制Map
-                contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
+                contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<Integer, MpDailyCapacityLimitVo>()));
 
                 // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
                 MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
@@ -693,5 +686,17 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @PostMapping("/issueMonthPlan")
     public AjaxResult issueMonthPlan(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal) {
         return factoryMonthPlanProductionFinalResultService.issueMonthPlan(factoryMonthPlanProdFinal);
+    }
+
+    /**
+     * 同步月计划调整后数据到SCM和MES
+     *
+     * @param factoryMonthPlanProdFinal 月计划查询参数
+     * @return 推送结果
+     */
+    @ApiOperation("同步月计划调整后数据到SCM和MES")
+    @PostMapping("/syncAdjustedMonthPlanToScmAndMes")
+    public AjaxResult syncAdjustedMonthPlanToScmAndMes(@RequestBody FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal) {
+        return monthPlanSyncService.syncAdjustedMonthPlanToScmAndMes(factoryMonthPlanProdFinal);
     }
 }
