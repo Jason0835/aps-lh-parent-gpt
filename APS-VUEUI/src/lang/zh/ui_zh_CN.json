@@ -2486,7 +2486,7 @@
   "ui.data.column.cxStructureTreadConfig.dataVersion": "版本号",
   "ui.data.column.cxStructureTreadConfig.factoryCode": "工厂",
   "ui.data.column.cxStructureTreadConfig.generate": "生成胎面整车配置",
-  "ui.data.column.cxStructureTreadConfig.sameStructureTreadCount": "更新相同结构整车胎面",
+  "ui.data.column.cxStructureTreadConfig.sameStructureTreadCount": "更新同结构胎面整车",
   "ui.data.column.cxStructureTreadConfig.unconfiguredTreadCount": "未配置整车胎面",
   "ui.data.alert.cxStructureTreadConfig.generate.confirm": "是否生成胎面整车配置？",
   "ui.data.alert.cxStructureTreadConfig.generate.factoryCodeRequired": "请选择工厂后再生成胎面整车配置",
