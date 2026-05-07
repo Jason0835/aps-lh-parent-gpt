@@ -137,7 +137,7 @@ public class LhDayFinishQtyController extends AbstractDocBizController<LhDayFini
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("companyCode")), "COMPANY_CODE", queryVO.getFieldValueByFieldName("companyCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         queryWrapper.exists(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), " SELECT 1 FROM T_MDM_MATERIAL_INFO WHERE" +
-                " T_MDM_MATERIAL_INFO.MATERIAL_CODE = T_LH_DAY_FINISH_QTY.MATERIAL_CODE AND MATERIAL_DESC = {0}", queryVO.getFieldValueByFieldName("materialDesc"));
+                " T_MDM_MATERIAL_INFO.MATERIAL_CODE = T_LH_DAY_FINISH_QTY.MATERIAL_CODE AND MATERIAL_DESC like CONCAT('%', {0}, '%')", queryVO.getFieldValueByFieldName("materialDesc"));
     }
 
     /**
