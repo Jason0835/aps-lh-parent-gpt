@@ -1465,6 +1465,12 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         for (CxScheduleResult record : records) {
             int dailyLh = getDailyLhCapacity(capacityList, mode, record.getMaterialCode(), fallbackDailyLh);
             BigDecimal singleTireTime = calcSingleTireTime(machine, record.getStructureName(), dailyLh);
+            // 记录每条已有记录的耗时明细
+            log.info("  机台{} 物料{} 结构{} 单条耗时={} 各班计划量: class1={} class2={} class3={} class4={} class5={} class6={} class7={} class8={}",
+                    machine.getCxMachineCode(), record.getMaterialCode(), record.getStructureName(),
+                    formatSeconds(singleTireTime),
+                    record.getClass1PlanQty(), record.getClass2PlanQty(), record.getClass3PlanQty(), record.getClass4PlanQty(),
+                    record.getClass5PlanQty(), record.getClass6PlanQty(), record.getClass7PlanQty(), record.getClass8PlanQty());
             if (record.getClass1PlanQty() != null) shiftTime[1] = shiftTime[1].add(record.getClass1PlanQty().multiply(singleTireTime));
             if (record.getClass2PlanQty() != null) shiftTime[2] = shiftTime[2].add(record.getClass2PlanQty().multiply(singleTireTime));
             if (record.getClass3PlanQty() != null) shiftTime[3] = shiftTime[3].add(record.getClass3PlanQty().multiply(singleTireTime));
@@ -1474,6 +1480,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             if (record.getClass7PlanQty() != null) shiftTime[7] = shiftTime[7].add(record.getClass7PlanQty().multiply(singleTireTime));
             if (record.getClass8PlanQty() != null) shiftTime[8] = shiftTime[8].add(record.getClass8PlanQty().multiply(singleTireTime));
         }
+        // 汇总各班次总耗时
+        log.info("  机台{} 各班次总耗时: class1={} class2={} class3={} class4={} class5={} class6={} class7={} class8={}",
+                machine.getCxMachineCode(),
+                formatSeconds(shiftTime[1]), formatSeconds(shiftTime[2]), formatSeconds(shiftTime[3]), formatSeconds(shiftTime[4]),
+                formatSeconds(shiftTime[5]), formatSeconds(shiftTime[6]), formatSeconds(shiftTime[7]), formatSeconds(shiftTime[8]));
         return shiftTime;
     }
 
