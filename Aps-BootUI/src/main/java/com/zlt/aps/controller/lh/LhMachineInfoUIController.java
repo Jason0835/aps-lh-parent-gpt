@@ -201,7 +201,7 @@ public class LhMachineInfoUIController extends BaseUIController<LhMachineInfo> {
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iLhMachineInfoService.importData(context,false);
+        AjaxResult ajaxResult = iLhMachineInfoService.importData(context,updateSupport);
         return ajaxResult;
     }
 

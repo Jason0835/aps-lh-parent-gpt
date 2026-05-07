@@ -22,11 +22,7 @@ import com.zlt.aps.mp.api.domain.deduct.DailyScheduleVo;
 import com.zlt.aps.mp.api.domain.deduct.DeductMouldVo;
 import com.zlt.aps.mp.api.domain.dto.IncMouldContext;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
-import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
-import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
+import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
@@ -45,15 +41,7 @@ import org.springframework.util.CollectionUtils;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -128,7 +116,7 @@ public class MpWeekRollAdjustEngine {
         int lockNextDay = contextDTO.getLockEndDay() + 1;
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO);
         initDayProductionInfo(contextDTO,dailyCapacityLimitVoMap);
-        contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
+        contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<Integer, MpDailyCapacityLimitVo>()));
         //4、拆出搭配量，用于快速判断是否搭配
         StringBuilder beginDaySb = new StringBuilder();
         mpProdFinalList.stream().forEach(x->{
@@ -538,7 +526,7 @@ public class MpWeekRollAdjustEngine {
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitVoMap = new MpAdjustDailyCapacityLimit().getDailyCapacityLimitMap(contextDTO);
         // 初始日最大排产量、开停产标识、比例
         initDayProductionInfo(contextDTO,dailyCapacityLimitVoMap);
-        contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<>()));
+        contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<Integer, MpDailyCapacityLimitVo>()));
         //4、拆出搭配量，用于快速判断是否搭配
         mpProdFinalList.stream().forEach(x->{
             if (isConvertionProd(x) && x.getConventionProductionQty() >0) {

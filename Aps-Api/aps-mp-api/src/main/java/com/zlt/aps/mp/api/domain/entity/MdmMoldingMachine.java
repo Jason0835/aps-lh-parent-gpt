@@ -34,36 +34,42 @@ public class MdmMoldingMachine extends BaseEntity {
 
      /** 工厂编号 */
     @Excel(name = "ui.data.column.mdmMoldingMachine.factoryCode", dictType = "biz_factory_name", sort = 1)
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 成型机编码 */
     @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineCode", sort = 2)
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "成型机编码", name = "cxMachineCode")
     @TableField(value = "CX_MACHINE_CODE")
     private String cxMachineCode;
 
     /** 成型机类型 */
     @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineBrandCode",dictType = "biz_machine_brand", sort = 4)
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "成型机类型", name = "cxMachineBrandCode")
     @TableField(value = "CX_MACHINE_BRAND_CODE")
     private String cxMachineBrandCode;
 
     /** 机型 */
     @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineTypeCode", dictType = "cx_machine_type_code", sort = 3)
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "机型", name = "cxMachineTypeCode")
     @TableField(value = "CX_MACHINE_TYPE_CODE")
     private String cxMachineTypeCode;
 
     /** 反包方式 */
     @Excel(name = "ui.data.column.mdmMoldingMachine.rollOverType", dictType = "ROLL_OVER_TYPE", sort = 5)
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "反包方式", name = "rollOverType")
     @TableField(value = "ROLL_OVER_TYPE")
     private String rollOverType;
 
     /** 是否有零度供料架 数据字典 biz_yes_no 1 是 0 否 */
     @Excel(name = "ui.data.column.mdmMoldingMachine.isZeroRack", dictType = "biz_yes_no", sort = 6)
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "是否有零度供料架 数据字典 biz_yes_no 1 是 0 否", name = "isZeroRack")
     @TableField(value = "IS_ZERO_RACK")
     private String isZeroRack;
@@ -100,6 +106,14 @@ public class MdmMoldingMachine extends BaseEntity {
     @ApiModelProperty(value = "最近12个月结构名称", name = "monthStructureNameMap")
     @TableField(exist = false)
     private Map<String, String> monthStructureNameMap;
+    /**
+     * 是否启用：0-禁用 1-启用
+     */
+    @Excel(name = "ui.data.column.mdmMoldingMachine.isActive")
+    @ImportExcelValidated(required = true)
+    @ApiModelProperty(value = "是否启用：0-禁用 1-启用")
+    @TableField("IS_ACTIVE")
+    private Integer isActive;
 
     @ImportExcelValidated(maxLength = 500)
     @Excel(name = "ui.common.column.remark")
@@ -108,11 +122,6 @@ public class MdmMoldingMachine extends BaseEntity {
     private String remark;
 
 
-    /**
-     * 是否启用：0-禁用 1-启用
-     */
-    @ApiModelProperty(value = "是否启用：0-禁用 1-启用")
-    @TableField("IS_ACTIVE")
-    private Integer isActive;
+
 
 }

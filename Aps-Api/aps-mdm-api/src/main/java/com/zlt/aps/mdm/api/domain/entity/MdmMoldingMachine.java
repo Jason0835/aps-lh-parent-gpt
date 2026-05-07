@@ -32,12 +32,14 @@ public class MdmMoldingMachine extends BaseEntity {
 
      /** 工厂编号 */
     @Excel(name = "ui.data.column.mdmMoldingMachine.factoryCode", dictType = "biz_factory_name", sort = 1)
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
     /** 成型机编码 */
     @Excel(name = "ui.data.column.mdmMoldingMachine.cxMachineCode", sort = 2)
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "成型机编码", name = "cxMachineCode")
     @TableField(value = "CX_MACHINE_CODE")
     private String cxMachineCode;
