@@ -176,16 +176,6 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     @TableField("SUPPORT_CHIP_TIRE")
     private String supportChipTire;
 
-    /**
-     * 单双模 1-单模，2-双模
-     */
-    @ImportExcelValidated(required = true, digits = true, min = 1, max = 9999)
-    @Excel(name = "ui.data.column.info.singleDoubleMode", cellType = Excel.ColumnType.NUMERIC, sort = 85)
-    @ApiModelProperty(value = "单双模 1-单模，2-双模", name = "singleDoubleMode")
-    @TableField(value = "SINGLE_DOUBLE_MODE")
-    private Integer singleDoubleMode;
-
-
 
 
 }

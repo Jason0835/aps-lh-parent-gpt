@@ -89,6 +89,22 @@ public class MesTask {
     }
 
     /**
+     * 同步胶囊已使用次数
+     */
+    @ApiOperation("同步胶囊已使用次数")
+    public void syncLhRepairCapsule() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncLhRepairCapsule(new AuxReqSyncDataLogs()));
+    }
+
+    /**
+     * 同步生胎库存
+     */
+    @ApiOperation("同步生胎库存")
+    public void syncMesCxStock() {
+        FeignTokenHelper.runWithToken(() -> iMesItfService.syncMesCxStock(new AuxReqSyncDataLogs()));
+    }
+
+    /**
      * 同步结构整车胎面配置
      */
     @ApiOperation("同步结构整车胎面配置")

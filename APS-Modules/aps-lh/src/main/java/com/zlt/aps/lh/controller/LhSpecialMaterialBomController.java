@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
@@ -155,8 +156,6 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
     protected void builderCondition(QueryWrapper<LhSpecialMaterialBom> queryWrapper, LhSpecialMaterialBom queryVO) {
         // 分厂编号精确查询
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        // 结构编码模糊查询
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureCode")), "STRUCTURE_CODE", queryVO.getFieldValueByFieldName("structureCode"));
         // 结构名称模糊查询
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
         // 物料编码模糊查询
@@ -165,6 +164,16 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
         // 分类精确查询
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("category")), "CATEGORY", queryVO.getFieldValueByFieldName("category"));
+    }
+
+    /**
+     * 唯一性校验
+     */
+    @ApiOperation("唯一性校验")
+    @PostMapping("/checkUniqueSpecialMaterialBom")
+    public AjaxResult checkUniqueSpecialMaterialBom(@RequestBody LhSpecialMaterialBom entity) {
+        String result = lhSpecialMaterialBomService.checkUnique(entity);
+        return AjaxResult.success().put("exist", UserConstants.NOT_UNIQUE.equals(result));
     }
 
     @Override
