@@ -120,11 +120,6 @@ export default {
           label: this.$t('ui.data.column.cxPrecisionPlan.cycle'),
           formatter: (row) => this.getCycleValue(row.precisionType)
         },
-        {
-          prop: 'cycle',
-          label: this.$t('ui.data.column.cxPrecisionPlan.cycle'),
-          formatter: (row) => this.getCycleValue(row.precisionType)
-        },
         { prop: 'planDate', label: this.$t('ui.data.column.cxPrecisionPlan.planDate') },
         { prop: 'actualDate', label: this.$t('ui.data.column.cxPrecisionPlan.actualDate') },
 
