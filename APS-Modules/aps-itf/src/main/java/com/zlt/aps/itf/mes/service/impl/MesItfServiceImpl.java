@@ -1299,24 +1299,24 @@ public class MesItfServiceImpl implements MesItfService {
         syncList = new ArrayList<>(groupMap.values());
 
         if (CollectionUtils.isNotEmpty(syncList)) {
-            // 先删后插 T_CX_MES_STOCK（MES原始数据全量覆盖）
-            cxMesSyncRemoteService.deleteMesStock(syncDataLogs.getFactoryCode());
-
-            List<CxMesStock> insertList = new ArrayList<>();
-            for (CxMesStock item : syncList) {
-                CxMesStock entity = new CxMesStock();
-                BeanUtils.copyProperties(item, entity);
-                entity.setCreateBy("MES");
-                entity.setUpdateBy("MES");
-                entity.setCreateTime(DateUtils.getNowDate());
-                entity.setUpdateTime(DateUtils.getNowDate());
-                insertList.add(entity);
-            }
-
-            List<List<CxMesStock>> splitList = ScmListUtils.getSplitList(insertList, 1000);
-            for (List<CxMesStock> importList : splitList) {
-                cxMesSyncRemoteService.saveMesStockBatch(importList);
-            }
+//            // 先删后插 T_CX_MES_STOCK（MES原始数据全量覆盖）
+//            cxMesSyncRemoteService.deleteMesStock(syncDataLogs.getFactoryCode());
+//
+//            List<CxMesStock> insertList = new ArrayList<>();
+//            for (CxMesStock item : syncList) {
+//                CxMesStock entity = new CxMesStock();
+//                BeanUtils.copyProperties(item, entity);
+//                entity.setCreateBy("MES");
+//                entity.setUpdateBy("MES");
+//                entity.setCreateTime(DateUtils.getNowDate());
+//                entity.setUpdateTime(DateUtils.getNowDate());
+//                insertList.add(entity);
+//            }
+//
+//            List<List<CxMesStock>> splitList = ScmListUtils.getSplitList(insertList, 1000);
+//            for (List<CxMesStock> importList : splitList) {
+//                cxMesSyncRemoteService.saveMesStockBatch(importList);
+//            }
 
             // T_CX_STOCK：混合方案同步
             List<CxStock> cxStockInsertList = syncList.stream().map(item -> {
@@ -1819,45 +1819,6 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public List<MdmOutbountOrdersNotScan> getOutbountOrdersNotScan(MdmOutbountOrdersNotScan outbountOrdersNotScan) {
         return mesViewMapper.selectOutbountOrdersNotScan(outbountOrdersNotScan);
-    }
-
-    /**
-     * 同步MES硫化精度计划实际执行日期回填数据
-     * MES在实际做精度的时间点把实际精度时间回填到中间表通知APS抓取
-     *
-     * @param syncDataLogs 同步参数
-     * @return 结果
-     */
-    @Override
-    public AjaxResult syncLhPrecisionPlanActual(AuxReqSyncDataLogs syncDataLogs) {
-        return null;
-    }
-
-    /**
-     * 下发硫化精度计划到MES
-     * 查询计划排程精度日期有值且实际执行日期为空的数据，下发到MES中间表
-     *
-     * @param factoryCode 分厂编码
-     * @return 下发结果
-     */
-    @Override
-    public AjaxResult issueLhPrecisionPlan(String factoryCode) {
-        return null;
-    }
-
-    /**
-     * 同步MES数据并生成硫化精度计划（综合接口）
-     * 执行步骤：
-     * 1. 同步MES设备保养计划到APS
-     * 2. 同步MES硫化精度计划实际执行日期回填数据
-     * 3. 将回填MES实际执行日期的数据生成新的下一年度的硫化精度计划
-     *
-     * @param year 年度
-     * @return 执行结果
-     */
-    @Override
-    public AjaxResult syncAndGenerateLhPrecisionPlan(Integer year) {
-        return null;
     }
 
     /**
