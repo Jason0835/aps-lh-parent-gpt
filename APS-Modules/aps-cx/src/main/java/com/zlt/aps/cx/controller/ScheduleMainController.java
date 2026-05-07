@@ -230,6 +230,20 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         return cxScheduleResultService.exportCxRemainQty(queryVO, fileName);
     }
 
+    /**
+     * 导出成型结构切换数据。
+     *
+     * @param queryVO 查询条件，按成型排程结果列表查询口径筛选数据
+     * @param fileName 导出文件名
+     * @return 成型结构切换Excel文件字节数组
+     */
+    @Log(title = "成型结构切换数据", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出成型结构切换数据")
+    @PostMapping("/exportStructureChange/{fileName}")
+    public byte[] exportStructureChange(@RequestBody CxScheduleResult queryVO, @PathVariable("fileName") String fileName) {
+        return cxScheduleResultService.exportStructureChange(queryVO, fileName);
+    }
+
     @ApiOperation(value = "生成排程", notes = "根据日期和天数生成排程")
     @PostMapping("/generate")
     public AjaxResult generateSchedule(@RequestBody ScheduleGenerateVo dto) {

@@ -71,5 +71,10 @@ public class LhMachineOnlineInfo extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.lhMachineOnlineInfo.factoryCode", dictType = "biz_factory_name")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
+
+    @ApiModelProperty(value = "在机模号", name = "inMachineMouldCode")
+    @Excel(name = "ui.data.column.lhMachineOnlineInfo.inMachineMouldCode")
+    @TableField(value = "IN_MACHINE_MOULD_CODE")
+    private String inMachineMouldCode;
 }
 
