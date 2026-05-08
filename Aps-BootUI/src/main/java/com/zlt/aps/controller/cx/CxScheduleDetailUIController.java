@@ -56,7 +56,6 @@ public class CxScheduleDetailUIController {
      * 根据主表ID查询明细列表
      */
     @ApiOperation("根据主表ID查询明细列表")
-    @RequiresPermissions("cx:cxScheduleDetail:list")
     @GetMapping("/listByMainId/{mainId}")
     @ResponseBody
     public AjaxResult listByMainId(@PathVariable("mainId") Long mainId) {
@@ -67,7 +66,6 @@ public class CxScheduleDetailUIController {
      * 根据机台和日期查询明细
      */
     @ApiOperation("根据机台和日期查询明细")
-    @RequiresPermissions("cx:cxScheduleDetail:list")
     @GetMapping("/listByMachineAndDate")
     @ResponseBody
     public AjaxResult listByMachineAndDate(
@@ -80,7 +78,6 @@ public class CxScheduleDetailUIController {
      * 根据班次查询明细
      */
     @ApiOperation("根据班次查询明细")
-    @RequiresPermissions("cx:cxScheduleDetail:list")
     @GetMapping("/listByShift")
     @ResponseBody
     public AjaxResult listByShift(
@@ -93,7 +90,6 @@ public class CxScheduleDetailUIController {
      * 综合查询明细列表（支持主表字段过滤）
      */
     @ApiOperation("综合查询明细列表")
-    @RequiresPermissions("cx:cxScheduleDetail:list")
     @PostMapping("/listByQuery")
     @ResponseBody
     public AjaxResult listByQuery(@RequestBody ScheduleDetailQueryVo query) {
@@ -104,7 +100,6 @@ public class CxScheduleDetailUIController {
      * 批量修改明细计划量（同步更新主表）
      */
     @ApiOperation("批量修改明细计划量")
-    @RequiresPermissions("cx:cxScheduleDetail:edit")
     @PostMapping("/updatePlanQty")
     @ResponseBody
     public AjaxResult updatePlanQty(@RequestBody List<ScheduleUpdateDetailPlanQtyVo> voList) {
@@ -115,7 +110,6 @@ public class CxScheduleDetailUIController {
      * 根据ID获取详细信息
      */
     @ApiOperation("获取详细信息")
-    @RequiresPermissions("cx:cxScheduleDetail:view")
     @GetMapping("/{detailId}")
     @ResponseBody
     public AjaxResult getById(@PathVariable("detailId") Long detailId) {
@@ -126,7 +120,6 @@ public class CxScheduleDetailUIController {
      * 更新完成量
      */
     @ApiOperation("更新完成量")
-    @RequiresPermissions("cx:cxScheduleDetail:edit")
     @PutMapping("/updateCompletedQty")
     @ResponseBody
     public AjaxResult updateCompletedQty(
@@ -139,7 +132,6 @@ public class CxScheduleDetailUIController {
      * 更新车次状态
      */
     @ApiOperation("更新车次状态")
-    @RequiresPermissions("cx:cxScheduleDetail:edit")
     @PutMapping("/updateTripStatus")
     @ResponseBody
     public AjaxResult updateTripStatus(
@@ -152,7 +144,6 @@ public class CxScheduleDetailUIController {
      * 修改排程明细
      */
     @ApiOperation("修改排程明细")
-    @RequiresPermissions("cx:cxScheduleDetail:edit")
     @PutMapping("/update")
     @ResponseBody
     public AjaxResult update(@RequestBody CxScheduleDetail detail) {
@@ -163,7 +154,6 @@ public class CxScheduleDetailUIController {
      * 删除排程明细（单个）
      */
     @ApiOperation("删除排程明细")
-    @RequiresPermissions("cx:cxScheduleDetail:remove")
     @DeleteMapping("/remove/{detailId}")
     @ResponseBody
     public AjaxResult remove(@PathVariable("detailId") Long detailId) {
@@ -174,7 +164,6 @@ public class CxScheduleDetailUIController {
      * 批量删除排程明细
      */
     @ApiOperation("批量删除排程明细")
-    @RequiresPermissions("cx:cxScheduleDetail:remove")
     @DeleteMapping("/batchRemove")
     @ResponseBody
     public AjaxResult batchRemove(@RequestBody List<Long> detailIds) {
