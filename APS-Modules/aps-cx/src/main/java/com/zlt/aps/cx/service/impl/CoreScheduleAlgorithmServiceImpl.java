@@ -678,7 +678,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             Long lhId = taskAlloc.getLhId();
             LhScheduleResult lhResult = lhId != null ? lhResultCache.get(lhId) : null;
             if (lhResult != null && classIndex > 0) {
-                int currentClassPlan = getClassPlanQtyByIndex(lhResult, classIndex);
+                Integer currentClassPlanObj = getClassPlanQtyByIndex(lhResult, classIndex);
+                if (currentClassPlanObj == null) {
+                    continue;
+                }
+                int currentClassPlan = currentClassPlanObj;
                 int stock = (materialStockMap != null)
                         ? materialStockMap.getOrDefault(String.valueOf(lhId), 0)
                         : 0;
@@ -723,17 +727,17 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         return 0;
     }
 
-    private int getClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex) {
+    private Integer getClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex) {
         switch (classIndex) {
-            case 1: return lhResult.getClass1PlanQty() != null ? lhResult.getClass1PlanQty() : 0;
-            case 2: return lhResult.getClass2PlanQty() != null ? lhResult.getClass2PlanQty() : 0;
-            case 3: return lhResult.getClass3PlanQty() != null ? lhResult.getClass3PlanQty() : 0;
-            case 4: return lhResult.getClass4PlanQty() != null ? lhResult.getClass4PlanQty() : 0;
-            case 5: return lhResult.getClass5PlanQty() != null ? lhResult.getClass5PlanQty() : 0;
-            case 6: return lhResult.getClass6PlanQty() != null ? lhResult.getClass6PlanQty() : 0;
-            case 7: return lhResult.getClass7PlanQty() != null ? lhResult.getClass7PlanQty() : 0;
-            case 8: return lhResult.getClass8PlanQty() != null ? lhResult.getClass8PlanQty() : 0;
-            default: return 0;
+            case 1: return lhResult.getClass1PlanQty();
+            case 2: return lhResult.getClass2PlanQty();
+            case 3: return lhResult.getClass3PlanQty();
+            case 4: return lhResult.getClass4PlanQty();
+            case 5: return lhResult.getClass5PlanQty();
+            case 6: return lhResult.getClass6PlanQty();
+            case 7: return lhResult.getClass7PlanQty();
+            case 8: return lhResult.getClass8PlanQty();
+            default: return null;
         }
     }
 
@@ -1586,8 +1590,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     classField = shiftToClassField.getOrDefault(spr.getShiftCode(), spr.getShiftCode());
                 }
                 int vulcanizeClassIndex = getClassIndex(classField);
-                int vulcanizeClassConsumption = lhResult != null
-                        ? getClassPlanQtyByIndex(lhResult, vulcanizeClassIndex) : 0;
+                Integer vulcanizeClassConsumptionObj = (lhResult != null)
+                        ? getClassPlanQtyByIndex(lhResult, vulcanizeClassIndex) : null;
+                int vulcanizeClassConsumption = (vulcanizeClassConsumptionObj != null)
+                        ? vulcanizeClassConsumptionObj : 0;
 
                 // 为每个车次创建 TripRecord（车次号从1开始，按机台+胎胚+物料维度独立编号）
                 for (int i = 1; i <= tripCount; i++) {
