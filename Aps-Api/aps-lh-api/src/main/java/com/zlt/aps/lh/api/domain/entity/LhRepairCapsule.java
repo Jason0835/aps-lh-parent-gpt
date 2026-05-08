@@ -34,7 +34,7 @@ public class LhRepairCapsule extends BaseEntity implements Serializable {
 
     @ApiModelProperty(value = "获取日期")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
-    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField(value = "OBTAIN_TIME")
     @Excel(name = "ui.data.column.lhRepairCapsule.obtainTime", dateFormat = "yyyy-MM-dd")
     private Date obtainTime;

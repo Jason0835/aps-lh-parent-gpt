@@ -33,6 +33,15 @@ public interface ICxScheduleResultService {
     TableDataInfo list(@RequestBody CxScheduleResult cxScheduleResult);
 
     /**
+     * 根据硫化排程结果ID列表查询关联的成型排程结果。
+     *
+     * @param lhScheduleIds 硫化排程结果ID列表
+     * @return 成型排程结果列表
+     */
+    @PostMapping("/cxScheduleResult/listByLhScheduleIds")
+    List<CxScheduleResult> listByLhScheduleIds(@RequestBody List<Long> lhScheduleIds);
+
+    /**
      * 生成排程
      *
      * @param scheduleGenerateVo 排程生成参数

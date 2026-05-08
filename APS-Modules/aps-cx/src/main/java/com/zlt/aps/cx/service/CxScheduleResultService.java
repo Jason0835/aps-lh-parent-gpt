@@ -25,6 +25,15 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
     List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate);
 
     /**
+     * 根据硫化排程结果ID列表查询关联的成型排程结果。
+     * <p>成型表 LH_SCHEDULE_IDS 字段为逗号分隔字符串，因此由服务层统一封装匹配口径。</p>
+     *
+     * @param lhScheduleIds 硫化排程结果ID列表
+     * @return 成型排程结果列表
+     */
+    List<CxScheduleResult> listByLhScheduleIds(List<Long> lhScheduleIds);
+
+    /**
      * 基于模板导出数据
      *
      * @param list         排程结果列表
