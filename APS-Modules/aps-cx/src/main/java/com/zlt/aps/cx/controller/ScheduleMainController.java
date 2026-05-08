@@ -230,6 +230,20 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         return cxScheduleResultService.exportCxRemainQty(queryVO, fileName);
     }
 
+    /**
+     * 导出成型结构切换数据。
+     *
+     * @param queryVO 查询条件，按成型排程结果列表查询口径筛选数据
+     * @param fileName 导出文件名
+     * @return 成型结构切换Excel文件字节数组
+     */
+    @Log(title = "成型结构切换数据", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出成型结构切换数据")
+    @PostMapping("/exportStructureChange/{fileName}")
+    public byte[] exportStructureChange(@RequestBody CxScheduleResult queryVO, @PathVariable("fileName") String fileName) {
+        return cxScheduleResultService.exportStructureChange(queryVO, fileName);
+    }
+
     @ApiOperation(value = "生成排程", notes = "根据日期和天数生成排程")
     @PostMapping("/generate")
     public AjaxResult generateSchedule(@RequestBody ScheduleGenerateVo dto) {
@@ -923,12 +937,34 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
             int dailyLhCapacity = getDailyLhCapacity(capacityList, mode, vo.getMaterialCode(), machine.getMaxDayCapacity());
 
-            // 查询该机台当天已有排程记录，计算各班次时间占用
-            BigDecimal[] existingTimeSeconds = calcShiftTimeConsumed(machine, scheduleDate,
-                    cxScheduleResultMapper.selectList(new LambdaQueryWrapper<CxScheduleResult>()
+            // 查询该机台当天已有排程记录
+            List<CxScheduleResult> existingRecords = cxScheduleResultMapper.selectList(
+                    new LambdaQueryWrapper<CxScheduleResult>()
                             .eq(CxScheduleResult::getScheduleDate, new java.sql.Date(scheduleDate.getTime()))
-                            .eq(CxScheduleResult::getCxMachineCode, vo.getCxMachineCode())),
-                    capacityList, mode, machine.getMaxDayCapacity());
+                            .eq(CxScheduleResult::getCxMachineCode, vo.getCxMachineCode()));
+
+            // 计算各班次时间占用，同时收集每条记录耗时明细
+            StringBuilder detailSb = new StringBuilder();
+            BigDecimal[] existingTimeSeconds = new BigDecimal[9];
+            for (int i = 1; i <= 8; i++) existingTimeSeconds[i] = BigDecimal.ZERO;
+            for (CxScheduleResult er : existingRecords) {
+                int erDailyLh = getDailyLhCapacity(capacityList, mode, er.getMaterialCode(), machine.getMaxDayCapacity());
+                BigDecimal erSingleTireTime = calcSingleTireTime(machine, er.getStructureName(), erDailyLh);
+                BigDecimal recordTotal = BigDecimal.ZERO;
+                for (int i = 1; i <= 8; i++) {
+                    BigDecimal pq = getClassPlanQty(er, i);
+                    if (pq != null) {
+                        BigDecimal time = pq.multiply(erSingleTireTime);
+                        existingTimeSeconds[i] = existingTimeSeconds[i].add(time);
+                        recordTotal = recordTotal.add(time);
+                    }
+                }
+                detailSb.append("  ").append(er.getMaterialCode()).append("(").append(er.getMaterialDesc()).append(")")
+                        .append(" 结构:").append(er.getStructureName())
+                        .append(" 单条:").append(formatSeconds(erSingleTireTime))
+                        .append(" 总耗时:").append(formatSeconds(recordTotal)).append("\n");
+            }
+            log.info("机台{} 已有记录明细:\n{}", vo.getCxMachineCode(), detailSb.toString());
 
             // 插单物料单条胎耗时
             BigDecimal insertSingleTireTime = calcSingleTireTime(machine, vo.getStructureName(), dailyLhCapacity);
@@ -940,7 +976,28 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             String[] shiftNames = buildShiftNames(DateUtil.toLocalDateTime(scheduleDate).toLocalDate());
             String capErr = checkPerShiftCapacity(planQtys, existingTimeSeconds, insertSingleTireTime, shiftNames);
             if (capErr != null) {
-                return AjaxResult.error("插单失败：" + capErr);
+                StringBuilder msg = new StringBuilder();
+                msg.append("<b>⚠ 插单产能校验不通过</b><br/>");
+                msg.append("排程日期：").append(DateUtil.format(scheduleDate, "yyyy-MM-dd")).append("<br/>");
+                msg.append("机台：").append(vo.getCxMachineCode()).append("<br/>");
+                msg.append("插单物料：").append(vo.getMaterialCode()).append("(").append(vo.getSpecDesc()).append(")<br/>");
+                msg.append("插单结构：").append(vo.getStructureName()).append("<br/>");
+                msg.append("单条耗时：").append(formatSeconds(insertSingleTireTime)).append("<br/>");
+                msg.append("单班产能：").append(formatSeconds(BigDecimal.valueOf(28800L))).append("<br/><br/>");
+                msg.append("<b>错误：</b><br/>");
+                String capErrText = capErr.replace("已有耗时", "<br/>已有耗时")
+                        .replace("剩余时间", "<br/>剩余时间")
+                        .replace("最多可生产", "<br/>最多可生产")
+                        .replace("计划量", "<br/>计划量");
+                msg.append("  ").append(capErrText).append("<br/><br/>");
+                msg.append("<b>该机台当天已有记录耗时明细：</b><br/>");
+                for (String line : detailSb.toString().split("\n")) {
+                    if (!line.trim().isEmpty()) {
+                        msg.append("  ").append(line).append("<br/>");
+                    }
+                }
+                msg.append("<br/>💡 提示：请减少插单计划量或清理该机台已有记录");
+                return AjaxResult.error(msg.toString());
             }
         }
 
@@ -1164,21 +1221,22 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
 
             if (scheduleLocalDate.isBefore(now.toLocalDate())) {
-                return AjaxResult.error("记录ID=" + record.getId() + "的排程日期为历史日期，不可转机台");
+                return AjaxResult.error("<b>转机台失败</b><br/>胎胚：" + record.getEmbryoCode()
+                        + "<br/>物料：" + (record.getMaterialCode() != null ? record.getMaterialCode() : "")
+                        + "<br/>排程日期(" + DateUtil.formatDate(record.getScheduleDate()) + ")为历史日期，不可转机台");
             }
 
             boolean hasTransferableShift = false;
             for (int i = 1; i <= 8; i++) {
                 if (isShiftTransferable(i, scheduleLocalDate, now, shiftConfigMap)) {
-                    BigDecimal planQty = getClassPlanQty(record, i);
-                    if (planQty != null && planQty.compareTo(BigDecimal.ZERO) > 0) {
-                        hasTransferableShift = true;
-                        break;
-                    }
+                    hasTransferableShift = true;
+                    break;
                 }
             }
             if (!hasTransferableShift) {
-                return AjaxResult.error("记录ID=" + record.getId() + "没有可转移的班次计划（所有班次均已过或计划量为0）");
+                return AjaxResult.error("<b>转机台失败</b><br/>胎胚：" + record.getEmbryoCode()
+                        + "<br/>物料：" + (record.getMaterialCode() != null ? record.getMaterialCode() : "")
+                        + "<br/>排程日期(" + DateUtil.formatDate(record.getScheduleDate()) + ")没有可转移的班次计划");
             }
 
             // 校验新机台唯一性（排程日期 + 新机台 + 胎胚 + 物料）
@@ -1193,8 +1251,12 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             }
             Long duplicateCount = cxScheduleResultMapper.selectCount(uniqueCheck);
             if (duplicateCount > 0) {
-                return AjaxResult.error("新机台(" + vo.getNewMachineCode() + ")在排程日期"
-                        + DateUtil.formatDate(record.getScheduleDate()) + "已存在相同胎胚、物料的排程记录");
+                return AjaxResult.error("<b>转机台失败</b><br/>"
+                        + "新机台(" + vo.getNewMachineCode() + ")<br/>"
+                        + "排程日期：" + DateUtil.formatDate(record.getScheduleDate()) + "<br/>"
+                        + "胎胚：" + record.getEmbryoCode() + "<br/>"
+                        + "物料：" + record.getMaterialCode() + "<br/>"
+                        + "<br/>该机台当天已存在相同胎胚、物料的排程记录");
             }
 
             transferRecords.add(record);
@@ -1465,6 +1527,12 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         for (CxScheduleResult record : records) {
             int dailyLh = getDailyLhCapacity(capacityList, mode, record.getMaterialCode(), fallbackDailyLh);
             BigDecimal singleTireTime = calcSingleTireTime(machine, record.getStructureName(), dailyLh);
+            // 记录每条已有记录的耗时明细
+            log.info("  机台{} 物料{} 结构{} 单条耗时={} 各班计划量: class1={} class2={} class3={} class4={} class5={} class6={} class7={} class8={}",
+                    machine.getCxMachineCode(), record.getMaterialCode(), record.getStructureName(),
+                    formatSeconds(singleTireTime),
+                    record.getClass1PlanQty(), record.getClass2PlanQty(), record.getClass3PlanQty(), record.getClass4PlanQty(),
+                    record.getClass5PlanQty(), record.getClass6PlanQty(), record.getClass7PlanQty(), record.getClass8PlanQty());
             if (record.getClass1PlanQty() != null) shiftTime[1] = shiftTime[1].add(record.getClass1PlanQty().multiply(singleTireTime));
             if (record.getClass2PlanQty() != null) shiftTime[2] = shiftTime[2].add(record.getClass2PlanQty().multiply(singleTireTime));
             if (record.getClass3PlanQty() != null) shiftTime[3] = shiftTime[3].add(record.getClass3PlanQty().multiply(singleTireTime));
@@ -1474,6 +1542,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             if (record.getClass7PlanQty() != null) shiftTime[7] = shiftTime[7].add(record.getClass7PlanQty().multiply(singleTireTime));
             if (record.getClass8PlanQty() != null) shiftTime[8] = shiftTime[8].add(record.getClass8PlanQty().multiply(singleTireTime));
         }
+        // 汇总各班次总耗时
+        log.info("  机台{} 各班次总耗时: class1={} class2={} class3={} class4={} class5={} class6={} class7={} class8={}",
+                machine.getCxMachineCode(),
+                formatSeconds(shiftTime[1]), formatSeconds(shiftTime[2]), formatSeconds(shiftTime[3]), formatSeconds(shiftTime[4]),
+                formatSeconds(shiftTime[5]), formatSeconds(shiftTime[6]), formatSeconds(shiftTime[7]), formatSeconds(shiftTime[8]));
         return shiftTime;
     }
 

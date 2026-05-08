@@ -181,6 +181,25 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
         response.flushBuffer();
     }
 
+    /**
+     * 导出成型结构切换数据。
+     *
+     * @param response HTTP响应对象，用于写出Excel文件流
+     * @param entity 查询条件，按成型排程结果列表查询口径筛选数据
+     * @throws IOException 写出Excel文件流失败时抛出
+     */
+    @ApiOperation("导出成型结构切换数据")
+    @GetMapping({"/exportStructureChange"})
+    @ResponseBody
+    public void exportStructureChange(HttpServletResponse response, CxScheduleResult entity) throws IOException {
+        String fileName = this.getExportTemplateFileName();
+        byte[] excelBytes = iCxScheduleResultService.exportStructureChange(entity, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
+    }
+
     // ==================== 业务功能方法 ====================
 
     /**

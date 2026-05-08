@@ -145,6 +145,7 @@ export default {
           label: this.$t("ui.data.column.lhSpecifyMachine.machineCode"),
           minWidth: 150,
         },
+
         // {
         //   prop: "lineType",
         //   align: "center",
@@ -256,7 +257,6 @@ export default {
     },
     handleEdit(row) {
       if (this.$refs.infoRef) {
-	  
         this.$refs.infoRef.show(row);
       }
     },

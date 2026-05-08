@@ -41,7 +41,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             if(max(d.AVERAGE_SALE_QTY) > 0, round(max(d.STOCK_QTY) / max(d.AVERAGE_SALE_QTY), 1), 0) INVENTORY_SALES_RATIO,
 		    max( IFNULL(r.DAY_VULCANIZATION_QTY, CASE WHEN IFNULL(FP.PARAM_VALUE, FP.DEFAULE_VALUE) = 'M' THEN lc.MES_CAPACITY / 2
 		                                              WHEN IFNULL(FP.PARAM_VALUE, FP.DEFAULE_VALUE) = 'A' THEN lc.APS_CAPACITY / 2
-		                                              ELSE lc.STANDARD_CAPACITY END)
+		                                              ELSE lc.STANDARD_CAPACITY / 2 END)
 		    ) DAY_VULCANIZATION_QTY,
 		    sum( d.HEIGHT_QTY ) HEIGHT_QTY,
 		    sum( d.MID_QTY ) MID_QTY,

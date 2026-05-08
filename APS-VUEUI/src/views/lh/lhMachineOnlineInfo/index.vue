@@ -113,6 +113,13 @@ export default {
           minWidth: 160
         },
         {
+          prop: 'inMachineMouldCode',
+          align: 'center',
+          halign: 'center',
+          label: this.$t('ui.data.column.lhMachineOnlineInfo.inMachineMouldCode'),
+          minWidth: 160
+        },
+        {
           prop: 'updateTime',
           align: 'center',
           halign: 'center',

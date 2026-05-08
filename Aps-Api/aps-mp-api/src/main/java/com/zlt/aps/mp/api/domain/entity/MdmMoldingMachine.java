@@ -109,8 +109,8 @@ public class MdmMoldingMachine extends BaseEntity {
     /**
      * 是否启用：0-禁用 1-启用
      */
-    @Excel(name = "ui.data.column.mdmMoldingMachine.isActive")
-    @ImportExcelValidated(required = true)
+//    @Excel(name = "ui.data.column.mdmMoldingMachine.isActive")
+//    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "是否启用：0-禁用 1-启用")
     @TableField("IS_ACTIVE")
     private Integer isActive;
