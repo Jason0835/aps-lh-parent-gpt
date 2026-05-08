@@ -855,6 +855,7 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步成型在机数据
+     * 采用逻辑删除后插入模式
      * @param cxMachineOnlineInfo 参数
      * @return 结果
      */
@@ -866,7 +867,7 @@ public class MesItfServiceImpl implements MesItfService {
 
         if (CollectionUtils.isNotEmpty(syncList)) {
             FeignTokenHelper.runWithToken(() -> {
-                cxMesSyncRemoteService.deleteMachineOnlineInfo(cxMachineOnlineInfo.getFactoryCode());
+                cxMesSyncRemoteService.logicDeleteMachineOnlineInfo(cxMachineOnlineInfo.getFactoryCode(), "MES");
 
                 List<CxMachineOnlineInfo> insertList = new ArrayList<>();
                 for (CxMachineOnlineInfo info : syncList) {
@@ -890,6 +891,7 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步硫化在机数据
+     * 采用逻辑删除后插入模式
      * @param lhMachineOnlineInfo 参数
      * @return 结果
      */
@@ -901,7 +903,7 @@ public class MesItfServiceImpl implements MesItfService {
 
         if (CollectionUtils.isNotEmpty(syncList)) {
             FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.deleteMachineOnlineInfo(lhMachineOnlineInfo.getFactoryCode());
+                lhMesSyncRemoteService.logicDeleteMachineOnlineInfo(lhMachineOnlineInfo.getFactoryCode(), "MES");
 
                 List<LhMachineOnlineInfo> insertList = new ArrayList<>();
                 for (LhMachineOnlineInfo info : syncList) {
@@ -1156,7 +1158,7 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步胶囊已使用次数
-     * 采用先删后插模式
+     * 采用逻辑删除后插入模式
      * @param syncDataLogs 同步参数
      * @return 结果
      */
@@ -1177,7 +1179,7 @@ public class MesItfServiceImpl implements MesItfService {
         if (CollectionUtils.isNotEmpty(syncList)) {
             List<LhRepairCapsuleVo> finalSyncList = syncList;
             FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.deleteRepairCapsule(syncDataLogs.getFactoryCode());
+                lhMesSyncRemoteService.logicDeleteRepairCapsule(syncDataLogs.getFactoryCode(), "MES");
 
                 List<LhRepairCapsule> insertList = new ArrayList<>();
                 for (LhRepairCapsuleVo item : finalSyncList) {
@@ -1286,12 +1288,11 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步生胎库存
-     * T_CX_MES_STOCK：保持先删后插模式（MES原始数据全量覆盖）
-     * T_CX_STOCK：采用混合方案（数据来源标识 + UPSERT + 按来源清理）
-     *   1. MES有 & APS有(任意来源) → 更新stockNum，保留手动维护的字段，dataSource标记为MES
-     *   2. MES有 & APS没有 → 新增，dataSource=MES
-     *   3. MES没有 & APS有(dataSource=MES) → 删除（MES不再推送的过期数据）
-     *   4. APS有(dataSource=MANUAL) → 完全不动
+     * T_CX_STOCK：采用先删后插方案
+     *   MES每天将最新库存数据写入MES中间库，APS只需：
+     *   步骤1：物理删除该分厂下数据来源为MES的所有库存数据（旧数据，如5月7号的数据）
+     *   步骤2：将MES最新数据（如5月8号的数据）批量插入
+     *   APS有(dataSource=MANUAL) → 完全不动
      * @param syncDataLogs 同步参数
      * @return 结果
      */
@@ -1310,26 +1311,8 @@ public class MesItfServiceImpl implements MesItfService {
         syncList = new ArrayList<>(groupMap.values());
 
         if (CollectionUtils.isNotEmpty(syncList)) {
-//            // 先删后插 T_CX_MES_STOCK（MES原始数据全量覆盖）
-//            cxMesSyncRemoteService.deleteMesStock(syncDataLogs.getFactoryCode());
-//
-//            List<CxMesStock> insertList = new ArrayList<>();
-//            for (CxMesStock item : syncList) {
-//                CxMesStock entity = new CxMesStock();
-//                BeanUtils.copyProperties(item, entity);
-//                entity.setCreateBy("MES");
-//                entity.setUpdateBy("MES");
-//                entity.setCreateTime(DateUtils.getNowDate());
-//                entity.setUpdateTime(DateUtils.getNowDate());
-//                insertList.add(entity);
-//            }
-//
-//            List<List<CxMesStock>> splitList = ScmListUtils.getSplitList(insertList, 1000);
-//            for (List<CxMesStock> importList : splitList) {
-//                cxMesSyncRemoteService.saveMesStockBatch(importList);
-//            }
+            String factoryCode = StringUtils.isBlank(syncDataLogs.getFactoryCode()) ? FactoryConstant.DEFAULT_FACTORY_CODE : syncDataLogs.getFactoryCode();
 
-            // T_CX_STOCK：混合方案同步
             List<CxStock> cxStockInsertList = syncList.stream().map(item -> {
                 CxStock cxStock = new CxStock();
                 cxStock.setFactoryCode(StringUtils.isBlank(item.getFactoryCode()) ? FactoryConstant.DEFAULT_FACTORY_CODE : item.getFactoryCode());
@@ -1344,58 +1327,17 @@ public class MesItfServiceImpl implements MesItfService {
                 return cxStock;
             }).collect(Collectors.toList());
 
-            // 步骤1~3：查询已存在记录、设置ID、批量保存或更新
             FeignTokenHelper.runWithToken(() -> {
-                List<CxStock> existsList = cxMesSyncRemoteService.selectCxStockExists(cxStockInsertList);
-                Map<String, CxStock> existsMap = new HashMap<>(16);
-                if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getEmbryoCode()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
-                }
+                // 步骤1：物理删除该分厂下数据来源为MES的所有库存数据
+                log.info("生胎库存同步：物理删除分厂{}下数据来源为MES的库存数据", factoryCode);
+                cxMesSyncRemoteService.deleteCxStockByDataSource(factoryCode, "MES");
 
-                for (CxStock entity : cxStockInsertList) {
-                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getStockDate()), entity.getEmbryoCode());
-                    if (existsMap.containsKey(mapKey)) {
-                        CxStock existsData = existsMap.get(mapKey);
-                        entity.setId(existsData.getId());
-                    }
-                }
-
-                List<List<CxStock>> cxStockSplitList = ScmListUtils.getSplitList(cxStockInsertList, 1000);
-                for (List<CxStock> importList : cxStockSplitList) {
+                // 步骤2：批量插入MES最新库存数据
+                List<List<CxStock>> insertSplitList = ScmListUtils.getSplitList(cxStockInsertList, 1000);
+                for (List<CxStock> importList : insertSplitList) {
                     cxMesSyncRemoteService.saveCxStockBatch(importList);
                 }
-            });
-
-            // 步骤4：清理MES不再推送的过期数据
-            FeignTokenHelper.runWithToken(() -> {
-                List<CxStock> mesSourceList = cxMesSyncRemoteService.selectCxStockByDataSource(syncDataLogs.getFactoryCode(), "MES");
-                if (CollectionUtils.isNotEmpty(mesSourceList)) {
-                    Map<String, CxStock> mesPushMap = cxStockInsertList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getEmbryoCode()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
-
-                    List<Long> obsoleteIds = mesSourceList.stream()
-                            .filter(item -> !mesPushMap.containsKey(
-                                    GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getStockDate()), item.getEmbryoCode())))
-                            .map(CxStock::getId)
-                            .collect(Collectors.toList());
-
-                    if (CollectionUtils.isNotEmpty(obsoleteIds)) {
-                        log.info("清理MES不再推送的成型库存数据，factoryCode={}，数量={}", syncDataLogs.getFactoryCode(), obsoleteIds.size());
-                        List<List<Long>> idSplitList = ScmListUtils.getSplitList(obsoleteIds, 1000);
-                        for (List<Long> idList : idSplitList) {
-                            cxMesSyncRemoteService.deleteCxStockByIds(idList);
-                        }
-                    }
-                }
+                log.info("生胎库存同步：插入MES最新数据，数量={}", cxStockInsertList.size());
             });
         }
         return AjaxResult.success();

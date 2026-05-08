@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
-import java.util.Map;
 
 @FeignClient(contextId = "ICxMesSyncRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cx:/cx}")
 public interface ICxMesSyncRemoteService {
@@ -23,6 +22,10 @@ public interface ICxMesSyncRemoteService {
     @ApiOperation("批量删除成型在机信息")
     @PostMapping("/mesSync/deleteMachineOnlineInfo")
     AjaxResult deleteMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode);
+
+    @ApiOperation("根据分厂编号逻辑删除成型在机信息")
+    @PostMapping("/mesSync/logicDeleteMachineOnlineInfo")
+    AjaxResult logicDeleteMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy);
 
     @ApiOperation("批量保存成型在机信息")
     @PostMapping("/mesSync/saveMachineOnlineInfoBatch")
@@ -60,7 +63,7 @@ public interface ICxMesSyncRemoteService {
     @PostMapping("/mesSync/selectDayFinishQtyExists")
     List<CxDayFinishQty> selectDayFinishQtyExists(@RequestBody List<CxDayFinishQty> list);
 
-    @ApiOperation("查询成型库存已存在数据（按唯一键）")
+    @ApiOperation("查询成型库存已存在数据（按唯一键，仅未删除）")
     @PostMapping("/mesSync/selectCxStockExists")
     List<CxStock> selectCxStockExists(@RequestBody List<CxStock> list);
 
@@ -68,15 +71,35 @@ public interface ICxMesSyncRemoteService {
     @PostMapping("/mesSync/saveCxStockBatch")
     AjaxResult saveCxStockBatch(@RequestBody List<CxStock> list);
 
+    @ApiOperation("根据分厂编号和数据来源逻辑删除成型库存")
+    @PostMapping("/mesSync/logicDeleteCxStockByDataSource")
+    AjaxResult logicDeleteCxStockByDataSource(@RequestParam("factoryCode") String factoryCode,
+                                              @RequestParam("dataSource") String dataSource,
+                                              @RequestParam("updateBy") String updateBy);
+
     @ApiOperation("根据分厂编号和数据来源删除成型库存")
     @PostMapping("/mesSync/deleteCxStockByDataSource")
     AjaxResult deleteCxStockByDataSource(@RequestParam("factoryCode") String factoryCode, @RequestParam("dataSource") String dataSource);
 
-    @ApiOperation("根据分厂编号和数据来源查询成型库存")
+    @ApiOperation("根据分厂编号和数据来源查询成型库存（仅未删除）")
     @PostMapping("/mesSync/selectCxStockByDataSource")
     List<CxStock> selectCxStockByDataSource(@RequestParam("factoryCode") String factoryCode, @RequestParam("dataSource") String dataSource);
+
+    @ApiOperation("根据分厂编号和数据来源查询全部成型库存（包含已删除）")
+    @PostMapping("/mesSync/selectAllCxStockByDataSource")
+    List<CxStock> selectAllCxStockByDataSource(@RequestParam("factoryCode") String factoryCode, @RequestParam("dataSource") String dataSource);
+
+    @ApiOperation("根据ID列表批量逻辑删除成型库存")
+    @PostMapping("/mesSync/logicDeleteCxStockByIds")
+    AjaxResult logicDeleteCxStockByIds(@RequestBody List<Long> ids);
 
     @ApiOperation("根据ID列表批量删除成型库存")
     @PostMapping("/mesSync/deleteCxStockByIds")
     AjaxResult deleteCxStockByIds(@RequestBody List<Long> ids);
+
+    @ApiOperation("根据唯一键恢复已逻辑删除的成型库存")
+    @PostMapping("/mesSync/recoverCxStockByUniqueKey")
+    AjaxResult recoverCxStockByUniqueKey(@RequestBody List<CxStock> list,
+                                         @RequestParam("dataSource") String dataSource,
+                                         @RequestParam("updateBy") String updateBy);
 }

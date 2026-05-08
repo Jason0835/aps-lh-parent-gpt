@@ -5,8 +5,10 @@ import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDate;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -55,4 +57,15 @@ public interface CxMachineOnlineInfoMapper extends BaseMapper<CxMachineOnlineInf
      */
     @Select("SELECT * FROM T_CX_MACHINE_ONLINE_INFO WHERE IS_DELETE = '0' ORDER BY CX_CODE, ONLINE_DATE DESC")
     List<CxMachineOnlineInfo> selectAllValid();
+
+    /**
+     * 根据分厂编号逻辑删除成型在机信息
+     *
+     * @param factoryCode 分厂编号
+     * @param updateBy    更新者
+     * @param updateTime  更新时间
+     * @return 更新的记录数
+     */
+    @Update("UPDATE T_CX_MACHINE_ONLINE_INFO SET IS_DELETE = 1, UPDATE_BY = #{updateBy}, UPDATE_TIME = #{updateTime} WHERE FACTORY_CODE = #{factoryCode} AND IS_DELETE = 0")
+    int logicDeleteByFactoryCode(@Param("factoryCode") String factoryCode, @Param("updateBy") String updateBy, @Param("updateTime") Date updateTime);
 }
