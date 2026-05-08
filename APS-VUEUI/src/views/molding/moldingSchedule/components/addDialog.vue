@@ -33,7 +33,7 @@
                 v-model="form.scheduleDate"
                 type="date"
                 value-format="yyyy-MM-dd"
-                disabled
+                :picker-options="pickerOptions"
               ></el-date-picker>
             </el-form-item>
           </el-col>
@@ -123,10 +123,12 @@
               :label="$t('ui.data.column.cxScheduleResult.embryoCode')"
               prop="embryoCode"
             >
-              <el-input
+              <embryoNoSelect
                 v-model="form.embryoCode"
-                placeholder=""
-              ></el-input>
+                :materialCode="form.materialCode"
+                :disabled="false"
+                @change="handleEmbryoCodeChange"
+              />
             </el-form-item>
           </el-col>
 
@@ -708,6 +710,12 @@ export default {
         shift: i + 1,
         shiftDate: "",
       })),
+      pickerOptions: {
+        disabledDate(time) {
+          // 不能选择今天之前的日期
+          return time.getTime() < Date.now() - 8.64e7;
+        },
+      },
     };
   },
   computed: {
@@ -759,6 +767,13 @@ export default {
       return moment(date).format("MM/DD");
     },
 
+    handleEmbryoCodeChange(val, row) {
+      if (val && row) {
+        this.$set(this.form, "embryoCode", row.embryoNo || row.embryoCode || val);
+        this.$set(this.form, "mainMaterialDesc", row.embryoDesc || row.mainMaterialDesc || "");
+        this.$set(this.form, "structureName", row.structureName || row.hierarchy || "");
+      }
+    },
     handleCxMachineChange(val) {
       const machine = (this.moldingMachines || []).find(
         (m) => m.cxMachineCode === val
