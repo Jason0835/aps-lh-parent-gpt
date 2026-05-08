@@ -71,6 +71,22 @@ public class FactoryMonthPlanProductionFinalResultUIController extends BaseUICon
     }
 
     /**
+     * 根据条件查询主表数据
+     */
+    @RequiresPermissions("monthplan:factoryMonthPlanFinalResult:list")
+    @ResponseBody
+    @PostMapping("/list4Adjust")
+    @ApiOperation("根据条件查询主表数据")
+    public TableDataInfo list4Adjust(FactoryMonthPlanProductionFinalResultParam param) {
+        if (null == param || null == param.getMonth() || null == param.getYear() || StringUtils.isBlank(param.getFactoryCode())) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.query.param.checkFactoryYearMonth"));
+        }
+        FactoryMonthPlanProductionFinalResult condition = new FactoryMonthPlanProductionFinalResult();
+        BeanUtils.copyProperties(param, condition);
+        return iFactoryMonthPlanProductionFinalResultService.list4Adjust(condition);
+    }
+
+    /**
      * 获取SKU排产明细
      */
     @ResponseBody

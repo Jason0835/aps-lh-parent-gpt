@@ -511,7 +511,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                             String mainPattern = CollectionUtils.firstElement(productionPlanList).getMainPattern(); // 主花纹
                             String embryoCode = CollectionUtils.firstElement(productionPlanList).getEmbryoCode(); // 胎胚号
                             groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern,embryoCode); // 重新计算统计产能
-//                            this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
+                            this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
                             if (plan.getMatchEndDay() == realEndDay) { // 如果区间最后一天有排产，且往后结构还没有结束，则继续尝试往后延一天
                                 Integer nextEndDay = this.getNextDay(productionContext, realEndDay, endDay);
                                 if (nextEndDay > 0 && nextEndDay <= endDay) {
@@ -528,6 +528,22 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                 }
             } while (true);
         } while (true);
+    }
+    
+    /**
+     * 更新搭配日期
+     * @param productionPlanList
+     * @param day
+     */
+    private void updateMatchDay(List<MonthPlanProductionRequirePlanVo> productionPlanList, Integer day) {
+        productionPlanList.forEach(item -> {
+            if (item.getMatchBeginDay() == null) {
+                item.setMatchBeginDay(day);
+            }
+            if (item.getMatchEndDay() == null || item.getMatchEndDay() < day) {
+                item.setMatchEndDay(day);
+            }
+        });
     }
 
     /**
@@ -1232,7 +1248,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                     productionContext.getBaseDataContainer().getDayCapacityLimit().addChangeMouldUsedQty(productionContext, usedBeginDate, materialDesc, mouldCodeSet);
                     this.updateProducedQty(productionPlanList, realProductionQty); // 更新需求计划的已排产量
                     newSkuQtyMap.put(materialDesc, lhProductionQtyHelper.getRealSumProductionQty()); // 累计已排量
-//                    this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
+                    this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
                     // 更新模具与排产量的累计量
                     limitHelper.setMouldQty(limitHelper.getMouldQty() + newDoubleMouldList.size());
                     limitHelper.setPlanQty(limitHelper.getPlanQty() + realProductionQty);

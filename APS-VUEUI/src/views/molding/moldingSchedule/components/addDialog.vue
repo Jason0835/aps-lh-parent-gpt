@@ -123,9 +123,11 @@
               :label="$t('ui.data.column.cxScheduleResult.embryoCode')"
               prop="embryoCode"
             >
-              <embryoNoSelect
+              <embryoCodeSelect
+                :key="`embryoCode-${form.embryoCode || ''}`"
                 v-model="form.embryoCode"
                 :materialCode="form.materialCode"
+                :title="$t('ui.data.column.cxScheduleResult.embryoCode')"
                 :disabled="false"
                 @change="handleEmbryoCodeChange"
               />
@@ -697,9 +699,10 @@ import { getScheduleDate } from "@/api/lh/scheduleResult";
 
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import embryoNoSelect from "@/views/components/embryoNoSelect.vue";
+import embryoCodeSelect from "@/views/components/embryoCodeSelect.vue";
 
 export default {
-  components: { materialCodeSelect, embryoNoSelect },
+  components: { materialCodeSelect, embryoNoSelect, embryoCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -769,9 +772,9 @@ export default {
 
     handleEmbryoCodeChange(val, row) {
       if (val && row) {
-        this.$set(this.form, "embryoCode", row.embryoNo || row.embryoCode || val);
-        this.$set(this.form, "mainMaterialDesc", row.embryoDesc || row.mainMaterialDesc || "");
-        this.$set(this.form, "structureName", row.structureName || row.hierarchy || "");
+        this.$set(this.form, "embryoCode", row.embryoCode || val);
+        this.$set(this.form, "mainMaterialDesc", row.embryoDesc || "");
+        this.$set(this.form, "structureName", row.hierarchy || row.structureName || "");
       }
     },
     handleCxMachineChange(val) {
