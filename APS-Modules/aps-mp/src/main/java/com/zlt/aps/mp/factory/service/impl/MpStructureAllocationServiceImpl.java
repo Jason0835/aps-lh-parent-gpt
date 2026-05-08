@@ -1231,11 +1231,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             totalMap.put(day, 0);
         }
         for (Integer i = 0, size = recordList.size(); i < size; i ++) {
-            // 3.2.1、把同结构的排产记录添加到列表中，全部添加完后开始处理这一批数据
+            // 3.2.1、把同机台的排产记录添加到列表中，全部添加完后开始处理这一批数据
             MpStructureAllocationExportVo record = recordList.get(i);
             machineStructureList.add(record); // 先添加到列表
             cxMachineCode = record.getCxMachineCode(); // 更新机台
-            // 3.2.2、下一笔结构没有变化，且还不是最后一笔记录，继续遍历下一笔数据
+            // 3.2.2、下一笔机台没有变化，且还不是最后一笔记录，继续遍历下一笔数据
             if (i < size - 1) { // 还不是最后一行，则校验下一行是否同一个机台
                 MpStructureAllocationExportVo nextRecord = recordList.get(i + 1);
                 if (cxMachineCode.equals(nextRecord.getCxMachineCode())) { // 机台没有变化，则添继续往下
@@ -1302,6 +1302,31 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         totalRecordList.add(maxProductQtyRecord);
         totalRecordList.add(enableCountRecord);
         exportVo.setRecordList(totalRecordList);
+        // 3.4、部分特殊规格总硫化机数会超过成型机 * 最大硫化机数，因此会有剩余，剩余的部分需要重新分配到最后一行当天有排产的记录中
+        for (Entry<String, Map<Integer, Integer>> statisticsEntry: lhMachineStatisticsMap.entrySet()) {
+            String structureName = statisticsEntry.getKey();
+            Map<Integer, Integer> lhMachineDayMap = statisticsEntry.getValue();
+            for (Entry<Integer, Integer> lhMachineDayEntry: lhMachineDayMap.entrySet()) {
+                Integer day = lhMachineDayEntry.getKey();
+                Integer remainLhMachine = Convert.toInt(lhMachineDayEntry.getValue(), 0);
+                if (remainLhMachine <= 0) {
+                    continue;
+                }
+                String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
+                for (int i = totalRecordList.size() - 1; i >= 0; i --) {
+                    MpStructureAllocationExportVo record = totalRecordList.get(i);
+                    if (!Objects.equals(structureName, record.getStructureName())) {
+                        continue;
+                    }
+                    // 检查当天是否有排产，有则加上，没有则看下一笔记录
+                    int lhMachineCount = Convert.toInt(record.getFieldValueByFieldName(dayFieldName), 0);
+                    if (lhMachineCount > 0) {
+                        record.setFieldValueByFieldName(dayFieldName, lhMachineCount + remainLhMachine);
+                        break;
+                    }
+                }
+            }
+        }
 
         // 4、构建切换数子表
         Map<String, List<MpStructureAllocationExportVo>> cxMachineExportMap = recordList.stream()
