@@ -212,6 +212,64 @@
           </el-col>
           <el-col :span="12">
             <el-form-item
+              :label="$t('ui.data.column.scheduleResult.analySystem')"
+              prop="class1Analysis"
+            >
+              <el-input v-model="form.class1Analysis" disabled></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方编号')" prop="class1RecipeNo">
+              <embryoNoSelect
+                :key="`class1RecipeNo-${form.class1RecipeNo || ''}`"
+                v-model="form.class1RecipeNo"
+                :materialCode="form.materialCode"
+                :disabled="!form.materialCode"
+                @change="(val, row) => handleRecipeNoChange(1, val, row)"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item :label="$t('示方类型')" prop="class1RecipeType">
+              <dict-select
+                v-model="form.class1RecipeType"
+                :options="parentDict.type.trial_status"
+                disabled
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-col :span="24">
+          <h4 class="form-header h4">
+            {{ getShiftTitle($t("中班"), 1) }}
+          </h4>
+        </el-col>
+        <el-row :gutter="0">
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.scheduleResult.plan')"
+              prop="class2PlanQty"
+            >
+              <el-input-number
+                class="w100"
+                v-model="form.class2PlanQty"
+                :min="0"
+                :disabled="isClassPast(2)"
+                controls-position="right"
+              ></el-input-number>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.scheduleResult.finish')"
+              prop="class2FinishQty"
+            >
+              <el-input v-model="form.class2FinishQty" disabled></el-input>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item
               :label="$t('ui.data.column.scheduleResult.analysis')"
               prop="class2AnalysisInput"
             >
