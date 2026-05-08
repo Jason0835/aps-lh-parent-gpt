@@ -7,6 +7,7 @@ import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.redis.service.RedisService;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common4ui.constant.UserConstants;
@@ -60,6 +61,9 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
 
     private final IFactoryMonthPlanProductionFinalResultRemoteService iFactoryMonthPlanProductionFinalResultService;
 
+    private final RedisService redisService;
+
+    private final static String ADJUSTS_CX_MACHINE_KEY = "MP_LONG_REDIS:ADJUSTS_CX_MACHINE_KEY";
 
     /**
      * 根据条件查询主表数据
@@ -88,6 +92,34 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
         List<MpStructureAllocation> resultList = convertToEntityList(list.getRows());
         return getTableDataInfo(resultList, list.getTotal());
     }
+
+
+
+    /**
+     * 从Redis获取正在调整的成型机台
+     */
+    @ResponseBody
+    @PostMapping("/getAdjustsCxMachineFromRedis")
+    @ApiOperation("从Redis获取正在调整的成型机台")
+    public AjaxResult getAdjustsCxMachineFromRedis() {
+        String redisKey = ADJUSTS_CX_MACHINE_KEY;
+        Object redisValue = redisService.getCacheObject(redisKey);
+        return AjaxResult.success(redisValue);
+    }
+
+    /**
+     * 保存正在调整的成型机台
+     */
+    @ResponseBody
+    @PostMapping("/setAdjustsCxMachineFromRedis/{cxMachine}")
+    @ApiOperation("保存正在调整的成型机台")
+    public AjaxResult setAdjustsCxMachineFromRedis(@PathVariable("cxMachine") String cxMachine) {
+        String redisKey = ADJUSTS_CX_MACHINE_KEY;
+        redisService.setCacheObject(redisKey, cxMachine);
+        return AjaxResult.success();
+    }
+
+
 
 
     private TableDataInfo getTableDataInfo(List<?> resultList, long total) {
