@@ -43,12 +43,12 @@ public class LhMachineInfoTemp extends ApsBaseEntity {
 
     @ApiModelProperty(value = "生产寸口下限", position = 50)
     @ImportValidated(number = true, min = 0, max = 9999.99)
-    @Excel(name = "ui.data.column.machine.dimensionMinmum")
+    @Excel(name = "ui.data.column.lhMachineInfo.dimensionMinimum")
     private BigDecimal dimensionMinmum;
 
     @ApiModelProperty(value = "生产寸口上限", position = 60)
     @ImportValidated(number = true, min = 0, max = 9999.99)
-    @Excel(name = "ui.data.column.machine.dimensionMaximum")
+    @Excel(name = "ui.data.column.lhMachineInfo.dimensionMaximum")
     private BigDecimal dimensionMaximum;
 
     @ApiModelProperty(value = "向心机构", position = 70)
@@ -57,7 +57,7 @@ public class LhMachineInfoTemp extends ApsBaseEntity {
 
     /** 维护硫化机最大使用模具数量 */
     @ImportValidated(number = true, digits = true, min = 0, max = 10)
-    @Excel(name = "ui.data.column.machine.maxMoldNum")
+    @Excel(name = "ui.data.column.lhMachineInfo.maxMoldNum")
     @ApiModelProperty(value = "维护硫化机最大使用模具数量")
     private Long maxMoldNum;
 

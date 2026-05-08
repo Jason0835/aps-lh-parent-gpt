@@ -9,8 +9,12 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
+import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
+import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
@@ -24,9 +28,12 @@ import com.zlt.aps.lh.engine.decorator.IScheduleExecutor;
 import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleException;
+import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
+import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.utils.ImportExcelValidatedUtils;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.utils.ImportExcelValidatedUtils;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -37,6 +44,19 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -59,6 +79,15 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     @Resource
     private LhScheduleResultMapper scheduleResultMapper;
+
+    @Resource
+    private LhRepairCapsuleMapper lhRepairCapsuleMapper;
+
+    @Resource
+    private LhDayFinishQtyMapper lhDayFinishQtyMapper;
+
+    @Resource
+    private ICxScheduleResultService cxScheduleResultService;
 
     @Resource
     private ScheduleEventPublisher scheduleEventPublisher;
@@ -520,15 +549,28 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      */
     @Override
     public byte[] exportData(List<LhScheduleResult> list, Date scheduleDate) {
+        // 节点1：读取固定导出模板。硫化计划导出不再走多语言表头加载，
+        // 表头、合并单元格、下拉框、公式位置都由 lhjhtemplate.xlsx 统一维护。
         InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("excelModel/lhjhtemplate.xlsx");
         if (Objects.isNull(inputStream)) {
             throw new ServiceException("硫化计划导出模板不存在");
         }
+        // 节点2：兼容查询结果为空的场景，后续表头仍可根据 scheduleDate 回填日期，
+        // 明细区域则保持为空，避免空指针影响模板导出。
         List<LhScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
+
+        // 节点3：模板表头数据只负责替换普通占位符，例如排程日期、版本、批次号、
+        // 以及 8 个班次标题里的 shiftDate1 ~ shiftDate8。
         Map<String, Object> tableMap = buildExportTableMap(exportList, scheduleDate);
+
+        // 节点4：模板第 7 行为 {.xxx} 明细模板行，writeMultiList 会从该行开始复制填充。
+        // 当前只有一个明细列表，因此只放入一个 List<Map<String,Object>>。
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         excelDataList.add(buildExportDataList(exportList));
-        return ExcelUtils.writeMultiList(inputStream, 1, tableMap, excelDataList);
+
+        // 节点5：硫化计划数据位于模板第 2 个 sheet（下标 1）的“硫化计划”页。
+        // 第 1 个 sheet 为模板辅助页，不能作为数据写入页。
+        return ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
     }
 
 
@@ -893,16 +935,24 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      */
     private Map<String, Object> buildExportTableMap(List<LhScheduleResult> list, Date scheduleDate) {
         Map<String, Object> tableMap = new HashMap<>(16);
+
+        // 优先使用前端传入的 scheduleDate 作为排程基准日；如果旧入口未传，
+        // 再从列表首条数据兜底，保证导出标题和班次日期仍有来源。
         Date exportScheduleDate = Objects.nonNull(scheduleDate) ? scheduleDate : list.stream()
                 .map(LhScheduleResult::getScheduleDate)
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
+
+        // 班次标题不能写死。这里复用 listScheduleShiftDates 的排班日历规则，
+        // 将 1~8 班对应的 MM/dd 回填到模板中的 {shiftDate1} ~ {shiftDate8}。
         List<LhScheduleShiftDateVO> shiftDateList = listScheduleShiftDates(exportScheduleDate);
         for (int i = 0; i < LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
             String shiftDate = i < shiftDateList.size() ? shiftDateList.get(i).getShiftDate() : "";
             tableMap.put("shiftDate" + (i + 1), shiftDate);
         }
+
+        // 固定表头字段沿用模板占位符，避免再通过 loadExportI18nTableName 动态改列名。
         tableMap.put("yearmonthday", DateUtil.format(exportScheduleDate, "yyyy年MM月dd日"));
         tableMap.put("productionVersion", PubUtil.isNotEmpty(list) ? list.get(0).getProductionVersion() : "");
         tableMap.put("batchNo", PubUtil.isNotEmpty(list) ? list.get(0).getBatchNo() : "");
@@ -917,25 +967,52 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      */
     private List<Map<String, Object>> buildExportDataList(List<LhScheduleResult> list) {
         List<Map<String, Object>> dataList = new ArrayList<>(list.size() + 1);
-        if(PubUtil.isNotEmpty(list)){
-            dataList.add(buildSummaryRow(list));
-        }
+        Map<String, LhRepairCapsule> capsuleMap = buildRepairCapsuleExportMap(list);
+        Map<Long, String> cxMachineCodeMap = buildCxMachineCodeExportMap(list);
+        Map<String, Object> todayNightFinishQtyMap = buildTodayNightFinishQtyExportMap(list);
+
+        // 模板要求第一条数据行不是具体机台明细，而是整张表的汇总行：
+        // 各班计划/实际取所有明细对应班次的合计，后面的每条才是原始排程明细。
+//        if(PubUtil.isNotEmpty(list)){
+//            dataList.add(buildSummaryRow(list));
+//        }
+
+
         for (LhScheduleResult result : list) {
-            Map<String, Object> row = new HashMap<>(96);
+            Map<String, Object> row = new HashMap<>(112);
             row.put("lhMachineCode", result.getLhMachineCode());
             row.put("materialCode", result.getMaterialCode());
             row.put("materialDesc", result.getMaterialDesc());
             row.put("mainMaterialDesc", result.getMainMaterialDesc());
-            row.put("scheduleType", buildScheduleTypeName(result.getScheduleType()));
+//            row.put("scheduleType", buildScheduleTypeName(result.getScheduleType()));
+
+            // 胶囊使用次数来自 T_LH_REPAIR_CAPSULE，同机台同日期优先；
+            // 如果排程日没有采集记录，则取该机台距离排程日最近的一条记录。
+            LhRepairCapsule repairCapsule = capsuleMap.get(buildCapsuleExportKey(result));
+            row.put("replaceCapsuleCount", Objects.nonNull(repairCapsule) ? repairCapsule.getReplaceCapsuleCount() : "");
+            row.put("replaceCapsuleCount2", Objects.nonNull(repairCapsule) ? repairCapsule.getReplaceCapsuleCount2() : "");
+            row.put("replaceCapsuleCountLeftRight", buildCapsuleCountLeftRight(repairCapsule));
+
+            // 成型机台号来自成型排程结果的 LH_SCHEDULE_IDS 反查，多个成型机台用中文分号拼接。
+            row.put("cxMachineCode", cxMachineCodeMap.get(result.getId()));
+            row.put("todayNightFinishQty", todayNightFinishQtyMap.get(buildMaterialFactoryExportKey(result.getFactoryCode(), result.getMaterialCode())));
             row.put("mouldSurplusQty", result.getMouldSurplusQty());
             row.put("embryoStock", result.getEmbryoStock());
             row.put("singleMouldShiftQty", result.getSingleMouldShiftQty());
             row.put("leftRightMould", result.getLeftRightMould());
             row.put("mouldMethod", result.getMouldMethod());
+            row.put("structureName", result.getStructureName());
             row.put("totalFinishQty", sumFinishQty(result));
+
+            // 明细行的 dailyPlanQty 已按需求从 totalDailyPlanQty 改为 dailyPlanQty。
+            // totalPlanQty 只是模板“总计”占位符，为了明细行保持同一日计划量展示，
+            // 当前同步写入 dailyPlanQty；首行汇总会在 buildSummaryRow 中单独计算。
             row.put("dailyPlanQty", result.getDailyPlanQty());
             row.put("totalPlanQty", result.getDailyPlanQty());
             row.put("remark", result.getRemark());
+
+            // 8 个班次字段结构完全一致，通过 class{班次号}xxx 统一组装，
+            // 与模板中的 {.class1PlanQty}、{.class8Analysis} 等占位符一一对应。
             for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
                 row.put("class" + shift + "Order", buildShiftOrder(result, shift));
                 row.put("class" + shift + "PlanQty", getClassPlanQty(result, shift));
@@ -950,12 +1027,281 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
+     * 构建导出用胶囊使用次数Map。
+     * <p>key 按导出明细行维度生成，保证同一机台在不同排程日期导出时可以分别匹配。</p>
+     *
+     * @param list 排程结果列表
+     * @return 胶囊使用次数Map，key=工厂|硫化机台|排程日期
+     */
+    private Map<String, LhRepairCapsule> buildRepairCapsuleExportMap(List<LhScheduleResult> list) {
+        if (PubUtil.isEmpty(list)) {
+            return Collections.emptyMap();
+        }
+        List<String> machineCodes = list.stream()
+                .map(LhScheduleResult::getLhMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.toList());
+        if (machineCodes.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<String> factoryCodes = list.stream()
+                .map(LhScheduleResult::getFactoryCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.toList());
+
+        LambdaQueryWrapper<LhRepairCapsule> queryWrapper = new LambdaQueryWrapper<LhRepairCapsule>()
+                .in(LhRepairCapsule::getLhCode, machineCodes)
+                .eq(LhRepairCapsule::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        if (!factoryCodes.isEmpty()) {
+            queryWrapper.in(LhRepairCapsule::getFactoryCode, factoryCodes);
+        }
+        List<LhRepairCapsule> capsuleList = lhRepairCapsuleMapper.selectList(queryWrapper);
+        if (PubUtil.isEmpty(capsuleList)) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, List<LhRepairCapsule>> machineCapsuleMap = capsuleList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getLhCode()))
+                .collect(Collectors.groupingBy(item -> buildCapsuleMachineKey(item.getFactoryCode(), item.getLhCode())));
+        Map<String, LhRepairCapsule> resultMap = new HashMap<>(list.size());
+        for (LhScheduleResult result : list) {
+            List<LhRepairCapsule> sameMachineCapsules = machineCapsuleMap.get(buildCapsuleMachineKey(result.getFactoryCode(), result.getLhMachineCode()));
+            LhRepairCapsule matched = matchRepairCapsuleByScheduleDate(sameMachineCapsules, result.getScheduleDate());
+            if (Objects.nonNull(matched)) {
+                resultMap.put(buildCapsuleExportKey(result), matched);
+            }
+        }
+        return resultMap;
+    }
+
+    /**
+     * 按排程日期匹配胶囊使用次数。
+     * <p>先找获取日期与排程日期同一天的记录；若不存在，则取获取日期距离排程日期最近的一条。</p>
+     *
+     * @param capsuleList 同一硫化机台下的胶囊使用次数列表
+     * @param scheduleDate 排程日期
+     * @return 匹配到的胶囊使用次数
+     */
+    private LhRepairCapsule matchRepairCapsuleByScheduleDate(List<LhRepairCapsule> capsuleList, Date scheduleDate) {
+        if (PubUtil.isEmpty(capsuleList)) {
+            return null;
+        }
+        if (Objects.isNull(scheduleDate)) {
+            return capsuleList.stream()
+                    .filter(item -> Objects.nonNull(item.getObtainTime()))
+                    .max(Comparator.comparing(LhRepairCapsule::getObtainTime))
+                    .orElse(capsuleList.get(0));
+        }
+        Date scheduleDay = DateUtil.beginOfDay(scheduleDate);
+        return capsuleList.stream()
+                .filter(item -> Objects.nonNull(item.getObtainTime()))
+                .min(Comparator
+                        .comparing((LhRepairCapsule item) -> DateUtil.isSameDay(item.getObtainTime(), scheduleDay) ? 0 : 1)
+                        .thenComparingLong(item -> Math.abs(DateUtil.beginOfDay(item.getObtainTime()).getTime() - scheduleDay.getTime())))
+                .orElse(null);
+    }
+
+    /**
+     * 构建胶囊L/R次数展示值。
+     * <p>模板只有一个“胶囊次数L/R”单元格，因此导出时组合为“左次数/右次数”。</p>
+     *
+     * @param repairCapsule 胶囊使用次数
+     * @return 胶囊L/R次数展示值
+     */
+    private String buildCapsuleCountLeftRight(LhRepairCapsule repairCapsule) {
+        if (Objects.isNull(repairCapsule)) {
+            return "";
+        }
+        String leftCount = Objects.nonNull(repairCapsule.getReplaceCapsuleCount())
+                ? String.valueOf(repairCapsule.getReplaceCapsuleCount()) : "";
+        String rightCount = Objects.nonNull(repairCapsule.getReplaceCapsuleCount2())
+                ? String.valueOf(repairCapsule.getReplaceCapsuleCount2()) : "";
+        if (StringUtils.isBlank(leftCount) && StringUtils.isBlank(rightCount)) {
+            return "";
+        }
+        return leftCount + "/" + rightCount;
+    }
+
+    /**
+     * 构建导出用成型机台Map。
+     * <p>通过成型排程结果 LH_SCHEDULE_IDS 反查当前硫化排程结果ID，一个硫化ID可能关联多个成型机台。</p>
+     *
+     * @param list 排程结果列表
+     * @return 成型机台Map，key=硫化排程结果ID，value=成型机台号
+     */
+    private Map<Long, String> buildCxMachineCodeExportMap(List<LhScheduleResult> list) {
+        List<Long> lhScheduleIds = list.stream()
+                .map(LhScheduleResult::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (lhScheduleIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<CxScheduleResult> cxScheduleResults = cxScheduleResultService.listByLhScheduleIds(lhScheduleIds);
+        if (PubUtil.isEmpty(cxScheduleResults)) {
+            return Collections.emptyMap();
+        }
+
+        Set<Long> exportIdSet = new HashSet<>(lhScheduleIds);
+        Map<Long, LinkedHashSet<String>> machineCodeMap = new HashMap<>(lhScheduleIds.size());
+        for (CxScheduleResult cxScheduleResult : cxScheduleResults) {
+            if (StringUtils.isBlank(cxScheduleResult.getCxMachineCode())) {
+                continue;
+            }
+            for (Long lhScheduleId : parseLhScheduleIds(cxScheduleResult.getLhScheduleIds())) {
+                if (!exportIdSet.contains(lhScheduleId)) {
+                    continue;
+                }
+                machineCodeMap.computeIfAbsent(lhScheduleId, key -> new LinkedHashSet<>())
+                        .add(cxScheduleResult.getCxMachineCode().trim());
+            }
+        }
+        return machineCodeMap.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> String.join("；", entry.getValue()),
+                        (oldValue, newValue) -> oldValue,
+                        HashMap::new
+                ));
+    }
+
+    /**
+     * 解析成型排程结果中的硫化排程ID字符串。
+     * <p>兼容逗号、中文逗号、斜杠、分号和空白分隔，避免历史数据分隔符不一致导致反查失败。</p>
+     *
+     * @param lhScheduleIds 硫化排程ID字符串
+     * @return 硫化排程ID列表
+     */
+    private List<Long> parseLhScheduleIds(String lhScheduleIds) {
+        if (StringUtils.isBlank(lhScheduleIds)) {
+            return Collections.emptyList();
+        }
+        List<Long> result = new ArrayList<>();
+        for (String token : lhScheduleIds.split("[,，/;；\\s]+")) {
+            if (StringUtils.isBlank(token)) {
+                continue;
+            }
+            try {
+                result.add(Long.valueOf(token.trim()));
+            } catch (NumberFormatException ignored) {
+                // 历史脏数据不影响导出，无法解析的片段直接跳过。
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 构建导出用“硫化产量今天夜班”Map。
+     * <p>按用户要求，使用 T_LH_DAY_FINISH_QTY 中同工厂、同物料从当月 1 日到排程日当天的
+     * DAY_FINISH_QTY 汇总值。这里先一次性查出导出列表涉及的全部工厂、物料和日期范围，
+     * 再在内存中按“工厂+物料”聚合，避免逐行查询数据库。</p>
+     *
+     * @param list 排程结果列表
+     * @return 硫化产量今天夜班Map，key=工厂|物料编码
+     */
+    private Map<String, Object> buildTodayNightFinishQtyExportMap(List<LhScheduleResult> list) {
+        if (PubUtil.isEmpty(list)) {
+            return Collections.emptyMap();
+        }
+        List<String> factoryCodes = list.stream()
+                .map(LhScheduleResult::getFactoryCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.toList());
+        List<String> materialCodes = list.stream()
+                .map(LhScheduleResult::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.toList());
+        if (factoryCodes.isEmpty() || materialCodes.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Date maxScheduleDate = list.stream()
+                .map(LhScheduleResult::getScheduleDate)
+                .filter(Objects::nonNull)
+                .max(Date::compareTo)
+                .orElse(DateUtil.date());
+        Date monthStart = DateUtil.beginOfMonth(maxScheduleDate);
+        Date nextDayStart = DateUtil.offsetDay(DateUtil.beginOfDay(maxScheduleDate), 1);
+
+        List<LhDayFinishQty> finishQtyList = lhDayFinishQtyMapper.selectList(
+                new LambdaQueryWrapper<LhDayFinishQty>()
+                        .in(LhDayFinishQty::getFactoryCode, factoryCodes)
+                        .in(LhDayFinishQty::getMaterialCode, materialCodes)
+                        .ge(LhDayFinishQty::getFinishDate, monthStart)
+                        .lt(LhDayFinishQty::getFinishDate, nextDayStart)
+                        .and(wrapper -> wrapper.eq(LhDayFinishQty::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                                .or()
+                                .isNull(LhDayFinishQty::getIsDelete)));
+        if (PubUtil.isEmpty(finishQtyList)) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, BigDecimal> finishQtyMap = new HashMap<>(finishQtyList.size());
+        for (LhDayFinishQty finishQty : finishQtyList) {
+            if (StringUtils.isBlank(finishQty.getFactoryCode()) || StringUtils.isBlank(finishQty.getMaterialCode())) {
+                continue;
+            }
+            BigDecimal dayFinishQty = Objects.nonNull(finishQty.getDayFinishQty())
+                    ? finishQty.getDayFinishQty() : BigDecimal.ZERO;
+            finishQtyMap.merge(
+                    buildMaterialFactoryExportKey(finishQty.getFactoryCode(), finishQty.getMaterialCode()),
+                    dayFinishQty,
+                    BigDecimal::add);
+        }
+        return new HashMap<>(finishQtyMap);
+    }
+
+    /**
+     * 构建物料工厂匹配key。
+     *
+     * @param factoryCode 工厂编号
+     * @param materialCode 物料编码
+     * @return 物料工厂匹配key
+     */
+    private String buildMaterialFactoryExportKey(String factoryCode, String materialCode) {
+        return StringUtils.defaultString(factoryCode).trim() + "|" + StringUtils.defaultString(materialCode).trim();
+    }
+
+    /**
+     * 构建胶囊导出明细行key。
+     *
+     * @param result 排程结果
+     * @return 明细行key
+     */
+    private String buildCapsuleExportKey(LhScheduleResult result) {
+        String scheduleDay = Objects.nonNull(result.getScheduleDate()) ? DateUtil.formatDate(result.getScheduleDate()) : "";
+        return buildCapsuleMachineKey(result.getFactoryCode(), result.getLhMachineCode()) + "|" + scheduleDay;
+    }
+
+    /**
+     * 构建胶囊机台匹配key。
+     *
+     * @param factoryCode 工厂编号
+     * @param lhMachineCode 硫化机台编号
+     * @return 机台匹配key
+     */
+    private String buildCapsuleMachineKey(String factoryCode, String lhMachineCode) {
+        return StringUtils.defaultString(factoryCode).trim() + "|" + StringUtils.defaultString(lhMachineCode).trim();
+    }
+
+    /**
      * 构建排程类型名称
      *
      * @param scheduleType 排程类型编码
      * @return 排程类型名称
      */
     private String buildScheduleTypeName(String scheduleType) {
+        // 排程类型在数据库中存编码，导出给业务使用时展示中文；
+        // 未知编码原样返回，避免后续新增字典值时导出为空。
         if ("01".equals(scheduleType)) {
             return "续作";
         }
@@ -974,6 +1320,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     private Map<String, Object> buildSummaryRow(List<LhScheduleResult> list) {
         Map<String, Object> row = new HashMap<>(96);
         int totalPlanQty = 0;
+
+        // 首行汇总按班次横向展示：每个班的计划量、完成量都取所有明细的纵向合计。
+        // 例如 class1PlanQty = 所有明细的 1 班计划量之和。
         for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
             int classPlanQty = sumPlanQtyByShift(list, shift);
             int classFinishQty = sumFinishQtyByShift(list, shift);
@@ -981,6 +1330,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             row.put("class" + shift + "FinishQty", classFinishQty);
             totalPlanQty += classPlanQty;
         }
+
+        // 模板最后区域有两个不同口径：
+        // dailyPlanQty 对应“合计”的计划量，只统计 6、7、8 班；
+        // totalFinishQty 对应“合计”的实际量，也只统计 6、7、8 班；
+        // totalPlanQty 对应“总计”，统计 1~8 班的全部计划量。
         row.put("dailyPlanQty", sumPlanQtyByShift(list, 6)
                 + sumPlanQtyByShift(list, 7)
                 + sumPlanQtyByShift(list, 8));
@@ -1030,6 +1384,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      */
     private Object buildShiftOrder(LhScheduleResult result, int shift) {
         Integer planQty = getClassPlanQty(result, shift);
+        // 只有该班次有计划量时才展示排程顺序，空班次保持空白，
+        // 防止同一条明细的顺序号误显示到没有排产的班次下。
         return Objects.nonNull(planQty) && planQty > 0 ? result.getScheduleOrder() : "";
     }
 
@@ -1045,6 +1401,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (Objects.isNull(planQty) || planQty <= 0) {
             return "";
         }
+        // 当前排程类型、首检、收尾、施工阶段都是明细级字段，不是班次级字段。
+        // 因此只有当该班次有计划量时，才把明细状态映射到这个班次格子里。
+        // 优先级按业务识别度处理：首检 > 试验/量试 > 收尾 > 正常。
         if ("1".equals(result.getIsFirst())) {
             return "首检";
         }

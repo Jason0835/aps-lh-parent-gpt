@@ -56,8 +56,7 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     private String machineName;
 
     /** 寸口信息 */
-    @ImportExcelValidated(required = true, number = true, min = 0, max = 9999)
-    @Excel(name = "ui.data.column.info.dimension", cellType = Excel.ColumnType.NUMERIC, sort = 50)
+//    @Excel(name = "ui.data.column.info.dimension",sort = 50)
     @ApiModelProperty(value = "寸口信息", name = "dimension")
     @TableField(value = "DIMENSION")
     private BigDecimal dimension;
@@ -67,17 +66,17 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     @TableField(value = "CENTRIPETAL_MECHANISM")
     private String centripetalMechanism;
 
-    /** 生产寸口范围下限，单位：英寸 */
+    /** 适配英寸下限 */
     @ImportExcelValidated(required = true, number = true, min = 0, max = 9999)
-    @Excel(name = "ui.data.column.info.dimensionMinimum", cellType = Excel.ColumnType.NUMERIC, sort = 60)
-    @ApiModelProperty(value = "生产寸口范围下限，单位：英寸", name = "dimensionMinimum")
+    @Excel(name = "ui.data.column.lhMachineInfo.dimensionMinimum", cellType = Excel.ColumnType.NUMERIC, sort = 60)
+    @ApiModelProperty(value = "适配英寸下限", name = "dimensionMinimum")
     @TableField(value = "DIMENSION_MINIMUM")
     private BigDecimal dimensionMinimum;
 
-    /** 生产寸口范围上限，单位：英寸 */
-    @ImportExcelValidated(number = true, min = 1, max = 9999)
-    @Excel(name = "ui.data.column.info.dimensionMaximum", cellType = Excel.ColumnType.NUMERIC, sort = 70)
-    @ApiModelProperty(value = "生产寸口范围上限，单位：英寸", name = "dimensionMaximum")
+    /** 适配英寸上限 */
+    @ImportExcelValidated(required = true, number = true, min = 1, max = 9999)
+    @Excel(name = "ui.data.column.lhMachineInfo.dimensionMaximum", cellType = Excel.ColumnType.NUMERIC, sort = 70)
+    @ApiModelProperty(value = "适配英寸上限", name = "dimensionMaximum")
     @TableField(value = "DIMENSION_MAXIMUM")
     private BigDecimal dimensionMaximum;
 
@@ -86,10 +85,10 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     @TableField(value = "CLASS_SHIFT")
     private String classShift;
 
-    /** 最大使用模具数量，范围 0-255 单双模*/
+    /** 单双模，范围 0-255 */
     @ImportExcelValidated(required = true, digits = true, min = 0, max = 255)
-    @Excel(name = "ui.data.column.info.maxMoldNum", cellType = Excel.ColumnType.NUMERIC, sort = 80)
-    @ApiModelProperty(value = "模台数 单双模", name = "maxMoldNum")
+    @Excel(name = "ui.data.column.lhMachineInfo.maxMoldNum", cellType = Excel.ColumnType.NUMERIC, sort = 80)
+    @ApiModelProperty(value = "单双模", name = "maxMoldNum")
     @TableField(value = "MAX_MOLD_NUM")
     private Integer maxMoldNum;
 
@@ -107,11 +106,13 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
 
     /** 是否启用 */
     @Excel(name = "ui.data.column.info.status",sort = 100,dictType = "sys_enable_disable")
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "是否启用，字典：sys_enable_disable", name = "status")
     @TableField(value = "STATUS")
     private String status;
 
     @Excel(name = "ui.data.column.info.machineType",sort = 40,dictType = "LH_MACHINE_TYPE")
+    @ImportExcelValidated(required = true)
     @ApiModelProperty(value = "机台类型，字典：LH_MACHINE_TYPE", name = "machineType")
     @TableField(value = "MACHINE_TYPE")
     private String machineType;
