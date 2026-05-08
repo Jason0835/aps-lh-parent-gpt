@@ -5,14 +5,12 @@ import static com.zlt.aps.common.core.utils.ApsNumberUtils.*;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.service.ISysConfigService;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.*;
@@ -33,13 +31,11 @@ import com.zlt.aps.mp.engine.handler.MouldProductionResultHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanMouldDayDetailMapper;
 import com.zlt.aps.mp.engine.mapper.FactoryMouldingDayResultMapper;
-import com.zlt.aps.mp.engine.mapper.FactoryProductionInitMapper;
 import com.zlt.aps.mp.engine.mapper.MonthPlanRequireMapper;
 import com.zlt.aps.mp.engine.mapper.MpStructureAllocationMapper;
 import com.zlt.aps.mp.engine.scheduling.AbstractDataLoaderService;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
-import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.SkuNeedProductionInfo;
 import com.zlt.aps.mp.engine.scheduling.init.ProductionInitParamConfiguration;
 import com.zlt.aps.mp.engine.service.DpRequireDataService;
@@ -52,7 +48,6 @@ import com.zlt.core.dao.basedao.BaseDao;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -83,10 +78,6 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
     }
 
     @Autowired
-    private ProductionMdmDataService productionSchedulingDataService;
-    @Autowired
-    private DpRequireDataService dpRequireDataService;
-    @Autowired
     private MonthProductionDataService monthProductionDataService;
     @Autowired
     private ISysConfigService sysConfigService;
@@ -102,8 +93,6 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
     private MpStructureAllocationMapper mpStructureAllocationMapper;
     @Autowired
     private MpMonthPlanStatisticsEntityMapper mpMonthPlanStatisticsEntityMapper;
-    @Autowired
-    private FactoryProductionInitMapper factoryProductionInitMapper;
     @Autowired
     private BaseDao baseDao;
 
@@ -540,24 +529,6 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             } while (true);
         } while (true);
     }
-
-    /**
-     * 更新搭配日期
-     * @param productionPlanList
-     * @param day
-     */
-    private void updateMatchDay(List<MonthPlanProductionRequirePlanVo> productionPlanList, Integer day) {
-        productionPlanList.forEach(item -> {
-            if (item.getMatchBeginDay() == null) {
-                item.setMatchBeginDay(day);
-            }
-            if (item.getMatchEndDay() == null || item.getMatchEndDay() < day) {
-                item.setMatchEndDay(day);
-            }
-        });
-    }
-    
-
 
     /**
      * 本次SKU搭配结束日期<br/>
@@ -2141,62 +2112,6 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
     }
 
     /**
-     * 获取计划对应结构成型硫化配比信息 计划内的结构
-     *
-     * @param context         排产上下文
-     * @param requirePlanList 需求计划信息
-     * @return
-     */
-    private List<MonthPlanStructureLhRatioVo> getLhRatioConfiguration(Context context,
-                                                                      List<MonthPlanProductionRequirePlanVo> requirePlanList) {
-        if (CollectionUtils.isEmpty(requirePlanList)) {
-            return Collections.emptyList();
-        }
-        // 提取结构查询条件
-        Set<String> structureNameMap = requirePlanList.stream().map(MonthPlanProductionRequirePlanVo::getStructureName)
-                .collect(Collectors.toSet());
-        List<String> structureNameList = new ArrayList<>(structureNameMap);
-        List<MonthPlanStructureLhRatioVo> structureLhRatioList = getDataService().getLhRatioInfo(context,
-                structureNameList);
-//        log.info(TbrBeforeProductionGroupLogRecorder.addReaderCxLhGroupRatioLog(context, structureLhRatioList));
-        if (CollectionUtils.isEmpty(structureLhRatioList)) {
-            return Collections.emptyList();
-        }
-        // 机型为空值，表示所有机型匹配
-        structureLhRatioList.forEach(singleRatio -> {
-            if (StringUtils.isNotBlank(singleRatio.getCxMachineTypeCode())) {
-                return;
-            }
-            singleRatio.setCxMachineTypeCode(ProductionConstant.ALL_BRAND_CODE_MATCH);
-        });
-        // 周期结构硫化配比
-        List<CycleStructureMinLhMachineQtyVo> cycleStructureMinLhRatioList = dpRequireDataService
-                .getCycleLhRatioInfo(context);
-        Map<String, Integer> cycleStructureMinLhRatioMap = new HashMap<>();
-        if (!CollectionUtils.isEmpty(cycleStructureMinLhRatioList)) {
-            cycleStructureMinLhRatioList.forEach(cycleStructureMinLhRatio -> {
-                cycleStructureMinLhRatioMap.put(cycleStructureMinLhRatio.getStructureName(),
-                        null == cycleStructureMinLhRatio.getMonthMinLhMachineQty()
-                                ? cycleStructureMinLhRatio.getMinLhMachineQty()
-                                : cycleStructureMinLhRatio.getMonthMinLhMachineQty());
-            });
-        }
-        // 常规结构的最低硫化配比
-        Integer defaultMinLhRatio = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration()
-                .getNoCycleProductionMinLhMachineNumber();
-        structureLhRatioList.forEach(structureLhRatio -> {
-            String structureName = structureLhRatio.getStructureName();
-            structureLhRatio.setLhMachineMinQty(defaultMinLhRatio);
-            // 如果是周期，则换成周期
-            if (cycleStructureMinLhRatioMap.containsKey(structureName)) {
-                structureLhRatio.setLhMachineMinQty(cycleStructureMinLhRatioMap.get(structureName));
-                return;
-            }
-        });
-        return structureLhRatioList;
-    }
-
-    /**
      * 加载需求计划列表
      * 
      * @param productionContext 上下文
@@ -2501,7 +2416,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             return StringUtils.EMPTY;
         }
         List<MonthPlanProductionRequirePlanVo> enablePlanList = productionPlanList;
-        // 只看有常规储备的sku
+        // 只看有待排产的sku
         List<MonthPlanProductionRequirePlanVo> hasReserveQtyPlanList = enablePlanList.stream()
                 .filter(s -> StringUtils.isEmpty(checkMaterialDesc) || Objects.equals(s.getMaterialDesc(), checkMaterialDesc)) // 如果有指定SKU，则只检查该SKU
                 .filter(s -> !scheduleMaterialDesc.contains(s.getMaterialDesc())) // 已经排过的跳过
@@ -2567,7 +2482,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         if (CollectionUtils.isEmpty(selectedPlanList)) {
             return null;
         }
-        // 是否有常规储备排产量
+        // 是否有待排产量
         List<MonthPlanProductionRequirePlanVo> heightList = selectedPlanList.stream()
                 .filter(plan -> plan.getProductionQty() > BigDecimal.ZERO.longValue())
                 .collect(Collectors.toList());
@@ -2672,131 +2587,6 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
 //              singleMouldInfo.setDayProductionInfo(new HashMap<>());
 //          });
 //      }
-    }
-
-    /**
-     * 设置工厂的排产日信息 包含 停产日及开停产的产能比例 t_mdm_work_calendar
-     *
-     * @param context
-     */
-    private void setMonthProductionDays(Context context) {
-        List<ProductionDayInfoVo> productionDayInfoList = this.getDataService().getProductCalendar(context);
-//        log.info(TbrBeforeProductionGroupLogRecorder.addReaderProductionCalendarLog(context, productionDayInfoList));
-        Integer maxBoostDays = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getMaxBoostDay();
-        if (CollectionUtils.isEmpty(productionDayInfoList)) {
-            context.setCapacityRatioMap(Collections.emptyMap());
-            context.setStopDays(Collections.emptySet(), maxBoostDays);
-            throw new BusinessException(I18nUtil.getMessage("alg.data.production.noConfigurationCalendar"));
-        }
-        // 排产开始日
-        Date productionStartDate = context.getProductionStartDate();
-        // 开产比例设置
-        Map<Integer, Integer> startProductionRatioMap = new HashMap<>(context.getMonthDays());
-        List<ProductionDayInfoVo> startProductionDays = productionDayInfoList.stream().filter(productionDayInfo -> YesOrNoEnum.YES.getCode().equals(productionDayInfo.getDayFlag())).collect(Collectors.toList());
-        if (!CollectionUtils.isEmpty(startProductionDays)) {
-            startProductionDays.forEach(startProductionInfo -> {
-                Date startProduction = startProductionInfo.getProductionDate();
-                Integer startDay = com.zlt.aps.mp.engine.utils.DateUtils.getIntervalDays(productionStartDate, startProduction);
-                startProductionRatioMap.put(startDay, startProductionInfo.getRate());
-            });
-        }
-        context.setCapacityRatioMap(startProductionRatioMap);
-        // 停产设置
-        List<ProductionDayInfoVo> stopDays = productionDayInfoList.stream().filter(productionDayInfo -> YesOrNoEnum.NO.getCode().equals(productionDayInfo.getDayFlag())).collect(Collectors.toList());
-//        log.info(TbrBeforeProductionGroupLogRecorder.addReaderStopCalendarLog(context, stopDays));
-        if (CollectionUtils.isEmpty(stopDays)) {
-            context.setStopDays(Collections.emptySet(), maxBoostDays);
-            return;
-        }
-        Set<Integer> stopDaySet = new HashSet<>(context.getMonthDays());
-        stopDays.forEach(stopProductionInfo -> {
-            Date stopProduction = stopProductionInfo.getProductionDate();
-            Integer stopDay = com.zlt.aps.mp.engine.utils.DateUtils.getIntervalDays(productionStartDate, stopProduction);
-            stopDaySet.add(stopDay);
-        });
-        context.setStopDays(stopDaySet, maxBoostDays);
-    }
-
-    /**
-     * 构建日产能限制对象信息
-     *
-     * @param productionContext 排产上下文
-     */
-    private void buildDayCapacityLimitInfo(TbrProductionContext productionContext) {
-        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
-        DayCapacityLimitVo dayCapacityLimit = new DayCapacityLimitVo(Collections.emptyMap());
-        Set<Integer> productionDayList = productionContext.getProductionDay();
-        if (CollectionUtils.isEmpty(productionDayList)) {
-            baseDataContainer.setDayCapacityLimit(dayCapacityLimit);
-            return;
-        }
-        Set<Integer> openDay = productionContext.getProductionDayAfterStop();
-        ProductionCapacityParamConfiguration paramConfiguration = baseDataContainer.getParamConfiguration();
-        Map<Integer, DayCapacityLimitHelper> dayCapacityLimitMap = new HashMap<>(productionDayList.size());
-        Map<Integer, Integer> startProductionRatioMap = productionContext.getCapacityRatioMap();
-        productionDayList.forEach(productionDay -> {
-            Integer ratio = startProductionRatioMap.get(productionDay);
-            //20260127 开产时，只是量放一半，日产限制还是放大到100
-            if (openDay.contains(productionDay)) {
-                ratio = ProductionConstant.PERCENTAGE;
-            }
-            DayCapacityLimitHelper dayInitLimit = DayCapacityLimitHelper.createInit(productionDay, paramConfiguration, ratio);
-            dayCapacityLimitMap.put(productionDay, dayInitLimit);
-        });
-        dayCapacityLimit.updateWholeDayLimitInfo(dayCapacityLimitMap);
-        baseDataContainer.setDayCapacityLimit(dayCapacityLimit);
-    }
-
-    /**
-     * 构建分组+主花纹的模具信息 TBR 为结构
-     *
-     * @param productionContext 排产上下文
-     * @return
-     */
-    private void buildGroupMainPatternInfo(TbrProductionContext productionContext) {
-        BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
-        Map<String, List<MonthPlanProductMouldInfoVo>> mouldAssociationMap = baseDataContainer.getSkuMouldRelationMap();
-        Map<String, ProductionMouldInfoVo> allMouldMap = baseDataContainer.getMouldInfoMap();
-        if (CollectionUtils.isEmpty(mouldAssociationMap) || CollectionUtils.isEmpty(allMouldMap)) {
-            baseDataContainer.setGroupMainPatternMouldRelationMap(Collections.emptyMap());
-            return;
-        }
-        List<MonthPlanProductMouldInfoVo> allRelationList = new ArrayList<>();
-        mouldAssociationMap.forEach((materialDesc, relationList) -> {
-            if (CollectionUtils.isEmpty(relationList)) {
-                return;
-            }
-            allRelationList.addAll(relationList);
-        });
-        if (CollectionUtils.isEmpty(allRelationList)) {
-            baseDataContainer.setGroupMainPatternMouldRelationMap(Collections.emptyMap());
-            return;
-        }
-        Map<String, List<MonthPlanProductMouldInfoVo>> groupMainPatternMap = allRelationList.stream()
-                .collect(Collectors.groupingBy(MonthPlanProductMouldInfoVo::getStructureNameAndMainPattern));
-        Map<String, List<ProductionMouldInfoVo>> groupMainPatternMouldMap = new HashMap<>();
-        groupMainPatternMap.forEach((groupNameAndMainPattern, relationList) -> {
-            if (CollectionUtils.isEmpty(relationList)) {
-                return;
-            }
-            List<ProductionMouldInfoVo> groupMainPatternList = new ArrayList<>();
-            Set<String> mouldCodeSet = new HashSet<>();
-            relationList.forEach(singleRelation -> {
-                String mouldCode = singleRelation.getMouldCode();
-                if (mouldCodeSet.contains(mouldCode)) {
-                    return;
-                }
-                mouldCodeSet.add(mouldCode);
-                if (allMouldMap.containsKey(mouldCode)) {
-                    groupMainPatternList.add(allMouldMap.get(mouldCode));
-                }
-            });
-            if (CollectionUtils.isEmpty(groupMainPatternList)) {
-                return;
-            }
-            groupMainPatternMouldMap.put(groupNameAndMainPattern, groupMainPatternList);
-        });
-        baseDataContainer.setGroupMainPatternMouldRelationMap(groupMainPatternMouldMap);
     }
 
     /**
@@ -3016,125 +2806,21 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
     }
 
     /**
-     * 获取结构+主花纹的模具分配比例控制信息
-     *
-     * @param context
-     * @return
-     */
-    private Map<String, MouldAllocationInfoVo> getGroupMainPatternAllocationInfo(Context context) {
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService()
-                .getMouldAllocationInfo(productionContext);
-//        log.info(TbrBeforeProductionGroupLogRecorder.addReaderMouldAllocationLog(context, mouldAllocationInfoList));
-        if (CollectionUtils.isEmpty(mouldAllocationInfoList)) {
-            return Collections.emptyMap();
-        }
-        Map<String, MouldAllocationInfoVo> groupMainPatternMap = mouldAllocationInfoList.stream().collect(Collectors
-                .toMap(MouldAllocationInfoVo::getDuplicateKey, Function.identity(), (before, after) -> after));
-        // 根据排产周期，转换成每日量控制
-        Set<Integer> productionDaySet = context.getProductionDay();
-        groupMainPatternMap.forEach((controlDimension, allocationInfo) -> {
-            Map<Integer, MouldAllocationDayInfoHelper> dayLimitInfoMap = new HashMap<>(productionDaySet.size());
-            productionDaySet.forEach(productionDay -> {
-                MouldAllocationDayInfoHelper dayLimit = MouldAllocationDayInfoHelper.buildInit(controlDimension,
-                        productionDay, allocationInfo.getAllocationQty());
-                dayLimitInfoMap.put(productionDay, dayLimit);
-            });
-            allocationInfo.setDayLimitInfoMap(dayLimitInfoMap);
-        });
-        return groupMainPatternMap;
-    }
-
-    /**
      * 2.1.2：根据排产信息，获取特殊原材料的配置信息 包含：
      * 1、特殊原材料的胎胚
      * 2、特殊原材料的库存及可转化的轮胎条数
      *
      * @param productionContext 排产单位
      */
-    private void specialMaterialInfoHandler(TbrProductionContext productionContext) {
-        List<EmbryoSpecialMaterialInfoVo> specialMaterialInfoList = getDataService().getEmbryoSpecialMaterialInfo(productionContext);
-        Map<String, Map<String, BigDecimal>> embryoSpecialMaterialMap = new HashMap<>();
-        Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = new HashMap<>();
-//        log.info(TbrBeforeProductionGroupLogRecorder.addReaderSpecialMaterialLog(productionContext, specialMaterialInfoList));
-        if (CollectionUtils.isEmpty(specialMaterialInfoList)) {
-            productionContext.getBaseDataContainer().setEmbryoSpecialMaterialInfoMap(embryoSpecialMaterialMap);
-            productionContext.setSpecialMaterialInfoMap(specialMaterialInfoMap);
-            return;
+    protected void specialMaterialInfoHandler(TbrProductionContext productionContext) {
+        super.specialMaterialInfoHandler(productionContext);
+        // 特殊处理一下库存栏位的已分配库存
+        Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = productionContext.getSpecialMaterialInfoMap();
+        for (Map<Long, SpecialMaterialInfoVo> specialMap: specialMaterialInfoMap.values()) {
+            for (SpecialMaterialInfoVo stockInfoVo: specialMap.values()) {
+                stockInfoVo.setSumNoRoundProductionQty(stockInfoVo.getStock());
+            }
         }
-        //转化胎胚号-特殊材料
-        Map<String, List<EmbryoSpecialMaterialInfoVo>> allSpecialMaterialMap = specialMaterialInfoList.stream().collect(Collectors.groupingBy(EmbryoSpecialMaterialInfoVo::getEmbryoCode));
-        allSpecialMaterialMap.forEach((embryoCode, rawMaterialList) -> {
-            if (CollectionUtils.isEmpty(rawMaterialList)) {
-                return;
-            }
-            Map<String, BigDecimal> rawMaterialConfigurationMap = embryoSpecialMaterialMap.get(embryoCode);
-            if (null == rawMaterialConfigurationMap) {
-                rawMaterialConfigurationMap = new HashMap<>();
-                embryoSpecialMaterialMap.put(embryoCode, rawMaterialConfigurationMap);
-            }
-            for (EmbryoSpecialMaterialInfoVo embryoSpecialMaterialInfo : rawMaterialList) {
-                String specialMaterialCode = embryoSpecialMaterialInfo.getChildMaterialCode();
-                if (StringUtils.isBlank(specialMaterialCode)) {
-                    continue;
-                }
-                BigDecimal dosage = embryoSpecialMaterialInfo.getDosage();
-                rawMaterialConfigurationMap.put(specialMaterialCode, dosage);
-            }
-        });
-        productionContext.getBaseDataContainer().setEmbryoSpecialMaterialInfoMap(embryoSpecialMaterialMap);
-        //构建特殊原材料库存信息
-        specialMaterialStockHandler(productionContext);
-        // 初始化特殊材料结构关系表
-        productionContext.setSpecialMaterialStructureRelationMap(new HashMap<>());
-    }
-
-    /**
-     * 2.1.2.1：构建特殊原材料的库存信息对象
-     *
-     * @param productionContext
-     */
-    private void specialMaterialStockHandler(TbrProductionContext productionContext) {
-        //获取特殊材料库存信息
-        List<SpecialMaterialStockVo> specialMaterialStockList = getDataService().getSpecialMaterialStockInfo(productionContext);
-//        log.info(TbrBeforeProductionGroupLogRecorder.addReaderSpecialMaterialStockLog(productionContext, specialMaterialStockList));
-        if (CollectionUtils.isEmpty(specialMaterialStockList)) {
-            productionContext.setSpecialMaterialInfoMap(new HashMap<>());
-            return;
-        }
-        Map<String, Map<Long, SpecialMaterialInfoVo>> specialMaterialInfoMap = new HashMap<>();
-        //构建库存对应的可生产量
-        specialMaterialStockList.forEach(specialMaterialStockInfo -> {
-            String specialMaterialCode = specialMaterialStockInfo.getMaterialCode();
-            if (StringUtils.isBlank(specialMaterialCode)) {
-                return;
-            }
-            Map<Long, SpecialMaterialInfoVo> standardLengthMap = specialMaterialInfoMap.get(specialMaterialCode);
-            if (null == standardLengthMap) {
-                standardLengthMap = new HashMap<>();
-                specialMaterialInfoMap.put(specialMaterialCode, standardLengthMap);
-            }
-            SpecialMaterialInfoVo stockInfoVo = SpecialMaterialInfoVo.createInitInfo(specialMaterialStockInfo);
-            stockInfoVo.setSumNoRoundProductionQty(stockInfoVo.getStock());
-            standardLengthMap.put(specialMaterialStockInfo.getStandardLength(), stockInfoVo);
-        });
-        productionContext.setSpecialMaterialInfoMap(specialMaterialInfoMap);
-    }
-
-    /**
-     * 获取需要排产的SKU的施工配置信息
-     * key = materialCode: value = List<MonthPlanProductConstructionInfoVo>
-     *
-     * @param productionContext
-     * @return
-     */
-    protected Map<String, List<MonthPlanProductConstructionInfoVo>> getProductionConstructionInfo(TbrProductionContext productionContext) {
-        List<MonthPlanProductConstructionInfoVo> constructionInfoList = getDataService().getProductionConstructionInfo(productionContext);
-        if (CollectionUtils.isEmpty(constructionInfoList)) {
-//            log.info(TbrProductionInitLogRecorder.addConstructionInfoEmptyLog(productionContext));
-            return Collections.emptyMap();
-        }
-        return constructionInfoList.stream().collect(Collectors.groupingBy(MonthPlanProductConstructionInfoVo::getMaterialCode));
     }
 
     /**
@@ -3191,15 +2877,6 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         logInfo.setWorkNo(context.getProductionVersion());
         logInfo.setLogContent(tempLogContent);
         baseDao.insert(logInfo);
-    }
-
-    /**
-     * 数据服务
-     *
-     * @return
-     */
-    public ProductionMdmDataService getDataService() {
-        return productionSchedulingDataService;
     }
 
     @Override

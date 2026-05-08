@@ -1,4 +1,4 @@
-﻿
+
 <template>
   <basic-container>
     <page-table

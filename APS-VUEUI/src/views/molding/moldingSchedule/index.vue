@@ -91,6 +91,11 @@
           v-hasPermi="['cx:productConstruction:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
+        <el-button
+          @click="handleExportStructureChange"
+          v-hasPermi="['monthplan:mouldingDayResult:export2']"
+          >{{ $t("ui.data.column.cxStructureChange.exportBtn") }}</el-button
+        >
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -167,6 +172,7 @@ import {
   hasRecordValidate,
   removeCxScheduleResult,
   parseCxScheduleResult,
+  exportStructureChange,
 } from "@/api/cx/cxScheduleResult";
 import { getScheduleDate } from "@/api/lh/scheduleResult";
 //components
@@ -1070,6 +1076,24 @@ export default {
     },
     handleExport() {
       downloadLink("/cx/cxScheduleResult/export", this.formatParams(false));
+    },
+    handleExportStructureChange() {
+      this.$confirm(this.$t(`ui.data.column.cxStructureChange.confirmExport`), {
+        type: "warning",
+      }).then(() => {
+        try {
+          this.loading = true;
+          let params = this.formatParams(false);
+          params = {
+            ...params,
+          };
+          exportStructureChange(params);
+        } catch (error) {
+          console.error(error);
+        } finally {
+          this.loading = false;
+        }
+      });
     },
     handleGotoMoldingScheduleSequence() {
       this.$router.push({

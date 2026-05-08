@@ -561,7 +561,7 @@ public class ContinueTaskProcessor {
         
         ProductionCalculator.PlanQuantityResult endingResult = productionCalculator.calculateEndingQuantity(
                 remainingToProduce,
-                getTripCapacity(task.getStructureName(), context),
+                getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context),
                 isMainProduct,
                 task.getEmbryoCode()
         );
@@ -598,8 +598,8 @@ public class ContinueTaskProcessor {
     }
 
 
-    private int getTripCapacity(String structureCode, ScheduleContextVo context) {
-        return productionCalculator.getTripCapacity(structureCode, context);
+    private int getTripCapacity(String structureCode, String embryoCode, ScheduleContextVo context) {
+        return productionCalculator.getTripCapacity(structureCode, embryoCode, context);
     }
 
     private void allocateTaskToMachine(

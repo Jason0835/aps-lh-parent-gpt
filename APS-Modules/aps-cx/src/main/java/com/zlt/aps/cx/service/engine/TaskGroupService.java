@@ -338,7 +338,7 @@ public class TaskGroupService {
 //                int doubleMoldDailyCapacity = getDailyLhCapacityByTask(task, context) * 2;
 //                if (doubleMoldDailyCapacity > 0) {
 //                    int raw = (int) Math.ceil(6.0 / 24.0 * doubleMoldDailyCapacity);
-//                    int tripCapacity = getTripCapacity(task.getStructureName(), context);
+//                    int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
 //                    int openingBase = tripCapacity > 0 ? (raw / tripCapacity) * tripCapacity : raw;
 //                    task.setOpeningShiftCapacity(openingBase);
 //                }
@@ -372,7 +372,7 @@ public class TaskGroupService {
                 int netDemand = Math.max(0, vulcanizeDmd - stock);
                 BigDecimal lossRate = context.getLossRate() != null ? context.getLossRate() : BigDecimal.ZERO;
                 boolean isTrialProduction = Boolean.TRUE.equals(task.getIsTrialTask()) || Boolean.TRUE.equals(task.getIsProductionTrial());
-                int tripCap = getTripCapacity(task.getStructureName(), context);
+                int tripCap = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
                 log.info("收尾任务[{}]: 剩余余量={}, 收尾日={}, 距收尾={}天, 紧急={}, 近期={}, 最后一批={}",
                         embryoCode, task.getEndingSurplusQty(), task.getEndingDate(),
                         task.getDaysToEnding(), task.getIsUrgentEnding(), task.getIsNearEnding(), task.getIsLastEndingBatch());
@@ -1021,7 +1021,7 @@ public class TaskGroupService {
         if (netDemand == 0 && !isTrialLikeTask) {
             int endingFallbackProduction = calculateEndingFallbackProduction(task, context);
             if (endingFallbackProduction > 0) {
-                int tripCapacity = getTripCapacity(task.getStructureName(), context);
+                int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
                 task.setPlannedProduction(endingFallbackProduction);
                 task.setRequiredCars(calculateRequiredCars(endingFallbackProduction, tripCapacity));
                 task.setEndingExtraInventory(endingFallbackProduction);
@@ -1047,7 +1047,7 @@ public class TaskGroupService {
         task.setPlannedProduction(requiredProductionValue);
 
         // Step 3: 整车取整（试制任务不补整车，直接用实际需求量）
-        int tripCapacity = getTripCapacity(task.getStructureName(), context);
+        int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
         int plannedProduction;
         int requiredCars;
         if (isTrialLikeTask) {
@@ -1087,7 +1087,7 @@ public class TaskGroupService {
         }
 
         int upperBound = Math.min(endingSurplusQty, maxQtyByHours);
-        int tripCapacity = getTripCapacity(task.getStructureName(), context);
+        int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
         return productionCalculator.roundToTrip(upperBound, tripCapacity, "FLOOR");
     }
 
@@ -1126,7 +1126,7 @@ public class TaskGroupService {
         }
 
         // 今天最后一天收尾
-        int tripCapacity = getTripCapacity(task.getStructureName(), context);
+        int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
         if (!Boolean.TRUE.equals(task.getIsMainProduct()) && endingSurplusQty <= getEndingDiscardThreshold(context)) {
             // 非主销产品 + 收尾余量≤2条，舍弃当天排产
             task.setPlannedProduction(0);
@@ -1240,7 +1240,7 @@ public class TaskGroupService {
                 log.info("跨天封顶(明天{}有停产,开产日): 胎胚={}, 反推需求={}, 库存={}, 还需={}, 正常需求={}, 封顶={}",
                         nextDay, task.getEmbryoCode(), closingRequiredStock, currentStock,
                         thisShiftNeeded, normalDemand, cappedProduction);
-                int tripCapacity = getTripCapacity(task.getStructureName(), context);
+                int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
                 int roundedProduction = productionCalculator.roundToVehicle(cappedProduction, tripCapacity);
                 task.setPlannedProduction(roundedProduction);
                 task.setEndingExtraInventory(roundedProduction);
@@ -1261,7 +1261,7 @@ public class TaskGroupService {
             log.info("跨天封顶(明天{}有停产): 胎胚={}, 反推需求={}, 库存={}, 还需={}, 正常需求={}, 封顶={}",
                     nextDay, task.getEmbryoCode(), closingRequiredStock, currentStock,
                     thisShiftNeeded, normalDemand, cappedProduction);
-            int tripCapacity = getTripCapacity(task.getStructureName(), context);
+            int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
             int roundedProduction = productionCalculator.roundToVehicle(cappedProduction, tripCapacity);
             task.setPlannedProduction(roundedProduction);
             task.setEndingExtraInventory(roundedProduction);
@@ -1359,7 +1359,7 @@ public class TaskGroupService {
         // ==================== 如果之前走了收尾余量处理，以停产为优先调整回来 ====================
         if (Boolean.TRUE.equals(task.getIsLastEndingBatch())) {
             // 收尾任务被停产逻辑覆盖，需要调整回来
-            int tripCapacity = getTripCapacity(task.getStructureName(), context);
+            int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
             log.info("停产优先于收尾：embryoCode={}, 原endingExtraInventory={}, 调整为cappedProduction={}, 原requiredCars={}",
                     task.getEmbryoCode(), task.getEndingExtraInventory(), cappedProduction, task.getRequiredCars());
             task.setEndingExtraInventory(cappedProduction);
@@ -1369,7 +1369,7 @@ public class TaskGroupService {
         }
 
         // ==================== 正常停产封顶逻辑 ====================
-        int tripCapacity = getTripCapacity(task.getStructureName(), context);
+        int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
 
         // 如果当前班次是停锅班次，不补整车（按实量下）
         if (currentDayShiftOrder == closingShiftOrder) {
@@ -1563,7 +1563,7 @@ public class TaskGroupService {
         task.setPlannedProduction(finalProduction);
         task.setEndingExtraInventory(finalProduction);
 
-        int tripCapacity = getTripCapacity(task.getStructureName(), context);
+        int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
         task.setRequiredCars(tripCapacity > 0 ? (finalProduction + tripCapacity - 1) / tripCapacity : 0);
 
         log.info("开产日排产: 胎胚={},  收尾后实需={}, 最终产量={}, 需车={}",
@@ -1761,14 +1761,15 @@ public class TaskGroupService {
     }
 
     /**
-     * 获取结构胎面整车配置
+     * 获取结构胎面整车配置（按结构+胎胚匹配）
      *
      * @param structureName 结构名称
+     * @param embryoCode    胎胚编码
      * @param context       排程上下文
      * @return 整车条数
      */
-    private int getTripCapacity(String structureName, ScheduleContextVo context) {
-        return productionCalculator.getTripCapacity(structureName, context);
+    private int getTripCapacity(String structureName, String embryoCode, ScheduleContextVo context) {
+        return productionCalculator.getTripCapacity(structureName, embryoCode, context);
     }
 
     private int calculateQuantityByStockHours(CoreScheduleAlgorithmService.DailyEmbryoTask task,

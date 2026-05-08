@@ -23,6 +23,7 @@
               {{ $t("ui.data.column.scheduleResult.baseInfo") }}
             </h4>
           </el-col>
+
           <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.scheduleResult.scheduleDate')"
@@ -37,18 +38,16 @@
               ></el-date-picker>
             </el-form-item>
           </el-col>
-          <!-- <el-col :span="12">
-                <el-form-item
-                  :label="$t('ui.data.column.cxScheduleResult.taskType')"
-                  prop="taskType"
-                >
-                  <dict-select
-                    v-model="form.taskType"
-                    :options="parentDict.type.TASK_TYPE"
-                    disabled
-                  />
-                </el-form-item>
-              </el-col> -->
+
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('common.factory')"
+              prop="factoryCode"
+            >
+              <el-input v-model="form.factoryCode" disabled></el-input>
+            </el-form-item>
+          </el-col>
+
           <el-col :span="12">
             <el-form-item
               :label="$t('ui.data.column.cxScheduleResult.cxMachineCode')"
@@ -79,6 +78,15 @@
               prop="materialDesc"
             >
               <el-input v-model="form.materialDesc" disabled></el-input>
+            </el-form-item>
+          </el-col>
+
+          <el-col :span="12">
+            <el-form-item
+              :label="$t('ui.data.column.cxScheduleResult.embryoCode')"
+              prop="embryoCode"
+            >
+              <el-input v-model="form.embryoCode" disabled></el-input>
             </el-form-item>
           </el-col>
 
@@ -175,7 +183,7 @@
                 :key="`class1RecipeNo-${form.class1RecipeNo || ''}`"
                 v-model="form.class1RecipeNo"
                 :materialCode="form.materialCode"
-                :disabled="isShiftLocked(1)"
+                disabled
                 @change="(val, row) => handleRecipeNoChange(1, val, row)"
               />
             </el-form-item>
@@ -243,7 +251,7 @@
                 :key="`class2RecipeNo-${form.class2RecipeNo || ''}`"
                 v-model="form.class2RecipeNo"
                 :materialCode="form.materialCode"
-                :disabled="isShiftLocked(2)"
+                disabled
                 @change="(val, row) => handleRecipeNoChange(2, val, row)"
               />
             </el-form-item>
@@ -311,7 +319,7 @@
                 :key="`class3RecipeNo-${form.class3RecipeNo || ''}`"
                 v-model="form.class3RecipeNo"
                 :materialCode="form.materialCode"
-                :disabled="isShiftLocked(3)"
+                disabled
                 @change="(val, row) => handleRecipeNoChange(3, val, row)"
               />
             </el-form-item>
@@ -379,7 +387,7 @@
                 :key="`class4RecipeNo-${form.class4RecipeNo || ''}`"
                 v-model="form.class4RecipeNo"
                 :materialCode="form.materialCode"
-                :disabled="isShiftLocked(4)"
+                disabled
                 @change="(val, row) => handleRecipeNoChange(4, val, row)"
               />
             </el-form-item>
@@ -447,7 +455,7 @@
                 :key="`class5RecipeNo-${form.class5RecipeNo || ''}`"
                 v-model="form.class5RecipeNo"
                 :materialCode="form.materialCode"
-                :disabled="isShiftLocked(5)"
+                disabled
                 @change="(val, row) => handleRecipeNoChange(5, val, row)"
               />
             </el-form-item>
@@ -515,7 +523,7 @@
                 :key="`class6RecipeNo-${form.class6RecipeNo || ''}`"
                 v-model="form.class6RecipeNo"
                 :materialCode="form.materialCode"
-                :disabled="isShiftLocked(6)"
+                disabled
                 @change="(val, row) => handleRecipeNoChange(6, val, row)"
               />
             </el-form-item>
@@ -585,7 +593,7 @@
                 :key="`class7RecipeNo-${form.class7RecipeNo || ''}`"
                 v-model="form.class7RecipeNo"
                 :materialCode="form.materialCode"
-                :disabled="isShiftLocked(7)"
+                disabled
                 @change="(val, row) => handleRecipeNoChange(7, val, row)"
               />
             </el-form-item>
@@ -654,7 +662,7 @@
                 :key="`class8RecipeNo-${form.class8RecipeNo || ''}`"
                 v-model="form.class8RecipeNo"
                 :materialCode="form.materialCode"
-                :disabled="isShiftLocked(8)"
+                disabled
                 @change="(val, row) => handleRecipeNoChange(8, val, row)"
               />
             </el-form-item>
@@ -1399,5 +1407,8 @@ export default {
   width: 100%;
   height: 100%;
   overflow: auto;
+}
+::v-deep .el-input__inner {
+  text-align: left;
 }
 </style>

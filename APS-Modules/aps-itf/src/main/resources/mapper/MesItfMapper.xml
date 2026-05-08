@@ -158,6 +158,7 @@
         MES_MATERIAL_CODE,
         SPEC_DESC,
         LR_MOLDS,
+        IN_MACHINE_MOULD_CODE,
         DATA_VERSION,
         COMPANY_CODE,
         FACTORY_CODE

@@ -503,6 +503,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.CX_LH_RATIO_EXTRA.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_LH_MACHINE_CONTINUE_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.HEIGHT_PRIORITY_SKU_PRODUCTION_MODE.getCode());
+        paramCodeList.add(MonthPlanEnums.MIN_HEIGHT_PRIORITY_LH_MACHINE_COUNT.getCode());
+        
         //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
         if (CollectionUtils.isEmpty(paramConfigurationMap)) {
@@ -612,6 +614,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             BigDecimal heightRequireRatio = heightRequireValue.divide(BigDecimal.valueOf(ProductionConstant.PERCENTAGE), 2, RoundingMode.HALF_UP);
             configuration.setHeightPriorityProductionMode(heightRequireRatio);
         }
+        configuration.setMinHeightPriorityLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.MIN_HEIGHT_PRIORITY_LH_MACHINE_COUNT.getCode()));
 
         return configuration;
     }
@@ -623,7 +626,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
      *
      * @param productionContext 排产单位
      */
-    private void specialMaterialInfoHandler(TbrProductionContext productionContext) {
+    protected void specialMaterialInfoHandler(TbrProductionContext productionContext) {
         List<EmbryoSpecialMaterialInfoVo> specialMaterialInfoList = getDataService().getEmbryoSpecialMaterialInfo(productionContext);
         buildSpecialMaterialInfo(productionContext, specialMaterialInfoList);
     }
@@ -732,7 +735,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
      *
      * @param context
      */
-    private void setMonthProductionDays(Context context) {
+    protected void setMonthProductionDays(Context context) {
         List<ProductionDayInfoVo> productionDayInfoList = getDataService().getProductCalendar(context);
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderProductionCalendarLog(context, productionDayInfoList));
         Integer maxBoostDays = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getMaxBoostDay();
@@ -772,10 +775,10 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
     /**
      * 2.1.6：构建日产能限制对象信息
-     *
+     *buildGroupMainPatternInfo
      * @param productionContext 排产上下文
      */
-    private void buildDayCapacityLimitInfo(TbrProductionContext productionContext) {
+    protected void buildDayCapacityLimitInfo(TbrProductionContext productionContext) {
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         DayCapacityLimitVo dayCapacityLimit = new DayCapacityLimitVo(Collections.emptyMap());
         Set<Integer> productionDayList = productionContext.getProductionDay();
@@ -905,7 +908,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
      * @param context
      * @return
      */
-    private Map<String, MouldAllocationInfoVo> getGroupMainPatternAllocationInfo(Context context) {
+    protected Map<String, MouldAllocationInfoVo> getGroupMainPatternAllocationInfo(Context context) {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         List<MouldAllocationInfoVo> mouldAllocationInfoList = getDataService().getMouldAllocationInfo(productionContext);
         log.info(TbrBeforeProductionGroupLogRecorder.addReaderMouldAllocationLog(context, mouldAllocationInfoList));
@@ -988,7 +991,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
      * @param requirePlanList 需求计划信息
      * @return
      */
-    private List<MonthPlanStructureLhRatioVo> getLhRatioConfiguration(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+    protected List<MonthPlanStructureLhRatioVo> getLhRatioConfiguration(Context context, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyList();
         }
@@ -1036,7 +1039,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
      * @param productionContext 排产上下文
      * @return
      */
-    private void buildGroupMainPatternInfo(TbrProductionContext productionContext) {
+    protected void buildGroupMainPatternInfo(TbrProductionContext productionContext) {
         BaseDataContainer baseDataContainer = productionContext.getBaseDataContainer();
         Map<String, List<MonthPlanProductMouldInfoVo>> mouldAssociationMap = baseDataContainer.getSkuMouldRelationMap();
         Map<String, ProductionMouldInfoVo> allMouldMap = baseDataContainer.getMouldInfoMap();

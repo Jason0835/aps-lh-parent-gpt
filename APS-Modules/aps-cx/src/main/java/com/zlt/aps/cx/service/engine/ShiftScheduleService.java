@@ -116,7 +116,7 @@ public class ShiftScheduleService {
             return results;
         }
 
-        int tripCapacity = getTripCapacity(task.getStructureName(), context);
+        int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
 
         // 调试日志
         log.debug("scheduleTaskToShifts: embryo={}, material={}, 待排={}条/{}台, " +
@@ -1104,13 +1104,14 @@ public class ShiftScheduleService {
     }
 
     /**
-     * 获取结构的整车容量
+     * 获取结构的整车容量（按结构+胎胚匹配）
      */
-    private int getTripCapacity(String structureCode, ScheduleContextVo context) {
+    private int getTripCapacity(String structureCode, String embryoCode, ScheduleContextVo context) {
         if (context.getStructureShiftCapacities() != null) {
             for (CxStructureTreadConfig capacity : context.getStructureShiftCapacities()) {
                 if (capacity.getStructureCode() != null
-                        && capacity.getStructureCode().equals(structureCode)) {
+                        && capacity.getStructureCode().equals(structureCode)
+                        && (embryoCode == null || embryoCode.equals(capacity.getEmbryoCode()))) {
                     if (capacity.getTreadCount() != null && capacity.getTreadCount() > 0) {
                         return capacity.getTreadCount();
                     }

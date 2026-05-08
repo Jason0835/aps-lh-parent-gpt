@@ -947,11 +947,12 @@ public class ScheduleServiceImpl implements ScheduleService {
                         .eq(CxStructureTreadConfig::getIsDelete, "0"));
         context.setStructureTreadConfigs(treadConfigs);
 
-        // 构建结构-整车条数映射
+        // 构建结构-整车条数映射（Key: structureCode|embryoCode）
         Map<String, Integer> structureTreadCountMap = new HashMap<>();
         for (CxStructureTreadConfig config : treadConfigs) {
             if (config.getStructureCode() != null && config.getTreadCount() != null) {
-                structureTreadCountMap.put(config.getStructureCode(), config.getTreadCount());
+                String key = config.getStructureCode() + "|" + config.getEmbryoCode();
+                structureTreadCountMap.put(key, config.getTreadCount());
             }
         }
         context.setStructureTreadCountMap(structureTreadCountMap);

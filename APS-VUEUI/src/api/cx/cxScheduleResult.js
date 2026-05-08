@@ -1,4 +1,4 @@
-import request from '@/utils/request'
+import request,{ downloadLink } from '@/utils/request'
 
 // 查询基础数据_地区列表
 export function listCxScheduleResult(query) {
@@ -334,4 +334,13 @@ export function listCxScheduleDetailByMainId(mainId) {
     url: `/cx/cxScheduleDetail/listByMainId/${mainId}`,
     method: 'get',
   })
+}
+
+/**
+ * 导出成型结构切换数据
+ * @param {*} params 查询条件
+ * @returns
+ */
+export function exportStructureChange(params) {
+  return downloadLink("/cx/cxScheduleResult/exportStructureChange", params);
 }

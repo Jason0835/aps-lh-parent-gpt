@@ -178,7 +178,7 @@ public class ScheduleContextVo {
 
     /**
      * 结构整车配置映射（快速查询用）
-     * Key: 结构编码 (structureCode)
+     * Key: 结构编码+胎胚编码 (structureCode + "|" + embryoCode)
      * Value: 整车胎面条数 (treadCount)
      */
     private Map<String, Integer> structureTreadCountMap;    /**
@@ -521,14 +521,15 @@ public class ScheduleContextVo {
     /**
      * 获取结构胎面整车条数映射
      *
-     * @return Map<structureName, treadCount>
+     * @return Map<structureCode|embryoCode, treadCount>
      */
     public Map<String, Integer> getStructureTreadCountMap() {
         Map<String, Integer> map = new HashMap<>();
         if (structureShiftCapacities != null) {
             for (CxStructureTreadConfig config : structureShiftCapacities) {
                 if (config.getStructureCode() != null && config.getTreadCount() != null) {
-                    map.put(config.getStructureCode(), config.getTreadCount());
+                    String key = config.getStructureCode() + "|" + config.getEmbryoCode();
+                    map.put(key, config.getTreadCount());
                 }
             }
         }

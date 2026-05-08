@@ -1332,7 +1332,7 @@ public class MesItfServiceImpl implements MesItfService {
             // T_CX_STOCK：混合方案同步
             List<CxStock> cxStockInsertList = syncList.stream().map(item -> {
                 CxStock cxStock = new CxStock();
-                cxStock.setFactoryCode(item.getFactoryCode());
+                cxStock.setFactoryCode(StringUtils.isBlank(item.getFactoryCode()) ? FactoryConstant.DEFAULT_FACTORY_CODE : item.getFactoryCode());
                 cxStock.setStockDate(item.getStockDate());
                 cxStock.setEmbryoCode(item.getEmbryoCode());
                 cxStock.setStockNum(item.getStockNum() != null ? item.getStockNum().intValue() : 0);

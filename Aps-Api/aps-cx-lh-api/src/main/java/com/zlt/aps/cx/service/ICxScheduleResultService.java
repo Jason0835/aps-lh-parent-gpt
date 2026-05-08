@@ -131,6 +131,16 @@ public interface ICxScheduleResultService {
     byte[] exportCxRemainQty(@RequestBody CxScheduleResult cxScheduleResult, @PathVariable("fileName") String fileName);
 
     /**
+     * 导出成型结构切换数据。
+     *
+     * @param cxScheduleResult 查询条件，按成型排程结果列表查询口径筛选数据
+     * @param fileName 导出文件名
+     * @return 成型结构切换Excel文件字节数组
+     */
+    @PostMapping("/cxScheduleResult/exportStructureChange/{fileName}")
+    byte[] exportStructureChange(@RequestBody CxScheduleResult cxScheduleResult, @PathVariable("fileName") String fileName);
+
+    /**
      * 导入数据（UI标准格式）
      */
     @PostMapping("/cxScheduleResult/importData")
