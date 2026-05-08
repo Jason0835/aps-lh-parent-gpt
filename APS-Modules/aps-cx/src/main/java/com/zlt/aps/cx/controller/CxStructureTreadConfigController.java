@@ -117,6 +117,7 @@ public class CxStructureTreadConfigController extends AbstractDocBizController<C
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("treadCount")), "TREAD_COUNT", queryVO.getFieldValueByFieldName("treadCount"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("dataVersion")), "DATA_VERSION", queryVO.getFieldValueByFieldName("dataVersion"));
         queryWrapper.and("1".equals(queryVO.getUnconfiguredTreadCount()), wrapper -> wrapper.eq("TREAD_COUNT", 0).or().isNull("TREAD_COUNT"));
+        queryWrapper.and("0".equals(queryVO.getUnconfiguredTreadCount()), wrapper -> wrapper.gt("TREAD_COUNT", 0));
     }
 
     @Override

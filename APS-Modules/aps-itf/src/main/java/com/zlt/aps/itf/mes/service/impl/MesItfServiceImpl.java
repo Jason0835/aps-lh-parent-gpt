@@ -1336,7 +1336,7 @@ public class MesItfServiceImpl implements MesItfService {
                 cxStock.setStockDate(item.getStockDate());
                 cxStock.setEmbryoCode(item.getEmbryoCode());
                 cxStock.setStockNum(item.getStockNum() != null ? item.getStockNum().intValue() : 0);
-                cxStock.setDataSource("MES");
+                cxStock.setDataSource(ApsConstant.DATA_SOURCE_MES);
                 cxStock.setCreateBy("MES");
                 cxStock.setUpdateBy("MES");
                 cxStock.setCreateTime(DateUtils.getNowDate());
