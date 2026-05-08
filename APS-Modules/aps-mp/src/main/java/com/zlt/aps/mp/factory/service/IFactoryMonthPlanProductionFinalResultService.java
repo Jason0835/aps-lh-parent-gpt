@@ -3,6 +3,7 @@ package com.zlt.aps.mp.factory.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanProductionFinal4AdjustVo;
 import com.zlt.aps.mp.common.utils.poi.WorksheetData;
 import com.zlt.bill.common.service.IDocService;
 import org.springframework.transaction.annotation.Transactional;
@@ -126,7 +127,7 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      */
     @Transactional(rollbackFor = Exception.class)
     AjaxResult issueMonthPlan(FactoryMonthPlanProductionFinalResult factoryMonthPlanProdFinal);
-    
+
     /**
      * 导入定稿
      * @param list 列表数据
@@ -136,4 +137,13 @@ public interface IFactoryMonthPlanProductionFinalResultService extends IDocServi
      * @return 结果
      */
     AjaxResult importDataFinalResult(List<FactoryMonthPlanProductionFinalResult> list, boolean updateSupport, Long importLogId, FactoryMonthPlanProductionFinalResult params);
+
+    /**
+     * 根据条件，列表查询
+     *
+     * @param condition 查询条件
+     * @return 结果
+     */
+    List<FactoryMonthPlanProductionFinal4AdjustVo> list4Adjust(FactoryMonthPlanProductionFinalResult condition);
+
 }

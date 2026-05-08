@@ -35,6 +35,7 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustExportVo;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanProductionFinal4AdjustVo;
 import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
 import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
@@ -136,6 +137,21 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         try {
             startPage();
             List<FactoryMonthPlanProductionFinalResult> list = factoryMonthPlanProductionFinalResultService.getDataList(queryCondition);
+            return getDataTable(list);
+        } finally {
+            PageUtils.clearPage();
+        }
+    }
+
+    /**
+     * 查询最终排产计划定稿-调整使用
+     */
+    @ApiOperation("查询最终排产计划定稿-调整使用")
+    @PostMapping("/list4Adjust")
+    public TableDataInfo list4Adjust(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition) {
+        try {
+            startPage();
+            List<FactoryMonthPlanProductionFinal4AdjustVo> list = factoryMonthPlanProductionFinalResultService.list4Adjust(queryCondition);
             return getDataTable(list);
         } finally {
             PageUtils.clearPage();
