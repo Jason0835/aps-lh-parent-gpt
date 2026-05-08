@@ -43,6 +43,15 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
     byte[] exportCxRemainQty(CxScheduleResult queryVO, String fileName);
 
     /**
+     * 导出成型结构切换数据。
+     *
+     * @param queryVO 查询条件，按成型排程结果列表查询口径筛选数据
+     * @param fileName 导出文件名，保留用于对齐远程调用契约
+     * @return 成型结构切换Excel文件字节数组
+     */
+    byte[] exportStructureChange(CxScheduleResult queryVO, String fileName);
+
+    /**
      * 基于模板导入数据
      *
      * @param list          模板导入VO列表

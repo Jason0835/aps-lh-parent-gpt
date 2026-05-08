@@ -15,6 +15,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.util.LhMachineHardMatchUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.LhSpecialMaterialUtil;
 import com.zlt.aps.lh.util.LhSpecifyMachineUtil;
 import com.zlt.aps.lh.util.MachineStatusUtil;
@@ -73,7 +74,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 LhSpecialMaterialUtil.resolveMatchResult(context, sku);
         log.debug("SKU特殊物料判定, materialCode: {}, special: {}, matchSource: {}, category: {}",
                 sku.getMaterialCode(), specialMaterialMatchResult.isSpecial(),
-                specialMaterialMatchResult.getMatchSource(), specialMaterialMatchResult.getCategory());
+                specialMaterialMatchResult.getMatchSource(), specialMaterialMatchResult.getCategoryDisplayText());
         List<MachineScheduleDTO> candidates = new ArrayList<>();
         List<MachineScheduleDTO> stopTimeoutCandidates = new ArrayList<>();
         MachineFilterTrace trace = new MachineFilterTrace(context.getMachineScheduleMap().size());
@@ -113,7 +114,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (CollectionUtils.isEmpty(candidates)) {
             log.warn("SKU候选机台为空, materialCode: {}, 规格: {}, 寸口: {}, 特殊分类: {}, 机台总数: {}, 不可作业过滤: {}, 禁用过滤: {}, 超时停机过滤: {}, 寸口过滤: {}, 模套过滤: {}, 特殊支持过滤: {}, 模具过滤: {}, 限制作业优先机台: {}",
                     sku.getMaterialCode(), sku.getSpecCode(), sku.getProSize(),
-                    specialMaterialMatchResult.getCategory(), trace.totalMachineCount,
+                    specialMaterialMatchResult.getCategoryDisplayText(), trace.totalMachineCount,
                     trace.notAllowedMachineFilteredCount,
                     trace.disabledCount, trace.stopTimeoutCount, trace.inchMismatchCount,
                     trace.mouldSetMismatchCount, trace.resolveSpecialSupportFilteredCount(),
@@ -121,7 +122,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         }
         log.info("SKU可用机台匹配完成, materialCode: {}, special: {}, category: {}, 候选机台数: {}",
                 sku.getMaterialCode(), specialMaterialMatchResult.isSpecial(),
-                specialMaterialMatchResult.getCategory(), candidates.size());
+                specialMaterialMatchResult.getCategoryDisplayText(), candidates.size());
         return candidates;
     }
 
@@ -236,24 +237,26 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         if (Objects.isNull(matchResult) || !matchResult.isSpecial()) {
             return MachineAvailabilityReason.AVAILABLE;
         }
-        LhSpecialMaterialCategoryEnum categoryEnum =
-                LhSpecialMaterialCategoryEnum.getByCode(matchResult.getCategory());
-        if (LhSpecialMaterialCategoryEnum.WIDE_BASE_195 == categoryEnum) {
-            return LhMachineHardMatchUtil.isSupport195WideBase(machine)
-                    ? MachineAvailabilityReason.AVAILABLE
-                    : MachineAvailabilityReason.SPECIAL_195_UNSUPPORTED;
+        for (String category : matchResult.getCategories()) {
+            LhSpecialMaterialCategoryEnum categoryEnum =
+                    LhSpecialMaterialCategoryEnum.getByCode(category);
+            if (LhSpecialMaterialCategoryEnum.WIDE_BASE_195 == categoryEnum
+                    && !LhMachineHardMatchUtil.isCategorySupported(categoryEnum, machine)) {
+                return MachineAvailabilityReason.SPECIAL_195_UNSUPPORTED;
+            }
+            if (LhSpecialMaterialCategoryEnum.WIDE_BASE_225 == categoryEnum
+                    && !LhMachineHardMatchUtil.isCategorySupported(categoryEnum, machine)) {
+                return MachineAvailabilityReason.SPECIAL_225_UNSUPPORTED;
+            }
+            if (LhSpecialMaterialCategoryEnum.CHIP_TIRE == categoryEnum
+                    && !LhMachineHardMatchUtil.isCategorySupported(categoryEnum, machine)) {
+                return MachineAvailabilityReason.SPECIAL_CHIP_UNSUPPORTED;
+            }
+            if (Objects.isNull(categoryEnum)) {
+                return MachineAvailabilityReason.SPECIAL_CATEGORY_UNSUPPORTED;
+            }
         }
-        if (LhSpecialMaterialCategoryEnum.WIDE_BASE_225 == categoryEnum) {
-            return LhMachineHardMatchUtil.isSupport225WideBase(machine)
-                    ? MachineAvailabilityReason.AVAILABLE
-                    : MachineAvailabilityReason.SPECIAL_225_UNSUPPORTED;
-        }
-        if (LhSpecialMaterialCategoryEnum.CHIP_TIRE == categoryEnum) {
-            return LhMachineHardMatchUtil.isSupportChipTire(machine)
-                    ? MachineAvailabilityReason.AVAILABLE
-                    : MachineAvailabilityReason.SPECIAL_CHIP_UNSUPPORTED;
-        }
-        return MachineAvailabilityReason.SPECIAL_CATEGORY_UNSUPPORTED;
+        return MachineAvailabilityReason.AVAILABLE;
     }
 
     /**
@@ -270,7 +273,8 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         Date candidateWindowEndTime = resolveCandidateWindowEndTime(context, candidateReferenceTime);
         for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
             if (planShut == null || StringUtils.isEmpty(planShut.getMachineCode())
-                    || !StringUtils.equals(planShut.getMachineCode(), machine.getMachineCode())) {
+                    || !LhSingleControlMachineUtil.isCompatibleMachineCode(
+                    context, machine.getMachineCode(), planShut.getMachineCode())) {
                 continue;
             }
             if (planShut.getBeginDate() == null || planShut.getEndDate() == null
@@ -412,6 +416,11 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                 return compareResult;
             }
 
+            compareResult = compareSingleControlPriority(context, sku, left, right);
+            if (compareResult != 0) {
+                return compareResult;
+            }
+
             compareResult = compareNormalMachinePriority(matchResult, left, right);
             if (compareResult != 0) {
                 return compareResult;
@@ -502,6 +511,40 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
         }
         return LhSpecifyMachineUtil.isLimitSpecifyMachine(context, machine.getMachineCode(), sku.getMaterialCode())
                 ? 0 : 1;
+    }
+
+    /**
+     * 比较单控拆分机台优先级。
+     *
+     * @param context 排程上下文
+     * @param sku 待排SKU
+     * @param left 左机台
+     * @param right 右机台
+     * @return 比较结果
+     */
+    private int compareSingleControlPriority(LhScheduleContext context, SkuScheduleDTO sku,
+                                             MachineScheduleDTO left, MachineScheduleDTO right) {
+        return Integer.compare(resolveSingleControlScore(context, sku, left),
+                resolveSingleControlScore(context, sku, right));
+    }
+
+    /**
+     * 解析单控拆分机台得分。
+     *
+     * @param context 排程上下文
+     * @param sku 待排SKU
+     * @param machine 候选机台
+     * @return 试制/小批量单控优先，普通SKU单控靠后
+     */
+    private int resolveSingleControlScore(LhScheduleContext context, SkuScheduleDTO sku, MachineScheduleDTO machine) {
+        if (Objects.isNull(machine)
+                || !LhSingleControlMachineUtil.isSingleControlSplitMachine(context, machine.getMachineCode())) {
+            return 1;
+        }
+        if (Objects.nonNull(sku) && (sku.isTrial() || sku.isSmallBatchValidation())) {
+            return 0;
+        }
+        return 2;
     }
 
     /**
@@ -755,7 +798,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                         + ", 寸口=" + PriorityTraceLogHelper.safeText(sku.getProSize())
                         + ", 特殊物料=" + PriorityTraceLogHelper.yesNo(matchResult.isSpecial())
                         + ", 命中方式=" + PriorityTraceLogHelper.safeText(matchResult.getMatchSource())
-                        + ", 特殊分类=" + PriorityTraceLogHelper.safeText(matchResult.getCategory()));
+                        + ", 特殊分类=" + PriorityTraceLogHelper.safeText(matchResult.getCategoryDisplayText()));
         PriorityTraceLogHelper.appendLine(detailBuilder,
                 "候选过滤概况: 机台总数=" + trace.totalMachineCount
                         + ", 不可作业过滤=" + trace.notAllowedMachineFilteredCount

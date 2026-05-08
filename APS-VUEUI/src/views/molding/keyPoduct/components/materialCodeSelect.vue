@@ -91,12 +91,8 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
-          type: "select", //GLUE_TYPE
+          type: "select",
           dictData: this.parentDict.type.biz_factory_name,
-        },
-        {
-          label: this.$t("ui.data.colume.wms.unused.productCode"),
-          prop: "materialCode",
         },
         {
           label: this.$t("ui.data.rubberMaterial.embryoCode"),
@@ -107,68 +103,15 @@ export default {
     columns: function () {
       const list = [
         {
-          prop: "materialCode",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.colume.wms.unused.productCode"),
-        },
-        {
-          prop: "mesMaterialCode",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
-        },
-        {
           prop: "embryoCode",
           label: this.$t("ui.data.rubberMaterial.embryoCode"),
+          width: 120,
         },
         {
           prop: "embryoDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-          width: 120,
+          minWidth: 260,
         },
-        {
-          prop: "materialDesc",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-        },
-        {
-          prop: "specifications",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.reportClassAccuracy.materialCode"),
-        },
-        {
-          prop: "pattern",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.confMinProd.pattern"),
-        },
-        {
-          prop: "speed",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.scheduleAdjust.seep"),
-        },
-        {
-          prop: "hierarchy",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.scheduleAdjust.hierarchy"),
-        },
-        {
-          prop: "proSize",
-          align: "center",
-          width: 120,
-          label: this.$t("ui.data.column.scheduleAdjust.proSize"),
-        },
-        // {
-        //   prop: "ability",
-        //   align: "center",
-        //   width: 120,
-        //   label: this.$t("ui.data.column.lean.productinfo.ability"),
-        // },
       ];
       if (this.multiple) {
         list.unshift({
