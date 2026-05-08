@@ -2,7 +2,6 @@ package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
-import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
@@ -29,7 +28,6 @@ import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.mapper.CxStructureTreadConfigMapper;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
-import com.zlt.aps.utils.AppUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -264,36 +262,35 @@ public class ScheduleServiceImpl implements ScheduleService {
     /**
      * 加载精度计划
      *
-     * <p>查询条件：planDate < 当前班次所在日期 - 3天（可配置），且 actualDate 为空（未执行）
-     * <p>这些是需要安排精度校验的机台
+     * <p>查询条件：planDate <= 当前排程日期 + 提前天数（可配置），且 actualDate 为空（未执行）
+     * <p>例如：排程日期=5月7日，提前天数=3，查询 planDate <= 5月10日 的未执行精度计划
      *
      * @param context      排程上下文
      * @param scheduleDate 排程日期
      */
     private void loadPrecisionPlans(ScheduleContextVo context, LocalDate scheduleDate) {
-        // 精度提前天数（默认3天，可通过参数配置）
         int precisionAdvanceDays = 3;
         CxParamConfig advanceDaysConfig = context.getParamConfigMap() != null
                 ? context.getParamConfigMap().get("PRECISION_ADVANCE_DAYS") : null;
         if (advanceDaysConfig != null && advanceDaysConfig.getParamValue() != null) {
             try {
                 precisionAdvanceDays = Integer.parseInt(advanceDaysConfig.getParamValue());
-                log.info("精度提前天数配置：{}天", precisionAdvanceDays);
             } catch (NumberFormatException e) {
                 log.warn("解析精度提前天数配置失败，使用默认3天");
             }
         }
+        log.info("精度提前天数配置：{}天", precisionAdvanceDays);
 
-        LocalDate cutoffDate = scheduleDate.minusDays(precisionAdvanceDays);
+        LocalDate cutoffDate = scheduleDate.plusDays(precisionAdvanceDays);
 
         List<CxPrecisionPlan> precisionPlans = precisionPlanMapper.selectList(
                 new LambdaQueryWrapper<CxPrecisionPlan>()
-                        .lt(CxPrecisionPlan::getPlanDate, java.sql.Date.valueOf(cutoffDate))
+                        .le(CxPrecisionPlan::getPlanDate, java.sql.Date.valueOf(cutoffDate))
                         .isNull(CxPrecisionPlan::getActualDate)
                         .eq(CxPrecisionPlan::getIsDelete, "0"));
         context.setPrecisionPlans(precisionPlans);
 
-        log.info("加载精度计划，cutoffDate={}（排程日期{}-{}天），未执行精度计划 {} 条",
+        log.info("加载精度计划，截止日期={}（排程日期{} + {}天），未执行精度计划 {} 条",
                 cutoffDate, scheduleDate, precisionAdvanceDays, precisionPlans != null ? precisionPlans.size() : 0);
     }
 
@@ -548,7 +545,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     private void loadMoldingMachines(ScheduleContextVo context) {
         List<MdmMoldingMachine> machines = moldingMachineMapper.selectList(
                 new LambdaQueryWrapper<MdmMoldingMachine>()
-                        .eq(MdmMoldingMachine::getIsActive, ApsConstant.APS_STRING_1)
+                        .eq(MdmMoldingMachine::getIsActive, 1)
                         .eq(MdmMoldingMachine::getIsDelete, "0"));
         context.setAvailableMachines(machines);
         log.info("加载成型机台 {} 台（已过滤禁用和已删除）", machines.size());
