@@ -7,6 +7,7 @@ import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.mapper.CxStockMapper;
 import com.zlt.aps.cx.service.CxStockService;
@@ -222,7 +223,7 @@ public class CxStockServiceImpl extends AbstractDocService<CxStock> implements C
         }
 
         for (CxStock entity : importList) {
-            entity.setDataSource("MANUAL");
+            entity.setDataSource(ApsConstant.DATA_SOURCE_SYSTEM);
             if (entity.getId() != null) {
                 cxStockMapper.updateById(entity);
             } else {

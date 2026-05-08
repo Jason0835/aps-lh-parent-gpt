@@ -214,5 +214,18 @@ public class MpAdjustResultUIController extends BaseUIController<MpAdjustResult>
         return iMpAdjustResultService.getVersionList(queryVO);
     }
 
+    /**
+     * 查询调整版本列表
+     */
+    @ApiOperation("查询调整版本列表")
+    @PostMapping("/getAdjustVersionList")
+    @ResponseBody
+    public TableDataInfo getAdjustVersionList(MpAdjustResult queryVO) {
+        return iMpAdjustResultService.getAdjustVersionList(queryVO);
+    }
+
+
+
+
 
 }

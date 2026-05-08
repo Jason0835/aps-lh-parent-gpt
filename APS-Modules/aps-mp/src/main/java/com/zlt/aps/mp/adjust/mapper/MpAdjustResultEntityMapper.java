@@ -49,4 +49,11 @@ public interface MpAdjustResultEntityMapper extends CommBaseMapper<MpAdjustResul
      */
     List<MpAdjustResult> getVersionList(MpAdjustResult queryVO);
 
+    /**
+     * 查询调整版本列表
+     * @param queryVO 查询参数
+     * @return 调整版本列表
+     */
+    List<MpAdjustResult> getAdjustVersionList(MpAdjustResult queryVO);
+
 }

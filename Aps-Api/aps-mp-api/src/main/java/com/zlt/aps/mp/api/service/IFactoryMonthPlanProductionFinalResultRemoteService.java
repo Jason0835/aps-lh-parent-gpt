@@ -37,6 +37,13 @@ public interface IFactoryMonthPlanProductionFinalResultRemoteService {
     TableDataInfo list(@RequestBody FactoryMonthPlanProductionFinalResult queryVO);
 
     /**
+     * 查询列表-调整使用
+     */
+    @ApiOperation("查询列表-调整使用")
+    @PostMapping("/factoryMonthPlanFinalResult/list4Adjust")
+    TableDataInfo list4Adjust(@RequestBody FactoryMonthPlanProductionFinalResult queryVO);
+
+    /**
      * 保存
      */
     @ApiOperation("保存")
@@ -72,14 +79,14 @@ public interface IFactoryMonthPlanProductionFinalResultRemoteService {
     @PostMapping("/factoryMonthPlanFinalResult/exportData/{fileName}")
     byte[] exportData(@RequestBody FactoryMonthPlanProductionFinalResult queryVO, @PathVariable("fileName") String fileName);
 
-    
+
     /**
      * 导出SKU排产明细列表
      */
     @ApiOperation("导出SKU排产明细")
     @PostMapping("/factoryMonthPlanFinalResult/exportSkuScheduleItems/{fileName}")
     byte[] exportSkuScheduleItems(@RequestBody FactoryMonthPlanProductionFinalResult queryVO, @PathVariable("fileName") String fileName);
-    
+
     /**
      * 导入定稿版本
      */
@@ -90,7 +97,7 @@ public interface IFactoryMonthPlanProductionFinalResultRemoteService {
                                       @RequestParam("factoryCode") String factoryCode,
                                       @RequestParam("productionVersion") String productionVersion,
                                       @RequestParam("structureName") String structureName);
-    
+
     /**
      * 导入工厂月生产计划-最终排产计划定稿数据
      */

@@ -111,6 +111,15 @@ public class ApsConstant {
     public static final String IS_PRODUNTION = "1";
 
     /**
+     * 数据来源 MES
+     */
+    public static final String DATA_SOURCE_MES = "0";
+    /**
+     * 数据来源 系统
+     */
+    public static final String DATA_SOURCE_SYSTEM = "1";
+
+    /**
      * 工序类型：硫化（工序值0已被密炼占用）
      */
     public static String PROCEDURE_CODE_LH = "11";

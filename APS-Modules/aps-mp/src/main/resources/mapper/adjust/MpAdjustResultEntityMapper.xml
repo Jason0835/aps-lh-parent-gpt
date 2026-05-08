@@ -68,4 +68,34 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ORDER BY VERSION DESC
     </select>
 
+    <select id="getAdjustVersionList" resultType="com.zlt.aps.mp.api.domain.entity.MpAdjustResult">
+        SELECT
+        r.FACTORY_CODE,
+        r.MONTH_PLAN_VERSION,
+        r.VERSION,
+        r.ADJUST_TYPE,
+        r.UPDATE_BY,
+        MAX(u.NICK_NAME) UPDATE_BY_NAME,
+        MAX(r.UPDATE_TIME) UPDATE_TIME
+        FROM
+        T_MP_ADJUST_RESULT r
+        LEFT JOIN SYS_USER u ON u.USER_NAME = r.UPDATE_BY AND u.DEL_FLAG = '0'
+        WHERE
+        r.IS_DELETE = 0
+        <if test="factoryCode != null and factoryCode != ''">AND r.FACTORY_CODE = #{factoryCode}</if>
+        <if test="year != null and year != ''">AND r.YEAR = #{year}</if>
+        <if test="month != null and month != ''">AND r.MONTH = #{month}</if>
+        <if test="monthPlanVersion != null and monthPlanVersion != ''">AND r.MONTH_PLAN_VERSION LIKE CONCAT('%', #{monthPlanVersion}, '%')</if>
+        <if test="version != null and version != ''">AND r.VERSION LIKE CONCAT('%', #{version}, '%')</if>
+        <if test="adjustType != null and adjustType != ''">AND r.ADJUST_TYPE = #{adjustType}</if>
+        <if test="updateBy != null and updateBy != ''">AND r.UPDATE_BY = #{updateBy}</if>
+        GROUP BY
+        r.FACTORY_CODE,
+        r.MONTH_PLAN_VERSION,
+        r.VERSION,
+        r.ADJUST_TYPE,
+        r.UPDATE_BY
+        ORDER BY UPDATE_TIME DESC
+    </select>
+
 </mapper>

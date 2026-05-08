@@ -78,7 +78,7 @@ public class MpAdjustResult extends BaseEntity {
     private String productionVersion;
 
      /** 调整类型 01-结构内，02-结构延长，03-结构缩短，04-新增结构 */
-    @Excel(name = "ui.data.column.mpAdjustResult.adjustType")
+    @Excel(name = "ui.data.column.mpAdjustResult.adjustType",dictType = "week_roll_adjust_type")
     @ApiModelProperty(value = "调整类型 01-结构内，02-结构延长，03-结构缩短，04-新增结构", name = "adjustType")
     @TableField(value = "ADJUST_TYPE")
     private String adjustType;
@@ -561,6 +561,13 @@ public class MpAdjustResult extends BaseEntity {
      */
     @TableField(exist = false)
     private Integer maxMouldCavityQty;
+
+    /**
+     * 更新人名称
+     */
+    @ApiModelProperty(value = "更新人名称", name = "updateByName")
+    @TableField(exist = false)
+    private String updateByName;
 
     /**
      * 从结构信息中解析出英寸

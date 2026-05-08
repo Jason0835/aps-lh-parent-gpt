@@ -84,4 +84,11 @@ public interface IMpAdjustResultRemoteService {
     @PostMapping("/mpAdjustResult/getVersionList")
     TableDataInfo getVersionList(@RequestBody MpAdjustResult queryVO);
 
+    /**
+     * 查询调整版本列表
+     */
+    @ApiOperation("查询调整版本列表")
+    @PostMapping("/mpAdjustResult/getAdjustVersionList")
+    TableDataInfo getAdjustVersionList(@RequestBody MpAdjustResult queryVO);
+
 }

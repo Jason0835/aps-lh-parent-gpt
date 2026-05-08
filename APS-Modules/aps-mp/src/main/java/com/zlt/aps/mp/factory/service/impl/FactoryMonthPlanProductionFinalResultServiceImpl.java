@@ -1,7 +1,5 @@
 package com.zlt.aps.mp.factory.service.impl;
 
-import static com.zlt.aps.common.core.utils.ApsNumberUtils.*;
-
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.ReflectUtil;
 import com.alibaba.fastjson.JSON;
@@ -28,6 +26,7 @@ import com.zlt.aps.maindata.enums.ReleaseStatusEnum;
 import com.zlt.aps.maindata.event.publisher.EventPublisher;
 import com.zlt.aps.mp.api.domain.dto.MonthPlanFinalizedEventDto;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanProductionFinal4AdjustVo;
 import com.zlt.aps.mp.common.utils.GroupedMapWithOrder;
 import com.zlt.aps.mp.common.utils.poi.WorksheetData;
 import com.zlt.aps.mp.demand.mapper.MpPredictionDetailEntityMapper;
@@ -46,7 +45,6 @@ import com.zlt.core.dao.basedao.BaseDao;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +56,8 @@ import java.time.YearMonth;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static com.zlt.aps.common.core.utils.ApsNumberUtils.intValue;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -797,7 +797,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         log.info("月计划下发MES更新发布状态->已发布");
         return AjaxResult.success();
     }
-    
+
     /**
      * 导入定稿
      * @param list 列表数据
@@ -816,7 +816,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getStructureName, params.getStructureName());
         List<FactoryMonthPlanProductionFinalResult> finalList = factoryMonthPlanProductionFinalResultEntityMapper
                 .selectList(queryWrapper);
-        
+
         // 2、把导入数据合并到原版本中
         List<FactoryMonthPlanProductionFinalResult> updateList = new ArrayList<>();
         Map<String, FactoryMonthPlanProductionFinalResult> importMap = list.stream().collect(Collectors.toMap(FactoryMonthPlanProductionFinalResult::getMaterialCode, Function.identity(), (p1, p2) -> p1));
@@ -850,5 +850,21 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         }
         baseDao.updateBatch(updateList);
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+    }
+
+    /**
+     * 根据条件，列表查询
+     *
+     * @param condition 查询条件
+     * @return 结果
+     */
+    @Override
+    public List<FactoryMonthPlanProductionFinal4AdjustVo> list4Adjust(FactoryMonthPlanProductionFinalResult condition) {
+        List<FactoryMonthPlanProductionFinal4AdjustVo> dataList = this.finalMapper.list4Adjust(condition);
+        if (CollectionUtils.isNotEmpty(dataList)) {
+            Locale language = SecurityUtils.getUserLang();
+            JsonUtils.parseJsonRemarkList(dataList, language.toString(), "reason");
+        }
+        return dataList;
     }
 }
