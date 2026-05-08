@@ -120,15 +120,16 @@ public class ShiftScheduleService {
 
         // 调试日志
         log.debug("scheduleTaskToShifts: embryo={}, material={}, 待排={}条/{}台, " +
-                        "试制={}, 停产={}, 开产={}, 收尾={}, 续作={}, 库存={}h, dayShifts={}",
+                        "试制={}, 量试={}, 停产={}, 开产={}, 收尾={}, 续作={}, 库存={}h, dayShifts={}",
                 task.getEmbryoCode(), task.getMaterialCode(),
                 endingExtraInventory, task.getVulcanizeMachineCount(),
-                task.getIsTrialTask(), task.getIsClosingDayTask(),
+                task.getIsTrialTask(), task.getIsProductionTrial(), task.getIsClosingDayTask(),
                 task.getIsOpeningDayTask(), task.getIsEndingTask(), task.getIsContinueTask(),
                 task.getStockHours(), dayShifts != null ? dayShifts.size() : "null");
 
         // 判断任务类型，按优先级从高到低
         boolean isTrial = Boolean.TRUE.equals(task.getIsTrialTask());
+        boolean isProductionTrial = Boolean.TRUE.equals(task.getIsProductionTrial());
         boolean isClosingDay = Boolean.TRUE.equals(task.getIsClosingDayTask());
         boolean isOpeningDay = Boolean.TRUE.equals(task.getIsOpeningDayTask());
         boolean isEnding = Boolean.TRUE.equals(task.getIsEndingTask()) || Boolean.TRUE.equals(task.getIsUrgentEnding());
@@ -136,6 +137,11 @@ public class ShiftScheduleService {
 
         // ---- 1. 试制任务：只在早班/中班，双数，不补整车 ----
         if (isTrial) {
+            return scheduleTrialTask(task, machineCode, context, dayShifts, scheduleDate, tripCapacity);
+        }
+
+        // ---- 1.5. 量试任务开产日：只在早班/中班（非开产日不限班次） ----
+        if (isProductionTrial && isOpeningDay) {
             return scheduleTrialTask(task, machineCode, context, dayShifts, scheduleDate, tripCapacity);
         }
 
@@ -182,10 +188,13 @@ public class ShiftScheduleService {
         return scheduleNormalTask(task, machineCode, context, dayShifts, scheduleDate, tripCapacity);
     }
 
-    // ==================== 1. 试制任务排产 ====================
+    // ==================== 1. 试制/量试任务排产 ====================
 
     /**
-     * 试制任务排产：只在早班/中班，双数，不补整车
+     * 试制/量试任务排产：只在早班/中班，双数，不补整车
+     *
+     * <p>试制任务：始终限制早班/中班
+     * <p>量试任务：仅开产日限制早班/中班，非开产日走普通排产路径
      */
     private List<ShiftProductionResult> scheduleTrialTask(
             CoreScheduleAlgorithmService.DailyEmbryoTask task,
@@ -282,7 +291,9 @@ public class ShiftScheduleService {
             remainingQty -= shiftQty;
         }
 
-        log.info("试制任务 {} 班次排产完成：总计划 {}，已排 {}", task.getEmbryoCode(), totalQty,
+        log.info("{}{} 班次排产完成：总计划 {}，已排 {}",
+                Boolean.TRUE.equals(task.getIsProductionTrial()) ? "量试" : "试制",
+                task.getEmbryoCode(), totalQty,
                 totalQty - remainingQty);
         return results;
     }
