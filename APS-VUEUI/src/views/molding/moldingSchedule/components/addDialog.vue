@@ -124,8 +124,10 @@
               prop="embryoCode"
             >
               <embryoNoSelect
+                :key="`embryoCode-${form.embryoCode || ''}`"
                 v-model="form.embryoCode"
                 :materialCode="form.materialCode"
+                :title="$t('ui.data.column.cxScheduleResult.embryoCode')"
                 :disabled="false"
                 @change="handleEmbryoCodeChange"
               />
