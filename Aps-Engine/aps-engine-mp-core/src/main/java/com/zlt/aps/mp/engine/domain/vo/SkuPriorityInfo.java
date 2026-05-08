@@ -16,6 +16,7 @@ public class SkuPriorityInfo {
     private String sku;
     private boolean hasSupplyChainPriority;
     private boolean hasHeightPriority;
+    private boolean hasProduction;
     private boolean hasMoldCapacityLimit;
     private int moldLimitedNetRequirement;
     private double inventorySaleRatio;
@@ -25,9 +26,9 @@ public class SkuPriorityInfo {
 
     @Override
     public String toString() {
-        return String.format("SKU: %s, 供应链优先: %s, 高优先级：%s,模具受限: %s, 受限净需求: %d, " +
+        return String.format("SKU: %s, 供应链优先: %s, 高优先级：%s,已排产：%s,模具受限: %s, 受限净需求: %d, " +
                         "库销比: %.2f, 小于最小排产量: %s, 总净需求: %d",
-                sku, hasSupplyChainPriority, hasHeightPriority, hasMoldCapacityLimit,
+                sku, hasSupplyChainPriority, hasHeightPriority, hasProduction, hasMoldCapacityLimit,
                 moldLimitedNetRequirement, inventorySaleRatio,
                 isLessMinQty, totalNetRequirement);
     }

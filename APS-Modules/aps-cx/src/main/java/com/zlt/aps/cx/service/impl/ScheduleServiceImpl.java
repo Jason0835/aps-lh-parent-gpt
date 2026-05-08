@@ -2,6 +2,7 @@ package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
@@ -28,6 +29,7 @@ import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.mapper.CxStructureTreadConfigMapper;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.utils.AppUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -546,7 +548,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     private void loadMoldingMachines(ScheduleContextVo context) {
         List<MdmMoldingMachine> machines = moldingMachineMapper.selectList(
                 new LambdaQueryWrapper<MdmMoldingMachine>()
-                        .eq(MdmMoldingMachine::getIsActive, 1)
+                        .eq(MdmMoldingMachine::getIsActive, ApsConstant.APS_STRING_1)
                         .eq(MdmMoldingMachine::getIsDelete, "0"));
         context.setAvailableMachines(machines);
         log.info("加载成型机台 {} 台（已过滤禁用和已删除）", machines.size());

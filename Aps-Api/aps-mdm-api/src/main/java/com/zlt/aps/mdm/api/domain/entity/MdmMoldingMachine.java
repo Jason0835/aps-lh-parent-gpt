@@ -80,6 +80,12 @@ public class MdmMoldingMachine extends BaseEntity {
     @TableField(value = "MAX_DAY_CAPACITY")
     private Integer maxDayCapacity;
 
+    /** 是否启用：0-禁用 1-启用 */
+    @Excel(name = "ui.data.column.mdmMoldingMachine.isActive", dictType = "biz_available_status", sort = 9)
+    @ApiModelProperty(value = "是否启用：0-禁用 1-启用", name = "isActive")
+    @TableField(value = "IS_ACTIVE")
+    private String isActive;
+
     /**
      * 展示机台编号
      */

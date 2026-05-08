@@ -159,6 +159,7 @@ public class MdmMoldingMachineController extends AbstractDocBizController<MdmMol
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isZeroRack")), "IS_ZERO_RACK", queryVO.getFieldValueByFieldName("isZeroRack"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("lhMachineMaxQty")), "LH_MACHINE_MAX_QTY", queryVO.getFieldValueByFieldName("lhMachineMaxQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("maxDayCapacity")), "MAX_DAY_CAPACITY", queryVO.getFieldValueByFieldName("maxDayCapacity"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("isActive")), "IS_ACTIVE", queryVO.getFieldValueByFieldName("isActive"));
     }
 
 

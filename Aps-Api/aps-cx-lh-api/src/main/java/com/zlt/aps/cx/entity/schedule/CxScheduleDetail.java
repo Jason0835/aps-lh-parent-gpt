@@ -71,12 +71,12 @@ public class CxScheduleDetail extends BaseEntity {
     private Integer class1Sequence;
 
     @ApiModelProperty(value = "一班计划开始时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS1_PLAN_START_TIME")
     private Date class1PlanStartTime;
 
     @ApiModelProperty(value = "一班计划结束时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS1_PLAN_END_TIME")
     private Date class1PlanEndTime;
 
@@ -102,12 +102,12 @@ public class CxScheduleDetail extends BaseEntity {
     private Integer class2Sequence;
 
     @ApiModelProperty(value = "二班计划开始时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS2_PLAN_START_TIME")
     private Date class2PlanStartTime;
 
     @ApiModelProperty(value = "二班计划结束时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS2_PLAN_END_TIME")
     private Date class2PlanEndTime;
 
@@ -133,12 +133,12 @@ public class CxScheduleDetail extends BaseEntity {
     private Integer class3Sequence;
 
     @ApiModelProperty(value = "三班计划开始时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS3_PLAN_START_TIME")
     private Date class3PlanStartTime;
 
     @ApiModelProperty(value = "三班计划结束时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS3_PLAN_END_TIME")
     private Date class3PlanEndTime;
 
@@ -164,12 +164,12 @@ public class CxScheduleDetail extends BaseEntity {
     private Integer class4Sequence;
 
     @ApiModelProperty(value = "四班计划开始时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS4_PLAN_START_TIME")
     private Date class4PlanStartTime;
 
     @ApiModelProperty(value = "四班计划结束时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS4_PLAN_END_TIME")
     private Date class4PlanEndTime;
 
@@ -195,12 +195,12 @@ public class CxScheduleDetail extends BaseEntity {
     private Integer class5Sequence;
 
     @ApiModelProperty(value = "五班计划开始时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS5_PLAN_START_TIME")
     private Date class5PlanStartTime;
 
     @ApiModelProperty(value = "五班计划结束时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS5_PLAN_END_TIME")
     private Date class5PlanEndTime;
 
@@ -226,12 +226,12 @@ public class CxScheduleDetail extends BaseEntity {
     private Integer class6Sequence;
 
     @ApiModelProperty(value = "六班计划开始时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS6_PLAN_START_TIME")
     private Date class6PlanStartTime;
 
     @ApiModelProperty(value = "六班计划结束时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS6_PLAN_END_TIME")
     private Date class6PlanEndTime;
 
@@ -257,12 +257,12 @@ public class CxScheduleDetail extends BaseEntity {
     private Integer class7Sequence;
 
     @ApiModelProperty(value = "七班计划开始时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS7_PLAN_START_TIME")
     private Date class7PlanStartTime;
 
     @ApiModelProperty(value = "七班计划结束时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS7_PLAN_END_TIME")
     private Date class7PlanEndTime;
 
@@ -288,12 +288,12 @@ public class CxScheduleDetail extends BaseEntity {
     private Integer class8Sequence;
 
     @ApiModelProperty(value = "八班计划开始时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS8_PLAN_START_TIME")
     private Date class8PlanStartTime;
 
     @ApiModelProperty(value = "八班计划结束时间")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("CLASS8_PLAN_END_TIME")
     private Date class8PlanEndTime;
 }

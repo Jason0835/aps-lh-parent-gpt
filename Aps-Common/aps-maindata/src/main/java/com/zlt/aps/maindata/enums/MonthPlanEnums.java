@@ -147,6 +147,10 @@ public enum MonthPlanEnums {
      */
     MAX_BOOST_DAY("SYS0204006", "单位天，SKU符合SYS0204005时，SKU收尾日离月底可补量的天数"),
     /**
+     * SYS0204008 单位天，SKU非首次上模，最短在机天数
+     */
+    SKU_SHORTEST_PRODUCTION_DAYS("SYS0204008", "SKU非首次上模，最短在机天数"),
+    /**
      * SYS0204009 结构需求量最小排产天数，<该值则不进行结构排产
      */
     MIN_PRODUCTION_DAYS("SYS0204009", "结构需求量最小排产天数，<该值则不进行结构排产"),

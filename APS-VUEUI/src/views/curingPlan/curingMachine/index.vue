@@ -197,12 +197,12 @@ export default {
           minWidth: 100,
         },
         {
-          label: this.$t("ui.data.column.machine.dimensionMinmum"),
+          label: this.$t("ui.data.column.lhMachineInfo.dimensionMinimum"),
           prop: "dimensionMinimum",
           minWidth: 100,
         },
         {
-          label: this.$t("ui.data.column.machine.dimensionMaximum"),
+          label: this.$t("ui.data.column.lhMachineInfo.dimensionMaximum"),
           prop: "dimensionMaximum",
           minWidth: 100,
         },
@@ -231,7 +231,7 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.machine.mouldNum"),
+          label: this.$t("ui.data.column.lhMachineInfo.maxMoldNum"),
           prop: "maxMoldNum",
           minWidth: 100,
           type: "number",

@@ -33,7 +33,7 @@
                 v-model="form.scheduleDate"
                 type="date"
                 value-format="yyyy-MM-dd"
-                disabled
+                :picker-options="pickerOptions"
               ></el-date-picker>
             </el-form-item>
           </el-col>
@@ -123,10 +123,14 @@
               :label="$t('ui.data.column.cxScheduleResult.embryoCode')"
               prop="embryoCode"
             >
-              <el-input
+              <embryoCodeSelect
+                :key="`embryoCode-${form.embryoCode || ''}`"
                 v-model="form.embryoCode"
-                placeholder=""
-              ></el-input>
+                :materialCode="form.materialCode"
+                :title="$t('ui.data.column.cxScheduleResult.embryoCode')"
+                :disabled="false"
+                @change="handleEmbryoCodeChange"
+              />
             </el-form-item>
           </el-col>
 
@@ -695,9 +699,10 @@ import { getScheduleDate } from "@/api/lh/scheduleResult";
 
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 import embryoNoSelect from "@/views/components/embryoNoSelect.vue";
+import embryoCodeSelect from "@/views/components/embryoCodeSelect.vue";
 
 export default {
-  components: { materialCodeSelect, embryoNoSelect },
+  components: { materialCodeSelect, embryoNoSelect, embryoCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -708,6 +713,12 @@ export default {
         shift: i + 1,
         shiftDate: "",
       })),
+      pickerOptions: {
+        disabledDate(time) {
+          // 不能选择今天之前的日期
+          return time.getTime() < Date.now() - 8.64e7;
+        },
+      },
     };
   },
   computed: {
@@ -759,6 +770,13 @@ export default {
       return moment(date).format("MM/DD");
     },
 
+    handleEmbryoCodeChange(val, row) {
+      if (val && row) {
+        this.$set(this.form, "embryoCode", row.embryoCode || val);
+        this.$set(this.form, "mainMaterialDesc", row.embryoDesc || "");
+        this.$set(this.form, "structureName", row.hierarchy || row.structureName || "");
+      }
+    },
     handleCxMachineChange(val) {
       const machine = (this.moldingMachines || []).find(
         (m) => m.cxMachineCode === val

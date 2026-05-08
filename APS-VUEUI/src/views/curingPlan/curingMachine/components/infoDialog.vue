@@ -31,7 +31,6 @@
 import infoForm from "@/views/components/infoForm.vue";
 import { editMachine, checkMachineCodeUnique } from "@/api/lh/machine";
 import { listMouldSleeve } from "@/api/mdm/mdmModelInfo";
-import { status } from "nprogress";
 
 export default {
   components: { infoForm },
@@ -218,7 +217,7 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.machine.dimensionMinmum"),
+          label: this.$t("ui.data.column.lhMachineInfo.dimensionMinimum"),
           prop: "dimensionMinimum",
           type: "number",
           attrs: {
@@ -230,7 +229,7 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.machine.dimensionMaximum"),
+          label: this.$t("ui.data.column.lhMachineInfo.dimensionMaximum"),
           prop: "dimensionMaximum",
           type: "number",
           attrs: {
@@ -260,7 +259,7 @@ export default {
           dictData: this.parentDict.type.biz_yes_no,
         },
         {
-          label: this.$t("ui.data.column.machine.mouldNum"),
+          label: this.$t("ui.data.column.lhMachineInfo.maxMoldNum"),
           prop: "maxMoldNum",
           type: "number",
           attrs: {
@@ -309,6 +308,8 @@ export default {
           label: this.$t("ui.data.column.machine.status"),
           prop: "status",
           type: "switch",
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           label: this.$t("ui.common.column.remark"),
@@ -366,7 +367,7 @@ export default {
             ? data.openMachineClass.split(",")
             : [],
           shellStandard: this.formatShellStandardForForm(data.shellStandard),
-          status: data.status == "1" ? true : false,
+          status: data.status || "0",
         };
         console.log(this.form);
       } else {
@@ -375,6 +376,7 @@ export default {
           openMachineClass: [],
           factoryCode: "116",
           shellStandard: [],
+          status: "1",
         };
       }
     },

@@ -18,7 +18,7 @@ import java.util.Date;
 public class ScheduleInsertVo {
 
     @ApiModelProperty(value = "排程日期", required = true)
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
     private Date scheduleDate;
 
     @ApiModelProperty(value = "机台编码", required = true)
