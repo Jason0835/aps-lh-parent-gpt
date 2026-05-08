@@ -282,6 +282,8 @@ public class SkuPrioritySelector {
         }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer maxLhDays = getLhMaxDays(productionContext, startDay, endDay);
+        // 非首次上模最短在机天数
+        Integer skuShortestProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuShortestProductionDays();
         List<ProductionSkuPriorityVo> highestList = new ArrayList<>();
         Set<String> foundSet = Sets.newHashSet();
         for (int count = BigDecimal.ONE.intValue(); count <= maxCount; ) {
@@ -298,6 +300,10 @@ public class SkuPrioritySelector {
             //有模具产能
             ProductionSkuPriorityVo priority = buildProductionSkuPriorityInfo(productionContext, highestPriority, groupPlanInfo, continueType, allSkuList, lhGroup, maxLhDays, startDay, endDay);
             if (null == priority) {
+                continue;
+            }
+            //若SKU已排产过，二次上模的天数小于 上机最短天数，忽略 sandy+ 2026.5.8
+            if (highestPriority.isHasProduction() && priority.getNeedDays() < skuShortestProductionDays){
                 continue;
             }
             highestList.add(priority);
@@ -726,6 +732,10 @@ public class SkuPrioritySelector {
         //1.1 高优先级量标记
         boolean hasHeightPriority = plans.stream().anyMatch(SkuPrioritySelector::hasHeightQtyPriority);
         info.setHasHeightPriority(hasHeightPriority);
+        //1.2 已排产标记 sandy+ 2026.5.8
+        boolean hasProduction = plans.stream().anyMatch(SkuPrioritySelector::hasProduction);
+        info.setHasProduction(hasProduction);
+
         boolean hasMoldCapacityLimit = hasMoldCapacityLimitBySku(info,plans,productionContext,startDay,endDay);
         info.setHasMoldCapacityLimit(hasMoldCapacityLimit);
 
@@ -876,5 +886,15 @@ public class SkuPrioritySelector {
      */
     private static boolean hasHeightQtyPriority(MonthPlanProductionRequirePlanVo plan) {
         return plan.getHeightProductionQty() > BigDecimal.ZERO.intValue();
+    }
+
+    /**
+     * 是否已排产
+     *
+     * @param plan
+     * @return
+     */
+    private static boolean hasProduction(MonthPlanProductionRequirePlanVo plan) {
+        return plan.getHeightProductionQty() != plan.getOriginHeightProductionQty() || plan.getProductionQty() != plan.getOriginProductionQty();
     }
 }

@@ -218,7 +218,7 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.machine.dimensionMinmum"),
+          label: this.$t("ui.data.column.lhMachineInfo.dimensionMinimum"),
           prop: "dimensionMinimum",
           type: "number",
           attrs: {
@@ -230,7 +230,7 @@ export default {
           },
         },
         {
-          label: this.$t("ui.data.column.machine.dimensionMaximum"),
+          label: this.$t("ui.data.column.lhMachineInfo.dimensionMaximum"),
           prop: "dimensionMaximum",
           type: "number",
           attrs: {
@@ -260,7 +260,7 @@ export default {
           dictData: this.parentDict.type.biz_yes_no,
         },
         {
-          label: this.$t("ui.data.column.machine.mouldNum"),
+          label: this.$t("ui.data.column.lhMachineInfo.maxMoldNum"),
           prop: "maxMoldNum",
           type: "number",
           attrs: {

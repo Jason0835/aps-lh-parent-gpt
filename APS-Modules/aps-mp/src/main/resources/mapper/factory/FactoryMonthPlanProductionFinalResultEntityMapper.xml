@@ -4,15 +4,27 @@
 
     <select id="getVersionList" resultType="com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult">
         SELECT
+        FACTORY_CODE,
+        YEAR,
+        MONTH,
+        MONTH_PLAN_VERSION,
+        LAST_MONTH_PLAN_VERSION,
         PRODUCTION_VERSION
         FROM
-        T_MP_PROC_VERSION
+        T_MP_MONTH_PLAN_PROD_FINAL
         WHERE
-        IS_DELETE = 0 AND PRODUCTION_VERSION IS NOT NULL
-        AND IS_FINAL = '1'
+        IS_DELETE = 0
+        AND PRODUCTION_VERSION IS NOT NULL
+        AND MONTH_PLAN_VERSION IS NOT NULL
+        AND LAST_MONTH_PLAN_VERSION IS NOT NULL
+        AND PRODUCTION_VERSION != ''
+        AND MONTH_PLAN_VERSION != ''
+        AND LAST_MONTH_PLAN_VERSION != ''
+        AND LAST_MONTH_PLAN_VERSION != MONTH_PLAN_VERSION
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="year != null and year != ''">AND YEAR = #{year}</if>
         <if test="month != null and month != ''">AND MONTH = #{month}</if>
+        GROUP BY FACTORY_CODE, YEAR, MONTH, MONTH_PLAN_VERSION, LAST_MONTH_PLAN_VERSION, PRODUCTION_VERSION
 </select>
 
 </mapper>

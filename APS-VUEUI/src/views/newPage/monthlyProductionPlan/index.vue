@@ -35,11 +35,98 @@
           :loading="syncLoading"
           @click="handleSyncAdjustedMonthPlan"
           v-hasPermi="['monthplan:factoryMonthPlanFinalResult:sync']"
-          >{{ $t("下发SCM/MES") }}</el-button
+          >{{ $t("推送SCM/MES") }}</el-button
         >
       </template>
       <template slot="headerRight"> </template>
     </page-table>
+    <el-dialog
+      title="推送SCM/MES"
+      :visible.sync="syncDialog.visible"
+      width="520px"
+      append-to-body
+      @close="resetSyncDialog"
+    >
+      <el-form
+        ref="syncForm"
+        :model="syncDialog.form"
+        :rules="syncDialog.rules"
+        label-width="120px"
+      >
+        <el-form-item label="年月" prop="yearMonth">
+          <el-date-picker
+            v-model="syncDialog.form.yearMonth"
+            type="month"
+            value-format="yyyy-MM"
+            format="yyyy-MM"
+            placeholder="请选择年月"
+            style="width: 100%"
+            @change="handleSyncBaseChange"
+          />
+        </el-form-item>
+        <el-form-item label="分厂" prop="factoryCode">
+          <el-select
+            v-model="syncDialog.form.factoryCode"
+            placeholder="请选择分厂"
+            filterable
+            clearable
+            style="width: 100%"
+            @change="handleSyncBaseChange"
+          >
+            <el-option
+              v-for="dict in dict.type.biz_factory_name"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="月计划版本" prop="productionVersion">
+          <el-select
+            v-model="syncDialog.form.productionVersion"
+            placeholder="请选择月计划版本"
+            filterable
+            clearable
+            style="width: 100%"
+            :loading="syncDialog.versionLoading"
+            @change="handleSyncProductionVersionChange"
+          >
+            <el-option
+              v-for="item in syncProductionVersionOptions"
+              :key="item"
+              :label="item"
+              :value="item"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="需求计划版本" prop="lastMonthPlanVersion">
+          <el-select
+            v-model="syncDialog.form.lastMonthPlanVersion"
+            placeholder="请选择需求计划版本"
+            filterable
+            clearable
+            style="width: 100%"
+            :loading="syncDialog.versionLoading"
+            @change="handleSyncDemandVersionChange"
+          >
+            <el-option
+              v-for="item in syncDemandVersionOptions"
+              :key="item.optionKey"
+              :label="item.lastMonthPlanVersion"
+              :value="item.optionKey"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="syncDialog.visible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="syncLoading"
+          @click="submitSyncAdjustedMonthPlan"
+        >确定</el-button>
+      </span>
+    </el-dialog>
   </basic-container>
 </template>
 <script>
@@ -50,7 +137,12 @@ import {mapGetters} from "vuex";
 //utils
 import {downloadLink} from "@/utils/request";
 //interface
-import {getProductionMonthType, listProduction, syncAdjustedMonthPlanToScmAndMes,} from "@/api/monthplan/monthlyProductionPlan";
+import {
+  getFinalResultVersionList,
+  getProductionMonthType,
+  listProduction,
+  syncAdjustedMonthPlanToScmAndMes,
+} from "@/api/monthplan/monthlyProductionPlan";
 import {statisticsResult,} from "@/api/monthplan/adjustStructure";
 //components
 
@@ -76,6 +168,24 @@ export default {
       productionStartDate: "",
       loading: false,
       syncLoading: false,
+      syncDialog: {
+        visible: false,
+        versionLoading: false,
+        versionList: [],
+        form: {
+          yearMonth: "",
+          factoryCode: "",
+          productionVersion: "",
+          lastMonthPlanVersion: "",
+          monthPlanVersion: "",
+        },
+        rules: {
+          yearMonth: [{ required: true, message: "请选择年月", trigger: "change" }],
+          factoryCode: [{ required: true, message: "请选择分厂", trigger: "change" }],
+          productionVersion: [{ required: true, message: "请选择月计划版本", trigger: "change" }],
+          lastMonthPlanVersion: [{ required: true, message: "请选择需求计划版本", trigger: "change" }],
+        },
+      },
       data: [],
       selection: [],
       page: {
@@ -483,6 +593,20 @@ export default {
         },
       ];
     },
+    syncProductionVersionOptions() {
+      const versionSet = new Set();
+      this.syncDialog.versionList.forEach((item) => {
+        if (item.productionVersion) {
+          versionSet.add(item.productionVersion);
+        }
+      });
+      return Array.from(versionSet);
+    },
+    syncDemandVersionOptions() {
+      return this.syncDialog.versionList.filter((item) => {
+        return item.productionVersion === this.syncDialog.form.productionVersion;
+      });
+    },
   },
   methods: {
     goProductionMonthPlanInit(){
@@ -542,60 +666,149 @@ export default {
         this.formatParams(false)
       );
     },
-    // 同步推送确认调整后的月计划到SCM和MES
+    // 打开手动推送弹框，由用户选择年月、分厂和版本后再推送
     handleSyncAdjustedMonthPlan() {
-      const params = this.getSyncAdjustedMonthPlanParams();
-      if (!params) {
-        return;
-      }
-      this.$confirm(this.$t("确定推送调整后的月计划到SCM/MES？"), {
-        type: "warning",
-      }).then(async () => {
-        try {
-          this.syncLoading = true;
-          const res = await syncAdjustedMonthPlanToScmAndMes(params);
-          this.$modal.msgSuccess(res.msg);
-          await this.getList();
-        } catch (error) {
-          console.error(error);
-        } finally {
-          this.syncLoading = false;
+      this.syncDialog.visible = true;
+      this.syncDialog.form.yearMonth = this.normalizeYearMonth(this.query.yearMonth);
+      this.syncDialog.form.factoryCode = this.query.factoryCode || "";
+      this.syncDialog.form.productionVersion = "";
+      this.syncDialog.form.lastMonthPlanVersion = "";
+      this.syncDialog.form.monthPlanVersion = "";
+      this.syncDialog.versionList = [];
+      this.$nextTick(() => {
+        if (this.$refs.syncForm) {
+          this.$refs.syncForm.clearValidate();
         }
       });
+      this.loadSyncVersionList(true);
     },
-    // 从当前列表中提取手动推送所需的年月、工厂和版本参数
-    getSyncAdjustedMonthPlanParams() {
-      const rows = this.data.filter((item) => {
-        return (
-          item &&
-          item.factoryCode &&
-          item.year &&
-          item.month &&
-          item.monthPlanVersion &&
-          item.productionVersion
-        );
+    // 年月或分厂变化后，需要重新加载可推送版本，避免沿用旧条件下的版本
+    handleSyncBaseChange() {
+      this.syncDialog.form.productionVersion = "";
+      this.syncDialog.form.lastMonthPlanVersion = "";
+      this.syncDialog.form.monthPlanVersion = "";
+      this.syncDialog.versionList = [];
+      this.loadSyncVersionList(false);
+    },
+    // 月计划版本变化后，清空需求计划版本，确保提交的原需求版本与所选需求版本匹配
+    handleSyncProductionVersionChange() {
+      this.syncDialog.form.lastMonthPlanVersion = "";
+      this.syncDialog.form.monthPlanVersion = "";
+    },
+    // 选择需求计划版本时，同时记录该版本对应的原始需求计划版本
+    handleSyncDemandVersionChange(optionKey) {
+      const selectedVersion = this.syncDialog.versionList.find((item) => item.optionKey === optionKey);
+      this.syncDialog.form.monthPlanVersion = selectedVersion ? selectedVersion.monthPlanVersion : "";
+    },
+    // 关闭弹框时清空表单和版本列表，避免下一次打开残留旧选择
+    resetSyncDialog() {
+      this.syncDialog.form = {
+        yearMonth: "",
+        factoryCode: "",
+        productionVersion: "",
+        lastMonthPlanVersion: "",
+        monthPlanVersion: "",
+      };
+      this.syncDialog.versionList = [];
+    },
+    // 加载当前年月和分厂下可推送的调整后版本
+    async loadSyncVersionList(showWarning) {
+      const { yearMonth, factoryCode } = this.syncDialog.form;
+      if (!yearMonth || !factoryCode) {
+        return;
+      }
+      const yearMonthInfo = this.parseYearMonth(yearMonth);
+      if (!yearMonthInfo) {
+        return;
+      }
+      try {
+        this.syncDialog.versionLoading = true;
+        const res = await getFinalResultVersionList({
+          factoryCode,
+          year: yearMonthInfo.year,
+          month: yearMonthInfo.month,
+        });
+        const rows = res.rows || [];
+        this.syncDialog.versionList = rows
+          .filter((item) => {
+            return item.productionVersion && item.monthPlanVersion && item.lastMonthPlanVersion;
+          })
+          .map((item) => {
+            return {
+              ...item,
+              optionKey: `${item.productionVersion}__${item.monthPlanVersion}__${item.lastMonthPlanVersion}`,
+            };
+          });
+        if (showWarning && this.syncDialog.versionList.length === 0) {
+          this.$modal.msgWarning("暂无可推送数据");
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.syncDialog.versionLoading = false;
+      }
+    },
+    // 校验弹框选择并同步推送调整后的月计划到SCM和MES
+    submitSyncAdjustedMonthPlan() {
+      this.$refs.syncForm.validate((valid) => {
+        if (!valid) {
+          return;
+        }
+        const selectedVersion = this.syncDialog.versionList.find((item) => {
+          return item.optionKey === this.syncDialog.form.lastMonthPlanVersion;
+        });
+        if (!selectedVersion) {
+          this.$modal.msgWarning("暂无可推送数据");
+          return;
+        }
+        const yearMonthInfo = this.parseYearMonth(this.syncDialog.form.yearMonth);
+        if (!yearMonthInfo) {
+          this.$modal.msgWarning("请选择正确的年月");
+          return;
+        }
+        const params = {
+          factoryCode: this.syncDialog.form.factoryCode,
+          year: yearMonthInfo.year,
+          month: yearMonthInfo.month,
+          monthPlanVersion: selectedVersion.monthPlanVersion,
+          lastMonthPlanVersion: selectedVersion.lastMonthPlanVersion,
+          productionVersion: this.syncDialog.form.productionVersion,
+        };
+        this.$confirm(this.$t("确定推送调整后的月计划到SCM/MES？"), {
+          type: "warning",
+        }).then(async () => {
+          try {
+            this.syncLoading = true;
+            const res = await syncAdjustedMonthPlanToScmAndMes(params);
+            this.$modal.msgSuccess(res.msg);
+            this.syncDialog.visible = false;
+            await this.getList();
+          } catch (error) {
+            console.error(error);
+          } finally {
+            this.syncLoading = false;
+          }
+        });
       });
-      if (rows.length === 0) {
-        this.$modal.msgWarning("暂无可推送数据");
+    },
+    // 将页面查询或弹框年月统一转换成yyyy-MM，便于日期组件回显
+    normalizeYearMonth(yearMonth) {
+      if (!yearMonth) {
+        return "";
+      }
+      const date = moment(yearMonth, ["YYYY-MM", "YYYY-M"], true);
+      return date.isValid() ? date.format("YYYY-MM") : "";
+    },
+    // 将yyyy-MM拆分为后端所需的year、month
+    parseYearMonth(yearMonth) {
+      const normalizedYearMonth = this.normalizeYearMonth(yearMonth);
+      if (!normalizedYearMonth) {
         return null;
       }
-      const plan = rows.find((item) => {
-        return (
-          item.lastMonthPlanVersion &&
-          item.lastMonthPlanVersion !== item.monthPlanVersion
-        );
-      });
-      if (!plan) {
-        this.$modal.msgWarning("未找到调整后的最新需求计划版本，无法推送");
-        return null;
-      }
+      const [year, month] = normalizedYearMonth.split("-");
       return {
-        factoryCode: plan.factoryCode,
-        year: plan.year,
-        month: plan.month,
-        monthPlanVersion: plan.monthPlanVersion,
-        lastMonthPlanVersion: plan.lastMonthPlanVersion,
-        productionVersion: plan.productionVersion,
+        year: Number(year),
+        month: Number(month),
       };
     },
 

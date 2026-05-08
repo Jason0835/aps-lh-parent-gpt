@@ -47,6 +47,11 @@ public class ProductionCapacityParamConfiguration {
      * SKU二次上机
      */
     private Integer skuSecondProduction;
+
+    /**
+     * SKU非首次上模最短在机天数
+     */
+    private Integer skuShortestProductionDays;
     /**
      * 可补量的排产分类集合
      */

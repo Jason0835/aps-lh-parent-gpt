@@ -149,11 +149,15 @@ export default {
     //utils
     show(data) {
       this.visible = true;
-      // 与硫化排程管理列表查询条件一致：当前日期 + 2 天
+       // 与硫化排程管理列表查询条件一致：当前日期 + 2 天
+      const raw = data && data.scheduleDate;
+      const scheduleDate =
+        raw != null && String(raw).trim() !== ""
+          ? moment(raw).format("YYYY-MM-DD 00:00:00")
+          : moment().add(1, "days").format("YYYY-MM-DD 00:00:00");
       this.form = {
         factoryCode: "116",
-        scheduleDate: data.scheduleDate,
-        // scheduleDate: moment().add(2, "days").format("YYYY-MM-DD 00:00:00"),
+        scheduleDate,
       };
     },
     hide() {

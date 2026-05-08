@@ -83,6 +83,37 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     @Override
+    public List<CxScheduleResult> listByLhScheduleIds(List<Long> lhScheduleIds) {
+        if (CollectionUtils.isEmpty(lhScheduleIds)) {
+            return Collections.emptyList();
+        }
+        List<Long> queryIds = lhScheduleIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(queryIds)) {
+            return Collections.emptyList();
+        }
+        QueryWrapper<CxScheduleResult> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("IS_DELETE", "0");
+        queryWrapper.and(wrapper -> {
+            boolean first = true;
+            for (Long lhScheduleId : queryIds) {
+                // LH_SCHEDULE_IDS 主要保存为逗号分隔字符串，同时兼容历史数据中的中文逗号、斜杠和分号。
+                // 统一转成英文逗号后再使用 FIND_IN_SET，避免 ID=1 误匹配 10、11。
+                String findInSetSql = "FIND_IN_SET({0}, REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LH_SCHEDULE_IDS, '，', ','), '/', ','), '；', ','), ';', ','), ' ', ''))";
+                if (first) {
+                    wrapper.apply(findInSetSql, String.valueOf(lhScheduleId));
+                    first = false;
+                } else {
+                    wrapper.or().apply(findInSetSql, String.valueOf(lhScheduleId));
+                }
+            }
+        });
+        return cxScheduleResultMapper.selectList(queryWrapper);
+    }
+
+    @Override
     public AjaxResult importData(List<CxScheduleResult> list, boolean updateSupport, Long importLogId) {
         int successNum = 0;
         int failureNum = 0;

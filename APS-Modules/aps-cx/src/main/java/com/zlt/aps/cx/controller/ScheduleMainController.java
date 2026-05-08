@@ -159,6 +159,18 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
+     * 根据硫化排程结果ID列表查询关联的成型排程结果。
+     *
+     * @param lhScheduleIds 硫化排程结果ID列表
+     * @return 成型排程结果列表
+     */
+    @ApiOperation("根据硫化排程结果ID列表查询关联成型排程结果")
+    @PostMapping("/listByLhScheduleIds")
+    public List<CxScheduleResult> listByLhScheduleIds(@RequestBody List<Long> lhScheduleIds) {
+        return cxScheduleResultService.listByLhScheduleIds(lhScheduleIds);
+    }
+
+    /**
      * 保存
      */
     @Log(title = "ui.data.column.cxScheduleResult.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
