@@ -54,7 +54,7 @@ public class CxScheduleResultTemplateImportVO extends BaseEntity {
 
     @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.cxScheduleResult.scheduleDate", dateFormat = "yyyy-MM-dd")
-    @JsonFormat(pattern = "yyyy-MM-dd", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private Date scheduleDate;
 
     @Excel(name = "ui.data.column.cxScheduleResult.isRelease", dictType = "IS_RELEASE")
