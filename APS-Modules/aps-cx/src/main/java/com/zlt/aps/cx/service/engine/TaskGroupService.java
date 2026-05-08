@@ -652,10 +652,13 @@ public class TaskGroupService {
     /**
      * 查找续作机台
      *
-     * <p>使用物料编码 + 胎胚编码组合键匹配：
-     * 机台在产 key 格式: materialCode|embryoCode
+     * <p>使用胎胚编码匹配：
+     * 机台在产 key 格式: embryoCode
+     * 
+     * <p>说明：由于操作人员导入数据时，materialCode字段被错误地填入了胎胚编号，
+     * 因此我们只使用胎胚编码作为匹配键，避免组合键匹配失败。
      *
-     * @param materialCode          成品物料编码
+     * @param materialCode          成品物料编码（未使用，保留参数兼容性）
      * @param embryoCode            胎胚编码
      * @param machineOnlineEmbryoMap 机台在产映射
      * @return 续作机台编码列表
@@ -663,9 +666,11 @@ public class TaskGroupService {
     private List<String> findContinueMachines(String materialCode, String embryoCode,
                                                Map<String, Set<String>> machineOnlineEmbryoMap) {
         List<String> machineCodes = new ArrayList<>();
-        String combinedKey = embryoCode;
+        if (embryoCode == null) {
+            return machineCodes;
+        }
         for (Map.Entry<String, Set<String>> entry : machineOnlineEmbryoMap.entrySet()) {
-            if (entry.getValue().contains(combinedKey)) {
+            if (entry.getValue().contains(embryoCode)) {
                 machineCodes.add(entry.getKey());
             }
         }
