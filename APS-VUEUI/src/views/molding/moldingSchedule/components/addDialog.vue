@@ -136,7 +136,7 @@
 
           <el-col :span="12">
             <el-form-item :label="$t('胎胚描述')" prop="mainMaterialDesc">
-              <el-input v-model="form.mainMaterialDesc"></el-input>
+              <el-input v-model="form.mainMaterialDesc" disabled></el-input>
             </el-form-item>
           </el-col>
 
