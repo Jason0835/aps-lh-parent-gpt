@@ -1,7 +1,6 @@
 package com.zlt.aps.mp.adjust.controller;
 
 import cn.hutool.core.bean.BeanUtil;
-
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
@@ -17,24 +16,24 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.redis.service.RedisService;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.exception.BusinessException;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
+import com.zlt.aps.mp.adjust.service.IMpWeekAdjustService;
 import com.zlt.aps.mp.adjust.service.impl.MpWeekAdjustFactory;
+import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
+import com.zlt.aps.mp.api.domain.dto.MpWeekRollAdjustDTO;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
 import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingAdjuestProductionHandler;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
-import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.maindata.enums.MonthPlanEnums;
-import com.zlt.aps.maindata.enums.MsgTemplateEnums;
-import com.zlt.aps.mp.adjust.service.IMpWeekAdjustService;
-import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
-import com.zlt.aps.mp.api.domain.dto.MpWeekRollAdjustDTO;
-import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
 import com.zlt.common.utils.ExcelReadUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.msg.message.api.IMsgTemplateRemoteService;
@@ -42,27 +41,18 @@ import com.zlt.msg.message.domain.entity.MsgTemplate;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-
 import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import javax.servlet.http.HttpServletResponse;
 
 /**
 * Copyright (c) 2022, All rights reserved。
@@ -191,7 +181,7 @@ public class MpWeekRollAdjustController extends BaseController {
         ExcelUtil<MpAdjustResult> util = new ExcelUtil<>(MpAdjustResult.class);
         Workbook workbook = util.exportExcel2(response, mpAdjustResultList, fileName);
         byte[] resultBytes =  ExcelReadUtils.writeExcel(workbook);
-        
+
         Date endTime = DateUtils.getNowDate();
         ExportLog exportLog = new ExportLog();
         exportLog.setProcedureCode("0");
@@ -445,4 +435,25 @@ public class MpWeekRollAdjustController extends BaseController {
         }
     }
 
+    /**
+     * 重新计算
+     */
+    @ApiOperation("重新计算")
+    @PostMapping("/recalculate")
+    public AjaxResult recalculate(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        // 获取周程滚动调整策略
+        IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
+        if (weekAdjustStrategy == null) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindStrategy"));
+        }
+        // 构建上下文对象
+        MpRollAdjustContextDTO contextDTO = buildAdjustContext(weekRollAdjustDTO);
+        log.info("重新计算 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
+                String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
+        // 执行周程滚动调整策略（确认调整）
+        weekAdjustStrategy.confirmAdjust(contextDTO);
+        log.info("重新计算 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
+                String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
+        return AjaxResult.success();
+    }
 }

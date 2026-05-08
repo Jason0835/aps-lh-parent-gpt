@@ -1,5 +1,6 @@
 package com.zlt.aps.controller.monthplan;
 
+import cn.hutool.core.date.DateUtil;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -10,23 +11,22 @@ import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.service.IFactoryMonthPlanMouldDayResultRemoteService;
 import com.zlt.aps.mp.api.service.IMpWeekRollAdjustRemoteService;
-
-import cn.hutool.core.date.DateUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.time.LocalDateTime;
-
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.time.LocalDateTime;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -103,4 +103,13 @@ public class MpWeekRollAdjustUIController extends BaseController {
         response.flushBuffer();
     }
 
+    /**
+     * 重新计算
+     */
+    @ApiOperation("重新计算")
+    @PostMapping("/recalculate")
+    @ResponseBody
+    public AjaxResult recalculate(MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        return mpWeekRollAdjustRemoteService.recalculate(weekRollAdjustDTO);
+    }
 }
