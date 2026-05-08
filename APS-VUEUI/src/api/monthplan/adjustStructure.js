@@ -125,6 +125,15 @@ export function resultVersion(query) {
   })
 }
 
+//查询调整版本列表
+export function adjustVersionList(query) {
+  return request({
+    url: '/monthplan/mpAdjustResult/getAdjustVersionList',
+    method: 'post',
+    data: query
+  })
+}
+
 //单选结构查询列表
 export function listOutHistory(query) {
   return request({

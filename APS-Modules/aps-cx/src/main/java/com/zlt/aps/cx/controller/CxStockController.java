@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.mapper.CxStockMapper;
 import com.zlt.aps.cx.service.CxStockService;
@@ -68,7 +69,7 @@ public class CxStockController extends AbstractDocBizController<CxStock> {
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody CxStock entity) {
-        entity.setDataSource("MANUAL");
+        entity.setDataSource(ApsConstant.DATA_SOURCE_SYSTEM);
         return super.save(entity);
     }
 

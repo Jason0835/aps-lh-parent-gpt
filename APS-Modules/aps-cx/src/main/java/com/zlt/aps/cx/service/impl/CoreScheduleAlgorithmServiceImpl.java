@@ -177,6 +177,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             // 跨天时重置试制/量试单日SKU上限计数（单日最多2个试制+量试SKU）
             if (day != lastDay) {
                 context.setDailyTrialAssignedEmbryoCodes(new HashSet<>());
+                context.setPrecisionPlanApplied(false);
             }
 
             // 执行该班次的排程
@@ -204,8 +205,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         // ==================== 合并多班次结果：每个机台一条记录，8个班次映射到CLASS1~8 ====================
         List<CxScheduleResult> allResults = buildFinalScheduleResultsFromShifts(context, shiftResults, allShiftConfigs);
 
-        // ==================== 精度计划扣量：成型停机做精度时，若可供硫化时长<4小时，硫化产能减半 ====================
-        applyPrecisionPlanDeduction(context, shiftResults);
+        // ==================== 精度计划扣量已移至每日首次班次排产前执行 ====================
 
         // ==================== 班次量均衡：按结构班产标准，最大硫化机数胎胚调整班次均衡 ====================
         balanceShiftQuantities(context, shiftResults, allShiftConfigs);
@@ -317,6 +317,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         allAllocations.addAll(trialAllocations);
 
         log.info("班次分配前检查: 总分配数={}", allAllocations.size());
+
+        // ==================== 精度计划挑选与提前扣量（每日首次执行） ====================
+        applyPrecisionPlanSelection(context, scheduleDate, shiftConfig, allAllocations);
 
         // ==================== 第六步：S5.3.7 班次排产（单个班次，无需跨班次均衡） ====================
         List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults = new ArrayList<>();
@@ -502,11 +505,262 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 精度计划扣量处理
+     * 精度计划挑选与提前扣量
+     *
+     * <p>在班次排产前，从当日精度计划中挑选需执行的机台（1~2台），
+     * 并对选中机台的任务提前扣减4小时产能。每日仅执行一次。
+     *
+     * <p>挑选规则：
+     * <ol>
+     *   <li>优先选计划日期≤当日的紧急计划，最多2台（按planDate升序）</li>
+     *   <li>无紧急计划时，选1台未来计划中总可供硫化时长最高的机台提前执行</li>
+     * </ol>
+     *
+     * <p>扣量规则：选中机台按任务stockHours降序，逐任务扣减4小时产能。
+     * 扣量后检查总可用量（库存+剩余产量）是否大于当前班次硫化需求，
+     * 若不够则回写 LhScheduleResult 下调对应 CLASS 计划量。
+     */
+    private void applyPrecisionPlanSelection(
+            ScheduleContextVo context,
+            LocalDate scheduleDate,
+            CxShiftConfig shiftConfig,
+            List<MachineAllocationResult> allAllocations) {
+
+        if (context.isPrecisionPlanApplied()) {
+            return;
+        }
+
+        List<CxPrecisionPlan> precisionPlans = context.getPrecisionPlans();
+        if (precisionPlans == null || precisionPlans.isEmpty()) {
+            context.setPrecisionPlanApplied(true);
+            return;
+        }
+
+        List<CxPrecisionPlan> uncompleted = precisionPlans.stream()
+                .filter(p -> !"1".equals(p.getCompletionStatus()) && p.getPlanDate() != null)
+                .sorted(Comparator.comparing(CxPrecisionPlan::getPlanDate))
+                .collect(Collectors.toList());
+
+        if (uncompleted.isEmpty()) {
+            context.setPrecisionPlanApplied(true);
+            return;
+        }
+
+        java.sql.Date todaySql = java.sql.Date.valueOf(scheduleDate);
+        List<CxPrecisionPlan> urgentPlans = uncompleted.stream()
+                .filter(p -> !p.getPlanDate().after(todaySql))
+                .collect(Collectors.toList());
+        List<CxPrecisionPlan> futurePlans = uncompleted.stream()
+                .filter(p -> p.getPlanDate().after(todaySql))
+                .collect(Collectors.toList());
+
+        List<CxPrecisionPlan> selectedPlans = new ArrayList<>();
+
+        if (!urgentPlans.isEmpty()) {
+            selectedPlans = urgentPlans.stream()
+                    .limit(2)
+                    .collect(Collectors.toList());
+            log.info("精度计划挑选: 紧急计划, 选中 {} 台机台: {}",
+                    selectedPlans.size(),
+                    selectedPlans.stream().map(CxPrecisionPlan::getMachineCode).collect(Collectors.toList()));
+        } else if (!futurePlans.isEmpty()) {
+            Map<String, BigDecimal> machineTotalStockHours = new HashMap<>();
+            for (MachineAllocationResult allocation : allAllocations) {
+                BigDecimal total = BigDecimal.ZERO;
+                if (allocation.getTaskAllocations() != null) {
+                    for (TaskAllocation ta : allocation.getTaskAllocations()) {
+                        if (ta.getStockHours() != null) {
+                            total = total.add(ta.getStockHours());
+                        }
+                    }
+                }
+                machineTotalStockHours.put(allocation.getMachineCode(), total);
+            }
+
+            CxPrecisionPlan bestPlan = null;
+            BigDecimal maxStockHours = BigDecimal.valueOf(-1);
+            for (CxPrecisionPlan plan : futurePlans) {
+                BigDecimal totalHours = machineTotalStockHours.getOrDefault(plan.getMachineCode(), BigDecimal.ZERO);
+                if (totalHours.compareTo(maxStockHours) > 0) {
+                    maxStockHours = totalHours;
+                    bestPlan = plan;
+                }
+            }
+
+            if (bestPlan != null && maxStockHours.compareTo(BigDecimal.ZERO) > 0) {
+                selectedPlans.add(bestPlan);
+                log.info("精度计划挑选: 未来计划提前执行, 选中机台 {} (总可供硫化时长={}h)",
+                        bestPlan.getMachineCode(), String.format("%.1f", maxStockHours));
+            } else {
+                log.info("精度计划挑选: 未来计划无可排任务的机台，跳过");
+            }
+        }
+
+        for (CxPrecisionPlan plan : selectedPlans) {
+            applyPrecisionHourDeduction(context, scheduleDate, shiftConfig, plan.getMachineCode(), allAllocations);
+        }
+
+        context.setPrecisionPlanApplied(true);
+    }
+
+    /**
+     * 对指定机台的任务扣减4小时产能，并检查硫化需求是否仍能满足
+     *
+     * <p>扣量：按任务stockHours降序，逐任务扣减，扣满4小时产能为止。
+     * <p>硫化检查：扣量后检查"库存+剩余产量 >= 当前CLASS硫化计划量"。
+     * 若不够，回写 LhScheduleResult 下调当前班次的 CLASS 计划量。
+     */
+    private void applyPrecisionHourDeduction(
+            ScheduleContextVo context,
+            LocalDate scheduleDate,
+            CxShiftConfig shiftConfig,
+            String machineCode,
+            List<MachineAllocationResult> allAllocations) {
+
+        MachineAllocationResult machineAllocation = null;
+        for (MachineAllocationResult allocation : allAllocations) {
+            if (machineCode.equals(allocation.getMachineCode())) {
+                machineAllocation = allocation;
+                break;
+            }
+        }
+
+        if (machineAllocation == null || machineAllocation.getTaskAllocations() == null
+                || machineAllocation.getTaskAllocations().isEmpty()) {
+            log.info("精度扣量: 机台 {} 无任务分配，跳过扣量", machineCode);
+            return;
+        }
+
+        List<TaskAllocation> sortedTasks = machineAllocation.getTaskAllocations().stream()
+                .sorted((a, b) -> {
+                    BigDecimal sa = a.getStockHours() != null ? a.getStockHours() : BigDecimal.ZERO;
+                    BigDecimal sb = b.getStockHours() != null ? b.getStockHours() : BigDecimal.ZERO;
+                    return sb.compareTo(sa);
+                })
+                .collect(Collectors.toList());
+
+        final double totalDeductionSeconds = 4.0 * 3600;
+        double remainingSeconds = totalDeductionSeconds;
+
+        Map<Long, LhScheduleResult> lhResultCache = buildLhResultIdMap(context);
+        Map<String, Integer> materialStockMap = context.getMaterialStockMap();
+
+        int classIndex = parseClassIndex(shiftConfig);
+
+        for (TaskAllocation taskAlloc : sortedTasks) {
+            if (remainingSeconds <= 0) break;
+
+            int hourlyCapacity = shiftScheduleService.getMachineHourlyCapacity(
+                    machineCode, taskAlloc.getMaterialCode(), taskAlloc.getStructureName(), context);
+            if (hourlyCapacity <= 0) continue;
+
+            double secondsPerTire = 3600.0 / hourlyCapacity;
+
+            int currentQty = taskAlloc.getEndingExtraInventory() != null
+                    ? taskAlloc.getEndingExtraInventory()
+                    : (taskAlloc.getQuantity() != null ? taskAlloc.getQuantity() : 0);
+            if (currentQty <= 0) continue;
+
+            int maxDeductTires = (int) (remainingSeconds / secondsPerTire);
+            int actualDeduct = Math.min(maxDeductTires, currentQty);
+            int newQty = currentQty - actualDeduct;
+
+            taskAlloc.setQuantity(taskAlloc.getQuantity() != null ? taskAlloc.getQuantity() - actualDeduct : 0);
+            taskAlloc.setEndingExtraInventory(newQty);
+
+            remainingSeconds -= actualDeduct * secondsPerTire;
+
+            log.info("精度扣量: 机台={}, 胎胚={}, stockHours={}h, 原量={}, 小时产能={}, 扣{}条, 新量={}",
+                    machineCode, taskAlloc.getEmbryoCode(),
+                    taskAlloc.getStockHours() != null ? String.format("%.1f", taskAlloc.getStockHours()) : "0",
+                    currentQty, hourlyCapacity, actualDeduct, newQty);
+
+            Long lhId = taskAlloc.getLhId();
+            LhScheduleResult lhResult = lhId != null ? lhResultCache.get(lhId) : null;
+            if (lhResult != null && classIndex > 0) {
+                Integer currentClassPlanObj = getClassPlanQtyByIndex(lhResult, classIndex);
+                if (currentClassPlanObj == null) {
+                    continue;
+                }
+                int currentClassPlan = currentClassPlanObj;
+                int stock = (materialStockMap != null)
+                        ? materialStockMap.getOrDefault(String.valueOf(lhId), 0)
+                        : 0;
+                int totalAvailable = stock + newQty;
+                if (totalAvailable < currentClassPlan) {
+                    setClassPlanQtyByIndex(lhResult, classIndex, totalAvailable);
+                    log.info("  硫化需求调整: 胎胚={}, CLASS{}原计划量={}, 库存={}+产量={}={}, 调整为{}",
+                            taskAlloc.getEmbryoCode(), classIndex,
+                            currentClassPlan, stock, newQty, totalAvailable, totalAvailable);
+                }
+            }
+        }
+
+        log.info("精度扣量完成: 机台={}, 总计扣减 {} 秒产能", machineCode,
+                String.format("%.0f", totalDeductionSeconds - remainingSeconds));
+    }
+
+    private Map<Long, LhScheduleResult> buildLhResultIdMap(ScheduleContextVo context) {
+        Map<Long, LhScheduleResult> map = new HashMap<>();
+        List<LhScheduleResult> lhResults = context.getLhScheduleResults();
+        if (lhResults != null) {
+            for (LhScheduleResult lh : lhResults) {
+                if (lh.getId() != null) {
+                    map.put(lh.getId(), lh);
+                }
+            }
+        }
+        return map;
+    }
+
+    private int parseClassIndex(CxShiftConfig shiftConfig) {
+        if (shiftConfig == null || shiftConfig.getClassField() == null) {
+            return 0;
+        }
+        String cf = shiftConfig.getClassField();
+        if (cf.startsWith("CLASS")) {
+            try {
+                return Integer.parseInt(cf.substring(5));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return 0;
+    }
+
+    private Integer getClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex) {
+        switch (classIndex) {
+            case 1: return lhResult.getClass1PlanQty();
+            case 2: return lhResult.getClass2PlanQty();
+            case 3: return lhResult.getClass3PlanQty();
+            case 4: return lhResult.getClass4PlanQty();
+            case 5: return lhResult.getClass5PlanQty();
+            case 6: return lhResult.getClass6PlanQty();
+            case 7: return lhResult.getClass7PlanQty();
+            case 8: return lhResult.getClass8PlanQty();
+            default: return null;
+        }
+    }
+
+    private void setClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex, int value) {
+        switch (classIndex) {
+            case 1: lhResult.setClass1PlanQty(value); break;
+            case 2: lhResult.setClass2PlanQty(value); break;
+            case 3: lhResult.setClass3PlanQty(value); break;
+            case 4: lhResult.setClass4PlanQty(value); break;
+            case 5: lhResult.setClass5PlanQty(value); break;
+            case 6: lhResult.setClass6PlanQty(value); break;
+            case 7: lhResult.setClass7PlanQty(value); break;
+            case 8: lhResult.setClass8PlanQty(value); break;
+            default: break;
+        }
+    }
+
+    /**
+     * 精度计划扣量处理（已废弃，改为 applyPrecisionPlanSelection 每日首次执行）
      *
      * <p>业务规则：
      * <ul>
-     *   <li>1. 从CxPrecisionPlan获取未完成的精度计划（planDate < 排程日期-3天，actualDate为空）</li>
+     *   <li>1. 从CxPrecisionPlan获取未完成的精度计划（planDate <= 排程日期+提前天数，actualDate为空）</li>
      *   <li>2. 将机台按其下所有任务的可供硫化时间降序排序</li>
      *   <li>3. 检查排序靠前的机台是否在精度计划列表中</li>
      *   <li>4. 若可供硫化时长 >= 4小时：硫化不停机，只扣成型4小时产能</li>
@@ -1336,9 +1590,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     classField = shiftToClassField.getOrDefault(spr.getShiftCode(), spr.getShiftCode());
                 }
                 int vulcanizeClassIndex = getClassIndex(classField);
-                int vulcanizeClassConsumption = lhResult != null
-                        ? (getClassPlanQtyByIndex(lhResult, vulcanizeClassIndex) != null
-                        ? getClassPlanQtyByIndex(lhResult, vulcanizeClassIndex) : 0) : 0;
+                Integer vulcanizeClassConsumptionObj = (lhResult != null)
+                        ? getClassPlanQtyByIndex(lhResult, vulcanizeClassIndex) : null;
+                int vulcanizeClassConsumption = (vulcanizeClassConsumptionObj != null)
+                        ? vulcanizeClassConsumptionObj : 0;
 
                 // 为每个车次创建 TripRecord（车次号从1开始，按机台+胎胚+物料维度独立编号）
                 for (int i = 1; i <= tripCount; i++) {
@@ -2191,27 +2446,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
         return 0;
-    }
-
-    /**
-     * 根据班次索引获取硫化记录的计划量
-     *
-     * @param lhResult   硫化记录
-     * @param classIndex 班次索引 (1-8)
-     * @return 计划量
-     */
-    private Integer getClassPlanQtyByIndex(LhScheduleResult lhResult, int classIndex) {
-        switch (classIndex) {
-            case 1: return lhResult.getClass1PlanQty();
-            case 2: return lhResult.getClass2PlanQty();
-            case 3: return lhResult.getClass3PlanQty();
-            case 4: return lhResult.getClass4PlanQty();
-            case 5: return lhResult.getClass5PlanQty();
-            case 6: return lhResult.getClass6PlanQty();
-            case 7: return lhResult.getClass7PlanQty();
-            case 8: return lhResult.getClass8PlanQty();
-            default: return null;
-        }
     }
 
     /**

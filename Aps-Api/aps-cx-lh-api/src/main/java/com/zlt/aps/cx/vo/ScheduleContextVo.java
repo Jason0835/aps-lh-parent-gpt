@@ -214,6 +214,11 @@ public class ScheduleContextVo {
     private List<CxPrecisionPlan> precisionPlans;
 
     /**
+     * 当日精度计划扣量是否已应用（避免跨班次重复扣减）
+     */
+    private boolean precisionPlanApplied;
+
+    /**
      * 材料异常列表
      */
     private List<CxMaterialException> materialExceptions;
