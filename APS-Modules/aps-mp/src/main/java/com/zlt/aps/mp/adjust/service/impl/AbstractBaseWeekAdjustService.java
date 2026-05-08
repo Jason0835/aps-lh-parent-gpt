@@ -647,6 +647,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         MpDayProductionStatisticsDetailVo dayProductionStatisticsDetailVo = new MpDayProductionStatisticsDetailVo();
+        dayProductionStatisticsDetailVo.setMaxLhMachines(Convert.toInt(capacityVo.getMaxLhMachines(), 0).equals(0) ? null : capacityVo.getMaxLhMachines());
+        dayProductionStatisticsDetailVo.setMaxEmbryoTypes(Convert.toInt(capacityVo.getMaxEmbryoTypes(), 0).equals(0) ? null : capacityVo.getMaxEmbryoTypes());
         dayProductionStatisticsDetailVo.setLhMachines(Convert.toInt(capacityVo.getUsedLhMachines(), 0).equals(0) ? null : capacityVo.getUsedLhMachines());
         dayProductionStatisticsDetailVo.setEmbryoCount(Convert.toInt(capacityVo.getUsedEmbryoTypes(), 0).equals(0) ? null : capacityVo.getUsedEmbryoTypes());
         dayProductionStatisticsDetailVo.setChangeMould(Convert.toInt(capacityVo.getUsedChangeMould(), 0).equals(0) ? null : capacityVo.getUsedChangeMould());
@@ -901,6 +903,33 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 8、更新结构转产
             updateStructureAllocationList(contextDTO);
             // 9、处理月计划统计结果
+            handleMonthPlanStatistics(contextDTO);
+            log.info("周程调整确认流程执行完成");
+        }catch (Exception e) {
+            log.error("周程调整确认流程执行异常", e);
+            throw new BusinessException(e.getMessage());
+        }
+    }
+
+    /**
+     * 重新计算
+     * @param contextDTO 周程滚动调整上下文对象
+     * @throws BusinessException 业务异常
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void recalculate(MpRollAdjustContextDTO contextDTO) throws BusinessException {
+        log.info("开始执行周程调整重新计算流程，调整类型：{}，工厂：{}，年份：{}，月份：{}，版本：{}，排产版本：{}，结构名称：{}，排产机台：{}，开始日期：{}，结束日期：{}，调整开始日期：{}，调整结束日期：{}",
+                contextDTO.getAdjustType(), contextDTO.getFactoryCode(), contextDTO.getMpYear(),
+                contextDTO.getMpMonth(), contextDTO.getVersion(), contextDTO.getProductionVersion(),
+                contextDTO.getStructureName(), contextDTO.getScheduledMachines(), contextDTO.getStartDay(),
+                contextDTO.getEndDay(), contextDTO.getAdjustStartDay(), contextDTO.getAdjustEndDay());
+        try{
+            // 查询周程调整结果
+            queryAdjustResult(contextDTO);
+            // 根据优先级顺序分配生产数量
+            allocateProductionByPriority(contextDTO);
+            // 处理月计划统计结果
             handleMonthPlanStatistics(contextDTO);
             log.info("周程调整确认流程执行完成");
         }catch (Exception e) {

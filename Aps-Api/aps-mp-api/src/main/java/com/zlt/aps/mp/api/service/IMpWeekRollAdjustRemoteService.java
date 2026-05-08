@@ -3,10 +3,11 @@ package com.zlt.aps.mp.api.service;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.mp.api.domain.dto.MpWeekRollAdjustDTO;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.*;
-import com.zlt.aps.mp.api.domain.dto.MpWeekRollAdjustDTO;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 
 /**
@@ -45,5 +46,12 @@ public interface IMpWeekRollAdjustRemoteService {
     @ApiOperation("确认调整结果")
     @PostMapping("/mpWeekRollAdjust/confirmAdjust")
     AjaxResult confirmAdjust(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO);
+
+    /**
+     * 重新计算
+     */
+    @ApiOperation("重新计算")
+    @PostMapping("/mpWeekRollAdjust/recalculate")
+    AjaxResult recalculate(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO);
 
 }

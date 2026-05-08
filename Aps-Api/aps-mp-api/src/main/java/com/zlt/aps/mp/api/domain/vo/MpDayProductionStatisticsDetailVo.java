@@ -14,6 +14,16 @@ import java.io.Serializable;
 public class MpDayProductionStatisticsDetailVo implements Serializable {
 
     /**
+     * 最大硫化机台数
+     */
+    private Integer maxLhMachines = 0;
+
+    /**
+     * 最大胎胚种类数
+     */
+    private Integer maxEmbryoTypes = 0;
+
+    /**
      * 胎胚种类数
      */
     private Integer embryoCount;

@@ -32,5 +32,11 @@ public interface IMpWeekAdjustService {
      * @param contextDTO 周程滚动调整上下文对象
      */
     void initVersion(MpRollAdjustContextDTO contextDTO);
+
+    /**
+     * 重新计算
+     * @param contextDTO 周程滚动调整上下文对象
+     */
+    void recalculate(MpRollAdjustContextDTO contextDTO);
 }
 
