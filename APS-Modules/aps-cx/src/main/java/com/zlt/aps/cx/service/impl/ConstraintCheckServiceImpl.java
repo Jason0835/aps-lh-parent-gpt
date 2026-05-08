@@ -1,6 +1,7 @@
 package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.CxTreadParkingConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
@@ -269,7 +270,7 @@ public class ConstraintCheckServiceImpl implements ConstraintCheckService {
         }
 
         // 检查机台是否启用
-        if (machine.getIsActive() == null || machine.getIsActive() != 1) {
+        if (!ApsConstant.APS_STRING_1.equals(machine.getIsActive())) {
             violations.add(String.format("机台 %s 未启用", machine.getCxMachineCode()));
         }
 

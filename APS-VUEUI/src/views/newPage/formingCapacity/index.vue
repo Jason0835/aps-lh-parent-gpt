@@ -73,6 +73,7 @@ import { downloadLink } from "@/utils/request";
 
 import {
   listMdmMoldingMachine,
+  saveMdmMoldingMachine,
   removeMdmMoldingMachine,
 } from "@/api/monthplan/mdmMoldingMachine";
 
@@ -88,7 +89,7 @@ export default {
     infoDialog,
     TltUploadForm
   },
-  dicts: ["roll_over_type", "biz_yes_no", "biz_factory_name",'biz_machine_brand','biz_class_type','cx_machine_type_code'],
+  dicts: ["roll_over_type", "biz_yes_no", "biz_factory_name",'biz_machine_brand','biz_class_type','cx_machine_type_code', "biz_available_status"],
   provide() {
     return {
       parentDict: this.dict,
@@ -182,6 +183,41 @@ export default {
           label: this.$t("ui.data.column.capsuleChuck.maxDayCapacity"),
         },
         {
+          prop: "isActive",
+          label: this.$t("ui.data.column.machine.status"),
+          minWidth: 100,
+          render: ({ row }) => {
+            return (
+              <el-switch
+                active-value="1"
+                inactive-value="0"
+                disabled={this.loading}
+                value={row.isActive}
+                onChange={(val) => {
+                  let text = val == "0" ? "禁用" : "启用";
+                  this.$confirm(`确认${text}吗？`, { type: "warning" }).then(
+                    async () => {
+                      try {
+                        this.loading = true;
+                        const data = await saveMdmMoldingMachine({
+                          ...row,
+                          isActive: val,
+                        });
+                        this.$modal.msgSuccess(data.msg);
+                        this.getList();
+                      } catch (error) {
+                        console.error(error);
+                      } finally {
+                        this.loading = false;
+                      }
+                    }
+                  );
+                }}
+              ></el-switch>
+            );
+          },
+        },
+        {
           prop: "remark",
           label: this.$t("common.remark"),
         },
@@ -252,6 +288,18 @@ export default {
           type: "select",
           filterable: true,
           dictData: this.dict.type.cx_machine_type_code,
+        },
+        {
+          prop: "isActive",
+          label: this.$t("ui.data.column.machine.status"),
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.isActive}
+                options={this.dict.type.biz_available_status}
+              />
+            );
+          },
         },
       ];
     },

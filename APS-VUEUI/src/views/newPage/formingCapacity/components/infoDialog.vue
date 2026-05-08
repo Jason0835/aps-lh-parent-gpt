@@ -188,6 +188,13 @@ export default {
           label: this.$t("ui.data.column.capsuleChuck.maxDayCapacity"),
           type: "number",
         },
+        {
+          prop: "isActive",
+          label: this.$t("ui.data.column.machine.status"),
+          type: "switch",
+          activeValue: "1",
+          inactiveValue: "0",
+        },
 
         {
           prop: "remark",
@@ -223,10 +230,12 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          isActive: data.isActive || "0",
         };
       } else {
         this.form = {
           factoryCode: "116",
+          isActive: "1",
         };
       }
     },
