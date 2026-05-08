@@ -8,7 +8,6 @@ export function listProductionPlan(query) {
   })
 }
 
-
 export function listProduction(query) {
   return request({
     url: '/monthplan/factoryMonthPlanFinalResult/list',
@@ -20,6 +19,14 @@ export function listProduction(query) {
 export function syncAdjustedMonthPlanToScmAndMes(query) {
   return request({
     url: '/monthplan/factoryMonthPlanFinalResult/syncAdjustedMonthPlanToScmAndMes',
+    method: 'post',
+    data: query
+  })
+}
+
+export function getFinalResultVersionList(query) {
+  return request({
+    url: '/monthplan/factoryMonthPlanFinalResult/getVersionList',
     method: 'post',
     data: query
   })
