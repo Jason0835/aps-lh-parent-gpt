@@ -129,6 +129,7 @@
         <if test="mainPattern != null and mainPattern != ''">AND fin.MAIN_PATTERN like CONCAT('%', #{mainPattern}, '%')</if>
         <if test="pattern != null and pattern != ''">AND fin.PATTERN like CONCAT('%', #{pattern}, '%')</if>
         <if test="structureName != null and structureName != ''">AND fin.STRUCTURE_NAME like CONCAT('%', #{structureName}, '%')</if>
+        <if test="cxMachineCode != null and cxMachineCode != ''">AND fin.CX_MACHINE_CODE like CONCAT('%', #{cxMachineCode}, '%')</if>
 
         ORDER BY STRUCTURE_NAME, MAIN_PATTERN, MAIN_MATERIAL_DESC
     </select>

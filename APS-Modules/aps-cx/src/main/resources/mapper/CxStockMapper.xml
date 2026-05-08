@@ -10,19 +10,50 @@
             FACTORY_CODE,
             STOCK_DATE,
             EMBRYO_CODE,
-            DATA_SOURCE
+            DATA_SOURCE,
+            IS_DELETE
         FROM T_CX_STOCK
-        WHERE (FACTORY_CODE, STOCK_DATE, EMBRYO_CODE) IN
+        WHERE IS_DELETE = 0
+          AND (FACTORY_CODE, STOCK_DATE, EMBRYO_CODE) IN
         <foreach collection="list" item="item" open="(" separator="," close=")">
             (#{item.factoryCode}, #{item.stockDate}, #{item.embryoCode})
         </foreach>
     </select>
 
-    <delete id="deleteByFactoryCodeAndDataSource">
-        DELETE FROM T_CX_STOCK
+    <update id="logicDeleteByFactoryCodeAndDataSource">
+        UPDATE T_CX_STOCK
+        SET IS_DELETE = 1,
+            UPDATE_BY = #{updateBy},
+            UPDATE_TIME = #{updateTime}
         WHERE FACTORY_CODE = #{factoryCode}
           AND DATA_SOURCE = #{dataSource}
-    </delete>
+          AND IS_DELETE = 0
+    </update>
+
+    <update id="logicDeleteByIds">
+        UPDATE T_CX_STOCK
+        SET IS_DELETE = 1,
+            UPDATE_BY = #{updateBy},
+            UPDATE_TIME = #{updateTime}
+        WHERE ID IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+          AND IS_DELETE = 0
+    </update>
+
+    <update id="recoverByUniqueKeyList">
+        UPDATE T_CX_STOCK
+        SET IS_DELETE = 0,
+            DATA_SOURCE = #{dataSource},
+            UPDATE_BY = #{updateBy},
+            UPDATE_TIME = #{updateTime}
+        WHERE IS_DELETE = 1
+          AND (FACTORY_CODE, STOCK_DATE, EMBRYO_CODE) IN
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            (#{item.factoryCode}, #{item.stockDate}, #{item.embryoCode})
+        </foreach>
+    </update>
 
     <select id="selectByFactoryCodeAndDataSource" resultType="com.zlt.aps.cx.api.domain.entity.CxStock">
         SELECT
@@ -34,6 +65,26 @@
         FROM T_CX_STOCK
         WHERE FACTORY_CODE = #{factoryCode}
           AND DATA_SOURCE = #{dataSource}
+          AND IS_DELETE = 0
     </select>
+
+    <select id="selectAllByFactoryCodeAndDataSource" resultType="com.zlt.aps.cx.api.domain.entity.CxStock">
+        SELECT
+            ID,
+            FACTORY_CODE,
+            STOCK_DATE,
+            EMBRYO_CODE,
+            DATA_SOURCE,
+            IS_DELETE
+        FROM T_CX_STOCK
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND DATA_SOURCE = #{dataSource}
+    </select>
+
+    <delete id="physicalDeleteByFactoryCodeAndDataSource">
+        DELETE FROM T_CX_STOCK
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND DATA_SOURCE = #{dataSource}
+    </delete>
 
 </mapper>
