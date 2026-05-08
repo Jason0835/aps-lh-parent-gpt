@@ -56,8 +56,7 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     private String machineName;
 
     /** 寸口信息 */
-    @ImportExcelValidated(required = true, number = true, min = 0, max = 9999)
-    @Excel(name = "ui.data.column.info.dimension", cellType = Excel.ColumnType.NUMERIC, sort = 50)
+//    @Excel(name = "ui.data.column.info.dimension",sort = 50)
     @ApiModelProperty(value = "寸口信息", name = "dimension")
     @TableField(value = "DIMENSION")
     private BigDecimal dimension;
