@@ -342,7 +342,9 @@ export default {
                   {this.$t("ui.data.console.productNoDetail")}
                 </text-button>
                 <text-button
-                  onClick={() => this.handleRouterMonthlyProductionPlanQuery()}
+                  onClick={() =>
+                    this.handleRouterMonthlyProductionPlanQuery(row)
+                  }
                 >
                   {this.$t("common.button.adjust")}
                 </text-button>
@@ -731,11 +733,23 @@ export default {
         // },
       });
     },
-    handleRouterMonthlyProductionPlanQuery() {
+    /** 月计划调整查询页：/monthPlanManagement/console/monthlyProductionPlan */
+    handleRouterMonthlyProductionPlanQuery(row) {
+      const query = {};
+      if (row && row.factoryCode) {
+        query.factoryCode = row.factoryCode;
+      }
+      if (row && row.year != null && row.month != null) {
+        const m = Number(row.month);
+        query.yearMonth = `${row.year}-${m < 10 ? "0" + m : m}`;
+      }
+      if (row && row.productionVersion) {
+        query.productionVersion = row.productionVersion;
+      }
       this.$router.push({
-        name: 'RollingCycle',
-        query: {pageType: "inner" },
-      })
+        path: "/monthPlanManagement/console/monthlyProductionPlan",
+        query,
+      });
     },
     handleReport(row) {
       this.$router.push({
