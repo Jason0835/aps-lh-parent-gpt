@@ -26,6 +26,7 @@ import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.mp.adjust.service.IMpWeekAdjustService;
 import com.zlt.aps.mp.adjust.service.impl.MpWeekAdjustFactory;
+import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.dto.MpWeekRollAdjustDTO;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
@@ -202,13 +203,13 @@ public class MpWeekRollAdjustController extends BaseController {
      * 排序：按英寸->结构->最大型腔数->主花纹->活块数->物料描述
      * @param mpAdjustResultList
      */
-    protected void sortAdjustResultList(List<MpAdjustResult> mpAdjustResultList) {
+    public void sortAdjustResultList(List<? extends IFinalAndAdjustResultInterface> mpAdjustResultList) {
         if (PubUtil.isEmpty(mpAdjustResultList)) {
             return;
         }
         // 主花纹的最大型腔数
         Map<String, Integer> maxMouldCavityQtyMap = new HashMap<>();
-        for (MpAdjustResult adjustResult: mpAdjustResultList) {
+        for (IFinalAndAdjustResultInterface adjustResult: mpAdjustResultList) {
             //记录主花纹的最大型腔数
             Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(adjustResult.getMainPattern(), 0);
             maxMouldCavityQtyMap.put(adjustResult.getMainPattern(), Math.max(maxMouldCavityQty, adjustResult.getMouldCavityQty()));
@@ -224,18 +225,18 @@ public class MpWeekRollAdjustController extends BaseController {
      * 排序器：按英寸->结构->最大型腔数->主花纹->活块数->物料描述
      * @return
      */
-    protected Comparator<MpAdjustResult> getAdjustResultSortComparator() {
+    protected Comparator<IFinalAndAdjustResultInterface> getAdjustResultSortComparator() {
         // 一级排序：结构名称升序，空值排最后
-        return Comparator.comparing(MpAdjustResult::getTbrProSize, Comparator.nullsLast(String::compareTo))
-                .thenComparing(MpAdjustResult::getStructureName,Comparator.nullsLast(String::compareTo))
+        return Comparator.comparing(IFinalAndAdjustResultInterface::getTbrProSize, Comparator.nullsLast(String::compareTo))
+                .thenComparing(IFinalAndAdjustResultInterface::getStructureName,Comparator.nullsLast(String::compareTo))
                 // 最大型腔数
-                .thenComparing(MpAdjustResult::getMaxMouldCavityQty, Comparator.reverseOrder())
+                .thenComparing(IFinalAndAdjustResultInterface::getMaxMouldCavityQty, Comparator.reverseOrder())
                 // 主花纹
-                .thenComparing(MpAdjustResult::getMainPattern, Comparator.nullsLast(String::compareTo))
+                .thenComparing(IFinalAndAdjustResultInterface::getMainPattern, Comparator.nullsLast(String::compareTo))
                 // 活块数
-                .thenComparing(MpAdjustResult::getTypeBlockQty, Comparator.reverseOrder())
+                .thenComparing(IFinalAndAdjustResultInterface::getTypeBlockQty, Comparator.reverseOrder())
                 // 物料描述
-                .thenComparing(MpAdjustResult::getMaterialDesc, Comparator.nullsLast(String::compareTo));
+                .thenComparing(IFinalAndAdjustResultInterface::getMaterialDesc, Comparator.nullsLast(String::compareTo));
     }
 
     /**

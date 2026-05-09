@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -29,7 +30,7 @@ import java.util.Optional;
 @Data
 @TableName(value = "T_MP_MONTH_PLAN_PROD_FINAL")
 @ApiModel(value = "工厂月生产计划-最终排产计划定稿对象", description = "工厂月生产计划-最终排产计划定稿对象")
-public class FactoryMonthPlanProductionFinalResult extends BaseEntity {
+public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements IFinalAndAdjustResultInterface {
 
     private static final long serialVersionUID = 1L;
 
