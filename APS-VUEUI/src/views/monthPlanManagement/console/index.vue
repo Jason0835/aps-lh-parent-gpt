@@ -732,11 +732,10 @@ export default {
       });
     },
     handleRouterMonthlyProductionPlanQuery() {
-      // this.$router.push({ path: "/new/monthlyProductionPlan" });
       this.$router.push({
-        name: "MonthPlanStructureInnerAdjust",
-        query: { pageType: "inner" },
-      });
+        name: 'RollingCycle',
+        query: {pageType: "inner" },
+      })
     },
     handleReport(row) {
       this.$router.push({
