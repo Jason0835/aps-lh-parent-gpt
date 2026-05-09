@@ -355,7 +355,9 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         //10.构建月计划统计结果
         MpMonthPlanStatistics monthPlanStatisticsVo = buildMonthPlanStatistics(contextDTO, oneStructMpFinalList,YesOrNoEnum.YES.getCode());
         List<MpMonthPlanStatistics> monthPlanStatisticsList = new ArrayList<>();
-        monthPlanStatisticsList.add(monthPlanStatisticsVo);
+        if (monthPlanStatisticsVo != null) {
+            monthPlanStatisticsList.add(monthPlanStatisticsVo);
+        }
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
 
         contextDTO.setSaveMpProdFinalList(oneStructMpFinalList);
