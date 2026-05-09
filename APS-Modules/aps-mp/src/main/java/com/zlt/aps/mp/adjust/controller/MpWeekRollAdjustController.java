@@ -199,7 +199,7 @@ public class MpWeekRollAdjustController extends BaseController {
     }
 
     /**
-     * 排序：按英寸->结构->最大型腔数->主花纹->活块数->物料描述
+     * 排序：按英寸->结构->同胎胚->最大型腔数->主花纹->活块数->物料描述
      * @param mpAdjustResultList
      */
     protected void sortAdjustResultList(List<MpAdjustResult> mpAdjustResultList) {
@@ -221,7 +221,7 @@ public class MpWeekRollAdjustController extends BaseController {
     }
 
     /**
-     * 排序器：按英寸->结构->最大型腔数->主花纹->活块数->物料描述
+     * 排序器：按英寸->结构->同胚胎->最大型腔数->主花纹->活块数->物料描述
      * @return
      */
     protected Comparator<MpAdjustResult> getAdjustResultSortComparator() {
