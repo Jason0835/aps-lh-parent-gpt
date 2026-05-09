@@ -8,6 +8,7 @@ import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.mapper.CxPrecisionPlanMapper;
+import com.zlt.aps.cx.mapper.LhScheduleResultMapper;
 import com.zlt.aps.cx.mapper.MdmSkuConstructionRefMapper;
 import com.zlt.aps.cx.service.engine.*;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
@@ -73,6 +74,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     private final BalancingService balancingService;
     private final MdmSkuConstructionRefMapper skuConstructionRefMapper;
     private final CxPrecisionPlanMapper precisionPlanMapper;
+    private final LhScheduleResultMapper lhScheduleResultMapper;
 
     /** 构造函数注入 */
     @Autowired
@@ -85,7 +87,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             ScheduleDayTypeHelper scheduleDayTypeHelper,
             @Lazy BalancingService balancingService,
             MdmSkuConstructionRefMapper skuConstructionRefMapper,
-            CxPrecisionPlanMapper precisionPlanMapper) {
+            CxPrecisionPlanMapper precisionPlanMapper,
+            LhScheduleResultMapper lhScheduleResultMapper) {
         this.continueTaskProcessor = continueTaskProcessor;
         this.trialTaskProcessor = trialTaskProcessor;
         this.newTaskProcessor = newTaskProcessor;
@@ -95,6 +98,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         this.balancingService = balancingService;
         this.skuConstructionRefMapper = skuConstructionRefMapper;
         this.precisionPlanMapper = precisionPlanMapper;
+        this.lhScheduleResultMapper = lhScheduleResultMapper;
     }
 
     /** 默认排程天数 */
@@ -542,6 +546,14 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return;
         }
 
+        // 精度计划只能安排在早班（06:00开始），夜班和中班不执行
+        boolean isMorningShift = isMorningShift(shiftConfig);
+        if (!isMorningShift) {
+            log.info("精度计划跳过: 当前班次{}不是早班，精度计划只安排在早班",
+                    shiftConfig.getShiftCode());
+            return;
+        }
+
         List<CxPrecisionPlan> precisionPlans = context.getPrecisionPlans();
         if (precisionPlans == null || precisionPlans.isEmpty()) {
             context.setPrecisionPlanApplied(true);
@@ -549,7 +561,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         List<CxPrecisionPlan> uncompleted = precisionPlans.stream()
-                .filter(p -> !"1".equals(p.getCompletionStatus()) && p.getPlanDate() != null)
+                .filter(p -> !"1".equals(p.getCompletionStatus()) && p.getPlanDate() != null && p.getScheduleDate() == null)
                 .sorted(Comparator.comparing(CxPrecisionPlan::getPlanDate))
                 .collect(Collectors.toList());
 
@@ -558,15 +570,21 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return;
         }
 
-        java.sql.Date todaySql = java.sql.Date.valueOf(scheduleDate);
+        // 将planDate转换为LocalDate做日期级比较，避免Date/Timestamp类型不一致导致after()判断错误
+        java.time.ZoneId zoneId = java.time.ZoneId.systemDefault();
         List<CxPrecisionPlan> urgentPlans = uncompleted.stream()
-                .filter(p -> !p.getPlanDate().after(todaySql))
+                .filter(p -> {
+                    LocalDate planLocalDate = p.getPlanDate().toInstant().atZone(zoneId).toLocalDate();
+                    return !planLocalDate.isAfter(scheduleDate);
+                })
                 .collect(Collectors.toList());
 
         LocalDate dayCutoffDate = scheduleDate.plusDays(context.getPrecisionAdvanceDays());
-        java.sql.Date dayCutoffSql = java.sql.Date.valueOf(dayCutoffDate);
         List<CxPrecisionPlan> futurePlans = uncompleted.stream()
-                .filter(p -> p.getPlanDate().after(todaySql) && !p.getPlanDate().after(dayCutoffSql))
+                .filter(p -> {
+                    LocalDate planLocalDate = p.getPlanDate().toInstant().atZone(zoneId).toLocalDate();
+                    return planLocalDate.isAfter(scheduleDate) && !planLocalDate.isAfter(dayCutoffDate);
+                })
                 .collect(Collectors.toList());
 
         log.info("精度计划筛选: 当天={}, 截止={}, 紧急{}条, 未来{}条",
@@ -623,7 +641,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             double bestDeductionNeeded = Double.MAX_VALUE;
             BigDecimal bestStockHours = BigDecimal.ZERO;
             for (CxPrecisionPlan plan : futurePlans) {
-                double idleH = machineIdleHours.getOrDefault(plan.getMachineCode(), 0.0);
+                double idleH = machineIdleHours.getOrDefault(plan.getMachineCode(), (double) shiftHours);
                 double deductionNeeded = Math.max(0, 4.0 - idleH);
                 BigDecimal stockH = machineTotalStockHours.getOrDefault(plan.getMachineCode(), BigDecimal.ZERO);
 
@@ -645,7 +663,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 selectedPlans.add(bestPlan);
                 log.info("精度计划挑选: 未来计划提前执行, 选中机台 {} (空闲{}h, 需扣{}h, 可供硫化{}h)",
                         bestPlan.getMachineCode(),
-                        String.format("%.1f", machineIdleHours.getOrDefault(bestPlan.getMachineCode(), 0.0)),
+                        String.format("%.1f", machineIdleHours.getOrDefault(bestPlan.getMachineCode(), (double) shiftHours)),
                         String.format("%.1f", bestDeductionNeeded),
                         String.format("%.1f", bestStockHours));
             } else {
@@ -752,6 +770,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         Map<String, Integer> materialStockMap = context.getMaterialStockMap();
 
         int classIndex = parseClassIndex(shiftConfig);
+        Set<LhScheduleResult> modifiedLhResults = new HashSet<>();
 
         for (TaskAllocation taskAlloc : sortedTasks) {
             if (remainingSeconds <= 0) break;
@@ -797,13 +816,24 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         : 0;
                 int totalAvailable = stock + newQty;
                 if (totalAvailable < currentClassPlan) {
-                    setClassPlanQtyByIndex(lhResult, classIndex, totalAvailable);
-                    appendClassAnalysisByIndex(lhResult, classIndex, "成型精度联动");
-                    log.info("  硫化需求调整: 胎胚={}, CLASS{}原计划量={}, 库存={}+产量={}={}, 调整为{}",
+                    // 不扣减硫化计划量，只在原因分析中记录精度影响
+                    String precisionNote = String.format("成型精度影响: 库存%d+产量%d=%d<硫化计划%d, 缺口%d条",
+                            stock, newQty, totalAvailable, currentClassPlan, currentClassPlan - totalAvailable);
+                    appendClassAnalysisByIndex(lhResult, classIndex, precisionNote);
+                    modifiedLhResults.add(lhResult);
+                    log.info("  硫化原因分析: 胎胚={}, CLASS{}硫化计划={}, 库存={}+产量={}={}, 缺口={}",
                             taskAlloc.getEmbryoCode(), classIndex,
-                            currentClassPlan, stock, newQty, totalAvailable, totalAvailable);
+                            currentClassPlan, stock, newQty, totalAvailable, currentClassPlan - totalAvailable);
                 }
             }
+        }
+
+        // 持久化硫化需求调整到数据库
+        if (!modifiedLhResults.isEmpty()) {
+            for (LhScheduleResult lhResult : modifiedLhResults) {
+                lhScheduleResultMapper.updateById(lhResult);
+            }
+            log.info("精度扣量: 已更新 {} 条硫化排程结果到数据库", modifiedLhResults.size());
         }
 
         log.info("精度扣量完成: 机台={}, 需扣{}h, 实扣{}h",
@@ -3271,5 +3301,32 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
         return 2;
+    }
+
+    /**
+     * 判断是否是早班
+     *
+     * <p>精度计划只能安排在早班执行。判断规则：
+     * <ul>
+     *   <li>班次名称包含"早班"</li>
+     *   <li>或班次编码以"DAY_"开头</li>
+     *   <li>或班次开始时间在06:00~12:00之间</li>
+     * </ul>
+     */
+    private boolean isMorningShift(CxShiftConfig shiftConfig) {
+        if (shiftConfig == null) {
+            return false;
+        }
+        // 规则1：班次名称包含"早班"
+        if (shiftConfig.getShiftName() != null && shiftConfig.getShiftName().contains("早班")) {
+            return true;
+        }
+        // 规则2：班次编码以"DAY_"开头（如DAY_D1, DAY_D2, DAY_D3）
+        if (shiftConfig.getShiftCode() != null && shiftConfig.getShiftCode().startsWith("DAY_")) {
+            return true;
+        }
+        // 规则3：班次开始时间在06:00~12:00之间
+        LocalTime startTime = shiftConfig.getShiftStartTime();
+        return !startTime.isBefore(LocalTime.of(6, 0)) && startTime.isBefore(LocalTime.of(12, 0));
     }
 }

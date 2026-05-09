@@ -1,14 +1,13 @@
 /**
- * 跳转月计划结构内/结构调整页（组件路径：newPage/rollingCycle/index）。
- * BootUI 若仍使用历史路由名 MonthPlanStructureInnerAdjust，需将菜单组件改为上述路径，或保留该 name 与 rollingCycle 指向同一组件。
+ * 跳转月计划「结构调整」页（路由名：MonthPlanStructureAdjust）。
  */
 export function pushToMonthPlanStructureAdjust(router, query) {
   const isDup = (e) => e && e.name === "NavigationDuplicated";
   return router
-    .push({ name: "rollingCycle", query })
+    .push({ name: "MonthPlanStructureAdjust", query })
     .catch((e) => {
       if (isDup(e)) return Promise.resolve();
-      return router.push({ name: "MonthPlanStructureInnerAdjust", query });
+      return router.push({ name: "MonthPlanStructureAdjust", query });
     })
     .catch(() => {});
 }
@@ -17,10 +16,10 @@ export function pushToMonthPlanStructureAdjust(router, query) {
 export function replaceMonthPlanStructureAdjust(router, query) {
   const isDup = (e) => e && e.name === "NavigationDuplicated";
   return router
-    .replace({ name: "rollingCycle", query })
+    .replace({ name: "MonthPlanStructureAdjust", query })
     .catch((e) => {
       if (isDup(e)) return Promise.resolve();
-      return router.replace({ name: "MonthPlanStructureInnerAdjust", query });
+      return router.replace({ name: "MonthPlanStructureAdjust", query });
     })
     .catch(() => {});
 }

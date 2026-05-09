@@ -1886,7 +1886,7 @@ export default {
       ) {
         this.monthPlanFromFinalSelect = false;
         this.$router.replace({
-          name: "MonthPlanStructureInnerAdjust",
+          name: "MonthPlanRollingCycleDevLegacy",
           query: { pageType: this.$route.query.pageType || "structure" },
         });
       }
