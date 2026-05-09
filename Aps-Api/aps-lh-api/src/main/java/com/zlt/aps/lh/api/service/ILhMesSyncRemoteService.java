@@ -23,6 +23,10 @@ public interface ILhMesSyncRemoteService {
     @PostMapping("/mesSync/deleteMachineOnlineInfo")
     AjaxResult deleteMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode);
 
+    @ApiOperation("根据分厂编号逻辑删除硫化在机信息")
+    @PostMapping("/mesSync/logicDeleteMachineOnlineInfo")
+    AjaxResult logicDeleteMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy);
+
     @ApiOperation("批量保存硫化在机信息")
     @PostMapping("/mesSync/saveMachineOnlineInfoBatch")
     AjaxResult saveMachineOnlineInfoBatch(@RequestBody List<LhMachineOnlineInfo> list);
@@ -30,6 +34,10 @@ public interface ILhMesSyncRemoteService {
     @ApiOperation("批量删除胶囊已使用次数")
     @PostMapping("/mesSync/deleteRepairCapsule")
     AjaxResult deleteRepairCapsule(@RequestParam("factoryCode") String factoryCode);
+
+    @ApiOperation("根据分厂编号逻辑删除胶囊已使用次数")
+    @PostMapping("/mesSync/logicDeleteRepairCapsule")
+    AjaxResult logicDeleteRepairCapsule(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy);
 
     @ApiOperation("批量保存胶囊已使用次数")
     @PostMapping("/mesSync/saveRepairCapsuleBatch")

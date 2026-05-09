@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,9 +61,15 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
     @ApiOperation("批量删除成型在机信息")
     @PostMapping("/deleteMachineOnlineInfo")
     public AjaxResult deleteMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("FACTORY_CODE", factoryCode);
-        baseDao.deleteByMap(CxMachineOnlineInfo.class, map);
+        cxMachineOnlineInfoMapper.logicDeleteByFactoryCode(factoryCode, "MES", new Date());
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("根据分厂编号逻辑删除成型在机信息")
+    @PostMapping("/logicDeleteMachineOnlineInfo")
+    public AjaxResult logicDeleteMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy) {
+        cxMachineOnlineInfoMapper.logicDeleteByFactoryCode(factoryCode, updateBy, new Date());
         return AjaxResult.success();
     }
 
@@ -148,7 +155,7 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
     }
 
     @Override
-    @ApiOperation("查询成型库存已存在数据（按唯一键）")
+    @ApiOperation("查询成型库存已存在数据（按唯一键，仅未删除）")
     @PostMapping("/selectCxStockExists")
     public List<CxStock> selectCxStockExists(@RequestBody List<CxStock> list) {
         return cxStockMapper.selectByUniqueKeyList(list);
@@ -165,18 +172,45 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
     }
 
     @Override
-    @ApiOperation("根据分厂编号和数据来源删除成型库存")
-    @PostMapping("/deleteCxStockByDataSource")
-    public AjaxResult deleteCxStockByDataSource(@RequestParam("factoryCode") String factoryCode, @RequestParam("dataSource") String dataSource) {
-        cxStockMapper.deleteByFactoryCodeAndDataSource(factoryCode, dataSource);
+    @ApiOperation("根据分厂编号和数据来源逻辑删除成型库存")
+    @PostMapping("/logicDeleteCxStockByDataSource")
+    public AjaxResult logicDeleteCxStockByDataSource(@RequestParam("factoryCode") String factoryCode,
+                                                      @RequestParam("dataSource") String dataSource,
+                                                      @RequestParam("updateBy") String updateBy) {
+        cxStockMapper.logicDeleteByFactoryCodeAndDataSource(factoryCode, dataSource, updateBy, new Date());
         return AjaxResult.success();
     }
 
     @Override
-    @ApiOperation("根据分厂编号和数据来源查询成型库存")
+    @ApiOperation("根据分厂编号和数据来源删除成型库存")
+    @PostMapping("/deleteCxStockByDataSource")
+    public AjaxResult deleteCxStockByDataSource(@RequestParam("factoryCode") String factoryCode, @RequestParam("dataSource") String dataSource) {
+        cxStockMapper.physicalDeleteByFactoryCodeAndDataSource(factoryCode, dataSource);
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("根据分厂编号和数据来源查询成型库存（仅未删除）")
     @PostMapping("/selectCxStockByDataSource")
     public List<CxStock> selectCxStockByDataSource(@RequestParam("factoryCode") String factoryCode, @RequestParam("dataSource") String dataSource) {
         return cxStockMapper.selectByFactoryCodeAndDataSource(factoryCode, dataSource);
+    }
+
+    @Override
+    @ApiOperation("根据分厂编号和数据来源查询全部成型库存（包含已删除）")
+    @PostMapping("/selectAllCxStockByDataSource")
+    public List<CxStock> selectAllCxStockByDataSource(@RequestParam("factoryCode") String factoryCode, @RequestParam("dataSource") String dataSource) {
+        return cxStockMapper.selectAllByFactoryCodeAndDataSource(factoryCode, dataSource);
+    }
+
+    @Override
+    @ApiOperation("根据ID列表批量逻辑删除成型库存")
+    @PostMapping("/logicDeleteCxStockByIds")
+    public AjaxResult logicDeleteCxStockByIds(@RequestBody List<Long> ids) {
+        if (ids != null && !ids.isEmpty()) {
+            cxStockMapper.logicDeleteByIds(ids, "MES", new Date());
+        }
+        return AjaxResult.success();
     }
 
     @Override
@@ -184,7 +218,19 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
     @PostMapping("/deleteCxStockByIds")
     public AjaxResult deleteCxStockByIds(@RequestBody List<Long> ids) {
         if (ids != null && !ids.isEmpty()) {
-            cxStockMapper.deleteBatchIds(ids);
+            cxStockMapper.logicDeleteByIds(ids, "MES", new Date());
+        }
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("根据唯一键恢复已逻辑删除的成型库存")
+    @PostMapping("/recoverCxStockByUniqueKey")
+    public AjaxResult recoverCxStockByUniqueKey(@RequestBody List<CxStock> list,
+                                                @RequestParam("dataSource") String dataSource,
+                                                @RequestParam("updateBy") String updateBy) {
+        if (list != null && !list.isEmpty()) {
+            cxStockMapper.recoverByUniqueKeyList(list, dataSource, updateBy, new Date());
         }
         return AjaxResult.success();
     }

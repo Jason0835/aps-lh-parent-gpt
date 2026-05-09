@@ -158,7 +158,7 @@ public class GroupPlanConclusionHandler {
         //获取使用硫化机台数低于minLhMachineCount的数据
         List<CxMachineUsedLhInfo> realLowMinLhMachineDayList = getLowMinLhMachineDayInfo(context, groupPlanInfo, productionUsedLhInfoList, conclusionRange, minLhMachineCount);
 
-        //20260507+  获取单个成型机台高优先级占当日排产的硫化机台数<2的天数数据
+        //20260507+  获取单个成型机台高优先级占当日排产的硫化机台数<3的天数数据
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo = groupPlanInfo.getDayProductionLimitInfo();
         if (!CollectionUtils.isEmpty(dayProductionLimitInfo)) {
             List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
@@ -354,7 +354,7 @@ public class GroupPlanConclusionHandler {
 
         List<GroupPlanCxLhCapacityLimitHelper> lowMinLhMachineDayList = getForcedConclusionDayInfo(groupPlanInfo, dayProductionLimitInfo);
         
-        //20260507+  获取单个成型机台高优先级占当日排产的硫化机台数<2的天数数据
+        //20260507+  获取单个成型机台高优先级占当日排产的硫化机台数<3的天数数据
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         List<GroupPlanCxLhCapacityLimitHelper> lowHeightPriorityLhMachineList = this.getLowHeightPriorityLhMachineList(
                 groupPlanInfo, dayLimitList);
@@ -439,7 +439,7 @@ public class GroupPlanConclusionHandler {
     }
     
     /**
-     * 获取单个成型机台高优先级占当日排产的硫化机台数<2的天数数据
+     * 获取单个成型机台高优先级占当日排产的硫化机台数<3的天数数据
      * @param groupPlanInfo
      * @param dayLimitList
      * @return

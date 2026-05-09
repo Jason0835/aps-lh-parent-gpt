@@ -187,14 +187,31 @@ public class BalancingService {
 
         // 获取其他参数
         boolean forceKeepHistory = getForceKeepHistoryConfig(context);
-        Map<String, Set<String>> machineHistoryMap = context.getMachineOnlineEmbryoMap();
-        if (machineHistoryMap == null) {
-            machineHistoryMap = new HashMap<>();
-        }
+        Map<String, Set<String>> machineHistoryMap = buildMachineHistoryMap(context);
 
         return balanceEmbryosToMachinesWithMachineCapacity(
                 tasks, configs, machineHistoryMap,
                 machineMaxLhMap, machineMaxEmbryoTypesMap, forceKeepHistory, context);
+    }
+
+    /**
+     * 构建历史机台映射（cxCode → Set&lt;embryoCode&gt;）
+     *
+     * <p>将 machineOnlineEmbryoMap（embryoCode → Set&lt;cxCode&gt;）反转为
+     * cxCode → Set&lt;embryoCode&gt; 格式，供均衡算法使用。
+     */
+    private Map<String, Set<String>> buildMachineHistoryMap(ScheduleContextVo context) {
+        Map<String, Set<String>> historyMap = new HashMap<>();
+        Map<String, Set<String>> onlineEmbryoMap = context.getMachineOnlineEmbryoMap();
+        if (onlineEmbryoMap != null) {
+            for (Map.Entry<String, Set<String>> entry : onlineEmbryoMap.entrySet()) {
+                String embryoCode = entry.getKey();
+                for (String cxCode : entry.getValue()) {
+                    historyMap.computeIfAbsent(cxCode, k -> new HashSet<>()).add(embryoCode);
+                }
+            }
+        }
+        return historyMap;
     }
 
     /**

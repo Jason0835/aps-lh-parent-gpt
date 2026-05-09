@@ -1,6 +1,8 @@
 package com.zlt.aps.cx.vo;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -16,6 +18,10 @@ import java.util.Date;
 @Data
 @ApiModel(value = "插单请求对象")
 public class ScheduleInsertVo {
+
+    /** 分厂编码 */
+    @ApiModelProperty(value = "分厂编码", required = true)
+    private String factoryCode;
 
     @ApiModelProperty(value = "排程日期", required = true)
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")

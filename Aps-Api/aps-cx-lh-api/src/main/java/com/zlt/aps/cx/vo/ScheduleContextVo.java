@@ -118,8 +118,8 @@ public class ScheduleContextVo {
 
     /**
      * 机台在机胎胚映射（快速查询用）
-     * Key: 成型机台编码
-     * Value: 该机台正在做的胎胚编码集合
+     * Key: 胎胚编码
+     * Value: 该胎胚正在做的机台编码集合
      */
     private Map<String, Set<String>> machineOnlineEmbryoMap;
 
@@ -217,6 +217,11 @@ public class ScheduleContextVo {
      * 当日精度计划扣量是否已应用（避免跨班次重复扣减）
      */
     private boolean precisionPlanApplied;
+
+    /**
+     * 精度计划提前天数（可配置参数 PRECISION_ADVANCE_DAYS）
+     */
+    private int precisionAdvanceDays;
 
     /**
      * 材料异常列表

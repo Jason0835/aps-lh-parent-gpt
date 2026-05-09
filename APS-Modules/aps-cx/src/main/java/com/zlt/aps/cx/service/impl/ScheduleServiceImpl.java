@@ -1,6 +1,7 @@
 package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
@@ -159,6 +160,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         try {
             log.info("开始执行排程，日期：{}，排程模式：{}", request.getScheduleDate(), request.getScheduleMode());
 
+            // 0. 回滚上次排程的精度计划（清除scheduleDate），使精度计划可被重新加载
+            rollbackPrecisionPlans();
+
             // 1. 构建排程上下文(流程图S5.1.6初始化)
             ScheduleContextVo context = buildScheduleContext(request);
             if (context == null) {
@@ -215,6 +219,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         try {
             log.info("开始执行重排程，日期：{}", request.getScheduleDate());
 
+            // 0. 回滚上次排程的精度计划（清除scheduleDate），使精度计划可被重新加载
+            rollbackPrecisionPlans();
+
             // 1. 构建排程上下文
             ScheduleContextVo context = buildScheduleContext(request);
 
@@ -262,11 +269,14 @@ public class ScheduleServiceImpl implements ScheduleService {
     /**
      * 加载精度计划
      *
-     * <p>查询条件：planDate <= 当前排程日期 + 提前天数（可配置），且 actualDate 为空（未执行）
-     * <p>例如：排程日期=5月7日，提前天数=3，查询 planDate <= 5月10日 的未执行精度计划
+     * <p>查询条件：planDate <= 排程起始日期 + 提前天数（可配置），且 actualDate 为空（未从MES回调），
+     * 且 scheduleDate 为空（未执行），且 isDelete=0
+     * <p>注意：此处使用排程起始日期一次性加载最大范围的数据，实际每日选择时会根据当天日期动态计算截止。
+     * 例如：传入排程日期=5月20日，提前天数=3，查询 planDate <= 5月23日 的所有未执行精度计划，
+     * 后续排5月18日时只选 planDate<=5月21日的，排5月19日只选 planDate<=5月22日的。
      *
      * @param context      排程上下文
-     * @param scheduleDate 排程日期
+     * @param scheduleDate 排程起始日期
      */
     private void loadPrecisionPlans(ScheduleContextVo context, LocalDate scheduleDate) {
         int precisionAdvanceDays = 3;
@@ -281,12 +291,15 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
         log.info("精度提前天数配置：{}天", precisionAdvanceDays);
 
+        context.setPrecisionAdvanceDays(precisionAdvanceDays);
+
         LocalDate cutoffDate = scheduleDate.plusDays(precisionAdvanceDays);
 
         List<CxPrecisionPlan> precisionPlans = precisionPlanMapper.selectList(
                 new LambdaQueryWrapper<CxPrecisionPlan>()
                         .le(CxPrecisionPlan::getPlanDate, java.sql.Date.valueOf(cutoffDate))
                         .isNull(CxPrecisionPlan::getActualDate)
+                        .isNull(CxPrecisionPlan::getScheduleDate)
                         .eq(CxPrecisionPlan::getIsDelete, "0"));
         context.setPrecisionPlans(precisionPlans);
 
@@ -322,6 +335,25 @@ public class ScheduleServiceImpl implements ScheduleService {
             log.info("批量删除日期 {} 的主表记录 {} 条", scheduleDate, existingResults.size());
         } else {
             log.info("日期 {} 无历史排程数据，跳过删除", scheduleDate);
+        }
+    }
+
+    /**
+     * 回滚精度计划的排程日期（清理上次排程回填的scheduleDate）
+     *
+     * <p>将实际未执行（actualDate为空）且未被删除（isDelete=0）的精度计划的scheduleDate置空，
+     * 使这些精度计划在重新排程时能被 loadPrecisionPlans 重新加载和分配。
+     * <p>已实际执行的精度计划（actualDate不为空）不回滚，因为已由MES确认执行。
+     */
+    private void rollbackPrecisionPlans() {
+        LambdaUpdateWrapper<CxPrecisionPlan> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.isNotNull(CxPrecisionPlan::getScheduleDate)
+                .isNull(CxPrecisionPlan::getActualDate)
+                .eq(CxPrecisionPlan::getIsDelete, "0")
+                .set(CxPrecisionPlan::getScheduleDate, null);
+        int count = precisionPlanMapper.update(null, updateWrapper);
+        if (count > 0) {
+            log.info("回滚精度计划 scheduleDate：清理 {} 条上次排程的精度计划回填记录", count);
         }
     }
 
@@ -623,7 +655,7 @@ public class ScheduleServiceImpl implements ScheduleService {
      */
     private void loadMaterials(ScheduleContextVo context) {
         List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
-        List<CxMachineOnlineInfo> onlineInfos = context.getOnlineInfos();
+//        List<CxMachineOnlineInfo> onlineInfos = context.getOnlineInfos();
 
         // 合并硫化任务物料和成型在机物料
         Set<String> materialCodes = new HashSet<>();
@@ -638,21 +670,21 @@ public class ScheduleServiceImpl implements ScheduleService {
             log.debug("从硫化排程结果提取到 {} 个不重复的外胎代码", lhMaterialCodes.size());
         }
 
-        // 2. 从成型在机信息提取物料编码
-        if (onlineInfos != null && !onlineInfos.isEmpty()) {
-            Set<String> onlineMaterialCodes = onlineInfos.stream()
-                    .map(CxMachineOnlineInfo::getMaterialCode)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-            int newCodes = 0;
-            for (String code : onlineMaterialCodes) {
-                if (materialCodes.add(code)) {
-                    newCodes++;
-                }
-            }
-            log.debug("从成型在机信息提取到 {} 个不重复的外胎代码，其中 {} 个是新增的",
-                    onlineMaterialCodes.size(), newCodes);
-        }
+        // 2. 从成型在机信息提取物料编码 KF_NICK成型在机已经没有给物料了
+//        if (onlineInfos != null && !onlineInfos.isEmpty()) {
+//            Set<String> onlineMaterialCodes = onlineInfos.stream()
+//                    .map(CxMachineOnlineInfo::getMaterialCode)
+//                    .filter(Objects::nonNull)
+//                    .collect(Collectors.toSet());
+//            int newCodes = 0;
+//            for (String code : onlineMaterialCodes) {
+//                if (materialCodes.add(code)) {
+//                    newCodes++;
+//                }
+//            }
+//            log.debug("从成型在机信息提取到 {} 个不重复的外胎代码，其中 {} 个是新增的",
+//                    onlineMaterialCodes.size(), newCodes);
+//        }
 
         if (materialCodes.isEmpty()) {
             log.info("硫化排程结果和成型在机信息均为空，加载物料信息 0 条");
@@ -705,24 +737,26 @@ public class ScheduleServiceImpl implements ScheduleService {
     /**
      * 构建机台在机胎胚映射
      *
-     * <p>使用物料编码 + 胎胚编码组合作为唯一键：
-     * - 机台在产: mesMaterialCode + embryoSpec
-     * - 硫化任务: materialCode + embryoCode
+     * <p>使用胎胚编码作为 Key，便于快速查找续作机台：
+     * <pre>
+     * embryoCode → Set&lt;cxCode&gt;
+     * </pre>
+     *
+     * <p>说明：由于MES数据时，materialCode字段被错误地填入了胎胚编号，
+     * 因此只使用胎胚编码作为匹配键，避免组合键匹配失败。
      */
     private void buildMachineOnlineEmbryoMap(ScheduleContextVo context) {
         Map<String, Set<String>> machineOnlineEmbryoMap = new HashMap<>();
         for (CxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
             String cxCode = onlineInfo.getCxCode();
-            // 组合物料编码和胎胚编码作为唯一键
-            String materialCode = onlineInfo.getMaterialCode();
-            String embryoSpec = onlineInfo.getEmbryoSpec();
-            String combinedKey = materialCode + "|" + embryoSpec;
-            if (cxCode != null && combinedKey != null && !combinedKey.equals("|")) {
-                machineOnlineEmbryoMap.computeIfAbsent(cxCode, k -> new HashSet<>()).add(combinedKey);
+            // KF_NICK 这里的 onlineInfo.getMaterialCode() 实际存的是胎胚号
+            String embryoCode = onlineInfo.getMaterialCode();
+            if (cxCode != null && embryoCode != null && !embryoCode.isEmpty()) {
+                machineOnlineEmbryoMap.computeIfAbsent(embryoCode, k -> new HashSet<>()).add(cxCode);
             }
         }
         context.setMachineOnlineEmbryoMap(machineOnlineEmbryoMap);
-        log.info("构建机台在机胎胚映射，共 {} 个机台有在机任务", machineOnlineEmbryoMap.size());
+        log.info("构建机台在机胎胚映射，共 {} 个胎胚有在机任务", machineOnlineEmbryoMap.size());
     }
 
     /**
@@ -1870,30 +1904,19 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
 
         // 3. 重新构建机台在机胎胚映射（使用过滤后的在机信息）
-        // machineOnlineEmbryoMap 存储格式：cxCode -> Set(物料编码|胎胚编码)
+        // machineOnlineEmbryoMap 存储格式：embryoCode → Set(cxCode)
         if (context.getOnlineInfos() != null) {
-            // 先构建 materialCode -> embryoCode 的映射（用于在机信息）
-            Map<String, String> materialToEmbryoCodeMap = new HashMap<>();
-            if (context.getMaterials() != null) {
-                for (MdmMaterialInfo material : context.getMaterials()) {
-                    if (material.getMaterialCode() != null && material.getEmbryoCode() != null) {
-                        materialToEmbryoCodeMap.put(material.getMaterialCode(), material.getEmbryoCode());
-                    }
-                }
-            }
-
             Map<String, Set<String>> machineOnlineEmbryoMap = new HashMap<>();
             for (CxMachineOnlineInfo onlineInfo : context.getOnlineInfos()) {
                 String cxCode = onlineInfo.getCxCode();
-                String materialCode = onlineInfo.getMaterialCode();
-                String embryoCode = materialToEmbryoCodeMap.get(materialCode);
-                String combinedKey = materialCode + "|" + embryoCode;
-                if (cxCode != null && combinedKey != null && !combinedKey.equals("|")) {
-                    machineOnlineEmbryoMap.computeIfAbsent(cxCode, k -> new HashSet<>()).add(embryoCode);
+                //KF_NICK 这里onlineInfo.getMaterialCode() 是胎胚号
+                String embryoCode = onlineInfo.getMaterialCode();
+                if (cxCode != null && embryoCode != null && !embryoCode.isEmpty()) {
+                    machineOnlineEmbryoMap.computeIfAbsent(embryoCode, k -> new HashSet<>()).add(cxCode);
                 }
             }
             context.setMachineOnlineEmbryoMap(machineOnlineEmbryoMap);
-            log.info("重新构建机台在机胎胚映射，共 {} 个机台有在机任务", machineOnlineEmbryoMap.size());
+            log.info("重新构建机台在机胎胚映射，共 {} 个胎胚有在机任务", machineOnlineEmbryoMap.size());
         }
 
         // 4. 记录被过滤的物料信息
