@@ -94,7 +94,8 @@
             mar.HAS_SPECIAL_MATERIAL,
             IFNULL(fin.LAST_MONTH_PLAN_VERSION, fin.MONTH_PLAN_VERSION) AS MONTH_PLAN_VERSION,
             fin.PRODUCTION_VERSION,
-            fin.id
+            fin.id,
+            mar.VERSIONS
 
         FROM T_MP_MONTH_PLAN_PROD_FINAL fin
 
