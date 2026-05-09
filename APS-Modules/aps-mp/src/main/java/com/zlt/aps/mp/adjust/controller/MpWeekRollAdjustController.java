@@ -451,7 +451,7 @@ public class MpWeekRollAdjustController extends BaseController {
         log.info("重新计算 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
                 String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
         // 执行周程滚动调整策略（确认调整）
-        weekAdjustStrategy.confirmAdjust(contextDTO);
+        weekAdjustStrategy.recalculate(contextDTO);
         log.info("重新计算 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
                 String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
         return AjaxResult.success();
