@@ -108,6 +108,13 @@ export default {
             trigger: "change",
           },
         ],
+        dimensionMaximum: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "change",
+          },
+        ],
         maxMoldNum: [
           {
             required: true,

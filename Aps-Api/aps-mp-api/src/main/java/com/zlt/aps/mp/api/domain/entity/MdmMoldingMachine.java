@@ -107,10 +107,10 @@ public class MdmMoldingMachine extends BaseEntity {
     @TableField(exist = false)
     private Map<String, String> monthStructureNameMap;
     /**
-     * 是否启用：0-禁用 1-启用
+     * 机台状态：0-禁用 1-启用
      */
     @Excel(name = "ui.data.column.mdmMoldingMachine.isActive", dictType = "biz_available_status", sort = 9)
-    @ApiModelProperty(value = "是否启用：0-禁用 1-启用", name = "isActive")
+    @ApiModelProperty(value = "机台状态：0-禁用 1-启用", name = "isActive")
     @TableField("IS_ACTIVE")
     private String isActive;
 

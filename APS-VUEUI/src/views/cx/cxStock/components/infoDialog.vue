@@ -138,7 +138,7 @@ export default {
           label: this.$t("ui.data.column.cxStock.dataSource"),
           type: "select",
           dictData: this.dict.type.lh_precision_data_source,
-          disabled: true,
+          filterable: true,
         },
         {
           prop: "remark",
@@ -165,7 +165,7 @@ export default {
         this.form = {
           factoryCode: "116",
           embryoDesc: "",
-          dataSource: "MANUAL",
+          dataSource: "1",
         };
       }
     },
