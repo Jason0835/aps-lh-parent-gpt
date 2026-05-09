@@ -252,4 +252,22 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
             return result > 0 ? AjaxResult.success() : AjaxResult.error();
         }
     }
+
+    @Override
+    public void logicDeleteAndSaveBatch(String factoryCode, String dataSource, String updateBy, List<LhChipStock> insertList) {
+        log.info("芯片库存同步-事务开始：逻辑删除分厂{}数据来源为{}的旧数据，待插入数量={}", factoryCode, dataSource, CollectionUtils.size(insertList));
+        lhChipStockMapper.logicDeleteByFactoryCodeAndDataSource(factoryCode, dataSource, updateBy, new Date());
+        log.info("芯片库存同步-逻辑删除完成，开始批量插入");
+        if (CollectionUtils.isNotEmpty(insertList)) {
+            int batchSize = 1000;
+            for (int i = 0; i < insertList.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, insertList.size());
+                List<LhChipStock> subList = insertList.subList(i, end);
+                baseDao.saveBatch(subList);
+                log.info("芯片库存同步-插入批次：{}/{}, 本批数量={}", (i / batchSize + 1),
+                        (insertList.size() + batchSize - 1) / batchSize, subList.size());
+            }
+        }
+        log.info("芯片库存同步-事务完成：分厂{}，插入数量={}", factoryCode, CollectionUtils.size(insertList));
+    }
 }

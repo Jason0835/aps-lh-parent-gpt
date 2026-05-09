@@ -20,4 +20,14 @@ public interface ILhMachineOnlineInfoService extends IDocService<LhMachineOnline
      * @return 结果
      */
     int saveOrUpdateBatch(List<LhMachineOnlineInfo> list);
+
+    /**
+     * 逻辑删除分厂旧数据并批量插入新数据（事务性操作）
+     * 如果插入失败，删除操作也会回滚，保证数据一致性
+     *
+     * @param factoryCode 分厂编号
+     * @param updateBy    更新者
+     * @param insertList  待插入的数据列表
+     */
+    void logicDeleteAndSaveBatch(String factoryCode, String updateBy, List<LhMachineOnlineInfo> insertList);
 }

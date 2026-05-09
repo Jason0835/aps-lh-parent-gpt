@@ -1,9 +1,11 @@
 package com.zlt.aps.itf.mes.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.mapper.CxScheduleResultIssueMapper;
@@ -114,33 +116,41 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
 
     /**
      * 更新或插入数据（存在则更新，不存在则插入）
+     * 中间表MES_CX_SCHEDULE_RESULT建在jy_aps_mid主库，需切换到master数据源
      */
     private void upsertCxScheduleResult(List<MesCxScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
-        for (MesCxScheduleResult mesItem : mesList) {
-            // 先尝试更新，如果更新失败则插入
-            int updateCount = cxScheduleResultIssueMapper.updateByScheduleDateAndMachine(mesItem);
-            if (updateCount == 0) {
-                // 更新失败，说明数据不存在，执行插入
-                cxScheduleResultIssueMapper.insertCxScheduleResult(mesItem);
+        try {
+            DynamicDataSourceContextHolder.push(DataSource.MASTER);
+            for (MesCxScheduleResult mesItem : mesList) {
+                int updateCount = cxScheduleResultIssueMapper.updateByScheduleDateAndMachine(mesItem);
+                if (updateCount == 0) {
+                    cxScheduleResultIssueMapper.insertCxScheduleResult(mesItem);
+                }
             }
+        } finally {
+            DynamicDataSourceContextHolder.poll();
         }
     }
 
     /**
      * 插入数据（先删除指定日期的旧数据，再插入新数据）
+     * 中间表MES_CX_SCHEDULE_RESULT建在jy_aps_mid主库，需切换到master数据源
      */
     private void insertCxScheduleResult(List<MesCxScheduleResult> mesList, LocalDate scheduleDate, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
-        // 删除指定日期的旧数据
-        String dateStr = scheduleDate.format(DATE_FORMATTER);
-        cxScheduleResultIssueMapper.deleteByScheduleDate(dateStr, dataVersion);
-        // 批量插入新数据
-        cxScheduleResultIssueMapper.batchInsertCxScheduleResult(mesList);
+        try {
+            DynamicDataSourceContextHolder.push(DataSource.MASTER);
+            String dateStr = scheduleDate.format(DATE_FORMATTER);
+            cxScheduleResultIssueMapper.deleteByScheduleDate(dateStr, dataVersion);
+            cxScheduleResultIssueMapper.batchInsertCxScheduleResult(mesList);
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
     }
 
     /**
