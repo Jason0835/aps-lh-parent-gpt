@@ -34,9 +34,9 @@
         <el-button v-hasPermi="['cx:cxStructureTreadConfig:updateSameStructureTreadCount']" :disabled="selection.length !== 1" @click="handleSameStructureTreadCount(selection[0])">
           {{ $t('ui.data.column.cxStructureTreadConfig.sameStructureTreadCount') }}
         </el-button>
-<!--        <el-button v-hasPermi="['cx:cxStructureTreadConfig:import']" @click="$refs.uploadRef.handleImport()">-->
-<!--          {{ $t('ui.frame.btn.import') }}-->
-<!--        </el-button>-->
+        <el-button v-hasPermi="['cx:cxStructureTreadConfig:import']" @click="$refs.uploadRef.handleImport()">
+          {{ $t('ui.frame.btn.import') }}
+        </el-button>
         <el-button v-hasPermi="['cx:cxStructureTreadConfig:export']" @click="handleExport">
           {{ $t('ui.frame.btn.export') }}
         </el-button>

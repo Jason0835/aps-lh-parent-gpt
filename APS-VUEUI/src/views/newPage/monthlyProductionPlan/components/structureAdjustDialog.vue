@@ -2,7 +2,7 @@
   <el-dialog
     :title="$t('ui.data.column.monthPlanFinalAdjustQuery.structureAdjust')"
     :visible.sync="dialogVisible"
-    width="900px"
+    width="700px"
     append-to-body
     :close-on-click-modal="false"
     @close="handleClose"
@@ -35,7 +35,7 @@
       <el-table :data="tableRows" border size="small" max-height="420">
         <el-table-column
           :label="$t('ui.data.column.finishStock.structureName')"
-          min-width="160"
+          min-width="120"
         >
           <template slot-scope="scope">
             <el-select
@@ -463,21 +463,23 @@ export default {
         this.$modal.msgWarning(this.$t("common.rule.select"));
         return;
       }
+      /** 跳转月计划结构调整页（与路由 path 一致） */
       this.$router.push({
-        name: 'RollingCycle',
+        path: "/newPage/monthPlanStructureAdjust",
         query: {
-        pageType: "structure",
-        fromSelect: "1",
-        factoryCode: this.factoryCode,
-        yearMonth: this.yearMonth,
-        cxMachineCode: row.cxMachineCode || this.cxMachineCode,
-        scheduledMachines: row.scheduledMachines || row.cxMachineCode || this.cxMachineCode,
-        structureName: row.structureName || "",
-        beginDay: row.beginDay != null ? String(row.beginDay) : "",
-        endDay: row.endDay != null ? String(row.endDay) : "",
-        productionVersion: row.productionVersion || "",
-      }
-      })
+          pageType: "structure",
+          fromSelect: "1",
+          factoryCode: this.factoryCode,
+          yearMonth: this.yearMonth,
+          cxMachineCode: row.cxMachineCode || this.cxMachineCode,
+          scheduledMachines:
+            row.scheduledMachines || row.cxMachineCode || this.cxMachineCode,
+          structureName: row.structureName || "",
+          beginDay: row.beginDay != null ? String(row.beginDay) : "",
+          endDay: row.endDay != null ? String(row.endDay) : "",
+          productionVersion: row.productionVersion || "",
+        },
+      });
       this.dialogVisible = false;
     },
   },

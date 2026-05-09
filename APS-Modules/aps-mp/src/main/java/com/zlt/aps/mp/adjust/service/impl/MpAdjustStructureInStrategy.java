@@ -200,7 +200,9 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 
                 //2.8 构建月计划统计结果
                 MpMonthPlanStatistics monthPlanStatisticsVo = buildMonthPlanStatistics(copyContextDTO, oneStructMpFinalList, YesOrNoEnum.YES.getCode());
-                monthPlanStatisticsResultList.add(monthPlanStatisticsVo);
+                if (monthPlanStatisticsVo != null) {
+                    monthPlanStatisticsResultList.add(monthPlanStatisticsVo);
+                }
 
                 //2.9 保存调整日志
                 saveMpAdjustLog(copyContextDTO);
