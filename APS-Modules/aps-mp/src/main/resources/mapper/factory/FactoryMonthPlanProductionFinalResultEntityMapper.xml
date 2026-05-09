@@ -31,6 +31,7 @@
         SELECT
             fin.STRUCTURE_NAME,
             fin.STRUCTURE_TYPE,
+            fin.CX_MACHINE_CODE,
             fin.MATERIAL_CODE,
             fin.MATERIAL_DESC,
             fin.EMBRYO_CODE,
