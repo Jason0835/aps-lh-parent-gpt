@@ -289,6 +289,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         if (Objects.isNull(inputStream)) {
             throw new ServiceException("成型余量导出模板不存在");
         }
+
+        // 按成型排程结果列表的查询口径查询明细数据，再按机台+物料合并余量。
+        List<CxScheduleResult> list = cxScheduleResultMapper.selectList(buildCxRemainQtyQueryWrapper(queryVO));
         Map<String, Object> tableMap = new HashMap<>(16);
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         excelDataList.add(buildCxRemainQtyExportDataList(list));

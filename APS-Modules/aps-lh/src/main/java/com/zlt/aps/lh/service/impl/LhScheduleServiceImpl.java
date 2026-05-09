@@ -15,6 +15,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
+import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
@@ -30,6 +31,7 @@ import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
 import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
+import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
@@ -85,6 +87,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     @Resource
     private LhDayFinishQtyMapper lhDayFinishQtyMapper;
+
+    @Resource
+    private LhScheFinishQtyMapper lhScheFinishQtyMapper;
 
     @Resource
     private ICxScheduleResultService cxScheduleResultService;
@@ -1198,8 +1203,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 构建导出用“硫化产量今天夜班”Map。
      * <p>按用户要求，使用 T_LH_DAY_FINISH_QTY 中同工厂、同物料从当月 1 日到排程日当天的
-     * DAY_FINISH_QTY 汇总值。这里先一次性查出导出列表涉及的全部工厂、物料和日期范围，
-     * 再在内存中按“工厂+物料”聚合，避免逐行查询数据库。</p>
+     * DAY_FINISH_QTY 汇总值，再叠加 T_LH_SCHE_FINISH_QTY 中排程日当天同工厂、同物料的
+     * CLASS1_FINISH_QTY 之和。两个来源都先一次性查出导出列表涉及的数据，再在内存中按
+     * “工厂+物料”聚合，避免逐行查询数据库。</p>
      *
      * @param list 排程结果列表
      * @return 硫化产量今天夜班Map，key=工厂|物料编码
@@ -1241,11 +1247,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                         .and(wrapper -> wrapper.eq(LhDayFinishQty::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
                                 .or()
                                 .isNull(LhDayFinishQty::getIsDelete)));
-        if (PubUtil.isEmpty(finishQtyList)) {
-            return Collections.emptyMap();
-        }
-
-        Map<String, BigDecimal> finishQtyMap = new HashMap<>(finishQtyList.size());
+        Map<String, BigDecimal> finishQtyMap = new HashMap<>(16);
         for (LhDayFinishQty finishQty : finishQtyList) {
             if (StringUtils.isBlank(finishQty.getFactoryCode()) || StringUtils.isBlank(finishQty.getMaterialCode())) {
                 continue;
@@ -1255,6 +1257,26 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             finishQtyMap.merge(
                     buildMaterialFactoryExportKey(finishQty.getFactoryCode(), finishQty.getMaterialCode()),
                     dayFinishQty,
+                    BigDecimal::add);
+        }
+        List<LhScheFinishQty> scheFinishQtyList = lhScheFinishQtyMapper.selectList(
+                new LambdaQueryWrapper<LhScheFinishQty>()
+                        .in(LhScheFinishQty::getFactoryCode, factoryCodes)
+                        .in(LhScheFinishQty::getMaterialCode, materialCodes)
+                        .ge(LhScheFinishQty::getScheduleDate, DateUtil.beginOfDay(maxScheduleDate))
+                        .lt(LhScheFinishQty::getScheduleDate, nextDayStart)
+                        .and(wrapper -> wrapper.eq(LhScheFinishQty::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                                .or()
+                                .isNull(LhScheFinishQty::getIsDelete)));
+        for (LhScheFinishQty finishQty : scheFinishQtyList) {
+            if (StringUtils.isBlank(finishQty.getFactoryCode()) || StringUtils.isBlank(finishQty.getMaterialCode())) {
+                continue;
+            }
+            BigDecimal class1FinishQty = Objects.nonNull(finishQty.getClass1FinishQty())
+                    ? finishQty.getClass1FinishQty() : BigDecimal.ZERO;
+            finishQtyMap.merge(
+                    buildMaterialFactoryExportKey(finishQty.getFactoryCode(), finishQty.getMaterialCode()),
+                    class1FinishQty,
                     BigDecimal::add);
         }
         return new HashMap<>(finishQtyMap);
