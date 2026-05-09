@@ -583,7 +583,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     selectedPlans.stream().map(CxPrecisionPlan::getMachineCode).collect(Collectors.toList()));
         } else if (!futurePlans.isEmpty()) {
             Map<String, BigDecimal> machineTotalStockHours = new HashMap<>();
-            Map<String, Double> machineIdleHours = new HashMap<>();
+            Map<String, Double> machineTaskHours = new HashMap<>();
             int shiftHours = shiftConfig.getShiftHours() != null && shiftConfig.getShiftHours() > 0
                     ? shiftConfig.getShiftHours() : 8;
 
@@ -605,8 +605,18 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                         }
                     }
                 }
-                machineTotalStockHours.put(allocation.getMachineCode(), total);
-                machineIdleHours.put(allocation.getMachineCode(), shiftHours - taskHours);
+                machineTotalStockHours.merge(allocation.getMachineCode(), total, BigDecimal::add);
+                machineTaskHours.merge(allocation.getMachineCode(), taskHours, Double::sum);
+            }
+
+            Map<String, Double> machineIdleHours = new HashMap<>();
+            for (Map.Entry<String, Double> entry : machineTaskHours.entrySet()) {
+                machineIdleHours.put(entry.getKey(), shiftHours - entry.getValue());
+                log.info("精度空闲计算: 机台={}, taskHours={}h, idle={}h, stockHours={}",
+                        entry.getKey(),
+                        String.format("%.1f", entry.getValue()),
+                        String.format("%.1f", shiftHours - entry.getValue()),
+                        String.format("%.1f", machineTotalStockHours.getOrDefault(entry.getKey(), BigDecimal.ZERO)));
             }
 
             CxPrecisionPlan bestPlan = null;
