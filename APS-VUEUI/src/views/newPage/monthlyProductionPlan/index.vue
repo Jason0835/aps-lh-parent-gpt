@@ -15,6 +15,7 @@
       @sort-change="handleSortChange"
       :showSummary="false"
       :selectArea="false"
+      :row-class-name="tableRowClassName"
     >
       <template slot="header">
         <div class="toolbar-row">
@@ -241,6 +242,8 @@ import {
   getAdjustsCxMachineFromRedis,
   confirmAdjust,
   recalculateWeekRollAdjust,
+  statisticsResult,
+  saveAdjustResult,
 } from "@/api/monthplan/adjustStructure";
 import structureAdjustDialog from "./components/structureAdjustDialog.vue";
 import adjustVersionDialog from "./components/adjustVersionDialog.vue";
@@ -295,6 +298,8 @@ export default {
           monthPlanVersion: "",
         },
       },
+      /** 1–31 号列编辑前原始值，用于失焦时与 rollingCycle 一致判断是否调用 save */
+      dayEditOriginalValue: null,
     };
   },
   computed: {
@@ -348,7 +353,7 @@ export default {
           filterable: true,
         },
         {
-          prop: "productionVersion",
+          prop: "version",
           label: this.$t(
             "ui.data.column.monthPlanFinalAdjustQuery.productionVersion"
           ),
@@ -541,6 +546,18 @@ export default {
           ),
           width: 120,
           render: ({ row }) => {
+            if (!row.id) {
+              return (
+                <span>
+                  {row.isLockSchedule != null && row.isLockSchedule !== ""
+                    ? this.selectDictLabel(
+                        this.dict.type.biz_yes_no,
+                        row.isLockSchedule
+                      )
+                    : ""}
+                </span>
+              );
+            }
             return (
               <el-select
                 v-model={row.isLockSchedule}
@@ -549,6 +566,7 @@ export default {
                 clearable
                 placeholder={this.$t("ui.frame.btn.choose")}
                 style="width: 100%"
+                onChange={() => this.handleLockScheduleChange(row)}
               >
                 {this.dict.type.biz_yes_no.map((item) => (
                   <el-option
@@ -579,18 +597,23 @@ export default {
           prop,
           minWidth: "72px",
           render: ({ row }) => {
+            const text =
+              row[prop] === null || row[prop] === undefined
+                ? ""
+                : String(row[prop]);
+            if (!row.id) {
+              return <span>{text}</span>;
+            }
             return (
               <el-input
                 size="mini"
-                value={
-                  row[prop] === null || row[prop] === undefined
-                    ? ""
-                    : String(row[prop])
-                }
+                value={text}
                 onInput={(value) => {
                   const n = String(value).replace(/[^\d]/g, "");
                   row[prop] = n === "" ? null : Number(n);
                 }}
+                onFocus={() => this.onDayEditFocus(row, prop)}
+                onBlur={() => this.handleResultDayEdit(row, prop)}
               />
             );
           },
@@ -671,6 +694,16 @@ export default {
       factoryCode: "116",
       yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
     };
+    const rq = this.$route.query || {};
+    if (rq.factoryCode) {
+      defaults.factoryCode = String(rq.factoryCode);
+    }
+    if (rq.yearMonth) {
+      defaults.yearMonth = String(rq.yearMonth);
+    }
+    if (rq.productionVersion) {
+      defaults.productionVersion = String(rq.productionVersion);
+    }
     this.search = { ...defaults };
     this.query = { ...defaults };
     await this.loadVersionOptions();
@@ -678,8 +711,8 @@ export default {
     this.getList();
   },
   methods: {
-    handleBaseQueryChange() {
-      this.loadVersionOptions();
+    async handleBaseQueryChange() {
+      await this.loadVersionOptions();
       this.fetchCurrentAdjustMachineFromRedis();
     },
     handleProductionVersionChange() {
@@ -734,11 +767,91 @@ export default {
         this.currentAdjustMachine = "";
       }
     },
+    /**
+     * 修改优先上机（原锁定上机），与 rollingCycle/index.backup-legacy.vue 一致调用 mpAdjustResult/save
+     */
+    handleLockScheduleChange(row) {
+      if (!row || !row.id) {
+        return;
+      }
+      saveAdjustResult({
+        id: row.id,
+        isLockSchedule: row.isLockSchedule,
+      })
+        .then((res) => {
+          this.$modal.msgSuccess(res.msg);
+        })
+        .catch((err) => {
+          console.error(err);
+        });
+    },
+    /** 记录 1–31 号列编辑前的原始值 */
+    onDayEditFocus(row, prop) {
+      this.dayEditOriginalValue = row[prop];
+    },
+    /** 将日期列的值归一化：null/undefined/''/'0'/0 都视为空（与 rollingCycle 一致） */
+    normalizeDayValue(val) {
+      if (val == null || val === "" || val === 0 || val === "0") {
+        return "";
+      }
+      return String(val);
+    },
+    /** 按后端规则本地重算开始/结束日期 */
+    recalculateBeginEndDay(row) {
+      if (!row) {
+        return;
+      }
+      const monthStartDay = 1;
+      const monthMaxDay = 31;
+      let realBeginDay = monthMaxDay + 1;
+      let realEndDay = 0;
+      for (let i = monthStartDay; i <= monthMaxDay; i++) {
+        const dayField = `day${i}`;
+        const dayVal = Number(row[dayField] || 0);
+        if (dayVal !== 0) {
+          if (realBeginDay > i) {
+            realBeginDay = i;
+          }
+          if (realEndDay < i) {
+            realEndDay = i;
+          }
+        }
+      }
+      row.beginDay = realBeginDay === monthMaxDay + 1 ? 0 : realBeginDay;
+      row.endDay = realEndDay;
+    },
+    /**
+     * 修改 1–31 号日排产后实时保存，与 rollingCycle handleResultDayEdit 一致
+     */
+    async handleResultDayEdit(row, prop) {
+      if (!row.id) {
+        return;
+      }
+      const oldVal = this.normalizeDayValue(this.dayEditOriginalValue);
+      const newVal = this.normalizeDayValue(row[prop]);
+      if (newVal === oldVal) {
+        return;
+      }
+      try {
+        this.recalculateBeginEndDay(row);
+        await saveAdjustResult(row);
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    /**
+     * 定稿排产版本下拉：getFinalResultVersionList（/monthplan/factoryMonthPlanFinalResult/getVersionList）。
+     * 与 mpMonthPlanStatistics 统计维度一致，应使用 productionVersion，而非 mpAdjustResult/getVersionList 的 version。
+     */
     async loadVersionOptions() {
-      const ym = this.normalizeYearMonth(this.query.yearMonth || this.search.yearMonth);
+      const ym = this.normalizeYearMonth(
+        this.query.yearMonth || this.search.yearMonth
+      );
       const factoryCode = this.query.factoryCode || this.search.factoryCode;
       if (!ym || !factoryCode) {
         this.versionOptions = [];
+        this.search = { ...this.search, productionVersion: "" };
+        this.query = { ...this.query, productionVersion: "" };
         return;
       }
       try {
@@ -751,16 +864,43 @@ export default {
         const set = new Set();
         rows.forEach((item) => {
           if (item.productionVersion) {
-            set.add(item.productionVersion);
+            set.add(String(item.productionVersion));
           }
         });
-        this.versionOptions = Array.from(set).map((v) => ({
+        const list = Array.from(set).map((v) => ({
           label: v,
           value: v,
         }));
+        this.versionOptions = list;
+
+        if (list.length > 0) {
+          const currentPv = String(
+            this.query.productionVersion ||
+              this.search.productionVersion ||
+              ""
+          ).trim();
+          if (currentPv) {
+            const hasVersion = list.some(
+              (item) => String(item.value) === currentPv
+            );
+            if (hasVersion) {
+              this.search = { ...this.search, productionVersion: currentPv };
+              this.query = { ...this.query, productionVersion: currentPv };
+              return;
+            }
+          }
+          const defaultPv = list[0].value;
+          this.search = { ...this.search, productionVersion: defaultPv };
+          this.query = { ...this.query, productionVersion: defaultPv };
+        } else {
+          this.search = { ...this.search, productionVersion: "" };
+          this.query = { ...this.query, productionVersion: "" };
+        }
       } catch (e) {
         console.error(e);
         this.versionOptions = [];
+        this.search = { ...this.search, productionVersion: "" };
+        this.query = { ...this.query, productionVersion: "" };
       }
     },
     normalizeYearMonth(yearMonth) {
@@ -774,6 +914,8 @@ export default {
       return { year: m.year(), month: m.month() + 1 };
     },
     async handleSearch(data) {
+      /** 与 query 一并维护 search，保证 PageTable → HeaderSearch 的 defaultValue 含当前表单中的版本号 */
+      this.search = { ...this.search, ...data };
       this.query = { ...data };
       this.$set(this.page, "current", 1);
       await this.loadVersionOptions();
@@ -826,15 +968,141 @@ export default {
       }
       try {
         this.loading = true;
-        const res = await listMonthPlanFinal4Adjust(this.formatParams());
-        this.data = res.rows || [];
-        this.page.total = res.total != null ? res.total : this.data.length;
+        /** list4Adjust 不传 productionVersion；与 query 解耦，不影响 mpMonthPlanStatistics 使用的 resolveProductionVersionForStatistics */
+        const listParams = { ...this.formatParams(true) };
+        delete listParams.productionVersion;
+        const res = await listMonthPlanFinal4Adjust(listParams);
+        const rawRows = res.rows || [];
+        this.page.total = res.total != null ? res.total : rawRows.length;
+        await this.applyAdjustmentStatisticsRows(rawRows);
       } catch (e) {
         console.error(e);
         this.data = [];
       } finally {
         this.loading = false;
       }
+    },
+    /**
+     * 与 rollingCycle/index.backup-legacy.vue getStatisticsResult(data) 一致：statistics 的 productionVersion 来自「列表首行」的 data.productionVersion。
+     * 月计划 list4Adjust 若行上无该字段，再退 query/search、再退定稿版本下拉第一项。
+     */
+    resolveProductionVersionForStatistics(firstRow) {
+      if (
+        firstRow &&
+        firstRow.productionVersion != null &&
+        String(firstRow.productionVersion).trim() !== ""
+      ) {
+        return String(firstRow.productionVersion).trim();
+      }
+      const q = String(
+        this.query.productionVersion ||
+          this.search.productionVersion ||
+          ""
+      ).trim();
+      if (q) {
+        return q;
+      }
+      const opts = this.versionOptions || [];
+      if (
+        opts.length &&
+        opts[0].value != null &&
+        String(opts[0].value).trim() !== ""
+      ) {
+        return String(opts[0].value).trim();
+      }
+      return "";
+    },
+    /**
+     * 与周程滚动「调整结果」一致：按结构分组末尾插入胎胚种类数、硫化机台数两行（接口 statisticsResult）
+     */
+    async applyAdjustmentStatisticsRows(resultList) {
+      if (!resultList.length) {
+        this.data = [];
+        return;
+      }
+      const first = resultList[0];
+      const ym = this.normalizeYearMonth(this.query.yearMonth);
+      const productionVersion = this.resolveProductionVersionForStatistics(first);
+      const params = {
+        factoryCode: first.factoryCode || this.query.factoryCode,
+        year:
+          first.year != null && first.year !== ""
+            ? Number(first.year)
+            : ym.year,
+        month:
+          first.month != null && first.month !== ""
+            ? Number(first.month)
+            : ym.month,
+        productionVersion,
+      };
+      if (!params.productionVersion) {
+        this.data = [...resultList];
+        return;
+      }
+      try {
+        const res = await statisticsResult(params);
+        this.data = this.insertStatisticsRowsAfterEachStructure(
+          resultList,
+          res.rows || []
+        );
+      } catch (e) {
+        console.error(e);
+        this.data = [...resultList];
+      }
+    },
+    /**
+     * 在每个 structureName 分组最后一行之后插入统计行（与 rollingCycle 调整结果 insertDataAfterEachName 逻辑一致）
+     */
+    insertStatisticsRowsAfterEachStructure(arr, statistList) {
+      if (!arr.length) {
+        return [];
+      }
+      const result = [];
+      for (let i = 0; i < arr.length; i++) {
+        const current = arr[i];
+        const next = arr[i + 1];
+        result.push(current);
+        if (!next || next.structureName !== current.structureName) {
+          const curName = String(current.structureName || "").trim();
+          for (let s = 0; s < statistList.length; s++) {
+            if (
+              String(statistList[s].structureName || "").trim() === curName
+            ) {
+              const embryoCount = {
+                structureName: current.structureName,
+                showBackground: "light-green",
+                materialCode: "胎胚种类数",
+              };
+              const lhMachines = {
+                structureName: current.structureName,
+                showBackground: "light-blue",
+                materialCode: "硫化机台数",
+              };
+              for (let j = 1; j <= 31; j++) {
+                const key = `day${j}`;
+                if (statistList[s][key]) {
+                  const dayData = JSON.parse(statistList[s][key]);
+                  embryoCount[key] = dayData.embryoCount;
+                  lhMachines[key] = dayData.lhMachines;
+                }
+              }
+              result.push(embryoCount);
+              result.push(lhMachines);
+            }
+          }
+        }
+      }
+      return result;
+    },
+    /** 统计行背景色（与 PageTable / 周程滚动一致） */
+    tableRowClassName({ row }) {
+      if (row.showBackground) {
+        return row.showBackground;
+      }
+      if (row.adjustFlag === 1) {
+        return "warning-row";
+      }
+      return "";
     },
     handleStructureInnerAdjust() {
       this.$router.push({
