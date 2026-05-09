@@ -166,6 +166,8 @@ public interface CoreScheduleAlgorithmService {
         private Integer endingExtraInventory;
         /** 机台小时产能（条/小时） */
         private Integer hourCapacity;
+        /** 是否被精度计划扣量 */
+        private Boolean precisionDeducted;
 
         // ==================== 新增任务排序相关字段 ====================
         /** 月计划优先级 */
@@ -241,6 +243,8 @@ public interface CoreScheduleAlgorithmService {
         private Boolean isOpeningDayTask;
         /** 是否停产日任务 */
         private Boolean isClosingDayTask;
+        /** 是否被精度计划扣量 */
+        private Boolean precisionDeducted;
     }
 
     /**
