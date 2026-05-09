@@ -91,7 +91,10 @@
             IFNULL(mar.DAY_29, fin.DAY_29) AS DAY_29,
             IFNULL(mar.DAY_30, fin.DAY_30) AS DAY_30,
             IFNULL(mar.DAY_31, fin.DAY_31) AS DAY_31,
-            mar.HAS_SPECIAL_MATERIAL
+            mar.HAS_SPECIAL_MATERIAL,
+            IFNULL(fin.LAST_MONTH_PLAN_VERSION, fin.MONTH_PLAN_VERSION) AS MONTH_PLAN_VERSION,
+            fin.PRODUCTION_VERSION,
+            fin.id
 
         FROM T_MP_MONTH_PLAN_PROD_FINAL fin
 

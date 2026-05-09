@@ -341,11 +341,15 @@ export default {
                 >
                   {this.$t("ui.data.console.productNoDetail")}
                 </text-button>
-                <text-button
-                  onClick={() => this.handleRouterMonthlyProductionPlanQuery()}
-                >
-                  {this.$t("common.button.adjust")}
-                </text-button>
+                {row.isFinal == 1 ? (
+                  <text-button
+                    onClick={() =>
+                      this.handleRouterMonthlyProductionPlanQuery(row)
+                    }
+                  >
+                    {this.$t("common.button.adjust")}
+                  </text-button>
+                ) : null}
                 <text-button onClick={() => this.handleDeleteChild(row)}>
                   {this.$t("common.button.delete")}
                 </text-button>
@@ -731,11 +735,22 @@ export default {
         // },
       });
     },
-    handleRouterMonthlyProductionPlanQuery() {
-      // this.$router.push({ path: "/new/monthlyProductionPlan" });
+    /** 月计划调整查询页：/monthPlanManagement/console/monthlyProductionPlan */
+    handleRouterMonthlyProductionPlanQuery(row) {
+      const query = {};
+      if (row && row.factoryCode) {
+        query.factoryCode = row.factoryCode;
+      }
+      if (row && row.year != null && row.month != null) {
+        const m = Number(row.month);
+        query.yearMonth = `${row.year}-${m < 10 ? "0" + m : m}`;
+      }
+      if (row && row.productionVersion) {
+        query.productionVersion = row.productionVersion;
+      }
       this.$router.push({
-        name: "MonthPlanStructureInnerAdjust",
-        query: { pageType: "inner" },
+        path: "/monthPlanManagement/console/monthlyProductionPlan",
+        query,
       });
     },
     handleReport(row) {

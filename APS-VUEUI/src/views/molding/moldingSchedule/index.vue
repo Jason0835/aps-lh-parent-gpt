@@ -1075,7 +1075,7 @@ export default {
       downloadLink("/cx/cxScheduleResult/export", this.formatParams(false));
     },
     handleExport() {
-      downloadLink("/cx/cxScheduleResult/export", this.formatParams(false));
+      downloadLink("/cx/cxScheduleResult/exportCxRemainQty", this.formatParams(false));
     },
     handleExportStructureChange() {
       this.$confirm(this.$t(`ui.data.column.cxStructureChange.confirmExport`), {

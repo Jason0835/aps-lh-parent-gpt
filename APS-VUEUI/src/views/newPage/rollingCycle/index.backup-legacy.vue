@@ -481,12 +481,12 @@ import result from "./components/result.vue";
 import special from "./components/special.vue";
 import addModal from "./components/addModal.vue";
 export default {
-  name: "RollingCycle",
+  name: "MonthPlanStructureInnerAdjust",
   props: {
-    /** default：周程滚动原 Tab 布局；monthPlanStructureInner：月计划结构内/结构调整（无 Tab）。本入口页固定为月计划调整布局。 */
+    /** default：周程滚动原 Tab 布局；monthPlanStructureInner：月计划结构内/结构调整（无 Tab） */
     layoutMode: {
       type: String,
-      default: "monthPlanStructureInner",
+      default: "default",
     },
   },
   components: {
@@ -1885,10 +1885,10 @@ export default {
         this.monthPlanFromFinalSelect
       ) {
         this.monthPlanFromFinalSelect = false;
-        this.$router.push({
-        name: 'RollingCycle',
-        query: {pageType: this.$route.query.pageType || "structure", },
-      })
+        this.$router.replace({
+          name: "MonthPlanStructureInnerAdjust",
+          query: { pageType: this.$route.query.pageType || "structure" },
+        });
       }
       this.show = false;
       this.showConfirmResult = false;
@@ -2847,6 +2847,27 @@ export default {
       }
     },
 
+    /** 根据路由 query.pageType 更新当前页签标题（结构内调整 / 结构调整） */
+    syncMonthPlanStructureInnerTabTitle() {
+      if (!this.isMonthPlanStructureInnerLayout) {
+        return;
+      }
+      const pageType = this.$route.query.pageType;
+      const title =
+        pageType === "structure"
+          ? this.$t("ui.data.column.monthPlanStructureInnerAdjust.titleStructure")
+          : this.$t("ui.data.column.monthPlanStructureInnerAdjust.titleInner");
+      this.$tab.updatePage({
+        ...this.$route,
+        title,
+        meta: { ...this.$route.meta, title },
+      });
+    },
+  },
+  watch: {
+    "$route.query.pageType"() {
+      this.syncMonthPlanStructureInnerTabTitle();
+    },
   },
   mounted() {
     // console.log("mounted");
@@ -2875,6 +2896,10 @@ export default {
     } else {
       this.getVersionList(true);
     }
+    this.syncMonthPlanStructureInnerTabTitle();
+  },
+  activated() {
+    this.syncMonthPlanStructureInnerTabTitle();
   },
 };
 </script>

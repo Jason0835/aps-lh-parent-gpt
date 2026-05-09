@@ -1,6 +1,7 @@
 package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
@@ -159,6 +160,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         try {
             log.info("开始执行排程，日期：{}，排程模式：{}", request.getScheduleDate(), request.getScheduleMode());
 
+            // 0. 回滚上次排程的精度计划（清除scheduleDate），使精度计划可被重新加载
+            rollbackPrecisionPlans();
+
             // 1. 构建排程上下文(流程图S5.1.6初始化)
             ScheduleContextVo context = buildScheduleContext(request);
             if (context == null) {
@@ -214,6 +218,9 @@ public class ScheduleServiceImpl implements ScheduleService {
     public boolean reSchedule(ScheduleRequestVo request) {
         try {
             log.info("开始执行重排程，日期：{}", request.getScheduleDate());
+
+            // 0. 回滚上次排程的精度计划（清除scheduleDate），使精度计划可被重新加载
+            rollbackPrecisionPlans();
 
             // 1. 构建排程上下文
             ScheduleContextVo context = buildScheduleContext(request);
@@ -328,6 +335,25 @@ public class ScheduleServiceImpl implements ScheduleService {
             log.info("批量删除日期 {} 的主表记录 {} 条", scheduleDate, existingResults.size());
         } else {
             log.info("日期 {} 无历史排程数据，跳过删除", scheduleDate);
+        }
+    }
+
+    /**
+     * 回滚精度计划的排程日期（清理上次排程回填的scheduleDate）
+     *
+     * <p>将实际未执行（actualDate为空）且未被删除（isDelete=0）的精度计划的scheduleDate置空，
+     * 使这些精度计划在重新排程时能被 loadPrecisionPlans 重新加载和分配。
+     * <p>已实际执行的精度计划（actualDate不为空）不回滚，因为已由MES确认执行。
+     */
+    private void rollbackPrecisionPlans() {
+        LambdaUpdateWrapper<CxPrecisionPlan> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.isNotNull(CxPrecisionPlan::getScheduleDate)
+                .isNull(CxPrecisionPlan::getActualDate)
+                .eq(CxPrecisionPlan::getIsDelete, "0")
+                .set(CxPrecisionPlan::getScheduleDate, null);
+        int count = precisionPlanMapper.update(null, updateWrapper);
+        if (count > 0) {
+            log.info("回滚精度计划 scheduleDate：清理 {} 条上次排程的精度计划回填记录", count);
         }
     }
 

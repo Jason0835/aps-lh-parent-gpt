@@ -128,46 +128,41 @@ export const constantRoutes = [
   },
 ];
 if (process.env.NODE_ENV == "development") {
-  /**
-   * 开发环境本地菜单：每个 Layout 下只挂一个子路由，侧边栏才会「抬升」显示子项标题。
-   * 若多个子路由共用一个父 path（如 /dev-month-plan/a、/dev-month-plan/b），会走 el-submenu，
-   * 父级无 meta 时标题空白，子项需点开后在弹出层里才能看到，易被误认为只有一个菜单。
-   */
   constantRoutes.push(
-    {
-      path: "/dev-month-plan/monthPlanFinalAdjustQuery",
-      component: Layout,
-      hidden: false,
-      children: [
-        {
-          path: "",
-          name: "MonthPlanFinalAdjustQuery",
-          component: () =>
-            import("@/views/newPage/monthPlanFinalAdjustQuery/index"),
-          meta: {
-            title: "月计划查询",
-            i18n: "ui.data.column.monthPlanFinalAdjustQuery.modelName",
-          },
-        },
-      ],
-    },
-    {
-      path: "/dev-month-plan/monthPlanStructureInnerAdjust",
-      component: Layout,
-      hidden: false,
-      children: [
-        {
-          path: "",
-          name: "MonthPlanStructureInnerAdjust",
-          component: () =>
-            import("@/views/newPage/monthPlanStructureInnerAdjust/index"),
-          meta: {
-            title: "月计划调整",
-            i18n: "ui.data.column.monthPlanStructureInnerAdjust.modelName",
-          },
-        },
-      ],
-    }
+    // {
+    //   path: "/dev-month-plan/monthPlanFinalAdjustQuery",
+    //   component: Layout,
+    //   hidden: false,
+    //   children: [
+    //     {
+    //       path: "",
+    //       name: "MonthPlanFinalAdjustQuery",
+    //       component: () =>
+    //         import("@/views/newPage/monthPlanFinalAdjustQuery/index"),
+    //       meta: {
+    //         title: "月计划查询",
+    //         i18n: "ui.data.column.monthPlanFinalAdjustQuery.modelName",
+    //       },
+    //     },
+    //   ],
+    // },
+    // {
+    //   path: "/newPage/rollingCycle",
+    //   component: Layout,
+    //   hidden: false,
+    //   children: [
+    //     {
+    //       path: "",
+    //       name: "MonthPlanStructureInnerAdjust",
+    //       component: () =>
+    //         import("@/views/newPage/rollingCycle/index.backup-legacy"),
+    //       meta: {
+    //         title: "月计划调整(旧)",
+    //         i18n: "ui.data.column.monthPlanStructureInnerAdjust.modelName",
+    //       },
+    //     },
+    //   ],
+    // }
   );
 }
 

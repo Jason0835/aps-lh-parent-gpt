@@ -464,20 +464,20 @@ export default {
         return;
       }
       this.$router.push({
-        name: "MonthPlanStructureInnerAdjust",
+        name: 'RollingCycle',
         query: {
-          pageType: "structure",
-          fromSelect: "1",
-          factoryCode: this.factoryCode,
-          yearMonth: this.yearMonth,
-          cxMachineCode: row.cxMachineCode || this.cxMachineCode,
-          scheduledMachines: row.scheduledMachines || row.cxMachineCode || this.cxMachineCode,
-          structureName: row.structureName || "",
-          beginDay: row.beginDay != null ? String(row.beginDay) : "",
-          endDay: row.endDay != null ? String(row.endDay) : "",
-          productionVersion: row.productionVersion || "",
-        },
-      });
+        pageType: "structure",
+        fromSelect: "1",
+        factoryCode: this.factoryCode,
+        yearMonth: this.yearMonth,
+        cxMachineCode: row.cxMachineCode || this.cxMachineCode,
+        scheduledMachines: row.scheduledMachines || row.cxMachineCode || this.cxMachineCode,
+        structureName: row.structureName || "",
+        beginDay: row.beginDay != null ? String(row.beginDay) : "",
+        endDay: row.endDay != null ? String(row.endDay) : "",
+        productionVersion: row.productionVersion || "",
+      }
+      })
       this.dialogVisible = false;
     },
   },
