@@ -26,7 +26,145 @@
       :max-height="showOutResult?450:'calc(100vh )'"
     >
       <template slot="header">
-        <el-tabs v-model="activeName" @tab-click="handleClick" type="card">
+        <!-- 月计划结构内调整：无 Tab，默认结构内工具栏；进入单结构调整流程后展示表单 -->
+        <div
+          v-if="isMonthPlanStructureInnerLayout"
+          class="mp-structure-inner-header"
+        >
+          <div v-if="!isShowResult" class="mp-structure-inner-toolbar">
+            <el-button
+              @click="adjustOrder"
+              :loading="getLoading"
+              v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
+              >{{ $t("获取调整订单") }}</el-button
+            >
+            <el-button
+              @click="handShowResult"
+              :loading="autoLoading"
+              :disabled="data.length == 0"
+              v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
+              >{{ $t("自动调整") }}</el-button
+            >
+          </div>
+          <el-form
+            v-else
+            :inline="true"
+            :model="formInline"
+            class="demo-form-inline"
+          >
+            <el-form-item
+              :label="this.$t('ui.data.column.workWearInfo.cxMachineCode')"
+            >
+              <el-input
+                v-model="formInline.cxMachineCode"
+                disabled
+                :placeholder="
+                  this.$t('ui.data.column.workWearInfo.cxMachineCode')
+                "
+              ></el-input>
+            </el-form-item>
+            <el-form-item
+              :label="
+                this.$t(
+                  'ui.data.column.monthPlanFinalAdjustQuery.relatedMachine'
+                )
+              "
+            >
+              <el-input
+                v-model="formInline.scheduledMachines"
+                disabled
+                :placeholder="
+                  this.$t(
+                    'ui.data.column.monthPlanFinalAdjustQuery.relatedMachine'
+                  )
+                "
+              />
+            </el-form-item>
+            <el-form-item
+              :label="this.$t('ui.data.column.finishStock.structureName')"
+            >
+              <el-input
+                v-model="formInline.structureName"
+                disabled
+                :placeholder="
+                  this.$t('ui.data.column.finishStock.structureName')
+                "
+              ></el-input>
+            </el-form-item>
+            <el-form-item :label="this.$t('common.startDate')">
+              <el-input
+                disabled
+                v-model="formInline.beginDay"
+                style="width: 50px"
+                :placeholder="this.$t('common.startDate')"
+              ></el-input>
+            </el-form-item>
+            <el-form-item :label="this.$t('common.endDate')">
+              <el-input
+                disabled
+                style="width: 50px"
+                v-model="formInline.endDay"
+                :placeholder="this.$t('common.endDate')"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="调整开始日期">
+              <el-select
+                v-model="formInline.adjustStartDay"
+                style="width: 100px"
+                disabled
+                filterable
+              >
+                <el-option
+                  v-for="item in dayList"
+                  :key="item"
+                  :label="item"
+                  :value="item"
+                >
+                </el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="调整结束日期">
+              <el-select
+                v-model="formInline.adjustEndDay"
+                style="width: 100px"
+                filterable
+              >
+                <el-option
+                  v-for="item in dayList"
+                  :key="item"
+                  :label="item"
+                  :value="item"
+                >
+                </el-option>
+              </el-select>
+            </el-form-item>
+
+            <el-form-item>
+              <el-button
+                type="primary"
+                @click="getOutList"
+                v-hasPermi="[
+                  'monthplan:mpWeekRollAdjust:getAdjustDetailList',
+                ]"
+                >获取调整订单</el-button
+              >
+            </el-form-item>
+            <el-form-item v-if="showOutResult">
+              <el-button
+                type="primary"
+                @click="nextStructure"
+                :loading="nextLoading"
+                >下一个</el-button
+              >
+            </el-form-item>
+          </el-form>
+        </div>
+        <el-tabs
+          v-else
+          v-model="activeName"
+          @tab-click="handleClick"
+          type="card"
+        >
           <el-tab-pane label="结构内" name="first" :disabled="loading">
             <el-button
               @click="adjustOrder"
@@ -109,6 +247,7 @@
                   v-model="formInline.adjustStartDay"
                   style="width: 100px"
                   disabled
+                  filterable
                 >
                   <el-option
                     v-for="item in dayList"
@@ -123,6 +262,7 @@
                 <el-select
                   v-model="formInline.adjustEndDay"
                   style="width: 100px"
+                  filterable
                 >
                   <el-option
                     v-for="item in dayList"
@@ -342,6 +482,13 @@ import special from "./components/special.vue";
 import addModal from "./components/addModal.vue";
 export default {
   name: "RollingCycle",
+  props: {
+    /** default：周程滚动原 Tab 布局；monthPlanStructureInner：月计划结构内/结构调整（无 Tab） */
+    layoutMode: {
+      type: String,
+      default: "default",
+    },
+  },
   components: {
     tltUpload,
     infoDialog,
@@ -403,6 +550,8 @@ export default {
         { label: "结构调整", value: "02" },
       ],
       actionDate: {},
+      /** 从月计划调整查询「选择」进入，用于取消时清理路由参数 */
+      monthPlanFromFinalSelect: false,
 
       dayList: 31,
       // 调整结果页日计划量是否可编辑：仅自动调整后可编辑
@@ -414,6 +563,10 @@ export default {
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
+    /** 月计划「结构内/结构调整」独立页：去掉 el-tabs，仅保留结构内与单结构调整相关区域 */
+    isMonthPlanStructureInnerLayout() {
+      return this.layoutMode === "monthPlanStructureInner";
+    },
     columns() {
       if (!this.show) {
         return [];
@@ -1727,6 +1880,16 @@ export default {
     },
 
     backPlan() {
+      if (
+        this.isMonthPlanStructureInnerLayout &&
+        this.monthPlanFromFinalSelect
+      ) {
+        this.monthPlanFromFinalSelect = false;
+        this.$router.replace({
+          name: "MonthPlanStructureInnerAdjust",
+          query: { pageType: this.$route.query.pageType || "structure" },
+        });
+      }
       this.show = false;
       this.showConfirmResult = false;
       this.resultDayEditable = false;
@@ -1972,13 +2135,17 @@ export default {
         let res = await autoAdjust(params);
         console.log(res);
         this.data = res;
-        if (res.length != 0) {
-          this.getStatisticsResult(res[0],1);
-        }
-        // this.data=res.rows
         this.show = true;
         this.loading = false;
         this.autoLoading = false;
+        /** 月计划独立页：结构内自动调整成功后关闭当前页签并回到月计划调整查询 */
+        if (this.isMonthPlanStructureInnerLayout) {
+          this.$tab.closeOpenPage({ name: "MonthPlanFinalAdjustQuery" });
+          return;
+        }
+        if (res.length != 0) {
+          this.getStatisticsResult(res[0], 1);
+        }
         this.isTabChange = false;
         this.isShowFoot = true;
         this.activeName = "three";
@@ -2541,17 +2708,165 @@ export default {
       return "";
     },
 
-    //获取开始日期
+    /**
+     * 调用 getPreviousStructure，需传齐：工厂、年、月、成型机编码、开始日、结束日（与 BootUI 校验一致）。
+     * 周程页来自列表行自带工厂/年月；月计划查询「选择」进入时行上可能仅有路由携带字段，需合并 this.query 并解析 yearMonth。
+     */
     async getStartDay(date) {
-      console.log("date", date);
+      const src = date && typeof date === "object" ? { ...date } : {};
+      const q = this.query || {};
+      const payload = { ...src };
+
+      if (!payload.factoryCode && q.factoryCode) {
+        payload.factoryCode = q.factoryCode;
+      }
+      const needYm =
+        payload.year == null ||
+        payload.year === "" ||
+        payload.month == null ||
+        payload.month === "";
+      if (needYm && q.yearMonth) {
+        const arr = String(q.yearMonth).split("-");
+        if (arr.length >= 2) {
+          payload.year = Number(arr[0]);
+          payload.month = Number(arr[1]);
+        }
+      } else {
+        if (payload.year != null && payload.year !== "") {
+          payload.year = Number(payload.year);
+        }
+        if (payload.month != null && payload.month !== "") {
+          payload.month = Number(payload.month);
+        }
+      }
+
+      if (!payload.cxMachineCode && q.scheduledMachines) {
+        payload.cxMachineCode = q.scheduledMachines;
+      }
+      if (!payload.cxMachineCode && q.cxMachineCode) {
+        payload.cxMachineCode = q.cxMachineCode;
+      }
+
+      if (!payload.productionVersion && q.productionVersion) {
+        payload.productionVersion = q.productionVersion;
+      }
+
+      if (payload.beginDay !== undefined && payload.beginDay !== "" && payload.beginDay != null) {
+        payload.beginDay = Number(payload.beginDay);
+      }
+      if (payload.endDay !== undefined && payload.endDay !== "" && payload.endDay != null) {
+        payload.endDay = Number(payload.endDay);
+      }
+
+      const invalid =
+        !payload.factoryCode ||
+        payload.year == null ||
+        Number.isNaN(payload.year) ||
+        payload.month == null ||
+        Number.isNaN(payload.month) ||
+        !String(payload.cxMachineCode).trim() ||
+        payload.beginDay == null ||
+        Number.isNaN(payload.beginDay) ||
+        payload.endDay == null ||
+        Number.isNaN(payload.endDay);
+
+      if (invalid) {
+        console.warn("getPreviousStructure 参数不齐，跳过请求", payload);
+        return;
+      }
+
       try {
-        let res = await outGetStayDay(date);
-        if (res.adjustStartDay) {
+        const res = await outGetStayDay(payload);
+        if (res && res.adjustStartDay != null) {
           this.$set(this.formInline, "adjustStartDay", res.adjustStartDay);
         }
       } catch (err) {
         console.log(err);
       }
+    },
+
+    /**
+     * 月计划调整查询弹窗中点击「选择」后携带参数进入：展示单结构调整表单并走与「单选结构调整」相同的数据加载逻辑
+     */
+    applyMonthPlanFinalSelectPrefill() {
+      const q = this.$route.query || {};
+      this.monthPlanFromFinalSelect = true;
+      this.search = {
+        ...this.search,
+        factoryCode: q.factoryCode || this.search.factoryCode,
+        yearMonth: q.yearMonth || this.search.yearMonth,
+        scheduledMachines: q.scheduledMachines || q.cxMachineCode || "",
+      };
+      this.query = { ...this.search };
+      this.adjustType = "02";
+      let year = null;
+      let month = null;
+      const ymStr = this.search.yearMonth;
+      if (ymStr) {
+        const arr = String(ymStr).split("-");
+        if (arr.length >= 2) {
+          year = Number(arr[0]);
+          month = Number(arr[1]);
+        }
+      }
+      /** 与 listAdjusts 列表行字段对齐，便于 getStartDay / 后续接口使用 */
+      const row = {
+        factoryCode: this.search.factoryCode,
+        year,
+        month,
+        cxMachineCode: q.cxMachineCode || "",
+        structureName: q.structureName || "",
+        beginDay:
+          q.beginDay !== undefined && q.beginDay !== ""
+            ? Number(q.beginDay)
+            : "",
+        endDay:
+          q.endDay !== undefined && q.endDay !== "" ? Number(q.endDay) : "",
+        productionVersion: q.productionVersion || "",
+        scheduledMachines: q.scheduledMachines || q.cxMachineCode || "",
+      };
+      this.formInline = { ...row };
+      this.actionDate = row;
+      this.show = false;
+      this.loading = true;
+      this.isEdit = false;
+      this.data = [];
+      this.getStartDay(row);
+      if (row.productionVersion) {
+        this.getOutVersionList(true);
+      } else {
+        this.page = null;
+        setTimeout(() => {
+          this.page = null;
+          this.data = [];
+          this.show = true;
+          this.loading = false;
+          this.isShowResult = true;
+          this.activeName = "singleResult";
+        }, 500);
+      }
+    },
+
+    /** 根据路由 query.pageType 更新当前页签标题（结构内调整 / 结构调整） */
+    syncMonthPlanStructureInnerTabTitle() {
+      if (!this.isMonthPlanStructureInnerLayout) {
+        return;
+      }
+      const pageType = this.$route.query.pageType;
+      const title =
+        pageType === "structure"
+          ? this.$t("ui.data.column.monthPlanStructureInnerAdjust.titleStructure")
+          : this.$t("ui.data.column.monthPlanStructureInnerAdjust.titleInner");
+      this.$tab.updatePage({
+        ...this.$route,
+        title,
+        meta: { ...this.$route.meta, title },
+      });
+    },
+  },
+  watch: {
+    "$route.query.pageType"() {
+      this.syncMonthPlanStructureInnerTabTitle();
     },
   },
   mounted() {
@@ -2573,12 +2888,18 @@ export default {
     this.query = {
       ...defaultParams,
     };
-    // this.getList();
-    this.getVersionList(true);
+    const isMpPrefill =
+      this.isMonthPlanStructureInnerLayout &&
+      this.$route.query.fromSelect === "1";
+    if (isMpPrefill) {
+      this.applyMonthPlanFinalSelectPrefill();
+    } else {
+      this.getVersionList(true);
+    }
+    this.syncMonthPlanStructureInnerTabTitle();
   },
   activated() {
-    // console.log('activated')
-    // this.getList();
+    this.syncMonthPlanStructureInnerTabTitle();
   },
 };
 </script>
@@ -2626,6 +2947,16 @@ export default {
 }
 ::v-deep .warning-row {
   background-color: #ffcccc!important;
+}
+
+.mp-structure-inner-header {
+  margin-bottom: 4px;
+}
+.mp-structure-inner-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 </style>

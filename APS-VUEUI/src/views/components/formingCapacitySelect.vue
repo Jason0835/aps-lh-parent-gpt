@@ -21,6 +21,7 @@
         :search="search"
         :highlight-current-row="true"
         @current-change="handleCurrentChange"
+        @row-click="handleRowClick"
         @row-dblclick="handleDbClick"
         @pageChange="handlePageChange"
         @selection-change="handleSelectionChange"
@@ -70,7 +71,7 @@ export default {
       //     dictData: this.parentDict.type.biz_factory_name,
       //   },
       // ],
-      search:{},
+      search: {},
       filterKey: "",
       page: {
         current: 1,
@@ -83,7 +84,10 @@ export default {
       valueProp: "cxMachineCode",
       labelProp: "cxMachineCode",
       data: [],
-      search:{}
+      /** 当前高亮行，未选时不可确认（否则父组件收不到 change） */
+      currentRow: null,
+      /** 多选模式下列选择 */
+      selection: [],
     };
   },
   computed: {
@@ -152,8 +156,10 @@ export default {
 
   watch: {
     value: function (val) {
-      if (!val) {
+      if (val === null || val === undefined || val === "") {
         this.showValue = "";
+      } else {
+        this.showValue = String(val);
       }
     },
 
@@ -221,7 +227,7 @@ export default {
     },
 
     handleShow() {
-      console.log(this.factoryCode);
+      this.currentRow = null;
       let defaultParams = {
         factoryCode: this.factoryCode ? this.factoryCode : "116",
       };
@@ -231,10 +237,10 @@ export default {
       this.query = {
         ...defaultParams,
       };
-      console.log(this.query);
       this.getList();
     },
     handleCancel() {
+      this.currentRow = null;
       this.data = [];
       this.query = {
         factoryCode: "116",
@@ -250,6 +256,13 @@ export default {
     handleCurrentChange(row) {
       this.currentRow = row;
     },
+    /** 单击行即选中（不依赖 current-change / 高亮行，避免弹窗内点行后确定仍无 change） */
+    handleRowClick(row) {
+      if (this.multiple) {
+        return;
+      }
+      this.currentRow = row;
+    },
     handleDbClick(row) {
       this.currentRow = row;
       this.handleConfirm(() => {
@@ -260,6 +273,7 @@ export default {
       this.selection = rows;
     },
     handleClear() {
+      this.currentRow = null;
       if (this.$refs.tableRef) {
         const tableRef = this.$refs.tableRef.getTableRef();
         tableRef && tableRef.setCurrentRow();
@@ -275,8 +289,10 @@ export default {
           this.$emit("change", this.currentRow[this.valueProp], {
             ...this.currentRow,
           });
+          done();
+        } else {
+          this.$modal.msgWarning(this.$t("common.rule.select"));
         }
-        done();
       } else {
         if (this.selection.length) {
           const ids = this.selection
@@ -287,8 +303,10 @@ export default {
             .join(",");
           this.$emit("updateValue", ids);
           this.$emit("change", ids, deepClone(this.selection));
+          done();
+        } else {
+          this.$modal.msgWarning(this.$t("common.rule.select"));
         }
-        done();
       }
     },
   },

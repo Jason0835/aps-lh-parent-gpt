@@ -54,7 +54,7 @@
           plain
           v-hasPermi="['monthplan:monthSaleOrderPlan:add']"
           @click="handleAdd"
-          >{{ $t("调整") }}</el-button
+          >{{ $t("common.button.adjust") }}</el-button
         >
         <el-button
           type="primary"
@@ -340,6 +340,11 @@ export default {
                   }
                 >
                   {this.$t("ui.data.console.productNoDetail")}
+                </text-button>
+                <text-button
+                  onClick={() => this.handleRouterMonthlyProductionPlanQuery()}
+                >
+                  {this.$t("common.button.adjust")}
                 </text-button>
                 <text-button onClick={() => this.handleDeleteChild(row)}>
                   {this.$t("common.button.delete")}
@@ -725,6 +730,9 @@ export default {
         //   monthPlanVersion: row.monthPlanVersion,
         // },
       });
+    },
+    handleRouterMonthlyProductionPlanQuery() {
+      this.$router.push({ path: "/new/monthlyProductionPlan" });
     },
     handleReport(row) {
       this.$router.push({
