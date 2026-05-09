@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish;
@@ -20,6 +21,8 @@ import com.zlt.aps.lh.mapper.LhParamsMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -50,7 +53,7 @@ public class LhIncreaseMouldStartPlanService {
     /**
      * 中班起始班次索引。
      */
-    private static final int MIDDLE_SHIFT_INDEX = 4;
+    private static final int MIDDLE_SHIFT_INDEX = 5;
 
     /**
      * 中班班次字典值。
@@ -68,6 +71,9 @@ public class LhIncreaseMouldStartPlanService {
 
     @Resource
     private LhParamsMapper lhParamsMapper;
+
+    @Resource
+    private MdmSkuConstructionRefEntityMapper mdmSkuConstructionRefEntityMapper;
 
     /**
      * 换模开产增加计划。
@@ -178,6 +184,7 @@ public class LhIncreaseMouldStartPlanService {
      */
     private void recalculateShiftPlanQty(LhScheduleResult scheduleResult) {
         validateCalculationFields(scheduleResult);
+        syncConstructionStage(scheduleResult);
 
         BigDecimal mouldChangeHours = getMouldChangeTotalHours(scheduleResult.getFactoryCode());
         Date middleShiftStartTime = Optional.ofNullable(ShiftFieldUtil.getShiftStartTime(scheduleResult, MIDDLE_SHIFT_INDEX))
@@ -221,6 +228,33 @@ public class LhIncreaseMouldStartPlanService {
         }
         // 重新汇总 1～8 班计划量，保证 DAILY_PLAN_QTY 与班次字段保持一致。
         ShiftFieldUtil.syncDailyPlanQty(scheduleResult);
+    }
+
+    /**
+     * 同步硫化结果的示方类型。
+     * <p>按分厂、物料编码查询 SKU 与施工（示方书）关系，取第一条数据的产品状态并转换成施工阶段后回写到硫化结果。</p>
+     *
+     * @param scheduleResult 当前排程结果
+     */
+    private void syncConstructionStage(LhScheduleResult scheduleResult) {
+        if (StringUtils.isAnyBlank(scheduleResult.getFactoryCode(), scheduleResult.getMaterialCode())) {
+            return;
+        }
+        MdmSkuConstructionRef skuConstructionRef = Optional.ofNullable(mdmSkuConstructionRefEntityMapper.selectList(
+                        new LambdaQueryWrapper<MdmSkuConstructionRef>()
+                                .eq(MdmSkuConstructionRef::getFactoryCode, scheduleResult.getFactoryCode())
+                                .eq(MdmSkuConstructionRef::getMaterialCode, scheduleResult.getMaterialCode())
+                                .eq(MdmSkuConstructionRef::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                                .orderByAsc(MdmSkuConstructionRef::getId)))
+                .filter(list -> !list.isEmpty())
+                .map(list -> list.get(0))
+                .orElse(null);
+        if (Objects.isNull(skuConstructionRef)) {
+            return;
+        }
+        // 主数据表当前保存的是产品状态标记（S/T/X），这里按项目既有枚举口径转换成硫化结果使用的施工阶段（03/02/01/00）。
+        scheduleResult.setConstructionStage(
+                ConstructionStageEnum.matchByMarkFlag(skuConstructionRef.getTrialStatus()).getStage());
     }
 
     /**
