@@ -57,6 +57,11 @@ public enum MesInterfaceCodeEnum {
     BOM_INFO("MES_BOM_INFO", "mesBomItfService", "syncBomInfo", "成型及半部件BOM施工信息同步"),
 
     /**
+     * 成型及半部件BOM施工信息同步
+     */
+    CONSTRUCTION_PROCESS_INFO("CONSTRUCTION_PROCESS_INFO", "mesBomItfService", "syncConstructionProcessInfo", "示方书工艺信息同步"),
+
+    /**
      * 成品物料信息同步
      */
     BAS_MATERIAL("MES_BAS_MATERIAL", "mesItfService", "syncMaterial", "成品物料信息同步"),

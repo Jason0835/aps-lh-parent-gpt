@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import com.baomidou.dynamic.datasource.annotation.DS;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionProcess;
 import com.zlt.aps.mp.api.domain.entity.MdmBomInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
@@ -44,4 +45,12 @@ public interface MesBomItfMapper {
 	 * @return 结果
 	 */
 	List<MdmBomInfo> selectMesBomInfo(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 示方书工艺信息同步
+     *
+     * @param syncDataLogs 查询参数
+     * @return 结果
+     */
+	List<MdmConstructionProcess> selectConstructionProcessInfo(AuxReqSyncDataLogs syncDataLogs);
 }

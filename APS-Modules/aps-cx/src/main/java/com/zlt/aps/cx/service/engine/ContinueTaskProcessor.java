@@ -239,8 +239,14 @@ public class ContinueTaskProcessor {
 
     private Map<String, Set<String>> buildMachineHistoryMap(ScheduleContextVo context) {
         Map<String, Set<String>> historyMap = new HashMap<>();
-        if (context.getMachineOnlineEmbryoMap() != null) {
-            historyMap.putAll(context.getMachineOnlineEmbryoMap());
+        Map<String, Set<String>> onlineEmbryoMap = context.getMachineOnlineEmbryoMap();
+        if (onlineEmbryoMap != null) {
+            for (Map.Entry<String, Set<String>> entry : onlineEmbryoMap.entrySet()) {
+                String embryoCode = entry.getKey();
+                for (String cxCode : entry.getValue()) {
+                    historyMap.computeIfAbsent(cxCode, k -> new HashSet<>()).add(embryoCode);
+                }
+            }
         }
         return historyMap;
     }

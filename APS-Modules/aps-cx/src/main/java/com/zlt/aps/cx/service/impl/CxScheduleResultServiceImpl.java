@@ -35,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -257,7 +258,12 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         Map<String, Object> tableMap = new HashMap<>(16);
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         excelDataList.add(buildCxRemainQtyExportDataList(list));
-        return ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
+        byte[] bytes = ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
+
+        inputStream = new ByteArrayInputStream(bytes);
+        bytes = ExcelUtils.writeMultiList(inputStream, 1, tableMap, excelDataList);
+
+        return bytes;
     }
 
     @Override

@@ -978,6 +978,10 @@ public class ShiftScheduleService {
             int hourlyCapacity,
             ScheduleContextVo context) {
 
+        if (context.isPrecisionPlanApplied()) {
+            return 0;
+        }
+
         if (context.getPrecisionPlans() == null || context.getPrecisionPlans().isEmpty()) {
             return 0;
         }
@@ -1067,7 +1071,7 @@ public class ShiftScheduleService {
      * @param context       排程上下文
      * @return 小时产能（条/小时）
      */
-    private int getMachineHourlyCapacity(String machineCode, String materialCode,
+    public int getMachineHourlyCapacity(String machineCode, String materialCode,
                                           String structureName, ScheduleContextVo context) {
         // 1. 获取日硫化量（materialLhCapacityMap 的 key 是 materialCode，不是 embryoCode）
         Integer dailyLhCapacity = null;

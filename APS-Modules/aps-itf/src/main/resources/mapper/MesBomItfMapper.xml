@@ -103,4 +103,21 @@
         WHERE FACTORY_CODE = #{factoryCode}
           AND DATA_VERSION = #{dataVersion}
     </select>
+
+    <!-- 示方书工艺信息同步 -->
+    <select id="selectConstructionProcessInfo" resultType="com.zlt.aps.mdm.api.domain.entity.MdmConstructionProcess">
+        SELECT
+            MATERIAL_CODE,
+            MATERIAL_VERSION,
+            MATERIAL_DESC,
+            PROCESS_CODE,
+            PRODUCT_TYPE_CODE,
+            PROCESS_VALUE,
+            UNIT,
+            DATA_VERSION,
+            FACTORY_CODE
+        FROM MES_CONSTRUCTION_PROCESS
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND DATA_VERSION = #{dataVersion}
+    </select>
 </mapper>

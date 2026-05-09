@@ -1,12 +1,10 @@
-
 <template>
   <basic-container>
     <page-table
-      tableRef="ProSizeSummaryMainTable"
-      :calcHeight="true"
+      tableRef="MonthPlanFinalAdjustQueryTable"
+      :calcHeight="88"
       v-loading="loading"
       :columns="columns"
-       :row-class-name="tableRowClassName"
       :searchColumns="searchColumns"
       :data="data"
       :page="page"
@@ -17,31 +15,107 @@
       @sort-change="handleSortChange"
       :showSummary="false"
       :selectArea="false"
-      :span-method="objectSpanMethod"
-      :summary-method="getSummaryMethod"
     >
       <template slot="header">
-        <el-button
-          @click="handleExport"
-          v-hasPermi="['monthplan:factoryMonthPlanMouldDayResult:export']"
-          >{{ $t("ui.frame.btn.export") }}</el-button
-        >
-        <el-button
-          @click="goProductionMonthPlanInit"
-          v-hasPermi="['monthplan:mpStructureAllocation:list']"
-          >{{ $t("查看结构排产") }}</el-button
-        >
-        <el-button
-          :loading="syncLoading"
-          @click="handleSyncAdjustedMonthPlan"
-          v-hasPermi="['monthplan:factoryMonthPlanFinalResult:sync']"
-          >{{ $t("推送SCM/MES") }}</el-button
-        >
+        <div class="toolbar-row">
+          <el-button
+            type="primary"
+            plain
+            @click="handleStructureInnerAdjust"
+            >{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.structureInnerAdjust")
+            }}</el-button
+          >
+          <el-button
+            type="primary"
+            plain
+            :disabled="!canUsePrimaryAdjustActions"
+            @click="handleStructureAdjust"
+            >{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.structureAdjust")
+            }}</el-button
+          >
+          <el-button @click="handleViewAdjustVersion">{{
+            $t("ui.data.column.monthPlanFinalAdjustQuery.viewAdjustVersion")
+          }}</el-button>
+          <!-- 导出 -->
+          <el-button @click="handleExport">{{
+            $t("ui.frame.btn.export")
+          }}</el-button>
+          <!-- 全物料导出 -->
+          <el-button @click="handleExportAllMaterial">{{
+            $t("ui.data.column.monthPlanFinalAdjustQuery.exportAllMaterial")
+          }}</el-button>
+          <el-button
+            :loading="syncLoading"
+            v-hasPermi="['monthplan:factoryMonthPlanFinalResult:sync']"
+            @click="handleIssueScmMes"
+            >{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.issueScmMes")
+            }}</el-button
+          >
+          <div class="current-machine-wrap">
+            <span class="current-machine-label">{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.currentAdjustMachine")
+            }}</span>
+            <el-input
+              class="current-machine-input"
+              :value="currentAdjustMachine"
+              disabled
+              :placeholder="
+                $t('ui.data.column.monthPlanFinalAdjustQuery.cxMachine')
+              "
+            />
+          </div>
+        </div>
       </template>
-      <template slot="headerRight"> </template>
+      <template slot="footer">
+        <div class="footer-actions">
+          <el-button
+            type="primary"
+            :loading="confirmAdjustLoading"
+            :disabled="
+              !canUsePrimaryAdjustActions ||
+              confirmAdjustLoading ||
+              recalculateLoading
+            "
+            @click="handleConfirmAdjust"
+            >{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.confirmAdjust")
+            }}</el-button
+          >
+          <el-button
+            :disabled="
+              !canUseContinueAdjust ||
+              confirmAdjustLoading ||
+              recalculateLoading
+            "
+            @click="handleContinueAdjust"
+            >{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.continueAdjust")
+            }}</el-button
+          >
+          <el-button
+            :loading="recalculateLoading"
+            :disabled="
+              confirmAdjustLoading ||
+              recalculateLoading
+            "
+            @click="handleRecalculate"
+            >{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.recalculate")
+            }}</el-button
+          >
+        </div>
+      </template>
     </page-table>
+    <structure-adjust-dialog
+      ref="structureAdjustDialogRef"
+      @structure-adjust-saved="onStructureAdjustSaved"
+    />
+    <adjust-version-dialog ref="adjustVersionDialogRef" />
     <el-dialog
-      title="推送SCM/MES"
+      :title="$t('ui.data.column.monthPlanFinalAdjustQuery.issueScmMes')"
       :visible.sync="syncDialog.visible"
       width="520px"
       append-to-body
@@ -50,24 +124,29 @@
       <el-form
         ref="syncForm"
         :model="syncDialog.form"
-        :rules="syncDialog.rules"
+        :rules="syncDialogRules"
         label-width="120px"
       >
-        <el-form-item label="年月" prop="yearMonth">
+        <el-form-item
+          :label="$t('ui.data.column.report.proSizeSummary.yearMonth')"
+          prop="yearMonth"
+        >
           <el-date-picker
             v-model="syncDialog.form.yearMonth"
             type="month"
             value-format="yyyy-MM"
             format="yyyy-MM"
-            placeholder="请选择年月"
+            :placeholder="
+              $t('ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleYearMonth')
+            "
             style="width: 100%"
             @change="handleSyncBaseChange"
           />
         </el-form-item>
-        <el-form-item label="分厂" prop="factoryCode">
+        <el-form-item :label="$t('common.factory')" prop="factoryCode">
           <el-select
             v-model="syncDialog.form.factoryCode"
-            placeholder="请选择分厂"
+            :placeholder="$t('ui.frame.btn.choose')"
             filterable
             clearable
             style="width: 100%"
@@ -81,10 +160,17 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="月计划版本" prop="productionVersion">
+        <el-form-item
+          :label="$t('ui.data.monthlyProductionPlan.productionVersion')"
+          prop="productionVersion"
+        >
           <el-select
             v-model="syncDialog.form.productionVersion"
-            placeholder="请选择月计划版本"
+            :placeholder="
+              $t(
+                'ui.data.column.monthPlanFinalAdjustQuery.issueScmMesPlaceholderProductionVersion'
+              )
+            "
             filterable
             clearable
             style="width: 100%"
@@ -99,10 +185,17 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="需求计划版本" prop="lastMonthPlanVersion">
+        <el-form-item
+          :label="$t('ui.data.monthlyProductionPlan.lastMonthPlanVersion')"
+          prop="lastMonthPlanVersion"
+        >
           <el-select
             v-model="syncDialog.form.lastMonthPlanVersion"
-            placeholder="请选择需求计划版本"
+            :placeholder="
+              $t(
+                'ui.data.column.monthPlanFinalAdjustQuery.issueScmMesPlaceholderDemandVersion'
+              )
+            "
             filterable
             clearable
             style="width: 100%"
@@ -119,55 +212,77 @@
         </el-form-item>
       </el-form>
       <span slot="footer" class="dialog-footer">
-        <el-button @click="syncDialog.visible = false">取消</el-button>
+        <el-button @click="syncDialog.visible = false">{{
+          $t("common.button.cancel")
+        }}</el-button>
         <el-button
           type="primary"
           :loading="syncLoading"
           @click="submitSyncAdjustedMonthPlan"
-        >确定</el-button>
+          >{{
+            $t("ui.data.column.monthPlanFinalAdjustQuery.issueScmMesOk")
+          }}</el-button
+        >
       </span>
     </el-dialog>
   </basic-container>
 </template>
+
 <script>
-//lib
 import moment from "moment";
-import Big from "big.js";
-import {mapGetters} from "vuex";
-//utils
-import {downloadLink} from "@/utils/request";
-//interface
+import { mapGetters } from "vuex";
+import { downloadLink } from "@/utils/request";
 import {
+  listMonthPlanFinal4Adjust,
   getFinalResultVersionList,
-  getProductionMonthType,
-  listProduction,
   syncAdjustedMonthPlanToScmAndMes,
 } from "@/api/monthplan/monthlyProductionPlan";
-import {statisticsResult,} from "@/api/monthplan/adjustStructure";
-//components
+import {
+  getAdjustsCxMachineFromRedis,
+  confirmAdjust,
+  recalculateWeekRollAdjust,
+} from "@/api/monthplan/adjustStructure";
+import structureAdjustDialog from "./components/structureAdjustDialog.vue";
+import adjustVersionDialog from "./components/adjustVersionDialog.vue";
 
 export default {
-  name: "MonthlyProductionPlan",
+  name: "MonthPlanFinalAdjustQuery",
   components: {
-    // tltUpload,
+    structureAdjustDialog,
+    adjustVersionDialog,
   },
+  /** 含成型机台选择弹窗所需字典（与 formingCapacitySelect / 周程滚动页一致） */
   dicts: [
     "biz_factory_name",
-    "biz_product_type",
     "biz_brand_type",
-    "biz_plan_type",
-    "biz_construction_stage",
-    "product_category",
-    "biz_schedule_type",
     "biz_yes_no",
-    "trial_status"
+    "biz_class_type",
+    "biz_machine_brand",
   ],
+  provide() {
+    return {
+      parentDict: this.dict,
+    };
+  },
   data() {
     return {
-      createLoading: false,
-      productionStartDate: "",
       loading: false,
+      data: [],
+      page: {
+        current: 1,
+        pageSize: 20,
+        total: 0,
+      },
+      sort: {},
+      search: {},
+      query: {},
+      versionOptions: [],
+      /** 当前调整机台（只读，来自 Redis） */
+      currentAdjustMachine: "",
+      confirmAdjustLoading: false,
+      recalculateLoading: false,
       syncLoading: false,
+      /** 下发 SCM/MES 弹窗（与月度生产计划页「推送SCM/MES」同源接口与交互） */
       syncDialog: {
         visible: false,
         versionLoading: false,
@@ -179,262 +294,222 @@ export default {
           lastMonthPlanVersion: "",
           monthPlanVersion: "",
         },
-        rules: {
-          yearMonth: [{ required: true, message: "请选择年月", trigger: "change" }],
-          factoryCode: [{ required: true, message: "请选择分厂", trigger: "change" }],
-          productionVersion: [{ required: true, message: "请选择月计划版本", trigger: "change" }],
-          lastMonthPlanVersion: [{ required: true, message: "请选择需求计划版本", trigger: "change" }],
-        },
       },
-      data: [],
-      selection: [],
-      page: {
-        current: 1,
-        pageSize: 20,
-        total: 0,
-      },
-      sort: {},
-      search: {},
-      query: {},
-      stat: {},
     };
   },
   computed: {
-    ...mapGetters('globalList', ['structureList']),
-    columns() {
-      let columns = [
-        {
-          prop: "productionNo",
-          label: this.$t("ui.data.monthlyProductionPlan.productionNo"),
-          width: 160,
-        },
+    ...mapGetters("globalList", ["structureList"]),
+    /** 当前调整机台有值则视为「调整进行中」 */
+    adjustFlowInProgress() {
+      return (this.currentAdjustMachine || "").trim() !== "";
+    },
+    /** 无机台或已清空：结构内调整、结构调整、确认、重新计算可用 */
+    canUsePrimaryAdjustActions() {
+      return !this.adjustFlowInProgress;
+    },
+    /** 有机台：仅「继续调整」可用 */
+    canUseContinueAdjust() {
+      return this.adjustFlowInProgress;
+    },
+    searchColumns() {
+      return [
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+          clearable: false,
+          filterable: true,
+          listeners: {
+            change: this.handleBaseQueryChange,
           },
-          width: 120,
         },
         {
-          prop: "year",
-          label: this.$t("ui.data.colume.year"),
-          width: 120,
+          prop: "yearMonth",
+          label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
+          type: "date",
+          dateType: "month",
+          valueFormat: "yyyy-MM",
+          clearable: false,
+          listeners: {
+            change: this.handleBaseQueryChange,
+          },
         },
         {
-          prop: "month",
-          label: this.$t("ui.data.colume.month"),
-          width: 120,
+          prop: "cxMachineCode",
+          label: this.$t("ui.data.column.monthPlanFinalAdjustQuery.cxMachine"),
+          filterable: true,
         },
         {
-          prop: "monthPlanVersion",
-          label: this.$t("ui.data.demandPlan.monthPlanVersion"),
-          width: 120,
-        },
-        {
-          prop: "lastMonthPlanVersion",
-          label: this.$t("ui.data.monthlyProductionPlan.lastMonthPlanVersion"),
-          width: 120,
+          prop: "structureName",
+          label: this.$t("ui.data.column.finishStock.structureName"),
+          type: "select",
+          dictData: this.structureList,
+          filterable: true,
         },
         {
           prop: "productionVersion",
-          label: this.$t("ui.data.monthlyProductionPlan.productionVersion"),
-          width: 120,
-        },
-        {
-          label: this.$t("ui.data.column.monthplan.productType"),
-          prop: "productTypeCode",
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_product_type, value);
+          label: this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.productionVersion"
+          ),
+          type: "select",
+          dictData: this.versionOptions,
+          filterable: true,
+          listeners: {
+            change: this.handleProductionVersionChange,
           },
-          width: 120,
         },
         {
           prop: "materialCode",
-          label: this.$t("ui.data.colume.wms.unused.productCode"),
-          width: 120,
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width: 280,
         },
-        {
-          prop: "mesMaterialCode",
-          label: this.$t("ui.data.defectiveStock.mesMaterialCode"),
-          width: 120,
-        },
+      ];
+    },
+    columns() {
+      const structureTypeLabel = (v) => {
+        const m = { "01": "周期结构", "02": "常规结构" };
+        return m[v] != null ? m[v] : v || "";
+      };
+      const cols = [
+        // {
+        //   prop: "factoryCode",
+        //   label: this.$t("common.factory"),
+        //   width: 120,
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+        //   },
+        // },
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
           width: 180,
         },
         {
-          prop: "proSize",
-          label: this.$t("ui.data.column.scheduleAdjust.proSize"),
+          prop: "structureType",
+          label: this.$t("ui.data.column.monthPlanFinalAdjustQuery.structureType"),
+          width: 110,
+          formatter: (row, column, value) => structureTypeLabel(value),
+        },
+        {
+          prop: "materialCode",
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           width: 120,
         },
         {
-          prop: "productCategory",
-          label: this.$t("ui.data.column.capsuleChuck.productTypeCode"),
-          width: 120,
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.product_category, value);
-          },
-        },
-        {
-          prop: "productStatus",
-          label: this.$t("ui.data.column.trialPlan.trialStatus"),
-          width: 120,
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.trial_status, value);
-          },
-        },
-        {
-          prop: "productionType",
-          label: this.$t("ui.data.DemandPlan.productionType"),
-          width: 120,
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_schedule_type, value);
-          },
+          prop: "materialDesc",
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          width: 250,
+          align: "left",
         },
         {
           prop: "mainMaterialDesc",
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-          width: 320,
-        },
-        {
-          prop: "constructionStage",
-          label: this.$t("排产类型"),
-          width: 120,
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
-          },
-        },
-        {
-          prop: "isZeroRack",
-          label: this.$t("ui.data.column.mpMonthlySaleQty.isZeroRack"),
-          width: 120,
-          formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-          },
+          label: "胎胚号",
+          width: 250,
+          align: "left",
         },
         {
           prop: "embryoNo",
-          label: this.$t("ui.data.column.trialPlan.embryoNo"),
-          width: 180,
-        },
-        {
-          prop: "textNo",
-          label: this.$t("ui.data.column.trialPlan.textNo"),
-          width: 180,
-        },
-        {
-          prop: "lhNo",
-          label: this.$t("ui.data.column.trialPlan.lhNo"),
-          width: 180,
+          label: "胎胚描述",
+          width: 250,
+          align: "left",
         },
         {
           prop: "brand",
           label: this.$t("common.brand"),
+          width: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_brand_type, value);
           },
-          width: 120,
         },
         {
           prop: "specifications",
           label: this.$t("ui.data.column.trialPlan.specifications"),
-          width: 120,
+          width: 100,
         },
         {
           prop: "mainPattern",
-          label: this.$t("ui.data.column.moldLedger.mainPattern"),
-          width: 120,
+          label: this.$t("ui.data.column.confMinProd.pattern"),
+          width: 100,
         },
         {
-          prop: "pattern",
-          label: this.$t("saleOrder.figure"),
-          width: 120,
+          prop: "proSize",
+          label: "英寸",
+          width: 80,
         },
         {
           prop: "mouldCavityQty",
           label: this.$t("ui.data.monthlyProductionPlan.mouldCavityQtyNum"),
-          width: 120,
+          width: 80,
         },
         {
           prop: "typeBlockQty",
           label: this.$t("ui.data.monthlyProductionPlan.typeBlockQtyNum"),
-          width: 120,
+          width: 80,
+        },
+        {
+          prop: "dayVulcanizationQty",
+          label: this.$t("ui.data.monthlyProductionPlan.dayVulcanizationQty"),
+          width: 100,
+        },
+        {
+          prop: "adjustQty1",
+          label: "调整1",
+          width: 80,
+        },
+        {
+          prop: "adjustQty2",
+          label: "调整2",
+          width: 80,
+        },
+        {
+          prop: "adjustQty3",
+          label: "调整3",
+          width: 80,
+        },
+        {
+          prop: "adjustQty4",
+          label: "调整4",
+          width: 80,
+        },
+        {
+          prop: "netQty",
+          label: this.$t("ui.data.column.demandPlanSum.netQty"),
+          width: 100,
+          formatter: (row, column, value) =>
+            value != null && value !== "" ? value : row.prodReqPlan,
         },
         {
           prop: "heightQty",
-          label: this.$t("ui.data.monthlyProductionPlan.heightQty"),
-          width: 120,
-        },
-        // {
-        //   prop: "averageSaleQty",
-        //   label: this.$t("ui.data.defectiveStock.averageSaleQty"),
-        //   width: 120,
-        // },
-        // {
-        //   prop: "inventorySalesRatio",
-        //   label: this.$t("ui.data.monthlyProductionPlan.inventorySalesRatio"),
-        //   width: 120,
-        // },
-        {
-          prop: "dayLhQty",
-          label: this.$t("ui.data.monthlyProductionPlan.dayVulcanizationQty"),
+          label: this.$t("ui.data.column.demandPlanSum.heightQty"),
           width: 120,
         },
         {
-          prop: "cxMachineCode",
-          label: this.$t("ui.data.monthlyProductionPlan.cxMachineCode"),
+          prop: "midQty",
+          label: this.$t("ui.data.column.demandPlanSum.midQty"),
           width: 120,
         },
         {
-          prop: "mouldChangeInfo",
-          label: this.$t("ui.data.monthlyProductionPlan.mouldChangeInfo"),
-          width: 120,
-        },
-        // {
-        //   prop: "dynamicBalanceQty",
-        //   label: this.$t("ui.data.monthlyProductionPlan.dynamicBalanceQty"),
-        //   width: 120,
-        // },
-        // {
-        //   prop: "uniformityQty",
-        //   label: this.$t("ui.data.monthlyProductionPlan.uniformityQty"),
-        //   width: 120,
-        // },
-        {
-          prop: "curingTime",
-          label: this.$t("ui.data.monthlyProductionPlan.curingTime"),
+          prop: "cycleReserveQty",
+          label: this.$t("ui.data.column.demandPlanSum.cycleReserveQty"),
           width: 120,
         },
         {
-          prop: "prodReqPlan",
-          label: this.$t("ui.data.monthlyProductionPlan.prodReqPlan"),
-          width: 120,
-        },
-        {
-          prop: "trialQty",
-          label: this.$t("ui.data.monthlyProductionPlan.trialQty"),
-          width: 120,
-        },
-        {
-          prop: "heightProductionQty",
-          label: this.$t("ui.data.mouldingDayResult.heightProductionQty"),
-          width: 120,
-        },
-        {
-          prop: "factProdReqQty",
-          label: this.$t("ui.data.monthlyProductionPlan.factProdReqQty"),
+          prop: "conventionReserveQty",
+          label: this.$t("ui.data.column.demandPlanSum.conventionReserveQty"),
           width: 120,
         },
         {
           prop: "totalQty",
           label: this.$t("ui.data.mouldingDayResult.totalQty"),
+          width: 120,
+        },
+        {
+          prop: "heightProductionQty",
+          label: this.$t("ui.data.mouldingDayResult.heightProductionQty"),
           width: 120,
         },
         {
@@ -444,7 +519,9 @@ export default {
         },
         {
           prop: "cycleProductionQty",
-          label: this.$t("ui.data.mouldingDayResult.cycleProductionQty"),
+          label: this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.cycleReserveProductionQty"
+          ),
           width: 120,
         },
         {
@@ -458,140 +535,76 @@ export default {
           width: 120,
         },
         {
-          prop: "trialProductionQty",
-          label: this.$t("ui.data.monthlyProductionPlan.trialProductionQty"),
+          prop: "isLockSchedule",
+          label: this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.isLockSchedule"
+          ),
           width: 120,
-        },
-        {
-          prop: "differenceQty",
-          label: this.$t("ui.data.mouldingDayResult.differenceQty"),
-          width: 120,
-        },
-        {
-          prop: "reason",
-          label: this.$t("ui.data.monthlyProductionPlan.reason"),
-          width: 120,
+          render: ({ row }) => {
+            return (
+              <el-select
+                v-model={row.isLockSchedule}
+                size="mini"
+                filterable
+                clearable
+                placeholder={this.$t("ui.frame.btn.choose")}
+                style="width: 100%"
+              >
+                {this.dict.type.biz_yes_no.map((item) => (
+                  <el-option
+                    key={item.value}
+                    label={item.label}
+                    value={item.value}
+                  />
+                ))}
+              </el-select>
+            );
+          },
         },
         {
           prop: "beginDay",
           label: this.$t("common.startDate"),
-          width: 120,
+          width: 90,
         },
         {
           prop: "endDay",
           label: this.$t("common.endDate"),
-          width: 120,
+          width: 90,
         },
-
       ];
-
-      if (this.productionStartDate) {
-        let start = moment(this.productionStartDate);
-        let end = moment(this.productionStartDate).add(1, "M");
-        let list = [];
-
-        while (start.isBefore(end)) {
-          list.push(start.format("DD"));
-          start.add(1, "d");
-        }
-        // console.log(list);
-        for (let i = 0; i < list.length; i++) {
-          let dayNumStr = list[i];
-          columns.push({
-            label: `${i + 1}号`,
-
-            prop: `day${i + 1}`,
-            minWidth: "80px",
-            type: "number",
-          });
-        }
-      } else {
-        //显示每日数据
-        const date = moment(this.query.yearMonth);
-        const days = date.daysInMonth();
-
-        for (let i = 0; i < days; i++) {
-          columns.push({
-            label: `${i + 1}号`,
-
-            prop: `day${i + 1}`,
-            minWidth: "80px",
-            type: "number",
-          });
-        }
+      for (let i = 1; i <= 31; i++) {
+        const prop = `day${i}`;
+        cols.push({
+          label: `${i}号`,
+          prop,
+          minWidth: "72px",
+          render: ({ row }) => {
+            return (
+              <el-input
+                size="mini"
+                value={
+                  row[prop] === null || row[prop] === undefined
+                    ? ""
+                    : String(row[prop])
+                }
+                onInput={(value) => {
+                  const n = String(value).replace(/[^\d]/g, "");
+                  row[prop] = n === "" ? null : Number(n);
+                }}
+              />
+            );
+          },
+        });
       }
-      // const days = 31;
-
-      // for (let i = 0; i < days; i++) {
-      //   columns.push({
-      //     label: `${i + 1}号`,
-      //     // label: this.$t("ui.data.column.mouldingDayResult.day", {
-      //     //   day: i + 1,
-      //     // }),
-      //     prop: `day${i + 1}`,
-      //     minWidth: "80px",
-      //     type: "number",
-      //   });
-      // }
-      return columns;
-    },
-    searchColumns() {
-      return [
-        {
-          prop: "factoryCode",
-          label: this.$t("common.factory"),
-          type: "select",
-          dictData: this.dict.type.biz_factory_name,
-          clearable: false,
+      cols.push({
+        prop: "hasSpecialMaterial",
+        label: this.$t("ui.data.column.mpAdjustResult.hasSpecialMaterial"),
+        width: 120,
+        formatter: (row, column, value) => {
+          return this.selectDictLabel(this.dict.type.biz_yes_no, value);
         },
-        {
-          prop: "yearMonth",
-          label: this.$t("ui.data.column.report.proSizeSummary.yearMonth"),
-          type: "date",
-          dateType: "month",
-          valueFormat: "yyyy-MM",
-          clearable: false,
-        },
-        {
-          label: this.$t("ui.data.column.finishStock.structureName"),
-          prop: "structureName",
-          type: "select",
-          dictData:this.structureList,
-          filterable: true
-        },
-        // {
-        //   label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-        //   prop: "mainMaterialDesc",
-        // },
-        {
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          prop: "materialDesc",
-        },
-        {
-          label: this.$t("ui.data.column.confMinProd.pattern"),
-          prop: "mainPattern",
-        },
-        // {
-        //   label: this.$t("产品状态"),
-        //   prop: "productStatus",
-        //   type: "select",
-        //   dictData: this.dict.type.biz_product_type,
-        // },
-        // {
-        //   label: this.$t("规格"),
-        //   prop: "materialDesc",
-        // },
-        {
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          prop: "materialCode",
-        },
-        {
-          label: this.$t("ui.data.column.monthplan.productType"),
-          prop: "productTypeCode",
-          type: "select",
-          dictData: this.dict.type.biz_product_type,
-        },
-      ];
+      });
+      return cols;
     },
     syncProductionVersionOptions() {
       const versionSet = new Set();
@@ -607,41 +620,165 @@ export default {
         return item.productionVersion === this.syncDialog.form.productionVersion;
       });
     },
+    syncDialogRules() {
+      const t = (k) => this.$t(k);
+      return {
+        yearMonth: [
+          {
+            required: true,
+            message: t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleYearMonth"
+            ),
+            trigger: "change",
+          },
+        ],
+        factoryCode: [
+          {
+            required: true,
+            message: t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleFactory"
+            ),
+            trigger: "change",
+          },
+        ],
+        productionVersion: [
+          {
+            required: true,
+            message: t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleProductionVersion"
+            ),
+            trigger: "change",
+          },
+        ],
+        lastMonthPlanVersion: [
+          {
+            required: true,
+            message: t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleDemandVersion"
+            ),
+            trigger: "change",
+          },
+        ],
+      };
+    },
+  },
+  async created() {
+    /** 与月计划调整（rollingCycle）查询条件默认年月一致：当前自然月，月份两位 */
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const defaults = {
+      factoryCode: "116",
+      yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
+    };
+    this.search = { ...defaults };
+    this.query = { ...defaults };
+    await this.loadVersionOptions();
+    await this.fetchCurrentAdjustMachineFromRedis();
+    this.getList();
   },
   methods: {
-    goProductionMonthPlanInit(){
-      if(this.data.length==0){
-        return this.$modal.msgWarning('暂无数据');
-      }
-      let date =this.data[0]
-      this.$router.push({
-        // path: `/monthPlanManagement/console/console/productionMonthPlanInit/${date.productionNo}`,
-        name: 'ProductionMonthPlanInit',
-        params: { id: date.productionNo },
-        query: {
-          year:date.year ,
-          month:date.month,
-          factoryCode:date.factoryCode,
-          monthPlanVersion: date.monthPlanVersion,
-          productionVersion: date.productionVersion,
-        },
-      });
+    handleBaseQueryChange() {
+      this.loadVersionOptions();
+      this.fetchCurrentAdjustMachineFromRedis();
     },
-    async generPlan() {
+    handleProductionVersionChange() {
+      this.fetchCurrentAdjustMachineFromRedis();
+    },
+    /**
+     * 解析 getAdjustsCxMachineFromRedis 返回值（兼容字符串、AjaxResult、对象字段）
+     */
+    extractRedisCxMachine(payload) {
+      if (payload == null || payload === "") {
+        return "";
+      }
+      if (typeof payload === "string" || typeof payload === "number") {
+        return String(payload).trim();
+      }
+      const inner =
+        payload.data !== undefined && payload.code === undefined
+          ? payload.data
+          : payload;
+      if (typeof inner === "string" || typeof inner === "number") {
+        return String(inner).trim();
+      }
+      if (inner && typeof inner === "object") {
+        if (inner.data != null && typeof inner.data !== "object") {
+          return String(inner.data).trim();
+        }
+        if (inner.data && typeof inner.data === "object") {
+          const nested = inner.data;
+          if (nested.cxMachineCode != null && nested.cxMachineCode !== "") {
+            return String(nested.cxMachineCode).trim();
+          }
+        }
+        if (inner.cxMachineCode != null && inner.cxMachineCode !== "") {
+          return String(inner.cxMachineCode).trim();
+        }
+        if (inner.currentAdjustMachine != null) {
+          return String(inner.currentAdjustMachine).trim();
+        }
+        if (inner.currentCxMachine != null) {
+          return String(inner.currentCxMachine).trim();
+        }
+      }
+      return "";
+    },
+    /** 从 Redis 拉取当前调整机台并回显到选择器 */
+    async fetchCurrentAdjustMachineFromRedis() {
       try {
-        this.createLoading = true;
-        let res = await createOrderForecast(this.formatParams());
-        this.$modal.msgSuccess(res.msg);
-        this.getList();
-        this.createLoading = false;
-      } catch (err) {
-        this.createLoading = false;
+        const res = await getAdjustsCxMachineFromRedis();
+        this.currentAdjustMachine = this.extractRedisCxMachine(res);
+      } catch (e) {
+        console.error(e);
+        this.currentAdjustMachine = "";
       }
     },
-    handleSearch(data) {
-      this.query = data;
+    async loadVersionOptions() {
+      const ym = this.normalizeYearMonth(this.query.yearMonth || this.search.yearMonth);
+      const factoryCode = this.query.factoryCode || this.search.factoryCode;
+      if (!ym || !factoryCode) {
+        this.versionOptions = [];
+        return;
+      }
+      try {
+        const res = await getFinalResultVersionList({
+          factoryCode,
+          year: ym.year,
+          month: ym.month,
+        });
+        const rows = res.rows || [];
+        const set = new Set();
+        rows.forEach((item) => {
+          if (item.productionVersion) {
+            set.add(item.productionVersion);
+          }
+        });
+        this.versionOptions = Array.from(set).map((v) => ({
+          label: v,
+          value: v,
+        }));
+      } catch (e) {
+        console.error(e);
+        this.versionOptions = [];
+      }
+    },
+    normalizeYearMonth(yearMonth) {
+      if (!yearMonth) {
+        return null;
+      }
+      const m = moment(yearMonth, ["YYYY-MM", "YYYY-M"], true);
+      if (!m.isValid()) {
+        return null;
+      }
+      return { year: m.year(), month: m.month() + 1 };
+    },
+    async handleSearch(data) {
+      this.query = { ...data };
       this.$set(this.page, "current", 1);
-      this.updateList();
+      await this.loadVersionOptions();
+      await this.fetchCurrentAdjustMachineFromRedis();
+      this.getList();
     },
     handlePageChange(current, pageSize) {
       this.$set(this.page, "current", current);
@@ -652,25 +789,145 @@ export default {
       if (order) {
         this.sort = {
           orderByColumn: prop,
-          isAsc: order == "ascending" ? "asc" : "desc",
+          isAsc: order === "ascending" ? "asc" : "desc",
         };
       } else {
-        //默认排序
         this.sort = {};
       }
       this.getList();
     },
+    formatParams(hasPage = true) {
+      const params = {
+        ...this.query,
+        ...this.sort,
+      };
+      if (hasPage) {
+        params.pageSize = this.page.pageSize;
+        params.pageNum = this.page.current;
+      }
+      if (params.yearMonth) {
+        const arr = params.yearMonth.split("-");
+        params.year = Number(arr[0]);
+        params.month = Number(arr[1]);
+        delete params.yearMonth;
+      }
+      const scheduled = (this.currentAdjustMachine || "").trim();
+      if (scheduled) {
+        params.cxMachineCode = scheduled;
+      } else {
+        delete params.cxMachineCode;
+      }
+      return params;
+    },
+    async getList() {
+      const ym = this.normalizeYearMonth(this.query.yearMonth);
+      if (!ym || !this.query.factoryCode) {
+        return;
+      }
+      try {
+        this.loading = true;
+        const res = await listMonthPlanFinal4Adjust(this.formatParams());
+        this.data = res.rows || [];
+        this.page.total = res.total != null ? res.total : this.data.length;
+      } catch (e) {
+        console.error(e);
+        this.data = [];
+      } finally {
+        this.loading = false;
+      }
+    },
+    handleStructureInnerAdjust() {
+      this.$router.push({
+        name: 'RollingCycle',
+        query: {pageType: "inner" },
+      })
+    },
+    /** 结构调整弹窗保存新增结构并写入 Redis 后，同步主页面机台与列表 */
+    onStructureAdjustSaved() {
+      this.fetchCurrentAdjustMachineFromRedis();
+      this.getList();
+    },
+    /**
+     * 与周程滚动「结构调整」listAdjusts 入参对齐：productionVersion + version + adjVersion（列表首行 version 一般为调整版本 ADJ…）
+     */
+    buildStructureDialogListVersionParams() {
+      const row = this.data && this.data.length ? this.data[0] : null;
+      const qpv = (
+        this.query.productionVersion ||
+        this.search.productionVersion ||
+        ""
+      ).trim();
+      const rowPv =
+        row &&
+        row.productionVersion != null &&
+        String(row.productionVersion).trim() !== ""
+          ? String(row.productionVersion).trim()
+          : "";
+      const productionVersion = qpv || rowPv;
+      const adj =
+        row && row.version != null && String(row.version).trim() !== ""
+          ? String(row.version).trim()
+          : "";
+      const listAdjustsVersion = adj || productionVersion;
+      const listAdjustsAdjVersion = adj || productionVersion;
+      return {
+        productionVersion,
+        listAdjustsVersion,
+        listAdjustsAdjVersion,
+      };
+    },
+    handleStructureAdjust() {
+      const ym = this.query.yearMonth || this.search.yearMonth;
+      const fc = this.query.factoryCode || this.search.factoryCode || "116";
+      if (!ym) {
+        this.$modal.msgWarning(
+          this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.pleaseSelectYearMonth"
+          )
+        );
+        return;
+      }
+      this.$refs.structureAdjustDialogRef.show({
+        factoryCode: fc,
+        yearMonth: ym,
+        ...this.buildStructureDialogListVersionParams(),
+      });
+    },
+    handleViewAdjustVersion() {
+      const q = {};
+      const fc = this.query.factoryCode || this.search.factoryCode;
+      if (fc) {
+        q.factoryCode = fc;
+      }
+      const ym = this.normalizeYearMonth(
+        this.query.yearMonth || this.search.yearMonth
+      );
+      if (ym) {
+        q.year = ym.year;
+        q.month = ym.month;
+      }
+      this.$refs.adjustVersionDialogRef.show(q);
+    },
     handleExport() {
+      downloadLink(
+        "/monthplan/factoryMonthPlanFinalResult/exportSkuScheduleItems",
+        this.formatParams(false)
+      );
+    },
+    handleExportAllMaterial() {
       downloadLink(
         "/monthplan/factoryMonthPlanFinalResult/export",
         this.formatParams(false)
       );
     },
-    // 打开手动推送弹框，由用户选择年月、分厂和版本后再推送
-    handleSyncAdjustedMonthPlan() {
+    /** 打开下发弹窗，预填当前查询的年月、分厂，并加载可推送版本列表 */
+    handleIssueScmMes() {
       this.syncDialog.visible = true;
-      this.syncDialog.form.yearMonth = this.normalizeYearMonth(this.query.yearMonth);
-      this.syncDialog.form.factoryCode = this.query.factoryCode || "";
+      this.syncDialog.form.yearMonth = this.formatYearMonthForPicker(
+        this.query.yearMonth || this.search.yearMonth
+      );
+      this.syncDialog.form.factoryCode =
+        this.query.factoryCode || this.search.factoryCode || "";
       this.syncDialog.form.productionVersion = "";
       this.syncDialog.form.lastMonthPlanVersion = "";
       this.syncDialog.form.monthPlanVersion = "";
@@ -682,7 +939,6 @@ export default {
       });
       this.loadSyncVersionList(true);
     },
-    // 年月或分厂变化后，需要重新加载可推送版本，避免沿用旧条件下的版本
     handleSyncBaseChange() {
       this.syncDialog.form.productionVersion = "";
       this.syncDialog.form.lastMonthPlanVersion = "";
@@ -690,17 +946,18 @@ export default {
       this.syncDialog.versionList = [];
       this.loadSyncVersionList(false);
     },
-    // 月计划版本变化后，清空需求计划版本，确保提交的原需求版本与所选需求版本匹配
     handleSyncProductionVersionChange() {
       this.syncDialog.form.lastMonthPlanVersion = "";
       this.syncDialog.form.monthPlanVersion = "";
     },
-    // 选择需求计划版本时，同时记录该版本对应的原始需求计划版本
     handleSyncDemandVersionChange(optionKey) {
-      const selectedVersion = this.syncDialog.versionList.find((item) => item.optionKey === optionKey);
-      this.syncDialog.form.monthPlanVersion = selectedVersion ? selectedVersion.monthPlanVersion : "";
+      const selectedVersion = this.syncDialog.versionList.find(
+        (item) => item.optionKey === optionKey
+      );
+      this.syncDialog.form.monthPlanVersion = selectedVersion
+        ? selectedVersion.monthPlanVersion
+        : "";
     },
-    // 关闭弹框时清空表单和版本列表，避免下一次打开残留旧选择
     resetSyncDialog() {
       this.syncDialog.form = {
         yearMonth: "",
@@ -711,13 +968,12 @@ export default {
       };
       this.syncDialog.versionList = [];
     },
-    // 加载当前年月和分厂下可推送的调整后版本
     async loadSyncVersionList(showWarning) {
       const { yearMonth, factoryCode } = this.syncDialog.form;
       if (!yearMonth || !factoryCode) {
         return;
       }
-      const yearMonthInfo = this.parseYearMonth(yearMonth);
+      const yearMonthInfo = this.parseYearMonthFromStr(yearMonth);
       if (!yearMonthInfo) {
         return;
       }
@@ -731,7 +987,11 @@ export default {
         const rows = res.rows || [];
         this.syncDialog.versionList = rows
           .filter((item) => {
-            return item.productionVersion && item.monthPlanVersion && item.lastMonthPlanVersion;
+            return (
+              item.productionVersion &&
+              item.monthPlanVersion &&
+              item.lastMonthPlanVersion
+            );
           })
           .map((item) => {
             return {
@@ -740,7 +1000,11 @@ export default {
             };
           });
         if (showWarning && this.syncDialog.versionList.length === 0) {
-          this.$modal.msgWarning("暂无可推送数据");
+          this.$modal.msgWarning(
+            this.$t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesNoData"
+            )
+          );
         }
       } catch (error) {
         console.error(error);
@@ -748,7 +1012,6 @@ export default {
         this.syncDialog.versionLoading = false;
       }
     },
-    // 校验弹框选择并同步推送调整后的月计划到SCM和MES
     submitSyncAdjustedMonthPlan() {
       this.$refs.syncForm.validate((valid) => {
         if (!valid) {
@@ -758,12 +1021,22 @@ export default {
           return item.optionKey === this.syncDialog.form.lastMonthPlanVersion;
         });
         if (!selectedVersion) {
-          this.$modal.msgWarning("暂无可推送数据");
+          this.$modal.msgWarning(
+            this.$t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesNoData"
+            )
+          );
           return;
         }
-        const yearMonthInfo = this.parseYearMonth(this.syncDialog.form.yearMonth);
+        const yearMonthInfo = this.parseYearMonthFromStr(
+          this.syncDialog.form.yearMonth
+        );
         if (!yearMonthInfo) {
-          this.$modal.msgWarning("请选择正确的年月");
+          this.$modal.msgWarning(
+            this.$t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesInvalidYearMonth"
+            )
+          );
           return;
         }
         const params = {
@@ -774,9 +1047,14 @@ export default {
           lastMonthPlanVersion: selectedVersion.lastMonthPlanVersion,
           productionVersion: this.syncDialog.form.productionVersion,
         };
-        this.$confirm(this.$t("确定推送调整后的月计划到SCM/MES？"), {
-          type: "warning",
-        }).then(async () => {
+        this.$confirm(
+          this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.confirmPushAdjustedMonthPlanToScmMes"
+          ),
+          {
+            type: "warning",
+          }
+        ).then(async () => {
           try {
             this.syncLoading = true;
             const res = await syncAdjustedMonthPlanToScmAndMes(params);
@@ -791,282 +1069,218 @@ export default {
         });
       });
     },
-    // 将页面查询或弹框年月统一转换成yyyy-MM，便于日期组件回显
-    normalizeYearMonth(yearMonth) {
+    /** 将查询条件中的年月转为 yyyy-MM，供下发弹窗日期组件回显 */
+    formatYearMonthForPicker(yearMonth) {
       if (!yearMonth) {
         return "";
       }
-      const date = moment(yearMonth, ["YYYY-MM", "YYYY-M"], true);
-      return date.isValid() ? date.format("YYYY-MM") : "";
+      const m = moment(yearMonth, ["YYYY-MM", "YYYY-M"], true);
+      return m.isValid() ? m.format("YYYY-MM") : "";
     },
-    // 将yyyy-MM拆分为后端所需的year、month
-    parseYearMonth(yearMonth) {
-      const normalizedYearMonth = this.normalizeYearMonth(yearMonth);
-      if (!normalizedYearMonth) {
+    /** 将弹窗内 yyyy-MM 解析为接口所需的 year、month */
+    parseYearMonthFromStr(yearMonth) {
+      if (!yearMonth) {
         return null;
       }
-      const [year, month] = normalizedYearMonth.split("-");
+      const m = moment(yearMonth, ["YYYY-MM", "YYYY-M"], true);
+      if (!m.isValid()) {
+        return null;
+      }
       return {
-        year: Number(year),
-        month: Number(month),
+        year: m.year(),
+        month: m.month() + 1,
       };
     },
-
-    // utils
-    setSum(data) {
-      if (data.length === 0) {
-        this.stat = {};
-        return;
-      }
-      const map = {};
-      const keys = Object.keys(data[0]);
-      data.forEach((item) => {
-        keys.forEach((key) => {
-          if (item[key] && !isNaN(item[key])) {
-            if (map[key]) {
-              map[key] = Big(map[key]).plus(item[key]).toString();
-            } else {
-              map[key] = item[key];
-            }
-          }
-        });
-      });
-
-      if (map.proFinishQty && map.proPlanQty) {
-        map.proFinishRate =
-          Big(map.proFinishQty)
-            .div(map.proPlanQty)
-            .times(100)
-            .round(2)
-            .toString() + "%";
-      }
-      if (map.saleFinishQty && map.salePlanQty) {
-        map.saleFinishRate =
-          Big(map.saleFinishQty)
-            .div(map.salePlanQty)
-            .times(100)
-            .round(2)
-            .toString() + "%";
-      }
-
-      this.stat = map;
-      console.log(map);
-    },
-    getSummaryMethod(param) {
-      const { columns, data } = param;
-      const sums = [];
-      columns.forEach((column, index) => {
-        if (column.property === "proSize") {
-          sums[index] = "合计";
-          return;
-        } else {
-          sums[index] = this.stat[column.property]
-            ? this.stat[column.property]
-            : "";
-        }
-      });
-
-      return sums;
-    },
-    objectSpanMethod({ row, column, rowIndex, columnIndex }) {
-      // if (column.property === "product") {
-      //   if (rowIndex % 5 === 0) {
-      //     return {
-      //       rowspan: 5,
-      //       colspan: 1,
-      //     };
-      //   } else {
-      //     return {
-      //       rowspan: 0,
-      //       colspan: 0,
-      //     };
-      //   }
-      // }
-    },
-    formatParams(hasPage = true) {
+    /**
+     * 组装与周程滚动「结构内调整 -> 调整结果 -> 确定」confirmResult 一致的入参（adjustType=01）。
+     * 供「确认调整」与「重新计算」共用，与 POST /monthplan/mpWeekRollAdjust/confirmAdjust 请求体一致。
+     */
+    buildWeekRollConfirmPayload() {
       const params = {
         ...this.query,
         ...this.sort,
       };
-
-      if (hasPage) {
-        params.pageSize = this.page.pageSize;
-        params.pageNum = this.page.current;
-      }
+      delete params.pageNum;
+      delete params.pageSize;
       if (params.yearMonth) {
-        let arr = params.yearMonth.split("-");
-        params.year = arr[0];
-        params.month = arr[1];
-        params.yearMonth = undefined;
+        const arr = params.yearMonth.split("-");
+        params.mpYear = arr[0];
+        params.mpMonth = arr[1];
+        delete params.yearMonth;
+      } else if (
+        this.query.year != null &&
+        this.query.month != null
+      ) {
+        params.mpYear = String(this.query.year);
+        params.mpMonth = String(this.query.month);
       }
-
-      if (params.createTime && params.createTime[0]) {
-        params.createTimeStart = params.createTime[0];
-        params.createTimeEnd = params.createTime[1];
-        params.createTime = undefined;
+      const row = this.data && this.data.length ? this.data[0] : null;
+      if (!row) {
+        return null;
       }
-
+      params.adjustType = "01";
+      params.version = row.version;
+      params.productionVersion =
+        row.productionVersion || this.query.productionVersion;
+      params.startDay = row.beginDay;
+      params.endDay = row.endDay;
+      params.adjustStartDay =
+        row.adjustStartDay != null && row.adjustStartDay !== ""
+          ? row.adjustStartDay
+          : row.beginDay;
+      params.adjustEndDay =
+        row.adjustEndDay != null && row.adjustEndDay !== ""
+          ? row.adjustEndDay
+          : row.endDay;
+      params.structureName =
+        row.structureName || this.query.structureName;
+      const sm = (this.currentAdjustMachine || "").trim();
+      params.scheduledMachines = sm;
       return params;
     },
-    async getProductionMonthType() {
-      try {
-        const res = await getProductionMonthType(this.formatParams(false));
-        if (res.productionStartDate) {
-          this.productionStartDate = res.productionStartDate;
-        } else {
-          this.productionStartDate = null;
-        }
-      } catch (error) {
-        console.log(error);
+    /**
+     * 确认调整 / 重新计算 前置校验，通过则返回与 confirmAdjust 相同的请求体，否则提示并返回 null
+     */
+    prepareWeekRollSubmitPayloadOrWarn() {
+      const machine = (this.currentAdjustMachine || "").trim();
+      if (!machine) {
+        this.$modal.msgWarning(
+          this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedMachine"
+          )
+        );
+        return null;
       }
+      if (!this.data || !this.data.length) {
+        this.$modal.msgWarning(
+          this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedListData"
+          )
+        );
+        return null;
+      }
+      const payload = this.buildWeekRollConfirmPayload();
+      if (
+        !payload ||
+        payload.version == null ||
+        payload.version === "" ||
+        !payload.productionVersion
+      ) {
+        this.$modal.msgWarning(
+          this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedVersion"
+          )
+        );
+        return null;
+      }
+      return payload;
     },
-    // api
-    async getList() {
+    async handleConfirmAdjust() {
+      if (!this.canUsePrimaryAdjustActions) {
+        return;
+      }
+      const payload = this.prepareWeekRollSubmitPayloadOrWarn();
+      if (!payload) {
+        return;
+      }
+      this.confirmAdjustLoading = true;
       try {
-        this.loading = true;
-        const res = await listProduction(this.formatParams());
-        // this.data = res.rows;
-        this.page.total = res.total;
-        if (res.rows.length != 0) {
-          this.getStatisticsResult(res.rows[0],res.rows);
-        }else{
-          this.data = [];
-        }
-      } catch (error) {
-        console.error(error);
+        const res = await confirmAdjust(payload);
+        this.$modal.msgSuccess(
+          (res && res.msg) ||
+            this.$t("common.msg.ajax.operation.success")
+        );
+        await this.getList();
+        await this.fetchCurrentAdjustMachineFromRedis();
+      } catch (e) {
+        console.error(e);
       } finally {
-        this.loading = false;
+        this.confirmAdjustLoading = false;
       }
     },
-      //渲染统计颜色
-      tableRowClassName({ row, rowIndex }) {
-      if (row.showBackground) {
-        return row.showBackground;
+    /** 继续调整：打开结构调整弹窗并带入当前调整机台（弹窗内机台只读） */
+    handleContinueAdjust() {
+      if (!this.canUseContinueAdjust) {
+        return;
       }
-      if (row.adjustFlag == 1) {
-        return "warning-row";
+      const ym = this.query.yearMonth || this.search.yearMonth;
+      const fc = this.query.factoryCode || this.search.factoryCode || "116";
+      if (!ym) {
+        this.$modal.msgWarning(
+          this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.pleaseSelectYearMonth"
+          )
+        );
+        return;
       }
-      return "";
+      const machine = (this.currentAdjustMachine || "").trim();
+      if (!machine) {
+        this.$modal.msgWarning(
+          this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedMachine"
+          )
+        );
+        return;
+      }
+      this.$refs.structureAdjustDialogRef.show({
+        factoryCode: fc,
+        yearMonth: ym,
+        ...this.buildStructureDialogListVersionParams(),
+        fixedCxMachineCode: machine,
+      });
     },
-
-    //调整结果统计
-    async getStatisticsResult(data,resultList) {
+    /** 重新计算：POST /monthplan/mpWeekRollAdjust，body 与 confirmAdjust 完全一致 */
+    async handleRecalculate() {
+      const payload = this.prepareWeekRollSubmitPayloadOrWarn();
+      if (!payload) {
+        return;
+      }
+      this.recalculateLoading = true;
       try {
-        let params = {
-          factoryCode: data.factoryCode,
-          year: data.year,
-          month: data.month,
-          productionVersion: data.productionVersion,
-          tempFlag:0
-        };
-        let res = await statisticsResult(params);
-
-
-
-        let list = this.insertDataAfterEachName(resultList, res.rows);
-        this.data = list;
-      } catch (err) {
-        console.log(err);
+        const res = await recalculateWeekRollAdjust(payload);
+        this.$modal.msgSuccess(
+          (res && res.msg) ||
+            this.$t("common.msg.ajax.operation.success")
+        );
+        await this.getList();
+        await this.fetchCurrentAdjustMachineFromRedis();
+      } catch (e) {
+        console.error(e);
       } finally {
+        this.recalculateLoading = false;
       }
-    },
-    //调整结果插入数据
-    insertDataAfterEachName(arr, statistList) {
-      if (!arr.length) return [];
-
-      const result = [];
-      for (let i = 0; i < arr.length; i++) {
-        const current = arr[i];
-        const next = arr[i + 1];
-        // 添加当前数据
-        result.push(current);
-        console.log(current.structureName);
-        // 如果下一个元素不存在或structureName不同，说明这是当前分组的最后一项
-        if (!next || next.structureName !== current.structureName) {
-          console.log(i);
-          // 在当前分组后插入两条数据
-          for (let i = 0; i < statistList.length; i++) {
-            if (statistList[i].structureName == current.structureName) {
-              let changeMould={
-                structureName: current.structureName,
-                showBackground: "light-yellow",
-              }
-              let embryoCount = {
-                structureName: current.structureName,
-                showBackground: "light-green",
-              };
-              let lhMachines = {
-                structureName: current.structureName,
-                showBackground: "light-blue",
-              };
-              embryoCount.productionNo = "胎胚种类数";
-              lhMachines.productionNo = "硫化机台数";
-              changeMould.productionNo = "换模次数";
-              for (let j = 1; j <= 31; j++) {
-                const key = `day${j}`;
-
-                if (statistList[i][key]) {
-                  let dayData = JSON.parse(statistList[i][key]);
-                  // embryoCount.push{
-                  //   `day${j}`:dayData.EmbryoCount
-                  // }
-                  embryoCount[key] = dayData.embryoCount;
-                  lhMachines[key] = dayData.lhMachines;
-                  changeMould[key] = dayData.changeMould;
-                }
-              }
-              result.push(embryoCount);
-              result.push(lhMachines);
-              // result.push(changeMould);
-            }
-          }
-        }
-      }
-
-      return result;
-    },
-    async updateList() {
-      this.loading = true;
-      await this.getProductionMonthType();
-      await this.getList();
     },
   },
-  created() {
-    const now = new Date();
-    // const year = now.getFullYear();
-    // const month = String(now.getMonth() + 1).padStart(2, "0"); // 月份从0开始，需要+1
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      const year = nextMonth.getFullYear();
-      const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
-    let defaultParams = {
-      factoryCode: "116",
-      yearMonth: `${year}-${month}`,
-    };
-    this.search = {
-      ...defaultParams,
-    };
-    this.query = {
-      ...defaultParams,
-    };
-    // this.getProductionMonthType()
-    // this.getList();
-    this.updateList();
-  },
-  activated() {},
 };
 </script>
+
 <style lang="scss" scoped>
-.more-btn {
-  margin: 2px 0;
-  width: 100%;
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
-</style>
-<style lang="scss" scoped>
-.stat-info {
-  font-size: 12px;
-  color: #5f5858;
-  span {
-    margin-left: 5px;
-  }
+.current-machine-wrap {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 12px;
+  margin-bottom: 5px;
+}
+.current-machine-label {
+  margin-right: 8px;
+  font-size: 14px;
+  color: #606266;
+  white-space: nowrap;
+}
+.current-machine-input {
+  width: 220px;
+}
+.footer-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0 4px;
 }
 </style>
