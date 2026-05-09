@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -173,6 +174,32 @@ public class LhChipStockController extends AbstractDocBizController<LhChipStock>
                                      @RequestParam("finishQty") Integer finishQty) {
         int result = lhChipStockService.updateFinishQty(factoryCode, chipCode, finishQty);
         return result > 0 ? AjaxResult.success() : AjaxResult.error();
+    }
+
+    /**
+     * 根据分厂编号和数据来源逻辑删除芯片库存
+     */
+    @ApiOperation("根据分厂编号和数据来源逻辑删除芯片库存")
+    @PostMapping("/logicDeleteByDataSource")
+    @ResponseBody
+    public AjaxResult logicDeleteByDataSource(@RequestParam("factoryCode") String factoryCode,
+                                              @RequestParam("dataSource") String dataSource,
+                                              @RequestParam("updateBy") String updateBy) {
+        lhChipStockMapper.logicDeleteByFactoryCodeAndDataSource(factoryCode, dataSource, updateBy, new Date());
+        return AjaxResult.success();
+    }
+
+    /**
+     * 批量保存芯片库存
+     */
+    @ApiOperation("批量保存芯片库存")
+    @PostMapping("/saveBatch")
+    @ResponseBody
+    public AjaxResult saveChipStockBatch(@RequestBody List<LhChipStock> list) {
+        if (list != null && !list.isEmpty()) {
+            baseDao.saveBatch(list);
+        }
+        return AjaxResult.success();
     }
 
     @Override

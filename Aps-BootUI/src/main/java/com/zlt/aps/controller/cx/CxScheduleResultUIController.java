@@ -189,7 +189,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @GetMapping({"/exportStructureChange"})
     @ResponseBody
     public void exportStructureChange(HttpServletResponse response, CxScheduleResult entity) throws IOException {
-        String fileName = this.getExportTemplateFileName();
+        String fileName = "成型结构切换";
         byte[] excelBytes = iCxScheduleResultService.exportStructureChange(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");

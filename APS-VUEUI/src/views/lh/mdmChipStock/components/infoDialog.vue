@@ -45,6 +45,7 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
+      dict: this.parentDict,
       form: {},
       rules: {
         factoryCode: [
@@ -115,6 +116,13 @@ export default {
           label: this.$t("ui.data.column.lhChipStock.finishQty"),
           type: "number",
           disabled: true,
+        },
+        {
+          prop: "dataSource",
+          label: this.$t("ui.data.column.lhChipStock.dataSource"),
+          type: "select",
+          dictData: this.dict.type.lh_precision_data_source,
+          filterable: true,
         },
         {
           prop: "remainStockNum",
@@ -212,6 +220,7 @@ export default {
           factoryCode: "116",
           id: undefined,
           finishQty: 0,
+          dataSource: "1",
         };
       }
       this.calcRemainStockNum();
