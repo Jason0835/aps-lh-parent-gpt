@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,9 +65,15 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @ApiOperation("批量删除硫化在机信息")
     @PostMapping("/deleteMachineOnlineInfo")
     public AjaxResult deleteMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("FACTORY_CODE", factoryCode);
-        baseDao.deleteByMap(LhMachineOnlineInfo.class, map);
+        lhMachineOnlineInfoMapper.logicDeleteByFactoryCode(factoryCode, "MES", new Date());
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("根据分厂编号逻辑删除硫化在机信息")
+    @PostMapping("/logicDeleteMachineOnlineInfo")
+    public AjaxResult logicDeleteMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy) {
+        lhMachineOnlineInfoMapper.logicDeleteByFactoryCode(factoryCode, updateBy, new Date());
         return AjaxResult.success();
     }
 
@@ -84,9 +91,15 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @ApiOperation("批量删除胶囊已使用次数")
     @PostMapping("/deleteRepairCapsule")
     public AjaxResult deleteRepairCapsule(@RequestParam("factoryCode") String factoryCode) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("FACTORY_CODE", factoryCode);
-        baseDao.deleteByMap(LhRepairCapsule.class, map);
+        lhRepairCapsuleMapper.logicDeleteByFactoryCode(factoryCode, "MES", new Date());
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("根据分厂编号逻辑删除胶囊已使用次数")
+    @PostMapping("/logicDeleteRepairCapsule")
+    public AjaxResult logicDeleteRepairCapsule(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy) {
+        lhRepairCapsuleMapper.logicDeleteByFactoryCode(factoryCode, updateBy, new Date());
         return AjaxResult.success();
     }
 

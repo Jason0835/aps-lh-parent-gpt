@@ -11,6 +11,7 @@ import com.zlt.aps.itf.mes.service.MesBomItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.utils.ScmListUtils;
+import com.zlt.aps.mdm.api.domain.entity.MdmConstructionProcess;
 import com.zlt.aps.mp.api.domain.entity.MdmBomInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmConstructionInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
@@ -46,6 +47,8 @@ public class MesBomItfServiceImpl implements MesBomItfService {
 	private MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
 	@Autowired
 	private MdmSkuStructureRefEntityMapper mdmSkuStructureRefEntityMapper;
+	@Autowired
+	private MdmConstructionProcessEntityMapper mdmConstructionProcessEntityMapper;
 	@Autowired
 	private BaseDao baseDao;
 
@@ -318,6 +321,63 @@ public class MesBomItfServiceImpl implements MesBomItfService {
                 .collect(Collectors.groupingBy(detail -> this.getMapKey(detail),
                         Collectors.collectingAndThen(Collectors.toList(), list -> list.get(0))));
         return new ArrayList<>(distinctDetailList.values());
+    }
+    
+    /**
+     * 示方书工艺信息同步
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncConstructionProcessInfo(AuxReqSyncDataLogs syncDataLogs) {
+        List<MdmConstructionProcess> syncList = mesBomItfMapper.selectConstructionProcessInfo(syncDataLogs);
+        if (CollectionUtils.isNotEmpty(syncList)) {
+            LambdaQueryWrapper<MdmConstructionProcess> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(MdmConstructionProcess::getIsDelete, ApsConstant.APS_YES_NO_0);
+            queryWrapper.eq(MdmConstructionProcess::getFactoryCode, syncDataLogs.getFactoryCode());
+            try {
+                /** 切换APS数据源 start **/
+                DynamicDataSourceContextHolder.push(DataSource.APS);
+                List<MdmConstructionProcess> apsDataList = mdmConstructionProcessEntityMapper.selectList(queryWrapper); // 取出APS数据
+                if (CollectionUtils.isNotEmpty(apsDataList)) {
+                    Map<String, List<MdmConstructionProcess>> refMap = syncList.stream()
+                            .collect(Collectors.groupingBy(item -> this.getMapKey(item))); // 按业务主键分组
+                    apsDataList.stream().filter(r -> refMap.containsKey(this.getMapKey(r))).forEach(item -> {
+                        List<MdmConstructionProcess> updateList = refMap.get(this.getMapKey(item));
+                        for (MdmConstructionProcess updateItem : updateList) {
+                            updateItem.setId(item.getId());
+                            updateItem.setBaseVale(item.getId());
+                        }
+                    });
+                }
+
+                List<List<MdmConstructionProcess>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+                for (List<MdmConstructionProcess> saveList : splitList) { // 分批保存，防止长度超出限制
+                    baseDao.saveBatch(saveList);
+                }
+
+            } finally {
+                DynamicDataSourceContextHolder.clear();
+                /** 切换APS数据源 end **/
+            }
+        }
+        return AjaxResult.success();
+    
+    }
+
+    /**
+     * 获取分组key（SKU与施工关系表）
+     *
+     * @param info
+     * @return
+     */
+    private String getMapKey(MdmConstructionProcess info) {
+        return GenerageMapKeyUtils.createMapKey(info.getFactoryCode(),
+                info.getMaterialCode(),
+                info.getMaterialVersion(),
+                info.getProcessCode()
+        );
     }
 
 	/**

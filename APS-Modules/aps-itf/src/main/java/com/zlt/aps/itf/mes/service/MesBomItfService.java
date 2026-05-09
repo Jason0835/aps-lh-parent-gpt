@@ -34,4 +34,12 @@ public interface MesBomItfService {
 	 */
 	AjaxResult syncBomInfo(AuxReqSyncDataLogs syncDataLogs);
 
+    /**
+     * 示方书工艺信息同步
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncConstructionProcessInfo(AuxReqSyncDataLogs syncDataLogs);
+
 }

@@ -57,7 +57,6 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("cx:cxScheduleResult:list")
     @PostMapping("/list")
     @ResponseBody
     public TableDataInfo list(CxScheduleResult cxScheduleResult) {
@@ -68,7 +67,6 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("cx:cxScheduleResult:edit")
     @PostMapping("/save")
     @ResponseBody
     public AjaxResult save(CxScheduleResult cxScheduleResult) {
@@ -83,7 +81,6 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      * 删除成型排程结果
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("cx:cxScheduleResult:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(@RequestParam String ids) {
@@ -206,7 +203,6 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      * 生成排程
      */
     @ApiOperation("生成排程")
-    @RequiresPermissions("cx:cxScheduleResult:generate")
     @PostMapping("/generate")
     @ResponseBody
     public AjaxResult generateSchedule(@RequestBody com.zlt.aps.cx.vo.ScheduleGenerateVo dto) {
@@ -217,7 +213,6 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      * 成型排程结果下发到MES
      */
     @ApiOperation("下发到MES")
-    @RequiresPermissions("cx:cxScheduleResult:issue")
     @PostMapping("/issueToMes")
     @ResponseBody
     public AjaxResult issueToMes() {
@@ -228,7 +223,6 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      * 【调量】调整各班计划量
      */
     @ApiOperation("调量")
-    @RequiresPermissions("cx:cxScheduleResult:adjust")
     @PostMapping("/adjustQty")
     @ResponseBody
     public AjaxResult adjustQty(@RequestBody com.zlt.aps.cx.vo.ScheduleAdjustVo vo) {
@@ -239,7 +233,6 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      * 【插单】插入新的排程记录
      */
     @ApiOperation("插单")
-    @RequiresPermissions("cx:cxScheduleResult:insert")
     @PostMapping("/insertOrder")
     @ResponseBody
     public AjaxResult insertOrder(@RequestBody ScheduleInsertVo vo) {
@@ -250,7 +243,6 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      * 【修改】修改备注和原因分析
      */
     @ApiOperation("修改备注和原因分析")
-    @RequiresPermissions("cx:cxScheduleResult:updateRemark")
     @PostMapping("/updateRemark")
     @ResponseBody
     public AjaxResult updateRemark(@RequestBody com.zlt.aps.cx.vo.ScheduleUpdateRemarkVo vo) {
@@ -261,7 +253,6 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      * 【转机台】转换机台
      */
     @ApiOperation("转机台")
-    @RequiresPermissions("cx:cxScheduleResult:transferMachine")
     @PostMapping("/transferMachine")
     @ResponseBody
     public AjaxResult transferMachine(@RequestBody ScheduleTransferMachineVo vo) {
@@ -272,7 +263,6 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
      * 【排程发布】发布排程数据
      */
     @ApiOperation("发布排程")
-    @RequiresPermissions("cx:cxScheduleResult:publish")
     @PostMapping("/publish")
     @ResponseBody
     public AjaxResult publish(@RequestBody List<Long> ids) {
