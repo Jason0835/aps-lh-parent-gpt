@@ -243,6 +243,7 @@ import {
   confirmAdjust,
   recalculateWeekRollAdjust,
   statisticsResult,
+  saveAdjustResult,
 } from "@/api/monthplan/adjustStructure";
 import structureAdjustDialog from "./components/structureAdjustDialog.vue";
 import adjustVersionDialog from "./components/adjustVersionDialog.vue";
@@ -297,6 +298,8 @@ export default {
           monthPlanVersion: "",
         },
       },
+      /** 1–31 号列编辑前原始值，用于失焦时与 rollingCycle 一致判断是否调用 save */
+      dayEditOriginalValue: null,
     };
   },
   computed: {
@@ -563,6 +566,7 @@ export default {
                 clearable
                 placeholder={this.$t("ui.frame.btn.choose")}
                 style="width: 100%"
+                onChange={() => this.handleLockScheduleChange(row)}
               >
                 {this.dict.type.biz_yes_no.map((item) => (
                   <el-option
@@ -608,6 +612,8 @@ export default {
                   const n = String(value).replace(/[^\d]/g, "");
                   row[prop] = n === "" ? null : Number(n);
                 }}
+                onFocus={() => this.onDayEditFocus(row, prop)}
+                onBlur={() => this.handleResultDayEdit(row, prop)}
               />
             );
           },
@@ -759,6 +765,78 @@ export default {
       } catch (e) {
         console.error(e);
         this.currentAdjustMachine = "";
+      }
+    },
+    /**
+     * 修改优先上机（原锁定上机），与 rollingCycle/index.backup-legacy.vue 一致调用 mpAdjustResult/save
+     */
+    handleLockScheduleChange(row) {
+      if (!row || !row.id) {
+        return;
+      }
+      saveAdjustResult({
+        id: row.id,
+        isLockSchedule: row.isLockSchedule,
+      })
+        .then((res) => {
+          this.$modal.msgSuccess(res.msg);
+        })
+        .catch((err) => {
+          console.error(err);
+        });
+    },
+    /** 记录 1–31 号列编辑前的原始值 */
+    onDayEditFocus(row, prop) {
+      this.dayEditOriginalValue = row[prop];
+    },
+    /** 将日期列的值归一化：null/undefined/''/'0'/0 都视为空（与 rollingCycle 一致） */
+    normalizeDayValue(val) {
+      if (val == null || val === "" || val === 0 || val === "0") {
+        return "";
+      }
+      return String(val);
+    },
+    /** 按后端规则本地重算开始/结束日期 */
+    recalculateBeginEndDay(row) {
+      if (!row) {
+        return;
+      }
+      const monthStartDay = 1;
+      const monthMaxDay = 31;
+      let realBeginDay = monthMaxDay + 1;
+      let realEndDay = 0;
+      for (let i = monthStartDay; i <= monthMaxDay; i++) {
+        const dayField = `day${i}`;
+        const dayVal = Number(row[dayField] || 0);
+        if (dayVal !== 0) {
+          if (realBeginDay > i) {
+            realBeginDay = i;
+          }
+          if (realEndDay < i) {
+            realEndDay = i;
+          }
+        }
+      }
+      row.beginDay = realBeginDay === monthMaxDay + 1 ? 0 : realBeginDay;
+      row.endDay = realEndDay;
+    },
+    /**
+     * 修改 1–31 号日排产后实时保存，与 rollingCycle handleResultDayEdit 一致
+     */
+    async handleResultDayEdit(row, prop) {
+      if (!row.id) {
+        return;
+      }
+      const oldVal = this.normalizeDayValue(this.dayEditOriginalValue);
+      const newVal = this.normalizeDayValue(row[prop]);
+      if (newVal === oldVal) {
+        return;
+      }
+      try {
+        this.recalculateBeginEndDay(row);
+        await saveAdjustResult(row);
+      } catch (err) {
+        console.error(err);
       }
     },
     /**

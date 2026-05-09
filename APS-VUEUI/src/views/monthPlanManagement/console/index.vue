@@ -341,13 +341,15 @@ export default {
                 >
                   {this.$t("ui.data.console.productNoDetail")}
                 </text-button>
-                <text-button
-                  onClick={() =>
-                    this.handleRouterMonthlyProductionPlanQuery(row)
-                  }
-                >
-                  {this.$t("common.button.adjust")}
-                </text-button>
+                {row.isFinal == 1 ? (
+                  <text-button
+                    onClick={() =>
+                      this.handleRouterMonthlyProductionPlanQuery(row)
+                    }
+                  >
+                    {this.$t("common.button.adjust")}
+                  </text-button>
+                ) : null}
                 <text-button onClick={() => this.handleDeleteChild(row)}>
                   {this.$t("common.button.delete")}
                 </text-button>
