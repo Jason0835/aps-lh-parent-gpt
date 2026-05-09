@@ -481,7 +481,7 @@ import result from "./components/result.vue";
 import special from "./components/special.vue";
 import addModal from "./components/addModal.vue";
 export default {
-  name: "RollingCycle",
+  name: "MonthPlanStructureInnerAdjust",
   props: {
     /** default：周程滚动原 Tab 布局；monthPlanStructureInner：月计划结构内/结构调整（无 Tab） */
     layoutMode: {

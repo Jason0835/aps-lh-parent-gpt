@@ -128,6 +128,42 @@ export const constantRoutes = [
   },
 ];
 if (process.env.NODE_ENV == "development") {
+  constantRoutes.push(
+    // {
+    //   path: "/dev-month-plan/monthPlanFinalAdjustQuery",
+    //   component: Layout,
+    //   hidden: false,
+    //   children: [
+    //     {
+    //       path: "",
+    //       name: "MonthPlanFinalAdjustQuery",
+    //       component: () =>
+    //         import("@/views/newPage/monthPlanFinalAdjustQuery/index"),
+    //       meta: {
+    //         title: "月计划查询",
+    //         i18n: "ui.data.column.monthPlanFinalAdjustQuery.modelName",
+    //       },
+    //     },
+    //   ],
+    // },
+    // {
+    //   path: "/newPage/rollingCycle",
+    //   component: Layout,
+    //   hidden: false,
+    //   children: [
+    //     {
+    //       path: "",
+    //       name: "MonthPlanStructureInnerAdjust",
+    //       component: () =>
+    //         import("@/views/newPage/rollingCycle/index.backup-legacy"),
+    //       meta: {
+    //         title: "月计划调整(旧)",
+    //         i18n: "ui.data.column.monthPlanStructureInnerAdjust.modelName",
+    //       },
+    //     },
+    //   ],
+    // }
+  );
 }
 
 constantRoutes.push(
