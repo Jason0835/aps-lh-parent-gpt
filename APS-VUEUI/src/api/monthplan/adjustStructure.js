@@ -23,10 +23,53 @@ export function listOutsideStructure(query) {
     data: query
   })
 }
+
+/** 从 Redis 读取当前调整用成型机台编码 */
+export function getAdjustsCxMachineFromRedis() {
+  return request({
+    url: '/monthplan/mpStructureAllocation/getAdjustsCxMachineFromRedis',
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+    data: {}
+  })
+}
+
+/**
+ * 将当前调整用成型机台写入 Redis（路径携带机台号，与后端约定一致）
+ * POST /monthplan/mpStructureAllocation/setAdjustsCxMachineFromRedis/{机台号}
+ * @param {string} cxMachineCode 机台编码，如 1111
+ */
+export function setAdjustsCxMachineFromRedis(cxMachineCode) {
+  const code =
+    cxMachineCode == null || cxMachineCode === '' ? '' : String(cxMachineCode).trim()
+  return request({
+    url: `/monthplan/mpStructureAllocation/setAdjustsCxMachineFromRedis/${encodeURIComponent(code)}`,
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+    data: {}
+  })
+}
+
 //确认调整结果
 export function confirmAdjust(query) {
   return request({
     url: '/monthplan/mpWeekRollAdjust/confirmAdjust',
+    method: 'post',
+    data: query
+  })
+}
+
+/**
+ * 月计划调整查询-重新计算（请求体与 confirmAdjust 相同）
+ * POST /monthplan/mpWeekRollAdjust
+ */
+export function recalculateWeekRollAdjust(query) {
+  return request({
+    url: '/monthplan/mpWeekRollAdjust',
     method: 'post',
     data: query
   })
