@@ -770,6 +770,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         Map<String, Integer> materialStockMap = context.getMaterialStockMap();
 
         int classIndex = parseClassIndex(shiftConfig);
+        log.info("精度扣量硫化联动: 机台={}, lhResultCache大小={}, classIndex={}",
+                machineCode, lhResultCache.size(), classIndex);
         Set<LhScheduleResult> modifiedLhResults = new HashSet<>();
 
         for (TaskAllocation taskAlloc : sortedTasks) {
@@ -805,26 +807,35 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
             Long lhId = taskAlloc.getLhId();
             LhScheduleResult lhResult = lhId != null ? lhResultCache.get(lhId) : null;
-            if (lhResult != null && classIndex > 0) {
-                Integer currentClassPlanObj = getClassPlanQtyByIndex(lhResult, classIndex);
-                if (currentClassPlanObj == null) {
-                    continue;
-                }
-                int currentClassPlan = currentClassPlanObj;
-                int stock = (materialStockMap != null)
-                        ? materialStockMap.getOrDefault(String.valueOf(lhId), 0)
-                        : 0;
-                int totalAvailable = stock + newQty;
-                if (totalAvailable < currentClassPlan) {
-                    // 不扣减硫化计划量，只在原因分析中记录精度影响
-                    String precisionNote = String.format("成型精度影响: 库存%d+产量%d=%d<硫化计划%d, 缺口%d条",
-                            stock, newQty, totalAvailable, currentClassPlan, currentClassPlan - totalAvailable);
-                    appendClassAnalysisByIndex(lhResult, classIndex, precisionNote);
-                    modifiedLhResults.add(lhResult);
-                    log.info("  硫化原因分析: 胎胚={}, CLASS{}硫化计划={}, 库存={}+产量={}={}, 缺口={}",
-                            taskAlloc.getEmbryoCode(), classIndex,
-                            currentClassPlan, stock, newQty, totalAvailable, currentClassPlan - totalAvailable);
-                }
+            if (lhResult == null || classIndex <= 0) {
+                log.info("  硫化联动跳过: 胎胚={}, lhId={}, lhResult={}, classIndex={}",
+                        taskAlloc.getEmbryoCode(), lhId, lhResult != null ? "已找到" : "未找到", classIndex);
+                continue;
+            }
+            Integer currentClassPlanObj = getClassPlanQtyByIndex(lhResult, classIndex);
+            if (currentClassPlanObj == null || currentClassPlanObj <= 0) {
+                log.info("  硫化联动跳过: 胎胚={}, CLASS{}硫化计划量为0或空({}), 无需联动",
+                        taskAlloc.getEmbryoCode(), classIndex, currentClassPlanObj);
+                continue;
+            }
+            int currentClassPlan = currentClassPlanObj;
+            int stock = (materialStockMap != null)
+                    ? materialStockMap.getOrDefault(String.valueOf(lhId), 0)
+                    : 0;
+            int totalAvailable = stock + newQty;
+            if (totalAvailable < currentClassPlan) {
+                // 不扣减硫化计划量，只在原因分析中记录精度影响
+                String precisionNote = String.format("成型精度影响: 库存%d+产量%d=%d<硫化计划%d, 缺口%d条",
+                        stock, newQty, totalAvailable, currentClassPlan, currentClassPlan - totalAvailable);
+                appendClassAnalysisByIndex(lhResult, classIndex, precisionNote);
+                modifiedLhResults.add(lhResult);
+                log.info("  硫化联动写入原因分析: 胎胚={}, lhId={}, CLASS{}硫化计划={}, 库存={}+扣后产量={}={}, 缺口={}条, 原因={}",
+                        taskAlloc.getEmbryoCode(), lhId, classIndex,
+                        currentClassPlan, stock, newQty, totalAvailable, currentClassPlan - totalAvailable, precisionNote);
+            } else {
+                log.info("  硫化联动检查通过: 胎胚={}, lhId={}, CLASS{}硫化计划={}, 库存={}+扣后产量={}={}, 供应充足无缺口",
+                        taskAlloc.getEmbryoCode(), lhId, classIndex,
+                        currentClassPlan, stock, newQty, totalAvailable);
             }
         }
 
