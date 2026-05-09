@@ -22,6 +22,7 @@
           <el-button
             type="primary"
             plain
+            :disabled="!canUsePrimaryAdjustActions"
             @click="handleStructureInnerAdjust"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.structureInnerAdjust")
@@ -698,7 +699,7 @@ export default {
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const year = nextMonth.getFullYear();
-    const month = nextMonth.getMonth() + 1;
+    const month = nextMonth.getMonth();
     const defaults = {
       factoryCode: "116",
       yearMonth: `${year}-${month}`,

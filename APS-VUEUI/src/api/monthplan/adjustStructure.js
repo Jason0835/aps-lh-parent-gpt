@@ -69,7 +69,7 @@ export function confirmAdjust(query) {
  */
 export function recalculateWeekRollAdjust(query) {
   return request({
-    url: '/monthplan/mpWeekRollAdjust',
+    url: '/monthplan/mpWeekRollAdjust/recalculate',
     method: 'post',
     data: query
   })
