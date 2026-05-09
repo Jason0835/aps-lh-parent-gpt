@@ -23,11 +23,13 @@ import com.zlt.aps.common.core.domain.ExcelStyleVo;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
+import com.zlt.aps.lh.service.ILhMachineOnlineInfoService;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -85,6 +87,9 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     @Autowired
     private IImportLogService iImportLogService;
 
+    @Autowired
+    private ILhMachineOnlineInfoService lhMachineOnlineInfoService;
+
     private final List<String> redMouldNoList = Arrays.asList(
             "HM20220503621",
             "HM20220603637",
@@ -121,7 +126,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             "HM2019102222",
             "HM2019102223",
             "HM20251104109",
-            "HM20251104110", "HM20201102273");
+            "HM20251104110");
 
     /**
      * 查询模具交替计划列表
@@ -253,7 +258,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
         //1.获取导出数据
         List<LhMouldChangePlan> list = this.listExportData(queryVO);
-        List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list);
+        List<LhMouldChangePlanVo> exportList = this.buildLhMouldChangePlanVoList(list, queryVO);
         Map<String, Object> tableMap = buildExportTableMap(exportList, queryVO.getScheduleDate());
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         excelDataList.add(buildExportDataList(exportList));
@@ -332,12 +337,29 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         return dataList;
     }
 
-    private List<LhMouldChangePlanVo> buildLhMouldChangePlanVoList(List<LhMouldChangePlan> list) {
+    private List<LhMouldChangePlanVo> buildLhMouldChangePlanVoList(List<LhMouldChangePlan> list, LhMouldChangePlan queryVO) {
         List<LhMouldChangePlanVo> resultList = new ArrayList<>();
         int seq = 1;
+        // 查询硫化在机数据，通过日期+机台，取在机模号，拼接后回写模具号字段
+        HashMap<String, Object> map = new HashMap<>();
+        map.put("ONLINE_DATE", queryVO.getPlanDate());
+        List<LhMachineOnlineInfo> lhMachineOnlineInfoList = baseDao.selectByMap(LhMachineOnlineInfo.class, map);
+        Map<String, List<LhMachineOnlineInfo>> lhMachineOnlineInfoMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(lhMachineOnlineInfoList)) {
+            lhMachineOnlineInfoMap = lhMachineOnlineInfoList.stream().collect(Collectors.groupingBy(LhMachineOnlineInfo::getLhCode));
+        }
         for (LhMouldChangePlan lhMouldChangePlan : list) {
             LhMouldChangePlanVo lhMouldChangePlanVo = new LhMouldChangePlanVo();
             BeanUtil.copyProperties(lhMouldChangePlan, lhMouldChangePlanVo);
+
+            String machineCode = lhMouldChangePlan.getLhMachineCode();
+            if (lhMachineOnlineInfoMap.containsKey(machineCode)) {
+                List<LhMachineOnlineInfo> onlineInfoList = lhMachineOnlineInfoMap.get(machineCode);
+                String mouldCode = onlineInfoList.stream().map(LhMachineOnlineInfo::getInMachineMouldCode)
+                        .filter(StringUtils::isNotBlank).distinct()
+                        .collect(Collectors.joining(","));
+                lhMouldChangePlanVo.setMouldCode(mouldCode);
+            }
 
             lhMouldChangePlanVo.setSeq(seq++);
 
