@@ -230,7 +230,7 @@ public class MpWeekRollAdjustController extends BaseController {
         return Comparator.comparing(IFinalAndAdjustResultInterface::getTbrProSize, Comparator.nullsLast(String::compareTo))
                 .thenComparing(IFinalAndAdjustResultInterface::getStructureName,Comparator.nullsLast(String::compareTo))
                 // 同胎胚
-                .thenComparing(MpAdjustResult::getEmbryoCode,Comparator.nullsLast(String::compareTo))
+                .thenComparing(IFinalAndAdjustResultInterface::getEmbryoCode,Comparator.nullsLast(String::compareTo))
                 // 最大型腔数
                 .thenComparing(IFinalAndAdjustResultInterface::getMaxMouldCavityQty, Comparator.reverseOrder())
                 // 主花纹

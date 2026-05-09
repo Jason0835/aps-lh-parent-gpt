@@ -43,4 +43,6 @@ public interface IFinalAndAdjustResultInterface {
     Integer getTypeBlockQty();
 
     String getMaterialDesc();
+
+    String getEmbryoCode();
 }
