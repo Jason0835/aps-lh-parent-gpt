@@ -6,10 +6,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.LhInsertOrderValidateResultDTO;
 import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
-import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
-import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
@@ -17,12 +16,13 @@ import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.lh.mapper.MdmMonthSurplusMapper;
 import com.zlt.aps.lh.mapper.MdmSkuLhCapacityMapper;
 import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
+import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
+import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
-import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
-import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
-import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.mdm.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -37,6 +37,8 @@ import java.util.stream.Collectors;
  * <p>负责插单前的所有校验逻辑，包括：</p>
  * <ul>
  *   <li>物料编码校验</li>
+ *   <li>物料编码月度计划校验</li>
+ *   <li>SKU月度计划及生产中校验</li>
  *   <li>班次计划量校验</li>
  *   <li>重复插单校验</li>
  *   <li>历史班次校验</li>
@@ -72,6 +74,18 @@ public class LhInsertOrderValidateHandler {
     @Resource
     private LhMouldChangePlanEntityMapper lhMouldChangePlanEntityMapper;
 
+    @Resource
+    private FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
+
+    @Resource
+    private MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
+
+    /** 排产版本已定稿 */
+    private static final String PRODUCTION_VERSION_IS_FINAL = "1";
+
+    /** 生产状态：生产中 */
+    private static final String PRODUCTION_STATUS_IN_PRODUCTION = "1";
+
     /**
      * 执行插单校验
      *
@@ -83,6 +97,8 @@ public class LhInsertOrderValidateHandler {
         result.setValid(true);
 
         validateMaterialCode(dto, result);
+        validateMaterialCodeInMonthPlan(dto, result);
+        validateSkuInMonthPlanAndNotInProduction(dto, result);
         validateShiftPlanQty(dto, result);
         validateDuplicateInsert(dto, result);
         validateHistoricalShift(dto, result);
@@ -125,6 +141,127 @@ public class LhInsertOrderValidateHandler {
         if (Objects.isNull(materialInfo)) {
             result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.materialCodeNotFound"), materialCode));
         }
+    }
+
+    /**
+     * 校验物料编码是否在当前排程月对应的月度计划中
+     * <p>根据排程日期确定所属年月，查找定稿排产版本，再校验物料编码是否存在于月度计划定稿表中</p>
+     *
+     * @param dto    插单数据
+     * @param result 校验结果
+     */
+    private void validateMaterialCodeInMonthPlan(LhOrderInsertDTO dto, LhInsertOrderValidateResultDTO result) {
+        String materialCode = resolveMaterialCode(dto);
+        if (StringUtils.isBlank(materialCode) || dto.getScheduleDate() == null) {
+            return;
+        }
+
+        Date scheduleDate = dto.getScheduleDate();
+        int year = DateUtil.year(scheduleDate);
+        int month = DateUtil.month(scheduleDate) + 1;
+        String yearMonthText = String.format("%04d-%02d", year, month);
+
+        MpFactoryProductionVersion finalVersion = getFinalProductionVersion(dto.getFactoryCode(), year, month);
+        if (finalVersion == null) {
+            result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.monthPlanVersionNotFound"), yearMonthText));
+            return;
+        }
+
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, dto.getFactoryCode())
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, year)
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, month)
+                .eq(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCode)
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        if (StringUtils.isNotBlank(finalVersion.getProductionVersion())) {
+            wrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, finalVersion.getProductionVersion());
+        }
+        wrapper.last("LIMIT 1");
+        Long count = monthPlanMapper.selectCount(wrapper);
+        if (count == null || count == 0) {
+            result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.materialCodeNotInMonthPlan"), materialCode, yearMonthText));
+        }
+    }
+
+    /**
+     * 校验SKU是否在当前月度计划表中，并且过滤掉当前月已经正在生产的SKU
+     * <p>1. 校验SKU（物料编码）是否存在于当前排程月对应的月度计划定稿表中</p>
+     * <p>2. 校验SKU在当前月是否已经正在生产（productionStatus=1），若正在生产则不允许重复插单</p>
+     *
+     * @param dto    插单数据
+     * @param result 校验结果
+     */
+    private void validateSkuInMonthPlanAndNotInProduction(LhOrderInsertDTO dto, LhInsertOrderValidateResultDTO result) {
+        String materialCode = resolveMaterialCode(dto);
+        if (StringUtils.isBlank(materialCode) || dto.getScheduleDate() == null) {
+            return;
+        }
+
+        Date scheduleDate = dto.getScheduleDate();
+        int year = DateUtil.year(scheduleDate);
+        int month = DateUtil.month(scheduleDate) + 1;
+
+        MpFactoryProductionVersion finalVersion = getFinalProductionVersion(dto.getFactoryCode(), year, month);
+        if (finalVersion == null) {
+            return;
+        }
+
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> planWrapper = new LambdaQueryWrapper<>();
+        planWrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, dto.getFactoryCode())
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, year)
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, month)
+                .eq(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCode)
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        if (StringUtils.isNotBlank(finalVersion.getProductionVersion())) {
+            planWrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, finalVersion.getProductionVersion());
+        }
+        planWrapper.last("LIMIT 1");
+        Long planCount = monthPlanMapper.selectCount(planWrapper);
+        if (planCount == null || planCount == 0) {
+            result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.skuNotInMonthPlan"), materialCode));
+            return;
+        }
+
+        Date startDate = DateUtil.beginOfMonth(scheduleDate);
+        Date endDate = DateUtil.offsetMonth(startDate, 1);
+
+        LambdaQueryWrapper<LhScheduleResult> productionWrapper = new LambdaQueryWrapper<>();
+        productionWrapper.eq(LhScheduleResult::getMaterialCode, materialCode)
+                .eq(LhScheduleResult::getProductionStatus, PRODUCTION_STATUS_IN_PRODUCTION)
+                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .ge(LhScheduleResult::getScheduleDate, startDate)
+                .lt(LhScheduleResult::getScheduleDate, endDate);
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            productionWrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
+        }
+        Long productionCount = lhScheduleResultMapper.selectCount(productionWrapper);
+        if (productionCount != null && productionCount > 0) {
+            result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.skuAlreadyInProduction"), materialCode));
+        }
+    }
+
+    /**
+     * 获取定稿排产版本
+     *
+     * @param factoryCode 分厂编码
+     * @param year        年份
+     * @param month       月份
+     * @return 定稿排产版本，不存在返回null
+     */
+    private MpFactoryProductionVersion getFinalProductionVersion(String factoryCode, int year, int month) {
+        if (StringUtils.isBlank(factoryCode)) {
+            return null;
+        }
+        LambdaQueryWrapper<MpFactoryProductionVersion> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MpFactoryProductionVersion::getFactoryCode, factoryCode)
+                .eq(MpFactoryProductionVersion::getYear, year)
+                .eq(MpFactoryProductionVersion::getMonth, month)
+                .eq(MpFactoryProductionVersion::getIsFinal, PRODUCTION_VERSION_IS_FINAL)
+                .eq(MpFactoryProductionVersion::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .orderByDesc(MpFactoryProductionVersion::getUpdateTime)
+                .orderByDesc(MpFactoryProductionVersion::getId)
+                .last("LIMIT 1");
+        return mpFactoryProductionVersionMapper.selectOne(wrapper);
     }
 
     /**

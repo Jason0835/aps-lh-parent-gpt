@@ -49,6 +49,7 @@
             UPDATE_BY = #{updateBy},
             UPDATE_TIME = #{updateTime}
         WHERE IS_DELETE = 1
+          AND DATA_SOURCE = #{dataSource}
           AND (FACTORY_CODE, STOCK_DATE, EMBRYO_CODE) IN
         <foreach collection="list" item="item" open="(" separator="," close=")">
             (#{item.factoryCode}, #{item.stockDate}, #{item.embryoCode})

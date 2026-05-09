@@ -22,6 +22,7 @@
           <el-button
             type="primary"
             plain
+            :disabled="!canUsePrimaryAdjustActions"
             @click="handleStructureInnerAdjust"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.structureInnerAdjust")
@@ -120,7 +121,10 @@
       ref="structureAdjustDialogRef"
       @structure-adjust-saved="onStructureAdjustSaved"
     />
-    <adjust-version-dialog ref="adjustVersionDialogRef" />
+    <adjust-version-dialog
+      ref="adjustVersionDialogRef"
+      @select-production-version="onAdjustVersionDialogSelectProductionVersion"
+    />
     <el-dialog
       :title="$t('ui.data.column.monthPlanFinalAdjustQuery.issueScmMes')"
       :visible.sync="syncDialog.visible"
@@ -406,6 +410,11 @@ export default {
           label: this.$t("ui.data.column.monthPlanFinalAdjustQuery.structureType"),
           width: 110,
           formatter: (row, column, value) => structureTypeLabel(value),
+        },
+        {
+          prop: "cxMachineCode",
+          label: this.$t("ui.data.column.monthPlanFinalAdjustQuery.cxMachine"),
+          width: 120,
         },
         {
           prop: "materialCode",
@@ -698,7 +707,7 @@ export default {
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const year = nextMonth.getFullYear();
-    const month = nextMonth.getMonth() + 1;
+    const month = nextMonth.getMonth();
     const defaults = {
       factoryCode: "116",
       yearMonth: `${year}-${month}`,
@@ -962,6 +971,9 @@ export default {
         params.year = Number(arr[0]);
         params.month = Number(arr[1]);
         delete params.yearMonth;
+      }
+      if(params.productionVersion){
+        params.version = params.productionVersion
       }
       const scheduled = (this.currentAdjustMachine || "").trim();
       if (scheduled) {
@@ -1238,6 +1250,25 @@ export default {
       }
       this.$refs.adjustVersionDialogRef.show(q);
     },
+    /**
+     * 查看调整版本弹窗中点击版本号：同步到查询条件 productionVersion 并拉列表
+     */
+    async onAdjustVersionDialogSelectProductionVersion(productionVersion) {
+      const v =
+        productionVersion != null ? String(productionVersion).trim() : "";
+      if (!v) {
+        return;
+      }
+      this.search = { ...this.search, productionVersion: v };
+      this.query = { ...this.query, productionVersion: v };
+      const opts = this.versionOptions || [];
+      if (!opts.some((item) => String(item.value) === v)) {
+        this.versionOptions = [...opts, { label: v, value: v }];
+      }
+      this.$set(this.page, "current", 1);
+      await this.fetchCurrentAdjustMachineFromRedis();
+      this.getList();
+    },
     handleExport() {
       downloadLink(
         "/monthplan/factoryMonthPlanMouldDayResult/export",
@@ -1478,14 +1509,14 @@ export default {
      */
     prepareWeekRollSubmitPayloadOrWarn() {
       const machine = (this.currentAdjustMachine || "").trim();
-      if (!machine) {
-        this.$modal.msgWarning(
-          this.$t(
-            "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedMachine"
-          )
-        );
-        return null;
-      }
+      // if (!machine) {
+      //   this.$modal.msgWarning(
+      //     this.$t(
+      //       "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedMachine"
+      //     )
+      //   );
+      //   return null;
+      // }
       if (!this.data || !this.data.length) {
         this.$modal.msgWarning(
           this.$t(

@@ -153,7 +153,7 @@ public class MpWeekRollAdjustController extends BaseController {
             weekAdjustStrategy.autoAdjust(contextDTO);
             log.info("自动调整 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(weekRollAdjustDTO.getAdjustType()).getName(),
                     String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
-            // 排序 按英寸->结构->最大型腔数->主花纹->活块数->物料描述
+            // 排序 按英寸->结构->同胎胚->最大型腔数->主花纹->活块数->物料描述
             sortAdjustResultList(contextDTO.getAdjustResultList());
             if (StringUtil.isEmptyWithTrim(contextDTO.getMsgStructureAdjustPreClose().toString())){
                 return AjaxResult.success(contextDTO.getMsgStructureAdjustPreClose().toString(),contextDTO.getAdjustResultList());
@@ -200,7 +200,7 @@ public class MpWeekRollAdjustController extends BaseController {
     }
 
     /**
-     * 排序：按英寸->结构->最大型腔数->主花纹->活块数->物料描述
+     * 排序：按英寸->结构->同胎胚->最大型腔数->主花纹->活块数->物料描述
      * @param mpAdjustResultList
      */
     public void sortAdjustResultList(List<? extends IFinalAndAdjustResultInterface> mpAdjustResultList) {
@@ -222,13 +222,15 @@ public class MpWeekRollAdjustController extends BaseController {
     }
 
     /**
-     * 排序器：按英寸->结构->最大型腔数->主花纹->活块数->物料描述
+     * 排序器：按英寸->结构->同胚胎->最大型腔数->主花纹->活块数->物料描述
      * @return
      */
     protected Comparator<IFinalAndAdjustResultInterface> getAdjustResultSortComparator() {
         // 一级排序：结构名称升序，空值排最后
         return Comparator.comparing(IFinalAndAdjustResultInterface::getTbrProSize, Comparator.nullsLast(String::compareTo))
                 .thenComparing(IFinalAndAdjustResultInterface::getStructureName,Comparator.nullsLast(String::compareTo))
+                // 同胎胚
+                .thenComparing(MpAdjustResult::getEmbryoCode,Comparator.nullsLast(String::compareTo))
                 // 最大型腔数
                 .thenComparing(IFinalAndAdjustResultInterface::getMaxMouldCavityQty, Comparator.reverseOrder())
                 // 主花纹

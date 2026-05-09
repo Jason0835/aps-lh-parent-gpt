@@ -320,12 +320,12 @@ export default {
       const pv = (this.productionVersion || "").trim();
       const ver = (this.listAdjustsVersion || "").trim();
       const adj = (this.listAdjustsAdjVersion || "").trim();
-      if (pv) {
-        params.productionVersion = pv;
-      }
-      if (ver) {
-        params.version = ver;
-      }
+      // if (pv) {
+      //   params.productionVersion = pv;
+      // }
+      // if (ver) {
+      //   params.version = ver;
+      // }
       if (adj) {
         params.adjVersion = adj;
       }

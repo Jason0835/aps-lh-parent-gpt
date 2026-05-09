@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
@@ -11,14 +12,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.domain.CellStyle;
 import com.zlt.aps.common.core.utils.ExcelUtils;
-import com.zlt.aps.cx.entity.CxMachineStructureCapacity;
-import com.zlt.aps.cx.entity.config.CxParamConfig;
-import com.zlt.aps.cx.entity.config.CxShiftConfig;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
-import com.zlt.aps.cx.mapper.CxMachineStructureCapacityMapper;
-import com.zlt.aps.cx.mapper.CxParamConfigMapper;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
-import com.zlt.aps.cx.mapper.CxShiftConfigMapper;
 import com.zlt.aps.cx.service.CxScheduleDetailService;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
@@ -42,8 +38,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -65,19 +59,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     @Autowired
     private IMpStructureAllocationRemoteService mpStructureAllocationRemoteService;
-
-    @Autowired
-    private CxShiftConfigMapper cxShiftConfigMapper;
-
-    @Autowired
-    private CxMachineStructureCapacityMapper cxMachineStructureCapacityMapper;
-
-    @Autowired
-    private CxParamConfigMapper cxParamConfigMapper;
-
-    private static final int DEFAULT_STRUCTURE_SWITCH_HOURS = 8;
-    private static final int END_TIME_CALCULATION_WINDOW_DAYS = 4;
-    private static final int DEFAULT_SHIFT_CAPACITY = 400;
 
     @Override
     public List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate) {
@@ -924,7 +905,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         MpStructureAllocation structureQuery = buildStructureAllocationQuery(queryVO);
         TableDataInfo structureDataInfo = mpStructureAllocationRemoteService.list(structureQuery);
         List<MpStructureAllocation> structureList = structureDataInfo != null
-                ? (List<MpStructureAllocation>) structureDataInfo.getRows()
+                ? convertToMpStructureAllocationList(structureDataInfo.getRows())
                 : Collections.emptyList();
 
         if (CollectionUtils.isEmpty(structureList)) {
@@ -942,40 +923,32 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                         Collectors.toList()));
         machineGroupMap.entrySet().removeIf(entry -> entry.getValue().size() < 2);
 
-        List<CxShiftConfig> shiftConfigs = cxShiftConfigMapper.selectList(
-                new LambdaQueryWrapper<CxShiftConfig>()
-                        .eq(CxShiftConfig::getIsActive, 1)
-                        .orderByAsc(CxShiftConfig::getScheduleDay)
-                        .orderByAsc(CxShiftConfig::getDayShiftOrder));
-
-        List<CxMachineStructureCapacity> capacityList = cxMachineStructureCapacityMapper.selectList(
-                new LambdaQueryWrapper<CxMachineStructureCapacity>()
-                        .eq(CxMachineStructureCapacity::getIsActive, 1));
-        Map<String, CxMachineStructureCapacity> capacityMap = capacityList.stream()
-                .collect(Collectors.toMap(
-                        c -> c.getCxMachineCode().trim() + "|" + c.getStructureName().trim(),
-                        c -> c,
-                        (oldVal, newVal) -> oldVal,
-                        LinkedHashMap::new));
-
         List<CxScheduleResult> scheduleResults = cxScheduleResultMapper.selectList(
                 buildStructureChangeQueryWrapper(queryVO));
+        // 按物料编码+胎胚代码分组，取成型余量最大值（同结构下不同机台可能存在共用数据）
         Map<String, BigDecimal> remainQtyMap = scheduleResults.stream()
-                .filter(r -> StringUtils.isNotBlank(r.getCxMachineCode()) && StringUtils.isNotBlank(r.getStructureName()))
+                .filter(r -> StringUtils.isNotBlank(r.getMaterialCode()) && StringUtils.isNotBlank(r.getEmbryoCode()))
                 .filter(r -> r.getCxRemainQty() != null)
                 .collect(Collectors.groupingBy(
-                        r -> r.getCxMachineCode().trim() + "|" + r.getStructureName().trim(),
-                        Collectors.reducing(BigDecimal.ZERO, CxScheduleResult::getCxRemainQty, BigDecimal::add)));
+                        r -> r.getMaterialCode().trim() + "|" + r.getEmbryoCode().trim(),
+                        Collectors.reducing(BigDecimal.ZERO, CxScheduleResult::getCxRemainQty, BigDecimal::max)));
 
-        int structureSwitchHours = getStructureSwitchHours();
+        // 构建结构名到物料编码+胎胚代码的映射，用于通过结构名查找成型余量
+        Map<String, String> structureToRemainKeyMap = scheduleResults.stream()
+                .filter(r -> StringUtils.isNotBlank(r.getStructureName()))
+                .filter(r -> StringUtils.isNotBlank(r.getMaterialCode()) && StringUtils.isNotBlank(r.getEmbryoCode()))
+                .collect(Collectors.toMap(
+                        CxScheduleResult::getStructureName,
+                        r -> r.getMaterialCode().trim() + "|" + r.getEmbryoCode().trim(),
+                        (existing, replacement) -> existing,
+                        LinkedHashMap::new));
 
         LocalDate scheduleDate = queryVO != null && queryVO.getScheduleDate() != null
                 ? cn.hutool.core.date.DateUtil.toLocalDateTime(queryVO.getScheduleDate()).toLocalDate()
                 : LocalDate.now();
 
         List<Map<String, Object>> dataList = buildStructureChangeDataListV2(
-                machineGroupMap, shiftConfigs, capacityMap, remainQtyMap,
-                structureSwitchHours, scheduleDate);
+                machineGroupMap, remainQtyMap, structureToRemainKeyMap, scheduleDate);
 
         Map<String, Object> tableMap = new HashMap<>();
         List<CellStyle> cellStyleList = buildCellStyleListForStructureChange(dataList);
@@ -989,6 +962,31 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     /**
+     * 将Feign远程调用返回的LinkedHashMap列表转换为MpStructureAllocation实体列表。
+     * Feign反序列化泛型丢失，TableDataInfo.getRows()中的元素实际类型为LinkedHashMap，
+     * 直接强转会导致ClassCastException，需使用ObjectMapper.convertValue进行类型转换。
+     *
+     * @param rows Feign远程调用返回的行数据列表
+     * @return MpStructureAllocation实体列表
+     */
+    private List<MpStructureAllocation> convertToMpStructureAllocationList(List<?> rows) {
+        List<MpStructureAllocation> entityList = new ArrayList<>();
+        if (PubUtil.isEmpty(rows)) {
+            return entityList;
+        }
+        com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        for (Object obj : rows) {
+            if (obj instanceof MpStructureAllocation) {
+                entityList.add((MpStructureAllocation) obj);
+            } else if (obj instanceof Map) {
+                MpStructureAllocation entity = objectMapper.convertValue(obj, MpStructureAllocation.class);
+                entityList.add(entity);
+            }
+        }
+        return entityList;
+    }
+
+    /**
      * 构建结构排产查询条件，从排程结果查询VO转换为结构排产查询对象。
      *
      * @param queryVO 排程结果查询条件
@@ -996,15 +994,19 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      */
     private MpStructureAllocation buildStructureAllocationQuery(CxScheduleResult queryVO) {
         MpStructureAllocation structureQuery = new MpStructureAllocation();
+        // 分厂为空时赋默认工厂编码
+        String factoryCode = (queryVO != null && StringUtils.isNotBlank(queryVO.getFactoryCode()))
+                ? queryVO.getFactoryCode() : FactoryConstant.DEFAULT_FACTORY_CODE;
+        structureQuery.setFactoryCode(factoryCode);
         if (queryVO != null) {
-            structureQuery.setFactoryCode(queryVO.getFactoryCode());
             structureQuery.setCxMachineCode(queryVO.getCxMachineCode());
-            if (queryVO.getScheduleDate() != null) {
-                LocalDate ld = cn.hutool.core.date.DateUtil.toLocalDateTime(queryVO.getScheduleDate()).toLocalDate();
-                structureQuery.setYear(ld.getYear());
-                structureQuery.setMonth(ld.getMonthValue());
-            }
         }
+        // 年月参数从排程日期的年月拆出，排程日期为空时默认当前日期
+        LocalDate ld = (queryVO != null && queryVO.getScheduleDate() != null)
+                ? DateUtil.toLocalDateTime(queryVO.getScheduleDate()).toLocalDate()
+                : LocalDate.now();
+        structureQuery.setYear(ld.getYear());
+        structureQuery.setMonth(ld.getMonthValue());
         return structureQuery;
     }
 
@@ -1031,47 +1033,23 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     /**
-     * 获取结构切换时间参数（小时），从T_CX_PARAM_CONFIG读取，
-     * 参数编码为STRUCTURE_SWITCH_HOURS，未配置时默认8小时。
-     *
-     * @return 结构切换时间（小时）
-     */
-    private int getStructureSwitchHours() {
-        CxParamConfig paramConfig = cxParamConfigMapper.selectOne(
-                new LambdaQueryWrapper<CxParamConfig>()
-                        .eq(CxParamConfig::getParamCode, "STRUCTURE_SWITCH_HOURS")
-                        .eq(CxParamConfig::getIsActive, 1)
-                        .last("LIMIT 1"));
-        if (paramConfig != null && StringUtils.isNotBlank(paramConfig.getParamValue())) {
-            try {
-                return Integer.parseInt(paramConfig.getParamValue().trim());
-            } catch (NumberFormatException e) {
-                log.warn("结构切换时间参数值格式错误，使用默认值{}小时: {}", DEFAULT_STRUCTURE_SWITCH_HOURS, paramConfig.getParamValue());
-            }
-        }
-        return DEFAULT_STRUCTURE_SWITCH_HOURS;
-    }
-
-    /**
      * 构建成型结构切换模板列表数据（V2版本，基于T_MP_STRUCTURE_ALLOCATION）。
      * 按成型机台分组，每个机台按beginDay排序，
-     * 相邻结构之间生成一条切换记录，
-     * 计算收尾预计时间和开产预计时间。
+     * 相邻结构之间生成一条切换记录。
+     *
+     * 班产和收尾预计时间由成型排程同事提供接口获取（TODO），
+     * 当前仅填充结构和成型余量，收尾/开产预计时间字段暂输出空串。
      *
      * @param machineGroupMap 按机台分组的结构排产数据
-     * @param shiftConfigs 班次配置列表
-     * @param capacityMap 机台结构产能配置映射（key: machineCode|structureName）
-     * @param remainQtyMap 余量映射（key: machineCode|structureName）
-     * @param structureSwitchHours 结构切换时间（小时）
+     * @param remainQtyMap 余量映射（key: materialCode|embryoCode）
+     * @param structureToRemainKeyMap 结构名到余量映射key的映射（key: structureName, value: materialCode|embryoCode）
      * @param scheduleDate 排程日期
      * @return 模板列表行数据
      */
     private List<Map<String, Object>> buildStructureChangeDataListV2(
             Map<String, List<MpStructureAllocation>> machineGroupMap,
-            List<CxShiftConfig> shiftConfigs,
-            Map<String, CxMachineStructureCapacity> capacityMap,
             Map<String, BigDecimal> remainQtyMap,
-            int structureSwitchHours,
+            Map<String, String> structureToRemainKeyMap,
             LocalDate scheduleDate) {
 
         List<Map<String, Object>> dataList = new ArrayList<>();
@@ -1088,8 +1066,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
                 Map<String, Object> row = buildStructureChangeRow(
                         machineCode, prevStructure, nextStructure,
-                        shiftConfigs, capacityMap, remainQtyMap,
-                        structureSwitchHours, scheduleDate);
+                        remainQtyMap, structureToRemainKeyMap, scheduleDate);
                 dataList.add(row);
             }
         }
@@ -1109,13 +1086,15 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     /**
      * 构建单条结构切换导出行数据。
      *
+     * 成型余量通过结构名关联到物料编码+胎胚代码，再从remainQtyMap取最大值。
+     * 班产和收尾/开产预计时间由成型排程同事提供接口获取（TODO），
+     * 当前receiveChangeDate和vulcanizeChangeDate暂输出空串。
+     *
      * @param machineCode 成型机台编码
      * @param prevStructure 前结构（当前正在执行的结构）
      * @param nextStructure 后结构（即将切换到的结构）
-     * @param shiftConfigs 班次配置列表
-     * @param capacityMap 机台结构产能配置映射
-     * @param remainQtyMap 余量映射
-     * @param structureSwitchHours 结构切换时间（小时）
+     * @param remainQtyMap 余量映射（key: materialCode|embryoCode）
+     * @param structureToRemainKeyMap 结构名到余量映射key的映射
      * @param scheduleDate 排程日期
      * @return 单行导出数据
      */
@@ -1123,10 +1102,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             String machineCode,
             MpStructureAllocation prevStructure,
             MpStructureAllocation nextStructure,
-            List<CxShiftConfig> shiftConfigs,
-            Map<String, CxMachineStructureCapacity> capacityMap,
             Map<String, BigDecimal> remainQtyMap,
-            int structureSwitchHours,
+            Map<String, String> structureToRemainKeyMap,
             LocalDate scheduleDate) {
 
         String prevStructureName = StringUtils.defaultString(prevStructure.getStructureName()).trim();
@@ -1134,12 +1111,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         String alternatingType = StringUtils.defaultString(nextStructure.getAlternatingType()).trim();
         boolean isInchChange = AlternativeTypeEnum.PRO_SIZE_ALTERNATIVE.getCode().equals(alternatingType);
 
-        String capacityKey = machineCode + "|" + prevStructureName;
-        CxMachineStructureCapacity capacity = capacityMap.get(capacityKey);
-        int shiftCapacity = capacity != null ? capacity.getDailyCapacity() : DEFAULT_SHIFT_CAPACITY;
-
-        String remainKey = machineCode + "|" + prevStructureName;
-        BigDecimal remainQty = remainQtyMap.getOrDefault(remainKey, BigDecimal.ZERO);
+        // 通过结构名查找对应的物料编码+胎胚代码key，再从remainQtyMap取成型余量
+        String remainKey = structureToRemainKeyMap.getOrDefault(prevStructureName, "");
+        BigDecimal remainQty = StringUtils.isNotBlank(remainKey)
+                ? remainQtyMap.getOrDefault(remainKey, BigDecimal.ZERO)
+                : BigDecimal.ZERO;
         if (remainQty.compareTo(BigDecimal.ZERO) == 0 && prevStructure.getNetQty() != null) {
             remainQty = new BigDecimal(prevStructure.getNetQty());
         }
@@ -1147,19 +1123,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         int year = prevStructure.getYear() != null ? prevStructure.getYear() : scheduleDate.getYear();
         int month = prevStructure.getMonth() != null ? prevStructure.getMonth() : scheduleDate.getMonthValue();
 
-        LocalDate prevEndDate = prevStructure.getEndDay() != null
-                ? LocalDate.of(year, month, Math.min(prevStructure.getEndDay(), LocalDate.of(year, month, 1).lengthOfMonth()))
-                : scheduleDate;
         LocalDate nextBeginDate = nextStructure.getBeginDay() != null
                 ? LocalDate.of(year, month, Math.min(nextStructure.getBeginDay(), LocalDate.of(year, month, 1).lengthOfMonth()))
                 : scheduleDate;
 
-        String estimatedEndTime = calculateEstimatedEndTime(
-                remainQty, shiftCapacity, shiftConfigs, scheduleDate, year, month);
-
-        String estimatedStartTime = calculateEstimatedStartTime(
-                estimatedEndTime, structureSwitchHours, isInchChange,
-                shiftConfigs, year, month);
+        // TODO: 班产和收尾预计时间由成型排程提供接口获取，传入结构和成型余量，
+        //  当前收尾预计时间和开产预计时间暂输出空串，待接口对接后替换
+        String estimatedEndTime = "";
+        String estimatedStartTime = "";
 
         String remark = isInchChange ? "换英寸" : "换结构";
 
@@ -1190,327 +1161,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         row.put("_nextBeginDate", nextBeginDate);
 
         return row;
-    }
-
-    /**
-     * 计算收尾预计时间。
-     * 根据余量和班产推算4天内的收尾时间，格式为"MM.DD日早班/中班/夜班"。
-     *
-     * @param remainQty 余量
-     * @param dailyCapacity 日产能
-     * @param shiftConfigs 班次配置列表
-     * @param scheduleDate 排程日期（计算起点）
-     * @param year 年份
-     * @param month 月份
-     * @return 格式化的收尾预计时间字符串
-     */
-    private String calculateEstimatedEndTime(BigDecimal remainQty, int dailyCapacity,
-                                             List<CxShiftConfig> shiftConfigs,
-                                             LocalDate scheduleDate, int year, int month) {
-        if (remainQty == null || remainQty.compareTo(BigDecimal.ZERO) <= 0) {
-            return "";
-        }
-        if (dailyCapacity <= 0) {
-            dailyCapacity = DEFAULT_SHIFT_CAPACITY;
-        }
-
-        int remainInt = remainQty.intValue();
-        int shiftsPerDay = shiftConfigs.isEmpty() ? 3 : (int) shiftConfigs.stream()
-                .filter(s -> s.getScheduleDay() != null && s.getScheduleDay() == 1)
-                .count();
-        if (shiftsPerDay <= 0) {
-            shiftsPerDay = 3;
-        }
-        int shiftCapacity = dailyCapacity / shiftsPerDay;
-        if (shiftCapacity <= 0) {
-            shiftCapacity = DEFAULT_SHIFT_CAPACITY / 3;
-        }
-
-        int shiftsNeeded = remainInt / shiftCapacity + (remainInt % shiftCapacity > 0 ? 1 : 0);
-
-        LocalDate calcDate = scheduleDate;
-        int shiftIndex = 0;
-
-        for (int dayOffset = 0; dayOffset < END_TIME_CALCULATION_WINDOW_DAYS; dayOffset++) {
-            LocalDate currentDate = calcDate.plusDays(dayOffset);
-            int dayShifts = getShiftCountForDate(shiftConfigs, currentDate, year, month);
-
-            for (int s = 0; s < dayShifts; s++) {
-                shiftIndex++;
-                if (shiftIndex >= shiftsNeeded) {
-                    String shiftName = getShiftNameByOrder(shiftConfigs, currentDate, year, month, s);
-                    return formatDateShift(currentDate, shiftName);
-                }
-            }
-        }
-
-        LocalDate lastDate = calcDate.plusDays(END_TIME_CALCULATION_WINDOW_DAYS - 1);
-        String lastShiftName = getLastShiftName(shiftConfigs, lastDate, year, month);
-        return formatDateShift(lastDate, lastShiftName);
-    }
-
-    /**
-     * 计算开产预计时间。
-     * 开产预计时间 = 收尾预计时间 + 结构切换时间，
-     * 如果是"换英寸"则强制安排在早班。
-     *
-     * @param estimatedEndTime 收尾预计时间（格式：MM.DD日X班）
-     * @param switchHours 结构切换时间（小时）
-     * @param isInchChange 是否为换英寸
-     * @param shiftConfigs 班次配置列表
-     * @param year 年份
-     * @param month 月份
-     * @return 格式化的开产预计时间字符串
-     */
-    private String calculateEstimatedStartTime(String estimatedEndTime, int switchHours,
-                                               boolean isInchChange,
-                                               List<CxShiftConfig> shiftConfigs,
-                                               int year, int month) {
-        if (StringUtils.isBlank(estimatedEndTime)) {
-            return "";
-        }
-
-        LocalDateTime endDateTime = parseDateShift(estimatedEndTime, year, month);
-        if (endDateTime == null) {
-            return "";
-        }
-
-        LocalDateTime startDateTime = endDateTime.plusHours(switchHours);
-
-        if (isInchChange) {
-            startDateTime = adjustToMorningShift(startDateTime, shiftConfigs, year, month);
-        }
-
-        String shiftName = determineShiftName(startDateTime, shiftConfigs, year, month);
-        return formatDateShift(startDateTime.toLocalDate(), shiftName);
-    }
-
-    /**
-     * 将"换英寸"的开产时间调整到早班。
-     * 如果计算出的开产时间不在早班时间段内，则调整到下一个早班的开始时间。
-     *
-     * @param dateTime 原始开产时间
-     * @param shiftConfigs 班次配置列表
-     * @param year 年份
-     * @param month 月份
-     * @return 调整后的开产时间
-     */
-    private LocalDateTime adjustToMorningShift(LocalDateTime dateTime,
-                                                List<CxShiftConfig> shiftConfigs,
-                                                int year, int month) {
-        CxShiftConfig morningShift = shiftConfigs.stream()
-                .filter(s -> s.getScheduleDay() != null && s.getScheduleDay() == 1)
-                .filter(s -> s.getDayShiftOrder() != null && s.getDayShiftOrder() == 1)
-                .findFirst()
-                .orElse(null);
-
-        if (morningShift == null) {
-            return dateTime;
-        }
-
-        LocalTime morningStart = morningShift.getShiftStartTime();
-        LocalTime morningEnd = morningShift.getShiftEndTime();
-
-        LocalTime time = dateTime.toLocalTime();
-        boolean isCrossDay = morningShift.getIsCrossDay() != null && morningShift.getIsCrossDay() == 1;
-
-        boolean inMorningShift;
-        if (isCrossDay) {
-            inMorningShift = !time.isBefore(morningStart) || !time.isAfter(morningEnd);
-        } else {
-            inMorningShift = !time.isBefore(morningStart) && !time.isAfter(morningEnd);
-        }
-
-        if (!inMorningShift) {
-            if (time.isAfter(morningEnd) && !isCrossDay) {
-                dateTime = dateTime.plusDays(1);
-            }
-            dateTime = LocalDateTime.of(dateTime.toLocalDate(), morningStart);
-        }
-
-        return dateTime;
-    }
-
-    /**
-     * 解析"MM.DD日X班"格式的时间字符串为LocalDateTime。
-     *
-     * @param dateShiftStr 格式化的日期班次字符串
-     * @param year 年份
-     * @param month 月份
-     * @return LocalDateTime对象
-     */
-    private LocalDateTime parseDateShift(String dateShiftStr, int year, int month) {
-        try {
-            String cleaned = dateShiftStr.replace("日", "|").replace("月", "|");
-            String[] parts = cleaned.split("\\|");
-            if (parts.length < 2) {
-                return null;
-            }
-            int m = Integer.parseInt(parts[0].trim());
-            int d = Integer.parseInt(parts[1].trim());
-            LocalDate date = LocalDate.of(year, m, d);
-
-            String shiftName = parts.length >= 3 ? parts[2].trim() : "早班";
-            LocalTime shiftTime = getShiftStartTimeByName(shiftName);
-            return LocalDateTime.of(date, shiftTime);
-        } catch (Exception e) {
-            log.warn("解析日期班次字符串失败: {}", dateShiftStr, e);
-            return null;
-        }
-    }
-
-    /**
-     * 根据班次名称获取班次开始时间。
-     *
-     * @param shiftName 班次名称（早班/中班/夜班）
-     * @return 班次开始时间
-     */
-    private LocalTime getShiftStartTimeByName(String shiftName) {
-        if (shiftName.contains("夜")) {
-            return LocalTime.of(0, 0);
-        } else if (shiftName.contains("中")) {
-            return LocalTime.of(16, 0);
-        } else {
-            return LocalTime.of(8, 0);
-        }
-    }
-
-    /**
-     * 根据时间确定所在班次名称。
-     *
-     * @param dateTime 时间
-     * @param shiftConfigs 班次配置列表
-     * @param year 年份
-     * @param month 月份
-     * @return 班次名称
-     */
-    private String determineShiftName(LocalDateTime dateTime, List<CxShiftConfig> shiftConfigs,
-                                       int year, int month) {
-        LocalTime time = dateTime.toLocalTime();
-        for (CxShiftConfig config : shiftConfigs) {
-            if (config.getScheduleDay() == null || config.getScheduleDay() != 1) {
-                continue;
-            }
-            LocalTime start = config.getShiftStartTime();
-            LocalTime end = config.getShiftEndTime();
-            boolean isCrossDay = config.getIsCrossDay() != null && config.getIsCrossDay() == 1;
-
-            boolean inRange;
-            if (isCrossDay) {
-                inRange = !time.isBefore(start) || !time.isAfter(end);
-            } else {
-                inRange = !time.isBefore(start) && !time.isAfter(end);
-            }
-            if (inRange) {
-                return config.getShiftName() != null ? config.getShiftName() : "早班";
-            }
-        }
-        if (time.isBefore(LocalTime.of(8, 0))) {
-            return "夜班";
-        } else if (time.isBefore(LocalTime.of(16, 0))) {
-            return "早班";
-        } else {
-            return "中班";
-        }
-    }
-
-    /**
-     * 获取指定日期的班次数。
-     *
-     * @param shiftConfigs 班次配置列表
-     * @param date 日期
-     * @param year 年份
-     * @param month 月份
-     * @return 班次数
-     */
-    private int getShiftCountForDate(List<CxShiftConfig> shiftConfigs, LocalDate date, int year, int month) {
-        int scheduleDay = getScheduleDay(shiftConfigs, date, year, month);
-        return (int) shiftConfigs.stream()
-                .filter(s -> s.getScheduleDay() != null && s.getScheduleDay() == scheduleDay)
-                .count();
-    }
-
-    /**
-     * 获取日期对应的排程天数（1/2/3表示排程周期中的第几天）。
-     *
-     * @param shiftConfigs 班次配置列表
-     * @param date 日期
-     * @param year 年份
-     * @param month 月份
-     * @return 排程天数
-     */
-    private int getScheduleDay(List<CxShiftConfig> shiftConfigs, LocalDate date, int year, int month) {
-        if (!shiftConfigs.isEmpty()) {
-            Integer maxDay = shiftConfigs.stream()
-                    .map(CxShiftConfig::getScheduleDay)
-                    .filter(Objects::nonNull)
-                    .max(Integer::compareTo)
-                    .orElse(1);
-            if (maxDay > 0) {
-                int dayOfMonth = date.getDayOfMonth();
-                return ((dayOfMonth - 1) % maxDay) + 1;
-            }
-        }
-        return 1;
-    }
-
-    /**
-     * 根据班次序号获取班次名称。
-     *
-     * @param shiftConfigs 班次配置列表
-     * @param date 日期
-     * @param year 年份
-     * @param month 月份
-     * @param order 班次序号（0开始）
-     * @return 班次名称
-     */
-    private String getShiftNameByOrder(List<CxShiftConfig> shiftConfigs, LocalDate date,
-                                        int year, int month, int order) {
-        int scheduleDay = getScheduleDay(shiftConfigs, date, year, month);
-        List<CxShiftConfig> dayShifts = shiftConfigs.stream()
-                .filter(s -> s.getScheduleDay() != null && s.getScheduleDay() == scheduleDay)
-                .sorted(Comparator.comparing(CxShiftConfig::getDayShiftOrder, Comparator.nullsLast(Comparator.naturalOrder())))
-                .collect(Collectors.toList());
-        if (order < dayShifts.size()) {
-            String name = dayShifts.get(order).getShiftName();
-            return name != null ? name : "早班";
-        }
-        return "早班";
-    }
-
-    /**
-     * 获取指定日期最后一个班次的名称。
-     *
-     * @param shiftConfigs 班次配置列表
-     * @param date 日期
-     * @param year 年份
-     * @param month 月份
-     * @return 最后班次名称
-     */
-    private String getLastShiftName(List<CxShiftConfig> shiftConfigs, LocalDate date, int year, int month) {
-        int scheduleDay = getScheduleDay(shiftConfigs, date, year, month);
-        return shiftConfigs.stream()
-                .filter(s -> s.getScheduleDay() != null && s.getScheduleDay() == scheduleDay)
-                .sorted(Comparator.comparing(CxShiftConfig::getDayShiftOrder, Comparator.nullsLast(Comparator.reverseOrder())))
-                .map(CxShiftConfig::getShiftName)
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse("夜班");
-    }
-
-    /**
-     * 格式化日期和班次为"MM.DD日X班"格式。
-     *
-     * @param date 日期
-     * @param shiftName 班次名称
-     * @return 格式化字符串
-     */
-    private String formatDateShift(LocalDate date, String shiftName) {
-        if (date == null) {
-            return "";
-        }
-        return String.format("%02d.%02d日%s", date.getMonthValue(), date.getDayOfMonth(),
-                StringUtils.defaultString(shiftName));
     }
 
     /**

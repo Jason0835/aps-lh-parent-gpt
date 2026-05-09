@@ -2,4 +2,14 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.lh.mapper.LhChipStockMapper">
 
+    <update id="logicDeleteByFactoryCodeAndDataSource">
+        UPDATE T_LH_CHIP_STOCK
+        SET IS_DELETE = 1,
+            UPDATE_BY = #{updateBy},
+            UPDATE_TIME = #{updateTime}
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND DATA_SOURCE = #{dataSource}
+          AND IS_DELETE = 0
+    </update>
+
 </mapper>
