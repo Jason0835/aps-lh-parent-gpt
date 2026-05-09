@@ -295,16 +295,17 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         LocalDate cutoffDate = scheduleDate.plusDays(precisionAdvanceDays);
 
+        // 查询条件：actualDate为空 AND scheduleDate为空，两者都为空才加载
+        // 不限制planDate范围，由后续applyPrecisionPlanSelection中根据当天日期动态筛选紧急/未来计划
         List<CxPrecisionPlan> precisionPlans = precisionPlanMapper.selectList(
                 new LambdaQueryWrapper<CxPrecisionPlan>()
-                        .le(CxPrecisionPlan::getPlanDate, java.sql.Date.valueOf(cutoffDate))
                         .isNull(CxPrecisionPlan::getActualDate)
                         .isNull(CxPrecisionPlan::getScheduleDate)
                         .eq(CxPrecisionPlan::getIsDelete, "0"));
         context.setPrecisionPlans(precisionPlans);
 
-        log.info("加载精度计划，截止日期={}（排程日期{} + {}天），未执行精度计划 {} 条",
-                cutoffDate, scheduleDate, precisionAdvanceDays, precisionPlans != null ? precisionPlans.size() : 0);
+        log.info("加载精度计划，排程日期={}，提前天数={}天，未执行精度计划 {} 条",
+                scheduleDate, precisionAdvanceDays, precisionPlans != null ? precisionPlans.size() : 0);
     }
 
     /**
