@@ -128,42 +128,43 @@ export const constantRoutes = [
   },
 ];
 if (process.env.NODE_ENV == "development") {
-  constantRoutes.push(
-    // {
-    //   path: "/dev-month-plan/monthPlanFinalAdjustQuery",
-    //   component: Layout,
-    //   hidden: false,
-    //   children: [
-    //     {
-    //       path: "",
-    //       name: "MonthPlanFinalAdjustQuery",
-    //       component: () =>
-    //         import("@/views/newPage/monthPlanFinalAdjustQuery/index"),
-    //       meta: {
-    //         title: "月计划查询",
-    //         i18n: "ui.data.column.monthPlanFinalAdjustQuery.modelName",
-    //       },
-    //     },
-    //   ],
-    // },
-    // {
-    //   path: "/newPage/rollingCycle",
-    //   component: Layout,
-    //   hidden: false,
-    //   children: [
-    //     {
-    //       path: "",
-    //       name: "MonthPlanStructureInnerAdjust",
-    //       component: () =>
-    //         import("@/views/newPage/rollingCycle/index.backup-legacy"),
-    //       meta: {
-    //         title: "月计划调整(旧)",
-    //         i18n: "ui.data.column.monthPlanStructureInnerAdjust.modelName",
-    //       },
-    //     },
-    //   ],
-    // }
-  );
+  // constantRoutes.push(
+  //   {
+  //     path: "/dev-month-plan/monthPlanFinalAdjustQuery",
+  //     component: Layout,
+  //     hidden: false,
+  //     children: [
+  //       {
+  //         path: "",
+  //         name: "MonthProductionPlanDevLegacy",
+  //         component: () =>
+  //           import("@/views/newPage/monthlyProductionPlan/index.backup-legacy"),
+  //         meta: {
+  //           title: "月计划查询",
+  //           i18n: "ui.data.column.monthPlanFinalAdjustQuery.modelName",
+  //         },
+  //       },
+  //     ],
+  //   },
+  //   {
+  //     path: "/newPage/rollingCycle",
+  //     component: Layout,
+  //     hidden: false,
+  //     children: [
+  //       {
+  //         path: "",
+  //         /** 开发环境专用：旧版合并页备份，勿与正式路由 name 冲突 */
+  //         name: "MonthPlanRollingCycleDevLegacy",
+  //         component: () =>
+  //           import("@/views/newPage/rollingCycle/index.backup-legacy"),
+  //         meta: {
+  //           title: "月计划调整(旧)",
+  //           i18n: "ui.data.column.monthPlanStructureInnerAdjust.modelName",
+  //         },
+  //       },
+  //     ],
+  //   }
+  // );
 }
 
 constantRoutes.push(
@@ -725,6 +726,43 @@ constantRoutes.push(
         name: "InsertOrderDetail",
         meta: { title: "明细" },
       }],
+  },
+  /** 月计划结构内调整、结构调整 */
+  {
+    path: "/newPage/monthPlanStructureInnerAdjust",
+    component: Layout,
+    hidden: true,
+    redirect: "noredirect",
+    children: [
+      {
+        path: "",
+        component: () =>
+          import("@/views/newPage/rollingCycle/structureInnerAdjust.vue"),
+        name: "MonthPlanStructureInnerAdjust",
+        meta: {
+          title: "月计划结构内调整",
+          i18n: "ui.data.column.monthPlanStructureInnerAdjust.titleInner",
+        },
+      },
+    ],
+  },
+  {
+    path: "/newPage/monthPlanStructureAdjust",
+    component: Layout,
+    hidden: true,
+    redirect: "noredirect",
+    children: [
+      {
+        path: "",
+        component: () =>
+          import("@/views/newPage/rollingCycle/structureAdjust.vue"),
+        name: "MonthPlanStructureAdjust",
+        meta: {
+          title: "月计划结构调整",
+          i18n: "ui.data.column.monthPlanStructureInnerAdjust.titleStructure",
+        },
+      },
+    ],
   },
   {
     path: "/monthPlanManagement",

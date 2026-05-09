@@ -147,7 +147,7 @@ import {statisticsResult,} from "@/api/monthplan/adjustStructure";
 //components
 
 export default {
-  name: "MonthlyProductionPlan",
+  name: "MonthProductionPlanDevLegacy",
   components: {
     // tltUpload,
   },

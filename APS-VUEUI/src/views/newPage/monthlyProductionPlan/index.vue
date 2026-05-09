@@ -39,14 +39,20 @@
           <el-button @click="handleViewAdjustVersion">{{
             $t("ui.data.column.monthPlanFinalAdjustQuery.viewAdjustVersion")
           }}</el-button>
-          <!-- 导出 -->
-          <el-button @click="handleExport">{{
-            $t("ui.frame.btn.export")
-          }}</el-button>
-          <!-- 全物料导出 -->
-          <el-button @click="handleExportAllMaterial">{{
-            $t("ui.data.column.monthPlanFinalAdjustQuery.exportAllMaterial")
-          }}</el-button>
+          <!-- 导出：与 console 排产明细 mouldingDayResult 页 factoryMonthPlanMouldDayResult/export 一致 -->
+          <el-button
+            @click="handleExport"
+            v-hasPermi="['monthplan:mouldingDayResult:export']"
+            >{{ $t("ui.frame.btn.export") }}</el-button
+          >
+          <!-- 全物料导出：与 mouldingDayResult 页 exportAllMaterial 一致 -->
+          <el-button
+            @click="handleExportAllMaterial"
+            v-hasPermi="['monthplan:mouldingDayResult:exportAllMaterial']"
+            >{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.exportAllMaterial")
+            }}</el-button
+          >
           <el-button
             :loading="syncLoading"
             v-hasPermi="['monthplan:factoryMonthPlanFinalResult:sync']"
@@ -407,19 +413,19 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width: 250,
+          width: 300,
+          align: "left",
+        },
+        {
+          prop: "embryoCode",
+          label: "胎胚号",
+          width: 100,
           align: "left",
         },
         {
           prop: "mainMaterialDesc",
-          label: "胎胚号",
-          width: 250,
-          align: "left",
-        },
-        {
-          prop: "embryoNo",
           label: "胎胚描述",
-          width: 250,
+          width: 310,
           align: "left",
         },
         {
@@ -686,13 +692,14 @@ export default {
     },
   },
   async created() {
-    /** 与月计划调整（rollingCycle）查询条件默认年月一致：当前自然月，月份两位 */
+    /** 与月度生产计划旧页 index.backup-legacy.vue 一致：默认查询「下个月」 */
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const year = nextMonth.getFullYear();
+    const month = nextMonth.getMonth() + 1;
     const defaults = {
       factoryCode: "116",
-      yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
+      yearMonth: `${year}-${month}`,
     };
     const rq = this.$route.query || {};
     if (rq.factoryCode) {
@@ -961,6 +968,35 @@ export default {
       }
       return params;
     },
+    /**
+     * 排产明细导出入参：与 monthPlanManagement/mouldingDayResult formatParams(false) 一致，
+     * 请求 /monthplan/factoryMonthPlanMouldDayResult/export、exportAllMaterial。
+     * 另附带本页「当前调整机台」cxMachineCode（与列表 list4Adjust 一致）。
+     */
+    formatMouldingDayExportParams() {
+      const params = {
+        ...this.query,
+        ...this.sort,
+      };
+      if (params.yearMonth) {
+        const arr = String(params.yearMonth).split("-");
+        params.year = arr[0];
+        params.month = arr[1];
+        delete params.yearMonth;
+      }
+      if (params.createTime && params.createTime[0]) {
+        params.createTimeStart = params.createTime[0];
+        params.createTimeEnd = params.createTime[1];
+        delete params.createTime;
+      }
+      const scheduled = (this.currentAdjustMachine || "").trim();
+      if (scheduled) {
+        params.cxMachineCode = scheduled;
+      } else {
+        delete params.cxMachineCode;
+      }
+      return params;
+    },
     async getList() {
       const ym = this.normalizeYearMonth(this.query.yearMonth);
       if (!ym || !this.query.factoryCode) {
@@ -1104,11 +1140,12 @@ export default {
       }
       return "";
     },
+    /** 跳转月计划结构内调整页 */
     handleStructureInnerAdjust() {
       this.$router.push({
-        name: 'RollingCycle',
-        query: {pageType: "inner" },
-      })
+        path: "/newPage/monthPlanStructureInnerAdjust",
+        query: { pageType: "inner" },
+      });
     },
     /** 结构调整弹窗保存新增结构并写入 Redis 后，同步主页面机台与列表 */
     onStructureAdjustSaved() {
@@ -1178,14 +1215,14 @@ export default {
     },
     handleExport() {
       downloadLink(
-        "/monthplan/factoryMonthPlanFinalResult/exportSkuScheduleItems",
-        this.formatParams(false)
+        "/monthplan/factoryMonthPlanMouldDayResult/export",
+        this.formatMouldingDayExportParams()
       );
     },
     handleExportAllMaterial() {
       downloadLink(
-        "/monthplan/factoryMonthPlanFinalResult/export",
-        this.formatParams(false)
+        "/monthplan/factoryMonthPlanMouldDayResult/exportAllMaterial",
+        this.formatMouldingDayExportParams()
       );
     },
     /** 打开下发弹窗，预填当前查询的年月、分厂，并加载可推送版本列表 */
