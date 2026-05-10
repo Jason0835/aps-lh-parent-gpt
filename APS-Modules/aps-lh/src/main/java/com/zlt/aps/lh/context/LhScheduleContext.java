@@ -209,11 +209,6 @@ public class LhScheduleContext {
     /** 排程日志列表 */
     private List<LhScheduleProcessLog> scheduleLogList = new ArrayList<>();
 
-    // ========== 性能缓存 ==========
-
-    /** SKU多机台合计产能缓存，key=materialCode，避免resolveInitialTargetQty/markEndingSkus/applyEndingDailyDemandUpgrade三阶段重复计算 */
-    private Map<String, Integer> skuTotalCapacityCache;
-
     // ========== 流程控制 ==========
 
     /** 是否中断排程 */
@@ -421,3 +416,4 @@ public class LhScheduleContext {
     }
 
 }
+

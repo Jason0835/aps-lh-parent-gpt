@@ -7,21 +7,19 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
+import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.domain.dto.ShiftRuntimeState;
-import com.zlt.aps.lh.api.domain.dto.SkuDailyScheduleDemandDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
-import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.NewSpecFailReasonEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
-import com.zlt.aps.lh.component.OrderNoGenerator;
-import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
-import com.zlt.aps.lh.context.LhScheduleConfig;
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
@@ -31,20 +29,22 @@ import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ITrialProductionStrategy;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSpecialMaterialUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
-import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.ShiftProductionControlUtil;
 import com.zlt.aps.lh.util.SingleMouldShiftQtyUtil;
+import com.zlt.aps.lh.component.OrderNoGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -111,7 +111,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         // 新增SKU的胎胚库存调整
         for (LhScheduleResult result : context.getScheduleResultList()) {
             // 排除换活字块（换活字块不需要胎胚库存调整）
-            if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())
+            if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType()) 
                     || "1".equals(result.getIsTypeBlock())) {
                 continue;
             }
@@ -191,37 +191,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     context, sku, candidates, shifts, machineMatch, mouldChangeBalance, inspectionBalance, capacityCalculate);
             MachineScheduleDTO preferredTrialMachine = resolvePreferredTrialMachine(context, sku, candidates);
 
-            // 1.2 构建日剩余量 Map，用于多机台拆量时的日计划桶控制
-            // 日维度需求列表为空时（如旧构造数据/测试），回退到窗口总量模式，不做日桶控制
-            Map<Date, Integer> dailyRemainingMap = buildDailyRemainingMap(sku);
-            if (CollectionUtils.isEmpty(sku.getDailyDemandList())) {
-                dailyRemainingMap = null;
-            } else if (!hasRemainingDailyDemand(dailyRemainingMap)) {
-                iterator.remove();
-                continue;
-            }
-            // 收尾场景：升级最后一天的日目标量，允许上调到胎胚库存
-            // 非收尾场景：跳过胎胚库存上调，严格按日计划量排产
-            if (isEnding && dailyRemainingMap != null) {
-                getTargetScheduleQtyResolver().applyEndingDailyDemandUpgrade(context, sku, dailyRemainingMap);
-            } else if (!isEnding && sku.getEmbryoStock() > 0) {
-                log.debug("SKU非收尾场景跳过胎胚库存上调, materialCode: {}, 胎胚库存: {}, 日计划量合计: {}",
-                        sku.getMaterialCode(), sku.getEmbryoStock(), dailyRemainingTotal(dailyRemainingMap));
-            }
-            // 更新 SKU 初始目标量，日桶模式下不超过月计划余量约束
-            int dailyRemainingTotal;
-            if (dailyRemainingMap != null) {
-                dailyRemainingTotal = dailyRemainingTotal(dailyRemainingMap);
-                int pendingQty = Math.max(0, sku.getPendingQty());
-                dailyRemainingTotal = Math.min(dailyRemainingTotal, pendingQty);
-            } else {
-                dailyRemainingTotal = sku.resolveTargetScheduleQty();
-            }
-            sku.setTargetScheduleQty(dailyRemainingTotal);
-
             // 2. 基于策略选择最优机台，失败后排除并继续选择下一台
-            // 多机台拆量模式：一台机台排完后检查日计划桶是否仍有余量，有余量则继续尝试下一台
-            boolean anyMachineScheduled = false;
             boolean scheduled = false;
             NewSpecFailReasonEnum failReason = NewSpecFailReasonEnum.MACHINE_SELECTION_FAILED;
             Set<String> excludedMachineCodes = new HashSet<>(candidates.size());
@@ -347,7 +317,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 sku.setTargetScheduleQty(refinedTargetQty);
                 LhScheduleResult result = buildNewSpecScheduleResult(
                         context, candidateMachine, sku, firstProductionStartTime, mouldChangeStartTime,
-                        mouldChangeCompleteTime, shifts, machineMouldQty, isEnding, dailyRemainingMap);
+                        mouldChangeCompleteTime, shifts, machineMouldQty, isEnding);
                 if (result == null || result.getDailyPlanQty() == null || result.getDailyPlanQty() <= 0) {
                     log.debug("新增SKU结果无有效班次计划量, materialCode: {}, 机台: {}, 目标量: {}, 开产时间: {}",
                             sku.getMaterialCode(), machineCode, sku.resolveTargetScheduleQty(),
@@ -363,7 +333,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     continue;
                 }
 
-                // 7. 排产成功后落地结果并刷新机台状态
+                // 7. 排产成功后落地结果并刷新机台状态，当前SKU结束尝试
                 sku.setMouldQty(machineMouldQty);
                 context.getScheduleResultList().add(result);
                 updateMachineState(context, candidateMachine, sku, result);
@@ -372,7 +342,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 scheduledCount++;
                 finalMachine = candidateMachine;
                 finalProductionStartTime = firstProductionStartTime;
-                anyMachineScheduled = true;
+                iterator.remove();
                 scheduled = true;
                 log.debug("新增排产完成, SKU: {}, 机台: {}, 机台就绪: {}, 换模开始: {}, 换模结束: {}, 首检开始: {}, 开产时间: {}",
                         sku.getMaterialCode(), machineCode,
@@ -381,23 +351,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         LhScheduleTimeUtil.formatDateTime(mouldChangeCompleteTime),
                         LhScheduleTimeUtil.formatDateTime(inspectionTime),
                         LhScheduleTimeUtil.formatDateTime(productionStartTime));
-
-                // 7.1 日计划桶扣减已在 distributeToShifts 中完成，直接检查是否排满
-                // 7.2 检查是否所有日计划桶已排满
-                if (!hasRemainingDailyDemand(dailyRemainingMap)) {
-                    iterator.remove();
-                    log.debug("新增SKU多机台排产全部日计划桶已排满, materialCode: {}", sku.getMaterialCode());
-                    break;
-                }
-
-                // 7.3 仍有日期未排满，更新目标量为剩余总量并更新日桶，继续尝试下一台机台
-                dailyRemainingTotal = dailyRemainingTotal(dailyRemainingMap);
-                sku.setTargetScheduleQty(dailyRemainingTotal);
-                originalTargetScheduleQty = dailyRemainingTotal;
-                log.info("新增SKU一台机台排产后仍有日计划桶未满, materialCode: {}, 剩余总量: {}, 继续尝试下一台机台",
-                        sku.getMaterialCode(), dailyRemainingTotal);
-                // 当前机台已用，继续循环尝试其他机台（不break）
-                excludedMachineCodes.add(machineCode);
+                break;
             }
 
             if (!scheduled) {
@@ -414,16 +368,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 traceNewSpecMachineDecision(context, sku, candidates, localSearchSuggestedMachine, finalMachine,
                         excludedMachineCodes, null, true,
                         PriorityTraceLogHelper.formatDateTime(finalProductionStartTime));
-                // 多机台排产后仍有日计划桶未满足，生成日维度未排记录
-                if (anyMachineScheduled && hasRemainingDailyDemand(dailyRemainingMap)) {
-                    for (Map.Entry<Date, Integer> entry : dailyRemainingMap.entrySet()) {
-                        int remainingQty = entry.getValue() != null ? entry.getValue() : 0;
-                        if (remainingQty > 0) {
-                            addDailyUnscheduledResult(context, sku, entry.getKey(),
-                                    remainingQty, unscheduledReasonCountMap);
-                        }
-                    }
-                }
             }
         }
         log.info("新增排产完成, 成功: {}, 未排: {}, 原因分布: {}",
@@ -618,106 +562,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         return new ArrayList<>(allNewSkuList.subList(skuIndex, endIndex));
     }
 
-    // ==================== 日计划桶控制辅助方法 ====================
-
-    /**
-     * 从 SKU 的 dailyDemandList 构建日剩余量 Map。
-     * <p>key 为已清零的日期，value 为当天剩余未排量。</p>
-     *
-     * @param sku SKU排程DTO
-     * @return 日剩余量 Map（Date->remainingQty）
-     */
-    private Map<Date, Integer> buildDailyRemainingMap(SkuScheduleDTO sku) {
-        Map<Date, Integer> dailyRemainingMap = new LinkedHashMap<>();
-        if (sku == null || CollectionUtils.isEmpty(sku.getDailyDemandList())) {
-            return dailyRemainingMap;
-        }
-        for (SkuDailyScheduleDemandDTO demand : sku.getDailyDemandList()) {
-            if (demand == null || demand.getScheduleDate() == null) {
-                continue;
-            }
-            Date clearedDate = LhScheduleTimeUtil.clearTime(demand.getScheduleDate());
-            dailyRemainingMap.put(clearedDate, Math.max(0, demand.getRemainingQty()));
-        }
-        return dailyRemainingMap;
-    }
-
-    /**
-     * 判断日剩余量 Map 中是否还有未满足的需求。
-     *
-     * @param dailyRemainingMap 日剩余量 Map
-     * @return true-有未满足需求
-     */
-    private boolean hasRemainingDailyDemand(Map<Date, Integer> dailyRemainingMap) {
-        if (dailyRemainingMap == null || dailyRemainingMap.isEmpty()) {
-            return false;
-        }
-        for (Integer remaining : dailyRemainingMap.values()) {
-            if (remaining != null && remaining > 0) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * 计算日剩余量 Map 中各日期剩余量之和。
-     *
-     * @param dailyRemainingMap 日剩余量 Map
-     * @return 总剩余量
-     */
-    private int dailyRemainingTotal(Map<Date, Integer> dailyRemainingMap) {
-        if (dailyRemainingMap == null || dailyRemainingMap.isEmpty()) {
-            return 0;
-        }
-        int total = 0;
-        for (Integer remaining : dailyRemainingMap.values()) {
-            if (remaining != null) {
-                total += Math.max(0, remaining);
-            }
-        }
-        return total;
-    }
-
-    /**
-     * 生成日维度未排结果。
-     *
-     * @param context          排程上下文
-     * @param sku              SKU排程DTO
-     * @param scheduleDate     未排日期
-     * @param unscheduledQty   未排数量
-     * @param unscheduledReasonCountMap 原因统计Map
-     */
-    private void addDailyUnscheduledResult(LhScheduleContext context,
-                                            SkuScheduleDTO sku,
-                                            Date scheduleDate,
-                                            int unscheduledQty,
-                                            Map<String, Integer> unscheduledReasonCountMap) {
-        if (context == null || sku == null || scheduleDate == null || unscheduledQty <= 0) {
-            return;
-        }
-        LhUnscheduledResult unscheduled = new LhUnscheduledResult();
-        unscheduled.setFactoryCode(context.getFactoryCode());
-        unscheduled.setBatchNo(context.getBatchNo());
-        unscheduled.setMaterialCode(sku.getMaterialCode());
-        unscheduled.setMaterialDesc(sku.getMaterialDesc());
-        // 使用具体日期作为排程日期，区分按日未排
-        unscheduled.setScheduleDate(scheduleDate);
-        unscheduled.setUnscheduledReason("多机台排产后日维度未排");
-        unscheduled.setUnscheduledQty(unscheduledQty);
-        unscheduled.setStructureName(sku.getStructureName());
-        unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
-        unscheduled.setSpecCode(sku.getSpecCode());
-        unscheduled.setEmbryoCode(sku.getEmbryoCode());
-        unscheduled.setMouldQty(sku.getMouldQty());
-        unscheduled.setDataSource(AUTO_DATA_SOURCE);
-        unscheduled.setIsDelete(0);
-        context.getUnscheduledResultList().add(unscheduled);
-        unscheduledReasonCountMap.merge("日维度未排", unscheduledQty, Integer::sum);
-        log.debug("新增SKU日维度未排, materialCode: {}, 日期: {}, 未排量: {}",
-                sku.getMaterialCode(), LhScheduleTimeUtil.formatDate(scheduleDate), unscheduledQty);
-    }
-
     // ==================== 私有辅助方法 ====================
 
     /**
@@ -731,8 +575,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                          Date mouldChangeEndTime,
                                                          List<LhShiftConfigVO> shifts,
                                                          int mouldQty,
-                                                         boolean isEnding,
-                                                         Map<Date, Integer> dailyRemainingMap) {
+                                                         boolean isEnding) {
         LhScheduleResult result = new LhScheduleResult();
         result.setFactoryCode(context.getFactoryCode());
         result.setBatchNo(context.getBatchNo());
@@ -790,7 +633,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 context, result.getLhMachineCode());
         distributeToShifts(context, result, shifts, startTime,
                 runtimeShiftCapacity, sku.getLhTimeSeconds(), mouldQty, pendingQty, cleaningWindowList,
-                maintenanceWindowList, dailyRemainingMap);
+                maintenanceWindowList);
         refreshResultSummary(context, result);
         applyCleaningMouldChangeAnalysis(context, result);
         return result;
@@ -897,10 +740,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 将计划量分配到各班次（从开产时间开始），可选日计划桶控制。
+     * 将计划量分配到各班次（从开产时间开始）
      *
-     * @param dailyRemainingMap 日计划桶剩余量（可为null，为null时不启用日桶控制）
-     * @return 未排产的剩余量（窗口总剩余量，不含日桶未排）
+     * @return 未排产的剩余量
      */
     private int distributeToShifts(LhScheduleContext context,
                                    LhScheduleResult result,
@@ -911,8 +753,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                    int mouldQty,
                                    int remaining,
                                    List<MachineCleaningWindowDTO> cleaningWindowList,
-                                   List<MachineMaintenanceWindowDTO> maintenanceWindowList,
-                                   Map<Date, Integer> dailyRemainingMap) {
+                                   List<MachineMaintenanceWindowDTO> maintenanceWindowList) {
         if (lhTimeSeconds <= 0 || mouldQty <= 0 || remaining <= 0 || startTime == null) {
             return remaining;
         }
@@ -931,16 +772,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 if (startTime.before(shift.getShiftEndDateTime())) {
                     started = true;
                 } else {
-                    continue;
-                }
-            }
-
-            // 日计划桶控制：该班次所属日期的日计划桶已满则跳过
-            Date workDate = shift.getWorkDate();
-            if (workDate != null && dailyRemainingMap != null) {
-                Date clearedDate = LhScheduleTimeUtil.clearTime(workDate);
-                Integer dailyRemaining = dailyRemainingMap.get(clearedDate);
-                if (dailyRemaining != null && dailyRemaining <= 0) {
                     continue;
                 }
             }
@@ -970,15 +801,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 continue;
             }
 
-            // 日计划桶上限：班次产量不超过该日计划桶剩余量
-            if (workDate != null && dailyRemainingMap != null) {
-                Date clearedDate = LhScheduleTimeUtil.clearTime(workDate);
-                Integer dailyRemaining = dailyRemainingMap.get(clearedDate);
-                if (dailyRemaining != null) {
-                    shiftMaxQty = Math.min(shiftMaxQty, dailyRemaining);
-                }
-            }
-
             int shiftQty = ShiftCapacityResolverUtil.normalizeAllocatedShiftQty(
                     Math.min(remaining, shiftMaxQty), shiftMaxQty, mouldQty);
             if (shiftQty > 0) {
@@ -994,15 +816,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 setShiftPlanQty(result, shift.getShiftIndex(), shiftQty, effectiveStart, shiftPlanEndTime);
                 remaining -= shiftQty;
                 startTime = effectiveEnd;
-
-                // 扣减日计划桶剩余量，避免同一日期多个班次累计超日计划
-                if (workDate != null && dailyRemainingMap != null) {
-                    Date clearedDate = LhScheduleTimeUtil.clearTime(workDate);
-                    Integer dailyRemaining = dailyRemainingMap.get(clearedDate);
-                    if (dailyRemaining != null) {
-                        dailyRemainingMap.put(clearedDate, Math.max(0, dailyRemaining - shiftQty));
-                    }
-                }
 
                 if (!CollectionUtils.isEmpty(stateMap)) {
                     ShiftRuntimeState st = stateMap.get(shift.getShiftIndex());
@@ -1077,7 +890,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         List<LhScheduleResult> zeroPlanResults = new ArrayList<>(8);
         for (LhScheduleResult result : context.getScheduleResultList()) {
             // 排除换活字块（换活字块不需要零计划量裁剪）
-            if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())
+            if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType()) 
                     || "1".equals(result.getIsTypeBlock())) {
                 continue;
             }
@@ -1552,19 +1365,17 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (context == null || CollectionUtils.isEmpty(context.getUnscheduledResultList())) {
             return;
         }
-        // 合并 key = materialCode + scheduleDate，保留日维度未排记录的日期信息
         Map<String, LhUnscheduledResult> mergedMap = new LinkedHashMap<>(context.getUnscheduledResultList().size());
         for (LhUnscheduledResult unscheduledResult : context.getUnscheduledResultList()) {
             if (unscheduledResult == null || StringUtils.isEmpty(unscheduledResult.getMaterialCode())) {
                 continue;
             }
-            String mergeKey = unscheduledResult.getMaterialCode() + "_"
-                    + LhScheduleTimeUtil.formatDate(unscheduledResult.getScheduleDate());
-            if (!mergedMap.containsKey(mergeKey)) {
-                mergedMap.put(mergeKey, unscheduledResult);
+            String materialCode = unscheduledResult.getMaterialCode();
+            if (!mergedMap.containsKey(materialCode)) {
+                mergedMap.put(materialCode, unscheduledResult);
                 continue;
             }
-            LhUnscheduledResult existing = mergedMap.get(mergeKey);
+            LhUnscheduledResult existing = mergedMap.get(materialCode);
             int existingQty = existing.getUnscheduledQty() != null ? existing.getUnscheduledQty() : 0;
             int currentQty = unscheduledResult.getUnscheduledQty() != null ? unscheduledResult.getUnscheduledQty() : 0;
             existing.setUnscheduledQty(existingQty + currentQty);
