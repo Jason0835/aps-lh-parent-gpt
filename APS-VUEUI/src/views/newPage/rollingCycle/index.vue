@@ -1806,7 +1806,6 @@ export default {
 
     //获取单选历史列表的版本号
     async getOutVersionList(isGet) {
-      console.log('getOutVersionList getOutVersionList getOutVersionList')
       try {
         const params = {
           ...this.query,
@@ -2409,7 +2408,8 @@ export default {
         this.$set(this.page, "current", 1);
       }
       if (this.activeName == "singleResult") {
-        // this.resizeOutHistoryList();
+        this.loadText = this.$t("正在加载中，请稍候");
+        this.resizeOutHistoryList();
         return;
       }
       this.loadText = this.$t("正在加载中，请稍候");
