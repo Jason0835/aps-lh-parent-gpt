@@ -228,6 +228,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 导出成型余量数据（含两个Sheet页：成型余量 + 成型计划明细）。
+     * 参考 LH 导出模式：以模板工作簿为最终输出基体，确保图片/隐藏列等属性完整保留，
+     * 再将成型余量Sheet通过copySheet合并进来。
      *
      * @param queryVO 查询条件，按成型排程结果列表查询口径筛选数据
      * @param fileName 导出文件名，保留用于对齐远程调用契约
@@ -235,24 +237,24 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      */
     @Override
     public byte[] exportCxRemainQty(CxScheduleResult queryVO, String fileName) {
-        // 按成型排程结果列表的查询口径查询明细数据
         List<CxScheduleResult> list = cxScheduleResultMapper.selectList(buildCxRemainQtyQueryWrapper(queryVO));
 
-        // 构建第一页（成型余量）数据
-        byte[] firstSheetBytes = buildFirstSheetBytes(list);
+        // 以备份模板为最终工作簿基体（保留图片、隐藏列等），先填充第二页数据
+        XSSFWorkbook finalWorkbook = buildFinalWorkbookFromTemplate(list);
 
-        // 加载第一页结果工作簿
-        XSSFWorkbook finalWorkbook;
+        // 再将第一页（成型余量）插入到位置0
+        byte[] firstSheetBytes = buildFirstSheetBytes(list);
         try {
-            finalWorkbook = new XSSFWorkbook(new ByteArrayInputStream(firstSheetBytes));
+            XSSFWorkbook firstWorkbook = new XSSFWorkbook(new ByteArrayInputStream(firstSheetBytes));
+            // 把成型余量Sheet复制到最终工作簿索引0，模板Sheet自动移到索引1
+            ExcelUtils.copySheet(firstWorkbook, 0, finalWorkbook);
+            // 将成型余量Sheet移到第一位
+            finalWorkbook.setSheetOrder(finalWorkbook.getSheetName(finalWorkbook.getNumberOfSheets() - 1), 0);
+            firstWorkbook.close();
         } catch (Exception e) {
-            throw new ServiceException("读取成型余量导出结果失败", e);
+            throw new ServiceException("合并成型余量Sheet失败", e);
         }
 
-        // 构建第二页（成型计划明细），写入最终工作簿
-        buildSecondSheet(finalWorkbook, list);
-
-        // 输出最终工作簿字节数组
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             finalWorkbook.write(out);
             finalWorkbook.close();
@@ -274,8 +276,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         if (Objects.isNull(inputStream)) {
             throw new ServiceException("成型余量导出模板不存在");
         }
-
-        // 按机台+物料合并余量后填充模板
         Map<String, Object> tableMap = new HashMap<>(16);
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         excelDataList.add(buildCxRemainQtyExportDataList(list));
@@ -283,124 +283,30 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     /**
-     * 构建第二页（成型计划明细），直接操作备份模板的单元格填入数据。
-     *
-     * @param finalWorkbook 最终输出工作簿，第二页将追加到此工作簿
-     * @param list 成型排程结果明细列表
+     * 加载备份模板并填充数据，返回最终工作簿。
+     * 模板中的图片、隐藏列等属性会在 POI 原生读写中完整保留。
      */
-    private void buildSecondSheet(XSSFWorkbook finalWorkbook, List<CxScheduleResult> list) {
+    private XSSFWorkbook buildFinalWorkbookFromTemplate(List<CxScheduleResult> list) {
         InputStream templateInput = this.getClass().getClassLoader()
                 .getResourceAsStream("excelModel/cxjhtemplate_backup.xlsx");
         if (Objects.isNull(templateInput)) {
             throw new ServiceException("成型计划模板不存在");
         }
-
         try {
-            XSSFWorkbook templateWorkbook = new XSSFWorkbook(templateInput);
-            Sheet sheet = templateWorkbook.getSheetAt(0);
-
+            XSSFWorkbook workbook = new XSSFWorkbook(templateInput);
+            Sheet sheet = workbook.getSheetAt(0);
             List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
-            // Step 1: 修改标题日期
             applyTitleDate(sheet, exportList);
-
-            // Step 2: 修改班次日期
             applyShiftDates(sheet, exportList);
-
-            // Step 3: 清除 Row 7+ 示例数据（不删行，保留图片锚点）
             clearSampleData(sheet);
-
-            // Step 4: 填入数据行（从 Row 7 开始）
             fillDataRows(sheet, exportList);
 
-            // 复制到最终工作簿
-            ExcelUtils.copySheet(templateWorkbook, 0, finalWorkbook);
-
-            // copySheet 对隐藏列和图片支持不完善，显式补上
-            int newSheetIdx = finalWorkbook.getNumberOfSheets() - 1;
-            Sheet targetSheet = finalWorkbook.getSheetAt(newSheetIdx);
-            targetSheet.setColumnHidden(0, true); // A
-            targetSheet.setColumnHidden(1, true); // B
-            targetSheet.setColumnHidden(2, true); // C
-
-            // 复制 logo 图片：从模板中取出图片数据，写入最终工作簿
-            copyLogoPicture(templateWorkbook, finalWorkbook, targetSheet);
-
-            templateWorkbook.close();
+            return workbook;
         } catch (ServiceException e) {
             throw e;
         } catch (Exception e) {
             throw new ServiceException("生成成型计划Sheet失败", e);
-        }
-    }
-
-    /**
-     * 从模板工作簿自动发现图片，复制到最终工作簿的目标Sheet中。
-     * 使用 POI 底层 OPCPackage 读取图片数据和锚点信息。
-     */
-    private void copyLogoPicture(XSSFWorkbook sourceWorkbook, XSSFWorkbook targetWorkbook, Sheet targetSheet) {
-        try {
-            // 尝试从源 Sheet 获取绘图，若 shapes 为空则图片引用可能丢失
-            XSSFSheet sourceSheet = sourceWorkbook.getSheetAt(0);
-            XSSFDrawing sourceDrawing = sourceSheet.getDrawingPatriarch();
-            if (sourceDrawing != null && !sourceDrawing.getShapes().isEmpty()) {
-                // 第1种方式：通过 POI 绘图对象复制
-                XSSFDrawing targetDrawing = ((XSSFSheet) targetSheet).createDrawingPatriarch();
-                for (XSSFShape shape : sourceDrawing.getShapes()) {
-                    if (shape instanceof XSSFPicture) {
-                        XSSFPicture picture = (XSSFPicture) shape;
-                        XSSFPictureData pictureData = picture.getPictureData();
-                        int pictureIdx = targetWorkbook.addPicture(
-                                pictureData.getData(), pictureData.getPictureType());
-                        XSSFClientAnchor anchor = (XSSFClientAnchor) picture.getClientAnchor();
-                        XSSFClientAnchor newAnchor = new XSSFClientAnchor(
-                                anchor.getDx1(), anchor.getDy1(),
-                                anchor.getDx2(), anchor.getDy2(),
-                                anchor.getCol1(), anchor.getRow1(),
-                                anchor.getCol2(), anchor.getRow2());
-                        newAnchor.setAnchorType(anchor.getAnchorType());
-                        targetDrawing.createPicture(newAnchor, pictureIdx);
-                    }
-                }
-                return;
-            }
-
-            // 第2种方式：直接读 zip 中的图片文件，按模板固定锚点写入
-            byte[] imageBytes = readFileFromWorkbookZip(sourceWorkbook, "xl/media/image1.png");
-            if (imageBytes == null || imageBytes.length == 0) return;
-
-            int pictureIdx = targetWorkbook.addPicture(imageBytes, Workbook.PICTURE_TYPE_PNG);
-            XSSFDrawing targetDrawing = ((XSSFSheet) targetSheet).createDrawingPatriarch();
-            // 锚点：C0 row0 到 E2（与原始模板一致：col3~5, row0~2）
-            XSSFClientAnchor anchor = new XSSFClientAnchor(28575, 52070, 647700, 152400, 3, 0, 5, 2);
-            targetDrawing.createPicture(anchor, pictureIdx);
-        } catch (Exception e) {
-            log.warn("复制logo图片失败: {}", e.getMessage());
-        }
-    }
-
-    /**
-     * 从 XSSFWorkbook 底层 zip 包中读取指定路径的原始字节。
-     */
-    private byte[] readFileFromWorkbookZip(XSSFWorkbook workbook, String entryPath) {
-        try {
-            java.lang.reflect.Field pkgField = XSSFWorkbook.class.getDeclaredField("pkg");
-            pkgField.setAccessible(true);
-            org.apache.poi.openxml4j.opc.OPCPackage pkg =
-                    (org.apache.poi.openxml4j.opc.OPCPackage) pkgField.get(workbook);
-            org.apache.poi.openxml4j.opc.PackagePart part = pkg.getPart(
-                    org.apache.poi.openxml4j.opc.PackagingURIHelper.createPartName(
-                            new java.net.URI(null, null, "/" + entryPath, null)));
-            try (InputStream is = part.getInputStream()) {
-                ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                byte[] buf = new byte[4096];
-                int n;
-                while ((n = is.read(buf)) > -1) bos.write(buf, 0, n);
-                return bos.toByteArray();
-            }
-        } catch (Exception e) {
-            log.warn("读取工作簿内文件失败: {} - {}", entryPath, e.getMessage());
-            return null;
         }
     }
 
