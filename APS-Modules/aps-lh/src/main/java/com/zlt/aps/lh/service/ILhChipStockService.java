@@ -4,6 +4,8 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.lh.api.domain.entity.LhChipStock;
 import com.zlt.bill.common.service.IDocService;
 
+import java.util.List;
+
 /**
  * 芯片库存 Service接口
  *
@@ -29,4 +31,14 @@ public interface ILhChipStockService extends IDocService<LhChipStock> {
      * @return 结果
      */
     AjaxResult mergeSave(LhChipStock lhChipStock);
+
+    /**
+     * 逻辑删除分厂指定数据来源的芯片库存并批量插入新数据（事务性操作）
+     *
+     * @param factoryCode 分厂编号
+     * @param dataSource  数据来源
+     * @param updateBy    更新者
+     * @param insertList  待插入的数据列表
+     */
+    void logicDeleteAndSaveBatch(String factoryCode, String dataSource, String updateBy, List<LhChipStock> insertList);
 }

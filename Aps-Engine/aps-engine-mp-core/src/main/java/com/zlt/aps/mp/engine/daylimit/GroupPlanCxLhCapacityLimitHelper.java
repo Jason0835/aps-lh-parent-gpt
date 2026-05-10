@@ -754,7 +754,8 @@ public class GroupPlanCxLhCapacityLimitHelper {
             if (CollectionUtils.isEmpty(detailList)) {
                 return;
             }
-            List<SkuDayProductionInfoHelper> fullList = detailList.stream().filter(single -> single.isFullProduction(context)).collect(Collectors.toList());
+            //20260510+ 判断是否满硫化机台，由开产日扩展到是否能支持换模或是换活字块
+            List<SkuDayProductionInfoHelper> fullList = detailList.stream().filter(single -> single.isFullLhMachine(context)).collect(Collectors.toList());
             if (CollectionUtils.isEmpty(fullList)) {
                 return;
             }

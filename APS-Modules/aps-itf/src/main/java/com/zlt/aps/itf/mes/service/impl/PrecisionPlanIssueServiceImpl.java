@@ -1,8 +1,10 @@
 package com.zlt.aps.itf.mes.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.mapper.PrecisionPlanIssueMapper;
@@ -56,14 +58,20 @@ public class PrecisionPlanIssueServiceImpl implements IPrecisionPlanIssueService
         }
 
         List<MesPrecisionPlan> insertList = new ArrayList<>();
-        for (MesPrecisionPlan mesItem : mesList) {
-            int updateCount = precisionPlanIssueMapper.updateByMachineCodeAndPrecisionType(mesItem);
-            if (updateCount == 0) {
-                insertList.add(mesItem);
+        try {
+            // 中间表MES_PRECISION_PLAN建在jy_aps_mid主库，需切换到master数据源
+            DynamicDataSourceContextHolder.push(DataSource.MASTER);
+            for (MesPrecisionPlan mesItem : mesList) {
+                int updateCount = precisionPlanIssueMapper.updateByMachineCodeAndPrecisionType(mesItem);
+                if (updateCount == 0) {
+                    insertList.add(mesItem);
+                }
             }
-        }
-        if (CollectionUtils.isNotEmpty(insertList)) {
-            precisionPlanIssueMapper.batchInsertPrecisionPlan(insertList);
+            if (CollectionUtils.isNotEmpty(insertList)) {
+                precisionPlanIssueMapper.batchInsertPrecisionPlan(insertList);
+            }
+        } finally {
+            DynamicDataSourceContextHolder.poll();
         }
 
         return sendMqNotice(mesList, dataVersion, factoryCode, companyCode);

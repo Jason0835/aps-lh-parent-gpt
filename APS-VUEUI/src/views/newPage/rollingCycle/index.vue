@@ -1443,6 +1443,24 @@ export default {
       }
       return permissions.includes(permission);
     },
+    /**
+     * 月计划调整查询页（src/views/newPage/monthlyProductionPlan/index.vue）在路由表中的入口。
+     * 与控制台「月计划调整查询」一致使用 path；组件 option `name: "MonthPlanFinalAdjustQuery"` 不是路由 name，
+     * 使用 router.push({ name: "MonthPlanFinalAdjustQuery" }) 会无法匹配路由，易出现空白页。
+     */
+    getMonthPlanFinalAdjustQueryRoute(queryExtra = {}) {
+      const query = { ...queryExtra };
+      if (this.search.factoryCode) {
+        query.factoryCode = this.search.factoryCode;
+      }
+      if (this.search.yearMonth) {
+        query.yearMonth = this.search.yearMonth;
+      }
+      return {
+        path: "/monthPlanManagement/console/monthlyProductionPlan",
+        query,
+      };
+    },
     //修改锁定上机日期
     handleLockScheduleChange(row, val) {
       saveAdjustResult({
@@ -1841,9 +1859,7 @@ export default {
         this.monthPlanFromFinalSelect
       ) {
         this.monthPlanFromFinalSelect = false;
-        this.$router.push({
-          name: "MonthPlanFinalAdjustQuery",
-        });
+        this.$router.push(this.getMonthPlanFinalAdjustQueryRoute());
       }
       this.show = false;
       this.showConfirmResult = false;
@@ -2052,7 +2068,7 @@ export default {
         this.autoLoading = false;
         /** 结构内独立页：自动调整成功后关闭当前页签并回到月计划调整查询 */
         if (this.pageVariant === "structureInner") {
-          this.$tab.closeOpenPage({ name: "MonthPlanFinalAdjustQuery" });
+          this.$tab.closeOpenPage(this.getMonthPlanFinalAdjustQueryRoute());
           return;
         }
         if (res.length != 0) {

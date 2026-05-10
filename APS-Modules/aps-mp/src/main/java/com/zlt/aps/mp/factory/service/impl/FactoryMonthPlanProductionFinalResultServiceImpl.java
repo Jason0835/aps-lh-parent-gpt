@@ -24,6 +24,8 @@ import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.enums.EventModuleTypeEnum;
 import com.zlt.aps.maindata.enums.ReleaseStatusEnum;
 import com.zlt.aps.maindata.event.publisher.EventPublisher;
+import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
+import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
 import com.zlt.aps.mp.api.domain.dto.MonthPlanFinalizedEventDto;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanProductionFinal4AdjustVo;
@@ -97,6 +99,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     private FactoryProductionVersionServiceImpl factoryProductionVersionService;
     @Autowired
     private  MpPredictionDetailEntityMapper mpPredictionDetailEntityMapper;
+    @Autowired
+    private MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -861,10 +865,32 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     @Override
     public List<FactoryMonthPlanProductionFinal4AdjustVo> list4Adjust(FactoryMonthPlanProductionFinalResult condition) {
         List<FactoryMonthPlanProductionFinal4AdjustVo> dataList = this.finalMapper.list4Adjust(condition);
+        // 查询调整
+        LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MpAdjustResult::getFactoryCode, condition.getFactoryCode());
+        queryWrapper.eq(MpAdjustResult::getYear, condition.getYear());
+        queryWrapper.eq(MpAdjustResult::getMonth, condition.getMonth());
+        queryWrapper.eq(MpAdjustResult::getIsDelete, YesOrNoEnum.NO.getCode());
+        List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
+        Map<String, MpAdjustResult> mpAdjustResultMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(mpAdjustResultList)) {
+            mpAdjustResultMap = mpAdjustResultList.stream().collect(Collectors.toMap(this::buildAdjustMapKey, Function.identity(), (s1, s2) -> s1));
+        }
         if (CollectionUtils.isNotEmpty(dataList)) {
+            for (FactoryMonthPlanProductionFinal4AdjustVo adjustVo : dataList) {
+                String mapKey = buildAdjustMapKey(adjustVo);
+                if (mpAdjustResultMap.containsKey(mapKey)) {
+                    MpAdjustResult mpAdjustResult = mpAdjustResultMap.get(mapKey);
+                    BeanUtil.copyProperties(mpAdjustResult, adjustVo);
+                }
+            }
             Locale language = SecurityUtils.getUserLang();
             JsonUtils.parseJsonRemarkList(dataList, language.toString(), "reason");
         }
         return dataList;
+    }
+
+    private String buildAdjustMapKey(IFinalAndAdjustResultInterface item) {
+        return StringUtils.defaultIfBlank(item.getLastMonthPlanVersion(), item.getMonthPlanVersion()) + "|" + item.getProductionVersion() + "|" + item.getMaterialCode();
     }
 }

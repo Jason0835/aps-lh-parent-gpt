@@ -26,6 +26,7 @@ import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
 import com.zlt.aps.maindata.service.IBatchMpMonthPlanStatisticsService;
 import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
+import com.zlt.aps.mp.adjust.controller.MpWeekRollAdjustController;
 import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
 import com.zlt.aps.mp.adjust.service.impl.MpAdjustStructureOutStrategy;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
@@ -127,6 +128,9 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @Autowired
     private IImportErrorLogService iImportErrorLogService;
 
+    @Autowired
+    private MpWeekRollAdjustController mpWeekRollAdjustController;
+
     /**
      * 查询工厂月度生产计划-最终排产计划定稿
      */
@@ -152,6 +156,8 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         try {
             startPage();
             List<FactoryMonthPlanProductionFinal4AdjustVo> list = factoryMonthPlanProductionFinalResultService.list4Adjust(queryCondition);
+            // 排序 按英寸->结构->最大型腔数->主花纹->活块数->物料描述
+            mpWeekRollAdjustController.sortAdjustResultList(list);
             return getDataTable(list);
         } finally {
             PageUtils.clearPage();

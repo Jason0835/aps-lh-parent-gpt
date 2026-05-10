@@ -3,6 +3,7 @@ package com.zlt.aps.mp.api.domain.vo;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
+import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -27,7 +28,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 @TableName(value = "T_MP_MONTH_PLAN_PROD_FINAL")
 @ApiModel(value = "工厂月生产计划-最终排产计划定稿对象", description = "工厂月生产计划-最终排产计划定稿对象")
-public class FactoryMonthPlanProductionFinal4AdjustVo extends FactoryMonthPlanProductionFinalResult {
+public class FactoryMonthPlanProductionFinal4AdjustVo extends FactoryMonthPlanProductionFinalResult implements IFinalAndAdjustResultInterface {
 
     /** 排产净需求 */
     @Excel(name = "ui.data.column.demandPlanSum.netQty", cellType = Excel.ColumnType.NUMERIC)

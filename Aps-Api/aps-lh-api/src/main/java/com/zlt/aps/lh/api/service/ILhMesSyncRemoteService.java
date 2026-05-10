@@ -31,6 +31,10 @@ public interface ILhMesSyncRemoteService {
     @PostMapping("/mesSync/saveMachineOnlineInfoBatch")
     AjaxResult saveMachineOnlineInfoBatch(@RequestBody List<LhMachineOnlineInfo> list);
 
+    @ApiOperation("逻辑删除并批量保存硫化在机信息（事务性操作）")
+    @PostMapping("/mesSync/logicDeleteAndSaveMachineOnlineInfo")
+    AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhMachineOnlineInfo> list);
+
     @ApiOperation("批量删除胶囊已使用次数")
     @PostMapping("/mesSync/deleteRepairCapsule")
     AjaxResult deleteRepairCapsule(@RequestParam("factoryCode") String factoryCode);
@@ -41,8 +45,11 @@ public interface ILhMesSyncRemoteService {
 
     @ApiOperation("批量保存胶囊已使用次数")
     @PostMapping("/mesSync/saveRepairCapsuleBatch")
-    
     AjaxResult saveRepairCapsuleBatch(@RequestBody List<LhRepairCapsule> list);
+
+    @ApiOperation("逻辑删除并批量保存胶囊已使用次数（事务性操作）")
+    @PostMapping("/mesSync/logicDeleteAndSaveRepairCapsule")
+    AjaxResult logicDeleteAndSaveRepairCapsule(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhRepairCapsule> list);
 
     @ApiOperation("批量保存模具清洗预警")
     @PostMapping("/mesSync/saveMouldCleanWarnBatch")
@@ -60,6 +67,14 @@ public interface ILhMesSyncRemoteService {
     @PostMapping("/mesSync/selectScheFinishQtyExists")
     List<LhScheFinishQty> selectScheFinishQtyExists(@RequestBody List<LhScheFinishQty> list);
 
+    @ApiOperation("根据分厂编号逻辑删除硫化排程完成量数据")
+    @PostMapping("/mesSync/logicDeleteScheFinishQty")
+    AjaxResult logicDeleteScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy);
+
+    @ApiOperation("逻辑删除并批量保存硫化排程完成量（事务性操作）")
+    @PostMapping("/mesSync/logicDeleteAndSaveScheFinishQty")
+    AjaxResult logicDeleteAndSaveScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhScheFinishQty> list);
+
     @ApiOperation("批量保存硫化排程日完成量")
     @PostMapping("/mesSync/saveDayFinishQtyBatch")
     AjaxResult saveDayFinishQtyBatch(@RequestBody List<LhDayFinishQty> list);
@@ -67,6 +82,14 @@ public interface ILhMesSyncRemoteService {
     @ApiOperation("查询硫化排程日完成量已存在数据")
     @PostMapping("/mesSync/selectDayFinishQtyExists")
     List<LhDayFinishQty> selectDayFinishQtyExists(@RequestBody List<LhDayFinishQty> list);
+
+    @ApiOperation("根据分厂编号逻辑删除硫化排程日完成量数据")
+    @PostMapping("/mesSync/logicDeleteDayFinishQty")
+    AjaxResult logicDeleteDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy);
+
+    @ApiOperation("逻辑删除并批量保存硫化排程日完成量（事务性操作）")
+    @PostMapping("/mesSync/logicDeleteAndSaveDayFinishQty")
+    AjaxResult logicDeleteAndSaveDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhDayFinishQty> list);
 
     @ApiOperation("批量保存模具交替计划完成回报")
     @PostMapping("/mesSync/saveMoldAlterPlanFinishBatch")
@@ -79,4 +102,8 @@ public interface ILhMesSyncRemoteService {
     @ApiOperation("硫化排程完成量回写硫化排程结果表各班次完成量")
     @PostMapping("/mesSync/writeBackScheduleResultFinishQty")
     AjaxResult writeBackScheduleResultFinishQty(@RequestBody List<LhScheFinishQty> list);
+
+    @ApiOperation("模具交替回报回填流程排程结果表的模具交替完成状态")
+    @PostMapping("/mesSync/writeBackMouldChangePlanFinishStatus")
+    AjaxResult writeBackMouldChangePlanFinishStatus(@RequestBody List<LhMoldAlterPlanFinish> list);
 }

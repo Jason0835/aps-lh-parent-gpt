@@ -708,7 +708,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     private AjaxResult doIssueLhScheduleResultToMes(Date scheduleDate) {
         // 按排程日期窗口计算3天日期，与listScheduleShiftDates逻辑一致
         // scheduleDate是窗口最后一天，往前推SCHEDULE_DAYS-1天为窗口第一天
-        LocalDate scheduleLocalDate = scheduleDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+        LocalDate scheduleLocalDate = scheduleDate instanceof java.sql.Date 
+                ? ((java.sql.Date) scheduleDate).toLocalDate() 
+                : scheduleDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
         LocalDate day1 = scheduleLocalDate.minusDays(LhScheduleConstant.SCHEDULE_DAYS - 1);
         LocalDate day2 = scheduleLocalDate.minusDays(LhScheduleConstant.SCHEDULE_DAYS - 2);
         LocalDate day3 = scheduleLocalDate;

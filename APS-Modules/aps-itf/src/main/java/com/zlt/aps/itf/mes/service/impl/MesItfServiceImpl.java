@@ -38,6 +38,8 @@ import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
 import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
 import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
 import com.zlt.aps.lh.api.service.ILhMesSyncRemoteService;
+import com.zlt.aps.lh.api.service.ILhChipStockRemoteService;
+import com.zlt.aps.lh.api.domain.entity.LhChipStock;
 import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
 import com.zlt.aps.cx.api.service.ICxPrecisionPlanRemoteService;
 
@@ -92,6 +94,9 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private ILhMesSyncRemoteService lhMesSyncRemoteService;
+
+    @Autowired
+    private ILhChipStockRemoteService lhChipStockRemoteService;
 
     @Autowired
     private ILhPrecisionPlanRemoteService lhPrecisionPlanRemoteService;
@@ -865,33 +870,41 @@ public class MesItfServiceImpl implements MesItfService {
         List<CxMachineOnlineInfo> syncList = mesItfMapper.selectCxMachineOnlineSyncList(cxMachineOnlineInfo);
         DynamicDataSourceContextHolder.poll();
 
-        if (CollectionUtils.isNotEmpty(syncList)) {
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("成型在机同步：MES中间表CX_MACHINE_ONLINE_SYNC查询结果为空，factoryCode={}", cxMachineOnlineInfo.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        List<CxMachineOnlineInfo> insertList = new ArrayList<>();
+        for (CxMachineOnlineInfo info : syncList) {
+            CxMachineOnlineInfo entity = new CxMachineOnlineInfo();
+            BeanUtils.copyProperties(info, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            insertList.add(entity);
+        }
+
+        try {
+            String factoryCode = cxMachineOnlineInfo.getFactoryCode();
+            log.info("成型在机同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, insertList.size());
+
             FeignTokenHelper.runWithToken(() -> {
-                cxMesSyncRemoteService.logicDeleteMachineOnlineInfo(cxMachineOnlineInfo.getFactoryCode(), "MES");
-
-                List<CxMachineOnlineInfo> insertList = new ArrayList<>();
-                for (CxMachineOnlineInfo info : syncList) {
-                    CxMachineOnlineInfo entity = new CxMachineOnlineInfo();
-                    BeanUtils.copyProperties(info, entity);
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-                    entity.setCreateTime(DateUtils.getNowDate());
-                    entity.setUpdateTime(DateUtils.getNowDate());
-                    insertList.add(entity);
-                }
-
-                List<List<CxMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(insertList, 1000);
-                for (List<CxMachineOnlineInfo> importList : splitList) {
-                    cxMesSyncRemoteService.saveMachineOnlineInfoBatch(importList);
-                }
+                cxMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, "MES", insertList);
             });
+
+            log.info("成型在机同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("成型在机同步：Feign调用异常，factoryCode={}, 待插入数量={}", cxMachineOnlineInfo.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("成型在机同步失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }
 
     /**
      * 同步硫化在机数据
-     * 采用逻辑删除后插入模式
+     * 采用逻辑删除后插入模式，删除和插入在同一事务中执行，保证原子性
      * @param lhMachineOnlineInfo 参数
      * @return 结果
      */
@@ -901,26 +914,34 @@ public class MesItfServiceImpl implements MesItfService {
         List<LhMachineOnlineInfo> syncList = mesItfMapper.selectLhMachineOnlineSyncList(lhMachineOnlineInfo);
         DynamicDataSourceContextHolder.poll();
 
-        if (CollectionUtils.isNotEmpty(syncList)) {
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("硫化在机同步：MES中间表LH_MACHINE_ONLINE_SYNC查询结果为空，factoryCode={}", lhMachineOnlineInfo.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        List<LhMachineOnlineInfo> insertList = new ArrayList<>();
+        for (LhMachineOnlineInfo info : syncList) {
+            LhMachineOnlineInfo entity = new LhMachineOnlineInfo();
+            BeanUtils.copyProperties(info, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            insertList.add(entity);
+        }
+
+        try {
+            String factoryCode = lhMachineOnlineInfo.getFactoryCode();
+            log.info("硫化在机同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, insertList.size());
+
             FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteMachineOnlineInfo(lhMachineOnlineInfo.getFactoryCode(), "MES");
-
-                List<LhMachineOnlineInfo> insertList = new ArrayList<>();
-                for (LhMachineOnlineInfo info : syncList) {
-                    LhMachineOnlineInfo entity = new LhMachineOnlineInfo();
-                    BeanUtils.copyProperties(info, entity);
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-                    entity.setCreateTime(DateUtils.getNowDate());
-                    entity.setUpdateTime(DateUtils.getNowDate());
-                    insertList.add(entity);
-                }
-
-                List<List<LhMachineOnlineInfo>> splitList = ScmListUtils.getSplitList(insertList, 1000);
-                for (List<LhMachineOnlineInfo> importList : splitList) {
-                    lhMesSyncRemoteService.saveMachineOnlineInfoBatch(importList);
-                }
+                lhMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, "MES", insertList);
             });
+
+            log.info("硫化在机同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("硫化在机同步：Feign调用异常，factoryCode={}, 待插入数量={}", lhMachineOnlineInfo.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("硫化在机同步失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }
@@ -1176,42 +1197,49 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        if (CollectionUtils.isNotEmpty(syncList)) {
-            List<LhRepairCapsuleVo> finalSyncList = syncList;
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("胶囊已使用次数同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        List<LhRepairCapsule> insertList = new ArrayList<>();
+        for (LhRepairCapsuleVo item : syncList) {
+            LhRepairCapsule entity = new LhRepairCapsule();
+            entity.setLhCode(item.getLhCode());
+            entity.setMaterialCode(item.getMaterialCode());
+            entity.setReplaceCapsuleCount(item.getReplaceCapsuleCount());
+            entity.setReplaceCapsuleCount2(item.getReplaceCapsuleCount2());
+            entity.setBrand(item.getBrand());
+            entity.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+            entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+
+            if (StringUtils.isNotBlank(item.getObtainTime())) {
+                try {
+                    entity.setObtainTime(DateUtils.parseDate(item.getObtainTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"));
+                } catch (Exception e) {
+                    log.error("解析获取日期失败：{}", item.getObtainTime(), e);
+                }
+            }
+
+            insertList.add(entity);
+        }
+
+        try {
+            String factoryCode = syncDataLogs.getFactoryCode();
+            log.info("胶囊已使用次数同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, insertList.size());
+
             FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteRepairCapsule(syncDataLogs.getFactoryCode(), "MES");
-
-                List<LhRepairCapsule> insertList = new ArrayList<>();
-                for (LhRepairCapsuleVo item : finalSyncList) {
-                    LhRepairCapsule entity = new LhRepairCapsule();
-                    entity.setLhCode(item.getLhCode());
-                    entity.setMaterialCode(item.getMaterialCode());
-                    entity.setReplaceCapsuleCount(item.getReplaceCapsuleCount());
-                    entity.setReplaceCapsuleCount2(item.getReplaceCapsuleCount2());
-                    entity.setBrand(item.getBrand());
-                    entity.setCompanyCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-                    entity.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
-                    entity.setCreateBy("MES");
-                    entity.setUpdateBy("MES");
-                    entity.setCreateTime(DateUtils.getNowDate());
-                    entity.setUpdateTime(DateUtils.getNowDate());
-
-                    if (StringUtils.isNotBlank(item.getObtainTime())) {
-                        try {
-                            entity.setObtainTime(DateUtils.parseDate(item.getObtainTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"));
-                        } catch (Exception e) {
-                            log.error("解析获取日期失败：{}", item.getObtainTime(), e);
-                        }
-                    }
-
-                    insertList.add(entity);
-                }
-
-                List<List<LhRepairCapsule>> splitList = ScmListUtils.getSplitList(insertList, 1000);
-                for (List<LhRepairCapsule> importList : splitList) {
-                    lhMesSyncRemoteService.saveRepairCapsuleBatch(importList);
-                }
+                lhMesSyncRemoteService.logicDeleteAndSaveRepairCapsule(factoryCode, "MES", insertList);
             });
+
+            log.info("胶囊已使用次数同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("胶囊已使用次数同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("胶囊已使用次数同步失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }
@@ -1288,10 +1316,9 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步生胎库存
-     * T_CX_STOCK：采用先删后插方案
-     *   MES每天将最新库存数据写入MES中间库，APS只需：
-     *   步骤1：物理删除该分厂下数据来源为MES的所有库存数据（旧数据，如5月7号的数据）
-     *   步骤2：将MES最新数据（如5月8号的数据）批量插入
+     * T_CX_STOCK：采用逻辑删除+插入方案
+     *   步骤1：逻辑删除该分厂下数据来源为MES的所有库存数据（IS_DELETE置为1）
+     *   步骤2：将MES最新库存数据批量插入（新记录，IS_DELETE=0）
      *   APS有(dataSource=MANUAL) → 完全不动
      * @param syncDataLogs 同步参数
      * @return 结果
@@ -1310,35 +1337,38 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        if (CollectionUtils.isNotEmpty(syncList)) {
-            String factoryCode = StringUtils.isBlank(syncDataLogs.getFactoryCode()) ? FactoryConstant.DEFAULT_FACTORY_CODE : syncDataLogs.getFactoryCode();
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("生胎库存同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
 
-            List<CxStock> cxStockInsertList = syncList.stream().map(item -> {
-                CxStock cxStock = new CxStock();
-                cxStock.setFactoryCode(StringUtils.isBlank(item.getFactoryCode()) ? FactoryConstant.DEFAULT_FACTORY_CODE : item.getFactoryCode());
-                cxStock.setStockDate(item.getStockDate());
-                cxStock.setEmbryoCode(item.getEmbryoCode());
-                cxStock.setStockNum(item.getStockNum() != null ? item.getStockNum().intValue() : 0);
-                cxStock.setDataSource(ApsConstant.DATA_SOURCE_MES);
-                cxStock.setCreateBy("MES");
-                cxStock.setUpdateBy("MES");
-                cxStock.setCreateTime(DateUtils.getNowDate());
-                cxStock.setUpdateTime(DateUtils.getNowDate());
-                return cxStock;
-            }).collect(Collectors.toList());
+        String factoryCode = StringUtils.isBlank(syncDataLogs.getFactoryCode()) ? FactoryConstant.DEFAULT_FACTORY_CODE : syncDataLogs.getFactoryCode();
+
+        List<CxStock> cxStockInsertList = syncList.stream().map(item -> {
+            CxStock cxStock = new CxStock();
+            cxStock.setFactoryCode(StringUtils.isBlank(item.getFactoryCode()) ? FactoryConstant.DEFAULT_FACTORY_CODE : item.getFactoryCode());
+            cxStock.setStockDate(item.getStockDate());
+            cxStock.setEmbryoCode(item.getEmbryoCode());
+            cxStock.setStockNum(item.getStockNum() != null ? item.getStockNum().intValue() : 0);
+            cxStock.setDataSource(ApsConstant.DATA_SOURCE_MES);
+            cxStock.setCreateBy("MES");
+            cxStock.setUpdateBy("MES");
+            cxStock.setCreateTime(DateUtils.getNowDate());
+            cxStock.setUpdateTime(DateUtils.getNowDate());
+            return cxStock;
+        }).collect(Collectors.toList());
+
+        try {
+            log.info("生胎库存同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, cxStockInsertList.size());
 
             FeignTokenHelper.runWithToken(() -> {
-                // 步骤1：物理删除该分厂下数据来源为MES的所有库存数据
-                log.info("生胎库存同步：物理删除分厂{}下数据来源为MES的库存数据", factoryCode);
-                cxMesSyncRemoteService.deleteCxStockByDataSource(factoryCode, "MES");
-
-                // 步骤2：批量插入MES最新库存数据
-                List<List<CxStock>> insertSplitList = ScmListUtils.getSplitList(cxStockInsertList, 1000);
-                for (List<CxStock> importList : insertSplitList) {
-                    cxMesSyncRemoteService.saveCxStockBatch(importList);
-                }
-                log.info("生胎库存同步：插入MES最新数据，数量={}", cxStockInsertList.size());
+                cxMesSyncRemoteService.logicDeleteAndSaveCxStockByDataSource(factoryCode, ApsConstant.DATA_SOURCE_MES, "MES", cxStockInsertList);
             });
+
+            log.info("生胎库存同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, cxStockInsertList.size());
+        } catch (Exception e) {
+            log.error("生胎库存同步：Feign调用异常，factoryCode={}, 待插入数量={}", factoryCode, cxStockInsertList.size(), e);
+            return AjaxResult.error("生胎库存同步失败：" + e.getMessage());
         }
         return AjaxResult.success();
     }
@@ -1409,15 +1439,23 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步硫化排程完成量
-     * 采用更新删除标识模式，而不是先删后插
+     * 采用逻辑删除后插入模式
      * @param syncDataLogs 同步参数
      * @return 结果
      */
     @Override
     public AjaxResult syncLhClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
+        Date nowDate = DateUtils.truncate(DateUtils.getNowDate(), Calendar.DATE);
+        syncDataLogs.setQueryParams(new HashMap<>());
+        syncDataLogs.getQueryParams().put("finishDate", nowDate);
         List<LhScheFinishQty> syncList = mesItfMapper.selectLhClassShiftFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("硫化排程完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
 
         Map<String, LhScheFinishQty> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
@@ -1427,52 +1465,38 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        List<LhScheFinishQty> insertOrUpdateList = new ArrayList<>();
+        List<LhScheFinishQty> insertList = new ArrayList<>();
         for (LhScheFinishQty item : syncList) {
             LhScheFinishQty entity = new LhScheFinishQty();
             BeanUtils.copyProperties(item, entity);
             entity.setCreateBy("MES");
             entity.setUpdateBy("MES");
-
-            if (entity.getIsDelete() == null) {
-                entity.setIsDelete(0);
-            }
-
-            insertOrUpdateList.add(entity);
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
         }
 
-        if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
+        try {
+            String factoryCode = syncDataLogs.getFactoryCode();
+            log.info("硫化排程完成量同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, insertList.size());
+
             FeignTokenHelper.runWithToken(() -> {
-                List<LhScheFinishQty> existsList = lhMesSyncRemoteService.selectScheFinishQtyExists(insertOrUpdateList);
-                Map<String, LhScheFinishQty> existsMap = new HashMap<>(16);
-                if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getOrderNo(), String.valueOf(item.getScheduleDate()), item.getLhMachineCode()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
-                }
-
-                for (LhScheFinishQty entity : insertOrUpdateList) {
-                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getOrderNo(), String.valueOf(entity.getScheduleDate()), entity.getLhMachineCode());
-                    if (existsMap.containsKey(mapKey)) {
-                        LhScheFinishQty existsData = existsMap.get(mapKey);
-                        entity.setId(existsData.getId());
-                    }
-                }
-
-                List<List<LhScheFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
-                for (List<LhScheFinishQty> saveList : splitList) {
-                    lhMesSyncRemoteService.saveScheFinishQtyBatch(saveList);
-                }
-
-                try {
-                    lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertOrUpdateList);
-                } catch (Exception e) {
-                    log.error("【硫化排程完成量回写】回写硫化排程结果表完成量异常", e);
-                }
+                lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, "MES", insertList);
             });
+
+            log.info("硫化排程完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("硫化排程完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("硫化排程完成量同步失败：" + e.getMessage());
+        }
+
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList);
+            });
+        } catch (Exception e) {
+            log.error("【硫化排程完成量回写】回写硫化排程结果表完成量异常", e);
         }
         return AjaxResult.success();
     }
@@ -1543,21 +1567,25 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 同步硫化排程日完成量
-     * 采用更新删除标识模式，而不是先删后插
+     * 采用逻辑删除后插入模式
+     * 同步完成后根据参数配置CHIP_CODE_STOCK_UPDATE里的芯片编码，过滤物料编码对应的编码数据累加到芯片库存的完成量
      * @param syncDataLogs 同步参数
      * @return 结果
      */
     @Override
     public AjaxResult syncLhScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        Date nowDate = DateUtils.truncate(DateUtils.getNowDate(), Calendar.DATE); // 当日0点
+        Date nowDate = DateUtils.truncate(DateUtils.getNowDate(), Calendar.DATE);
         Date lastDate = DateUtils.addDays(nowDate, -1);
-        if (StringUtils.isEmpty(syncDataLogs.getDataVersion())) { // 如果没有数据版本，则取完成日期为上一天的数据
-            syncDataLogs.setQueryParams(new HashMap<>());
-            syncDataLogs.getQueryParams().put("finishDate", lastDate); // 取上一天的日期
-        }
+        syncDataLogs.setQueryParams(new HashMap<>());
+        syncDataLogs.getQueryParams().put("finishDate", lastDate);
         List<LhDayFinishQty> syncList = mesItfMapper.selectLhScheDayFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("硫化排程日完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
 
         Map<String, LhDayFinishQty> groupMap = syncList.stream()
                 .collect(Collectors.toMap(
@@ -1567,59 +1595,113 @@ public class MesItfServiceImpl implements MesItfService {
                 ));
         syncList = new ArrayList<>(groupMap.values());
 
-        List<LhDayFinishQty> insertOrUpdateList = new ArrayList<>();
+        List<LhDayFinishQty> insertList = new ArrayList<>();
         for (LhDayFinishQty item : syncList) {
             LhDayFinishQty entity = new LhDayFinishQty();
             BeanUtils.copyProperties(item, entity);
             entity.setCreateBy("MES");
             entity.setUpdateBy("MES");
-
-            if (entity.getIsDelete() == null) {
-                entity.setIsDelete(0);
-            }
-
-            insertOrUpdateList.add(entity);
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
         }
 
-        if (CollectionUtils.isNotEmpty(insertOrUpdateList)) {
+        try {
+            String factoryCode = syncDataLogs.getFactoryCode();
+            log.info("硫化排程日完成量同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, insertList.size());
+
             FeignTokenHelper.runWithToken(() -> {
-                List<LhDayFinishQty> existsList = lhMesSyncRemoteService.selectDayFinishQtyExists(insertOrUpdateList);
-                Map<String, LhDayFinishQty> existsMap = new HashMap<>(16);
-                if (CollectionUtils.isNotEmpty(existsList)) {
-                    existsMap = existsList.stream()
-                            .collect(Collectors.toMap(
-                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), String.valueOf(item.getFinishDate()), item.getMaterialCode(), item.getMesMaterialCode()),
-                                    Function.identity(),
-                                    (v1, v2) -> v1
-                            ));
-                }
-
-                for (LhDayFinishQty entity : insertOrUpdateList) {
-                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), String.valueOf(entity.getFinishDate()), entity.getMaterialCode(), entity.getMesMaterialCode());
-                    if (existsMap.containsKey(mapKey)) {
-                        LhDayFinishQty existsData = existsMap.get(mapKey);
-                        entity.setId(existsData.getId());
-                    }
-                }
-
-                List<List<LhDayFinishQty>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
-                for (List<LhDayFinishQty> saveList : splitList) {
-                    lhMesSyncRemoteService.saveDayFinishQtyBatch(saveList);
-                }
+                lhMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, "MES", insertList);
             });
 
-            try {
-                MpMonthPlanMonitor paramVo = new MpMonthPlanMonitor();
-                paramVo.setFactoryCode(syncDataLogs.getFactoryCode());
-                paramVo.setYear(DateUtils.getYear(lastDate));
-                paramVo.setMonth(DateUtils.getMonth(lastDate));
-                DynamicDataSourceContextHolder.push(DataSource.APS);
-                mpMonthPlanMonitorEntityMapper.updateByDayFinish(paramVo);
-            } finally {
-                DynamicDataSourceContextHolder.poll();
-            }
+            log.info("硫化排程日完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("硫化排程日完成量同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("硫化排程日完成量同步失败：" + e.getMessage());
         }
+
+        try {
+            MpMonthPlanMonitor paramVo = new MpMonthPlanMonitor();
+            paramVo.setFactoryCode(syncDataLogs.getFactoryCode());
+            paramVo.setYear(DateUtils.getYear(lastDate));
+            paramVo.setMonth(DateUtils.getMonth(lastDate));
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+            mpMonthPlanMonitorEntityMapper.updateByDayFinish(paramVo);
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
+
+        updateChipStockFinishQty(syncDataLogs.getFactoryCode(), syncList);
         return AjaxResult.success();
+    }
+
+    /**
+     * 根据参数配置CHIP_CODE_STOCK_UPDATE里的芯片编码，过滤物料编码对应的日完成量数据插入芯片库存
+     * 采用逻辑删除+插入方案（参考生胎库存同步syncMesCxStock）：
+     *   步骤1：逻辑删除该分厂下数据来源为MES的所有芯片库存数据（IS_DELETE置为1）
+     *   步骤2：将过滤后的芯片库存数据批量插入（新记录，IS_DELETE=0，DATA_SOURCE=MES）
+     * @param factoryCode 分厂编码
+     * @param syncList 硫化排程日完成量列表
+     */
+    private void updateChipStockFinishQty(String factoryCode, List<LhDayFinishQty> syncList) {
+        FactoryParam chipCodeParam = new FactoryParam();
+        chipCodeParam.setFactoryCode(factoryCode);
+        chipCodeParam.setParamCode("CHIP_CODE_STOCK_UPDATE");
+        FactoryParam paramResult;
+        try {
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+            paramResult = iFactoryParamService.getFacParamSingle(chipCodeParam);
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
+        if (paramResult == null || StringUtils.isBlank(paramResult.getParamValue())) {
+            return;
+        }
+        Set<String> chipCodeSet = Arrays.stream(paramResult.getParamValue().split(","))
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(chipCodeSet)) {
+            return;
+        }
+
+        List<LhDayFinishQty> chipDataList = syncList.stream()
+                .filter(item -> chipCodeSet.contains(item.getMaterialCode()))
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(chipDataList)) {
+            return;
+        }
+
+        Map<String, Integer> chipFinishQtyMap = chipDataList.stream()
+                .filter(item -> item.getDayFinishQty() != null)
+                .collect(Collectors.groupingBy(
+                        LhDayFinishQty::getMaterialCode,
+                        Collectors.summingInt(item -> item.getDayFinishQty().intValue())
+                ));
+
+        List<LhChipStock> chipStockInsertList = chipFinishQtyMap.entrySet().stream().map(entry -> {
+            LhChipStock chipStock = new LhChipStock();
+            chipStock.setFactoryCode(factoryCode);
+            chipStock.setChipCode(entry.getKey());
+            chipStock.setFinishQty(entry.getValue());
+            chipStock.setDataSource(ApsConstant.DATA_SOURCE_MES);
+            chipStock.setCreateBy("MES");
+            chipStock.setUpdateBy("MES");
+            chipStock.setCreateTime(DateUtils.getNowDate());
+            chipStock.setUpdateTime(DateUtils.getNowDate());
+            return chipStock;
+        }).collect(Collectors.toList());
+
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                log.info("芯片库存同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, chipStockInsertList.size());
+                lhChipStockRemoteService.logicDeleteAndSaveByDataSource(factoryCode, ApsConstant.DATA_SOURCE_MES, "MES", chipStockInsertList);
+                log.info("芯片库存同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, chipStockInsertList.size());
+            });
+        } catch (Exception e) {
+            log.error("同步芯片库存异常, factoryCode={}", factoryCode, e);
+        }
     }
 
     /**
@@ -1642,14 +1724,13 @@ public class MesItfServiceImpl implements MesItfService {
         }
 
         try {
-            // 切换MES数据源 start
-            DynamicDataSourceContextHolder.push(DataSource.MES);
-
+            // 切换到主库数据源（MOLD_ALTER_PLAN表建在jy_aps_mid主库）
+            DynamicDataSourceContextHolder.push(DataSource.MASTER);
             // 批量插入到中间表
             mesItfMapper.insertMoldAlterPlanList(issueList);
         } finally {
-            DynamicDataSourceContextHolder.clear();
-            // 切换MES数据源 end
+            DynamicDataSourceContextHolder.poll();
+            // 切换数据源 end
         }
         return AjaxResult.success();
     }
@@ -1657,6 +1738,7 @@ public class MesItfServiceImpl implements MesItfService {
     /**
      * 同步模具交替计划完成回报
      * 采用更新删除标识模式，而不是先删后插
+     * 同步完成后回填流程排程结果表的模具交替完成状态
      * @param syncDataLogs 同步参数
      * @return 结果
      */
@@ -1713,6 +1795,8 @@ public class MesItfServiceImpl implements MesItfService {
                 for (List<LhMoldAlterPlanFinish> saveList : splitList) {
                     lhMesSyncRemoteService.saveMoldAlterPlanFinishBatch(saveList);
                 }
+
+                lhMesSyncRemoteService.writeBackMouldChangePlanFinishStatus(insertOrUpdateList);
             });
         }
         return AjaxResult.success();

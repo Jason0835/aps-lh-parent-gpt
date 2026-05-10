@@ -64,7 +64,7 @@ export default {
     TltUploadForm,
     infoDialog,
   },
-  dicts: ["biz_factory_name"],
+  dicts: ["biz_factory_name", "lh_precision_data_source"],
   provide() {
     return {
       parentDict: this.dict,
@@ -148,6 +148,16 @@ export default {
           minWidth: 120,
         },
         {
+          prop: "dataSource",
+          align: "center",
+          halign: "center",
+          label: this.$t("ui.data.column.lhChipStock.dataSource"),
+          minWidth: 120,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.lh_precision_data_source, value);
+          },
+        },
+        {
           prop: "remainStockNum",
           align: "center",
           halign: "center",
@@ -219,6 +229,14 @@ export default {
         {
           label: this.$t("ui.data.column.lhChipStock.chipCode"),
           prop: "chipCode",
+        },
+        {
+          label: this.$t("ui.data.column.lhChipStock.dataSource"),
+          prop: "dataSource",
+          type: "select",
+          dictData: this.dict.type.lh_precision_data_source,
+          filterable: true,
+          clearable: true,
         },
       ];
     },
