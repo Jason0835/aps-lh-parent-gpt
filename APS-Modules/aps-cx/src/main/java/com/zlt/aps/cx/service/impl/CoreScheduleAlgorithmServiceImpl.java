@@ -290,6 +290,17 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 taskGroup.getContinueTasks().size(),
                 taskGroup.getTrialTasks().size(),
                 taskGroup.getNewTasks().size());
+        // 诊断：检查任务分组后的endingExtraInventory
+        for (CoreScheduleAlgorithmService.DailyEmbryoTask t : taskGroup.getContinueTasks()) {
+            if (Boolean.TRUE.equals(t.getIsOpeningDayTask()))
+                log.info("【分组诊断】续作任务: embryo={}, endingExtraInventory={}, plannedProduction={}, isOpeningDay={}",
+                        t.getEmbryoCode(), t.getEndingExtraInventory(), t.getPlannedProduction(), t.getIsOpeningDayTask());
+        }
+        for (CoreScheduleAlgorithmService.DailyEmbryoTask t : taskGroup.getNewTasks()) {
+            if (Boolean.TRUE.equals(t.getIsOpeningDayTask()))
+                log.info("【分组诊断】新增任务: embryo={}, endingExtraInventory={}, plannedProduction={}, isOpeningDay={}",
+                        t.getEmbryoCode(), t.getEndingExtraInventory(), t.getPlannedProduction(), t.getIsOpeningDayTask());
+        }
 
         // ==================== 第一步附加：单日试制/量试SKU上限过滤（单日最多2个） ====================
         applyDailyTrialSkuLimit(context, taskGroup);
@@ -322,11 +333,22 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         allAllocations.addAll(trialAllocations);
 
         log.info("班次分配前检查: 总分配数={}", allAllocations.size());
+        // 诊断：检查所有TaskAllocation的endingExtraInventory
+        for (MachineAllocationResult alloc : allAllocations) {
+            for (TaskAllocation ta : alloc.getTaskAllocations()) {
+                if (ta.getIsOpeningDayTask() != null && ta.getIsOpeningDayTask())
+                    log.info("【分配诊断】机台={}, embryo={}, endingExtraInventory={}, quantity={}, isOpeningDay={}",
+                            alloc.getMachineCode(), ta.getEmbryoCode(), ta.getEndingExtraInventory(), ta.getQuantity(), ta.getIsOpeningDayTask());
+            }
+        }
 
         // ==================== 精度计划挑选与提前扣量（每日首次执行） ====================
         applyPrecisionPlanSelection(context, scheduleDate, shiftConfig, allAllocations);
 
         // ==================== 第六步：S5.3.7 班次排产（单个班次，无需跨班次均衡） ====================
+        log.info("【班次排程】天={}, 班次={}, 机台分配数={}, 任务总数={}",
+                day, shiftConfig.getShiftCode(), allAllocations.size(),
+                allAllocations.stream().mapToInt(a -> a.getTaskAllocations().size()).sum());
         List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults = new ArrayList<>();
         LocalDate scheduleDateForShift = scheduleDate;
 
@@ -350,6 +372,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setIsContinueTask(taskAlloc.getIsContinueTask());
                 task.setIsLastEndingBatch(taskAlloc.getIsLastEndingBatch());  // 设置是否收尾最后一批
                 task.setIsEndProduction(taskAlloc.getIsEndProduction());  // 设置是否结束生产
+                task.setConstructionStage(taskAlloc.getConstructionStage());  // 设置施工阶段
                 task.setEndingAbandoned(taskAlloc.getEndingAbandoned());  // 设置收尾是否被舍弃
                 task.setPrecisionDeducted(taskAlloc.getPrecisionDeducted());  // 设置精度扣量标记
                 // 优先保留 TaskGroupService 设置的标记，仅 null 时用班次类型兜底
