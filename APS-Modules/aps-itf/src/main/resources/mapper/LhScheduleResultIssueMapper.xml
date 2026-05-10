@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.itf.mes.mapper.LhScheduleResultIssueMapper">
+
+    <insert id="batchInsertLhScheduleResult" parameterType="list">
+        INSERT INTO MES_LH_SCHEDULE_RESULT (
+            ID, LH_BATCH_NO, ORDER_NO, SCHEDULE_DATE, LH_MACHINE_CODE, LH_MACHINE_NAME,
+            LEFT_RIGHT_MOLD, MATERIAL_CODE, MES_MATERIAL_CODE, SPEC_CODE, SPEC_DESC,
+            DAILY_PLAN_QTY,
+            CLASS1_PLAN_QTY_SEQ, CLASS1_ANALYSIS_INPUT, CLASS1_ANALYSIS, CLASS1_PLAN_QTY,
+            CLASS1_EXAMPLE_TYPE, CLASS1_EXAMPLE_NO,
+            CLASS2_PLAN_QTY_SEQ, CLASS2_ANALYSIS_INPUT, CLASS2_ANALYSIS, CLASS2_PLAN_QTY,
+            CLASS2_EXAMPLE_TYPE, CLASS2_EXAMPLE_NO,
+            CLASS3_PLAN_QTY_SEQ, CLASS3_ANALYSIS_INPUT, CLASS3_ANALYSIS, CLASS3_PLAN_QTY,
+            CLASS3_EXAMPLE_TYPE, CLASS3_EXAMPLE_NO,
+            LH_TIME, DATA_VERSION, COMPANY_CODE, FACTORY_CODE
+        )
+        SELECT * FROM (
+        <foreach collection="list" item="item" separator=" UNION ALL ">
+            SELECT
+            #{item.id} AS ID,
+            #{item.lhBatchNo} AS LH_BATCH_NO,
+            #{item.orderNo} AS ORDER_NO,
+            #{item.scheduleDate} AS SCHEDULE_DATE,
+            #{item.lhMachineCode} AS LH_MACHINE_CODE,
+            #{item.lhMachineName} AS LH_MACHINE_NAME,
+            #{item.leftRightMold} AS LEFT_RIGHT_MOLD,
+            #{item.materialCode} AS MATERIAL_CODE,
+            #{item.mesMaterialCode} AS MES_MATERIAL_CODE,
+            #{item.specCode} AS SPEC_CODE,
+            #{item.specDesc} AS SPEC_DESC,
+            #{item.dailyPlanQty} AS DAILY_PLAN_QTY,
+            #{item.class1PlanQtySeq} AS CLASS1_PLAN_QTY_SEQ,
+            #{item.class1AnalysisInput} AS CLASS1_ANALYSIS_INPUT,
+            #{item.class1Analysis} AS CLASS1_ANALYSIS,
+            #{item.class1PlanQty} AS CLASS1_PLAN_QTY,
+            #{item.class1ExampleType} AS CLASS1_EXAMPLE_TYPE,
+            #{item.class1ExampleNo} AS CLASS1_EXAMPLE_NO,
+            #{item.class2PlanQtySeq} AS CLASS2_PLAN_QTY_SEQ,
+            #{item.class2AnalysisInput} AS CLASS2_ANALYSIS_INPUT,
+            #{item.class2Analysis} AS CLASS2_ANALYSIS,
+            #{item.class2PlanQty} AS CLASS2_PLAN_QTY,
+            #{item.class2ExampleType} AS CLASS2_EXAMPLE_TYPE,
+            #{item.class2ExampleNo} AS CLASS2_EXAMPLE_NO,
+            #{item.class3PlanQtySeq} AS CLASS3_PLAN_QTY_SEQ,
+            #{item.class3AnalysisInput} AS CLASS3_ANALYSIS_INPUT,
+            #{item.class3Analysis} AS CLASS3_ANALYSIS,
+            #{item.class3PlanQty} AS CLASS3_PLAN_QTY,
+            #{item.class3ExampleType} AS CLASS3_EXAMPLE_TYPE,
+            #{item.class3ExampleNo} AS CLASS3_EXAMPLE_NO,
+            #{item.lhTime} AS LH_TIME,
+            #{item.dataVersion} AS DATA_VERSION,
+            #{item.companyCode} AS COMPANY_CODE,
+            #{item.factoryCode} AS FACTORY_CODE
+        </foreach>
+        ) AS t
+        WHERE NOT EXISTS (
+            SELECT 1 FROM MES_LH_SCHEDULE_RESULT
+            WHERE LH_BATCH_NO = t.LH_BATCH_NO AND SCHEDULE_DATE = t.SCHEDULE_DATE AND DATA_VERSION = t.DATA_VERSION
+        )
+    </insert>
+
+    <update id="updateByScheduleDateAndMachine" parameterType="com.zlt.aps.itf.vo.MesLhScheduleResult">
+        UPDATE MES_LH_SCHEDULE_RESULT SET
+            LH_BATCH_NO = #{lhBatchNo},
+            ORDER_NO = #{orderNo},
+            LH_MACHINE_NAME = #{lhMachineName},
+            LEFT_RIGHT_MOLD = #{leftRightMold},
+            MATERIAL_CODE = #{materialCode},
+            MES_MATERIAL_CODE = #{mesMaterialCode},
+            SPEC_CODE = #{specCode},
+            SPEC_DESC = #{specDesc},
+            DAILY_PLAN_QTY = #{dailyPlanQty},
+            CLASS1_PLAN_QTY_SEQ = #{class1PlanQtySeq},
+            CLASS1_ANALYSIS_INPUT = #{class1AnalysisInput},
+            CLASS1_ANALYSIS = #{class1Analysis},
+            CLASS1_PLAN_QTY = #{class1PlanQty},
+            CLASS1_EXAMPLE_TYPE = #{class1ExampleType},
+            CLASS1_EXAMPLE_NO = #{class1ExampleNo},
+            CLASS2_PLAN_QTY_SEQ = #{class2PlanQtySeq},
+            CLASS2_ANALYSIS_INPUT = #{class2AnalysisInput},
+            CLASS2_ANALYSIS = #{class2Analysis},
+            CLASS2_PLAN_QTY = #{class2PlanQty},
+            CLASS2_EXAMPLE_TYPE = #{class2ExampleType},
+            CLASS2_EXAMPLE_NO = #{class2ExampleNo},
+            CLASS3_PLAN_QTY_SEQ = #{class3PlanQtySeq},
+            CLASS3_ANALYSIS_INPUT = #{class3AnalysisInput},
+            CLASS3_ANALYSIS = #{class3Analysis},
+            CLASS3_PLAN_QTY = #{class3PlanQty},
+            CLASS3_EXAMPLE_TYPE = #{class3ExampleType},
+            CLASS3_EXAMPLE_NO = #{class3ExampleNo},
+            LH_TIME = #{lhTime},
+            COMPANY_CODE = #{companyCode},
+            FACTORY_CODE = #{factoryCode}
+        WHERE SCHEDULE_DATE = #{scheduleDate}
+          AND LH_MACHINE_CODE = #{lhMachineCode}
+          AND DATA_VERSION = #{dataVersion}
+    </update>
+
+    <delete id="deleteByScheduleDate">
+        DELETE FROM MES_LH_SCHEDULE_RESULT
+        WHERE SCHEDULE_DATE = #{scheduleDate}
+          AND DATA_VERSION = #{dataVersion}
+    </delete>
+
+</mapper>

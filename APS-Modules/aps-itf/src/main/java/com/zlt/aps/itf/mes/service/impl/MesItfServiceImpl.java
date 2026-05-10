@@ -14,13 +14,19 @@ import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.mes.enums.MouldCategoryConvertEnum;
+import com.zlt.aps.itf.constant.SysCode;
+import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.mapper.MesItfMapper;
+import com.zlt.aps.itf.mes.mapper.MoldAlterPlanIssueMapper;
 import com.zlt.aps.itf.mes.mapper.MesViewMapper;
 import com.zlt.aps.itf.mes.service.IPrecisionPlanIssueService;
 import com.zlt.aps.itf.mes.service.MesItfService;
 import com.zlt.aps.itf.mes.vo.MoldAlterPlanIssue;
 import com.zlt.aps.itf.scm.service.ScmItfService;
 import com.zlt.aps.itf.vo.*;
+import com.zlt.sync.handle.SyncDataHandle;
+import com.zlt.sync.povo.SyncParamsVO;
+import com.zlt.sync.service.SyncDataLogsService;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
@@ -67,6 +73,8 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private MesItfMapper mesItfMapper;
+    @Autowired
+    private MoldAlterPlanIssueMapper moldAlterPlanIssueMapper;
     @Autowired
     private MesViewMapper mesViewMapper;
     @Autowired
@@ -119,6 +127,12 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Autowired
     private ScmItfService scmItfService;
+
+    @Autowired
+    private SyncDataHandle syncDataHandle;
+
+    @Autowired
+    private SyncDataLogsService syncDataLogsService;
 
     @Autowired
     private MpMonthPlanMonitorEntityMapper mpMonthPlanMonitorEntityMapper;
@@ -1385,13 +1399,10 @@ public class MesItfServiceImpl implements MesItfService {
         List<CxScheFinishQty> syncList = mesItfMapper.selectCxClassShiftFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
-        Map<String, CxScheFinishQty> groupMap = syncList.stream()
-                .collect(Collectors.toMap(
-                        item -> item.getFactoryCode() + "|" + item.getOrderNo() + "|" + item.getScheduleDate() + "|" + item.getCxMachineCode(),
-                        Function.identity(),
-                        (v1, v2) -> v1
-                ));
-        syncList = new ArrayList<>(groupMap.values());
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("成型排程完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
 
         List<CxScheFinishQty> insertOrUpdateList = new ArrayList<>();
         for (CxScheFinishQty item : syncList) {
@@ -1446,9 +1457,6 @@ public class MesItfServiceImpl implements MesItfService {
     @Override
     public AjaxResult syncLhClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs) {
         DynamicDataSourceContextHolder.push(DataSource.MES);
-        Date nowDate = DateUtils.truncate(DateUtils.getNowDate(), Calendar.DATE);
-        syncDataLogs.setQueryParams(new HashMap<>());
-        syncDataLogs.getQueryParams().put("finishDate", nowDate);
         List<LhScheFinishQty> syncList = mesItfMapper.selectLhClassShiftFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
@@ -1456,14 +1464,6 @@ public class MesItfServiceImpl implements MesItfService {
             log.warn("硫化排程完成量同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
             return AjaxResult.success("MES中间表无数据可同步");
         }
-
-        Map<String, LhScheFinishQty> groupMap = syncList.stream()
-                .collect(Collectors.toMap(
-                        item -> item.getFactoryCode() + "|" + item.getOrderNo() + "|" + item.getScheduleDate() + "|" + item.getLhMachineCode(),
-                        Function.identity(),
-                        (v1, v2) -> v1
-                ));
-        syncList = new ArrayList<>(groupMap.values());
 
         List<LhScheFinishQty> insertList = new ArrayList<>();
         for (LhScheFinishQty item : syncList) {
@@ -1706,6 +1706,8 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 模具交替计划下发到MES
+     * 1. 写入APS中间表MOLD_ALTER_PLAN（建在jy_aps_mid主库）
+     * 2. 发送MQ通知MES来获取数据
      * @param moldAlterPlanList 模具交替计划列表
      * @return 结果
      */
@@ -1715,24 +1717,66 @@ public class MesItfServiceImpl implements MesItfService {
             return AjaxResult.success();
         }
 
+        // 获取下发接口版本号
+        String dataVersion = syncDataHandle.getDataVersion(ItfSyncKeyEnum.MOLD_ALTER_PLAN_ISSUE.getCode());
+
+        // 从数据中获取factoryCode和companyCode
+        String factoryCode = moldAlterPlanList.get(0).getFactoryCode();
+        String companyCode = moldAlterPlanList.get(0).getCompanyCode();
+
         // 转换为中间表实体
         List<MoldAlterPlanIssue> issueList = new ArrayList<>();
         for (MdmMoldAlterPlan plan : moldAlterPlanList) {
             MoldAlterPlanIssue issue = new MoldAlterPlanIssue();
             BeanUtils.copyProperties(plan, issue);
+            issue.setDataVersion(dataVersion);
             issueList.add(issue);
         }
 
         try {
-            // 切换到主库数据源（MOLD_ALTER_PLAN表建在jy_aps_mid主库）
-            DynamicDataSourceContextHolder.push(DataSource.MASTER);
-            // 批量插入到中间表
-            mesItfMapper.insertMoldAlterPlanList(issueList);
-        } finally {
-            DynamicDataSourceContextHolder.poll();
-            // 切换数据源 end
+            // MOLD_ALTER_PLAN表建在jy_aps_mid主库，使用@DS(DataSource.MASTER)的独立Mapper直接写入
+            moldAlterPlanIssueMapper.insertMoldAlterPlanList(issueList);
+        } catch (Exception e) {
+            log.error("模具交替计划下发到MES中间表失败", e);
+            throw e;
         }
-        return AjaxResult.success();
+
+        // 发送MQ通知MES来获取数据
+        return sendMoldAlterPlanMqNotice(issueList.size(), dataVersion, factoryCode, companyCode);
+    }
+
+    /**
+     * 发送模具交替计划MQ通知MES
+     */
+    private AjaxResult sendMoldAlterPlanMqNotice(int rowCount, String dataVersion, String factoryCode, String companyCode) {
+        try {
+            SyncParamsVO syncParamsVO = new SyncParamsVO();
+            syncParamsVO.setSyncKey(ItfSyncKeyEnum.MOLD_ALTER_PLAN_ISSUE.getCode());
+            syncParamsVO.setDataVersion(dataVersion);
+
+            JSONObject params = new JSONObject();
+            params.put("rowCount", rowCount);
+            syncParamsVO.setParams(params);
+            syncParamsVO.setDataSys(SysCode.APS);
+            syncParamsVO.setDockSys(ApsConstant.DOCK_SYS_MES);
+            syncParamsVO.setFactoryCode(factoryCode);
+            syncParamsVO.setCompanyCode(companyCode);
+
+            // 往消息队列发送消息
+            syncDataHandle.syncNotice(syncParamsVO);
+
+            // 取回mes的反馈结果
+            SyncDataLogs logs = syncDataLogsService.getSyncDataResult(dataVersion);
+            String status = logs.getStatus();
+            if (ApsConstant.IS_RELEASE.equals(status)) {
+                return AjaxResult.success("模具交替计划下发成功");
+            } else {
+                return AjaxResult.error(logs.getMsg());
+            }
+        } catch (Exception e) {
+            log.error("模具交替计划下发MQ通知MES失败", e);
+            return AjaxResult.error("模具交替计划下发MES失败：" + e.getMessage());
+        }
     }
 
     /**
