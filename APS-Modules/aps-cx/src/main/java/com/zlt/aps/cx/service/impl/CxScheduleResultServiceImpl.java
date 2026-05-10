@@ -314,11 +314,92 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
             // 复制到最终工作簿
             ExcelUtils.copySheet(templateWorkbook, 0, finalWorkbook);
+
+            // copySheet 对隐藏列和图片支持不完善，显式补上
+            int newSheetIdx = finalWorkbook.getNumberOfSheets() - 1;
+            Sheet targetSheet = finalWorkbook.getSheetAt(newSheetIdx);
+            targetSheet.setColumnHidden(0, true); // A
+            targetSheet.setColumnHidden(1, true); // B
+            targetSheet.setColumnHidden(2, true); // C
+
+            // 复制 logo 图片：从模板中取出图片数据，写入最终工作簿
+            copyLogoPicture(templateWorkbook, finalWorkbook, targetSheet);
+
             templateWorkbook.close();
         } catch (ServiceException e) {
             throw e;
         } catch (Exception e) {
             throw new ServiceException("生成成型计划Sheet失败", e);
+        }
+    }
+
+    /**
+     * 从模板工作簿自动发现图片，复制到最终工作簿的目标Sheet中。
+     * 使用 POI 底层 OPCPackage 读取图片数据和锚点信息。
+     */
+    private void copyLogoPicture(XSSFWorkbook sourceWorkbook, XSSFWorkbook targetWorkbook, Sheet targetSheet) {
+        try {
+            // 尝试从源 Sheet 获取绘图，若 shapes 为空则图片引用可能丢失
+            XSSFSheet sourceSheet = sourceWorkbook.getSheetAt(0);
+            XSSFDrawing sourceDrawing = sourceSheet.getDrawingPatriarch();
+            if (sourceDrawing != null && !sourceDrawing.getShapes().isEmpty()) {
+                // 第1种方式：通过 POI 绘图对象复制
+                XSSFDrawing targetDrawing = ((XSSFSheet) targetSheet).createDrawingPatriarch();
+                for (XSSFShape shape : sourceDrawing.getShapes()) {
+                    if (shape instanceof XSSFPicture) {
+                        XSSFPicture picture = (XSSFPicture) shape;
+                        XSSFPictureData pictureData = picture.getPictureData();
+                        int pictureIdx = targetWorkbook.addPicture(
+                                pictureData.getData(), pictureData.getPictureType());
+                        XSSFClientAnchor anchor = (XSSFClientAnchor) picture.getClientAnchor();
+                        XSSFClientAnchor newAnchor = new XSSFClientAnchor(
+                                anchor.getDx1(), anchor.getDy1(),
+                                anchor.getDx2(), anchor.getDy2(),
+                                anchor.getCol1(), anchor.getRow1(),
+                                anchor.getCol2(), anchor.getRow2());
+                        newAnchor.setAnchorType(anchor.getAnchorType());
+                        targetDrawing.createPicture(newAnchor, pictureIdx);
+                    }
+                }
+                return;
+            }
+
+            // 第2种方式：直接读 zip 中的图片文件，按模板固定锚点写入
+            byte[] imageBytes = readFileFromWorkbookZip(sourceWorkbook, "xl/media/image1.png");
+            if (imageBytes == null || imageBytes.length == 0) return;
+
+            int pictureIdx = targetWorkbook.addPicture(imageBytes, Workbook.PICTURE_TYPE_PNG);
+            XSSFDrawing targetDrawing = ((XSSFSheet) targetSheet).createDrawingPatriarch();
+            // 锚点：C0 row0 到 E2（与原始模板一致：col3~5, row0~2）
+            XSSFClientAnchor anchor = new XSSFClientAnchor(28575, 52070, 647700, 152400, 3, 0, 5, 2);
+            targetDrawing.createPicture(anchor, pictureIdx);
+        } catch (Exception e) {
+            log.warn("复制logo图片失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 从 XSSFWorkbook 底层 zip 包中读取指定路径的原始字节。
+     */
+    private byte[] readFileFromWorkbookZip(XSSFWorkbook workbook, String entryPath) {
+        try {
+            java.lang.reflect.Field pkgField = XSSFWorkbook.class.getDeclaredField("pkg");
+            pkgField.setAccessible(true);
+            org.apache.poi.openxml4j.opc.OPCPackage pkg =
+                    (org.apache.poi.openxml4j.opc.OPCPackage) pkgField.get(workbook);
+            org.apache.poi.openxml4j.opc.PackagePart part = pkg.getPart(
+                    org.apache.poi.openxml4j.opc.PackagingURIHelper.createPartName(
+                            new java.net.URI(null, null, "/" + entryPath, null)));
+            try (InputStream is = part.getInputStream()) {
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                byte[] buf = new byte[4096];
+                int n;
+                while ((n = is.read(buf)) > -1) bos.write(buf, 0, n);
+                return bos.toByteArray();
+            }
+        } catch (Exception e) {
+            log.warn("读取工作簿内文件失败: {} - {}", entryPath, e.getMessage());
+            return null;
         }
     }
 
