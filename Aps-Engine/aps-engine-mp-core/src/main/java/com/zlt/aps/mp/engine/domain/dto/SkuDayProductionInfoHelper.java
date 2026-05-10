@@ -207,6 +207,28 @@ public class SkuDayProductionInfoHelper implements Serializable {
     }
 
     /**
+     * 20260510+ 当前排产是否已经硫化满机台
+     * 1、本身满产
+     * 2、不能进行换活字块或是换模
+     *
+     * @param context 排产上下文
+     * @return
+     */
+    public boolean isFullLhMachine(Context context) {
+        Integer dayLhMachineQty = dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        //考虑开产日
+        dayLhMachineQty = context.getOpenDayMaxQty(productionDay, dayLhMachineQty);
+        if (sumProductionQty >= dayLhMachineQty) {
+            return true;
+        }
+        //可以换模或是换活字块，则表示没满
+        if (isChangeMould() || isChangeTypeBlock(context)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * 可否换活字块 当天或是隔天
      *
      * @param context
