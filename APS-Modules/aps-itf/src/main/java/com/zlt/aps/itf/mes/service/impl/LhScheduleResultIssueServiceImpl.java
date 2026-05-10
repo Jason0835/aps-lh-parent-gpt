@@ -1,9 +1,11 @@
 package com.zlt.aps.itf.mes.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.mapper.LhScheduleResultIssueMapper;
@@ -174,35 +176,43 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
 
     /**
      * 更新或插入数据（存在则更新，不存在则插入）
+     * 中间表MES_LH_SCHEDULE_RESULT建在jy_aps_mid主库，需切换到master数据源
      */
     private void upsertLhScheduleResult(List<MesLhScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
-        for (MesLhScheduleResult mesItem : mesList) {
-            // 先尝试更新，如果更新失败则插入
-            int updateCount = lhScheduleResultIssueMapper.updateByScheduleDateAndMachine(mesItem);
-            if (updateCount == 0) {
-                // 更新失败，说明数据不存在，执行插入
-                List<MesLhScheduleResult> insertList = new ArrayList<>();
-                insertList.add(mesItem);
-                lhScheduleResultIssueMapper.batchInsertLhScheduleResult(insertList);
+        try {
+            DynamicDataSourceContextHolder.push(DataSource.MASTER);
+            for (MesLhScheduleResult mesItem : mesList) {
+                int updateCount = lhScheduleResultIssueMapper.updateByScheduleDateAndMachine(mesItem);
+                if (updateCount == 0) {
+                    List<MesLhScheduleResult> insertList = new ArrayList<>();
+                    insertList.add(mesItem);
+                    lhScheduleResultIssueMapper.batchInsertLhScheduleResult(insertList);
+                }
             }
+        } finally {
+            DynamicDataSourceContextHolder.poll();
         }
     }
 
     /**
      * 插入数据（先删除指定日期的旧数据，再插入新数据）
+     * 中间表MES_LH_SCHEDULE_RESULT建在jy_aps_mid主库，需切换到master数据源
      */
     private void insertLhScheduleResult(List<MesLhScheduleResult> mesList, LocalDate scheduleDate, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
-        // 删除指定日期的旧数据
-        String dateStr = scheduleDate.format(DATE_FORMATTER);
-        lhScheduleResultIssueMapper.deleteByScheduleDate(dateStr, dataVersion);
-        // 批量插入新数据
-        lhScheduleResultIssueMapper.batchInsertLhScheduleResult(mesList);
+        try {
+            DynamicDataSourceContextHolder.push(DataSource.MASTER);
+            String dateStr = scheduleDate.format(DATE_FORMATTER);
+            lhScheduleResultIssueMapper.deleteByScheduleDate(dateStr, dataVersion);
+            lhScheduleResultIssueMapper.batchInsertLhScheduleResult(mesList);
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
     }
 
     /**

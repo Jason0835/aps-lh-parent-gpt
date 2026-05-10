@@ -202,6 +202,20 @@ public class LhChipStockController extends AbstractDocBizController<LhChipStock>
         return AjaxResult.success();
     }
 
+    /**
+     * 逻辑删除并批量保存芯片库存（事务性操作）
+     */
+    @ApiOperation("逻辑删除并批量保存芯片库存（事务性操作）")
+    @PostMapping("/logicDeleteAndSaveByDataSource")
+    @ResponseBody
+    public AjaxResult logicDeleteAndSaveByDataSource(@RequestParam("factoryCode") String factoryCode,
+                                                      @RequestParam("dataSource") String dataSource,
+                                                      @RequestParam("updateBy") String updateBy,
+                                                      @RequestBody List<LhChipStock> list) {
+        lhChipStockService.logicDeleteAndSaveBatch(factoryCode, dataSource, updateBy, list);
+        return AjaxResult.success();
+    }
+
     @Override
     protected List<LhChipStock> listExportData(LhChipStock obj) {
         QueryWrapper<LhChipStock> wrapper = new QueryWrapper<>();

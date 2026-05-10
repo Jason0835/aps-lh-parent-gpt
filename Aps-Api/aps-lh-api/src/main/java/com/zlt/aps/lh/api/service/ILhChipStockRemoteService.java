@@ -94,6 +94,13 @@ public interface ILhChipStockRemoteService {
     @PostMapping("/lhChipStock/saveBatch")
     AjaxResult saveChipStockBatch(@RequestBody List<LhChipStock> list);
 
+    @ApiOperation("逻辑删除并批量保存芯片库存（事务性操作）")
+    @PostMapping("/lhChipStock/logicDeleteAndSaveByDataSource")
+    AjaxResult logicDeleteAndSaveByDataSource(@RequestParam("factoryCode") String factoryCode,
+                                              @RequestParam("dataSource") String dataSource,
+                                              @RequestParam("updateBy") String updateBy,
+                                              @RequestBody List<LhChipStock> list);
+
     /**
      * 合并保存 - 新增时检测到重复，将库存量和完成量累加到已有数据上
      */

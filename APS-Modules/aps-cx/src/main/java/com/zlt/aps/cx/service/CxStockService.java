@@ -54,4 +54,14 @@ public interface CxStockService extends IDocService<CxStock> {
      * 获取查询反显公式
      */
     String[] getQueryFormulas();
+
+    /**
+     * 逻辑删除分厂指定数据来源的库存并批量插入新数据（事务性操作）
+     *
+     * @param factoryCode 分厂编号
+     * @param dataSource  数据来源
+     * @param updateBy    更新者
+     * @param insertList  待插入的数据列表
+     */
+    void logicDeleteAndSaveBatch(String factoryCode, String dataSource, String updateBy, List<CxStock> insertList);
 }

@@ -31,6 +31,10 @@ public interface ICxMesSyncRemoteService {
     @PostMapping("/mesSync/saveMachineOnlineInfoBatch")
     AjaxResult saveMachineOnlineInfoBatch(@RequestBody List<CxMachineOnlineInfo> list);
 
+    @ApiOperation("逻辑删除并批量保存成型在机信息（事务性操作）")
+    @PostMapping("/mesSync/logicDeleteAndSaveMachineOnlineInfo")
+    AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<CxMachineOnlineInfo> list);
+
     @ApiOperation("批量保存结构整车胎面配置")
     @PostMapping("/mesSync/saveStructureTreadConfigBatch")
     AjaxResult saveStructureTreadConfigBatch(@RequestBody List<CxStructureTreadConfig> list);
@@ -76,6 +80,13 @@ public interface ICxMesSyncRemoteService {
     AjaxResult logicDeleteCxStockByDataSource(@RequestParam("factoryCode") String factoryCode,
                                               @RequestParam("dataSource") String dataSource,
                                               @RequestParam("updateBy") String updateBy);
+
+    @ApiOperation("逻辑删除并批量保存生胎库存（事务性操作）")
+    @PostMapping("/mesSync/logicDeleteAndSaveCxStockByDataSource")
+    AjaxResult logicDeleteAndSaveCxStockByDataSource(@RequestParam("factoryCode") String factoryCode,
+                                                     @RequestParam("dataSource") String dataSource,
+                                                     @RequestParam("updateBy") String updateBy,
+                                                     @RequestBody List<CxStock> list);
 
     @ApiOperation("根据分厂编号和数据来源删除成型库存")
     @PostMapping("/mesSync/deleteCxStockByDataSource")

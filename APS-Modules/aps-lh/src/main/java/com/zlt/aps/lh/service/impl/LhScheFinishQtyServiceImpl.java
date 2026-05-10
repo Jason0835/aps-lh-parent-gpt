@@ -8,6 +8,7 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
+import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
 import com.zlt.aps.lh.service.ILhScheFinishQtyService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.core.dao.basedao.BaseDao;
@@ -36,6 +37,9 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
 
     @Autowired
     private LhScheduleResultMapper lhScheduleResultMapper;
+
+    @Autowired
+    private LhScheFinishQtyMapper lhScheFinishQtyMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -278,5 +282,23 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
         log.info("【完成量回写】排程日期D+2更新，ID：{}，1班(早)={}，2班(中)={}，更新行数：{}",
                 result.getId(), morningQty, middleQty, count);
         return count;
+    }
+
+    @Override
+    public void logicDeleteAndSaveBatch(String factoryCode, String updateBy, List<LhScheFinishQty> insertList) {
+        log.info("硫化排程完成量同步-事务开始：逻辑删除分厂{}旧数据，待插入数量={}", factoryCode, CollectionUtils.size(insertList));
+        lhScheFinishQtyMapper.logicDeleteByFactoryCode(factoryCode, updateBy, new Date());
+        log.info("硫化排程完成量同步-逻辑删除完成，开始批量插入");
+        if (CollectionUtils.isNotEmpty(insertList)) {
+            int batchSize = 1000;
+            for (int i = 0; i < insertList.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, insertList.size());
+                List<LhScheFinishQty> subList = insertList.subList(i, end);
+                baseDao.saveBatch(subList);
+                log.info("硫化排程完成量同步-插入批次：{}/{}, 本批数量={}", (i / batchSize + 1),
+                        (insertList.size() + batchSize - 1) / batchSize, subList.size());
+            }
+        }
+        log.info("硫化排程完成量同步-事务完成：分厂{}，插入数量={}", factoryCode, CollectionUtils.size(insertList));
     }
 }

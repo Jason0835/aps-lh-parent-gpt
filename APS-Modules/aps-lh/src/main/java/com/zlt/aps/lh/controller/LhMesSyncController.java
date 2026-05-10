@@ -16,6 +16,9 @@ import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhMouldCleanWarnMapper;
 import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
 import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
+import com.zlt.aps.lh.service.ILhDayFinishQtyService;
+import com.zlt.aps.lh.service.ILhMachineOnlineInfoService;
+import com.zlt.aps.lh.service.ILhRepairCapsuleService;
 import com.zlt.aps.lh.service.ILhScheFinishQtyService;
 import com.zlt.core.dao.basedao.BaseDao;
 import io.swagger.annotations.Api;
@@ -69,6 +72,15 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     private ILhScheFinishQtyService lhScheFinishQtyService;
 
     @Autowired
+    private ILhMachineOnlineInfoService lhMachineOnlineInfoService;
+
+    @Autowired
+    private ILhRepairCapsuleService lhRepairCapsuleService;
+
+    @Autowired
+    private ILhDayFinishQtyService lhDayFinishQtyService;
+
+    @Autowired
     private LhMouldChangePlanEntityMapper lhMouldChangePlanEntityMapper;
 
     @Override
@@ -98,6 +110,14 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     }
 
     @Override
+    @ApiOperation("逻辑删除并批量保存硫化在机信息（事务性操作）")
+    @PostMapping("/logicDeleteAndSaveMachineOnlineInfo")
+    public AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhMachineOnlineInfo> list) {
+        lhMachineOnlineInfoService.logicDeleteAndSaveBatch(factoryCode, updateBy, list);
+        return AjaxResult.success();
+    }
+
+    @Override
     @ApiOperation("批量删除胶囊已使用次数")
     @PostMapping("/deleteRepairCapsule")
     public AjaxResult deleteRepairCapsule(@RequestParam("factoryCode") String factoryCode) {
@@ -120,6 +140,14 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
         if (list != null && !list.isEmpty()) {
             baseDao.insertBatch(list);
         }
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("逻辑删除并批量保存胶囊已使用次数（事务性操作）")
+    @PostMapping("/logicDeleteAndSaveRepairCapsule")
+    public AjaxResult logicDeleteAndSaveRepairCapsule(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhRepairCapsule> list) {
+        lhRepairCapsuleService.logicDeleteAndSaveBatch(factoryCode, updateBy, list);
         return AjaxResult.success();
     }
 
@@ -166,6 +194,14 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     }
 
     @Override
+    @ApiOperation("逻辑删除并批量保存硫化排程完成量（事务性操作）")
+    @PostMapping("/logicDeleteAndSaveScheFinishQty")
+    public AjaxResult logicDeleteAndSaveScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhScheFinishQty> list) {
+        lhScheFinishQtyService.logicDeleteAndSaveBatch(factoryCode, updateBy, list);
+        return AjaxResult.success();
+    }
+
+    @Override
     @ApiOperation("批量保存硫化排程日完成量")
     @PostMapping("/saveDayFinishQtyBatch")
     public AjaxResult saveDayFinishQtyBatch(@RequestBody List<LhDayFinishQty> list) {
@@ -187,6 +223,14 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @PostMapping("/logicDeleteDayFinishQty")
     public AjaxResult logicDeleteDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy) {
         lhDayFinishQtyMapper.logicDeleteByFactoryCode(factoryCode, updateBy, new Date());
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("逻辑删除并批量保存硫化排程日完成量（事务性操作）")
+    @PostMapping("/logicDeleteAndSaveDayFinishQty")
+    public AjaxResult logicDeleteAndSaveDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhDayFinishQty> list) {
+        lhDayFinishQtyService.logicDeleteAndSaveBatch(factoryCode, updateBy, list);
         return AjaxResult.success();
     }
 

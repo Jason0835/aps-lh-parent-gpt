@@ -39,4 +39,13 @@ public interface ILhDayFinishQtyService extends IDocService<LhDayFinishQty> {
      * @return 列表
      */
     List<LhDayFinishQty> selectList(LhDayFinishQty queryVO);
+
+    /**
+     * 逻辑删除分厂旧数据并批量插入新数据（事务性操作）
+     *
+     * @param factoryCode 分厂编号
+     * @param updateBy    更新者
+     * @param insertList  待插入的数据列表
+     */
+    void logicDeleteAndSaveBatch(String factoryCode, String updateBy, List<LhDayFinishQty> insertList);
 }
