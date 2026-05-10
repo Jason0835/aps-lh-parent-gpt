@@ -1,11 +1,9 @@
 package com.zlt.aps.itf.mes.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
-import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.itf.constant.DataSource;
 import com.zlt.aps.itf.constant.SysCode;
 import com.zlt.aps.itf.mes.enums.ItfSyncKeyEnum;
 import com.zlt.aps.itf.mes.mapper.CxScheduleResultIssueMapper;
@@ -116,41 +114,31 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
 
     /**
      * 更新或插入数据（存在则更新，不存在则插入）
-     * 中间表MES_CX_SCHEDULE_RESULT建在jy_aps_mid主库，需切换到master数据源
+     * 中间表MES_CX_SCHEDULE_RESULT建在jy_aps_mid主库，Mapper已通过@DS(DataSource.MASTER)指定数据源
      */
     private void upsertCxScheduleResult(List<MesCxScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.MASTER);
-            for (MesCxScheduleResult mesItem : mesList) {
-                int updateCount = cxScheduleResultIssueMapper.updateByScheduleDateAndMachine(mesItem);
-                if (updateCount == 0) {
-                    cxScheduleResultIssueMapper.insertCxScheduleResult(mesItem);
-                }
+        for (MesCxScheduleResult mesItem : mesList) {
+            int updateCount = cxScheduleResultIssueMapper.updateByScheduleDateAndMachine(mesItem);
+            if (updateCount == 0) {
+                cxScheduleResultIssueMapper.insertCxScheduleResult(mesItem);
             }
-        } finally {
-            DynamicDataSourceContextHolder.poll();
         }
     }
 
     /**
      * 插入数据（先删除指定日期的旧数据，再插入新数据）
-     * 中间表MES_CX_SCHEDULE_RESULT建在jy_aps_mid主库，需切换到master数据源
+     * 中间表MES_CX_SCHEDULE_RESULT建在jy_aps_mid主库，Mapper已通过@DS(DataSource.MASTER)指定数据源
      */
     private void insertCxScheduleResult(List<MesCxScheduleResult> mesList, LocalDate scheduleDate, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
-        try {
-            DynamicDataSourceContextHolder.push(DataSource.MASTER);
-            String dateStr = scheduleDate.format(DATE_FORMATTER);
-            cxScheduleResultIssueMapper.deleteByScheduleDate(dateStr, dataVersion);
-            cxScheduleResultIssueMapper.batchInsertCxScheduleResult(mesList);
-        } finally {
-            DynamicDataSourceContextHolder.poll();
-        }
+        String dateStr = scheduleDate.format(DATE_FORMATTER);
+        cxScheduleResultIssueMapper.deleteByScheduleDate(dateStr, dataVersion);
+        cxScheduleResultIssueMapper.batchInsertCxScheduleResult(mesList);
     }
 
     /**
