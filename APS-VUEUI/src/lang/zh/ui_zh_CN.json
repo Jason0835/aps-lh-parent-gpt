@@ -2659,6 +2659,7 @@
   "ui.data.column.monthPlanStructureInnerAdjust.modelName": "月计划调整",
   "ui.data.column.monthPlanStructureInnerAdjust.titleInner": "结构内调整",
   "ui.data.column.monthPlanStructureInnerAdjust.titleStructure": "结构调整",
+  "ui.data.column.monthPlanStructureAdjust.cxMachineCode": "调整机台",
   "ui.data.column.monthPlanFinalAdjustQuery.modelName": "月计划查询",
   "ui.data.column.monthPlanFinalAdjustQuery.currentAdjustMachine": "当前调整机台",
   "ui.data.column.monthPlanFinalAdjustQuery.structureInnerAdjust": "结构内调整",

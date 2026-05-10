@@ -69,13 +69,13 @@
             class="demo-form-inline"
           >
             <el-form-item
-              :label="this.$t('ui.data.column.workWearInfo.cxMachineCode')"
+              :label="this.$t('ui.data.column.cxScheduleResult.cxMachineCode')"
             >
               <el-input
                 v-model="formInline.cxMachineCode"
                 disabled
                 :placeholder="
-                  this.$t('ui.data.column.workWearInfo.cxMachineCode')
+                  this.$t('ui.data.column.cxScheduleResult.cxMachineCode')
                 "
               ></el-input>
             </el-form-item>
@@ -1179,17 +1179,17 @@ export default {
             change: this.handleYearMonthChange,
           },
         },
-        {
-          prop: "scheduledMachines",
-          label: this.$t("成型机台"),
-        },
-        {
-          prop: "structureName",
-          label: this.$t("产品结构"),
-          type: "select",
-          dictData: this.structureList,
-          filterable: true,
-        },
+        // {
+        //   prop: "scheduledMachines",
+        //   label: this.$t("成型机台"),
+        // },
+        // {
+        //   prop: "structureName",
+        //   label: this.$t("产品结构"),
+        //   type: "select",
+        //   dictData: this.structureList,
+        //   filterable: true,
+        // },
         {
           prop:
             this.activeName == "second" ? "productionVersion" : "version",
@@ -1806,6 +1806,7 @@ export default {
 
     //获取单选历史列表的版本号
     async getOutVersionList(isGet) {
+      console.log('getOutVersionList getOutVersionList getOutVersionList')
       try {
         const params = {
           ...this.query,

@@ -27,13 +27,13 @@
           show-overflow-tooltip
         >
           <template slot-scope="scope">
-            <el-button
+            <div
               type="text"
               class="adjust-version-link"
               @click.stop="handleVersionClick(scope.row)"
             >
               {{ scope.row.version }}
-            </el-button>
+            </div>
           </template>
         </el-table-column>
         <el-table-column
@@ -85,6 +85,8 @@
   white-space: normal;
   text-align: left;
   word-break: break-all;
+  text-decoration: underline;
+  cursor: pointer;
 }
 </style>
 
