@@ -870,10 +870,11 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         queryWrapper.eq(MpAdjustResult::getFactoryCode, condition.getFactoryCode());
         queryWrapper.eq(MpAdjustResult::getYear, condition.getYear());
         queryWrapper.eq(MpAdjustResult::getMonth, condition.getMonth());
+        queryWrapper.eq(MpAdjustResult::getIsDelete, YesOrNoEnum.NO.getCode());
         List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
         Map<String, MpAdjustResult> mpAdjustResultMap = new HashMap<>();
         if (CollectionUtils.isNotEmpty(mpAdjustResultList)) {
-            mpAdjustResultMap = mpAdjustResultList.stream().collect(Collectors.toMap(this::buildAdjustMapKey, Function.identity()));
+            mpAdjustResultMap = mpAdjustResultList.stream().collect(Collectors.toMap(this::buildAdjustMapKey, Function.identity(), (s1, s2) -> s1));
         }
         if (CollectionUtils.isNotEmpty(dataList)) {
             for (FactoryMonthPlanProductionFinal4AdjustVo adjustVo : dataList) {
