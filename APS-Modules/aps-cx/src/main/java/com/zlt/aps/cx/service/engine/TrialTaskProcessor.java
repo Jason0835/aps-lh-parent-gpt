@@ -348,6 +348,7 @@ public class TrialTaskProcessor {
         taskAllocation.setIsClosingDayTask(task.getIsClosingDayTask());
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
         taskAllocation.setLhId(task.getLhId());
+        taskAllocation.setConstructionStage(task.getConstructionStage());
 
         allocation.getTaskAllocations().add(taskAllocation);
         allocation.setUsedCapacity(allocation.getUsedCapacity() + task.getPlannedProduction());

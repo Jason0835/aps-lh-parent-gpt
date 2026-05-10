@@ -9,14 +9,12 @@ import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.mapper.CxPrecisionPlanMapper;
 import com.zlt.aps.cx.mapper.LhScheduleResultMapper;
-import com.zlt.aps.cx.mapper.MdmSkuConstructionRefMapper;
 import com.zlt.aps.cx.service.engine.*;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
-import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,7 +70,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     private final ProductionCalculator productionCalculator;
     private final ScheduleDayTypeHelper scheduleDayTypeHelper;
     private final BalancingService balancingService;
-    private final MdmSkuConstructionRefMapper skuConstructionRefMapper;
     private final CxPrecisionPlanMapper precisionPlanMapper;
     private final LhScheduleResultMapper lhScheduleResultMapper;
 
@@ -86,7 +83,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             @Lazy ProductionCalculator productionCalculator,
             ScheduleDayTypeHelper scheduleDayTypeHelper,
             @Lazy BalancingService balancingService,
-            MdmSkuConstructionRefMapper skuConstructionRefMapper,
             CxPrecisionPlanMapper precisionPlanMapper,
             LhScheduleResultMapper lhScheduleResultMapper) {
         this.continueTaskProcessor = continueTaskProcessor;
@@ -96,7 +92,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         this.productionCalculator = productionCalculator;
         this.scheduleDayTypeHelper = scheduleDayTypeHelper;
         this.balancingService = balancingService;
-        this.skuConstructionRefMapper = skuConstructionRefMapper;
         this.precisionPlanMapper = precisionPlanMapper;
         this.lhScheduleResultMapper = lhScheduleResultMapper;
     }
@@ -1256,6 +1251,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     classField = shiftClassFieldMap.get(shiftCode + "_" + day);
                 }
             }
+            log.info("主表合并班次: day={}, classField={}, shiftCode={}, productionResults={}",
+                    day, classField,
+                    shiftResult.getShiftConfig() != null ? shiftResult.getShiftConfig().getShiftCode() : null,
+                    shiftResult.getShiftProductionResults() != null ? shiftResult.getShiftProductionResults().size() : 0);
 
             for (ShiftScheduleService.ShiftProductionResult spr : shiftResult.getShiftProductionResults()) {
                 String machineCode = spr.getMachineCode();
@@ -1276,7 +1275,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
                 final String effectiveClassField = effectiveClassFieldTmp;
 
-                String taskKey = machineCode + "|" + embryoCode + "|" + materialCode;
+                String taskKey = machineCode + "|" + embryoCode + "|" + materialCode + "|" + (spr.getConstructionStage() != null ? spr.getConstructionStage() : "");
                 taskClassSprMap.computeIfAbsent(taskKey, k -> new LinkedHashMap<>())
                         .compute(effectiveClassField, (k, existing) -> {
                             if (existing == null) {
@@ -1410,10 +1409,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             String taskKey = entry.getKey();
             Map<String, ShiftScheduleService.ShiftProductionResult> classSprMap = entry.getValue();
 
-            String[] parts = taskKey.split("\\|", 3);
+            String[] parts = taskKey.split("\\|", 4);
             String machineCode = parts[0];
             String embryoCode = parts.length > 1 ? parts[1] : null;
             String materialCode = parts.length > 2 && !parts[2].isEmpty() ? parts[2] : null;
+            String constructionStage = parts.length > 3 && !parts[3].isEmpty() ? parts[3] : null;
             String structureName = taskStructureMap.get(taskKey);
 
             CxScheduleResult result = new CxScheduleResult();
@@ -1595,8 +1595,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 result.setMarkCloseOutTip("1");
             }
 
-            // ---- 查询示方书类型（每条结果查一次，避免 CLASS1~8 重复查库） ----
-            String recipeType = resolveRecipeType(primaryLh, materialCode);
+            // ---- 示方书类型直接取 constructionStage ----
+            String recipeType = constructionStage;
 
             // ---- 映射班次排量到 CLASS1~8 ----
             for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
@@ -1682,7 +1682,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 String mCode = spr.getMachineCode();
                 String eCode = spr.getEmbryoCode();
                 String matCode = spr.getMaterialCode() != null ? spr.getMaterialCode() : "";
-                String mergeKey = mCode + "|" + eCode + "|" + matCode;
+                String mergeKey = mCode + "|" + eCode + "|" + matCode + "|" + (spr.getConstructionStage() != null ? spr.getConstructionStage() : "");
 
                 ShiftScheduleService.ShiftProductionResult existing = mergedSprMap.get(mergeKey);
                 if (existing == null) {
@@ -1713,7 +1713,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             for (ShiftScheduleService.ShiftProductionResult spr : mergedSprMap.values()) {
                 String embryoCode = spr.getEmbryoCode();
                 String materialCode = spr.getMaterialCode() != null ? spr.getMaterialCode() : "";
-                String embryoKey = embryoCode + "|" + materialCode;
+                String embryoKey = embryoCode + "|" + materialCode + "|" + (spr.getConstructionStage() != null ? spr.getConstructionStage() : "");
 
                 EmbryoTripTracker tracker = embryoTrackers.computeIfAbsent(embryoKey,
                         k -> new EmbryoTripTracker(embryoCode, materialCode));
@@ -2234,36 +2234,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /**
      * 填充未排产班次的默认值（PLAN_QTY=0, FINISH_QTY=0）
      */
-    /**
-     * 查询示方书类型（每条结果查询一次，供 CLASS1~8 复用）
-     * @param primaryLh    主硫化任务
-     * @param materialCode 物料编码
-     * @return 示方书类型，查不到返回 null
-     */
-    private String resolveRecipeType(LhScheduleResult primaryLh, String materialCode) {
-        if (materialCode == null) {
-            return null;
-        }
-        String recipeNo = (primaryLh != null) ? primaryLh.getEmbryoNo() : null;
-        if (recipeNo == null) {
-            return null;
-        }
-        recipeNo = recipeNo.trim();
-        if (recipeNo.isEmpty()) {
-            return null;
-        }
-        try {
-            MdmSkuConstructionRef ref = skuConstructionRefMapper.selectByMaterialCodeAndEmbryoNo(materialCode, recipeNo);
-            if (ref != null && ref.getEmbryoType() != null) {
-                return ref.getEmbryoType();
-            }
-            log.warn("未查到示方书类型: materialCode={}, embryoNo={}", materialCode, recipeNo);
-        } catch (Exception e) {
-            log.warn("查询示方书类型异常: materialCode={}, embryoNo={}", materialCode, recipeNo, e);
-        }
-        return null;
-    }
-
     private void fillDefaultClassValues(CxScheduleResult result, Set<String> filledClasses) {
         BigDecimal zero = BigDecimal.ZERO;
         if (!filledClasses.contains("CLASS1")) { result.setClass1PlanQty(zero); result.setClass1FinishQty(zero); }

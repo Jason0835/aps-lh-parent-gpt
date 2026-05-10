@@ -176,6 +176,8 @@ public interface CoreScheduleAlgorithmService {
         private Boolean isNewEmbryo;
         /** 推荐机台列表（从月计划获取） */
         private List<String> recommendedMachines;
+        /** 施工阶段（00 无工艺 01 试制 02 量试 03 正式），来自硫化任务 */
+        private String constructionStage;
     }
 
     /**
@@ -245,6 +247,8 @@ public interface CoreScheduleAlgorithmService {
         private Boolean isClosingDayTask;
         /** 是否被精度计划扣量 */
         private Boolean precisionDeducted;
+        /** 施工阶段（00 无工艺 01 试制 02 量试 03 正式），来自硫化任务 */
+        private String constructionStage;
     }
 
     /**

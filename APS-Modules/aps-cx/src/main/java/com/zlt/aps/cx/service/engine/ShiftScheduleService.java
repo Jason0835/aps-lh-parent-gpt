@@ -1205,6 +1205,8 @@ public class ShiftScheduleService {
         result.setSourceTask(task);
         // 传递结束生产标记
         result.setIsEndProduction(task.getIsEndProduction());
+        // 传递施工阶段
+        result.setConstructionStage(task.getConstructionStage());
 
         return result;
     }
@@ -1262,5 +1264,7 @@ public class ShiftScheduleService {
         private CoreScheduleAlgorithmService.DailyEmbryoTask sourceTask;
         /** 是否结束生产（反推需求-库存<=0，无需再排产） */
         private Boolean isEndProduction;
+        /** 施工阶段（00 无工艺 01 试制 02 量试 03 正式），来自硫化任务 */
+        private String constructionStage;
     }
 }
