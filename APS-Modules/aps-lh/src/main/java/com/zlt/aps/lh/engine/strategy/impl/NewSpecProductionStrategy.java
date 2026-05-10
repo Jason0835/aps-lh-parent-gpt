@@ -7,19 +7,20 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
-import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
-import com.zlt.aps.lh.context.LhScheduleContext;
-import com.zlt.aps.lh.context.LhScheduleConfig;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
-import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.domain.dto.ShiftRuntimeState;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.NewSpecFailReasonEnum;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.component.OrderNoGenerator;
+import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.context.LhScheduleConfig;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
@@ -29,22 +30,20 @@ import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ITrialProductionStrategy;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
-import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSpecialMaterialUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.ShiftProductionControlUtil;
 import com.zlt.aps.lh.util.SingleMouldShiftQtyUtil;
-import com.zlt.aps.lh.component.OrderNoGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -111,7 +110,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         // 新增SKU的胎胚库存调整
         for (LhScheduleResult result : context.getScheduleResultList()) {
             // 排除换活字块（换活字块不需要胎胚库存调整）
-            if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType()) 
+            if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())
                     || "1".equals(result.getIsTypeBlock())) {
                 continue;
             }
@@ -125,9 +124,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 continue;
             }
             int totalPlan = ShiftFieldUtil.resolveScheduledQty(result);
-            if (totalPlan > sku.getEmbryoStock()) {
-                // 库存不足，按比例削减各班次计划量
-                double ratio = (double) sku.getEmbryoStock() / totalPlan;
+            // 需求上限取余量和胎胚库存的大值，与S4.3待排量基线口径一致
+            int demandUpperLimit = Math.max(sku.getSurplusQty(), sku.getEmbryoStock());
+            if (totalPlan > demandUpperLimit) {
+                // 计划量超过需求上限，按比例削减各班次计划量
+                double ratio = (double) demandUpperLimit / totalPlan;
                 scaleShiftPlanQty(context, result, ratio);
                 refreshResultSummary(context, result);
             }
@@ -890,7 +891,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         List<LhScheduleResult> zeroPlanResults = new ArrayList<>(8);
         for (LhScheduleResult result : context.getScheduleResultList()) {
             // 排除换活字块（换活字块不需要零计划量裁剪）
-            if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType()) 
+            if (!NEW_SPEC_SCHEDULE_TYPE.equals(result.getScheduleType())
                     || "1".equals(result.getIsTypeBlock())) {
                 continue;
             }

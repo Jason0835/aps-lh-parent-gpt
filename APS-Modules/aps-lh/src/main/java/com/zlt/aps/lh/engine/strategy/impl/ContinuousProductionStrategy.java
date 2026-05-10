@@ -7,16 +7,17 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
-import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
-import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.domain.dto.ShiftRuntimeState;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
+import com.zlt.aps.lh.component.OrderNoGenerator;
+import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
+import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.ICapacityCalculateStrategy;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
 import com.zlt.aps.lh.engine.strategy.IFirstInspectionBalanceStrategy;
@@ -25,25 +26,23 @@ import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
-import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSpecialMaterialUtil;
 import com.zlt.aps.lh.util.LhSpecifyMachineUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
+import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.ShiftProductionControlUtil;
 import com.zlt.aps.lh.util.SingleMouldShiftQtyUtil;
-import com.zlt.aps.lh.component.OrderNoGenerator;
-import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -1230,35 +1229,42 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 构建物料维度胎胚库存Map。
-     * <p>SKU库存已在归集阶段按同胎胚标准产能分摊，此处按物料编码扣减，避免同胎胚SKU互相占用。</p>
+     * 构建物料维度的排产需求上限Map。
+     * <p>口径与S4.3待排量基线一致：max(硫化余量, 胎胚库存)。
+     * SKU库存已在归集阶段按同胎胚标准产能分摊，此处按物料编码扣减，避免同胎胚SKU互相占用。
+     * 库存未知(-1)时跳过裁剪，保持排程过程-1语义。</p>
      *
      * @param context 排程上下文
-     * @return 物料维度胎胚库存Map，key=物料编码
+     * @return 物料编码 -> 排产需求上限
      */
     private Map<String, Integer> buildMaterialEmbryoStockMap(LhScheduleContext context) {
         Map<String, Integer> stockMap = new HashMap<>();
         for (SkuScheduleDTO sku : context.getContinuousSkuList()) {
             if (StringUtils.isNotEmpty(sku.getMaterialCode()) && sku.getEmbryoStock() >= 0) {
-                stockMap.put(sku.getMaterialCode(), sku.getEmbryoStock());
+                // 余量和胎胚库存取大，与S4.3待排量基线口径一致
+                int demandUpperLimit = Math.max(sku.getSurplusQty(), sku.getEmbryoStock());
+                stockMap.put(sku.getMaterialCode(), demandUpperLimit);
             }
         }
         for (SkuScheduleDTO sku : context.getNewSpecSkuList()) {
             if (StringUtils.isNotEmpty(sku.getMaterialCode())
                     && sku.getEmbryoStock() >= 0
                     && !stockMap.containsKey(sku.getMaterialCode())) {
-                stockMap.put(sku.getMaterialCode(), sku.getEmbryoStock());
+                int demandUpperLimit = Math.max(sku.getSurplusQty(), sku.getEmbryoStock());
+                stockMap.put(sku.getMaterialCode(), demandUpperLimit);
             }
         }
         return stockMap;
     }
 
     /**
-     * 根据胎胚库存调整排程结果的计划量
+     * 根据排产需求上限调整排程结果的计划量。
+     * <p>需求上限 = max(硫化余量, 胎胚库存)，与S4.3待排量基线口径一致。
+     * 计划量超过需求上限时按上限削减，避免超余量/超库存排产。</p>
      *
      * @param context 排程上下文
      * @param result 排程结果
-     * @param materialEmbryoStockMap 物料维度胎胚库存Map
+     * @param materialEmbryoStockMap 物料维度排产需求上限Map
      * @param shifts 班次列表
      */
     private void adjustResultByEmbryoStock(LhScheduleContext context,
@@ -1277,7 +1283,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         if (totalPlan <= stock) {
             materialEmbryoStockMap.put(materialCode, stock - totalPlan);
         } else {
-            // 库存不足，削减计划量
+            // 计划量超过需求上限，削减计划量
             redistributeShiftQty(context, result, shifts, stock);
             materialEmbryoStockMap.put(materialCode, 0);
         }
