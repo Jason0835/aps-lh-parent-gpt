@@ -355,7 +355,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     /**
-     * 构建成型计划模板列表数据，按工厂分组并在每组末尾插入小计行。
+     * 构建成型计划模板列表数据，按机台分组并在每组末尾插入小计行。
      *
      * @param list 排程结果列表
      * @return 列表行数据，每行为一个Map，key对应模板中的{.xxx}占位符
@@ -363,11 +363,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     private List<Map<String, Object>> buildCxTemplateDataList(List<CxScheduleResult> list) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
-        // 按工厂编码分组，保持顺序
+        // 按机台编码分组，保持顺序
         Map<String, List<CxScheduleResult>> groupMap = exportList.stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(
-                        item -> PubUtil.isNotEmpty(item.getFactoryCode()) ? item.getFactoryCode() : "",
+                        item -> PubUtil.isNotEmpty(item.getCxMachineCode()) ? item.getCxMachineCode() : "",
                         LinkedHashMap::new,
                         Collectors.toList()));
 
@@ -375,9 +375,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         for (Map.Entry<String, List<CxScheduleResult>> entry : groupMap.entrySet()) {
             List<CxScheduleResult> groupList = entry.getValue();
 
-            // 按机台排序
+            // 组内按物料排序
             groupList.sort(Comparator.comparing(
-                    item -> PubUtil.isNotEmpty(item.getCxMachineCode()) ? item.getCxMachineCode() : "",
+                    item -> PubUtil.isNotEmpty(item.getMaterialCode()) ? item.getMaterialCode() : "",
                     String::compareTo));
 
             // 添加明细行
@@ -474,10 +474,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     /**
-     * 构建按工厂分组的小计行。
+     * 构建按机台分组的小计行。
      * 小计标识放在 cxMachineCode(C4) 列，便于区分。
      */
-    private Map<String, Object> buildCxTemplateSubtotalRow(String factoryCode, List<CxScheduleResult> groupList) {
+    private Map<String, Object> buildCxTemplateSubtotalRow(String machineCode, List<CxScheduleResult> groupList) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("cxMachineCode", "小计");
         row.put("structureName", "");
