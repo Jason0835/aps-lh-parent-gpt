@@ -722,6 +722,13 @@ export default {
     if (rq.productionVersion) {
       defaults.productionVersion = String(rq.productionVersion);
     }
+    if (rq.structureName) {
+      defaults.structureName = String(rq.structureName);
+    }
+    /** 调整版本号（ADJ…），随路由带入时参与 list4Adjust 等查询入参 */
+    if (rq.version) {
+      defaults.version = String(rq.version);
+    }
     this.search = { ...defaults };
     this.query = { ...defaults };
     await this.loadVersionOptions();
