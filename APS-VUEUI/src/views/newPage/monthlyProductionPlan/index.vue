@@ -973,7 +973,7 @@ export default {
         delete params.yearMonth;
       }
       if(params.productionVersion){
-        params.version = params.productionVersion
+        params.lastMonthPlanVersion = params.productionVersion
       }
       const scheduled = (this.currentAdjustMachine || "").trim();
       if (scheduled) {
