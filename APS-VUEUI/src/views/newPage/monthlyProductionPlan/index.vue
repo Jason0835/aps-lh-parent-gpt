@@ -1,6 +1,7 @@
 <template>
   <basic-container>
     <page-table
+      ref="monthPlanPageTableRef"
       tableRef="MonthPlanFinalAdjustQueryTable"
       :calcHeight="88"
       v-loading="loading"
@@ -13,6 +14,7 @@
       @search="handleSearch"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
+      @selection-change="handleStructureAdjustSelectionChange"
       :showSummary="false"
       :selectArea="false"
       :row-class-name="tableRowClassName"
@@ -31,7 +33,7 @@
           <el-button
             type="primary"
             plain
-            :disabled="!canUsePrimaryAdjustActions"
+            :disabled="isStructureAdjustEntryDisabled"
             @click="handleStructureAdjust"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.structureAdjust")
@@ -311,6 +313,8 @@ export default {
       },
       /** 1–31 号列编辑前原始值，用于失焦时与 rollingCycle 一致判断是否调用 save */
       dayEditOriginalValue: null,
+      /** 结构调整：表格多选勾选行（统计行不可选）；超过 1 条时禁用「结构调整」按钮 */
+      structureAdjustSelection: [],
     };
   },
   computed: {
@@ -326,6 +330,14 @@ export default {
     /** 有机台：仅「继续调整」可用 */
     canUseContinueAdjust() {
       return this.adjustFlowInProgress;
+    },
+    /** 结构调整入口：调整进行中不可点；勾选多于 1 条时不可点 */
+    isStructureAdjustEntryDisabled() {
+      if (!this.canUsePrimaryAdjustActions) {
+        return true;
+      }
+      const n = (this.structureAdjustSelection || []).length;
+      return n > 1;
     },
     searchColumns() {
       return [
@@ -392,6 +404,12 @@ export default {
         return m[v] != null ? m[v] : v || "";
       };
       const cols = [
+        {
+          type: "selection",
+          fixed: "left",
+          width: 48,
+          selectable: (row) => !row.showBackground,
+        },
         // {
         //   prop: "factoryCode",
         //   label: this.$t("common.factory"),
@@ -1060,7 +1078,45 @@ export default {
         this.data = [];
       } finally {
         this.loading = false;
+        this.$nextTick(() => {
+          this.clearStructureAdjustSelection();
+        });
       }
+    },
+    /**
+     * 成型机台字段可能为多个机台逗号分隔，取第一个用于结构调整跳转（如 H1503,H1201 → H1503）
+     */
+    extractFirstCxMachineCode(val) {
+      if (val == null || val === "") {
+        return "";
+      }
+      const s = String(val).trim();
+      if (!s) {
+        return "";
+      }
+      const parts = s
+        .split(/[,，]/)
+        .map((x) => String(x).trim())
+        .filter((x) => x);
+      return parts.length ? parts[0] : "";
+    },
+    /** 获取 PageTable 内层表格实例 */
+    getMonthPlanTableInnerRef() {
+      const pt = this.$refs.monthPlanPageTableRef;
+      return pt && typeof pt.getTableRef === "function"
+        ? pt.getTableRef()
+        : null;
+    },
+    clearStructureAdjustSelection() {
+      this.structureAdjustSelection = [];
+      const inner = this.getMonthPlanTableInnerRef();
+      if (inner && typeof inner.clearSelection === "function") {
+        inner.clearSelection();
+      }
+    },
+    /** 结构调整：支持多选；勾选多于 1 条时「结构调整」按钮禁用 */
+    handleStructureAdjustSelectionChange(rows) {
+      this.structureAdjustSelection = rows || [];
     },
     /**
      * 与 rollingCycle/index.backup-legacy.vue getStatisticsResult(data) 一致：statistics 的 productionVersion 来自「列表首行」的 data.productionVersion。
@@ -1236,11 +1292,25 @@ export default {
         );
         return;
       }
-      this.$refs.structureAdjustDialogRef.show({
+      const sel = this.structureAdjustSelection || [];
+      if (sel.length > 1) {
+        return;
+      }
+      const payload = {
         factoryCode: fc,
         yearMonth: ym,
         ...this.buildStructureDialogListVersionParams(),
-      });
+      };
+      /** 仅当勾选一行且该机台有值时预填；未勾选或无机台则打开弹窗自行选机台 */
+      if (sel.length === 1) {
+        const firstMachine = this.extractFirstCxMachineCode(
+          sel[0].cxMachineCode
+        );
+        if (firstMachine) {
+          payload.prefillCxMachineCode = firstMachine;
+        }
+      }
+      this.$refs.structureAdjustDialogRef.show(payload);
     },
     handleViewAdjustVersion() {
       const q = {};
