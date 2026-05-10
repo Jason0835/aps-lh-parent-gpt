@@ -214,7 +214,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 计算指定SKU的已完成量（汇总各班次完成量）
      * 计算指定SKU的已完成量（月累计完成量 + T日晚班完成量）
      *
      * @param context 排程上下文
@@ -222,13 +221,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @return 已完成量
      */
     private int calculateFinishedQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
-        // 严格使用基础数据阶段按物料汇总好的月累计完成量（截至窗口T-1，含当天）。
         // 已完成量 = 月累计完成量（截至T-1日）+ T日排程晚班完成量（class1FinishQty）
         String materialCode = plan.getMaterialCode();
         if (StringUtils.isNotEmpty(materialCode)) {
             Integer monthFinishedQty = context.getMaterialMonthFinishedQtyMap().get(materialCode);
             if (Objects.nonNull(monthFinishedQty)) {
-                return Math.max(monthFinishedQty, 0);
                 return Math.max(monthFinishedQty, 0) + resolveScheDayFinishQty(context, materialCode);
             }
             if (canFallbackToPreviousFinishedQty(context)) {
@@ -249,6 +246,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         }
         return 0;
     }
+
 
     /**
      * 获取指定物料的T日排程班次完成量（class1FinishQty汇总值）。
