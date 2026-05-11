@@ -162,10 +162,10 @@ export default {
         },
         {
           prop: 'embryoDesc',
-          align: 'center',
+          align: 'left',
           halign: 'center',
           label: this.$t('ui.data.column.cxStock.embryoDesc'),
-          minWidth: 180
+          minWidth: 300
         },
         {
           prop: 'stockNum',
