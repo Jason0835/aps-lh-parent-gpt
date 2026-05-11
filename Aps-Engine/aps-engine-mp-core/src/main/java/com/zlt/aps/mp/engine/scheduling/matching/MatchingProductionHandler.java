@@ -1237,7 +1237,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             }
             // 10、当天已经有排产的SKU再次上模时至少需要5天量的限制
             if (currentDayProductionQty > 0 && productionQty < maxProductionQty * skuShortestProductionDays) {
-                continue
+                continue;
             }
             
             // 根据剩余可排模具限制模具数量
