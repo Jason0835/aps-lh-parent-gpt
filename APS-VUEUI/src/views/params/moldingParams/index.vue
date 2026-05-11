@@ -117,18 +117,21 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.paramsCode"),
           // sortable: "custom",
+          minWidth: 200,
         },
         {
           prop: "paramName",
           halign: "center",
           label: this.$t("ui.data.column.paramsName"),
           titleTooltip: true,
+          minWidth: 200,
           // sortable: "custom",
         },
         {
           prop: "paramValue",
           halign: "center",
           label: this.$t("ui.data.column.paramsValue"),
+          minWidth: 200,
           // sortable: "custom",
         },
         {

@@ -8,11 +8,9 @@
       :columns="columns"
       :searchColumns="searchColumns"
       :data="data"
-      :page="page"
       :search="search"
       @refresh="getList"
       @search="handleSearch"
-      @pageChange="handlePageChange"
       @sort-change="handleSortChange"
       @selection-change="handleStructureAdjustSelectionChange"
       :showSummary="false"
@@ -966,11 +964,6 @@ export default {
       await this.fetchCurrentAdjustMachineFromRedis();
       this.getList();
     },
-    handlePageChange(current, pageSize) {
-      this.$set(this.page, "current", current);
-      this.$set(this.page, "pageSize", pageSize);
-      this.getList();
-    },
     handleSortChange({ column, prop, order }) {
       if (order) {
         this.sort = {
@@ -982,15 +975,12 @@ export default {
       }
       this.getList();
     },
-    formatParams(hasPage = true) {
+    /** 列表 list4Adjust 入参（接口一次性返回全量，不含分页字段） */
+    formatParams() {
       const params = {
         ...this.query,
         ...this.sort,
       };
-      if (hasPage) {
-        params.pageSize = this.page.pageSize;
-        params.pageNum = this.page.current;
-      }
       if (params.yearMonth) {
         const arr = params.yearMonth.split("-");
         params.year = Number(arr[0]);
@@ -1031,7 +1021,7 @@ export default {
       return params;
     },
     /**
-     * 排产明细导出入参：与 monthPlanManagement/mouldingDayResult formatParams(false) 一致，
+     * 排产明细导出入参：与 monthPlanManagement/mouldingDayResult 一致（不含分页），
      * 请求 /monthplan/factoryMonthPlanMouldDayResult/export、exportAllMaterial。
      * 另附带本页「当前调整机台」cxMachineCode（与列表 list4Adjust 一致）。
      */
@@ -1067,11 +1057,10 @@ export default {
       try {
         this.loading = true;
         /** list4Adjust 不传 productionVersion；与 query 解耦，不影响 mpMonthPlanStatistics 使用的 resolveProductionVersionForStatistics */
-        const listParams = { ...this.formatParams(true) };
+        const listParams = { ...this.formatParams() };
         delete listParams.productionVersion;
         const res = await listMonthPlanFinal4Adjust(listParams);
         const rawRows = res.rows || [];
-        this.page.total = res.total != null ? res.total : rawRows.length;
         await this.applyAdjustmentStatisticsRows(rawRows);
       } catch (e) {
         console.error(e);

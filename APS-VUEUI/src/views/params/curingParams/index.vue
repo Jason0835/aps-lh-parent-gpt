@@ -119,12 +119,14 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.paramsCode"),
           // sortable: "custom",
+          width: 360
         },
         {
           prop: "paramName",
           halign: "center",
           label: this.$t("ui.data.column.paramsName"),
           titleTooltip: true,
+          minWidth: 180,
           // sortable: "custom",
         },
         {
@@ -132,12 +134,13 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.paramsValue"),
           // sortable: "custom",
+          width: 180
         },
         {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
-          minWidth: 100,
+          minWidth: 220,
           // sortable: "custom",
         },
         {
@@ -150,7 +153,7 @@ export default {
           prop: "updateTime",
           halign: "center",
           label: this.$t("ui.data.column.lhParams.updateTime"),
-          minWidth: 160,
+          minWidth: 180,
         },
         {
           align: "center",
