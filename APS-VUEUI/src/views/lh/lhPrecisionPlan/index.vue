@@ -167,6 +167,8 @@ export default {
         },
         {
           prop: "scheduleDate",
+          align: "center",
+          minWidth: 120,
           label: this.$t("ui.data.column.lhPrecisionPlan.scheduleDate"),
         },
         {

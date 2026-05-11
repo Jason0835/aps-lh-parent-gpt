@@ -64,8 +64,9 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          align: "left",
           prop: "materialDesc",
-          minWidth: 340,
+          minWidth: 350,
           showOverflowTooltip: true,
         },
         {
@@ -107,6 +108,8 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "materialDesc",
         },
       ];

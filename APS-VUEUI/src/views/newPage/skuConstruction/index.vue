@@ -179,8 +179,8 @@ export default {
         },
         {
           prop: "materialDesc",
-          align: "center",
-          width: 300,
+          align: "left",
+          minWidth: 350,
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
         },
         {
@@ -230,7 +230,8 @@ export default {
         {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-          width: 300,
+          align: "left",
+          minWidth: 350,
         },
         // {
         //   prop: "curingTime",
@@ -334,6 +335,8 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "materialDesc",
         },
         // {
@@ -349,6 +352,8 @@ export default {
         {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          minWidth: 350,
+          align: "left",
         },
 
       ];

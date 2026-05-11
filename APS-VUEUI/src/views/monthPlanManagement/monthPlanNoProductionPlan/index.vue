@@ -145,8 +145,9 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          align: "left",
           prop: "materialDesc",
-          minWidth: 300,
+          minWidth: 350,
         },
         {
           label: this.$t("排产类型"),
@@ -330,6 +331,8 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "materialDesc",
         },
         // {

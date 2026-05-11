@@ -142,7 +142,7 @@ export default {
           align: "left",
           halign: "center",
           label: this.$t("ui.data.column.lhSpecialMaterialBom.materialDesc"),
-          minWidth: 320,
+          minWidth: 350,
         },
         {
           prop: "category",
@@ -212,6 +212,8 @@ export default {
         },
         {
           label: this.$t("ui.data.column.lhSpecialMaterialBom.materialDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "materialDesc",
         },
         {

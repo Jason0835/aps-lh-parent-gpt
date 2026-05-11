@@ -134,7 +134,7 @@ export default {
               align: "center",
               halign: "center",
               //  sortable: "custom",
-              minWidth: 100,
+              minWidth: 120,
             },
             {
               prop: "materialCode",

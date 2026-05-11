@@ -158,7 +158,7 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.lhMouldChangePlan.scheduleDate"),
-          minWidth: 140,
+          minWidth: 120,
         },
         {
           prop: "classIndex",
@@ -206,7 +206,7 @@ export default {
           align: "left",
           halign: "center",
           label: this.$t("ui.data.column.lhMouldChangePlan.beforeMaterialDesc"),
-          width: 350,
+          minWidth: 350,
           render: ({ row }) => this.renderMaterialDesc(row.beforeMaterialDesc),
         },
         {
@@ -221,7 +221,7 @@ export default {
           align: "left",
           halign: "center",
           label: this.$t("ui.data.column.lhMouldChangePlan.afterMaterialDesc"),
-          width: 350,
+          minWidth: 350,
           render: ({ row }) => this.renderMaterialDesc(row.afterMaterialDesc),
         },
         {
@@ -277,8 +277,8 @@ export default {
         },
         {
           prop: "orderNo",
-          align: "center",
-          halign: "center",
+          align: "left",
+          halign: "left",
           label: this.$t("ui.data.column.lhMouldChangePlan.orderNo"),
           minWidth: 160,
         },
@@ -356,6 +356,8 @@ export default {
         {
           label: this.$t("ui.data.column.lhMouldChangePlan.orderNo"),
           prop: "orderNo",
+          align: "left",
+          minWidth: 160,
         },
         {
           label: this.$t("ui.data.column.lhMouldChangePlan.planDate"),

@@ -136,6 +136,7 @@ export default {
         {
           prop: "specDesc",
           align: "left",
+          minWidth: 350,
           halign: "center",
           label: this.$t("ui.data.column.cxScheduleResult.specDesc"),
           // sortable: "custom",

@@ -107,7 +107,8 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
-          minWidth: 180,
+          align: "center",
+          minWidth: 120,
           // sortable: "custom",
         },
         {
@@ -148,7 +149,8 @@ export default {
         {
           label: this.$t("ui.data.column.remark"),
           prop: "orderNo",
-          minWidth: 100,
+          align: "left",
+          minWidth: 160,
           // sortable: "custom",
         },
         {
@@ -166,7 +168,8 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.specDesc"),
           prop: "specDesc",
-          minWidth: 140,
+          align: "left",
+          minWidth: 350,
           // sortable: "custom",
         },
         {

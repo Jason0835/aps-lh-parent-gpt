@@ -918,7 +918,7 @@ export default {
               this.search.productionVersion ||
               ""
           ).trim();
-          
+
           if (currentPv) {
             const hasVersion = list.some(
               (item) => String(item.value) === currentPv

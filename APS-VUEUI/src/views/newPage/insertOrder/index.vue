@@ -185,7 +185,8 @@ export default {
         {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-          width: 320,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "materialCode",
@@ -195,7 +196,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width: 320,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "mouldQty",
@@ -369,6 +371,8 @@ export default {
         {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          minWidth: 350,
+          align: "left",
         },
         {
           prop: "materialCode",
@@ -377,6 +381,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          minWidth: 350,
+          align: "left",
         },
         {
           prop: "brand",

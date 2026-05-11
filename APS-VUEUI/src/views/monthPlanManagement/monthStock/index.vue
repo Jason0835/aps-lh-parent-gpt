@@ -158,7 +158,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.monthStock.productDesc"),
-          width: 250,
+          align: "left",
+          minWidth: 350,
         },
         // {
         //   prop: "channel",
@@ -243,6 +244,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.monthStock.productDesc"),
+          minWidth: 350,
+          align: "left",
         },
         {
           prop: "locationType",

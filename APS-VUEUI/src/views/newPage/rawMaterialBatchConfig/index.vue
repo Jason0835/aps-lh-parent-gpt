@@ -152,7 +152,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("common.name"),
-          width:200
+          align: "left",
+          minWidth: 350
         },
         {
           prop: "outboundDate",
@@ -227,6 +228,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("common.name"),
+          minWidth: 350,
+          align: "left",
         }, {
           prop: "outboundDate",
           label: this.$t("ui.data.column.masterdata.outboundDate"),

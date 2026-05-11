@@ -165,6 +165,8 @@ export default {
         },
         {
           label: this.$t("物料描述"),
+          minWidth: 350,
+          align: "left",
           prop: "productDesc",
         },
       ];

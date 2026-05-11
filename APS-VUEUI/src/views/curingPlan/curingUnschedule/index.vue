@@ -123,12 +123,14 @@ export default {
         {
           label: this.$t("ui.data.column.unscheduleResult.scheduleDate"),
           prop: "scheduleDate",
-          width: 160,
+          align: "center",
+          minWidth: 120,
         },
         {
           label: this.$t("ui.data.column.unscheduleResult.batchNo"),
           prop: "batchNo",
-          width: 180,
+          align: "left",
+          minWidth: 160,
         },
         {
           label: this.$t("ui.data.column.unscheduleResult.embryoCode"),
@@ -158,8 +160,9 @@ export default {
         },
         {
           label: this.$t("ui.data.column.unscheduleResult.specDesc"),
+          align: "left",
           prop: "specDesc",
-          width: 250,
+          minWidth: 350,
         },
         {
           label: this.$t("ui.data.column.unscheduleResult.unscheduledQty"),
@@ -206,6 +209,8 @@ export default {
         {
           label: this.$t("ui.data.column.unscheduleResult.batchNo"),
           prop: "batchNo",
+          align: "left",
+          minWidth: 160,
         },
         {
           label: this.$t("ui.data.column.unscheduleResult.factoryCode"),
@@ -223,6 +228,8 @@ export default {
         },
         {
           label: this.$t("ui.data.column.unscheduleResult.specDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "specDesc",
         },
         {

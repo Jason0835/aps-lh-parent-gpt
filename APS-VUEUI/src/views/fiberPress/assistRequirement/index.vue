@@ -126,7 +126,9 @@ export default {
         {
           prop: "scheduleDate",
           align: "center",
+          minWidth: 120,
           halign: "center",
+          minWidth: 120,
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           // sortable: "custom",
         },

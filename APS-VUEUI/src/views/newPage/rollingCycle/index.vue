@@ -109,7 +109,7 @@
                 "
               />
             </el-form-item>
-            
+
             <el-form-item :label="this.$t('common.startDate')">
               <el-input
                 disabled
@@ -220,13 +220,13 @@
           >
             {{ this.$t("common.button.confirm") }}</el-button
           >
-		  
+
 		  <el-button
             @click="handleExport"
             v-hasPermi="['monthplan:factoryMonthPlanFinalResult:export']"
             >{{ $t("ui.frame.btn.export") }}</el-button
           >
-		  
+
           <el-button
             v-hasPermi="['monthplan:factoryMonthPlanFinalResult:import']"
             @click="$refs.tltUpload.handleImport()"
@@ -240,7 +240,7 @@
               $t("ui.data.column.monthPlanFinalAdjustQuery.issueScmMes")
             }}</el-button
           >
-		  
+
         </div>
       </template>
     </page-table>
@@ -630,7 +630,8 @@ export default {
           {
             prop: "materialDesc",
             label: this.$t("物料描述"),
-            width: 320,
+          align: "left",
+            minWidth: 350,
             fixed: "left",
           },
           {
@@ -884,7 +885,8 @@ export default {
           {
             prop: "materialDesc",
             label: this.$t("物料描述"),
-            width: 320,
+          align: "left",
+            minWidth: 350,
           },
           {
             prop: "hasSpecialMaterial",
@@ -1004,7 +1006,8 @@ export default {
           {
             prop: "materialDesc",
             label: this.$t("物料描述"),
-            width: 320,
+          align: "left",
+            minWidth: 350,
             fixed: "left",
           },
 
@@ -1311,7 +1314,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("物料描述"),
-          width: 320,
+          align: "left",
+          minWidth: 350,
           fixed: "flex",
         },
 
@@ -1542,8 +1546,8 @@ export default {
             row.version === item.version
         );
         if (sourceItem && sourceItem.productTypeCode) {
-          return { 
-            ...item, 
+          return {
+            ...item,
             productTypeCode: sourceItem.productTypeCode,
             dayVulcanizationQty: sourceItem.dayVulcanizationQty
           };

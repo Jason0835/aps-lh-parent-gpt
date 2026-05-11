@@ -183,7 +183,8 @@ export default {
           {
             prop: "materialDesc",
             label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-            width: 300,
+          align: "left",
+            minWidth: 350,
           },
           {
             prop: "productionType",
@@ -353,7 +354,8 @@ export default {
           {
             prop: "materialDesc",
             label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-            width: 400,
+          align: "left",
+            minWidth: 350,
           },
           {
             prop: "productCategory",
@@ -488,12 +490,14 @@ export default {
           {
             prop: "mainMaterialDesc",
             label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-            width: 280,
+          align: "left",
+            minWidth: 350,
           },
           {
             prop: "materialDesc",
             label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-            width: 300,
+          align: "left",
+            minWidth: 350,
           },
           {
             prop: "mainPattern",
@@ -652,8 +656,9 @@ export default {
           },
           {
             label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          align: "left",
             prop: "materialDesc",
-            minWidth: 300,
+            minWidth: 350,
           },
           {
             label: this.$t("ui.data.column.finishStock.structureName"),
@@ -800,6 +805,8 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "materialDesc",
         },
         // {

@@ -48,7 +48,8 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
-          minWidth: 100,
+          align: "center",
+          minWidth: 120,
           // sortable: "custom",
           formatter: (row) => {
             return row.scheduleDate || "-";

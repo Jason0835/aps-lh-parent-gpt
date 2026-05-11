@@ -117,8 +117,9 @@ export default {
         },
         {
           prop: "embryoDesc",
-          align: "center",
+          align: "left",
           label: this.$t("胎胚描述"),
+          minWidth: 350,
         },
         {
           prop: "isActive",
@@ -189,6 +190,8 @@ export default {
         },
         {
           label: this.$t("胎胚描述"),
+          minWidth: 350,
+          align: "left",
           prop: "embryoDesc",
         },
         {
