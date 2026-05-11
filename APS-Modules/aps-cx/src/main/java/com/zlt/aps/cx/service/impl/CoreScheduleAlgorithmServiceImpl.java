@@ -181,7 +181,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
             // 跨天时重置试制/量试单日SKU上限计数（单日最多2个试制+量试SKU）
             if (day != lastDay) {
-                context.setDailyTrialAssignedEmbryoCodes(new HashSet<>());
+                context.setDailyTrialAssignedMaterialCodes(new HashSet<>());
                 context.setPrecisionPlanApplied(false);
             }
 
@@ -446,10 +446,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return;
         }
 
-        Set<String> dailySet = context.getDailyTrialAssignedEmbryoCodes();
+        Set<String> dailySet = context.getDailyTrialAssignedMaterialCodes();
         if (dailySet == null) {
             dailySet = new HashSet<>();
-            context.setDailyTrialAssignedEmbryoCodes(dailySet);
+            context.setDailyTrialAssignedMaterialCodes(dailySet);
         }
 
         int initialSize = dailySet.size();
@@ -457,12 +457,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         // 过滤试制任务
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredTrialTasks = new ArrayList<>();
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getTrialTasks()) {
-            String ec = task.getEmbryoCode();
-            if (dailySet.contains(ec) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
-                dailySet.add(ec);
+            String mc = task.getMaterialCode();
+            if (dailySet.contains(mc) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
+                dailySet.add(mc);
                 filteredTrialTasks.add(task);
             } else {
-                log.warn("试制任务 {} 已超过单日上限{}个SKU，跳过", ec, MAX_TRIAL_SKU_PER_DAY);
+                log.warn("试制任务 物料{} 已超过单日上限{}个SKU，跳过", mc, MAX_TRIAL_SKU_PER_DAY);
             }
         }
         taskGroup.getTrialTasks().clear();
@@ -472,12 +472,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredNewTasks = new ArrayList<>();
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getNewTasks()) {
             if (Boolean.TRUE.equals(task.getIsProductionTrial())) {
-                String ec = task.getEmbryoCode();
-                if (dailySet.contains(ec) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
-                    dailySet.add(ec);
+                String mc = task.getMaterialCode();
+                if (dailySet.contains(mc) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
+                    dailySet.add(mc);
                     filteredNewTasks.add(task);
                 } else {
-                    log.warn("量试任务 {} 已超过单日上限{}个SKU，跳过", ec, MAX_TRIAL_SKU_PER_DAY);
+                    log.warn("量试任务 物料{} 已超过单日上限{}个SKU，跳过", mc, MAX_TRIAL_SKU_PER_DAY);
                 }
             } else {
                 filteredNewTasks.add(task);
@@ -490,12 +490,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredContinueTasks = new ArrayList<>();
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getContinueTasks()) {
             if (Boolean.TRUE.equals(task.getIsTrialTask()) || Boolean.TRUE.equals(task.getIsProductionTrial())) {
-                String ec = task.getEmbryoCode();
+                String mc = task.getMaterialCode();
                 // 已在dailySet中的（前面班次已排产），直接放行；不在的也不占新名额，直接放行
-                dailySet.add(ec);
+                dailySet.add(mc);
                 filteredContinueTasks.add(task);
-                log.debug("续作{}任务 {} 直接放行（续作不占新增SKU名额）",
-                        Boolean.TRUE.equals(task.getIsProductionTrial()) ? "量试" : "试制", ec);
+                log.debug("续作{}任务 物料{} 直接放行（续作不占新增SKU名额）",
+                        Boolean.TRUE.equals(task.getIsProductionTrial()) ? "量试" : "试制", mc);
             } else {
                 filteredContinueTasks.add(task);
             }
