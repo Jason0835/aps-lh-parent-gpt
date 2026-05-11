@@ -1,6 +1,7 @@
 package com.zlt.aps.itf.mes.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -10,20 +11,24 @@ import com.zlt.aps.itf.mes.mapper.LhScheduleResultIssueMapper;
 import com.zlt.aps.itf.mes.service.ILhScheduleResultIssueService;
 import com.zlt.aps.itf.vo.MesLhScheduleResult;
 import com.zlt.aps.itf.vo.SyncDataLogs;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import com.zlt.sync.handle.SyncDataHandle;
 import com.zlt.sync.povo.SyncParamsVO;
 import com.zlt.sync.service.SyncDataLogsService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -44,6 +49,12 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
 
     @Autowired
     private LhScheduleResultIssueMapper lhScheduleResultIssueMapper;
+
+    @Autowired
+    private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
+
+    @Autowired
+    private MdmSkuConstructionRefEntityMapper skuConstructionRefEntityMapper;
 
     /**
      * 日期格式化器
@@ -87,6 +98,9 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
         LocalDate firstDate = distinctDates.get(0);
         LocalDate lastDate = distinctDates.get(distinctDates.size() - 1);
 
+        // 补全MES物料编码和示方号
+        enrichMaterialAndExampleInfo(lhScheduleResultIssueList);
+
         // 按日期分组处理数据
         List<LhScheduleResultIssue> day1List = filterByDate(lhScheduleResultIssueList, distinctDates.get(0));
         List<LhScheduleResultIssue> day2List = distinctDates.size() > 1
@@ -124,6 +138,119 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
 
         // 发送MQ通知MES
         return sendMqNotice(allMesList, firstDate, lastDate, dataVersion, factoryCode, companyCode);
+    }
+
+    /**
+     * 补全MES物料编码和示方号
+     * 1. 通过物料编码关联物料信息表(MdmMaterialInfo)获取MES物料编码
+     * 2. 通过物料编码关联SKU与示方书关系表(MdmSkuConstructionRef)获取硫化示方书号作为示方号
+     * 3个班的示方号都取同一个值
+     *
+     * @param issueList 硫化排程结果下发列表
+     */
+    private void enrichMaterialAndExampleInfo(List<LhScheduleResultIssue> issueList) {
+        if (CollectionUtils.isEmpty(issueList)) {
+            return;
+        }
+
+        // 收集所有不重复的物料编码
+        List<String> materialCodeList = issueList.stream()
+                .map(LhScheduleResultIssue::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (CollectionUtils.isEmpty(materialCodeList)) {
+            return;
+        }
+
+        // 查询物料信息表，构建物料编码 -> MES物料编码的映射
+        Map<String, String> materialCodeToMesCodeMap = getMaterialCodeToMesCodeMap(materialCodeList);
+
+        // 查询SKU与示方书关系表，构建物料编码 -> 硫化示方书号的映射
+        Map<String, String> materialCodeToLhNoMap = getMaterialCodeToLhNoMap(materialCodeList);
+
+        // 补全每条记录的MES物料编码和示方号
+        for (LhScheduleResultIssue item : issueList) {
+            String materialCode = item.getMaterialCode();
+            if (StringUtils.isNotBlank(materialCode)) {
+                // 设置MES物料编码
+                String mesMaterialCode = materialCodeToMesCodeMap.get(materialCode);
+                if (StringUtils.isNotBlank(mesMaterialCode)) {
+                    item.setMesMaterialCode(mesMaterialCode);
+                }
+
+                // 设置3个班的示方号（硫化示方书号），3个班的示方号都取同一个值
+                String lhNo = materialCodeToLhNoMap.get(materialCode);
+                if (StringUtils.isNotBlank(lhNo)) {
+                    item.setClass1ExampleNo(lhNo);
+                    item.setClass2ExampleNo(lhNo);
+                    item.setClass3ExampleNo(lhNo);
+                }
+            }
+        }
+    }
+
+    /**
+     * 获取物料编码到MES物料编码的映射
+     * 通过物料编码关联物料信息表(MdmMaterialInfo)获取MES物料编码
+     *
+     * @param materialCodeList 物料编码列表
+     * @return 物料编码 -> MES物料编码的映射
+     */
+    private Map<String, String> getMaterialCodeToMesCodeMap(List<String> materialCodeList) {
+        if (CollectionUtils.isEmpty(materialCodeList)) {
+            return new HashMap<>();
+        }
+
+        LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(MdmMaterialInfo::getMaterialCode, materialCodeList)
+                .select(MdmMaterialInfo::getMaterialCode, MdmMaterialInfo::getMesMaterialCode);
+
+        List<MdmMaterialInfo> materialInfoList = materialInfoEntityMapper.selectList(queryWrapper);
+
+        if (CollectionUtils.isEmpty(materialInfoList)) {
+            return new HashMap<>();
+        }
+
+        return materialInfoList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getMesMaterialCode()))
+                .collect(Collectors.toMap(
+                        MdmMaterialInfo::getMaterialCode,
+                        MdmMaterialInfo::getMesMaterialCode,
+                        (v1, v2) -> v1
+                ));
+    }
+
+    /**
+     * 获取物料编码到硫化示方书号的映射
+     * 通过物料编码关联SKU与示方书关系表(MdmSkuConstructionRef)获取硫化示方书号
+     *
+     * @param materialCodeList 物料编码列表
+     * @return 物料编码 -> 硫化示方书号的映射
+     */
+    private Map<String, String> getMaterialCodeToLhNoMap(List<String> materialCodeList) {
+        if (CollectionUtils.isEmpty(materialCodeList)) {
+            return new HashMap<>();
+        }
+
+        LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeList)
+                .select(MdmSkuConstructionRef::getMaterialCode, MdmSkuConstructionRef::getLhNo);
+
+        List<MdmSkuConstructionRef> constructionRefList = skuConstructionRefEntityMapper.selectList(queryWrapper);
+
+        if (CollectionUtils.isEmpty(constructionRefList)) {
+            return new HashMap<>();
+        }
+
+        return constructionRefList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getLhNo()))
+                .collect(Collectors.toMap(
+                        MdmSkuConstructionRef::getMaterialCode,
+                        MdmSkuConstructionRef::getLhNo,
+                        (v1, v2) -> v1
+                ));
     }
 
     /**

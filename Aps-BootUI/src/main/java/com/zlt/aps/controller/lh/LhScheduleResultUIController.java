@@ -12,6 +12,7 @@ import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
+import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
 import com.zlt.aps.lh.api.service.ILhScheduleResultRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
@@ -345,6 +346,19 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     @ResponseBody
     public AjaxResult issueToMes() {
         return iLhScheduleResultRemoteService.issueToMes();
+    }
+
+    @ApiOperation("排产小结报表导出")
+    @GetMapping("/exportScheduleSummaryReport")
+    @ResponseBody
+    public void exportScheduleSummaryReport(HttpServletResponse response,
+                                             ScheduleSummaryReportVO queryVO) throws IOException {
+        String fileName = "排产小结报表";
+        byte[] excelBytes = iLhScheduleResultRemoteService.exportScheduleSummaryReport(queryVO, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
     }
 
 }
