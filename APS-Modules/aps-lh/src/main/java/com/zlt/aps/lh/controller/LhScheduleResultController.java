@@ -26,12 +26,14 @@ import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
+import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.component.ScheduleExecutionGuard;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleService;
+import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
@@ -89,6 +91,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     @Autowired
     private ScheduleExecutionGuard scheduleExecutionGuard;
+
+    @Autowired
+    private IScheduleSummaryReportService scheduleSummaryReportService;
 
 
     @Autowired
@@ -801,7 +806,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass2AnalysisInput(null);
         target.setClass2Analysis(source.getClass1Analysis());
         target.setClass2PlanQty(source.getClass1PlanQty());
-        target.setClass2ExampleType(null);
+        target.setClass2ExampleType(source.getConstructionStage());
         target.setClass2ExampleNo(null);
 
         // 中间表3班 = 中班（对应APS 2班）
@@ -809,7 +814,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass3AnalysisInput(null);
         target.setClass3Analysis(source.getClass2Analysis());
         target.setClass3PlanQty(source.getClass2PlanQty());
-        target.setClass3ExampleType(null);
+        target.setClass3ExampleType(source.getConstructionStage());
         target.setClass3ExampleNo(null);
 
         // 硫化时长
@@ -859,7 +864,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass1AnalysisInput(null);
         target.setClass1Analysis(source.getClass3Analysis());
         target.setClass1PlanQty(source.getClass3PlanQty());
-        target.setClass1ExampleType(null);
+        target.setClass1ExampleType(source.getConstructionStage());
         target.setClass1ExampleNo(null);
 
         // 中间表2班 = 早班（对应APS 4班）
@@ -867,7 +872,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass2AnalysisInput(null);
         target.setClass2Analysis(source.getClass4Analysis());
         target.setClass2PlanQty(source.getClass4PlanQty());
-        target.setClass2ExampleType(null);
+        target.setClass2ExampleType(source.getConstructionStage());
         target.setClass2ExampleNo(null);
 
         // 中间表3班 = 中班（对应APS 5班）
@@ -875,7 +880,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass3AnalysisInput(null);
         target.setClass3Analysis(source.getClass5Analysis());
         target.setClass3PlanQty(source.getClass5PlanQty());
-        target.setClass3ExampleType(null);
+        target.setClass3ExampleType(source.getConstructionStage());
         target.setClass3ExampleNo(null);
 
         // 硫化时长
@@ -925,7 +930,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass1AnalysisInput(null);
         target.setClass1Analysis(source.getClass6Analysis());
         target.setClass1PlanQty(source.getClass6PlanQty());
-        target.setClass1ExampleType(null);
+        target.setClass1ExampleType(source.getConstructionStage());
         target.setClass1ExampleNo(null);
 
         // 中间表2班 = 早班（对应APS 7班）
@@ -933,7 +938,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass2AnalysisInput(null);
         target.setClass2Analysis(source.getClass7Analysis());
         target.setClass2PlanQty(source.getClass7PlanQty());
-        target.setClass2ExampleType(null);
+        target.setClass2ExampleType(source.getConstructionStage());
         target.setClass2ExampleNo(null);
 
         // 中间表3班 = 中班（对应APS 8班）
@@ -941,7 +946,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass3AnalysisInput(null);
         target.setClass3Analysis(source.getClass8Analysis());
         target.setClass3PlanQty(source.getClass8PlanQty());
-        target.setClass3ExampleType(null);
+        target.setClass3ExampleType(source.getConstructionStage());
         target.setClass3ExampleNo(null);
 
         // 硫化时长
@@ -995,7 +1000,19 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         return "schedule_date desc, lh_machine_code asc";
     }
 
-
-
+    /**
+     * 排产小结报表导出
+     *
+     * @param queryVO 查询条件，包含排程日期和分厂编码
+     * @param fileName 导出文件名
+     * @return Excel文件字节数组
+     */
+    @Log(title = "排产小结导出", businessType = BusinessType.EXPORT)
+    @ApiOperation("排产小结报表导出")
+    @PostMapping("/exportScheduleSummaryReport/{fileName}")
+    public byte[] exportScheduleSummaryReport(@RequestBody ScheduleSummaryReportVO queryVO,
+                                               @PathVariable("fileName") String fileName) {
+        return scheduleSummaryReportService.exportScheduleSummaryReport(queryVO);
+    }
 
 }

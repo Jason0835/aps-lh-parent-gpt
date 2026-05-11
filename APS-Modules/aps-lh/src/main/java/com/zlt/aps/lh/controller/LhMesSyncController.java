@@ -287,4 +287,44 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
         }
         return AjaxResult.success();
     }
+
+    @Override
+    @ApiOperation("清理硫化在机历史重复数据，保留每个历史日期最新版本")
+    @PostMapping("/cleanLhMachineOnlineHistoryDuplicate")
+    public AjaxResult cleanLhMachineOnlineHistoryDuplicate() {
+        log.info("开始清理硫化在机历史重复数据...");
+        int count = lhMachineOnlineInfoMapper.cleanHistoryDuplicateData();
+        log.info("清理硫化在机历史重复数据完成，删除记录数={}", count);
+        return AjaxResult.success("删除记录数：" + count);
+    }
+
+    @Override
+    @ApiOperation("清理胶囊已使用次数历史重复数据，保留每个历史日期最新版本")
+    @PostMapping("/cleanLhRepairCapsuleHistoryDuplicate")
+    public AjaxResult cleanLhRepairCapsuleHistoryDuplicate() {
+        log.info("开始清理胶囊已使用次数历史重复数据...");
+        int count = lhRepairCapsuleMapper.cleanHistoryDuplicateData();
+        log.info("清理胶囊已使用次数历史重复数据完成，删除记录数={}", count);
+        return AjaxResult.success("删除记录数：" + count);
+    }
+
+    @Override
+    @ApiOperation("清理硫化排程完成量历史重复数据，保留每个历史日期最新版本")
+    @PostMapping("/cleanLhScheFinishQtyHistoryDuplicate")
+    public AjaxResult cleanLhScheFinishQtyHistoryDuplicate() {
+        log.info("开始清理硫化排程完成量历史重复数据...");
+        int count = lhScheFinishQtyMapper.cleanHistoryDuplicateData();
+        log.info("清理硫化排程完成量历史重复数据完成，删除记录数={}", count);
+        return AjaxResult.success("删除记录数：" + count);
+    }
+
+    @Override
+    @ApiOperation("清理硫化排程日完成量历史重复数据，保留每个历史日期最新版本")
+    @PostMapping("/cleanLhDayFinishQtyHistoryDuplicate")
+    public AjaxResult cleanLhDayFinishQtyHistoryDuplicate() {
+        log.info("开始清理硫化排程日完成量历史重复数据...");
+        int count = lhDayFinishQtyMapper.cleanHistoryDuplicateData();
+        log.info("清理硫化排程日完成量历史重复数据完成，删除记录数={}", count);
+        return AjaxResult.success("删除记录数：" + count);
+    }
 }
