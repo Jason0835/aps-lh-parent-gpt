@@ -6,8 +6,10 @@ import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
+import com.zlt.aps.mp.engine.enums.ProductionQtyModelEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
+import com.zlt.aps.mp.engine.scheduling.cxcapacity.SkuNeedProductionInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
@@ -157,15 +159,20 @@ public class ContinueSkuCalculator {
         if (CollectionUtils.isEmpty(planList)) {
             return BigDecimal.ZERO.intValue();
         }
-        //非测算阶段
-        if(ProductionStageEnum.CALCULATION_STAGE != productionStage){
-            //总净需求量
-            return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
-        }
+//        //非测算阶段
+//        if(ProductionStageEnum.CALCULATION_STAGE != productionStage){
+//            //总净需求量
+//            return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+//        }
         //是否按总需求排产
         Integer isProductionBySum = planList.get(BigDecimal.ZERO.intValue()).getIsProductionBySum();
         if (YesOrNoEnum.YES.getValue().equals(isProductionBySum)) {
             //总净需求量
+            return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
+        }
+        //计算需要排产的量 20260430+ Sku是否一起排产
+        boolean isAllSum = planList.get(BigDecimal.ZERO.intValue()).getIsAllSum();
+        if (isAllSum) {
             return planList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProductionQty).sum();
         }
         //高优先级排产量

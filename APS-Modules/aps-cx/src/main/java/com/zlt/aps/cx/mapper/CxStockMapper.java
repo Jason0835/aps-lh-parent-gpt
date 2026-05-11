@@ -39,6 +39,22 @@ public interface CxStockMapper extends CommBaseMapper<CxStock> {
                                               @Param("updateTime") Date updateTime);
 
     /**
+     * 根据分厂编号、数据来源和库存日期逻辑删除成型库存
+     *
+     * @param factoryCode 分厂编号
+     * @param dataSource  数据来源
+     * @param stockDate   库存日期
+     * @param updateBy    更新者
+     * @param updateTime  更新时间
+     * @return 更新的记录数
+     */
+    int logicDeleteByFactoryCodeAndDataSourceAndStockDate(@Param("factoryCode") String factoryCode,
+                                                          @Param("dataSource") String dataSource,
+                                                          @Param("stockDate") Date stockDate,
+                                                          @Param("updateBy") String updateBy,
+                                                          @Param("updateTime") Date updateTime);
+
+    /**
      * 根据ID列表逻辑删除成型库存
      *
      * @param ids        ID列表

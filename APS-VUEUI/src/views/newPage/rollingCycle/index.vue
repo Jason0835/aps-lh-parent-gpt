@@ -69,13 +69,13 @@
             class="demo-form-inline"
           >
             <el-form-item
-              :label="this.$t('ui.data.column.workWearInfo.cxMachineCode')"
+              :label="this.$t('ui.data.column.cxScheduleResult.cxMachineCode')"
             >
               <el-input
                 v-model="formInline.cxMachineCode"
                 disabled
                 :placeholder="
-                  this.$t('ui.data.column.workWearInfo.cxMachineCode')
+                  this.$t('ui.data.column.cxScheduleResult.cxMachineCode')
                 "
               ></el-input>
             </el-form-item>
@@ -1179,17 +1179,17 @@ export default {
             change: this.handleYearMonthChange,
           },
         },
-        {
-          prop: "scheduledMachines",
-          label: this.$t("成型机台"),
-        },
-        {
-          prop: "structureName",
-          label: this.$t("产品结构"),
-          type: "select",
-          dictData: this.structureList,
-          filterable: true,
-        },
+        // {
+        //   prop: "scheduledMachines",
+        //   label: this.$t("成型机台"),
+        // },
+        // {
+        //   prop: "structureName",
+        //   label: this.$t("产品结构"),
+        //   type: "select",
+        //   dictData: this.structureList,
+        //   filterable: true,
+        // },
         {
           prop:
             this.activeName == "second" ? "productionVersion" : "version",
@@ -2066,9 +2066,28 @@ export default {
         this.show = true;
         this.loading = false;
         this.autoLoading = false;
-        /** 结构内独立页：自动调整成功后关闭当前页签并回到月计划调整查询 */
+        /** 结构内独立页：自动调整成功后关闭当前页签并回到月计划调整查询；版本号、结构与页头查询区、表单一致 */
         if (this.pageVariant === "structureInner") {
-          this.$tab.closeOpenPage(this.getMonthPlanFinalAdjustQueryRoute());
+          const queryExtra = {};
+          const structureName =
+            this.formInline && this.formInline.structureName != null
+              ? String(this.formInline.structureName).trim()
+              : "";
+          if (structureName) {
+            queryExtra.structureName = structureName;
+          }
+          const versionProp =
+            this.activeName === "second" ? "productionVersion" : "version";
+          const versionVal = this.search[versionProp] ?? this.query[versionProp];
+          if (
+            versionVal != null &&
+            String(versionVal).trim() !== ""
+          ) {
+            queryExtra[versionProp] = String(versionVal).trim();
+          }
+          this.$tab.closeOpenPage(
+            this.getMonthPlanFinalAdjustQueryRoute(queryExtra)
+          );
           return;
         }
         if (res.length != 0) {
@@ -2408,7 +2427,8 @@ export default {
         this.$set(this.page, "current", 1);
       }
       if (this.activeName == "singleResult") {
-        // this.resizeOutHistoryList();
+        this.loadText = this.$t("正在加载中，请稍候");
+        this.resizeOutHistoryList();
         return;
       }
       this.loadText = this.$t("正在加载中，请稍候");

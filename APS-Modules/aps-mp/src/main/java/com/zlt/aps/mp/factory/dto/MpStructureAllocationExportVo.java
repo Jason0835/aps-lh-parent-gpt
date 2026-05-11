@@ -47,6 +47,11 @@ public class MpStructureAllocationExportVo extends MpStructureAllocation {
      * 净需求(不含暂缓)
      */
     private Integer unPostponeNetQty;
+    
+    /**
+     * 高优先级净需求
+     */
+    private Integer heightQty;
 
     /**
      * 实际排产

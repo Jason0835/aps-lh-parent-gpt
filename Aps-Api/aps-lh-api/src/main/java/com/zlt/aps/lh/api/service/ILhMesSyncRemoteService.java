@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.Date;
 import java.util.List;
 
 @FeignClient(contextId = "ILhMesSyncRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.lh:/lh}")
@@ -33,7 +34,7 @@ public interface ILhMesSyncRemoteService {
 
     @ApiOperation("逻辑删除并批量保存硫化在机信息（事务性操作）")
     @PostMapping("/mesSync/logicDeleteAndSaveMachineOnlineInfo")
-    AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhMachineOnlineInfo> list);
+    AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("onlineDate") Date onlineDate, @RequestParam("updateBy") String updateBy, @RequestBody List<LhMachineOnlineInfo> list);
 
     @ApiOperation("批量删除胶囊已使用次数")
     @PostMapping("/mesSync/deleteRepairCapsule")
@@ -49,7 +50,7 @@ public interface ILhMesSyncRemoteService {
 
     @ApiOperation("逻辑删除并批量保存胶囊已使用次数（事务性操作）")
     @PostMapping("/mesSync/logicDeleteAndSaveRepairCapsule")
-    AjaxResult logicDeleteAndSaveRepairCapsule(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhRepairCapsule> list);
+    AjaxResult logicDeleteAndSaveRepairCapsule(@RequestParam("factoryCode") String factoryCode, @RequestParam("obtainTime") Date obtainTime, @RequestParam("updateBy") String updateBy, @RequestBody List<LhRepairCapsule> list);
 
     @ApiOperation("批量保存模具清洗预警")
     @PostMapping("/mesSync/saveMouldCleanWarnBatch")
@@ -73,7 +74,7 @@ public interface ILhMesSyncRemoteService {
 
     @ApiOperation("逻辑删除并批量保存硫化排程完成量（事务性操作）")
     @PostMapping("/mesSync/logicDeleteAndSaveScheFinishQty")
-    AjaxResult logicDeleteAndSaveScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhScheFinishQty> list);
+    AjaxResult logicDeleteAndSaveScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("scheduleDate") Date scheduleDate, @RequestParam("updateBy") String updateBy, @RequestBody List<LhScheFinishQty> list);
 
     @ApiOperation("批量保存硫化排程日完成量")
     @PostMapping("/mesSync/saveDayFinishQtyBatch")
@@ -89,7 +90,7 @@ public interface ILhMesSyncRemoteService {
 
     @ApiOperation("逻辑删除并批量保存硫化排程日完成量（事务性操作）")
     @PostMapping("/mesSync/logicDeleteAndSaveDayFinishQty")
-    AjaxResult logicDeleteAndSaveDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhDayFinishQty> list);
+    AjaxResult logicDeleteAndSaveDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("finishDate") Date finishDate, @RequestParam("updateBy") String updateBy, @RequestBody List<LhDayFinishQty> list);
 
     @ApiOperation("批量保存模具交替计划完成回报")
     @PostMapping("/mesSync/saveMoldAlterPlanFinishBatch")

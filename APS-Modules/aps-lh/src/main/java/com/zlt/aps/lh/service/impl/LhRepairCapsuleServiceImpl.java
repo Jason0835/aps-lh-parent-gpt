@@ -55,9 +55,9 @@ public class LhRepairCapsuleServiceImpl extends AbstractDocService<LhRepairCapsu
     }
 
     @Override
-    public void logicDeleteAndSaveBatch(String factoryCode, String updateBy, List<LhRepairCapsule> insertList) {
-        log.info("胶囊已使用次数同步-事务开始：逻辑删除分厂{}旧数据，待插入数量={}", factoryCode, CollectionUtils.size(insertList));
-        lhRepairCapsuleMapper.logicDeleteByFactoryCode(factoryCode, updateBy, new Date());
+    public void logicDeleteAndSaveBatch(String factoryCode, Date obtainTime, String updateBy, List<LhRepairCapsule> insertList) {
+        log.info("胶囊已使用次数同步-事务开始：逻辑删除分厂{}获取日期为{}的旧数据，待插入数量={}", factoryCode, obtainTime, CollectionUtils.size(insertList));
+        lhRepairCapsuleMapper.logicDeleteByFactoryCodeAndObtainTime(factoryCode, obtainTime, updateBy, new Date());
         log.info("胶囊已使用次数同步-逻辑删除完成，开始批量插入");
         if (CollectionUtils.isNotEmpty(insertList)) {
             int batchSize = 1000;
@@ -69,6 +69,6 @@ public class LhRepairCapsuleServiceImpl extends AbstractDocService<LhRepairCapsu
                         (insertList.size() + batchSize - 1) / batchSize, subList.size());
             }
         }
-        log.info("胶囊已使用次数同步-事务完成：分厂{}，插入数量={}", factoryCode, CollectionUtils.size(insertList));
+        log.info("胶囊已使用次数同步-事务完成：分厂{}，获取日期={}，插入数量={}", factoryCode, obtainTime, CollectionUtils.size(insertList));
     }
 }

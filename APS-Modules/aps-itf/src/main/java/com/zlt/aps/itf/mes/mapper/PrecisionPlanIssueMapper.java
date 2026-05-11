@@ -15,7 +15,7 @@ import java.util.List;
  *
  * @author APS Team
  */
-@DS(DataSource.MES)
+@DS(DataSource.MASTER)
 @Mapper
 public interface PrecisionPlanIssueMapper {
 

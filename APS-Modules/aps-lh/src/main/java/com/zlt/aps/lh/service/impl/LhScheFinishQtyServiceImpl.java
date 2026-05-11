@@ -285,9 +285,9 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
     }
 
     @Override
-    public void logicDeleteAndSaveBatch(String factoryCode, String updateBy, List<LhScheFinishQty> insertList) {
-        log.info("硫化排程完成量同步-事务开始：逻辑删除分厂{}旧数据，待插入数量={}", factoryCode, CollectionUtils.size(insertList));
-        lhScheFinishQtyMapper.logicDeleteByFactoryCode(factoryCode, updateBy, new Date());
+    public void logicDeleteAndSaveBatch(String factoryCode, Date scheduleDate, String updateBy, List<LhScheFinishQty> insertList) {
+        log.info("硫化排程完成量同步-事务开始：逻辑删除分厂{}排程日期为{}的旧数据，待插入数量={}", factoryCode, scheduleDate, CollectionUtils.size(insertList));
+        lhScheFinishQtyMapper.logicDeleteByFactoryCodeAndScheduleDate(factoryCode, scheduleDate, updateBy, new Date());
         log.info("硫化排程完成量同步-逻辑删除完成，开始批量插入");
         if (CollectionUtils.isNotEmpty(insertList)) {
             int batchSize = 1000;
@@ -299,6 +299,6 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
                         (insertList.size() + batchSize - 1) / batchSize, subList.size());
             }
         }
-        log.info("硫化排程完成量同步-事务完成：分厂{}，插入数量={}", factoryCode, CollectionUtils.size(insertList));
+        log.info("硫化排程完成量同步-事务完成：分厂{}，排程日期={}，插入数量={}", factoryCode, scheduleDate, CollectionUtils.size(insertList));
     }
 }

@@ -27,4 +27,16 @@ public interface LhRepairCapsuleMapper extends CommBaseMapper<LhRepairCapsule> {
      */
     @Update("UPDATE T_LH_REPAIR_CAPSULE SET IS_DELETE = 1, UPDATE_BY = #{updateBy}, UPDATE_TIME = #{updateTime} WHERE FACTORY_CODE = #{factoryCode} AND IS_DELETE = 0")
     int logicDeleteByFactoryCode(@Param("factoryCode") String factoryCode, @Param("updateBy") String updateBy, @Param("updateTime") Date updateTime);
+
+    /**
+     * 根据分厂编号和获取日期逻辑删除胶囊已使用次数
+     *
+     * @param factoryCode 分厂编号
+     * @param obtainTime  获取日期
+     * @param updateBy    更新者
+     * @param updateTime  更新时间
+     * @return 更新的记录数
+     */
+    @Update("UPDATE T_LH_REPAIR_CAPSULE SET IS_DELETE = 1, UPDATE_BY = #{updateBy}, UPDATE_TIME = #{updateTime} WHERE FACTORY_CODE = #{factoryCode} AND DATE(OBTAIN_TIME) = #{obtainTime} AND IS_DELETE = 0")
+    int logicDeleteByFactoryCodeAndObtainTime(@Param("factoryCode") String factoryCode, @Param("obtainTime") Date obtainTime, @Param("updateBy") String updateBy, @Param("updateTime") Date updateTime);
 }

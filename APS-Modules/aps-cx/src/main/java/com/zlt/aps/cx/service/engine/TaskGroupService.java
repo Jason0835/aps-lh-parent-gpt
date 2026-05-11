@@ -310,6 +310,7 @@ public class TaskGroupService {
             task.setIsProductionTrial(isProductionTrial);
             task.setContinueMachineCodes(continueMachineCodes);
             task.setIsFirstTask(!isContinueTask && !isTrialTask && !isProductionTrial);
+            task.setConstructionStage(constructionStage);
 
             // 将任务添加到物料任务列表（用于回溯更新）
             materialTasksMap.computeIfAbsent(materialCode, k -> new ArrayList<>()).add(task);

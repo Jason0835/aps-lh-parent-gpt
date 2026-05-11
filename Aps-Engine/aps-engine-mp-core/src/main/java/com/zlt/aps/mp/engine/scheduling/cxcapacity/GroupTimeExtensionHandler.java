@@ -326,11 +326,16 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         if (!handledDayInfo.contains(handlerKey)) {
             return;
         }
-        Integer earliestConclusionDay = earliestConclusion.getEndDay();
+        //20260511+ 因加入高优先级强制收尾业务，导致延长探测会出现跳跃，故而获取截止nextDay连续有效探测日
+        Set<String> effectiveDetectKey = getEffectiveDetectDayInfo(context, earliestConclusion, handledDayInfo, nextDay);
+        if(CollectionUtils.isEmpty(effectiveDetectKey)){
+            return ;
+        }
         String prefix = earliestConclusion.getTimeExtensionPrefix();
         Integer startIndex = prefix.length();
+        Integer earliestConclusionDay = earliestConclusion.getEndDay();
         Set<Integer> effectiveDaySet = Sets.newHashSet();
-        handledDayInfo.forEach(singleDay -> {
+        effectiveDetectKey.forEach(singleDay -> {
             if (!singleDay.startsWith(prefix)) {
                 return;
             }
@@ -477,6 +482,57 @@ public class GroupTimeExtensionHandler extends OnLineGroupOnLineMachineHandler {
         groupPlan.setDayProductionLimitInfo(Maps.newHashMap());
         groupPlan.buildDayProductionLimitInfoByContinue(context, newAllocationInfoList);
         groupPlan.setDailyCapacityLimitVoMap(Maps.newHashMap());
+    }
+
+    /**
+     * 20260511+ 获取有效延长收尾探测日信息
+     * 1、nextDay已经存在
+     * 2、从nextDay开始，往后延续日且大于nextDay的日期，剔除最后一个日期
+     *
+     * @param context            排产上下文
+     * @param earliestConclusion 分配信息
+     * @param handledDayInfo     已经探测的所有日信息
+     * @param nextDay            最后一次尝试探测日
+     * @return
+     */
+    private Set<String> getEffectiveDetectDayInfo(Context context, CxMachineAllocationPlanHelper earliestConclusion, Set<String> handledDayInfo, Integer nextDay) {
+        if (null == earliestConclusion || CollectionUtils.isEmpty(handledDayInfo) || null == nextDay) {
+            return Collections.emptySet();
+        }
+        String handlerKey = earliestConclusion.getTimeExtensionDayInfo(nextDay);
+        if (!handledDayInfo.contains(handlerKey)) {
+            return Collections.emptySet();
+        }
+        String selectedCxMachineCode = earliestConclusion.getCxMachineCode();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(selectedCxMachineCode);
+        if (null == cxMachineInfo) {
+            return Collections.emptySet();
+        }
+        //获取截止nextDay连续的探测日，大于nextDay，且与nextDay是连续的
+        Set<Integer> matchDetectDay = Sets.newHashSet();
+        Set<Integer> stopDays = Optional.ofNullable(cxMachineInfo.getStopDayInfo()).orElse(Collections.emptySet());
+        Integer endDay = context.getProductionEndDay();
+        Integer startDay = nextDay;
+        for (; startDay <= endDay; ) {
+            String effectiveKey = earliestConclusion.getTimeExtensionDayInfo(startDay);
+            if (stopDays.contains(startDay)) {
+                startDay = startDay + BigDecimal.ONE.intValue();
+                continue;
+            }
+            if (handledDayInfo.contains(effectiveKey)) {
+                matchDetectDay.add(startDay);
+                startDay = startDay + BigDecimal.ONE.intValue();
+                continue;
+            }
+            break;
+        }
+        if (CollectionUtils.isEmpty(matchDetectDay) || matchDetectDay.size() <= BigDecimal.ONE.intValue()) {
+            return Collections.emptySet();
+        }
+        Set<String> effectiveKeySet = Sets.newHashSet();
+        matchDetectDay.forEach(day -> effectiveKeySet.add(earliestConclusion.getTimeExtensionDayInfo(day)));
+        return effectiveKeySet;
     }
 
     @Override

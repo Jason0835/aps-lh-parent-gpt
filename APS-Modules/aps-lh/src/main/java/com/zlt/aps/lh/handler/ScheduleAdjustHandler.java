@@ -3,7 +3,6 @@ package com.zlt.aps.lh.handler;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
-import com.zlt.aps.lh.api.domain.dto.SkuDailyScheduleDemandDTO;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -81,8 +80,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                 context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
                 LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
                 context.getMonthPlanList().size(), context.getPreviousScheduleResultList().size());
-        // 初始化SKU合计产能缓存，避免resolveInitialTargetQty/markEndingSkus/applyEndingDailyDemandUpgrade三阶段重复计算
-        context.setSkuTotalCapacityCache(new LinkedHashMap<>(context.getMonthPlanList().size()));
         // S4.3.1 前日排程欠/超产量调整
         adjustPreviousSchedule(context);
 
@@ -250,6 +247,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         return 0;
     }
 
+
     /**
      * 获取指定物料的T日排程班次完成量（class1FinishQty汇总值）。
      *
@@ -317,18 +315,14 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setWindowPlanQty(windowPlanQty);
         dto.setSurplusQty(surplus.getSurplusQty());
         dto.setEmbryoStock(resolveAllocatedEmbryoStock(context, plan, embryoStandardCapacitySumMap));
-        // 非停产模式下，待排量基线取余量，不上调胎胚库存
-        // 收尾/胎胚库存上调逻辑移到 TargetScheduleQtyResolver 中按日处理
-        int basePendingQty = surplus.getSurplusQty();
+        // 待排量以“余量/库存取大”为基线，再叠加滚动继承扣减与欠产传导，避免重复排产。
+        int basePendingQty = Math.max(surplus.getSurplusQty(), Math.max(0, dto.getEmbryoStock()));
         if (context.isStopProductionMode()) {
-            // 停产收尾按”停产日含损耗计划量”和”胎胚库存”取大，优先把停锅前可收的量拉齐。
+            // 停产收尾按“停产日含损耗计划量”和“胎胚库存”取大，优先把停锅前可收的量拉齐。
             basePendingQty = resolveStopProductionDemandQty(context, plan, dto.getEmbryoStock());
         }
         dto.setPendingQty(Math.max(0, basePendingQty - inheritedPlanQty) + carryForwardQty);
         dto.setDailyPlanQty(plan.getDayVulcanizationQty() != null ? plan.getDayVulcanizationQty() : 0);
-
-        // 生成日维度排产需求列表，供日计划桶控制和多机台拆量使用
-        dto.setDailyDemandList(buildDailyDemandList(context, plan, inheritedPlanQty, carryForwardQty));
 
         // 产能信息（从SKU日硫化产能Map获取）
         MdmSkuLhCapacity capacity = context.getSkuLhCapacityMap().get(plan.getMaterialCode());
@@ -703,7 +697,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private boolean isPreviousBaselineFromScheduleDate(LhScheduleContext context) {
         return context.isRollingScheduleHandoff()
                 || context.getParamIntValue(LhScheduleParamConstant.FORCE_RESCHEDULE,
-                        LhScheduleConstant.FORCE_RESCHEDULE) == LhScheduleConstant.FORCE_RESCHEDULE_ENABLED;
+                LhScheduleConstant.FORCE_RESCHEDULE) == LhScheduleConstant.FORCE_RESCHEDULE_ENABLED;
     }
 
     /**
@@ -962,63 +956,6 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 构建日维度排产需求列表。
-     * <p>按排程窗口内每个自然日生成一条 SkuDailyScheduleDemandDTO，
-     * 继承量从最早日起逐日扣减，欠产结转到首日。</p>
-     *
-     * @param context           排程上下文
-     * @param plan              月生产计划记录
-     * @param inheritedPlanQty  已继承计划量
-     * @param carryForwardQty   欠产结转量
-     * @return 日维度排产需求列表
-     */
-    private List<SkuDailyScheduleDemandDTO> buildDailyDemandList(LhScheduleContext context,
-                                                                  FactoryMonthPlanProductionFinalResult plan,
-                                                                  int inheritedPlanQty,
-                                                                  int carryForwardQty) {
-        List<SkuDailyScheduleDemandDTO> demandList = new ArrayList<>(LhScheduleConstant.DEFAULT_SHIFTS_PER_DAY);
-        Date startDate = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
-        Date endDate = LhScheduleTimeUtil.clearTime(context.getScheduleTargetDate());
-        if (startDate == null || endDate == null || startDate.after(endDate)) {
-            return demandList;
-        }
-
-        int remainingInherited = Math.max(0, inheritedPlanQty);
-        int remainingCarryForward = Math.max(0, carryForwardQty);
-
-        Calendar cursor = Calendar.getInstance();
-        cursor.setTime(startDate);
-        while (!cursor.after(endDate)) {
-            int dayOfMonth = cursor.get(Calendar.DAY_OF_MONTH);
-            int dayPlanQty = MonthPlanDayQtyUtil.resolveDayQty(plan, dayOfMonth);
-
-            SkuDailyScheduleDemandDTO demand = new SkuDailyScheduleDemandDTO();
-            demand.setMaterialCode(plan.getMaterialCode());
-            demand.setScheduleDate(cursor.getTime());
-            demand.setDayPlanQty(dayPlanQty);
-
-            // 继承量从最早日起逐日扣减
-            int dayInherited = Math.min(remainingInherited, dayPlanQty);
-            demand.setInheritedQty(dayInherited);
-            remainingInherited -= dayInherited;
-
-            // 欠产结转到首日
-            int dayCarryForward = remainingCarryForward;
-            demand.setCarryForwardQty(dayCarryForward);
-            remainingCarryForward = 0;
-
-            // 初始目标量 = max(0, dayPlanQty - inheritedQty + carryForwardQty)
-            int initialTarget = Math.max(0, dayPlanQty - dayInherited + dayCarryForward);
-            demand.setTargetQty(initialTarget);
-            demand.setRemainingQty(initialTarget);
-
-            demandList.add(demand);
-            cursor.add(Calendar.DAY_OF_MONTH, 1);
-        }
-        return demandList;
-    }
-
-    /**
      * 安全获取Integer值，null时返回0
      *
      * @param value Integer值
@@ -1060,3 +997,4 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         return ScheduleStepEnum.S4_3_ADJUST_AND_GATHER.getDescription();
     }
 }
+

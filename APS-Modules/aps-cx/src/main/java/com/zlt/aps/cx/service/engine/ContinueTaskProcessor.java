@@ -201,6 +201,7 @@ public class ContinueTaskProcessor {
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
         taskAllocation.setIsContinueTask(true);  // 标记为续作预留
         taskAllocation.setLhId(task.getLhId());
+        taskAllocation.setConstructionStage(task.getConstructionStage());
 
         allocation.getTaskAllocations().add(taskAllocation);
         // 注意：这里占用的是硫化机数，不是胎胚数量
@@ -639,6 +640,7 @@ public class ContinueTaskProcessor {
         taskAllocation.setIsClosingDayTask(task.getIsClosingDayTask());  // 设置是否停产日任务
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
         taskAllocation.setLhId(task.getLhId());
+        taskAllocation.setConstructionStage(task.getConstructionStage());
 
         allocation.getTaskAllocations().add(taskAllocation);
         allocation.setUsedCapacity(allocation.getUsedCapacity() + quantity);

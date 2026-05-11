@@ -233,7 +233,7 @@
             <el-form-item :label="$t('示方类型')" prop="class1RecipeType">
               <dict-select
                 v-model="form.class1RecipeType"
-                :options="parentDict.type.trial_status"
+                :options="parentDict.type.biz_construction_stage"
                 disabled
               />
             </el-form-item>
@@ -304,7 +304,7 @@
             <el-form-item :label="$t('示方类型')" prop="class2RecipeType">
               <dict-select
                 v-model="form.class2RecipeType"
-                :options="parentDict.type.trial_status"
+                :options="parentDict.type.biz_construction_stage"
                 disabled
               />
             </el-form-item>
@@ -375,7 +375,7 @@
             <el-form-item :label="$t('示方类型')" prop="class3RecipeType">
               <dict-select
                 v-model="form.class3RecipeType"
-                :options="parentDict.type.trial_status"
+                :options="parentDict.type.biz_construction_stage"
                 disabled
               />
             </el-form-item>
@@ -446,7 +446,7 @@
             <el-form-item :label="$t('示方类型')" prop="class4RecipeType">
               <dict-select
                 v-model="form.class4RecipeType"
-                :options="parentDict.type.trial_status"
+                :options="parentDict.type.biz_construction_stage"
                 disabled
               />
             </el-form-item>
@@ -517,7 +517,7 @@
             <el-form-item :label="$t('示方类型')" prop="class5RecipeType">
               <dict-select
                 v-model="form.class5RecipeType"
-                :options="parentDict.type.trial_status"
+                :options="parentDict.type.biz_construction_stage"
                 disabled
               />
             </el-form-item>
@@ -588,7 +588,7 @@
             <el-form-item :label="$t('示方类型')" prop="class6RecipeType">
               <dict-select
                 v-model="form.class6RecipeType"
-                :options="parentDict.type.trial_status"
+                :options="parentDict.type.biz_construction_stage"
                 disabled
               />
             </el-form-item>
@@ -659,7 +659,7 @@
             <el-form-item :label="$t('示方类型')" prop="class7RecipeType">
               <dict-select
                 v-model="form.class7RecipeType"
-                :options="parentDict.type.trial_status"
+                :options="parentDict.type.biz_construction_stage"
                 disabled
               />
             </el-form-item>
@@ -730,7 +730,7 @@
             <el-form-item :label="$t('示方类型')" prop="class8RecipeType">
               <dict-select
                 v-model="form.class8RecipeType"
-                :options="parentDict.type.trial_status"
+                :options="parentDict.type.biz_construction_stage"
                 disabled
               />
             </el-form-item>
@@ -878,7 +878,7 @@ export default {
     handleRecipeNoChange(shift, val, row) {
       const recipeTypeField = `class${shift}RecipeType`;
       if (val && row) {
-        this.$set(this.form, recipeTypeField, row.trialStatus || "");
+        this.$set(this.form, recipeTypeField, row.constructionStage || "");
       } else {
         this.$set(this.form, recipeTypeField, "");
       }
