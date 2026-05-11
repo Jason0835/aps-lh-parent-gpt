@@ -8,7 +8,6 @@ import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.exception.ServiceException;
-import com.sun.deploy.association.utility.AppConstants;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
