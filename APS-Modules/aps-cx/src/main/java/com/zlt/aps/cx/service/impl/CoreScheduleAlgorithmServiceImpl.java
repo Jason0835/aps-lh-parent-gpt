@@ -350,6 +350,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setIsContinueTask(taskAlloc.getIsContinueTask());
                 task.setIsLastEndingBatch(taskAlloc.getIsLastEndingBatch());  // 设置是否收尾最后一批
                 task.setIsEndProduction(taskAlloc.getIsEndProduction());  // 设置是否结束生产
+                task.setConstructionStage(taskAlloc.getConstructionStage());  // 设置施工阶段
                 task.setEndingAbandoned(taskAlloc.getEndingAbandoned());  // 设置收尾是否被舍弃
                 task.setPrecisionDeducted(taskAlloc.getPrecisionDeducted());  // 设置精度扣量标记
                 // 优先保留 TaskGroupService 设置的标记，仅 null 时用班次类型兜底
