@@ -6,12 +6,7 @@ utf-8 no bom
 - 所有的@apixxx等和注释，必须使用中文。
 - 如果要写plan,解释语言使用中文。
 ## 前端规范
-- **所有下拉选择框必须添加 `filterable` 属性**支持可输入筛选
-- factoryCode字典反显使用 `selectDictLabel(this.dict.type.biz_factory_name, value)`
-- factoryCode列表中必须放在第一列
-- companyCode冗余字段不在任何界面显示
-- 多语言key格式：`ui.data.column.cxEntityName.fieldName`
-- xxdesc要求宽度250,左对齐
+- 前端开发规范见@docs/前端规则.md
 
 ## 后端规范
 - Date类的运算可以使用cn.hutool.core内的Date相关方法
