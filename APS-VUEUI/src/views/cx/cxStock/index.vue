@@ -165,7 +165,7 @@ export default {
         {
           prop: 'embryoDesc',
           align: 'left',
-          halign: 'center',
+          halign: "left",
           label: this.$t('ui.data.column.cxStock.embryoDesc'),
           minWidth: 350
         },

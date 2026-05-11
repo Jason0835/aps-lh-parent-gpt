@@ -126,7 +126,7 @@ export default {
           prop: "specDesc",
           align: "left",
           minWidth: 350,
-          halign: "center",
+          halign: "left",
           label: this.$t("ui.data.column.sapSpecMoldUse.specDesc"),
           // sortable: "custom",
         },

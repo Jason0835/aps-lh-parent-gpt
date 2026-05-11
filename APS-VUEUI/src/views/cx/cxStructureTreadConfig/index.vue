@@ -259,7 +259,7 @@ export default {
         {
           prop: 'structureCode',
           align: "left",
-          halign: 'center',
+          halign: "left",
           label: this.$t('ui.data.column.cxStructureTreadConfig.structureCode'),
           minWidth: 160
         },
@@ -273,7 +273,7 @@ export default {
         {
           prop: 'mainMaterialDesc',
           align: 'left',
-          halign: 'center',
+          halign: "left",
           label: this.$t('ui.data.column.cxStructureTreadConfig.mainMaterialDesc'),
           minWidth: 350
         },

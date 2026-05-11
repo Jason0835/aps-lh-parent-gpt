@@ -140,7 +140,7 @@ export default {
         {
           prop: "materialDesc",
           align: "left",
-          halign: "center",
+          halign: "left",
           label: this.$t("ui.data.column.lhSpecialMaterialBom.materialDesc"),
           minWidth: 350,
         },

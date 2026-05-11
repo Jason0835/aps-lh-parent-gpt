@@ -184,7 +184,7 @@ export default {
             {
               prop: "specDesc",
               align: "left",
-              halign: "center",
+              halign: "left",
               label: this.$t("ui.data.column.productConstruction.specDesc"),
               minWidth: 350,
             },
