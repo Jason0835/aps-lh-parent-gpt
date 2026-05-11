@@ -93,7 +93,7 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.lhRepairCapsule.materialDesc"),
-          minWidth: 180,
+          minWidth: 340,
         },
         {
           prop: "replaceCapsuleCount",
@@ -114,7 +114,7 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.lhRepairCapsule.updateDate"),
-          minWidth: 150,
+          minWidth: 180,
         },
         // {
         //   prop: "brand",

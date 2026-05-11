@@ -109,6 +109,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             if (record.getScheduleDate() == null) {
                 continue;
             }
+
+
             LocalDate scheduleDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
 
             for (int i = 1; i <= 8; i++) {
@@ -152,6 +154,58 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                     case 7: record.setClass7StartTime(start); record.setClass7EndTime(end); break;
                     case 8: record.setClass8StartTime(start); record.setClass8EndTime(end); break;
                 }
+            }
+
+            // classXFinishQty = 0 时设为 null
+            if (record.getClass1FinishQty() != null && record.getClass1FinishQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass1FinishQty(null);
+            }
+            if (record.getClass2FinishQty() != null && record.getClass2FinishQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass2FinishQty(null);
+            }
+            if (record.getClass3FinishQty() != null && record.getClass3FinishQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass3FinishQty(null);
+            }
+            if (record.getClass4FinishQty() != null && record.getClass4FinishQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass4FinishQty(null);
+            }
+            if (record.getClass5FinishQty() != null && record.getClass5FinishQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass5FinishQty(null);
+            }
+            if (record.getClass6FinishQty() != null && record.getClass6FinishQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass6FinishQty(null);
+            }
+            if (record.getClass7FinishQty() != null && record.getClass7FinishQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass7FinishQty(null);
+            }
+            if (record.getClass8FinishQty() != null && record.getClass8FinishQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass8FinishQty(null);
+            }
+
+            // classXPlanQty = 0 时设为 null
+            if (record.getClass1PlanQty() != null && record.getClass1PlanQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass1PlanQty(null);
+            }
+            if (record.getClass2PlanQty() != null && record.getClass2PlanQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass2PlanQty(null);
+            }
+            if (record.getClass3PlanQty() != null && record.getClass3PlanQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass3PlanQty(null);
+            }
+            if (record.getClass4PlanQty() != null && record.getClass4PlanQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass4PlanQty(null);
+            }
+            if (record.getClass5PlanQty() != null && record.getClass5PlanQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass5PlanQty(null);
+            }
+            if (record.getClass6PlanQty() != null && record.getClass6PlanQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass6PlanQty(null);
+            }
+            if (record.getClass7PlanQty() != null && record.getClass7PlanQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass7PlanQty(null);
+            }
+            if (record.getClass8PlanQty() != null && record.getClass8PlanQty().compareTo(BigDecimal.ZERO) == 0) {
+                record.setClass8PlanQty(null);
             }
         }
 
@@ -1561,6 +1615,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                 formatSeconds(shiftTime[5]), formatSeconds(shiftTime[6]), formatSeconds(shiftTime[7]), formatSeconds(shiftTime[8]));
         return shiftTime;
     }
+
 
     /**
      * 校验指定班次的计划量是否超出机台剩余产能

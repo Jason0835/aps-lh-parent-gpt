@@ -158,10 +158,12 @@ export default {
         {
           prop: "planDate",
           label: this.$t("ui.lh.precision.plan.plan.date"),
+          width: 150
         },
         {
           prop: "actualDate",
           label: this.$t("ui.lh.precision.plan.actual.date"),
+          width: 150
         },
         {
           prop: "scheduleDate",

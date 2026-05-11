@@ -784,4 +784,10 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
      */
     @TableField(exist = false)
     private boolean rollingInherited;
+
+    /**
+     * 硫化产量今天夜班 - 列表接口动态赋值，不落库
+     */
+    @TableField(exist = false)
+    private BigDecimal todayNightFinishQty;
 }

@@ -115,4 +115,12 @@ public interface ICxMesSyncRemoteService {
     AjaxResult recoverCxStockByUniqueKey(@RequestBody List<CxStock> list,
                                          @RequestParam("dataSource") String dataSource,
                                          @RequestParam("updateBy") String updateBy);
+
+    @ApiOperation("清理成型在机历史重复数据，保留每个历史日期最新版本")
+    @PostMapping("/mesSync/cleanCxMachineOnlineHistoryDuplicate")
+    AjaxResult cleanCxMachineOnlineHistoryDuplicate();
+
+    @ApiOperation("清理生胎库存历史重复数据，保留每个历史日期最新版本")
+    @PostMapping("/mesSync/cleanCxStockHistoryDuplicate")
+    AjaxResult cleanCxStockHistoryDuplicate();
 }

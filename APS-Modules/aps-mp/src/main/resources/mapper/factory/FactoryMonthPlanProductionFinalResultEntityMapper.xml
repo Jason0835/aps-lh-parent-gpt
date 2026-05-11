@@ -65,8 +65,6 @@
         <if test="structureName != null and structureName != ''">AND fin.STRUCTURE_NAME like CONCAT('%', #{structureName}, '%')</if>
         <if test="cxMachineCode != null and cxMachineCode != ''">AND fin.CX_MACHINE_CODE like CONCAT('%', #{cxMachineCode}, '%')</if>
         <if test="lastMonthPlanVersion != null and lastMonthPlanVersion != ''">AND fin.LAST_MONTH_PLAN_VERSION like CONCAT('%', #{lastMonthPlanVersion}, '%')</if>
-
-        ORDER BY STRUCTURE_NAME, MAIN_PATTERN, MAIN_MATERIAL_DESC
     </select>
 
 </mapper>

@@ -106,4 +106,11 @@ public interface CxStockMapper extends CommBaseMapper<CxStock> {
      * @return 删除的记录数
      */
     int physicalDeleteByFactoryCodeAndDataSource(@Param("factoryCode") String factoryCode, @Param("dataSource") String dataSource);
+
+    /**
+     * 物理删除历史重复数据，保留每个历史库存日期最新版本的数据
+     *
+     * @return 删除的记录数
+     */
+    int cleanHistoryDuplicateData();
 }

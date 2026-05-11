@@ -4,7 +4,7 @@
       tableRef="cxFixedMachineMainTable"
       key="cxFixedMachineMainTable"
       ref="tableRef"
-      :calcHeight="showOutResult ? false : true"
+      :calcHeight="showOutResult && displayOutResultDetailTable ? false : true"
       v-loading="loading"
       :element-loading-text="loadText"
       :row-class-name="tableRowClassName"
@@ -23,7 +23,9 @@
       row-key="id"
       :expand-row-keys="expands"
       @expand-change="handleExpandChange"
-      :max-height="showOutResult?450:'calc(100vh )'"
+      :max-height="
+        showOutResult && displayOutResultDetailTable ? 450 : 'calc(100vh )'
+      "
     >
       <template slot="header">
         <!-- 结构内调整页：仅结构内工具栏 -->
@@ -69,13 +71,24 @@
             class="demo-form-inline"
           >
             <el-form-item
-              :label="this.$t('ui.data.column.cxScheduleResult.cxMachineCode')"
+              :label="this.$t('ui.data.column.monthPlanStructureAdjust.cxMachineCode')"
             >
               <el-input
                 v-model="formInline.cxMachineCode"
                 disabled
                 :placeholder="
                   this.$t('ui.data.column.cxScheduleResult.cxMachineCode')
+                "
+              ></el-input>
+            </el-form-item>
+            <el-form-item
+              :label="this.$t('ui.data.column.finishStock.structureName')"
+            >
+              <el-input
+                v-model="formInline.structureName"
+                disabled
+                :placeholder="
+                  this.$t('ui.data.column.finishStock.structureName')
                 "
               ></el-input>
             </el-form-item>
@@ -96,17 +109,7 @@
                 "
               />
             </el-form-item>
-            <el-form-item
-              :label="this.$t('ui.data.column.finishStock.structureName')"
-            >
-              <el-input
-                v-model="formInline.structureName"
-                disabled
-                :placeholder="
-                  this.$t('ui.data.column.finishStock.structureName')
-                "
-              ></el-input>
-            </el-form-item>
+            
             <el-form-item :label="this.$t('common.startDate')">
               <el-input
                 disabled
@@ -123,63 +126,66 @@
                 :placeholder="this.$t('common.endDate')"
               ></el-input>
             </el-form-item>
-            <el-form-item label="调整开始日期">
-              <el-select
-                v-model="formInline.adjustStartDay"
-                style="width: 100px"
-                disabled
-                filterable
-              >
-                <el-option
-                  v-for="item in dayList"
-                  :key="item"
-                  :label="item"
-                  :value="item"
+            <!-- 调整日期与操作按钮单独一行 -->
+            <div class="mp-roll-adjust-toolbar-line">
+              <el-form-item label="调整开始日期">
+                <el-select
+                  v-model="formInline.adjustStartDay"
+                  style="width: 100px"
+                  disabled
+                  filterable
                 >
-                </el-option>
-              </el-select>
-            </el-form-item>
-            <el-form-item label="调整结束日期">
-              <el-select
-                v-model="formInline.adjustEndDay"
-                style="width: 100px"
-                filterable
-              >
-                <el-option
-                  v-for="item in dayList"
-                  :key="item"
-                  :label="item"
-                  :value="item"
+                  <el-option
+                    v-for="item in dayList"
+                    :key="item"
+                    :label="item"
+                    :value="item"
+                  >
+                  </el-option>
+                </el-select>
+              </el-form-item>
+              <el-form-item label="调整结束日期">
+                <el-select
+                  v-model="formInline.adjustEndDay"
+                  style="width: 100px"
+                  filterable
                 >
-                </el-option>
-              </el-select>
-            </el-form-item>
+                  <el-option
+                    v-for="item in dayList"
+                    :key="item"
+                    :label="item"
+                    :value="item"
+                  >
+                  </el-option>
+                </el-select>
+              </el-form-item>
 
-            <el-form-item>
+              <el-form-item>
+                <el-button
+                  type="primary"
+                  @click="getOutList"
+                  v-hasPermi="[
+                    'monthplan:mpWeekRollAdjust:getAdjustDetailList',
+                  ]"
+                  >获取调整订单</el-button
+                >
+              </el-form-item>
               <el-button
-                type="primary"
-                @click="getOutList"
-                v-hasPermi="[
-                  'monthplan:mpWeekRollAdjust:getAdjustDetailList',
-                ]"
-                >获取调整订单</el-button
+                @click="handShowResult"
+                :loading="autoLoading"
+                :disabled="data.length == 0"
+                v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
+                >{{ $t("自动调整") }}</el-button
               >
-            </el-form-item>
-            <el-button
-              @click="handShowResult"
-              :loading="autoLoading"
-              :disabled="data.length == 0"
-              v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
-              >{{ $t("自动调整") }}</el-button
-            >
-            <el-form-item v-if="showOutResult">
-              <el-button
-                type="primary"
-                @click="nextStructure"
-                :loading="nextLoading"
-                >下一个</el-button
-              >
-            </el-form-item>
+              <el-form-item v-if="showOutResult">
+                <el-button
+                  type="primary"
+                  @click="nextStructure"
+                  :loading="nextLoading"
+                  >下一个</el-button
+                >
+              </el-form-item>
+            </div>
           </el-form>
         </div>
       </template>
@@ -238,8 +244,13 @@
         </div>
       </template>
     </page-table>
+    <!--
+      结构调整单结构流程：getOutList「获取调整订单」后 showOutResult 为 true 时，原会在主表下方再展示结构明细 el-table。
+      业务要求暂不展示该表：由 displayOutResultDetailTable 控制（默认 false）；需恢复时将 data 中该项改为 true。
+    -->
     <div v-if="showOutResult">
       <el-table
+        v-if="displayOutResultDetailTable"
         :data="outResultData"
         border
         style="width: 100%"
@@ -515,6 +526,8 @@ export default {
       //结构外调整结果列表
       outResultData: [],
       outResultVersion: "",
+      /** 是否渲染单结构流程「获取调整订单」下方的结构明细表（7 列+锁定上机+1～31 号）；false 为隐藏 */
+      displayOutResultDetailTable: false,
       showOutResult: false,
       nextLoading: false,
       showConfirmResult: false,
@@ -1283,6 +1296,10 @@ export default {
       }
       return list;
     },
+    /**
+     * 结构明细表列配置（仅当 displayOutResultDetailTable 为 true 时 el-table 会挂载）。
+     * 顺序：物料/机台/结构/计划量/起止日 → 锁定上机 → 1～31 号日列（editable）。
+     */
     outResultColumns() {
       let list = [
         {
@@ -1348,6 +1365,7 @@ export default {
           // },
         },
       ];
+      // 日计划列：day1～day31，与模板中 item.editable 分支联动可编辑
       const days = 31;
       for (let i = 0; i < days; i++) {
         list.push({
@@ -3071,6 +3089,13 @@ export default {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+/* 行内表单中占满一行，使调整日期与按钮换到下一行 */
+.mp-roll-adjust-toolbar-line {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
 }
 
 </style>

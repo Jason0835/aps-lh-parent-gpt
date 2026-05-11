@@ -154,7 +154,7 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
 
     @Override
     protected String getOrderBy() {
-        return "PLAN_DATE desc, ID desc";
+        return "MACHINE_CODE ASC, ID desc";
     }
 
     @ApiOperation("从MES同步数据生成成型精度初版计划")

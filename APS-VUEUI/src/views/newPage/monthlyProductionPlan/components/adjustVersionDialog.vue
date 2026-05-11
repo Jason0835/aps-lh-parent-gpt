@@ -14,7 +14,7 @@
           :label="
             $t('ui.data.column.monthPlanFinalAdjustQuery.monthPlanVersionNo')
           "
-          prop="monthPlanVersion"
+          prop="productionVersion"
           min-width="140"
           show-overflow-tooltip
         />

@@ -9,6 +9,7 @@ import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 硫化排程主服务接口
@@ -97,4 +98,13 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
 
 
     AjaxResult importScheduleTemplate(List<LhScheduleResultTemplateImportVO> list, LhScheduleResult result, boolean updateSupport, Long id);
+
+    /**
+     * 构建硫化产量今天夜班Map
+     *
+     * @param list 排程结果列表
+     * @return key=工厂编码|物料编码, value=今天夜班产量(BigDecimal)
+     */
+    Map<String, Object> buildTodayNightFinishQtyMap(List<LhScheduleResult> list);
+
 }
