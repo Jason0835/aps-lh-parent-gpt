@@ -187,6 +187,7 @@ export default {
         {
           prop: "isActive",
           label: this.$t("ui.data.column.machine.status"),
+          aling: 'center',
           minWidth: 100,
           render: ({ row }) => {
             return (
