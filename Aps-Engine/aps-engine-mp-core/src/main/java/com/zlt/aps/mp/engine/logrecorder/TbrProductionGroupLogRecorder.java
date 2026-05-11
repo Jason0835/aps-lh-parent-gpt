@@ -700,6 +700,28 @@ public class TbrProductionGroupLogRecorder {
     }
 
     /**
+     * 增加结构没有匹配到成型机-重复切换英寸次数限制日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 达到重复切换英寸次数限制%s====
+     *
+     * @param context         排程上下文
+     * @param groupName       分组名
+     * @param isZeroRack      分组是否要求零度
+     * @param cxMachineCode   成型机台
+     * @param machineTypeCode 机型
+     * @param maxRepeatCount  最大重复切换英寸次数
+     * @return
+     */
+    public static String addGroupNoSelectedRepeatProSizeLimitLog(Context context, String groupName, String isZeroRack, String cxMachineCode, String machineTypeCode, Integer maxRepeatCount) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 达到重复切换英寸次数限制%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, isZeroRack, cxMachineCode, machineTypeCode,
+                maxRepeatCount);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_CX_MACHINE_BASE_MACHE, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加 结构匹配到成型机-初步被选中日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s, 结构：%s 零度：%s 成型机台：%s 机型：%s 初步被选中====
      *

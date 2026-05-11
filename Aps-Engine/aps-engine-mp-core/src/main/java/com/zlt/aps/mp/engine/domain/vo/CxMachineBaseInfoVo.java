@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.domain.vo;
 
+import com.google.common.collect.Sets;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.CxMachineFixedPriorityEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
@@ -1111,6 +1112,57 @@ public class CxMachineBaseInfoVo implements Serializable {
         }
         int size = allocationList.size();
         return allocationList.get(size - BigDecimal.ONE.intValue());
+    }
+
+    /**
+     * 判断当前英寸是否超出单台重复切换英寸次数
+     *
+     * @param maxRepeatCount 最大允许重复切换英寸次数
+     * @param proSize        当前预分配分组的英寸
+     * @return
+     */
+    public boolean isExceedLimitMaxRepeatCount(Integer maxRepeatCount, String proSize) {
+        if (null == maxRepeatCount || StringUtils.isBlank(proSize)) {
+            return false;
+        }
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return false;
+        }
+        int size = allocationList.size();
+        if (size <= BigDecimal.ONE.intValue()) {
+            return false;
+        }
+        allocationList.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getStartDay));
+        CxMachineAllocationPlanHelper last = getLastAllocationInfo();
+        String lastProSize = last.getProductionProSize();
+        if (proSize.equals(lastProSize)) {
+            return false;
+        }
+        //切换英寸
+        Set<String> allProductionProSizeSet = allocationList.stream().map(CxMachineAllocationPlanHelper::getProductionProSize).collect(Collectors.toSet());
+        if (!allProductionProSizeSet.contains(proSize)) {
+            return false;
+        }
+        int endIndex = size - BigDecimal.ONE.intValue();
+        Set<String> proSizeSet = Sets.newHashSet();
+        int repeatChangeProSize = BigDecimal.ZERO.intValue();
+        for (int index = BigDecimal.ZERO.intValue(); index < endIndex; index++) {
+            CxMachineAllocationPlanHelper before = allocationList.get(index);
+            int afterIndex = index + BigDecimal.ONE.intValue();
+            CxMachineAllocationPlanHelper after = allocationList.get(afterIndex);
+            String beforeProSize = before.getProductionProSize();
+            String afterProSize = after.getProductionProSize();
+            if (beforeProSize.equals(afterProSize)) {
+                continue;
+            }
+            //前后切换英寸
+            proSizeSet.add(beforeProSize);
+            if (proSizeSet.contains(afterProSize)) {
+                repeatChangeProSize = repeatChangeProSize + BigDecimal.ONE.intValue();
+            }
+        }
+        int preRepeatCount = repeatChangeProSize + BigDecimal.ONE.intValue();
+        return preRepeatCount > maxRepeatCount;
     }
 
     /**
