@@ -8,12 +8,14 @@ import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -30,6 +32,7 @@ import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
+import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
 import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
@@ -90,6 +93,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     @Resource
     private LhScheFinishQtyMapper lhScheFinishQtyMapper;
+
+    @Resource
+    private LhMouldChangePlanEntityMapper lhMouldChangePlanMapper;
 
     @Resource
     private ICxScheduleResultService cxScheduleResultService;
@@ -957,11 +963,160 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             tableMap.put("shiftDate" + (i + 1), shiftDate);
         }
 
+        // 换模次数属于模板表头数据，不随明细行逐行复制。
+        // 这里把每个班次“左右模/Khuôn trái phải”列上方需要展示的次数写入 tableMap。
+        tableMap.putAll(buildMouldChangeCountTableMap(list, exportScheduleDate, shiftDateList));
+
         // 固定表头字段沿用模板占位符，避免再通过 loadExportI18nTableName 动态改列名。
         tableMap.put("yearmonthday", DateUtil.format(exportScheduleDate, "yyyy年MM月dd日"));
         tableMap.put("productionVersion", PubUtil.isNotEmpty(list) ? list.get(0).getProductionVersion() : "");
         tableMap.put("batchNo", PubUtil.isNotEmpty(list) ? list.get(0).getBatchNo() : "");
         return tableMap;
+    }
+
+    /**
+     * 构建模板表头中的换模次数。
+     * <p>模板“换模次数”显示在各班次“左右模/Khuôn trái phải”列上方，因此这里按班次生成
+     * mouldChangeCount1 ~ mouldChangeCount6，交给 tableMap 替换。换模计划来源按当前导出明细的
+     * batchNo + factoryCode 批量查询，再按班次标题日期 + classIndex 统计：</p>
+     * <p>只统计早班和中班：第1天早/中、第2天早/中、第3天早/中依次对应 1~6；夜班没有对应 classIndex，不生成占位符。</p>
+     *
+     * @param list 排程结果列表
+     * @param exportScheduleDate 导出排程日期
+     * @param shiftDateList 班次标题日期列表
+     * @return 换模次数表头Map
+     */
+    private Map<String, Object> buildMouldChangeCountTableMap(List<LhScheduleResult> list,
+                                                              Date exportScheduleDate,
+                                                              List<LhScheduleShiftDateVO> shiftDateList) {
+        Map<String, Object> resultMap = new HashMap<>(16);
+
+        // 先初始化 6 个占位符，保证没有换模计划时模板不会残留 {mouldChangeCountX}。
+        for (int index = 1; index <= LhScheduleConstant.SCHEDULE_DAYS * 2; index++) {
+            resultMap.put("mouldChangeCount" + index, "");
+        }
+        if (PubUtil.isEmpty(list) || Objects.isNull(exportScheduleDate) || PubUtil.isEmpty(shiftDateList)) {
+            return resultMap;
+        }
+
+        // 查询来源按“导出结果中的批次号+工厂”确定，先拆成 in 条件降低数据库查询范围。
+        // 后续仍会用 batchFactoryKeySet 做精确二次过滤，避免 A工厂批次 + B工厂批次交叉误算。
+        List<String> batchNos = list.stream()
+                .map(LhScheduleResult::getBatchNo)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.toList());
+        List<String> factoryCodes = list.stream()
+                .map(LhScheduleResult::getFactoryCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.toList());
+        if (batchNos.isEmpty() || factoryCodes.isEmpty()) {
+            return resultMap;
+        }
+        Set<String> batchFactoryKeySet = list.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getBatchNo()))
+                .filter(item -> StringUtils.isNotBlank(item.getFactoryCode()))
+                .map(item -> buildBatchFactoryKey(item.getBatchNo(), item.getFactoryCode()))
+                .collect(Collectors.toSet());
+
+        // 班次标题日期来自 listScheduleShiftDates，例如 04/27、04/28。
+        // 这里转回完整 Date，用于限定换模计划查询日期范围，减少无关历史数据进入内存聚合。
+        List<Date> shiftDates = shiftDateList.stream()
+                .map(item -> parseShiftDate(exportScheduleDate, item.getShiftDate()))
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (shiftDates.isEmpty()) {
+            return resultMap;
+        }
+        Date minScheduleDate = shiftDates.stream().min(Date::compareTo).orElse(exportScheduleDate);
+        Date maxScheduleDate = shiftDates.stream().max(Date::compareTo).orElse(exportScheduleDate);
+
+        // 一次性查出导出窗口内的换模计划。换模次数最终只统计数量，
+        // 不区分左右模具体值；展示位置由模板的“左右模”列决定。
+        List<LhMouldChangePlan> mouldChangePlanList = lhMouldChangePlanMapper.selectList(
+                new LambdaQueryWrapper<LhMouldChangePlan>()
+                        .in(LhMouldChangePlan::getLhResultBatchNo, batchNos)
+                        .in(LhMouldChangePlan::getFactoryCode, factoryCodes)
+                        .ge(LhMouldChangePlan::getPlanDate, DateUtil.beginOfDay(minScheduleDate))
+                        .lt(LhMouldChangePlan::getPlanDate, DateUtil.offsetDay(DateUtil.beginOfDay(maxScheduleDate), 1)));
+        if (PubUtil.isEmpty(mouldChangePlanList)) {
+            return resultMap;
+        }
+
+        // 按“计划日期 + 班次编码”聚合换模次数。
+        // 业务要求 classIndex 只取 02早班、03中班，夜班没有换模次数口径。
+        Map<String, Long> countMap = mouldChangePlanList.stream()
+                .filter(item -> batchFactoryKeySet.contains(buildBatchFactoryKey(item.getLhResultBatchNo(), item.getFactoryCode())))
+                .filter(item -> Objects.nonNull(item.getScheduleDate()))
+                .filter(item -> StringUtils.isNotBlank(item.getClassIndex()))
+                .collect(Collectors.groupingBy(
+                        item -> buildMouldChangeCountKey(item.getScheduleDate(), item.getClassIndex()),
+                        Collectors.counting()
+                ));
+
+        // 把聚合结果写回模板占位符：
+        // 只为早班/中班生成连续序号，避免第三天早班被写成 mouldChangeCount7。
+        int mouldChangeIndex = 1;
+        for (int i = 0; i < LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
+            LhScheduleShiftDateVO shiftDateVO = i < shiftDateList.size() ? shiftDateList.get(i) : null;
+            if (Objects.isNull(shiftDateVO)) {
+                continue;
+            }
+            String classIndex = buildMouldChangeClassIndex(shiftDateVO.getShift());
+            Date shiftDate = parseShiftDate(exportScheduleDate, shiftDateVO.getShiftDate());
+            if (StringUtils.isBlank(classIndex) || Objects.isNull(shiftDate)) {
+                continue;
+            }
+            Long count = countMap.get(buildMouldChangeCountKey(shiftDate, classIndex));
+            resultMap.put("mouldChangeCount" + mouldChangeIndex, Objects.nonNull(count) && count > 0 ? count : "");
+            mouldChangeIndex++;
+        }
+        return resultMap;
+    }
+
+    /**
+     * 根据模板班次序号换算换模计划班次。
+     *
+     * @param shift 模板班次序号
+     * @return 换模计划班次编码，02=早班，03=中班
+     */
+    private String buildMouldChangeClassIndex(Integer shift) {
+        if (Objects.isNull(shift)) {
+            return "";
+        }
+        if (shift == 1 || shift == 4 || shift == 7) {
+            return ApsConstant.CLASS_INDEX_MORNING_SHIFT;
+        }
+        if (shift == 2 || shift == 5 || shift == 8) {
+            return ApsConstant.CLASS_INDEX_MIDDLE_SHIFT;
+        }
+        return "";
+    }
+
+    /**
+     * 构建换模次数聚合Key。
+     *
+     * @param scheduleDate 排程日期
+     * @param classIndex 班次编码
+     * @return 聚合Key
+     */
+    private String buildMouldChangeCountKey(Date scheduleDate, String classIndex) {
+        return DateUtil.formatDate(DateUtil.beginOfDay(scheduleDate)) + "|" + StringUtils.defaultString(classIndex).trim();
+    }
+
+    /**
+     * 构建批次工厂匹配Key。
+     *
+     * @param batchNo 批次号
+     * @param factoryCode 工厂编号
+     * @return 批次工厂匹配Key
+     */
+    private String buildBatchFactoryKey(String batchNo, String factoryCode) {
+        return StringUtils.defaultString(batchNo).trim() + "|" + StringUtils.defaultString(factoryCode).trim();
     }
 
     /**

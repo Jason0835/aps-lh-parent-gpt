@@ -388,7 +388,7 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.materialDesc"),
           prop: "materialDesc",
-          minWidth: 320,
+          minWidth: 360,
           showOverflowTooltip: true,
         },
         {
@@ -739,7 +739,7 @@ export default {
         {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleResult.updateTime"),
-          minWidth: 160,
+          minWidth: 180,
         },
         {
           prop: "todayNightFinishQty",

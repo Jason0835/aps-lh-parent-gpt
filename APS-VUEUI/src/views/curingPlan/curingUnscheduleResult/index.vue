@@ -105,7 +105,7 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.updateTime"),
           prop: "processedTime",
-          minWidth: 160,
+          minWidth: 180,
           formatter: (row) => row.processedTime || row.updateTime,
         },
       ];

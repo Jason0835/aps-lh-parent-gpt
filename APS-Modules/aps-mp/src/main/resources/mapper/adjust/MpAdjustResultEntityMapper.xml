@@ -72,6 +72,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         SELECT
         r.FACTORY_CODE,
         r.MONTH_PLAN_VERSION,
+        r.PRODUCTION_VERSION,
         r.VERSION,
         r.ADJUST_TYPE,
         r.UPDATE_BY,
@@ -92,6 +93,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         GROUP BY
         r.FACTORY_CODE,
         r.MONTH_PLAN_VERSION,
+        r.PRODUCTION_VERSION,
         r.VERSION,
         r.ADJUST_TYPE,
         r.UPDATE_BY

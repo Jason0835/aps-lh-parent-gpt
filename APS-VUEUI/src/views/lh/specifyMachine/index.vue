@@ -136,7 +136,7 @@ export default {
           align: "left",
           halign: "center",
           label: this.$t("ui.data.column.lhSpecifyMachine.materialDesc"),
-          minWidth: 250,
+          minWidth: 290,
         },
         {
           prop: "machineCode",
@@ -171,7 +171,7 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.updateTime"),
-          minWidth: 160,
+          minWidth: 180,
         },
         {
           prop: "remark",

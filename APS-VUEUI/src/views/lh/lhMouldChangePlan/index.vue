@@ -280,14 +280,14 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.lhMouldChangePlan.orderNo"),
-          minWidth: 140,
+          minWidth: 160,
         },
         {
           prop: "updateTime",
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.updateTime"),
-          minWidth: 160,
+          minWidth: 180,
         },
 
         // {

@@ -1616,6 +1616,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         return shiftTime;
     }
 
+
     /**
      * 校验指定班次的计划量是否超出机台剩余产能
      * @return 产能不足时返回错误信息，充足时返回 null

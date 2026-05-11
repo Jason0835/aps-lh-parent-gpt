@@ -65,7 +65,7 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.materialDesc"),
           prop: "materialDesc",
-          minWidth: 240,
+          minWidth: 340,
           showOverflowTooltip: true,
         },
         {

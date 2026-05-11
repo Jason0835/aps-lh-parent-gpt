@@ -103,12 +103,12 @@ export default {
         {
           label: this.$t("物料编码"),
           prop: "materialCode",
-          width: 200
+          width: 320
         },
         {
           label: this.$t("物料描述"),
           prop: "materialDesc",
-          width: 200
+          width: 320
         },
         {
           label: this.$t("胎胚描述"),
@@ -449,7 +449,7 @@ export default {
         {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleResult.updateTime"),
-          minWidth: 160,
+          minWidth: 180,
         },
       ];
     },

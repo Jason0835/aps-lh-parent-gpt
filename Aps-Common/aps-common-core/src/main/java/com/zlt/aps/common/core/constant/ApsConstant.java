@@ -120,6 +120,19 @@ public class ApsConstant {
     public static final String DATA_SOURCE_SYSTEM = "1";
 
     /**
+     * 班次索引：早班
+     */
+    public static final String CLASS_INDEX_MORNING_SHIFT = "02";
+
+    /**
+     * 班次索引：中班
+     */
+    public static final String CLASS_INDEX_MIDDLE_SHIFT = "03";
+
+
+
+
+    /**
      * 工序类型：硫化（工序值0已被密炼占用）
      */
     public static String PROCEDURE_CODE_LH = "11";
