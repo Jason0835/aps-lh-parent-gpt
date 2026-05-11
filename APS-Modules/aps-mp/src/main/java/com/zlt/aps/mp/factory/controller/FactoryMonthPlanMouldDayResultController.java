@@ -215,18 +215,20 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
      * 导出定稿版本列表
      */
     @Log(title = "ui.data.column.factoryMonthPlanMouldDayResult.modelName", businessType = BusinessType.EXPORT)
-    @ApiOperation("导出调整版本数据")
-    @PostMapping("/exportAdjuest/{fileName}")
-    public byte[] exportAdjuest(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
+    @ApiOperation("导出定稿版本数据")
+    @PostMapping("/exportFinal/{fileName}")
+    public byte[] exportFinal(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         // 组装月计划导出excel
         Date beginTime = DateUtils.getNowDate();
         List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, false, true);
-        byte[] excelBytes = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, true);
-        
+        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, true);
+
+        // 合并月计划、结构转产表的导出数据
+        byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1);
         // 保存导出日志
         this.saveExportLog(queryVO, fileName, beginTime, list);
-        return excelBytes;
+        return resultBytes;
     }
 
     /**
@@ -240,6 +242,25 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
         Date beginTime = DateUtils.getNowDate();
         List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, true, false);
         byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, false);
+
+        // 合并月计划、结构转产表的导出数据
+        byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1);
+        // 保存导出日志
+        this.saveExportLog(queryVO, fileName, beginTime, list);
+        return resultBytes;
+    }
+
+    /**
+     * 全物料导出
+     */
+    @Log(title = "ui.data.column.factoryMonthPlanMouldDayResult.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("定稿版本全物料导出")
+    @PostMapping("/exportFinalAllMaterial/{fileName}")
+    public byte[] exportFinalAllMaterial(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        Date beginTime = DateUtils.getNowDate();
+        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, true, true);
+        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, true);
 
         // 合并月计划、结构转产表的导出数据
         byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1);
