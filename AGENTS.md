@@ -6,7 +6,7 @@ utf-8 no bom
 - 所有的@apixxx等和注释，必须使用中文。
 - 如果要写plan,解释语言使用中文。
 ## 前端规范
-- 前端开发规范见@docs/前端规则.md
+- 前端开发规范见@APS-VUEUI/docs/前端规则.md
 
 ## 后端规范
 - Date类的运算可以使用cn.hutool.core内的Date相关方法
