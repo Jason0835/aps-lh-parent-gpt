@@ -94,6 +94,7 @@ public class GroupPlanCxMachineSelector {
      * 1、零度供料架的匹配
      * 2、是否限制作业(限制结构，限制规格)
      * 3、是否存在对应的硫化配比
+     * 4、是否超出了英寸切换次数
      *
      * @param context       排产上下文
      * @param groupPlanInfo 分组计划
@@ -127,6 +128,10 @@ public class GroupPlanCxMachineSelector {
         cxMachineInfo.setRatio(lhRatioInfo.getLhMachineMaxQty());
         Set<String> fixedCxMachineSet = Optional.ofNullable(groupPlanInfo.getFixedCxMachineSet()).orElse(Collections.emptySet());
         if (CollectionUtils.isEmpty(fixedCxMachineSet)) {
+            //20260511+ 增加切换英寸重复次数限制
+            if (isMatchChangeProSizeCount(context, groupPlanInfo, cxMachineInfo)) {
+                return false;
+            }
             log.info(TbrProductionGroupLogRecorder.addGroupSelectedCxMachineCodeLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode));
             return true;
         }
@@ -134,6 +139,10 @@ public class GroupPlanCxMachineSelector {
         String fixedMachineInfo = String.join(StringConstant.COMMA, fixedCxMachineSet);
         TbrProductionGroupLogRecorder.addGroupSelectedFixedCxMachineLog(context, structureName, fixedMachineInfo);
         if (fixedCxMachineSet.contains(cxMachineCode)) {
+            //20260511+ 增加切换英寸重复次数限制
+            if (isMatchChangeProSizeCount(context, groupPlanInfo, cxMachineInfo)) {
+                return false;
+            }
             TbrProductionGroupLogRecorder.addGroupSelectedCxMachineCodeLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode);
             return true;
         }
@@ -156,22 +165,48 @@ public class GroupPlanCxMachineSelector {
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         if (null == singleSku) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedGroupNoProductionLog(context, "", "", cxMachineCode));
+            TbrProductionGroupLogRecorder.addGroupNoSelectedGroupNoProductionLog(context, "", "", cxMachineCode);
             return false;
 
         }
         String structureName = singleSku.getStructureName();
         if (StringUtils.isBlank(singleSku.getMaterialDesc())) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedGroupMaterialDescExceptionLog(context, structureName, "", cxMachineCode));
+            TbrProductionGroupLogRecorder.addGroupNoSelectedGroupMaterialDescExceptionLog(context, structureName, "", cxMachineCode);
             return false;
         }
         String materialCode = singleSku.getMaterialCode();
         if (cxMachineInfo.isNoProductionMaterial(materialCode)) {
             //记录日志
-            log.info(TbrProductionGroupLogRecorder.addGroupNoSelectedLimitLog(context, structureName, "", cxMachineCode));
+            TbrProductionGroupLogRecorder.addGroupNoSelectedLimitLog(context, structureName, "", cxMachineCode);
             return false;
         }
         return true;
+    }
+
+    /**
+     * 是否达到切换英寸重复的次数
+     *
+     * @param context       排产上下文
+     * @param groupPlanInfo 预排分组
+     * @param cxMachineInfo 排产机台
+     * @return
+     */
+    private static boolean isMatchChangeProSizeCount(Context context, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo) {
+        if (null == groupPlanInfo || null == cxMachineInfo) {
+            return true;
+        }
+        String structureName = groupPlanInfo.getGroupName();
+        String isZeroRack = groupPlanInfo.getIsZero();
+        String cxMachineCode = cxMachineInfo.getCxMachineCode();
+        String machineTypeCode = cxMachineInfo.getCxMachineTypeCode();
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Integer repeatMaxCount = productionContext.getBaseDataContainer().getParamConfiguration().getSingleCxMachineChangeProSizeRepeatMaxCount();
+        String proSize = groupPlanInfo.getProSizeInfo();
+        boolean isLimit = cxMachineInfo.isExceedLimitMaxRepeatCount(repeatMaxCount, proSize);
+        if (isLimit) {
+            TbrProductionGroupLogRecorder.addGroupNoSelectedRepeatProSizeLimitLog(context, structureName, isZeroRack, cxMachineCode, machineTypeCode, repeatMaxCount);
+        }
+        return isLimit;
     }
 }

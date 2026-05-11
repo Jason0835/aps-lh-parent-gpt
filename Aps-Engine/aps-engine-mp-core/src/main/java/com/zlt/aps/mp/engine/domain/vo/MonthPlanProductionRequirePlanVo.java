@@ -124,16 +124,6 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 其余搭配量
      */
     private Integer otherMatchingQty;
-
-    /**
-     * 搭配开始日期
-     */
-    private Integer matchBeginDay;
-
-    /**
-     * 搭配结束日期
-     */
-    private Integer matchEndDay;
     /**
      * 20260430+ 是否先高优先级排产
      */

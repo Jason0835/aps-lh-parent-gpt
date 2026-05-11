@@ -229,6 +229,8 @@ export default {
         {
           prop: 'mainMaterialDesc',
           label: this.$t('ui.data.column.cxStructureTreadConfig.mainMaterialDesc'),
+          minWidth: 350,
+          align: "left",
           clearable: true
         },
         {
@@ -256,10 +258,10 @@ export default {
         },
         {
           prop: 'structureCode',
-          align: 'center',
-          halign: 'center',
+          align: "left",
+          halign: "left",
           label: this.$t('ui.data.column.cxStructureTreadConfig.structureCode'),
-          minWidth: 140
+          minWidth: 160
         },
         {
           prop: 'embryoCode',
@@ -271,9 +273,9 @@ export default {
         {
           prop: 'mainMaterialDesc',
           align: 'left',
-          halign: 'center',
+          halign: "left",
           label: this.$t('ui.data.column.cxStructureTreadConfig.mainMaterialDesc'),
-          minWidth: 250
+          minWidth: 350
         },
         {
           prop: 'treadCount',

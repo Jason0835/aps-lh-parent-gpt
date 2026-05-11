@@ -130,8 +130,9 @@ export default {
         },
         {
           prop: 'scheduleDate',
+          align: "center",
           label: this.$t('ui.data.column.cxPrecisionPlan.scheduleDate'),
-          width: 180
+          minWidth: 120
         },
         {
           prop: 'dataSource',

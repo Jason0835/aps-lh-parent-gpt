@@ -150,7 +150,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.colume.must.finish.plan.productDescription"),
-          width: 300,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "locationType",

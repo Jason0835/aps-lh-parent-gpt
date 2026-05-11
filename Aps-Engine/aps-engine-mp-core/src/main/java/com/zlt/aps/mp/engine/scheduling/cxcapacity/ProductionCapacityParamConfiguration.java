@@ -102,6 +102,10 @@ public class ProductionCapacityParamConfiguration {
      */
     private Integer changeTypeBlockMaxQty;
     /**
+     * 单机台切换英寸，重复的次数
+     */
+    private Integer singleCxMachineChangeProSizeRepeatMaxCount;
+    /**
      * 最小批量值
      */
     private Integer minQty;

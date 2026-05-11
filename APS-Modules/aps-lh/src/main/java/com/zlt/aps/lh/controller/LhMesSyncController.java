@@ -289,42 +289,42 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     }
 
     @Override
-    @ApiOperation("清理硫化在机历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/cleanLhMachineOnlineHistoryDuplicate")
-    public AjaxResult cleanLhMachineOnlineHistoryDuplicate() {
-        log.info("开始清理硫化在机历史重复数据...");
-        int count = lhMachineOnlineInfoMapper.cleanHistoryDuplicateData();
-        log.info("清理硫化在机历史重复数据完成，删除记录数={}", count);
-        return AjaxResult.success("删除记录数：" + count);
+    @ApiOperation("逻辑删除硫化在机今天之前所有数据")
+    @PostMapping("/logicDeleteLhMachineOnlineAllBeforeToday")
+    public AjaxResult logicDeleteLhMachineOnlineAllBeforeToday() {
+        log.info("开始逻辑删除硫化在机今天之前所有数据...");
+        int deleteCount = lhMachineOnlineInfoMapper.logicDeleteAllBeforeToday();
+        log.info("逻辑删除硫化在机今天之前所有数据完成，删除记录数={}", deleteCount);
+        return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("清理胶囊已使用次数历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/cleanLhRepairCapsuleHistoryDuplicate")
-    public AjaxResult cleanLhRepairCapsuleHistoryDuplicate() {
-        log.info("开始清理胶囊已使用次数历史重复数据...");
-        int count = lhRepairCapsuleMapper.cleanHistoryDuplicateData();
-        log.info("清理胶囊已使用次数历史重复数据完成，删除记录数={}", count);
-        return AjaxResult.success("删除记录数：" + count);
+    @ApiOperation("逻辑删除胶囊已使用次数今天之前所有数据")
+    @PostMapping("/logicDeleteLhRepairCapsuleAllBeforeToday")
+    public AjaxResult logicDeleteLhRepairCapsuleAllBeforeToday() {
+        log.info("开始逻辑删除胶囊已使用次数今天之前所有数据...");
+        int deleteCount = lhRepairCapsuleMapper.logicDeleteAllBeforeToday();
+        log.info("逻辑删除胶囊已使用次数今天之前所有数据完成，删除记录数={}", deleteCount);
+        return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("清理硫化排程完成量历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/cleanLhScheFinishQtyHistoryDuplicate")
-    public AjaxResult cleanLhScheFinishQtyHistoryDuplicate() {
-        log.info("开始清理硫化排程完成量历史重复数据...");
-        int count = lhScheFinishQtyMapper.cleanHistoryDuplicateData();
-        log.info("清理硫化排程完成量历史重复数据完成，删除记录数={}", count);
-        return AjaxResult.success("删除记录数：" + count);
+    @ApiOperation("逻辑删除硫化排程完成量今天之前所有数据")
+    @PostMapping("/logicDeleteLhScheFinishQtyAllBeforeToday")
+    public AjaxResult logicDeleteLhScheFinishQtyAllBeforeToday() {
+        log.info("开始逻辑删除硫化排程完成量今天之前所有数据...");
+        int deleteCount = lhScheFinishQtyMapper.logicDeleteAllBeforeToday();
+        log.info("逻辑删除硫化排程完成量今天之前所有数据完成，删除记录数={}", deleteCount);
+        return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("清理硫化排程日完成量历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/cleanLhDayFinishQtyHistoryDuplicate")
-    public AjaxResult cleanLhDayFinishQtyHistoryDuplicate() {
-        log.info("开始清理硫化排程日完成量历史重复数据...");
-        int count = lhDayFinishQtyMapper.cleanHistoryDuplicateData();
-        log.info("清理硫化排程日完成量历史重复数据完成，删除记录数={}", count);
-        return AjaxResult.success("删除记录数：" + count);
+    @ApiOperation("逻辑删除硫化排程日完成量今天之前所有数据")
+    @PostMapping("/logicDeleteLhDayFinishQtyAllBeforeToday")
+    public AjaxResult logicDeleteLhDayFinishQtyAllBeforeToday() {
+        log.info("开始逻辑删除硫化排程日完成量今天之前所有数据...");
+        int deleteCount = lhDayFinishQtyMapper.logicDeleteAllBeforeToday();
+        log.info("逻辑删除硫化排程日完成量今天之前所有数据完成，删除记录数={}", deleteCount);
+        return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 }

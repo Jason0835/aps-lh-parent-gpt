@@ -387,14 +387,16 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          align: "left",
           prop: "materialDesc",
-          minWidth: 360,
+          minWidth: 350,
           showOverflowTooltip: true,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.embryoDesc"),
+          align: "left",
           prop: "mainMaterialDesc",
-          minWidth: 320,
+          minWidth: 350,
           showOverflowTooltip: true,
         },
         {
@@ -729,12 +731,14 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.batchNo"),
           prop: "batchNo",
-          width: 180,
+          align: "left",
+          minWidth: 160,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.orderNo"),
           prop: "orderNo",
-          width: 180,
+          align: "left",
+          minWidth: 160,
         },
         {
           prop: "updateTime",

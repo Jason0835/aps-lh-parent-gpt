@@ -121,7 +121,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.mdmStockUpPlan.productDesc"),
-          width: 250,
+          align: "left",
+          minWidth: 350,
         },
         // {
         //   prop: "productDesc",

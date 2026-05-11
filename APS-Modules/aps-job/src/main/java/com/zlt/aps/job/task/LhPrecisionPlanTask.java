@@ -27,17 +27,15 @@ public class LhPrecisionPlanTask {
 
     /**
      * 从MES同步数据生成硫化精度计划
+     * 调用综合接口，内部按最新版本号增量同步设备保养计划、回填实际执行日期、生成精度计划、自动推算下一年度
      */
     public void generateFromMes() {
         log.info("定时任务：从MES同步数据生成硫化精度计划");
         FeignTokenHelper.runWithToken(() -> {
             try {
                 Integer currentYear = LocalDate.now().getYear();
-                AjaxResult result = lhPrecisionPlanRemoteService.generatePlansFromMes(currentYear);
+                AjaxResult result = iMesItfService.syncAndGenerateLhPrecisionPlan(currentYear);
                 log.info("定时任务执行结果：{}", result.get("msg"));
-
-                AjaxResult calculateResult = lhPrecisionPlanRemoteService.autoCalculateLhPrecisionPlan(currentYear + 1);
-                log.info("自动推算结果：{}", calculateResult.get("msg"));
             } catch (Exception e) {
                 log.error("定时任务执行失败", e);
             }

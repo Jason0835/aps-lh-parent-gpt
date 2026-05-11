@@ -156,7 +156,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width:350
+          align: "left",
+          minWidth: 350
         },
         {
           prop: "classCapacity",
@@ -276,6 +277,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          minWidth: 350,
+          align: "left",
         },
       ];
     },

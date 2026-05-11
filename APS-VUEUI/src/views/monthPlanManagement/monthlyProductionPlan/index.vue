@@ -236,7 +236,8 @@ export default {
         {
           label: this.$t("ui.data.column.mdmMonthProdPlan.specDesc"),
           prop: "specDesc",
-          minWidth: 100,
+          align: "left",
+          minWidth: 350,
           // sortable: "custom",
         },
         {

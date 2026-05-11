@@ -44,4 +44,12 @@
         </foreach>
     </select>
 
+    <select id="selectMaxDataVersion" resultType="java.lang.String">
+        SELECT MAX(DATA_VERSION)
+        FROM T_MDM_DEV_MAINTENANCE_PLAN
+        WHERE PRECISION_TYPE = #{precisionType}
+          AND IS_DELETE = 0
+          AND DATA_VERSION IS NOT NULL
+    </select>
+
 </mapper>

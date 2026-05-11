@@ -159,7 +159,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.monthPlanAdjustNotice.productDesc"),
-          width: 300,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "needQty",
@@ -320,6 +321,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.monthPlanAdjustNotice.productDesc"),
+          minWidth: 350,
+          align: "left",
         },
       ];
     },

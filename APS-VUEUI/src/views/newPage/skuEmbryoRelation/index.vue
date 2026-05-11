@@ -164,6 +164,8 @@ export default {
         {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          minWidth: 350,
+          align: "left",
         },
 
         {
@@ -213,6 +215,8 @@ export default {
         {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          minWidth: 350,
+          align: "left",
         },
         // {
         //   prop: "materialCode",

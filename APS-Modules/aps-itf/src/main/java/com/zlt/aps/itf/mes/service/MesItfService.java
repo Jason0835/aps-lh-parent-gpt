@@ -301,4 +301,15 @@ public interface MesItfService {
      * @return 执行结果
      */
     AjaxResult syncAndGenerateLhPrecisionPlan(Integer year);
+
+    /**
+     * 清理并重新同步所有MES历史数据
+     * 执行步骤：
+     * 1. 逻辑删除APS库中今天之前的所有数据（6张表）
+     * 2. 从MES库重新抓取今天之前每天最新版本数据
+     * 3. 将MES数据插入到APS库
+     *
+     * @return 执行结果
+     */
+    AjaxResult cleanAndResyncAllHistory();
 }

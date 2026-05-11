@@ -264,22 +264,22 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
     }
 
     @Override
-    @ApiOperation("清理成型在机历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/cleanCxMachineOnlineHistoryDuplicate")
-    public AjaxResult cleanCxMachineOnlineHistoryDuplicate() {
-        log.info("开始清理成型在机历史重复数据...");
-        int count = cxMachineOnlineInfoMapper.cleanHistoryDuplicateData();
-        log.info("清理成型在机历史重复数据完成，删除记录数={}", count);
-        return AjaxResult.success("删除记录数：" + count);
+    @ApiOperation("逻辑删除成型在机今天之前所有数据")
+    @PostMapping("/logicDeleteCxMachineOnlineAllBeforeToday")
+    public AjaxResult logicDeleteCxMachineOnlineAllBeforeToday() {
+        log.info("开始逻辑删除成型在机今天之前所有数据...");
+        int deleteCount = cxMachineOnlineInfoMapper.logicDeleteAllBeforeToday();
+        log.info("逻辑删除成型在机今天之前所有数据完成，删除记录数={}", deleteCount);
+        return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("清理生胎库存历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/cleanCxStockHistoryDuplicate")
-    public AjaxResult cleanCxStockHistoryDuplicate() {
-        log.info("开始清理生胎库存历史重复数据...");
-        int count = cxStockMapper.cleanHistoryDuplicateData();
-        log.info("清理生胎库存历史重复数据完成，删除记录数={}", count);
-        return AjaxResult.success("删除记录数：" + count);
+    @ApiOperation("逻辑删除生胎库存今天之前所有数据")
+    @PostMapping("/logicDeleteCxStockAllBeforeToday")
+    public AjaxResult logicDeleteCxStockAllBeforeToday() {
+        log.info("开始逻辑删除生胎库存今天之前所有数据...");
+        int deleteCount = cxStockMapper.logicDeleteAllBeforeToday();
+        log.info("逻辑删除生胎库存今天之前所有数据完成，删除记录数={}", deleteCount);
+        return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 }

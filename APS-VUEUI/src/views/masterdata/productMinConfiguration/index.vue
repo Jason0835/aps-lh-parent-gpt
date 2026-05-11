@@ -127,6 +127,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.confMinProd.productDescription"),
+          minWidth: 350,
+          align: "left",
         },
         {
           prop: "productType",
@@ -200,6 +202,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.confMinProd.productDescription"),
+          minWidth: 350,
+          align: "left",
         },
         {
           prop: "productType",

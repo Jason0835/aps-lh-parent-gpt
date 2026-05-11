@@ -282,9 +282,18 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
             redisService.setCacheObject(lockKey, "1");
             log.info("开始从MES同步数据生成{}年度硫化精度计划", year);
 
+            // 查询APS本地表中硫化精度类型的最大版本号，只处理最新版本的数据
+            String maxVersion = mdmDevMaintenancePlanEntityMapper.selectMaxDataVersion(PRECISION_TYPE_LH);
+            if (maxVersion == null || maxVersion.isEmpty()) {
+                log.warn("APS本地表中无硫化精度版本数据，跳过处理");
+                return 0;
+            }
+            log.info("硫化精度最新版本号：{}", maxVersion);
+
             LambdaQueryWrapper<MdmDevMaintenancePlan> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(MdmDevMaintenancePlan::getPrecisionType, PRECISION_TYPE_LH)
                    .eq(MdmDevMaintenancePlan::getIsDelete, 0)
+                   .eq(MdmDevMaintenancePlan::getDataVersion, maxVersion)
                    .and(w -> w.isNotNull(MdmDevMaintenancePlan::getFirstWashTime).or().isNotNull(MdmDevMaintenancePlan::getOperTime));
 
             List<MdmDevMaintenancePlan> mesPlans = mdmDevMaintenancePlanEntityMapper.selectList(wrapper);

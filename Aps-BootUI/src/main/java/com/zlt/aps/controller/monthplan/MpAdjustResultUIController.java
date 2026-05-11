@@ -7,7 +7,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
+import com.zlt.aps.mp.api.service.IFactoryMonthPlanMouldDayResultRemoteService;
 import com.zlt.aps.mp.api.service.IMpAdjustResultRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -19,10 +21,14 @@ import org.springframework.ui.ModelMap;
 import lombok.extern.slf4j.Slf4j;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
+
+import cn.hutool.core.date.DateUtil;
+
 import org.apache.commons.io.IOUtils;
 
 import java.util.Arrays;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.io.ByteArrayInputStream;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -55,6 +61,9 @@ public class MpAdjustResultUIController extends BaseUIController<MpAdjustResult>
 
     @Autowired
     private IMpAdjustResultRemoteService iMpAdjustResultService;
+    
+    @Autowired
+    private IFactoryMonthPlanMouldDayResultRemoteService iFactoryMonthPlanMouldDayResultService;
 
     private final String prefix = "aps/monthplan/mpAdjustResult";
 
@@ -181,6 +190,30 @@ public class MpAdjustResultUIController extends BaseUIController<MpAdjustResult>
     public void export(HttpServletResponse response, MpAdjustResult entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
         byte[] excelBytes = iMpAdjustResultService.exportData(entity,fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
+    }
+    
+    @ApiOperation("数据导出")
+    @GetMapping({"/exportFinal"})
+    @ResponseBody
+    public void exportFinal(HttpServletResponse response, FactoryMonthPlanMouldDayResult entity) throws IOException {
+        String fileName = this.getExportTemplateFileName()+ DateUtil.format(LocalDateTime.now(),"yyyyMMdd");
+        byte[] excelBytes = iFactoryMonthPlanMouldDayResultService.exportFinal(entity,fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
+    }
+    
+    @ApiOperation("全物料导出")
+    @GetMapping({"/exportAllMaterial"})
+    @ResponseBody
+    public void exportAllMaterial(HttpServletResponse response, FactoryMonthPlanMouldDayResult entity) throws IOException {
+        String fileName = this.getExportTemplateFileName()+ DateUtil.format(LocalDateTime.now(),"yyyyMMdd");
+        byte[] excelBytes = iFactoryMonthPlanMouldDayResultService.exportFinalAllMaterial(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());

@@ -169,7 +169,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.monthSaleOrderPlan.productDesc"),
-          width: 250,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "locationType",
@@ -253,8 +254,9 @@ export default {
         },
         {
           prop: "orderNo",
+          align: "left",
           label: this.$t("ui.data.column.monthSaleOrderPlan.orderNo"),
-          width: 120,
+          minWidth: 160,
         },
         {
           prop: "createTime",
@@ -264,6 +266,8 @@ export default {
         {
           prop: "sourceTypeDesc",
           label: this.$t("ui.data.column.monthSaleOrderPlan.sourceType"),
+          minWidth: 350,
+          align: "left",
         },
         // {
         //   prop: "remark",
@@ -333,9 +337,13 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.monthSaleOrderPlan.productDesc"),
+          minWidth: 350,
+          align: "left",
         },
         {
           prop: "orderNo",
+          align: "left",
+          minWidth: 160,
           label: this.$t("ui.data.column.monthSaleOrderPlan.orderNo"),
         },
         {

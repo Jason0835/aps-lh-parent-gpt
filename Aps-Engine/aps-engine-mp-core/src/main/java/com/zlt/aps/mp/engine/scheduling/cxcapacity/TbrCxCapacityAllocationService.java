@@ -345,11 +345,9 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         allGroupPlanMap.forEach((structureName, groupPlanInfo) -> {
             CxContinueInfoHelper cxContinueInfoHelper = allCxContinueInfoMap.get(structureName);
             if (null == cxContinueInfoHelper) {
-                //log.info();
                 TbrProductionGroupLogRecorder.addGroupNoContinueGroupLog(context, structureName);
                 return;
             }
-            //log.info();
             TbrProductionGroupLogRecorder.addOnLineGroupSetUpDataLog(context, structureName);
             ContinueSkuCalculator.setContinueSkuPlanDemandQty(context, groupPlanInfo, cxContinueInfoHelper);
             ContinueSkuCalculator.initContinueCxMachineLimit(context, groupPlanInfo, cxContinueInfoHelper);
@@ -552,7 +550,6 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
                 return;
             }
             Set<String> onLineMachineSet = continueGroupInfo.get(groupName);
-            //log.info();
             TbrBeforeProductionGroupLogRecorder.addContinueGroupNoOnLineMachineLog(context, groupName, continueSku.getMaterialDesc(), onLineMachineSet);
             continueSku.setContinueCxMachineCodeSet(onLineMachineSet);
         });

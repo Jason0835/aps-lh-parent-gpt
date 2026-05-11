@@ -90,10 +90,10 @@ export default {
         },
         {
           prop: "materialDesc",
-          align: "center",
-          halign: "center",
+          align: "left",
+          halign: "left",
           label: this.$t("ui.data.column.lhRepairCapsule.materialDesc"),
-          minWidth: 340,
+          minWidth: 350,
         },
         {
           prop: "replaceCapsuleCount",
@@ -154,6 +154,8 @@ export default {
         },
         {
           label: this.$t("ui.data.column.lhRepairCapsule.materialDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "materialDesc",
         },
         // {

@@ -221,6 +221,8 @@
         {
           label: '排程日期',
           prop: 'scheduleDate',
+          align: "center",
+          minWidth: 120,
         },
       ]"
       :rules="importRules"
@@ -234,6 +236,8 @@
         {
           label: '排程日期',
           prop: 'scheduleDate',
+          align: "center",
+          minWidth: 120,
         },
       ]"
       :rules="importRules"
@@ -248,6 +252,8 @@
         {
           label: '排程日期',
           prop: 'scheduleDate',
+          align: "center",
+          minWidth: 120,
         },
       ]"
       :rules="importRules"

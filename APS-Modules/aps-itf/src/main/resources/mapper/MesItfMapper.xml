@@ -414,4 +414,149 @@
         <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
     </select>
+
+    <select id="selectMaxDataVersionFromMes" resultType="java.lang.String">
+        SELECT MAX(DATA_VERSION)
+        FROM DEV_MAINTENANCE_PLAN
+        WHERE DATA_VERSION IS NOT NULL
+        <if test="precisionType != null and precisionType != ''">AND PRECISION_TYPE = #{precisionType}</if>
+    </select>
+
+    <select id="selectCxMachineOnlineHistorySyncList" resultType="com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo">
+        SELECT
+        t.ONLINE_DATE,
+        t.CX_CODE,
+        t.MATERIAL_CODE,
+        t.MES_MATERIAL_CODE,
+        t.SPEC_DESC,
+        t.EMBRYO_SPEC,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM CX_MACHINE_ONLINE_SYNC t
+        INNER JOIN (
+            SELECT CONVERT(DATE, ONLINE_DATE) AS online_day, CX_CODE, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM CX_MACHINE_ONLINE_SYNC
+            WHERE CONVERT(DATE, ONLINE_DATE) &lt; CONVERT(DATE, GETDATE())
+            <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+            <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+            GROUP BY CONVERT(DATE, ONLINE_DATE), CX_CODE
+        ) latest ON CONVERT(DATE, t.ONLINE_DATE) = latest.online_day AND t.CX_CODE = latest.CX_CODE AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE CONVERT(DATE, t.ONLINE_DATE) &lt; CONVERT(DATE, GETDATE())
+        <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
+    </select>
+
+    <select id="selectLhMachineOnlineHistorySyncList" resultType="com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo">
+        SELECT
+        t.ONLINE_DATE,
+        t.LH_CODE,
+        t.MATERIAL_CODE,
+        t.MES_MATERIAL_CODE,
+        t.SPEC_DESC,
+        t.LR_MOLDS,
+        t.IN_MACHINE_MOULD_CODE,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM LH_MACHINE_ONLINE_SYNC t
+        INNER JOIN (
+            SELECT CONVERT(DATE, ONLINE_DATE) AS online_day, LH_CODE, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM LH_MACHINE_ONLINE_SYNC
+            WHERE CONVERT(DATE, ONLINE_DATE) &lt; CONVERT(DATE, GETDATE())
+            <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+            <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+            GROUP BY CONVERT(DATE, ONLINE_DATE), LH_CODE
+        ) latest ON CONVERT(DATE, t.ONLINE_DATE) = latest.online_day AND t.LH_CODE = latest.LH_CODE AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE CONVERT(DATE, t.ONLINE_DATE) &lt; CONVERT(DATE, GETDATE())
+        <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
+    </select>
+
+    <select id="selectLhRepairCapsuleHistoryList" resultType="com.zlt.aps.itf.vo.LhRepairCapsuleVo">
+        SELECT
+        CONVERT(VARCHAR, OBTAIN_TIME, 120) AS OBTAIN_TIME,
+        LH_CODE,
+        MATERIAL_CODE,
+        REPLACE_CAPSULE_COUNT,
+        REPLACE_CAPSULE_COUNT2,
+        BRAND,
+        DATA_VERSION,
+        COMPANY_CODE,
+        FACTORY_CODE
+        FROM LH_REPAIR_CAPSULE t
+        INNER JOIN (
+            SELECT CONVERT(DATE, OBTAIN_TIME) AS obtain_day, LH_CODE, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM LH_REPAIR_CAPSULE
+            WHERE CONVERT(DATE, OBTAIN_TIME) &lt; CONVERT(DATE, GETDATE())
+            GROUP BY CONVERT(DATE, OBTAIN_TIME), LH_CODE
+        ) latest ON CONVERT(DATE, t.OBTAIN_TIME) = latest.obtain_day AND t.LH_CODE = latest.LH_CODE AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE CONVERT(DATE, t.OBTAIN_TIME) &lt; CONVERT(DATE, GETDATE())
+    </select>
+
+    <select id="selectMesCxStockHistoryList" resultType="com.zlt.aps.cx.api.domain.entity.CxMesStock">
+        SELECT
+        STOCK_DATE,
+        EMBRYO_CODE,
+        STOCK_NUM
+        FROM MES_CX_STOCK
+        WHERE CONVERT(DATE, STOCK_DATE) &lt; CONVERT(DATE, GETDATE())
+    </select>
+
+    <select id="selectLhClassShiftFinishQtyHistoryList" resultType="com.zlt.aps.lh.api.domain.entity.LhScheFinishQty">
+        SELECT
+        t.ORDER_NO,
+        t.SCHEDULE_DATE,
+        t.LH_MACHINE_CODE,
+        t.MATERIAL_CODE,
+        t.MES_MATERIAL_CODE,
+        t.CLASS1_FINISH_QTY,
+        t.CLASS2_FINISH_QTY,
+        t.CLASS3_FINISH_QTY,
+        t.CLASS1_UN_REASON,
+        t.CLASS2_UN_REASON,
+        t.CLASS3_UN_REASON,
+        t.CLASS1_PERSON,
+        t.CLASS2_PERSON,
+        t.CLASS3_PERSON,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM MES_LH_CLASS_SHIFT_FINISH_QTY t
+        INNER JOIN (
+            SELECT CONVERT(DATE, SCHEDULE_DATE) AS schedule_day, LH_MACHINE_CODE, ORDER_NO, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM MES_LH_CLASS_SHIFT_FINISH_QTY
+            WHERE CONVERT(DATE, SCHEDULE_DATE) &lt; CONVERT(DATE, GETDATE())
+            <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+            <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+            GROUP BY CONVERT(DATE, SCHEDULE_DATE), LH_MACHINE_CODE, ORDER_NO
+        ) latest ON CONVERT(DATE, t.SCHEDULE_DATE) = latest.schedule_day
+            AND t.LH_MACHINE_CODE = latest.LH_MACHINE_CODE
+            AND t.ORDER_NO = latest.ORDER_NO
+            AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE CONVERT(DATE, t.SCHEDULE_DATE) &lt; CONVERT(DATE, GETDATE())
+        <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
+    </select>
+
+    <select id="selectLhScheDayFinishQtyHistoryList" resultType="com.zlt.aps.lh.api.domain.entity.LhDayFinishQty">
+        SELECT
+        t.FINISH_DATE,
+        t.DAY_FINISH_QTY,
+        t.MATERIAL_CODE,
+        t.MES_MATERIAL_CODE,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM MES_LH_DAY_FINISH_QTY t
+        INNER JOIN (
+            SELECT CONVERT(DATE, FINISH_DATE) AS finish_day, FACTORY_CODE, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM MES_LH_DAY_FINISH_QTY
+            WHERE CONVERT(DATE, FINISH_DATE) &lt; CONVERT(DATE, GETDATE())
+            GROUP BY CONVERT(DATE, FINISH_DATE), FACTORY_CODE
+        ) latest ON CONVERT(DATE, t.FINISH_DATE) = latest.finish_day
+            AND t.FACTORY_CODE = latest.FACTORY_CODE
+            AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE CONVERT(DATE, t.FINISH_DATE) &lt; CONVERT(DATE, GETDATE())
+    </select>
 </mapper>

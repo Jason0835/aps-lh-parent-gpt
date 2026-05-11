@@ -177,6 +177,7 @@ export default {
         {
           label: this.$t("ui.data.column.machine.lhMachineType"),
           prop: "machineType",
+          minWidth: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.LH_MACHINE_TYPE, value);
           },

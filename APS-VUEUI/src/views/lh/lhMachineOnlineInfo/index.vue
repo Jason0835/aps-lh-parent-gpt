@@ -103,7 +103,7 @@ export default {
           align: 'left',
           halign: 'left',
           label: this.$t('ui.data.column.lhMachineOnlineInfo.specDesc'),
-          minWidth: 300
+          minWidth: 350
         },
         {
           prop: 'lrMolds',

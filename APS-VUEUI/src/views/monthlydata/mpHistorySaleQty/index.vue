@@ -167,7 +167,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.mpHistorySaleQty.productDesc"),
-          width: 250,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "remark",

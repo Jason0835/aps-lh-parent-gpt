@@ -147,6 +147,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("common.name"),
+          minWidth: 350,
+          align: "left",
         },
         {
           prop: "standardLength",
@@ -216,6 +218,8 @@ export default {
         {
           label: this.$t("common.name"),
           prop: "materialDesc",
+          align: "left",
+          minWidth: 350,
           // type: "select",
           // dictData: this.dict.type.JOB_TYPE, // "JOB_TYPE",
         },

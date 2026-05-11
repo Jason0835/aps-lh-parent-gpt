@@ -108,19 +108,19 @@ public interface ILhMesSyncRemoteService {
     @PostMapping("/mesSync/writeBackMouldChangePlanFinishStatus")
     AjaxResult writeBackMouldChangePlanFinishStatus(@RequestBody List<LhMoldAlterPlanFinish> list);
 
-    @ApiOperation("清理硫化在机历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/mesSync/cleanLhMachineOnlineHistoryDuplicate")
-    AjaxResult cleanLhMachineOnlineHistoryDuplicate();
+    @ApiOperation("逻辑删除硫化在机今天之前所有数据")
+    @PostMapping("/mesSync/logicDeleteLhMachineOnlineAllBeforeToday")
+    AjaxResult logicDeleteLhMachineOnlineAllBeforeToday();
 
-    @ApiOperation("清理胶囊已使用次数历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/mesSync/cleanLhRepairCapsuleHistoryDuplicate")
-    AjaxResult cleanLhRepairCapsuleHistoryDuplicate();
+    @ApiOperation("逻辑删除胶囊已使用次数今天之前所有数据")
+    @PostMapping("/mesSync/logicDeleteLhRepairCapsuleAllBeforeToday")
+    AjaxResult logicDeleteLhRepairCapsuleAllBeforeToday();
 
-    @ApiOperation("清理硫化排程完成量历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/mesSync/cleanLhScheFinishQtyHistoryDuplicate")
-    AjaxResult cleanLhScheFinishQtyHistoryDuplicate();
+    @ApiOperation("逻辑删除硫化排程完成量今天之前所有数据")
+    @PostMapping("/mesSync/logicDeleteLhScheFinishQtyAllBeforeToday")
+    AjaxResult logicDeleteLhScheFinishQtyAllBeforeToday();
 
-    @ApiOperation("清理硫化排程日完成量历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/mesSync/cleanLhDayFinishQtyHistoryDuplicate")
-    AjaxResult cleanLhDayFinishQtyHistoryDuplicate();
+    @ApiOperation("逻辑删除硫化排程日完成量今天之前所有数据")
+    @PostMapping("/mesSync/logicDeleteLhDayFinishQtyAllBeforeToday")
+    AjaxResult logicDeleteLhDayFinishQtyAllBeforeToday();
 }

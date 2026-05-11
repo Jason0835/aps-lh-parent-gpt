@@ -126,21 +126,21 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.paramsName"),
           titleTooltip: true,
-          minWidth: 180,
+          minWidth: 250,
           // sortable: "custom",
         },
         {
           prop: "paramValue",
           halign: "center",
           label: this.$t("ui.data.column.paramsValue"),
+          minWidth: 250,
           // sortable: "custom",
-          width: 180
         },
         {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
-          minWidth: 220,
+          minWidth: 200,
           // sortable: "custom",
         },
         {
