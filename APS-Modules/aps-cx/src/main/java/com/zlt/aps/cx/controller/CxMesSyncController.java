@@ -8,6 +8,8 @@ import com.zlt.aps.cx.api.domain.entity.CxScheFinishQty;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
+import com.zlt.aps.cx.service.CxStockService;
+import com.zlt.aps.cx.service.ICxMachineOnlineInfoService;
 import com.zlt.aps.cx.mapper.CxDayFinishQtyMapper;
 import com.zlt.aps.cx.mapper.CxMachineOnlineInfoMapper;
 import com.zlt.aps.cx.mapper.CxMesStockMapper;
@@ -43,6 +45,9 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
     private CxMachineOnlineInfoMapper cxMachineOnlineInfoMapper;
 
     @Autowired
+    private ICxMachineOnlineInfoService cxMachineOnlineInfoService;
+
+    @Autowired
     private CxStructureTreadConfigMapper cxStructureTreadConfigMapper;
 
     @Autowired
@@ -56,6 +61,9 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
 
     @Autowired
     private CxStockMapper cxStockMapper;
+
+    @Autowired
+    private CxStockService cxStockService;
 
     @Override
     @ApiOperation("批量删除成型在机信息")
@@ -80,6 +88,14 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
         if (list != null && !list.isEmpty()) {
             baseDao.insertBatch(list);
         }
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("逻辑删除并批量保存成型在机信息（事务性操作）")
+    @PostMapping("/logicDeleteAndSaveMachineOnlineInfo")
+    public AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("onlineDate") Date onlineDate, @RequestParam("updateBy") String updateBy, @RequestBody List<CxMachineOnlineInfo> list) {
+        cxMachineOnlineInfoService.logicDeleteAndSaveBatch(factoryCode, onlineDate, updateBy, list);
         return AjaxResult.success();
     }
 
@@ -178,6 +194,18 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
                                                       @RequestParam("dataSource") String dataSource,
                                                       @RequestParam("updateBy") String updateBy) {
         cxStockMapper.logicDeleteByFactoryCodeAndDataSource(factoryCode, dataSource, updateBy, new Date());
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("逻辑删除并批量保存生胎库存（事务性操作）")
+    @PostMapping("/logicDeleteAndSaveCxStockByDataSource")
+    public AjaxResult logicDeleteAndSaveCxStockByDataSource(@RequestParam("factoryCode") String factoryCode,
+                                                             @RequestParam("dataSource") String dataSource,
+                                                             @RequestParam("stockDate") Date stockDate,
+                                                             @RequestParam("updateBy") String updateBy,
+                                                             @RequestBody List<CxStock> list) {
+        cxStockService.logicDeleteAndSaveBatch(factoryCode, dataSource, stockDate, updateBy, list);
         return AjaxResult.success();
     }
 

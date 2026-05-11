@@ -2,7 +2,7 @@
   <el-dialog
     :title="$t('ui.data.column.monthPlanFinalAdjustQuery.structureAdjust')"
     :visible.sync="dialogVisible"
-    width="900px"
+    width="700px"
     append-to-body
     :close-on-click-modal="false"
     @close="handleClose"
@@ -35,7 +35,7 @@
       <el-table :data="tableRows" border size="small" max-height="420">
         <el-table-column
           :label="$t('ui.data.column.finishStock.structureName')"
-          min-width="160"
+          min-width="120"
         >
           <template slot-scope="scope">
             <el-select
@@ -236,6 +236,21 @@ export default {
     },
   },
   methods: {
+    /** 机台字段可能为 H1503,H1201 形式，跳转结构调整页只带第一台 */
+    extractFirstCxMachineCode(val) {
+      if (val == null) {
+        return "";
+      }
+      const s = String(val).trim();
+      if (!s) {
+        return "";
+      }
+      const parts = s
+        .split(/[,，]/)
+        .map((x) => String(x).trim())
+        .filter(Boolean);
+      return parts.length ? parts[0] : "";
+    },
     show(payload) {
       this.factoryCode = (payload && payload.factoryCode) || "116";
       this.yearMonth = (payload && payload.yearMonth) || "";
@@ -255,15 +270,26 @@ export default {
       )
         ? String(payload.fixedCxMachineCode).trim()
         : "";
+      /** 月计划列表勾选行带入的首台机台（可改）；与 fixed 互斥 */
+      const prefill =
+        !fixed &&
+        payload &&
+        payload.prefillCxMachineCode != null &&
+        String(payload.prefillCxMachineCode).trim() !== ""
+          ? String(payload.prefillCxMachineCode).trim()
+          : "";
       this.adjustMachineLocked = !!fixed;
       this.serverRows = [];
       this.newRows = [];
       this.dialogVisible = true;
-      /** 先打开弹窗再设机台；继续调整时带入固定机台并拉列表 */
+      /** 先打开弹窗再设机台；继续调整时带入固定机台并拉列表；普通入口可预填首台机台 */
       this.$nextTick(() => {
         if (fixed) {
           this.cxMachineCode = fixed;
           this.loadMachineStructureList(fixed);
+        } else if (prefill) {
+          this.cxMachineCode = prefill;
+          this.loadMachineStructureList(prefill);
         } else {
           this.cxMachineCode = "";
         }
@@ -320,12 +346,12 @@ export default {
       const pv = (this.productionVersion || "").trim();
       const ver = (this.listAdjustsVersion || "").trim();
       const adj = (this.listAdjustsAdjVersion || "").trim();
-      if (pv) {
-        params.productionVersion = pv;
-      }
-      if (ver) {
-        params.version = ver;
-      }
+      // if (pv) {
+      //   params.productionVersion = pv;
+      // }
+      // if (ver) {
+      //   params.version = ver;
+      // }
       if (adj) {
         params.adjVersion = adj;
       }
@@ -463,21 +489,30 @@ export default {
         this.$modal.msgWarning(this.$t("common.rule.select"));
         return;
       }
+      const rawSched =
+        row.scheduledMachines || row.cxMachineCode || this.cxMachineCode;
+      const rawCx = row.cxMachineCode || this.cxMachineCode || rawSched;
+      const cxFirst =
+        this.extractFirstCxMachineCode(rawCx) ||
+        this.extractFirstCxMachineCode(rawSched);
+      const schedFirst =
+        this.extractFirstCxMachineCode(rawSched) || cxFirst;
+      /** 跳转月计划结构调整页（与路由 path 一致），多机台时 query 只带第一台成型机 */
       this.$router.push({
-        name: 'RollingCycle',
+        path: "/newPage/monthPlanStructureAdjust",
         query: {
-        pageType: "structure",
-        fromSelect: "1",
-        factoryCode: this.factoryCode,
-        yearMonth: this.yearMonth,
-        cxMachineCode: row.cxMachineCode || this.cxMachineCode,
-        scheduledMachines: row.scheduledMachines || row.cxMachineCode || this.cxMachineCode,
-        structureName: row.structureName || "",
-        beginDay: row.beginDay != null ? String(row.beginDay) : "",
-        endDay: row.endDay != null ? String(row.endDay) : "",
-        productionVersion: row.productionVersion || "",
-      }
-      })
+          pageType: "structure",
+          fromSelect: "1",
+          factoryCode: this.factoryCode,
+          yearMonth: this.yearMonth,
+          cxMachineCode: cxFirst,
+          scheduledMachines: schedFirst,
+          structureName: row.structureName || "",
+          beginDay: row.beginDay != null ? String(row.beginDay) : "",
+          endDay: row.endDay != null ? String(row.endDay) : "",
+          productionVersion: row.productionVersion || "",
+        },
+      });
       this.dialogVisible = false;
     },
   },

@@ -124,9 +124,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 continue;
             }
             int totalPlan = ShiftFieldUtil.resolveScheduledQty(result);
-            if (totalPlan > sku.getEmbryoStock()) {
-                // 库存不足，按比例削减各班次计划量
-                double ratio = (double) sku.getEmbryoStock() / totalPlan;
+            // 需求上限取余量和胎胚库存的大值，与S4.3待排量基线口径一致
+            int demandUpperLimit = Math.max(sku.getSurplusQty(), sku.getEmbryoStock());
+            if (totalPlan > demandUpperLimit) {
+                // 计划量超过需求上限，按比例削减各班次计划量
+                double ratio = (double) demandUpperLimit / totalPlan;
                 scaleShiftPlanQty(context, result, ratio);
                 refreshResultSummary(context, result);
             }

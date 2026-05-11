@@ -1133,7 +1133,9 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         Integer maxProductionQty = needProductionInfo.getDayMaxProductionQty(); // 单机台硫化上限
         List<MatchingMouldDayUsedHelper> mouldDayUsedList = this.caculateMouldDayUsed(productionContext, materialDesc,
                 maxProductionQty, realStartDay, realEndDay); // 统计每一天所有可用模具
-
+        Integer producedQty = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProducedQty).sum(); // 统计已排产量
+        Integer skuShortestProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuShortestProductionDays(); // SKU非首次上模最短在机天数
+        
         for (MatchingMouldDayUsedHelper mouldDayUsed : mouldDayUsedList) { // 遍历各模具可用列表
             Integer usedBeginDate = mouldDayUsed.getBeginDate();
             Integer usedEndDate = mouldDayUsed.getEndDate();
@@ -1182,7 +1184,10 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             if (productionQty < needProductionInfo.getDayMaxProductionQty()) {
                 continue;
             }
-            
+            // 9、SKU再次上模时至少需要5天量的限制
+            if (producedQty > 0 && productionQty >= maxProductionQty * skuShortestProductionDays) {
+                continue;
+            }
             
             // 根据剩余可排模具限制模具数量
             MatchingPlanLimitHelper limitHelper = limitMap.get(usedBeginDate);

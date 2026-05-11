@@ -30,6 +30,17 @@
           AND IS_DELETE = 0
     </update>
 
+    <update id="logicDeleteByFactoryCodeAndDataSourceAndStockDate">
+        UPDATE T_CX_STOCK
+        SET IS_DELETE = 1,
+            UPDATE_BY = #{updateBy},
+            UPDATE_TIME = #{updateTime}
+        WHERE FACTORY_CODE = #{factoryCode}
+          AND DATA_SOURCE = #{dataSource}
+          AND DATE(STOCK_DATE) = #{stockDate}
+          AND IS_DELETE = 0
+    </update>
+
     <update id="logicDeleteByIds">
         UPDATE T_CX_STOCK
         SET IS_DELETE = 1,
@@ -49,6 +60,7 @@
             UPDATE_BY = #{updateBy},
             UPDATE_TIME = #{updateTime}
         WHERE IS_DELETE = 1
+          AND DATA_SOURCE = #{dataSource}
           AND (FACTORY_CODE, STOCK_DATE, EMBRYO_CODE) IN
         <foreach collection="list" item="item" open="(" separator="," close=")">
             (#{item.factoryCode}, #{item.stockDate}, #{item.embryoCode})

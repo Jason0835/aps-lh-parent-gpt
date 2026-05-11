@@ -56,6 +56,7 @@ public class PrecisionPlanIssueServiceImpl implements IPrecisionPlanIssueService
         }
 
         List<MesPrecisionPlan> insertList = new ArrayList<>();
+        // 中间表MES_PRECISION_PLAN建在jy_aps_mid主库，Mapper已通过@DS(DataSource.MASTER)指定数据源
         for (MesPrecisionPlan mesItem : mesList) {
             int updateCount = precisionPlanIssueMapper.updateByMachineCodeAndPrecisionType(mesItem);
             if (updateCount == 0) {

@@ -134,39 +134,53 @@
 
     <select id="selectCxMachineOnlineSyncList" resultType="com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo">
         SELECT
-        ONLINE_DATE,
-        CX_CODE,
-        MATERIAL_CODE,
-        MES_MATERIAL_CODE,
-        SPEC_DESC,
-        EMBRYO_SPEC,
-        DATA_VERSION,
-        COMPANY_CODE,
-        FACTORY_CODE
-        FROM CX_MACHINE_ONLINE_SYNC
-        WHERE 1 = 1
-        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
-        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
-        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+        t.ONLINE_DATE,
+        t.CX_CODE,
+        t.MATERIAL_CODE,
+        t.MES_MATERIAL_CODE,
+        t.SPEC_DESC,
+        t.EMBRYO_SPEC,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM CX_MACHINE_ONLINE_SYNC t
+        INNER JOIN (
+            SELECT CX_CODE, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM CX_MACHINE_ONLINE_SYNC
+            WHERE CONVERT(DATE, ONLINE_DATE) = CONVERT(DATE, GETDATE())
+            <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+            <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+            GROUP BY CX_CODE
+        ) latest ON t.CX_CODE = latest.CX_CODE AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE CONVERT(DATE, t.ONLINE_DATE) = CONVERT(DATE, GETDATE())
+        <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
     </select>
 
     <select id="selectLhMachineOnlineSyncList" resultType="com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo">
         SELECT
-        ONLINE_DATE,
-        LH_CODE,
-        MATERIAL_CODE,
-        MES_MATERIAL_CODE,
-        SPEC_DESC,
-        LR_MOLDS,
-        IN_MACHINE_MOULD_CODE,
-        DATA_VERSION,
-        COMPANY_CODE,
-        FACTORY_CODE
-        FROM LH_MACHINE_ONLINE_SYNC
-        WHERE 1 = 1
-        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
-        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
-        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+        t.ONLINE_DATE,
+        t.LH_CODE,
+        t.MATERIAL_CODE,
+        t.MES_MATERIAL_CODE,
+        t.SPEC_DESC,
+        t.LR_MOLDS,
+        t.IN_MACHINE_MOULD_CODE,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM LH_MACHINE_ONLINE_SYNC t
+        INNER JOIN (
+            SELECT LH_CODE, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM LH_MACHINE_ONLINE_SYNC
+            WHERE CONVERT(DATE, ONLINE_DATE) = CONVERT(DATE, GETDATE())
+            <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+            <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+            GROUP BY LH_CODE
+        ) latest ON t.LH_CODE = latest.LH_CODE AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE CONVERT(DATE, t.ONLINE_DATE) = CONVERT(DATE, GETDATE())
+        <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
     </select>
 
     <select id="selectDevMaintenancePlanList" resultType="com.zlt.aps.itf.vo.DevMaintenancePlan">
@@ -243,55 +257,75 @@
 
     <select id="selectCxClassShiftFinishQtyList" resultType="com.zlt.aps.cx.api.domain.entity.CxScheFinishQty">
         SELECT
-        ORDER_NO,
-        SCHEDULE_DATE,
-        CX_MACHINE_CODE,
-        MATERIAL_CODE,
-        MES_MATERIAL_CODE,
-        CLASS1_FINISH_QTY,
-        CLASS2_FINISH_QTY,
-        CLASS3_FINISH_QTY,
-        CLASS1_UN_REASON,
-        CLASS2_UN_REASON,
-        CLASS3_UN_REASON,
-        CLASS1_PERSON,
-        CLASS2_PERSON,
-        CLASS3_PERSON,
-        EMBRYO_CODE,
-        DATA_VERSION,
-        COMPANY_CODE,
-        FACTORY_CODE
-        FROM MES_CX_CLASS_SHIFT_FINISH_QTY
-        WHERE 1 = 1
-        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
-        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
-        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+        t.ORDER_NO,
+        t.SCHEDULE_DATE,
+        t.CX_MACHINE_CODE,
+        t.MATERIAL_CODE,
+        t.MES_MATERIAL_CODE,
+        t.CLASS1_FINISH_QTY,
+        t.CLASS2_FINISH_QTY,
+        t.CLASS3_FINISH_QTY,
+        t.CLASS1_UN_REASON,
+        t.CLASS2_UN_REASON,
+        t.CLASS3_UN_REASON,
+        t.CLASS1_PERSON,
+        t.CLASS2_PERSON,
+        t.CLASS3_PERSON,
+        t.EMBRYO_CODE,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM MES_CX_CLASS_SHIFT_FINISH_QTY t
+        INNER JOIN (
+            SELECT SCHEDULE_DATE, CX_MACHINE_CODE, ORDER_NO, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM MES_CX_CLASS_SHIFT_FINISH_QTY
+            WHERE CONVERT(DATE, SCHEDULE_DATE) = CONVERT(DATE, GETDATE())
+            <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+            <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+            GROUP BY SCHEDULE_DATE, CX_MACHINE_CODE, ORDER_NO
+        ) latest ON t.SCHEDULE_DATE = latest.SCHEDULE_DATE
+            AND t.CX_MACHINE_CODE = latest.CX_MACHINE_CODE
+            AND t.ORDER_NO = latest.ORDER_NO
+            AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE CONVERT(DATE, t.SCHEDULE_DATE) = CONVERT(DATE, GETDATE())
+        <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
     </select>
 
     <select id="selectLhClassShiftFinishQtyList" resultType="com.zlt.aps.lh.api.domain.entity.LhScheFinishQty">
         SELECT
-        ORDER_NO,
-        SCHEDULE_DATE,
-        LH_MACHINE_CODE,
-        MATERIAL_CODE,
-        MES_MATERIAL_CODE,
-        CLASS1_FINISH_QTY,
-        CLASS2_FINISH_QTY,
-        CLASS3_FINISH_QTY,
-        CLASS1_UN_REASON,
-        CLASS2_UN_REASON,
-        CLASS3_UN_REASON,
-        CLASS1_PERSON,
-        CLASS2_PERSON,
-        CLASS3_PERSON,
-        DATA_VERSION,
-        COMPANY_CODE,
-        FACTORY_CODE
-        FROM MES_LH_CLASS_SHIFT_FINISH_QTY
-        WHERE 1 = 1
-        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
-        <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
-        <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
+        t.ORDER_NO,
+        t.SCHEDULE_DATE,
+        t.LH_MACHINE_CODE,
+        t.MATERIAL_CODE,
+        t.MES_MATERIAL_CODE,
+        t.CLASS1_FINISH_QTY,
+        t.CLASS2_FINISH_QTY,
+        t.CLASS3_FINISH_QTY,
+        t.CLASS1_UN_REASON,
+        t.CLASS2_UN_REASON,
+        t.CLASS3_UN_REASON,
+        t.CLASS1_PERSON,
+        t.CLASS2_PERSON,
+        t.CLASS3_PERSON,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM MES_LH_CLASS_SHIFT_FINISH_QTY t
+        INNER JOIN (
+            SELECT SCHEDULE_DATE, LH_MACHINE_CODE, ORDER_NO, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM MES_LH_CLASS_SHIFT_FINISH_QTY
+            WHERE CONVERT(DATE, SCHEDULE_DATE) = CONVERT(DATE, GETDATE())
+            <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+            <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+            GROUP BY SCHEDULE_DATE, LH_MACHINE_CODE, ORDER_NO
+        ) latest ON t.SCHEDULE_DATE = latest.SCHEDULE_DATE
+            AND t.LH_MACHINE_CODE = latest.LH_MACHINE_CODE
+            AND t.ORDER_NO = latest.ORDER_NO
+            AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE CONVERT(DATE, t.SCHEDULE_DATE) = CONVERT(DATE, GETDATE())
+        <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
     </select>
 
     <select id="selectCxScheDayFinishQtyList" resultType="com.zlt.aps.cx.api.domain.entity.CxDayFinishQty">
@@ -327,55 +361,6 @@
         <if test="dataVersion != null and dataVersion != ''">AND DATA_VERSION = #{dataVersion}</if>
         <if test="queryParams != null and queryParams.finishDate != null">AND FINISH_DATE = #{queryParams.finishDate}</if>
     </select>
-
-    <insert id="insertMoldAlterPlanList">
-        INSERT INTO MOLD_ALTER_PLAN (
-            LH_BATCH_NO,
-            ORDER_NO,
-            SCHEDULE_DATE,
-            CLASS_INDEX,
-            LH_MACHINE_CODE,
-            PLAN_INDEX,
-            LEFT_RIGHT_MOLD,
-            MATERIAL_CODE,
-            MES_MATERIAL_CODE,
-            SPEC_DESC,
-            PLAN_MATERIAL_CODE,
-            MES_PLAN_MATERIAL_CODE,
-            PLAN_SPEC_DESC,
-            CHANGE_MOLD_TYPE,
-            MOLD_NO,
-            REMARK,
-            FINISH_STATUS,
-            DATA_VERSION,
-            COMPANY_CODE,
-            FACTORY_CODE
-        ) VALUES
-        <foreach collection="list" item="item" separator=",">
-            (
-                #{item.lhBatchNo},
-                #{item.orderNo},
-                #{item.scheduleDate},
-                #{item.classIndex},
-                #{item.lhMachineCode},
-                #{item.planIndex},
-                #{item.leftRightMold},
-                #{item.materialCode},
-                #{item.mesMaterialCode},
-                #{item.specDesc},
-                #{item.planMaterialCode},
-                #{item.mesPlanMaterialCode},
-                #{item.planSpecDesc},
-                #{item.changeMoldType},
-                #{item.moldNo},
-                #{item.remark},
-                #{item.finishStatus},
-                #{item.dataVersion},
-                #{item.companyCode},
-                #{item.factoryCode}
-            )
-        </foreach>
-    </insert>
 
     <select id="selectMoldAlterPlanFinishList" resultType="com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish">
         SELECT

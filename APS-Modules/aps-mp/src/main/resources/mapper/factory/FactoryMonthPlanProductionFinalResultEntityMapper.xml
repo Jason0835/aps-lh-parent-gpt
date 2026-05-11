@@ -29,72 +29,12 @@
 
     <select id="list4Adjust" resultType="com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanProductionFinal4AdjustVo">
         SELECT
-            fin.STRUCTURE_NAME,
-            fin.STRUCTURE_TYPE,
-            fin.MATERIAL_CODE,
-            fin.MATERIAL_DESC,
-            fin.EMBRYO_CODE,
-            fin.MAIN_MATERIAL_DESC,
-            fin.BRAND,
-            fin.SPECIFICATIONS,
-            fin.MAIN_PATTERN,
-            fin.PRO_SIZE,
-            fin.MOULD_CAVITY_QTY,
-            fin.TYPE_BLOCK_QTY,
-            fin.DAY_VULCANIZATION_QTY,
-            fin.ADJUST_QTY1,
-            fin.ADJUST_QTY2,
-            fin.ADJUST_QTY3,
-            fin.ADJUST_QTY4,
+            fin.*,
             ddps.NET_QTY,
             ddps.HEIGHT_QTY,
             ddps.MID_QTY,
             ddps.CYCLE_RESERVE_QTY,
-            ddps.CONVENTION_RESERVE_QTY,
-            IFNULL(mar.TOTAL_QTY, fin.TOTAL_QTY) AS TOTAL_QTY,
-            IFNULL(mar.HEIGHT_PRODUCTION_QTY, fin.HEIGHT_PRODUCTION_QTY) AS HEIGHT_PRODUCTION_QTY,
-            IFNULL(mar.MID_PRODUCTION_QTY, fin.MID_PRODUCTION_QTY) AS MID_PRODUCTION_QTY,
-            IFNULL(mar.CYCLE_PRODUCTION_QTY, fin.CYCLE_PRODUCTION_QTY) AS CYCLE_PRODUCTION_QTY,
-            IFNULL(mar.CONVENTION_PRODUCTION_QTY, fin.CONVENTION_PRODUCTION_QTY) AS CONVENTION_PRODUCTION_QTY,
-            IFNULL(mar.POSTPONE_PRODUCTION_QTY, fin.POSTPONE_PRODUCTION_QTY) AS POSTPONE_PRODUCTION_QTY,
-            mar.IS_LOCK_SCHEDULE,
-            IFNULL(mar.BEGIN_DAY, fin.BEGIN_DAY) AS BEGIN_DAY,
-            IFNULL(mar.END_DAY, fin.END_DAY) AS END_DAY,
-            IFNULL(mar.DAY_1, fin.DAY_1) AS DAY_1,
-            IFNULL(mar.DAY_2, fin.DAY_2) AS DAY_2,
-            IFNULL(mar.DAY_3, fin.DAY_3) AS DAY_3,
-            IFNULL(mar.DAY_4, fin.DAY_4) AS DAY_4,
-            IFNULL(mar.DAY_5, fin.DAY_5) AS DAY_5,
-            IFNULL(mar.DAY_6, fin.DAY_6) AS DAY_6,
-            IFNULL(mar.DAY_7, fin.DAY_7) AS DAY_7,
-            IFNULL(mar.DAY_8, fin.DAY_8) AS DAY_8,
-            IFNULL(mar.DAY_9, fin.DAY_9) AS DAY_9,
-            IFNULL(mar.DAY_10, fin.DAY_10) AS DAY_10,
-            IFNULL(mar.DAY_11, fin.DAY_11) AS DAY_11,
-            IFNULL(mar.DAY_12, fin.DAY_12) AS DAY_12,
-            IFNULL(mar.DAY_13, fin.DAY_13) AS DAY_13,
-            IFNULL(mar.DAY_14, fin.DAY_14) AS DAY_14,
-            IFNULL(mar.DAY_15, fin.DAY_15) AS DAY_15,
-            IFNULL(mar.DAY_16, fin.DAY_16) AS DAY_16,
-            IFNULL(mar.DAY_17, fin.DAY_17) AS DAY_17,
-            IFNULL(mar.DAY_18, fin.DAY_18) AS DAY_18,
-            IFNULL(mar.DAY_19, fin.DAY_19) AS DAY_19,
-            IFNULL(mar.DAY_20, fin.DAY_20) AS DAY_20,
-            IFNULL(mar.DAY_21, fin.DAY_21) AS DAY_21,
-            IFNULL(mar.DAY_22, fin.DAY_22) AS DAY_22,
-            IFNULL(mar.DAY_23, fin.DAY_23) AS DAY_23,
-            IFNULL(mar.DAY_24, fin.DAY_24) AS DAY_24,
-            IFNULL(mar.DAY_25, fin.DAY_25) AS DAY_25,
-            IFNULL(mar.DAY_26, fin.DAY_26) AS DAY_26,
-            IFNULL(mar.DAY_27, fin.DAY_27) AS DAY_27,
-            IFNULL(mar.DAY_28, fin.DAY_28) AS DAY_28,
-            IFNULL(mar.DAY_29, fin.DAY_29) AS DAY_29,
-            IFNULL(mar.DAY_30, fin.DAY_30) AS DAY_30,
-            IFNULL(mar.DAY_31, fin.DAY_31) AS DAY_31,
-            mar.HAS_SPECIAL_MATERIAL,
-            IFNULL(fin.LAST_MONTH_PLAN_VERSION, fin.MONTH_PLAN_VERSION) AS MONTH_PLAN_VERSION,
-            fin.PRODUCTION_VERSION,
-            fin.id
+            ddps.CONVENTION_RESERVE_QTY
 
         FROM T_MP_MONTH_PLAN_PROD_FINAL fin
 
@@ -105,15 +45,6 @@
                 AND fin.MATERIAL_CODE = ddps.MATERIAL_CODE
                 AND IFNULL(fin.LAST_MONTH_PLAN_VERSION, fin.MONTH_PLAN_VERSION) = ddps.MONTH_PLAN_VERSION
                 AND ddps.IS_DELETE = 0
-
-        LEFT JOIN T_MP_ADJUST_RESULT mar
-            ON fin.FACTORY_CODE = mar.FACTORY_CODE
-                AND fin.`YEAR` = mar.`YEAR`
-                AND fin.`MONTH` = mar.`MONTH`
-                AND IFNULL(fin.LAST_MONTH_PLAN_VERSION, fin.MONTH_PLAN_VERSION) = mar.MONTH_PLAN_VERSION
-                AND fin.PRODUCTION_VERSION = mar.PRODUCTION_VERSION
-                AND fin.MATERIAL_CODE = mar.MATERIAL_CODE
-                AND mar.IS_DELETE = 0
 
         WHERE fin.IS_DELETE = 0
         <if test="factoryCode != null and factoryCode != ''">AND fin.FACTORY_CODE = #{factoryCode}</if>
@@ -133,6 +64,7 @@
         <if test="pattern != null and pattern != ''">AND fin.PATTERN like CONCAT('%', #{pattern}, '%')</if>
         <if test="structureName != null and structureName != ''">AND fin.STRUCTURE_NAME like CONCAT('%', #{structureName}, '%')</if>
         <if test="cxMachineCode != null and cxMachineCode != ''">AND fin.CX_MACHINE_CODE like CONCAT('%', #{cxMachineCode}, '%')</if>
+        <if test="lastMonthPlanVersion != null and lastMonthPlanVersion != ''">AND fin.LAST_MONTH_PLAN_VERSION like CONCAT('%', #{lastMonthPlanVersion}, '%')</if>
 
         ORDER BY STRUCTURE_NAME, MAIN_PATTERN, MAIN_MATERIAL_DESC
     </select>

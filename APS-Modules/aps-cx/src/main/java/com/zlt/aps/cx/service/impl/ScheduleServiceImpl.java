@@ -160,8 +160,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         try {
             log.info("开始执行排程，日期：{}，排程模式：{}", request.getScheduleDate(), request.getScheduleMode());
 
-            // 0. 回滚上次排程的精度计划（清除scheduleDate），使精度计划可被重新加载
-            rollbackPrecisionPlans();
+            // 0. 精度计划不再全局回滚，由loadPrecisionPlans的重新纳入逻辑处理
+            // scheduleDate为空的直接加载，已回填但planDate>排程日期的重新纳入
 
             // 1. 构建排程上下文(流程图S5.1.6初始化)
             ScheduleContextVo context = buildScheduleContext(request);
@@ -219,8 +219,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         try {
             log.info("开始执行重排程，日期：{}", request.getScheduleDate());
 
-            // 0. 回滚上次排程的精度计划（清除scheduleDate），使精度计划可被重新加载
-            rollbackPrecisionPlans();
+            // 0. 精度计划不再全局回滚，由loadPrecisionPlans的重新纳入逻辑处理
+            // scheduleDate为空的直接加载，已回填但planDate>排程日期的重新纳入
 
             // 1. 构建排程上下文
             ScheduleContextVo context = buildScheduleContext(request);
@@ -295,16 +295,37 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         LocalDate cutoffDate = scheduleDate.plusDays(precisionAdvanceDays);
 
+        // 查询1：actualDate为空 AND scheduleDate为空 — 从未安排过的精度计划
         List<CxPrecisionPlan> precisionPlans = precisionPlanMapper.selectList(
                 new LambdaQueryWrapper<CxPrecisionPlan>()
-                        .le(CxPrecisionPlan::getPlanDate, java.sql.Date.valueOf(cutoffDate))
                         .isNull(CxPrecisionPlan::getActualDate)
                         .isNull(CxPrecisionPlan::getScheduleDate)
                         .eq(CxPrecisionPlan::getIsDelete, "0"));
+
+        // 查询2：actualDate为空 AND scheduleDate已回填 AND planDate > 排程日期
+        // 这种情况是：前一天排程时已经安排了精度计划并回填了scheduleDate，
+        // 但planDate在今天之后，今天还需要重新做精度（防止精度被提前消耗后当天无法再做）
+        List<CxPrecisionPlan> reapplyPlans = precisionPlanMapper.selectList(
+                new LambdaQueryWrapper<CxPrecisionPlan>()
+                        .isNull(CxPrecisionPlan::getActualDate)
+                        .isNotNull(CxPrecisionPlan::getScheduleDate)
+                        .gt(CxPrecisionPlan::getPlanDate, java.sql.Timestamp.valueOf(scheduleDate.atTime(0, 0, 0)))
+                        .eq(CxPrecisionPlan::getIsDelete, "0"));
+
+        if (reapplyPlans != null && !reapplyPlans.isEmpty()) {
+            // 重置scheduleDate为null，让这些记录能被重新安排
+            reapplyPlans.forEach(p -> p.setScheduleDate(null));
+            precisionPlans.addAll(reapplyPlans);
+            log.info("精度计划重新纳入: {} 条已回填但planDate > {} 的记录将被重新安排",
+                    reapplyPlans.size(), scheduleDate);
+        }
+
         context.setPrecisionPlans(precisionPlans);
 
-        log.info("加载精度计划，截止日期={}（排程日期{} + {}天），未执行精度计划 {} 条",
-                cutoffDate, scheduleDate, precisionAdvanceDays, precisionPlans != null ? precisionPlans.size() : 0);
+        log.info("加载精度计划，排程日期={}，提前天数={}天，未执行精度计划 {} 条(含重新纳入 {} 条)",
+                scheduleDate, precisionAdvanceDays,
+                precisionPlans != null ? precisionPlans.size() : 0,
+                reapplyPlans != null ? reapplyPlans.size() : 0);
     }
 
     /**

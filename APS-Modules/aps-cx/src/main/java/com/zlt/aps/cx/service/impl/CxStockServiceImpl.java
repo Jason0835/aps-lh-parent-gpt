@@ -16,6 +16,7 @@ import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
 import jodd.util.StringUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ import java.util.List;
  *
  * @author APS Team
  */
+@Slf4j
 @Service
 public class CxStockServiceImpl extends AbstractDocService<CxStock> implements CxStockService {
 
@@ -268,5 +270,23 @@ public class CxStockServiceImpl extends AbstractDocService<CxStock> implements C
         return new String[]{
                 "embryoDesc -> getcolvalue(T_MDM_MATERIAL_INFO, MATERIAL_DESC, EMBRYO_CODE, embryoCode)"
         };
+    }
+
+    @Override
+    public void logicDeleteAndSaveBatch(String factoryCode, String dataSource, Date stockDate, String updateBy, List<CxStock> insertList) {
+        log.info("生胎库存同步-事务开始：逻辑删除分厂{}数据来源为{}库存日期为{}的旧数据，待插入数量={}", factoryCode, dataSource, stockDate, CollectionUtils.size(insertList));
+        cxStockMapper.logicDeleteByFactoryCodeAndDataSourceAndStockDate(factoryCode, dataSource, stockDate, updateBy, new Date());
+        log.info("生胎库存同步-逻辑删除完成，开始批量插入");
+        if (CollectionUtils.isNotEmpty(insertList)) {
+            int batchSize = 1000;
+            for (int i = 0; i < insertList.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, insertList.size());
+                List<CxStock> subList = insertList.subList(i, end);
+                baseDao.saveBatch(subList);
+                log.info("生胎库存同步-插入批次：{}/{}, 本批数量={}", (i / batchSize + 1),
+                        (insertList.size() + batchSize - 1) / batchSize, subList.size());
+            }
+        }
+        log.info("生胎库存同步-事务完成：分厂{}，库存日期={}，插入数量={}", factoryCode, stockDate, CollectionUtils.size(insertList));
     }
 }

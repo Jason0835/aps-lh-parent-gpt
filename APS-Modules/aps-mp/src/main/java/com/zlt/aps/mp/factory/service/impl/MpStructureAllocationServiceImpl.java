@@ -1194,13 +1194,15 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
         // 1.5、加载需求计划
         QueryWrapper<DpDemandPlan> dpDemandPlanQueryWrapper = new QueryWrapper<>();
-        dpDemandPlanQueryWrapper.select("STRUCTURE_NAME", "SUM(UN_POSTPONE_NET_QTY) UN_POSTPONE_NET_QTY");
+        dpDemandPlanQueryWrapper.select("STRUCTURE_NAME", "SUM(UN_POSTPONE_NET_QTY) UN_POSTPONE_NET_QTY",
+                "SUM(HEIGHT_QTY) HEIGHT_QTY");
         dpDemandPlanQueryWrapper.groupBy("STRUCTURE_NAME");
         dpDemandPlanQueryWrapper.eq("FACTORY_CODE", param.getFactoryCode());
         dpDemandPlanQueryWrapper.eq("MONTH_PLAN_VERSION", param.getMonthPlanVersion());
-        Map<String, Integer> unPostponeNetQtyMap = dpDemandPlanEntityMapper.selectList(dpDemandPlanQueryWrapper)
-                .stream().filter(p -> p.getUnPostponeNetQty() != null)
-                .collect(Collectors.toMap(DpDemandPlan::getStructureName, DpDemandPlan::getUnPostponeNetQty));
+        List<DpDemandPlan> dpDemandPlanList = dpDemandPlanEntityMapper.selectList(dpDemandPlanQueryWrapper);
+        Map<String, DpDemandPlan> dpDemandPlanMap = dpDemandPlanList.stream()
+                .filter(p -> p.getUnPostponeNetQty() != null)
+                .collect(Collectors.toMap(DpDemandPlan::getStructureName, Function.identity()));
 
         // 2、构建报表头
         MpStructureAllocationExportStatisticsVo exportVo = new MpStructureAllocationExportStatisticsVo();
@@ -1245,7 +1247,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             // 3.2.3、处理列表明细的数据
             Integer changeRank = 1; // 切换序号，用于导出的切换颜色渲染
             for (MpStructureAllocationExportVo machineRecord: machineStructureList) {
-                Map<Integer, Integer> dayLhMachinesMap = lhMachineStatisticsMap.get(machineRecord.getStructureName());
+                String structureName = machineRecord.getStructureName();
+                Map<Integer, Integer> dayLhMachinesMap = lhMachineStatisticsMap.get(structureName);
                 if (dayLhMachinesMap == null) {
                     continue;
                 }
@@ -1268,7 +1271,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     }
                 }
                 // 3.2.3.2、统计结构排产汇总数据
-                FactoryMonthPlanMouldDayResult mouldingDayResultAggregated = structureDayResultMap.get(machineRecord.getStructureName());
+                FactoryMonthPlanMouldDayResult mouldingDayResultAggregated = structureDayResultMap.get(structureName);
                 if (mouldingDayResultAggregated != null) {
                     machineRecord.setStructureType(mouldingDayResultAggregated.getStructureType()); // 结构类型
                     machineRecord.setTotalQty(mouldingDayResultAggregated.getTotalQty()); // 结构总排产量
@@ -1281,7 +1284,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 machineRecord.setChangeRank(changeRank ++); // 设置序号
                 machineRecord.setBeginDay(beginDay);
                 machineRecord.setEndDay(endDay);
-                machineRecord.setUnPostponeNetQty(unPostponeNetQtyMap.getOrDefault(machineRecord.getStructureName(), 0));
+                machineRecord.setUnPostponeNetQty(Optional.ofNullable(dpDemandPlanMap.get(structureName)).map(DpDemandPlan::getUnPostponeNetQty).orElse(0));
+                machineRecord.setHeightQty(Optional.ofNullable(dpDemandPlanMap.get(structureName)).map(DpDemandPlan::getHeightQty).orElse(0));
                 if (beginDay != null && endDay != null) {
                     machineRecord.setAllotDays(endDay - beginDay + 1);
                 }
@@ -1531,6 +1535,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         headMap.put("structureType", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.structureType"));
         headMap.put("lossQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.lossQty"));
         headMap.put("unPostponeNetQty", I18nUtil.getMessage("ui.data.column.demandPlanSum.unPostponeNetQty"));
+        headMap.put("heightQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.heightQty"));
         headMap.put("totalQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.totalQty"));
         headMap.put("differenceQty", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.differenceQty"));
         headMap.put("beginDay", I18nUtil.getMessage("ui.data.column.mpStructureAllocation.beginDay"));
@@ -1699,6 +1704,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         listDataMap.put(this.getRealFieldName("structureType", suffix), structureTypeMap.getOrDefault(exportVo.getStructureType(), exportVo.getStructureType()));
         listDataMap.put(this.getRealFieldName("lossQty", suffix), exportVo.getLossQty());
         listDataMap.put(this.getRealFieldName("unPostponeNetQty", suffix), exportVo.getUnPostponeNetQty());
+        listDataMap.put(this.getRealFieldName("heightQty", suffix), exportVo.getHeightQty());
         listDataMap.put(this.getRealFieldName("totalQty", suffix), exportVo.getTotalQty());
         listDataMap.put(this.getRealFieldName("differenceQty", suffix), exportVo.getDifferenceQty());
         listDataMap.put(this.getRealFieldName("beginDay", suffix), exportVo.getBeginDay());

@@ -261,6 +261,7 @@ public class NewTaskProcessor {
                     taskAlloc.setEndingAbandoned(task.getEndingAbandoned());
                     taskAlloc.setIsOpeningDayTask(task.getIsOpeningDayTask());
                     taskAlloc.setIsClosingDayTask(task.getIsClosingDayTask());
+                    taskAlloc.setConstructionStage(task.getConstructionStage());
 
                     result.getTaskAllocations().add(taskAlloc);
                 }

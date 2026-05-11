@@ -14,7 +14,7 @@ import java.util.List;
  * @author APS Team
  * @since 2.0.0
  */
-@DS(DataSource.MES)
+@DS(DataSource.MASTER)
 @Mapper
 public interface CxScheduleResultIssueMapper {
 

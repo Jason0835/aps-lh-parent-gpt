@@ -232,7 +232,7 @@ public class LhIncreaseMouldStartPlanService {
 
     /**
      * 同步硫化结果的示方类型。
-     * <p>按分厂、物料编码查询 SKU 与施工（示方书）关系，取第一条数据的产品状态并转换成施工阶段后回写到硫化结果。</p>
+     * <p>按分厂、物料编码查询 SKU 与施工（示方书）关系，取第一条数据的文字示方类型并转换成施工阶段后回写到硫化结果。</p>
      *
      * @param scheduleResult 当前排程结果
      */
@@ -252,9 +252,9 @@ public class LhIncreaseMouldStartPlanService {
         if (Objects.isNull(skuConstructionRef)) {
             return;
         }
-        // 主数据表当前保存的是产品状态标记（S/T/X），这里按项目既有枚举口径转换成硫化结果使用的施工阶段（03/02/01/00）。
+        // 主数据表当前保存的是文字示方类型标记（S/T/X），这里按项目既有枚举口径转换成硫化结果使用的施工阶段（03/02/01/00）。
         scheduleResult.setConstructionStage(
-                ConstructionStageEnum.matchByMarkFlag(skuConstructionRef.getTrialStatus()).getStage());
+                ConstructionStageEnum.matchByMarkFlag(skuConstructionRef.getTextType()).getStage());
     }
 
     /**

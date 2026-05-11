@@ -26,12 +26,12 @@
       :max-height="showOutResult?450:'calc(100vh )'"
     >
       <template slot="header">
-        <!-- 月计划结构内调整：无 Tab，默认结构内工具栏；进入单结构调整流程后展示表单 -->
+        <!-- 结构内调整页：仅结构内工具栏 -->
         <div
-          v-if="isMonthPlanStructureInnerLayout"
+          v-if="isStructureInnerPage"
           class="mp-structure-inner-header"
         >
-          <div v-if="!isShowResult" class="mp-structure-inner-toolbar">
+          <div class="mp-structure-inner-toolbar">
             <el-button
               @click="adjustOrder"
               :loading="getLoading"
@@ -46,6 +46,22 @@
               >{{ $t("自动调整") }}</el-button
             >
           </div>
+        </div>
+        <!-- 结构调整页：列表工具栏或单结构流程表单 -->
+        <div
+          v-else-if="isStructureAdjustPage"
+          class="mp-structure-inner-header"
+        >
+          <div v-if="!isShowResult" class="mp-structure-inner-toolbar">
+            <el-button @click="handleAdd" :disabled="selection.length != 1">{{
+              $t("单选结构调整")
+            }}</el-button>
+            <el-button
+              @click="handleAddSpecial"
+              v-hasPermi="['monthplan:mpStructureAllocation:save']"
+              >{{ $t("新增结构") }}</el-button
+            >
+          </div>
           <el-form
             v-else
             :inline="true"
@@ -53,13 +69,13 @@
             class="demo-form-inline"
           >
             <el-form-item
-              :label="this.$t('ui.data.column.workWearInfo.cxMachineCode')"
+              :label="this.$t('ui.data.column.cxScheduleResult.cxMachineCode')"
             >
               <el-input
                 v-model="formInline.cxMachineCode"
                 disabled
                 :placeholder="
-                  this.$t('ui.data.column.workWearInfo.cxMachineCode')
+                  this.$t('ui.data.column.cxScheduleResult.cxMachineCode')
                 "
               ></el-input>
             </el-form-item>
@@ -149,6 +165,13 @@
                 >获取调整订单</el-button
               >
             </el-form-item>
+            <el-button
+              @click="handShowResult"
+              :loading="autoLoading"
+              :disabled="data.length == 0"
+              v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
+              >{{ $t("自动调整") }}</el-button
+            >
             <el-form-item v-if="showOutResult">
               <el-button
                 type="primary"
@@ -159,156 +182,6 @@
             </el-form-item>
           </el-form>
         </div>
-        <el-tabs
-          v-else
-          v-model="activeName"
-          @tab-click="handleClick"
-          type="card"
-        >
-          <el-tab-pane label="结构内" name="first" :disabled="loading">
-            <el-button
-              @click="adjustOrder"
-              :loading="getLoading"
-              v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
-              >{{ $t("获取调整订单") }}</el-button
-            >
-            <el-button
-              @click="handShowResult"
-              :loading="autoLoading"
-              :disabled="data.length == 0"
-              v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
-              >{{ $t("自动调整") }}</el-button
-            >
-          </el-tab-pane>
-          <el-tab-pane label="结构调整" name="second" :disabled="loading">
-            <el-button @click="handleAdd" :disabled="selection.length != 1">{{
-              $t("单选结构调整")
-            }}</el-button>
-            <!-- <el-button @click="handleShowSpecial">{{
-              $t("特殊材料生产情况")
-            }}</el-button> -->
-            <el-button
-              @click="handleAddSpecial"
-              v-hasPermi="['monthplan:mpStructureAllocation:save']"
-              >{{ $t("新增结构") }}</el-button
-            >
-          </el-tab-pane>
-          <el-tab-pane
-            label="单结构调整"
-            disabled
-            name="singleResult"
-            v-if="isShowResult"
-          >
-            <el-form
-              :inline="true"
-              :model="formInline"
-              class="demo-form-inline"
-            >
-              <el-form-item
-                :label="this.$t('ui.data.column.workWearInfo.cxMachineCode')"
-              >
-                <el-input
-                  v-model="formInline.cxMachineCode"
-                  disabled
-                  :placeholder="
-                    this.$t('ui.data.column.workWearInfo.cxMachineCode')
-                  "
-                ></el-input>
-              </el-form-item>
-              <el-form-item
-                :label="this.$t('ui.data.column.finishStock.structureName')"
-              >
-                <el-input
-                  v-model="formInline.structureName"
-                  disabled
-                  :placeholder="
-                    this.$t('ui.data.column.finishStock.structureName')
-                  "
-                ></el-input>
-              </el-form-item>
-              <el-form-item :label="this.$t('common.startDate')">
-                <el-input
-                  disabled
-                  v-model="formInline.beginDay"
-                  style="width: 50px"
-                  :placeholder="this.$t('common.startDate')"
-                ></el-input>
-              </el-form-item>
-              <el-form-item :label="this.$t('common.endDate')">
-                <el-input
-                  disabled
-                  style="width: 50px"
-                  v-model="formInline.endDay"
-                  :placeholder="this.$t('common.endDate')"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="调整开始日期">
-                <el-select
-                  v-model="formInline.adjustStartDay"
-                  style="width: 100px"
-                  disabled
-                  filterable
-                >
-                  <el-option
-                    v-for="item in dayList"
-                    :key="item"
-                    :label="item"
-                    :value="item"
-                  >
-                  </el-option>
-                </el-select>
-              </el-form-item>
-              <el-form-item label="调整结束日期">
-                <el-select
-                  v-model="formInline.adjustEndDay"
-                  style="width: 100px"
-                  filterable
-                >
-                  <el-option
-                    v-for="item in dayList"
-                    :key="item"
-                    :label="item"
-                    :value="item"
-                  >
-                  </el-option>
-                </el-select>
-              </el-form-item>
-
-              <el-form-item>
-                <el-button
-                  type="primary"
-                  @click="getOutList"
-                  v-hasPermi="[
-                    'monthplan:mpWeekRollAdjust:getAdjustDetailList',
-                  ]"
-                  >获取调整订单</el-button
-                >
-              </el-form-item>
-              <el-form-item v-if="showOutResult">
-                <el-button
-                  type="primary"
-                  @click="nextStructure"
-                  :loading="nextLoading"
-                  >下一个</el-button
-                >
-              </el-form-item>
-            </el-form>
-          </el-tab-pane>
-
-          <el-tab-pane
-            label="调整结果"
-            name="three"
-            :disabled="loading"
-            v-if="this.hasPermission('monthplan:mpAdjustResult:list')"
-          >
-          </el-tab-pane>
-          <el-tab-pane
-            label="调整日志"
-            name="four"
-            v-if="this.hasPermission('monthplan:mpAdjustMaterialLog:list')"
-          >
-          </el-tab-pane>
-        </el-tabs>
       </template>
       <template slot="footer" v-if="isShowFoot">
         <div
@@ -352,6 +225,14 @@
             v-hasPermi="['monthplan:factoryMonthPlanFinalResult:import']"
             @click="$refs.tltUpload.handleImport()"
             >{{ $t("ui.frame.btn.import") }}</el-button
+          >
+          <el-button
+            :loading="syncLoading"
+            v-hasPermi="['monthplan:factoryMonthPlanFinalResult:sync']"
+            @click="handleIssueScmMes"
+            >{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.issueScmMes")
+            }}</el-button
           >
 		  
         </div>
@@ -428,6 +309,117 @@
       </div>
     </div>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
+    <el-dialog
+      :title="$t('ui.data.column.monthPlanFinalAdjustQuery.issueScmMes')"
+      :visible.sync="syncDialog.visible"
+      width="520px"
+      append-to-body
+      @close="resetSyncDialog"
+    >
+      <el-form
+        ref="syncForm"
+        :model="syncDialog.form"
+        :rules="syncDialogRules"
+        label-width="120px"
+      >
+        <el-form-item
+          :label="$t('ui.data.column.report.proSizeSummary.yearMonth')"
+          prop="yearMonth"
+        >
+          <el-date-picker
+            v-model="syncDialog.form.yearMonth"
+            type="month"
+            value-format="yyyy-MM"
+            format="yyyy-MM"
+            :placeholder="
+              $t('ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleYearMonth')
+            "
+            style="width: 100%"
+            @change="handleSyncBaseChange"
+          />
+        </el-form-item>
+        <el-form-item :label="$t('common.factory')" prop="factoryCode">
+          <el-select
+            v-model="syncDialog.form.factoryCode"
+            :placeholder="$t('ui.frame.btn.choose')"
+            filterable
+            clearable
+            style="width: 100%"
+            @change="handleSyncBaseChange"
+          >
+            <el-option
+              v-for="dict in dict.type.biz_factory_name"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item
+          :label="$t('ui.data.monthlyProductionPlan.productionVersion')"
+          prop="productionVersion"
+        >
+          <el-select
+            v-model="syncDialog.form.productionVersion"
+            :placeholder="
+              $t(
+                'ui.data.column.monthPlanFinalAdjustQuery.issueScmMesPlaceholderProductionVersion'
+              )
+            "
+            filterable
+            clearable
+            style="width: 100%"
+            :loading="syncDialog.versionLoading"
+            @change="handleSyncProductionVersionChange"
+          >
+            <el-option
+              v-for="item in syncProductionVersionOptions"
+              :key="item"
+              :label="item"
+              :value="item"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item
+          :label="$t('ui.data.monthlyProductionPlan.lastMonthPlanVersion')"
+          prop="lastMonthPlanVersion"
+        >
+          <el-select
+            v-model="syncDialog.form.lastMonthPlanVersion"
+            :placeholder="
+              $t(
+                'ui.data.column.monthPlanFinalAdjustQuery.issueScmMesPlaceholderDemandVersion'
+              )
+            "
+            filterable
+            clearable
+            style="width: 100%"
+            :loading="syncDialog.versionLoading"
+            @change="handleSyncDemandVersionChange"
+          >
+            <el-option
+              v-for="item in syncDemandVersionOptions"
+              :key="item.optionKey"
+              :label="item.lastMonthPlanVersion"
+              :value="item.optionKey"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="syncDialog.visible = false">{{
+          $t("common.button.cancel")
+        }}</el-button>
+        <el-button
+          type="primary"
+          :loading="syncLoading"
+          @click="submitSyncAdjustedMonthPlan"
+          >{{
+            $t("ui.data.column.monthPlanFinalAdjustQuery.issueScmMesOk")
+          }}</el-button
+        >
+      </span>
+    </el-dialog>
     <tlt-upload
       ref="tltUpload"
       downloadUrl=""
@@ -442,10 +434,15 @@
 </template>
 <script>
 //lib
+import moment from "moment";
 import { mapState, mapGetters } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 
+import {
+  getFinalResultVersionList,
+  syncAdjustedMonthPlanToScmAndMes,
+} from "@/api/monthplan/monthlyProductionPlan";
 import {
   listInternalStructure,
   getAdjustDetailList,
@@ -468,8 +465,6 @@ import {
   saveAdjustResult,
   statisticsResult,
   outGetStayDay,
-  logList,
-  versionLog,
   updateSkuScheduleItems,
 } from "@/api/monthplan/adjustStructure";
 
@@ -483,10 +478,14 @@ import addModal from "./components/addModal.vue";
 export default {
   name: "RollingCycle",
   props: {
-    /** default：周程滚动原 Tab 布局；monthPlanStructureInner：月计划结构内/结构调整（无 Tab）。本入口页固定为月计划调整布局。 */
-    layoutMode: {
+    /**
+     * 页面类型：结构内调整与结构调整拆分为两个路由，由外层包装组件传入。
+     * structureInner — 原「结构内」Tab；structureAdjust — 原「结构调整」Tab（含单结构流程）。
+     */
+    pageVariant: {
       type: String,
-      default: "monthPlanStructureInner",
+      required: true,
+      validator: (v) => ["structureInner", "structureAdjust"].includes(v),
     },
   },
   components: {
@@ -553,6 +552,21 @@ export default {
       /** 从月计划调整查询「选择」进入，用于取消时清理路由参数 */
       monthPlanFromFinalSelect: false,
 
+      syncLoading: false,
+      /** 下发 SCM/MES 弹窗（与月计划调整查询页同源接口；弹窗年月独立按 backup-legacy 默认下月初始化） */
+      syncDialog: {
+        visible: false,
+        versionLoading: false,
+        versionList: [],
+        form: {
+          yearMonth: "",
+          factoryCode: "",
+          productionVersion: "",
+          lastMonthPlanVersion: "",
+          monthPlanVersion: "",
+        },
+      },
+
       dayList: 31,
       // 调整结果页日计划量是否可编辑：仅自动调整后可编辑
       resultDayEditable: false,
@@ -563,9 +577,13 @@ export default {
     ...mapState({
       moldingMachines: (state) => state.molding.machines,
     }),
-    /** 月计划「结构内/结构调整」独立页：去掉 el-tabs，仅保留结构内与单结构调整相关区域 */
-    isMonthPlanStructureInnerLayout() {
-      return this.layoutMode === "monthPlanStructureInner";
+    /** 结构内调整独立页 */
+    isStructureInnerPage() {
+      return this.pageVariant === "structureInner";
+    },
+    /** 结构调整独立页 */
+    isStructureAdjustPage() {
+      return this.pageVariant === "structureAdjust";
     },
     columns() {
       if (!this.show) {
@@ -1135,95 +1153,6 @@ export default {
           },
         ];
       }
-      if (this.activeName == "four") {
-        return [
-          {
-            prop: "materialCode",
-            label: this.$t("物料编码"),
-            width: 120,
-            fixed: "left",
-          },
-          {
-            prop: "materialDesc",
-            label: this.$t("物料描述"),
-            width: 320,
-            fixed: "left",
-          },
-          {
-            prop: "adjustDetail",
-            label: this.$t("调整明细"),
-            width: 720,
-            render: ({ row }) => {
-              return (
-                <el-popover
-                  placement="right"
-                  title="调整明细"
-                  width="500"
-                  trigger="click"
-                >
-                  <div domPropsInnerHTML={row.adjustDetail}></div>
-                  <div
-                    slot="reference"
-                    style="cursor: pointer;"
-                    domPropsInnerHTML={row.adjustDetail}
-                  ></div>
-                </el-popover>
-              );
-            },
-          },
-          {
-            prop: "factoryCode",
-            label: this.$t("common.factory"),
-            formatter: (row, column, value) => {
-              return this.selectDictLabel(
-                this.dict.type.biz_factory_name,
-                value
-              );
-            },
-            width: 120,
-          },
-          {
-            prop: "year",
-            label: this.$t("年份"),
-            width: 120,
-          },
-          {
-            prop: "month",
-            label: this.$t("月份"),
-            width: 120,
-          },
-          {
-            prop: "productionVersion",
-            label: this.$t("排产版本号"),
-            width: 180,
-          },
-          {
-            prop: "adjVersion",
-            label: this.$t("调整版本"),
-            width: 180,
-          },
-          {
-            prop: "adjustType",
-            label: this.$t("调整类型"),
-            width: 120,
-            formatter: (row, column, value) => {
-              return this.selectDictLabel(
-                this.dict.type.week_roll_adjust_type,
-                value
-              );
-            },
-          },
-
-          {
-            prop: "hasSpecialMaterial",
-            label: this.$t("是否含特殊材料"),
-            formatter: (row, column, value) => {
-              return this.selectDictLabel(this.dict.type.biz_yes_no, value);
-            },
-            width: 120,
-          },
-        ];
-      }
 
       return [];
     },
@@ -1250,24 +1179,20 @@ export default {
             change: this.handleYearMonthChange,
           },
         },
-        {
-          prop: "scheduledMachines",
-          label: this.$t("成型机台"),
-        },
-        {
-          prop: "structureName",
-          label: this.$t("产品结构"),
-          type: "select",
-          dictData: this.structureList,
-          filterable: true,
-        },
+        // {
+        //   prop: "scheduledMachines",
+        //   label: this.$t("成型机台"),
+        // },
+        // {
+        //   prop: "structureName",
+        //   label: this.$t("产品结构"),
+        //   type: "select",
+        //   dictData: this.structureList,
+        //   filterable: true,
+        // },
         {
           prop:
-            this.activeName == "second"
-              ? "productionVersion"
-              : this.activeName == "four"
-              ? "adjVersion"
-              : "version",
+            this.activeName == "second" ? "productionVersion" : "version",
           label: this.$t("版本号"),
           type: "select",
           clearable: this.activeName == "first" ? false : true,
@@ -1438,6 +1363,61 @@ export default {
       }
       return list;
     },
+    syncProductionVersionOptions() {
+      const versionSet = new Set();
+      this.syncDialog.versionList.forEach((item) => {
+        if (item.productionVersion) {
+          versionSet.add(item.productionVersion);
+        }
+      });
+      return Array.from(versionSet);
+    },
+    syncDemandVersionOptions() {
+      return this.syncDialog.versionList.filter((item) => {
+        return item.productionVersion === this.syncDialog.form.productionVersion;
+      });
+    },
+    syncDialogRules() {
+      const t = (k) => this.$t(k);
+      return {
+        yearMonth: [
+          {
+            required: true,
+            message: t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleYearMonth"
+            ),
+            trigger: "change",
+          },
+        ],
+        factoryCode: [
+          {
+            required: true,
+            message: t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleFactory"
+            ),
+            trigger: "change",
+          },
+        ],
+        productionVersion: [
+          {
+            required: true,
+            message: t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleProductionVersion"
+            ),
+            trigger: "change",
+          },
+        ],
+        lastMonthPlanVersion: [
+          {
+            required: true,
+            message: t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleDemandVersion"
+            ),
+            trigger: "change",
+          },
+        ],
+      };
+    },
   },
   methods: {
     refreshSearch() {
@@ -1462,6 +1442,24 @@ export default {
         return permission.some((perm) => permissions.includes(perm));
       }
       return permissions.includes(permission);
+    },
+    /**
+     * 月计划调整查询页（src/views/newPage/monthlyProductionPlan/index.vue）在路由表中的入口。
+     * 与控制台「月计划调整查询」一致使用 path；组件 option `name: "MonthPlanFinalAdjustQuery"` 不是路由 name，
+     * 使用 router.push({ name: "MonthPlanFinalAdjustQuery" }) 会无法匹配路由，易出现空白页。
+     */
+    getMonthPlanFinalAdjustQueryRoute(queryExtra = {}) {
+      const query = { ...queryExtra };
+      if (this.search.factoryCode) {
+        query.factoryCode = this.search.factoryCode;
+      }
+      if (this.search.yearMonth) {
+        query.yearMonth = this.search.yearMonth;
+      }
+      return {
+        path: "/monthPlanManagement/console/monthlyProductionPlan",
+        query,
+      };
     },
     //修改锁定上机日期
     handleLockScheduleChange(row, val) {
@@ -1668,15 +1666,6 @@ export default {
           ...this.search,
           productionVersion: val,
         };
-      } else if (this.activeName == "four") {
-        this.search = {
-          ...this.search,
-          adjVersion: val,
-        };
-        this.query = {
-          ...this.search,
-          adjVersion: val,
-        };
       } else {
         this.search = {
           ...this.search,
@@ -1732,16 +1721,18 @@ export default {
       try {
         if (this.activeName == "first") {
           res = await versionAdjust(this.formatParams());
-        }
-        if (this.activeName == "second") {
+        } else if (this.activeName == "second") {
           res = await versionStructure(this.formatParams());
-        }
-        if (this.activeName == "three") {
+        } else if (this.activeName == "three") {
           if (!this.isTabChange) return;
           res = await resultVersion(this.formatParams());
-        }
-        if (this.activeName == "four") {
-          res = await versionLog(this.formatParams());
+        } else {
+          if (isGet) {
+            this.getList();
+          } else {
+            this.loading = false;
+          }
+          return;
         }
 
         let list = [];
@@ -1750,14 +1741,10 @@ export default {
             label:
               this.activeName == "second"
                 ? res.rows[i].productionVersion
-                : this.activeName == "four"
-                ? res.rows[i].adjVersion
                 : res.rows[i].version,
             value:
               this.activeName == "second"
                 ? res.rows[i].productionVersion
-                : this.activeName == "four"
-                ? res.rows[i].adjVersion
                 : res.rows[i].version,
           };
           list.push(obj);
@@ -1769,19 +1756,6 @@ export default {
           if (this.activeName == "second") {
             this.$set(this.search, "productionVersion", list[0].value);
             this.$set(this.query, "productionVersion", list[0].value);
-          } else if (this.activeName == "four") {
-            if (this.query.version) {
-              let hasVersion = list.some(
-                (item) => item.value == this.query.version
-              );
-              if (hasVersion) {
-                this.$set(this.search, "adjVersion", this.query.version);
-                this.$set(this.query, "adjVersion", this.query.version);
-                return;
-              }
-            }
-            this.$set(this.search, "adjVersion", list[0].value);
-            this.$set(this.query, "adjVersion", list[0].value);
           } else {
             if (isNewVersion) {
               this.$set(this.search, "version", list[0].value);
@@ -1881,14 +1855,11 @@ export default {
 
     backPlan() {
       if (
-        this.isMonthPlanStructureInnerLayout &&
+        this.pageVariant === "structureAdjust" &&
         this.monthPlanFromFinalSelect
       ) {
         this.monthPlanFromFinalSelect = false;
-        this.$router.push({
-        name: 'RollingCycle',
-        query: {pageType: this.$route.query.pageType || "structure", },
-      })
+        this.$router.push(this.getMonthPlanFinalAdjustQueryRoute());
       }
       this.show = false;
       this.showConfirmResult = false;
@@ -2058,49 +2029,6 @@ export default {
       }
     },
 
-    //tab切换
-    handleClick(tab, event) {
-      // this.loading = true;
-      this.loadText = this.$t("正在加载中，请稍候");
-      this.showConfirmResult = false;
-      this.resultDayEditable = false;
-      this.show = false;
-      this.isShowResult = false;
-      this.isShowFoot = false;
-      this.showOutResult = false;
-      console.log("this.activeName", this.activeName);
-      if (this.activeName == "three") {
-        this.isTabChange = true;
-        this.page = null;
-        this.getVersionList(true);
-
-        return;
-      }
-      if (this.activeName == "four") {
-        this.page = {
-          current: 1,
-          pageSize: 20,
-          total: 0,
-        };
-        this.getVersionList(true);
-
-        return;
-      }
-      if (this.activeName == "second") {
-        this.page = {
-          current: 1,
-          pageSize: 20,
-          total: 0,
-        };
-        this.adjustType = "02";
-      } else {
-        this.adjustType = "01";
-        this.page = null;
-      }
-      // this.getList();
-      this.getVersionList(true);
-    },
-
     //获取调整结果列表
     async getResultList() {
       try {
@@ -2138,9 +2066,28 @@ export default {
         this.show = true;
         this.loading = false;
         this.autoLoading = false;
-        /** 月计划独立页：结构内自动调整成功后关闭当前页签并回到月计划调整查询 */
-        if (this.isMonthPlanStructureInnerLayout) {
-          this.$tab.closeOpenPage({ name: "MonthPlanFinalAdjustQuery" });
+        /** 结构内独立页：自动调整成功后关闭当前页签并回到月计划调整查询；版本号、结构与页头查询区、表单一致 */
+        if (this.pageVariant === "structureInner") {
+          const queryExtra = {};
+          const structureName =
+            this.formInline && this.formInline.structureName != null
+              ? String(this.formInline.structureName).trim()
+              : "";
+          if (structureName) {
+            queryExtra.structureName = structureName;
+          }
+          const versionProp =
+            this.activeName === "second" ? "productionVersion" : "version";
+          const versionVal = this.search[versionProp] ?? this.query[versionProp];
+          if (
+            versionVal != null &&
+            String(versionVal).trim() !== ""
+          ) {
+            queryExtra[versionProp] = String(versionVal).trim();
+          }
+          this.$tab.closeOpenPage(
+            this.getMonthPlanFinalAdjustQueryRoute(queryExtra)
+          );
           return;
         }
         if (res.length != 0) {
@@ -2480,7 +2427,8 @@ export default {
         this.$set(this.page, "current", 1);
       }
       if (this.activeName == "singleResult") {
-        // this.resizeOutHistoryList();
+        this.loadText = this.$t("正在加载中，请稍候");
+        this.resizeOutHistoryList();
         return;
       }
       this.loadText = this.$t("正在加载中，请稍候");
@@ -2516,6 +2464,187 @@ export default {
 	  const params = this.formatParams(false);
 	  params.structureName = this.formInline.structureName; // 只导出指定结构的数据
       downloadLink("/monthplan/factoryMonthPlanFinalResult/exportSkuScheduleItems", params);
+    },
+
+    /**
+     * 与 monthlyProductionPlan/index.backup-legacy.vue created 中 defaultParams.yearMonth 一致：下月 `${year}-${month}`。
+     * 仅用于下发弹窗预填，不改变周程页列表查询条件。
+     */
+    getYearMonthStringLikeBackupLegacyDefault() {
+      const now = new Date();
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const y = nextMonth.getFullYear();
+      const mo = nextMonth.getMonth() + 1;
+      return `${y}-${mo}`;
+    },
+    /** 打开下发弹窗：年月按 backup-legacy 默认下月；分厂预填当前查询 */
+    handleIssueScmMes() {
+      this.syncDialog.visible = true;
+      this.syncDialog.form.yearMonth = this.formatYearMonthForPicker(
+        this.getYearMonthStringLikeBackupLegacyDefault()
+      );
+      this.syncDialog.form.factoryCode =
+        this.query.factoryCode || this.search.factoryCode || "";
+      this.syncDialog.form.productionVersion = "";
+      this.syncDialog.form.lastMonthPlanVersion = "";
+      this.syncDialog.form.monthPlanVersion = "";
+      this.syncDialog.versionList = [];
+      this.$nextTick(() => {
+        if (this.$refs.syncForm) {
+          this.$refs.syncForm.clearValidate();
+        }
+      });
+      this.loadSyncVersionList(true);
+    },
+    handleSyncBaseChange() {
+      this.syncDialog.form.productionVersion = "";
+      this.syncDialog.form.lastMonthPlanVersion = "";
+      this.syncDialog.form.monthPlanVersion = "";
+      this.syncDialog.versionList = [];
+      this.loadSyncVersionList(false);
+    },
+    handleSyncProductionVersionChange() {
+      this.syncDialog.form.lastMonthPlanVersion = "";
+      this.syncDialog.form.monthPlanVersion = "";
+    },
+    handleSyncDemandVersionChange(optionKey) {
+      const selectedVersion = this.syncDialog.versionList.find(
+        (item) => item.optionKey === optionKey
+      );
+      this.syncDialog.form.monthPlanVersion = selectedVersion
+        ? selectedVersion.monthPlanVersion
+        : "";
+    },
+    resetSyncDialog() {
+      this.syncDialog.form = {
+        yearMonth: "",
+        factoryCode: "",
+        productionVersion: "",
+        lastMonthPlanVersion: "",
+        monthPlanVersion: "",
+      };
+      this.syncDialog.versionList = [];
+    },
+    async loadSyncVersionList(showWarning) {
+      const { yearMonth, factoryCode } = this.syncDialog.form;
+      if (!yearMonth || !factoryCode) {
+        return;
+      }
+      const yearMonthInfo = this.parseYearMonthFromStr(yearMonth);
+      if (!yearMonthInfo) {
+        return;
+      }
+      try {
+        this.syncDialog.versionLoading = true;
+        const res = await getFinalResultVersionList({
+          factoryCode,
+          year: yearMonthInfo.year,
+          month: yearMonthInfo.month,
+        });
+        const rows = res.rows || [];
+        this.syncDialog.versionList = rows
+          .filter((item) => {
+            return (
+              item.productionVersion &&
+              item.monthPlanVersion &&
+              item.lastMonthPlanVersion
+            );
+          })
+          .map((item) => {
+            return {
+              ...item,
+              optionKey: `${item.productionVersion}__${item.monthPlanVersion}__${item.lastMonthPlanVersion}`,
+            };
+          });
+        if (showWarning && this.syncDialog.versionList.length === 0) {
+          this.$modal.msgWarning(
+            this.$t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesNoData"
+            )
+          );
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.syncDialog.versionLoading = false;
+      }
+    },
+    submitSyncAdjustedMonthPlan() {
+      this.$refs.syncForm.validate((valid) => {
+        if (!valid) {
+          return;
+        }
+        const selectedVersion = this.syncDialog.versionList.find((item) => {
+          return item.optionKey === this.syncDialog.form.lastMonthPlanVersion;
+        });
+        if (!selectedVersion) {
+          this.$modal.msgWarning(
+            this.$t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesNoData"
+            )
+          );
+          return;
+        }
+        const yearMonthInfo = this.parseYearMonthFromStr(
+          this.syncDialog.form.yearMonth
+        );
+        if (!yearMonthInfo) {
+          this.$modal.msgWarning(
+            this.$t(
+              "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesInvalidYearMonth"
+            )
+          );
+          return;
+        }
+        const params = {
+          factoryCode: this.syncDialog.form.factoryCode,
+          year: yearMonthInfo.year,
+          month: yearMonthInfo.month,
+          monthPlanVersion: selectedVersion.monthPlanVersion,
+          lastMonthPlanVersion: selectedVersion.lastMonthPlanVersion,
+          productionVersion: this.syncDialog.form.productionVersion,
+        };
+        this.$confirm(
+          this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.confirmPushAdjustedMonthPlanToScmMes"
+          ),
+          {
+            type: "warning",
+          }
+        ).then(async () => {
+          try {
+            this.syncLoading = true;
+            const res = await syncAdjustedMonthPlanToScmAndMes(params);
+            this.$modal.msgSuccess(res.msg);
+            this.syncDialog.visible = false;
+            await this.getList();
+          } catch (error) {
+            console.error(error);
+          } finally {
+            this.syncLoading = false;
+          }
+        });
+      });
+    },
+    formatYearMonthForPicker(yearMonth) {
+      if (!yearMonth) {
+        return "";
+      }
+      const m = moment(yearMonth, ["YYYY-MM", "YYYY-M"], true);
+      return m.isValid() ? m.format("YYYY-MM") : "";
+    },
+    parseYearMonthFromStr(yearMonth) {
+      if (!yearMonth) {
+        return null;
+      }
+      const m = moment(yearMonth, ["YYYY-MM", "YYYY-M"], true);
+      if (!m.isValid()) {
+        return null;
+      }
+      return {
+        year: m.year(),
+        month: m.month() + 1,
+      };
     },
 
     formatParams() {
@@ -2555,14 +2684,12 @@ export default {
           if (data.rows.length != 0) {
             this.getStatisticsResult(data.rows[0]);
           }
-        } else if (this.activeName == "four") {
-          data = await logList(this.formatParams());
         } else {
           return;
         }
 
         this.data = data.rows;
-        if (this.activeName == "second" || this.activeName == "four") {
+        if (this.activeName == "second") {
           this.page.total = data.total;
         }
 
@@ -2853,10 +2980,9 @@ export default {
     // this.getList();
   },
   created() {
-    // 获取当前ui.data.colume.year和月份
     const now = new Date();
-    const year = now.getFullYear(); // 2024
-    const month = now.getMonth() + 1; // 注意：月份从0开始，需要+1
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
     let defaultParams = {
       yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
       factoryCode: "116",
@@ -2867,8 +2993,21 @@ export default {
     this.query = {
       ...defaultParams,
     };
+    if (this.pageVariant === "structureAdjust") {
+      this.adjustType = "02";
+      this.activeName = "second";
+      this.page = {
+        current: 1,
+        pageSize: 20,
+        total: 0,
+      };
+    } else {
+      this.adjustType = "01";
+      this.activeName = "first";
+      this.page = null;
+    }
     const isMpPrefill =
-      this.isMonthPlanStructureInnerLayout &&
+      this.pageVariant === "structureAdjust" &&
       this.$route.query.fromSelect === "1";
     if (isMpPrefill) {
       this.applyMonthPlanFinalSelectPrefill();

@@ -114,16 +114,15 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
 
     /**
      * 更新或插入数据（存在则更新，不存在则插入）
+     * 中间表MES_CX_SCHEDULE_RESULT建在jy_aps_mid主库，Mapper已通过@DS(DataSource.MASTER)指定数据源
      */
     private void upsertCxScheduleResult(List<MesCxScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
         for (MesCxScheduleResult mesItem : mesList) {
-            // 先尝试更新，如果更新失败则插入
             int updateCount = cxScheduleResultIssueMapper.updateByScheduleDateAndMachine(mesItem);
             if (updateCount == 0) {
-                // 更新失败，说明数据不存在，执行插入
                 cxScheduleResultIssueMapper.insertCxScheduleResult(mesItem);
             }
         }
@@ -131,15 +130,14 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
 
     /**
      * 插入数据（先删除指定日期的旧数据，再插入新数据）
+     * 中间表MES_CX_SCHEDULE_RESULT建在jy_aps_mid主库，Mapper已通过@DS(DataSource.MASTER)指定数据源
      */
     private void insertCxScheduleResult(List<MesCxScheduleResult> mesList, LocalDate scheduleDate, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
-        // 删除指定日期的旧数据
         String dateStr = scheduleDate.format(DATE_FORMATTER);
         cxScheduleResultIssueMapper.deleteByScheduleDate(dateStr, dataVersion);
-        // 批量插入新数据
         cxScheduleResultIssueMapper.batchInsertCxScheduleResult(mesList);
     }
 

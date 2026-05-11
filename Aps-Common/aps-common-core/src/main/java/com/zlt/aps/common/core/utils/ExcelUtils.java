@@ -872,6 +872,37 @@ public class ExcelUtils {
             CellRangeAddress region = sourceSheet.getMergedRegion(i);
             targetSheet.addMergedRegion(region);
         }
+
+        // 6. 复制列隐藏状态
+        for (int i = 0; i < 256; i++) {
+            if (sourceSheet.isColumnHidden(i)) {
+                targetSheet.setColumnHidden(i, true);
+            }
+        }
+
+        // 7. 复制图片（logo等）
+        if (sourceSheet instanceof XSSFSheet && targetWorkbook instanceof XSSFWorkbook) {
+            XSSFDrawing sourceDrawing = ((XSSFSheet) sourceSheet).getDrawingPatriarch();
+            if (sourceDrawing != null) {
+                XSSFDrawing targetDrawing = ((XSSFSheet) targetSheet).createDrawingPatriarch();
+                for (XSSFShape shape : sourceDrawing.getShapes()) {
+                    if (shape instanceof XSSFPicture) {
+                        XSSFPicture picture = (XSSFPicture) shape;
+                        XSSFPictureData pictureData = picture.getPictureData();
+                        int pictureIdx = ((XSSFWorkbook) targetWorkbook).addPicture(
+                                pictureData.getData(), pictureData.getPictureType());
+                        XSSFClientAnchor sourceAnchor = (XSSFClientAnchor) picture.getClientAnchor();
+                        XSSFClientAnchor targetAnchor = new XSSFClientAnchor(
+                                sourceAnchor.getDx1(), sourceAnchor.getDy1(),
+                                sourceAnchor.getDx2(), sourceAnchor.getDy2(),
+                                sourceAnchor.getCol1(), sourceAnchor.getRow1(),
+                                sourceAnchor.getCol2(), sourceAnchor.getRow2());
+                        targetAnchor.setAnchorType(sourceAnchor.getAnchorType());
+                        targetDrawing.createPicture(targetAnchor, pictureIdx);
+                    }
+                }
+            }
+        }
     }
 
     /**

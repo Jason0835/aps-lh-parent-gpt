@@ -1,18 +1,15 @@
 package com.zlt.aps.mp.api.domain.entity;
 
-import com.google.common.collect.Lists;
-import com.ruoyi.common.core.web.domain.BaseEntity;
-import com.zlt.aps.mp.api.constants.MonthPlanConstants;
-import com.zlt.common.utils.StringUtil;
-import lombok.Data;
-import com.ruoyi.common.core.annotation.Excel;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
-import org.springframework.util.CollectionUtils;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
+import com.zlt.common.utils.StringUtil;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
 
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,7 +30,7 @@ import java.util.regex.Pattern;
 @ApiModel(value = "调整-调整结果记录对象", description = "调整-调整结果记录对象 ")
 @Data
 @TableName(value = "T_MP_ADJUST_RESULT")
-public class MpAdjustResult extends BaseEntity {
+public class MpAdjustResult extends BaseEntity implements IFinalAndAdjustResultInterface {
 
     private static final long serialVersionUID = 1L;
 

@@ -101,7 +101,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
     private void calculateDaysToDue(LhPrecisionPlan entity) {
         if (entity.getPlanDate() != null) {
             LocalDate today = LocalDate.now();
-            LocalDate planDate = entity.getPlanDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalDate planDate = parseDate(entity.getPlanDate());
             int daysToDue = (int) ChronoUnit.DAYS.between(today, planDate);
             if (daysToDue < 0) {
                 daysToDue = 0;
@@ -202,7 +202,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
         if (!validFactoryCodes.isEmpty() && !validMachineCodes.isEmpty() && !validPlanDates.isEmpty()) {
             List<LhPrecisionPlan> dbExistList = lhPrecisionPlanMapper.selectByFactoryMachinePlanBatch(validFactoryCodes, validMachineCodes, validPlanDates);
             dbExistMap = dbExistList.stream()
-                    .collect(Collectors.groupingBy(p -> p.getFactoryCode() + "-" + p.getMachineCode() + "-" + p.getPlanDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))));
+                    .collect(Collectors.groupingBy(p -> p.getFactoryCode() + "-" + p.getMachineCode() + "-" + parseDate(p.getPlanDate()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))));
         }
 
         List<Long> idsToDelete = new ArrayList<>();
@@ -214,9 +214,9 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
                 continue;
             }
 
-            BigDecimal year = new BigDecimal(importVO.getPlanDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate().getYear());
+            BigDecimal year = new BigDecimal(parseDate(importVO.getPlanDate()).getYear());
 
-            String dbKey = importVO.getFactoryCode() + "-" + importVO.getMachineCode() + "-" + importVO.getPlanDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String dbKey = importVO.getFactoryCode() + "-" + importVO.getMachineCode() + "-" + parseDate(importVO.getPlanDate()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             List<LhPrecisionPlan> existList = dbExistMap.getOrDefault(dbKey, Collections.emptyList());
 
             if (!existList.isEmpty()) {
@@ -671,7 +671,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
         for (Map<String, Object> item : fillList) {
             Date actualDate = (Date) item.get("actualDate");
             if (actualDate != null) {
-                LocalDate actualLocal = actualDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                LocalDate actualLocal = parseDate(actualDate);
                 allNextYears.add(actualLocal.plusYears(intervalYears).getYear());
             }
         }
@@ -708,7 +708,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
             matchedPlan.setBaseVale(matchedPlan.getId());
             matchedPlan.setActualDate(actualDate);
             matchedPlan.setCompletionStatus(COMPLETION_STATUS_COMPLETED);
-            LocalDate actualDateLocal = actualDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalDate actualDateLocal = parseDate(actualDate);
             Date dueDate = Date.from(actualDateLocal.plusYears(intervalYears).atStartOfDay(ZoneId.systemDefault()).toInstant());
             matchedPlan.setDueDate(dueDate);
             plansToUpdate.add(matchedPlan);
@@ -755,7 +755,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
         plan.setPrecisionType(PRECISION_TYPE_LH);
         plan.setDataSource(DATA_SOURCE_MES);
 
-        LocalDate lastActualDateLocal = lastActualDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate lastActualDateLocal = parseDate(lastActualDate);
         LocalDate planDateLocal = lastActualDateLocal.plusYears(intervalYears);
         Date planDate = Date.from(planDateLocal.atStartOfDay(ZoneId.systemDefault()).toInstant());
         plan.setPlanDate(planDate);
@@ -798,6 +798,9 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
             return null;
         }
         try {
+            if (date instanceof java.sql.Date) {
+                return ((java.sql.Date) date).toLocalDate();
+            }
             return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         } catch (Exception e) {
             log.warn("解析Date失败：{}", date, e);
@@ -812,7 +815,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
         try {
             String templateCode = MsgTemplateEnums.LH_PRECISION_PLAN_WARNING.getCode();
             
-            LocalDate planDateLocal = plan.getPlanDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalDate planDateLocal = parseDate(plan.getPlanDate());
             String planDateStr = planDateLocal.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             
             messageServiceUtils.sendWarning(templateCode, (String) null, 
@@ -1063,13 +1066,13 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
 
         LhPrecisionPlan nearest = null;
         long minDiff = Long.MAX_VALUE;
-        LocalDate actualLocal = actualDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate actualLocal = parseDate(actualDate);
 
         for (LhPrecisionPlan plan : candidates) {
             if (plan.getScheduleDate() == null) {
                 continue;
             }
-            LocalDate scheduleLocal = plan.getScheduleDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalDate scheduleLocal = parseDate(plan.getScheduleDate());
             long diff = Math.abs(ChronoUnit.DAYS.between(scheduleLocal, actualLocal));
             if (diff < minDiff) {
                 minDiff = diff;
@@ -1221,7 +1224,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
         plan.setActualDate(actualDate);
         plan.setCompletionStatus(COMPLETION_STATUS_COMPLETED);
         int intervalYears = getIntervalYears();
-        LocalDate actualDateLocal = actualDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate actualDateLocal = parseDate(actualDate);
         Date dueDate = Date.from(actualDateLocal.plusYears(intervalYears).atStartOfDay(ZoneId.systemDefault()).toInstant());
         plan.setDueDate(dueDate);
 
@@ -1302,10 +1305,10 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
             issue.setMachineCode(plan.getMachineCode());
             issue.setPrecisionType(plan.getPrecisionType());
             if (plan.getScheduleDate() != null) {
-                issue.setScheduleDate(plan.getScheduleDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+                issue.setScheduleDate(parseDate(plan.getScheduleDate()));
             }
             if (plan.getPlanDate() != null) {
-                issue.setPlanDate(plan.getPlanDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+                issue.setPlanDate(parseDate(plan.getPlanDate()));
             }
             issue.setFactoryCode(plan.getFactoryCode());
             issue.setCompanyCode(plan.getCompanyCode());

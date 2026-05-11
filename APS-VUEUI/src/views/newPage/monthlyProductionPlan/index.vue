@@ -1,6 +1,7 @@
 <template>
   <basic-container>
     <page-table
+      ref="monthPlanPageTableRef"
       tableRef="MonthPlanFinalAdjustQueryTable"
       :calcHeight="88"
       v-loading="loading"
@@ -13,6 +14,7 @@
       @search="handleSearch"
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
+      @selection-change="handleStructureAdjustSelectionChange"
       :showSummary="false"
       :selectArea="false"
       :row-class-name="tableRowClassName"
@@ -22,6 +24,7 @@
           <el-button
             type="primary"
             plain
+            :disabled="!canUsePrimaryAdjustActions"
             @click="handleStructureInnerAdjust"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.structureInnerAdjust")
@@ -30,7 +33,7 @@
           <el-button
             type="primary"
             plain
-            :disabled="!canUsePrimaryAdjustActions"
+            :disabled="isStructureAdjustEntryDisabled"
             @click="handleStructureAdjust"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.structureAdjust")
@@ -39,14 +42,20 @@
           <el-button @click="handleViewAdjustVersion">{{
             $t("ui.data.column.monthPlanFinalAdjustQuery.viewAdjustVersion")
           }}</el-button>
-          <!-- 导出 -->
-          <el-button @click="handleExport">{{
-            $t("ui.frame.btn.export")
-          }}</el-button>
-          <!-- 全物料导出 -->
-          <el-button @click="handleExportAllMaterial">{{
-            $t("ui.data.column.monthPlanFinalAdjustQuery.exportAllMaterial")
-          }}</el-button>
+          <!-- 导出：与 console 排产明细 mouldingDayResult 页 factoryMonthPlanMouldDayResult/export 一致 -->
+          <el-button
+            @click="handleExport"
+            v-hasPermi="['monthplan:mouldingDayResult:export']"
+            >{{ $t("ui.frame.btn.export") }}</el-button
+          >
+          <!-- 全物料导出：与 mouldingDayResult 页 exportAllMaterial 一致 -->
+          <el-button
+            @click="handleExportAllMaterial"
+            v-hasPermi="['monthplan:mouldingDayResult:exportAllMaterial']"
+            >{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.exportAllMaterial")
+            }}</el-button
+          >
           <el-button
             :loading="syncLoading"
             v-hasPermi="['monthplan:factoryMonthPlanFinalResult:sync']"
@@ -114,7 +123,10 @@
       ref="structureAdjustDialogRef"
       @structure-adjust-saved="onStructureAdjustSaved"
     />
-    <adjust-version-dialog ref="adjustVersionDialogRef" />
+    <adjust-version-dialog
+      ref="adjustVersionDialogRef"
+      @select-production-version="onAdjustVersionDialogSelectProductionVersion"
+    />
     <el-dialog
       :title="$t('ui.data.column.monthPlanFinalAdjustQuery.issueScmMes')"
       :visible.sync="syncDialog.visible"
@@ -244,6 +256,7 @@ import {
   recalculateWeekRollAdjust,
   statisticsResult,
   saveAdjustResult,
+  resultVersion
 } from "@/api/monthplan/adjustStructure";
 import structureAdjustDialog from "./components/structureAdjustDialog.vue";
 import adjustVersionDialog from "./components/adjustVersionDialog.vue";
@@ -300,6 +313,8 @@ export default {
       },
       /** 1–31 号列编辑前原始值，用于失焦时与 rollingCycle 一致判断是否调用 save */
       dayEditOriginalValue: null,
+      /** 结构调整：表格多选勾选行（统计行不可选）；超过 1 条时禁用「结构调整」按钮 */
+      structureAdjustSelection: [],
     };
   },
   computed: {
@@ -315,6 +330,14 @@ export default {
     /** 有机台：仅「继续调整」可用 */
     canUseContinueAdjust() {
       return this.adjustFlowInProgress;
+    },
+    /** 结构调整入口：调整进行中不可点；勾选多于 1 条时不可点 */
+    isStructureAdjustEntryDisabled() {
+      if (!this.canUsePrimaryAdjustActions) {
+        return true;
+      }
+      const n = (this.structureAdjustSelection || []).length;
+      return n > 1;
     },
     searchColumns() {
       return [
@@ -353,7 +376,8 @@ export default {
           filterable: true,
         },
         {
-          prop: "version",
+          /** 与 rollingCycle/index.backup-legacy.vue 结构调整 Tab（activeName==second）一致：字段名为 productionVersion */
+          prop: "productionVersion",
           label: this.$t(
             "ui.data.column.monthPlanFinalAdjustQuery.productionVersion"
           ),
@@ -380,6 +404,12 @@ export default {
         return m[v] != null ? m[v] : v || "";
       };
       const cols = [
+        {
+          type: "selection",
+          fixed: "left",
+          width: 48,
+          selectable: (row) => !row.showBackground,
+        },
         // {
         //   prop: "factoryCode",
         //   label: this.$t("common.factory"),
@@ -400,6 +430,11 @@ export default {
           formatter: (row, column, value) => structureTypeLabel(value),
         },
         {
+          prop: "cxMachineCode",
+          label: this.$t("ui.data.column.monthPlanFinalAdjustQuery.cxMachine"),
+          width: 120,
+        },
+        {
           prop: "materialCode",
           label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
           width: 120,
@@ -407,19 +442,19 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width: 250,
+          width: 300,
+          align: "left",
+        },
+        {
+          prop: "embryoCode",
+          label: "胎胚号",
+          width: 100,
           align: "left",
         },
         {
           prop: "mainMaterialDesc",
-          label: "胎胚号",
-          width: 250,
-          align: "left",
-        },
-        {
-          prop: "embryoNo",
           label: "胎胚描述",
-          width: 250,
+          width: 310,
           align: "left",
         },
         {
@@ -686,13 +721,14 @@ export default {
     },
   },
   async created() {
-    /** 与月计划调整（rollingCycle）查询条件默认年月一致：当前自然月，月份两位 */
+    /** 与月度生产计划旧页 index.backup-legacy.vue 一致：默认查询「下个月」 */
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const year = nextMonth.getFullYear();
+    const month = nextMonth.getMonth();
     const defaults = {
       factoryCode: "116",
-      yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
+      yearMonth: `${year}-${month}`,
     };
     const rq = this.$route.query || {};
     if (rq.factoryCode) {
@@ -703,6 +739,13 @@ export default {
     }
     if (rq.productionVersion) {
       defaults.productionVersion = String(rq.productionVersion);
+    }
+    if (rq.structureName) {
+      defaults.structureName = String(rq.structureName);
+    }
+    /** 调整版本号（ADJ…），随路由带入时参与 list4Adjust 等查询入参 */
+    if (rq.version) {
+      defaults.version = String(rq.version);
     }
     this.search = { ...defaults };
     this.query = { ...defaults };
@@ -840,37 +883,35 @@ export default {
       }
     },
     /**
-     * 定稿排产版本下拉：getFinalResultVersionList（/monthplan/factoryMonthPlanFinalResult/getVersionList）。
-     * 与 mpMonthPlanStatistics 统计维度一致，应使用 productionVersion，而非 mpAdjustResult/getVersionList 的 version。
+     * 版本号下拉：与 rollingCycle/index.backup-legacy.vue 结构调整 Tab 的 getVersionList 一致，
+     * 调用 versionStructure（即 /monthplan/factoryMonthPlanFinalResult/getVersionList），
+     * 选项为每行的 productionVersion（label/value 均为 productionVersion），默认取列表首项；
+     * 若当前 query/search 中 productionVersion 仍在列表中则保留。
      */
     async loadVersionOptions() {
-      const ym = this.normalizeYearMonth(
-        this.query.yearMonth || this.search.yearMonth
-      );
       const factoryCode = this.query.factoryCode || this.search.factoryCode;
-      if (!ym || !factoryCode) {
+      const yearMonth = this.query.yearMonth || this.search.yearMonth;
+      if (!factoryCode || !yearMonth) {
         this.versionOptions = [];
         this.search = { ...this.search, productionVersion: "" };
         this.query = { ...this.query, productionVersion: "" };
         return;
       }
       try {
-        const res = await getFinalResultVersionList({
-          factoryCode,
-          year: ym.year,
-          month: ym.month,
-        });
+        const res = await resultVersion(this.formatParamsForStructureVersionList());
+        console.log('res版本获取', res)
         const rows = res.rows || [];
-        const set = new Set();
-        rows.forEach((item) => {
-          if (item.productionVersion) {
-            set.add(String(item.productionVersion));
+        const list = [];
+        for (let i = 0; i < rows.length; i++) {
+          const pv = rows[i].version;
+          if (pv == null || String(pv).trim() === "") {
+            continue;
           }
-        });
-        const list = Array.from(set).map((v) => ({
-          label: v,
-          value: v,
-        }));
+          list.push({
+            label: pv,
+            value: pv,
+          });
+        }
         this.versionOptions = list;
 
         if (list.length > 0) {
@@ -879,6 +920,7 @@ export default {
               this.search.productionVersion ||
               ""
           ).trim();
+          
           if (currentPv) {
             const hasVersion = list.some(
               (item) => String(item.value) === currentPv
@@ -890,6 +932,8 @@ export default {
             }
           }
           const defaultPv = list[0].value;
+          console.log('defaultPv', defaultPv)
+          console.log('list', list)
           this.search = { ...this.search, productionVersion: defaultPv };
           this.query = { ...this.query, productionVersion: defaultPv };
         } else {
@@ -953,6 +997,60 @@ export default {
         params.month = Number(arr[1]);
         delete params.yearMonth;
       }
+      if(params.productionVersion){
+        params.lastMonthPlanVersion = params.productionVersion
+      }
+      const scheduled = (this.currentAdjustMachine || "").trim();
+      if (scheduled) {
+        params.cxMachineCode = scheduled;
+      } else {
+        delete params.cxMachineCode;
+      }
+      return params;
+    },
+    /**
+     * 版本号下拉数据请求入参：与 rollingCycle/index.backup-legacy.vue 结构调整 Tab 下
+     * getVersionList → versionStructure(this.formatParams()) 一致（含分页与 year/month 拆分方式）。
+     * 仅用于拉取版本列表，不影响本页其它接口的 formatParams。
+     */
+    formatParamsForStructureVersionList() {
+      const params = {
+        ...this.query,
+        ...this.sort,
+      };
+      if (this.page) {
+        params.pageSize = this.page.pageSize;
+        params.pageNum = this.page.current;
+      }
+      if (params.yearMonth) {
+        const arr = String(params.yearMonth).split("-");
+        params.year = arr[0];
+        params.month = arr[1];
+        delete params.yearMonth;
+      }
+      return params;
+    },
+    /**
+     * 排产明细导出入参：与 monthPlanManagement/mouldingDayResult formatParams(false) 一致，
+     * 请求 /monthplan/factoryMonthPlanMouldDayResult/export、exportAllMaterial。
+     * 另附带本页「当前调整机台」cxMachineCode（与列表 list4Adjust 一致）。
+     */
+    formatMouldingDayExportParams() {
+      const params = {
+        ...this.query,
+        ...this.sort,
+      };
+      if (params.yearMonth) {
+        const arr = String(params.yearMonth).split("-");
+        params.year = arr[0];
+        params.month = arr[1];
+        delete params.yearMonth;
+      }
+      if (params.createTime && params.createTime[0]) {
+        params.createTimeStart = params.createTime[0];
+        params.createTimeEnd = params.createTime[1];
+        delete params.createTime;
+      }
       const scheduled = (this.currentAdjustMachine || "").trim();
       if (scheduled) {
         params.cxMachineCode = scheduled;
@@ -980,7 +1078,45 @@ export default {
         this.data = [];
       } finally {
         this.loading = false;
+        this.$nextTick(() => {
+          this.clearStructureAdjustSelection();
+        });
       }
+    },
+    /**
+     * 成型机台字段可能为多个机台逗号分隔，取第一个用于结构调整跳转（如 H1503,H1201 → H1503）
+     */
+    extractFirstCxMachineCode(val) {
+      if (val == null || val === "") {
+        return "";
+      }
+      const s = String(val).trim();
+      if (!s) {
+        return "";
+      }
+      const parts = s
+        .split(/[,，]/)
+        .map((x) => String(x).trim())
+        .filter((x) => x);
+      return parts.length ? parts[0] : "";
+    },
+    /** 获取 PageTable 内层表格实例 */
+    getMonthPlanTableInnerRef() {
+      const pt = this.$refs.monthPlanPageTableRef;
+      return pt && typeof pt.getTableRef === "function"
+        ? pt.getTableRef()
+        : null;
+    },
+    clearStructureAdjustSelection() {
+      this.structureAdjustSelection = [];
+      const inner = this.getMonthPlanTableInnerRef();
+      if (inner && typeof inner.clearSelection === "function") {
+        inner.clearSelection();
+      }
+    },
+    /** 结构调整：支持多选；勾选多于 1 条时「结构调整」按钮禁用 */
+    handleStructureAdjustSelectionChange(rows) {
+      this.structureAdjustSelection = rows || [];
     },
     /**
      * 与 rollingCycle/index.backup-legacy.vue getStatisticsResult(data) 一致：statistics 的 productionVersion 来自「列表首行」的 data.productionVersion。
@@ -1104,11 +1240,12 @@ export default {
       }
       return "";
     },
+    /** 跳转月计划结构内调整页 */
     handleStructureInnerAdjust() {
       this.$router.push({
-        name: 'RollingCycle',
-        query: {pageType: "inner" },
-      })
+        path: "/newPage/monthPlanStructureInnerAdjust",
+        query: { pageType: "inner" },
+      });
     },
     /** 结构调整弹窗保存新增结构并写入 Redis 后，同步主页面机台与列表 */
     onStructureAdjustSaved() {
@@ -1155,11 +1292,25 @@ export default {
         );
         return;
       }
-      this.$refs.structureAdjustDialogRef.show({
+      const sel = this.structureAdjustSelection || [];
+      if (sel.length > 1) {
+        return;
+      }
+      const payload = {
         factoryCode: fc,
         yearMonth: ym,
         ...this.buildStructureDialogListVersionParams(),
-      });
+      };
+      /** 仅当勾选一行且该机台有值时预填；未勾选或无机台则打开弹窗自行选机台 */
+      if (sel.length === 1) {
+        const firstMachine = this.extractFirstCxMachineCode(
+          sel[0].cxMachineCode
+        );
+        if (firstMachine) {
+          payload.prefillCxMachineCode = firstMachine;
+        }
+      }
+      this.$refs.structureAdjustDialogRef.show(payload);
     },
     handleViewAdjustVersion() {
       const q = {};
@@ -1176,24 +1327,48 @@ export default {
       }
       this.$refs.adjustVersionDialogRef.show(q);
     },
+    /**
+     * 查看调整版本弹窗中点击版本号：同步到查询条件 productionVersion 并拉列表
+     */
+    async onAdjustVersionDialogSelectProductionVersion(productionVersion) {
+      const v =
+        productionVersion != null ? String(productionVersion).trim() : "";
+      if (!v) {
+        return;
+      }
+      this.search = { ...this.search, productionVersion: v };
+      this.query = { ...this.query, productionVersion: v };
+      const opts = this.versionOptions || [];
+      if (!opts.some((item) => String(item.value) === v)) {
+        this.versionOptions = [...opts, { label: v, value: v }];
+      }
+      this.$set(this.page, "current", 1);
+      await this.fetchCurrentAdjustMachineFromRedis();
+      this.getList();
+    },
     handleExport() {
       downloadLink(
-        "/monthplan/factoryMonthPlanFinalResult/exportSkuScheduleItems",
-        this.formatParams(false)
+        "/monthplan/factoryMonthPlanMouldDayResult/export",
+        this.formatMouldingDayExportParams()
       );
     },
     handleExportAllMaterial() {
       downloadLink(
-        "/monthplan/factoryMonthPlanFinalResult/export",
-        this.formatParams(false)
+        "/monthplan/factoryMonthPlanMouldDayResult/exportAllMaterial",
+        this.formatMouldingDayExportParams()
       );
     },
     /** 打开下发弹窗，预填当前查询的年月、分厂，并加载可推送版本列表 */
     handleIssueScmMes() {
+      const now = new Date();
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const year = nextMonth.getFullYear();
+      const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
       this.syncDialog.visible = true;
-      this.syncDialog.form.yearMonth = this.formatYearMonthForPicker(
-        this.query.yearMonth || this.search.yearMonth
-      );
+      this.syncDialog.form.yearMonth =`${year}-${month < 10 ? "0" + month : month}`;
+      // this.syncDialog.form.yearMonth = this.formatYearMonthForPicker(
+      //   this.query.yearMonth || this.search.yearMonth
+      // );
       this.syncDialog.form.factoryCode =
         this.query.factoryCode || this.search.factoryCode || "";
       this.syncDialog.form.productionVersion = "";
@@ -1411,14 +1586,14 @@ export default {
      */
     prepareWeekRollSubmitPayloadOrWarn() {
       const machine = (this.currentAdjustMachine || "").trim();
-      if (!machine) {
-        this.$modal.msgWarning(
-          this.$t(
-            "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedMachine"
-          )
-        );
-        return null;
-      }
+      // if (!machine) {
+      //   this.$modal.msgWarning(
+      //     this.$t(
+      //       "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedMachine"
+      //     )
+      //   );
+      //   return null;
+      // }
       if (!this.data || !this.data.length) {
         this.$modal.msgWarning(
           this.$t(

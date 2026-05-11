@@ -8,14 +8,13 @@ import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.mapper.CxPrecisionPlanMapper;
-import com.zlt.aps.cx.mapper.MdmSkuConstructionRefMapper;
+import com.zlt.aps.cx.mapper.LhScheduleResultMapper;
 import com.zlt.aps.cx.service.engine.*;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
-import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,8 +70,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     private final ProductionCalculator productionCalculator;
     private final ScheduleDayTypeHelper scheduleDayTypeHelper;
     private final BalancingService balancingService;
-    private final MdmSkuConstructionRefMapper skuConstructionRefMapper;
     private final CxPrecisionPlanMapper precisionPlanMapper;
+    private final LhScheduleResultMapper lhScheduleResultMapper;
 
     /** 构造函数注入 */
     @Autowired
@@ -84,8 +83,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             @Lazy ProductionCalculator productionCalculator,
             ScheduleDayTypeHelper scheduleDayTypeHelper,
             @Lazy BalancingService balancingService,
-            MdmSkuConstructionRefMapper skuConstructionRefMapper,
-            CxPrecisionPlanMapper precisionPlanMapper) {
+            CxPrecisionPlanMapper precisionPlanMapper,
+            LhScheduleResultMapper lhScheduleResultMapper) {
         this.continueTaskProcessor = continueTaskProcessor;
         this.trialTaskProcessor = trialTaskProcessor;
         this.newTaskProcessor = newTaskProcessor;
@@ -93,8 +92,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         this.productionCalculator = productionCalculator;
         this.scheduleDayTypeHelper = scheduleDayTypeHelper;
         this.balancingService = balancingService;
-        this.skuConstructionRefMapper = skuConstructionRefMapper;
         this.precisionPlanMapper = precisionPlanMapper;
+        this.lhScheduleResultMapper = lhScheduleResultMapper;
     }
 
     /** 默认排程天数 */
@@ -291,6 +290,17 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 taskGroup.getContinueTasks().size(),
                 taskGroup.getTrialTasks().size(),
                 taskGroup.getNewTasks().size());
+        // 诊断：检查任务分组后的endingExtraInventory
+        for (CoreScheduleAlgorithmService.DailyEmbryoTask t : taskGroup.getContinueTasks()) {
+            if (Boolean.TRUE.equals(t.getIsOpeningDayTask()))
+                log.info("【分组诊断】续作任务: embryo={}, endingExtraInventory={}, plannedProduction={}, isOpeningDay={}",
+                        t.getEmbryoCode(), t.getEndingExtraInventory(), t.getPlannedProduction(), t.getIsOpeningDayTask());
+        }
+        for (CoreScheduleAlgorithmService.DailyEmbryoTask t : taskGroup.getNewTasks()) {
+            if (Boolean.TRUE.equals(t.getIsOpeningDayTask()))
+                log.info("【分组诊断】新增任务: embryo={}, endingExtraInventory={}, plannedProduction={}, isOpeningDay={}",
+                        t.getEmbryoCode(), t.getEndingExtraInventory(), t.getPlannedProduction(), t.getIsOpeningDayTask());
+        }
 
         // ==================== 第一步附加：单日试制/量试SKU上限过滤（单日最多2个） ====================
         applyDailyTrialSkuLimit(context, taskGroup);
@@ -323,11 +333,22 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         allAllocations.addAll(trialAllocations);
 
         log.info("班次分配前检查: 总分配数={}", allAllocations.size());
+        // 诊断：检查所有TaskAllocation的endingExtraInventory
+        for (MachineAllocationResult alloc : allAllocations) {
+            for (TaskAllocation ta : alloc.getTaskAllocations()) {
+                if (ta.getIsOpeningDayTask() != null && ta.getIsOpeningDayTask())
+                    log.info("【分配诊断】机台={}, embryo={}, endingExtraInventory={}, quantity={}, isOpeningDay={}",
+                            alloc.getMachineCode(), ta.getEmbryoCode(), ta.getEndingExtraInventory(), ta.getQuantity(), ta.getIsOpeningDayTask());
+            }
+        }
 
         // ==================== 精度计划挑选与提前扣量（每日首次执行） ====================
         applyPrecisionPlanSelection(context, scheduleDate, shiftConfig, allAllocations);
 
         // ==================== 第六步：S5.3.7 班次排产（单个班次，无需跨班次均衡） ====================
+        log.info("【班次排程】天={}, 班次={}, 机台分配数={}, 任务总数={}",
+                day, shiftConfig.getShiftCode(), allAllocations.size(),
+                allAllocations.stream().mapToInt(a -> a.getTaskAllocations().size()).sum());
         List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults = new ArrayList<>();
         LocalDate scheduleDateForShift = scheduleDate;
 
@@ -351,6 +372,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setIsContinueTask(taskAlloc.getIsContinueTask());
                 task.setIsLastEndingBatch(taskAlloc.getIsLastEndingBatch());  // 设置是否收尾最后一批
                 task.setIsEndProduction(taskAlloc.getIsEndProduction());  // 设置是否结束生产
+                task.setConstructionStage(taskAlloc.getConstructionStage());  // 设置施工阶段
                 task.setEndingAbandoned(taskAlloc.getEndingAbandoned());  // 设置收尾是否被舍弃
                 task.setPrecisionDeducted(taskAlloc.getPrecisionDeducted());  // 设置精度扣量标记
                 // 优先保留 TaskGroupService 设置的标记，仅 null 时用班次类型兜底
@@ -542,6 +564,14 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return;
         }
 
+        // 精度计划只能安排在早班（06:00开始），夜班和中班不执行
+        boolean isMorningShift = isMorningShift(shiftConfig);
+        if (!isMorningShift) {
+            log.info("精度计划跳过: 当前班次{}不是早班，精度计划只安排在早班",
+                    shiftConfig.getShiftCode());
+            return;
+        }
+
         List<CxPrecisionPlan> precisionPlans = context.getPrecisionPlans();
         if (precisionPlans == null || precisionPlans.isEmpty()) {
             context.setPrecisionPlanApplied(true);
@@ -549,7 +579,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         }
 
         List<CxPrecisionPlan> uncompleted = precisionPlans.stream()
-                .filter(p -> !"1".equals(p.getCompletionStatus()) && p.getPlanDate() != null)
+                .filter(p -> !"1".equals(p.getCompletionStatus()) && p.getPlanDate() != null && p.getScheduleDate() == null)
                 .sorted(Comparator.comparing(CxPrecisionPlan::getPlanDate))
                 .collect(Collectors.toList());
 
@@ -558,15 +588,21 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return;
         }
 
-        java.sql.Date todaySql = java.sql.Date.valueOf(scheduleDate);
+        // 将planDate转换为LocalDate做日期级比较，避免Date/Timestamp类型不一致导致after()判断错误
+        java.time.ZoneId zoneId = java.time.ZoneId.systemDefault();
         List<CxPrecisionPlan> urgentPlans = uncompleted.stream()
-                .filter(p -> !p.getPlanDate().after(todaySql))
+                .filter(p -> {
+                    LocalDate planLocalDate = p.getPlanDate().toInstant().atZone(zoneId).toLocalDate();
+                    return !planLocalDate.isAfter(scheduleDate);
+                })
                 .collect(Collectors.toList());
 
         LocalDate dayCutoffDate = scheduleDate.plusDays(context.getPrecisionAdvanceDays());
-        java.sql.Date dayCutoffSql = java.sql.Date.valueOf(dayCutoffDate);
         List<CxPrecisionPlan> futurePlans = uncompleted.stream()
-                .filter(p -> p.getPlanDate().after(todaySql) && !p.getPlanDate().after(dayCutoffSql))
+                .filter(p -> {
+                    LocalDate planLocalDate = p.getPlanDate().toInstant().atZone(zoneId).toLocalDate();
+                    return planLocalDate.isAfter(scheduleDate) && !planLocalDate.isAfter(dayCutoffDate);
+                })
                 .collect(Collectors.toList());
 
         log.info("精度计划筛选: 当天={}, 截止={}, 紧急{}条, 未来{}条",
@@ -623,7 +659,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             double bestDeductionNeeded = Double.MAX_VALUE;
             BigDecimal bestStockHours = BigDecimal.ZERO;
             for (CxPrecisionPlan plan : futurePlans) {
-                double idleH = machineIdleHours.getOrDefault(plan.getMachineCode(), 0.0);
+                double idleH = machineIdleHours.getOrDefault(plan.getMachineCode(), (double) shiftHours);
                 double deductionNeeded = Math.max(0, 4.0 - idleH);
                 BigDecimal stockH = machineTotalStockHours.getOrDefault(plan.getMachineCode(), BigDecimal.ZERO);
 
@@ -645,7 +681,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 selectedPlans.add(bestPlan);
                 log.info("精度计划挑选: 未来计划提前执行, 选中机台 {} (空闲{}h, 需扣{}h, 可供硫化{}h)",
                         bestPlan.getMachineCode(),
-                        String.format("%.1f", machineIdleHours.getOrDefault(bestPlan.getMachineCode(), 0.0)),
+                        String.format("%.1f", machineIdleHours.getOrDefault(bestPlan.getMachineCode(), (double) shiftHours)),
                         String.format("%.1f", bestDeductionNeeded),
                         String.format("%.1f", bestStockHours));
             } else {
@@ -752,6 +788,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         Map<String, Integer> materialStockMap = context.getMaterialStockMap();
 
         int classIndex = parseClassIndex(shiftConfig);
+        log.info("精度扣量硫化联动: 机台={}, lhResultCache大小={}, classIndex={}",
+                machineCode, lhResultCache.size(), classIndex);
+        Set<LhScheduleResult> modifiedLhResults = new HashSet<>();
 
         for (TaskAllocation taskAlloc : sortedTasks) {
             if (remainingSeconds <= 0) break;
@@ -786,24 +825,44 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
             Long lhId = taskAlloc.getLhId();
             LhScheduleResult lhResult = lhId != null ? lhResultCache.get(lhId) : null;
-            if (lhResult != null && classIndex > 0) {
-                Integer currentClassPlanObj = getClassPlanQtyByIndex(lhResult, classIndex);
-                if (currentClassPlanObj == null) {
-                    continue;
-                }
-                int currentClassPlan = currentClassPlanObj;
-                int stock = (materialStockMap != null)
-                        ? materialStockMap.getOrDefault(String.valueOf(lhId), 0)
-                        : 0;
-                int totalAvailable = stock + newQty;
-                if (totalAvailable < currentClassPlan) {
-                    setClassPlanQtyByIndex(lhResult, classIndex, totalAvailable);
-                    appendClassAnalysisByIndex(lhResult, classIndex, "成型精度联动");
-                    log.info("  硫化需求调整: 胎胚={}, CLASS{}原计划量={}, 库存={}+产量={}={}, 调整为{}",
-                            taskAlloc.getEmbryoCode(), classIndex,
-                            currentClassPlan, stock, newQty, totalAvailable, totalAvailable);
-                }
+            if (lhResult == null || classIndex <= 0) {
+                log.info("  硫化联动跳过: 胎胚={}, lhId={}, lhResult={}, classIndex={}",
+                        taskAlloc.getEmbryoCode(), lhId, lhResult != null ? "已找到" : "未找到", classIndex);
+                continue;
             }
+            Integer currentClassPlanObj = getClassPlanQtyByIndex(lhResult, classIndex);
+            if (currentClassPlanObj == null || currentClassPlanObj <= 0) {
+                log.info("  硫化联动跳过: 胎胚={}, CLASS{}硫化计划量为0或空({}), 无需联动",
+                        taskAlloc.getEmbryoCode(), classIndex, currentClassPlanObj);
+                continue;
+            }
+            int currentClassPlan = currentClassPlanObj;
+            int stock = (materialStockMap != null)
+                    ? materialStockMap.getOrDefault(String.valueOf(lhId), 0)
+                    : 0;
+            int totalAvailable = stock + newQty;
+            if (totalAvailable < currentClassPlan) {
+                // 不扣减硫化计划量，只在原因分析中记录精度影响
+                String precisionNote = String.format("成型精度影响: 库存%d+产量%d=%d<硫化计划%d, 缺口%d条",
+                        stock, newQty, totalAvailable, currentClassPlan, currentClassPlan - totalAvailable);
+                appendClassAnalysisByIndex(lhResult, classIndex, precisionNote);
+                modifiedLhResults.add(lhResult);
+                log.info("  硫化联动写入原因分析: 胎胚={}, lhId={}, CLASS{}硫化计划={}, 库存={}+扣后产量={}={}, 缺口={}条, 原因={}",
+                        taskAlloc.getEmbryoCode(), lhId, classIndex,
+                        currentClassPlan, stock, newQty, totalAvailable, currentClassPlan - totalAvailable, precisionNote);
+            } else {
+                log.info("  硫化联动检查通过: 胎胚={}, lhId={}, CLASS{}硫化计划={}, 库存={}+扣后产量={}={}, 供应充足无缺口",
+                        taskAlloc.getEmbryoCode(), lhId, classIndex,
+                        currentClassPlan, stock, newQty, totalAvailable);
+            }
+        }
+
+        // 持久化硫化需求调整到数据库
+        if (!modifiedLhResults.isEmpty()) {
+            for (LhScheduleResult lhResult : modifiedLhResults) {
+                lhScheduleResultMapper.updateById(lhResult);
+            }
+            log.info("精度扣量: 已更新 {} 条硫化排程结果到数据库", modifiedLhResults.size());
         }
 
         log.info("精度扣量完成: 机台={}, 需扣{}h, 实扣{}h",
@@ -1215,6 +1274,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     classField = shiftClassFieldMap.get(shiftCode + "_" + day);
                 }
             }
+            log.info("主表合并班次: day={}, classField={}, shiftCode={}, productionResults={}",
+                    day, classField,
+                    shiftResult.getShiftConfig() != null ? shiftResult.getShiftConfig().getShiftCode() : null,
+                    shiftResult.getShiftProductionResults() != null ? shiftResult.getShiftProductionResults().size() : 0);
 
             for (ShiftScheduleService.ShiftProductionResult spr : shiftResult.getShiftProductionResults()) {
                 String machineCode = spr.getMachineCode();
@@ -1235,7 +1298,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 }
                 final String effectiveClassField = effectiveClassFieldTmp;
 
-                String taskKey = machineCode + "|" + embryoCode + "|" + materialCode;
+                String taskKey = machineCode + "|" + embryoCode + "|" + materialCode + "|" + (spr.getConstructionStage() != null ? spr.getConstructionStage() : "");
                 taskClassSprMap.computeIfAbsent(taskKey, k -> new LinkedHashMap<>())
                         .compute(effectiveClassField, (k, existing) -> {
                             if (existing == null) {
@@ -1369,10 +1432,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             String taskKey = entry.getKey();
             Map<String, ShiftScheduleService.ShiftProductionResult> classSprMap = entry.getValue();
 
-            String[] parts = taskKey.split("\\|", 3);
+            String[] parts = taskKey.split("\\|", 4);
             String machineCode = parts[0];
             String embryoCode = parts.length > 1 ? parts[1] : null;
             String materialCode = parts.length > 2 && !parts[2].isEmpty() ? parts[2] : null;
+            String constructionStage = parts.length > 3 && !parts[3].isEmpty() ? parts[3] : null;
             String structureName = taskStructureMap.get(taskKey);
 
             CxScheduleResult result = new CxScheduleResult();
@@ -1554,8 +1618,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 result.setMarkCloseOutTip("1");
             }
 
-            // ---- 查询示方书类型（每条结果查一次，避免 CLASS1~8 重复查库） ----
-            String recipeType = resolveRecipeType(primaryLh, materialCode);
+            // ---- 示方书类型直接取 constructionStage ----
+            String recipeType = constructionStage;
 
             // ---- 映射班次排量到 CLASS1~8 ----
             for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
@@ -1641,7 +1705,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 String mCode = spr.getMachineCode();
                 String eCode = spr.getEmbryoCode();
                 String matCode = spr.getMaterialCode() != null ? spr.getMaterialCode() : "";
-                String mergeKey = mCode + "|" + eCode + "|" + matCode;
+                String mergeKey = mCode + "|" + eCode + "|" + matCode + "|" + (spr.getConstructionStage() != null ? spr.getConstructionStage() : "");
 
                 ShiftScheduleService.ShiftProductionResult existing = mergedSprMap.get(mergeKey);
                 if (existing == null) {
@@ -1672,7 +1736,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             for (ShiftScheduleService.ShiftProductionResult spr : mergedSprMap.values()) {
                 String embryoCode = spr.getEmbryoCode();
                 String materialCode = spr.getMaterialCode() != null ? spr.getMaterialCode() : "";
-                String embryoKey = embryoCode + "|" + materialCode;
+                String embryoKey = embryoCode + "|" + materialCode + "|" + (spr.getConstructionStage() != null ? spr.getConstructionStage() : "");
 
                 EmbryoTripTracker tracker = embryoTrackers.computeIfAbsent(embryoKey,
                         k -> new EmbryoTripTracker(embryoCode, materialCode));
@@ -2193,36 +2257,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /**
      * 填充未排产班次的默认值（PLAN_QTY=0, FINISH_QTY=0）
      */
-    /**
-     * 查询示方书类型（每条结果查询一次，供 CLASS1~8 复用）
-     * @param primaryLh    主硫化任务
-     * @param materialCode 物料编码
-     * @return 示方书类型，查不到返回 null
-     */
-    private String resolveRecipeType(LhScheduleResult primaryLh, String materialCode) {
-        if (materialCode == null) {
-            return null;
-        }
-        String recipeNo = (primaryLh != null) ? primaryLh.getEmbryoNo() : null;
-        if (recipeNo == null) {
-            return null;
-        }
-        recipeNo = recipeNo.trim();
-        if (recipeNo.isEmpty()) {
-            return null;
-        }
-        try {
-            MdmSkuConstructionRef ref = skuConstructionRefMapper.selectByMaterialCodeAndEmbryoNo(materialCode, recipeNo);
-            if (ref != null && ref.getEmbryoType() != null) {
-                return ref.getEmbryoType();
-            }
-            log.warn("未查到示方书类型: materialCode={}, embryoNo={}", materialCode, recipeNo);
-        } catch (Exception e) {
-            log.warn("查询示方书类型异常: materialCode={}, embryoNo={}", materialCode, recipeNo, e);
-        }
-        return null;
-    }
-
     private void fillDefaultClassValues(CxScheduleResult result, Set<String> filledClasses) {
         BigDecimal zero = BigDecimal.ZERO;
         if (!filledClasses.contains("CLASS1")) { result.setClass1PlanQty(zero); result.setClass1FinishQty(zero); }
@@ -3271,5 +3305,32 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
         return 2;
+    }
+
+    /**
+     * 判断是否是早班
+     *
+     * <p>精度计划只能安排在早班执行。判断规则：
+     * <ul>
+     *   <li>班次名称包含"早班"</li>
+     *   <li>或班次编码以"DAY_"开头</li>
+     *   <li>或班次开始时间在06:00~12:00之间</li>
+     * </ul>
+     */
+    private boolean isMorningShift(CxShiftConfig shiftConfig) {
+        if (shiftConfig == null) {
+            return false;
+        }
+        // 规则1：班次名称包含"早班"
+        if (shiftConfig.getShiftName() != null && shiftConfig.getShiftName().contains("早班")) {
+            return true;
+        }
+        // 规则2：班次编码以"DAY_"开头（如DAY_D1, DAY_D2, DAY_D3）
+        if (shiftConfig.getShiftCode() != null && shiftConfig.getShiftCode().startsWith("DAY_")) {
+            return true;
+        }
+        // 规则3：班次开始时间在06:00~12:00之间
+        LocalTime startTime = shiftConfig.getShiftStartTime();
+        return !startTime.isBefore(LocalTime.of(6, 0)) && startTime.isBefore(LocalTime.of(12, 0));
     }
 }

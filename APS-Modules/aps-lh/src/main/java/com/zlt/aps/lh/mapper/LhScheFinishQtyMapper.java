@@ -4,7 +4,9 @@ import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -23,5 +25,28 @@ public interface LhScheFinishQtyMapper extends CommBaseMapper<LhScheFinishQty> {
      * @return 已存在的数据
      */
     List<LhScheFinishQty> selectByUniqueKeyList(@Param("list") List<LhScheFinishQty> list);
+
+    /**
+     * 根据分厂编号逻辑删除硫化排程完成量数据
+     *
+     * @param factoryCode 分厂编号
+     * @param updateBy    更新者
+     * @param updateTime  更新时间
+     * @return 更新的记录数
+     */
+    @Update("UPDATE T_LH_SCHE_FINISH_QTY SET IS_DELETE = 1, UPDATE_BY = #{updateBy}, UPDATE_TIME = #{updateTime} WHERE FACTORY_CODE = #{factoryCode} AND IS_DELETE = 0")
+    int logicDeleteByFactoryCode(@Param("factoryCode") String factoryCode, @Param("updateBy") String updateBy, @Param("updateTime") Date updateTime);
+
+    /**
+     * 根据分厂编号和排程日期逻辑删除硫化排程完成量数据
+     *
+     * @param factoryCode  分厂编号
+     * @param scheduleDate 排程日期
+     * @param updateBy     更新者
+     * @param updateTime   更新时间
+     * @return 更新的记录数
+     */
+    @Update("UPDATE T_LH_SCHE_FINISH_QTY SET IS_DELETE = 1, UPDATE_BY = #{updateBy}, UPDATE_TIME = #{updateTime} WHERE FACTORY_CODE = #{factoryCode} AND DATE(SCHEDULE_DATE) = #{scheduleDate} AND IS_DELETE = 0")
+    int logicDeleteByFactoryCodeAndScheduleDate(@Param("factoryCode") String factoryCode, @Param("scheduleDate") Date scheduleDate, @Param("updateBy") String updateBy, @Param("updateTime") Date updateTime);
 
 }

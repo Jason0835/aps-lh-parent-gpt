@@ -247,6 +247,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         return 0;
     }
 
+
     /**
      * 获取指定物料的T日排程班次完成量（class1FinishQty汇总值）。
      *
@@ -696,7 +697,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private boolean isPreviousBaselineFromScheduleDate(LhScheduleContext context) {
         return context.isRollingScheduleHandoff()
                 || context.getParamIntValue(LhScheduleParamConstant.FORCE_RESCHEDULE,
-                        LhScheduleConstant.FORCE_RESCHEDULE) == LhScheduleConstant.FORCE_RESCHEDULE_ENABLED;
+                LhScheduleConstant.FORCE_RESCHEDULE) == LhScheduleConstant.FORCE_RESCHEDULE_ENABLED;
     }
 
     /**
@@ -996,3 +997,4 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         return ScheduleStepEnum.S4_3_ADJUST_AND_GATHER.getDescription();
     }
 }
+

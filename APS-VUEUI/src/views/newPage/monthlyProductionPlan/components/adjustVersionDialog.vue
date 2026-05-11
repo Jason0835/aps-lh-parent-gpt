@@ -25,7 +25,17 @@
           prop="version"
           min-width="160"
           show-overflow-tooltip
-        />
+        >
+          <template slot-scope="scope">
+            <div
+              type="text"
+              class="adjust-version-link"
+              @click.stop="handleVersionClick(scope.row)"
+            >
+              {{ scope.row.version }}
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column
           :label="$t('ui.data.column.scheduleAdjust.adjustType')"
           prop="adjustType"
@@ -69,6 +79,17 @@
   </el-dialog>
 </template>
 
+<style scoped>
+.adjust-version-link {
+  padding: 0;
+  white-space: normal;
+  text-align: left;
+  word-break: break-all;
+  text-decoration: underline;
+  cursor: pointer;
+}
+</style>
+
 <script>
 import { adjustVersionList } from "@/api/monthplan/adjustStructure";
 
@@ -109,6 +130,15 @@ export default {
       } finally {
         this.loading = false;
       }
+    },
+    /** 点击调整版本号：通知父页写入查询条件 productionVersion 并重新查询 */
+    handleVersionClick(row) {
+      if (!row || row.version == null || String(row.version).trim() === "") {
+        return;
+      }
+      const productionVersion = String(row.version).trim();
+      this.$emit("select-production-version", productionVersion, row);
+      this.visible = false;
     },
   },
 };
