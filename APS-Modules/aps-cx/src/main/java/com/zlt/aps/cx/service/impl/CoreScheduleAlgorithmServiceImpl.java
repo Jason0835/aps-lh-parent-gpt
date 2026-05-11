@@ -290,17 +290,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 taskGroup.getContinueTasks().size(),
                 taskGroup.getTrialTasks().size(),
                 taskGroup.getNewTasks().size());
-        // 诊断：检查任务分组后的endingExtraInventory
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask t : taskGroup.getContinueTasks()) {
-            if (Boolean.TRUE.equals(t.getIsOpeningDayTask()))
-                log.info("【分组诊断】续作任务: embryo={}, endingExtraInventory={}, plannedProduction={}, isOpeningDay={}",
-                        t.getEmbryoCode(), t.getEndingExtraInventory(), t.getPlannedProduction(), t.getIsOpeningDayTask());
-        }
-        for (CoreScheduleAlgorithmService.DailyEmbryoTask t : taskGroup.getNewTasks()) {
-            if (Boolean.TRUE.equals(t.getIsOpeningDayTask()))
-                log.info("【分组诊断】新增任务: embryo={}, endingExtraInventory={}, plannedProduction={}, isOpeningDay={}",
-                        t.getEmbryoCode(), t.getEndingExtraInventory(), t.getPlannedProduction(), t.getIsOpeningDayTask());
-        }
 
         // ==================== 第一步附加：单日试制/量试SKU上限过滤（单日最多2个） ====================
         applyDailyTrialSkuLimit(context, taskGroup);
@@ -333,22 +322,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         allAllocations.addAll(trialAllocations);
 
         log.info("班次分配前检查: 总分配数={}", allAllocations.size());
-        // 诊断：检查所有TaskAllocation的endingExtraInventory
-        for (MachineAllocationResult alloc : allAllocations) {
-            for (TaskAllocation ta : alloc.getTaskAllocations()) {
-                if (ta.getIsOpeningDayTask() != null && ta.getIsOpeningDayTask())
-                    log.info("【分配诊断】机台={}, embryo={}, endingExtraInventory={}, quantity={}, isOpeningDay={}",
-                            alloc.getMachineCode(), ta.getEmbryoCode(), ta.getEndingExtraInventory(), ta.getQuantity(), ta.getIsOpeningDayTask());
-            }
-        }
 
         // ==================== 精度计划挑选与提前扣量（每日首次执行） ====================
         applyPrecisionPlanSelection(context, scheduleDate, shiftConfig, allAllocations);
 
         // ==================== 第六步：S5.3.7 班次排产（单个班次，无需跨班次均衡） ====================
-        log.info("【班次排程】天={}, 班次={}, 机台分配数={}, 任务总数={}",
-                day, shiftConfig.getShiftCode(), allAllocations.size(),
-                allAllocations.stream().mapToInt(a -> a.getTaskAllocations().size()).sum());
         List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults = new ArrayList<>();
         LocalDate scheduleDateForShift = scheduleDate;
 
@@ -372,7 +350,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setIsContinueTask(taskAlloc.getIsContinueTask());
                 task.setIsLastEndingBatch(taskAlloc.getIsLastEndingBatch());  // 设置是否收尾最后一批
                 task.setIsEndProduction(taskAlloc.getIsEndProduction());  // 设置是否结束生产
-                task.setConstructionStage(taskAlloc.getConstructionStage());  // 设置施工阶段
                 task.setEndingAbandoned(taskAlloc.getEndingAbandoned());  // 设置收尾是否被舍弃
                 task.setPrecisionDeducted(taskAlloc.getPrecisionDeducted());  // 设置精度扣量标记
                 // 优先保留 TaskGroupService 设置的标记，仅 null 时用班次类型兜底
@@ -2437,9 +2414,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         log.info("【步骤2.5】更新胎胚库存表（CxStock），计算新库存...");
         updateCxStockEntities(context, formingOutputMap, vulcanizingConsumptionByEmbryo);
 
+        // 3.5. 收集本班次最后一批=true的物料编码（收尾锁定）
+        Set<String> lastBatchMaterials = collectLastBatchMaterials(shiftProductionResults, vulcanizingConsumptionByMaterial);
+
         // 4. 先更新硫化余量，确保分配库存时使用最新余量（余量<=0时跳过分配）
         log.info("【步骤3】更新硫化余量（monthSurplusMap）...");
-        updateMonthSurplus(context, vulcanizingConsumptionByMaterial);
+        updateMonthSurplus(context, vulcanizingConsumptionByMaterial, lastBatchMaterials);
 
         // 3. 重新按日硫化量比例分配库存给硫化任务（使用更新后的库存和硫化余量）
         log.info("【步骤4】按日硫化量比例重新分配库存（materialStockMap）...");
@@ -2447,7 +2427,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // 6. 重算 formingRemainderMap（成型余量 = 硫化余量 - 库存）
         log.info("【步骤5】重算成型余量（formingRemainderMap）...");
-        recalculateFormingRemainder(context);
+        recalculateFormingRemainder(context, lastBatchMaterials);
 
         log.info("========== 第 {} 天 - {} 班上下文更新完成 ==========\n",
                 currentDay, shiftName);
@@ -3059,14 +3039,54 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
+     * 收集本班次排产结果中最后一批=true的物料编码
+     *
+     * <p>从 ShiftProductionResult 中提取 isLastEndingBatch=true 的物料，
+     * 用于后续硫化余量和成型余量的锁定（直接置0，不参与库存分配）。
+     *
+     * @param shiftProductionResults          当前班次的成型排产结果
+     * @param vulcanizingConsumptionByMaterial 物料 → 硫化消耗量（用于过滤有实际消耗的物料）
+     * @return 最后一批=true且本班次有硫化消耗的物料编码集合
+     */
+    private Set<String> collectLastBatchMaterials(
+            List<ShiftScheduleService.ShiftProductionResult> shiftProductionResults,
+            Map<String, Integer> vulcanizingConsumptionByMaterial) {
+        Set<String> lastBatchMaterials = new HashSet<>();
+        if (shiftProductionResults == null || shiftProductionResults.isEmpty()) {
+            return lastBatchMaterials;
+        }
+
+        for (ShiftScheduleService.ShiftProductionResult spr : shiftProductionResults) {
+            if (Boolean.TRUE.equals(spr.getIsLastEndingBatch()) && spr.getMaterialCode() != null) {
+                String materialCode = spr.getMaterialCode();
+                if (vulcanizingConsumptionByMaterial != null
+                        && vulcanizingConsumptionByMaterial.containsKey(materialCode)) {
+                    lastBatchMaterials.add(materialCode);
+                    log.info("【收尾锁定】物料 {} 本班次为最后一批收尾，成型产出={}，硫化消耗={}",
+                            materialCode, spr.getQuantity(),
+                            vulcanizingConsumptionByMaterial.get(materialCode));
+                }
+            }
+        }
+
+        return lastBatchMaterials;
+    }
+
+    /**
      * 更新 monthSurplusMap（硫化余量 -= 当天硫化消耗）
+
+     *
+     * <p>对于最后一批=true的收尾物料，直接设置硫化余量为0（提前锁定量覆盖全部余量），
+     * 不再参与后续库存分配，保证收尾物料不会因为共用胎胚库存被分摊而导致余量残留。
      *
      * @param context                             排程上下文
      * @param vulcanizingConsumptionByMaterial    物料编码 → 硫化消耗量
+     * @param lastBatchMaterials                  本班次最后一批=true的物料编码集合
      */
     private void updateMonthSurplus(
             ScheduleContextVo context,
-            Map<String, Integer> vulcanizingConsumptionByMaterial) {
+            Map<String, Integer> vulcanizingConsumptionByMaterial,
+            Set<String> lastBatchMaterials) {
 
         Map<String, MdmMonthSurplus> monthSurplusMap = context.getMonthSurplusMap();
         if (monthSurplusMap == null || monthSurplusMap.isEmpty()) {
@@ -3087,10 +3107,17 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             MdmMonthSurplus surplus = monthSurplusMap.get(materialCode);
             if (surplus != null && surplus.getPlanSurplusQty() != null) {
                 BigDecimal oldSurplus = surplus.getPlanSurplusQty();
-                BigDecimal newSurplus = oldSurplus.subtract(BigDecimal.valueOf(consumption));
-                surplus.setPlanSurplusQty(newSurplus);
-                log.info("  - {}: 原余量={}, 硫化消耗={}, 新余量={}",
-                        materialCode, oldSurplus, consumption, newSurplus);
+
+                if (lastBatchMaterials != null && lastBatchMaterials.contains(materialCode)) {
+                    surplus.setPlanSurplusQty(BigDecimal.ZERO);
+                    log.info("  - {}: 最后一批收尾锁定，原余量={}, 硫化消耗={}, 新余量=0",
+                            materialCode, oldSurplus, consumption);
+                } else {
+                    BigDecimal newSurplus = oldSurplus.subtract(BigDecimal.valueOf(consumption));
+                    surplus.setPlanSurplusQty(newSurplus);
+                    log.info("  - {}: 原余量={}, 硫化消耗={}, 新余量={}",
+                            materialCode, oldSurplus, consumption, newSurplus);
+                }
             } else {
                 log.warn("  - {}: 未找到硫化余量记录或余量为空，消耗={}", materialCode, consumption);
             }
@@ -3157,9 +3184,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /**
      * 重算 formingRemainderMap（成型余量 = 硫化余量 - 库存）
      *
-     * @param context 排程上下文
+     * <p>对于最后一批=true的收尾物料，成型余量直接设为0（已提前锁定量覆盖全部余量），
+     * 确保收尾物料不会因为共用胎胚库存被分摊而导致下个班次仍有余量残留。
+     *
+     * @param context             排程上下文
+     * @param lastBatchMaterials 本班次最后一批=true的物料编码集合
      */
-    private void recalculateFormingRemainder(ScheduleContextVo context) {
+    private void recalculateFormingRemainder(ScheduleContextVo context, Set<String> lastBatchMaterials) {
         Map<String, MdmMonthSurplus> monthSurplusMap = context.getMonthSurplusMap();
         Map<String, Integer> materialStockMap = context.getMaterialStockMap();
         List<LhScheduleResult> lhResults = context.getLhScheduleResults();
@@ -3186,6 +3217,13 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         for (Map.Entry<String, MdmMonthSurplus> entry : monthSurplusMap.entrySet()) {
             String materialCode = entry.getKey();
             MdmMonthSurplus surplus = entry.getValue();
+
+            if (lastBatchMaterials != null && lastBatchMaterials.contains(materialCode)) {
+                newFormingRemainderMap.put(materialCode, 0);
+                log.info("  - {}: 最后一批收尾锁定，成型余量=0", materialCode);
+                continue;
+            }
+
             int vulcanizingRemainder = surplus.getPlanSurplusQty() != null
                     ? surplus.getPlanSurplusQty().intValue() : 0;
             int materialStock = stockByMaterial.getOrDefault(materialCode, 0);
