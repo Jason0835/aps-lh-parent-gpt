@@ -33,9 +33,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -283,26 +281,28 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     /**
-     * 加载备份模板并填充数据，返回最终工作簿。
-     * 模板中的图片、隐藏列等属性会在 POI 原生读写中完整保留。
+     * 加载模板并通过占位符替换填充数据，返回最终工作簿。
+     * 参考 LH 导出模式：writeMultiList 会保留模板中的图片、隐藏列等属性。
      */
     private XSSFWorkbook buildFinalWorkbookFromTemplate(List<CxScheduleResult> list) {
         InputStream templateInput = this.getClass().getClassLoader()
-                .getResourceAsStream("excelModel/cxjhtemplate_backup.xlsx");
+                .getResourceAsStream("excelModel/cxjhtemplate.xlsx");
         if (Objects.isNull(templateInput)) {
             throw new ServiceException("成型计划模板不存在");
         }
         try {
-            XSSFWorkbook workbook = new XSSFWorkbook(templateInput);
-            Sheet sheet = workbook.getSheetAt(0);
             List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
-            applyTitleDate(sheet, exportList);
-            applyShiftDates(sheet, exportList);
-            clearSampleData(sheet);
-            fillDataRows(sheet, exportList);
+            // 构建表头占位符数据（{shiftDate1}~{shiftDate8}、{yearmonthday}等）
+            Map<String, Object> tableMap = buildCxTemplateTableMap(exportList);
 
-            return workbook;
+            // 构建列表数据（按机台分组 + 小计行），key 对应模板中的 {.xxx} 占位符
+            List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
+            excelDataList.add(buildCxTemplateDataList(exportList));
+
+            // writeMultiList 读取模板 → 替换占位符 → 输出字节
+            byte[] bytes = ExcelUtils.writeMultiList(templateInput, 0, tableMap, excelDataList);
+            return new XSSFWorkbook(new ByteArrayInputStream(bytes));
         } catch (ServiceException e) {
             throw e;
         } catch (Exception e) {
@@ -311,110 +311,53 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     /**
-     * 修改标题 H1：将固定日期前缀替换为排程日期。
+     * 构建表头占位符数据。
      */
-    private void applyTitleDate(Sheet sheet, List<CxScheduleResult> list) {
-        Row row1 = sheet.getRow(0);
-        if (row1 == null) return;
-        Cell h1 = row1.getCell(7); // H1
-        if (h1 == null) return;
-        String title = h1.getStringCellValue();
-        if (title == null) return;
+    private Map<String, Object> buildCxTemplateTableMap(List<CxScheduleResult> list) {
+        Map<String, Object> tableMap = new LinkedHashMap<>();
 
         Date scheduleDate = list.stream()
                 .map(CxScheduleResult::getScheduleDate)
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
-        if (scheduleDate == null) return;
 
-        String datePrefix = cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyy年MM月dd日");
-        // 原始标题格式: "2026年5月3日全钢成型工程..."，替换日期前缀
-        String prefix = "全钢成型工程生产";
-        int idx = title.indexOf(prefix);
-        if (idx > 0) {
-            title = datePrefix + title.substring(idx);
+        if (scheduleDate != null) {
+            java.time.LocalDate baseDate = cn.hutool.core.date.DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
+            java.time.LocalDate d1 = baseDate.minusDays(2);
+            java.time.LocalDate d2 = baseDate.minusDays(1);
+            java.time.LocalDate d3 = baseDate;
+            java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("MM/dd");
+
+            tableMap.put("shiftDate1", "早班 Ca sáng " + d1.format(fmt));
+            tableMap.put("shiftDate2", "中班 Ca chiều " + d1.format(fmt));
+            tableMap.put("shiftDate3", "夜班 Ca đêm " + d2.format(fmt));
+            tableMap.put("shiftDate4", "早班 Ca sáng " + d2.format(fmt));
+            tableMap.put("shiftDate5", "中班 Ca chiều " + d2.format(fmt));
+            tableMap.put("shiftDate6", "夜班 Ca đêm " + d3.format(fmt));
+            tableMap.put("shiftDate7", "早班 Ca sáng " + d3.format(fmt));
+            tableMap.put("shiftDate8", "中班 Ca chiều " + d3.format(fmt));
+
+            tableMap.put("yearmonthday", cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyy年MM月dd日"));
         }
-        h1.setCellValue(title);
+
+        return tableMap;
     }
 
     /**
-     * 修改 Row 4 各班次日期，替换原固定日期为排程日期。
+     * 构建列表数据，按机台分组并在每组末尾插入小计行。
      */
-    private void applyShiftDates(Sheet sheet, List<CxScheduleResult> list) {
-        Date scheduleDate = list.stream()
-                .map(CxScheduleResult::getScheduleDate)
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse(null);
-        if (scheduleDate == null) return;
+    private List<Map<String, Object>> buildCxTemplateDataList(List<CxScheduleResult> list) {
+        List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
-        java.time.LocalDate baseDate = cn.hutool.core.date.DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
-        java.time.LocalDate d1 = baseDate.minusDays(2);
-        java.time.LocalDate d2 = baseDate.minusDays(1);
-        java.time.LocalDate d3 = baseDate;
-        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("MM/dd");
-
-        String[] shiftFormats = {
-                "早班 Ca sáng %s", // D1
-                "中班 Ca chiều %s", // D1
-                "夜班 Ca đêm %s", // D2
-                "早班 Ca sáng %s", // D2
-                "中班 Ca chiều %s", // D2
-                "夜班 Ca đêm %s", // D3
-                "早班 Ca sáng %s", // D3
-                "中班 Ca chiều %s", // D3
-        };
-        String[] dates = {
-                d1.format(fmt), d1.format(fmt),
-                d2.format(fmt), d2.format(fmt), d2.format(fmt),
-                d3.format(fmt), d3.format(fmt), d3.format(fmt)
-        };
-        int[] cols = {15, 20, 25, 30, 35, 40, 45, 50}; // P,U,Z,AE,AJ,AO,AT,AY (0-based)
-
-        Row row4 = sheet.getRow(3);
-        if (row4 == null) return;
-        for (int i = 0; i < cols.length; i++) {
-            Cell cell = row4.getCell(cols[i]);
-            if (cell != null) {
-                cell.setCellValue(String.format(shiftFormats[i], dates[i]));
-            }
-        }
-    }
-
-    /**
-     * 清除 Row 7+ 的示例数据（保留行结构，不删行以保护图片锚点）。
-     */
-    private void clearSampleData(Sheet sheet) {
-        int lastRow = sheet.getLastRowNum();
-        for (int r = 6; r <= lastRow; r++) {
-            Row row = sheet.getRow(r);
-            if (row != null) {
-                for (int c = 0; c < row.getLastCellNum(); c++) {
-                    Cell cell = row.getCell(c);
-                    if (cell != null) {
-                        cell.setCellValue((String) null);
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * 填入数据行：按机台分组，每组末尾插入小计行。
-     * 数据从 Row 7 (0-based row 6) 开始填入。
-     */
-    private void fillDataRows(Sheet sheet, List<CxScheduleResult> exportList) {
-        if (CollectionUtils.isEmpty(exportList)) return;
-
-        // 按机台编码分组
         Map<String, List<CxScheduleResult>> groupMap = exportList.stream()
+                .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(
                         item -> PubUtil.isNotEmpty(item.getCxMachineCode()) ? item.getCxMachineCode() : "",
                         LinkedHashMap::new,
                         Collectors.toList()));
 
-        int rowIdx = 6; // 0-based, Row 7
+        List<Map<String, Object>> dataList = new ArrayList<>();
         for (Map.Entry<String, List<CxScheduleResult>> entry : groupMap.entrySet()) {
             List<CxScheduleResult> groupList = entry.getValue();
             groupList.sort(Comparator.comparing(
@@ -422,111 +365,95 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     String::compareTo));
 
             for (CxScheduleResult item : groupList) {
-                writeDataRow(sheet, rowIdx++, item);
+                dataList.add(buildCxTemplateRow(item));
             }
-            // 小计行
-            writeSubtotalRow(sheet, rowIdx++, groupList);
+            dataList.add(buildCxTemplateSubtotalRow(groupList));
         }
+
+        return dataList;
     }
 
     /**
-     * 写入一行明细数据到模板。
-     * 列映射: C4=机台, C5=结构, C6=胎胚编码, C7=胎胚描述, C8=物料描述,
-     * C9=物料编码, C12=合计成型余量, C13=合计硫化余量, C14=胎胚库存, C15=硫化班产,
-     * C16-C55=8班次x5列, C56=合计计划, C57=合计实际, C58=总计, C59=备注, C60=硫化机台数
+     * 构建一行明细数据。
      */
-    private void writeDataRow(Sheet sheet, int rowIdx, CxScheduleResult item) {
-        Row row = sheet.getRow(rowIdx);
-        if (row == null) {
-            row = sheet.createRow(rowIdx);
-        }
-        int c = 0;
-        // C1-C3: skip
-        c = 3;
-        setCellVal(row.createCell(c++), item.getCxMachineCode());       // C4
-        setCellVal(row.createCell(c++), item.getStructureName());       // C5
-        setCellVal(row.createCell(c++), item.getEmbryoCode());          // C6
-        setCellVal(row.createCell(c++), item.getMaterialDesc());        // C7
-        setCellVal(row.createCell(c++), item.getMainMaterialDesc());    // C8
-        setCellVal(row.createCell(c++), item.getMaterialCode());        // C9
-        setCellVal(row.createCell(c++), null);                          // C10 TD胶种
-        setCellVal(row.createCell(c++), null);                          // C11 TD整车条数
-        setCellVal(row.createCell(c++), item.getCxRemainQty());         // C12
-        setCellVal(row.createCell(c++), item.getLhRemainQty());         // C13
-        setCellVal(row.createCell(c++), item.getTotalStock());          // C14
-        setCellVal(row.createCell(c++), item.getLhClassQty());          // C15
+    private Map<String, Object> buildCxTemplateRow(CxScheduleResult item) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("cxMachineCode", item.getCxMachineCode());
+        row.put("structureName", item.getStructureName());
+        row.put("embryoCode", item.getEmbryoCode());
+        row.put("materialDesc", item.getMaterialDesc());
+        row.put("mainMaterialDesc", item.getMainMaterialDesc());
+        row.put("materialCode", item.getMaterialCode());
+        row.put("cxRemainQty", item.getCxRemainQty());
+        row.put("lhRemainQty", item.getLhRemainQty());
+        row.put("totalStock", item.getTotalStock());
+        row.put("lhClassQty", item.getLhClassQty());
 
-        // C16-C55: 8班次 x 5列
-        setCellVal(row.createCell(c++), item.getClass1PlanQty());
-        setCellVal(row.createCell(c++), item.getClass1FinishQty());
-        setCellVal(row.createCell(c++), item.getClass1Analysis());
-        setCellVal(row.createCell(c++), item.getClass1RecipeType());
-        setCellVal(row.createCell(c++), item.getClass1RecipeNo());
+        row.put("class1PlanQty", item.getClass1PlanQty());
+        row.put("class1FinishQty", item.getClass1FinishQty());
+        row.put("class1Analysis", item.getClass1Analysis());
+        row.put("class1RecipeType", item.getClass1RecipeType());
+        row.put("class1RecipeNo", item.getClass1RecipeNo());
 
-        setCellVal(row.createCell(c++), item.getClass2PlanQty());
-        setCellVal(row.createCell(c++), item.getClass2FinishQty());
-        setCellVal(row.createCell(c++), item.getClass2Analysis());
-        setCellVal(row.createCell(c++), item.getClass2RecipeType());
-        setCellVal(row.createCell(c++), item.getClass2RecipeNo());
+        row.put("class2PlanQty", item.getClass2PlanQty());
+        row.put("class2FinishQty", item.getClass2FinishQty());
+        row.put("class2Analysis", item.getClass2Analysis());
+        row.put("class2RecipeType", item.getClass2RecipeType());
+        row.put("class2RecipeNo", item.getClass2RecipeNo());
 
-        setCellVal(row.createCell(c++), item.getClass3PlanQty());
-        setCellVal(row.createCell(c++), item.getClass3FinishQty());
-        setCellVal(row.createCell(c++), item.getClass3Analysis());
-        setCellVal(row.createCell(c++), item.getClass3RecipeType());
-        setCellVal(row.createCell(c++), item.getClass3RecipeNo());
+        row.put("class3PlanQty", item.getClass3PlanQty());
+        row.put("class3FinishQty", item.getClass3FinishQty());
+        row.put("class3Analysis", item.getClass3Analysis());
+        row.put("class3RecipeType", item.getClass3RecipeType());
+        row.put("class3RecipeNo", item.getClass3RecipeNo());
 
-        setCellVal(row.createCell(c++), item.getClass4PlanQty());
-        setCellVal(row.createCell(c++), item.getClass4FinishQty());
-        setCellVal(row.createCell(c++), item.getClass4Analysis());
-        setCellVal(row.createCell(c++), item.getClass4RecipeType());
-        setCellVal(row.createCell(c++), item.getClass4RecipeNo());
+        row.put("class4PlanQty", item.getClass4PlanQty());
+        row.put("class4FinishQty", item.getClass4FinishQty());
+        row.put("class4Analysis", item.getClass4Analysis());
+        row.put("class4RecipeType", item.getClass4RecipeType());
+        row.put("class4RecipeNo", item.getClass4RecipeNo());
 
-        setCellVal(row.createCell(c++), item.getClass5PlanQty());
-        setCellVal(row.createCell(c++), item.getClass5FinishQty());
-        setCellVal(row.createCell(c++), item.getClass5Analysis());
-        setCellVal(row.createCell(c++), item.getClass5RecipeType());
-        setCellVal(row.createCell(c++), item.getClass5RecipeNo());
+        row.put("class5PlanQty", item.getClass5PlanQty());
+        row.put("class5FinishQty", item.getClass5FinishQty());
+        row.put("class5Analysis", item.getClass5Analysis());
+        row.put("class5RecipeType", item.getClass5RecipeType());
+        row.put("class5RecipeNo", item.getClass5RecipeNo());
 
-        setCellVal(row.createCell(c++), item.getClass6PlanQty());
-        setCellVal(row.createCell(c++), item.getClass6FinishQty());
-        setCellVal(row.createCell(c++), item.getClass6Analysis());
-        setCellVal(row.createCell(c++), item.getClass6RecipeType());
-        setCellVal(row.createCell(c++), item.getClass6RecipeNo());
+        row.put("class6PlanQty", item.getClass6PlanQty());
+        row.put("class6FinishQty", item.getClass6FinishQty());
+        row.put("class6Analysis", item.getClass6Analysis());
+        row.put("class6RecipeType", item.getClass6RecipeType());
+        row.put("class6RecipeNo", item.getClass6RecipeNo());
 
-        setCellVal(row.createCell(c++), item.getClass7PlanQty());
-        setCellVal(row.createCell(c++), item.getClass7FinishQty());
-        setCellVal(row.createCell(c++), item.getClass7Analysis());
-        setCellVal(row.createCell(c++), item.getClass7RecipeType());
-        setCellVal(row.createCell(c++), item.getClass7RecipeNo());
+        row.put("class7PlanQty", item.getClass7PlanQty());
+        row.put("class7FinishQty", item.getClass7FinishQty());
+        row.put("class7Analysis", item.getClass7Analysis());
+        row.put("class7RecipeType", item.getClass7RecipeType());
+        row.put("class7RecipeNo", item.getClass7RecipeNo());
 
-        setCellVal(row.createCell(c++), item.getClass8PlanQty());
-        setCellVal(row.createCell(c++), item.getClass8FinishQty());
-        setCellVal(row.createCell(c++), item.getClass8Analysis());
-        setCellVal(row.createCell(c++), item.getClass8RecipeType());
-        setCellVal(row.createCell(c++), item.getClass8RecipeNo());
+        row.put("class8PlanQty", item.getClass8PlanQty());
+        row.put("class8FinishQty", item.getClass8FinishQty());
+        row.put("class8Analysis", item.getClass8Analysis());
+        row.put("class8RecipeType", item.getClass8RecipeType());
+        row.put("class8RecipeNo", item.getClass8RecipeNo());
 
-        // C56-C60: 合计
         BigDecimal totalPlan = sumPlan(item);
         BigDecimal totalFinish = sumFinish(item);
-        setCellVal(row.createCell(c++), totalPlan);      // C56 合计计划
-        setCellVal(row.createCell(c++), totalFinish);     // C57 合计实际
-        setCellVal(row.createCell(c++), totalPlan);       // C58 总计
-        setCellVal(row.createCell(c++), item.getRemark());// C59 备注
-        setCellVal(row.createCell(c++), item.getLhMachineQty()); // C60
+        row.put("totalPlanQty", totalPlan);
+        row.put("totalFinishQty", totalFinish);
+        row.put("dailyPlanQty", totalPlan);
+        row.put("remark", item.getRemark());
+        row.put("lhMachineQty", item.getLhMachineQty());
+
+        return row;
     }
 
     /**
-     * 写入小计行。
+     * 构建小计行。
      */
-    private void writeSubtotalRow(Sheet sheet, int rowIdx, List<CxScheduleResult> groupList) {
-        Row row = sheet.getRow(rowIdx);
-        if (row == null) {
-            row = sheet.createRow(rowIdx);
-        }
-        int c = 3;
-        setCellVal(row.createCell(c++), "小计"); // C4
-        c = 4; // skip C5-C15
-        c = 15;
+    private Map<String, Object> buildCxTemplateSubtotalRow(List<CxScheduleResult> groupList) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("cxMachineCode", "小计");
 
         BigDecimal[] planSums = new BigDecimal[9];
         BigDecimal[] finishSums = new BigDecimal[9];
@@ -555,9 +482,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         }
 
         for (int i = 1; i <= 8; i++) {
-            setCellVal(row.createCell(c++), planSums[i]);
-            setCellVal(row.createCell(c++), finishSums[i]);
-            c += 3; // skip analysis, recipeType, recipeNo
+            row.put("class" + i + "PlanQty", planSums[i]);
+            row.put("class" + i + "FinishQty", finishSums[i]);
         }
 
         BigDecimal totalPlan = BigDecimal.ZERO;
@@ -566,25 +492,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             totalPlan = safeAdd(totalPlan, planSums[i]);
             totalFinish = safeAdd(totalFinish, finishSums[i]);
         }
-        setCellVal(row.createCell(c++), totalPlan);   // C56
-        setCellVal(row.createCell(c++), totalFinish);  // C57
-        setCellVal(row.createCell(c++), totalPlan);    // C58
-    }
+        row.put("totalPlanQty", totalPlan);
+        row.put("totalFinishQty", totalFinish);
+        row.put("dailyPlanQty", totalPlan);
 
-    /**
-     * 安全设置单元格值。
-     */
-    private void setCellVal(Cell cell, Object value) {
-        if (value == null) return;
-        if (value instanceof BigDecimal) {
-            cell.setCellValue(((BigDecimal) value).doubleValue());
-        } else if (value instanceof Number) {
-            cell.setCellValue(((Number) value).doubleValue());
-        } else if (value instanceof Date) {
-            cell.setCellValue((Date) value);
-        } else {
-            cell.setCellValue(value.toString());
-        }
+        return row;
     }
 
     private BigDecimal sumPlan(CxScheduleResult item) {
@@ -603,9 +515,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 item.getClass7FinishQty()), item.getClass8FinishQty());
     }
 
-    /**
-     * 安全加法，null视为0。
-     */
     private BigDecimal safeAdd(BigDecimal a, BigDecimal b) {
         if (a == null && b == null) return BigDecimal.ZERO;
         if (a == null) return b;
