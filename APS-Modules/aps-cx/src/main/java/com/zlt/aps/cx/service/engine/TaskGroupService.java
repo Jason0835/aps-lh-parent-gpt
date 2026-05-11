@@ -1056,8 +1056,9 @@ public class TaskGroupService {
         int requiredCars;
         if (isTrialLikeTask) {
             // 试制量试任务：不补整车，使用实际需求量
+            // requiredCars：只要需排产就算1车（哪怕不够整车），避免因0车被跳过
             plannedProduction = requiredProductionValue;
-            requiredCars = tripCapacity > 0 ? requiredProductionValue / tripCapacity : 0;
+            requiredCars = requiredProductionValue > 0 ? 1 : 0;
         } else {
             // 普通任务：整车取整
             plannedProduction = productionCalculator.roundToVehicle(requiredProductionValue, tripCapacity);

@@ -486,19 +486,16 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         taskGroup.getNewTasks().clear();
         taskGroup.getNewTasks().addAll(filteredNewTasks);
 
-        // 过滤续作中的试制/量试任务
+        // 过滤续作中的试制/量试任务——续作是前面班次已排产过的，直接放行不占新增SKU名额
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredContinueTasks = new ArrayList<>();
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getContinueTasks()) {
             if (Boolean.TRUE.equals(task.getIsTrialTask()) || Boolean.TRUE.equals(task.getIsProductionTrial())) {
                 String ec = task.getEmbryoCode();
-                if (dailySet.contains(ec) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
-                    dailySet.add(ec);
-                    filteredContinueTasks.add(task);
-                } else {
-                    log.warn("续作{}任务 {} 已超过单日上限{}个SKU，跳过",
-                            Boolean.TRUE.equals(task.getIsProductionTrial()) ? "量试" : "试制",
-                            ec, MAX_TRIAL_SKU_PER_DAY);
-                }
+                // 已在dailySet中的（前面班次已排产），直接放行；不在的也不占新名额，直接放行
+                dailySet.add(ec);
+                filteredContinueTasks.add(task);
+                log.debug("续作{}任务 {} 直接放行（续作不占新增SKU名额）",
+                        Boolean.TRUE.equals(task.getIsProductionTrial()) ? "量试" : "试制", ec);
             } else {
                 filteredContinueTasks.add(task);
             }
