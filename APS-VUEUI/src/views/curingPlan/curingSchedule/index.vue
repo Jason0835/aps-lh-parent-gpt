@@ -742,6 +742,12 @@ export default {
           minWidth: 160,
         },
         {
+          prop: "todayNightFinishQty",
+          label: this.$t("ui.data.column.scheduleResult.todayNightFinishQty"),
+          minWidth: 120,
+          align: "right",
+        },
+        {
           prop: "rowOperator",
           label: this.$t("common.option"),
           width: 150,

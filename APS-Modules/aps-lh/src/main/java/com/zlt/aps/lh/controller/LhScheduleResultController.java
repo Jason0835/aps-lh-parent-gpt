@@ -142,7 +142,19 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         TableDataInfo tableDataInfo = super.list(entity);
         List<LhScheduleResult> list = (List<LhScheduleResult>) tableDataInfo.getRows();
         if (CollectionUtils.isNotEmpty(list)) {
+            // 解码备注和原因分析字段的特殊字符
             list.forEach(this::decodeRemarkFields);
+            // 构建硫化产量今天夜班Map（key: 工厂编码|物料编码）
+            Map<String, Object> todayNightFinishQtyMap = lhScheduleService.buildTodayNightFinishQtyMap(list);
+            // 为每条排程结果设置今天夜班产量
+            for (LhScheduleResult result : list) {
+                String key = StringUtils.defaultString(result.getFactoryCode()).trim()
+                        + "|" + StringUtils.defaultString(result.getMaterialCode()).trim();
+                Object qty = todayNightFinishQtyMap.get(key);
+                if (qty instanceof BigDecimal) {
+                    result.setTodayNightFinishQty((BigDecimal) qty);
+                }
+            }
         }
         return tableDataInfo;
     }

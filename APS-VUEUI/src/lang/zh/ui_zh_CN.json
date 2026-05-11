@@ -424,6 +424,7 @@
   "ui.data.column.scheduleResult.factoryCode": "分厂",
   "ui.data.column.scheduleResult.scheduleDate": "排程日期",
   "ui.data.column.scheduleResult.updateTime": "更新时间",
+  "ui.data.column.scheduleResult.todayNightFinishQty": "硫化产量今天夜班",
   "ui.data.column.scheduleResult.unscheduledPlanQty": "未排计划量",
   "ui.data.column.scheduleResult.unscheduledReason": "未排原因",
   "ui.data.btn.scheduleResult.unscheduledResult": "未排结果",
