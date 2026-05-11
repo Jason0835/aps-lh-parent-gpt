@@ -70,4 +70,15 @@ public class GroupPrioritySchedulerResultHelper implements Serializable {
         return priorityValue.getDiffValue();
     }
 
+    /**
+     * 选中的机台
+     *
+     * @return
+     */
+    public String getSelectedCxMachineCode() {
+        if (null == selectedCxMachine) {
+            return null;
+        }
+        return selectedCxMachine.getCxMachineCode();
+    }
 }
