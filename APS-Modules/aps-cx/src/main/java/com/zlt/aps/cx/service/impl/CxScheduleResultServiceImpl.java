@@ -4,7 +4,9 @@ import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
@@ -61,6 +63,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     @Autowired
     private IMpStructureAllocationRemoteService mpStructureAllocationRemoteService;
+
+    @Autowired
+    private ISysDictDataCacheService sysDictDataCacheService;
 
     @Override
     public List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate) {
@@ -293,12 +298,15 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         try {
             List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
+            // 加载示方类型字典（biz_construction_stage），用于导出时 code → label 转义
+            Map<String, String> recipeTypeMap = loadRecipeTypeDictMap();
+
             // 构建表头占位符数据（{shiftDate1}~{shiftDate8}、{yearmonthday}等）
             Map<String, Object> tableMap = buildCxTemplateTableMap(exportList);
 
             // 构建列表数据（按机台分组 + 小计行），key 对应模板中的 {.xxx} 占位符
             List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-            excelDataList.add(buildCxTemplateDataList(exportList));
+            excelDataList.add(buildCxTemplateDataList(exportList, recipeTypeMap));
 
             // writeMultiList 读取模板 → 替换占位符 → 输出字节
             byte[] bytes = ExcelUtils.writeMultiList(templateInput, 0, tableMap, excelDataList);
@@ -308,6 +316,20 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         } catch (Exception e) {
             throw new ServiceException("生成成型计划Sheet失败", e);
         }
+    }
+
+    /**
+     * 加载示方类型字典，构建 code → label 映射。
+     */
+    private Map<String, String> loadRecipeTypeDictMap() {
+        List<SysDictData> dictList = sysDictDataCacheService.getType("biz_construction_stage");
+        if (CollectionUtils.isEmpty(dictList)) {
+            return Collections.emptyMap();
+        }
+        return dictList.stream()
+                .filter(d -> StringUtils.isNotEmpty(d.getDictValue()))
+                .collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel,
+                        (a, b) -> a, LinkedHashMap::new));
     }
 
     /**
@@ -347,7 +369,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     /**
      * 构建列表数据，按机台分组并在每组末尾插入小计行。
      */
-    private List<Map<String, Object>> buildCxTemplateDataList(List<CxScheduleResult> list) {
+    private List<Map<String, Object>> buildCxTemplateDataList(List<CxScheduleResult> list, Map<String, String> recipeTypeMap) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
         Map<String, List<CxScheduleResult>> groupMap = exportList.stream()
@@ -365,7 +387,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     String::compareTo));
 
             for (CxScheduleResult item : groupList) {
-                dataList.add(buildCxTemplateRow(item));
+                dataList.add(buildCxTemplateRow(item, recipeTypeMap));
             }
             dataList.add(buildCxTemplateSubtotalRow(groupList));
         }
@@ -376,7 +398,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     /**
      * 构建一行明细数据。
      */
-    private Map<String, Object> buildCxTemplateRow(CxScheduleResult item) {
+    private Map<String, Object> buildCxTemplateRow(CxScheduleResult item, Map<String, String> recipeTypeMap) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("cxMachineCode", item.getCxMachineCode());
         row.put("structureName", item.getStructureName());
@@ -392,49 +414,49 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         row.put("class1PlanQty", item.getClass1PlanQty());
         row.put("class1FinishQty", item.getClass1FinishQty());
         row.put("class1Analysis", item.getClass1Analysis());
-        row.put("class1RecipeType", item.getClass1RecipeType());
+        row.put("class1RecipeType", dictLabel(recipeTypeMap, item.getClass1RecipeType()));
         row.put("class1RecipeNo", item.getClass1RecipeNo());
 
         row.put("class2PlanQty", item.getClass2PlanQty());
         row.put("class2FinishQty", item.getClass2FinishQty());
         row.put("class2Analysis", item.getClass2Analysis());
-        row.put("class2RecipeType", item.getClass2RecipeType());
+        row.put("class2RecipeType", dictLabel(recipeTypeMap, item.getClass2RecipeType()));
         row.put("class2RecipeNo", item.getClass2RecipeNo());
 
         row.put("class3PlanQty", item.getClass3PlanQty());
         row.put("class3FinishQty", item.getClass3FinishQty());
         row.put("class3Analysis", item.getClass3Analysis());
-        row.put("class3RecipeType", item.getClass3RecipeType());
+        row.put("class3RecipeType", dictLabel(recipeTypeMap, item.getClass3RecipeType()));
         row.put("class3RecipeNo", item.getClass3RecipeNo());
 
         row.put("class4PlanQty", item.getClass4PlanQty());
         row.put("class4FinishQty", item.getClass4FinishQty());
         row.put("class4Analysis", item.getClass4Analysis());
-        row.put("class4RecipeType", item.getClass4RecipeType());
+        row.put("class4RecipeType", dictLabel(recipeTypeMap, item.getClass4RecipeType()));
         row.put("class4RecipeNo", item.getClass4RecipeNo());
 
         row.put("class5PlanQty", item.getClass5PlanQty());
         row.put("class5FinishQty", item.getClass5FinishQty());
         row.put("class5Analysis", item.getClass5Analysis());
-        row.put("class5RecipeType", item.getClass5RecipeType());
+        row.put("class5RecipeType", dictLabel(recipeTypeMap, item.getClass5RecipeType()));
         row.put("class5RecipeNo", item.getClass5RecipeNo());
 
         row.put("class6PlanQty", item.getClass6PlanQty());
         row.put("class6FinishQty", item.getClass6FinishQty());
         row.put("class6Analysis", item.getClass6Analysis());
-        row.put("class6RecipeType", item.getClass6RecipeType());
+        row.put("class6RecipeType", dictLabel(recipeTypeMap, item.getClass6RecipeType()));
         row.put("class6RecipeNo", item.getClass6RecipeNo());
 
         row.put("class7PlanQty", item.getClass7PlanQty());
         row.put("class7FinishQty", item.getClass7FinishQty());
         row.put("class7Analysis", item.getClass7Analysis());
-        row.put("class7RecipeType", item.getClass7RecipeType());
+        row.put("class7RecipeType", dictLabel(recipeTypeMap, item.getClass7RecipeType()));
         row.put("class7RecipeNo", item.getClass7RecipeNo());
 
         row.put("class8PlanQty", item.getClass8PlanQty());
         row.put("class8FinishQty", item.getClass8FinishQty());
         row.put("class8Analysis", item.getClass8Analysis());
-        row.put("class8RecipeType", item.getClass8RecipeType());
+        row.put("class8RecipeType", dictLabel(recipeTypeMap, item.getClass8RecipeType()));
         row.put("class8RecipeNo", item.getClass8RecipeNo());
 
         BigDecimal totalPlan = sumPlan(item);
@@ -446,6 +468,16 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         row.put("lhMachineQty", item.getLhMachineQty());
 
         return row;
+    }
+
+    /**
+     * 字典转义：根据 code 返回 label，code为空时返回空串。
+     */
+    private String dictLabel(Map<String, String> dictMap, String code) {
+        if (StringUtils.isEmpty(code) || CollectionUtils.sizeIsEmpty(dictMap)) {
+            return "";
+        }
+        return dictMap.getOrDefault(code, code);
     }
 
     /**
