@@ -170,13 +170,13 @@
                   >获取调整订单</el-button
                 >
               </el-form-item>
-              <el-button
+              <!-- <el-button
                 @click="handShowResult"
                 :loading="autoLoading"
                 :disabled="data.length == 0"
                 v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
                 >{{ $t("自动调整") }}</el-button
-              >
+              > -->
               <!-- <el-form-item v-if="showOutResult">
                 <el-button
                   type="primary"
@@ -1204,14 +1204,16 @@ export default {
         //   prop: "scheduledMachines",
         //   label: this.$t("成型机台"),
         // },
-        // {
-        //   prop: "structureName",
-        //   label: this.$t("产品结构"),
-        //   type: "select",
-        //   dictData: this.structureList,
-        //   filterable: true,
-        // },
       ];
+      if(this.pageVariant === 'structureInner'){
+        list.push({
+          prop: "structureName",
+          label: this.$t("产品结构"),
+          type: "select",
+          dictData: this.structureList,
+          filterable: true,
+        })
+      }
       /** 月计划结构调整独立路由：不展示查询区「版本号」（定稿版本仍可由 getVersionList 写入 query 供列表接口使用） */
       if (!this.isStructureAdjustPage) {
         list.push({
