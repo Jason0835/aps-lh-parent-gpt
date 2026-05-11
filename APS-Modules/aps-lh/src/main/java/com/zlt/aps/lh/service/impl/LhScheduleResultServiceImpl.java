@@ -123,6 +123,16 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     }
 
     @Override
+    public List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> getCxLhScheduleResultListByIds(List<Long> ids) {
+        if (CollectionUtils.isEmpty(ids)) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<com.zlt.aps.cx.entity.schedule.LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getId, ids);
+        return cxLhScheduleResultMapper.selectList(wrapper);
+    }
+
+    @Override
     public LhInsertOrderValidateResultDTO validateInsertOrder(LhOrderInsertDTO dto) {
         return insertOrderValidateHandler.validateInsertOrder(dto);
     }

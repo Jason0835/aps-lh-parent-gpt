@@ -78,6 +78,14 @@ public interface ILhScheduleResultService {
     List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> getCxLhScheduleResultList(Date scheduleDate);
 
     /**
+     * 根据ID列表查询硫化排程结果（cx-lh-api实体）
+     *
+     * @param ids 主键ID列表
+     * @return 排程结果列表
+     */
+    List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> getCxLhScheduleResultListByIds(List<Long> ids);
+
+    /**
      * 插单校验
      *
      * @param dto 插单请求数据

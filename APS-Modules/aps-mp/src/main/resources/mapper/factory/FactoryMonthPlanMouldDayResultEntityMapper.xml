@@ -10,20 +10,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.MATERIAL_DESC,
 		    m.STRUCTURE_NAME,
             MAX(IF(C.ID IS NULL, '02', '01')) STRUCTURE_TYPE,
-        <choose>
-            <when test="isAdjuest">
-            MAX(IFNULL(i.PRODUCT_STATUS, CASE WHEN REF.CONSTRUCTION_STAGE = '03' THEN 'S' 
-					                          WHEN REF.CONSTRUCTION_STAGE = '02' THEN 'T' 
-					                          WHEN REF.CONSTRUCTION_STAGE = '01' THEN 'X'
-					                          ELSE null END )) PRODUCT_STATUS,
-            </when>
-            <otherwise>
             MAX(IFNULL(i.PRODUCT_STATUS, IFNULL(r.PRODUCT_STATUS, CASE WHEN REF.CONSTRUCTION_STAGE = '03' THEN 'S' 
                                                                        WHEN REF.CONSTRUCTION_STAGE = '02' THEN 'T' 
                                                                        WHEN REF.CONSTRUCTION_STAGE = '01' THEN 'X'
                                                                        ELSE null END ))) PRODUCT_STATUS,
-            </otherwise>
-        </choose>
             m.EMBRYO_CODE,
             m.EMBRYO_DESC MAIN_MATERIAL_DESC,
 		    MAX(IFNULL(i.CONSTRUCTION_STAGE, IFNULL(r.CONSTRUCTION_STAGE, REF.CONSTRUCTION_STAGE))) CONSTRUCTION_STAGE,
@@ -91,6 +81,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    F.DAY_29 LAST_29,
 		    F.DAY_30 LAST_30,
 		    F.DAY_31 LAST_31,
+            <if test="isFinal">
+            r.ADJUST_QTY1,
+            r.ADJUST_QTY2,
+            r.ADJUST_QTY3,
+            r.ADJUST_QTY4,
+            </if>
 		    F.PRODUCTION_VERSION LAST_PRODUCTION_VERSION,
 		    '1' DATA_TYPE,
 		    '2' LOCATION_TYPE /*内外销，目前没有地方取，暂时固定外销*/
@@ -110,9 +106,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND i.PRODUCTION_VERSION = #{dayResult.productionVersion}
             AND i.IS_DELETE = 0 
         <choose>
-	        <when test="isAdjuest">
-            LEFT JOIN T_MP_ADJUST_RESULT r ON m.MATERIAL_CODE = r.MATERIAL_CODE
-	        </when>
+            <when test="isFinal">
+            LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL r ON m.MATERIAL_CODE = r.MATERIAL_CODE
+            </when>
 	        <otherwise>
             LEFT JOIN T_MP_MOULDING_DAY_RESULT r ON m.MATERIAL_CODE = r.MATERIAL_CODE
             </otherwise>
@@ -144,9 +140,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND m.IS_DELETE = 0 
 		    AND m.STRUCTURE_NAME IS NOT NULL 
             AND (QUALITY_STATE_CODE != '2' or d.FACTORY_CODE = m.FACTORY_CODE)
-        <if test="isAdjuest">
-            AND m.FACTORY_CODE = r.FACTORY_CODE
-        </if>
         <if test="!isAllMaterial">
             AND d.FACTORY_CODE = m.FACTORY_CODE
         </if>
@@ -219,6 +212,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    F.DAY_29 ,
 		    F.DAY_30 ,
 		    F.DAY_31 ,
+            <if test="isFinal">
+            r.ADJUST_QTY1,
+            r.ADJUST_QTY2,
+            r.ADJUST_QTY3,
+            r.ADJUST_QTY4,
+            </if>
 		    F.PRODUCTION_VERSION
 		ORDER BY
             MM.MIN_PRO_SIZE,
