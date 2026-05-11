@@ -3,6 +3,7 @@ package com.zlt.aps.lh.service;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.bill.common.service.IDocService;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -24,7 +25,6 @@ public interface ILhRepairCapsuleService extends IDocService<LhRepairCapsule> {
     /**
      * 查询导出数据
      *
-     * @param obj 查询条件
      * @return 结果
      */
     String[] getQueryFormulas();

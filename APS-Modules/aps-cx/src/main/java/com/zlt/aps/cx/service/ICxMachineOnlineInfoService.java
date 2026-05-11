@@ -3,6 +3,7 @@ package com.zlt.aps.cx.service;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.bill.common.service.IDocService;
 
+import java.util.Date;
 import java.util.List;
 
 /**

@@ -63,8 +63,8 @@ public class CxPrecisionPlan extends BaseEntity implements Serializable {
     private Long daysToDue;
 
     /** 排程日期（硫化排程回填） */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("SCHEDULE_DATE")
     private Date scheduleDate;
 

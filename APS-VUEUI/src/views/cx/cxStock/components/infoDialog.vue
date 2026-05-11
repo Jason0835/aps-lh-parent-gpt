@@ -139,6 +139,7 @@ export default {
           type: "select",
           dictData: this.dict.type.lh_precision_data_source,
           filterable: true,
+          disabled: true,
         },
         {
           prop: "remark",

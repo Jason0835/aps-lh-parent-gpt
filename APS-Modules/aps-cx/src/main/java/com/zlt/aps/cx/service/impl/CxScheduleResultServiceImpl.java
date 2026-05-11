@@ -1154,7 +1154,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 if (colorToggle) {
                     for (Integer rowIdx : rowIndexes) {
                         cellStyleList.add(new CellStyle(
-                                rowIdx + 1, rowIdx + 1, 0, 11,
+                                rowIdx + 2, rowIdx + 2, 0, 11,
                                 redColor, true));
                     }
                 }
