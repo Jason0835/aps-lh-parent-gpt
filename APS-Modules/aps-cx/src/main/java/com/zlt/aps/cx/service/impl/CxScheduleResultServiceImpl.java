@@ -21,7 +21,6 @@ import com.zlt.aps.cx.service.CxScheduleDetailService;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
-import com.zlt.aps.mp.api.enums.AlternativeTypeEnum;
 import com.zlt.aps.mp.api.service.IMpStructureAllocationRemoteService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
@@ -1007,10 +1006,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     /**
      * 构建成型结构切换模板列表数据（V2版本，基于T_MP_STRUCTURE_ALLOCATION）。
      * 按成型机台分组，每个机台按beginDay排序，
-     * 相邻结构之间生成一条切换记录。
-     *
-     * 班产和收尾预计时间由成型排程同事提供接口获取（TODO），
-     * 当前仅填充结构和成型余量，收尾/开产预计时间字段暂输出空串。
+     * 根据排程日期找到当前正在运行的结构（scheduleDate的日落在某条结构的beginDay~endDay区间内），
+     * 只取当前运行结构作为切换前结构，下一条作为切换后结构，合并为1条导出记录。
+     * 即使当天有多次切换，每个机台也只输出1条记录。
      *
      * @param machineGroupMap 按机台分组的结构排产数据
      * @param remainQtyMap 余量映射（key: materialCode|embryoCode）
@@ -1025,6 +1023,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             LocalDate scheduleDate) {
 
         List<Map<String, Object>> dataList = new ArrayList<>();
+        int scheduleDayOfMonth = scheduleDate.getDayOfMonth();
 
         for (Map.Entry<String, List<MpStructureAllocation>> entry : machineGroupMap.entrySet()) {
             String machineCode = entry.getKey();
@@ -1032,9 +1031,26 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     .sorted(Comparator.comparing(MpStructureAllocation::getBeginDay, Comparator.nullsLast(Comparator.naturalOrder())))
                     .collect(Collectors.toList());
 
-            for (int i = 0; i < structures.size() - 1; i++) {
-                MpStructureAllocation prevStructure = structures.get(i);
-                MpStructureAllocation nextStructure = structures.get(i + 1);
+            // 根据排程日期找到当前正在运行的结构（scheduleDayOfMonth落在beginDay~endDay区间内）
+            int currentIndex = -1;
+            for (int i = 0; i < structures.size(); i++) {
+                MpStructureAllocation s = structures.get(i);
+                if (s.getBeginDay() != null && s.getEndDay() != null
+                        && scheduleDayOfMonth >= s.getBeginDay() && scheduleDayOfMonth <= s.getEndDay()) {
+                    currentIndex = i;
+                    break;
+                }
+            }
+
+            // 如果未找到当前运行的结构（排程日期在所有结构之前），取第一条作为当前结构
+            if (currentIndex == -1) {
+                currentIndex = 0;
+            }
+
+            // 只取当前运行结构+下一个切换结构，合并为1条记录
+            if (currentIndex < structures.size() - 1) {
+                MpStructureAllocation prevStructure = structures.get(currentIndex);
+                MpStructureAllocation nextStructure = structures.get(currentIndex + 1);
 
                 Map<String, Object> row = buildStructureChangeRow(
                         machineCode, prevStructure, nextStructure,
@@ -1059,12 +1075,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * 构建单条结构切换导出行数据。
      *
      * 成型余量通过结构名关联到物料编码+胎胚代码，再从remainQtyMap取最大值。
-     * 班产和收尾/开产预计时间由成型排程同事提供接口获取（TODO），
-     * 当前receiveChangeDate和vulcanizeChangeDate暂输出空串。
+     * 字段取值说明：
+     *   receiveEstDate  - 预计收尾时间，需硫化排程接口提供（暂输出空串，待接口对接）
+     *   startEstDate    - 预计开产时间，需硫化排程接口提供（暂输出空串，待接口对接）
+     *   receiveMonthPlan - 收尾月计划时间，取转产表第1条（切换前结构）的结束日期
+     *   remark           - 收尾备注，取转产表第1条（切换前结构）的REMARK字段
+     *   nextStructure    - 后结构，取合并第2条（切换后结构）的结构名称
+     *   startMonthPlan   - 开产月计划时间，取合并第2条（切换后结构）的开始日期
+     *   remark2          - 开产备注，取合并第2条（切换后结构）的REMARK字段
      *
      * @param machineCode 成型机台编码
-     * @param prevStructure 前结构（当前正在执行的结构）
-     * @param nextStructure 后结构（即将切换到的结构）
+     * @param prevStructure 前结构（当前正在执行的结构，即切换前的结构）
+     * @param nextStructure 后结构（即将切换到的结构，即切换后的结构）
      * @param remainQtyMap 余量映射（key: materialCode|embryoCode）
      * @param structureToRemainKeyMap 结构名到余量映射key的映射
      * @param scheduleDate 排程日期
@@ -1080,8 +1102,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         String prevStructureName = StringUtils.defaultString(prevStructure.getStructureName()).trim();
         String nextStructureName = StringUtils.defaultString(nextStructure.getStructureName()).trim();
-        String alternatingType = StringUtils.defaultString(nextStructure.getAlternatingType()).trim();
-        boolean isInchChange = AlternativeTypeEnum.PRO_SIZE_ALTERNATIVE.getCode().equals(alternatingType);
 
         // 通过结构名查找对应的物料编码+胎胚代码key，再从remainQtyMap取成型余量
         String remainKey = structureToRemainKeyMap.getOrDefault(prevStructureName, "");
@@ -1099,24 +1119,21 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 ? LocalDate.of(year, month, Math.min(nextStructure.getBeginDay(), LocalDate.of(year, month, 1).lengthOfMonth()))
                 : scheduleDate;
 
-        // TODO: 班产和收尾预计时间由成型排程提供接口获取，传入结构和成型余量，
-        //  当前收尾预计时间和开产预计时间暂输出空串，待接口对接后替换
-        String estimatedEndTime = "";
-        String estimatedStartTime = "";
-
-        String remark = isInchChange ? "换英寸" : "换结构";
+        // TODO: 预计收尾时间和预计开产时间需硫化排程接口提供，当前暂输出空串，待接口对接后替换
+        String receiveEstDate = "";
+        String startEstDate = "";
 
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("stt", 0);
-        row.put("cxMachineCode", machineCode);
-        row.put("materialSpec", prevStructureName + "→" + nextStructureName);
-        row.put("qty", remainQty.intValue());
-        row.put("receivePlanDate", formatDateFromDay(year, month, prevStructure.getEndDay()));
-        row.put("receiveChangeDate", estimatedEndTime);
-        row.put("remark", remark);
-        row.put("orderNo", "");
-        row.put("vulcanizePlanDate", formatDateFromDay(year, month, nextStructure.getBeginDay()));
-        row.put("vulcanizeChangeDate", estimatedStartTime);
+        row.put("machineCode", machineCode);
+        row.put("structureSpec", prevStructureName + "→" + nextStructureName);
+        row.put("remainQty", remainQty.intValue());
+        row.put("receiveEstDate", receiveEstDate);
+        row.put("receiveMonthPlan", formatDateFromDay(year, month, prevStructure.getEndDay()));
+        row.put("remark", prevStructure.getRemark() != null ? prevStructure.getRemark() : "");
+        row.put("nextStructure", nextStructureName);
+        row.put("startEstDate", startEstDate);
+        row.put("startMonthPlan", formatDateFromDay(year, month, nextStructure.getBeginDay()));
         row.put("remark2", nextStructure.getRemark() != null ? nextStructure.getRemark() : "");
         row.put("traceTd", "");
         row.put("traceSw", "");
@@ -1172,7 +1189,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             if (nextBeginDate instanceof LocalDate) {
                 dateKey = ((LocalDate) nextBeginDate).toString();
             } else {
-                dateKey = String.valueOf(dataList.get(i).get("vulcanizePlanDate"));
+                dateKey = String.valueOf(dataList.get(i).get("startMonthPlan"));
             }
             dateGroupMap.computeIfAbsent(dateKey, k -> new ArrayList<>()).add(i);
         }
@@ -1186,7 +1203,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 if (colorToggle) {
                     for (Integer rowIdx : rowIndexes) {
                         cellStyleList.add(new CellStyle(
-                                rowIdx + 2, rowIdx + 2, 0, 11,
+                                rowIdx + 2, rowIdx + 2, 0, 18,
                                 redColor, true));
                     }
                 }

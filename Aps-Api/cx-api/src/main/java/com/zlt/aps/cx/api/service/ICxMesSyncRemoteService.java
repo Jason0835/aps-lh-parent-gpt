@@ -116,11 +116,11 @@ public interface ICxMesSyncRemoteService {
                                          @RequestParam("dataSource") String dataSource,
                                          @RequestParam("updateBy") String updateBy);
 
-    @ApiOperation("清理成型在机历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/mesSync/cleanCxMachineOnlineHistoryDuplicate")
-    AjaxResult cleanCxMachineOnlineHistoryDuplicate();
+    @ApiOperation("逻辑删除成型在机今天之前所有数据")
+    @PostMapping("/mesSync/logicDeleteCxMachineOnlineAllBeforeToday")
+    AjaxResult logicDeleteCxMachineOnlineAllBeforeToday();
 
-    @ApiOperation("清理生胎库存历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/mesSync/cleanCxStockHistoryDuplicate")
-    AjaxResult cleanCxStockHistoryDuplicate();
+    @ApiOperation("逻辑删除生胎库存今天之前所有数据")
+    @PostMapping("/mesSync/logicDeleteCxStockAllBeforeToday")
+    AjaxResult logicDeleteCxStockAllBeforeToday();
 }
