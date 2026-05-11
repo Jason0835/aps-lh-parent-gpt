@@ -902,10 +902,11 @@ public class MesItfServiceImpl implements MesItfService {
 
         try {
             String factoryCode = cxMachineOnlineInfo.getFactoryCode();
-            log.info("成型在机同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, insertList.size());
+            Date onlineDate = insertList.stream().map(CxMachineOnlineInfo::getOnlineDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            log.info("成型在机同步：开始同步，factoryCode={}, onlineDate={}, 待插入数量={}", factoryCode, onlineDate, insertList.size());
 
             FeignTokenHelper.runWithToken(() -> {
-                cxMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, "MES", insertList);
+                cxMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, onlineDate, "MES", insertList);
             });
 
             log.info("成型在机同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
@@ -946,10 +947,11 @@ public class MesItfServiceImpl implements MesItfService {
 
         try {
             String factoryCode = lhMachineOnlineInfo.getFactoryCode();
-            log.info("硫化在机同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, insertList.size());
+            Date onlineDate = insertList.stream().map(LhMachineOnlineInfo::getOnlineDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            log.info("硫化在机同步：开始同步，factoryCode={}, onlineDate={}, 待插入数量={}", factoryCode, onlineDate, insertList.size());
 
             FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, "MES", insertList);
+                lhMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, onlineDate, "MES", insertList);
             });
 
             log.info("硫化在机同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
@@ -1244,10 +1246,11 @@ public class MesItfServiceImpl implements MesItfService {
 
         try {
             String factoryCode = syncDataLogs.getFactoryCode();
-            log.info("胶囊已使用次数同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, insertList.size());
+            Date obtainTime = insertList.stream().map(LhRepairCapsule::getObtainTime).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            log.info("胶囊已使用次数同步：开始同步，factoryCode={}, obtainTime={}, 待插入数量={}", factoryCode, obtainTime, insertList.size());
 
             FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteAndSaveRepairCapsule(factoryCode, "MES", insertList);
+                lhMesSyncRemoteService.logicDeleteAndSaveRepairCapsule(factoryCode, obtainTime, "MES", insertList);
             });
 
             log.info("胶囊已使用次数同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
@@ -1374,9 +1377,10 @@ public class MesItfServiceImpl implements MesItfService {
 
         try {
             log.info("生胎库存同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, cxStockInsertList.size());
+            Date stockDate = cxStockInsertList.stream().map(CxStock::getStockDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
 
             FeignTokenHelper.runWithToken(() -> {
-                cxMesSyncRemoteService.logicDeleteAndSaveCxStockByDataSource(factoryCode, ApsConstant.DATA_SOURCE_MES, "MES", cxStockInsertList);
+                cxMesSyncRemoteService.logicDeleteAndSaveCxStockByDataSource(factoryCode, ApsConstant.DATA_SOURCE_MES, stockDate, "MES", cxStockInsertList);
             });
 
             log.info("生胎库存同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, cxStockInsertList.size());
@@ -1479,10 +1483,11 @@ public class MesItfServiceImpl implements MesItfService {
 
         try {
             String factoryCode = syncDataLogs.getFactoryCode();
-            log.info("硫化排程完成量同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, insertList.size());
+            Date scheduleDate = insertList.stream().map(LhScheFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            log.info("硫化排程完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDate, insertList.size());
 
             FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, "MES", insertList);
+                lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDate, "MES", insertList);
             });
 
             log.info("硫化排程完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
@@ -1609,10 +1614,11 @@ public class MesItfServiceImpl implements MesItfService {
 
         try {
             String factoryCode = syncDataLogs.getFactoryCode();
-            log.info("硫化排程日完成量同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, insertList.size());
+            Date finishDate = insertList.stream().map(LhDayFinishQty::getFinishDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            log.info("硫化排程日完成量同步：开始同步，factoryCode={}, finishDate={}, 待插入数量={}", factoryCode, finishDate, insertList.size());
 
             FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, "MES", insertList);
+                lhMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, finishDate, "MES", insertList);
             });
 
             log.info("硫化排程日完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());

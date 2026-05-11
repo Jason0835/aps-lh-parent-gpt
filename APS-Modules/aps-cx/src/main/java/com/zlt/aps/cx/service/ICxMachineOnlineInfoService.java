@@ -22,11 +22,12 @@ public interface ICxMachineOnlineInfoService extends IDocService<CxMachineOnline
     int saveOrUpdateBatch(List<CxMachineOnlineInfo> list);
 
     /**
-     * 逻辑删除分厂旧数据并批量插入新数据（事务性操作）
+     * 逻辑删除分厂指定在线日期的旧数据并批量插入新数据（事务性操作）
      *
      * @param factoryCode 分厂编号
+     * @param onlineDate  在线日期
      * @param updateBy    更新者
      * @param insertList  待插入的数据列表
      */
-    void logicDeleteAndSaveBatch(String factoryCode, String updateBy, List<CxMachineOnlineInfo> insertList);
+    void logicDeleteAndSaveBatch(String factoryCode, Date onlineDate, String updateBy, List<CxMachineOnlineInfo> insertList);
 }

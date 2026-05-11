@@ -37,4 +37,16 @@ public interface LhDayFinishQtyMapper extends CommBaseMapper<LhDayFinishQty> {
     @Update("UPDATE T_LH_DAY_FINISH_QTY SET IS_DELETE = 1, UPDATE_BY = #{updateBy}, UPDATE_TIME = #{updateTime} WHERE FACTORY_CODE = #{factoryCode} AND IS_DELETE = 0")
     int logicDeleteByFactoryCode(@Param("factoryCode") String factoryCode, @Param("updateBy") String updateBy, @Param("updateTime") Date updateTime);
 
+    /**
+     * 根据分厂编号和完成日期逻辑删除硫化排程日完成量数据
+     *
+     * @param factoryCode 分厂编号
+     * @param finishDate  完成日期
+     * @param updateBy    更新者
+     * @param updateTime  更新时间
+     * @return 更新的记录数
+     */
+    @Update("UPDATE T_LH_DAY_FINISH_QTY SET IS_DELETE = 1, UPDATE_BY = #{updateBy}, UPDATE_TIME = #{updateTime} WHERE FACTORY_CODE = #{factoryCode} AND DATE(FINISH_DATE) = #{finishDate} AND IS_DELETE = 0")
+    int logicDeleteByFactoryCodeAndFinishDate(@Param("factoryCode") String factoryCode, @Param("finishDate") Date finishDate, @Param("updateBy") String updateBy, @Param("updateTime") Date updateTime);
+
 }

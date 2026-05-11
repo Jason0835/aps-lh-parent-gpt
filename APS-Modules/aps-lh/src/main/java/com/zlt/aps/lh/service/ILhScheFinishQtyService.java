@@ -4,6 +4,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.bill.common.service.IDocService;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -33,11 +34,12 @@ public interface ILhScheFinishQtyService extends IDocService<LhScheFinishQty> {
     AjaxResult writeBackScheduleResultFinishQty(List<LhScheFinishQty> finishQtyList);
 
     /**
-     * 逻辑删除分厂旧数据并批量插入新数据（事务性操作）
+     * 逻辑删除分厂指定排程日期的旧数据并批量插入新数据（事务性操作）
      *
-     * @param factoryCode 分厂编号
-     * @param updateBy    更新者
-     * @param insertList  待插入的数据列表
+     * @param factoryCode  分厂编号
+     * @param scheduleDate 排程日期
+     * @param updateBy     更新者
+     * @param insertList   待插入的数据列表
      */
-    void logicDeleteAndSaveBatch(String factoryCode, String updateBy, List<LhScheFinishQty> insertList);
+    void logicDeleteAndSaveBatch(String factoryCode, Date scheduleDate, String updateBy, List<LhScheFinishQty> insertList);
 }

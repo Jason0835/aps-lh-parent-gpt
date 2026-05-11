@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.Date;
 import java.util.List;
 
 @FeignClient(contextId = "ICxMesSyncRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cx:/cx}")
@@ -33,7 +34,7 @@ public interface ICxMesSyncRemoteService {
 
     @ApiOperation("逻辑删除并批量保存成型在机信息（事务性操作）")
     @PostMapping("/mesSync/logicDeleteAndSaveMachineOnlineInfo")
-    AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<CxMachineOnlineInfo> list);
+    AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("onlineDate") Date onlineDate, @RequestParam("updateBy") String updateBy, @RequestBody List<CxMachineOnlineInfo> list);
 
     @ApiOperation("批量保存结构整车胎面配置")
     @PostMapping("/mesSync/saveStructureTreadConfigBatch")
@@ -85,6 +86,7 @@ public interface ICxMesSyncRemoteService {
     @PostMapping("/mesSync/logicDeleteAndSaveCxStockByDataSource")
     AjaxResult logicDeleteAndSaveCxStockByDataSource(@RequestParam("factoryCode") String factoryCode,
                                                      @RequestParam("dataSource") String dataSource,
+                                                     @RequestParam("stockDate") Date stockDate,
                                                      @RequestParam("updateBy") String updateBy,
                                                      @RequestBody List<CxStock> list);
 
