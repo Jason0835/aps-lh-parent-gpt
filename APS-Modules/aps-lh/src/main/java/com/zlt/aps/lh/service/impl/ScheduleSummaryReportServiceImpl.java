@@ -16,6 +16,7 @@ import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.constant.FactoryConstant;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.io.InputStream;
@@ -195,7 +196,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             if (!materialGroupMap.containsKey(materialCode)) {
                 Map<String, Object> item = new HashMap<>();
                 item.put("smallRubberCode", materialCode);
-                item.put("smallRubberDetail", StringUtils.defaultString(result.getMaterialName())
+                item.put("smallRubberDetail", StringUtils.defaultString(result.getMaterialDesc())
                         + " | 计划:" + sumCxQtyByShiftType(result, classShiftTypeMap, "夜班")
                         + "/" + sumCxQtyByShiftType(result, classShiftTypeMap, "早班")
                         + "/" + sumCxQtyByShiftType(result, classShiftTypeMap, "中班"));
@@ -243,14 +244,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             if (shiftType.equals(entry.getValue())) {
                 int shiftIndex = entry.getKey();
                 switch (shiftIndex) {
-                    case 1: total = total.add(nvl(result.getClass1PlanQty())); break;
-                    case 2: total = total.add(nvl(result.getClass2PlanQty())); break;
-                    case 3: total = total.add(nvl(result.getClass3PlanQty())); break;
-                    case 4: total = total.add(nvl(result.getClass4PlanQty())); break;
-                    case 5: total = total.add(nvl(result.getClass5PlanQty())); break;
-                    case 6: total = total.add(nvl(result.getClass6PlanQty())); break;
-                    case 7: total = total.add(nvl(result.getClass7PlanQty())); break;
-                    case 8: total = total.add(nvl(result.getClass8PlanQty())); break;
+                    case 1: total = total.add(nvlInt(result.getClass1PlanQty())); break;
+                    case 2: total = total.add(nvlInt(result.getClass2PlanQty())); break;
+                    case 3: total = total.add(nvlInt(result.getClass3PlanQty())); break;
+                    case 4: total = total.add(nvlInt(result.getClass4PlanQty())); break;
+                    case 5: total = total.add(nvlInt(result.getClass5PlanQty())); break;
+                    case 6: total = total.add(nvlInt(result.getClass6PlanQty())); break;
+                    case 7: total = total.add(nvlInt(result.getClass7PlanQty())); break;
+                    case 8: total = total.add(nvlInt(result.getClass8PlanQty())); break;
                     default: break;
                 }
             }
@@ -278,14 +279,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 int shiftIndex = entry.getKey();
                 BigDecimal qty = BigDecimal.ZERO;
                 switch (shiftIndex) {
-                    case 1: qty = nvl(result.getClass1PlanQty()); break;
-                    case 2: qty = nvl(result.getClass2PlanQty()); break;
-                    case 3: qty = nvl(result.getClass3PlanQty()); break;
-                    case 4: qty = nvl(result.getClass4PlanQty()); break;
-                    case 5: qty = nvl(result.getClass5PlanQty()); break;
-                    case 6: qty = nvl(result.getClass6PlanQty()); break;
-                    case 7: qty = nvl(result.getClass7PlanQty()); break;
-                    case 8: qty = nvl(result.getClass8PlanQty()); break;
+                    case 1: qty = nvlInt(result.getClass1PlanQty()); break;
+                    case 2: qty = nvlInt(result.getClass2PlanQty()); break;
+                    case 3: qty = nvlInt(result.getClass3PlanQty()); break;
+                    case 4: qty = nvlInt(result.getClass4PlanQty()); break;
+                    case 5: qty = nvlInt(result.getClass5PlanQty()); break;
+                    case 6: qty = nvlInt(result.getClass6PlanQty()); break;
+                    case 7: qty = nvlInt(result.getClass7PlanQty()); break;
+                    case 8: qty = nvlInt(result.getClass8PlanQty()); break;
                     default: break;
                 }
                 if (qty.compareTo(BigDecimal.ZERO) > 0) {
@@ -298,6 +299,13 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     private BigDecimal nvl(BigDecimal val) {
         return val != null ? val : BigDecimal.ZERO;
+    }
+
+    /**
+     * Integer空值转BigDecimal零值
+     */
+    private BigDecimal nvlInt(Integer val) {
+        return val != null ? new BigDecimal(val) : BigDecimal.ZERO;
     }
 
     /**
