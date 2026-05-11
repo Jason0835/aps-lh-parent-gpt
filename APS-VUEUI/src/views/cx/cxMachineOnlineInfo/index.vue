@@ -122,13 +122,13 @@ export default {
           prop: 'specDesc',
           halign: 'center',
           label: this.$t('ui.data.column.cxMachineOnlineInfo.specDesc'),
-          minWidth: 180
+          minWidth: 300
         },
         {
           prop: 'embryoSpec',
           halign: 'center',
           label: this.$t('ui.data.column.cxMachineOnlineInfo.embryoSpec'),
-          minWidth: 180
+          minWidth: 300
         },
         // {
         //   prop: 'remark',

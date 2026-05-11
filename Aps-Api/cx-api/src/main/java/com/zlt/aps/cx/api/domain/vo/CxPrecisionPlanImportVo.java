@@ -82,8 +82,8 @@ public class CxPrecisionPlanImportVo extends BaseEntity implements Serializable 
     /** 排程日期（硫化排程回填） */
 //    @Excel(name = "ui.data.column.cxPrecisionPlan.scheduleDate", dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "排程日期（硫化排程回填）")
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField("SCHEDULE_DATE")
     private Date scheduleDate;
 

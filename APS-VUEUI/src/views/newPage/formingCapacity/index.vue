@@ -149,6 +149,7 @@ export default {
         {
           prop: "cxMachineTypeCode",
           label: this.$t("ui.data.column.curingPlan.cxMachineTypeCode"),
+          minWidth: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.cx_machine_type_code, value);
           },
@@ -170,6 +171,7 @@ export default {
         {
           prop: "isZeroRack",
           label: this.$t("ui.data.column.capsuleChuck.isZeroRack"),
+          align: 'center',
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -185,6 +187,7 @@ export default {
         {
           prop: "isActive",
           label: this.$t("ui.data.column.machine.status"),
+          aling: 'center',
           minWidth: 100,
           render: ({ row }) => {
             return (
