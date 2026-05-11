@@ -108,7 +108,6 @@ public class GroupPriorityProductionScheduler {
         ProductionPlanGroupInfo addNewGroupPlan = finalSelected.getSelectedGroup();
         String groupName = addNewGroupPlan.getGroupName();
         Integer originNeedAllocationDaysByGroupPlan = addNewGroupPlan.getLeftOverNeedAllocationDays();
-        Integer originLeftOverByCxMachine = selectedCxMachine.getRemainingDays();
         CxMachineAllocationPlanHelper addHelper = buildAllocationDetailInfo(productionContext, finalSelected);
         if (null == addHelper) {
             excludeGroupPlan.add(groupName);
@@ -156,7 +155,7 @@ public class GroupPriorityProductionScheduler {
         if (CollectionUtils.isEmpty(topFixedCxMachineList)) {
             return;
         }
-        //2、获取对应的指定机台i
+        //2、获取对应的指定机台
         List<GroupPrioritySchedulerResultHelper> topSelectedCxMachineList = getGroupSelectedCxMachine(context, topFixedCxMachineList, isFixed, discontinueGroupSet);
         if (CollectionUtils.isEmpty(topSelectedCxMachineList)) {
             excludeGroupPlan.addAll(topFixedCxMachineList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.toSet()));
@@ -180,7 +179,6 @@ public class GroupPriorityProductionScheduler {
         ProductionPlanGroupInfo addNewGroupPlan = finalSelected.getSelectedGroup();
         String groupName = addNewGroupPlan.getGroupName();
         Integer originNeedAllocationDaysByGroupPlan = addNewGroupPlan.getLeftOverNeedAllocationDays();
-        Integer originLeftOverByCxMachine = selectedCxMachine.getRemainingDays();
         CxMachineAllocationPlanHelper addHelper = buildAllocationDetailInfo(productionContext, finalSelected);
         if (null == addHelper) {
             excludeGroupPlan.add(groupName);
@@ -200,6 +198,61 @@ public class GroupPriorityProductionScheduler {
         cxMouldProductionHandler.handlerTimeExtensionDayConclusionByBeforeGroup(productionContext, addHelper);
         //下一批
         productionAppointGroupCxMachine(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet, isFixed);
+    }
+
+    /**
+     * 对有设置固定机台的分组，当预分配到同一机台时，预分配起始时间在前的分组先排
+     * 1、对有设置固定的分组appointPriorityGroupList，获取其预分配的机台
+     * 2、当预分配的机台有多个分组时，判断其各预分配的时间
+     * 3、预分配时间在前的分组先进行排产
+     *
+     * @param context                  排产上下文
+     * @param excludeGroupPlan         需要剔除的分组信息
+     * @param appointPriorityGroupList 指定的固定分组信息
+     * @param discontinueGroupSet      有间断的分组
+     * @return
+     */
+    public void allocationFixedGroupSameCxMachineEarlyGroup(Context context, Set<String> excludeGroupPlan, List<ProductionPlanGroupInfo> appointPriorityGroupList, Set<String> discontinueGroupSet) {
+        if (CollectionUtils.isEmpty(appointPriorityGroupList)) {
+            return;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Set<String> excludeGroupSet = Sets.newHashSet();
+        if (!CollectionUtils.isEmpty(excludeGroupPlan)) {
+            excludeGroupSet.addAll(excludeGroupPlan);
+        }
+        List<ProductionPlanGroupInfo> effectiveList = appointPriorityGroupList.stream().filter(singleGroup -> !excludeGroupSet.contains(singleGroup.getGroupName())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return;
+        }
+        //获取预选中为同一台的固定结构中，预分配起始时间最早的分组信息
+        List<GroupPrioritySchedulerResultHelper> earlyList = getFixedGroupSameCxMachineEarlyGroupInfo(context, effectiveList, discontinueGroupSet);
+        if (CollectionUtils.isEmpty(earlyList)) {
+            return;
+        }
+        earlyList.forEach(preSelectedInfo -> {
+            //对挑选出来的分组，进行机台产能分配
+            CxMachineBaseInfoVo selectedCxMachine = preSelectedInfo.getSelectedCxMachine();
+            ProductionPlanGroupInfo addNewGroupPlan = preSelectedInfo.getSelectedGroup();
+            String groupName = addNewGroupPlan.getGroupName();
+            Integer originNeedAllocationDaysByGroupPlan = addNewGroupPlan.getLeftOverNeedAllocationDays();
+            CxMachineAllocationPlanHelper addHelper = buildAllocationDetailInfo(productionContext, preSelectedInfo);
+            if (null == addHelper) {
+                excludeGroupPlan.add(groupName);
+                return;
+            }
+            //对成型机台进行模拟模具排产
+            cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper, new HashSet<>());
+            //重新获取剩余天数：可能因提前收尾变化，导致计划实际没有排，下轮直接排除,不能设置分配完成
+            Integer newNeedAllocationDaysByGroupPlan = addNewGroupPlan.getLeftOverNeedAllocationDays();
+            if (newNeedAllocationDaysByGroupPlan.equals(originNeedAllocationDaysByGroupPlan)) {
+                excludeGroupPlan.add(groupName);
+            } else {
+                excludeGroupPlan.remove(groupName);
+            }
+        });
+        //重新分配
+        allocationFixedGroupSameCxMachineEarlyGroup(context, excludeGroupPlan, appointPriorityGroupList, discontinueGroupSet);
     }
 
     /**
@@ -330,6 +383,76 @@ public class GroupPriorityProductionScheduler {
     }
 
     /**
+     * 获取固定结构分配到同一成型机台，超过多个固定结构时，预分配时间在前的固定结构信息
+     * 因时间在前的先排(防止因工装限制导致的结构二次分配)
+     * 1、先获取有指定固定机台的分组，预分配的机台信息
+     * 2、提取预分配机台对应的分组，超过1个时(即同机台有多个分组竞争)
+     * 3、对超过1个的分组的机台进行预分配，提取起始时间最早的分组信息
+     *
+     * @param context             排产上下文
+     * @param effectiveList       有效结构(有指定固定机台结构)
+     * @param discontinueGroupSet 有间断结构信息
+     * @return
+     */
+    private List<GroupPrioritySchedulerResultHelper> getFixedGroupSameCxMachineEarlyGroupInfo(Context context, List<ProductionPlanGroupInfo> effectiveList, Set<String> discontinueGroupSet) {
+        Set<String> realDiscontinueGroupSet;
+        if (CollectionUtils.isEmpty(discontinueGroupSet)) {
+            realDiscontinueGroupSet = Collections.emptySet();
+        } else {
+            realDiscontinueGroupSet = Sets.newHashSet();
+            realDiscontinueGroupSet.addAll(discontinueGroupSet);
+        }
+        List<GroupPrioritySchedulerResultHelper> resultList = Lists.newArrayList();
+        effectiveList.forEach(singleGroup -> {
+            //如果是间断，则选时间最长的机台
+            boolean isMoreProductionDay = realDiscontinueGroupSet.contains(singleGroup.getGroupName());
+            CxMachineBaseInfoVo preSelectedCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlanAppoint(context, singleGroup, isMoreProductionDay, true);
+            if (null != preSelectedCxMachine) {
+                GroupPrioritySchedulerResultHelper singleResult = new GroupPrioritySchedulerResultHelper(singleGroup, preSelectedCxMachine);
+                resultList.add(singleResult);
+            }
+        });
+        if (CollectionUtils.isEmpty(resultList)) {
+            return Collections.emptyList();
+        }
+        //如果选中的是同一台，则时间在前的先排
+        Map<String, List<GroupPrioritySchedulerResultHelper>> cxMachinePreMap = resultList.stream().collect(Collectors.groupingBy(GroupPrioritySchedulerResultHelper::getSelectedCxMachineCode));
+        Map<String, List<GroupPrioritySchedulerResultHelper>> multipleGroupMap = Maps.newHashMap();
+        cxMachinePreMap.forEach((cxMachineCode, preGroupList) -> {
+            if (CollectionUtils.isEmpty(preGroupList) || preGroupList.size() <= BigDecimal.ONE.intValue()) {
+                return;
+            }
+            multipleGroupMap.put(cxMachineCode, preGroupList);
+        });
+        if (CollectionUtils.isEmpty(multipleGroupMap)) {
+            return Collections.emptyList();
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        List<GroupPrioritySchedulerResultHelper> earlyList = new ArrayList<>();
+        multipleGroupMap.forEach((cxMachineCode, preGroupList) -> {
+            List<CxMachineAllocationPlanHelper> addAllocationHelperList = Lists.newArrayList();
+            Map<ProductionPlanGroupInfo, GroupPrioritySchedulerResultHelper> groupMap = Maps.newHashMap();
+            preGroupList.forEach(preSingleGroup -> {
+                CxMachineAllocationPlanHelper addPreHelper = getAllocationDetailInfo(productionContext, preSingleGroup);
+                if (null == addPreHelper) {
+                    return;
+                }
+                addAllocationHelperList.add(addPreHelper);
+                groupMap.put(preSingleGroup.getSelectedGroup(), preSingleGroup);
+            });
+            if (CollectionUtils.isEmpty(addAllocationHelperList)) {
+                return;
+            }
+            addAllocationHelperList.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getStartDay));
+            earlyList.add(groupMap.get(addAllocationHelperList.get(BigDecimal.ZERO.intValue()).getProductionPlanInfo()));
+        });
+        if (CollectionUtils.isEmpty(earlyList)) {
+            return Collections.emptyList();
+        }
+        return earlyList;
+    }
+
+    /**
      * 按GroupCxMachinePriorityEnum中的顺序获取Top3对应的选中的排产机台
      *
      * @param context             排产上下文
@@ -391,6 +514,31 @@ public class GroupPriorityProductionScheduler {
      * @return
      */
     private CxMachineAllocationPlanHelper buildAllocationDetailInfo(TbrProductionContext productionContext, GroupPrioritySchedulerResultHelper finalSelected) {
+        CxMachineAllocationPlanHelper addHelper = getAllocationDetailInfo(productionContext, finalSelected);
+        if (null == addHelper) {
+            return null;
+        }
+        CxMachineBaseInfoVo selectedCxMachine = finalSelected.getSelectedCxMachine();
+        ProductionPlanGroupInfo addNewGroupPlan = finalSelected.getSelectedGroup();
+        Integer realAllocationDays = addHelper.getAllocationDay();
+        //更新剩余天数：分组的剩余天数、成型机台剩余可分配天数
+        addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
+        //20260429+ 前分组分配信息传递，用于当需要前分组强制延长收尾时需要
+        CxMachineAllocationPlanHelper beforeAllocation = selectedCxMachine.addAllocationPlanInfo(productionContext, addHelper);
+        addHelper.setBeforeAllocationByChangeLimit(beforeAllocation);
+        return addHelper;
+    }
+
+    /**
+     * 从finalSelected的匹配组中
+     * 将selectedGroup在selectedCxMachine进行产能分配
+     * 并返回分配结果
+     *
+     * @param productionContext 排产上下文
+     * @param finalSelected     分组+机台匹配组信息
+     * @return
+     */
+    private CxMachineAllocationPlanHelper getAllocationDetailInfo(TbrProductionContext productionContext, GroupPrioritySchedulerResultHelper finalSelected) {
         CxMachineBaseInfoVo selectedCxMachine = finalSelected.getSelectedCxMachine();
         ProductionPlanGroupInfo addNewGroupPlan = finalSelected.getSelectedGroup();
         String groupName = addNewGroupPlan.getGroupName();
@@ -419,12 +567,7 @@ public class GroupPriorityProductionScheduler {
         }
         needAllocationDays = Math.max(needAllocationDays, confirmNeedAllocationDays);
         Integer realAllocationDays = Math.min(remainingDays, needAllocationDays);
-        //更新剩余天数：分组的剩余天数、成型机台剩余可分配天数
-        addNewGroupPlan.updateLeftOverNeedAllocationDays(realAllocationDays);
         CxMachineAllocationPlanHelper addHelper = CxCapacityAllocationHandler.createAllocationPlanHelper(selectedCxMachine, lhRatioInfo, addNewGroupPlan, null, realAllocationDays, startDay, monthMaxDays);
-        //20260429+ 前分组分配信息传递，用于当需要前分组强制延长收尾时需要
-        CxMachineAllocationPlanHelper beforeAllocation = selectedCxMachine.addAllocationPlanInfo(productionContext, addHelper);
-        addHelper.setBeforeAllocationByChangeLimit(beforeAllocation);
         return addHelper;
     }
 
