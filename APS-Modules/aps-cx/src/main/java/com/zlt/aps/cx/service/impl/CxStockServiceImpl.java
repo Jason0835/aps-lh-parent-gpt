@@ -273,9 +273,9 @@ public class CxStockServiceImpl extends AbstractDocService<CxStock> implements C
     }
 
     @Override
-    public void logicDeleteAndSaveBatch(String factoryCode, String dataSource, String updateBy, List<CxStock> insertList) {
-        log.info("生胎库存同步-事务开始：逻辑删除分厂{}数据来源为{}的旧数据，待插入数量={}", factoryCode, dataSource, CollectionUtils.size(insertList));
-        cxStockMapper.logicDeleteByFactoryCodeAndDataSource(factoryCode, dataSource, updateBy, new Date());
+    public void logicDeleteAndSaveBatch(String factoryCode, String dataSource, Date stockDate, String updateBy, List<CxStock> insertList) {
+        log.info("生胎库存同步-事务开始：逻辑删除分厂{}数据来源为{}库存日期为{}的旧数据，待插入数量={}", factoryCode, dataSource, stockDate, CollectionUtils.size(insertList));
+        cxStockMapper.logicDeleteByFactoryCodeAndDataSourceAndStockDate(factoryCode, dataSource, stockDate, updateBy, new Date());
         log.info("生胎库存同步-逻辑删除完成，开始批量插入");
         if (CollectionUtils.isNotEmpty(insertList)) {
             int batchSize = 1000;
@@ -287,6 +287,6 @@ public class CxStockServiceImpl extends AbstractDocService<CxStock> implements C
                         (insertList.size() + batchSize - 1) / batchSize, subList.size());
             }
         }
-        log.info("生胎库存同步-事务完成：分厂{}，插入数量={}", factoryCode, CollectionUtils.size(insertList));
+        log.info("生胎库存同步-事务完成：分厂{}，库存日期={}，插入数量={}", factoryCode, stockDate, CollectionUtils.size(insertList));
     }
 }

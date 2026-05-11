@@ -94,8 +94,8 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
     @Override
     @ApiOperation("逻辑删除并批量保存成型在机信息（事务性操作）")
     @PostMapping("/logicDeleteAndSaveMachineOnlineInfo")
-    public AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<CxMachineOnlineInfo> list) {
-        cxMachineOnlineInfoService.logicDeleteAndSaveBatch(factoryCode, updateBy, list);
+    public AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("onlineDate") Date onlineDate, @RequestParam("updateBy") String updateBy, @RequestBody List<CxMachineOnlineInfo> list) {
+        cxMachineOnlineInfoService.logicDeleteAndSaveBatch(factoryCode, onlineDate, updateBy, list);
         return AjaxResult.success();
     }
 
@@ -202,9 +202,10 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
     @PostMapping("/logicDeleteAndSaveCxStockByDataSource")
     public AjaxResult logicDeleteAndSaveCxStockByDataSource(@RequestParam("factoryCode") String factoryCode,
                                                              @RequestParam("dataSource") String dataSource,
+                                                             @RequestParam("stockDate") Date stockDate,
                                                              @RequestParam("updateBy") String updateBy,
                                                              @RequestBody List<CxStock> list) {
-        cxStockService.logicDeleteAndSaveBatch(factoryCode, dataSource, updateBy, list);
+        cxStockService.logicDeleteAndSaveBatch(factoryCode, dataSource, stockDate, updateBy, list);
         return AjaxResult.success();
     }
 

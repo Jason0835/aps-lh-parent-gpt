@@ -112,8 +112,8 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @Override
     @ApiOperation("逻辑删除并批量保存硫化在机信息（事务性操作）")
     @PostMapping("/logicDeleteAndSaveMachineOnlineInfo")
-    public AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhMachineOnlineInfo> list) {
-        lhMachineOnlineInfoService.logicDeleteAndSaveBatch(factoryCode, updateBy, list);
+    public AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("onlineDate") Date onlineDate, @RequestParam("updateBy") String updateBy, @RequestBody List<LhMachineOnlineInfo> list) {
+        lhMachineOnlineInfoService.logicDeleteAndSaveBatch(factoryCode, onlineDate, updateBy, list);
         return AjaxResult.success();
     }
 
@@ -146,8 +146,8 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @Override
     @ApiOperation("逻辑删除并批量保存胶囊已使用次数（事务性操作）")
     @PostMapping("/logicDeleteAndSaveRepairCapsule")
-    public AjaxResult logicDeleteAndSaveRepairCapsule(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhRepairCapsule> list) {
-        lhRepairCapsuleService.logicDeleteAndSaveBatch(factoryCode, updateBy, list);
+    public AjaxResult logicDeleteAndSaveRepairCapsule(@RequestParam("factoryCode") String factoryCode, @RequestParam("obtainTime") Date obtainTime, @RequestParam("updateBy") String updateBy, @RequestBody List<LhRepairCapsule> list) {
+        lhRepairCapsuleService.logicDeleteAndSaveBatch(factoryCode, obtainTime, updateBy, list);
         return AjaxResult.success();
     }
 
@@ -196,8 +196,8 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @Override
     @ApiOperation("逻辑删除并批量保存硫化排程完成量（事务性操作）")
     @PostMapping("/logicDeleteAndSaveScheFinishQty")
-    public AjaxResult logicDeleteAndSaveScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhScheFinishQty> list) {
-        lhScheFinishQtyService.logicDeleteAndSaveBatch(factoryCode, updateBy, list);
+    public AjaxResult logicDeleteAndSaveScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("scheduleDate") Date scheduleDate, @RequestParam("updateBy") String updateBy, @RequestBody List<LhScheFinishQty> list) {
+        lhScheFinishQtyService.logicDeleteAndSaveBatch(factoryCode, scheduleDate, updateBy, list);
         return AjaxResult.success();
     }
 
@@ -229,8 +229,8 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @Override
     @ApiOperation("逻辑删除并批量保存硫化排程日完成量（事务性操作）")
     @PostMapping("/logicDeleteAndSaveDayFinishQty")
-    public AjaxResult logicDeleteAndSaveDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy, @RequestBody List<LhDayFinishQty> list) {
-        lhDayFinishQtyService.logicDeleteAndSaveBatch(factoryCode, updateBy, list);
+    public AjaxResult logicDeleteAndSaveDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("finishDate") Date finishDate, @RequestParam("updateBy") String updateBy, @RequestBody List<LhDayFinishQty> list) {
+        lhDayFinishQtyService.logicDeleteAndSaveBatch(factoryCode, finishDate, updateBy, list);
         return AjaxResult.success();
     }
 

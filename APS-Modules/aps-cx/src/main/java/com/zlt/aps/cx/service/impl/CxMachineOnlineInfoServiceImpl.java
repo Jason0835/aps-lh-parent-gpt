@@ -43,9 +43,9 @@ public class CxMachineOnlineInfoServiceImpl extends AbstractDocService<CxMachine
     }
 
     @Override
-    public void logicDeleteAndSaveBatch(String factoryCode, String updateBy, List<CxMachineOnlineInfo> insertList) {
-        log.info("成型在机同步-事务开始：逻辑删除分厂{}旧数据，待插入数量={}", factoryCode, CollectionUtils.size(insertList));
-        cxMachineOnlineInfoMapper.logicDeleteByFactoryCode(factoryCode, updateBy, new Date());
+    public void logicDeleteAndSaveBatch(String factoryCode, Date onlineDate, String updateBy, List<CxMachineOnlineInfo> insertList) {
+        log.info("成型在机同步-事务开始：逻辑删除分厂{}在线日期为{}的旧数据，待插入数量={}", factoryCode, onlineDate, CollectionUtils.size(insertList));
+        cxMachineOnlineInfoMapper.logicDeleteByFactoryCodeAndOnlineDate(factoryCode, onlineDate, updateBy, new Date());
         log.info("成型在机同步-逻辑删除完成，开始批量插入");
         if (CollectionUtils.isNotEmpty(insertList)) {
             int batchSize = 1000;
@@ -57,6 +57,6 @@ public class CxMachineOnlineInfoServiceImpl extends AbstractDocService<CxMachine
                         (insertList.size() + batchSize - 1) / batchSize, subList.size());
             }
         }
-        log.info("成型在机同步-事务完成：分厂{}，插入数量={}", factoryCode, CollectionUtils.size(insertList));
+        log.info("成型在机同步-事务完成：分厂{}，在线日期={}，插入数量={}", factoryCode, onlineDate, CollectionUtils.size(insertList));
     }
 }
