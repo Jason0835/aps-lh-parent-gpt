@@ -246,7 +246,7 @@ export default {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.lhMouldChangePlan.mouldCode"),
-          width: 250,
+          width: 450,
         },
         {
           prop: "isRelease",
