@@ -106,6 +106,7 @@ public class MpWeekRollAdjustUIController extends BaseController {
     /**
      * 重新计算
      */
+    @RequiresPermissions("monthplan:mpWeekRollAdjust:recalculate")
     @ApiOperation("重新计算")
     @PostMapping("/recalculate")
     @ResponseBody

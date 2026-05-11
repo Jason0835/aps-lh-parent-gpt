@@ -25,6 +25,7 @@
             type="primary"
             plain
             :disabled="!canUsePrimaryAdjustActions"
+            v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
             @click="handleStructureInnerAdjust"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.structureInnerAdjust")
@@ -34,12 +35,16 @@
             type="primary"
             plain
             :disabled="isStructureAdjustEntryDisabled"
+            v-hasPermi="['monthplan:mpStructureAllocation:list']"
             @click="handleStructureAdjust"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.structureAdjust")
             }}</el-button
           >
-          <el-button @click="handleViewAdjustVersion">{{
+          <el-button
+            v-hasPermi="['monthplan:mpAdjustResult:list']"
+            @click="handleViewAdjustVersion"
+            >{{
             $t("ui.data.column.monthPlanFinalAdjustQuery.viewAdjustVersion")
           }}</el-button>
           <!-- 导出：与 console 排产明细 mouldingDayResult 页 factoryMonthPlanMouldDayResult/export 一致 -->
@@ -89,6 +94,7 @@
               confirmAdjustLoading ||
               recalculateLoading
             "
+            v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
             @click="handleConfirmAdjust"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.confirmAdjust")
@@ -100,6 +106,7 @@
               confirmAdjustLoading ||
               recalculateLoading
             "
+            v-hasPermi="['monthplan:mpStructureAllocation:list']"
             @click="handleContinueAdjust"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.continueAdjust")
@@ -111,6 +118,7 @@
               confirmAdjustLoading ||
               recalculateLoading
             "
+            v-hasPermi="['monthplan:mpWeekRollAdjust:recalculate']"
             @click="handleRecalculate"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.recalculate")
@@ -231,6 +239,7 @@
         <el-button
           type="primary"
           :loading="syncLoading"
+          v-hasPermi="['monthplan:factoryMonthPlanFinalResult:sync']"
           @click="submitSyncAdjustedMonthPlan"
           >{{
             $t("ui.data.column.monthPlanFinalAdjustQuery.issueScmMesOk")
@@ -243,20 +252,16 @@
 
 <script>
 import moment from "moment";
-import { mapGetters } from "vuex";
-import { downloadLink } from "@/utils/request";
+import {mapGetters} from "vuex";
+import {downloadLink} from "@/utils/request";
+import {getFinalResultVersionList, listMonthPlanFinal4Adjust, syncAdjustedMonthPlanToScmAndMes,} from "@/api/monthplan/monthlyProductionPlan";
 import {
-  listMonthPlanFinal4Adjust,
-  getFinalResultVersionList,
-  syncAdjustedMonthPlanToScmAndMes,
-} from "@/api/monthplan/monthlyProductionPlan";
-import {
-  getAdjustsCxMachineFromRedis,
   confirmAdjust,
+  getAdjustsCxMachineFromRedis,
   recalculateWeekRollAdjust,
-  statisticsResult,
+  resultVersion,
   saveAdjustResult,
-  resultVersion
+  statisticsResult
 } from "@/api/monthplan/adjustStructure";
 import structureAdjustDialog from "./components/structureAdjustDialog.vue";
 import adjustVersionDialog from "./components/adjustVersionDialog.vue";
@@ -920,7 +925,7 @@ export default {
               this.search.productionVersion ||
               ""
           ).trim();
-          
+
           if (currentPv) {
             const hasVersion = list.some(
               (item) => String(item.value) === currentPv
