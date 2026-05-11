@@ -78,11 +78,18 @@ public interface IFactoryMonthPlanMouldDayResultRemoteService {
     byte[] exportAllMaterial(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName);
 
     /**
-     * 调整版本导出S2-0604.排产结果-生产计划排产结果列表
+     * 定稿版本导出S2-0604.排产结果-生产计划排产结果列表
     */
-    @ApiOperation("调整版本导出")
-    @PostMapping("/factoryMonthPlanMouldDayResult/exportAdjuest/{fileName}")
-    byte[] exportAdjuest(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName);
+    @ApiOperation("定稿版本导出")
+    @PostMapping("/factoryMonthPlanMouldDayResult/exportFinal/{fileName}")
+    byte[] exportFinal(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName);
+
+    /**
+     * 定稿版本全物料导出S2-0604.排产结果-生产计划排产结果列表
+    */
+    @ApiOperation("定稿版本全物料导出")
+    @PostMapping("/factoryMonthPlanMouldDayResult/exportFinalAllMaterial/{fileName}")
+    byte[] exportFinalAllMaterial(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName);
 
     /**
      * 导入S2-0604.排产结果-生产计划排产结果数据

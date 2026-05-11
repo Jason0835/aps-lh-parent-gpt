@@ -113,4 +113,28 @@ public class FactoryMonthPlanMouldDayResultExportVo extends FactoryMonthPlanMoul
      */
     @ApiModelProperty(value = "同主花纹最大活块数量", name = "maxTypeBlockQty")
     private Integer maxTypeBlockQty;
+    
+    /**
+     * 第1周调整量
+     */
+    @ApiModelProperty(value = "第1周调整量", name = "adjustQty1")
+    private Integer adjustQty1;
+
+    /**
+     * 第2周调整量
+     */
+    @ApiModelProperty(value = "第2周调整量", name = "adjustQty2")
+    private Integer adjustQty2;
+
+    /**
+     * 第3周调整量
+     */
+    @ApiModelProperty(value = "第3周调整量", name = "adjustQty3")
+    private Integer adjustQty3;
+
+    /**
+     * 第4周调整量
+     */
+    @ApiModelProperty(value = "第4周调整量", name = "adjustQty4")
+    private Integer adjustQty4;
 }
