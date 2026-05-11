@@ -153,15 +153,15 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @ApiOperation("查询最终排产计划定稿-调整使用")
     @PostMapping("/list4Adjust")
     public TableDataInfo list4Adjust(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition) {
-        try {
-            startPage();
+//        try {
+//            startPage();
             List<FactoryMonthPlanProductionFinal4AdjustVo> list = factoryMonthPlanProductionFinalResultService.list4Adjust(queryCondition);
             // 排序 按英寸->结构->最大型腔数->主花纹->活块数->物料描述
             mpWeekRollAdjustController.sortAdjustResultList(list);
             return getDataTable(list);
-        } finally {
-            PageUtils.clearPage();
-        }
+//        } finally {
+//            PageUtils.clearPage();
+//        }
     }
 
     /**
