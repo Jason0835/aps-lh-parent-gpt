@@ -107,7 +107,8 @@ export default {
         {
           prop: "specDesc",
           align: "left",
-          halign: "center",
+          minWidth: 350,
+          halign: "left",
           label: this.$t("ui.data.column.specColor.specDesc"),
           // sortable: "custom",
         },
@@ -213,6 +214,8 @@ export default {
       return [
         {
           label: this.$t("ui.data.column.specColor.specDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "specDesc",
         },
         {

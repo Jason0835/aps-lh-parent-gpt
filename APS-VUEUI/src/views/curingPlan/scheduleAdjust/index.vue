@@ -140,17 +140,20 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleAdjust.scheduleDate"),
           prop: "scheduleDate",
-          width: 160,
+          align: "center",
+          minWidth: 120,
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.batchNo"),
           prop: "batchNo",
-          width: 180,
+          align: "left",
+          minWidth: 160,
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.orderNo"),
           prop: "orderNo",
-          width: 160,
+          align: "left",
+          minWidth: 160,
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.adjustBatchNo"),

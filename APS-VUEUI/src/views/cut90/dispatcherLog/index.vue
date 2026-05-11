@@ -134,7 +134,7 @@ export default {
               valign: "middle",
               align: "center",
               halign: "center",
-              minWidth: 100,
+              minWidth: 120,
              //  sortable: "custom",
             },
             {

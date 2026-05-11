@@ -177,7 +177,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("common.name"),
-          width: 200,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "materialCode",
@@ -302,6 +303,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("common.name"),
+          minWidth: 350,
+          align: "left",
         },
         // {
         //   prop: "物料代码",

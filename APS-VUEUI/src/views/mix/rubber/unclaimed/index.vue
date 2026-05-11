@@ -125,6 +125,8 @@ export default {
         {
           label: this.$t("setting.unclaimed.scheduleDate"),
           prop: "scheduleDate",
+          align: "center",
+          minWidth: 120,
         },
         {
           label: this.$t("setting.unclaimed.glue"),
@@ -146,7 +148,9 @@ export default {
           prop: "scheduleDate",
           // sortable: "custom",
           halign: "center",
+          minWidth: 120,
           align: "center",
+          minWidth: 120,
           label: this.$t("setting.unclaimed.scheduleDate"),
         },
         {

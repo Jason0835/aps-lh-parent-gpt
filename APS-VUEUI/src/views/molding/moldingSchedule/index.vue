@@ -274,7 +274,7 @@ export default {
           label: this.$t("排程日期"),
           prop: "scheduleDate",
           align: "center",
-          minWidth: 100,
+          minWidth: 120,
         },
         {
           label: this.$t("工厂"),
@@ -291,14 +291,14 @@ export default {
         {
           label: this.$t("工单号"),
           prop: "orderNo",
-          align: "center",
-          minWidth: 100,
+          align: "left",
+          minWidth: 160,
         },
         {
           label: this.$t("成型批次号"),
           prop: "cxBatchNo",
-          align: "center",
-          minWidth: 100,
+          align: "left",
+          minWidth: 160,
         },
         {
           label: this.$t("是否发布"),
@@ -318,6 +318,7 @@ export default {
           label: this.$t("硫化机台"),
           prop: "lhMachineCode",
           align: "center",
+          minWidth: 250,
         },
         {
           label: this.$t("物料编码"),
@@ -327,6 +328,7 @@ export default {
         },
         {
           label: this.$t("物料描述"),
+          align: "left",
           prop: "materialDesc",
           minWidth: 350,
         },
@@ -338,6 +340,7 @@ export default {
         },
         {
           label: this.$t("胎胚描述"),
+          align: "left",
           prop: "mainMaterialDesc",
           minWidth: 350,
         },
@@ -861,10 +864,14 @@ export default {
         },
         {
           label: this.$t("物料描述"),
+          minWidth: 350,
+          align: "left",
           prop: "materialDesc",
         },
         {
           label: this.$t("胎胚描述"),
+          minWidth: 350,
+          align: "left",
           prop: "mainMaterialDesc",
         },
         {

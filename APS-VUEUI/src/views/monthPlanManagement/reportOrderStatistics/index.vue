@@ -49,7 +49,8 @@ export default {
         {
           label: this.$t("ui.data.column.reportOrderStatistics.scheduleDate"),
           prop: "scheduleDate",
-          minWidth: 150,
+          align: "center",
+          minWidth: 120,
           // sortable: "custom",
           formatter: (row) => {
             return row.scheduleDate || "-";
@@ -71,7 +72,8 @@ export default {
         {
           label: this.$t("ui.data.column.reportOrderStatistics.orderNo"),
           prop: "orderNo",
-          minWidth: 80,
+          align: "left",
+          minWidth: 160,
           // sortable: "custom",
         },
         {

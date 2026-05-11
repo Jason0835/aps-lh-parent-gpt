@@ -129,7 +129,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.rawMaterial.materialName"),
-          width: 300,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "year",
@@ -188,6 +189,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.rawMaterial.materialName"),
+          minWidth: 350,
+          align: "left",
         },
 
 

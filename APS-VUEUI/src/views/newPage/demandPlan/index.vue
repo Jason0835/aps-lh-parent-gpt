@@ -356,7 +356,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width: 300,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "productionType",
@@ -682,6 +683,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          minWidth: 350,
+          align: "left",
         },
         {
           prop: "scmPriority",

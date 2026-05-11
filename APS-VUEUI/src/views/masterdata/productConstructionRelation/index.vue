@@ -164,7 +164,8 @@ export default {
          {
           prop: "embryoDesc",
           label: this.$t("胎胚描述"),
-          width: 300,
+          align: "left",
+          minWidth: 350,
         },
         // {
         //   prop: "materialCode",
@@ -318,6 +319,8 @@ export default {
         {
           prop: "embryoDesc",
           label: this.$t("胎胚描述"),
+          minWidth: 350,
+          align: "left",
         },
         // {
         //   label: this.$t("ui.data.column.monthplan.oriMaterialCode"),

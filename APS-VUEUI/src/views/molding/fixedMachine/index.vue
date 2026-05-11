@@ -279,8 +279,9 @@ export default {
         },
         {
           prop: "fixedMaterialDesc",
+          align: "left",
           label: this.$t("固定物料描述"),
-          width: 300,
+          minWidth: 350,
           render: ({ row }) => {
             return (
               // <el-popover
@@ -383,8 +384,9 @@ export default {
         },
         {
           prop: "disableMaterialDesc",
+          align: "left",
           label: this.$t("不可作业物料描述"),
-          width: 300,
+          minWidth: 350,
           render: ({ row }) => {
             return (
               // <el-popover

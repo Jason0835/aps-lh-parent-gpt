@@ -158,7 +158,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("物料名称"),
-          width:300
+          align: "left",
+          minWidth: 350
         },
         {
           prop: "rubberSpec",
@@ -240,6 +241,8 @@ export default {
         {
           prop: "materialDesc",
           label: this.$t("物料名称"),
+          minWidth: 350,
+          align: "left",
         }
       ];
     },

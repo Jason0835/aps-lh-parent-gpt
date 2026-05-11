@@ -184,9 +184,9 @@ export default {
             {
               prop: "specDesc",
               align: "left",
-              halign: "center",
+              halign: "left",
               label: this.$t("ui.data.column.productConstruction.specDesc"),
-              width: 150,
+              minWidth: 350,
             },
             {
               prop: "noseWidth",

@@ -143,7 +143,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.monthSaleOrderPlan.productDesc"),
-          width: 250,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "planQty",
@@ -251,8 +252,9 @@ export default {
         },
         {
           prop: "orderNo",
+          align: "left",
           label: this.$t("ui.data.column.monthSaleOrderPlan.orderNo"),
-          width: 120,
+          minWidth: 160,
         },
         {
           prop: "remark",

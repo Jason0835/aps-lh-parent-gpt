@@ -146,7 +146,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.monthSaleOrderPlan.productDesc"),
-          width: 250,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "productTypeCode",
@@ -327,7 +328,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.monthSaleOrderPlan.productDesc"),
-          width: 250,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "locationType",

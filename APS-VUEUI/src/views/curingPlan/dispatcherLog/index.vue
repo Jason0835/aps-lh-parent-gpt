@@ -122,7 +122,7 @@ export default {
               valign: "middle",
               align: "center",
               //  sortable: "custom",
-              width: 160,
+              minWidth: 120,
             },
             {
               prop: "specCode",

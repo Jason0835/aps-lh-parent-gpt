@@ -148,7 +148,8 @@ export default {
         {
           prop: "productDesc",
           label: this.$t("ui.data.column.lean.productinfo.productDesc"),
-          width: 300,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "tireType",
