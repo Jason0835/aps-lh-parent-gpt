@@ -1210,16 +1210,26 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param list 排程结果列表
      * @return 硫化产量今天夜班Map，key=工厂|物料编码
      */
+    /**
+     * 构建硫化产量今天夜班的Map（供导出和列表展示用）
+     * <p>计算逻辑：从本月1日到最大排程日期当天的日产量（LhDayFinishQty.DAY_FINISH_QTY）
+     * + 最大排程日期当天的1班完成量（LhScheFinishQty.CLASS1_FINISH_QTY）
+     *
+     * @param list 排程结果列表，用于提取工厂和物料查询范围
+     * @return key=工厂编码|物料编码，value=今天夜班总产量BigDecimal
+     */
     private Map<String, Object> buildTodayNightFinishQtyExportMap(List<LhScheduleResult> list) {
         if (PubUtil.isEmpty(list)) {
             return Collections.emptyMap();
         }
+        // 提取去重的工厂编码，限定查询范围
         List<String> factoryCodes = list.stream()
                 .map(LhScheduleResult::getFactoryCode)
                 .filter(StringUtils::isNotBlank)
                 .map(String::trim)
                 .distinct()
                 .collect(Collectors.toList());
+        // 提取去重的物料编码，限定查询范围
         List<String> materialCodes = list.stream()
                 .map(LhScheduleResult::getMaterialCode)
                 .filter(StringUtils::isNotBlank)
@@ -1230,14 +1240,17 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return Collections.emptyMap();
         }
 
+        // 取列表中的最大排程日期，作为计算截止日
         Date maxScheduleDate = list.stream()
                 .map(LhScheduleResult::getScheduleDate)
                 .filter(Objects::nonNull)
                 .max(Date::compareTo)
                 .orElse(DateUtil.date());
+        // 查询日期范围：本月1日 到 最大排程日期的次日（不含）
         Date monthStart = DateUtil.beginOfMonth(maxScheduleDate);
         Date nextDayStart = DateUtil.offsetDay(DateUtil.beginOfDay(maxScheduleDate), 1);
 
+        // 第一步：查询T_LH_DAY_FINISH_QTY日产量表（本月1日~排程日当天），按工厂+物料聚合
         List<LhDayFinishQty> finishQtyList = lhDayFinishQtyMapper.selectList(
                 new LambdaQueryWrapper<LhDayFinishQty>()
                         .in(LhDayFinishQty::getFactoryCode, factoryCodes)
@@ -1254,11 +1267,14 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             }
             BigDecimal dayFinishQty = Objects.nonNull(finishQty.getDayFinishQty())
                     ? finishQty.getDayFinishQty() : BigDecimal.ZERO;
+            // 按工厂|物料key累加日产量
             finishQtyMap.merge(
                     buildMaterialFactoryExportKey(finishQty.getFactoryCode(), finishQty.getMaterialCode()),
                     dayFinishQty,
                     BigDecimal::add);
         }
+
+        // 第二步：查询T_LH_SCHE_FINISH_QTY排程完成量表（排程日当天），累加1班完成量
         List<LhScheFinishQty> scheFinishQtyList = lhScheFinishQtyMapper.selectList(
                 new LambdaQueryWrapper<LhScheFinishQty>()
                         .in(LhScheFinishQty::getFactoryCode, factoryCodes)
@@ -1274,12 +1290,19 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             }
             BigDecimal class1FinishQty = Objects.nonNull(finishQty.getClass1FinishQty())
                     ? finishQty.getClass1FinishQty() : BigDecimal.ZERO;
+            // 按工厂|物料key累加1班产量
             finishQtyMap.merge(
                     buildMaterialFactoryExportKey(finishQty.getFactoryCode(), finishQty.getMaterialCode()),
                     class1FinishQty,
                     BigDecimal::add);
         }
         return new HashMap<>(finishQtyMap);
+    }
+
+    @Override
+    public Map<String, Object> buildTodayNightFinishQtyMap(List<LhScheduleResult> list) {
+        // 供列表接口调用，查询排程页面显示的"硫化产量今天夜班"字段
+        return buildTodayNightFinishQtyExportMap(list);
     }
 
     /**

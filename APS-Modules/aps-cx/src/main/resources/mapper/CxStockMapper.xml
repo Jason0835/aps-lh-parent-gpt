@@ -99,4 +99,25 @@
           AND DATA_SOURCE = #{dataSource}
     </delete>
 
+    <update id="cleanHistoryDuplicateData">
+        UPDATE T_CX_STOCK
+        SET IS_DELETE = 1,
+            UPDATE_BY = 'CLEAN_TASK',
+            UPDATE_TIME = NOW()
+        WHERE DATE(STOCK_DATE) &lt; CURDATE()
+          AND IS_DELETE = 0
+          AND EXISTS (
+            SELECT 1 FROM (
+                SELECT FACTORY_CODE, DATA_SOURCE, DATE(STOCK_DATE) AS stock_day, MAX(UPDATE_TIME) AS max_update_time
+                FROM T_CX_STOCK
+                WHERE DATE(STOCK_DATE) &lt; CURDATE() AND IS_DELETE = 0
+                GROUP BY FACTORY_CODE, DATA_SOURCE, DATE(STOCK_DATE)
+            ) latest
+            WHERE T_CX_STOCK.FACTORY_CODE = latest.FACTORY_CODE
+              AND T_CX_STOCK.DATA_SOURCE = latest.DATA_SOURCE
+              AND DATE(T_CX_STOCK.STOCK_DATE) = latest.stock_day
+              AND T_CX_STOCK.UPDATE_TIME &lt; latest.max_update_time
+          )
+    </update>
+
 </mapper>

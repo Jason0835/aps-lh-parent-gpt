@@ -96,7 +96,7 @@ public class MpWeekRollAdjustUIController extends BaseController {
         result.setStructureName(entity.getStructureName());
         result.setYear(entity.getYear());
         result.setMonth(entity.getMonth());
-        byte[] excelBytes = iFactoryMonthPlanMouldDayResultService.exportAdjuest(result, fileName);
+        byte[] excelBytes = iFactoryMonthPlanMouldDayResultService.exportFinal(result, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());

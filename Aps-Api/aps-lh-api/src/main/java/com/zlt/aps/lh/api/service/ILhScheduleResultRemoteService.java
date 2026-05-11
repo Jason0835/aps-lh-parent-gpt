@@ -8,6 +8,7 @@ import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
+import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
@@ -185,4 +186,15 @@ public interface ILhScheduleResultRemoteService {
     @ApiOperation("导入数据")
     @PostMapping("/lhScheduleResult/importDataByCust/{updateSupport}")
     AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport, @RequestBody LhScheduleImportDTO importDTO);
+
+    /**
+     * 排产小结报表导出
+     *
+     * @param queryVO 查询条件，包含排程日期和分厂编码
+     * @param fileName 导出文件名
+     * @return Excel文件字节数组
+     */
+    @ApiOperation("排产小结报表导出")
+    @PostMapping("/lhScheduleResult/exportScheduleSummaryReport/{fileName}")
+    byte[] exportScheduleSummaryReport(@RequestBody ScheduleSummaryReportVO queryVO, @PathVariable("fileName") String fileName);
 }

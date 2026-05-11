@@ -107,4 +107,20 @@ public interface ILhMesSyncRemoteService {
     @ApiOperation("模具交替回报回填流程排程结果表的模具交替完成状态")
     @PostMapping("/mesSync/writeBackMouldChangePlanFinishStatus")
     AjaxResult writeBackMouldChangePlanFinishStatus(@RequestBody List<LhMoldAlterPlanFinish> list);
+
+    @ApiOperation("清理硫化在机历史重复数据，保留每个历史日期最新版本")
+    @PostMapping("/mesSync/cleanLhMachineOnlineHistoryDuplicate")
+    AjaxResult cleanLhMachineOnlineHistoryDuplicate();
+
+    @ApiOperation("清理胶囊已使用次数历史重复数据，保留每个历史日期最新版本")
+    @PostMapping("/mesSync/cleanLhRepairCapsuleHistoryDuplicate")
+    AjaxResult cleanLhRepairCapsuleHistoryDuplicate();
+
+    @ApiOperation("清理硫化排程完成量历史重复数据，保留每个历史日期最新版本")
+    @PostMapping("/mesSync/cleanLhScheFinishQtyHistoryDuplicate")
+    AjaxResult cleanLhScheFinishQtyHistoryDuplicate();
+
+    @ApiOperation("清理硫化排程日完成量历史重复数据，保留每个历史日期最新版本")
+    @PostMapping("/mesSync/cleanLhDayFinishQtyHistoryDuplicate")
+    AjaxResult cleanLhDayFinishQtyHistoryDuplicate();
 }

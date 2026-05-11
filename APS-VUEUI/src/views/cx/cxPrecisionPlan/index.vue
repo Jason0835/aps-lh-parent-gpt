@@ -113,6 +113,7 @@ export default {
         {
           prop: 'precisionType',
           label: this.$t('ui.data.column.cxPrecisionPlan.accuracyType'),
+          width: 110,
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.cx_precision_plan_type, value)
         },
         {
@@ -120,8 +121,8 @@ export default {
           label: this.$t('ui.data.column.cxPrecisionPlan.cycle'),
           formatter: (row) => this.getCycleValue(row.precisionType)
         },
-        { prop: 'planDate', label: this.$t('ui.data.column.cxPrecisionPlan.planDate') },
-        { prop: 'actualDate', label: this.$t('ui.data.column.cxPrecisionPlan.actualDate') },
+        { prop: 'planDate', label: this.$t('ui.data.column.cxPrecisionPlan.planDate') ,width: 180},
+        { prop: 'actualDate', label: this.$t('ui.data.column.cxPrecisionPlan.actualDate'),width: 180},
 
         {
           prop: 'daysToDue',
@@ -129,7 +130,8 @@ export default {
         },
         {
           prop: 'scheduleDate',
-          label: this.$t('ui.data.column.cxPrecisionPlan.scheduleDate')
+          label: this.$t('ui.data.column.cxPrecisionPlan.scheduleDate'),
+          width: 180
         },
         {
           prop: 'dataSource',

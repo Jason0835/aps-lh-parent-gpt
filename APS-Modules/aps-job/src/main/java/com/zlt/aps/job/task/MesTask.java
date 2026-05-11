@@ -2,9 +2,11 @@ package com.zlt.aps.job.task;
 
 import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
+import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.service.ILhMesSyncRemoteService;
 import com.zlt.aps.mp.api.domain.entity.*;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,12 @@ public class MesTask {
 
     @Autowired
     private IMesItfService iMesItfService;
+
+    @Autowired
+    private ILhMesSyncRemoteService lhMesSyncRemoteService;
+
+    @Autowired
+    private ICxMesSyncRemoteService cxMesSyncRemoteService;
 
     /**
      * 同步成品库存
@@ -158,5 +166,123 @@ public class MesTask {
     @ApiOperation("同步MES硫化精度计划实际执行日期回填数据")
     public void syncLhPrecisionPlanActual() {
         FeignTokenHelper.runWithToken(() -> iMesItfService.syncLhPrecisionPlanActual(new AuxReqSyncDataLogs()));
+    }
+
+    /**
+     * 临时任务：清理成型在机历史重复数据
+     * 保留今天以前每个历史日期最新版本的数据，删除旧版本重复数据
+     */
+    @ApiOperation("临时任务-清理成型在机历史重复数据")
+    public void cleanCxMachineOnlineHistoryDuplicate() {
+        log.info("临时任务-开始清理成型在机历史重复数据");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                com.ruoyi.common.core.web.domain.AjaxResult result = cxMesSyncRemoteService.cleanCxMachineOnlineHistoryDuplicate();
+                log.info("临时任务-清理成型在机历史重复数据结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-清理成型在机历史重复数据异常", e);
+        }
+    }
+
+    /**
+     * 临时任务：清理硫化在机历史重复数据
+     * 保留今天以前每个历史日期最新版本的数据，删除旧版本重复数据
+     */
+    @ApiOperation("临时任务-清理硫化在机历史重复数据")
+    public void cleanLhMachineOnlineHistoryDuplicate() {
+        log.info("临时任务-开始清理硫化在机历史重复数据");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                com.ruoyi.common.core.web.domain.AjaxResult result = lhMesSyncRemoteService.cleanLhMachineOnlineHistoryDuplicate();
+                log.info("临时任务-清理硫化在机历史重复数据结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-清理硫化在机历史重复数据异常", e);
+        }
+    }
+
+    /**
+     * 临时任务：清理胶囊已使用次数历史重复数据
+     * 保留今天以前每个历史日期最新版本的数据，删除旧版本重复数据
+     */
+    @ApiOperation("临时任务-清理胶囊已使用次数历史重复数据")
+    public void cleanLhRepairCapsuleHistoryDuplicate() {
+        log.info("临时任务-开始清理胶囊已使用次数历史重复数据");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                com.ruoyi.common.core.web.domain.AjaxResult result = lhMesSyncRemoteService.cleanLhRepairCapsuleHistoryDuplicate();
+                log.info("临时任务-清理胶囊已使用次数历史重复数据结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-清理胶囊已使用次数历史重复数据异常", e);
+        }
+    }
+
+    /**
+     * 临时任务：清理硫化排程完成量历史重复数据
+     * 保留今天以前每个历史日期最新版本的数据，删除旧版本重复数据
+     */
+    @ApiOperation("临时任务-清理硫化排程完成量历史重复数据")
+    public void cleanLhScheFinishQtyHistoryDuplicate() {
+        log.info("临时任务-开始清理硫化排程完成量历史重复数据");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                com.ruoyi.common.core.web.domain.AjaxResult result = lhMesSyncRemoteService.cleanLhScheFinishQtyHistoryDuplicate();
+                log.info("临时任务-清理硫化排程完成量历史重复数据结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-清理硫化排程完成量历史重复数据异常", e);
+        }
+    }
+
+    /**
+     * 临时任务：清理硫化排程日完成量历史重复数据
+     * 保留今天以前每个历史日期最新版本的数据，删除旧版本重复数据
+     */
+    @ApiOperation("临时任务-清理硫化排程日完成量历史重复数据")
+    public void cleanLhDayFinishQtyHistoryDuplicate() {
+        log.info("临时任务-开始清理硫化排程日完成量历史重复数据");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                com.ruoyi.common.core.web.domain.AjaxResult result = lhMesSyncRemoteService.cleanLhDayFinishQtyHistoryDuplicate();
+                log.info("临时任务-清理硫化排程日完成量历史重复数据结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-清理硫化排程日完成量历史重复数据异常", e);
+        }
+    }
+
+    /**
+     * 临时任务：清理生胎库存历史重复数据
+     * 保留今天以前每个历史日期最新版本的数据，删除旧版本重复数据
+     */
+    @ApiOperation("临时任务-清理生胎库存历史重复数据")
+    public void cleanCxStockHistoryDuplicate() {
+        log.info("临时任务-开始清理生胎库存历史重复数据");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                com.ruoyi.common.core.web.domain.AjaxResult result = cxMesSyncRemoteService.cleanCxStockHistoryDuplicate();
+                log.info("临时任务-清理生胎库存历史重复数据结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-清理生胎库存历史重复数据异常", e);
+        }
+    }
+
+    /**
+     * 临时任务：一次性执行所有历史重复数据清理
+     * 清理成型在机、硫化在机、胶囊已使用次数、硫化排程完成量、硫化排程日完成量、生胎库存
+     */
+    @ApiOperation("临时任务-清理所有历史重复数据")
+    public void cleanAllHistoryDuplicate() {
+        log.info("临时任务-开始清理所有历史重复数据");
+        cleanCxMachineOnlineHistoryDuplicate();
+        cleanLhMachineOnlineHistoryDuplicate();
+        cleanLhRepairCapsuleHistoryDuplicate();
+        cleanLhScheFinishQtyHistoryDuplicate();
+        cleanLhDayFinishQtyHistoryDuplicate();
+        cleanCxStockHistoryDuplicate();
+        log.info("临时任务-清理所有历史重复数据完成");
     }
 }

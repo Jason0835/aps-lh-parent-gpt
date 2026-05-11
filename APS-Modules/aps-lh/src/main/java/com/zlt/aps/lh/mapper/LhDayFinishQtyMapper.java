@@ -49,4 +49,22 @@ public interface LhDayFinishQtyMapper extends CommBaseMapper<LhDayFinishQty> {
     @Update("UPDATE T_LH_DAY_FINISH_QTY SET IS_DELETE = 1, UPDATE_BY = #{updateBy}, UPDATE_TIME = #{updateTime} WHERE FACTORY_CODE = #{factoryCode} AND DATE(FINISH_DATE) = #{finishDate} AND IS_DELETE = 0")
     int logicDeleteByFactoryCodeAndFinishDate(@Param("factoryCode") String factoryCode, @Param("finishDate") Date finishDate, @Param("updateBy") String updateBy, @Param("updateTime") Date updateTime);
 
+    /**
+     * 逻辑删除历史重复数据，保留每个历史完成日期DATA_VERSION最大（最新版本）的数据
+     *
+     * @return 更新的记录数
+     */
+    @Update("UPDATE T_LH_DAY_FINISH_QTY SET IS_DELETE = 1, UPDATE_BY = 'CLEAN_TASK', UPDATE_TIME = NOW() WHERE DATE(FINISH_DATE) < CURDATE() AND IS_DELETE = 0 AND " +
+            "EXISTS (" +
+            "SELECT 1 FROM (" +
+            "SELECT FACTORY_CODE, DATE(FINISH_DATE) AS finish_day, MAX(DATA_VERSION) AS max_data_version " +
+            "FROM T_LH_DAY_FINISH_QTY WHERE DATE(FINISH_DATE) < CURDATE() AND IS_DELETE = 0 " +
+            "GROUP BY FACTORY_CODE, DATE(FINISH_DATE)" +
+            ") latest " +
+            "WHERE T_LH_DAY_FINISH_QTY.FACTORY_CODE = latest.FACTORY_CODE " +
+            "AND DATE(T_LH_DAY_FINISH_QTY.FINISH_DATE) = latest.finish_day " +
+            "AND T_LH_DAY_FINISH_QTY.DATA_VERSION < latest.max_data_version" +
+            ")")
+    int cleanHistoryDuplicateData();
+
 }
