@@ -99,6 +99,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /** 默认排程天数 */
     private static final int DEFAULT_SCHEDULE_DAYS = 3;
 
+    /** 一天总秒数 */
+    private static final int SECONDS_PER_DAY = 24 * 60 * 60;
+
+    /** 秒转小时的除数 */
+    private static final int SECONDS_PER_HOUR = 3600;
+
     /** 排程起始偏移天数：前端传入最后一天，需要往前推2天开始排产 */
     private static final int SCHEDULE_START_OFFSET_DAYS = 2;
 
@@ -1734,6 +1740,18 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                                 spr.getMachineCode(), materialCode, task.getStructureName(), context);
                         tracker.setHourlyCapacity(hourlyCapacity);
                     }
+                    // 从 materialLhCapacityMap 获取日硫化量（与 TaskGroupService 逻辑一致）
+                    if (tracker.getDailyLhCapacity() == null && context.getMaterialLhCapacityMap() != null) {
+                        MonthPlanProductLhCapacityVo capacityVo = context.getMaterialLhCapacityMap().get(materialCode);
+                        if (capacityVo != null) {
+                            if (capacityVo.getDayVulcanizationQty() != null && capacityVo.getDayVulcanizationQty() > 0) {
+                                // 日硫化量是双模的，需要除以2得到单模产量
+                                tracker.setDailyLhCapacity(capacityVo.getDayVulcanizationQty() / 2);
+                            } else if (capacityVo.getStandardCapacity() != null && capacityVo.getStandardCapacity() > 0) {
+                                tracker.setDailyLhCapacity(capacityVo.getStandardCapacity());
+                            }
+                        }
+                    }
                 }
 
                 int tripCapacity = spr.getTripCapacity() != null ? spr.getTripCapacity() : 12;
@@ -1769,7 +1787,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     double stockHours = calculateStockHours(
                             currentStock, tracker.getCumulativeForming(),
                             tracker.getCumulativeVulcanize(),
-                            tracker.getVulcanizeMachineCount(), tracker.getVulcanizeMoldCount());
+                            tracker.getVulcanizeMachineCount(), tracker.getVulcanizeMoldCount(),
+                            tracker.getDailyLhCapacity());
 
                     // 计算车次时间
                     LocalDateTime tripStartTime = null;
@@ -1910,7 +1929,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /**
      * 计算库存可供硫化时长（小时）
      *
-     * <p>公式：库存可供硫化时长 = (当前库存 + 成型累计计划量) / 硫化机数 / 单台模数
+     * <p>正确公式：
+     * <pre>
+     *   单胎单模硫化时长(秒) = 86400 / 日硫化量
+     *   库存可供硫化时长(小时) = (当前库存 + 成型累计) × 单胎单模硫化时长 / 3600 / 硫化机数 / 单台模数
+     * </pre>
      *
      * <p>其中当前库存 = 期初库存 + 成型累计 - 硫化累计
      *
@@ -1919,16 +1942,22 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * @param vulcanizeConsumed 硫化累计消耗量
      * @param vulcanizeMachineCount 硫化机台数
      * @param vulcanizeMoldCount   单台模数
+     * @param dailyLhCapacity   日硫化量（单模）
      * @return 库存可供硫化时长（小时）
      */
     private double calculateStockHours(int currentStock, int cumulativeForming,
                                        int vulcanizeConsumed,
-                                       int vulcanizeMachineCount, int vulcanizeMoldCount) {
-        if (vulcanizeMachineCount <= 0 || vulcanizeMoldCount <= 0) {
+                                       int vulcanizeMachineCount, int vulcanizeMoldCount,
+                                       Integer dailyLhCapacity) {
+        if (vulcanizeMachineCount <= 0 || vulcanizeMoldCount <= 0 || dailyLhCapacity == null || dailyLhCapacity <= 0) {
             return 0;
         }
-        // 库存可供硫化时长 = (当前库存 + 成型累计) / 硫化机数 / 单台模数
-        return (double) (currentStock + cumulativeForming) / vulcanizeMachineCount / vulcanizeMoldCount;
+        // 1. 单胎单模硫化时长(秒) = 86400 / 日硫化量
+        double singleTireMoldSeconds = (double) SECONDS_PER_DAY / dailyLhCapacity;
+
+        // 2. 库存可供硫化时长(小时) = (库存 + 成型累计) × 单胎单模硫化时长 / 3600 / 硫化机数 / 单台模数
+        return (double) (currentStock + cumulativeForming) * singleTireMoldSeconds
+                / SECONDS_PER_HOUR / vulcanizeMachineCount / vulcanizeMoldCount;
     }
 
     /**
@@ -1944,6 +1973,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         private int cumulativeVulcanize;   // 硫化累计消耗
         private int vulcanizeMachineCount = 1;
         private int vulcanizeMoldCount = 1;
+        private Integer dailyLhCapacity;   // 日硫化量（单模）
         private int hourlyCapacity = 12;   // 小时产能（条/小时）
 
         EmbryoTripTracker(String embryoCode, String materialCode) {
@@ -1963,6 +1993,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         void setVulcanizeMachineCount(int count) { this.vulcanizeMachineCount = count; }
         int getVulcanizeMoldCount() { return vulcanizeMoldCount; }
         void setVulcanizeMoldCount(int count) { this.vulcanizeMoldCount = count; }
+        Integer getDailyLhCapacity() { return dailyLhCapacity; }
+        void setDailyLhCapacity(Integer capacity) { this.dailyLhCapacity = capacity; }
 
         int getCurrentStock() {
             return (beginStock != null ? beginStock : 0) + cumulativeForming - cumulativeVulcanize;

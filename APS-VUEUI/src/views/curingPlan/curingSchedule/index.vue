@@ -304,6 +304,8 @@ export default {
         current: 1,
         pageSize: 20,
         total: 0,
+        // 本页分页每页条数选项，最大 500
+        pageSizes: [10, 20, 50, 100, 200, 500],
       },
       sort: {},
       search: {

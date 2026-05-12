@@ -271,6 +271,7 @@ public class MpWeekRollAdjustController extends BaseController {
      */
     private MpRollAdjustContextDTO buildAdjustContext(MpWeekRollAdjustDTO weekRollAdjustDTO) {
         MpRollAdjustContextDTO contextDTO = BeanUtil.copyProperties(weekRollAdjustDTO, MpRollAdjustContextDTO.class);
+        contextDTO.setFrontScheduledMachinesFlag(!StringUtil.isEmptyWithTrim(weekRollAdjustDTO.getScheduledMachines()));
         return contextDTO;
     }
 
@@ -291,6 +292,7 @@ public class MpWeekRollAdjustController extends BaseController {
         Date startTime = new Date();
         log.debug(String.format("自动调整初始化,开始时间:%s", DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, startTime)));
         MpRollAdjustContextDTO contextDTO = BeanUtil.copyProperties(weekRollAdjustDTO, MpRollAdjustContextDTO.class);
+        contextDTO.setFrontScheduledMachinesFlag(!StringUtil.isEmptyWithTrim(weekRollAdjustDTO.getScheduledMachines()));
 
         // ===== 阶段1（串行）：初始定稿版本信息，后续查询依赖 productionVersion / productType =====
         weekAdjustStrategy.initVersion(contextDTO);

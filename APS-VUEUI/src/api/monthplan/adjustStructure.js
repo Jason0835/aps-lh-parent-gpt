@@ -36,21 +36,15 @@ export function getAdjustsCxMachineFromRedis() {
   })
 }
 
-/**
- * 将当前调整用成型机台写入 Redis（路径携带机台号，与后端约定一致）
- * POST /monthplan/mpStructureAllocation/setAdjustsCxMachineFromRedis/{机台号}
- * @param {string} cxMachineCode 机台编码，如 1111
- */
-export function setAdjustsCxMachineFromRedis(cxMachineCode) {
-  const code =
-    cxMachineCode == null || cxMachineCode === '' ? '' : String(cxMachineCode).trim()
+/** 将当前结构调整上下文写入 Redis，请求体与 AdjustsCxMachineVo 一致，入参在调用处组装 */
+export function setAdjustsCxMachineFromRedis(query) {
   return request({
-    url: `/monthplan/mpStructureAllocation/setAdjustsCxMachineFromRedis/${encodeURIComponent(code)}`,
+    url: '/monthplan/mpStructureAllocation/setAdjustsCxMachineFromRedis',
     method: 'post',
     headers: {
       'Content-Type': 'application/json;charset=UTF-8'
     },
-    data: {}
+    data: query
   })
 }
 
