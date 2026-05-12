@@ -8,9 +8,11 @@
       :columns="columns"
       :searchColumns="searchColumns"
       :data="data"
+      :page="page"
       :search="search"
       @refresh="getList"
       @search="handleSearch"
+      @pageChange="handlePageChange"
       @sort-change="handleSortChange"
       @selection-change="handleStructureAdjustSelectionChange"
       :showSummary="false"
@@ -32,7 +34,6 @@
           <el-button
             type="primary"
             plain
-            :disabled="isStructureAdjustEntryDisabled"
             v-hasPermi="['monthplan:mpStructureAllocation:list']"
             @click="handleStructureAdjust"
             >{{
@@ -80,6 +81,42 @@
               "
             />
           </div>
+          <div class="current-machine-wrap">
+            <span class="current-machine-label">当前调整结构</span>
+            <el-input
+              class="current-machine-input"
+              :value="currentAdjustStructure"
+              disabled
+              placeholder="当前调整结构"
+            />
+          </div>
+          <div class="current-machine-wrap">
+            <span class="current-machine-label">调整开始日期</span>
+            <el-input
+              class="current-machine-input"
+              :value="currentAdjustBeginDay"
+              disabled
+              placeholder="调整开始日期"
+            />
+          </div>
+          <div class="current-machine-wrap">
+            <span class="current-machine-label">调整结束日期</span>
+            <el-input
+              class="current-machine-input"
+              :value="currentAdjustEndDay"
+              disabled
+              placeholder="调整结束日期"
+            />
+          </div>
+          <div class="current-machine-wrap">
+            <span class="current-machine-label">版本号</span>
+            <el-input
+              class="current-machine-input"
+              :value="currentAdjustMonthPlanVersion"
+              disabled
+              placeholder="版本号"
+            />
+          </div>
         </div>
       </template>
       <template slot="footer">
@@ -88,7 +125,6 @@
             type="primary"
             :loading="confirmAdjustLoading"
             :disabled="
-              !canUsePrimaryAdjustActions ||
               confirmAdjustLoading ||
               recalculateLoading
             "
@@ -96,18 +132,6 @@
             @click="handleConfirmAdjust"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.confirmAdjust")
-            }}</el-button
-          >
-          <el-button
-            :disabled="
-              !canUseContinueAdjust ||
-              confirmAdjustLoading ||
-              recalculateLoading
-            "
-            v-hasPermi="['monthplan:mpStructureAllocation:list']"
-            @click="handleContinueAdjust"
-            >{{
-              $t("ui.data.column.monthPlanFinalAdjustQuery.continueAdjust")
             }}</el-button
           >
           <el-button
@@ -259,6 +283,7 @@ import {
   recalculateWeekRollAdjust,
   resultVersion,
   saveAdjustResult,
+  setAdjustsCxMachineFromRedis,
   statisticsResult
 } from "@/api/monthplan/adjustStructure";
 import structureAdjustDialog from "./components/structureAdjustDialog.vue";
@@ -277,6 +302,7 @@ export default {
     "biz_yes_no",
     "biz_class_type",
     "biz_machine_brand",
+    "biz_construction_stage",
   ],
   provide() {
     return {
@@ -298,6 +324,14 @@ export default {
       versionOptions: [],
       /** 当前调整机台（只读，来自 Redis） */
       currentAdjustMachine: "",
+      /** 当前调整结构（来自 Redis） */
+      currentAdjustStructure: "",
+      /** 调整开始日期（来自 Redis） */
+      currentAdjustBeginDay: "",
+      /** 调整结束日期（来自 Redis） */
+      currentAdjustEndDay: "",
+      /** 调整版本号（来自 Redis） */
+      currentAdjustMonthPlanVersion: "",
       confirmAdjustLoading: false,
       recalculateLoading: false,
       syncLoading: false,
@@ -578,6 +612,11 @@ export default {
           width: 120,
         },
         {
+          prop: "trialProductionQty",
+          label: this.$t("ui.data.monthlyProductionPlan.trialProductionQty"),
+          width: 120,
+        },
+        {
           prop: "isLockSchedule",
           label: this.$t(
             "ui.data.column.monthPlanFinalAdjustQuery.isLockSchedule"
@@ -803,14 +842,75 @@ export default {
       }
       return "";
     },
+    /**
+     * 解析 getAdjustsCxMachineFromRedis 返回值，提取所有字段
+     */
+    extractRedisFields(payload) {
+      const empty = {
+        cxMachineCode: "",
+        structureName: "",
+        beginDay: "",
+        endDay: "",
+        monthPlanVersion: "",
+      };
+      if (payload == null || payload === "") {
+        return empty;
+      }
+      if (typeof payload === "string" || typeof payload === "number") {
+        return { ...empty, cxMachineCode: String(payload).trim() };
+      }
+      const inner =
+        payload.data !== undefined && payload.code === undefined
+          ? payload.data
+          : payload;
+      if (typeof inner === "string" || typeof inner === "number") {
+        return { ...empty, cxMachineCode: String(inner).trim() };
+      }
+      if (inner && typeof inner === "object") {
+        const resolve = (obj) => ({
+          cxMachineCode:
+            obj.cxMachineCode != null && obj.cxMachineCode !== ""
+              ? String(obj.cxMachineCode).trim()
+              : obj.currentAdjustMachine != null
+                ? String(obj.currentAdjustMachine).trim()
+                : obj.currentCxMachine != null
+                  ? String(obj.currentCxMachine).trim()
+                  : "",
+          structureName:
+            obj.structureName != null ? String(obj.structureName).trim() : "",
+          beginDay:
+            obj.beginDay != null ? String(obj.beginDay).trim() : "",
+          endDay:
+            obj.endDay != null ? String(obj.endDay).trim() : "",
+          monthPlanVersion:
+            obj.monthPlanVersion != null
+              ? String(obj.monthPlanVersion).trim()
+              : "",
+        });
+        if (inner.data != null && typeof inner.data === "object") {
+          return resolve(inner.data);
+        }
+        return resolve(inner);
+      }
+      return empty;
+    },
     /** 从 Redis 拉取当前调整机台并回显到选择器 */
     async fetchCurrentAdjustMachineFromRedis() {
       try {
         const res = await getAdjustsCxMachineFromRedis();
-        this.currentAdjustMachine = this.extractRedisCxMachine(res);
+        const fields = this.extractRedisFields(res);
+        this.currentAdjustMachine = fields.cxMachineCode;
+        this.currentAdjustStructure = fields.structureName;
+        this.currentAdjustBeginDay = fields.beginDay;
+        this.currentAdjustEndDay = fields.endDay;
+        this.currentAdjustMonthPlanVersion = fields.monthPlanVersion;
       } catch (e) {
         console.error(e);
         this.currentAdjustMachine = "";
+        this.currentAdjustStructure = "";
+        this.currentAdjustBeginDay = "";
+        this.currentAdjustEndDay = "";
+        this.currentAdjustMonthPlanVersion = "";
       }
     },
     /**
@@ -866,6 +966,121 @@ export default {
       row.beginDay = realBeginDay === monthMaxDay + 1 ? 0 : realBeginDay;
       row.endDay = realEndDay;
     },
+    allocateProductionByPriority(row) {
+      if (!row) {
+        return;
+      }
+      let totalQty = 0;
+      for (let i = 1; i <= 31; i++) {
+        const val = Number(row[`day${i}`] || 0);
+        totalQty += val;
+      }
+      row.totalQty = totalQty;
+
+      const stageLabel = this.selectDictLabel(
+        this.dict.type.biz_construction_stage,
+        row.constructionStage
+      );
+      if (
+        stageLabel &&
+        (stageLabel.indexOf("试制") !== -1 || stageLabel.indexOf("量试") !== -1)
+      ) {
+        row.trialProductionQty = totalQty;
+        row.heightProductionQty = 0;
+        row.midProductionQty = 0;
+        row.cycleProductionQty = 0;
+        row.conventionProductionQty = 0;
+        row.postponeProductionQty = 0;
+        return;
+      }
+
+      row.trialProductionQty = 0;
+      row.heightProductionQty = 0;
+      row.midProductionQty = 0;
+      row.cycleProductionQty = 0;
+      row.conventionProductionQty = 0;
+      row.postponeProductionQty = 0;
+
+      if (!totalQty || totalQty <= 0) {
+        return;
+      }
+
+      let remainingQty = totalQty;
+      const scmPriorities = [];
+
+      const heightQty = Number(row.heightQty || 0);
+      if (heightQty > 0) {
+        row.heightProductionQty = Math.min(remainingQty, heightQty);
+        remainingQty -= row.heightProductionQty;
+        scmPriorities.push("height");
+      }
+
+      if (remainingQty > 0) {
+        const midQty = Number(row.midQty || 0);
+        if (midQty > 0) {
+          row.midProductionQty = Math.min(remainingQty, midQty);
+          remainingQty -= row.midProductionQty;
+          scmPriorities.push("mid");
+        }
+      }
+
+      if (remainingQty > 0) {
+        const cycleReserveQty = Number(row.cycleReserveQty || 0);
+        if (cycleReserveQty > 0) {
+          row.cycleProductionQty = Math.min(remainingQty, cycleReserveQty);
+          remainingQty -= row.cycleProductionQty;
+          scmPriorities.push("cycle");
+        }
+      }
+
+      const adjustPriority = Number(row.adjustPriority || 0);
+      if (adjustPriority > 0 && remainingQty > 0) {
+        const postponeQty = Number(row.postponeQty || 0);
+        if (postponeQty > 0) {
+          row.postponeProductionQty = Math.min(remainingQty, postponeQty);
+          remainingQty -= row.postponeProductionQty;
+          scmPriorities.push("postpone");
+        }
+      }
+
+      if (remainingQty > 0) {
+        const conventionReserveQty = Number(row.conventionReserveQty || 0);
+        if (conventionReserveQty > 0) {
+          row.conventionProductionQty = Math.min(
+            remainingQty,
+            conventionReserveQty
+          );
+          remainingQty -= row.conventionProductionQty;
+          scmPriorities.push("convention");
+        }
+      }
+
+      if (remainingQty > 0 && scmPriorities.length > 0) {
+        const lastPriority = scmPriorities[scmPriorities.length - 1];
+        switch (lastPriority) {
+          case "convention":
+            row.conventionProductionQty =
+              (row.conventionProductionQty || 0) + remainingQty;
+            break;
+          case "postpone":
+            row.postponeProductionQty =
+              (row.postponeProductionQty || 0) + remainingQty;
+            break;
+          case "mid":
+            row.midProductionQty =
+              (row.midProductionQty || 0) + remainingQty;
+            break;
+          case "cycle":
+            row.cycleProductionQty =
+              (row.cycleProductionQty || 0) + remainingQty;
+            break;
+          default:
+            row.heightProductionQty =
+              (row.heightProductionQty || 0) + remainingQty;
+            break;
+        }
+      }
+    },
     /**
      * 修改 1–31 号日排产后实时保存，与 rollingCycle handleResultDayEdit 一致
      */
@@ -881,6 +1096,7 @@ export default {
       try {
         this.recalculateBeginEndDay(row);
         await saveAdjustResult(row);
+        this.allocateProductionByPriority(row);
       } catch (err) {
         console.error(err);
       }
@@ -980,12 +1196,19 @@ export default {
       }
       this.getList();
     },
-    /** 列表 list4Adjust 入参（接口一次性返回全量，不含分页字段） */
+    handlePageChange(current, pageSize) {
+      this.$set(this.page, "current", current);
+      this.$set(this.page, "pageSize", pageSize);
+      this.getList();
+    },
+    /** 列表 list4Adjust 入参 */
     formatParams() {
       const params = {
         ...this.query,
         ...this.sort,
       };
+      params.pageSize = this.page.pageSize;
+      params.pageNum = this.page.current;
       if (params.yearMonth) {
         const arr = params.yearMonth.split("-");
         params.year = Number(arr[0]);
@@ -1066,6 +1289,7 @@ export default {
         delete listParams.productionVersion;
         const res = await listMonthPlanFinal4Adjust(listParams);
         const rawRows = res.rows || [];
+        this.page.total = res.total || 0;
         await this.applyAdjustmentStatisticsRows(rawRows);
       } catch (e) {
         console.error(e);
@@ -1613,9 +1837,6 @@ export default {
       return payload;
     },
     async handleConfirmAdjust() {
-      if (!this.canUsePrimaryAdjustActions) {
-        return;
-      }
       const payload = this.prepareWeekRollSubmitPayloadOrWarn();
       if (!payload) {
         return;
@@ -1627,6 +1848,10 @@ export default {
           (res && res.msg) ||
             this.$t("common.msg.ajax.operation.success")
         );
+        await setAdjustsCxMachineFromRedis("");
+        if (this.$refs.structureAdjustDialogRef) {
+          this.$refs.structureAdjustDialogRef.dialogVisible = false;
+        }
         await this.getList();
         await this.fetchCurrentAdjustMachineFromRedis();
       } catch (e) {
@@ -1634,37 +1859,6 @@ export default {
       } finally {
         this.confirmAdjustLoading = false;
       }
-    },
-    /** 继续调整：打开结构调整弹窗并带入当前调整机台（弹窗内机台只读） */
-    handleContinueAdjust() {
-      if (!this.canUseContinueAdjust) {
-        return;
-      }
-      const ym = this.query.yearMonth || this.search.yearMonth;
-      const fc = this.query.factoryCode || this.search.factoryCode || "116";
-      if (!ym) {
-        this.$modal.msgWarning(
-          this.$t(
-            "ui.data.column.monthPlanFinalAdjustQuery.pleaseSelectYearMonth"
-          )
-        );
-        return;
-      }
-      const machine = (this.currentAdjustMachine || "").trim();
-      if (!machine) {
-        this.$modal.msgWarning(
-          this.$t(
-            "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedMachine"
-          )
-        );
-        return;
-      }
-      this.$refs.structureAdjustDialogRef.show({
-        factoryCode: fc,
-        yearMonth: ym,
-        ...this.buildStructureDialogListVersionParams(),
-        fixedCxMachineCode: machine,
-      });
     },
     /** 重新计算：POST /monthplan/mpWeekRollAdjust，body 与 confirmAdjust 完全一致 */
     async handleRecalculate() {
