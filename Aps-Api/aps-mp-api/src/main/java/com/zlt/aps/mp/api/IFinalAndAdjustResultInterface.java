@@ -21,6 +21,14 @@ public interface IFinalAndAdjustResultInterface {
 
     String getMaterialCode();
 
+    /**
+     * 获取施工阶段，用于定稿结果与调整结果按相同业务维度匹配。
+     *
+     * @return 施工阶段
+     */
+    default String getConstructionStage() {
+        return "";
+    }
 
     String getMainPattern();
 

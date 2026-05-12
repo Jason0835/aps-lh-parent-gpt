@@ -864,33 +864,58 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      */
     @Override
     public List<FactoryMonthPlanProductionFinal4AdjustVo> list4Adjust(FactoryMonthPlanProductionFinalResult condition) {
+        // 调整列表以传入的调整版本号优先匹配；没有调整版本号时使用排产版本号匹配。
+        String matchVersion = StringUtils.defaultIfBlank(condition.getVersion(), condition.getProductionVersion());
         List<FactoryMonthPlanProductionFinal4AdjustVo> dataList = this.finalMapper.list4Adjust(condition);
+        // 先放入定稿数据，保证定稿独有数据不会丢失，并保留原列表顺序。
+        Map<String, FactoryMonthPlanProductionFinal4AdjustVo> finalResultMap = new LinkedHashMap<>();
+        if (CollectionUtils.isNotEmpty(dataList)) {
+            for (FactoryMonthPlanProductionFinal4AdjustVo adjustVo : dataList) {
+                finalResultMap.putIfAbsent(buildAdjustMapKey(matchVersion, adjustVo), adjustVo);
+            }
+        }
         // 查询调整
+        List<MpAdjustResult> mpAdjustResultList = new ArrayList<>();
         LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MpAdjustResult::getFactoryCode, condition.getFactoryCode());
         queryWrapper.eq(MpAdjustResult::getYear, condition.getYear());
         queryWrapper.eq(MpAdjustResult::getMonth, condition.getMonth());
+        // 前端传入 version 时表示调整版本号，对应调整结果表 VERSION 字段。
+        queryWrapper.eq(MpAdjustResult::getVersion, matchVersion);
         queryWrapper.eq(MpAdjustResult::getIsDelete, YesOrNoEnum.NO.getCode());
-        List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
-        Map<String, MpAdjustResult> mpAdjustResultMap = new HashMap<>();
+        mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
+
+        Map<String, MpAdjustResult> mpAdjustResultMap = new LinkedHashMap<>();
         if (CollectionUtils.isNotEmpty(mpAdjustResultList)) {
-            mpAdjustResultMap = mpAdjustResultList.stream().collect(Collectors.toMap(this::buildAdjustMapKey, Function.identity(), (s1, s2) -> s1));
-        }
-        if (CollectionUtils.isNotEmpty(dataList)) {
-            for (FactoryMonthPlanProductionFinal4AdjustVo adjustVo : dataList) {
-                String mapKey = buildAdjustMapKey(adjustVo);
-                if (mpAdjustResultMap.containsKey(mapKey)) {
-                    MpAdjustResult mpAdjustResult = mpAdjustResultMap.get(mapKey);
-                    BeanUtil.copyProperties(mpAdjustResult, adjustVo);
-                }
+            for (MpAdjustResult mpAdjustResult : mpAdjustResultList) {
+                mpAdjustResultMap.putIfAbsent(buildAdjustMapKey(matchVersion, mpAdjustResult), mpAdjustResult);
             }
-            Locale language = SecurityUtils.getUserLang();
-            JsonUtils.parseJsonRemarkList(dataList, language.toString(), "reason");
         }
-        return dataList;
+        for (Map.Entry<String, MpAdjustResult> entry : mpAdjustResultMap.entrySet()) {
+            FactoryMonthPlanProductionFinal4AdjustVo adjustVo = finalResultMap.get(entry.getKey());
+            if (adjustVo == null) {
+                adjustVo = new FactoryMonthPlanProductionFinal4AdjustVo();
+                finalResultMap.put(entry.getKey(), adjustVo);
+            }
+            // 相同业务Key时以调整结果为准；调整独有数据转换为同一VO后追加返回。
+            BeanUtil.copyProperties(entry.getValue(), adjustVo);
+        }
+        List<FactoryMonthPlanProductionFinal4AdjustVo> resultList = new ArrayList<>(finalResultMap.values());
+        if (CollectionUtils.isNotEmpty(resultList)) {
+            Locale language = SecurityUtils.getUserLang();
+            JsonUtils.parseJsonRemarkList(resultList, language.toString(), "reason");
+        }
+        return resultList;
     }
 
-    private String buildAdjustMapKey(IFinalAndAdjustResultInterface item) {
-        return StringUtils.defaultIfBlank(item.getLastMonthPlanVersion(), item.getMonthPlanVersion()) + "|" + item.getProductionVersion() + "|" + item.getMaterialCode();
+    /**
+     * 构建月计划调整结果匹配键，用于定稿结果与调整结果按同一业务维度合并。
+     *
+     * @param matchVersion 查询传入的调整版本号，未传调整版本号时使用排产版本号
+     * @param item         定稿结果或调整结果数据
+     * @return 版本号、物料编码、施工阶段组成的匹配键
+     */
+    private String buildAdjustMapKey(String matchVersion, IFinalAndAdjustResultInterface item) {
+        return matchVersion + "|" + item.getMaterialCode() + "|" + item.getConstructionStage();
     }
 }
