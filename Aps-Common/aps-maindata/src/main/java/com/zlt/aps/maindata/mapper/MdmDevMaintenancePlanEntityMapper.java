@@ -39,4 +39,15 @@ public interface MdmDevMaintenancePlanEntityMapper extends BaseMapper<MdmDevMain
      * @return 最大版本号，无数据时返回null
      */
     String selectMaxDataVersion(@Param("precisionType") String precisionType);
+
+    /**
+     * 查询指定精度类型和版本号前缀的最大版本号
+     * 用于按版本前缀过滤，如只取APS_MES_AH01前缀的最新版本
+     *
+     * @param precisionType 精度类型（如：硫化精度）
+     * @param versionPrefix 版本号前缀（如：APS_MES_AH01）
+     * @return 最大版本号，无数据时返回null
+     */
+    String selectMaxDataVersionByPrefix(@Param("precisionType") String precisionType,
+                                         @Param("versionPrefix") String versionPrefix);
 }
