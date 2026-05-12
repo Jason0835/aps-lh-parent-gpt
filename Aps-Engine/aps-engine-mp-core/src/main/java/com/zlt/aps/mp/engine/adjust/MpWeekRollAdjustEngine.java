@@ -2723,6 +2723,12 @@ public class MpWeekRollAdjustEngine {
             return;
         }
 
+        if (ConstructionStageEnum.MEASUREMENT.getStage().equals(adjustResult.getConstructionStage()) ||
+                ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(adjustResult.getConstructionStage())){
+            //若是试制、量试，全归到试制量试排产量
+            adjustResult.setTrialProductionQty(adjustResult.getTotalQty());
+            return;
+        }
         int remainingQty = adjustResult.getTotalQty();
         List<String> scmPriorities = Lists.newArrayList();
         // 1. 分配高优先级
