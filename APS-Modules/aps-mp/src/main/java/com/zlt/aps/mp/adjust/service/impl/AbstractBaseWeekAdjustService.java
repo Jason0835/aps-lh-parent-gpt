@@ -51,6 +51,7 @@ import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
+import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
 import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
@@ -154,6 +155,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected DpDemandPlanEntityMapper demandPlanEntityMapper;
+
+    @Autowired
+    private IFactoryMonthPlanProductionFinalResultService finalResultService;
 
     @Override
     public void generateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
@@ -922,10 +926,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 contextDTO.getStructureName(), contextDTO.getScheduledMachines(), contextDTO.getStartDay(),
                 contextDTO.getEndDay(), contextDTO.getAdjustStartDay(), contextDTO.getAdjustEndDay());
         try{
-            // 查询周程调整结果
-            queryAdjustResult(contextDTO);
-            // 根据优先级顺序分配生产数量
-            allocateProductionByPriority(contextDTO);
+            FactoryMonthPlanProductionFinalResult params = new FactoryMonthPlanProductionFinalResult();
+            BeanUtil.copyProperties(contextDTO, params);
+            params.setYear(contextDTO.getMpYear());
+            params.setMonth(contextDTO.getMpMonth());
+            finalResultService.list4Adjust(params);
             // 处理月计划统计结果
             if (isHandleMonthPlanStatistics) {
                 handleMonthPlanStatistics(contextDTO);
