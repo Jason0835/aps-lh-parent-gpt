@@ -414,7 +414,7 @@ export default {
         },
         {
           /** 与 rollingCycle/index.backup-legacy.vue 结构调整 Tab（activeName==second）一致：字段名为 productionVersion */
-          prop: "productionVersion",
+          prop: "version",
           label: this.$t(
             "ui.data.column.monthPlanFinalAdjustQuery.productionVersion"
           ),
