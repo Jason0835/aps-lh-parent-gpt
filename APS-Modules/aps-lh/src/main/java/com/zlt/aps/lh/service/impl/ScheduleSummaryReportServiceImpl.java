@@ -3,6 +3,7 @@ package com.zlt.aps.lh.service.impl;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
+import com.zlt.aps.common.core.domain.ExcelCellRangeAddress;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
@@ -10,6 +11,7 @@ import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
 import com.zlt.aps.lh.api.domain.entity.LhShiftConfig;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
+import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.mapper.CxLhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.CxParamConfigMapper;
 import com.zlt.aps.lh.mapper.CxScheduleResultMapper;
@@ -18,6 +20,7 @@ import com.zlt.aps.lh.mapper.LhMouldCleanPlanMapper;
 import com.zlt.aps.lh.mapper.LhShiftConfigMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
@@ -29,8 +32,6 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import java.io.InputStream;
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -73,6 +74,12 @@ import java.util.stream.Collectors;
 @Service
 public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportService {
 
+    private static final int SMALL_RUBBER_TITLE_ROW_INDEX = 6;
+
+    private static final int SMALL_RUBBER_START_COL = 0;
+
+    private static final int SMALL_RUBBER_END_COL = 1;
+
     @Resource
     private CxLhScheduleResultMapper cxLhScheduleResultMapper;
 
@@ -104,13 +111,28 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         }
 
         Date scheduleDate = DateUtil.parse(queryVO.getScheduleDate(), "yyyy-MM-dd");
+        scheduleDate = LhScheduleTimeUtil.clearTime(scheduleDate);
         String factoryCode = StringUtils.defaultString(queryVO.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
+
+        log.info("排产小结导出开始, 排程日期: {}, 分厂: {}", DateUtil.formatDate(scheduleDate), factoryCode);
 
         List<LhShiftConfig> shiftConfigs = loadShiftConfigs(factoryCode);
         Map<Integer, String> classShiftTypeMap = buildClassShiftTypeMap(shiftConfigs);
 
         Map<String, Object> tableMap = buildTableMap(scheduleDate, factoryCode, classShiftTypeMap);
         List<List<Map<String, Object>>> dataList = buildDataList(scheduleDate, factoryCode);
+
+        // 小胶种标题行合并单元格：第7行（索引6）的A列到B列合并
+        List<Map<String, Object>> smallRubberList = dataList.isEmpty() ? Collections.emptyList() : dataList.get(0);
+        if (!smallRubberList.isEmpty()) {
+            List<ExcelCellRangeAddress> rangeAddressList = new ArrayList<>();
+            rangeAddressList.add(new ExcelCellRangeAddress(
+                    SMALL_RUBBER_TITLE_ROW_INDEX,
+                    SMALL_RUBBER_TITLE_ROW_INDEX,
+                    SMALL_RUBBER_START_COL,
+                    SMALL_RUBBER_END_COL));
+            tableMap.put(ExcelUtils.RANGE_ADDRESS, rangeAddressList);
+        }
 
         InputStream inputStream = this.getClass().getClassLoader()
                 .getResourceAsStream("excelModel/scheduleSummaryReport.xlsx");
@@ -129,15 +151,15 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                                               Map<Integer, String> classShiftTypeMap) {
         Map<String, Object> map = new HashMap<>(32);
 
-        // 标题日期：中文+越南语两行
         map.put("titleDate", DateUtil.format(scheduleDate, "MM月dd日") + "计划排产\n"
                 + "Ke hoach san xuat ngay " + DateUtil.format(scheduleDate, "dd/MM"));
 
-        // 成型排程结果
+        // 成型排程结果：CxScheduleResult没有isDelete字段，无需过滤
         List<CxScheduleResult> cxResults = cxScheduleResultMapper.selectList(
                 new LambdaQueryWrapper<CxScheduleResult>()
                         .eq(CxScheduleResult::getScheduleDate, scheduleDate)
                         .eq(CxScheduleResult::getFactoryCode, factoryCode));
+        log.info("成型排程结果查询完成, 日期: {}, 数量: {}", DateUtil.formatDate(scheduleDate), cxResults.size());
 
         BigDecimal cxNightTotal = BigDecimal.ZERO;
         BigDecimal cxMorningTotal = BigDecimal.ZERO;
@@ -161,16 +183,22 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         map.put("cxMiddleQty", cxMiddleTotal.toString());
         map.put("cxTotalQty", cxNightTotal.add(cxMorningTotal).add(cxMiddleTotal).toString());
 
+        log.info("成型排程汇总 - 夜班: {}, 早班: {}, 中班: {}, 合计: {}",
+                cxNightTotal, cxMorningTotal, cxMiddleTotal,
+                cxNightTotal.add(cxMorningTotal).add(cxMiddleTotal));
+
         // 成型试制/量试信息：从原因分析字段匹配
         map.put("cxSetupInfo", buildCxSetupOrTrialInfo(cxResults, "试制"));
         map.put("cxTrialInfo", buildCxSetupOrTrialInfo(cxResults, "量试"));
         map.put("cxSpecSwitch", String.join("；", structureChanges));
 
-        // 硫化排程结果
+        // 硫化排程结果：cx-lh-api的LhScheduleResult有isDelete字段，需要过滤
         List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> lhResults = cxLhScheduleResultMapper.selectList(
                 new LambdaQueryWrapper<com.zlt.aps.cx.entity.schedule.LhScheduleResult>()
                         .eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getScheduleDate, scheduleDate)
-                        .eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getFactoryCode, factoryCode));
+                        .eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getFactoryCode, factoryCode)
+                        .eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        log.info("硫化排程结果查询完成, 日期: {}, 数量: {}", DateUtil.formatDate(scheduleDate), lhResults.size());
 
         BigDecimal lhNightTotal = BigDecimal.ZERO;
         BigDecimal lhMorningTotal = BigDecimal.ZERO;
@@ -195,31 +223,18 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         map.put("lhMiddleMachines", String.valueOf(middleMachines));
         map.put("lhTotalMachines", String.valueOf(nightMachines + morningMachines + middleMachines));
 
-        // 模具交模信息：从换模计划表查询
+        log.info("硫化排程汇总 - 夜班: {}, 早班: {}, 中班: {}, 合计: {}, 开动机台 - 夜: {}, 早: {}, 中: {}, 合计: {}",
+                lhNightTotal, lhMorningTotal, lhMiddleTotal,
+                lhNightTotal.add(lhMorningTotal).add(lhMiddleTotal),
+                nightMachines, morningMachines, middleMachines,
+                nightMachines + morningMachines + middleMachines);
+
+        // 模具交模信息：从换模计划表查询，需过滤isDelete
         map.put("mouldChangeInfo", buildMouldChangeInfo(scheduleDate, factoryCode));
 
-        // 模具清洗日期和清洗信息
-        LocalDate localDate = scheduleDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-        Date startDate = Date.from(localDate.minusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
-        Date endDate = Date.from(localDate.plusDays(1).atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant());
-
-        List<LhMouldCleanPlan> cleanPlans = lhMouldCleanPlanMapper.selectList(
-                new LambdaQueryWrapper<LhMouldCleanPlan>()
-                        .eq(LhMouldCleanPlan::getFactoryCode, factoryCode)
-                        .ge(LhMouldCleanPlan::getCleanTime, startDate)
-                        .le(LhMouldCleanPlan::getCleanTime, endDate));
-
-        if (!cleanPlans.isEmpty()) {
-            map.put("mouldCleanDate", DateUtil.format(cleanPlans.get(0).getCleanTime(), "MM月dd日"));
-            map.put("mouldCleanInfo", cleanPlans.stream()
-                    .map(LhMouldCleanPlan::getLhCode)
-                    .filter(StringUtils::isNotBlank)
-                    .distinct()
-                    .collect(Collectors.joining("、")));
-        } else {
-            map.put("mouldCleanDate", "");
-            map.put("mouldCleanInfo", "");
-        }
+        // 模具清洗日期和清洗信息：参考LhBaseDataServiceImpl的查询方式
+        map.put("mouldCleanDate", buildMouldCleanDate(scheduleDate, factoryCode));
+        map.put("mouldCleanInfo", buildMouldCleanInfo(scheduleDate, factoryCode));
 
         // 成型/硫化备注
         map.put("cxRemark", buildCxRemark(cxResults));
@@ -253,10 +268,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     /**
      * 判断成型排程结果的任意一班原因分析字段是否包含指定关键字
-     *
-     * @param result  成型排程结果
-     * @param keyword 关键字
-     * @return 是否包含
      */
     private boolean containsKeywordInAnyAnalysis(CxScheduleResult result, String keyword) {
         return StringUtils.contains(result.getClass1Analysis(), keyword)
@@ -273,6 +284,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * 构建模具交模信息
      *
      * <p>查询排程日期对应的换模计划，按机台汇总格式如"机台A: 前规格→后规格；机台B: 前规格→后规格"</p>
+     * <p>参考LhBaseDataServiceImpl的查询方式，添加isDelete过滤</p>
      *
      * @param scheduleDate 排程日期
      * @param factoryCode  分厂编码
@@ -283,13 +295,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 new LambdaQueryWrapper<LhMouldChangePlan>()
                         .eq(LhMouldChangePlan::getFactoryCode, factoryCode)
                         .eq(LhMouldChangePlan::getScheduleDate, scheduleDate)
-                        .eq(LhMouldChangePlan::getIsDelete, 0));
+                        .and(w -> w.eq(LhMouldChangePlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                                .or().isNull(LhMouldChangePlan::getIsDelete)));
+        log.info("模具交替计划查询完成, 日期: {}, 数量: {}", DateUtil.formatDate(scheduleDate), changePlans.size());
 
         if (changePlans.isEmpty()) {
             return "";
         }
 
-        // 按机台分组，同机台多个换模用"、"
         Map<String, List<LhMouldChangePlan>> machineGroupMap = changePlans.stream()
                 .filter(p -> StringUtils.isNotBlank(p.getLhMachineCode()))
                 .collect(Collectors.groupingBy(LhMouldChangePlan::getLhMachineCode, LinkedHashMap::new, Collectors.toList()));
@@ -303,6 +316,82 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                             + StringUtils.defaultString(p.getAfterMaterialDesc()))
                     .collect(Collectors.toList());
             machineParts.add(machineName + ": " + String.join("、", changeParts));
+        }
+        return String.join("；", machineParts);
+    }
+
+    /**
+     * 构建模具清洗日期
+     *
+     * <p>查询排程日期当天的清洗计划，取第一条的清洗时间作为日期</p>
+     * <p>参考LhBaseDataServiceImpl的查询方式，添加isDelete过滤</p>
+     *
+     * @param scheduleDate 排程日期
+     * @param factoryCode  分厂编码
+     * @return 清洗日期字符串
+     */
+    private String buildMouldCleanDate(Date scheduleDate, String factoryCode) {
+        Date dayStart = LhScheduleTimeUtil.clearTime(scheduleDate);
+        Date dayEnd = LhScheduleTimeUtil.addDays(dayStart, 1);
+
+        List<LhMouldCleanPlan> cleanPlans = lhMouldCleanPlanMapper.selectList(
+                new LambdaQueryWrapper<LhMouldCleanPlan>()
+                        .eq(LhMouldCleanPlan::getFactoryCode, factoryCode)
+                        .ge(LhMouldCleanPlan::getCleanTime, dayStart)
+                        .lt(LhMouldCleanPlan::getCleanTime, dayEnd)
+                        .and(w -> w.eq(LhMouldCleanPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                                .or().isNull(LhMouldCleanPlan::getIsDelete))
+                        .orderByAsc(LhMouldCleanPlan::getCleanTime));
+        log.info("模具清洗计划查询完成, 日期范围: {} ~ {}, 数量: {}",
+                DateUtil.formatDateTime(dayStart), DateUtil.formatDateTime(dayEnd), cleanPlans.size());
+
+        if (!cleanPlans.isEmpty()) {
+            return DateUtil.format(cleanPlans.get(0).getCleanTime(), "MM月dd日");
+        }
+        return "";
+    }
+
+    /**
+     * 构建模具清洗信息
+     *
+     * <p>查询排程日期当天的清洗计划，按机台汇总格式如"机台A: 清洗类型；机台B: 清洗类型"</p>
+     * <p>参考LhBaseDataServiceImpl的查询方式，添加isDelete过滤</p>
+     *
+     * @param scheduleDate 排程日期
+     * @param factoryCode  分厂编码
+     * @return 清洗信息字符串
+     */
+    private String buildMouldCleanInfo(Date scheduleDate, String factoryCode) {
+        Date dayStart = LhScheduleTimeUtil.clearTime(scheduleDate);
+        Date dayEnd = LhScheduleTimeUtil.addDays(dayStart, 1);
+
+        List<LhMouldCleanPlan> cleanPlans = lhMouldCleanPlanMapper.selectList(
+                new LambdaQueryWrapper<LhMouldCleanPlan>()
+                        .eq(LhMouldCleanPlan::getFactoryCode, factoryCode)
+                        .ge(LhMouldCleanPlan::getCleanTime, dayStart)
+                        .lt(LhMouldCleanPlan::getCleanTime, dayEnd)
+                        .and(w -> w.eq(LhMouldCleanPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                                .or().isNull(LhMouldCleanPlan::getIsDelete))
+                        .orderByAsc(LhMouldCleanPlan::getCleanTime));
+
+        if (cleanPlans.isEmpty()) {
+            return "";
+        }
+
+        Map<String, List<LhMouldCleanPlan>> machineGroupMap = cleanPlans.stream()
+                .filter(p -> StringUtils.isNotBlank(p.getLhCode()))
+                .collect(Collectors.groupingBy(LhMouldCleanPlan::getLhCode, LinkedHashMap::new, Collectors.toList()));
+
+        List<String> machineParts = new ArrayList<>();
+        for (Map.Entry<String, List<LhMouldCleanPlan>> entry : machineGroupMap.entrySet()) {
+            String machineCode = entry.getKey();
+            List<LhMouldCleanPlan> plans = entry.getValue();
+            String cleanTypes = plans.stream()
+                    .map(p -> StringUtils.defaultString(p.getCleanType()))
+                    .filter(StringUtils::isNotBlank)
+                    .distinct()
+                    .collect(Collectors.joining("/"));
+            machineParts.add(machineCode + ": " + cleanTypes);
         }
         return String.join("；", machineParts);
     }
@@ -326,7 +415,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     private List<List<Map<String, Object>>> buildDataList(Date scheduleDate, String factoryCode) {
         List<Map<String, Object>> smallRubberList = new ArrayList<>();
 
-        // Step1：读取胶种类型配置
         List<String> rubberTypeCodes = loadRubberTypeCodes();
         if (rubberTypeCodes.isEmpty()) {
             log.warn("未配置胶种类型编码（RUBBER_TYPE_CODES），小胶种列表为空");
@@ -335,7 +423,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return dataList;
         }
 
-        // Step2：查询本次成型排程结果的胎胚列表
+        // 查询本次成型排程结果的胎胚列表
         List<CxScheduleResult> cxResults = cxScheduleResultMapper.selectList(
                 new LambdaQueryWrapper<CxScheduleResult>()
                         .eq(CxScheduleResult::getScheduleDate, scheduleDate)
@@ -346,20 +434,24 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 .collect(Collectors.toSet());
 
         if (scheduleEmbryoCodes.isEmpty()) {
+            log.warn("成型排程结果中无胎胚代码，小胶种列表为空");
             List<List<Map<String, Object>>> dataList = new ArrayList<>();
             dataList.add(smallRubberList);
             return dataList;
         }
 
-        // Step3：按胶种类型查询对应的胎胚，构建胶种→胎胚映射
+        // 按胶种类型查询对应的胎胚，构建胶种→胎胚映射
         Map<String, Set<String>> rubberTypeEmbryoMap = new LinkedHashMap<>();
         for (String rubberType : rubberTypeCodes) {
             String childMaterialName = "AQ" + rubberType;
             List<MdmMaterialConsumeDetail> consumeDetails = mdmMaterialConsumeDetailMapper.selectList(
                     new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
                             .eq(MdmMaterialConsumeDetail::getFactoryCode, factoryCode)
-                            .eq(MdmMaterialConsumeDetail::getIsDelete, 0)
-                            .eq(MdmMaterialConsumeDetail::getChildMaterialName, childMaterialName));
+                            .eq(MdmMaterialConsumeDetail::getChildMaterialName, childMaterialName)
+                            .and(w -> w.eq(MdmMaterialConsumeDetail::getIsDelete, 0)
+                                    .or().isNull(MdmMaterialConsumeDetail::getIsDelete)));
+            log.info("胶种类型[{}]消耗明细查询, CHILD_MATERIAL_NAME: {}, 数量: {}",
+                    rubberType, childMaterialName, consumeDetails.size());
 
             Set<String> embryoCodes = consumeDetails.stream()
                     .map(MdmMaterialConsumeDetail::getEmbryoCode)
@@ -368,26 +460,29 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             rubberTypeEmbryoMap.put(rubberType, embryoCodes);
         }
 
-        // Step4：查询物料主数据，构建胎胚→规格+花纹映射
+        // 查询物料主数据，构建胎胚→规格+花纹映射
         Set<String> allRelevantEmbryoCodes = rubberTypeEmbryoMap.values().stream()
                 .flatMap(Set::stream)
                 .filter(scheduleEmbryoCodes::contains)
                 .collect(Collectors.toSet());
+
+        log.info("需要查询物料主数据的胎胚代码数量: {}", allRelevantEmbryoCodes.size());
 
         Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
         if (!allRelevantEmbryoCodes.isEmpty()) {
             List<MdmMaterialInfo> materialInfoList = mdmMaterialInfoMapper.selectList(
                     new LambdaQueryWrapper<MdmMaterialInfo>()
                             .in(MdmMaterialInfo::getMaterialCode, allRelevantEmbryoCodes)
-                            .eq(MdmMaterialInfo::getIsDelete, 0));
+                            .and(w -> w.eq(MdmMaterialInfo::getIsDelete, 0)
+                                    .or().isNull(MdmMaterialInfo::getIsDelete)));
             materialInfoList.forEach(m -> materialInfoMap.put(m.getMaterialCode(), m));
+            log.info("物料主数据查询完成, 数量: {}", materialInfoList.size());
         }
 
-        // Step5：按胶种分组构建列表数据
+        // 按胶种分组构建列表数据
         for (String rubberType : rubberTypeCodes) {
             Set<String> embryoCodes = rubberTypeEmbryoMap.getOrDefault(rubberType, Collections.emptySet());
 
-            // 只取本次排程中存在的胎胚
             Set<String> scheduledEmbryos = embryoCodes.stream()
                     .filter(scheduleEmbryoCodes::contains)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -396,11 +491,11 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 continue;
             }
 
-            // 按规格分组，同规格下花纹用"/"隔开
             Map<String, Set<String>> specPatternMap = new LinkedHashMap<>();
             for (String embryoCode : scheduledEmbryos) {
                 MdmMaterialInfo materialInfo = materialInfoMap.get(embryoCode);
                 if (materialInfo == null) {
+                    log.warn("胎胚代码[{}]未找到物料主数据", embryoCode);
                     continue;
                 }
                 String spec = StringUtils.defaultString(materialInfo.getSpecifications()).trim();
@@ -414,7 +509,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 }
             }
 
-            // 格式化：同规格多花纹用"/"隔开，不同规格用"，"隔开
             List<String> specParts = new ArrayList<>();
             for (Map.Entry<String, Set<String>> entry : specPatternMap.entrySet()) {
                 StringBuilder sb = new StringBuilder(entry.getKey());
@@ -449,13 +543,16 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                         .eq(CxParamConfig::getIsActive, 1));
 
         if (config == null || StringUtils.isBlank(config.getParamValue())) {
+            log.warn("未找到胶种类型配置（PARAM_CODE=RUBBER_TYPE_CODES）");
             return Collections.emptyList();
         }
 
-        return Arrays.stream(config.getParamValue().split(","))
+        List<String> codes = Arrays.stream(config.getParamValue().split(","))
                 .map(String::trim)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toList());
+        log.info("胶种类型配置: {}", codes);
+        return codes;
     }
 
     /**
@@ -549,9 +646,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         return val != null ? val : BigDecimal.ZERO;
     }
 
-    /**
-     * Integer空值转BigDecimal零值
-     */
     private BigDecimal nvlInt(Integer val) {
         return val != null ? new BigDecimal(val) : BigDecimal.ZERO;
     }
@@ -585,6 +679,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         return lhShiftConfigMapper.selectList(
                 new LambdaQueryWrapper<LhShiftConfig>()
                         .eq(LhShiftConfig::getFactoryCode, factoryCode)
+                        .eq(LhShiftConfig::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
                         .orderByAsc(LhShiftConfig::getShiftIndex));
     }
 
@@ -598,6 +693,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 map.put(config.getShiftIndex(), config.getShiftType());
             }
         }
+        log.info("班次配置映射: {}", map);
         return map;
     }
 }

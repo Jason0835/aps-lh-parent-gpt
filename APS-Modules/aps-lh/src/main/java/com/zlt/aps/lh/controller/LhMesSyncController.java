@@ -18,6 +18,7 @@ import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
 import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
 import com.zlt.aps.lh.service.ILhDayFinishQtyService;
 import com.zlt.aps.lh.service.ILhMachineOnlineInfoService;
+import com.zlt.aps.lh.service.ILhMouldCleanPlanService;
 import com.zlt.aps.lh.service.ILhRepairCapsuleService;
 import com.zlt.aps.lh.service.ILhScheFinishQtyService;
 import com.zlt.core.dao.basedao.BaseDao;
@@ -83,6 +84,9 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
 
     @Autowired
     private LhMouldChangePlanEntityMapper lhMouldChangePlanEntityMapper;
+
+    @Autowired
+    private ILhMouldCleanPlanService lhMouldCleanPlanService;
 
     @Override
     @ApiOperation("批量删除硫化在机信息")
@@ -331,5 +335,18 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
         int deleteCount = lhDayFinishQtyMapper.logicDeleteAllBeforeToday();
         log.info("逻辑删除硫化排程日完成量今天之前所有数据完成，删除记录数={}", deleteCount);
         return AjaxResult.success("逻辑删除记录数：" + deleteCount);
+    }
+
+    @Override
+    @ApiOperation("从模具清洗预警同步生成清洗计划")
+    @PostMapping("/syncMouldCleanPlanFromWarn")
+    public AjaxResult syncMouldCleanPlanFromWarn() {
+        try {
+            int count = lhMouldCleanPlanService.syncFromMouldCleanWarn();
+            return AjaxResult.success("操作成功，成功同步" + count + "条模具清洗计划");
+        } catch (Exception e) {
+            log.error("从模具清洗预警同步生成计划失败", e);
+            return AjaxResult.error("操作失败：" + e.getMessage());
+        }
     }
 }

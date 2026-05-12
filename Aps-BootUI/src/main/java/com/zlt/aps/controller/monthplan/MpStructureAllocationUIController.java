@@ -15,6 +15,7 @@ import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.ruoyi.common4ui.exception.BusinessException;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.api.domain.vo.MpStructureAllocationVo;
 import com.zlt.aps.mp.api.service.IFactoryMonthPlanProductionFinalResultRemoteService;
 import com.zlt.aps.mp.api.service.IMpStructureAllocationRemoteService;
@@ -111,11 +112,11 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
      * 保存正在调整的成型机台
      */
     @ResponseBody
-    @PostMapping("/setAdjustsCxMachineFromRedis/{cxMachine}")
+    @PostMapping("/setAdjustsCxMachineFromRedis")
     @ApiOperation("保存正在调整的成型机台")
-    public AjaxResult setAdjustsCxMachineFromRedis(@PathVariable("cxMachine") String cxMachine) {
+    public AjaxResult setAdjustsCxMachineFromRedis(@RequestBody AdjustsCxMachineVo cxMachineVo) {
         String redisKey = ADJUSTS_CX_MACHINE_KEY;
-        redisService.setCacheObject(redisKey, cxMachine);
+        redisService.setCacheObject(redisKey, cxMachineVo);
         return AjaxResult.success();
     }
 

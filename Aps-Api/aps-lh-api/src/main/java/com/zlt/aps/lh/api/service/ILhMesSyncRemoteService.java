@@ -122,4 +122,8 @@ public interface ILhMesSyncRemoteService {
     @ApiOperation("逻辑删除硫化排程日完成量今天之前所有数据")
     @PostMapping("/mesSync/logicDeleteLhDayFinishQtyAllBeforeToday")
     AjaxResult logicDeleteLhDayFinishQtyAllBeforeToday();
+
+    @ApiOperation("从模具清洗预警同步生成清洗计划")
+    @PostMapping("/mesSync/syncMouldCleanPlanFromWarn")
+    AjaxResult syncMouldCleanPlanFromWarn();
 }
