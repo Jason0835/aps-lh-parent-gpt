@@ -422,6 +422,13 @@
         <if test="precisionType != null and precisionType != ''">AND PRECISION_TYPE = #{precisionType}</if>
     </select>
 
+    <select id="selectMaxDataVersionFromMouldCleanPlan" resultType="java.lang.String">
+        SELECT MAX(DATA_VERSION)
+        FROM MOULD_CLEAN_PLAN
+        WHERE DATA_VERSION IS NOT NULL
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+    </select>
+
     <select id="selectCxMachineOnlineHistorySyncList" resultType="com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo">
         SELECT
         t.ONLINE_DATE,

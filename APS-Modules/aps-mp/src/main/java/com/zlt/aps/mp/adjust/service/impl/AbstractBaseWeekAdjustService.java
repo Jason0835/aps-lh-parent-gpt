@@ -918,7 +918,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void recalculate(MpRollAdjustContextDTO contextDTO) throws BusinessException {
+    public void recalculate(MpRollAdjustContextDTO contextDTO, Boolean isHandleMonthPlanStatistics) throws BusinessException {
         log.info("开始执行周程调整重新计算流程，调整类型：{}，工厂：{}，年份：{}，月份：{}，版本：{}，排产版本：{}，结构名称：{}，排产机台：{}，开始日期：{}，结束日期：{}，调整开始日期：{}，调整结束日期：{}",
                 contextDTO.getAdjustType(), contextDTO.getFactoryCode(), contextDTO.getMpYear(),
                 contextDTO.getMpMonth(), contextDTO.getVersion(), contextDTO.getProductionVersion(),
@@ -930,7 +930,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 根据优先级顺序分配生产数量
             allocateProductionByPriority(contextDTO);
             // 处理月计划统计结果
-            handleMonthPlanStatistics(contextDTO);
+            if (isHandleMonthPlanStatistics) {
+                handleMonthPlanStatistics(contextDTO);
+            }
             log.info("周程调整确认流程执行完成");
         }catch (Exception e) {
             log.error("周程调整确认流程执行异常", e);
@@ -2414,16 +2416,41 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
         try {
             List<MpAdjustResult> resultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
+            if (StringUtils.isNotBlank(contextDTO.getScheduledMachines())) {
+                List<MpStructureAllocation> structureAllocationList = queryStructureAllocationList(contextDTO);
+                if (WeekRollAdjustMachineCrossChecker.hasDifferentStructureCross(structureAllocationList, contextDTO.getScheduledMachines())) {
+                    throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.machineStructureCross"));
+                }
+                resultList = WeekRollAdjustMachineCrossChecker.filterAdjustResultByMachine(resultList, contextDTO.getScheduledMachines());
+            }
             Set<String> structureNameSet = resultList.stream().map(x->x.getStructureName()).collect(Collectors.toSet());
             if (structureNameSet != null && structureNameSet.size() == 1){
                 //若调整结果只有一个结果，直接设置为当前结构
                 contextDTO.setStructureName(structureNameSet.iterator().next());
             }
             contextDTO.setAdjustResultList(resultList);
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             log.error("查询周程调整结果异常，年份：{}，月份：{}，版本：{}", year, month, version, e);
             throw new RuntimeException("查询月度生产计划失败", e);
         }
+    }
+
+    /**
+     * 查询结构转产记录，用于单台机台结构时间交叉校验。
+     *
+     * @param contextDTO 周滚动调整上下文对象
+     * @return 结构转产记录集合
+     */
+    private List<MpStructureAllocation> queryStructureAllocationList(MpRollAdjustContextDTO contextDTO) {
+        LambdaQueryWrapper<MpStructureAllocation> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(StringUtils.isNotBlank(contextDTO.getFactoryCode()), MpStructureAllocation::getFactoryCode, contextDTO.getFactoryCode());
+        queryWrapper.eq(contextDTO.getMpYear() != null, MpStructureAllocation::getYear, contextDTO.getMpYear());
+        queryWrapper.eq(contextDTO.getMpMonth() != null, MpStructureAllocation::getMonth, contextDTO.getMpMonth());
+        queryWrapper.eq(StringUtils.isNotBlank(contextDTO.getProductionVersion()), MpStructureAllocation::getProductionVersion, contextDTO.getProductionVersion());
+        queryWrapper.eq(MpStructureAllocation::getIsDelete, YesOrNoEnum.NO.getValue());
+        return mpStructureAllocationEntityMapper.selectList(queryWrapper);
     }
 
     /**
