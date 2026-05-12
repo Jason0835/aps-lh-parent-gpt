@@ -163,7 +163,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         if (!CollectionUtils.isEmpty(singleControlLhMachineCode)) {
             Set<String> lhMachineCodeSet = lhMachineInfoList.stream().map(LhMachineInfo::getMachineCode).distinct()
                     .collect(Collectors.toSet()); // 硫化机台号集合
-            long singleControlMachineCount = lhMachineCodeSet.stream().filter(lhMachineCodeSet::contains).count(); // 校验单控机台编号，只保留有效的
+            long singleControlMachineCount = singleControlLhMachineCode.stream().filter(lhMachineCodeSet::contains).count(); // 校验单控机台编号，只保留有效的
             int reduceMachineCount = BigDecimalUtils
                     .div(singleControlMachineCount, ProductionConstant.DOUBLE_MOULD_PRODUCTION, 4)
                     .setScale(0, RoundingMode.DOWN).intValue(); // 单控机台数的一半需要扣除掉（向下取整）
