@@ -345,6 +345,8 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
           prop: "scheduleDate",
+          align: "center",
+          minWidth: 120,
         },
       ];
     },

@@ -259,12 +259,14 @@ export default {
         {
           prop: "mainMaterialDesc",
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-          width: 280,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "materialDesc",
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          width: 300,
+          align: "left",
+          minWidth: 350,
         },
         {
           prop: "mainPattern",
@@ -426,10 +428,14 @@ export default {
         },
         {
           label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "mainMaterialDesc",
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "materialDesc",
         },
         {

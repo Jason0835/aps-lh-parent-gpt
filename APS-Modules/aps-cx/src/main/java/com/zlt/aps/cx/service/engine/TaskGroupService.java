@@ -262,7 +262,7 @@ public class TaskGroupService {
                 if (monthSurplus != null && monthSurplus.getPlanSurplusQty() != null) {
                     int vulcanizeSurplus = monthSurplus.getPlanSurplusQty().intValue();
                     if (vulcanizeSurplus <= 0) {
-                        log.debug("物料 {} 硫化余量={} <= 0，已超产，跳过该任务", materialCode, vulcanizeSurplus);
+                        log.info("物料 {} 硫化余量={} <= 0，已超产，跳过该任务", materialCode, vulcanizeSurplus);
                         skippedVulcanizeSurplusZero++;
                         continue;
                     }
@@ -272,7 +272,7 @@ public class TaskGroupService {
             // 检查2：成型余量 <= 0，说明胎胚库存已满足硫化需求，不再需要成型生产
             Integer formingRemainder = getFormingRemainder(materialCode, context);
             if (formingRemainder != null && formingRemainder <= 0) {
-                log.debug("物料 {} 成型余量={} <= 0，胎胚已满足，跳过该任务", materialCode, formingRemainder);
+                log.info("物料 {} 成型余量={} <= 0，胎胚已满足，跳过该任务", materialCode, formingRemainder);
                 skippedFormingRemainderZero++;
                 continue;
             }
@@ -403,7 +403,7 @@ public class TaskGroupService {
             // 更新已使用的成型余量（累加当前任务的 endingExtraInventory）
             if (task.getEndingExtraInventory() != null && task.getEndingExtraInventory() > 0) {
                 materialUsedFormingRemainder.merge(materialCode, task.getEndingExtraInventory(), Integer::sum);
-                log.debug("物料 {} 已使用成型余量累计: {}", materialCode, materialUsedFormingRemainder.get(materialCode));
+                log.info("物料 {} 已使用成型余量累计: {}", materialCode, materialUsedFormingRemainder.get(materialCode));
             }
             
             // S5.2.7 停产特殊处理
@@ -476,7 +476,7 @@ public class TaskGroupService {
         Integer remainingFormingRemainder = null;
         if (totalFormingRemainder != null) {
             remainingFormingRemainder = Math.max(0, totalFormingRemainder - usedRemainder);
-            log.debug("物料 {} 总成型余量={}, 已使用={}, 剩余={}", 
+            log.info("物料 {} 总成型余量={}, 已使用={}, 剩余={}", 
                     materialCode, totalFormingRemainder, usedRemainder, remainingFormingRemainder);
         }
 
@@ -708,7 +708,7 @@ public class TaskGroupService {
 
         // 获取分配给该硫化任务的库存（按硫化任务维度分配，共用胎胚库存已按比例分配）
         int currentStock = getCurrentStock(context, lhResult.getId());
-        log.debug("硫化任务排量: embryoCode={}, vulcanizeDemand={}, currentStock={}",
+        log.info("硫化任务排量: embryoCode={}, vulcanizeDemand={}, currentStock={}",
                 embryoCode, vulcanizeDemand, currentStock);
 
         // 获取物料信息
@@ -965,7 +965,7 @@ public class TaskGroupService {
         } else {
             logDailyLhCapacity = "标准=" + dailyLhCapacity;
         }
-        log.debug("物料 {} stockHours计算: 日硫化量({}), 单胎单模时长={}s, 模数={}, 库存={}, 库存可供时长={}h",
+        log.info("物料 {} stockHours计算: 日硫化量({}), 单胎单模时长={}s, 模数={}, 库存={}, 库存可供时长={}h",
                 task.getEmbryoCode(), logDailyLhCapacity, singleTireMoldSeconds, taskMoldQty, currentStock, stockHours);
     }
 
@@ -1056,8 +1056,9 @@ public class TaskGroupService {
         int requiredCars;
         if (isTrialLikeTask) {
             // 试制量试任务：不补整车，使用实际需求量
+            // requiredCars：只要需排产就算1车（哪怕不够整车），避免因0车被跳过
             plannedProduction = requiredProductionValue;
-            requiredCars = tripCapacity > 0 ? requiredProductionValue / tripCapacity : 0;
+            requiredCars = requiredProductionValue > 0 ? 1 : 0;
         } else {
             // 普通任务：整车取整
             plannedProduction = productionCalculator.roundToVehicle(requiredProductionValue, tripCapacity);

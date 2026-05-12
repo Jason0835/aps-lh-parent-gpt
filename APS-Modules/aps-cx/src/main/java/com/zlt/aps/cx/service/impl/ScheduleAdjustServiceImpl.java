@@ -1,12 +1,16 @@
 package com.zlt.aps.cx.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleDetail;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
-import com.zlt.aps.cx.mapper.*;
+import com.zlt.aps.cx.mapper.CxParamConfigMapper;
+import com.zlt.aps.cx.mapper.CxScheduleDetailMapper;
+import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
+import com.zlt.aps.cx.mapper.CxShiftConfigMapper;
+import com.zlt.aps.cx.mapper.CxStockMapper;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.service.ScheduleAdjustService;
 import com.zlt.aps.cx.vo.ScheduleAdjustResultVo;
 import lombok.extern.slf4j.Slf4j;
@@ -345,7 +349,7 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
      * 根据子表数据重新汇总主表各班次计划量
      */
     private void recalculateMainTableFromDetails(List<CxScheduleResult> mainResults,
-                                                  Map<Long, List<CxScheduleDetail>> detailsByMainId) {
+                                                 Map<Long, List<CxScheduleDetail>> detailsByMainId) {
         for (CxScheduleResult main : mainResults) {
             List<CxScheduleDetail> details = detailsByMainId.getOrDefault(main.getId(), Collections.emptyList());
             if (details.isEmpty()) {
@@ -392,20 +396,10 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
     }
 
     /**
-     * 获取子表某班次车次容量（整车条数）
+     * 获取子表车次容量（整车条数）- 子表级别，所有班次共用
      */
     private BigDecimal getDetailClassTripCapacity(CxScheduleDetail detail, String shiftClass) {
-        switch (shiftClass) {
-            case "CLASS1": return detail.getClass1TripCapacity();
-            case "CLASS2": return detail.getClass2TripCapacity();
-            case "CLASS3": return detail.getClass3TripCapacity();
-            case "CLASS4": return detail.getClass4TripCapacity();
-            case "CLASS5": return detail.getClass5TripCapacity();
-            case "CLASS6": return detail.getClass6TripCapacity();
-            case "CLASS7": return detail.getClass7TripCapacity();
-            case "CLASS8": return detail.getClass8TripCapacity();
-            default: return null;
-        }
+        return detail.getTripCapacity();
     }
 
     /**
@@ -731,20 +725,10 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
     }
 
     /**
-     * 获取子表某班次车次号
+     * 获取子表车次号 - 子表级别，所有班次共用
      */
     private String getDetailClassTripNo(CxScheduleDetail detail, String shiftClass) {
-        switch (shiftClass) {
-            case "CLASS1": return detail.getClass1TripNo();
-            case "CLASS2": return detail.getClass2TripNo();
-            case "CLASS3": return detail.getClass3TripNo();
-            case "CLASS4": return detail.getClass4TripNo();
-            case "CLASS5": return detail.getClass5TripNo();
-            case "CLASS6": return detail.getClass6TripNo();
-            case "CLASS7": return detail.getClass7TripNo();
-            case "CLASS8": return detail.getClass8TripNo();
-            default: return null;
-        }
+        return detail.getTripNo();
     }
 
     /**

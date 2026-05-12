@@ -60,12 +60,14 @@ export default {
         {
           label: this.$t("ui.data.column.lhUnscheduledResult.batchNo"),
           prop: "batchNo",
-          width: 180,
+          align: "left",
+          minWidth: 160,
         },
         {
           label: this.$t("ui.data.column.lhUnscheduledResult.scheduleDate"),
           prop: "scheduleDate",
-          width: 160,
+          align: "center",
+          minWidth: 120,
         },
         {
           label: this.$t("ui.data.column.lhUnscheduledResult.materialCode"),
@@ -74,14 +76,16 @@ export default {
         },
         {
           label: this.$t("ui.data.column.lhUnscheduledResult.materialDesc"),
+          align: "left",
           prop: "materialDesc",
-          minWidth: 360,
+          minWidth: 350,
           showOverflowTooltip: true,
         },
         {
           label: this.$t("ui.data.column.lhUnscheduledResult.mainMaterialDesc"),
+          align: "left",
           prop: "mainMaterialDesc",
-          minWidth: 330,
+          minWidth: 350,
           showOverflowTooltip: true,
         },
         {
@@ -133,10 +137,14 @@ export default {
         },
         {
           label: this.$t("ui.data.column.lhUnscheduledResult.materialDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "materialDesc",
         },
         {
           label: this.$t("ui.data.column.lhUnscheduledResult.mainMaterialDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "mainMaterialDesc",
         },
       ];

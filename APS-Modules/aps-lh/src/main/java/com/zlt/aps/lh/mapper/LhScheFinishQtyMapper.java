@@ -50,21 +50,12 @@ public interface LhScheFinishQtyMapper extends CommBaseMapper<LhScheFinishQty> {
     int logicDeleteByFactoryCodeAndScheduleDate(@Param("factoryCode") String factoryCode, @Param("scheduleDate") Date scheduleDate, @Param("updateBy") String updateBy, @Param("updateTime") Date updateTime);
 
     /**
-     * 逻辑删除历史重复数据，保留每个历史排程日期DATA_VERSION最大（最新版本）的数据
+     * 逻辑删除今天之前所有数据（将IS_DELETE置为1）
+     * 用于清理任务：先删除所有历史数据，再从MES重新抓取每天最新版本数据
      *
      * @return 更新的记录数
      */
-    @Update("UPDATE T_LH_SCHE_FINISH_QTY SET IS_DELETE = 1, UPDATE_BY = 'CLEAN_TASK', UPDATE_TIME = NOW() WHERE DATE(SCHEDULE_DATE) < CURDATE() AND IS_DELETE = 0 AND " +
-            "EXISTS (" +
-            "SELECT 1 FROM (" +
-            "SELECT FACTORY_CODE, DATE(SCHEDULE_DATE) AS schedule_day, MAX(DATA_VERSION) AS max_data_version " +
-            "FROM T_LH_SCHE_FINISH_QTY WHERE DATE(SCHEDULE_DATE) < CURDATE() AND IS_DELETE = 0 " +
-            "GROUP BY FACTORY_CODE, DATE(SCHEDULE_DATE)" +
-            ") latest " +
-            "WHERE T_LH_SCHE_FINISH_QTY.FACTORY_CODE = latest.FACTORY_CODE " +
-            "AND DATE(T_LH_SCHE_FINISH_QTY.SCHEDULE_DATE) = latest.schedule_day " +
-            "AND T_LH_SCHE_FINISH_QTY.DATA_VERSION < latest.max_data_version" +
-            ")")
-    int cleanHistoryDuplicateData();
+    @Update("UPDATE T_LH_SCHE_FINISH_QTY SET IS_DELETE = 1, UPDATE_BY = 'CLEAN_TASK', UPDATE_TIME = NOW() WHERE DATE(SCHEDULE_DATE) < CURDATE() AND IS_DELETE = 0")
+    int logicDeleteAllBeforeToday();
 
 }

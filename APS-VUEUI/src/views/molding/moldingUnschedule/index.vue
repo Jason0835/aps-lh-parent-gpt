@@ -123,7 +123,8 @@ export default {
         {
           label: this.$t("ui.data.column.unscheduleResult.scheduleDate"),
           prop: "scheduleDate",
-          width: 160,
+          align: "center",
+          minWidth: 120,
         },
 
         {

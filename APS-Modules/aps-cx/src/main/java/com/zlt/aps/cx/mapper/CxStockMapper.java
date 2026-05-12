@@ -108,9 +108,10 @@ public interface CxStockMapper extends CommBaseMapper<CxStock> {
     int physicalDeleteByFactoryCodeAndDataSource(@Param("factoryCode") String factoryCode, @Param("dataSource") String dataSource);
 
     /**
-     * 物理删除历史重复数据，保留每个历史库存日期最新版本的数据
+     * 逻辑删除今天之前所有数据（将IS_DELETE置为1）
+     * 用于清理任务：先删除所有历史数据，再从MES重新抓取每天最新版本数据
      *
-     * @return 删除的记录数
+     * @return 更新的记录数
      */
-    int cleanHistoryDuplicateData();
+    int logicDeleteAllBeforeToday();
 }

@@ -124,7 +124,7 @@ public class ProductionCalculator {
         result.setTripCount(trips);
         result.setPlanQuantity(planQuantity);
 
-        log.debug("胎胚 {} 计划量计算：硫化需求={}, 成型余量={}, 待排={}, 整车容量={}, 车次={}, 计划量={}",
+        log.info("胎胚 {} 计划量计算：硫化需求={}, 成型余量={}, 待排={}, 整车容量={}, 车次={}, 计划量={}",
                 embryoCode, vulcanizeDemand, formingRemainder, productionWithLoss,
                 tripCapacity, trips, planQuantity);
 

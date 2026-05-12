@@ -42,6 +42,16 @@ public interface ILhPrecisionPlanService extends IDocService<LhPrecisionPlan> {
     int generatePlansFromMes(Integer year);
 
     /**
+     * 从MES同步数据生成硫化精度初版计划（按版本号前缀过滤）
+     * 只处理版本号前缀匹配的数据，如APS_MES_AH01
+     *
+     * @param versionPrefix 版本号前缀（如：APS_MES_AH01）
+     * @param year 年份
+     * @return 生成数量
+     */
+    int generatePlansFromMesByVersionPrefix(String versionPrefix, Integer year);
+
+    /**
      * 自动生成年度硫化精度计划
      *
      * @param year 年份

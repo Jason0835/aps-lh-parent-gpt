@@ -59,6 +59,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.text.ParseException;
+import cn.hutool.core.date.DateUtil;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -903,10 +904,11 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             String factoryCode = cxMachineOnlineInfo.getFactoryCode();
             Date onlineDate = insertList.stream().map(CxMachineOnlineInfo::getOnlineDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
-            log.info("成型在机同步：开始同步，factoryCode={}, onlineDate={}, 待插入数量={}", factoryCode, onlineDate, insertList.size());
+            String onlineDateStr = DateUtil.formatDate(onlineDate);
+            log.info("成型在机同步：开始同步，factoryCode={}, onlineDate={}, 待插入数量={}", factoryCode, onlineDateStr, insertList.size());
 
             FeignTokenHelper.runWithToken(() -> {
-                cxMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, onlineDate, "MES", insertList);
+                cxMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, onlineDateStr, "MES", insertList);
             });
 
             log.info("成型在机同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
@@ -948,10 +950,11 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             String factoryCode = lhMachineOnlineInfo.getFactoryCode();
             Date onlineDate = insertList.stream().map(LhMachineOnlineInfo::getOnlineDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
-            log.info("硫化在机同步：开始同步，factoryCode={}, onlineDate={}, 待插入数量={}", factoryCode, onlineDate, insertList.size());
+            String onlineDateStr = DateUtil.formatDate(onlineDate);
+            log.info("硫化在机同步：开始同步，factoryCode={}, onlineDate={}, 待插入数量={}", factoryCode, onlineDateStr, insertList.size());
 
             FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, onlineDate, "MES", insertList);
+                lhMesSyncRemoteService.logicDeleteAndSaveMachineOnlineInfo(factoryCode, onlineDateStr, "MES", insertList);
             });
 
             log.info("硫化在机同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
@@ -970,6 +973,22 @@ public class MesItfServiceImpl implements MesItfService {
      */
     @Override
     public AjaxResult syncDevMaintenancePlan(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询MES中间表指定精度类型的最大版本号，只同步最新版本的数据
+        String precisionType = syncDataLogs != null ? syncDataLogs.getPrecisionType() : null;
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        String maxVersion = mesItfMapper.selectMaxDataVersionFromMes(precisionType);
+        DynamicDataSourceContextHolder.poll();
+
+        if (maxVersion != null && !maxVersion.isEmpty()) {
+            if (syncDataLogs == null) {
+                syncDataLogs = new AuxReqSyncDataLogs();
+            }
+            syncDataLogs.setDataVersion(maxVersion);
+            log.info("同步设备保养计划，精度类型={}，最新版本号={}", precisionType, maxVersion);
+        } else {
+            log.info("MES中间表无设备保养计划版本数据，精度类型={}", precisionType);
+        }
+
         DynamicDataSourceContextHolder.push(DataSource.MES);
         List<DevMaintenancePlan> syncList = mesItfMapper.selectDevMaintenancePlanList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
@@ -1247,10 +1266,11 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             String factoryCode = syncDataLogs.getFactoryCode();
             Date obtainTime = insertList.stream().map(LhRepairCapsule::getObtainTime).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
-            log.info("胶囊已使用次数同步：开始同步，factoryCode={}, obtainTime={}, 待插入数量={}", factoryCode, obtainTime, insertList.size());
+            String obtainTimeStr = DateUtil.formatDate(obtainTime);
+            log.info("胶囊已使用次数同步：开始同步，factoryCode={}, obtainTime={}, 待插入数量={}", factoryCode, obtainTimeStr, insertList.size());
 
             FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteAndSaveRepairCapsule(factoryCode, obtainTime, "MES", insertList);
+                lhMesSyncRemoteService.logicDeleteAndSaveRepairCapsule(factoryCode, obtainTimeStr, "MES", insertList);
             });
 
             log.info("胶囊已使用次数同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
@@ -1378,9 +1398,10 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             log.info("生胎库存同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, cxStockInsertList.size());
             Date stockDate = cxStockInsertList.stream().map(CxStock::getStockDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            String stockDateStr = DateUtil.formatDate(stockDate);
 
             FeignTokenHelper.runWithToken(() -> {
-                cxMesSyncRemoteService.logicDeleteAndSaveCxStockByDataSource(factoryCode, ApsConstant.DATA_SOURCE_MES, stockDate, "MES", cxStockInsertList);
+                cxMesSyncRemoteService.logicDeleteAndSaveCxStockByDataSource(factoryCode, ApsConstant.DATA_SOURCE_MES, stockDateStr, "MES", cxStockInsertList);
             });
 
             log.info("生胎库存同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, cxStockInsertList.size());
@@ -1484,10 +1505,11 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             String factoryCode = syncDataLogs.getFactoryCode();
             Date scheduleDate = insertList.stream().map(LhScheFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
-            log.info("硫化排程完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDate, insertList.size());
+            String scheduleDateStr = DateUtil.formatDate(scheduleDate);
+            log.info("硫化排程完成量同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
 
             FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDate, "MES", insertList);
+                lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
             });
 
             log.info("硫化排程完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
@@ -1615,10 +1637,11 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             String factoryCode = syncDataLogs.getFactoryCode();
             Date finishDate = insertList.stream().map(LhDayFinishQty::getFinishDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
-            log.info("硫化排程日完成量同步：开始同步，factoryCode={}, finishDate={}, 待插入数量={}", factoryCode, finishDate, insertList.size());
+            String finishDateStr = DateUtil.formatDate(finishDate);
+            log.info("硫化排程日完成量同步：开始同步，factoryCode={}, finishDate={}, 待插入数量={}", factoryCode, finishDateStr, insertList.size());
 
             FeignTokenHelper.runWithToken(() -> {
-                lhMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, finishDate, "MES", insertList);
+                lhMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(factoryCode, finishDateStr, "MES", insertList);
             });
 
             log.info("硫化排程日完成量同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
@@ -1989,6 +2012,22 @@ public class MesItfServiceImpl implements MesItfService {
 
     @Override
     public AjaxResult syncLhPrecisionPlanActual(AuxReqSyncDataLogs syncDataLogs) {
+        // 先查询MES中间表硫化精度类型的最大版本号，只同步最新版本的数据
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        String maxVersion = mesItfMapper.selectMaxDataVersionFromMes("硫化精度");
+        DynamicDataSourceContextHolder.poll();
+
+        if (maxVersion == null || maxVersion.isEmpty()) {
+            return AjaxResult.success("MES中间表无硫化精度版本数据");
+        }
+        log.info("MES中间表硫化精度最新版本号：{}", maxVersion);
+
+        // 将最新版本号设置到查询参数中，只查该版本的数据
+        if (syncDataLogs == null) {
+            syncDataLogs = new AuxReqSyncDataLogs();
+        }
+        syncDataLogs.setDataVersion(maxVersion);
+
         DynamicDataSourceContextHolder.push(DataSource.MES);
         List<DevMaintenancePlan> syncList = mesItfMapper.selectLhPrecisionPlanActualList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
@@ -2070,7 +2109,8 @@ public class MesItfServiceImpl implements MesItfService {
         StringBuilder resultMsg = new StringBuilder();
         int totalGenerated = 0;
 
-        log.info("同步MES设备保养计划到APS（仅硫化精度）");
+        // 步骤1：同步MES设备保养计划到APS（仅硫化精度），同步时按最新版本号增量同步
+        log.info("步骤1：同步MES设备保养计划到APS（仅硫化精度）");
         try {
             AuxReqSyncDataLogs lhSyncParam = new AuxReqSyncDataLogs();
             lhSyncParam.setPrecisionType("硫化精度");
@@ -2081,31 +2121,461 @@ public class MesItfServiceImpl implements MesItfService {
             log.error("同步硫化设备保养计划失败", e);
             resultMsg.append("同步硫化设备保养计划失败：").append(e.getMessage()).append("；");
         }
-//
-//        log.info("步骤2：同步MES硫化精度计划实际执行日期回填数据");
-//        try {
-//            AjaxResult actualResult = syncLhPrecisionPlanActual(new AuxReqSyncDataLogs());
-//            log.info("同步实际执行日期结果：{}", actualResult.get("msg"));
-//            resultMsg.append("同步实际执行日期完成；");
-//        } catch (Exception e) {
-//            log.error("同步实际执行日期失败", e);
-//            resultMsg.append("同步实际执行日期失败：").append(e.getMessage()).append("；");
-//        }
-//
-//        log.info("步骤3：将回填MES实际执行日期的数据生成新的下一年度的硫化精度计划");
-//        try {
-//            AjaxResult generateResult = lhPrecisionPlanRemoteService.autoGenerateYearlyPlans(year + 1);
-//            Object data = generateResult.get("data");
-//            int count = data != null ? Integer.parseInt(data.toString()) : 0;
-//            totalGenerated += count;
-//            log.info("生成下一年度硫化精度计划{}条", count);
-//            resultMsg.append("生成下一年度硫化精度计划").append(count).append("条；");
-//        } catch (Exception e) {
-//            log.error("生成下一年度硫化精度计划失败", e);
-//            resultMsg.append("生成下一年度硫化精度计划失败：").append(e.getMessage()).append("；");
-//        }
+
+        // 步骤2：同步MES硫化精度计划实际执行日期回填数据（按最新版本号增量查询）
+        log.info("步骤2：同步MES硫化精度计划实际执行日期回填数据");
+        try {
+            AjaxResult actualResult = syncLhPrecisionPlanActual(new AuxReqSyncDataLogs());
+            log.info("同步实际执行日期结果：{}", actualResult.get("msg"));
+            resultMsg.append("同步实际执行日期完成；");
+        } catch (Exception e) {
+            log.error("同步实际执行日期失败", e);
+            resultMsg.append("同步实际执行日期失败：").append(e.getMessage()).append("；");
+        }
+
+        // 步骤3：从MES同步数据生成硫化精度计划（只处理最新版本号的数据）
+        log.info("步骤3：从MES同步数据生成硫化精度计划");
+        try {
+            AjaxResult generateResult = lhPrecisionPlanRemoteService.generatePlansFromMes(year);
+            Object data = generateResult.get("data");
+            int count = data != null ? Integer.parseInt(data.toString()) : 0;
+            totalGenerated += count;
+            log.info("从MES同步数据生成硫化精度计划{}条", count);
+            resultMsg.append("从MES同步数据生成硫化精度计划").append(count).append("条；");
+        } catch (Exception e) {
+            log.error("从MES同步数据生成硫化精度计划失败", e);
+            resultMsg.append("从MES同步数据生成硫化精度计划失败：").append(e.getMessage()).append("；");
+        }
+
+        // 步骤4：自动推算生成下一年度硫化精度计划
+        log.info("步骤4：自动推算生成下一年度硫化精度计划");
+        try {
+            AjaxResult autoResult = lhPrecisionPlanRemoteService.autoCalculateLhPrecisionPlan(year + 1);
+            Object autoData = autoResult.get("data");
+            int autoCount = autoData != null ? Integer.parseInt(autoData.toString()) : 0;
+            totalGenerated += autoCount;
+            log.info("自动推算生成下一年度硫化精度计划{}条", autoCount);
+            resultMsg.append("自动推算生成下一年度硫化精度计划").append(autoCount).append("条；");
+        } catch (Exception e) {
+            log.error("自动推算生成下一年度硫化精度计划失败", e);
+            resultMsg.append("自动推算生成下一年度硫化精度计划失败：").append(e.getMessage()).append("；");
+        }
 
         log.info("同步MES数据并生成硫化精度计划执行完成");
         return AjaxResult.success(resultMsg.toString(), totalGenerated);
+    }
+
+    @Override
+    public AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefix(String versionPrefix, Integer year) {
+        log.info("开始执行同步MES数据并生成硫化精度计划（版本前缀={}，年度={}）", versionPrefix, year);
+
+        StringBuilder resultMsg = new StringBuilder();
+        int totalGenerated = 0;
+
+        // 步骤1：同步MES设备保养计划到APS（仅硫化精度），同步时按最新版本号增量同步
+        log.info("步骤1：同步MES设备保养计划到APS（仅硫化精度）");
+        try {
+            AuxReqSyncDataLogs lhSyncParam = new AuxReqSyncDataLogs();
+            lhSyncParam.setPrecisionType("硫化精度");
+            AjaxResult syncResult = syncDevMaintenancePlan(lhSyncParam);
+            log.info("同步设备保养计划结果：{}", syncResult.get("msg"));
+            resultMsg.append("同步硫化设备保养计划完成；");
+        } catch (Exception e) {
+            log.error("同步硫化设备保养计划失败", e);
+            resultMsg.append("同步硫化设备保养计划失败：").append(e.getMessage()).append("；");
+        }
+
+        // 步骤2：同步MES硫化精度计划实际执行日期回填数据（按最新版本号增量查询）
+        log.info("步骤2：同步MES硫化精度计划实际执行日期回填数据");
+        try {
+            AjaxResult actualResult = syncLhPrecisionPlanActual(new AuxReqSyncDataLogs());
+            log.info("同步实际执行日期结果：{}", actualResult.get("msg"));
+            resultMsg.append("同步实际执行日期完成；");
+        } catch (Exception e) {
+            log.error("同步实际执行日期失败", e);
+            resultMsg.append("同步实际执行日期失败：").append(e.getMessage()).append("；");
+        }
+
+        // 步骤3：按版本前缀从MES同步数据生成硫化精度计划
+        log.info("步骤3：按版本前缀={}从MES同步数据生成硫化精度计划", versionPrefix);
+        try {
+            AjaxResult generateResult = lhPrecisionPlanRemoteService.generatePlansFromMesByVersionPrefix(versionPrefix, year);
+            Object data = generateResult.get("data");
+            int count = data != null ? Integer.parseInt(data.toString()) : 0;
+            totalGenerated += count;
+            log.info("按版本前缀={}从MES同步数据生成硫化精度计划{}条", versionPrefix, count);
+            resultMsg.append("按版本前缀生成硫化精度计划").append(count).append("条；");
+        } catch (Exception e) {
+            log.error("按版本前缀={}从MES同步数据生成硫化精度计划失败", versionPrefix, e);
+            resultMsg.append("按版本前缀生成硫化精度计划失败：").append(e.getMessage()).append("；");
+        }
+
+        // 步骤4：自动推算生成下一年度硫化精度计划
+        log.info("步骤4：自动推算生成下一年度硫化精度计划");
+        try {
+            AjaxResult autoResult = lhPrecisionPlanRemoteService.autoCalculateLhPrecisionPlan(year + 1);
+            Object autoData = autoResult.get("data");
+            int autoCount = autoData != null ? Integer.parseInt(autoData.toString()) : 0;
+            totalGenerated += autoCount;
+            log.info("自动推算生成下一年度硫化精度计划{}条", autoCount);
+            resultMsg.append("自动推算生成下一年度硫化精度计划").append(autoCount).append("条；");
+        } catch (Exception e) {
+            log.error("自动推算生成下一年度硫化精度计划失败", e);
+            resultMsg.append("自动推算生成下一年度硫化精度计划失败：").append(e.getMessage()).append("；");
+        }
+
+        log.info("同步MES数据并生成硫化精度计划（版本前缀={}）执行完成", versionPrefix);
+        return AjaxResult.success(resultMsg.toString(), totalGenerated);
+    }
+
+    /**
+     * 清理并重新同步所有MES历史数据
+     * 执行步骤：
+     * 1. 逻辑删除APS库中今天之前的所有数据（6张表）
+     * 2. 从MES库重新抓取今天之前每天最新版本数据
+     * 3. 将MES数据插入到APS库
+     *
+     * @return 执行结果
+     */
+    @Override
+    public AjaxResult cleanAndResyncAllHistory() {
+        log.info("===== 开始清理并重新同步所有MES历史数据 =====");
+        StringBuilder resultMsg = new StringBuilder();
+
+        resultMsg.append(resyncCxMachineOnlineHistory());
+        resultMsg.append(resyncLhMachineOnlineHistory());
+        resultMsg.append(resyncLhRepairCapsuleHistory());
+        resultMsg.append(resyncCxStockHistory());
+        resultMsg.append(resyncLhScheFinishQtyHistory());
+        resultMsg.append(resyncLhDayFinishQtyHistory());
+
+        log.info("===== 清理并重新同步所有MES历史数据完成 =====");
+        return AjaxResult.success(resultMsg.toString());
+    }
+
+    /**
+     * 重新同步成型在机历史数据
+     * 1. 逻辑删除APS库今天之前所有成型在机数据
+     * 2. 从MES库查询今天之前每天最新版本的成型在机数据
+     * 3. 插入到APS库
+     */
+    private String resyncCxMachineOnlineHistory() {
+        String tableName = "成型在机";
+        log.info("开始重新同步{}历史数据", tableName);
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult deleteResult = cxMesSyncRemoteService.logicDeleteCxMachineOnlineAllBeforeToday();
+                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+            });
+
+            DynamicDataSourceContextHolder.push(DataSource.MES);
+            List<CxMachineOnlineInfo> syncList = mesItfMapper.selectCxMachineOnlineHistorySyncList(new CxMachineOnlineInfo());
+            DynamicDataSourceContextHolder.poll();
+
+            if (CollectionUtils.isEmpty(syncList)) {
+                log.info("{}历史数据：MES中间表无历史数据可同步", tableName);
+                return tableName + "：MES无历史数据；";
+            }
+
+            List<CxMachineOnlineInfo> insertList = new ArrayList<>();
+            for (CxMachineOnlineInfo info : syncList) {
+                CxMachineOnlineInfo entity = new CxMachineOnlineInfo();
+                BeanUtils.copyProperties(info, entity);
+                entity.setCreateBy("CLEAN_TASK");
+                entity.setUpdateBy("CLEAN_TASK");
+                entity.setCreateTime(DateUtils.getNowDate());
+                entity.setUpdateTime(DateUtils.getNowDate());
+                insertList.add(entity);
+            }
+
+            log.info("{}历史数据：从MES抓取到{}条记录，开始插入APS库", tableName, insertList.size());
+            FeignTokenHelper.runWithToken(() -> {
+                cxMesSyncRemoteService.saveMachineOnlineInfoBatch(insertList);
+            });
+            log.info("{}历史数据：重新同步完成，插入{}条", tableName, insertList.size());
+            return tableName + "：插入" + insertList.size() + "条；";
+        } catch (Exception e) {
+            log.error("{}历史数据重新同步异常", tableName, e);
+            return tableName + "：异常-" + e.getMessage() + "；";
+        }
+    }
+
+    /**
+     * 重新同步硫化在机历史数据
+     * 1. 逻辑删除APS库今天之前所有硫化在机数据
+     * 2. 从MES库查询今天之前每天最新版本的硫化在机数据
+     * 3. 插入到APS库
+     */
+    private String resyncLhMachineOnlineHistory() {
+        String tableName = "硫化在机";
+        log.info("开始重新同步{}历史数据", tableName);
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult deleteResult = lhMesSyncRemoteService.logicDeleteLhMachineOnlineAllBeforeToday();
+                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+            });
+
+            DynamicDataSourceContextHolder.push(DataSource.MES);
+            List<LhMachineOnlineInfo> syncList = mesItfMapper.selectLhMachineOnlineHistorySyncList(new LhMachineOnlineInfo());
+            DynamicDataSourceContextHolder.poll();
+
+            if (CollectionUtils.isEmpty(syncList)) {
+                log.info("{}历史数据：MES中间表无历史数据可同步", tableName);
+                return tableName + "：MES无历史数据；";
+            }
+
+            List<LhMachineOnlineInfo> insertList = new ArrayList<>();
+            for (LhMachineOnlineInfo info : syncList) {
+                LhMachineOnlineInfo entity = new LhMachineOnlineInfo();
+                BeanUtils.copyProperties(info, entity);
+                entity.setCreateBy("CLEAN_TASK");
+                entity.setUpdateBy("CLEAN_TASK");
+                entity.setCreateTime(DateUtils.getNowDate());
+                entity.setUpdateTime(DateUtils.getNowDate());
+                insertList.add(entity);
+            }
+
+            log.info("{}历史数据：从MES抓取到{}条记录，开始插入APS库", tableName, insertList.size());
+            FeignTokenHelper.runWithToken(() -> {
+                lhMesSyncRemoteService.saveMachineOnlineInfoBatch(insertList);
+            });
+            log.info("{}历史数据：重新同步完成，插入{}条", tableName, insertList.size());
+            return tableName + "：插入" + insertList.size() + "条；";
+        } catch (Exception e) {
+            log.error("{}历史数据重新同步异常", tableName, e);
+            return tableName + "：异常-" + e.getMessage() + "；";
+        }
+    }
+
+    /**
+     * 重新同步胶囊已使用次数历史数据
+     * 1. 逻辑删除APS库今天之前所有胶囊已使用次数数据
+     * 2. 从MES库查询今天之前每天最新版本的胶囊已使用次数数据
+     * 3. 插入到APS库
+     */
+    private String resyncLhRepairCapsuleHistory() {
+        String tableName = "胶囊已使用次数";
+        log.info("开始重新同步{}历史数据", tableName);
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult deleteResult = lhMesSyncRemoteService.logicDeleteLhRepairCapsuleAllBeforeToday();
+                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+            });
+
+            DynamicDataSourceContextHolder.push(DataSource.MES);
+            List<LhRepairCapsuleVo> syncList = mesItfMapper.selectLhRepairCapsuleHistoryList(new AuxReqSyncDataLogs());
+            DynamicDataSourceContextHolder.poll();
+
+            if (CollectionUtils.isEmpty(syncList)) {
+                log.info("{}历史数据：MES中间表无历史数据可同步", tableName);
+                return tableName + "：MES无历史数据；";
+            }
+
+            Map<String, LhRepairCapsuleVo> groupMap = syncList.stream()
+                    .collect(Collectors.toMap(
+                            item -> item.getFactoryCode() + "|" + item.getLhCode(),
+                            Function.identity(),
+                            (v1, v2) -> v1
+                    ));
+            syncList = new ArrayList<>(groupMap.values());
+
+            List<LhRepairCapsule> insertList = new ArrayList<>();
+            for (LhRepairCapsuleVo item : syncList) {
+                LhRepairCapsule entity = new LhRepairCapsule();
+                entity.setLhCode(item.getLhCode());
+                entity.setMaterialCode(item.getMaterialCode());
+                entity.setReplaceCapsuleCount(item.getReplaceCapsuleCount());
+                entity.setReplaceCapsuleCount2(item.getReplaceCapsuleCount2());
+                entity.setBrand(item.getBrand());
+                entity.setCompanyCode(StringUtils.isBlank(item.getCompanyCode()) ? FactoryConstant.DEFAULT_COMPANY_CODE : item.getCompanyCode());
+                entity.setFactoryCode(StringUtils.isBlank(item.getFactoryCode()) ? FactoryConstant.DEFAULT_FACTORY_CODE : item.getFactoryCode());
+                entity.setCreateBy("CLEAN_TASK");
+                entity.setUpdateBy("CLEAN_TASK");
+                entity.setCreateTime(DateUtils.getNowDate());
+                entity.setUpdateTime(DateUtils.getNowDate());
+
+                if (StringUtils.isNotBlank(item.getObtainTime())) {
+                    try {
+                        entity.setObtainTime(DateUtils.parseDate(item.getObtainTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"));
+                    } catch (Exception e) {
+                        log.error("解析获取日期失败：{}", item.getObtainTime(), e);
+                    }
+                }
+
+                insertList.add(entity);
+            }
+
+            log.info("{}历史数据：从MES抓取到{}条记录，开始插入APS库", tableName, insertList.size());
+            FeignTokenHelper.runWithToken(() -> {
+                lhMesSyncRemoteService.saveRepairCapsuleBatch(insertList);
+            });
+            log.info("{}历史数据：重新同步完成，插入{}条", tableName, insertList.size());
+            return tableName + "：插入" + insertList.size() + "条；";
+        } catch (Exception e) {
+            log.error("{}历史数据重新同步异常", tableName, e);
+            return tableName + "：异常-" + e.getMessage() + "；";
+        }
+    }
+
+    /**
+     * 重新同步生胎库存历史数据
+     * 1. 逻辑删除APS库今天之前所有生胎库存数据
+     * 2. 从MES库查询今天之前的生胎库存数据
+     * 3. 插入到APS库
+     */
+    private String resyncCxStockHistory() {
+        String tableName = "生胎库存";
+        log.info("开始重新同步{}历史数据", tableName);
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult deleteResult = cxMesSyncRemoteService.logicDeleteCxStockAllBeforeToday();
+                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+            });
+
+            DynamicDataSourceContextHolder.push(DataSource.MES);
+            List<CxMesStock> syncList = mesItfMapper.selectMesCxStockHistoryList(new AuxReqSyncDataLogs());
+            DynamicDataSourceContextHolder.poll();
+
+            if (CollectionUtils.isEmpty(syncList)) {
+                log.info("{}历史数据：MES中间表无历史数据可同步", tableName);
+                return tableName + "：MES无历史数据；";
+            }
+
+            Map<String, CxMesStock> groupMap = syncList.stream()
+                    .collect(Collectors.toMap(
+                            item -> item.getFactoryCode() + "|" + item.getEmbryoCode(),
+                            Function.identity(),
+                            (v1, v2) -> v1
+                    ));
+            syncList = new ArrayList<>(groupMap.values());
+
+            List<CxStock> cxStockInsertList = syncList.stream().map(item -> {
+                CxStock cxStock = new CxStock();
+                cxStock.setFactoryCode(StringUtils.isBlank(item.getFactoryCode()) ? FactoryConstant.DEFAULT_FACTORY_CODE : item.getFactoryCode());
+                cxStock.setStockDate(item.getStockDate());
+                cxStock.setEmbryoCode(item.getEmbryoCode());
+                cxStock.setStockNum(item.getStockNum() != null ? item.getStockNum().intValue() : 0);
+                cxStock.setDataSource(ApsConstant.DATA_SOURCE_MES);
+                cxStock.setCreateBy("CLEAN_TASK");
+                cxStock.setUpdateBy("CLEAN_TASK");
+                cxStock.setCreateTime(DateUtils.getNowDate());
+                cxStock.setUpdateTime(DateUtils.getNowDate());
+                return cxStock;
+            }).collect(Collectors.toList());
+
+            log.info("{}历史数据：从MES抓取到{}条记录，开始插入APS库", tableName, cxStockInsertList.size());
+            FeignTokenHelper.runWithToken(() -> {
+                cxMesSyncRemoteService.saveCxStockBatch(cxStockInsertList);
+            });
+            log.info("{}历史数据：重新同步完成，插入{}条", tableName, cxStockInsertList.size());
+            return tableName + "：插入" + cxStockInsertList.size() + "条；";
+        } catch (Exception e) {
+            log.error("{}历史数据重新同步异常", tableName, e);
+            return tableName + "：异常-" + e.getMessage() + "；";
+        }
+    }
+
+    /**
+     * 重新同步硫化排程完成量历史数据
+     * 1. 逻辑删除APS库今天之前所有硫化排程完成量数据
+     * 2. 从MES库查询今天之前每天最新版本的硫化排程完成量数据
+     * 3. 插入到APS库
+     */
+    private String resyncLhScheFinishQtyHistory() {
+        String tableName = "硫化排程完成量";
+        log.info("开始重新同步{}历史数据", tableName);
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult deleteResult = lhMesSyncRemoteService.logicDeleteLhScheFinishQtyAllBeforeToday();
+                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+            });
+
+            DynamicDataSourceContextHolder.push(DataSource.MES);
+            List<LhScheFinishQty> syncList = mesItfMapper.selectLhClassShiftFinishQtyHistoryList(new AuxReqSyncDataLogs());
+            DynamicDataSourceContextHolder.poll();
+
+            if (CollectionUtils.isEmpty(syncList)) {
+                log.info("{}历史数据：MES中间表无历史数据可同步", tableName);
+                return tableName + "：MES无历史数据；";
+            }
+
+            List<LhScheFinishQty> insertList = new ArrayList<>();
+            for (LhScheFinishQty item : syncList) {
+                LhScheFinishQty entity = new LhScheFinishQty();
+                BeanUtils.copyProperties(item, entity);
+                entity.setCreateBy("CLEAN_TASK");
+                entity.setUpdateBy("CLEAN_TASK");
+                entity.setCreateTime(DateUtils.getNowDate());
+                entity.setUpdateTime(DateUtils.getNowDate());
+                entity.setIsDelete(0);
+                insertList.add(entity);
+            }
+
+            log.info("{}历史数据：从MES抓取到{}条记录，开始插入APS库", tableName, insertList.size());
+            FeignTokenHelper.runWithToken(() -> {
+                lhMesSyncRemoteService.saveScheFinishQtyBatch(insertList);
+            });
+            log.info("{}历史数据：重新同步完成，插入{}条", tableName, insertList.size());
+            return tableName + "：插入" + insertList.size() + "条；";
+        } catch (Exception e) {
+            log.error("{}历史数据重新同步异常", tableName, e);
+            return tableName + "：异常-" + e.getMessage() + "；";
+        }
+    }
+
+    /**
+     * 重新同步硫化排程日完成量历史数据
+     * 1. 逻辑删除APS库今天之前所有硫化排程日完成量数据
+     * 2. 从MES库查询今天之前每天最新版本的硫化排程日完成量数据
+     * 3. 插入到APS库
+     */
+    private String resyncLhDayFinishQtyHistory() {
+        String tableName = "硫化排程日完成量";
+        log.info("开始重新同步{}历史数据", tableName);
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult deleteResult = lhMesSyncRemoteService.logicDeleteLhDayFinishQtyAllBeforeToday();
+                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+            });
+
+            DynamicDataSourceContextHolder.push(DataSource.MES);
+            List<LhDayFinishQty> syncList = mesItfMapper.selectLhScheDayFinishQtyHistoryList(new AuxReqSyncDataLogs());
+            DynamicDataSourceContextHolder.poll();
+
+            if (CollectionUtils.isEmpty(syncList)) {
+                log.info("{}历史数据：MES中间表无历史数据可同步", tableName);
+                return tableName + "：MES无历史数据；";
+            }
+
+            Map<String, LhDayFinishQty> groupMap = syncList.stream()
+                    .collect(Collectors.toMap(
+                            item -> item.getFactoryCode() + "|" + item.getFinishDate() + "|" + item.getMaterialCode() + "|" + item.getMesMaterialCode(),
+                            Function.identity(),
+                            (v1, v2) -> v1
+                    ));
+            syncList = new ArrayList<>(groupMap.values());
+
+            List<LhDayFinishQty> insertList = new ArrayList<>();
+            for (LhDayFinishQty item : syncList) {
+                LhDayFinishQty entity = new LhDayFinishQty();
+                BeanUtils.copyProperties(item, entity);
+                entity.setCreateBy("CLEAN_TASK");
+                entity.setUpdateBy("CLEAN_TASK");
+                entity.setCreateTime(DateUtils.getNowDate());
+                entity.setUpdateTime(DateUtils.getNowDate());
+                entity.setIsDelete(0);
+                insertList.add(entity);
+            }
+
+            log.info("{}历史数据：从MES抓取到{}条记录，开始插入APS库", tableName, insertList.size());
+            FeignTokenHelper.runWithToken(() -> {
+                lhMesSyncRemoteService.saveDayFinishQtyBatch(insertList);
+            });
+            log.info("{}历史数据：重新同步完成，插入{}条", tableName, insertList.size());
+            return tableName + "：插入" + insertList.size() + "条；";
+        } catch (Exception e) {
+            log.error("{}历史数据重新同步异常", tableName, e);
+            return tableName + "：异常-" + e.getMessage() + "；";
+        }
     }
 }

@@ -663,4 +663,30 @@ public class MesItfController {
         }
         return mesItfService.syncAndGenerateLhPrecisionPlan(year);
     }
+
+    @ApiOperation("同步MES数据并生成硫化精度计划（按版本号前缀过滤，综合接口）")
+    @PostMapping("/syncAndGenerateLhPrecisionPlanByVersionPrefix")
+    public AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefix(@RequestParam("versionPrefix") String versionPrefix,
+                                                                     @RequestParam("year") Integer year) {
+        if (year == null) {
+            year = java.time.LocalDate.now().getYear();
+        }
+        return mesItfService.syncAndGenerateLhPrecisionPlanByVersionPrefix(versionPrefix, year);
+    }
+
+    /**
+     * 清理并重新同步所有MES历史数据
+     * 执行步骤：
+     * 1. 逻辑删除APS库中今天之前的所有数据（6张表）
+     * 2. 从MES库重新抓取今天之前每天最新版本数据
+     * 3. 将MES数据插入到APS库
+     *
+     * @return 执行结果
+     */
+    @ApiOperation("清理并重新同步所有MES历史数据")
+    @PostMapping("/cleanAndResyncAllHistory")
+    @AutoLoginLog
+    public AjaxResult cleanAndResyncAllHistory() {
+        return mesItfService.cleanAndResyncAllHistory();
+    }
 }

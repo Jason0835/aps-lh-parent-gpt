@@ -119,6 +119,8 @@ export default {
         {
           prop: 'embryoDesc',
           label: this.$t('ui.data.column.cxStock.embryoDesc'),
+          minWidth: 350,
+          align: "left",
           placeholder: this.$t('common.rule.input'),
           type: 'input'
         },
@@ -163,9 +165,9 @@ export default {
         {
           prop: 'embryoDesc',
           align: 'left',
-          halign: 'center',
+          halign: "left",
           label: this.$t('ui.data.column.cxStock.embryoDesc'),
-          minWidth: 300
+          minWidth: 350
         },
         {
           prop: 'stockNum',

@@ -39,6 +39,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import cn.hutool.core.date.DateUtil;
 import org.apache.commons.lang.StringUtils;
 
 @Slf4j
@@ -112,7 +113,8 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @Override
     @ApiOperation("逻辑删除并批量保存硫化在机信息（事务性操作）")
     @PostMapping("/logicDeleteAndSaveMachineOnlineInfo")
-    public AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("onlineDate") Date onlineDate, @RequestParam("updateBy") String updateBy, @RequestBody List<LhMachineOnlineInfo> list) {
+    public AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("onlineDate") String onlineDateStr, @RequestParam("updateBy") String updateBy, @RequestBody List<LhMachineOnlineInfo> list) {
+        Date onlineDate = DateUtil.parse(onlineDateStr);
         lhMachineOnlineInfoService.logicDeleteAndSaveBatch(factoryCode, onlineDate, updateBy, list);
         return AjaxResult.success();
     }
@@ -146,7 +148,8 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @Override
     @ApiOperation("逻辑删除并批量保存胶囊已使用次数（事务性操作）")
     @PostMapping("/logicDeleteAndSaveRepairCapsule")
-    public AjaxResult logicDeleteAndSaveRepairCapsule(@RequestParam("factoryCode") String factoryCode, @RequestParam("obtainTime") Date obtainTime, @RequestParam("updateBy") String updateBy, @RequestBody List<LhRepairCapsule> list) {
+    public AjaxResult logicDeleteAndSaveRepairCapsule(@RequestParam("factoryCode") String factoryCode, @RequestParam("obtainTime") String obtainTimeStr, @RequestParam("updateBy") String updateBy, @RequestBody List<LhRepairCapsule> list) {
+        Date obtainTime = DateUtil.parse(obtainTimeStr);
         lhRepairCapsuleService.logicDeleteAndSaveBatch(factoryCode, obtainTime, updateBy, list);
         return AjaxResult.success();
     }
@@ -196,7 +199,8 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @Override
     @ApiOperation("逻辑删除并批量保存硫化排程完成量（事务性操作）")
     @PostMapping("/logicDeleteAndSaveScheFinishQty")
-    public AjaxResult logicDeleteAndSaveScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("scheduleDate") Date scheduleDate, @RequestParam("updateBy") String updateBy, @RequestBody List<LhScheFinishQty> list) {
+    public AjaxResult logicDeleteAndSaveScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("scheduleDate") String scheduleDateStr, @RequestParam("updateBy") String updateBy, @RequestBody List<LhScheFinishQty> list) {
+        Date scheduleDate = DateUtil.parse(scheduleDateStr);
         lhScheFinishQtyService.logicDeleteAndSaveBatch(factoryCode, scheduleDate, updateBy, list);
         return AjaxResult.success();
     }
@@ -229,7 +233,8 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     @Override
     @ApiOperation("逻辑删除并批量保存硫化排程日完成量（事务性操作）")
     @PostMapping("/logicDeleteAndSaveDayFinishQty")
-    public AjaxResult logicDeleteAndSaveDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("finishDate") Date finishDate, @RequestParam("updateBy") String updateBy, @RequestBody List<LhDayFinishQty> list) {
+    public AjaxResult logicDeleteAndSaveDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("finishDate") String finishDateStr, @RequestParam("updateBy") String updateBy, @RequestBody List<LhDayFinishQty> list) {
+        Date finishDate = DateUtil.parse(finishDateStr);
         lhDayFinishQtyService.logicDeleteAndSaveBatch(factoryCode, finishDate, updateBy, list);
         return AjaxResult.success();
     }
@@ -289,42 +294,42 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     }
 
     @Override
-    @ApiOperation("清理硫化在机历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/cleanLhMachineOnlineHistoryDuplicate")
-    public AjaxResult cleanLhMachineOnlineHistoryDuplicate() {
-        log.info("开始清理硫化在机历史重复数据...");
-        int count = lhMachineOnlineInfoMapper.cleanHistoryDuplicateData();
-        log.info("清理硫化在机历史重复数据完成，删除记录数={}", count);
-        return AjaxResult.success("删除记录数：" + count);
+    @ApiOperation("逻辑删除硫化在机今天之前所有数据")
+    @PostMapping("/logicDeleteLhMachineOnlineAllBeforeToday")
+    public AjaxResult logicDeleteLhMachineOnlineAllBeforeToday() {
+        log.info("开始逻辑删除硫化在机今天之前所有数据...");
+        int deleteCount = lhMachineOnlineInfoMapper.logicDeleteAllBeforeToday();
+        log.info("逻辑删除硫化在机今天之前所有数据完成，删除记录数={}", deleteCount);
+        return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("清理胶囊已使用次数历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/cleanLhRepairCapsuleHistoryDuplicate")
-    public AjaxResult cleanLhRepairCapsuleHistoryDuplicate() {
-        log.info("开始清理胶囊已使用次数历史重复数据...");
-        int count = lhRepairCapsuleMapper.cleanHistoryDuplicateData();
-        log.info("清理胶囊已使用次数历史重复数据完成，删除记录数={}", count);
-        return AjaxResult.success("删除记录数：" + count);
+    @ApiOperation("逻辑删除胶囊已使用次数今天之前所有数据")
+    @PostMapping("/logicDeleteLhRepairCapsuleAllBeforeToday")
+    public AjaxResult logicDeleteLhRepairCapsuleAllBeforeToday() {
+        log.info("开始逻辑删除胶囊已使用次数今天之前所有数据...");
+        int deleteCount = lhRepairCapsuleMapper.logicDeleteAllBeforeToday();
+        log.info("逻辑删除胶囊已使用次数今天之前所有数据完成，删除记录数={}", deleteCount);
+        return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("清理硫化排程完成量历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/cleanLhScheFinishQtyHistoryDuplicate")
-    public AjaxResult cleanLhScheFinishQtyHistoryDuplicate() {
-        log.info("开始清理硫化排程完成量历史重复数据...");
-        int count = lhScheFinishQtyMapper.cleanHistoryDuplicateData();
-        log.info("清理硫化排程完成量历史重复数据完成，删除记录数={}", count);
-        return AjaxResult.success("删除记录数：" + count);
+    @ApiOperation("逻辑删除硫化排程完成量今天之前所有数据")
+    @PostMapping("/logicDeleteLhScheFinishQtyAllBeforeToday")
+    public AjaxResult logicDeleteLhScheFinishQtyAllBeforeToday() {
+        log.info("开始逻辑删除硫化排程完成量今天之前所有数据...");
+        int deleteCount = lhScheFinishQtyMapper.logicDeleteAllBeforeToday();
+        log.info("逻辑删除硫化排程完成量今天之前所有数据完成，删除记录数={}", deleteCount);
+        return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("清理硫化排程日完成量历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/cleanLhDayFinishQtyHistoryDuplicate")
-    public AjaxResult cleanLhDayFinishQtyHistoryDuplicate() {
-        log.info("开始清理硫化排程日完成量历史重复数据...");
-        int count = lhDayFinishQtyMapper.cleanHistoryDuplicateData();
-        log.info("清理硫化排程日完成量历史重复数据完成，删除记录数={}", count);
-        return AjaxResult.success("删除记录数：" + count);
+    @ApiOperation("逻辑删除硫化排程日完成量今天之前所有数据")
+    @PostMapping("/logicDeleteLhDayFinishQtyAllBeforeToday")
+    public AjaxResult logicDeleteLhDayFinishQtyAllBeforeToday() {
+        log.info("开始逻辑删除硫化排程日完成量今天之前所有数据...");
+        int deleteCount = lhDayFinishQtyMapper.logicDeleteAllBeforeToday();
+        log.info("逻辑删除硫化排程日完成量今天之前所有数据完成，删除记录数={}", deleteCount);
+        return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 }

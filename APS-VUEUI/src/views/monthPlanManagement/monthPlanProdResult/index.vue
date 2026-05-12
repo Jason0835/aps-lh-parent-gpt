@@ -208,8 +208,8 @@ export default {
         {
           label: this.$t("ui.data.column.mouldingDayResult.productDesc"),
           prop: "productDesc",
-          minWidth: 100,
-          width: 250,
+          align: "left",
+          minWidth: 350,
           // sortable: "custom",
         },
 
@@ -429,6 +429,8 @@ export default {
         },
         {
           label: this.$t("ui.data.column.mouldingDayResult.productDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "productDesc",
         },
         {

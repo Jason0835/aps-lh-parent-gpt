@@ -254,7 +254,8 @@ export default {
         {
           label: this.$t("ui.data.column.lhApsMoldAdjustPlan.beforeSpecDesc"),
           prop: "beforeSpecDesc",
-          minWidth: 100,
+          align: "left",
+          minWidth: 350,
           // sortable: "custom",
         },
         {
@@ -308,7 +309,8 @@ export default {
         {
           label: this.$t("ui.data.column.lhApsMoldAdjustPlan.afterSpecDesc"),
           prop: "afterSpecDesc",
-          minWidth: 100,
+          align: "left",
+          minWidth: 350,
           // sortable: "custom",
         },
         {

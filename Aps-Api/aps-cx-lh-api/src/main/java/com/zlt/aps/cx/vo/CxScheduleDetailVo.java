@@ -23,6 +23,12 @@ public class CxScheduleDetailVo {
     /** 所属主表ID */
     private Long mainId;
 
+    /** 车次号 */
+    private String tripNo;
+
+    /** 车次容量（整车条数） */
+    private BigDecimal tripCapacity;
+
     // 一班~八班计划数
     private BigDecimal class1PlanQty;
     private BigDecimal class2PlanQty;

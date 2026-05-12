@@ -181,4 +181,66 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<DevMaintenancePlan> selectLhPrecisionPlanActualList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询MES中间表设备保养计划指定精度类型的最大版本号
+     * 版本号格式如：APS_MES_AH01_20260510120430003，字符串MAX比较即可获取最新版本
+     *
+     * @param precisionType 精度类型（如：硫化精度）
+     * @return 最大版本号，无数据时返回null
+     */
+    String selectMaxDataVersionFromMes(@Param("precisionType") String precisionType);
+
+    /**
+     * 查询成型在机历史同步数据（今天之前每天最新版本）
+     * 按日期+成型机台分组，取每天每个机台的MAX(DATA_VERSION)
+     *
+     * @param cxMachineOnlineInfo 参数（factoryCode可选）
+     * @return 列表
+     */
+    List<CxMachineOnlineInfo> selectCxMachineOnlineHistorySyncList(CxMachineOnlineInfo cxMachineOnlineInfo);
+
+    /**
+     * 查询硫化在机历史同步数据（今天之前每天最新版本）
+     * 按日期+硫化机台分组，取每天每个机台的MAX(DATA_VERSION)
+     *
+     * @param lhMachineOnlineInfo 参数（factoryCode可选）
+     * @return 列表
+     */
+    List<LhMachineOnlineInfo> selectLhMachineOnlineHistorySyncList(LhMachineOnlineInfo lhMachineOnlineInfo);
+
+    /**
+     * 查询胶囊已使用次数历史同步数据（今天之前每天最新版本）
+     * 按日期+硫化机台分组，取每天每个机台的MAX(DATA_VERSION)
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<LhRepairCapsuleVo> selectLhRepairCapsuleHistoryList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询生胎库存历史同步数据（今天之前的数据）
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<CxMesStock> selectMesCxStockHistoryList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询硫化排程完成量历史同步数据（今天之前每天最新版本）
+     * 按日期+硫化机台+订单号分组，取每天每组的MAX(DATA_VERSION)
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<LhScheFinishQty> selectLhClassShiftFinishQtyHistoryList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询硫化排程日完成量历史同步数据（今天之前每天最新版本）
+     * 按日期+分厂分组，取每天每组的MAX(DATA_VERSION)
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<LhDayFinishQty> selectLhScheDayFinishQtyHistoryList(AuxReqSyncDataLogs syncDataLogs);
 }

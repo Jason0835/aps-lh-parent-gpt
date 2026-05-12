@@ -53,10 +53,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
     private final ProductionHistoryHandler productionHistoryHandler;
 
-    public AbstractDataLoaderService(ProductionMdmDataService dataService,
-                                     DpRequireDataService dpRequireDataService,
-                                     MonthProductionDataService monthProductionDataService,
-                                     ProductionHistoryHandler productionHistoryHandler) {
+    public AbstractDataLoaderService(ProductionMdmDataService dataService, DpRequireDataService dpRequireDataService, MonthProductionDataService monthProductionDataService, ProductionHistoryHandler productionHistoryHandler) {
         super(dataService, dpRequireDataService, monthProductionDataService);
         this.productionHistoryHandler = productionHistoryHandler;
     }
@@ -174,8 +171,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
      * @param mpCheckItemVos
      * @param mpCheckItemRecords
      */
-    protected void initProductionBaseDataWithExceptions(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList, List<MpCheckItemVo> mpCheckItemVos,
-                                                        List<MpCheckItemRecord> mpCheckItemRecords) {
+    protected void initProductionBaseDataWithExceptions(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
         //1、获取排产参数设定
         try {
             ProductionCapacityParamConfiguration paramConfiguration = createParamConfiguration(productionContext);
@@ -186,9 +182,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             productionContext.getBaseDataContainer().setParamConfiguration(paramConfiguration);
         } catch (Exception e) {
             log.error("获取排产参数设定失败", e);
-            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.PARAMS_CONFIG),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.PARAMS_CONFIG), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //2、特殊材料的胎胚配置信息--基于净需求计划版本
@@ -196,9 +190,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             specialMaterialInfoHandler(productionContext);
         } catch (Exception e) {
             log.error("特殊材料的胎胚配置信息处理失败", e);
-            addCheckResult(false, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.SPECIAL_RAW_MATERIAL_NOTEMPTY),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.SPECIAL_RAW_MATERIAL_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.SPECIAL_RAW_MATERIAL_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //3、超6个成品库存信息
@@ -206,9 +198,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             overSixMonthStockHandler(productionContext);
         } catch (Exception e) {
             log.error("超6个成品库存信息处理失败", e);
-            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.OVER_SIX_MONTH_STOCK_ERROR),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.OVER_SIX_MONTH_STOCK_ERROR), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //4、初始化库销比、标记是否按总需求排产
@@ -216,9 +206,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             initProductionRequirePlanInfo(productionContext, requirePlanList);
         } catch (Exception e) {
             log.error("初始化库销比处理失败", e);
-            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.INIT_PRODUCTION_REQUIRE_PLAN_ERROR),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.INIT_PRODUCTION_REQUIRE_PLAN_ERROR), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //5、获取周期内的生产日历信息
@@ -226,9 +214,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             setMonthProductionDays(productionContext);
         } catch (Exception e) {
             log.error("获取周期内的生产日历信息失败", e);
-            addCheckResult(false, CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.PRODUCTION_CALENDAR_NOTEMPTY),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.PRODUCTION_CALENDAR_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.PRODUCTION_CALENDAR_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //6、构建全局日排产限制信息
@@ -236,9 +222,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             buildDayCapacityLimitInfo(productionContext);
         } catch (Exception e) {
             log.error("构建全局日排产限制信息失败", e);
-            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.DAY_CAPACITY_LIMIT_ERROR),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.DAY_CAPACITY_LIMIT_ERROR), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //7、获取成型机台信息--日产信息
@@ -247,9 +231,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             productionContext.getBaseDataContainer().setCxMachineBaseInfo(cxMachineBaseInfo);
         } catch (Exception e) {
             log.error("获取成型机台信息失败", e);
-            addCheckResult(false, CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_MACHINE_BASEDATA_NOTEMPTY),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.BASIC_DATA_OF_MOLDING_MACHINE, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_MACHINE_BASEDATA_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //8、成型鼓
@@ -258,9 +240,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             productionContext.getBaseDataContainer().setTireDrumInfoMap(workWearTypeInfoMap);
         } catch (Exception e) {
             log.error("获取成型鼓信息失败", e);
-            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.WORKWEAR_TYPE_INFO_ERROR),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.WORKWEAR_TYPE_INFO_ERROR), mpCheckItemVos, mpCheckItemRecords);
         }
         Map<String, List<MonthPlanProductMouldInfoVo>> mouldRelationMap = new HashMap<>();
         //9、获取SKU模具配置信息
@@ -271,9 +251,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             productionContext.getBaseDataContainer().setSkuMouldRelationMap(mouldRelationMap);
         } catch (Exception e) {
             log.error("获取SKU模具配置信息失败", e);
-            addCheckResult(false, CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.WORKWEAR_INVENTORY_NOTEMPTY),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.EQUIPMENT_LEDGER_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.WORKWEAR_INVENTORY_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //10、结构模具分配配比
@@ -282,9 +260,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             productionContext.getBaseDataContainer().setGroupMainPatternAllocationLimitMap(mouldAllocationMap);
         } catch (Exception e) {
             log.error("获取结构模具分配配比信息失败", e);
-            addCheckResult(false, CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_ALLOCATION_RATIO_CONFIG_NOTEMPTY),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.MOLD_ALLOCATION_RATIO_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_ALLOCATION_RATIO_CONFIG_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //11、获取模壳配置信息
@@ -293,9 +269,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             productionContext.getBaseDataContainer().setMouldShellMap(mouldShellMap);
         } catch (Exception e) {
             log.error("获取模壳配置信息失败", e);
-            addCheckResult(false, CheckItemTypeEnums.MOLD_SHELL_DATA,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_SHELL_NOTEMPTY),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.MOLD_SHELL_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOLD_SHELL_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //12、获取胶囊卡盘配置信息
@@ -304,9 +278,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             productionContext.getBaseDataContainer().setCapsuleChuckInfoMap(capsuleChuckInfoMap);
         } catch (Exception e) {
             log.error("获取胶囊卡盘配置信息失败", e);
-            addCheckResult(false, CheckItemTypeEnums.CAPSULE_CHUCK_DATA,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.CAPSULE_CHUCK_NOTEMPTY),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.CAPSULE_CHUCK_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.CAPSULE_CHUCK_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //13、获取结构的硫化配比
@@ -315,9 +287,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             productionContext.getBaseDataContainer().setStructureLhRatioList(structureLhRatioList);
         } catch (Exception e) {
             log.error("获取结构的硫化配比信息失败", e);
-            addCheckResult(false, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.STRUCTURE_FORMING_VULCANIZATION_RATIO_NOTEMPTY),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.SULFURIZATION_RATIO_DATA, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.STRUCTURE_FORMING_VULCANIZATION_RATIO_NOTEMPTY), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //16、机台近3个月的生产历史信息
@@ -329,9 +299,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             productionContext.getBaseDataContainer().setGroupPlanHistoryInfoMap(groupPlanHistoryInfoMap);
         } catch (Exception e) {
             log.error("获取机台近3个月的生产历史信息失败", e);
-            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.PRODUCTION_HISTORY_ERROR),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.PRODUCTION_HISTORY_ERROR), mpCheckItemVos, mpCheckItemRecords);
         }
 
         if (CollectionUtils.isEmpty(requirePlanList)) {
@@ -361,9 +329,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             });
         } catch (Exception e) {
             log.error("根据计划的物料描述补充模具关系中的物料结构名失败", e);
-            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOULD_STRUCTURE_NAME_ERROR),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.MOULD_STRUCTURE_NAME_ERROR), mpCheckItemVos, mpCheckItemRecords);
         }
 
         //15、构建结构、主花纹的模具信息
@@ -371,9 +337,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             buildGroupMainPatternInfo(productionContext);
         } catch (Exception e) {
             log.error("构建结构、主花纹的模具信息失败", e);
-            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG,
-                    NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.GROUP_MAIN_PATTERN_ERROR),
-                    mpCheckItemVos, mpCheckItemRecords);
+            addCheckResult(false, CheckItemTypeEnums.OTHER_PARAMS_CONFIG, NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.GROUP_MAIN_PATTERN_ERROR), mpCheckItemVos, mpCheckItemRecords);
         }
     }
 
@@ -382,8 +346,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
      */
     private void addCheckResult(boolean isPass, CheckItemTypeEnums checkItemType, String failReason, List<MpCheckItemVo> mpCheckItemVos, List<MpCheckItemRecord> mpCheckItemRecords) {
         // 先判断该类型的检测是否已经存在结果
-        boolean isAlreadyChecked = mpCheckItemVos.stream()
-                .anyMatch(vo -> checkItemType.getCode().equals(vo.getCheckItem()) && !StringUtils.equals(vo.getCheckItem(), CheckItemTypeEnums.OTHER_PARAMS_CONFIG.getCode()));
+        boolean isAlreadyChecked = mpCheckItemVos.stream().anyMatch(vo -> checkItemType.getCode().equals(vo.getCheckItem()) && !StringUtils.equals(vo.getCheckItem(), CheckItemTypeEnums.OTHER_PARAMS_CONFIG.getCode()));
 
         // 如果已经检测过，直接返回，保留原来的结果（保留第1、2项的成功状态）
         if (isAlreadyChecked) {
@@ -406,10 +369,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
      */
     private void addErrorRecordWithMultipleErrors(List<MpCheckItemRecord> records, String checkItem, String errorReason) {
         // 检查是否已经存在该类型的记录
-        MpCheckItemRecord existingRecord = records.stream()
-                .filter(record -> checkItem.equals(record.getCheckItem()))
-                .findFirst()
-                .orElse(null);
+        MpCheckItemRecord existingRecord = records.stream().filter(record -> checkItem.equals(record.getCheckItem())).findFirst().orElse(null);
 
         if (existingRecord != null) {
             // 如果记录已存在，将新异常追加到现有记录中
@@ -469,6 +429,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_MIN_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.PRODUCTION_MODE.getCode());
+        paramCodeList.add(MonthPlanEnums.SINGLE_CX_MACHINE_CHANGE_PRO_SIZE_REPEAT_COUNT.getCode());
         //排产控制相关
         paramCodeList.add(MonthPlanEnums.SUM_PRODUCTION_QTY.getCode());
         paramCodeList.add(MonthPlanEnums.HEIGHT_DIFF_QTY.getCode());
@@ -505,7 +466,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.MIN_LH_MACHINE_CONTINUE_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.HEIGHT_PRIORITY_SKU_PRODUCTION_MODE.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_HEIGHT_PRIORITY_LH_MACHINE_COUNT.getCode());
-        
+
         //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
         if (CollectionUtils.isEmpty(paramConfigurationMap)) {
@@ -560,6 +521,19 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         configuration.setSingleCxEmbryoCodeCount((Integer) paramConfigurationMap.get(MonthPlanEnums.SINGLE_CX_EMBRYO_CODE_COUNT.getCode()));
         configuration.setDayMaxCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MAX_CAPACITY.getCode()));
         configuration.setDayMinCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MIN_CAPACITY.getCode()));
+        //20260511+ 单机台允许重复切换英寸的最大次数
+        Object changeProSizeRepeatMaxCountValue = paramConfigurationMap.get(MonthPlanEnums.SINGLE_CX_MACHINE_CHANGE_PRO_SIZE_REPEAT_COUNT.getCode());
+        if (null == changeProSizeRepeatMaxCountValue) {
+            configuration.setSingleCxMachineChangeProSizeRepeatMaxCount(Integer.MAX_VALUE);
+        } else {
+            Integer changeProSizeRepeatMaxCount = (Integer) changeProSizeRepeatMaxCountValue;
+            if (changeProSizeRepeatMaxCount <= BigDecimal.ZERO.intValue()) {
+                configuration.setSingleCxMachineChangeProSizeRepeatMaxCount(BigDecimal.ZERO.intValue());
+            } else {
+                configuration.setSingleCxMachineChangeProSizeRepeatMaxCount(changeProSizeRepeatMaxCount);
+            }
+        }
+
         //降膜排产相关
         configuration.setDeductMouldMinLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.DEDUCT_MOULD_MIN_LH_MACHINE_COUNT.getCode()));
         configuration.setFirstNearDeadLineMaxLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.FIRST_NEAR_DEAD_LINE_MAX_LH_MACHINE_COUNT.getCode()));
@@ -653,12 +627,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
     private void overSixMonthStockHandler(TbrProductionContext productionContext) {
         List<MdmProductStock> stockList = getDataService().getMdmProductStock(productionContext);
         //过滤库存为空的值
-        Map<String, Integer> overSixMonthStockMap = stockList.stream()
-                .filter(s -> StringUtils.isNotEmpty(s.getMaterialDesc()) && null != s.getStockQty())
-                .collect(Collectors.groupingBy(MdmProductStock::getMaterialDesc,
-                        Collectors.collectingAndThen(Collectors.toList(),
-                                list -> list.stream().filter(s -> ApsConstant.TRUE.equals(s.getIsExceedSixMonth()))
-                                        .collect(Collectors.summingInt(MdmProductStock::getStockQty)))));
+        Map<String, Integer> overSixMonthStockMap = stockList.stream().filter(s -> StringUtils.isNotEmpty(s.getMaterialDesc()) && null != s.getStockQty()).collect(Collectors.groupingBy(MdmProductStock::getMaterialDesc, Collectors.collectingAndThen(Collectors.toList(), list -> list.stream().filter(s -> ApsConstant.TRUE.equals(s.getIsExceedSixMonth())).collect(Collectors.summingInt(MdmProductStock::getStockQty)))));
         productionContext.setOverSixMonthStockMap(overSixMonthStockMap);
     }
 
@@ -777,7 +746,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
     /**
      * 2.1.6：构建日产能限制对象信息
-     *buildGroupMainPatternInfo
+     * buildGroupMainPatternInfo
+     *
      * @param productionContext 排产上下文
      */
     protected void buildDayCapacityLimitInfo(TbrProductionContext productionContext) {

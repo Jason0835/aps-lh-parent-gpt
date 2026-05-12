@@ -127,6 +127,8 @@ export default {
         {
           label: this.$t("setting.glueFinish.orderNo"),
           prop: "orderNo",
+          align: "left",
+          minWidth: 160,
         },
         {
           label: this.$t("setting.glueFinish.scheduleDate"),
@@ -153,10 +155,10 @@ export default {
         {
           prop: "orderNo",
           // sortable: "custom",
-          halign: "center",
-          align: "center",
+          halign: "left",
+          align: "left",
           valign: "middle",
-          width: 200,
+          minWidth: 160,
           label: this.$t("setting.glueFinish.orderNo"),
         },
         {
@@ -165,7 +167,7 @@ export default {
           halign: "center",
           align: "center",
           valign: "middle",
-          minWidth: 100,
+          minWidth: 120,
           label: this.$t("setting.glueFinish.scheduleDate"),
         },
         {
