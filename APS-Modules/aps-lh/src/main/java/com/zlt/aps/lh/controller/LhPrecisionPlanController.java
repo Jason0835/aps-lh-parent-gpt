@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import cn.hutool.core.date.DateUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -232,6 +233,23 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
     }
 
     /**
+     * 从MES同步数据生成硫化精度初版计划（按版本号前缀过滤）
+     * 只处理版本号前缀匹配的数据，如APS_MES_AH01
+     */
+    @ApiOperation("从MES同步数据生成硫化精度初版计划（按版本号前缀过滤）")
+    @PostMapping("/generateFromMesByVersionPrefix")
+    public AjaxResult generatePlansFromMesByVersionPrefix(@RequestParam("versionPrefix") String versionPrefix,
+                                                           @RequestParam("year") Integer year) {
+        try {
+            int count = lhPrecisionPlanService.generatePlansFromMesByVersionPrefix(versionPrefix, year);
+            return AjaxResult.success("生成成功", count);
+        } catch (Exception e) {
+            log.error("从MES同步数据生成硫化精度计划失败（版本前缀={}）", versionPrefix, e);
+            return AjaxResult.error("生成失败：" + e.getMessage());
+        }
+    }
+
+    /**
      * 自动生成年度硫化精度计划
      */
     @ApiOperation("自动生成年度硫化精度计划")
@@ -314,8 +332,9 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
     @PostMapping("/fillScheduleDate")
     public AjaxResult fillScheduleDate(@RequestParam("machineCode") String machineCode,
                                        @RequestParam("factoryCode") String factoryCode,
-                                       @RequestParam("scheduleDate") java.util.Date scheduleDate) {
+                                       @RequestParam("scheduleDate") String scheduleDateStr) {
         try {
+            java.util.Date scheduleDate = DateUtil.parse(scheduleDateStr);
             int count = lhPrecisionPlanService.fillScheduleDate(machineCode, factoryCode, scheduleDate);
             return AjaxResult.success("回填成功", count);
         } catch (Exception e) {
@@ -340,8 +359,9 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
     @PostMapping("/fillActualDateAndGenerateNext")
     public AjaxResult fillActualDateAndGenerateNext(@RequestParam("machineCode") String machineCode,
                                                      @RequestParam("factoryCode") String factoryCode,
-                                                     @RequestParam("actualDate") java.util.Date actualDate) {
+                                                     @RequestParam("actualDate") String actualDateStr) {
         try {
+            java.util.Date actualDate = DateUtil.parse(actualDateStr);
             boolean result = lhPrecisionPlanService.fillActualDateAndGenerateNext(machineCode, factoryCode, actualDate);
             return result ? AjaxResult.success("回填成功并已生成下一次计划") : AjaxResult.error("回填失败");
         } catch (Exception e) {

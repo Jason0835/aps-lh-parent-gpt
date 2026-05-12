@@ -362,5 +362,35 @@ public interface IMesItfService {
      */
     @ApiOperation("同步MES数据并生成硫化精度计划（综合接口）")
     @PostMapping("/mesItf/syncAndGenerateLhPrecisionPlan")
-    public AjaxResult syncAndGenerateLhPrecisionPlan(@RequestParam("year") Integer year);
+    AjaxResult syncAndGenerateLhPrecisionPlan(@RequestParam("year") Integer year);
+
+    /**
+     * 同步MES数据并生成硫化精度计划（按版本号前缀过滤，综合接口）
+     * 执行步骤：
+     * 1. 同步MES设备保养计划到APS
+     * 2. 同步MES硫化精度计划实际执行日期回填数据
+     * 3. 按版本前缀过滤生成硫化精度计划
+     * 4. 自动推算下一年度计划
+     *
+     * @param versionPrefix 版本号前缀（如：APS_MES_AH01）
+     * @param year 年度
+     * @return 执行结果
+     */
+    @ApiOperation("同步MES数据并生成硫化精度计划（按版本号前缀过滤，综合接口）")
+    @PostMapping("/mesItf/syncAndGenerateLhPrecisionPlanByVersionPrefix")
+    AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefix(@RequestParam("versionPrefix") String versionPrefix,
+                                                              @RequestParam("year") Integer year);
+
+    /**
+     * 清理并重新同步所有MES历史数据
+     * 执行步骤：
+     * 1. 逻辑删除APS库中今天之前的所有数据（6张表）
+     * 2. 从MES库重新抓取今天之前每天最新版本数据
+     * 3. 将MES数据插入到APS库
+     *
+     * @return 执行结果
+     */
+    @ApiOperation("清理并重新同步所有MES历史数据")
+    @PostMapping("/mesItf/cleanAndResyncAllHistory")
+    AjaxResult cleanAndResyncAllHistory();
 }

@@ -918,7 +918,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void recalculate(MpRollAdjustContextDTO contextDTO) throws BusinessException {
+    public void recalculate(MpRollAdjustContextDTO contextDTO, Boolean isHandleMonthPlanStatistics) throws BusinessException {
         log.info("开始执行周程调整重新计算流程，调整类型：{}，工厂：{}，年份：{}，月份：{}，版本：{}，排产版本：{}，结构名称：{}，排产机台：{}，开始日期：{}，结束日期：{}，调整开始日期：{}，调整结束日期：{}",
                 contextDTO.getAdjustType(), contextDTO.getFactoryCode(), contextDTO.getMpYear(),
                 contextDTO.getMpMonth(), contextDTO.getVersion(), contextDTO.getProductionVersion(),
@@ -930,7 +930,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 根据优先级顺序分配生产数量
             allocateProductionByPriority(contextDTO);
             // 处理月计划统计结果
-            handleMonthPlanStatistics(contextDTO);
+            if (isHandleMonthPlanStatistics) {
+                handleMonthPlanStatistics(contextDTO);
+            }
             log.info("周程调整确认流程执行完成");
         }catch (Exception e) {
             log.error("周程调整确认流程执行异常", e);

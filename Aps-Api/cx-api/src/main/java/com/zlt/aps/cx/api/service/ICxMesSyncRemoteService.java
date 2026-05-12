@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import java.util.Date;
 import java.util.List;
 
 @FeignClient(contextId = "ICxMesSyncRemoteService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.cx:/cx}")
@@ -34,7 +33,7 @@ public interface ICxMesSyncRemoteService {
 
     @ApiOperation("逻辑删除并批量保存成型在机信息（事务性操作）")
     @PostMapping("/mesSync/logicDeleteAndSaveMachineOnlineInfo")
-    AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("onlineDate") Date onlineDate, @RequestParam("updateBy") String updateBy, @RequestBody List<CxMachineOnlineInfo> list);
+    AjaxResult logicDeleteAndSaveMachineOnlineInfo(@RequestParam("factoryCode") String factoryCode, @RequestParam("onlineDate") String onlineDate, @RequestParam("updateBy") String updateBy, @RequestBody List<CxMachineOnlineInfo> list);
 
     @ApiOperation("批量保存结构整车胎面配置")
     @PostMapping("/mesSync/saveStructureTreadConfigBatch")
@@ -86,7 +85,7 @@ public interface ICxMesSyncRemoteService {
     @PostMapping("/mesSync/logicDeleteAndSaveCxStockByDataSource")
     AjaxResult logicDeleteAndSaveCxStockByDataSource(@RequestParam("factoryCode") String factoryCode,
                                                      @RequestParam("dataSource") String dataSource,
-                                                     @RequestParam("stockDate") Date stockDate,
+                                                     @RequestParam("stockDate") String stockDate,
                                                      @RequestParam("updateBy") String updateBy,
                                                      @RequestBody List<CxStock> list);
 
@@ -116,11 +115,11 @@ public interface ICxMesSyncRemoteService {
                                          @RequestParam("dataSource") String dataSource,
                                          @RequestParam("updateBy") String updateBy);
 
-    @ApiOperation("清理成型在机历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/mesSync/cleanCxMachineOnlineHistoryDuplicate")
-    AjaxResult cleanCxMachineOnlineHistoryDuplicate();
+    @ApiOperation("逻辑删除成型在机今天之前所有数据")
+    @PostMapping("/mesSync/logicDeleteCxMachineOnlineAllBeforeToday")
+    AjaxResult logicDeleteCxMachineOnlineAllBeforeToday();
 
-    @ApiOperation("清理生胎库存历史重复数据，保留每个历史日期最新版本")
-    @PostMapping("/mesSync/cleanCxStockHistoryDuplicate")
-    AjaxResult cleanCxStockHistoryDuplicate();
+    @ApiOperation("逻辑删除生胎库存今天之前所有数据")
+    @PostMapping("/mesSync/logicDeleteCxStockAllBeforeToday")
+    AjaxResult logicDeleteCxStockAllBeforeToday();
 }

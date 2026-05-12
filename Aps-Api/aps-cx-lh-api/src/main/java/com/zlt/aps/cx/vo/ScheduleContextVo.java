@@ -70,7 +70,7 @@ public class ScheduleContextVo {
      * Key: 胎胚编码 (embryoCode)
      * 单日最多2个试制+量试SKU，按天重置
      */
-    private Set<String> dailyTrialAssignedEmbryoCodes;
+    private Set<String> dailyTrialAssignedMaterialCodes;
 
     /**
      * 所有班次配置列表（按排程天数分组）

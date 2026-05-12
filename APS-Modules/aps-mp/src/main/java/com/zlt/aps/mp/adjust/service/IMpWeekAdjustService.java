@@ -37,6 +37,6 @@ public interface IMpWeekAdjustService {
      * 重新计算
      * @param contextDTO 周程滚动调整上下文对象
      */
-    void recalculate(MpRollAdjustContextDTO contextDTO);
+    void recalculate(MpRollAdjustContextDTO contextDTO, Boolean isHandleMonthPlanStatistics);
 }
 

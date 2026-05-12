@@ -181,7 +181,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
             // 跨天时重置试制/量试单日SKU上限计数（单日最多2个试制+量试SKU）
             if (day != lastDay) {
-                context.setDailyTrialAssignedEmbryoCodes(new HashSet<>());
+                context.setDailyTrialAssignedMaterialCodes(new HashSet<>());
                 context.setPrecisionPlanApplied(false);
             }
 
@@ -446,10 +446,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return;
         }
 
-        Set<String> dailySet = context.getDailyTrialAssignedEmbryoCodes();
+        Set<String> dailySet = context.getDailyTrialAssignedMaterialCodes();
         if (dailySet == null) {
             dailySet = new HashSet<>();
-            context.setDailyTrialAssignedEmbryoCodes(dailySet);
+            context.setDailyTrialAssignedMaterialCodes(dailySet);
         }
 
         int initialSize = dailySet.size();
@@ -457,12 +457,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         // 过滤试制任务
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredTrialTasks = new ArrayList<>();
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getTrialTasks()) {
-            String ec = task.getEmbryoCode();
-            if (dailySet.contains(ec) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
-                dailySet.add(ec);
+            String mc = task.getMaterialCode();
+            if (dailySet.contains(mc) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
+                dailySet.add(mc);
                 filteredTrialTasks.add(task);
             } else {
-                log.warn("试制任务 {} 已超过单日上限{}个SKU，跳过", ec, MAX_TRIAL_SKU_PER_DAY);
+                log.warn("试制任务 物料{} 已超过单日上限{}个SKU，跳过", mc, MAX_TRIAL_SKU_PER_DAY);
             }
         }
         taskGroup.getTrialTasks().clear();
@@ -472,12 +472,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredNewTasks = new ArrayList<>();
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getNewTasks()) {
             if (Boolean.TRUE.equals(task.getIsProductionTrial())) {
-                String ec = task.getEmbryoCode();
-                if (dailySet.contains(ec) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
-                    dailySet.add(ec);
+                String mc = task.getMaterialCode();
+                if (dailySet.contains(mc) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
+                    dailySet.add(mc);
                     filteredNewTasks.add(task);
                 } else {
-                    log.warn("量试任务 {} 已超过单日上限{}个SKU，跳过", ec, MAX_TRIAL_SKU_PER_DAY);
+                    log.warn("量试任务 物料{} 已超过单日上限{}个SKU，跳过", mc, MAX_TRIAL_SKU_PER_DAY);
                 }
             } else {
                 filteredNewTasks.add(task);
@@ -486,19 +486,16 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         taskGroup.getNewTasks().clear();
         taskGroup.getNewTasks().addAll(filteredNewTasks);
 
-        // 过滤续作中的试制/量试任务
+        // 过滤续作中的试制/量试任务——续作是前面班次已排产过的，直接放行不占新增SKU名额
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredContinueTasks = new ArrayList<>();
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getContinueTasks()) {
             if (Boolean.TRUE.equals(task.getIsTrialTask()) || Boolean.TRUE.equals(task.getIsProductionTrial())) {
-                String ec = task.getEmbryoCode();
-                if (dailySet.contains(ec) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
-                    dailySet.add(ec);
-                    filteredContinueTasks.add(task);
-                } else {
-                    log.warn("续作{}任务 {} 已超过单日上限{}个SKU，跳过",
-                            Boolean.TRUE.equals(task.getIsProductionTrial()) ? "量试" : "试制",
-                            ec, MAX_TRIAL_SKU_PER_DAY);
-                }
+                String mc = task.getMaterialCode();
+                // 已在dailySet中的（前面班次已排产），直接放行；不在的也不占新名额，直接放行
+                dailySet.add(mc);
+                filteredContinueTasks.add(task);
+                log.debug("续作{}任务 物料{} 直接放行（续作不占新增SKU名额）",
+                        Boolean.TRUE.equals(task.getIsProductionTrial()) ? "量试" : "试制", mc);
             } else {
                 filteredContinueTasks.add(task);
             }
@@ -1356,7 +1353,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     for (TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
                         String embryoCode = taskAlloc.getEmbryoCode();
                         String materialCode = taskAlloc.getMaterialCode() != null ? taskAlloc.getMaterialCode() : "";
-                        String taskKey = allocation.getMachineCode() + "|" + embryoCode + "|" + materialCode;
+                        String constructionStage = taskAlloc.getConstructionStage() != null ? taskAlloc.getConstructionStage() : "";
+                        String taskKey = allocation.getMachineCode() + "|" + embryoCode + "|" + materialCode + "|" + constructionStage;
                         if (taskAlloc.getLhId() != null) {
                             taskLhIdListMap.computeIfAbsent(taskKey, k -> new ArrayList<>()).add(taskAlloc.getLhId());
                         }
@@ -1466,7 +1464,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             List<Long> lhIdList = taskLhIdListMap.get(taskKey);
             int totalStock = 0;
             if (lhIdList != null && !lhIdList.isEmpty()) {
-                // 去重：同一个lhId可能在多个班次分配中重复出现
                 List<Long> distinctLhIdList = lhIdList.stream().distinct().collect(Collectors.toList());
                 Map<String, Integer> stockMap = context.getInitialMaterialStockMap();
                 for (Long lhId : distinctLhIdList) {
@@ -1871,6 +1868,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     d.setCxMachineCode(trip.getMachineCode());
                     d.setEmbryoCode(trip.getEmbryoCode());
                     d.setMaterialCode(trip.getMaterialCode());
+                    d.setTripNo(String.valueOf(trip.getTripNo()));
+                    d.setTripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                     return d;
                 });
 
@@ -1891,16 +1890,16 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         for (Map.Entry<String, List<CxScheduleDetail>> entry : resultGroupMap.entrySet()) {
             for (CxScheduleDetail d : entry.getValue()) {
                 if (printCount >= 5) break;
-                log.info("子表明细[{}]: groupKey={}, machine={}, embryo={}, material={}, CLASS1=[PLAN={},TRIP={},HOURS={},SEQ={}], CLASS2=[PLAN={},TRIP={},HOURS={},SEQ={}], CLASS3=[PLAN={},TRIP={},HOURS={},SEQ={}], CLASS4=[PLAN={},TRIP={},HOURS={},SEQ={}], CLASS5=[PLAN={},TRIP={},HOURS={},SEQ={}], CLASS6=[PLAN={},TRIP={},HOURS={},SEQ={}], CLASS7=[PLAN={},TRIP={},HOURS={},SEQ={}], CLASS8=[PLAN={},TRIP={},HOURS={},SEQ={}]",
-                        printCount, entry.getKey(), d.getCxMachineCode(), d.getEmbryoCode(), d.getMaterialCode(),
-                        d.getClass1PlanQty(), d.getClass1TripNo(), d.getClass1StockHours(), d.getClass1Sequence(),
-                        d.getClass2PlanQty(), d.getClass2TripNo(), d.getClass2StockHours(), d.getClass2Sequence(),
-                        d.getClass3PlanQty(), d.getClass3TripNo(), d.getClass3StockHours(), d.getClass3Sequence(),
-                        d.getClass4PlanQty(), d.getClass4TripNo(), d.getClass4StockHours(), d.getClass4Sequence(),
-                        d.getClass5PlanQty(), d.getClass5TripNo(), d.getClass5StockHours(), d.getClass5Sequence(),
-                        d.getClass6PlanQty(), d.getClass6TripNo(), d.getClass6StockHours(), d.getClass6Sequence(),
-                        d.getClass7PlanQty(), d.getClass7TripNo(), d.getClass7StockHours(), d.getClass7Sequence(),
-                        d.getClass8PlanQty(), d.getClass8TripNo(), d.getClass8StockHours(), d.getClass8Sequence());
+                log.info("子表明细[{}]: groupKey={}, machine={}, embryo={}, material={}, tripNo={}, tripCapacity={}, CLASS1=[PLAN={},HOURS={},SEQ={}], CLASS2=[PLAN={},HOURS={},SEQ={}], CLASS3=[PLAN={},HOURS={},SEQ={}], CLASS4=[PLAN={},HOURS={},SEQ={}], CLASS5=[PLAN={},HOURS={},SEQ={}], CLASS6=[PLAN={},HOURS={},SEQ={}], CLASS7=[PLAN={},HOURS={},SEQ={}], CLASS8=[PLAN={},HOURS={},SEQ={}]",
+                        printCount, entry.getKey(), d.getCxMachineCode(), d.getEmbryoCode(), d.getMaterialCode(), d.getTripNo(), d.getTripCapacity(),
+                        d.getClass1PlanQty(), d.getClass1StockHours(), d.getClass1Sequence(),
+                        d.getClass2PlanQty(), d.getClass2StockHours(), d.getClass2Sequence(),
+                        d.getClass3PlanQty(), d.getClass3StockHours(), d.getClass3Sequence(),
+                        d.getClass4PlanQty(), d.getClass4StockHours(), d.getClass4Sequence(),
+                        d.getClass5PlanQty(), d.getClass5StockHours(), d.getClass5Sequence(),
+                        d.getClass6PlanQty(), d.getClass6StockHours(), d.getClass6Sequence(),
+                        d.getClass7PlanQty(), d.getClass7StockHours(), d.getClass7Sequence(),
+                        d.getClass8PlanQty(), d.getClass8StockHours(), d.getClass8Sequence());
                 printCount++;
             }
         }
@@ -1987,8 +1986,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         switch (classField) {
             case "CLASS1":
                 detail.setClass1PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
-                detail.setClass1TripNo(String.valueOf(trip.getTripNo()));
-                detail.setClass1TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass1StockHours(trip.getStockHours());
                 detail.setClass1Sequence(trip.getSequence());
                 detail.setClass1PlanStartTime(trip.getPlanStartTime() != null
@@ -1998,8 +1995,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 break;
             case "CLASS2":
                 detail.setClass2PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
-                detail.setClass2TripNo(String.valueOf(trip.getTripNo()));
-                detail.setClass2TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass2StockHours(trip.getStockHours());
                 detail.setClass2Sequence(trip.getSequence());
                 detail.setClass2PlanStartTime(trip.getPlanStartTime() != null
@@ -2009,8 +2004,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 break;
             case "CLASS3":
                 detail.setClass3PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
-                detail.setClass3TripNo(String.valueOf(trip.getTripNo()));
-                detail.setClass3TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass3StockHours(trip.getStockHours());
                 detail.setClass3Sequence(trip.getSequence());
                 detail.setClass3PlanStartTime(trip.getPlanStartTime() != null
@@ -2020,8 +2013,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 break;
             case "CLASS4":
                 detail.setClass4PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
-                detail.setClass4TripNo(String.valueOf(trip.getTripNo()));
-                detail.setClass4TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass4StockHours(trip.getStockHours());
                 detail.setClass4Sequence(trip.getSequence());
                 detail.setClass4PlanStartTime(trip.getPlanStartTime() != null
@@ -2031,8 +2022,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 break;
             case "CLASS5":
                 detail.setClass5PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
-                detail.setClass5TripNo(String.valueOf(trip.getTripNo()));
-                detail.setClass5TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass5StockHours(trip.getStockHours());
                 detail.setClass5Sequence(trip.getSequence());
                 detail.setClass5PlanStartTime(trip.getPlanStartTime() != null
@@ -2042,8 +2031,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 break;
             case "CLASS6":
                 detail.setClass6PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
-                detail.setClass6TripNo(String.valueOf(trip.getTripNo()));
-                detail.setClass6TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass6StockHours(trip.getStockHours());
                 detail.setClass6Sequence(trip.getSequence());
                 detail.setClass6PlanStartTime(trip.getPlanStartTime() != null
@@ -2053,8 +2040,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 break;
             case "CLASS7":
                 detail.setClass7PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
-                detail.setClass7TripNo(String.valueOf(trip.getTripNo()));
-                detail.setClass7TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass7StockHours(trip.getStockHours());
                 detail.setClass7Sequence(trip.getSequence());
                 detail.setClass7PlanStartTime(trip.getPlanStartTime() != null
@@ -2064,8 +2049,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 break;
             case "CLASS8":
                 detail.setClass8PlanQty(BigDecimal.valueOf(trip.getPlanQty()));
-                detail.setClass8TripNo(String.valueOf(trip.getTripNo()));
-                detail.setClass8TripCapacity(BigDecimal.valueOf(trip.getTripCapacity()));
                 detail.setClass8StockHours(trip.getStockHours());
                 detail.setClass8Sequence(trip.getSequence());
                 detail.setClass8PlanStartTime(trip.getPlanStartTime() != null

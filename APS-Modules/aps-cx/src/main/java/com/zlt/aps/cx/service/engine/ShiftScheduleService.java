@@ -119,7 +119,7 @@ public class ShiftScheduleService {
         int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
 
         // 调试日志
-        log.debug("scheduleTaskToShifts: embryo={}, material={}, 待排={}条/{}台, " +
+        log.info("scheduleTaskToShifts: embryo={}, material={}, 待排={}条/{}台, " +
                         "试制={}, 量试={}, 停产={}, 开产={}, 收尾={}, 续作={}, 库存={}h, dayShifts={}",
                 task.getEmbryoCode(), task.getMaterialCode(),
                 endingExtraInventory, task.getVulcanizeMachineCount(),

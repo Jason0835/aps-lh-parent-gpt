@@ -100,6 +100,10 @@ public enum MonthPlanEnums {
      */
     DAY_MIN_CAPACITY("SYS0203009", "每日最小产能"),
     /**
+     * SYS0203010 单台成型机，允许切换英寸重复的次数
+     */
+    SINGLE_CX_MACHINE_CHANGE_PRO_SIZE_REPEAT_COUNT("SYS0203010", "单台成型机，允许切换英寸重复的次数"),
+    /**
      * SYS0203011 外销贴牌-品牌配置
      */
     OEM_BRAND_CONFIG("SYS0203011", "外销贴牌-品牌配置"),

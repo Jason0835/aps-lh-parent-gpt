@@ -39,6 +39,58 @@ public class ScheduleUpdateDetailPlanQtyVo {
     @ApiModelProperty(value = "八班计划量（中班D3=T+2日）")
     private BigDecimal class8PlanQty;
 
+    // ==================== 库存可供硫化时长 ====================
+
+    @ApiModelProperty(value = "一班库存可供硫化时长")
+    private BigDecimal class1StockHours;
+
+    @ApiModelProperty(value = "二班库存可供硫化时长")
+    private BigDecimal class2StockHours;
+
+    @ApiModelProperty(value = "三班库存可供硫化时长")
+    private BigDecimal class3StockHours;
+
+    @ApiModelProperty(value = "四班库存可供硫化时长")
+    private BigDecimal class4StockHours;
+
+    @ApiModelProperty(value = "五班库存可供硫化时长")
+    private BigDecimal class5StockHours;
+
+    @ApiModelProperty(value = "六班库存可供硫化时长")
+    private BigDecimal class6StockHours;
+
+    @ApiModelProperty(value = "七班库存可供硫化时长")
+    private BigDecimal class7StockHours;
+
+    @ApiModelProperty(value = "八班库存可供硫化时长")
+    private BigDecimal class8StockHours;
+
+    // ==================== 顺位 ====================
+
+    @ApiModelProperty(value = "一班顺位")
+    private Integer class1Sequence;
+
+    @ApiModelProperty(value = "二班顺位")
+    private Integer class2Sequence;
+
+    @ApiModelProperty(value = "三班顺位")
+    private Integer class3Sequence;
+
+    @ApiModelProperty(value = "四班顺位")
+    private Integer class4Sequence;
+
+    @ApiModelProperty(value = "五班顺位")
+    private Integer class5Sequence;
+
+    @ApiModelProperty(value = "六班顺位")
+    private Integer class6Sequence;
+
+    @ApiModelProperty(value = "七班顺位")
+    private Integer class7Sequence;
+
+    @ApiModelProperty(value = "八班顺位")
+    private Integer class8Sequence;
+
     // ==================== 示方书类型 ====================
 
     @ApiModelProperty(value = "一班示方书类型")

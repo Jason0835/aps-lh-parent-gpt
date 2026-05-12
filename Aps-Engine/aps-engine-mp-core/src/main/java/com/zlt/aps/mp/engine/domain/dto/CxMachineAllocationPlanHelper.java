@@ -423,6 +423,15 @@ public class CxMachineAllocationPlanHelper implements Serializable {
         this.releasePriority = releasePriority;
     }
 
+    /**
+     * 排产英寸
+     *
+     * @return
+     */
+    public String getProductionProSize() {
+        return productionPlanInfo.getProSizeInfo();
+    }
+
     private CxMachineAllocationPlanHelper() {
 
     }
