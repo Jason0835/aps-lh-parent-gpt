@@ -2616,11 +2616,12 @@ public class MesItfServiceImpl implements MesItfService {
     /**
      * 临时任务：按版本迭代同步模具清洗预警数据并生成清洗计划
      * 执行步骤：
-     * 1. 从MES获取全部模具清洗预警版本号（升序排列）
-     * 2. 从最小版本号开始，先插入APS作为初始数据
-     * 3. 逐个版本迭代，对后续版本进行更新和新增
-     * 4. 迭代到最新版本后，调用已有逻辑生成模具清洗计划
-     * 5. 删除的预警也同步生成计划（标记为已删除的计划）
+     * 1. 清空APS现有的模具清洗预警和清洗计划表全部数据
+     * 2. 从MES获取全部模具清洗预警版本号（升序排列）
+     * 3. 从最小版本号开始，先插入APS作为初始数据
+     * 4. 逐个版本迭代，对后续版本进行更新和新增
+     * 5. 迭代到最新版本后，基于全部预警数据（不限制版本号）生成模具清洗计划
+     * 6. 删除的预警也同步生成计划（标记为已删除的计划）
      *
      * @param syncDataLogs 同步参数
      * @return 执行结果
@@ -2630,7 +2631,20 @@ public class MesItfServiceImpl implements MesItfService {
         log.info("临时任务-开始按版本迭代同步模具清洗预警数据并生成清洗计划");
         String factoryCode = syncDataLogs != null ? syncDataLogs.getFactoryCode() : null;
 
-        // 步骤1：从MES获取所有版本号（升序排列）
+        // 步骤1：清空APS现有的模具清洗预警和清洗计划表全部数据
+        log.info("临时任务-步骤1：清空APS现有的模具清洗预警和清洗计划表全部数据");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult cleanResult = lhMesSyncRemoteService.cleanAllMouldCleanWarnAndPlan();
+                log.info("清空预警和计划表结果：{}", cleanResult != null ? cleanResult.get("msg") : "null");
+            });
+        } catch (Exception e) {
+            log.error("清空预警和计划表异常", e);
+            return AjaxResult.error("清空预警和计划表失败：" + e.getMessage());
+        }
+
+        // 步骤2：从MES获取所有版本号（升序排列）
+        log.info("临时任务-步骤2：从MES获取所有版本号");
         DynamicDataSourceContextHolder.push(DataSource.MES);
         List<String> allVersions = mesItfMapper.selectAllDataVersionsFromMouldCleanPlan(factoryCode);
         DynamicDataSourceContextHolder.poll();
@@ -2646,7 +2660,8 @@ public class MesItfServiceImpl implements MesItfService {
         AtomicInteger totalInsertCount = new AtomicInteger(0);
         AtomicInteger totalUpdateCount = new AtomicInteger(0);
 
-        // 步骤2和3：按版本号从小到大迭代同步
+        // 步骤3和4：按版本号从小到大迭代同步预警数据
+        log.info("临时任务-步骤3和4：按版本号从小到大迭代同步预警数据");
         for (int i = 0; i < allVersions.size(); i++) {
             String version = allVersions.get(i);
             boolean isFirstVersion = (i == 0);
@@ -2769,19 +2784,21 @@ public class MesItfServiceImpl implements MesItfService {
         log.info("模具清洗预警全部版本迭代同步完成，共处理{}个版本，总新增{}条，总更新{}条",
                 allVersions.size(), totalInsertCount.get(), totalUpdateCount.get());
 
-        // 步骤4：预警数据同步完成后，调用已有逻辑生成模具清洗计划
-        // 已有的syncFromMouldCleanWarn逻辑会处理删除的预警（标记计划为已删除）
+        // 步骤5：预警数据同步完成后，基于全部预警数据（不限制版本号）生成模具清洗计划
+        // 使用syncAllMouldCleanPlanFromWarn而非syncMouldCleanPlanFromWarn
+        // 因为syncMouldCleanPlanFromWarn只取MAX(DATA_VERSION)的预警来生成计划，会丢失历史版本数据
+        log.info("临时任务-步骤5：基于全部预警数据全量生成清洗计划");
         try {
             FeignTokenHelper.runWithToken(() -> {
                 try {
-                    AjaxResult planResult = lhMesSyncRemoteService.syncMouldCleanPlanFromWarn();
-                    log.info("自动同步模具清洗计划结果：{}", planResult != null ? planResult.get("msg") : "null");
+                    AjaxResult planResult = lhMesSyncRemoteService.syncAllMouldCleanPlanFromWarn();
+                    log.info("基于全部预警数据全量生成清洗计划结果：{}", planResult != null ? planResult.get("msg") : "null");
                 } catch (Exception e) {
-                    log.error("自动同步模具清洗计划失败", e);
+                    log.error("基于全部预警数据全量生成清洗计划失败", e);
                 }
             });
         } catch (Exception e) {
-            log.error("自动同步模具清洗计划异常", e);
+            log.error("基于全部预警数据全量生成清洗计划异常", e);
         }
 
         log.info("临时任务-按版本迭代同步模具清洗预警数据并生成清洗计划完成");
