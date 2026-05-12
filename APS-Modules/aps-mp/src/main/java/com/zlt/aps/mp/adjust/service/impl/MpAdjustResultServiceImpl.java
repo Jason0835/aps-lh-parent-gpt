@@ -1,6 +1,5 @@
 package com.zlt.aps.mp.adjust.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -9,14 +8,9 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
-import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustResultService;
-import com.zlt.aps.mp.adjust.service.IMpWeekAdjustService;
-import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
-import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
-import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
@@ -82,7 +76,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     @Override
     public void forceUpdateById(MpAdjustResult entity) {
         // 根据版本号+物料编号+施工阶段查询，如果没有，则新增，否则更新
-        String adjVersion = StrUtil.isNotBlank(entity.getVersion()) ? entity.getProductionVersion() : entity.getVersion();
+        String adjVersion = StrUtil.isBlank(entity.getVersion()) ? entity.getProductionVersion() : entity.getVersion();
 
         LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MpAdjustResult::getFactoryCode, entity.getFactoryCode());
