@@ -564,7 +564,7 @@ public class CxAddSkuProductionHandler {
         ProductionPlanGroupInfo groupPlan;
         int accUsedLhMachines;
         // 1. 获取总的硫化机台数
-        Integer totalLhMachines = productionContext.getBaseDataContainer().getLhMachineInfoList().size();
+        Integer totalLhMachines = productionContext.getBaseDataContainer().getLhMachineCount();
         // 2. 按日更新 结构下每日剩余可用的硫化机台数
         for (int i = ProductionConstant.MONTH_START_DAY; i <= endDay; i++) {
             // 更新当前结构的 剩余可使用的硫化机台

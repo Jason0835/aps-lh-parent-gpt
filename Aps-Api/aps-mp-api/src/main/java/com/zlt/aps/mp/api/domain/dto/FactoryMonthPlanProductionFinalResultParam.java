@@ -98,6 +98,12 @@ public class FactoryMonthPlanProductionFinalResultParam implements Serializable 
     private String productionVersion;
 
     /**
+     * 调整版本号
+     */
+    @ApiModelProperty(value = "调整版本号", name = "version")
+    private String version;
+
+    /**
      * 销售生产需求计划版本
      */
     @ApiModelProperty(value = "需求计划版本", name = "monthPlanVersion")

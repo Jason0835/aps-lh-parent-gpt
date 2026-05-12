@@ -98,6 +98,13 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
     private String productionVersion;
 
     /**
+     * 调整版本号，仅用于月计划调整列表查询条件透传，不对应定稿表字段
+     */
+    @ApiModelProperty(value = "调整版本号", name = "version")
+    @TableField(exist = false)
+    private String version;
+
+    /**
      * 产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢
      */
     @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.productTypeCode", dictType = "biz_product_type")

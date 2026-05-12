@@ -126,4 +126,12 @@ public interface ILhMesSyncRemoteService {
     @ApiOperation("从模具清洗预警同步生成清洗计划")
     @PostMapping("/mesSync/syncMouldCleanPlanFromWarn")
     AjaxResult syncMouldCleanPlanFromWarn();
+
+    @ApiOperation("清空模具清洗预警和清洗计划表全部数据")
+    @PostMapping("/mesSync/cleanAllMouldCleanWarnAndPlan")
+    AjaxResult cleanAllMouldCleanWarnAndPlan();
+
+    @ApiOperation("基于全部预警数据全量生成清洗计划（不限制版本号）")
+    @PostMapping("/mesSync/syncAllMouldCleanPlanFromWarn")
+    AjaxResult syncAllMouldCleanPlanFromWarn();
 }

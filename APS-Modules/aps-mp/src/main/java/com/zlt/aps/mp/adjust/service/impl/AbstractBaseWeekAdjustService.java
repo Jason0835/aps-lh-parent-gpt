@@ -16,6 +16,7 @@ import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
+import com.zlt.aps.common.core.enums.DataSourceEnum;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.IncrementConstant;
 import com.zlt.aps.constant.StringConstant;
@@ -51,6 +52,7 @@ import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
+import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
 import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
@@ -154,6 +156,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected DpDemandPlanEntityMapper demandPlanEntityMapper;
+
+    @Autowired
+    private IFactoryMonthPlanProductionFinalResultService finalResultService;
 
     @Override
     public void generateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
@@ -922,10 +927,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 contextDTO.getStructureName(), contextDTO.getScheduledMachines(), contextDTO.getStartDay(),
                 contextDTO.getEndDay(), contextDTO.getAdjustStartDay(), contextDTO.getAdjustEndDay());
         try{
-            // 查询周程调整结果
-            queryAdjustResult(contextDTO);
-            // 根据优先级顺序分配生产数量
-            allocateProductionByPriority(contextDTO);
+            FactoryMonthPlanProductionFinalResult params = new FactoryMonthPlanProductionFinalResult();
+            BeanUtil.copyProperties(contextDTO, params);
+            params.setYear(contextDTO.getMpYear());
+            params.setMonth(contextDTO.getMpMonth());
+            finalResultService.list4Adjust(params);
             // 处理月计划统计结果
             if (isHandleMonthPlanStatistics) {
                 handleMonthPlanStatistics(contextDTO);
@@ -1164,7 +1170,30 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     protected void updateStructureAllocationList(MpRollAdjustContextDTO contextDTO) {
-
+        MpStructureAllocation targetAllocation = buildTargetStructureAllocation(contextDTO);
+        if (targetAllocation == null) {
+            return;
+        }
+        List<MpStructureAllocation> structureAllocationList = queryStructureAllocationList(contextDTO);
+        MpStructureAllocation existAllocation = WeekRollAdjustMachineCrossChecker.findSameMachineStructure(structureAllocationList, targetAllocation);
+        if (existAllocation != null) {
+            targetAllocation.setId(existAllocation.getId());
+            targetAllocation.setMonthPlanVersion(existAllocation.getMonthPlanVersion());
+        } else if (PubUtil.isNotEmpty(structureAllocationList)) {
+            targetAllocation.setMonthPlanVersion(structureAllocationList.get(0).getMonthPlanVersion());
+        } else {
+            targetAllocation.setMonthPlanVersion(contextDTO.getVersion());
+        }
+        if (WeekRollAdjustMachineCrossChecker.hasTargetDifferentStructureCross(targetAllocation, structureAllocationList)) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.machineStructureCross"));
+        }
+        if (targetAllocation.getId() == null) {
+            targetAllocation.setIsDelete(YesOrNoEnum.NO.getValue());
+            targetAllocation.setDataSource(DataSourceEnum.HAND.getCode());
+            mpStructureAllocationEntityMapper.insert(targetAllocation);
+            return;
+        }
+        mpStructureAllocationEntityMapper.updateById(targetAllocation);
     }
 
 
@@ -2413,11 +2442,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
         try {
             List<MpAdjustResult> resultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
-            if (StringUtils.isNotBlank(contextDTO.getScheduledMachines())) {
-                List<MpStructureAllocation> structureAllocationList = queryStructureAllocationList(contextDTO);
-                if (WeekRollAdjustMachineCrossChecker.hasDifferentStructureCross(structureAllocationList, contextDTO.getScheduledMachines())) {
-                    throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.machineStructureCross"));
-                }
+            if (Boolean.TRUE.equals(contextDTO.getFrontScheduledMachinesFlag())) {
                 resultList = WeekRollAdjustMachineCrossChecker.filterAdjustResultByMachine(resultList, contextDTO.getScheduledMachines());
             }
             Set<String> structureNameSet = resultList.stream().map(x->x.getStructureName()).collect(Collectors.toSet());
@@ -2426,8 +2451,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 contextDTO.setStructureName(structureNameSet.iterator().next());
             }
             contextDTO.setAdjustResultList(resultList);
-        } catch (BusinessException e) {
-            throw e;
         } catch (Exception e) {
             log.error("查询周程调整结果异常，年份：{}，月份：{}，版本：{}", year, month, version, e);
             throw new RuntimeException("查询月度生产计划失败", e);
@@ -2455,6 +2478,26 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      *
      * @param contextDTO
      */
+    private MpStructureAllocation buildTargetStructureAllocation(MpRollAdjustContextDTO contextDTO) {
+        if (StringUtils.isAnyBlank(contextDTO.getFactoryCode(), contextDTO.getProductionVersion(),
+                contextDTO.getScheduledMachines(), contextDTO.getStructureName())
+                || contextDTO.getMpYear() == null || contextDTO.getMpMonth() == null
+                || contextDTO.getStartDay() == null || contextDTO.getEndDay() == null) {
+            return null;
+        }
+        MpStructureAllocation targetAllocation = new MpStructureAllocation();
+        targetAllocation.setFactoryCode(contextDTO.getFactoryCode());
+        targetAllocation.setYear(contextDTO.getMpYear());
+        targetAllocation.setMonth(contextDTO.getMpMonth());
+        targetAllocation.setProductionVersion(contextDTO.getProductionVersion());
+        targetAllocation.setCxMachineCode(contextDTO.getScheduledMachines());
+        targetAllocation.setStructureName(contextDTO.getStructureName());
+        targetAllocation.setBeginDay(contextDTO.getStartDay());
+        targetAllocation.setEndDay(contextDTO.getEndDay());
+        targetAllocation.setAllotDays(contextDTO.getEndDay() - contextDTO.getStartDay() + 1);
+        return targetAllocation;
+    }
+
     private void saveAdjustResult(MpRollAdjustContextDTO contextDTO) {
         // 调整结果
         List<MpAdjustResult> adjustResultList = contextDTO.getAdjustResultList();

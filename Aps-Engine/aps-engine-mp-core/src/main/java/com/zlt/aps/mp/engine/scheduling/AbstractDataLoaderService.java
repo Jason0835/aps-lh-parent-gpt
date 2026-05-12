@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.scheduling;
 import com.google.common.collect.Maps;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.constant.Constant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
@@ -12,6 +13,7 @@ import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpCheckItemVo;
 import com.zlt.aps.mp.engine.basedata.assemble.history.CxMachineProductionHistoryInfo;
@@ -141,6 +143,33 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
         //17. 初始硫化机台信息
         productionContext.getBaseDataContainer().setLhMachineInfoList(getDataService().listLhMachineInfo(productionContext));
+        
+        //18. 硫化机台信息总台数（扣除单控机台数）
+        productionContext.getBaseDataContainer().setLhMachineCount(this.getLhMachineCount(productionContext));
+    }
+
+    /**
+     * 获取硫化机台信息总台数（扣除单控机台数）
+     * @param productionContext
+     * @return
+     */
+    protected Integer getLhMachineCount(TbrProductionContext productionContext) {
+        // 取出硫化机列表，统计总台数
+        List<LhMachineInfo> lhMachineInfoList = productionContext.getBaseDataContainer().getLhMachineInfoList();
+        Integer lhMachineCount = lhMachineInfoList.size();
+        // 有配置单控机台的情况，需要扣减掉配置的有效硫化机台总数的一半
+        Set<String> singleControlLhMachineCode = productionContext.getBaseDataContainer().getParamConfiguration()
+                .getSingleControlLhMachineCode();
+        if (!CollectionUtils.isEmpty(singleControlLhMachineCode)) {
+            Set<String> lhMachineCodeSet = lhMachineInfoList.stream().map(LhMachineInfo::getMachineCode).distinct()
+                    .collect(Collectors.toSet()); // 硫化机台号集合
+            long singleControlMachineCount = singleControlLhMachineCode.stream().filter(lhMachineCodeSet::contains).count(); // 校验单控机台编号，只保留有效的
+            int reduceMachineCount = BigDecimalUtils
+                    .div(singleControlMachineCount, ProductionConstant.DOUBLE_MOULD_PRODUCTION, 4)
+                    .setScale(0, RoundingMode.DOWN).intValue(); // 单控机台数的一半需要扣除掉（向下取整）
+            lhMachineCount -= reduceMachineCount;
+        }
+        return lhMachineCount;
     }
 
     /**
@@ -467,6 +496,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.HEIGHT_PRIORITY_SKU_PRODUCTION_MODE.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_HEIGHT_PRIORITY_LH_MACHINE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.CONTINUE_SKU_HEIGHT_REQUIRE_QTY.getCode());
+        paramCodeList.add(MonthPlanEnums.SINGLE_CONTROL_LH_MACHINE_CODE.getCode());
 
         //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
@@ -601,6 +631,14 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
                 continueSkuProductionHeightValue = BigDecimal.ZERO.intValue();
             }
             configuration.setContinueSkuProductionHeightRequire(continueSkuProductionHeightValue);
+        }
+        //20260512+ 单控硫化机配置
+        String singleControlLhMachineCodeValue = (String)paramConfigurationMap.get(MonthPlanEnums.SINGLE_CONTROL_LH_MACHINE_CODE.getCode());
+        String singleControlLhMachineCode = (String) Optional.ofNullable(singleControlLhMachineCodeValue).orElse("");
+        if (StringUtils.isBlank(singleControlLhMachineCode)) {
+            configuration.setSingleControlLhMachineCode(Collections.emptySet());
+        } else {
+            configuration.setSingleControlLhMachineCode(Stream.of(singleControlLhMachineCode.split(StringConstant.COMMA)).collect(Collectors.toSet()));
         }
 
         return configuration;

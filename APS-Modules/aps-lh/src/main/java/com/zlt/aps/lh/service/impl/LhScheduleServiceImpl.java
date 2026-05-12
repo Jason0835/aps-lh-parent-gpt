@@ -46,9 +46,16 @@ import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -577,11 +584,75 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 节点4：模板第 7 行为 {.xxx} 明细模板行，writeMultiList 会从该行开始复制填充。
         // 当前只有一个明细列表，因此只放入一个 List<Map<String,Object>>。
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-        excelDataList.add(buildExportDataList(exportList));
+        List<Map<String, Object>> exportDataList = buildExportDataList(exportList);
+        excelDataList.add(exportDataList);
 
         // 节点5：硫化计划数据位于模板第 2 个 sheet（下标 1）的“硫化计划”页。
         // 第 1 个 sheet 为模板辅助页，不能作为数据写入页。
-        return ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
+        byte[] exportBytes = ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
+        return fillExportSummaryFormulas(exportBytes, exportDataList.size());
+    }
+
+    /**
+     * 回填导出结果中的明细行公式。
+     * <p>通用模板写入工具在复制列表行时，只会识别字符串占位符；遇到公式单元格时不会复制公式，
+     * 因此 J/BZ/CA/CB 这几个模板公式在生成阶段会被清掉。这里在最终 xlsx 字节生成后重新打开工作簿，
+     * 按实际数据行数逐行写回公式，保证用户下载后的文件仍然保留 Excel 公式。</p>
+     *
+     * @param exportBytes Excel 导出字节
+     * @param dataRowCount 明细数据行数
+     * @return 已回填公式的 Excel 导出字节
+     */
+    private byte[] fillExportSummaryFormulas(byte[] exportBytes, int dataRowCount) {
+        if (Objects.isNull(exportBytes) || exportBytes.length == 0 || dataRowCount <= 0) {
+            return exportBytes;
+        }
+        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(exportBytes);
+             XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.getSheetAt(0);
+            // 模板明细数据从第 7 行开始，POI 行号从 0 开始，因此这里的起始下标是 6。
+            int startRowIndex = 6;
+            for (int rowIndex = startRowIndex; rowIndex < startRowIndex + dataRowCount; rowIndex++) {
+                int excelRowNum = rowIndex + 1;
+                Row row = sheet.getRow(rowIndex);
+                if (Objects.isNull(row)) {
+                    row = sheet.createRow(rowIndex);
+                }
+                setFormulaCell(row, 9, "CF" + excelRowNum + "-CE" + excelRowNum);
+                setFormulaCell(row, 77, "BC" + excelRowNum + "+BK" + excelRowNum + "+BS" + excelRowNum);
+                setFormulaCell(row, 78, "BL" + excelRowNum + "+BT" + excelRowNum + "+BD" + excelRowNum);
+                setFormulaCell(row, 79, "O" + excelRowNum + "+W" + excelRowNum + "+AE" + excelRowNum
+                        + "+AM" + excelRowNum + "+AU" + excelRowNum + "+BC" + excelRowNum
+                        + "+BK" + excelRowNum + "+BS" + excelRowNum);
+            }
+            workbook.setForceFormulaRecalculation(true);
+            sheet.setForceFormulaRecalculation(true);
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        } catch (Exception e) {
+            throw new ServiceException("硫化计划导出公式回填失败");
+        }
+    }
+
+    /**
+     * 设置公式单元格。
+     *
+     * @param row 当前数据行
+     * @param columnIndex 公式所在列下标，POI 从 0 开始计数
+     * @param formula Excel 公式内容，不包含等号
+     */
+    private void setFormulaCell(Row row, int columnIndex, String formula) {
+        Cell cell = row.getCell(columnIndex);
+        CellStyle cellStyle = Objects.nonNull(cell) ? cell.getCellStyle() : null;
+        if (Objects.nonNull(cell)) {
+            row.removeCell(cell);
+        }
+        cell = row.createCell(columnIndex);
+        if (Objects.nonNull(cellStyle)) {
+            cell.setCellStyle(cellStyle);
+        }
+        cell.setCellFormula(formula);
     }
 
 
@@ -1169,15 +1240,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             // 当前同步写入 dailyPlanQty；首行汇总会在 buildSummaryRow 中单独计算。
             row.put("dailyPlanQty", result.getDailyPlanQty());
             row.put("totalPlanQty", result.getDailyPlanQty());
+            row.put("totalDailyPlanQty", result.getTotalDailyPlanQty());
             row.put("remark", result.getRemark());
 
             // 8 个班次字段结构完全一致，通过 class{班次号}xxx 统一组装，
             // 与模板中的 {.class1PlanQty}、{.class8Analysis} 等占位符一一对应。
             for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+                row.put("class" + shift + "LeftRightMould", buildShiftLeftRightMould(result, shift));
                 row.put("class" + shift + "Order", buildShiftOrder(result, shift));
                 row.put("class" + shift + "PlanQty", getClassPlanQty(result, shift));
                 row.put("class" + shift + "FinishQty", getClassFinishQty(result, shift));
                 row.put("class" + shift + "Type", buildShiftType(result, shift));
+                row.put("class" + shift + "MouldMethod", buildShiftMouldMethod(result, shift));
                 row.put("class" + shift + "Analysis", getClassAnalysis(result, shift));
                 row.put("class" + shift + "Dot", "");
             }
@@ -1542,7 +1616,24 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 + sumFinishQtyByShift(list, 7)
                 + sumFinishQtyByShift(list, 8));
         row.put("totalPlanQty", totalPlanQty);
+        row.put("totalDailyPlanQty", sumTotalDailyPlanQty(list));
         return row;
+    }
+
+    /**
+     * 汇总明细行订单总计划数量。
+     * <p>模板 CE 列使用 totalDailyPlanQty，和日计划 dailyPlanQty、总计 totalPlanQty 是不同展示口径，
+     * 因此这里单独按明细上的 TOTAL_DAILY_PLAN_QTY 求和。</p>
+     *
+     * @param list 排程结果列表
+     * @return 订单总计划数量合计
+     */
+    private int sumTotalDailyPlanQty(List<LhScheduleResult> list) {
+        return list.stream()
+                .map(LhScheduleResult::getTotalDailyPlanQty)
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
     }
 
     /**
@@ -1590,6 +1681,73 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
+     * 构建班次维度的左右模导出值。
+     * <p>前端列表的 shiftLeftRightMouldFormatter 会按班次判断是否展示左右模：
+     * 如果当前班次已经超过收尾位置，或者当前班次没有计划量，则显示为空；只有当前班次确实有排产时，
+     * 才展示排程结果上的左右模值。模板导出需要与列表显示保持一致，所以这里也按同一规则生成
+     * class1LeftRightMould ~ class8LeftRightMould。</p>
+     *
+     * @param result 排程结果明细
+     * @param shift  班次序号，范围 1~8
+     * @return 当前班次左右模导出值
+     */
+    private Object buildShiftLeftRightMould(LhScheduleResult result, int shift) {
+        if (Objects.isNull(result) || isShiftAfterEnding(result, shift)) {
+            return "";
+        }
+        Integer planQty = getClassPlanQty(result, shift);
+        if (Objects.isNull(planQty) || planQty <= 0) {
+            return "";
+        }
+        return StringUtils.defaultString(result.getLeftRightMould());
+    }
+
+    /**
+     * 判断指定班次是否已经超过收尾位置。
+     * <p>该逻辑对齐前端 curingSchedule/index.vue 中的 isShiftAfterEnding：
+     * 以硫化余量和胎胚库存的较大值作为需要覆盖的参考数量；如果 8 个班次总计划量不足参考数量，
+     * 则不隐藏任何后续班次；当累计计划量覆盖参考数量后，覆盖点之后的班次视为收尾之后，导出为空。</p>
+     *
+     * @param result     排程结果明细
+     * @param shiftIndex 当前班次序号
+     * @return true 表示当前班次在收尾之后，需要隐藏左右模等班次展示值
+     */
+    private boolean isShiftAfterEnding(LhScheduleResult result, int shiftIndex) {
+        if (Objects.isNull(result)) {
+            return false;
+        }
+        int referenceQty = Math.max(defaultZero(result.getMouldSurplusQty()), defaultZero(result.getEmbryoStock()));
+        if (referenceQty <= 0) {
+            return false;
+        }
+        int totalPlanQty = 0;
+        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+            totalPlanQty += defaultZero(getClassPlanQty(result, shift));
+        }
+        if (totalPlanQty < referenceQty) {
+            return false;
+        }
+        int remaining = referenceQty;
+        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+            remaining -= defaultZero(getClassPlanQty(result, shift));
+            if (remaining <= 0) {
+                return shiftIndex > shift;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 将空数量按前端空值兜底规则转换为 0。
+     *
+     * @param value 数量值
+     * @return 非空数量，空值返回 0
+     */
+    private int defaultZero(Integer value) {
+        return Objects.isNull(value) ? 0 : value;
+    }
+
+    /**
      * 构建班次类型
      *
      * @param result 排程结果
@@ -1597,26 +1755,81 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @return 班次类型
      */
     private String buildShiftType(LhScheduleResult result, int shift) {
+        if (isShiftAfterEnding(result, shift)) {
+            return "";
+        }
         Integer planQty = getClassPlanQty(result, shift);
         if (Objects.isNull(planQty) || planQty <= 0) {
             return "";
         }
-        // 当前排程类型、首检、收尾、施工阶段都是明细级字段，不是班次级字段。
-        // 因此只有当该班次有计划量时，才把明细状态映射到这个班次格子里。
-        // 优先级按业务识别度处理：首检 > 试验/量试 > 收尾 > 正常。
-        if ("1".equals(result.getIsFirst())) {
-            return "首检";
+
+        // 对齐前端 curingSchedule/index.vue 的 calcShiftIsEnd：
+        // 该列展示 biz_end_type 字典含义，0=正常、1=收尾；空班次和收尾后的班次不展示。
+        int referenceQty = Math.max(defaultZero(result.getMouldSurplusQty()), defaultZero(result.getEmbryoStock()));
+        if (referenceQty <= 0) {
+            return "正常";
         }
-        if ("01".equals(result.getConstructionStage())) {
-            return "试验";
+        int totalPlanQty = 0;
+        for (int index = 1; index <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; index++) {
+            totalPlanQty += defaultZero(getClassPlanQty(result, index));
         }
-        if ("02".equals(result.getConstructionStage())) {
-            return "量试";
+        if (totalPlanQty < referenceQty) {
+            return "正常";
         }
-        if ("1".equals(result.getIsEnd())) {
-            return "收尾";
+        int remaining = referenceQty;
+        for (int index = 1; index <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; index++) {
+            remaining -= defaultZero(getClassPlanQty(result, index));
+            if (remaining <= 0) {
+                return index == shift ? "收尾" : "正常";
+            }
         }
         return "正常";
+    }
+
+    /**
+     * 构建班次维度的示方类型/施工阶段导出值。
+     * <p>模板当前列占位符是 mouldMethod，但前端同一位置使用 constructionStage 并通过
+     * shiftConstructionStageFormatter 展示 biz_construction_stage 字典。这里按前端规则处理：
+     * 收尾后的班次不展示；没有计划量的班次不展示；有计划量时，空值按无工艺处理。</p>
+     *
+     * @param result 排程结果明细
+     * @param shift  班次序号，范围 1~8
+     * @return 当前班次示方类型/施工阶段展示值
+     */
+    private Object buildShiftMouldMethod(LhScheduleResult result, int shift) {
+        if (Objects.isNull(result) || isShiftAfterEnding(result, shift)) {
+            return "";
+        }
+        Integer planQty = getClassPlanQty(result, shift);
+        if (Objects.isNull(planQty) || planQty <= 0) {
+            return "";
+        }
+        return buildConstructionStageName(result.getConstructionStage());
+    }
+
+    /**
+     * 将施工阶段字典值转换为导出展示文本。
+     * <p>前端字典 biz_construction_stage：00=无工艺、01=试制、02=量试、03=正式。
+     * 前端空值会兜底到无工艺，这里同时兼容历史值 0 和标准值 00。</p>
+     *
+     * @param constructionStage 施工阶段字典值
+     * @return 施工阶段展示文本
+     */
+    private String buildConstructionStageName(String constructionStage) {
+        String dictValue = StringUtils.defaultIfBlank(constructionStage, "00");
+        if ("0".equals(dictValue) || "00".equals(dictValue)) {
+            return "无工艺";
+        }
+        if ("01".equals(dictValue)) {
+            return "试制";
+        }
+        if ("02".equals(dictValue)) {
+            return "量试";
+        }
+        if ("03".equals(dictValue)) {
+            return "正式";
+        }
+        return dictValue;
     }
 
     /**
