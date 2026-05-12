@@ -154,6 +154,8 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
     @Override
     public List<CxScheduleDetailVo> listVoByQuery(ScheduleDetailQueryVo query) {
         QueryWrapper<CxScheduleResult> mainQuery = new QueryWrapper<>();
+        // 主表ID精确查询
+        mainQuery.eq(query.getMainId() != null, "ID", query.getMainId());
         // 排程日期查询
         mainQuery.eq(query.getScheduleDate() != null, "SCHEDULE_DATE", query.getScheduleDate());
         // 机台代码模糊查询
@@ -300,7 +302,7 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
             }
         }
 
-        // 更新明细表（明细表仅包含计划量字段）
+        // 更新明细表（明细表包含计划量、库存时长、顺位字段）
         if (vo.getClass1PlanQty() != null) detail.setClass1PlanQty(vo.getClass1PlanQty());
         if (vo.getClass2PlanQty() != null) detail.setClass2PlanQty(vo.getClass2PlanQty());
         if (vo.getClass3PlanQty() != null) detail.setClass3PlanQty(vo.getClass3PlanQty());
@@ -309,6 +311,25 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
         if (vo.getClass6PlanQty() != null) detail.setClass6PlanQty(vo.getClass6PlanQty());
         if (vo.getClass7PlanQty() != null) detail.setClass7PlanQty(vo.getClass7PlanQty());
         if (vo.getClass8PlanQty() != null) detail.setClass8PlanQty(vo.getClass8PlanQty());
+
+        if (vo.getClass1StockHours() != null) detail.setClass1StockHours(vo.getClass1StockHours());
+        if (vo.getClass2StockHours() != null) detail.setClass2StockHours(vo.getClass2StockHours());
+        if (vo.getClass3StockHours() != null) detail.setClass3StockHours(vo.getClass3StockHours());
+        if (vo.getClass4StockHours() != null) detail.setClass4StockHours(vo.getClass4StockHours());
+        if (vo.getClass5StockHours() != null) detail.setClass5StockHours(vo.getClass5StockHours());
+        if (vo.getClass6StockHours() != null) detail.setClass6StockHours(vo.getClass6StockHours());
+        if (vo.getClass7StockHours() != null) detail.setClass7StockHours(vo.getClass7StockHours());
+        if (vo.getClass8StockHours() != null) detail.setClass8StockHours(vo.getClass8StockHours());
+
+        if (vo.getClass1Sequence() != null) detail.setClass1Sequence(vo.getClass1Sequence());
+        if (vo.getClass2Sequence() != null) detail.setClass2Sequence(vo.getClass2Sequence());
+        if (vo.getClass3Sequence() != null) detail.setClass3Sequence(vo.getClass3Sequence());
+        if (vo.getClass4Sequence() != null) detail.setClass4Sequence(vo.getClass4Sequence());
+        if (vo.getClass5Sequence() != null) detail.setClass5Sequence(vo.getClass5Sequence());
+        if (vo.getClass6Sequence() != null) detail.setClass6Sequence(vo.getClass6Sequence());
+        if (vo.getClass7Sequence() != null) detail.setClass7Sequence(vo.getClass7Sequence());
+        if (vo.getClass8Sequence() != null) detail.setClass8Sequence(vo.getClass8Sequence());
+
         updateById(detail);
 
         // 重新汇总主表数据：查询该主表下所有明细，按班次累加计划量
@@ -619,7 +640,7 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
         vo.setMainMaterialDesc(main.getMainMaterialDesc());
         vo.setSpecDimension(main.getSpecDimension() != null ? main.getSpecDimension().toString() : null);
         vo.setStructureName(main.getStructureName());
-        vo.setScheduleDate(main.getScheduleDate() != null ? main.getScheduleDate().toString() : null);
+        vo.setScheduleDate(main.getScheduleDate() != null ? cn.hutool.core.date.DateUtil.format(main.getScheduleDate(), "yyyy-MM-dd") : null);
         vo.setCxBatchNo(main.getCxBatchNo());
         vo.setOrderNo(main.getOrderNo());
         vo.setProductionStatus(main.getProductionStatus());

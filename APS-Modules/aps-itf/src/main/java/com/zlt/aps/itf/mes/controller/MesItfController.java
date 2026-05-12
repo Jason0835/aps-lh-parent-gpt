@@ -664,6 +664,16 @@ public class MesItfController {
         return mesItfService.syncAndGenerateLhPrecisionPlan(year);
     }
 
+    @ApiOperation("同步MES数据并生成硫化精度计划（按版本号前缀过滤，综合接口）")
+    @PostMapping("/syncAndGenerateLhPrecisionPlanByVersionPrefix")
+    public AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefix(@RequestParam("versionPrefix") String versionPrefix,
+                                                                     @RequestParam("year") Integer year) {
+        if (year == null) {
+            year = java.time.LocalDate.now().getYear();
+        }
+        return mesItfService.syncAndGenerateLhPrecisionPlanByVersionPrefix(versionPrefix, year);
+    }
+
     /**
      * 清理并重新同步所有MES历史数据
      * 执行步骤：

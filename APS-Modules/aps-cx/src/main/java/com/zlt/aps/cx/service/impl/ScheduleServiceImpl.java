@@ -1360,6 +1360,16 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             log.info("计算成型余量映射完成，共 {} 条", formingRemainderMap.size());
+            for (Map.Entry<String, Integer> entry : formingRemainderMap.entrySet()) {
+                log.info("成型余量: materialCode={}, formingRemainder={}", entry.getKey(), entry.getValue());
+            }
+            for (Map.Entry<String, Integer> entry : materialStockMap.entrySet()) {
+                log.info("物料库存分配: taskKey={}, stock={}", entry.getKey(), entry.getValue());
+            }
+            for (Map.Entry<String, MdmMonthSurplus> entry : monthSurplusMap.entrySet()) {
+                log.info("硫化余量: materialCode={}, planSurplusQty={}", entry.getKey(),
+                        entry.getValue().getPlanSurplusQty());
+            }
 
         } catch (Exception e) {
             log.error("计算成型余量映射失败", e);
