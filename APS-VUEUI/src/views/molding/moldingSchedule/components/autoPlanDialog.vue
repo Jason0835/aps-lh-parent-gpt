@@ -135,6 +135,10 @@ export default {
           this.$modal.msgSuccess(result.msg);
           this.$emit("success", params.scheduleDate);
           this.hide();
+        } else if (result.code === 423) {
+          // 排程执行中（锁冲突），提示用户稍后查看
+          this.$modal.msgWarning(result.msg || "排程正在执行中，请稍后刷新页面查看结果");
+          this.hide();
         } else if (result.code === 500) {
           const errorData = result.data || {};
           const errors = errorData.errors || [];
@@ -205,6 +209,7 @@ export default {
       } catch (error) {
         console.error(error);
         this.loading = false;
+        this.$modal.msgWarning("排程请求超时或服务异常，如排程正在执行中，请稍后刷新页面查看结果");
       }
     },
     async autoPlan(params) {

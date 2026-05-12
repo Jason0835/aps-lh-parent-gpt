@@ -206,7 +206,19 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @PostMapping("/generate")
     @ResponseBody
     public AjaxResult generateSchedule(@RequestBody com.zlt.aps.cx.vo.ScheduleGenerateVo dto) {
-        return iCxScheduleResultService.generateSchedule(dto);
+        try {
+            return iCxScheduleResultService.generateSchedule(dto);
+        } catch (feign.FeignException e) {
+            // Feign调用异常（如超时）：排程服务可能仍在执行中，提示用户稍后查看
+            log.warn("排程Feign调用异常, status={}, message={}", e.status(), e.getMessage());
+            if (e.status() == 423) {
+                return AjaxResult.error(423, e.getMessage());
+            }
+            return AjaxResult.error("排程请求超时，如排程正在执行中，请稍后刷新页面查看结果");
+        } catch (Exception e) {
+            log.error("排程调用异常", e);
+            return AjaxResult.error("排程请求异常，请稍后重试");
+        }
     }
 
     /**

@@ -3,6 +3,7 @@ package com.zlt.aps.cx.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
+import com.zlt.aps.cx.component.ScheduleExecutionGuard;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
@@ -34,6 +35,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -126,6 +129,9 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final HolidayScheduleService holidayScheduleService;
     private final ScheduleDataValidator scheduleDataValidator;
 
+    @Autowired
+    private ScheduleExecutionGuard scheduleExecutionGuard;
+
     private final MdmMoldingMachineMapper moldingMachineMapper;
     private final MdmMaterialInfoMapper materialInfoMapper;
     private final MdmMonthSurplusMapper monthSurplusMapper;
@@ -156,6 +162,18 @@ public class ScheduleServiceImpl implements ScheduleService {
         ScheduleResult result = new ScheduleResult();
         result.setSuccess(false);
         result.setScheduleDate(request.getScheduleDate());
+
+        String factoryCode = request.getFactoryCode() != null ? request.getFactoryCode() : DEFAULT_FACTORY_CODE;
+        LocalDate scheduleDate = request.getScheduleDate();
+
+        // 获取排程执行锁（工厂+日期维度）
+        String lockToken = scheduleExecutionGuard.acquire(factoryCode, scheduleDate);
+        if (lockToken == null) {
+            result.setSuccess(false);
+            result.setMessage("排程执行中，请稍后重试：当前工厂[" + factoryCode + "]日期[" + scheduleDate + "]已有排程正在执行");
+            log.warn("排程锁已被占用，拒绝重复执行。工厂: {}, 日期: {}", factoryCode, scheduleDate);
+            return result;
+        }
 
         try {
             log.info("开始执行排程，日期：{}，排程模式：{}", request.getScheduleDate(), request.getScheduleMode());
@@ -209,6 +227,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         } catch (Exception e) {
             log.error("排程执行失败", e);
             result.setMessage("排程失败：" + e.getMessage());
+        } finally {
+            // 释放排程执行锁
+            scheduleExecutionGuard.release(factoryCode, scheduleDate, lockToken);
         }
 
         return result;
