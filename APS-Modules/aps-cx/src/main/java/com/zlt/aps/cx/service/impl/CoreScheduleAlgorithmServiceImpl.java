@@ -1353,7 +1353,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     for (TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
                         String embryoCode = taskAlloc.getEmbryoCode();
                         String materialCode = taskAlloc.getMaterialCode() != null ? taskAlloc.getMaterialCode() : "";
-                        String taskKey = allocation.getMachineCode() + "|" + embryoCode + "|" + materialCode;
+                        String constructionStage = taskAlloc.getConstructionStage() != null ? taskAlloc.getConstructionStage() : "";
+                        String taskKey = allocation.getMachineCode() + "|" + embryoCode + "|" + materialCode + "|" + constructionStage;
                         if (taskAlloc.getLhId() != null) {
                             taskLhIdListMap.computeIfAbsent(taskKey, k -> new ArrayList<>()).add(taskAlloc.getLhId());
                         }
@@ -1463,7 +1464,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             List<Long> lhIdList = taskLhIdListMap.get(taskKey);
             int totalStock = 0;
             if (lhIdList != null && !lhIdList.isEmpty()) {
-                // 去重：同一个lhId可能在多个班次分配中重复出现
                 List<Long> distinctLhIdList = lhIdList.stream().distinct().collect(Collectors.toList());
                 Map<String, Integer> stockMap = context.getInitialMaterialStockMap();
                 for (Long lhId : distinctLhIdList) {

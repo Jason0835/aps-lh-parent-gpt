@@ -221,9 +221,11 @@ export default {
             return <span>{row[prop]}</span>;
           }
           if (type === "number") {
+            const rawVal = row[prop];
+            const numVal = Number(rawVal);
             return (
               <el-input-number
-                value={Number(row[prop] || 0)}
+                value={!isNaN(numVal) && numVal > 0 ? numVal : undefined}
                 min={0}
                 controls={false}
                 style="width: 100%;"
