@@ -1,6 +1,5 @@
 package com.zlt.aps.mp.adjust.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -9,13 +8,10 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
-import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustResultService;
-import com.zlt.aps.mp.adjust.service.IMpWeekAdjustService;
-import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
-import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
+import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
@@ -80,13 +76,11 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     @Override
     public void forceUpdateById(MpAdjustResult entity) {
         // 根据版本号+物料编号+施工阶段查询，如果没有，则新增，否则更新
-        String lastMonthPlanVersion = entity.getLastMonthPlanVersion();
+        String adjVersion = StrUtil.isBlank(entity.getVersion()) ? entity.getProductionVersion() : entity.getVersion();
+
         LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MpAdjustResult::getFactoryCode, entity.getFactoryCode());
-        // (version = ? OR monthPlanVersion = ?)
-        queryWrapper.and(w -> w.eq(MpAdjustResult::getVersion, lastMonthPlanVersion)
-                .or()
-                .eq(MpAdjustResult::getMonthPlanVersion, lastMonthPlanVersion));
+        queryWrapper.eq(MpAdjustResult::getVersion, adjVersion);
         queryWrapper.eq(MpAdjustResult::getMaterialCode, entity.getMaterialCode());
         queryWrapper.eq(MpAdjustResult::getConstructionStage, entity.getConstructionStage());
         List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
@@ -114,9 +108,13 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         entity.setEndDay(realEndDay);
         entity.setTotalQty(totalQty);
         // 如果版本号没有值，更新调整类型=人工调整
-        if (StrUtil.isNotBlank(entity.getMonthPlanVersion())) {
+        if (StrUtil.isNotBlank(entity.getVersion())) {
             entity.setAdjustType(ApsConstant.APS_ZERO_3);
+            entity.setVersion(adjVersion);
         }
+        // 计算各排产量
+        MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
+        weekRollAdjustEngine.allocateProductionByPriority(entity);
         // 没有数据，需新增
         if (CollUtil.isEmpty(mpAdjustResultList)) {
             entity.setId(null);
@@ -125,20 +123,6 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
             //2、更新每日调整值
             mpAdjustResultEntityMapper.forceUpdateById(entity);
         }
-
-        // 计算收尾日及各排产量
-        MpRollAdjustContextDTO contextDTO = new MpRollAdjustContextDTO();
-        BeanUtil.copyProperties(entity, contextDTO);
-        IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(contextDTO.getAdjustType());
-        if (weekAdjustStrategy == null) {
-            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindStrategy"));
-        }
-        log.info("重算收尾日、及各排产量 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
-                String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
-        // 重算收尾日、及各排产量
-        weekAdjustStrategy.recalculate(contextDTO, false);
-        log.info("重算收尾日、及各排产量 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
-                String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
     }
 
     @Override

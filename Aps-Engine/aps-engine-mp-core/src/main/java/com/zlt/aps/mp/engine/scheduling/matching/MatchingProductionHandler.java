@@ -742,7 +742,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                     Integer allUsedLhMachines = productionContext.getGroupProductionInfo().values().stream()
                             .map(g -> g.getDailyCapacityLimitVoMap().get(day)).filter(Objects::nonNull)
                             .mapToInt(MpDailyCapacityLimitVo::getUsedLhMachines).sum();
-                    Integer allMaxLhMachines = productionContext.getBaseDataContainer().getLhMachineInfoList().size();
+                    Integer allMaxLhMachines = productionContext.getBaseDataContainer().getLhMachineCount();
                     // 2.2.2.4、完成判断后重算当天的排产统计，防止后续使用有问题
                     groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, day, firstPlan.getMainPattern(),firstPlan.getEmbryoCode());
                     // 2.2.2.5、判断结构机台数
@@ -1169,7 +1169,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         Integer maxProductionQty = needProductionInfo.getDayMaxProductionQty(); // 单机台硫化上限
         List<MatchingMouldDayUsedHelper> mouldDayUsedList = this.caculateMouldDayUsed(productionContext, materialDesc,
                 maxProductionQty, realStartDay, realEndDay); // 统计每一天所有可用模具
-//        Integer producedQty = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProducedQty).sum(); // 统计已排产量
+        Integer producedQty = productionPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getProducedQty).sum(); // 统计已排产量
         Integer skuShortestProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuShortestProductionDays(); // SKU非首次上模最短在机天数
         Set<Integer> allocationStartDaySet = this.getCxMachineAllocationStartDaySet(productionContext, structureName); // 计算本结构在各成型机的上机日
         
@@ -1229,10 +1229,10 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             if (productionQty < needProductionInfo.getDayMaxProductionQty()) {
                 continue;
             }
-            // 9、当天没有排产，后一天有排产的SKU不能加模
+            // 9、当天没有排产，则但是其他天有排产的情况不能加模
             Integer currentDayProductionQty = this.sumDayProductionQty(groupInfo, materialDesc, usedBeginDate); // 当天已排产量
-            Integer nextDayProductionQty = this.sumDayProductionQty(groupInfo, materialDesc, nextDay); // 下一天已排产量
-            if (currentDayProductionQty == 0 && nextDayProductionQty != 0) {
+//            Integer nextDayProductionQty = this.sumDayProductionQty(groupInfo, materialDesc, nextDay); // 下一天已排产量
+            if (currentDayProductionQty == 0 && producedQty != 0) {
                 continue;
             }
             // 10、当天已经有排产的SKU再次上模时至少需要5天量的限制
@@ -1393,7 +1393,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         Integer usedLhMachines = productionContext.getGroupProductionInfo().values().stream()
                 .map(g -> g.getDailyCapacityLimitVoMap().get(day)).filter(Objects::nonNull)
                 .mapToInt(MpDailyCapacityLimitVo::getUsedLhMachines).sum();
-        Integer maxLhMachines = productionContext.getBaseDataContainer().getLhMachineInfoList().size();
+        Integer maxLhMachines = productionContext.getBaseDataContainer().getLhMachineCount();
         return usedLhMachines < maxLhMachines;
     }
 
@@ -2288,7 +2288,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                 productionQty = detailLogs.stream().filter(d -> d.getTotalQty() != null)
                         .mapToInt(FactoryMonthPlanMouldDayDetail::getTotalQty).sum();
             }
-            requirePlan.setOriginProductionQty(productionQty);
+            requirePlan.setOriginProductionQty(demandPlan.getNetQty());
             requirePlan.setProductionQty(0);
             requirePlan.setProducedQty(productionQty);
             requirePlan.resetProductionDataInfo();
@@ -2365,6 +2365,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         container.setMouldInfoMap(this.buildMouldInfoMap(productionContext, detailLogList, requirePlanMap)); // 已排模具计划
         container.setGroupMainPatternAllocationLimitMap(this.getGroupMainPatternAllocationInfo(productionContext)); // 结构模具分配配比
         container.setLhMachineInfoList(getDataService().listLhMachineInfo(productionContext)); // 加载硫化机
+        container.setLhMachineCount(this.getLhMachineCount(productionContext)); // 计算硫化机数
         this.specialMaterialInfoHandler(productionContext);
 //        this.buildCxLhRatioMap(productionContext, container.getMouldInfoMap(), requirePlanMap); // 构建成型硫化组
         productionContext.setOverSixMonthStockMap(this.overSixMonthStockHandler(productionContext,

@@ -302,7 +302,7 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     /**
      * 修改或新增
      */
-    @RequiresPermissions("monthplan:mpStructureAllocation:save")
+//    @RequiresPermissions("monthplan:mpStructureAllocation:save")
     @ApiOperation("修改或新增")
     @PostMapping("/save")
     @ResponseBody

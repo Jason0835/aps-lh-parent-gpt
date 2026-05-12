@@ -236,6 +236,10 @@ public class ProductionCapacityParamConfiguration {
      * SYS0209013 续作SKU先排产高优级量条件
      */
     private Integer continueSkuProductionHeightRequire;
+    /**
+     * SYS0209014 单控硫化机机台号
+     */
+    private Set<String> singleControlLhMachineCode;
 
     /**
      * 设置额外处理的配比值

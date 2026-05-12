@@ -349,4 +349,30 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
             return AjaxResult.error("操作失败：" + e.getMessage());
         }
     }
+
+    @Override
+    @ApiOperation("清空模具清洗预警和清洗计划表全部数据")
+    @PostMapping("/cleanAllMouldCleanWarnAndPlan")
+    public AjaxResult cleanAllMouldCleanWarnAndPlan() {
+        try {
+            lhMouldCleanPlanService.cleanAllWarnAndPlan();
+            return AjaxResult.success("操作成功，已清空模具清洗预警和清洗计划表全部数据");
+        } catch (Exception e) {
+            log.error("清空模具清洗预警和清洗计划表数据失败", e);
+            return AjaxResult.error("操作失败：" + e.getMessage());
+        }
+    }
+
+    @Override
+    @ApiOperation("基于全部预警数据全量生成清洗计划（不限制版本号）")
+    @PostMapping("/syncAllMouldCleanPlanFromWarn")
+    public AjaxResult syncAllMouldCleanPlanFromWarn() {
+        try {
+            int count = lhMouldCleanPlanService.syncAllFromMouldCleanWarn();
+            return AjaxResult.success("操作成功，成功全量生成" + count + "条模具清洗计划");
+        } catch (Exception e) {
+            log.error("基于全部预警数据全量生成清洗计划失败", e);
+            return AjaxResult.error("操作失败：" + e.getMessage());
+        }
+    }
 }

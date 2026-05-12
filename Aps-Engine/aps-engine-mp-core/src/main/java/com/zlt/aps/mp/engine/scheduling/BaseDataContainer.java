@@ -56,6 +56,11 @@ public class BaseDataContainer implements Serializable {
     private List<LhMachineInfo> lhMachineInfoList;
 
     /**
+     * 硫化机台信息总台数（扣除单控机台数）
+     */
+    private Integer lhMachineCount;
+
+    /**
      * 成型鼓(工装台账)信息集合
      * key=鼓类型 ：value=鼓类型台账信息{key=鼓groupId ：value=数量}
      */
