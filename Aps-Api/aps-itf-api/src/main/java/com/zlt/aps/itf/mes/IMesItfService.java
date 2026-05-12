@@ -393,4 +393,20 @@ public interface IMesItfService {
     @ApiOperation("清理并重新同步所有MES历史数据")
     @PostMapping("/mesItf/cleanAndResyncAllHistory")
     AjaxResult cleanAndResyncAllHistory();
+
+    /**
+     * 临时任务：按版本迭代同步模具清洗预警数据并生成清洗计划
+     * 执行步骤：
+     * 1. 从MES获取全部模具清洗预警版本号（升序排列）
+     * 2. 从最小版本号开始，先插入APS作为初始数据
+     * 3. 逐个版本迭代，对后续版本进行更新和新增
+     * 4. 迭代到最新版本后，调用已有逻辑生成模具清洗计划
+     * 5. 删除的预警也同步生成计划（标记为已删除的计划）
+     *
+     * @param syncDataLogs 同步参数
+     * @return 执行结果
+     */
+    @ApiOperation("临时任务-按版本迭代同步模具清洗预警并生成清洗计划")
+    @PostMapping("/mesItf/syncAllVersionsMouldCleanWarnAndGenPlan")
+    AjaxResult syncAllVersionsMouldCleanWarnAndGenPlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 }

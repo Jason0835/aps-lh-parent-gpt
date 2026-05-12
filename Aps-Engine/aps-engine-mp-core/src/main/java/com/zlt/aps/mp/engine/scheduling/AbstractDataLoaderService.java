@@ -466,6 +466,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.MIN_LH_MACHINE_CONTINUE_DAYS.getCode());
         paramCodeList.add(MonthPlanEnums.HEIGHT_PRIORITY_SKU_PRODUCTION_MODE.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_HEIGHT_PRIORITY_LH_MACHINE_COUNT.getCode());
+        paramCodeList.add(MonthPlanEnums.CONTINUE_SKU_HEIGHT_REQUIRE_QTY.getCode());
 
         //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
@@ -528,10 +529,9 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         } else {
             Integer changeProSizeRepeatMaxCount = (Integer) changeProSizeRepeatMaxCountValue;
             if (changeProSizeRepeatMaxCount <= BigDecimal.ZERO.intValue()) {
-                configuration.setSingleCxMachineChangeProSizeRepeatMaxCount(BigDecimal.ZERO.intValue());
-            } else {
-                configuration.setSingleCxMachineChangeProSizeRepeatMaxCount(changeProSizeRepeatMaxCount);
+                changeProSizeRepeatMaxCount = BigDecimal.ZERO.intValue();
             }
+            configuration.setSingleCxMachineChangeProSizeRepeatMaxCount(changeProSizeRepeatMaxCount);
         }
 
         //降膜排产相关
@@ -581,7 +581,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         }
         //20260429+ 月计划排产模式 1 交付优先，非1则为效率优先
         configuration.setProductionMode((Integer) paramConfigurationMap.get(MonthPlanEnums.PRODUCTION_MODE.getCode()));
-        //202430+ 结构下Sku采用先高优先级排产
+        //20260430+ 结构下Sku采用先高优先级排产
         Object heightRequireRatioValue = paramConfigurationMap.get(MonthPlanEnums.HEIGHT_PRIORITY_SKU_PRODUCTION_MODE.getCode());
         if (null == heightRequireRatioValue) {
             configuration.setHeightPriorityProductionMode(BigDecimal.ONE);
@@ -591,6 +591,17 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             configuration.setHeightPriorityProductionMode(heightRequireRatio);
         }
         configuration.setMinHeightPriorityLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.MIN_HEIGHT_PRIORITY_LH_MACHINE_COUNT.getCode()));
+        //20260512+ 续作Sku排产高优级量基本条件
+        Object continueSkuProductionHeight = paramConfigurationMap.get(MonthPlanEnums.CONTINUE_SKU_HEIGHT_REQUIRE_QTY.getCode());
+        if (null == continueSkuProductionHeight) {
+            configuration.setContinueSkuProductionHeightRequire(Integer.MAX_VALUE);
+        } else {
+            Integer continueSkuProductionHeightValue = (Integer) continueSkuProductionHeight;
+            if (continueSkuProductionHeightValue <= BigDecimal.ZERO.intValue()) {
+                continueSkuProductionHeightValue = BigDecimal.ZERO.intValue();
+            }
+            configuration.setContinueSkuProductionHeightRequire(continueSkuProductionHeightValue);
+        }
 
         return configuration;
     }

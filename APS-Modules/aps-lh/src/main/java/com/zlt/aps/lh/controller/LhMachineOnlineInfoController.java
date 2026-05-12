@@ -84,6 +84,7 @@ public class LhMachineOnlineInfoController extends AbstractDocBizController<LhMa
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getSpecDesc()), "SPEC_DESC", queryVO.getSpecDesc());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getLrMolds()), "LR_MOLDS", queryVO.getLrMolds());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getDataVersion()), "DATA_VERSION", queryVO.getDataVersion());
+        queryWrapper.orderByAsc("LH_CODE");
     }
 
     @Override

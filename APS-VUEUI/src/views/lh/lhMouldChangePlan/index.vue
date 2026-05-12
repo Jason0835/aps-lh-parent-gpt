@@ -241,13 +241,13 @@ export default {
           label: this.$t("ui.data.column.lhMouldChangePlan.changeTime"),
           minWidth: 140,
         },
-        {
-          prop: "mouldCode",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.lhMouldChangePlan.mouldCode"),
-          width: 450,
-        },
+        // {
+        //   prop: "mouldCode",
+        //   align: "center",
+        //   halign: "center",
+        //   label: this.$t("ui.data.column.lhMouldChangePlan.mouldCode"),
+        //   width: 450,
+        // },
         {
           prop: "isRelease",
           align: "center",

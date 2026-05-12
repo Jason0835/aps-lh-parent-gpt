@@ -435,7 +435,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     @Override
     protected String getOrderBy() {
-        return " update_time desc,plan_date desc";
+        return " LH_MACHINE_CODE ASC";
     }
 
     /**

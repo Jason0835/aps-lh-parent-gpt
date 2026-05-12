@@ -232,6 +232,10 @@ public class ProductionCapacityParamConfiguration {
      * SYS0209012 高优先级最小排产机数
      */
     private Integer minHeightPriorityLhMachineCount;
+    /**
+     * SYS0209013 续作SKU先排产高优级量条件
+     */
+    private Integer continueSkuProductionHeightRequire;
 
     /**
      * 设置额外处理的配比值

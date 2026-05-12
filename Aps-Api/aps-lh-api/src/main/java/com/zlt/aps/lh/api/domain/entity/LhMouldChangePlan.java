@@ -119,7 +119,7 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
     private Date changeTime;
 
     @ApiModelProperty(value = "模具号")
-    @Excel(name = "ui.data.column.lhMouldChangePlan.mouldCode")
+//    @Excel(name = "ui.data.column.lhMouldChangePlan.mouldCode")
     @ImportExcelValidated(required = true, maxLength = 250)
     @TableField(value = "MOULD_CODE")
     private String mouldCode;

@@ -252,4 +252,13 @@ public interface MesItfMapper {
      * @return 列表
      */
     List<LhDayFinishQty> selectLhScheDayFinishQtyHistoryList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询MES中间表模具清洗预警计划的所有版本号（升序排列）
+     * 用于临时任务按版本迭代同步全部预警数据
+     *
+     * @param factoryCode 分厂编码（可选）
+     * @return 版本号列表，按升序排列
+     */
+    List<String> selectAllDataVersionsFromMouldCleanPlan(@Param("factoryCode") String factoryCode);
 }
