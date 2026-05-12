@@ -640,7 +640,7 @@ public class CxScheduleDetailServiceImpl extends ServiceImpl<CxScheduleDetailMap
         vo.setMainMaterialDesc(main.getMainMaterialDesc());
         vo.setSpecDimension(main.getSpecDimension() != null ? main.getSpecDimension().toString() : null);
         vo.setStructureName(main.getStructureName());
-        vo.setScheduleDate(main.getScheduleDate() != null ? main.getScheduleDate().toString() : null);
+        vo.setScheduleDate(main.getScheduleDate() != null ? cn.hutool.core.date.DateUtil.format(main.getScheduleDate(), "yyyy-MM-dd") : null);
         vo.setCxBatchNo(main.getCxBatchNo());
         vo.setOrderNo(main.getOrderNo());
         vo.setProductionStatus(main.getProductionStatus());

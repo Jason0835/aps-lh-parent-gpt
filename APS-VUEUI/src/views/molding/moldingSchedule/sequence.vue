@@ -223,9 +223,21 @@ export default {
           if (type === "number") {
             const rawVal = row[prop];
             const numVal = Number(rawVal);
+            let displayValue = undefined;
+            if (!isNaN(numVal) && numVal > 0) {
+              displayValue = numVal;
+            }
+            const isStockHours = prop.endsWith("StockHours");
+            if (isStockHours) {
+              const planQtyProp = prop.replace("StockHours", "PlanQty");
+              const planQty = Number(row[planQtyProp]);
+              if (!isNaN(planQty) && planQty > 0) {
+                displayValue = numVal;
+              }
+            }
             return (
               <el-input-number
-                value={!isNaN(numVal) && numVal > 0 ? numVal : undefined}
+                value={displayValue}
                 min={0}
                 controls={false}
                 style="width: 100%;"
