@@ -1,5 +1,6 @@
 package com.zlt.aps.job.task;
 
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.itf.mes.IMesItfService;
@@ -10,6 +11,8 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import java.time.LocalDate;
 
 /**
  * MES接口定时任务
@@ -180,5 +183,29 @@ public class MesTask {
             log.error("临时任务-清理并重新同步所有MES历史数据异常", e);
         }
         log.info("临时任务-清理并重新同步所有MES历史数据完成");
+    }
+
+    /**
+     * 临时任务：按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成硫化精度计划
+     * 执行步骤：
+     * 1. 同步MES设备保养计划到APS（仅硫化精度）
+     * 2. 同步MES硫化精度计划实际执行日期回填数据
+     * 3. 只处理版本号前缀为APS_MES_AH01且类型为硫化精度的数据，生成新的硫化精度计划
+     * 4. 新的硫化精度计划只有计划时间（planDate），实际时间（actualDate）为空，等待MES回填
+     * 5. 自动推算下一年度硫化精度计划
+     */
+    @ApiOperation("临时任务-按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成计划")
+    public void syncAndGenerateLhPrecisionPlanByVersionPrefix() {
+        log.info("临时任务-开始按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成计划");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                Integer currentYear = LocalDate.now().getYear();
+                AjaxResult result = iMesItfService.syncAndGenerateLhPrecisionPlanByVersionPrefix("APS_MES_AH01", currentYear);
+                log.info("临时任务-按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成计划结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成计划异常", e);
+        }
+        log.info("临时任务-按版本前缀APS_MES_AH01抓取MES硫化精度数据并生成计划完成");
     }
 }
