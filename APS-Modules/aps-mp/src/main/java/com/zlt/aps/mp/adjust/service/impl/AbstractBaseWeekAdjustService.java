@@ -117,9 +117,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     protected IDpDemandPlanService dpDemandPlanService;
 
     @Autowired
-    protected IMpAdjustResultService mpAdjustResultService;
-
-    @Autowired
     protected IBatchMpAdjustResultService batchMpAdjustResultService;
 
     @Autowired
@@ -760,7 +757,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         //1、根据调整版本 先删除(物理)
-        mpAdjustResultService.deleteAdjustResultByVersion(contextDTO.getFactoryCode(),
+        mpAdjustResultEntityMapper.deleteAdjustResultByVersion(contextDTO.getFactoryCode(),
                 String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getVersion());
         //2、保存调整记录
         MpAdjustResult mpAdjustResult;
