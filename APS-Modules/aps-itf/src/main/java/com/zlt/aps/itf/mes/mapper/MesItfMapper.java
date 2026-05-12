@@ -192,6 +192,15 @@ public interface MesItfMapper {
     String selectMaxDataVersionFromMes(@Param("precisionType") String precisionType);
 
     /**
+     * 查询MES中间表模具清洗预警计划的最大版本号
+     * 只取最新版本的数据进行同步
+     *
+     * @param factoryCode 分厂编码（可选）
+     * @return 最大版本号，无数据时返回null
+     */
+    String selectMaxDataVersionFromMouldCleanPlan(@Param("factoryCode") String factoryCode);
+
+    /**
      * 查询成型在机历史同步数据（今天之前每天最新版本）
      * 按日期+成型机台分组，取每天每个机台的MAX(DATA_VERSION)
      *

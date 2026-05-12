@@ -1121,11 +1121,30 @@ public class MesItfServiceImpl implements MesItfService {
     /**
      * 同步模具清洗预警计划
      * 采用更新删除标识模式，而不是先删后插
+     * 只抓取MES最新版本号的数据进行同步，更新时版本号也同步更新
+     * 同步预警数据完成后自动触发模具清洗计划的增量同步
      * @param syncDataLogs 同步参数
      * @return 结果
      */
     @Override
     public AjaxResult syncMouldCleanWarn(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询MES中间表模具清洗预警计划的最大版本号，只同步最新版本的数据
+        String factoryCode = syncDataLogs != null ? syncDataLogs.getFactoryCode() : null;
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        String maxVersion = mesItfMapper.selectMaxDataVersionFromMouldCleanPlan(factoryCode);
+        DynamicDataSourceContextHolder.poll();
+
+        if (maxVersion != null && !maxVersion.isEmpty()) {
+            if (syncDataLogs == null) {
+                syncDataLogs = new AuxReqSyncDataLogs();
+            }
+            syncDataLogs.setDataVersion(maxVersion);
+            log.info("同步模具清洗预警计划，最新版本号={}", maxVersion);
+        } else {
+            log.info("MES中间表无模具清洗预警计划版本数据");
+            return AjaxResult.success("MES中间表无模具清洗预警计划版本数据");
+        }
+
         DynamicDataSourceContextHolder.push(DataSource.MES);
         List<MouldCleanPlanVo> syncList = mesItfMapper.selectMouldCleanPlanList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
@@ -1208,6 +1227,20 @@ public class MesItfServiceImpl implements MesItfService {
                     lhMesSyncRemoteService.saveMouldCleanWarnBatch(saveList);
                 }
             });
+
+            // 预警数据同步完成后，自动触发模具清洗计划的增量同步
+            try {
+                FeignTokenHelper.runWithToken(() -> {
+                    try {
+                        AjaxResult planResult = lhMesSyncRemoteService.syncMouldCleanPlanFromWarn();
+                        log.info("自动同步模具清洗计划结果：{}", planResult != null ? planResult.get("msg") : "null");
+                    } catch (Exception e) {
+                        log.error("自动同步模具清洗计划失败", e);
+                    }
+                });
+            } catch (Exception e) {
+                log.error("自动同步模具清洗计划异常", e);
+            }
         }
         return AjaxResult.success();
     }

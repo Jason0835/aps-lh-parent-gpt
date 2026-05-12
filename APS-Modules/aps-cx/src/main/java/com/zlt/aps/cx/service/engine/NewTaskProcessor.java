@@ -131,8 +131,9 @@ public class NewTaskProcessor {
                 }
             }
 
-            // Step 3.3: 构建试制机台映射 materialCode → machineCode（同结构下）
-            Map<String, String> trialMachineMap = buildTrialMachineMap(trialAllocations, structureName);
+            // Step 3.3: 构建试制机台映射 embryoCode → machineCode（同结构下）
+            // 同时从续作分配和试制分配中获取试制任务的机台信息
+            Map<String, String> trialMachineMap = buildTrialMachineMap(trialAllocations, existAllocations, structureName);
 
             // Step 3.4: 分类新增任务 - 固定量试 vs 参与均衡
             // 量试约束任务：量试任务 + 同胎胚有试制任务 → 设置约束机台，参与均衡
@@ -474,23 +475,38 @@ public class NewTaskProcessor {
     }
 
     /**
-     * 构建试制机台映射：materialCode → machineCode
+     * 构建试制机台映射：embryoCode → machineCode
      * 仅返回指定结构下的试制任务
+     * 同时从续作分配（existAllocations）和试制分配（trialAllocations）中获取
      */
     private Map<String, String> buildTrialMachineMap(
             List<CoreScheduleAlgorithmService.MachineAllocationResult> trialAllocations,
+            List<CoreScheduleAlgorithmService.MachineAllocationResult> existAllocations,
             String structureName) {
         Map<String, String> trialMachineMap = new HashMap<>();
-        if (trialAllocations == null) {
-            return trialMachineMap;
+        // 从试制分配中获取
+        if (trialAllocations != null) {
+            for (CoreScheduleAlgorithmService.MachineAllocationResult allocation : trialAllocations) {
+                String machineCode = allocation.getMachineCode();
+                for (CoreScheduleAlgorithmService.TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
+                    if (structureName.equals(taskAlloc.getStructureName())
+                            && taskAlloc.getEmbryoCode() != null
+                            && Boolean.TRUE.equals(taskAlloc.getIsTrialTask())) {
+                        trialMachineMap.put(taskAlloc.getEmbryoCode(), machineCode);
+                    }
+                }
+            }
         }
-        for (CoreScheduleAlgorithmService.MachineAllocationResult allocation : trialAllocations) {
-            String machineCode = allocation.getMachineCode();
-            for (CoreScheduleAlgorithmService.TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
-                if (structureName.equals(taskAlloc.getStructureName())
-                        && taskAlloc.getEmbryoCode() != null
-                        && Boolean.TRUE.equals(taskAlloc.getIsTrialTask())) {
-                    trialMachineMap.put(taskAlloc.getEmbryoCode(), machineCode);
+        // 从续作分配中获取续作试制任务的机台信息
+        if (existAllocations != null) {
+            for (CoreScheduleAlgorithmService.MachineAllocationResult allocation : existAllocations) {
+                String machineCode = allocation.getMachineCode();
+                for (CoreScheduleAlgorithmService.TaskAllocation taskAlloc : allocation.getTaskAllocations()) {
+                    if (structureName.equals(taskAlloc.getStructureName())
+                            && taskAlloc.getEmbryoCode() != null
+                            && Boolean.TRUE.equals(taskAlloc.getIsTrialTask())) {
+                        trialMachineMap.putIfAbsent(taskAlloc.getEmbryoCode(), machineCode);
+                    }
                 }
             }
         }
