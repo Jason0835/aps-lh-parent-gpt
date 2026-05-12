@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
 import com.zlt.aps.constant.StringConstant;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.deduct.DailyScheduleVo;
 import com.zlt.aps.mp.api.domain.deduct.DeductMouldVo;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -198,82 +199,6 @@ public class CxContinueProductionHandler {
     }
 
     /**
-     * 排产续作排产
-     * 1、同规格同花纹
-     * 2、共生胎、同模具
-     *
-     * @param context            排产上下文
-     * @param productionStage    排产阶段
-     * @param productionPlanInfo 分组排产计划
-     * @param continueType       续作类型 同规格同花纹 共生胎同模具
-     * @param continueSkuMap     分组计划中续作Sku信息集合
-     */
-    @Deprecated
-    public static void oldProductionContinueByType(Context context, ProductionStageEnum productionStage, ProductionPlanGroupInfo productionPlanInfo, ContinueTypeEnum continueType, Integer endDay, Map<String, CxContinueSkuInfoHelper> continueSkuMap, Set<Integer> excludeDaySet) {
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        String groupName = productionPlanInfo.getGroupName();
-        Set<String> cxMachineCodeInfo = continueSkuMap.values().stream().collect(Collectors.toList()).get(BigDecimal.ZERO.intValue()).getOnLineCxMachineSet();
-        String onLineMachineInfo = String.join(StringConstant.COMMA, cxMachineCodeInfo);
-        //取得最早收尾的续作硫化组
-        EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfoByContinueSku(context, continueSkuMap, excludeDaySet);
-        if (null == earliestConclusionLhGroup) {
-            //记录日志
-            log.info(TbrMouldProductionLogRecorder.addContinueGroupContinueSkuNoLhGroupLog(context, productionStage, groupName, onLineMachineInfo, continueType));
-            return;
-        }
-        Integer startDay = earliestConclusionLhGroup.getClosingDay();
-        //20260109 使用判断的结束日
-        Integer realEndDay = earliestConclusionLhGroup.getEndDay();
-        if (startDay > realEndDay) {
-            //todo 记录日志
-            return;
-        }
-        List<MonthPlanProductionRequirePlanVo> productionPlanList = productionPlanInfo.getGroupPlanData().stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(productionPlanList)) {
-            //todo 记录日志
-            return;
-        }
-        //获取 续作收尾的sku 规格、花纹等信息
-        String materialDesc = earliestConclusionLhGroup.getBeforeMaterialDesc();
-        CxContinueSkuInfoHelper continueProductInfoHelper = CxContinueSkuInfoHelper.buildContinueProductInfo(materialDesc, productionPlanList, continueSkuMap);
-        //共用模具的sku
-        Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap = productionContext.getBaseDataContainer().getSkuMouldRelationMap();
-        Set<String> shareMouldMaterialDescSet = getShareMouldSkuByLhGroup(mouldInfoMap, earliestConclusionLhGroup);
-        //获取同规格同花纹或是同生胎同模具的其它sku排产计划
-        List<MonthPlanProductionRequirePlanVo> matchList = productionPlanInfo.getContinueListByType(productionStage, continueType, materialDesc, shareMouldMaterialDescSet, continueProductInfoHelper);
-        if (CollectionUtils.isEmpty(matchList)) {
-            //todo
-            return;
-        }
-        //挑选下一个同规格同花纹的sku进行排产
-        String selectedMaterialDesc = getSelectedSuitableSku(productionStage, matchList);
-        if (StringUtils.isBlank(selectedMaterialDesc)) {
-            //todo 记录日志
-            return;
-        }
-        //选中的续作模具
-        List<ProductionMouldInfoVo> selectedMouldList = SkuMouldSelector.getSelectedMouldList(context, selectedMaterialDesc, earliestConclusionLhGroup, startDay, realEndDay);
-        if (CollectionUtils.isEmpty(selectedMouldList)) {
-            //todo 记录日志
-            productionContext.addSkuProductionLimitInfo(selectedMaterialDesc, MouldProductionLimitTypeEnum.FIND_MOULD_LIMIT);
-            return;
-        }
-        log.info(TbrMouldProductionLogRecorder.addContinueSkuStartSameInfoMouldLog(context, groupName, materialDesc, continueType, selectedMaterialDesc));
-        List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList = matchList.stream().filter(selectedPlan -> selectedPlan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
-        //总排产量
-        Integer sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(productionStage, selectedProductionPlanList);
-        //日硫化量
-        Integer dayMaxProductionQty = selectedProductionPlanList.get(BigDecimal.ZERO.intValue()).getMaxDaySingleLhMachineQty();
-        //实际排产量
-        Integer realSumProductionQty = BigDecimal.ZERO.intValue();
-        LhProductionQtyHelper lhProductionQtyHelper = new LhProductionQtyHelper(productionPlanInfo, null, earliestConclusionLhGroup.transformCxLhGroup(), sumProductionQty, realSumProductionQty, dayMaxProductionQty);
-        //逐日进行排产
-        CxLhMouldProductionCalculator.lhProductionByGroupHandler(context, lhProductionQtyHelper, startDay, endDay, selectedMouldList, selectedProductionPlanList, continueType);
-        //迭代下一个硫化组
-        oldProductionContinueByType(productionContext, productionStage, productionPlanInfo, continueType, endDay, continueSkuMap, excludeDaySet);
-    }
-
-    /**
      * 续作-降膜排产信息设置
      * 1、周期结构-Sku排产量调整
      * 2、不同分组-强制降膜信息
@@ -287,6 +212,9 @@ public class CxContinueProductionHandler {
         //20260414+ 周期结构调整排产量
         Integer planDemandQty = CycleGroupCalculateHandler.getSingleSkuMaxQty(context, cxContinueSkuInfo, groupPlanInfo);
         if (null != planDemandQty) {
+            //20260511+ 增加是否取高优先级量的处理
+            Integer lhMachineCondition = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getContinueSkuProductionHeightRequire();
+            planDemandQty = getContinueHeightQty(groupPlanInfo, lhMachineCondition, deductMould, cxContinueSkuInfo, planDemandQty);
             deductMould.setTotalQty(planDemandQty);
             deductMould.setRemainingQty(planDemandQty);
         }
@@ -428,5 +356,44 @@ public class CxContinueProductionHandler {
         }
         Optional<Map.Entry<String, Integer>> maxEntry = productionSkuMap.entrySet().stream().max(Map.Entry.comparingByValue());
         return maxEntry.get().getKey();
+    }
+
+    /**
+     * 增加续作是否先排产高优先级量
+     *
+     * @param groupPlanInfo      分组计划
+     * @param lhMachineCondition 硫化机台条件
+     * @param deductMould        续作排产信息
+     * @param cxContinueSkuInfo  续作Sku信息
+     * @param planDemandQty      排产量
+     * @return
+     */
+    private static Integer getContinueHeightQty(ProductionPlanGroupInfo groupPlanInfo, Integer lhMachineCondition, DeductMouldVo deductMould, CxContinueSkuInfoHelper cxContinueSkuInfo, Integer planDemandQty) {
+        if (null == lhMachineCondition) {
+            lhMachineCondition = Integer.MAX_VALUE;
+        }
+        Integer lhMachineSize = deductMould.getMachinesAssigned();
+        if (lhMachineSize <= lhMachineCondition) {
+            return planDemandQty;
+        }
+        List<MonthPlanProductionRequirePlanVo> groupAllPlanList = groupPlanInfo.getGroupPlanData();
+        if (CollectionUtils.isEmpty(groupAllPlanList)) {
+            return planDemandQty;
+        }
+        String materialDesc = cxContinueSkuInfo.getMaterialDesc();
+        List<MonthPlanProductionRequirePlanVo> allSkuPlanList = groupAllPlanList.stream().filter(singlePlan -> YesOrNoEnum.YES.getCode().equals(singlePlan.getIsProduction()) && materialDesc.equals(singlePlan.getMaterialDesc())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(allSkuPlanList)) {
+            return planDemandQty;
+        }
+        MonthPlanProductionRequirePlanVo skuPlan = allSkuPlanList.get(BigDecimal.ZERO.intValue());
+        boolean isAllSum = skuPlan.getIsAllSum();
+        if (isAllSum) {
+            return planDemandQty;
+        }
+        //需按净需求一起排产
+        if (YesOrNoEnum.YES.getValue().equals(skuPlan.getIsProductionBySum())) {
+            return planDemandQty;
+        }
+        return allSkuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();
     }
 }

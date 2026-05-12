@@ -296,7 +296,11 @@ public enum MonthPlanEnums {
     /**
      * SYS0209012 单个成型机台高优先级占当日排产的硫化机台数 小于 参数值强制收尾
      */
-    MIN_HEIGHT_PRIORITY_LH_MACHINE_COUNT("SYS0209012", "单个成型机台高优先级占当日排产的硫化机台数小于参数值强制收尾");
+    MIN_HEIGHT_PRIORITY_LH_MACHINE_COUNT("SYS0209012", "单个成型机台高优先级占当日排产的硫化机台数小于参数值强制收尾"),
+    /**
+     * SYS0209013 单位：台，续作SKU当前硫化机台数超过该值时，且结构高优级需求量占比符合SYS0209011值，则续作先排产高优级量
+     */
+    CONTINUE_SKU_HEIGHT_REQUIRE_QTY("SYS0209013", "单位：台，续作SKU当前硫化机台数超过该值时，且结构高优级需求量占比符合SYS0209011值，则续作先排产高优级量");
 
     private final String code;
     private final String name;
