@@ -132,8 +132,8 @@ public class NewTaskProcessor {
             }
 
             // Step 3.3: 构建试制机台映射 embryoCode → machineCode（同结构下）
-            // 同时从续作分配和试制分配中获取试制任务的机台信息
-            Map<String, String> trialMachineMap = buildTrialMachineMap(trialAllocations, existAllocations, structureName);
+            // 同时从续作分配、试制分配和续作任务列表中获取试制任务的机台信息
+            Map<String, String> trialMachineMap = buildTrialMachineMap(trialAllocations, existAllocations, continueTasks, structureName);
 
             // Step 3.4: 分类新增任务 - 固定量试 vs 参与均衡
             // 量试约束任务：量试任务 + 同胎胚有试制任务 → 设置约束机台，参与均衡
@@ -477,11 +477,12 @@ public class NewTaskProcessor {
     /**
      * 构建试制机台映射：embryoCode → machineCode
      * 仅返回指定结构下的试制任务
-     * 同时从续作分配（existAllocations）和试制分配（trialAllocations）中获取
+     * 同时从续作分配（existAllocations）、试制分配（trialAllocations）和续作任务列表（continueTasks）中获取
      */
     private Map<String, String> buildTrialMachineMap(
             List<CoreScheduleAlgorithmService.MachineAllocationResult> trialAllocations,
             List<CoreScheduleAlgorithmService.MachineAllocationResult> existAllocations,
+            List<CoreScheduleAlgorithmService.DailyEmbryoTask> continueTasks,
             String structureName) {
         Map<String, String> trialMachineMap = new HashMap<>();
         // 从试制分配中获取
@@ -509,6 +510,23 @@ public class NewTaskProcessor {
                     }
                 }
             }
+        }
+        // 从续作任务列表中获取试制任务的续作机台信息（兜底：保底预留可能跳过plannedProduction=0的任务）
+        if (continueTasks != null) {
+            for (CoreScheduleAlgorithmService.DailyEmbryoTask task : continueTasks) {
+                if (structureName.equals(task.getStructureName())
+                        && task.getEmbryoCode() != null
+                        && Boolean.TRUE.equals(task.getIsTrialTask())
+                        && task.getContinueMachineCodes() != null && !task.getContinueMachineCodes().isEmpty()
+                        && !trialMachineMap.containsKey(task.getEmbryoCode())) {
+                    String preferredMachine = task.getContinueMachineCodes().get(0);
+                    trialMachineMap.put(task.getEmbryoCode(), preferredMachine);
+                    log.info("buildTrialMachineMap[{}]: 从continueTasks兜底添加 embryoCode={} -> machineCode={} (续作机台)", structureName, task.getEmbryoCode(), preferredMachine);
+                }
+            }
+        }
+        if (!trialMachineMap.isEmpty()) {
+            log.info("buildTrialMachineMap[{}]: 最终结果 trialMachineMap={}", structureName, trialMachineMap);
         }
         return trialMachineMap;
     }
