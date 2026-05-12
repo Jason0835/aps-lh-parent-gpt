@@ -113,7 +113,7 @@ export default {
           align: "center",
           formatter: (row, column, value) => {
             if (!value) return "";
-            return value + "车";
+            return  "车"+ value;
           },
         },
         {
