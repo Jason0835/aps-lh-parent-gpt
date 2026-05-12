@@ -1215,9 +1215,6 @@ export default {
         params.month = Number(arr[1]);
         delete params.yearMonth;
       }
-      if(params.productionVersion){
-        params.lastMonthPlanVersion = params.productionVersion
-      }
       const scheduled = (this.currentAdjustMachine || "").trim();
       if (scheduled) {
         params.cxMachineCode = scheduled;
@@ -1286,7 +1283,6 @@ export default {
         this.loading = true;
         /** list4Adjust 不传 productionVersion；与 query 解耦，不影响 mpMonthPlanStatistics 使用的 resolveProductionVersionForStatistics */
         const listParams = { ...this.formatParams() };
-        delete listParams.productionVersion;
         const res = await listMonthPlanFinal4Adjust(listParams);
         const rawRows = res.rows || [];
         this.page.total = res.total || 0;
