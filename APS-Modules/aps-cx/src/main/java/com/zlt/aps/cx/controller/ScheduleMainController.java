@@ -334,6 +334,10 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         if (result.isSuccess()) {
             return AjaxResult.success();
         } else {
+            // 排程锁冲突：已有排程执行中
+            if (result.getMessage() != null && result.getMessage().contains("排程执行中")) {
+                return AjaxResult.error(423, result.getMessage());
+            }
             // 校验不通过时，构建校验摘要返回前端
             ScheduleService.ValidationSummary summary = new ScheduleService.ValidationSummary();
             summary.setErrorCount(result.getValidationErrors() != null ? result.getValidationErrors().size() : 0);
