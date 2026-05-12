@@ -61,6 +61,7 @@ import org.springframework.stereotype.Service;
 import java.text.ParseException;
 import cn.hutool.core.date.DateUtil;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -2610,5 +2611,180 @@ public class MesItfServiceImpl implements MesItfService {
             log.error("{}历史数据重新同步异常", tableName, e);
             return tableName + "：异常-" + e.getMessage() + "；";
         }
+    }
+
+    /**
+     * 临时任务：按版本迭代同步模具清洗预警数据并生成清洗计划
+     * 执行步骤：
+     * 1. 从MES获取全部模具清洗预警版本号（升序排列）
+     * 2. 从最小版本号开始，先插入APS作为初始数据
+     * 3. 逐个版本迭代，对后续版本进行更新和新增
+     * 4. 迭代到最新版本后，调用已有逻辑生成模具清洗计划
+     * 5. 删除的预警也同步生成计划（标记为已删除的计划）
+     *
+     * @param syncDataLogs 同步参数
+     * @return 执行结果
+     */
+    @Override
+    public AjaxResult syncAllVersionsMouldCleanWarnAndGenPlan(AuxReqSyncDataLogs syncDataLogs) {
+        log.info("临时任务-开始按版本迭代同步模具清洗预警数据并生成清洗计划");
+        String factoryCode = syncDataLogs != null ? syncDataLogs.getFactoryCode() : null;
+
+        // 步骤1：从MES获取所有版本号（升序排列）
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<String> allVersions = mesItfMapper.selectAllDataVersionsFromMouldCleanPlan(factoryCode);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(allVersions)) {
+            log.info("MES中间表无模具清洗预警计划版本数据");
+            return AjaxResult.success("MES中间表无模具清洗预警计划版本数据");
+        }
+
+        log.info("MES中间表模具清洗预警共有{}个版本，从{}到{}",
+                allVersions.size(), allVersions.get(0), allVersions.get(allVersions.size() - 1));
+
+        AtomicInteger totalInsertCount = new AtomicInteger(0);
+        AtomicInteger totalUpdateCount = new AtomicInteger(0);
+
+        // 步骤2和3：按版本号从小到大迭代同步
+        for (int i = 0; i < allVersions.size(); i++) {
+            String version = allVersions.get(i);
+            boolean isFirstVersion = (i == 0);
+            log.info("开始同步版本号={}，是否为初始版本={}", version, isFirstVersion);
+
+            // 从MES查询该版本的数据
+            AuxReqSyncDataLogs versionParam = new AuxReqSyncDataLogs();
+            versionParam.setFactoryCode(factoryCode);
+            versionParam.setDataVersion(version);
+
+            DynamicDataSourceContextHolder.push(DataSource.MES);
+            List<MouldCleanPlanVo> syncList = mesItfMapper.selectMouldCleanPlanList(versionParam);
+            DynamicDataSourceContextHolder.poll();
+
+            if (CollectionUtils.isEmpty(syncList)) {
+                log.info("版本号={}的MES数据为空，跳过", version);
+                continue;
+            }
+
+            // 按factoryCode|lhCode去重，同一机台取第一条
+            Map<String, MouldCleanPlanVo> groupMap = syncList.stream()
+                    .collect(Collectors.toMap(
+                            item -> item.getFactoryCode() + "|" + item.getLhCode(),
+                            Function.identity(),
+                            (v1, v2) -> v1
+                    ));
+            syncList = new ArrayList<>(groupMap.values());
+
+            // 转换为LhMouldCleanWarn实体
+            List<LhMouldCleanWarn> insertOrUpdateList = new ArrayList<>();
+            for (MouldCleanPlanVo item : syncList) {
+                LhMouldCleanWarn entity = new LhMouldCleanWarn();
+                entity.setLhCode(item.getLhCode());
+                entity.setFactoryCode(item.getFactoryCode());
+                entity.setCompanyCode(item.getCompanyCode());
+                entity.setDataVersion(item.getDataVersion());
+                entity.setCreateBy("MES_VERSION_SYNC");
+                entity.setUpdateBy("MES_VERSION_SYNC");
+                entity.setCreateTime(DateUtils.getNowDate());
+                entity.setUpdateTime(DateUtils.getNowDate());
+
+                if (StringUtils.isNotBlank(item.getOperTime())) {
+                    try {
+                        entity.setOperTime(DateUtils.parseDate(item.getOperTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss"));
+                    } catch (Exception e) {
+                        log.error("解析上机时间失败：{}", item.getOperTime(), e);
+                    }
+                }
+
+                if (StringUtils.isNotBlank(item.getFirstWashTime())) {
+                    try {
+                        entity.setFirstWashTime(DateUtils.parseDate(item.getFirstWashTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss"));
+                    } catch (Exception e) {
+                        log.error("解析首次清洗时间失败：{}", item.getFirstWashTime(), e);
+                    }
+                }
+
+                if (StringUtils.isNotBlank(item.getSecondWashTime())) {
+                    try {
+                        entity.setSecondWashTime(DateUtils.parseDate(item.getSecondWashTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss"));
+                    } catch (Exception e) {
+                        log.error("解析二次清洗时间失败：{}", item.getSecondWashTime(), e);
+                    }
+                }
+
+                if (StringUtils.isNotBlank(item.getDelFlag())) {
+                    entity.setIsDelete(Integer.valueOf(item.getDelFlag()));
+                } else {
+                    entity.setIsDelete(0);
+                }
+
+                insertOrUpdateList.add(entity);
+            }
+
+            if (CollectionUtils.isEmpty(insertOrUpdateList)) {
+                continue;
+            }
+
+            // 查询APS中已存在的预警数据，判断是新增还是更新
+            FeignTokenHelper.runWithToken(() -> {
+                List<LhMouldCleanWarn> existsList = lhMesSyncRemoteService.selectMouldCleanWarnExists(insertOrUpdateList);
+                Map<String, LhMouldCleanWarn> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getLhCode()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                int versionInsertCount = 0;
+                int versionUpdateCount = 0;
+
+                for (LhMouldCleanWarn entity : insertOrUpdateList) {
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getLhCode());
+                    if (existsMap.containsKey(mapKey)) {
+                        // 已存在：更新（设置ID以覆盖）
+                        LhMouldCleanWarn existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                        versionUpdateCount++;
+                    } else {
+                        // 不存在：新增
+                        versionInsertCount++;
+                    }
+                }
+
+                // 分批保存（新增+更新混合保存）
+                List<List<LhMouldCleanWarn>> splitList = ScmListUtils.getSplitList(insertOrUpdateList, 1000);
+                for (List<LhMouldCleanWarn> saveList : splitList) {
+                    lhMesSyncRemoteService.saveMouldCleanWarnBatch(saveList);
+                }
+
+                log.info("版本号={}同步完成，新增{}条，更新{}条", version, versionInsertCount, versionUpdateCount);
+                totalInsertCount.addAndGet(versionInsertCount);
+                totalUpdateCount.addAndGet(versionUpdateCount);
+            });
+        }
+
+        log.info("模具清洗预警全部版本迭代同步完成，共处理{}个版本，总新增{}条，总更新{}条",
+                allVersions.size(), totalInsertCount.get(), totalUpdateCount.get());
+
+        // 步骤4：预警数据同步完成后，调用已有逻辑生成模具清洗计划
+        // 已有的syncFromMouldCleanWarn逻辑会处理删除的预警（标记计划为已删除）
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                try {
+                    AjaxResult planResult = lhMesSyncRemoteService.syncMouldCleanPlanFromWarn();
+                    log.info("自动同步模具清洗计划结果：{}", planResult != null ? planResult.get("msg") : "null");
+                } catch (Exception e) {
+                    log.error("自动同步模具清洗计划失败", e);
+                }
+            });
+        } catch (Exception e) {
+            log.error("自动同步模具清洗计划异常", e);
+        }
+
+        log.info("临时任务-按版本迭代同步模具清洗预警数据并生成清洗计划完成");
+        return AjaxResult.success("同步完成，共处理" + allVersions.size() + "个版本，总新增" + totalInsertCount.get() + "条，总更新" + totalUpdateCount.get() + "条");
     }
 }

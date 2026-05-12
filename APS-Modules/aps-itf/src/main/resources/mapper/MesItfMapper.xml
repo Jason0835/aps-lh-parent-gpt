@@ -566,4 +566,12 @@
             AND t.DATA_VERSION = latest.MAX_VERSION
         WHERE CONVERT(DATE, t.FINISH_DATE) &lt; CONVERT(DATE, GETDATE())
     </select>
+
+    <select id="selectAllDataVersionsFromMouldCleanPlan" resultType="java.lang.String">
+        SELECT DISTINCT DATA_VERSION
+        FROM MOULD_CLEAN_PLAN
+        WHERE DATA_VERSION IS NOT NULL
+        <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+        ORDER BY DATA_VERSION ASC
+    </select>
 </mapper>
