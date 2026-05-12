@@ -31,7 +31,7 @@ import { listCxDayFinishQty } from '@/api/cx/cxDayFinishQty'
 
 export default {
   name: 'CxDayFinishQty',
-  dicts: ['biz_factory_name'],
+  dicts: ['biz_factory_name', 'trial_status'],
   provide() {
     return { parentDict: this.dict }
   },
@@ -66,7 +66,10 @@ export default {
         {
           prop: 'exampleType',
           label: this.$t('ui.data.column.cxDayFinishQty.exampleType'),
-          minWidth: 120
+          minWidth: 120,
+          formatter: (row, column, value) => {
+              return this.selectDictLabel(this.dict.type.trial_status, value);
+          },
         },
         {
           prop: 'dayFinishQty',
@@ -114,7 +117,8 @@ export default {
         {
           prop: 'exampleType',
           label: this.$t('ui.data.column.cxDayFinishQty.exampleType'),
-          type: 'input'
+          type: "select",
+          dictData: this.dict.type.trial_status,
         }
       ]
     }

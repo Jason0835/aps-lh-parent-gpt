@@ -712,7 +712,7 @@ public class GroupPlanConclusionHandler {
      * @return
      */
     private List<GroupPlanCxLhCapacityLimitHelper> getMinLhMachineDayInfo(Context context, ProductionPlanGroupInfo groupPlanInfo, Integer endDay) {
-        if (null == groupPlanInfo) {
+        if (null == groupPlanInfo || null == endDay) {
             return Collections.emptyList();
         }
         Set<String> allCxMachineCodeSet = groupPlanInfo.getAllocationCxMachineCodeSet();

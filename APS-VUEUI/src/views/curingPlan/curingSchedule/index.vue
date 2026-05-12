@@ -304,6 +304,8 @@ export default {
         current: 1,
         pageSize: 20,
         total: 0,
+        // 本页分页每页条数选项，最大 500
+        pageSizes: [10, 20, 50, 100, 200, 500],
       },
       sort: {},
       search: {
@@ -368,37 +370,37 @@ export default {
     },
     columns() {
       let columns = [
-        { type: "selection", fixed: "left" },
+        { type: "selection", fixed: "left" }, // 选择框列
         {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
-        },
+        }, // 工厂代码
         {
           label: this.$t("ui.data.column.scheduleResult.lhMachineCode"),
           prop: "lhMachineCode",
-        },
+        }, // 硫化机台代码
         {
           label: this.$t("ui.data.column.scheduleResult.materialCode"),
           width:120,
           prop: "materialCode",
-        },
+        }, // 物料编码
         {
           label: this.$t("ui.data.column.scheduleResult.materialDesc"),
           align: "left",
           prop: "materialDesc",
           minWidth: 350,
           showOverflowTooltip: true,
-        },
+        }, // 物料描述
         {
           label: this.$t("ui.data.column.scheduleResult.embryoDesc"),
           align: "left",
           prop: "mainMaterialDesc",
           minWidth: 350,
           showOverflowTooltip: true,
-        },
+        }, // 胚料描述
         {
           prop: "scheduleType",
           label: this.$t("ui.data.column.scheduleResult.scheduleType"),
@@ -406,28 +408,28 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.lh_schedule_type, value);
           },
-        },
+        }, // 排程类型
 
         {
           label: this.$t("ui.data.column.scheduleResult.finishQty"),
           prop: "todayNightFinishQty",
           minWidth: 100,
           align: "right",
-        },
+        }, // 今日夜班完成数量
         {
           label: this.$t("ui.data.column.scheduleResult.totalSurplusQty"),
           prop: "mouldSurplusQty",
           minWidth: 100,
           align: "right",
-        },
+        }, // 模具剩余数量
         {
           label: this.$t("ui.data.column.scheduleResult.embryoStock"),
           prop: "embryoStock",
-        },
+        }, // 胚料库存
         {
           label: this.$t("ui.data.column.scheduleResult.lhShiftQty"),
           prop: "singleMouldShiftQty",
-        },
+        }, // 单模班产数量
         {
           label: this.$t("ui.data.column.scheduleResult.isRelease"),
           prop: "isRelease",
@@ -435,7 +437,7 @@ export default {
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.IS_RELEASE_LH, value);
           },
-        },
+        }, // 是否发布
 
         {
           label: this.$t("ui.data.column.scheduleResult.morningShift") + " " + (this.dateList[0]?.shiftDate ?? ""),
@@ -444,34 +446,34 @@ export default {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 1),
-            },
+            }, // 第1班-左右模
             {
               prop: "constructionStage",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 1),
-            },
+            }, // 第1班-施工阶段
             {
               prop: "class1IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
               formatter: (row, column, value) => this.calcShiftIsEnd(row, 1),
-            },
+            }, // 第1班-类型
             {
               prop: "class1PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
               formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 1),
-            },
+            }, // 第1班-计划数量
             {
               prop: "class1FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
               formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 1),
-            },
+            }, // 第1班-实际数量
             {
               prop: "class1Analysis",
               label: this.$t("ui.data.column.scheduleResult.analysis"),
               formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 1),
-            },
+            }, // 第1班-分析备注
           ],
-        },
+        }, // 第1班-早班
         {
           label: this.$t("ui.data.column.scheduleResult.middleShift") + " " + (this.dateList[1]?.shiftDate ?? ""),
           children: [
@@ -479,35 +481,35 @@ export default {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 2),
-            },
+            }, // 第2班-左右模
             {
               prop: "constructionStage",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 2),
-            },
+            }, // 第2班-施工阶段
            {
               prop: "class2IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
               formatter: (row, column, value) => this.calcShiftIsEnd(row, 2),
-            },
+            }, // 第2班-类型
             {
               prop: "class2PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
               formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 2),
-            },
+            }, // 第2班-计划数量
             {
               prop: "class2FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
               formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 2),
-            },
+            }, // 第2班-实际数量
             {
               prop: "class2Analysis",
               label: this.$t("ui.data.column.scheduleResult.analysis"),
               formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 2),
-            },
+            }, // 第2班-分析备注
 
           ],
-        },
+        }, // 第2班-中班
         {
           label: this.$t("ui.data.column.scheduleResult.nightShift") + " " + (this.dateList[2]?.shiftDate ?? ""),
           children: [
@@ -515,35 +517,35 @@ export default {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 3),
-            },
+            }, // 第3班-左右模
             {
               prop: "constructionStage",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 3),
-            },
+            }, // 第3班-施工阶段
            {
               prop: "class3IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
               formatter: (row, column, value) => this.calcShiftIsEnd(row, 3),
-            },
+            }, // 第3班-类型
             {
               prop: "class3PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
               formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 3),
-            },
+            }, // 第3班-计划数量
             {
               prop: "class3FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
               formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 3),
-            },
+            }, // 第3班-实际数量
             {
               prop: "class3Analysis",
               label: this.$t("ui.data.column.scheduleResult.analysis"),
               formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 3),
-            },
+            }, // 第3班-分析备注
 
           ],
-        },
+        }, // 第3班-晚班
         {
           label: this.$t("ui.data.column.scheduleResult.morningShift") + " " + (this.dateList[3]?.shiftDate ?? ""),
           children: [
@@ -551,35 +553,35 @@ export default {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 4),
-            },
+            }, // 第4班-左右模
             {
               prop: "constructionStage",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 4),
-            },
+            }, // 第4班-施工阶段
            {
               prop: "class4IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
               formatter: (row, column, value) => this.calcShiftIsEnd(row, 4),
-            },
+            }, // 第4班-类型
             {
               prop: "class4PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
               formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 4),
-            },
+            }, // 第4班-计划数量
             {
               prop: "class4FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
               formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 4),
-            },
+            }, // 第4班-实际数量
             {
               prop: "class4Analysis",
               label: this.$t("ui.data.column.scheduleResult.analysis"),
               formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 4),
-            },
+            }, // 第4班-分析备注
 
           ],
-        },
+        }, // 第4班-早班
         {
           label: this.$t("ui.data.column.scheduleResult.middleShift") + " " + (this.dateList[4]?.shiftDate ?? ""),
           children: [
@@ -587,35 +589,35 @@ export default {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 5),
-            },
+            }, // 第5班-左右模
             {
               prop: "constructionStage",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 5),
-            },
+            }, // 第5班-施工阶段
             {
               prop: "class5IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
               formatter: (row, column, value) => this.calcShiftIsEnd(row, 5),
-            },
+            }, // 第5班-类型
             {
               prop: "class5PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
               formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 5),
-            },
+            }, // 第5班-计划数量
             {
               prop: "class5FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
               formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 5),
-            },
+            }, // 第5班-实际数量
             {
               prop: "class5Analysis",
               label: this.$t("ui.data.column.scheduleResult.analysis"),
               formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 5),
-            },
+            }, // 第5班-分析备注
 
           ],
-        },
+        }, // 第5班-中班
         {
           label: this.$t("ui.data.column.scheduleResult.nightShift") + " " + (this.dateList[5]?.shiftDate ?? ""),
           children: [
@@ -623,35 +625,35 @@ export default {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 6),
-            },
+            }, // 第6班-左右模
             {
               prop: "constructionStage",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 6),
-            },
+            }, // 第6班-施工阶段
             {
               prop: "class6IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
               formatter: (row, column, value) => this.calcShiftIsEnd(row, 6),
-            },
+            }, // 第6班-类型
             {
               prop: "class6PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
               formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 6),
-            },
+            }, // 第6班-计划数量
             {
               prop: "class6FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
               formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 6),
-            },
+            }, // 第6班-实际数量
             {
               prop: "class6Analysis",
               label: this.$t("ui.data.column.scheduleResult.analysis"),
               formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 6),
-            },
+            }, // 第6班-分析备注
 
           ],
-        },
+        }, // 第6班-晚班
         {
           label: this.$t("ui.data.column.scheduleResult.morningShift") + " " + (this.dateList[6]?.shiftDate ?? ""),
           children: [
@@ -659,35 +661,35 @@ export default {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 7),
-            },
+            }, // 第7班-左右模
             {
               prop: "constructionStage",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 7),
-            },
+            }, // 第7班-施工阶段
             {
               prop: "class7IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
               formatter: (row, column, value) => this.calcShiftIsEnd(row, 7),
-            },
+            }, // 第7班-类型
             {
               prop: "class7PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
               formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 7),
-            },
+            }, // 第7班-计划数量
             {
               prop: "class7FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
               formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 7),
-            },
+            }, // 第7班-实际数量
             {
               prop: "class7Analysis",
               label: this.$t("ui.data.column.scheduleResult.analysis"),
               formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 7),
-            },
+            }, // 第7班-分析备注
 
           ],
-        },
+        }, // 第7班-早班
         {
           label: this.$t("ui.data.column.scheduleResult.middleShift") + " " + (this.dateList[7]?.shiftDate ?? ""),
           children: [
@@ -695,56 +697,56 @@ export default {
               prop: "leftRightMould",
               label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 8),
-            },
+            }, // 第8班-左右模
             {
               prop: "constructionStage",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 8),
-            },
+            }, // 第8班-施工阶段
             {
               prop: "class8IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
               formatter: (row, column, value) => this.calcShiftIsEnd(row, 8),
-            },
+            }, // 第8班-类型
             {
               prop: "class8PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
               formatter: (row, column, value) => this.shiftPlanQtyFormatter(row, column, value, 8),
-            },
+            }, // 第8班-计划数量
             {
               prop: "class8FinishQty",
               label: this.$t("ui.data.column.scheduleResult.actual"),
               formatter: (row, column, value) => this.shiftFinishQtyFormatter(row, column, value, 8),
-            },
+            }, // 第8班-实际数量
             {
               prop: "class8Analysis",
               label: this.$t("ui.data.column.scheduleResult.analysis"),
               formatter: (row, column, value) => this.shiftAnalysisFormatter(row, column, value, 8),
-            },
+            }, // 第8班-分析备注
 
           ],
-        },
+        }, // 第8班-中班
         {
           prop: "remark",
           label: this.$t("ui.data.column.remark"),
-        },
+        }, // 备注
         {
           label: this.$t("ui.data.column.scheduleResult.batchNo"),
           prop: "batchNo",
           align: "left",
           minWidth: 160,
-        },
+        }, // 批号
         {
           label: this.$t("ui.data.column.scheduleResult.orderNo"),
           prop: "orderNo",
           align: "left",
           minWidth: 160,
-        },
+        }, // 订单号
         {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleResult.updateTime"),
           minWidth: 180,
-        },
+        }, // 更新时间
         // {
         //   prop: "todayNightFinishQty",
         //   label: this.$t("ui.data.column.scheduleResult.todayNightFinishQty"),
@@ -788,7 +790,7 @@ export default {
               </div>
             );
           },
-        },
+        }, // 操作列
       ];
       return columns;
     },

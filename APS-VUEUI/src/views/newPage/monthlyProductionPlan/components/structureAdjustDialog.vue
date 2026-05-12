@@ -601,8 +601,25 @@ export default {
           delete params.yearMonth;
         }
         const res = await addAdjust(params);
-        /** 新增结构保存成功后，将当前调整机台写入 Redis（与主页面只读展示一致） */
-        await setAdjustsCxMachineFromRedis(this.cxMachineCode);
+        /** 新增结构保存成功后，将调整上下文写入 Redis（与 AdjustsCxMachineVo 一致，主页面仅读展示） */
+        const adjVer = (this.listAdjustsAdjVersion || "").trim();
+        const listVer = (this.listAdjustsVersion || "").trim();
+        const prodVer = (this.productionVersion || "").trim();
+        await setAdjustsCxMachineFromRedis({
+          cxMachineCode: String(this.cxMachineCode || "").trim(),
+          structureName:
+            row.structureName != null ? String(row.structureName).trim() : "",
+          beginDay:
+            row.beginDay != null && row.beginDay !== ""
+              ? Number(row.beginDay)
+              : null,
+          endDay:
+            row.endDay != null && row.endDay !== ""
+              ? Number(row.endDay)
+              : null,
+          /** 与后端 AdjustsCxMachineVo.version 对应（JSON 键为 version，勿写 verison） */
+          version: listVer || adjVer || prodVer,
+        });
         this.$modal.msgSuccess(
           res.msg || this.$t("common.msg.success.operate")
         );
