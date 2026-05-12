@@ -1,8 +1,10 @@
 package com.zlt.aps.cx.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
 
@@ -19,6 +21,8 @@ public class ScheduleDetailQueryVo {
     @ApiModelProperty(value = "成型机台名称")
     private String cxMachineName;
 
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     @ApiModelProperty(value = "排程日期")
     private LocalDate scheduleDate;
 
