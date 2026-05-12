@@ -71,6 +71,18 @@ public class GroupPrioritySchedulerResultHelper implements Serializable {
     }
 
     /**
+     * 预选的分组信息
+     *
+     * @return
+     */
+    public String getPreSelectedGroupName() {
+        if (null == selectedGroup) {
+            return null;
+        }
+        return selectedGroup.getGroupName();
+    }
+
+    /**
      * 选中的机台
      *
      * @return

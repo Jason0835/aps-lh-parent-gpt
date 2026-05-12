@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
@@ -141,21 +142,33 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //4.2、对有多段的固定最先排
         List<ProductionPlanGroupInfo> multipleRangeFixedPriorityCxMachineList = hasFixedPriorityCxMachineList.stream().filter(singleGroup -> multipleRangeGroupSet.contains(singleGroup.getGroupName())).collect(Collectors.toList());
         if (!CollectionUtils.isEmpty(multipleRangeFixedPriorityCxMachineList)) {
-            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), multipleRangeFixedPriorityCxMachineList, discontinueGroupSet, true);
+            String groupInfo = multipleRangeFixedPriorityCxMachineList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.joining(StringConstant.COMMA));
+            String typeText = "多段分配指定分组优先排产";
+            TbrSimulateProductionLogRecorder.addDeliveryPriorityTypeLog(productionContext, groupInfo, typeText);
+            Set<String> multipleDiscontinueGroupSet = Sets.newHashSet();
+            multipleRangeFixedPriorityCxMachineList.forEach((singleGroup -> multipleDiscontinueGroupSet.add(singleGroup.getGroupName())));
+            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), multipleRangeFixedPriorityCxMachineList, multipleDiscontinueGroupSet, true);
         }
         //4.3 对有多段的非固定优先排产
         List<ProductionPlanGroupInfo> multipleRangeNoFixedList = getMultipleNoFixedGroup(productionContext, hasFixedPriorityCxMachineList, multipleRangeGroupSet);
         if (!CollectionUtils.isEmpty(multipleRangeNoFixedList)) {
-            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), multipleRangeNoFixedList, discontinueGroupSet, false);
+            String groupInfo = multipleRangeNoFixedList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.joining(StringConstant.COMMA));
+            String typeText = "多段分配非指定分组优先排产";
+            TbrSimulateProductionLogRecorder.addDeliveryPriorityTypeLog(productionContext, groupInfo, typeText);
+            Set<String> multipleDiscontinueGroupSet = Sets.newHashSet();
+            multipleRangeNoFixedList.forEach((singleGroup -> multipleDiscontinueGroupSet.add(singleGroup.getGroupName())));
+            groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), multipleRangeNoFixedList, multipleDiscontinueGroupSet, false);
         }
         //4.4、对其它固定先排
         List<ProductionPlanGroupInfo> otherFixedPriorityCxMachineList = hasFixedPriorityCxMachineList.stream().filter(singleGroup -> !multipleRangeGroupSet.contains(singleGroup.getGroupName())).collect(Collectors.toList());
         if (!CollectionUtils.isEmpty(otherFixedPriorityCxMachineList)) {
+            String groupInfo = otherFixedPriorityCxMachineList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.joining(StringConstant.COMMA));
+            String typeText = "其它指定分组优先排产";
+            TbrSimulateProductionLogRecorder.addDeliveryPriorityTypeLog(productionContext, groupInfo, typeText);
             groupPriorityProductionScheduler.productionAppointGroupCxMachine(productionContext, Sets.newHashSet(), otherFixedPriorityCxMachineList, discontinueGroupSet, true);
         }
         //5、在对剩余的进行Top3排产
         TbrSimulateProductionLogRecorder.addDeliveryPriorityLeftOverGroupLog(productionContext);
-
         //5.2 剩余排产
         groupPriorityProductionScheduler.allocationCxMachine(productionContext, Sets.newHashSet(), Sets.newHashSet(), Maps.newHashMap(), discontinueGroupSet);
     }

@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.handler;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
 import com.zlt.aps.mp.engine.domain.Context;
@@ -11,6 +12,7 @@ import com.zlt.aps.mp.engine.domain.dto.ProductGroupCxCapacityInfo;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
+import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.CxCapacityAllocationHandler;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.CxMouldProductionHandler;
@@ -230,6 +232,8 @@ public class GroupPriorityProductionScheduler {
         if (CollectionUtils.isEmpty(earlyList)) {
             return;
         }
+        String groupInfo = earlyList.stream().map(GroupPrioritySchedulerResultHelper::getPreSelectedGroupName).collect(Collectors.joining(StringConstant.COMMA));
+        TbrSimulateProductionLogRecorder.addDeliveryPriorityTypeLog(context, groupInfo, "指定分组分配同机台时，时间在前优先排产");
         earlyList.forEach(preSelectedInfo -> {
             //对挑选出来的分组，进行机台产能分配
             CxMachineBaseInfoVo selectedCxMachine = preSelectedInfo.getSelectedCxMachine();

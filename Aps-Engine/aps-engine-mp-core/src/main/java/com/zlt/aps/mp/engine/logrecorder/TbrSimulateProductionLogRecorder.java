@@ -50,7 +50,7 @@ public class TbrSimulateProductionLogRecorder {
      * 增加 排产模式 效率优先或是交付优先 日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，采用%s模式进行排产====
      *
-     * @param context 排程上下文
+     * @param context        排程上下文
      * @param productionMode 排产模式
      * @return
      */
@@ -104,6 +104,25 @@ public class TbrSimulateProductionLogRecorder {
     public static String addDeliveryPriorityFixedCxMachineGroupLog(Context context) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产：分组固定优先挑选固定机台====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 交付优先排产模式因结构固定优先分组挑选固定机台日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产：[%s]%s====
+     * typeText: 指定分组分配同机台时，时间在前优先排产
+     *
+     * @param context   排程上下文
+     * @param groupInfo 分组信息
+     * @param typeText 分段信息
+     * @return
+     */
+    public static String addDeliveryPriorityTypeLog(Context context, String groupInfo, String typeText) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产：[%s]%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupInfo, typeText);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
         return logContent;
