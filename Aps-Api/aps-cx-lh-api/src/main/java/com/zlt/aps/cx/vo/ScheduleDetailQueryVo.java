@@ -10,6 +10,9 @@ import java.time.LocalDate;
 @ApiModel(value = "排程明细查询对象")
 public class ScheduleDetailQueryVo {
 
+    @ApiModelProperty(value = "主表ID")
+    private Long mainId;
+
     @ApiModelProperty(value = "成型机台编号")
     private String cxMachineCode;
 

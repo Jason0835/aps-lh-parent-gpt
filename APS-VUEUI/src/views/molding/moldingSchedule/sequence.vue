@@ -6,12 +6,13 @@
       v-loading="loading"
       :columns="columns"
       :searchColumns="searchColumns"
-      :data="data"
-      :page="null"
+      :data="pagedData"
+      :page="page"
       :search="search"
       @refresh="getList"
       @search="handleSearch"
       @reset="handleReset"
+      @page-change="handlePageChange"
       @sort-change="handleSortChange"
       :showSummary="false"
       :selectArea="false"
@@ -49,7 +50,7 @@ import { getScheduleDate } from "@/api/lh/scheduleResult";
 import editDialog from "./components/editDialog.vue";
 
 const SHIFT_COUNT = 8;
-const EDIT_FIELDS = ["PlanQty", "Analysis", "RecipeType"];
+const EDIT_FIELDS = ["PlanQty", "StockHours", "Sequence"];
 
 export default {
   name: "MoldingScheduleSequence",
@@ -85,6 +86,11 @@ export default {
     hasDirtyData() {
       return this.dirtyRowIds.length > 0;
     },
+    pagedData() {
+      const start = (this.page.current - 1) * this.page.pageSize;
+      const end = start + this.page.pageSize;
+      return this.data.slice(start, end);
+    },
     columns() {
       const fixedColumns = [
         {
@@ -100,25 +106,32 @@ export default {
         { label: this.$t("物料编码"), prop: "materialCode", minWidth: 100, align: "center" },
         { label: this.$t("物料描述"), prop: "materialDesc", minWidth: 350 },
         { label: this.$t("胎胚描述"), prop: "mainMaterialDesc", minWidth: 350 },
+        {
+          label: "车次号",
+          prop: "tripNo",
+          minWidth: 100,
+          align: "center",
+          formatter: (row, column, value) => {
+            if (!value) return "";
+            return value + "车";
+          },
+        },
+        {
+          label: "车次容量（整车条数）",
+          prop: "tripCapacity",
+          minWidth: 140,
+          align: "center",
+        },
       ];
 
       const shiftColumns = Array.from({ length: SHIFT_COUNT }, (_, idx) => {
         const shift = idx + 1;
-        const sequenceProp = `class${shift}Sequence`;
         return {
           label: `${this.$t(this.getShiftLabel(shift))} ${this.dateList[idx].shiftDate}`,
           children: [
-            {
-              prop: sequenceProp,
-              label: "顺位",
-              align: "center",
-              minWidth: 120,
-              render: ({ row }) => <span>{row[sequenceProp] ?? ""}</span>,
-            },
             this.createEditableColumn(`class${shift}PlanQty`, this.$t("ui.data.column.scheduleResult.plan"), "number"),
-            this.createEditableColumn(`class${shift}FinishQty`, this.$t("实际"), "number"),
-            this.createEditableColumn(`class${shift}Analysis`, this.$t("ui.data.column.scheduleResult.analysis"), "text"),
-            this.createEditableColumn(`class${shift}RecipeType`, this.$t("示方类型"), "select"),
+            this.createEditableColumn(`class${shift}StockHours`, "库存可供硫化时长", "number"),
+            this.createEditableColumn(`class${shift}Sequence`, "顺位", "number"),
           ],
         };
       });
@@ -248,19 +261,11 @@ export default {
       };
     },
     getShiftFromProp(prop) {
-      const matched = /^class(\d+)(PlanQty|FinishQty|Analysis|RecipeType)$/.exec(prop);
+      const matched = /^class(\d+)(PlanQty|StockHours|Sequence)$/.exec(prop);
       return matched ? Number(matched[1]) : null;
     },
     canEditField(row, prop) {
-      const shift = this.getShiftFromProp(prop);
-      if (!shift) return false;
-      const finishProp = `class${shift}FinishQty`;
-      const rowId = row.id || row.mainId || row.scheduleMainId;
-      const snapshot = rowId ? this.originEditMap[rowId] : null;
-      const finishQty = snapshot && Object.prototype.hasOwnProperty.call(snapshot, finishProp)
-        ? snapshot[finishProp]
-        : row[finishProp];
-      return Number(finishQty || 0) === 0;
+      return !!this.getShiftFromProp(prop);
     },
     buildEditableSnapshot(row) {
       const snapshot = {};
@@ -305,9 +310,8 @@ export default {
       this.getList();
     },
     handlePageChange(current, pageSize) {
-      this.$set(this.page, "current", current);
-      this.$set(this.page, "pageSize", pageSize);
-      this.getList();
+      this.page.current = current;
+      this.page.pageSize = pageSize;
     },
     handleSortChange({ prop, order }) {
       if (order) {
@@ -329,9 +333,8 @@ export default {
         };
         for (let i = 1; i <= SHIFT_COUNT; i += 1) {
           item[`class${i}PlanQty`] = Number(row[`class${i}PlanQty`] || 0);
-          item[`class${i}AnalysisInput`] = row[`class${i}AnalysisInput`] ?? row[`class${i}Analysis`] ?? "";
-          item[`class${i}RecipeNo`] = row[`class${i}RecipeNo`] ?? "";
-          item[`class${i}RecipeType`] = row[`class${i}RecipeType`] ?? "";
+          item[`class${i}StockHours`] = row[`class${i}StockHours`] ?? "";
+          item[`class${i}Sequence`] = Number(row[`class${i}Sequence`] || 0);
         }
         return item;
       });
