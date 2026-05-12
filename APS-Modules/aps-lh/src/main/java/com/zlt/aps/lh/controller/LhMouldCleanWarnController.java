@@ -111,6 +111,6 @@ public class LhMouldCleanWarnController extends AbstractDocBizController<LhMould
 
     @Override
     protected String getOrderBy() {
-        return "OPER_TIME desc, id desc";
+        return "LH_CODE asc";
     }
 }
