@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 周滚动调整单台机台结构时间交叉校验工具。
@@ -61,6 +62,60 @@ class WeekRollAdjustMachineCrossChecker {
             }
         }
         return false;
+    }
+
+    /**
+     * 判断目标结构转产记录是否与同机台其它结构时间交叉。
+     *
+     * @param targetAllocation 目标结构转产记录
+     * @param allocationList 已有结构转产记录
+     * @return true 存在交叉，false 不存在交叉
+     */
+    static boolean hasTargetDifferentStructureCross(MpStructureAllocation targetAllocation, List<MpStructureAllocation> allocationList) {
+        if (targetAllocation == null || PubUtil.isEmpty(allocationList)
+                || StringUtils.isBlank(targetAllocation.getCxMachineCode())
+                || StringUtils.isBlank(targetAllocation.getStructureName())
+                || targetAllocation.getBeginDay() == null || targetAllocation.getEndDay() == null
+                || targetAllocation.getBeginDay() > targetAllocation.getEndDay()) {
+            return false;
+        }
+        for (MpStructureAllocation allocation : allocationList) {
+            if (allocation == null || Objects.equals(targetAllocation.getId(), allocation.getId())
+                    || StringUtils.equals(targetAllocation.getStructureName(), allocation.getStructureName())
+                    || StringUtils.isBlank(allocation.getStructureName())
+                    || allocation.getBeginDay() == null || allocation.getEndDay() == null
+                    || allocation.getBeginDay() > allocation.getEndDay()) {
+                continue;
+            }
+            if (containsMachine(allocation.getCxMachineCode(), targetAllocation.getCxMachineCode())
+                    && isTimeCrossed(targetAllocation, allocation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 查找同机台同结构的结构转产记录。
+     *
+     * @param allocationList 已有结构转产记录
+     * @param targetAllocation 目标结构转产记录
+     * @return 已有结构转产记录
+     */
+    static MpStructureAllocation findSameMachineStructure(List<MpStructureAllocation> allocationList, MpStructureAllocation targetAllocation) {
+        if (targetAllocation == null || PubUtil.isEmpty(allocationList)
+                || StringUtils.isBlank(targetAllocation.getCxMachineCode())
+                || StringUtils.isBlank(targetAllocation.getStructureName())) {
+            return null;
+        }
+        for (MpStructureAllocation allocation : allocationList) {
+            if (allocation != null
+                    && StringUtils.equals(targetAllocation.getStructureName(), allocation.getStructureName())
+                    && containsMachine(allocation.getCxMachineCode(), targetAllocation.getCxMachineCode())) {
+                return allocation;
+            }
+        }
+        return null;
     }
 
     /**

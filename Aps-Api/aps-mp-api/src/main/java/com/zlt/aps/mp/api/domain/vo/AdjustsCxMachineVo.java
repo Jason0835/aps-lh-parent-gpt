@@ -47,4 +47,7 @@ public class AdjustsCxMachineVo {
     @ApiModelProperty(value = "排产计划版本", name = "productionVersion")
     private String productionVersion;
 
+    @ApiModelProperty(value = "版本号")
+    private String version;
+
 }

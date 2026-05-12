@@ -146,6 +146,11 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
      */
     @Override
     protected void updateStructureAllocationList(MpRollAdjustContextDTO contextDTO) {
+        //只有前端传值才会去走这里
+        if (contextDTO != null && Boolean.TRUE.equals(contextDTO.getFrontScheduledMachinesFlag())) {
+            super.updateStructureAllocationList(contextDTO);
+            return;
+        }
         // 工厂编码
         String factoryCode = contextDTO.getFactoryCode();
         // 年份
