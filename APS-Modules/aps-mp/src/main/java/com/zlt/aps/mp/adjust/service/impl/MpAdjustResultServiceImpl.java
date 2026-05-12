@@ -1,22 +1,30 @@
 package com.zlt.aps.mp.adjust.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustResultService;
+import com.zlt.aps.mp.adjust.service.IMpWeekAdjustService;
+import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
+import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
+import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
-
-import org.springframework.transaction.annotation.Transactional;
-import com.zlt.bill.common.service.AbstractDocService;
-import com.ruoyi.common.exception.ServiceException;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -38,6 +46,9 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
 
     @Autowired
     protected MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
+
+    @Autowired
+    private MpWeekAdjustFactory mpWeekAdjustFactory;
 
     @Override
     protected String getDocTypeCode() {
@@ -68,6 +79,18 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
 
     @Override
     public void forceUpdateById(MpAdjustResult entity) {
+        // 根据版本号+物料编号+施工阶段查询，如果没有，则新增，否则更新
+        String lastMonthPlanVersion = entity.getLastMonthPlanVersion();
+        LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MpAdjustResult::getFactoryCode, entity.getFactoryCode());
+        // (version = ? OR monthPlanVersion = ?)
+        queryWrapper.and(w -> w.eq(MpAdjustResult::getVersion, lastMonthPlanVersion)
+                .or()
+                .eq(MpAdjustResult::getMonthPlanVersion, lastMonthPlanVersion));
+        queryWrapper.eq(MpAdjustResult::getMaterialCode, entity.getMaterialCode());
+        queryWrapper.eq(MpAdjustResult::getConstructionStage, entity.getConstructionStage());
+        List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
+
         //1、更新开始和结束日期
         String dayField;
         int realBeginDay = FactoryConstant.MONTH_MAX_DAY+1;
@@ -90,8 +113,32 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         entity.setBeginDay(realBeginDay==FactoryConstant.MONTH_MAX_DAY+1 ? 0:realBeginDay);
         entity.setEndDay(realEndDay);
         entity.setTotalQty(totalQty);
-        //2、更新每日调整值
-        mpAdjustResultEntityMapper.forceUpdateById(entity);
+        // 如果版本号没有值，更新调整类型=人工调整
+        if (StrUtil.isNotBlank(entity.getMonthPlanVersion())) {
+            entity.setAdjustType(ApsConstant.APS_ZERO_3);
+        }
+        // 没有数据，需新增
+        if (CollUtil.isEmpty(mpAdjustResultList)) {
+            entity.setId(null);
+            mpAdjustResultEntityMapper.insert(entity);
+        } else {
+            //2、更新每日调整值
+            mpAdjustResultEntityMapper.forceUpdateById(entity);
+        }
+
+        // 计算收尾日及各排产量
+        MpRollAdjustContextDTO contextDTO = new MpRollAdjustContextDTO();
+        BeanUtil.copyProperties(entity, contextDTO);
+        IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(contextDTO.getAdjustType());
+        if (weekAdjustStrategy == null) {
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindStrategy"));
+        }
+        log.info("重算收尾日、及各排产量 ==> 开始执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
+                String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
+        // 重算收尾日、及各排产量
+        weekAdjustStrategy.recalculate(contextDTO, false);
+        log.info("重算收尾日、及各排产量 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
+                String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
     }
 
     @Override
