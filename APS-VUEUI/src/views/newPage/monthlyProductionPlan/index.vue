@@ -1797,8 +1797,9 @@ export default {
     },
     /**
      * 确认调整 / 重新计算 前置校验，通过则返回与 confirmAdjust 相同的请求体，否则提示并返回 null
+     * @param {"confirmAdjust"|"recalculate"} weekRollSubmitKind 当前操作类型，用于区分无列表数据时的提示文案
      */
-    prepareWeekRollSubmitPayloadOrWarn() {
+    prepareWeekRollSubmitPayloadOrWarn(weekRollSubmitKind = "confirmAdjust") {
       const machine = (this.currentAdjustMachine || "").trim();
       // if (!machine) {
       //   this.$modal.msgWarning(
@@ -1809,11 +1810,11 @@ export default {
       //   return null;
       // }
       if (!this.data || !this.data.length) {
-        this.$modal.msgWarning(
-          this.$t(
-            "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedListData"
-          )
-        );
+        const listDataMsgKey =
+          weekRollSubmitKind === "recalculate"
+            ? "ui.data.column.monthPlanFinalAdjustQuery.recalculateNeedListData"
+            : "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedListData";
+        this.$modal.msgWarning(this.$t(listDataMsgKey));
         return null;
       }
       const payload = this.buildWeekRollConfirmPayload();
@@ -1833,7 +1834,7 @@ export default {
       return payload;
     },
     async handleConfirmAdjust() {
-      const payload = this.prepareWeekRollSubmitPayloadOrWarn();
+      const payload = this.prepareWeekRollSubmitPayloadOrWarn("confirmAdjust");
       if (!payload) {
         return;
       }
@@ -1858,7 +1859,7 @@ export default {
     },
     /** 重新计算：POST /monthplan/mpWeekRollAdjust，body 与 confirmAdjust 完全一致 */
     async handleRecalculate() {
-      const payload = this.prepareWeekRollSubmitPayloadOrWarn();
+      const payload = this.prepareWeekRollSubmitPayloadOrWarn("recalculate");
       if (!payload) {
         return;
       }
