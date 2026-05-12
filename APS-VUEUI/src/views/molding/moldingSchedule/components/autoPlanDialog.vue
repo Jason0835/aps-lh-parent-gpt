@@ -141,6 +141,16 @@ export default {
           this.hide();
         } else if (result.code === 500) {
           const errorData = result.data || {};
+          const errorCount = errorData.errorCount || 0;
+          const warningCount = errorData.warningCount || 0;
+
+          // 校验已通过但超时：排程实际正在执行中，友好提示用户稍后刷新
+          if (errorCount === 0 && warningCount === 0) {
+            this.$modal.msgWarning("排程正在进行中，数据校验已通过，请稍后刷新页面查看结果");
+            this.hide();
+            return;
+          }
+
           const errors = errorData.errors || [];
           const warnings = errorData.warnings || [];
           
