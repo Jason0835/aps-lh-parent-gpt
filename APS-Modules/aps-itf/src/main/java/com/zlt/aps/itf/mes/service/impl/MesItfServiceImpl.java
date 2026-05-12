@@ -1233,7 +1233,7 @@ public class MesItfServiceImpl implements MesItfService {
                 FeignTokenHelper.runWithToken(() -> {
                     try {
                         AjaxResult planResult = lhMesSyncRemoteService.syncMouldCleanPlanFromWarn();
-                        log.info("自动同步模具清洗计划结果：{}", planResult != null ? planResult.getMsg() : "null");
+                        log.info("自动同步模具清洗计划结果：{}", planResult != null ? planResult.get("msg") : "null");
                     } catch (Exception e) {
                         log.error("自动同步模具清洗计划失败", e);
                     }
