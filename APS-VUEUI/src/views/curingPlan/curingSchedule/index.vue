@@ -410,7 +410,7 @@ export default {
 
         {
           label: this.$t("ui.data.column.scheduleResult.finishQty"),
-          prop: "finishQty",
+          prop: "todayNightFinishQty",
           minWidth: 100,
           align: "right",
         },
@@ -745,12 +745,18 @@ export default {
           label: this.$t("ui.data.column.scheduleResult.updateTime"),
           minWidth: 180,
         },
-        {
-          prop: "todayNightFinishQty",
-          label: this.$t("ui.data.column.scheduleResult.todayNightFinishQty"),
-          minWidth: 120,
-          align: "right",
-        },
+        // {
+        //   prop: "todayNightFinishQty",
+        //   label: this.$t("ui.data.column.scheduleResult.todayNightFinishQty"),
+        //   minWidth: 120,
+        //   align: "right",
+        // },
+        // {
+        //   prop: "todayNightFinishQty",
+        //   label: this.$t("ui.data.column.scheduleResult.todayNightFinishQty"),
+        //   minWidth: 120,
+        //   align: "right",
+        // },
         {
           prop: "rowOperator",
           label: this.$t("common.option"),
@@ -807,10 +813,14 @@ export default {
         {
           label: this.$t("ui.data.column.scheduleResult.orderNo"),
           prop: "orderNo",
+          align: "left",
+          minWidth: 160,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.batchNo"),
           prop: "batchNo",
+          align: "left",
+          minWidth: 160,
         },
         {
           label: this.$t("ui.data.column.scheduleResult.isRelease"),
@@ -830,10 +840,14 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "materialDesc",
         },
         {
           label: this.$t("ui.data.column.scheduleResult.embryoDesc"),
+          minWidth: 350,
+          align: "left",
           prop: "mainMaterialDesc",
         },
         {

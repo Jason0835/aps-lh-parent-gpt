@@ -743,7 +743,7 @@
   "ui.data.column.scheduleResult.model": "型号",
   "ui.data.column.scheduleResult.lhMachineName": "硫化机台名称",
   "ui.data.column.scheduleResult.leftRightMold": "左右模",
-  "ui.data.column.scheduleResult.lhMachineCode": "硫化机台编号",
+  "ui.data.column.scheduleResult.lhMachineCode": "硫化机台",
   "ui.data.column.scheduleResult.stockArea": "库区信息",
   "ui.data.column.scheduleResult.sapCode": "SAP代码",
   "ui.data.column.scheduleResult.embryoCode": "胎胚代码",
