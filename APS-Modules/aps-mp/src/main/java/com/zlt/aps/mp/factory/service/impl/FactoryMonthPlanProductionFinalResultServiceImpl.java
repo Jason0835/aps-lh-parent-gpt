@@ -31,6 +31,7 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanProductionFinal4AdjustVo;
 import com.zlt.aps.mp.common.utils.GroupedMapWithOrder;
 import com.zlt.aps.mp.common.utils.poi.WorksheetData;
+import com.zlt.aps.mp.demand.mapper.DpDemandPlanSumEntityMapper;
 import com.zlt.aps.mp.demand.mapper.MpPredictionDetailEntityMapper;
 import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.mp.factory.event.MonthPlanFinalizedEvent;
@@ -101,6 +102,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     private  MpPredictionDetailEntityMapper mpPredictionDetailEntityMapper;
     @Autowired
     private MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
+    @Autowired
+    private DpDemandPlanSumEntityMapper dpDemandPlanSumEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -875,7 +878,6 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             }
         }
         // 查询调整
-        List<MpAdjustResult> mpAdjustResultList = new ArrayList<>();
         LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MpAdjustResult::getFactoryCode, condition.getFactoryCode());
         queryWrapper.eq(MpAdjustResult::getYear, condition.getYear());
@@ -883,8 +885,9 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         // 前端传入 version 时表示调整版本号，对应调整结果表 VERSION 字段。
         queryWrapper.eq(MpAdjustResult::getVersion, matchVersion);
         queryWrapper.eq(MpAdjustResult::getIsDelete, YesOrNoEnum.NO.getCode());
-        mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
+        List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
 
+        Map<String, DpDemandPlanSum> demandPlanSumMap = buildDemandPlanSumMap(condition, mpAdjustResultList);
         Map<String, MpAdjustResult> mpAdjustResultMap = new LinkedHashMap<>();
         if (CollectionUtils.isNotEmpty(mpAdjustResultList)) {
             for (MpAdjustResult mpAdjustResult : mpAdjustResultList) {
@@ -899,6 +902,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             }
             // 相同业务Key时以调整结果为准；调整独有数据转换为同一VO后追加返回。
             BeanUtil.copyProperties(entry.getValue(), adjustVo);
+            fillDemandQty(adjustVo, demandPlanSumMap.get(buildDemandPlanSumMapKey(entry.getValue().getMonthPlanVersion(), entry.getValue().getMaterialCode())));
         }
         List<FactoryMonthPlanProductionFinal4AdjustVo> resultList = new ArrayList<>(finalResultMap.values());
         if (CollectionUtils.isNotEmpty(resultList)) {
@@ -917,5 +921,73 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      */
     private String buildAdjustMapKey(String matchVersion, IFinalAndAdjustResultInterface item) {
         return matchVersion + "|" + item.getMaterialCode() + "|" + item.getConstructionStage();
+    }
+
+    /**
+     * 批量查询调整结果对应的需求计划汇总数据，避免逐条查询数据库。
+     *
+     * @param condition          调整列表查询条件
+     * @param mpAdjustResultList 调整结果列表
+     * @return 需求计划版本号和物料编码组成的需求计划汇总映射
+     */
+    private Map<String, DpDemandPlanSum> buildDemandPlanSumMap(FactoryMonthPlanProductionFinalResult condition, List<MpAdjustResult> mpAdjustResultList) {
+        if (CollectionUtils.isEmpty(mpAdjustResultList)) {
+            return Collections.emptyMap();
+        }
+        Set<String> materialCodeSet = mpAdjustResultList.stream()
+                .map(MpAdjustResult::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+        Set<String> monthPlanVersionSet = mpAdjustResultList.stream()
+                .map(MpAdjustResult::getMonthPlanVersion)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(materialCodeSet) || CollectionUtils.isEmpty(monthPlanVersionSet)) {
+            return Collections.emptyMap();
+        }
+        LambdaQueryWrapper<DpDemandPlanSum> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(DpDemandPlanSum::getFactoryCode, condition.getFactoryCode());
+        queryWrapper.eq(DpDemandPlanSum::getYear, condition.getYear());
+        queryWrapper.eq(DpDemandPlanSum::getMonth, condition.getMonth());
+        queryWrapper.in(DpDemandPlanSum::getMaterialCode, materialCodeSet);
+        queryWrapper.in(DpDemandPlanSum::getMonthPlanVersion, monthPlanVersionSet);
+        queryWrapper.eq(DpDemandPlanSum::getIsDelete, YesOrNoEnum.NO.getCode());
+        List<DpDemandPlanSum> demandPlanSumList = dpDemandPlanSumEntityMapper.selectList(queryWrapper);
+        if (CollectionUtils.isEmpty(demandPlanSumList)) {
+            return Collections.emptyMap();
+        }
+        return demandPlanSumList.stream().collect(Collectors.toMap(
+                item -> buildDemandPlanSumMapKey(item.getMonthPlanVersion(), item.getMaterialCode()),
+                Function.identity(),
+                (first, second) -> first
+        ));
+    }
+
+    /**
+     * 将需求计划汇总中的需求量字段补充到调整列表返回对象。
+     *
+     * @param adjustVo      调整列表返回对象
+     * @param demandPlanSum 需求计划汇总数据
+     */
+    private void fillDemandQty(FactoryMonthPlanProductionFinal4AdjustVo adjustVo, DpDemandPlanSum demandPlanSum) {
+        if (demandPlanSum == null) {
+            return;
+        }
+        adjustVo.setNetQty(demandPlanSum.getNetQty());
+        adjustVo.setHeightQty(demandPlanSum.getHeightQty());
+        adjustVo.setMidQty(demandPlanSum.getMidQty());
+        adjustVo.setCycleReserveQty(demandPlanSum.getCycleReserveQty());
+        adjustVo.setConventionReserveQty(demandPlanSum.getConventionReserveQty());
+    }
+
+    /**
+     * 构建需求计划汇总匹配键，用于调整结果关联对应需求量字段。
+     *
+     * @param monthPlanVersion 需求计划版本号
+     * @param materialCode     物料编码
+     * @return 需求计划版本号和物料编码组成的匹配键
+     */
+    private String buildDemandPlanSumMapKey(String monthPlanVersion, String materialCode) {
+        return monthPlanVersion + "|" + materialCode;
     }
 }
