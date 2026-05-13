@@ -281,6 +281,7 @@ public class MpTrialPlan extends BaseEntity {
     /**
      * 更新人名称
      */
+    @Excel(name = "ui.data.column.updateByName")
     @ApiModelProperty(value = "更新人名称", name = "updateByName")
     @TableField(exist = false)
     private String updateByName;
@@ -293,4 +294,21 @@ public class MpTrialPlan extends BaseEntity {
     @ApiModelProperty(value = "部门", name = "deptIdName")
     @TableField(exist = false)
     private String deptIdName;
+
+    /**
+     * 备注
+     */
+    @Excel(name = "ui.data.column.sale.remark")
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField(value = "REMARK")
+    private String remark;
+
+    /**
+     * 更新日期
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "ui.data.column.demandPlanSum.updateTime", type = Excel.Type.EXPORT, dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @ApiModelProperty(value = "更新日期", name = "updateTime")
+    @TableField(value = "UPDATE_TIME")
+    private Date updateTime;
 }

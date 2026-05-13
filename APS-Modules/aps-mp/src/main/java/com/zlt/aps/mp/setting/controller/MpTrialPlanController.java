@@ -8,6 +8,7 @@ import com.ruoyi.api.gateway.system.service.ISysUserService;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
@@ -16,25 +17,22 @@ import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MpTrialPlanEntityMapper;
 import com.zlt.aps.maindata.service.IMpTrialPlanService;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
-import com.zlt.aps.mp.api.domain.entity.MpHistorySaleRecord;
 import com.zlt.aps.mp.api.domain.entity.MpTrialPlan;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.exception.QueryExprException;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.core.queryformulas.QueryFormulaUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -192,7 +190,14 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
     protected List<MpTrialPlan> listExportData(MpTrialPlan obj) {
         QueryWrapper<MpTrialPlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return entityMapper.selectList(wrapper);
+        List<MpTrialPlan> list = entityMapper.selectList(wrapper);
+        try {
+            QueryFormulaUtil.execFormula(list, this.getQueryFormulas());
+        } catch (QueryExprException e) {
+            this.logger.error(e.getMessage(), e);
+            throw new ServiceException("执行查询公式时发生错误.");
+        }
+        return list;
     }
 
     @Override
@@ -231,7 +236,7 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
 
     @Override
     protected String[] getQueryFormulas() {
-        return new String[]{
+        return new String[] {
                 "updateByName->getcolvalue(SYS_USER, nick_name, user_name, updateBy)",
                 "deptIdName->getcolvalue(SYS_DEPT, dept_name, dept_id, deptId)",
         };
