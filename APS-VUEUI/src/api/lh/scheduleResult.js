@@ -229,13 +229,19 @@ export function changeQtyBuId(query) {
 /**
  * 发布排程
  * @param {*} query
+ * @param {string} query.scheduleDate 排程日期
+ * @param {string} [query.factoryCode] 工厂编码
+ * @param {string} [query.ids] 选中的记录ID，多个用逗号分隔
  * @returns
  */
 export function publishScheduleResult(query) {
   return request({
     url: '/lh/lhScheduleResult/publish',
     method: 'post',
-    data: query
+    data: { scheduleDate: query.scheduleDate, factoryCode: query.factoryCode, ids: query.ids },
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    }
   })
 }
 

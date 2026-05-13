@@ -289,7 +289,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
      * @param scheduleDate 排程日期
      * @return 模板表头数据
      */
-    private Map<String, Object> buildExportTableMap(List<LhMouldChangePlanVo> list, Date scheduleDate) {
+    public Map<String, Object> buildExportTableMap(List<LhMouldChangePlanVo> list, Date scheduleDate) {
         Map<String, Object> tableMap = new HashMap<>(16);
         String cnFormatDate = DateUtil.format(scheduleDate, "yyyy年MM月dd日");
         String vnFormatDate = DateUtil.format(scheduleDate, "dd/MM/yyyy");
@@ -300,7 +300,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         return tableMap;
     }
 
-    private List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list) {
+    public List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list) {
         List<Map<String, Object>> dataList = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             LhMouldChangePlanVo item = list.get(i);
@@ -323,12 +323,14 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             row.put("mouldCode", mouldCodeStr);
             row.put("remark", item.getRemark());
 
-            String[] mouldCodeArr = mouldCodeStr.split(",");
-            for (String mouldCode : mouldCodeArr) {
-                if (redMouldNoList.contains(mouldCode)) {
-                    ExcelStyleVo excelStyleVo = new ExcelStyleVo();
-                    excelStyleVo.setColor(IndexedColors.RED.index);
-                    row.put("style", excelStyleVo);
+            if (StringUtils.isNotBlank(mouldCodeStr)) {
+                String[] mouldCodeArr = mouldCodeStr.split(",");
+                for (String mouldCode : mouldCodeArr) {
+                    if (redMouldNoList.contains(mouldCode)) {
+                        ExcelStyleVo excelStyleVo = new ExcelStyleVo();
+                        excelStyleVo.setColor(IndexedColors.RED.index);
+                        row.put("style", excelStyleVo);
+                    }
                 }
             }
 
@@ -337,7 +339,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         return dataList;
     }
 
-    private List<LhMouldChangePlanVo> buildLhMouldChangePlanVoList(List<LhMouldChangePlan> list, LhMouldChangePlan queryVO) {
+    public List<LhMouldChangePlanVo> buildLhMouldChangePlanVoList(List<LhMouldChangePlan> list, LhMouldChangePlan queryVO) {
         List<LhMouldChangePlanVo> resultList = new ArrayList<>();
         int seq = 1;
         // 查询硫化在机数据，通过日期+机台，取在机模号，拼接后回写模具号字段
@@ -384,7 +386,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     }
 
     @Override
-    protected String[] getQueryFormulas() {
+    public String[] getQueryFormulas() {
         return lhMouldChangePlanService.getQueryFormulas();
     }
 
@@ -395,7 +397,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
      * @param queryVO
      */
     @Override
-    protected void builderCondition(QueryWrapper<LhMouldChangePlan> queryWrapper, LhMouldChangePlan queryVO) {
+    public void builderCondition(QueryWrapper<LhMouldChangePlan> queryWrapper, LhMouldChangePlan queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getLhResultBatchNo()), "LH_RESULT_BATCH_NO", queryVO.getLhResultBatchNo());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getOrderNo()), "ORDER_NO", queryVO.getOrderNo());

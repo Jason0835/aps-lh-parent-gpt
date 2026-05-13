@@ -91,10 +91,10 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
      * 导出数据
      *
      * @param list 数据列表
-     * @param scheduleDate 排程日期
+     * @param result 排程日期
      * @return 导出数据
      */
-    byte[] exportData(List<LhScheduleResult> list, Date scheduleDate);
+    byte[] exportData(List<LhScheduleResult> list, LhScheduleResult result);
 
 
     AjaxResult importScheduleTemplate(List<LhScheduleResultTemplateImportVO> list, LhScheduleResult result, boolean updateSupport, Long id);

@@ -21,6 +21,7 @@ import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
@@ -35,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -149,6 +151,8 @@ public class LhScheduleContext {
     private Map<String, Set<String>> specialMaterialCategoryByMaterialCode = new HashMap<>();
     /** 特殊物料分类Map, key=结构名称, value=分类集合 */
     private Map<String, Set<String>> specialMaterialCategoryByStructureName = new HashMap<>();
+    /** SKU与示方书关系Map, key=materialCode */
+    private Map<String, MdmSkuConstructionRef> skuConstructionRefMap = new HashMap<>();
 
     // ========== 中间计算结果(S4.3) ==========
 
@@ -172,6 +176,10 @@ public class LhScheduleContext {
     private Map<String, Integer> carryForwardQtyMap = new HashMap<>();
     /** 满班补齐超排量累加器，key=materialCode，供最终汇总日志使用（不受SKU从待排列表中移除影响） */
     private Map<String, Integer> skuShiftFillOverQtyMap = new LinkedHashMap<>();
+    /** 续作结果日额度账本是否已完成最终同步，防止同一上下文重复扣账 */
+    private boolean continuousDailyQuotaSynced;
+    /** 运行态结果来源SKU映射，使用对象身份避免结果行可变字段影响Map命中 */
+    private Map<LhScheduleResult, SkuScheduleDTO> scheduleResultSourceSkuMap = new IdentityHashMap<>();
 
     // ========== 机台分配状态 ==========
 

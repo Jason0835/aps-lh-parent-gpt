@@ -222,7 +222,6 @@ import {
   removeScheduleResult,
   exportScheduleResult,
   publishScheduleResult,
-  issueToMes,
   exportCombine,
   getScheduleDate,
   adjustTextNo,
@@ -304,6 +303,8 @@ export default {
         current: 1,
         pageSize: 20,
         total: 0,
+        // 本页分页每页条数选项，最大 500
+        pageSizes: [10, 20, 50, 100, 200, 500],
       },
       sort: {},
       search: {
@@ -1224,26 +1225,12 @@ export default {
           });
           const params = {
             scheduleDate: this.query.scheduleDate,
+            factoryCode: this.query.factoryCode,
             ids: ids.join(),
           };
-          const valid = await issueToMes({ scheduleDate: this.query.scheduleDate });
-          if (valid.msg == "0") {
-            this.$confirm(
-              this.$t("ui.data.column.scheduleResult.hasNullLhMachineCode")
-            )
-              .then(async () => {
-                const data = await publishScheduleResult(params);
-                this.$modal.msgSuccess(data.msg);
-                this.getList();
-              })
-              .catch(() => {
-                this.loading = false;
-              });
-          } else {
-            const data = await publishScheduleResult(params);
-            this.$modal.msgSuccess(data.msg);
-            this.getList();
-          }
+          const data = await publishScheduleResult(params);
+          this.$modal.msgSuccess(data.msg);
+          this.getList();
         } catch (error) {
           console.error(error);
         } finally {

@@ -24,7 +24,6 @@
           <el-button
             type="primary"
             plain
-            :disabled="!canUsePrimaryAdjustActions"
             v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
             @click="handleStructureInnerAdjust"
             >{{
@@ -88,33 +87,6 @@
               :value="currentAdjustStructure"
               disabled
               placeholder="当前调整结构"
-            />
-          </div>
-          <div class="current-machine-wrap">
-            <span class="current-machine-label">调整开始日期</span>
-            <el-input
-              class="current-machine-input"
-              :value="currentAdjustBeginDay"
-              disabled
-              placeholder="调整开始日期"
-            />
-          </div>
-          <div class="current-machine-wrap">
-            <span class="current-machine-label">调整结束日期</span>
-            <el-input
-              class="current-machine-input"
-              :value="currentAdjustEndDay"
-              disabled
-              placeholder="调整结束日期"
-            />
-          </div>
-          <div class="current-machine-wrap">
-            <span class="current-machine-label">版本号</span>
-            <el-input
-              class="current-machine-input"
-              :value="currentAdjustMonthPlanVersion"
-              disabled
-              placeholder="版本号"
             />
           </div>
         </div>
@@ -1838,6 +1810,13 @@ export default {
       if (!payload) {
         return;
       }
+      Object.assign(payload, {
+        startDay: this.currentAdjustBeginDay,
+        endDay: this.currentAdjustEndDay,
+        version: this.currentAdjustMonthPlanVersion,
+        scheduledMachines: (this.currentAdjustMachine || "").trim(),
+        structureName: this.currentAdjustStructure,
+      });
       this.confirmAdjustLoading = true;
       try {
         const res = await confirmAdjust(payload);
@@ -1845,7 +1824,13 @@ export default {
           (res && res.msg) ||
             this.$t("common.msg.ajax.operation.success")
         );
-        await setAdjustsCxMachineFromRedis("");
+        await setAdjustsCxMachineFromRedis({
+          cxMachineCode: "",
+          structureName: "",
+          beginDay: null,
+          endDay: null,
+          version: "",
+        });
         if (this.$refs.structureAdjustDialogRef) {
           this.$refs.structureAdjustDialogRef.dialogVisible = false;
         }
@@ -1902,7 +1887,7 @@ export default {
   white-space: nowrap;
 }
 .current-machine-input {
-  width: 220px;
+  // width: 220px;
 }
 .footer-actions {
   display: flex;

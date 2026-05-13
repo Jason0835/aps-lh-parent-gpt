@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.factory.controller;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
@@ -18,6 +19,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.ruoyi.common.text.Convert;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
@@ -66,6 +68,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -152,16 +155,21 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
      */
     @ApiOperation("查询最终排产计划定稿-调整使用")
     @PostMapping("/list4Adjust")
-    public TableDataInfo list4Adjust(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition) {
-        try {
-            startPage();
-            List<FactoryMonthPlanProductionFinal4AdjustVo> list = factoryMonthPlanProductionFinalResultService.list4Adjust(queryCondition);
-            // 排序 按英寸->结构->最大型腔数->主花纹->活块数->物料描述
-            mpWeekRollAdjustController.sortAdjustResultList(list);
-            return getDataTable(list);
-        } finally {
-            PageUtils.clearPage();
-        }
+    public TableDataInfo list4Adjust(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition, HttpServletRequest request) {
+        List<FactoryMonthPlanProductionFinal4AdjustVo> list = factoryMonthPlanProductionFinalResultService.list4Adjust(queryCondition);
+        // 排序 按英寸->结构->最大型腔数->主花纹->活块数->物料描述
+        mpWeekRollAdjustController.sortAdjustResultList(list);
+        Integer pageNum = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageNum"), ServletUtils.getHeader("pageNum")));
+        Integer pageSize = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageSize"), ServletUtils.getHeader("pageSize")));
+        pageNum = pageNum == null ? 1 : pageNum;
+        pageSize = pageSize == null ? 10000000 : pageSize;
+        List<FactoryMonthPlanProductionFinal4AdjustVo> page = CollUtil.page(pageNum, pageSize, list);
+        TableDataInfo rspData = new TableDataInfo();
+        rspData.setCode(200);
+        rspData.setRows(page);
+        rspData.setMsg(I18nUtil.getMessage("common.msg.base.query.success"));
+        rspData.setTotal(list.size());
+        return rspData;
     }
 
     /**

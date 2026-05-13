@@ -64,8 +64,8 @@
 
 <script>
 import PageTable from "@/components/Table/PageTable.vue";
-import { listMachine } from "@/api/lh/machine";
-import { validateChangeMachine, changeMachine } from "@/api/lh/scheduleResult";
+import {listMachine} from "@/api/lh/machine";
+import {changeMachine, validateChangeMachine} from "@/api/lh/scheduleResult";
 
 export default {
   components: { PageTable },
@@ -131,7 +131,7 @@ export default {
         },
         {
           label: this.$t("完成量"),
-          prop: "finishQty",
+          prop: "todayNightFinishQty",
         },
         {
           label: this.$t("胎胚库存"),

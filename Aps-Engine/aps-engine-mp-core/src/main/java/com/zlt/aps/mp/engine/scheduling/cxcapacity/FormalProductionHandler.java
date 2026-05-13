@@ -184,16 +184,6 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
                 return;
             }
             productionGroupAddSku(productionContext, allGroupPlanInfo, groupPlan, round, "在机");
-
-//            TbrMouldFormalProductionLogRecorder.addProductionContinueGroupSingleGroupAddSkuLog(productionContext, structureName, round);
-//            // 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
-//            cxAddSkuProductionHandler.setRemainLhMachineCount(context, allGroupPlanInfo, structureName);
-//            //4.1 初始日产能限制信息，用于统计使用
-//            groupPlan.initMpDailyCapacityLimit(context);
-//            //4.2 SKU排产
-//            cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, ProductionStageEnum.FORMAL_STAGE, round, groupPlan, new HashSet<>());
-//            //4.3 重新计算统计产能
-//            groupPlan.reCalcMpDailyCapacityLimit(context);
         });
         //2、非在机结构，新增规格排产
         allGroupPlanInfo.forEach((structureName, groupPlan) -> {
@@ -201,16 +191,6 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
                 return;
             }
             productionGroupAddSku(productionContext, allGroupPlanInfo, groupPlan, round, "新增");
-
-//            log.info(TbrMouldFormalProductionLogRecorder.addProductionAddGroupSingleGroupLog(context, structureName, round));
-//            // 设置当前结构 剩余的每日硫化机台数 sandy+ 2026.3.22
-//            cxAddSkuProductionHandler.setRemainLhMachineCount(context, allGroupPlanInfo, structureName);
-//            //5.1 初始日产能限制信息，用于统计使用
-//            groupPlan.initMpDailyCapacityLimit(context);
-//            //5.2 SKU排产
-//            cxAddSkuProductionHandler.productionAddSkuByContinueCxMachine(productionContext, ProductionStageEnum.FORMAL_STAGE, round, groupPlan, new HashSet<>());
-//            //5.3 重新计算统计产能
-//            groupPlan.reCalcMpDailyCapacityLimit(context);
         });
     }
 
