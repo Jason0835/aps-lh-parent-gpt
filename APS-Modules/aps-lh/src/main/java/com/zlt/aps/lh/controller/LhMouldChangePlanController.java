@@ -323,12 +323,14 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             row.put("mouldCode", mouldCodeStr);
             row.put("remark", item.getRemark());
 
-            String[] mouldCodeArr = mouldCodeStr.split(",");
-            for (String mouldCode : mouldCodeArr) {
-                if (redMouldNoList.contains(mouldCode)) {
-                    ExcelStyleVo excelStyleVo = new ExcelStyleVo();
-                    excelStyleVo.setColor(IndexedColors.RED.index);
-                    row.put("style", excelStyleVo);
+            if (StringUtils.isNotBlank(mouldCodeStr)) {
+                String[] mouldCodeArr = mouldCodeStr.split(",");
+                for (String mouldCode : mouldCodeArr) {
+                    if (redMouldNoList.contains(mouldCode)) {
+                        ExcelStyleVo excelStyleVo = new ExcelStyleVo();
+                        excelStyleVo.setColor(IndexedColors.RED.index);
+                        row.put("style", excelStyleVo);
+                    }
                 }
             }
 
