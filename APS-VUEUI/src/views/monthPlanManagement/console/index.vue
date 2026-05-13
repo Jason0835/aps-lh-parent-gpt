@@ -492,18 +492,14 @@ export default {
       console.log(val);
       this.query.yearMonth = val;
       this.search.yearMonth = val;
-      this.$set(this.search, "monthPlanVersion", "");
       this.$set(this.query, "monthPlanVersion", "");
-      this.$set(this.search, "productionVersion", "");
       this.$set(this.query, "productionVersion", "");
       this.requireProductionPlanVersionList();
     },
     handlePlanChange(val) {
       console.log("查询");
-      this.$set(this.search, "productionVersion", "");
       this.$set(this.query, "productionVersion", "");
       this.query.monthPlanVersion = val;
-      this.search.monthPlanVersion = val;
 
       this.listProductionVersionList();
     },
