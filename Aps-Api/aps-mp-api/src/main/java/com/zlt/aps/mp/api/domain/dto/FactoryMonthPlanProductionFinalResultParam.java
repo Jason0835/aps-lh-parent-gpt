@@ -132,4 +132,10 @@ public class FactoryMonthPlanProductionFinalResultParam implements Serializable 
      */
     @ApiModelProperty(value = "产品品类 数据字典：biz_product_type TBR 全钢 PCR 半钢", name = "productTypeCode")
     private String productTypeCode;
+
+    /**
+     * 成型机台编号
+     */
+    @ApiModelProperty(value = "成型机台信息", name = "cxMachineCode")
+    private String cxMachineCode;
 }
