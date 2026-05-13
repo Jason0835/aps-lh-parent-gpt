@@ -556,7 +556,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 导出数据
      *
      * @param list 数据列表
-     * @param scheduleDate 排程日期
      * @return 导出数据
      */
     @Override
@@ -578,7 +577,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 节点4：模板第 7 行为 {.xxx} 明细模板行，writeMultiList 会从该行开始复制填充。
         // 当前只有一个明细列表，因此只放入一个 List<Map<String,Object>>。
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-        List<Map<String, Object>> exportDataList = buildExportDataList(exportList, scheduleDate);
+        List<Map<String, Object>> exportDataList = buildExportDataList(exportList, result.getScheduleDate());
         excelDataList.add(exportDataList);
 
         // 节点5：硫化计划数据位于模板第 2 个 sheet（下标 1）的“硫化计划”页。
