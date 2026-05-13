@@ -291,18 +291,6 @@ export default {
           },
         },
         {
-          label: this.$t("工单号"),
-          prop: "orderNo",
-          align: "left",
-          minWidth: 160,
-        },
-        {
-          label: this.$t("成型批次号"),
-          prop: "cxBatchNo",
-          align: "left",
-          minWidth: 160,
-        },
-        {
           label: this.$t("是否发布"),
           prop: "isRelease",
           align: "center",
@@ -320,7 +308,7 @@ export default {
           label: this.$t("硫化机台"),
           prop: "lhMachineCode",
           align: "center",
-          minWidth: 250,
+          minWidth: 200,
         },
         {
           label: this.$t("物料编码"),
@@ -711,7 +699,18 @@ export default {
 
           ],
         },
-
+        {
+          label: this.$t("工单号"),
+          prop: "orderNo",
+          align: "left",
+          minWidth: 160,
+        },
+        {
+          label: this.$t("成型批次号"),
+          prop: "cxBatchNo",
+          align: "left",
+          minWidth: 160,
+        },
         // {
         //   label: this.$t("T+1日"),
         //   children: [

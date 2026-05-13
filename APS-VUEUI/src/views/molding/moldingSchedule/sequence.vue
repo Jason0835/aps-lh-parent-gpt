@@ -97,15 +97,13 @@ export default {
           label: this.$t("ui.data.column.unscheduleResult.scheduleDate"),
           prop: "scheduleDate",
           align: "center",
-          minWidth: 100,
+          minWidth: 130,
         },
-        { label: this.$t("工单号"), prop: "orderNo", align: "center", minWidth: 100 },
-        { label: this.$t("成型批次号"), prop: "cxBatchNo", align: "center", minWidth: 100 },
         { label: this.$t("成型机台"), prop: "cxMachineCode", align: "center" },
-        { label: this.$t("硫化机台"), prop: "lhMachineCode", align: "center" },
-        { label: this.$t("物料编码"), prop: "materialCode", minWidth: 100, align: "center" },
-        { label: this.$t("物料描述"), prop: "materialDesc", minWidth: 350 },
-        { label: this.$t("胎胚描述"), prop: "mainMaterialDesc", minWidth: 350 },
+        { label: this.$t("硫化机台"), prop: "lhMachineCode", align: "center", minWidth: 180, },
+        { label: this.$t("物料编码"), prop: "materialCode", minWidth: 130, align: "center" },
+        { label: this.$t("物料描述"), prop: "materialDesc", minWidth: 300 },
+        { label: this.$t("胎胚描述"), prop: "mainMaterialDesc", minWidth: 320 },
         {
           label: "车次号",
           prop: "tripNo",
@@ -117,11 +115,13 @@ export default {
           },
         },
         {
-          label: "车次容量（整车条数）",
+          label: "整车条数",
           prop: "tripCapacity",
           minWidth: 140,
           align: "center",
         },
+        { label: this.$t("工单号"), prop: "orderNo", align: "center", minWidth: 180 },
+        { label: this.$t("成型批次号"), prop: "cxBatchNo", align: "center", minWidth: 150 },
       ];
 
       const shiftColumns = Array.from({ length: SHIFT_COUNT }, (_, idx) => {
