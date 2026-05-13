@@ -1514,7 +1514,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         ExcelUtil<CxScheduleResultTemplateImportVO> util = new ExcelUtil<>(CxScheduleResultTemplateImportVO.class);
         // 使用3参数版本: sheetName, InputStream, headRowNum
         List<CxScheduleResultTemplateImportVO> list = util.importExcel(
-                sheetName, new java.io.ByteArrayInputStream(fileBytes), 0);
+                sheetName, new java.io.ByteArrayInputStream(fileBytes), 0, 7, -1);
         return cxScheduleResultService.importScheduleTemplate(list, scheduleResult, updateSupport, null);
     }
 

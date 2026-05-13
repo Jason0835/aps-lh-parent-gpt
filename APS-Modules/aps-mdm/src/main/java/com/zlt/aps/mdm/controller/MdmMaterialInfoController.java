@@ -461,14 +461,12 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     @ApiOperation("查询胎胚编码列表（去重）")
     @PostMapping("/listEmbryoCode")
     public TableDataInfo listEmbryoCode(@RequestBody MdmMaterialInfo productInfo) {
-        startPage("create_time desc, id desc");
+        startPage("embryo_no asc");
         LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(PubUtil.isNotEmpty(productInfo.getFactoryCode()), MdmSkuConstructionRef::getFactoryCode, productInfo.getFactoryCode());
-        queryWrapper.isNotNull(MdmSkuConstructionRef::getEmbryoNo);
-        queryWrapper.ne(MdmSkuConstructionRef::getEmbryoNo, "");
-        queryWrapper.like(PubUtil.isNotEmpty(productInfo.getEmbryoCode()), MdmSkuConstructionRef::getEmbryoNo, productInfo.getEmbryoCode());
-        queryWrapper.select(MdmSkuConstructionRef::getEmbryoNo);
-        queryWrapper.groupBy(MdmSkuConstructionRef::getEmbryoNo);
+        queryWrapper.like(PubUtil.isNotEmpty(productInfo.getEmbryoCode()), MdmSkuConstructionRef::getEmbryoCode, productInfo.getEmbryoCode());
+        queryWrapper.select(MdmSkuConstructionRef::getEmbryoCode);
+        queryWrapper.groupBy(MdmSkuConstructionRef::getEmbryoCode);
         List<MdmSkuConstructionRef> list = skuConstructionRefEntityMapper.selectList(queryWrapper);
         // 将SKU施工关系对象列表转换为只包含胎胚编码的Map列表
         List<Map<String, Object>> resultList = list.stream()

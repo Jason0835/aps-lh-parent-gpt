@@ -522,7 +522,7 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     @ApiOperation("查询胎胚编码列表（去重）")
     @PostMapping("/listEmbryoCode")
     public TableDataInfo listEmbryoCode(@RequestBody MdmMaterialInfo productInfo) {
-        startPage("create_time desc, id desc");
+        startPage("embryo_no asc");
         LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(PubUtil.isNotEmpty(productInfo.getFactoryCode()), MdmSkuConstructionRef::getFactoryCode, productInfo.getFactoryCode());
         queryWrapper.isNotNull(MdmSkuConstructionRef::getEmbryoNo);
