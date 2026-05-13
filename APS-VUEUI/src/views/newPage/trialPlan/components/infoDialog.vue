@@ -102,7 +102,7 @@ export default {
         yearMonth: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
+            message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],
