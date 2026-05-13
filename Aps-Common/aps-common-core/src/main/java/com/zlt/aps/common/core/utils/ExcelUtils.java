@@ -152,6 +152,11 @@ public class ExcelUtils {
 
     public static final String BORDER_STYLE = "BORDER_STYLE";
 
+    /**
+     * 隐藏行，值为List&lt;Integer&gt;，元素为需要隐藏的行索引（0起始）
+     */
+    public static final String HIDDEN_ROWS = "HIDDEN_ROWS";
+
     private ExcelUtils() {
     }
 
@@ -375,15 +380,16 @@ public class ExcelUtils {
             if(context.containsKey(RANGE_ADDRESS)){
                 List<ExcelCellRangeAddress> rangeAddressList = (List<ExcelCellRangeAddress>) context.get(RANGE_ADDRESS);
                 for (ExcelCellRangeAddress addr : rangeAddressList) {
-//                    int index = getMergedRangeAddressIndex(sheet, addr.getFirstRow(), addr.getDateColumn());
-//                    if(index != -999){
-//                        sheet.removeMergedRegion(index);
-//                    }
                     //确保至少有两个单元格
                     if ( addr.getFirstRow() == addr.getLastRow()
                             && addr.getFirstColumn()  == addr.getLastColumn()) {
                         continue;
                     }
+
+                    // 移除与新合并区域重叠的已有合并区域，避免重叠异常
+                    removeOverlappingMergedRegions(sheet,
+                            addr.getFirstRow(), addr.getLastRow(),
+                            addr.getFirstColumn(), addr.getLastColumn());
 
                     // 添加新的合并区域，确保至少有两个单元格
                     sheet.addMergedRegion(new CellRangeAddress(addr.getFirstRow(), addr.getLastRow()
@@ -392,6 +398,16 @@ public class ExcelUtils {
                 }
                 // 合并单元格（将第一行的第1到第4列合并）
 
+            }
+            // 隐藏行处理
+            if(context.containsKey(HIDDEN_ROWS)){
+                List<Integer> hiddenRowIndexList = (List<Integer>) context.get(HIDDEN_ROWS);
+                for (Integer rowIndex : hiddenRowIndexList) {
+                    Row row = sheet.getRow(rowIndex);
+                    if (row != null) {
+                        row.setZeroHeight(true);
+                    }
+                }
             }
             if(context.containsKey(CELL_STYLE)){
 //                List<com.zlt.aps.common.core.domain.CellStyle> cellStyleList = (List<com.zlt.aps.common.core.domain.CellStyle>) context.get(CELL_STYLE);
@@ -467,6 +483,33 @@ public class ExcelUtils {
     }
 
     /**
+     * 移除与指定矩形区域重叠的所有已有合并区域。
+     * 两个矩形区域重叠的条件：行范围有交集且列范围有交集。
+     *
+     * @param sheet      工作表
+     * @param firstRow   新区域起始行（含）
+     * @param lastRow    新区域结束行（含）
+     * @param firstCol   新区域起始列（含）
+     * @param lastCol    新区域结束列（含）
+     */
+    private static void removeOverlappingMergedRegions(Sheet sheet, int firstRow, int lastRow, int firstCol, int lastCol) {
+        List<Integer> removeIndices = new ArrayList<>();
+        List<CellRangeAddress> mergedRegions = sheet.getMergedRegions();
+        for (int i = 0; i < mergedRegions.size(); i++) {
+            CellRangeAddress existing = mergedRegions.get(i);
+            boolean rowOverlap = existing.getFirstRow() <= lastRow && existing.getLastRow() >= firstRow;
+            boolean colOverlap = existing.getFirstColumn() <= lastCol && existing.getLastColumn() >= firstCol;
+            if (rowOverlap && colOverlap) {
+                removeIndices.add(i);
+            }
+        }
+        // 从后往前移除，避免索引偏移
+        for (int i = removeIndices.size() - 1; i >= 0; i--) {
+            sheet.removeMergedRegion(removeIndices.get(i));
+        }
+    }
+
+    /**
      * 获取指定行/列的合并单元格区域
      *
      * @param sheet
@@ -531,8 +574,10 @@ public class ExcelUtils {
             //先取出合并单元格，最后一步才进行合并
             List<ExcelCellRangeAddress> rangeAddressList = (List<ExcelCellRangeAddress>) context.get(RANGE_ADDRESS);
             List<ExcelCellRangeAddress> cellStyleList = (List<ExcelCellRangeAddress>) context.get(CELL_STYLE);
+            List<Integer> hiddenRowIndexList = (List<Integer>) context.get(HIDDEN_ROWS);
             context.remove(RANGE_ADDRESS);
             context.remove(CELL_STYLE);
+            context.remove(HIDDEN_ROWS);
             int index = 0;
             int allListCount = dataLists.size();
             if (CollectionUtils.isNotEmpty(dataLists)) {
@@ -547,6 +592,9 @@ public class ExcelUtils {
                     }
                     if((index == allListCount - 1 ) &&  !CollectionUtils.isEmpty(cellStyleList)){
                         context.put(CELL_STYLE,cellStyleList);
+                    }
+                    if((index == allListCount - 1 ) &&  !CollectionUtils.isEmpty(hiddenRowIndexList)){
+                        context.put(HIDDEN_ROWS,hiddenRowIndexList);
                     }
                     index ++;
                     FileInputStream inputStream = new FileInputStream(temp);

@@ -11,10 +11,12 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
+import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
@@ -32,6 +34,7 @@ import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhScheduleService;
+import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.utils.AppUtils;
@@ -53,10 +56,15 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 /**
  * 硫化排程主服务实现
@@ -106,6 +114,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     @Autowired
     private LhMouldChangePlanController lhMouldChangePlanController;
+
+    @Resource
+    private IScheduleSummaryReportService scheduleSummaryReportService;
 
     @Override
     public LhScheduleResponseDTO executeSchedule(LhScheduleRequestDTO request) {
@@ -550,7 +561,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 导出数据
      *
      * @param list 数据列表
-     * @param scheduleDate 排程日期
      * @return 导出数据
      */
     @Override
@@ -572,7 +582,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 节点4：模板第 7 行为 {.xxx} 明细模板行，writeMultiList 会从该行开始复制填充。
         // 当前只有一个明细列表，因此只放入一个 List<Map<String,Object>>。
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-        List<Map<String, Object>> exportDataList = buildExportDataList(exportList);
+        List<Map<String, Object>> exportDataList = buildExportDataList(exportList, result.getScheduleDate());
         excelDataList.add(exportDataList);
 
         // 节点5：硫化计划数据位于模板第 2 个 sheet（下标 1）的“硫化计划”页。
@@ -593,6 +603,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes =  ExcelUtils.writeMultiList(inputStream, 1, mouldChangePlanTableMap, mouldChangePlanExcelDataList);
+
+        // 节点6：排产小结数据位于模板第 3 个 sheet（下标 2），
+        // 复用 ScheduleSummaryReportService 的数据构建逻辑，将排产小结作为第三个sheet写入。
+        String factoryCode = StringUtils.defaultString(result.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
+        Map<String, Object> summaryExportData = scheduleSummaryReportService.buildScheduleSummaryExportData(result.getScheduleDate(), factoryCode);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> summaryTableMap = (Map<String, Object>) summaryExportData.get("tableMap");
+        @SuppressWarnings("unchecked")
+        List<List<Map<String, Object>>> summaryDataList = (List<List<Map<String, Object>>>) summaryExportData.get("dataList");
+
+        inputStream = new ByteArrayInputStream(exportBytes);
+        exportBytes = ExcelUtils.writeMultiList(inputStream, 2, summaryTableMap, summaryDataList);
 
         return fillExportSummaryFormulas(exportBytes, exportDataList.size());
     }
@@ -633,10 +655,93 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             workbook.setForceFormulaRecalculation(true);
             sheet.setForceFormulaRecalculation(true);
             workbook.write(outputStream);
-            return outputStream.toByteArray();
+            return removeCalcChain(outputStream.toByteArray());
         } catch (Exception e) {
             throw new ServiceException("硫化计划导出公式回填失败");
         }
+    }
+
+    /**
+     * 移除 xlsx 中的计算链文件及其引用。
+     * <p>导出工具先基于模板生成明细，再由 POI 二次回填公式。此时模板或生成结果中残留的
+     * calcChain.xml 可能仍指向旧公式单元格，Excel 打开文件时会按旧计算链校验，导致提示
+     * “已删除的记录: /xl/calcChain.xml 部分的 公式(计算属性)”。删除计算链后，Excel 会根据
+     * 当前单元格公式重新计算并重建计算链，避免修复提示。</p>
+     *
+     * @param xlsxBytes 已写入公式的 xlsx 字节
+     * @return 已清理计算链的 xlsx 字节
+     * @throws IOException zip 包读写异常
+     */
+    private byte[] removeCalcChain(byte[] xlsxBytes) throws IOException {
+        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(xlsxBytes);
+             ZipInputStream zipInputStream = new ZipInputStream(inputStream);
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+             ZipOutputStream zipOutputStream = new ZipOutputStream(outputStream)) {
+            ZipEntry entry;
+            byte[] buffer = new byte[4096];
+            while (Objects.nonNull(entry = zipInputStream.getNextEntry())) {
+                String entryName = entry.getName();
+                if ("xl/calcChain.xml".equals(entryName)) {
+                    zipInputStream.closeEntry();
+                    continue;
+                }
+                byte[] entryBytes = readZipEntryBytes(zipInputStream, buffer);
+                if ("xl/_rels/workbook.xml.rels".equals(entryName)) {
+                    entryBytes = removeCalcChainRelationship(entryBytes);
+                } else if ("[Content_Types].xml".equals(entryName)) {
+                    entryBytes = removeCalcChainContentType(entryBytes);
+                }
+                ZipEntry newEntry = new ZipEntry(entryName);
+                newEntry.setTime(entry.getTime());
+                zipOutputStream.putNextEntry(newEntry);
+                zipOutputStream.write(entryBytes);
+                zipOutputStream.closeEntry();
+                zipInputStream.closeEntry();
+            }
+            zipOutputStream.finish();
+            return outputStream.toByteArray();
+        }
+    }
+
+    /**
+     * 读取 zip 当前条目的完整字节。
+     *
+     * @param zipInputStream zip 输入流
+     * @param buffer 复用缓冲区
+     * @return 当前条目字节
+     * @throws IOException zip 读取异常
+     */
+    private byte[] readZipEntryBytes(ZipInputStream zipInputStream, byte[] buffer) throws IOException {
+        ByteArrayOutputStream entryOutputStream = new ByteArrayOutputStream();
+        int length;
+        while ((length = zipInputStream.read(buffer)) > -1) {
+            entryOutputStream.write(buffer, 0, length);
+        }
+        return entryOutputStream.toByteArray();
+    }
+
+    /**
+     * 从 workbook 关系文件中移除计算链关系。
+     *
+     * @param entryBytes workbook.xml.rels 字节
+     * @return 移除计算链关系后的字节
+     */
+    private byte[] removeCalcChainRelationship(byte[] entryBytes) {
+        String xml = new String(entryBytes, StandardCharsets.UTF_8);
+        xml = xml.replaceAll("(?s)<Relationship\\b(?=[^>]*Type=\"http://schemas\\.openxmlformats\\.org/officeDocument/2006/relationships/calcChain\")[^>]*/>", "");
+        return xml.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * 从内容类型文件中移除 calcChain.xml 的 Override 声明。
+     *
+     * @param entryBytes [Content_Types].xml 字节
+     * @return 移除计算链内容类型后的字节
+     */
+    private byte[] removeCalcChainContentType(byte[] entryBytes) {
+        String xml = new String(entryBytes, StandardCharsets.UTF_8);
+        xml = xml.replaceAll("(?s)<Override\\b(?=[^>]*PartName=\"/xl/calcChain\\.xml\")[^>]*/>", "");
+        return xml.getBytes(StandardCharsets.UTF_8);
     }
 
     /**
@@ -1198,13 +1303,14 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * 构建模板列表数据
      *
      * @param list 排程结果列表
+     * @param scheduleDate 导出入口传入的排程日期，用于固定 T 日完成量查询口径
      * @return 模板列表数据
      */
-    private List<Map<String, Object>> buildExportDataList(List<LhScheduleResult> list) {
+    private List<Map<String, Object>> buildExportDataList(List<LhScheduleResult> list, Date scheduleDate) {
         List<Map<String, Object>> dataList = new ArrayList<>(list.size() + 1);
         Map<String, LhRepairCapsule> capsuleMap = buildRepairCapsuleExportMap(list);
         Map<Long, String> cxMachineCodeMap = buildCxMachineCodeExportMap(list);
-        Map<String, Object> todayNightFinishQtyMap = buildTodayNightFinishQtyExportMap(list);
+        Map<String, Object> todayNightFinishQtyMap = buildTodayNightFinishQtyExportMap(list, scheduleDate);
 
         // 模板要求第一条数据行不是具体机台明细，而是整张表的汇总行：
         // 各班计划/实际取所有明细对应班次的合计，后面的每条才是原始排程明细。
@@ -1451,7 +1557,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param list 排程结果列表，用于提取工厂和物料查询范围
      * @return key=工厂编码|物料编码，value=今天夜班总产量BigDecimal
      */
-    private Map<String, Object> buildTodayNightFinishQtyExportMap(List<LhScheduleResult> list) {
+    // scheduleDate 用于固定 T 日口径；为空时兼容旧调用，回退为列表最大排程日期。
+    private Map<String, Object> buildTodayNightFinishQtyExportMap(List<LhScheduleResult> list, Date scheduleDate) {
         if (PubUtil.isEmpty(list)) {
             return Collections.emptyMap();
         }
@@ -1473,15 +1580,19 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return Collections.emptyMap();
         }
 
-        // 取列表中的最大排程日期，作为计算截止日
-        Date maxScheduleDate = list.stream()
+        // 优先使用导出/查询入口传入的排程日期作为 T 日，避免 8 班窗口跨多天时误取列表最大排程日期。
+        // 旧入口未传日期时，才回退到列表最大排程日期，保证历史调用仍可正常显示。
+        Date targetScheduleDate = Objects.nonNull(scheduleDate)
+                ? DateUtil.beginOfDay(scheduleDate)
+                : list.stream()
                 .map(LhScheduleResult::getScheduleDate)
                 .filter(Objects::nonNull)
                 .max(Date::compareTo)
-                .orElse(DateUtil.date());
-        // 查询日期范围：本月1日 到 最大排程日期的次日（不含）
-        Date monthStart = DateUtil.beginOfMonth(maxScheduleDate);
-        Date nextDayStart = DateUtil.offsetDay(DateUtil.beginOfDay(maxScheduleDate), 1);
+                .map(DateUtil::beginOfDay)
+                .orElse(DateUtil.beginOfDay(DateUtil.date()));
+        // 查询日期范围：本月1日 到 T 日次日（不含）。
+        Date monthStart = DateUtil.beginOfMonth(targetScheduleDate);
+        Date nextDayStart = DateUtil.offsetDay(targetScheduleDate, 1);
 
         // 第一步：查询T_LH_DAY_FINISH_QTY日产量表（本月1日~排程日当天），按工厂+物料聚合
         List<LhDayFinishQty> finishQtyList = lhDayFinishQtyMapper.selectList(
@@ -1512,11 +1623,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 new LambdaQueryWrapper<LhScheFinishQty>()
                         .in(LhScheFinishQty::getFactoryCode, factoryCodes)
                         .in(LhScheFinishQty::getMaterialCode, materialCodes)
-                        .ge(LhScheFinishQty::getScheduleDate, DateUtil.beginOfDay(maxScheduleDate))
-                        .lt(LhScheFinishQty::getScheduleDate, nextDayStart)
-                        .and(wrapper -> wrapper.eq(LhScheFinishQty::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                                .or()
-                                .isNull(LhScheFinishQty::getIsDelete)));
+                        .ge(LhScheFinishQty::getScheduleDate, targetScheduleDate)
+                        .lt(LhScheFinishQty::getScheduleDate, nextDayStart));
         for (LhScheFinishQty finishQty : scheFinishQtyList) {
             if (StringUtils.isBlank(finishQty.getFactoryCode()) || StringUtils.isBlank(finishQty.getMaterialCode())) {
                 continue;
@@ -1535,7 +1643,13 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Override
     public Map<String, Object> buildTodayNightFinishQtyMap(List<LhScheduleResult> list) {
         // 供列表接口调用，查询排程页面显示的"硫化产量今天夜班"字段
-        return buildTodayNightFinishQtyExportMap(list);
+        return buildTodayNightFinishQtyExportMap(list, null);
+    }
+
+    @Override
+    public Map<String, Object> buildTodayNightFinishQtyMap(List<LhScheduleResult> list, Date scheduleDate) {
+        // 列表接口传入查询条件中的排程日期时，按该日期作为 T 日查询今天夜班完成量。
+        return buildTodayNightFinishQtyExportMap(list, scheduleDate);
     }
 
     /**
@@ -1571,23 +1685,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         return StringUtils.defaultString(factoryCode).trim() + "|" + StringUtils.defaultString(lhMachineCode).trim();
     }
 
-    /**
-     * 构建排程类型名称
-     *
-     * @param scheduleType 排程类型编码
-     * @return 排程类型名称
-     */
-    private String buildScheduleTypeName(String scheduleType) {
-        // 排程类型在数据库中存编码，导出给业务使用时展示中文；
-        // 未知编码原样返回，避免后续新增字典值时导出为空。
-        if ("01".equals(scheduleType)) {
-            return "续作";
-        }
-        if ("02".equals(scheduleType)) {
-            return "新增";
-        }
-        return scheduleType;
-    }
+
 
     /**
      * 构建导出首行汇总数据

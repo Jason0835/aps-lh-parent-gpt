@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -77,7 +78,7 @@ public class LhMouldCleanWarn extends BaseEntity implements Serializable {
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @Excel(name = "ui.data.column.mouldCleanWarn.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
-    @TableField(value = "UPDATE_TIME")
+    @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE)
     private Date updateTime;
 
     @ApiModelProperty(value = "版本号")

@@ -122,4 +122,32 @@ public interface ICxMesSyncRemoteService {
     @ApiOperation("逻辑删除生胎库存今天之前所有数据")
     @PostMapping("/mesSync/logicDeleteCxStockAllBeforeToday")
     AjaxResult logicDeleteCxStockAllBeforeToday();
+
+    @ApiOperation("逻辑删除成型排程完成量今天之前所有数据")
+    @PostMapping("/mesSync/logicDeleteCxScheFinishQtyAllBeforeToday")
+    AjaxResult logicDeleteCxScheFinishQtyAllBeforeToday();
+
+    @ApiOperation("逻辑删除成型排程日完成量今天之前所有数据")
+    @PostMapping("/mesSync/logicDeleteCxDayFinishQtyAllBeforeToday")
+    AjaxResult logicDeleteCxDayFinishQtyAllBeforeToday();
+
+    @ApiOperation("根据分厂编号逻辑删除成型排程完成量数据")
+    @PostMapping("/mesSync/logicDeleteScheFinishQty")
+    AjaxResult logicDeleteScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy);
+
+    @ApiOperation("逻辑删除并批量保存成型排程完成量（事务性操作）")
+    @PostMapping("/mesSync/logicDeleteAndSaveScheFinishQty")
+    AjaxResult logicDeleteAndSaveScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("scheduleDate") String scheduleDate, @RequestParam("updateBy") String updateBy, @RequestBody List<CxScheFinishQty> list);
+
+    @ApiOperation("根据分厂编号逻辑删除成型排程日完成量数据")
+    @PostMapping("/mesSync/logicDeleteDayFinishQty")
+    AjaxResult logicDeleteDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy);
+
+    @ApiOperation("逻辑删除并批量保存成型排程日完成量（事务性操作）")
+    @PostMapping("/mesSync/logicDeleteAndSaveDayFinishQty")
+    AjaxResult logicDeleteAndSaveDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("finishDate") String finishDate, @RequestParam("updateBy") String updateBy, @RequestBody List<CxDayFinishQty> list);
+
+    @ApiOperation("成型排程完成量回写成型排程结果表各班次完成量")
+    @PostMapping("/mesSync/writeBackScheduleResultFinishQty")
+    AjaxResult writeBackScheduleResultFinishQty(@RequestBody List<CxScheFinishQty> list);
 }

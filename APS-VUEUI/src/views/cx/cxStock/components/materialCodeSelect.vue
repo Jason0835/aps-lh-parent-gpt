@@ -38,7 +38,7 @@
 import { deepClone } from "@/utils";
 
 import selectDialog from "@/components/Table/SelectDialog.vue";
-import { listProductinfo } from "@/api/lean/productinfo";
+import { listEmbryoCode } from "@/api/lean/productinfo";
 export default {
   components: { selectDialog },
   inject: ["parentDict"],
@@ -98,12 +98,7 @@ export default {
         {
           prop: "embryoCode",
           label: this.$t("ui.data.rubberMaterial.embryoCode"),
-          width: 120,
-        },
-        {
-          prop: "embryoDesc",
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
-          minWidth: 260,
+          minWidth: 200,
         },
       ];
       if (this.multiple) {
@@ -142,7 +137,7 @@ export default {
         if (isFirst && this.multiple) {
           let topItems = [];
           if (this.oldList) {
-            let res = await listProductinfo({ materialCodes: this.oldList });
+            let res = await listEmbryoCode({ embryoCodes: this.oldList });
             topItems = res.rows;
           }
 
@@ -154,7 +149,7 @@ export default {
             this.getFirstList();
           });
         } else {
-          const data = await listProductinfo(this.formatParams());
+          const data = await listEmbryoCode(this.formatParams());
           this.data = data.rows;
           this.page.total = data.total;
           this.loading = false;
@@ -167,7 +162,7 @@ export default {
     },
     async getFirstList() {
       try {
-        const data = await listProductinfo(this.formatParams());
+        const data = await listEmbryoCode(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (err) {}
@@ -181,8 +176,6 @@ export default {
         pageSize: this.page.pageSize,
         pageNum: this.page.current,
         ...this.query,
-        status: 0, //过滤，只显示启用的数据
-        structureName: this.structureName,
       };
     },
     getTitle() {

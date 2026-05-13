@@ -107,4 +107,13 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
      */
     Map<String, Object> buildTodayNightFinishQtyMap(List<LhScheduleResult> list);
 
+    /**
+     * 构建指定 T 日的硫化产量今天夜班Map。
+     *
+     * @param list 排程结果列表
+     * @param scheduleDate 排程日期，传入时按该日期查询 T_LH_SCHE_FINISH_QTY.CLASS1_FINISH_QTY
+     * @return key=工厂编码|物料编码, value=今天夜班产量(BigDecimal)
+     */
+    Map<String, Object> buildTodayNightFinishQtyMap(List<LhScheduleResult> list, Date scheduleDate);
+
 }

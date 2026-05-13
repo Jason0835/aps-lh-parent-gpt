@@ -78,7 +78,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     private static final int SMALL_RUBBER_START_COL = 0;
 
-    private static final int SMALL_RUBBER_END_COL = 1;
+    private static final int SMALL_RUBBER_END_COL = 0;
 
     @Resource
     private CxLhScheduleResultMapper cxLhScheduleResultMapper;
@@ -114,25 +114,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         scheduleDate = LhScheduleTimeUtil.clearTime(scheduleDate);
         String factoryCode = StringUtils.defaultString(queryVO.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
 
-        log.info("排产小结导出开始, 排程日期: {}, 分厂: {}", DateUtil.formatDate(scheduleDate), factoryCode);
-
-        List<LhShiftConfig> shiftConfigs = loadShiftConfigs(factoryCode);
-        Map<Integer, String> classShiftTypeMap = buildClassShiftTypeMap(shiftConfigs);
-
-        Map<String, Object> tableMap = buildTableMap(scheduleDate, factoryCode, classShiftTypeMap);
-        List<List<Map<String, Object>>> dataList = buildDataList(scheduleDate, factoryCode);
-
-        // 小胶种标题行合并单元格：第7行（索引6）的A列到B列合并
-        List<Map<String, Object>> smallRubberList = dataList.isEmpty() ? Collections.emptyList() : dataList.get(0);
-        if (!smallRubberList.isEmpty()) {
-            List<ExcelCellRangeAddress> rangeAddressList = new ArrayList<>();
-            rangeAddressList.add(new ExcelCellRangeAddress(
-                    SMALL_RUBBER_TITLE_ROW_INDEX,
-                    SMALL_RUBBER_TITLE_ROW_INDEX,
-                    SMALL_RUBBER_START_COL,
-                    SMALL_RUBBER_END_COL));
-            tableMap.put(ExcelUtils.RANGE_ADDRESS, rangeAddressList);
-        }
+        Map<String, Object> exportData = buildScheduleSummaryExportData(scheduleDate, factoryCode);
 
         InputStream inputStream = this.getClass().getClassLoader()
                 .getResourceAsStream("excelModel/scheduleSummaryReport.xlsx");
@@ -141,7 +123,58 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             throw new ServiceException("排产小结模板文件不存在");
         }
 
+        @SuppressWarnings("unchecked")
+        Map<String, Object> tableMap = (Map<String, Object>) exportData.get("tableMap");
+        @SuppressWarnings("unchecked")
+        List<List<Map<String, Object>>> dataList = (List<List<Map<String, Object>>>) exportData.get("dataList");
+
         return ExcelUtils.writeMultiList(inputStream, 0, tableMap, dataList);
+    }
+
+    /**
+     * 构建排产小结导出数据（tableMap和dataList），
+     * 供外部调用方将排产小结作为子sheet嵌入到多sheet导出流程中。
+     *
+     * @param scheduleDate 排程日期
+     * @param factoryCode  分厂编码
+     * @return 包含 tableMap（模板占位符映射）和 dataList（列表数据）的Map
+     */
+    @Override
+    public Map<String, Object> buildScheduleSummaryExportData(Date scheduleDate, String factoryCode) {
+        scheduleDate = LhScheduleTimeUtil.clearTime(scheduleDate);
+        factoryCode = StringUtils.defaultString(factoryCode, FactoryConstant.DEFAULT_FACTORY_CODE);
+
+        log.info("构建排产小结导出数据, 排程日期: {}, 分厂: {}", DateUtil.formatDate(scheduleDate), factoryCode);
+
+        List<LhShiftConfig> shiftConfigs = loadShiftConfigs(factoryCode);
+        Map<Integer, String> classShiftTypeMap = buildClassShiftTypeMap(shiftConfigs);
+
+        Map<String, Object> tableMap = buildTableMap(scheduleDate, factoryCode, classShiftTypeMap);
+        List<List<Map<String, Object>>> dataList = buildDataList(scheduleDate, factoryCode);
+
+        // 小胶种列表数据处理：无数据时隐藏第7行，有数据时合并A7到B列结束行
+        List<Map<String, Object>> smallRubberList = dataList.isEmpty() ? Collections.emptyList() : dataList.get(0);
+        if (smallRubberList.isEmpty()) {
+            // 小胶种列表无数据，隐藏第7行（索引6）
+            List<Integer> hiddenRows = new ArrayList<>();
+            hiddenRows.add(SMALL_RUBBER_TITLE_ROW_INDEX);
+            tableMap.put(ExcelUtils.HIDDEN_ROWS, hiddenRows);
+        } else {
+            // 小胶种列表有数据，合并A7到B列结束行
+            List<ExcelCellRangeAddress> rangeAddressList = new ArrayList<>();
+            int endRowIndex = SMALL_RUBBER_TITLE_ROW_INDEX + smallRubberList.size() - 1;
+            rangeAddressList.add(new ExcelCellRangeAddress(
+                    SMALL_RUBBER_TITLE_ROW_INDEX,
+                    endRowIndex,
+                    SMALL_RUBBER_START_COL,
+                    SMALL_RUBBER_END_COL));
+            tableMap.put(ExcelUtils.RANGE_ADDRESS, rangeAddressList);
+        }
+
+        Map<String, Object> result = new HashMap<>(4);
+        result.put("tableMap", tableMap);
+        result.put("dataList", dataList);
+        return result;
     }
 
     /**
@@ -168,9 +201,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         Set<String> structureChanges = new LinkedHashSet<>();
         String prevStructure = null;
         for (CxScheduleResult result : cxResults) {
-            cxNightTotal = cxNightTotal.add(sumCxQtyByShiftType(result, classShiftTypeMap, "夜班"));
-            cxMorningTotal = cxMorningTotal.add(sumCxQtyByShiftType(result, classShiftTypeMap, "早班"));
-            cxMiddleTotal = cxMiddleTotal.add(sumCxQtyByShiftType(result, classShiftTypeMap, "中班"));
+            cxNightTotal = cxNightTotal.add(sumCxQtyByShiftType(result, classShiftTypeMap, "01"));
+            cxMorningTotal = cxMorningTotal.add(sumCxQtyByShiftType(result, classShiftTypeMap, "02"));
+            cxMiddleTotal = cxMiddleTotal.add(sumCxQtyByShiftType(result, classShiftTypeMap, "03"));
             String currentStructure = StringUtils.defaultString(result.getStructureName()).trim();
             if (prevStructure != null && !prevStructure.equals(currentStructure)) {
                 structureChanges.add(prevStructure + "→" + currentStructure);
@@ -205,14 +238,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         BigDecimal lhMiddleTotal = BigDecimal.ZERO;
 
         for (com.zlt.aps.cx.entity.schedule.LhScheduleResult result : lhResults) {
-            lhNightTotal = lhNightTotal.add(sumLhQtyByShiftType(result, classShiftTypeMap, "夜班"));
-            lhMorningTotal = lhMorningTotal.add(sumLhQtyByShiftType(result, classShiftTypeMap, "早班"));
-            lhMiddleTotal = lhMiddleTotal.add(sumLhQtyByShiftType(result, classShiftTypeMap, "中班"));
+            lhNightTotal = lhNightTotal.add(sumLhQtyByShiftType(result, classShiftTypeMap, "01"));
+            lhMorningTotal = lhMorningTotal.add(sumLhQtyByShiftType(result, classShiftTypeMap, "02"));
+            lhMiddleTotal = lhMiddleTotal.add(sumLhQtyByShiftType(result, classShiftTypeMap, "03"));
         }
 
-        long nightMachines = countLhMachinesByShiftType(lhResults, classShiftTypeMap, "夜班");
-        long morningMachines = countLhMachinesByShiftType(lhResults, classShiftTypeMap, "早班");
-        long middleMachines = countLhMachinesByShiftType(lhResults, classShiftTypeMap, "中班");
+        long nightMachines = countLhMachinesByShiftType(lhResults, classShiftTypeMap, "01");
+        long morningMachines = countLhMachinesByShiftType(lhResults, classShiftTypeMap, "02");
+        long middleMachines = countLhMachinesByShiftType(lhResults, classShiftTypeMap, "03");
 
         map.put("lhNightQty", lhNightTotal.toString());
         map.put("lhMorningQty", lhMorningTotal.toString());

@@ -320,4 +320,14 @@ public class MdmMaterialInfoController extends BaseUIController<MdmMaterialInfo>
     public AjaxResult updateQualityStateCodeName(TableProductInfoVo entity) {
         return iMaterialInfoService.updateQualityStateCodeName(entity);
     }
+
+    /**
+     * 查询胎胚编码列表（去重）
+     */
+    @ApiOperation("查询胎胚编码列表（去重）")
+    @PostMapping("/listEmbryoCode")
+    @ResponseBody
+    public TableDataInfo listEmbryoCode(MdmMaterialInfo entity) {
+        return iMaterialInfoService.listEmbryoCode(entity);
+    }
 }

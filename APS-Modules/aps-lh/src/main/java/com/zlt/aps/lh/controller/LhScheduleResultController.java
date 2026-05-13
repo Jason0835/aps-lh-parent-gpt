@@ -149,7 +149,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
             // 解码备注和原因分析字段的特殊字符
             list.forEach(this::decodeRemarkFields);
             // 构建硫化产量今天夜班Map（key: 工厂编码|物料编码）
-            Map<String, Object> todayNightFinishQtyMap = lhScheduleService.buildTodayNightFinishQtyMap(list);
+            Map<String, Object> todayNightFinishQtyMap = lhScheduleService.buildTodayNightFinishQtyMap(list, entity.getScheduleDate());
             // 为每条排程结果设置今天夜班产量
             for (LhScheduleResult result : list) {
                 String key = StringUtils.defaultString(result.getFactoryCode()).trim()
