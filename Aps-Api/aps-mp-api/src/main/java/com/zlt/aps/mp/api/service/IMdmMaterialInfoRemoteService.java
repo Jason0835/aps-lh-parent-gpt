@@ -200,4 +200,13 @@ public interface IMdmMaterialInfoRemoteService {
     @ApiOperation("更新质控状态")
     @PostMapping("/productinfo/updateQualityStateCodeName")
     public AjaxResult updateQualityStateCodeName(@RequestBody MdmMaterialInfo materialInfo);
+
+    /**
+     * 查询胎胚编码列表（去重）
+     *
+     * @param productInfo 查询条件
+     * @return 胎胚编码列表
+     */
+    @PostMapping("/productinfo/listEmbryoCode")
+    TableDataInfo listEmbryoCode(@RequestBody MdmMaterialInfo productInfo);
 }

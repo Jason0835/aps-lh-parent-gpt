@@ -512,4 +512,35 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     public AjaxResult updateQualityStateCodeName(@RequestBody MdmMaterialInfo materialInfo) {
         return iproductInfoService.updateQualityStateCodeName(materialInfo);
     }
+
+    /**
+     * 查询胎胚编码列表（去重）
+     *
+     * @param productInfo 查询条件
+     * @return 胎胚编码列表
+     */
+    @ApiOperation("查询胎胚编码列表（去重）")
+    @PostMapping("/listEmbryoCode")
+    public TableDataInfo listEmbryoCode(@RequestBody MdmMaterialInfo productInfo) {
+        startPage("create_time desc, id desc");
+        LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(PubUtil.isNotEmpty(productInfo.getFactoryCode()), MdmSkuConstructionRef::getFactoryCode, productInfo.getFactoryCode());
+        queryWrapper.isNotNull(MdmSkuConstructionRef::getEmbryoNo);
+        queryWrapper.ne(MdmSkuConstructionRef::getEmbryoNo, "");
+        queryWrapper.like(PubUtil.isNotEmpty(productInfo.getEmbryoCode()), MdmSkuConstructionRef::getEmbryoNo, productInfo.getEmbryoCode());
+        queryWrapper.select(MdmSkuConstructionRef::getEmbryoNo);
+        queryWrapper.groupBy(MdmSkuConstructionRef::getEmbryoNo);
+        List<MdmSkuConstructionRef> list = skuConstructionRefEntityMapper.selectList(queryWrapper);
+        // 将SKU施工关系对象列表转换为只包含胎胚编码的Map列表
+        List<Map<String, Object>> resultList = list.stream()
+                .map(item -> {
+                    // 创建Map，用于存储简化后的数据
+                    Map<String, Object> map = new HashMap<>();
+                    // 将embryoNo字段以embryoCode为key存入Map，保持与前端字段名的一致性
+                    map.put("embryoCode", item.getEmbryoNo());
+                    return map;
+                })
+                .collect(Collectors.toList());
+        return getDataTable(resultList);
+    }
 }

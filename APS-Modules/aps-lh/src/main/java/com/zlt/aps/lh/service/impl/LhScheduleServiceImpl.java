@@ -6,19 +6,15 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
-import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
-import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
-import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
-import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
-import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
@@ -31,14 +27,9 @@ import com.zlt.aps.lh.engine.decorator.IScheduleExecutor;
 import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleException;
-import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
-import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
-import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
-import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
-import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
+import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.utils.ImportExcelValidatedUtils;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.utils.ImportExcelValidatedUtils;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -58,18 +49,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -1567,23 +1546,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         return StringUtils.defaultString(factoryCode).trim() + "|" + StringUtils.defaultString(lhMachineCode).trim();
     }
 
-    /**
-     * 构建排程类型名称
-     *
-     * @param scheduleType 排程类型编码
-     * @return 排程类型名称
-     */
-    private String buildScheduleTypeName(String scheduleType) {
-        // 排程类型在数据库中存编码，导出给业务使用时展示中文；
-        // 未知编码原样返回，避免后续新增字典值时导出为空。
-        if ("01".equals(scheduleType)) {
-            return "续作";
-        }
-        if ("02".equals(scheduleType)) {
-            return "新增";
-        }
-        return scheduleType;
-    }
+
 
     /**
      * 构建导出首行汇总数据
