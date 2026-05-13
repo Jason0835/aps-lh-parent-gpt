@@ -87,4 +87,12 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      * @return 排程结果列表
      */
     List<CxScheduleResult> listByScheduleDateAndFactory(Date scheduleDate, String factoryCode);
+
+    /**
+     * 根据ID列表查询排程结果
+     *
+     * @param ids ID列表
+     * @return 排程结果列表
+     */
+    List<CxScheduleResult> listByIds(List<Long> ids);
 }

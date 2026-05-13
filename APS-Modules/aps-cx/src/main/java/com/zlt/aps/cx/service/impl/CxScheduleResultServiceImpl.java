@@ -1308,4 +1308,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         wrapper.orderByAsc(CxScheduleResult::getCxMachineCode);
         return cxScheduleResultMapper.selectList(wrapper);
     }
+
+    @Override
+    public List<CxScheduleResult> listByIds(List<Long> ids) {
+        if (org.apache.commons.collections4.CollectionUtils.isEmpty(ids)) {
+            return new ArrayList<>();
+        }
+        LambdaQueryWrapper<CxScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(CxScheduleResult::getId, ids);
+        return cxScheduleResultMapper.selectList(wrapper);
+    }
 }
