@@ -24,7 +24,6 @@
           <el-button
             type="primary"
             plain
-            :disabled="!canUsePrimaryAdjustActions"
             v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
             @click="handleStructureInnerAdjust"
             >{{
