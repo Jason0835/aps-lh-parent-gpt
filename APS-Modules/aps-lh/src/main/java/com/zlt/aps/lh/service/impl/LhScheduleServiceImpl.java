@@ -3,22 +3,20 @@ package com.zlt.aps.lh.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
-import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
-import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
-import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
-import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
-import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.entity.*;
+import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
@@ -27,19 +25,17 @@ import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.LhScheduleConfigResolver;
 import com.zlt.aps.lh.component.ScheduleExecutionGuard;
 import com.zlt.aps.lh.context.LhScheduleContext;
+import com.zlt.aps.lh.controller.LhMouldChangePlanController;
 import com.zlt.aps.lh.engine.decorator.IScheduleExecutor;
 import com.zlt.aps.lh.engine.observer.ScheduleEvent;
 import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleException;
-import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
-import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
-import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
-import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
-import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
+import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
-import com.zlt.aps.utils.ImportExcelValidatedUtils;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.utils.AppUtils;
+import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.utils.ImportExcelValidatedUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
@@ -51,6 +47,7 @@ import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -58,18 +55,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -118,6 +103,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     @Resource
     private LhIncreaseMouldStartPlanService increaseMouldStartPlanService;
+
+    @Autowired
+    private LhMouldChangePlanController lhMouldChangePlanController;
 
     @Override
     public LhScheduleResponseDTO executeSchedule(LhScheduleRequestDTO request) {
@@ -566,7 +554,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @return 导出数据
      */
     @Override
-    public byte[] exportData(List<LhScheduleResult> list, Date scheduleDate) {
+    public byte[] exportData(List<LhScheduleResult> list, LhScheduleResult result) {
         // 节点1：读取固定导出模板。硫化计划导出不再走多语言表头加载，
         // 表头、合并单元格、下拉框、公式位置都由 lhjhtemplate.xlsx 统一维护。
         InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("excelModel/lhjhtemplate.xlsx");
@@ -579,7 +567,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 节点3：模板表头数据只负责替换普通占位符，例如排程日期、版本、批次号、
         // 以及 8 个班次标题里的 shiftDate1 ~ shiftDate8。
-        Map<String, Object> tableMap = buildExportTableMap(exportList, scheduleDate);
+        Map<String, Object> tableMap = buildExportTableMap(exportList, result.getScheduleDate());
 
         // 节点4：模板第 7 行为 {.xxx} 明细模板行，writeMultiList 会从该行开始复制填充。
         // 当前只有一个明细列表，因此只放入一个 List<Map<String,Object>>。
@@ -590,6 +578,22 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 节点5：硫化计划数据位于模板第 2 个 sheet（下标 1）的“硫化计划”页。
         // 第 1 个 sheet 为模板辅助页，不能作为数据写入页。
         byte[] exportBytes = ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
+
+        //1.获取导出数据
+        LhMouldChangePlan mouldChangePlan = BeanCopyUtils.copyBean(result, LhMouldChangePlan.class);
+        QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
+        lhMouldChangePlanController.builderCondition(wrapper, mouldChangePlan);
+        List<LhMouldChangePlan> mouldChangePlanList = lhMouldChangePlanMapper.selectList(wrapper);
+        AppUtils.formatData(mouldChangePlanList, lhMouldChangePlanController.getQueryFormulas());
+        List<LhMouldChangePlanVo> mouldChangePlanExportList = lhMouldChangePlanController.buildLhMouldChangePlanVoList(mouldChangePlanList, mouldChangePlan);
+
+        Map<String, Object> mouldChangePlanTableMap = lhMouldChangePlanController.buildExportTableMap(mouldChangePlanExportList, result.getScheduleDate());
+        List<List<Map<String, Object>>> mouldChangePlanExcelDataList = new ArrayList<>();
+        mouldChangePlanExcelDataList.add(lhMouldChangePlanController.buildExportDataList(mouldChangePlanExportList));
+
+        inputStream = new ByteArrayInputStream(exportBytes);
+        exportBytes =  ExcelUtils.writeMultiList(inputStream, 1, mouldChangePlanTableMap, mouldChangePlanExcelDataList);
+
         return fillExportSummaryFormulas(exportBytes, exportDataList.size());
     }
 

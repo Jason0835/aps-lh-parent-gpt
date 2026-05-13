@@ -11,40 +11,36 @@ import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
-import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.exception.CustomException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
-import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
-import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.component.ScheduleExecutionGuard;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
+import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
-import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
-import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
-import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
-import com.zlt.common.utils.ExcelReadUtils;
 import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
@@ -52,8 +48,6 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -266,7 +260,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 //        LhScheduleResult  lhScheduleResult = new LhScheduleResult();
 //        lhScheduleResult.setScheduleDate(queryVO.getScheduleDate());
 //        list.add(lhScheduleResult);
-        byte[] resultBytes = lhScheduleService.exportData(list, queryVO.getScheduleDate());
+        byte[] resultBytes = lhScheduleService.exportData(list, queryVO);
         return resultBytes;
     }
 
@@ -282,7 +276,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
                              HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
         List<LhScheduleResult> list = this.listExportData(queryVO);
-        byte[] resultBytes = lhScheduleService.exportData(list, queryVO.getScheduleDate());
+        byte[] resultBytes = lhScheduleService.exportData(list, queryVO);
         Date endTime = DateUtils.getNowDate();
         ExportLog exportLog = new ExportLog();
         exportLog.setProcedureCode("0");
@@ -747,8 +741,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * @return 下发结果
      */
     private AjaxResult doIssueLhScheduleResultToMes(Date scheduleDate, List<Long> selectedIds) {
-        LocalDate scheduleLocalDate = scheduleDate instanceof java.sql.Date 
-                ? ((java.sql.Date) scheduleDate).toLocalDate() 
+        LocalDate scheduleLocalDate = scheduleDate instanceof java.sql.Date
+                ? ((java.sql.Date) scheduleDate).toLocalDate()
                 : scheduleDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
         LocalDate day1 = scheduleLocalDate.minusDays(LhScheduleConstant.SCHEDULE_DAYS - 1);
         LocalDate day2 = scheduleLocalDate.minusDays(LhScheduleConstant.SCHEDULE_DAYS - 2);
