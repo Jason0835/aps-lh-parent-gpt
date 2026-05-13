@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
@@ -34,8 +35,12 @@ import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
+import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -95,6 +100,11 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @Autowired
     private IScheduleSummaryReportService scheduleSummaryReportService;
 
+    @Autowired
+    private MdmMaterialInfoMapper mdmMaterialInfoMapper;
+
+    @Autowired
+    private MdmSkuConstructionRefEntityMapper mdmSkuConstructionRefEntityMapper;
 
     @Autowired
     private IImportLogService iImportLogService;
@@ -788,9 +798,125 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         allIssueList.addAll(day2IssueList);
         allIssueList.addAll(day3IssueList);
 
+        // 下发前补全MES物料编码和示方号（数据准备应在aps-lh模块完成，而非itf层）
+        enrichMaterialAndExampleInfo(allIssueList);
+
         return mesItfService.issueLhScheduleResult(allIssueList);
     }
 
+
+    /**
+     * 补全MES物料编码和示方号
+     * 1. 通过物料编码关联物料信息表(MdmMaterialInfo)获取MES物料编码
+     * 2. 通过物料编码关联SKU与示方书关系表(MdmSkuConstructionRef)获取硫化示方书号作为示方号
+     * 3个班的示方号都取同一个值
+     *
+     * @param issueList 硫化排程结果下发列表
+     */
+    private void enrichMaterialAndExampleInfo(List<LhScheduleResultIssue> issueList) {
+        if (CollectionUtils.isEmpty(issueList)) {
+            return;
+        }
+
+        // 收集所有不重复的物料编码
+        List<String> materialCodeList = issueList.stream()
+                .map(LhScheduleResultIssue::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (CollectionUtils.isEmpty(materialCodeList)) {
+            return;
+        }
+
+        // 查询物料信息表，构建物料编码 -> MES物料编码的映射
+        Map<String, String> materialCodeToMesCodeMap = getMaterialCodeToMesCodeMap(materialCodeList);
+
+        // 查询SKU与示方书关系表，构建物料编码 -> 硫化示方书号的映射
+        Map<String, String> materialCodeToLhNoMap = getMaterialCodeToLhNoMap(materialCodeList);
+
+        // 补全每条记录的MES物料编码和示方号
+        for (LhScheduleResultIssue item : issueList) {
+            String materialCode = item.getMaterialCode();
+            if (StringUtils.isNotBlank(materialCode)) {
+                // 设置MES物料编码
+                String mesMaterialCode = materialCodeToMesCodeMap.get(materialCode);
+                if (StringUtils.isNotBlank(mesMaterialCode)) {
+                    item.setMesMaterialCode(mesMaterialCode);
+                }
+
+                // 设置3个班的示方号（硫化示方书号），3个班的示方号都取同一个值
+                String lhNo = materialCodeToLhNoMap.get(materialCode);
+                if (StringUtils.isNotBlank(lhNo)) {
+                    item.setClass1ExampleNo(lhNo);
+                    item.setClass2ExampleNo(lhNo);
+                    item.setClass3ExampleNo(lhNo);
+                }
+            }
+        }
+    }
+
+    /**
+     * 获取物料编码到MES物料编码的映射
+     * 通过物料编码关联物料信息表(MdmMaterialInfo)获取MES物料编码
+     *
+     * @param materialCodeList 物料编码列表
+     * @return 物料编码 -> MES物料编码的映射
+     */
+    private Map<String, String> getMaterialCodeToMesCodeMap(List<String> materialCodeList) {
+        if (CollectionUtils.isEmpty(materialCodeList)) {
+            return new HashMap<>();
+        }
+
+        LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(MdmMaterialInfo::getMaterialCode, materialCodeList)
+                .select(MdmMaterialInfo::getMaterialCode, MdmMaterialInfo::getMesMaterialCode);
+
+        List<MdmMaterialInfo> materialInfoList = mdmMaterialInfoMapper.selectList(queryWrapper);
+
+        if (CollectionUtils.isEmpty(materialInfoList)) {
+            return new HashMap<>();
+        }
+
+        return materialInfoList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getMesMaterialCode()))
+                .collect(Collectors.toMap(
+                        MdmMaterialInfo::getMaterialCode,
+                        MdmMaterialInfo::getMesMaterialCode,
+                        (v1, v2) -> v1
+                ));
+    }
+
+    /**
+     * 获取物料编码到硫化示方书号的映射
+     * 通过物料编码关联SKU与示方书关系表(MdmSkuConstructionRef)获取硫化示方书号
+     *
+     * @param materialCodeList 物料编码列表
+     * @return 物料编码 -> 硫化示方书号的映射
+     */
+    private Map<String, String> getMaterialCodeToLhNoMap(List<String> materialCodeList) {
+        if (CollectionUtils.isEmpty(materialCodeList)) {
+            return new HashMap<>();
+        }
+
+        LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeList)
+                .select(MdmSkuConstructionRef::getMaterialCode, MdmSkuConstructionRef::getLhNo);
+
+        List<MdmSkuConstructionRef> constructionRefList = mdmSkuConstructionRefEntityMapper.selectList(queryWrapper);
+
+        if (CollectionUtils.isEmpty(constructionRefList)) {
+            return new HashMap<>();
+        }
+
+        return constructionRefList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getLhNo()))
+                .collect(Collectors.toMap(
+                        MdmSkuConstructionRef::getMaterialCode,
+                        MdmSkuConstructionRef::getLhNo,
+                        (v1, v2) -> v1
+                ));
+    }
 
     /**
      * 转换为T-2日（窗口首日）的下发实体
@@ -805,7 +931,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
         LhScheduleResultIssue target = new LhScheduleResultIssue();
 
-        target.setId(source.getId());
+        // 中间表id由数据库自增生成，不能直接使用APS排程结果表的主键id
+        target.setId(null);
         target.setLhBatchNo(source.getBatchNo());
         target.setOrderNo(source.getOrderNo());
         target.setScheduleDate(scheduleDate.atStartOfDay());
@@ -866,7 +993,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
         LhScheduleResultIssue target = new LhScheduleResultIssue();
 
-        target.setId(source.getId());
+        // 中间表id由数据库自增生成，不能直接使用APS排程结果表的主键id
+        target.setId(null);
         target.setLhBatchNo(source.getBatchNo());
         target.setOrderNo(source.getOrderNo());
         target.setScheduleDate(scheduleDate.atStartOfDay());
@@ -927,7 +1055,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
         LhScheduleResultIssue target = new LhScheduleResultIssue();
 
-        target.setId(source.getId());
+        // 中间表id由数据库自增生成，不能直接使用APS排程结果表的主键id
+        target.setId(null);
         target.setLhBatchNo(source.getBatchNo());
         target.setOrderNo(source.getOrderNo());
         target.setScheduleDate(scheduleDate.atStartOfDay());

@@ -40,13 +40,12 @@
           :disabled="selection.length == 0"
           >{{ $t("ui.frame.btn.delete") }}</el-button
         >
-        <!-- <el-button
-          v-hasPermi="['lh:lhLhMoldChangePlan:publish']"
+        <el-button
+          v-hasPermi="['lh:lhMouldChangePlan:issueSchedule']"
           type="primary"
           @click="handlePublish"
-          :disabled="selection.length == 0"
           >{{ $t("ui.data.column.scheduleResult.publish") }}</el-button
-        > -->
+        >
         <!-- <el-button
           v-hasPermi="['lh:lhMoldChangePlan:import']"
           @click="() => $refs.tltUploadForm.handleImport(importDefaultValue)"
@@ -86,10 +85,13 @@ import { mapState } from "vuex";
 import {
   listLhMoldChangePlan,
   exportLhMoldChangePlan,
-  publishLhMoldChangePlan,
   removeLhMoldChangePlan,
   generateMoldReplacementPlan,
 } from "@/api/lh/lhMoldChangePlan.js";
+import {
+  issueSchedule,
+  issueScheduleByQuery,
+} from "@/api/lh/lhMouldChangePlan.js";
 
 import generateDialog from "./components/generateDialog.vue";
 // import TltUploadForm from "@/views/components/tltUploadForm.vue";
@@ -402,29 +404,50 @@ export default {
       });
     },
     handlePublish() {
-      this.$confirm(this.$t(`确认要发布排程吗？`), {
-        type: "warning",
-      }).then(async () => {
-        try {
-          this.loading = true;
-          let ids = [];
-          this.selection.forEach((element) => {
-            ids.push(element.id);
-          });
-          const params = {
-            planDate: this.query.planDate,
-            ids: ids.join(),
-          };
-          const data = await publishLhMoldChangePlan(params);
-          this.$modal.msgSuccess(data.msg);
-          this.$set(this.page, "current", 1);
-          this.getList();
-        } catch (error) {
-          console.error(error);
-        } finally {
-          this.loading = false;
+      if (this.selection.length > 0) {
+        this.$confirm(this.$t(`确认要发布选中的排程吗？`), {
+          type: "warning",
+        }).then(async () => {
+          try {
+            this.loading = true;
+            let ids = [];
+            this.selection.forEach((element) => {
+              ids.push(element.id);
+            });
+            const data = await issueSchedule(ids);
+            this.$modal.msgSuccess(data.msg);
+            this.$set(this.page, "current", 1);
+            this.getList();
+          } catch (error) {
+            console.error(error);
+          } finally {
+            this.loading = false;
+          }
+        });
+      } else {
+        if (!this.query.scheduleDate) {
+          this.$modal.msgWarning(this.$t("请选择排程日期"));
+          return;
         }
-      });
+        this.$confirm(this.$t(`确认要按排程日期发布所有未发布数据吗？`), {
+          type: "warning",
+        }).then(async () => {
+          try {
+            this.loading = true;
+            const data = await issueScheduleByQuery({
+              scheduleDate: this.query.scheduleDate,
+              factoryCode: this.query.factoryCode,
+            });
+            this.$modal.msgSuccess(data.msg);
+            this.$set(this.page, "current", 1);
+            this.getList();
+          } catch (error) {
+            console.error(error);
+          } finally {
+            this.loading = false;
+          }
+        });
+      }
     },
     handleGenerateMoldReplacementPlan() {
       if (this.$refs.genDialogRef) {

@@ -58,7 +58,7 @@ export default {
         mouldCode: [
           {
             required: true,
-            message: this.$t("common.rule.select"),
+            message: this.$t("common.rule.input"),
             trigger: "change",
           },
         ],
@@ -72,7 +72,7 @@ export default {
         materialCode: [
           {
             required: true,
-            message: this.$t("common.rule.input"),
+            message: this.$t("common.rule.select"),
             trigger: "change",
           },
         ],

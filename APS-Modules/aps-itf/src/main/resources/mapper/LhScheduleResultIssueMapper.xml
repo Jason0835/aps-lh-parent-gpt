@@ -6,7 +6,7 @@
 
     <insert id="batchInsertLhScheduleResult" parameterType="list">
         INSERT INTO MES_LH_SCHEDULE_RESULT (
-            ID, LH_BATCH_NO, ORDER_NO, SCHEDULE_DATE, LH_MACHINE_CODE, LH_MACHINE_NAME,
+            LH_BATCH_NO, ORDER_NO, SCHEDULE_DATE, LH_MACHINE_CODE, LH_MACHINE_NAME,
             LEFT_RIGHT_MOLD, MATERIAL_CODE, MES_MATERIAL_CODE, SPEC_CODE, SPEC_DESC,
             DAILY_PLAN_QTY,
             CLASS1_PLAN_QTY_SEQ, CLASS1_ANALYSIS_INPUT, CLASS1_ANALYSIS, CLASS1_PLAN_QTY,
@@ -20,7 +20,6 @@
         SELECT * FROM (
         <foreach collection="list" item="item" separator=" UNION ALL ">
             SELECT
-            #{item.id} AS ID,
             #{item.lhBatchNo} AS LH_BATCH_NO,
             #{item.orderNo} AS ORDER_NO,
             #{item.scheduleDate} AS SCHEDULE_DATE,
@@ -58,7 +57,10 @@
         ) AS t
         WHERE NOT EXISTS (
             SELECT 1 FROM MES_LH_SCHEDULE_RESULT
-            WHERE LH_BATCH_NO = t.LH_BATCH_NO AND SCHEDULE_DATE = t.SCHEDULE_DATE AND DATA_VERSION = t.DATA_VERSION
+            WHERE LH_MACHINE_CODE = t.LH_MACHINE_CODE
+              AND MATERIAL_CODE = t.MATERIAL_CODE
+              AND SCHEDULE_DATE = t.SCHEDULE_DATE
+              AND DATA_VERSION = t.DATA_VERSION
         )
     </insert>
 
@@ -96,6 +98,7 @@
             FACTORY_CODE = #{factoryCode}
         WHERE SCHEDULE_DATE = #{scheduleDate}
           AND LH_MACHINE_CODE = #{lhMachineCode}
+          AND MATERIAL_CODE = #{materialCode}
           AND DATA_VERSION = #{dataVersion}
     </update>
 
