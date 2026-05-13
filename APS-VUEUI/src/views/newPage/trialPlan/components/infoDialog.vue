@@ -175,6 +175,19 @@ export default {
           valueFormat: "yyyy-MM",
         },
         {
+          prop: "materialCode",
+          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
+          render: (form) => {
+            return (
+              <materialCodeSelect
+                key={form.materialCode}
+                v-model={form.materialCode}
+                onChange={this.handleMaterialCodeChange}
+              />
+            );
+          },
+        },
+        {
           prop: "specifications",
           label: this.$t("ui.data.column.trialPlan.specifications"),
           maxlength:64,
@@ -187,19 +200,6 @@ export default {
           maxlength:64,
           disabled:true
 
-        },
-        {
-          prop: "materialCode",
-          label: this.$t("ui.data.column.monthplan.oriMaterialCode"),
-          render: (form) => {
-            return (
-              <materialCodeSelect
-                key={form.materialCode}
-                v-model={form.materialCode}
-                onChange={this.handleMaterialCodeChange}
-              />
-            );
-          },
         },
         {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
