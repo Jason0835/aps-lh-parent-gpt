@@ -327,6 +327,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
         LhScheduleResult dto = new LhScheduleResult();
         String ids = params.get("ids");
         String scheduleDateStr = params.get("scheduleDate");
+        String factoryCode = params.get("factoryCode");
         if (StringUtils.isNotEmpty(scheduleDateStr)) {
             try {
                 dto.setScheduleDate(DateUtils.parseDate(scheduleDateStr));
@@ -337,6 +338,7 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
         if (dto.getScheduleDate() == null) {
             dto.setScheduleDate(DateUtils.addDays(new Date(), 1));
         }
+        dto.setFactoryCode(factoryCode);
         return iLhScheduleResultRemoteService.publish(dto, ids);
     }
 
