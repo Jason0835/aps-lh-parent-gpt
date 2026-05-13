@@ -130,12 +130,7 @@ public class MesMergeController {
         	infoService.mergePlmConstructionInfo(dataVersion);
         } else if (syncKey.equals(SyncKeyEnum.FINISH_SCHE_COMPLETE.getDescription())) {
             // ========================================================================  完成量回报  ============================================================
-            // 成型排程完成量回报
-            AjaxResult result = finishService.mergeCxFinish(dataVersion);
-            if ((int)result.get(Constants.CODE) == HttpStatus.ERROR) {
-                log.setServiceResult((String) result.get(GatewayConstants.MSG_TAG));
-            }
-            result1 = result;
+            // 成型排程完成量回报（已改为itf→cx直接同步，不再走MPS合并）
         } else if (syncKey.equals(SyncKeyEnum.VULCANIZE_SCHE_COMPLETE.getDescription())) {
             // 硫化排程完成量回报
             AjaxResult result = finishService.mergeLhFinish(dataVersion);
@@ -144,12 +139,7 @@ public class MesMergeController {
             }
             result1 = result;
         } else if (syncKey.equals(SyncKeyEnum.CX_DAY_COMPLETE.getDescription())) {
-            // 成型日完成量
-            AjaxResult result = finishService.mergeCxDayFinish(dataVersion);
-            if ((int)result.get(Constants.CODE) == HttpStatus.ERROR) {
-                log.setServiceResult((String) result.get(GatewayConstants.MSG_TAG));
-            }
-            result1 = result;
+            // 成型日完成量（已改为itf→cx直接同步，不再走MPS合并）
         } else if (syncKey.equals(SyncKeyEnum.LH_DAY_COMPLETE.getDescription())) {
             // 硫化日完成量
             AjaxResult result = finishService.mergeLhDayFinish(dataVersion);

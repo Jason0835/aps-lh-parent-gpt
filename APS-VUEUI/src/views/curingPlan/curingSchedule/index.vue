@@ -118,11 +118,7 @@
           v-hasPermi="['monthplan:mouldingDayResult:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
-        <el-button
-          @click="handleExportSummaryReport"
-          v-hasPermi="['monthplan:mouldingDayResult:export']"
-          >{{ $t("ui.data.column.scheduleResult.exportScheduleSummaryReport") }}</el-button
-        >
+
         <!-- <el-dropdown>
           <el-button type="primary" style="margin-left: 10px">
             更多按钮<i class="el-icon-arrow-down el-icon--right"></i>
@@ -227,7 +223,6 @@ import {
   adjustTextNo,
   generateTextMouldChangePlan,
   increaseMouldStartPlan,
-  exportScheduleSummaryReport,
 } from "@/api/lh/scheduleResult";
 import { checkPermi } from "@/utils/permission";
 
@@ -1198,21 +1193,7 @@ export default {
       };
       exportCombine(params);
     },
-    handleExportSummaryReport() {
-      this.$confirm(this.$t(`ui.data.column.scheduleResult.confirmExportScheduleSummaryReport`), {
-        type: "warning",
-      }).then(() => {
-        try {
-          this.loading = true;
-          let params = this.formatParams();
-          exportScheduleSummaryReport(params);
-        } catch (error) {
-          console.error(error);
-        } finally {
-          this.loading = false;
-        }
-      });
-    },
+
     handlePublish() {
       this.$confirm(this.$t(`ui.biz.alter.makeSurePublish`), {
         type: "warning",

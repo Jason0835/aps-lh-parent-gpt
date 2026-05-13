@@ -10,6 +10,8 @@ import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.api.service.ICxMesSyncRemoteService;
 import com.zlt.aps.cx.service.CxStockService;
 import com.zlt.aps.cx.service.ICxMachineOnlineInfoService;
+import com.zlt.aps.cx.service.ICxScheFinishQtyService;
+import com.zlt.aps.cx.service.ICxDayFinishQtyService;
 import com.zlt.aps.cx.mapper.CxDayFinishQtyMapper;
 import com.zlt.aps.cx.mapper.CxMachineOnlineInfoMapper;
 import com.zlt.aps.cx.mapper.CxMesStockMapper;
@@ -65,6 +67,12 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
 
     @Autowired
     private CxStockService cxStockService;
+
+    @Autowired
+    private ICxScheFinishQtyService cxScheFinishQtyService;
+
+    @Autowired
+    private ICxDayFinishQtyService cxDayFinishQtyService;
 
     @Override
     @ApiOperation("批量删除成型在机信息")
@@ -284,5 +292,66 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
         int deleteCount = cxStockMapper.logicDeleteAllBeforeToday();
         log.info("逻辑删除生胎库存今天之前所有数据完成，删除记录数={}", deleteCount);
         return AjaxResult.success("逻辑删除记录数：" + deleteCount);
+    }
+
+    @Override
+    @ApiOperation("逻辑删除成型排程完成量今天之前所有数据")
+    @PostMapping("/logicDeleteCxScheFinishQtyAllBeforeToday")
+    public AjaxResult logicDeleteCxScheFinishQtyAllBeforeToday() {
+        log.info("开始逻辑删除成型排程完成量今天之前所有数据...");
+        int deleteCount = cxScheFinishQtyMapper.logicDeleteAllBeforeToday();
+        log.info("逻辑删除成型排程完成量今天之前所有数据完成，删除记录数={}", deleteCount);
+        return AjaxResult.success("逻辑删除记录数：" + deleteCount);
+    }
+
+    @Override
+    @ApiOperation("逻辑删除成型排程日完成量今天之前所有数据")
+    @PostMapping("/logicDeleteCxDayFinishQtyAllBeforeToday")
+    public AjaxResult logicDeleteCxDayFinishQtyAllBeforeToday() {
+        log.info("开始逻辑删除成型排程日完成量今天之前所有数据...");
+        int deleteCount = cxDayFinishQtyMapper.logicDeleteAllBeforeToday();
+        log.info("逻辑删除成型排程日完成量今天之前所有数据完成，删除记录数={}", deleteCount);
+        return AjaxResult.success("逻辑删除记录数：" + deleteCount);
+    }
+
+    @Override
+    @ApiOperation("根据分厂编号逻辑删除成型排程完成量数据")
+    @PostMapping("/logicDeleteScheFinishQty")
+    public AjaxResult logicDeleteScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy) {
+        cxScheFinishQtyMapper.logicDeleteByFactoryCode(factoryCode, updateBy, new Date());
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("逻辑删除并批量保存成型排程完成量（事务性操作）")
+    @PostMapping("/logicDeleteAndSaveScheFinishQty")
+    public AjaxResult logicDeleteAndSaveScheFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("scheduleDate") String scheduleDateStr, @RequestParam("updateBy") String updateBy, @RequestBody List<CxScheFinishQty> list) {
+        Date scheduleDate = DateUtil.parse(scheduleDateStr);
+        cxScheFinishQtyService.logicDeleteAndSaveBatch(factoryCode, scheduleDate, updateBy, list);
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("根据分厂编号逻辑删除成型排程日完成量数据")
+    @PostMapping("/logicDeleteDayFinishQty")
+    public AjaxResult logicDeleteDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("updateBy") String updateBy) {
+        cxDayFinishQtyMapper.logicDeleteByFactoryCode(factoryCode, updateBy, new Date());
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("逻辑删除并批量保存成型排程日完成量（事务性操作）")
+    @PostMapping("/logicDeleteAndSaveDayFinishQty")
+    public AjaxResult logicDeleteAndSaveDayFinishQty(@RequestParam("factoryCode") String factoryCode, @RequestParam("finishDate") String finishDateStr, @RequestParam("updateBy") String updateBy, @RequestBody List<CxDayFinishQty> list) {
+        Date finishDate = DateUtil.parse(finishDateStr);
+        cxDayFinishQtyService.logicDeleteAndSaveBatch(factoryCode, finishDate, updateBy, list);
+        return AjaxResult.success();
+    }
+
+    @Override
+    @ApiOperation("成型排程完成量回写成型排程结果表各班次完成量")
+    @PostMapping("/writeBackScheduleResultFinishQty")
+    public AjaxResult writeBackScheduleResultFinishQty(@RequestBody List<CxScheFinishQty> list) {
+        return cxScheFinishQtyService.writeBackScheduleResultFinishQty(list);
     }
 }

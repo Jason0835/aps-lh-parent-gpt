@@ -254,6 +254,24 @@ public interface MesItfMapper {
     List<LhDayFinishQty> selectLhScheDayFinishQtyHistoryList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 查询成型排程完成量历史同步数据（今天之前每天最新版本）
+     * 按日期+成型机台+订单号分组，取每天每组的MAX(DATA_VERSION)
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<CxScheFinishQty> selectCxClassShiftFinishQtyHistoryList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 查询成型排程日完成量历史同步数据（今天之前每天最新版本）
+     * 按日期+分厂+胚胎编码+施工版本分组，取每天每组的MAX(DATA_VERSION)
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<CxDayFinishQty> selectCxScheDayFinishQtyHistoryList(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 查询MES中间表模具清洗预警计划的所有版本号（升序排列）
      * 用于临时任务按版本迭代同步全部预警数据
      *

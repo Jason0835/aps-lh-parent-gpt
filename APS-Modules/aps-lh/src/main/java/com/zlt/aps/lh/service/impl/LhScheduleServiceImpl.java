@@ -11,6 +11,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
@@ -33,6 +34,7 @@ import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhScheduleService;
+import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.utils.AppUtils;
@@ -112,6 +114,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     @Autowired
     private LhMouldChangePlanController lhMouldChangePlanController;
+
+    @Resource
+    private IScheduleSummaryReportService scheduleSummaryReportService;
 
     @Override
     public LhScheduleResponseDTO executeSchedule(LhScheduleRequestDTO request) {
@@ -598,6 +603,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes =  ExcelUtils.writeMultiList(inputStream, 1, mouldChangePlanTableMap, mouldChangePlanExcelDataList);
+
+        // 节点6：排产小结数据位于模板第 3 个 sheet（下标 2），
+        // 复用 ScheduleSummaryReportService 的数据构建逻辑，将排产小结作为第三个sheet写入。
+        String factoryCode = StringUtils.defaultString(result.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
+        Map<String, Object> summaryExportData = scheduleSummaryReportService.buildScheduleSummaryExportData(result.getScheduleDate(), factoryCode);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> summaryTableMap = (Map<String, Object>) summaryExportData.get("tableMap");
+        @SuppressWarnings("unchecked")
+        List<List<Map<String, Object>>> summaryDataList = (List<List<Map<String, Object>>>) summaryExportData.get("dataList");
+
+        inputStream = new ByteArrayInputStream(exportBytes);
+        exportBytes = ExcelUtils.writeMultiList(inputStream, 2, summaryTableMap, summaryDataList);
 
         return fillExportSummaryFormulas(exportBytes, exportDataList.size());
     }

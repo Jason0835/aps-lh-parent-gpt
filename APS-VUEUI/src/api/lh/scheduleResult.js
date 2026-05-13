@@ -388,13 +388,4 @@ export function increaseMouldStartPlan(query) {
   })
 }
 
-/**
- * 排产小结报表导出
- * @param {Object} params
- * @param {string} params.scheduleDate 排程日期
- * @param {string} [params.factoryCode] 分厂编码
- * @returns
- */
-export function exportScheduleSummaryReport(params) {
-  return downloadLink("/lh/lhScheduleResult/exportScheduleSummaryReport", params);
-}
+
