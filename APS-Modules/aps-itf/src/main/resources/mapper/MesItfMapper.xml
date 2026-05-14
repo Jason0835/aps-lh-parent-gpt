@@ -567,6 +567,67 @@
         WHERE CONVERT(DATE, t.FINISH_DATE) &lt; CONVERT(DATE, GETDATE())
     </select>
 
+    <select id="selectCxClassShiftFinishQtyHistoryList" resultType="com.zlt.aps.cx.api.domain.entity.CxScheFinishQty">
+        SELECT
+        t.ORDER_NO,
+        t.SCHEDULE_DATE,
+        t.CX_MACHINE_CODE,
+        t.MATERIAL_CODE,
+        t.MES_MATERIAL_CODE,
+        t.CLASS1_FINISH_QTY,
+        t.CLASS2_FINISH_QTY,
+        t.CLASS3_FINISH_QTY,
+        t.CLASS1_UN_REASON,
+        t.CLASS2_UN_REASON,
+        t.CLASS3_UN_REASON,
+        t.CLASS1_PERSON,
+        t.CLASS2_PERSON,
+        t.CLASS3_PERSON,
+        t.EMBRYO_CODE,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM MES_CX_CLASS_SHIFT_FINISH_QTY t
+        INNER JOIN (
+            SELECT CONVERT(DATE, SCHEDULE_DATE) AS schedule_day, CX_MACHINE_CODE, ORDER_NO, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM MES_CX_CLASS_SHIFT_FINISH_QTY
+            WHERE CONVERT(DATE, SCHEDULE_DATE) &lt; CONVERT(DATE, GETDATE())
+            <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
+            <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
+            GROUP BY CONVERT(DATE, SCHEDULE_DATE), CX_MACHINE_CODE, ORDER_NO
+        ) latest ON CONVERT(DATE, t.SCHEDULE_DATE) = latest.schedule_day
+            AND t.CX_MACHINE_CODE = latest.CX_MACHINE_CODE
+            AND t.ORDER_NO = latest.ORDER_NO
+            AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE CONVERT(DATE, t.SCHEDULE_DATE) &lt; CONVERT(DATE, GETDATE())
+        <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
+        <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
+    </select>
+
+    <select id="selectCxScheDayFinishQtyHistoryList" resultType="com.zlt.aps.cx.api.domain.entity.CxDayFinishQty">
+        SELECT
+        t.FINISH_DATE,
+        t.DAY_FINISH_QTY,
+        t.EMBRYO_CODE,
+        t.EXAMPLE_TYPE,
+        t.BOM_DATA_VERSION,
+        t.DATA_VERSION,
+        t.COMPANY_CODE,
+        t.FACTORY_CODE
+        FROM MES_CX_DAY_FINISH_QTY t
+        INNER JOIN (
+            SELECT CONVERT(DATE, FINISH_DATE) AS finish_day, FACTORY_CODE, EMBRYO_CODE, BOM_DATA_VERSION, MAX(DATA_VERSION) AS MAX_VERSION
+            FROM MES_CX_DAY_FINISH_QTY
+            WHERE CONVERT(DATE, FINISH_DATE) &lt; CONVERT(DATE, GETDATE())
+            GROUP BY CONVERT(DATE, FINISH_DATE), FACTORY_CODE, EMBRYO_CODE, BOM_DATA_VERSION
+        ) latest ON CONVERT(DATE, t.FINISH_DATE) = latest.finish_day
+            AND t.FACTORY_CODE = latest.FACTORY_CODE
+            AND t.EMBRYO_CODE = latest.EMBRYO_CODE
+            AND t.BOM_DATA_VERSION = latest.BOM_DATA_VERSION
+            AND t.DATA_VERSION = latest.MAX_VERSION
+        WHERE CONVERT(DATE, t.FINISH_DATE) &lt; CONVERT(DATE, GETDATE())
+    </select>
+
     <select id="selectAllDataVersionsFromMouldCleanPlan" resultType="java.lang.String">
         SELECT DISTINCT DATA_VERSION
         FROM MOULD_CLEAN_PLAN

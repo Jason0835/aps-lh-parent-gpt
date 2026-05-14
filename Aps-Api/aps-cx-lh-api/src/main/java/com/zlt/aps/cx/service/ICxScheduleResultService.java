@@ -96,12 +96,14 @@ public interface ICxScheduleResultService {
 
     /**
      * 【排程发布】发布排程数据
+     * 参考硫化排程发布逻辑：接收dto（含scheduleDate、factoryCode）和ids参数
      *
-     * @param ids ID列表
+     * @param dto 排程结果对象（含scheduleDate、factoryCode）
+     * @param ids 选中的记录ID，多个用逗号分隔
      * @return 操作结果
      */
     @PostMapping("/cxScheduleResult/publish")
-    AjaxResult publish(@RequestBody List<Long> ids);
+    AjaxResult publish(@RequestBody CxScheduleResult dto, @RequestParam(value = "ids", required = false) String ids);
 
     // ==================== UI Controller 需要的方法 ====================
 

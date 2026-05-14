@@ -91,11 +91,6 @@
           v-hasPermi="['cx:productConstruction:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
-        <el-button
-          @click="handleExportStructureChange"
-          v-hasPermi="['monthplan:mouldingDayResult:export2']"
-          >{{ $t("ui.data.column.cxStructureChange.exportBtn") }}</el-button
-        >
       </template>
     </page-table>
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
@@ -163,7 +158,6 @@ import { downloadLink } from "@/utils/request";
 //interface
 import {
   listCxScheduleResult,
-  publishValidate,
   publishScheduleResult,
   modifyQty,
   manualClose,
@@ -172,7 +166,6 @@ import {
   hasRecordValidate,
   removeCxScheduleResult,
   parseCxScheduleResult,
-  exportStructureChange,
 } from "@/api/cx/cxScheduleResult";
 import { getScheduleDate } from "@/api/lh/scheduleResult";
 //components
@@ -949,7 +942,29 @@ export default {
       }
     },
     async handlePublish() {
-      this.publishSchedule();
+      this.$confirm(this.$t(`ui.biz.alter.makeSurePublish`), {
+        type: "warning",
+      }).then(async () => {
+        try {
+          this.loading = true;
+          let ids = [];
+          this.selection.forEach((element) => {
+            ids.push(element.id);
+          });
+          const params = {
+            scheduleDate: this.query.scheduleDate,
+            factoryCode: this.query.factoryCode,
+            ids: ids.join(),
+          };
+          const data = await publishScheduleResult(params);
+          this.$modal.msgSuccess(data.msg);
+          this.getList();
+        } catch (error) {
+          console.error(error);
+        } finally {
+          this.loading = false;
+        }
+      });
     },
 
     async handleModifyMonthQty() {
@@ -1085,24 +1100,6 @@ export default {
     },
     handleExport() {
       downloadLink("/cx/cxScheduleResult/exportCxRemainQty", this.formatParams(false));
-    },
-    handleExportStructureChange() {
-      this.$confirm(this.$t(`ui.data.column.cxStructureChange.confirmExport`), {
-        type: "warning",
-      }).then(() => {
-        try {
-          this.loading = true;
-          let params = this.formatParams(false);
-          params = {
-            ...params,
-          };
-          exportStructureChange(params);
-        } catch (error) {
-          console.error(error);
-        } finally {
-          this.loading = false;
-        }
-      });
     },
     handleGotoMoldingScheduleSequence() {
       this.$router.push({
@@ -1349,38 +1346,6 @@ export default {
         }
       } catch (error) {
         console.error(error);
-      }
-    },
-
-    async publishSchedule() {
-      try {
-        const params = {
-          scheduleDate: this.query.scheduleDate,
-          ids: this.selection.map((row) => row.id).join(","),
-        };
-        this.loading = true;
-        const valid = await publishValidate(params);
-        if (valid.msg == "0") {
-          this.$confirm(
-            this.$t("ui.data.column.scheduleResult.hasNullLhMachineCode")
-          )
-            .then(async () => {
-                const res = await publishScheduleResult(params);
-                this.$modal.msgSuccess(res.msg);
-                this.getList();
-            })
-            .catch(() => {
-              this.loading = false;
-            });
-        } else {
-            const res = await publishScheduleResult(params);
-            this.$modal.msgSuccess(res.msg);
-
-            this.getList();
-        }
-      } catch (error) {
-        console.error(error);
-        this.loading = false;
       }
     },
   },

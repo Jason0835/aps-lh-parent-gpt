@@ -71,4 +71,28 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
      */
     AjaxResult importScheduleTemplate(List<CxScheduleResultTemplateImportVO> list,
                                       CxScheduleResult result, boolean updateSupport, Long logId);
+
+    /**
+     * 更新发布状态
+     *
+     * @param item 排程结果对象（仅更新isRelease字段）
+     */
+    void updateReleaseStatus(CxScheduleResult item);
+
+    /**
+     * 根据排程日期和工厂查询排程结果
+     *
+     * @param scheduleDate 排程日期
+     * @param factoryCode  工厂编码
+     * @return 排程结果列表
+     */
+    List<CxScheduleResult> listByScheduleDateAndFactory(Date scheduleDate, String factoryCode);
+
+    /**
+     * 根据ID列表查询排程结果
+     *
+     * @param ids ID列表
+     * @return 排程结果列表
+     */
+    List<CxScheduleResult> listByIds(List<Long> ids);
 }

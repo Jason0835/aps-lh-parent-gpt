@@ -29,7 +29,9 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -273,12 +275,28 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
 
     /**
      * 【排程发布】发布排程数据
+     * 参考硫化BootUI交互模式：接收Map参数，解析scheduleDate、factoryCode、ids后调用微服务publish接口
      */
     @ApiOperation("发布排程")
     @PostMapping("/publish")
     @ResponseBody
-    public AjaxResult publish(@RequestBody List<Long> ids) {
-        return iCxScheduleResultService.publish(ids);
+    public AjaxResult publish(@RequestBody Map<String, String> params) {
+        CxScheduleResult dto = new CxScheduleResult();
+        String ids = params.get("ids");
+        String scheduleDateStr = params.get("scheduleDate");
+        String factoryCode = params.get("factoryCode");
+        if (StringUtils.isNotEmpty(scheduleDateStr)) {
+            try {
+                dto.setScheduleDate(com.ruoyi.common.core.utils.DateUtils.parseDate(scheduleDateStr));
+            } catch (Exception e) {
+                dto.setScheduleDate(com.ruoyi.common.core.utils.DateUtils.addDays(new Date(), 1));
+            }
+        }
+        if (dto.getScheduleDate() == null) {
+            dto.setScheduleDate(com.ruoyi.common.core.utils.DateUtils.addDays(new Date(), 1));
+        }
+        dto.setFactoryCode(factoryCode);
+        return iCxScheduleResultService.publish(dto, ids);
     }
 
     @PostMapping({"/importData"})
