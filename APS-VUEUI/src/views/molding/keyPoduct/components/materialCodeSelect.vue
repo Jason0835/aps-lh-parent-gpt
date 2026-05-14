@@ -38,7 +38,7 @@
 import { deepClone } from "@/utils";
 
 import selectDialog from "@/components/Table/SelectDialog.vue";
-import { listProductinfo } from "@/api/lean/productinfo";
+import { listProductinfo, listEmbryoCode } from "@/api/lean/productinfo";
 export default {
   components: { selectDialog },
   inject: ["parentDict"],
@@ -149,8 +149,8 @@ export default {
         if (isFirst && this.multiple) {
           let topItems = [];
           if (this.oldList) {
-            let res = await listProductinfo({ materialCodes: this.oldList });
-            topItems = this.deduplicateByEmbryoCode(res.rows);
+            let res = await listEmbryoCode({ embryoCodes: this.oldList });
+            topItems = res.rows;
           }
 
           this.$nextTick(() => {
@@ -161,8 +161,8 @@ export default {
             this.getFirstList();
           });
         } else {
-          const data = await listProductinfo(this.formatParams());
-          this.data = this.deduplicateByEmbryoCode(data.rows);
+          const data = await listEmbryoCode(this.formatParams());
+          this.data = data.rows;
           this.page.total = data.total;
           this.loading = false;
         }
@@ -174,23 +174,13 @@ export default {
     },
     async getFirstList() {
       try {
-        const data = await listProductinfo(this.formatParams());
-        this.data = this.deduplicateByEmbryoCode(data.rows);
+        const data = await listEmbryoCode(this.formatParams());
+        this.data = data.rows;
         this.page.total = data.total;
       } catch (err) {}
       finally{
         this.loading = false;
       }
-    },
-    deduplicateByEmbryoCode(rows) {
-      if (!Array.isArray(rows)) return [];
-      const map = new Map();
-      rows.forEach(item => {
-        if (!map.has(item.embryoCode)) {
-          map.set(item.embryoCode, item);
-        }
-      });
-      return Array.from(map.values());
     },
     //
     formatParams() {
