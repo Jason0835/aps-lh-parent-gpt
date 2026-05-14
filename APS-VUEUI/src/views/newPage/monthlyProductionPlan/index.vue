@@ -388,7 +388,7 @@ export default {
           /** 与 rollingCycle/index.backup-legacy.vue 结构调整 Tab（activeName==second）一致：字段名为 productionVersion */
           prop: "version",
           label: this.$t(
-            "ui.data.column.monthPlanFinalAdjustQuery.productionVersion"
+            "ui.data.column.monthPlanFinalAdjustQuery.productionVersion11"
           ),
           type: "select",
           dictData: this.versionOptions,
@@ -982,16 +982,18 @@ export default {
 
       const heightQty = Number(row.heightQty || 0);
       if (heightQty > 0) {
-        row.heightProductionQty = Math.min(remainingQty, heightQty);
-        remainingQty -= row.heightProductionQty;
+        const allocated = Math.min(remainingQty, heightQty);
+        row.heightProductionQty = allocated;
+        remainingQty -= allocated;
         scmPriorities.push("height");
       }
 
       if (remainingQty > 0) {
         const midQty = Number(row.midQty || 0);
         if (midQty > 0) {
-          row.midProductionQty = Math.min(remainingQty, midQty);
-          remainingQty -= row.midProductionQty;
+          const allocated = Math.min(remainingQty, midQty);
+          row.midProductionQty = allocated;
+          remainingQty -= allocated;
           scmPriorities.push("mid");
         }
       }
@@ -999,8 +1001,9 @@ export default {
       if (remainingQty > 0) {
         const cycleReserveQty = Number(row.cycleReserveQty || 0);
         if (cycleReserveQty > 0) {
-          row.cycleProductionQty = Math.min(remainingQty, cycleReserveQty);
-          remainingQty -= row.cycleProductionQty;
+          const allocated = Math.min(remainingQty, cycleReserveQty);
+          row.cycleProductionQty = allocated;
+          remainingQty -= allocated;
           scmPriorities.push("cycle");
         }
       }
@@ -1009,8 +1012,9 @@ export default {
       if (adjustPriority > 0 && remainingQty > 0) {
         const postponeQty = Number(row.postponeQty || 0);
         if (postponeQty > 0) {
-          row.postponeProductionQty = Math.min(remainingQty, postponeQty);
-          remainingQty -= row.postponeProductionQty;
+          const allocated = Math.min(remainingQty, postponeQty);
+          row.postponeProductionQty = allocated;
+          remainingQty -= allocated;
           scmPriorities.push("postpone");
         }
       }
@@ -1018,11 +1022,9 @@ export default {
       if (remainingQty > 0) {
         const conventionReserveQty = Number(row.conventionReserveQty || 0);
         if (conventionReserveQty > 0) {
-          row.conventionProductionQty = Math.min(
-            remainingQty,
-            conventionReserveQty
-          );
-          remainingQty -= row.conventionProductionQty;
+          const allocated = Math.min(remainingQty, conventionReserveQty);
+          row.conventionProductionQty = allocated;
+          remainingQty -= allocated;
           scmPriorities.push("convention");
         }
       }
@@ -1032,23 +1034,23 @@ export default {
         switch (lastPriority) {
           case "convention":
             row.conventionProductionQty =
-              (row.conventionProductionQty || 0) + remainingQty;
+              Number(row.conventionProductionQty || 0) + remainingQty;
             break;
           case "postpone":
             row.postponeProductionQty =
-              (row.postponeProductionQty || 0) + remainingQty;
+              Number(row.postponeProductionQty || 0) + remainingQty;
             break;
           case "mid":
             row.midProductionQty =
-              (row.midProductionQty || 0) + remainingQty;
+              Number(row.midProductionQty || 0) + remainingQty;
             break;
           case "cycle":
             row.cycleProductionQty =
-              (row.cycleProductionQty || 0) + remainingQty;
+              Number(row.cycleProductionQty || 0) + remainingQty;
             break;
           default:
             row.heightProductionQty =
-              (row.heightProductionQty || 0) + remainingQty;
+              Number(row.heightProductionQty || 0) + remainingQty;
             break;
         }
       }
@@ -1255,6 +1257,7 @@ export default {
         this.loading = true;
         /** list4Adjust 不传 productionVersion；与 query 解耦，不影响 mpMonthPlanStatistics 使用的 resolveProductionVersionForStatistics */
         const listParams = { ...this.formatParams() };
+        console.log('listParams', listParams)
         const res = await listMonthPlanFinal4Adjust(listParams);
         const rawRows = res.rows || [];
         this.page.total = res.total || 0;

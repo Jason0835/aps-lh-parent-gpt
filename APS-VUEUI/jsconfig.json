@@ -5,7 +5,8 @@
         "./src/*"
       ]
     },
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "checkJs": false
   },
   "exclude": [
     "node_modules"
