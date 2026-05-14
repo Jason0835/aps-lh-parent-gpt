@@ -304,18 +304,6 @@ export default {
           minWidth: 200,
         },
         {
-          label: this.$t("物料编码"),
-          prop: "materialCode",
-          minWidth: 100,
-          align: "center",
-        },
-        {
-          label: this.$t("物料描述"),
-          align: "left",
-          prop: "materialDesc",
-          minWidth: 350,
-        },
-        {
           label: this.$t("胎胚代码"),
           prop: "embryoCode",
           minWidth: 120,
@@ -325,6 +313,18 @@ export default {
           label: this.$t("胎胚描述"),
           align: "left",
           prop: "mainMaterialDesc",
+          minWidth: 350,
+        },
+        {
+          label: this.$t("物料编码"),
+          prop: "materialCode",
+          minWidth: 100,
+          align: "center",
+        },
+        {
+          label: this.$t("物料描述"),
+          align: "left",
+          prop: "materialDesc",
           minWidth: 350,
         },
         {
