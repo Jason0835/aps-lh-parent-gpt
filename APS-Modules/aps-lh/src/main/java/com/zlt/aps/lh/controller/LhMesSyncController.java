@@ -1,47 +1,28 @@
 package com.zlt.aps.lh.controller;
 
+import cn.hutool.core.date.DateUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
-import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
-import com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish;
-import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
-import com.zlt.aps.lh.api.domain.entity.LhMouldCleanWarn;
-import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
-import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
+import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.service.ILhMesSyncRemoteService;
-import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
-import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
-import com.zlt.aps.lh.mapper.LhMoldAlterPlanFinishMapper;
-import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
-import com.zlt.aps.lh.mapper.LhMouldCleanWarnMapper;
-import com.zlt.aps.lh.mapper.LhRepairCapsuleMapper;
-import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
-import com.zlt.aps.lh.service.ILhDayFinishQtyService;
-import com.zlt.aps.lh.service.ILhMachineOnlineInfoService;
-import com.zlt.aps.lh.service.ILhMouldCleanPlanService;
-import com.zlt.aps.lh.service.ILhRepairCapsuleService;
-import com.zlt.aps.lh.service.ILhScheFinishQtyService;
+import com.zlt.aps.lh.mapper.*;
+import com.zlt.aps.lh.service.*;
 import com.zlt.core.dao.basedao.BaseDao;
+import io.seata.common.util.CollectionUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import cn.hutool.core.date.DateUtil;
-import org.apache.commons.lang.StringUtils;
 
 @Slf4j
 @Api(tags = "MES数据同步")
@@ -87,6 +68,12 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
 
     @Autowired
     private ILhMouldCleanPlanService lhMouldCleanPlanService;
+
+    @Autowired
+    private ILhScheduleService lhScheduleService;
+
+    @Resource
+    private LhScheduleResultMapper scheduleResultMapper;
 
     @Override
     @ApiOperation("批量删除硫化在机信息")
@@ -293,6 +280,16 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
                 updateWrapper.eq(LhMouldChangePlan::getLeftRightMould, finishItem.getLeftRightMold());
             }
             lhMouldChangePlanEntityMapper.update(null, updateWrapper);
+            // 执行硫化排程自动更新
+            LambdaQueryWrapper<LhScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(LhScheduleResult::getFactoryCode, finishItem.getFactoryCode());
+            queryWrapper.eq(LhScheduleResult::getScheduleDate, finishItem.getScheduleDate());
+            queryWrapper.eq(LhScheduleResult::getLhMachineCode, finishItem.getLhMachineCode());
+            queryWrapper.eq(LhScheduleResult::getIsDelete, YesOrNoEnum.NO.getCode());
+            List<LhScheduleResult> lhScheduleResultList = scheduleResultMapper.selectList(queryWrapper);
+            if (CollectionUtils.isNotEmpty(lhScheduleResultList)) {
+                lhScheduleService.increaseMouldStartPlan(lhScheduleResultList.get(0));
+            }
         }
         return AjaxResult.success();
     }

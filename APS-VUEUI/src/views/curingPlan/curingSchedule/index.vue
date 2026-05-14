@@ -41,17 +41,6 @@
           >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button
         >
         <el-button
-          v-hasPermi="['lh:lhScheduleResult:save']"
-          type="warning"
-          @click="
-            () => {
-              handleEdit(this.selection[0]);
-            }
-          "
-          :disabled="selection.length != 1"
-          >{{ $t("ui.frame.btn.modify") }}</el-button
-        >
-        <el-button
           v-hasPermi="['lh:lhScheduleResult:remove']"
           type="danger"
           @click="handleDeleteMulti"
@@ -86,20 +75,6 @@
           @click="getAdjustTextNo"
           >{{ $t("ui.data.column.scheduleResult.textAdjust") }}</el-button
         > -->
-        <el-button
-          v-hasPermi="['lh:lhScheduleResult:generateTextPlan']"
-          type="primary"
-          :disabled="selection.length != 1"
-          @click="handleGenerateTextMouldChangePlan"
-        >{{ $t("ui.data.btn.lhMouldChangePlan.generateTextPlan") }}</el-button
-        >
-        <el-button
-          v-hasPermi="['lh:lhScheduleResult:increaseMouldStartPlan']"
-          type="primary"
-          :disabled="selection.length != 1"
-          @click="handleIncreaseMouldStartPlan"
-        >{{ $t("ui.data.btn.lhScheduleResult.increaseMouldStartPlan") }}</el-button
-        >
         <el-button
           v-hasPermi="['lh:lhScheduleResult:unscheduledResult']"
           type="primary"
@@ -167,6 +142,22 @@
           </el-dropdown-menu>
         </el-dropdown> -->
       </template>
+      <template slot="headerRight">
+        <el-button
+          v-hasPermi="['lh:lhScheduleResult:generateTextPlan']"
+          type="primary"
+          :disabled="selection.length != 1"
+          @click="handleGenerateTextMouldChangePlan"
+        >{{ $t("ui.data.btn.lhMouldChangePlan.generateTextPlan") }}</el-button
+        >
+        <el-button
+          v-hasPermi="['lh:lhScheduleResult:increaseMouldStartPlan']"
+          type="primary"
+          :disabled="selection.length != 1"
+          @click="handleIncreaseMouldStartPlan"
+        >{{ $t("ui.data.btn.lhScheduleResult.increaseMouldStartPlan") }}</el-button
+        >
+      </template>
     </page-table>
     <tlt-upload-form
       ref="tltUploadForm"
@@ -209,22 +200,22 @@
   </basic-container>
 </template>
 <script>
-import { mapState } from "vuex";
+import {mapState} from "vuex";
 import moment from "moment";
 
 import {
-  listScheduleResult,
-  changeQty,
-  removeScheduleResult,
-  exportScheduleResult,
-  publishScheduleResult,
-  exportCombine,
-  getScheduleDate,
   adjustTextNo,
+  changeQty,
+  exportCombine,
+  exportScheduleResult,
   generateTextMouldChangePlan,
+  getScheduleDate,
   increaseMouldStartPlan,
+  listScheduleResult,
+  publishScheduleResult,
+  removeScheduleResult,
 } from "@/api/lh/scheduleResult";
-import { checkPermi } from "@/utils/permission";
+import {checkPermi} from "@/utils/permission";
 
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import TltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -766,9 +757,9 @@ export default {
                     type="text"
                     size="mini"
                     icon="el-icon-edit"
-                    onClick={() => this.handleEdit(row)}
+                    onClick={() => this.handleShowChangeQty(row)}
                   >
-                    {this.$t("ui.frame.btn.modify")}
+                    {this.$t("ui.data.column.scheduleResult.changePlan")}
                   </el-button>
                 ) : null}
                 {checkPermi(["lh:lhScheduleResult:remove"]) ? (

@@ -72,7 +72,7 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
     AjaxResult adjustQuantity(LhScheduleResultUpdateDTO dto);
 
     /**
-     * 根据单条硫化排程结果生成文字示方换模计划。
+     * 根据单条硫化排程结果文字示方更新。
      *
      * @param dto 生成入参
      * @return 处理结果
@@ -80,7 +80,7 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
     AjaxResult generateTextMouldChangePlan(LhGenerateTextMouldPlanDTO dto);
 
     /**
-     * 换模开产增加计划。
+     * 计划更新。
      *
      * @param scheduleResult 当前硫化排程结果
      * @return 处理结果

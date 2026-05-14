@@ -44,11 +44,7 @@ import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -439,7 +435,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 根据单条排程结果生成文字示方换模计划。
+     * 根据单条排程结果文字示方更新。
      *
      * @param dto 生成入参
      * @return 处理结果
@@ -450,7 +446,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 换模开产增加计划。
+     * 计划更新。
      *
      * @param scheduleResult 当前硫化排程结果
      * @return 处理结果
