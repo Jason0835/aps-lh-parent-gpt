@@ -33,6 +33,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.adjust.service.impl.MpMonthPlanStaticService;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
@@ -2350,13 +2351,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         queryWrapper.eq(FactoryParam::getFactoryCode, factoryCode);
         queryWrapper.eq(FactoryParam::getIsDelete, YesOrNoEnum.NO.getValue());
         queryWrapper.in(FactoryParam::getParamCode, MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode(), MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode());
-        List<FactoryParam> paramList = factoryParamMapper.selectList(queryWrapper);
-        Map<String, Object> paramMap = new HashMap<>(); // 参数
-        for (FactoryParam param: paramList) {
-            Object defaultValue = param.getDefauleValue();
-            Object paramValue = param.getParamValue();
-            paramMap.put(param.getParamCode(), Optional.ofNullable(paramValue).orElse(defaultValue));
-        }
+        Map<String, Object> paramMap = factoryParamMapper.selectList(queryWrapper).stream()
+                .collect(Collectors.toMap(FactoryParam::getParamCode, FactoryParamUtils::getParamValue));
         
         // 加载日历
         MpStructureAllocation mpStructureAllocation = new MpStructureAllocation();
