@@ -1,21 +1,15 @@
 package com.zlt.aps.cx.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.mapper.CxKeyProductMapper;
+import com.zlt.aps.cx.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.cx.service.CxKeyProductService;
-import com.zlt.aps.maindata.mapper.MdmConstructionInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmSkuStructureRefEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmStructureNameEntityMapper;
-import com.zlt.aps.mp.api.domain.entity.MdmConstructionInfo;
-import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
-import com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef;
-import com.zlt.aps.mp.api.domain.entity.MdmStructureName;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -46,10 +40,7 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
     private CxKeyProductMapper cxKeyProductMapper;
 
     @Autowired
-    private MdmStructureNameEntityMapper mdmStructureNameEntityMapper;
-
-    @Autowired
-    private MdmSkuStructureRefEntityMapper mdmSkuStructureRefEntityMapper;
+    private MdmMaterialInfoMapper mdmMaterialInfoMapper;
 
     @Override
     public AjaxResult importData(List<CxKeyProduct> list, boolean updateSupport, Long importLogId) {
@@ -147,14 +138,13 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
                     }
                 }*/
 
-                // 校验胎胚编码是否在该结构下（embryoCode对应constructionCode，structureName对应specCode）
+                // 校验胎胚编码是否在该结构下（直接从物料信息表用胎胚编码+结构名称查询，避免胎胚描述匹配不准确的问题）
                 if (StringUtil.isNotBlank(docEntity.getEmbryoCode())
-                        && StringUtil.isNotBlank(docEntity.getEmbryoDesc())
                         && StringUtil.isNotBlank(docEntity.getStructureName())) {
-                    QueryWrapper<MdmSkuStructureRef> skuStructureQueryWrapper = new QueryWrapper<>();
-                    skuStructureQueryWrapper.eq("MAIN_MATERIAL_DESC", docEntity.getEmbryoDesc());
-                    skuStructureQueryWrapper.eq("STRUCTURE_NAME", docEntity.getStructureName());
-                    if (mdmSkuStructureRefEntityMapper.selectCount(skuStructureQueryWrapper) == 0) {
+                    LambdaQueryWrapper<MdmMaterialInfo> materialQueryWrapper = new LambdaQueryWrapper<>();
+                    materialQueryWrapper.eq(MdmMaterialInfo::getEmbryoCode, docEntity.getEmbryoCode());
+                    materialQueryWrapper.eq(MdmMaterialInfo::getStructureName, docEntity.getStructureName());
+                    if (mdmMaterialInfoMapper.selectCount(materialQueryWrapper) == 0) {
                         isCan = false;
                         String message = String.format(I18nUtil.getMessage("ui.data.alert.cxKeyProduct.embryoNotInStructure"), errorNum, docEntity.getEmbryoCode(), docEntity.getStructureName());
                         ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
@@ -168,9 +158,9 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
                         checkList.add(docEntity);
                     } else {
                         if (updateSupport) {
-                            QueryWrapper<CxKeyProduct> queryWrapper = new QueryWrapper<>();
-                            queryWrapper.eq("EMBRYO_CODE", docEntity.getEmbryoCode());
-                            queryWrapper.eq("STRUCTURE_NAME", docEntity.getStructureName());
+                            LambdaQueryWrapper<CxKeyProduct> queryWrapper = new LambdaQueryWrapper<>();
+                            queryWrapper.eq(CxKeyProduct::getEmbryoCode, docEntity.getEmbryoCode());
+                            queryWrapper.eq(CxKeyProduct::getStructureName, docEntity.getStructureName());
                             CxKeyProduct existEntity = cxKeyProductMapper.selectOne(queryWrapper);
                             if (existEntity != null) {
                                 docEntity.setId(existEntity.getId());
@@ -226,10 +216,10 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
 
     @Override
     public String checkUnique(CxKeyProduct entity) {
-        QueryWrapper<CxKeyProduct> queryWrapper = new QueryWrapper<>();
-        queryWrapper.ne(PubUtil.isNotEmpty(entity.getFieldValueByFieldName("id")), "ID", entity.getFieldValueByFieldName("id"));
-        queryWrapper.eq("EMBRYO_CODE", entity.getEmbryoCode());
-        queryWrapper.eq("STRUCTURE_NAME", entity.getStructureName());
+        LambdaQueryWrapper<CxKeyProduct> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.ne(PubUtil.isNotEmpty(entity.getFieldValueByFieldName("id")), CxKeyProduct::getId, entity.getFieldValueByFieldName("id"));
+        queryWrapper.eq(CxKeyProduct::getEmbryoCode, entity.getEmbryoCode());
+        queryWrapper.eq(CxKeyProduct::getStructureName, entity.getStructureName());
 
         if (cxKeyProductMapper.selectCount(queryWrapper) > 0) {
             return UserConstants.NOT_UNIQUE;

@@ -25,6 +25,10 @@ import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.service.IMpStructureAllocationRemoteService;
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -32,6 +36,7 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -103,6 +108,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     @Resource
     private MdmMaterialInfoMapper mdmMaterialInfoMapper;
+
+    @Resource
+    private IMpStructureAllocationRemoteService mpStructureAllocationRemoteService;
 
     @Override
     public byte[] exportScheduleSummaryReport(ScheduleSummaryReportVO queryVO) {
@@ -198,17 +206,10 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         BigDecimal cxMorningTotal = BigDecimal.ZERO;
         BigDecimal cxMiddleTotal = BigDecimal.ZERO;
 
-        Set<String> structureChanges = new LinkedHashSet<>();
-        String prevStructure = null;
         for (CxScheduleResult result : cxResults) {
             cxNightTotal = cxNightTotal.add(sumCxQtyByShiftType(result, classShiftTypeMap, "01"));
             cxMorningTotal = cxMorningTotal.add(sumCxQtyByShiftType(result, classShiftTypeMap, "02"));
             cxMiddleTotal = cxMiddleTotal.add(sumCxQtyByShiftType(result, classShiftTypeMap, "03"));
-            String currentStructure = StringUtils.defaultString(result.getStructureName()).trim();
-            if (prevStructure != null && !prevStructure.equals(currentStructure)) {
-                structureChanges.add(prevStructure + "→" + currentStructure);
-            }
-            prevStructure = currentStructure;
         }
 
         map.put("cxNightQty", cxNightTotal.toString());
@@ -220,10 +221,11 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 cxNightTotal, cxMorningTotal, cxMiddleTotal,
                 cxNightTotal.add(cxMorningTotal).add(cxMiddleTotal));
 
-        // 成型试制/量试信息：从原因分析字段匹配
+        // 成型试制/量试信息：从原因分析字段匹配，取出排程日期当天对应试制/量试的所有规格去重按逗号隔开
         map.put("cxSetupInfo", buildCxSetupOrTrialInfo(cxResults, "试制"));
         map.put("cxTrialInfo", buildCxSetupOrTrialInfo(cxResults, "量试"));
-        map.put("cxSpecSwitch", String.join("；", structureChanges));
+        // 成型规格切换：参考成型日计划生成页面的成型结构切换导出逻辑，从T_MP_STRUCTURE_ALLOCATION取切换结构数据
+        map.put("cxSpecSwitch", buildCxSpecSwitch(scheduleDate, factoryCode));
 
         // 硫化排程结果：cx-lh-api的LhScheduleResult有isDelete字段，需要过滤
         List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> lhResults = cxLhScheduleResultMapper.selectList(
@@ -712,5 +714,121 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         }
         log.info("班次配置映射: {}", map);
         return map;
+    }
+
+    /**
+     * 构建成型规格切换信息。
+     * 参考成型日计划生成页面的成型结构切换导出逻辑（CxScheduleResultServiceImpl.buildStructureChangeDataListV2），
+     * 从T_MP_STRUCTURE_ALLOCATION表获取结构排产数据，
+     * 按成型机台分组，根据排程日期找到当前正在运行的结构和下一个切换结构，
+     * 展示格式为"前结构 换 后结构"，多个切换用"；"隔开。
+     *
+     * @param scheduleDate 排程日期
+     * @param factoryCode  分厂编码
+     * @return 规格切换信息字符串，如"结构A 换 结构B；结构C 换 结构D"
+     */
+    private String buildCxSpecSwitch(Date scheduleDate, String factoryCode) {
+        LocalDate localScheduleDate = DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
+
+        MpStructureAllocation structureQuery = new MpStructureAllocation();
+        structureQuery.setFactoryCode(factoryCode);
+        structureQuery.setYear(localScheduleDate.getYear());
+        structureQuery.setMonth(localScheduleDate.getMonthValue());
+
+        List<MpStructureAllocation> structureList = queryStructureAllocationList(structureQuery);
+        if (structureList.isEmpty()) {
+            log.info("成型规格切换：未查询到结构排产数据, 日期: {}, 分厂: {}", DateUtil.formatDate(scheduleDate), factoryCode);
+            return "";
+        }
+
+        Map<String, List<MpStructureAllocation>> machineGroupMap = structureList.stream()
+                .filter(Objects::nonNull)
+                .filter(s -> StringUtils.isNotBlank(s.getCxMachineCode()))
+                .collect(Collectors.groupingBy(
+                        s -> s.getCxMachineCode().trim(),
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+
+        List<String> switchList = new ArrayList<>();
+        int scheduleDayOfMonth = localScheduleDate.getDayOfMonth();
+
+        for (Map.Entry<String, List<MpStructureAllocation>> entry : machineGroupMap.entrySet()) {
+            List<MpStructureAllocation> structures = entry.getValue().stream()
+                    .sorted(Comparator.comparing(MpStructureAllocation::getBeginDay, Comparator.nullsLast(Comparator.naturalOrder())))
+                    .collect(Collectors.toList());
+
+            int currentIndex = -1;
+            for (int i = 0; i < structures.size(); i++) {
+                MpStructureAllocation s = structures.get(i);
+                if (s.getBeginDay() != null && s.getEndDay() != null
+                        && scheduleDayOfMonth >= s.getBeginDay() && scheduleDayOfMonth <= s.getEndDay()) {
+                    currentIndex = i;
+                    break;
+                }
+            }
+
+            if (currentIndex == -1 || currentIndex >= structures.size() - 1) {
+                continue;
+            }
+
+            MpStructureAllocation prevStructure = structures.get(currentIndex);
+            MpStructureAllocation nextStructure = structures.get(currentIndex + 1);
+
+            String prevStructureName = StringUtils.defaultString(prevStructure.getStructureName()).trim();
+            String nextStructureName = StringUtils.defaultString(nextStructure.getStructureName()).trim();
+
+            if (StringUtils.isNotBlank(prevStructureName) && StringUtils.isNotBlank(nextStructureName)) {
+                switchList.add(prevStructureName + " 换 " + nextStructureName);
+            }
+        }
+
+        String result = String.join("；", switchList);
+        log.info("成型规格切换: {}", result);
+        return result;
+    }
+
+    /**
+     * 通过Feign远程调用查询结构排产数据列表，
+     * 并将返回的LinkedHashMap转换为MpStructureAllocation实体列表。
+     *
+     * @param structureQuery 查询条件（含factoryCode、year、month）
+     * @return MpStructureAllocation实体列表
+     */
+    private List<MpStructureAllocation> queryStructureAllocationList(MpStructureAllocation structureQuery) {
+        try {
+            TableDataInfo structureDataInfo = mpStructureAllocationRemoteService.list(structureQuery);
+            if (structureDataInfo == null || structureDataInfo.getRows() == null) {
+                return Collections.emptyList();
+            }
+            return convertToMpStructureAllocationList(structureDataInfo.getRows());
+        } catch (Exception e) {
+            log.error("查询结构排产数据失败", e);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * 将Feign远程调用返回的LinkedHashMap列表转换为MpStructureAllocation实体列表。
+     * Feign反序列化泛型丢失，TableDataInfo.getRows()中的元素实际类型为LinkedHashMap，
+     * 需使用ObjectMapper.convertValue进行类型转换。
+     *
+     * @param rows Feign远程调用返回的行数据列表
+     * @return MpStructureAllocation实体列表
+     */
+    private List<MpStructureAllocation> convertToMpStructureAllocationList(List<?> rows) {
+        List<MpStructureAllocation> entityList = new ArrayList<>();
+        if (rows == null || rows.isEmpty()) {
+            return entityList;
+        }
+        ObjectMapper objectMapper = new ObjectMapper();
+        for (Object obj : rows) {
+            if (obj instanceof MpStructureAllocation) {
+                entityList.add((MpStructureAllocation) obj);
+            } else if (obj instanceof Map) {
+                MpStructureAllocation entity = objectMapper.convertValue(obj, MpStructureAllocation.class);
+                entityList.add(entity);
+            }
+        }
+        return entityList;
     }
 }
