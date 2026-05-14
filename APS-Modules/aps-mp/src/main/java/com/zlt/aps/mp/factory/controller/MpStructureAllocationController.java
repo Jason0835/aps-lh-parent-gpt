@@ -21,6 +21,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
@@ -28,6 +29,7 @@ import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.api.domain.vo.MpStructureAllocationVo;
 import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
 import com.zlt.aps.mp.common.utils.PubUtil;
@@ -254,6 +256,25 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
     @PostMapping("/getPreviousStructure")
     public MpStructureAllocation getPreviousStructure(@RequestBody MpStructureAllocation queryCondition) {
         return mpStructureAllocationService.getPreviousStructure(queryCondition);
+    }
+
+    /**
+     * 从缓存中获取调整机台
+     */
+    @ApiOperation("从缓存中获取调整机台")
+    @PostMapping("/getAdjustsCxMachineFromRedis")
+    public AdjustsCxMachineVo getAdjustsCxMachineFromRedis() {
+        return mpStructureAllocationService.getAdjustsCxMachineFromRedis();
+    }
+
+    /**
+     * 调整机台设置到缓存
+     * @param adjustsCxMachineVo
+     */
+    @ApiOperation("调整机台设置到缓存")
+    @PostMapping("/setAdjustsCxMachineFromRedis")
+    public void setAdjustsCxMachineFromRedis(@RequestBody AdjustsCxMachineVo adjustsCxMachineVo) {
+        mpStructureAllocationService.setAdjustsCxMachineFromRedis(adjustsCxMachineVo);
     }
 
     /**

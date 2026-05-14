@@ -4,6 +4,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
 import com.zlt.bill.common.service.IDocService;
@@ -48,6 +49,22 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
      * @return
      */
     MpStructureAllocation getPreviousStructure(MpStructureAllocation param);
+
+    /**
+     * 从缓存中获取调整机台
+     * @param redisKey
+     * @return
+     */
+    AdjustsCxMachineVo getAdjustsCxMachineFromRedis();
+
+    /**
+     * 调整机台设置到缓存
+     * @param adjustsCxMachineVo
+     * @return
+     */
+    void setAdjustsCxMachineFromRedis(AdjustsCxMachineVo adjustsCxMachineVo);
+
+
     /**
      *  根据调整参数获取分配结构
      * @param createCondition 调整参数

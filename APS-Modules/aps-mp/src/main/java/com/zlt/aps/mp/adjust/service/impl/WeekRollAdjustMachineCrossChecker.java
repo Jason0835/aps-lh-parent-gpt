@@ -6,10 +6,10 @@ import com.zlt.common.utils.PubUtil;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * 周滚动调整单台机台结构时间交叉校验工具。
@@ -65,13 +65,13 @@ class WeekRollAdjustMachineCrossChecker {
     }
 
     /**
-     * 判断目标结构转产记录是否与同机台其它结构时间交叉。
+     * 判断目标结构转产记录是否与同机台其它结构时间连续性。
      *
      * @param targetAllocation 目标结构转产记录
      * @param allocationList 已有结构转产记录
-     * @return true 存在交叉，false 不存在交叉
+     * @return true 存在连续性，false 不连续
      */
-    static boolean hasTargetDifferentStructureCross(MpStructureAllocation targetAllocation, List<MpStructureAllocation> allocationList) {
+    static boolean hasTargetDifferentStructureContinue(MpStructureAllocation targetAllocation, List<MpStructureAllocation> allocationList) {
         if (targetAllocation == null || PubUtil.isEmpty(allocationList)
                 || StringUtils.isBlank(targetAllocation.getCxMachineCode())
                 || StringUtils.isBlank(targetAllocation.getStructureName())
@@ -79,22 +79,59 @@ class WeekRollAdjustMachineCrossChecker {
                 || targetAllocation.getBeginDay() > targetAllocation.getEndDay()) {
             return false;
         }
-        for (MpStructureAllocation allocation : allocationList) {
-            if (allocation == null || Objects.equals(targetAllocation.getId(), allocation.getId())
-                    || StringUtils.equals(targetAllocation.getStructureName(), allocation.getStructureName())
-                    || StringUtils.isBlank(allocation.getStructureName())
-                    || allocation.getBeginDay() == null || allocation.getEndDay() == null
-                    || allocation.getBeginDay() > allocation.getEndDay()) {
-                continue;
-            }
-            if (containsMachine(allocation.getCxMachineCode(), targetAllocation.getCxMachineCode())
-                    && isTimeCrossed(targetAllocation, allocation)) {
-                return true;
+
+        //1. 将目标替换到列表
+        if (targetAllocation.getId() == null){
+            // 新增结构
+            allocationList.add(targetAllocation);
+        }else{
+            for (int i=0; i<allocationList.size(); i++){
+                if (targetAllocation.getId() == allocationList.get(i).getId()){
+                    allocationList.set(i,targetAllocation);
+                }
             }
         }
-        return false;
+
+        //2. 判断是否连续
+        return isContinuous(allocationList);
     }
 
+    /**
+     * 判断是否连续,有间隔或重叠，则为不连续
+     * @param structureAllocationList
+     * @return
+     */
+    public static boolean isContinuous(List<MpStructureAllocation> structureAllocationList) {
+        if (structureAllocationList == null || structureAllocationList.isEmpty()) return true;
+        if (structureAllocationList.size() == 1) return true;
+
+        // 按开始日期排序
+        List<MpStructureAllocation> sorted = new ArrayList<>(structureAllocationList);
+        sorted.sort(Comparator.comparingInt(MpStructureAllocation::getBeginDay));
+
+        // 1. 检查每个区间自身有效性
+        for (MpStructureAllocation r : sorted) {
+            if (r.getBeginDay() > r.getEndDay()) {
+                return false;
+            }
+        }
+
+        // 2. 检查相邻区间是否有重叠或间隔
+        for (int i = 0; i < sorted.size() - 1; i++) {
+            MpStructureAllocation curr = sorted.get(i);
+            MpStructureAllocation next = sorted.get(i + 1);
+
+            // 重叠判断：下一个的开始 <= 当前的结束
+            if (next.getBeginDay() <= curr.getEndDay()) {
+                return false; // 存在交叉/重叠
+            }
+            // 间隔判断：下一个的开始 != 当前的结束 + 1
+            if (next.getBeginDay() != curr.getEndDay() + 1) {
+                return false; // 存在空闲间隔
+            }
+        }
+        return true;
+    }
     /**
      * 查找同机台同结构的结构转产记录。
      *

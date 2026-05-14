@@ -20,6 +20,7 @@ import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.redis.service.RedisService;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
@@ -38,6 +39,7 @@ import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.adjust.service.impl.MpMonthPlanStaticService;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
@@ -134,6 +136,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     @Autowired
     @Lazy
     private MpMonthPlanStaticService mpMonthPlanStaticService;
+
+    @Autowired
+    private RedisService redisService;
     /**
      * 日计划字段名称
      */
@@ -1064,6 +1069,15 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
     }
 
+    @Override
+    public AdjustsCxMachineVo getAdjustsCxMachineFromRedis() {
+        return redisService.getCacheObject(ApsConstant.ADJUSTS_CX_MACHINE_KEY);
+    }
+
+    @Override
+    public void setAdjustsCxMachineFromRedis(AdjustsCxMachineVo adjustsCxMachineVo) {
+        redisService.setCacheObject(ApsConstant.ADJUSTS_CX_MACHINE_KEY, adjustsCxMachineVo);
+    }
 
     /**
      * 获取日期最接近的上一个结构

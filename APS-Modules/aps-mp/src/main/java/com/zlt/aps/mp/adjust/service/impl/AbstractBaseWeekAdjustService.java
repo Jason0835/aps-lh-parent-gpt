@@ -50,6 +50,7 @@ import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
+import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
 import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
@@ -129,6 +130,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected IMpAdjustStructureInService mpAdjustStructureInService;
+
+    @Autowired
+    protected IMpStructureAllocationService mpStructureAllocationService;
 
     @Autowired
     protected MoldCavityInsertMaxValueCalculatorImpl moldCavityInsertMaxValueCalculator;
@@ -1171,6 +1175,18 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     protected void updateStructureAllocationList(MpRollAdjustContextDTO contextDTO) {
+        if (StringUtil.isEmptyWithTrim(contextDTO.getScheduledMachines())){
+            //scheduledMachines,存储的是当前调整机台，若没有当前调整机台，则返回
+            return;
+        }
+        if (PubUtil.isEmpty(contextDTO.getFactoryMonthPlanProdFinalList())){
+            return;
+        }
+        if (StringUtil.isEmptyWithTrim(contextDTO.getProductionVersion())){
+            FactoryMonthPlanFinalAdjustVo firstFinalVo = contextDTO.getFactoryMonthPlanProdFinalList().get(0);
+            contextDTO.setProductionVersion(firstFinalVo.getProductionVersion());
+            contextDTO.setMonthPlanVersion(firstFinalVo.getMonthPlanVersion());
+        }
         MpStructureAllocation targetAllocation = buildTargetStructureAllocation(contextDTO);
         if (targetAllocation == null) {
             return;
@@ -1179,14 +1195,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         MpStructureAllocation existAllocation = WeekRollAdjustMachineCrossChecker.findSameMachineStructure(structureAllocationList, targetAllocation);
         if (existAllocation != null) {
             targetAllocation.setId(existAllocation.getId());
-            targetAllocation.setMonthPlanVersion(existAllocation.getMonthPlanVersion());
-        } else if (PubUtil.isNotEmpty(structureAllocationList)) {
-            targetAllocation.setMonthPlanVersion(structureAllocationList.get(0).getMonthPlanVersion());
-        } else {
-            targetAllocation.setMonthPlanVersion(contextDTO.getVersion());
         }
-        if (WeekRollAdjustMachineCrossChecker.hasTargetDifferentStructureCross(targetAllocation, structureAllocationList)) {
-            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.machineStructureCross"));
+        // 判断同机台不同结构是否存在连续性
+        if (WeekRollAdjustMachineCrossChecker.hasTargetDifferentStructureContinue(targetAllocation, structureAllocationList)) {
+            //若是连续性的，清空缓存
+            mpStructureAllocationService.setAdjustsCxMachineFromRedis(null);
         }
         if (targetAllocation.getId() == null) {
             targetAllocation.setIsDelete(YesOrNoEnum.NO.getValue());
@@ -2470,6 +2483,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryWrapper.eq(contextDTO.getMpYear() != null, MpStructureAllocation::getYear, contextDTO.getMpYear());
         queryWrapper.eq(contextDTO.getMpMonth() != null, MpStructureAllocation::getMonth, contextDTO.getMpMonth());
         queryWrapper.eq(StringUtils.isNotBlank(contextDTO.getProductionVersion()), MpStructureAllocation::getProductionVersion, contextDTO.getProductionVersion());
+        queryWrapper.eq(MpStructureAllocation::getCxMachineCode, contextDTO.getScheduledMachines());
         queryWrapper.eq(MpStructureAllocation::getIsDelete, YesOrNoEnum.NO.getValue());
         return mpStructureAllocationEntityMapper.selectList(queryWrapper);
     }
@@ -2483,7 +2497,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (StringUtils.isAnyBlank(contextDTO.getFactoryCode(), contextDTO.getProductionVersion(),
                 contextDTO.getScheduledMachines(), contextDTO.getStructureName())
                 || contextDTO.getMpYear() == null || contextDTO.getMpMonth() == null
-                || contextDTO.getStartDay() == null || contextDTO.getEndDay() == null) {
+                || contextDTO.getAdjustStartDay() == null || contextDTO.getAdjustEndDay() == null) {
             return null;
         }
         MpStructureAllocation targetAllocation = new MpStructureAllocation();
@@ -2491,10 +2505,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         targetAllocation.setYear(contextDTO.getMpYear());
         targetAllocation.setMonth(contextDTO.getMpMonth());
         targetAllocation.setProductionVersion(contextDTO.getProductionVersion());
+        targetAllocation.setMonthPlanVersion(contextDTO.getMonthPlanVersion());
         targetAllocation.setCxMachineCode(contextDTO.getScheduledMachines());
         targetAllocation.setStructureName(contextDTO.getStructureName());
-        targetAllocation.setBeginDay(contextDTO.getStartDay());
-        targetAllocation.setEndDay(contextDTO.getEndDay());
+        targetAllocation.setBeginDay(contextDTO.getAdjustStartDay());
+        targetAllocation.setEndDay(contextDTO.getAdjustEndDay());
         targetAllocation.setAllotDays(contextDTO.getEndDay() - contextDTO.getStartDay() + 1);
         return targetAllocation;
     }

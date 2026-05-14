@@ -5,6 +5,7 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.api.domain.vo.MpStructureAllocationVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -104,6 +105,20 @@ public interface IMpStructureAllocationRemoteService {
     @ApiOperation("获取日期最接近的上一个结构")
     @PostMapping("/mpStructureAllocation/getPreviousStructure")
     MpStructureAllocation getPreviousStructure(@RequestBody MpStructureAllocation queryVO);
+
+    /**
+     * 调整机台设置到缓存
+     */
+    @ApiOperation("调整机台设置到缓存")
+    @PostMapping("/mpStructureAllocation/setAdjustsCxMachineFromRedis")
+    void setAdjustsCxMachineFromRedis(@RequestBody AdjustsCxMachineVo adjustsCxMachineVo);
+
+    /**
+     * 从缓存中获取调整机台
+     */
+    @ApiOperation("从缓存中获取调整机台")
+    @PostMapping("/mpStructureAllocation/getAdjustsCxMachineFromRedis")
+    AdjustsCxMachineVo getAdjustsCxMachineFromRedis();
 
     /**
      * 导入结构排产

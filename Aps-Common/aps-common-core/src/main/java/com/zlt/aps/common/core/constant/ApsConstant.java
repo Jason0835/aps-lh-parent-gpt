@@ -526,6 +526,11 @@ public class ApsConstant {
 
 
     /**
+     * 月计划调整：当前调整机台
+     */
+    public static final String ADJUSTS_CX_MACHINE_KEY = "MP_LONG_REDIS:ADJUSTS_CX_MACHINE_KEY";
+
+    /**
      * 结构调整-自动调整
      */
     public static final String REDIS_ADJUST_STRUCT_AUTO = "APS:STRUCT:AUTO:";

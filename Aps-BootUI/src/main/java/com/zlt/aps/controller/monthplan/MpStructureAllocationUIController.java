@@ -103,9 +103,10 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     @PostMapping("/getAdjustsCxMachineFromRedis")
     @ApiOperation("从Redis获取正在调整的成型机台")
     public AjaxResult getAdjustsCxMachineFromRedis() {
-        String redisKey = ADJUSTS_CX_MACHINE_KEY;
-        Object redisValue = redisService.getCacheObject(redisKey);
-        return AjaxResult.success(redisValue);
+        //String redisKey = ADJUSTS_CX_MACHINE_KEY;
+        //Object redisValue = redisService.getCacheObject(redisKey);
+        AdjustsCxMachineVo  adjustsCxMachineVo = iMpStructureAllocationService.getAdjustsCxMachineFromRedis();
+        return AjaxResult.success(adjustsCxMachineVo);
     }
 
     /**
@@ -115,8 +116,9 @@ public class MpStructureAllocationUIController extends BaseUIController<MpStruct
     @PostMapping("/setAdjustsCxMachineFromRedis")
     @ApiOperation("保存正在调整的成型机台")
     public AjaxResult setAdjustsCxMachineFromRedis(@RequestBody AdjustsCxMachineVo cxMachineVo) {
-        String redisKey = ADJUSTS_CX_MACHINE_KEY;
-        redisService.setCacheObject(redisKey, cxMachineVo);
+        //String redisKey = ADJUSTS_CX_MACHINE_KEY;
+        //redisService.setCacheObject(redisKey, cxMachineVo);
+        iMpStructureAllocationService.setAdjustsCxMachineFromRedis(cxMachineVo);
         return AjaxResult.success();
     }
 
