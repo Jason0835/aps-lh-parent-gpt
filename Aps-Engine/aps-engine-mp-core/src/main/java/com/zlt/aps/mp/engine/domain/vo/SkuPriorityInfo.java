@@ -12,8 +12,13 @@ import java.util.List;
  */
 @Data
 public class SkuPriorityInfo {
-
+    /**
+     * 物料描述
+     */
     private String sku;
+    /**
+     * 是否供应链优先标记：即
+     */
     private boolean hasSupplyChainPriority;
     private boolean hasHeightPriority;
     private boolean hasProduction;

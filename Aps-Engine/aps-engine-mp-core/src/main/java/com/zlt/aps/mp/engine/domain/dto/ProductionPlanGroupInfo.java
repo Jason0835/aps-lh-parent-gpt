@@ -681,7 +681,7 @@ public class ProductionPlanGroupInfo {
         MouldProductionDayLimitHelper limitHelper = getProductionDayLimitInfo(context, addSkuInfo, preSelected, selectedMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
-            log.info(TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo, mouldSetCode, limitHelper.getLimitType()));
+            TbrMouldProductionLogRecorder.addLhGroupSkuLimitLog(context, groupName, onLineMachineInfo, addSkuInfo, mouldSetCode, limitHelper.getLimitType());
             preSelected.updateProductionDateRange(null, null);
             return;
         }
@@ -2106,5 +2106,39 @@ public class ProductionPlanGroupInfo {
             }
             dayLimitInfo.addMaxLhMachines(lhMachines);
         });
+    }
+
+    /**
+     * 是否达到二次排产条件
+     * 1、首次排产，直接跳过
+     * 2、二次排产时，满足最短上机天数
+     *
+     * @param context             排产上下文
+     * @param addSkuInfo          排产计划
+     * @param canProductionDaySet 排产天数
+     * @param maxNeedDays         需求量最少排产天数
+     * @return
+     */
+    private boolean isReachAgainProduction(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, Set<Integer> canProductionDaySet, Integer maxNeedDays) {
+        if (null == addSkuInfo || CollectionUtils.isEmpty(canProductionDaySet)) {
+            return false;
+        }
+        List<MonthPlanProductionRequirePlanVo> skuPlanList = groupPlanData.stream().filter(singlePlan -> addSkuInfo.getMaterialDesc().equals(singlePlan.getMaterialDesc())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(skuPlanList)) {
+            return false;
+        }
+        List<MonthPlanProductionRequirePlanVo> effectiveList = skuPlanList.stream().filter(singleSkuPlan -> singleSkuPlan.getOriginProductionQty() > BigDecimal.ZERO.intValue()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(effectiveList)) {
+            return false;
+        }
+        boolean hasProduction = effectiveList.stream().anyMatch(MonthPlanProductionRequirePlanVo::hasPlannedProduction);
+        if (!hasProduction) {
+            return true;
+        }
+        Integer daySize = Math.min(canProductionDaySet.size(), maxNeedDays);
+        // 非首次上模最短在机天数
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Integer skuShortestProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuShortestProductionDays();
+        return daySize >= skuShortestProductionDays;
     }
 }

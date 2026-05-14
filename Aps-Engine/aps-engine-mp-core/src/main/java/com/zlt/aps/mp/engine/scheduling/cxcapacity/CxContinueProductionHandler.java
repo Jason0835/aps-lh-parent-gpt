@@ -156,7 +156,7 @@ public class CxContinueProductionHandler {
             return;
         }
         //挑选下一个同规格同花纹的sku进行排产
-        ContinueSkuNextSkuInfo selectSkuInfo = getNextSku(productionContext, earliestConclusionLhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet, startDay, endDay);
+        ContinueSkuNextSkuInfo selectSkuInfo = getNextSku(productionContext, earliestConclusionLhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet);
         if (null == selectSkuInfo) {
             excludeDaySet.add(startDay);
             //递归迭代下一个硫化组
@@ -258,13 +258,13 @@ public class CxContinueProductionHandler {
      * @param continueType      类型
      * @param matchList         可排产计划集合
      * @param excludeSkuSet     需要剔除的Sku集合
-     * @param startDay          起始日
-     * @param endDay            结束日
      * @return
      */
-    private static ContinueSkuNextSkuInfo getNextSku(TbrProductionContext productionContext, EarliestConclusionLhGroupHelper lhGroup, ProductionPlanGroupInfo productionPlanInfo, ProductionStageEnum productionStage, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> matchList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
+    private static ContinueSkuNextSkuInfo getNextSku(TbrProductionContext productionContext, EarliestConclusionLhGroupHelper lhGroup, ProductionPlanGroupInfo productionPlanInfo, ProductionStageEnum productionStage, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> matchList, Set<String> excludeSkuSet) {
         //改用Top3列表，不再单个优先级：ContinueSkuPrioritySelector.getHeightPrioritySku(productionStage, matchList, excludeSkuSet);
-        String selectedMaterialDesc = SkuPrioritySelector.getHighestPrioritySku(productionContext, productionStage, null, productionPlanInfo, lhGroup, continueType, matchList, excludeSkuSet, startDay, endDay);
+        Integer startDay = lhGroup.getClosingDay();
+        Integer endDay = lhGroup.getEndDay();
+        String selectedMaterialDesc = SkuPrioritySelector.getHighestPrioritySku(productionContext, productionStage, null, productionPlanInfo, lhGroup, continueType, matchList, excludeSkuSet, null);
         String groupName = productionPlanInfo.getGroupName();
         if (StringUtils.isBlank(selectedMaterialDesc)) {
             //todo 记录日志
@@ -276,7 +276,7 @@ public class CxContinueProductionHandler {
             excludeSkuSet.add(selectedMaterialDesc);
             //记录日志
             productionContext.addSkuProductionLimitInfo(selectedMaterialDesc, MouldProductionLimitTypeEnum.FIND_MOULD_LIMIT);
-            return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet, startDay, endDay);
+            return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet);
         }
         List<MonthPlanProductionRequirePlanVo> selectedProductionPlanList = matchList.stream().filter(selectedPlan -> selectedPlan.hasSelectedProduction(selectedMaterialDesc)).collect(Collectors.toList());
         //20260327 修正根据materialDesc重新构建前Sku信息
@@ -285,7 +285,7 @@ public class CxContinueProductionHandler {
         if (!SecondOnLineMachineHandler.checkSecondOnLine(productionPlanInfo, productionContext, addSkuInfo, startDay)) {
             TbrMouldProductionLogRecorder.addSkuProductionLimitLog(productionContext, productionPlanInfo.getGroupName(), "", addSkuInfo, startDay, MouldProductionLimitTypeEnum.SECOND_PRODUCTION_LIMIT);
             excludeSkuSet.add(selectedMaterialDesc);
-            return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet, startDay, endDay);
+            return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet);
         }
         Set<String> cxMachineCodeInfo = Optional.ofNullable(productionPlanInfo.getAllocationCxMachineCodeSet()).orElse(Collections.emptySet());
         String onLineMachineInfo = String.join(StringConstant.COMMA, cxMachineCodeInfo);
@@ -295,13 +295,13 @@ public class CxContinueProductionHandler {
         TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(productionContext, groupName, onLineMachineInfo, newStartDay, endDay);
         if (null == newStartDay || null == endDay || !startDay.equals(newStartDay)) {
             excludeSkuSet.add(selectedMaterialDesc);
-            return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet, startDay, endDay);
+            return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet);
         }
         BeforeSkuProductionInfo lhBeforeSkuInfo = ConclusionLhMachineHandler.findChangeTypeBlockBeforeSkuByAddSku(productionContext, addSkuInfo, productionPlanInfo, startDay);
         TbrMouldProductionLogRecorder.addFindBeforeSkuInfo(productionContext, groupName, addSkuInfo.getMaterialDesc(), lhBeforeSkuInfo);
         if (null == lhBeforeSkuInfo) {
             excludeSkuSet.add(selectedMaterialDesc);
-            return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet, startDay, endDay);
+            return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet);
         }
         return new ContinueSkuNextSkuInfo(selectedMaterialDesc, selectedMouldList, lhBeforeSkuInfo);
     }

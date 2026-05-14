@@ -751,6 +751,15 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 是否排产过
+     *
+     * @return
+     */
+    public boolean hasPlannedProduction() {
+        return !heightProductionQty.equals(originHeightProductionQty) || !productionQty.equals(originProductionQty);
+    }
+
+    /**
      * 检测不排继续往下匹配的不排产原因
      * 1、计划本身不排产
      * 2、没有物料编码

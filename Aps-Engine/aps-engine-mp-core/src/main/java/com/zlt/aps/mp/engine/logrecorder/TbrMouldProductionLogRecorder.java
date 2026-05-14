@@ -344,6 +344,27 @@ public class TbrMouldProductionLogRecorder {
     }
 
     /**
+     * 增加 Sku二次排产最短上机天数限制日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进行模具排产，物料：%s 达到二次上机最短天数限制%s天====
+     *
+     * @param context           排程上下文
+     * @param groupName         分组名-结构
+     * @param onLineMachineInfo 成型机台编码
+     * @param skuInfo           Sku信息
+     * @param limitDays    限制天数
+     * @return
+     */
+    public static String addAgainProductionSkuLimitLog(Context context, String groupName, String onLineMachineInfo, MonthPlanProductionRequirePlanVo skuInfo, Integer limitDays) {
+        String materialDesc = skuInfo.getMaterialDesc();
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 机台：%s 进行模具排产，物料：%s 达到二次上机最短天数限制%s天====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, materialDesc, limitDays);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_SKU_LIMIT_LH_GROUP, logContent);
+        return logContent;
+    }
+
+    /**
      * 增加分组结构排产成型机台没有找到机台信息日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 进行模具排产，没有找到机台====
      *

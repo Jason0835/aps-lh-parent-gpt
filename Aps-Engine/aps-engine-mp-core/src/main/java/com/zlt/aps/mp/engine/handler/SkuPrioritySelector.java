@@ -38,19 +38,18 @@ public class SkuPrioritySelector {
      * 1、同规格同花纹->同模具
      * 2、新增Sku
      *
-     * @param context         排产上下文
-     * @param productionStage 排产阶段
-     * @param formalRound     轮次
-     * @param groupPlanInfo   分组计划
-     * @param lhGroup         收尾硫化组
-     * @param continueType    类型(续作同规格同花纹、同模具)
-     * @param allSkuList      可选择Sku计划
-     * @param excludeSkuSet   需要剔除的Sku信息
-     * @param startDay        开始排产日
-     * @param endDay          结束排产日
+     * @param context             排产上下文
+     * @param productionStage     排产阶段
+     * @param formalRound         轮次
+     * @param groupPlanInfo       分组计划
+     * @param lhGroup             收尾硫化组
+     * @param continueType        类型(续作同规格同花纹、同模具)
+     * @param allSkuList          可选择Sku计划
+     * @param excludeSkuSet       需要剔除的Sku信息
+     * @param allLhMachineLhGroup 所有的最早收尾日
      * @return
      */
-    public static String getHighestPrioritySku(Context context, ProductionStageEnum productionStage, FormalRoundEnum formalRound, ProductionPlanGroupInfo groupPlanInfo, EarliestConclusionLhGroupHelper lhGroup, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> allSkuList, Set<String> excludeSkuSet, Integer startDay, Integer endDay) {
+    public static String getHighestPrioritySku(Context context, ProductionStageEnum productionStage, FormalRoundEnum formalRound, ProductionPlanGroupInfo groupPlanInfo, EarliestConclusionLhGroupHelper lhGroup, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> allSkuList, Set<String> excludeSkuSet, EarliestConclusionLhGroupHelper allLhMachineLhGroup) {
         /*if (groupPlanInfo != null && groupPlanInfo.getGroupName().equals("215/75R17.5")){
             System.out.println("215/75R17.5");
         }*/
@@ -58,6 +57,8 @@ public class SkuPrioritySelector {
         if (CollectionUtils.isEmpty(effectiveSkuList)) {
             return StringUtils.EMPTY;
         }
+        Integer startDay = lhGroup.getClosingDay();
+        Integer endDay = lhGroup.getEndDay();
         Map<String, List<MonthPlanProductionRequirePlanVo>> skuGroupMap = effectiveSkuList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         TbrProductionContext productionContext = (TbrProductionContext) context;
         List<SkuPriorityInfo> skuPriorityList = new ArrayList<>();
@@ -72,7 +73,7 @@ public class SkuPrioritySelector {
             return StringUtils.EMPTY;
         }
         Integer maxCount = productionContext.getBaseDataContainer().getParamConfiguration().getHeightPrioritySkuPreCount();
-        List<ProductionSkuPriorityVo> selectedSkuPriorityList = getEffectiveHighestPriorityCount(productionContext, groupPlanInfo, continueType, skuPriorityList, maxCount, allSkuList, lhGroup, startDay, endDay);
+        List<ProductionSkuPriorityVo> selectedSkuPriorityList = getEffectiveHighestPriorityCount(productionContext, groupPlanInfo, formalRound, continueType, skuPriorityList, maxCount, allSkuList, lhGroup, allLhMachineLhGroup);
         if (CollectionUtils.isEmpty(selectedSkuPriorityList)) {
             return StringUtils.EMPTY;
         }
@@ -253,22 +254,24 @@ public class SkuPrioritySelector {
     /**
      * 获取最高优先级的列表
      *
-     * @param context         排产上下文
-     * @param groupPlanInfo   分组对象
-     * @param skuPriorityList 所有列表
-     * @param continueType    类型
-     * @param allSkuList      所有还需排产Sku
-     * @param maxCount        最大个数
-     * @param lhGroup         硫化组信息
-     * @param startDay        开始排产日
-     * @param endDay          结束排产日
+     * @param context             排产上下文
+     * @param groupPlanInfo       分组对象
+     * @param formalRound         轮次
+     * @param skuPriorityList     所有列表
+     * @param continueType        类型
+     * @param allSkuList          所有还需排产Sku
+     * @param maxCount            最大个数
+     * @param lhGroup             硫化组信息
+     * @param allLhMachineLhGroup 所有配比的硫化组信息
      * @return
      * @
      */
-    private static List<ProductionSkuPriorityVo> getEffectiveHighestPriorityCount(Context context, ProductionPlanGroupInfo groupPlanInfo, ContinueTypeEnum continueType, List<SkuPriorityInfo> skuPriorityList, Integer maxCount, List<MonthPlanProductionRequirePlanVo> allSkuList, EarliestConclusionLhGroupHelper lhGroup, Integer startDay, Integer endDay) {
+    private static List<ProductionSkuPriorityVo> getEffectiveHighestPriorityCount(Context context, ProductionPlanGroupInfo groupPlanInfo, FormalRoundEnum formalRound, ContinueTypeEnum continueType, List<SkuPriorityInfo> skuPriorityList, Integer maxCount, List<MonthPlanProductionRequirePlanVo> allSkuList, EarliestConclusionLhGroupHelper lhGroup, EarliestConclusionLhGroupHelper allLhMachineLhGroup) {
         if (CollectionUtils.isEmpty(skuPriorityList) || null == maxCount || maxCount < BigDecimal.ZERO.intValue()) {
             return Collections.emptyList();
         }
+        Integer startDay = lhGroup.getClosingDay();
+        Integer endDay = lhGroup.getEndDay();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer maxLhDays = getLhMaxDays(productionContext, startDay, endDay);
         // 非首次上模最短在机天数
@@ -291,8 +294,21 @@ public class SkuPrioritySelector {
             if (null == priority) {
                 continue;
             }
+            boolean isSameProductionRange = false;
+            if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE == formalRound && null != allLhMachineLhGroup) {
+                Integer allLhStartDay = allLhMachineLhGroup.getClosingDay();
+                Integer allLhEndDay = allLhMachineLhGroup.getEndDay();
+                Integer allMaxLhDays = getLhMaxDays(productionContext, allLhStartDay, allLhEndDay);
+                ProductionSkuPriorityVo allLhPriority = buildProductionSkuPriorityInfo(productionContext, highestPriority, groupPlanInfo, continueType, allSkuList, allLhMachineLhGroup, allMaxLhDays, allLhStartDay, allLhEndDay);
+                isSameProductionRange = priority.isSameProductionDay(allLhPriority);
+            }
+            //若是最低实单，则需求所需天数大于硫化机台或是模具天数，则跳过
+            if (isSkipActualMinLhMachine(context, groupPlanInfo, priority, formalRound, isSameProductionRange)) {
+                continue;
+            }
             //若SKU已排产过，二次上模的天数小于 上机最短天数，忽略 sandy+ 2026.5.8
-            Integer theoryMaxDays = Math.min(Math.min(priority.getMaxLhDays(), priority.getMaxMouldDays()), priority.getNeedDays());
+            Integer lhDays = Math.min(priority.getMaxLhDays(), priority.getMaxMouldDays());
+            Integer theoryMaxDays = Math.min(lhDays, priority.getNeedDays());
             if (highestPriority.isHasProduction() && theoryMaxDays < skuShortestProductionDays) {
                 continue;
             }
@@ -448,7 +464,7 @@ public class SkuPrioritySelector {
         if (CollectionUtils.isEmpty(productionDaySet)) {
             return null;
         }
-        return new ProductionSkuPriorityVo(materialDesc, maxLhDays, productionDaySet.size(), needProductionInfo.getMaxNeedDays(), singlePriority.isHasSupplyChainPriority());
+        return new ProductionSkuPriorityVo(materialDesc, productionDaySet, maxLhDays, productionDaySet.size(), needProductionInfo.getMaxNeedDays(), singlePriority.isHasSupplyChainPriority());
     }
 
     /**
@@ -487,7 +503,7 @@ public class SkuPrioritySelector {
         if (CollectionUtils.isEmpty(productionDaySet)) {
             return null;
         }
-        return new ProductionSkuPriorityVo(materialDesc, maxLhDays, productionDaySet.size(), needProductionInfo.getMaxNeedDays(), singlePriority.isHasSupplyChainPriority());
+        return new ProductionSkuPriorityVo(materialDesc, productionDaySet, maxLhDays, productionDaySet.size(), needProductionInfo.getMaxNeedDays(), singlePriority.isHasSupplyChainPriority());
     }
 
     /**
@@ -886,5 +902,33 @@ public class SkuPrioritySelector {
      */
     private static boolean hasProduction(MonthPlanProductionRequirePlanVo plan) {
         return !plan.getHeightProductionQty().equals(plan.getOriginHeightProductionQty()) || !plan.getProductionQty().equals(plan.getOriginProductionQty());
+    }
+
+    /**
+     * 判断需求是否可以排产整段，在最低实单阶段
+     *
+     * @param context               排产上下文
+     * @param groupPlanInfo         结构分组
+     * @param priority              选中的Sku信息
+     * @param formalRound           轮次
+     * @param isSameProductionRange 是否相同排产时间范围
+     * @return
+     */
+    private static boolean isSkipActualMinLhMachine(Context context, ProductionPlanGroupInfo groupPlanInfo, ProductionSkuPriorityVo priority, FormalRoundEnum formalRound, boolean isSameProductionRange) {
+        if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE != formalRound) {
+            return false;
+        }
+        //整个结构排产段都要排
+        Set<Integer> productionDaySet = groupPlanInfo.getDayProductionLimitInfo().keySet();
+        Integer lhDays = Math.min(priority.getMaxLhDays(), priority.getMaxMouldDays());
+        Integer requireNeedDays = priority.getNeedDays();
+        Integer theoryMaxDays = Math.min(lhDays, requireNeedDays);
+        if (theoryMaxDays == productionDaySet.size()) {
+            return false;
+        }
+        if (isSameProductionRange) {
+            return false;
+        }
+        return lhDays < requireNeedDays;
     }
 }

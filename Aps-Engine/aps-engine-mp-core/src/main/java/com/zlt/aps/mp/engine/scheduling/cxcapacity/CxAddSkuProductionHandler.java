@@ -131,7 +131,11 @@ public class CxAddSkuProductionHandler {
         List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
         BeforeSkuProductionInfo beforeSkuInfo = lhGroup.getBeforeSkuInfo();
         //获取优先级最高的Sku信息 getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList)
-        String materialDesc = SkuPrioritySelector.getHighestPrioritySku(context, productionStage, formalRound, groupPlanInfo, lhGroup, ContinueTypeEnum.NO_CONTINUE, leftOverHasProductionList, new HashSet<>(), startDay, endDay);
+        EarliestConclusionLhGroupHelper allLhMachine = null;
+        if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE == formalRound) {
+            allLhMachine = checkBaseProductionCondition(context, FormalRoundEnum.DISPOSABLE_LH_MACHINE, groupPlanInfo, excludeDays);
+        }
+        String materialDesc = SkuPrioritySelector.getHighestPrioritySku(context, productionStage, formalRound, groupPlanInfo, lhGroup, ContinueTypeEnum.NO_CONTINUE, leftOverHasProductionList, new HashSet<>(), allLhMachine);
         TbrMouldProductionLogRecorder.addContinueGroupLhGroupFindSkuLog(context, groupName, onLineMachineInfo, materialDesc);
         if (StringUtils.isBlank(materialDesc)) {
             //20260113 剔除需要排除的收尾时间点
