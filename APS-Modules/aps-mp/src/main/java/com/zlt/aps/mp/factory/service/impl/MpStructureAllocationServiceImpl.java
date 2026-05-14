@@ -2032,7 +2032,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             return;
         }
         for (int i = 1; i <= 31; i++) {
-            Object fieldValue = ReflectUtils.getFieldValue(item, "day" + i);
+            Object fieldValue = item.getFieldValueByFieldName("day" + i);
             if (ObjUtil.isNotNull(fieldValue)) {
                 if (item.getBeginDay() == null) {
                     item.setBeginDay(i);
@@ -2301,6 +2301,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         String productTypeCode = firstResult.getProductTypeCode();
         Integer year = firstResult.getYear();
         Integer month = firstResult.getMonth();
+        Integer yearMonth = Convert.toInt(String.format("%s%02d", year, month));
         
         // 加载需求计划
         QueryWrapper<DpDemandPlan> dpDemandPlanQueryWrapper = new QueryWrapper<>();
@@ -2460,6 +2461,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj, paramMap, startDay, mpFinalVo,
                     dailyCapacityMap);
             insertItem.setMouldChangeInfo(mpFinalVo.getMouldChangeInfo());
+            insertItem.setYearMonth(yearMonth);
         }
         // 生成统计信息（handleMonthPlanStatistics）
         mpMonthPlanStaticService.handleMonthPlanStatistics(insertList);
@@ -2467,7 +2469,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
     private void setBeginDayAndEndDay(FactoryMonthPlanMouldDayResult item) {
         for (int i = 1; i <= 31; i++) {
-            Object fieldValue = ReflectUtils.getFieldValue(item, "day" + i);
+            Object fieldValue = item.getFieldValueByFieldName("day" + i);
             if (ObjUtil.isNotNull(fieldValue) && Integer.parseInt(fieldValue.toString()) > 0) {
                 if (item.getBeginDay() == null) {
                     item.setBeginDay(i);
