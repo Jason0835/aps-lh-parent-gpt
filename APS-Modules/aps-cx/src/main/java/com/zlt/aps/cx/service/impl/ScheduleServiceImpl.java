@@ -203,14 +203,9 @@ public class ScheduleServiceImpl implements ScheduleService {
             // 3. 执行核心排程算法(流程图S5.2-S5.5)
             List<CxScheduleResult> scheduleResults = coreScheduleAlgorithmService.executeSchedule(context);
 
-            // 3.1 删除该排程日期范围内已有的排程结果（主表+子表），避免重复数据
-            // 注意：排程从 scheduleDate 前2天开始（SCHEDULE_START_OFFSET_DAYS=2），需要一并清除
-            LocalDate startDate = request.getScheduleDate().minusDays(2);
-            int days = request.getDays() != null ? request.getDays() : DEFAULT_SCHEDULE_DAYS;
-            for (int d = 0; d < days + 2; d++) {
-                LocalDate date = startDate.plusDays(d);
-                deleteExistingScheduleResults(date);
-            }
+            // 3.1 删除该排程日期已有的排程结果（主表+子表），避免重复数据
+            // 注意：排程算法返回的结果中，scheduleDate 只有 request.getScheduleDate() 这一天
+            deleteExistingScheduleResults(request.getScheduleDate());
 
             // 3.2 保存排程结果（主表+子表）
             saveScheduleResults(scheduleResults);
@@ -249,13 +244,9 @@ public class ScheduleServiceImpl implements ScheduleService {
             // 2. 执行重排程算法
             List<CxScheduleResult> scheduleResults = coreScheduleAlgorithmService.executeSchedule(context);
 
-            // 3. 删除该排程日期范围内原有排程结果（主表+子表）
-            LocalDate startDate = request.getScheduleDate();
-            int days = request.getDays() != null ? request.getDays() : DEFAULT_SCHEDULE_DAYS;
-            for (int d = 0; d < days; d++) {
-                LocalDate date = startDate.plusDays(d);
-                deleteExistingScheduleResults(date);
-            }
+            // 3. 删除该排程日期已有的排程结果（主表+子表）
+            // 注意：排程算法返回的结果中，scheduleDate 只有 request.getScheduleDate() 这一天
+            deleteExistingScheduleResults(request.getScheduleDate());
 
             // 4. 保存新的排程结果（主表+子表）
             saveScheduleResults(scheduleResults);
@@ -1178,6 +1169,23 @@ public class ScheduleServiceImpl implements ScheduleService {
     public void saveScheduleResults(List<CxScheduleResult> results) {
         if (CollectionUtils.isEmpty(results)) {
             return;
+        }
+
+        // 检查是否有重复的taskKey(机台+胎胚+物料+施工阶段)
+        java.util.Map<String, java.util.List<CxScheduleResult>> keyMap = new java.util.HashMap<>();
+        for (CxScheduleResult r : results) {
+            String key = r.getCxMachineCode() + "|" + r.getEmbryoCode() + "|" + r.getMaterialCode() + "|" + r.getClass1RecipeType();
+            keyMap.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(r);
+        }
+        for (java.util.Map.Entry<String, java.util.List<CxScheduleResult>> entry : keyMap.entrySet()) {
+            if (entry.getValue().size() > 1) {
+                log.warn("主表重复taskKey: {}, 记录数={}", entry.getKey(), entry.getValue().size());
+                for (CxScheduleResult r : entry.getValue()) {
+                    log.warn("  重复记录: ID={}, machine={}, embryo={}, material={}, recipeType={}, class1Qty={}, lhIds={}",
+                            r.getId(), r.getCxMachineCode(), r.getEmbryoCode(), r.getMaterialCode(),
+                            r.getClass1RecipeType(), r.getClass1PlanQty(), r.getLhScheduleIds());
+                }
+            }
         }
 
         for (CxScheduleResult result : results) {

@@ -7,9 +7,9 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.security.annotation.RequiresPermissions;
-import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
-import com.zlt.aps.lh.mapper.LhSpecialMaterialBomEntityMapper;
-import com.zlt.aps.lh.service.ILhSpecialMaterialBomService;
+import com.zlt.aps.lh.api.domain.entity.LhSharedMouldPat;
+import com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper;
+import com.zlt.aps.lh.service.ILhSharedMouldPatService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -27,58 +27,58 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 特殊物料清单配置控制器
+ * 共用模具花纹配置控制器
  *
  * @author zlt
- * @date 2026-05-06
+ * @date 2026-05-14
  */
 @Slf4j
-@Api(tags = "特殊物料清单配置")
+@Api(tags = "共用模具花纹配置")
 @RestController
-@RequestMapping("/lhSpecialMaterialBom")
-public class LhSpecialMaterialBomController extends AbstractDocBizController<LhSpecialMaterialBom> {
+@RequestMapping("/lhSharedMouldPat")
+public class LhSharedMouldPatController extends AbstractDocBizController<LhSharedMouldPat> {
 
     @Autowired
-    private ILhSpecialMaterialBomService lhSpecialMaterialBomService;
+    private ILhSharedMouldPatService lhSharedMouldPatService;
 
     @Resource
-    private LhSpecialMaterialBomEntityMapper lhSpecialMaterialBomEntityMapper;
+    private LhSharedMouldPatEntityMapper lhSharedMouldPatEntityMapper;
 
     /**
-     * 查询特殊物料清单配置列表
+     * 查询共用模具花纹配置列表
      */
     @ApiOperation("查询列表")
-    @RequiresPermissions("lh:lhSpecialMaterialBom:list")
+    @RequiresPermissions("lh:lhSharedMouldPat:list")
     @PostMapping("/list")
     @Override
-    public TableDataInfo list(@RequestBody LhSpecialMaterialBom queryVO) {
+    public TableDataInfo list(@RequestBody LhSharedMouldPat queryVO) {
         return super.list(queryVO);
     }
 
     /**
      * 保存
      */
-    @Log(title = "ui.data.column.lhSpecialMaterialBom.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @Log(title = "ui.data.column.lhSharedMouldPat.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("保存")
-    @RequiresPermissions({"lh:lhSpecialMaterialBom:edit", "lh:lhSpecialMaterialBom:add"})
+    @RequiresPermissions({"lh:lhSharedMouldPat:edit", "lh:lhSharedMouldPat:add"})
     @PostMapping("/save")
     @Override
-    public AjaxResult save(@RequestBody LhSpecialMaterialBom entity) {
+    public AjaxResult save(@RequestBody LhSharedMouldPat entity) {
         return super.save(entity);
     }
 
     /**
-     * 删除特殊物料清单配置
+     * 删除共用模具花纹配置
      */
-    @Log(title = "ui.data.column.lhSpecialMaterialBom.modelName", businessType = BusinessType.DELETE)
+    @Log(title = "ui.data.column.lhSharedMouldPat.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
-    @RequiresPermissions("lh:lhSpecialMaterialBom:remove")
+    @RequiresPermissions("lh:lhSharedMouldPat:remove")
     @DeleteMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         // 空值校验：防止MyBatis Plus deleteBatchIds空指针异常
         if (CollectionUtils.isEmpty(ids)) {
-            log.warn("删除特殊物料清单配置时ID列表为空，跳过删除操作");
+            log.warn("删除共用模具花纹配置时ID列表为空，跳过删除操作");
             return AjaxResult.success();
         }
 
@@ -91,35 +91,35 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
         }
 
         if (validIds.isEmpty()) {
-            log.warn("删除特殊物料清单配置时没有有效的ID，跳过删除操作");
+            log.warn("删除共用模具花纹配置时没有有效的ID，跳过删除操作");
             return AjaxResult.success();
         }
 
         // 直接调用MyBatis Plus的deleteBatchIds
-        int result = lhSpecialMaterialBomEntityMapper.deleteBatchIds(validIds);
+        int result = lhSharedMouldPatEntityMapper.deleteBatchIds(validIds);
         return result > 0 ? AjaxResult.success() : AjaxResult.error();
     }
 
     /**
-     * 获取特殊物料清单配置详细信息
+     * 获取共用模具花纹配置详细信息
      */
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{billId}")
     @Override
-    public LhSpecialMaterialBom getInfo(@PathVariable("billId") Long billId) {
+    public LhSharedMouldPat getInfo(@PathVariable("billId") Long billId) {
         return super.getInfo(billId);
     }
 
     /**
-     * 根据集合导入特殊物料清单配置数据
+     * 根据集合导入共用模具花纹配置数据
      *
      * @param importContext  导入上下文
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
-    @Log(title = "ui.data.column.lhSpecialMaterialBom.modelName", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.lhSharedMouldPat.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
-    @RequiresPermissions("lh:lhSpecialMaterialBom:import")
+    @RequiresPermissions("lh:lhSharedMouldPat:import")
     @PostMapping("/importData/{updateSupport}")
     @Override
     public AjaxResult importData(@RequestBody com.ruoyi.api.gateway.system.domain.vo.ImportContext importContext,
@@ -128,28 +128,28 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
     }
 
     /**
-     * 导出特殊物料清单配置列表
+     * 导出共用模具花纹配置列表
      */
-    @Log(title = "ui.data.column.lhSpecialMaterialBom.modelName", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.lhSharedMouldPat.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @RequiresPermissions("lh:lhSpecialMaterialBom:export")
+    @RequiresPermissions("lh:lhSharedMouldPat:export")
     @PostMapping("/exportData/{fileName}")
     @Override
-    public byte[] exportData(@RequestBody LhSpecialMaterialBom queryVO, @PathVariable("fileName") String fileName,
+    public byte[] exportData(@RequestBody LhSharedMouldPat queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         return super.exportData(queryVO, fileName, response);
     }
 
     @Override
-    protected List<LhSpecialMaterialBom> listExportData(LhSpecialMaterialBom obj) {
-        QueryWrapper<LhSpecialMaterialBom> wrapper = new QueryWrapper<>();
+    protected List<LhSharedMouldPat> listExportData(LhSharedMouldPat obj) {
+        QueryWrapper<LhSharedMouldPat> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return lhSpecialMaterialBomEntityMapper.selectList(wrapper);
+        return lhSharedMouldPatEntityMapper.selectList(wrapper);
     }
 
     @Override
     protected IDocService getDocService() {
-        return lhSpecialMaterialBomService;
+        return lhSharedMouldPatService;
     }
 
     /**
@@ -159,42 +159,34 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
      * @param queryVO      查询参数
      */
     @Override
-    protected void builderCondition(QueryWrapper<LhSpecialMaterialBom> queryWrapper, LhSpecialMaterialBom queryVO) {
+    protected void builderCondition(QueryWrapper<LhSharedMouldPat> queryWrapper, LhSharedMouldPat queryVO) {
         // 工厂编号精确查询
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        // 结构名称模糊查询
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
         // 物料编码模糊查询
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
         // 物料描述模糊查询
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
-        // 分类精确查询
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("category")), "CATEGORY", queryVO.getFieldValueByFieldName("category"));
+        // 主花纹模糊查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mainPattern")), "MAIN_PATTERN", queryVO.getFieldValueByFieldName("mainPattern"));
+        // 模具类型精确查询
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldType")), "MOULD_TYPE", queryVO.getFieldValueByFieldName("mouldType"));
+        // 模具号模糊查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mouldNo")), "MOULD_NO", queryVO.getFieldValueByFieldName("mouldNo"));
     }
 
     /**
      * 唯一性校验
      */
     @ApiOperation("唯一性校验")
-    @PostMapping("/checkUniqueSpecialMaterialBom")
-    public AjaxResult checkUniqueSpecialMaterialBom(@RequestBody LhSpecialMaterialBom entity) {
-        String result = lhSpecialMaterialBomService.checkUnique(entity);
+    @PostMapping("/checkUniqueLhSharedMouldPat")
+    public AjaxResult checkUniqueLhSharedMouldPat(@RequestBody LhSharedMouldPat entity) {
+        String result = lhSharedMouldPatService.checkUnique(entity);
         return AjaxResult.success().put("exist", UserConstants.NOT_UNIQUE.equals(result));
-    }
-
-    /**
-     * 分类冲突校验
-     */
-    @ApiOperation("分类冲突校验")
-    @PostMapping("/checkCategoryConflict")
-    public AjaxResult checkCategoryConflict(@RequestBody LhSpecialMaterialBom entity) {
-        String conflict = lhSpecialMaterialBomService.checkCategoryConflict(entity);
-        return AjaxResult.success().put("conflict", conflict);
     }
 
     @Override
     protected String getTypeCode() {
-        return "LH_SPECIAL_MATERIAL_BOM";
+        return "LH_SHARED_MOULD_PAT";
     }
 
     @Override

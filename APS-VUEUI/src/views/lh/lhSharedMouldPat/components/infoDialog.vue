@@ -30,13 +30,12 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import structureSelect from "@/views/components/structureSelect.vue";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 
-import { editSpecialMaterialBom, checkUniqueSpecialMaterialBom, checkCategoryConflictSpecialMaterialBom } from "@/api/lh/specialMaterialBom";
+import { editSharedMouldPat, checkUniqueSharedMouldPat } from "@/api/lh/sharedMouldPat";
 
 export default {
-  components: { infoForm, structureSelect, materialCodeSelect },
+  components: { infoForm, materialCodeSelect },
   inject: ["parentDict"],
   data() {
     return {
@@ -52,11 +51,25 @@ export default {
             trigger: "change",
           },
         ],
-        category: [
+        materialCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
             trigger: "change",
+          },
+        ],
+        mainPattern: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+        ],
+        mouldNo: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
           },
         ],
       },
@@ -78,26 +91,9 @@ export default {
           filterable: true,
         },
         {
-          prop: "structureName",
-          align: "center",
-          label: this.$t("ui.data.column.lhSpecialMaterialBom.structureName"),
-          render: (form) => {
-            return (
-              <structureSelect
-                key={form.structureName}
-                v-model={form.structureName}
-                factoryCode={form.factoryCode || "116"}
-                machineType="CX"
-                clearable
-                onChange={this.handleStructureChange}
-              />
-            );
-          },
-        },
-        {
           prop: "materialCode",
           align: "center",
-          label: this.$t("ui.data.column.lhSpecialMaterialBom.materialCode"),
+          label: this.$t("ui.data.column.lhSharedMouldPat.materialCode"),
           render: (form) => {
             return (
               <materialCodeSelect
@@ -111,35 +107,48 @@ export default {
         {
           prop: "materialDesc",
           align: "center",
-          label: this.$t("ui.data.column.lhSpecialMaterialBom.materialDesc"),
+          label: this.$t("ui.data.column.lhSharedMouldPat.materialDesc"),
           disabled: true,
         },
         {
-          prop: "category",
+          prop: "specifications",
           align: "center",
-          label: this.$t("ui.data.column.lhSpecialMaterialBom.category"),
+          label: this.$t("ui.data.column.lhSharedMouldPat.specifications"),
+        },
+        {
+          prop: "mainPattern",
+          align: "center",
+          label: this.$t("ui.data.column.lhSharedMouldPat.mainPattern"),
+        },
+        {
+          prop: "mouldType",
+          align: "center",
+          label: this.$t("ui.data.column.lhSharedMouldPat.mouldType"),
           type: "select",
-          dictData: this.parentDict.type.lh_special_material_category,
+          dictData: this.parentDict.type.biz_mould_Type,
           filterable: true,
+        },
+        {
+          prop: "mouldNo",
+          align: "center",
+          label: this.$t("ui.data.column.lhSharedMouldPat.mouldNo"),
+        },
+        {
+          prop: "patternBlock",
+          align: "center",
+          label: this.$t("ui.data.column.lhSharedMouldPat.patternBlock"),
         },
         {
           prop: "remark",
           label: this.$t("ui.common.column.remark"),
           type: "textarea",
           rows: 3,
-          maxlength: 300,
+          maxlength: 900,
         },
       ];
     },
   },
   methods: {
-    handleStructureChange(val, row) {
-      if (val && row) {
-        this.$set(this.form, "structureName", row.structureName);
-      } else {
-        this.$set(this.form, "structureName", "");
-      }
-    },
     handleMaterialCodeChange(val, row) {
       if (val && row) {
         this.$set(this.form, "materialCode", row.materialCode);
@@ -152,7 +161,7 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-        const res = await editSpecialMaterialBom(params);
+        const res = await editSharedMouldPat(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -182,26 +191,16 @@ export default {
     },
     handleConfirm() {
       this.$refs.form.triggerConfirm(async (params) => {
-        if (!params.structureName && !params.materialCode) {
-          this.$modal.msgError(this.$t("ui.data.alert.lhSpecialMaterialBom.needOne"));
-          return;
-        }
         const checkData = {
           factoryCode: params.factoryCode,
-          structureName: params.structureName,
           materialCode: params.materialCode,
-          category: params.category,
+          mainPattern: params.mainPattern,
+          mouldNo: params.mouldNo,
           id: this.form.id || null,
         };
-        const checkRes = await checkUniqueSpecialMaterialBom(checkData);
+        const checkRes = await checkUniqueSharedMouldPat(checkData);
         if (checkRes.data && checkRes.data.exist) {
-          this.$modal.msgError(this.$t("ui.data.alert.lhSpecialMaterialBom.notUnique"));
-          return;
-        }
-        // 分类冲突校验：同一物料/结构下不能同时存在芯片胎、19.5寸宽基和22.5寸宽基
-        const categoryCheckRes = await checkCategoryConflictSpecialMaterialBom(checkData);
-        if (categoryCheckRes.data && categoryCheckRes.data.conflict) {
-          this.$modal.msgError(categoryCheckRes.data.conflict);
+          this.$modal.msgError(this.$t("ui.data.alert.lhSharedMouldPat.notUnique"));
           return;
         }
         this.save(params);

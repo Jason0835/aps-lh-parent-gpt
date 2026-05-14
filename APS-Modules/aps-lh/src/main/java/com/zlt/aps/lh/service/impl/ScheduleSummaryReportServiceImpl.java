@@ -76,9 +76,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     private static final int SMALL_RUBBER_TITLE_ROW_INDEX = 6;
 
-    private static final int SMALL_RUBBER_START_COL = 0;
+    private static final int SMALL_RUBBER_START_COL = 1;
 
-    private static final int SMALL_RUBBER_END_COL = 0;
+    private static final int SMALL_RUBBER_END_COL = 1;
 
     @Resource
     private CxLhScheduleResultMapper cxLhScheduleResultMapper;
@@ -152,7 +152,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         Map<String, Object> tableMap = buildTableMap(scheduleDate, factoryCode, classShiftTypeMap);
         List<List<Map<String, Object>>> dataList = buildDataList(scheduleDate, factoryCode);
 
-        // 小胶种列表数据处理：无数据时隐藏第7行，有数据时合并A7到B列结束行
+        // 小胶种列表数据处理：无数据时隐藏第7行，有数据时合并B7到B列结束行
         List<Map<String, Object>> smallRubberList = dataList.isEmpty() ? Collections.emptyList() : dataList.get(0);
         if (smallRubberList.isEmpty()) {
             // 小胶种列表无数据，隐藏第7行（索引6）
@@ -160,7 +160,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             hiddenRows.add(SMALL_RUBBER_TITLE_ROW_INDEX);
             tableMap.put(ExcelUtils.HIDDEN_ROWS, hiddenRows);
         } else {
-            // 小胶种列表有数据，合并A7到B列结束行
+            // 小胶种列表有数据，合并B7到B列结束行
             List<ExcelCellRangeAddress> rangeAddressList = new ArrayList<>();
             int endRowIndex = SMALL_RUBBER_TITLE_ROW_INDEX + smallRubberList.size() - 1;
             rangeAddressList.add(new ExcelCellRangeAddress(
@@ -316,12 +316,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 构建模具交模信息
      *
-     * <p>查询排程日期对应的换模计划，按机台汇总格式如"机台A: 前规格→后规格；机台B: 前规格→后规格"</p>
+     * <p>查询排程日期对应的换模计划，取出去重的机台编码，逗号隔开</p>
      * <p>参考LhBaseDataServiceImpl的查询方式，添加isDelete过滤</p>
      *
      * @param scheduleDate 排程日期
      * @param factoryCode  分厂编码
-     * @return 换模信息字符串
+     * @return 去重机台编码字符串，逗号隔开
      */
     private String buildMouldChangeInfo(Date scheduleDate, String factoryCode) {
         List<LhMouldChangePlan> changePlans = lhMouldChangePlanEntityMapper.selectList(
@@ -336,21 +336,11 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return "";
         }
 
-        Map<String, List<LhMouldChangePlan>> machineGroupMap = changePlans.stream()
-                .filter(p -> StringUtils.isNotBlank(p.getLhMachineCode()))
-                .collect(Collectors.groupingBy(LhMouldChangePlan::getLhMachineCode, LinkedHashMap::new, Collectors.toList()));
-
-        List<String> machineParts = new ArrayList<>();
-        for (Map.Entry<String, List<LhMouldChangePlan>> entry : machineGroupMap.entrySet()) {
-            String machineName = entry.getKey();
-            List<LhMouldChangePlan> plans = entry.getValue();
-            List<String> changeParts = plans.stream()
-                    .map(p -> StringUtils.defaultString(p.getBeforeMaterialDesc()) + "→"
-                            + StringUtils.defaultString(p.getAfterMaterialDesc()))
-                    .collect(Collectors.toList());
-            machineParts.add(machineName + ": " + String.join("、", changeParts));
-        }
-        return String.join("；", machineParts);
+        return changePlans.stream()
+                .map(LhMouldChangePlan::getLhMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.joining(","));
     }
 
     /**
@@ -387,12 +377,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 构建模具清洗信息
      *
-     * <p>查询排程日期当天的清洗计划，按机台汇总格式如"机台A: 清洗类型；机台B: 清洗类型"</p>
+     * <p>查询排程日期当天的清洗计划，取出去重的机台编码，逗号隔开</p>
      * <p>参考LhBaseDataServiceImpl的查询方式，添加isDelete过滤</p>
      *
      * @param scheduleDate 排程日期
      * @param factoryCode  分厂编码
-     * @return 清洗信息字符串
+     * @return 去重机台编码字符串，逗号隔开
      */
     private String buildMouldCleanInfo(Date scheduleDate, String factoryCode) {
         Date dayStart = LhScheduleTimeUtil.clearTime(scheduleDate);
@@ -411,22 +401,11 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return "";
         }
 
-        Map<String, List<LhMouldCleanPlan>> machineGroupMap = cleanPlans.stream()
-                .filter(p -> StringUtils.isNotBlank(p.getLhCode()))
-                .collect(Collectors.groupingBy(LhMouldCleanPlan::getLhCode, LinkedHashMap::new, Collectors.toList()));
-
-        List<String> machineParts = new ArrayList<>();
-        for (Map.Entry<String, List<LhMouldCleanPlan>> entry : machineGroupMap.entrySet()) {
-            String machineCode = entry.getKey();
-            List<LhMouldCleanPlan> plans = entry.getValue();
-            String cleanTypes = plans.stream()
-                    .map(p -> StringUtils.defaultString(p.getCleanType()))
-                    .filter(StringUtils::isNotBlank)
-                    .distinct()
-                    .collect(Collectors.joining("/"));
-            machineParts.add(machineCode + ": " + cleanTypes);
-        }
-        return String.join("；", machineParts);
+        return cleanPlans.stream()
+                .map(LhMouldCleanPlan::getLhCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.joining(","));
     }
 
     /**
@@ -438,7 +417,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      *   <li>从原材料消耗明细表按胶种类型查对应的胎胚（CHILD_MATERIAL_NAME='AQ'+胶种类型）</li>
      *   <li>匹配本次成型排程结果中的胎胚</li>
      *   <li>通过胎胚编号关联物料主数据取规格+花纹</li>
-     *   <li>按胶种分组，同规格多花纹用"/"隔开，不同规格用"，"隔开</li>
+     *   <li>按胶种分组，同规格多花纹用"/"隔开，不同规格用","隔开</li>
      * </ol>
      *
      * @param scheduleDate 排程日期
@@ -493,7 +472,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             rubberTypeEmbryoMap.put(rubberType, embryoCodes);
         }
 
-        // 查询物料主数据，构建胎胚→规格+花纹映射
+        // 查询物料主数据，构建胎胚→物料列表映射
         Set<String> allRelevantEmbryoCodes = rubberTypeEmbryoMap.values().stream()
                 .flatMap(Set::stream)
                 .filter(scheduleEmbryoCodes::contains)
@@ -501,15 +480,18 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
         log.info("需要查询物料主数据的胎胚代码数量: {}", allRelevantEmbryoCodes.size());
 
-        Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>();
+        // 查询物料主数据，构建胎胚→物料列表映射（一个胎胚代码可能对应多条物料记录）
+        Map<String, List<MdmMaterialInfo>> materialInfoMap = new HashMap<>();
         if (!allRelevantEmbryoCodes.isEmpty()) {
             List<MdmMaterialInfo> materialInfoList = mdmMaterialInfoMapper.selectList(
                     new LambdaQueryWrapper<MdmMaterialInfo>()
-                            .in(MdmMaterialInfo::getMaterialCode, allRelevantEmbryoCodes)
+                            .in(MdmMaterialInfo::getEmbryoCode, allRelevantEmbryoCodes)
                             .and(w -> w.eq(MdmMaterialInfo::getIsDelete, 0)
                                     .or().isNull(MdmMaterialInfo::getIsDelete)));
-            materialInfoList.forEach(m -> materialInfoMap.put(m.getMaterialCode(), m));
-            log.info("物料主数据查询完成, 数量: {}", materialInfoList.size());
+            materialInfoMap = materialInfoList.stream()
+                    .filter(m -> StringUtils.isNotBlank(m.getEmbryoCode()))
+                    .collect(Collectors.groupingBy(MdmMaterialInfo::getEmbryoCode, HashMap::new, Collectors.toList()));
+            log.info("物料主数据查询完成, 数量: {}, 胎胚分组数: {}", materialInfoList.size(), materialInfoMap.size());
         }
 
         // 按胶种分组构建列表数据
@@ -526,19 +508,21 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
             Map<String, Set<String>> specPatternMap = new LinkedHashMap<>();
             for (String embryoCode : scheduledEmbryos) {
-                MdmMaterialInfo materialInfo = materialInfoMap.get(embryoCode);
-                if (materialInfo == null) {
+                List<MdmMaterialInfo> materialInfoList = materialInfoMap.get(embryoCode);
+                if (materialInfoList == null || materialInfoList.isEmpty()) {
                     log.warn("胎胚代码[{}]未找到物料主数据", embryoCode);
                     continue;
                 }
-                String spec = StringUtils.defaultString(materialInfo.getSpecifications()).trim();
-                String pattern = StringUtils.defaultString(materialInfo.getPattern()).trim();
-                if (StringUtils.isBlank(spec)) {
-                    continue;
-                }
-                specPatternMap.computeIfAbsent(spec, k -> new LinkedHashSet<>());
-                if (StringUtils.isNotBlank(pattern)) {
-                    specPatternMap.get(spec).add(pattern);
+                for (MdmMaterialInfo materialInfo : materialInfoList) {
+                    String spec = StringUtils.defaultString(materialInfo.getSpecifications()).trim();
+                    String pattern = StringUtils.defaultString(materialInfo.getPattern()).trim();
+                    if (StringUtils.isBlank(spec)) {
+                        continue;
+                    }
+                    specPatternMap.computeIfAbsent(spec, k -> new LinkedHashSet<>());
+                    if (StringUtils.isNotBlank(pattern)) {
+                        specPatternMap.get(spec).add(pattern);
+                    }
                 }
             }
 
@@ -553,7 +537,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
             Map<String, Object> item = new HashMap<>();
             item.put("rubberTypeName", rubberType);
-            item.put("specPattern", String.join("，", specParts));
+            item.put("specPattern", String.join(",", specParts));
             smallRubberList.add(item);
         }
 

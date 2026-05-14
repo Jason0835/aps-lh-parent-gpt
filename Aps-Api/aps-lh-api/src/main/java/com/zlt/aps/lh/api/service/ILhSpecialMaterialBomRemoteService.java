@@ -56,6 +56,13 @@ public interface ILhSpecialMaterialBomRemoteService {
     String checkUnique(@RequestBody LhSpecialMaterialBom lhSpecialMaterialBomVO);
 
     /**
+     * 校验分类冲突
+     */
+    @ApiOperation("校验分类冲突")
+    @PostMapping("/lhSpecialMaterialBom/checkCategoryConflict")
+    String checkCategoryConflict(@RequestBody LhSpecialMaterialBom lhSpecialMaterialBomVO);
+
+    /**
      * 导出特殊物料清单配置列表
      */
     @ApiOperation("导出列表")

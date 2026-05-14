@@ -910,6 +910,27 @@ export default {
           console.error(err);
         });
     },
+    /**
+     * 查询区「调整版本」当前值（与 searchColumns 中 prop: version 一致）；
+     * 优先取 HeaderSearch 表单，避免用户改了下拉未点查询时与 this.search 不同步。
+     */
+    resolveSearchColumnsVersion() {
+      const pt = this.$refs.monthPlanPageTableRef;
+      const searchRef = pt && pt.$refs && pt.$refs.searchRef;
+      if (searchRef && typeof searchRef.getValues === "function") {
+        const form = searchRef.getValues();
+        if (form && form.version != null && String(form.version).trim() !== "") {
+          return String(form.version).trim();
+        }
+      }
+      return String(
+        this.query.version != null
+          ? this.query.version
+          : this.search.version != null
+            ? this.search.version
+            : ""
+      ).trim();
+    },
     /** 记录 1–31 号列编辑前的原始值 */
     onDayEditFocus(row, prop) {
       this.dayEditOriginalValue = row[prop];
@@ -1076,7 +1097,13 @@ export default {
       }
       try {
         this.recalculateBeginEndDay(row);
-        await saveAdjustResult(row);
+        const versionFromSearch = this.resolveSearchColumnsVersion();
+        await saveAdjustResult({
+          ...row,
+          version:
+            versionFromSearch ||
+            (row.version != null ? String(row.version).trim() : ""),
+        });
         this.allocateProductionByPriority(row);
       } catch (err) {
         console.error(err);
@@ -1444,11 +1471,17 @@ export default {
       }
       return "";
     },
-    /** 跳转月计划结构内调整页 */
+    /** 跳转月计划结构内调整页（仅同步年月，与当前查询条件一致） */
     handleStructureInnerAdjust() {
+      const ymRaw = this.query.yearMonth || this.search.yearMonth;
+      const ym = this.formatYearMonthForPicker(ymRaw);
+      const query = { pageType: "inner" };
+      if (ym) {
+        query.yearMonth = ym;
+      }
       this.$router.push({
         path: "/newPage/monthPlanStructureInnerAdjust",
-        query: { pageType: "inner" },
+        query,
       });
     },
     /** 结构调整弹窗保存新增结构并写入 Redis 后，同步主页面机台与列表 */
@@ -1767,7 +1800,7 @@ export default {
         return null;
       }
       params.adjustType = "01";
-      params.version = row.version;
+      params.version = row.version || this.query.version;
       params.productionVersion =
         row.productionVersion || this.query.version;
       params.startDay = row.beginDay;
@@ -1792,14 +1825,6 @@ export default {
      */
     prepareWeekRollSubmitPayloadOrWarn(weekRollSubmitKind = "confirmAdjust") {
       const machine = (this.currentAdjustMachine || "").trim();
-      // if (!machine) {
-      //   this.$modal.msgWarning(
-      //     this.$t(
-      //       "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedMachine"
-      //     )
-      //   );
-      //   return null;
-      // }
       if (!this.data || !this.data.length) {
         const listDataMsgKey =
           weekRollSubmitKind === "recalculate"
@@ -1812,8 +1837,7 @@ export default {
       if (
         !payload ||
         payload.version == null ||
-        payload.version === "" ||
-        !payload.productionVersion
+        payload.version === ""
       ) {
         this.$modal.msgWarning(
           this.$t(
@@ -1861,15 +1885,54 @@ export default {
         this.confirmAdjustLoading = false;
       }
     },
-    /** 重新计算：POST /monthplan/mpWeekRollAdjust，body 与 confirmAdjust 完全一致 */
+    /**
+     * 重新计算：POST /monthplan/mpWeekRollAdjust。
+     * 有当前调整机台且有时当前调整结构时 body 与列表组装的 confirm 入参一致；
+     * 否则使用精简入参（version 优先 currentAdjustMonthPlanVersion，productionVersion/startDay/endDay 置空等）。
+     */
     async handleRecalculate() {
       const payload = this.prepareWeekRollSubmitPayloadOrWarn("recalculate");
       if (!payload) {
         return;
       }
+      const machineTrim = (this.currentAdjustMachine || "").trim();
+      const structureTrim = (this.currentAdjustStructure || "").trim();
+      /** 无当前调整机台或无当前调整结构时，重新计算接口使用精简入参 */
+      let recalculatePayload = payload;
+      if (!machineTrim || !structureTrim) {
+        const version =
+          this.currentAdjustMonthPlanVersion || this.query.version;
+        if (version == null || version === "") {
+          this.$modal.msgWarning(
+            this.$t(
+              "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedVersion"
+            )
+          );
+          return;
+        }
+        /** 优先当前调整结构，否则用查询条件产品结构 structureName，再无则传空 */
+        const structureNameForRecalculate =
+          structureTrim ||
+          String(this.query.structureName || "").trim() ||
+          "";
+        recalculatePayload = {
+          factoryCode: this.query.factoryCode,
+          version,
+          mpYear: payload.mpYear,
+          mpMonth: payload.mpMonth,
+          adjustType: payload.adjustType,
+          productionVersion: "",
+          startDay: "",
+          endDay: "",
+          adjustStartDay: this.currentAdjustBeginDay,
+          adjustEndDay: this.currentAdjustEndDay,
+          structureName: structureNameForRecalculate,
+          scheduledMachines: machineTrim,
+        };
+      }
       this.recalculateLoading = true;
       try {
-        const res = await recalculateWeekRollAdjust(payload);
+        const res = await recalculateWeekRollAdjust(recalculatePayload);
         this.$modal.msgSuccess(
           (res && res.msg) ||
             this.$t("common.msg.ajax.operation.success")

@@ -23,7 +23,9 @@ import com.zlt.aps.cx.mapper.LhScheduleResultMapper;
 import com.zlt.aps.cx.service.CxScheduleDetailService;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.service.IFactoryMonthPlanProductionFinalResultRemoteService;
 import com.zlt.aps.mp.api.service.IMpStructureAllocationRemoteService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
@@ -65,6 +67,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     @Autowired
     private IMpStructureAllocationRemoteService mpStructureAllocationRemoteService;
+
+    @Autowired
+    private IFactoryMonthPlanProductionFinalResultRemoteService factoryMonthPlanProductionFinalResultRemoteService;
 
     @Autowired
     private ISysDictDataCacheService sysDictDataCacheService;
@@ -1138,6 +1143,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * 主数据源改为T_MP_STRUCTURE_ALLOCATION（通过Feign获取），
      * 只展示有2条以上结构记录的机台（说明有结构切换），
      * 计算收尾预计时间和开产预计时间。
+     * 数据需定稿后才能导出：转产表通过PRODUCTION_VERSION关联T_MP_MONTH_PLAN_PROD_FINAL表，
+     * 只有在定稿表中存在对应PRODUCTION_VERSION的数据才允许导出。
      *
      * @param queryVO 查询条件，按成型排程结果列表查询口径筛选数据
      * @param fileName 导出文件名，保留用于对齐远程调用契约
@@ -1156,6 +1163,23 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<MpStructureAllocation> structureList = structureDataInfo != null
                 ? convertToMpStructureAllocationList(structureDataInfo.getRows())
                 : Collections.emptyList();
+
+        if (CollectionUtils.isEmpty(structureList)) {
+            List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
+            excelDataList.add(new ArrayList<>());
+            return ExcelUtils.writeMultiList(inputStream, 0, new HashMap<>(), excelDataList);
+        }
+
+        // 通过PRODUCTION_VERSION关联T_MP_MONTH_PLAN_PROD_FINAL定稿表，过滤出已定稿的数据
+        Set<String> validProductionVersions = queryValidProductionVersions(structureQuery);
+        if (PubUtil.isNotEmpty(validProductionVersions)) {
+            structureList = structureList.stream()
+                    .filter(s -> s != null && validProductionVersions.contains(s.getProductionVersion()))
+                    .collect(Collectors.toList());
+        } else {
+            // 定稿表中无数据，则无符合条件的数据可导出
+            structureList = Collections.emptyList();
+        }
 
         if (CollectionUtils.isEmpty(structureList)) {
             List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
@@ -1237,6 +1261,46 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         structureQuery.setYear(ld.getYear());
         structureQuery.setMonth(ld.getMonthValue());
         return structureQuery;
+    }
+
+    /**
+     * 查询定稿表T_MP_MONTH_PLAN_PROD_FINAL中有效的PRODUCTION_VERSION集合。
+     * 转产表数据需通过PRODUCTION_VERSION关联定稿表，只有定稿表中存在的PRODUCTION_VERSION才允许导出。
+     *
+     * @param structureQuery 结构排产查询条件（含factoryCode、year、month）
+     * @return 定稿表中存在的PRODUCTION_VERSION集合
+     */
+    private Set<String> queryValidProductionVersions(MpStructureAllocation structureQuery) {
+        FactoryMonthPlanProductionFinalResult finalQuery = new FactoryMonthPlanProductionFinalResult();
+        finalQuery.setFactoryCode(structureQuery.getFactoryCode());
+        finalQuery.setYear(structureQuery.getYear());
+        finalQuery.setMonth(structureQuery.getMonth());
+        try {
+            TableDataInfo finalDataInfo = factoryMonthPlanProductionFinalResultRemoteService.list(finalQuery);
+            List<?> rows = finalDataInfo != null ? finalDataInfo.getRows() : null;
+            if (PubUtil.isEmpty(rows)) {
+                return Collections.emptySet();
+            }
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            Set<String> productionVersions = new HashSet<>();
+            for (Object obj : rows) {
+                String productionVersion = null;
+                if (obj instanceof FactoryMonthPlanProductionFinalResult) {
+                    productionVersion = ((FactoryMonthPlanProductionFinalResult) obj).getProductionVersion();
+                } else if (obj instanceof Map) {
+                    FactoryMonthPlanProductionFinalResult entity = objectMapper.convertValue(obj, FactoryMonthPlanProductionFinalResult.class);
+                    productionVersion = entity.getProductionVersion();
+                }
+                if (StringUtils.isNotBlank(productionVersion)) {
+                    productionVersions.add(productionVersion.trim());
+                }
+            }
+            return productionVersions;
+        } catch (Exception e) {
+            log.error("查询定稿表PRODUCTION_VERSION异常，factoryCode={}, year={}, month={}",
+                    structureQuery.getFactoryCode(), structureQuery.getYear(), structureQuery.getMonth(), e);
+            return Collections.emptySet();
+        }
     }
 
     /**

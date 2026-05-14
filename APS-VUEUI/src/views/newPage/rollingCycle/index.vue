@@ -3325,6 +3325,16 @@ export default {
       yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
       factoryCode: "116",
     };
+    /** 从月计划调整查询页「结构内调整」进入时，路由仅带 yearMonth，需与来源页查询年月一致 */
+    const rq = this.$route.query || {};
+    if (rq.yearMonth != null && String(rq.yearMonth).trim() !== "") {
+      const normalized = this.formatYearMonthForPicker(
+        String(rq.yearMonth).trim()
+      );
+      if (normalized) {
+        defaultParams.yearMonth = normalized;
+      }
+    }
     this.search = {
       ...defaultParams,
     };

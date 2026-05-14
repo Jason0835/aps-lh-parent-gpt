@@ -39,11 +39,15 @@ public class SpecialMaterialBomValidator implements IDataValidator {
         }
         List<String> emptyKeyErrorList = new ArrayList<>(MAX_ERROR_DETAIL_COUNT);
         List<String> invalidCategoryErrorList = new ArrayList<>(MAX_ERROR_DETAIL_COUNT);
-        List<String> wideBaseConflictErrorList = new ArrayList<>(MAX_ERROR_DETAIL_COUNT);
+        List<String> categoryConflictErrorList = new ArrayList<>(MAX_ERROR_DETAIL_COUNT);
+        // 按物料编码维度收集分类
         Map<String, Set<String>> materialCategoryMap = new HashMap<>(16);
-        Map<String, Integer> materialWideBase195FirstRowMap = new HashMap<>(16);
-        Map<String, Integer> materialWideBase225FirstRowMap = new HashMap<>(16);
+        Map<String, Map<String, Integer>> materialCategoryFirstRowMap = new HashMap<>(16);
         Set<String> materialConflictKeySet = new HashSet<>(8);
+        // 按结构名称维度收集分类
+        Map<String, Set<String>> structureCategoryMap = new HashMap<>(16);
+        Map<String, Map<String, Integer>> structureCategoryFirstRowMap = new HashMap<>(16);
+        Set<String> structureConflictKeySet = new HashSet<>(8);
         int rowIndex = 0;
         for (LhSpecialMaterialBom bom : context.getSpecialMaterialBomList()) {
             rowIndex++;
@@ -59,10 +63,17 @@ public class SpecialMaterialBomValidator implements IDataValidator {
                 addErrorDetail(invalidCategoryErrorList, buildRowText(rowIndex, bom));
                 continue;
             }
+            // 按物料编码维度收集分类冲突
             if (StringUtils.isNotEmpty(materialCode)) {
-                collectWideBaseConflict(wideBaseConflictErrorList, materialCategoryMap,
-                        materialWideBase195FirstRowMap, materialWideBase225FirstRowMap,
-                        materialConflictKeySet, materialCode, bom.getCategory(), rowIndex);
+                collectCategoryConflict(categoryConflictErrorList, materialCategoryMap,
+                        materialCategoryFirstRowMap, materialConflictKeySet,
+                        materialCode, bom.getCategory(), "物料编码", rowIndex);
+            }
+            // 按结构名称维度收集分类冲突
+            if (StringUtils.isNotEmpty(structureName)) {
+                collectCategoryConflict(categoryConflictErrorList, structureCategoryMap,
+                        structureCategoryFirstRowMap, structureConflictKeySet,
+                        structureName, bom.getCategory(), "结构名称", rowIndex);
             }
         }
         if (!CollectionUtils.isEmpty(emptyKeyErrorList)) {
@@ -75,20 +86,20 @@ public class SpecialMaterialBomValidator implements IDataValidator {
                     + "] 特殊物料清单分类只能为01/02/03: "
                     + String.join("；", invalidCategoryErrorList));
         }
-        if (!CollectionUtils.isEmpty(wideBaseConflictErrorList)) {
+        if (!CollectionUtils.isEmpty(categoryConflictErrorList)) {
             context.addValidationError("[" + getValidatorName()
-                    + "] 同一物料编码不能同时配置19.5寸宽基和22.5寸宽基: "
-                    + String.join("；", wideBaseConflictErrorList));
+                    + "] 同一物料/结构下只能有一条芯片胎加一条非芯片胎分类的数据，不能同时存在芯片胎、19.5寸宽基和22.5寸宽基: "
+                    + String.join("；", categoryConflictErrorList));
         }
         boolean passed = CollectionUtils.isEmpty(emptyKeyErrorList)
                 && CollectionUtils.isEmpty(invalidCategoryErrorList)
-                && CollectionUtils.isEmpty(wideBaseConflictErrorList);
+                && CollectionUtils.isEmpty(categoryConflictErrorList);
         if (passed) {
             log.info("特殊物料清单校验通过, 配置数: {}", context.getSpecialMaterialBomList().size());
         } else {
-            log.warn("特殊物料清单校验未通过, 空键错误: {}, 分类错误: {}, 物料宽基冲突: {}",
+            log.warn("特殊物料清单校验未通过, 空键错误: {}, 分类错误: {}, 分类冲突: {}",
                     emptyKeyErrorList.size(), invalidCategoryErrorList.size(),
-                    wideBaseConflictErrorList.size());
+                    categoryConflictErrorList.size());
         }
         return passed;
     }
@@ -136,45 +147,58 @@ public class SpecialMaterialBomValidator implements IDataValidator {
     }
 
     /**
-     * 收集同一物料编码下 19.5 寸宽基与 22.5 寸宽基互斥冲突。
+     * 收集同一维度下分类冲突。
+     * 同一维度下只能有一条芯片胎分类和一条非芯片胎分类的数据，
+     * 即非芯片胎分类（19.5寸宽基、22.5寸宽基）最多只能出现一种。
      *
      * @param errorList 冲突错误列表
      * @param categoryMap 已命中的分类集合
-     * @param first195RowMap 首次出现 01 的行号Map
-     * @param first225RowMap 首次出现 02 的行号Map
+     * @param firstRowMap 各分类首次出现的行号Map
      * @param conflictKeySet 已记录冲突的键集合
-     * @param key 当前命中键
+     * @param key 当前命中键（物料编码或结构名称）
      * @param category 当前分类
+     * @param dimensionName 维度名称（物料编码/结构名称）
      * @param rowIndex 当前行号
      */
-    private void collectWideBaseConflict(List<String> errorList,
-                                         Map<String, Set<String>> categoryMap,
-                                         Map<String, Integer> first195RowMap,
-                                         Map<String, Integer> first225RowMap,
-                                         Set<String> conflictKeySet,
-                                         String key,
-                                         String category,
-                                         int rowIndex) {
+    private void collectCategoryConflict(List<String> errorList,
+                                          Map<String, Set<String>> categoryMap,
+                                          Map<String, Map<String, Integer>> firstRowMap,
+                                          Set<String> conflictKeySet,
+                                          String key,
+                                          String category,
+                                          String dimensionName,
+                                          int rowIndex) {
         Set<String> categorySet = categoryMap.computeIfAbsent(key, value -> new HashSet<String>(4));
         categorySet.add(category);
-        if (StringUtils.equals(LhSpecialMaterialCategoryEnum.WIDE_BASE_195.getCode(), category)) {
-            first195RowMap.putIfAbsent(key, rowIndex);
-        }
-        if (StringUtils.equals(LhSpecialMaterialCategoryEnum.WIDE_BASE_225.getCode(), category)) {
-            first225RowMap.putIfAbsent(key, rowIndex);
-        }
-        if (!categorySet.contains(LhSpecialMaterialCategoryEnum.WIDE_BASE_195.getCode())
-                || !categorySet.contains(LhSpecialMaterialCategoryEnum.WIDE_BASE_225.getCode())
-                || !conflictKeySet.add(key)) {
+        // 记录各分类首次出现的行号
+        Map<String, Integer> rowMap = firstRowMap.computeIfAbsent(key, value -> new HashMap<>(4));
+        rowMap.putIfAbsent(category, rowIndex);
+
+        // 统计非芯片胎分类数量
+        long nonChipTireCount = categorySet.stream()
+                .filter(c -> !StringUtils.equals(LhSpecialMaterialCategoryEnum.CHIP_TIRE.getCode(), c))
+                .count();
+
+        // 非芯片胎分类超过1种时存在冲突（同时存在19.5寸宽基和22.5寸宽基）
+        if (nonChipTireCount <= 1 || !conflictKeySet.add(key)) {
             return;
         }
-        Integer first195Row = first195RowMap.get(key);
-        Integer first225Row = first225RowMap.get(key);
-        addErrorDetail(errorList, "物料编码=" + key
-                + "(第" + first195Row + "条分类="
-                + LhSpecialMaterialCategoryEnum.WIDE_BASE_195.getCode()
-                + ", 第" + first225Row + "条分类="
-                + LhSpecialMaterialCategoryEnum.WIDE_BASE_225.getCode() + ")");
+
+        // 构建冲突描述
+        StringBuilder detail = new StringBuilder();
+        detail.append(dimensionName).append("=").append(key).append("(");
+        boolean first = true;
+        for (Map.Entry<String, Integer> entry : rowMap.entrySet()) {
+            if (!first) {
+                detail.append(", ");
+            }
+            first = false;
+            LhSpecialMaterialCategoryEnum categoryEnum = LhSpecialMaterialCategoryEnum.getByCode(entry.getKey());
+            String categoryDesc = categoryEnum != null ? categoryEnum.getDescription() : entry.getKey();
+            detail.append("第").append(entry.getValue()).append("条分类=").append(categoryDesc);
+        }
+        detail.append(")");
+        addErrorDetail(errorList, detail.toString());
     }
 
     /**
