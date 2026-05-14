@@ -1552,13 +1552,13 @@ export default {
     },
     handleExport() {
       downloadLink(
-        "/monthplan/factoryMonthPlanMouldDayResult/export",
+        "/monthplan/mpAdjustResult/exportFinal",
         this.formatMouldingDayExportParams()
       );
     },
     handleExportAllMaterial() {
       downloadLink(
-        "/monthplan/factoryMonthPlanMouldDayResult/exportAllMaterial",
+        "/monthplan/mpAdjustResult/exportAllMaterial",
         this.formatMouldingDayExportParams()
       );
     },
