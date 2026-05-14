@@ -327,7 +327,18 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         allAllocations.addAll(newAllocations);
         allAllocations.addAll(trialAllocations);
 
-        log.info("班次分配前检查: 总分配数={}", allAllocations.size());
+        log.info("班次分配前检查: 总分配数={} (续作={}, 新增={}, 试制={})",
+                allAllocations.size(), continueAllocations.size(), newAllocations.size(), trialAllocations.size());
+        // 检查量试任务重复
+        for (MachineAllocationResult mar : allAllocations) {
+            for (TaskAllocation ta : mar.getTaskAllocations()) {
+                if (Boolean.TRUE.equals(ta.getIsProductionTrial())) {
+                    log.info("量试分配检查: 机台={}, 胎胚={}, 物料={}, 数量={}, isContinue={}",
+                            mar.getMachineCode(), ta.getEmbryoCode(), ta.getMaterialCode(),
+                            ta.getQuantity(), ta.getIsContinueTask());
+                }
+            }
+        }
 
         // ==================== 精度计划挑选与提前扣量（每日首次执行） ====================
         applyPrecisionPlanSelection(context, scheduleDate, shiftConfig, allAllocations);
@@ -1730,6 +1741,14 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     if (task.getVulcanizeMoldCount() != null) {
                         tracker.setVulcanizeMoldCount(task.getVulcanizeMoldCount());
                     }
+                    // 每个班次开始时，更新beginStock为上一班次结束时的库存（currentStock），
+                    // 并重置累计值，使stockHours反映当前班次的实时库存水位
+                    if (tracker.getBeginStock() != null) {
+                        int previousStock = tracker.getCurrentStock();
+                        tracker.setBeginStock(previousStock);
+                        tracker.setCumulativeForming(0);
+                        tracker.setCumulativeVulcanize(0);
+                    }
                     if (task.getCurrentStock() != null && tracker.getBeginStock() == null) {
                         tracker.setBeginStock(task.getCurrentStock());
                     }
@@ -1955,8 +1974,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         // 1. 单胎单模硫化时长(秒) = 86400 / 日硫化量
         double singleTireMoldSeconds = (double) SECONDS_PER_DAY / dailyLhCapacity;
 
-        // 2. 库存可供硫化时长(小时) = (库存 + 成型累计) × 单胎单模硫化时长 / 3600 / 硫化机数 / 单台模数
-        return (double) (currentStock + cumulativeForming) * singleTireMoldSeconds
+        // 2. 库存可供硫化时长(小时) = 当前库存 × 单胎单模硫化时长 / 3600 / 硫化机数 / 单台模数
+        // 注意: currentStock = 期初库存 + 成型累计 - 硫化累计，已经包含了成型累计，不需要再加cumulativeForming
+        return (double) currentStock * singleTireMoldSeconds
                 / SECONDS_PER_HOUR / vulcanizeMachineCount / vulcanizeMoldCount;
     }
 
@@ -2002,6 +2022,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         int getCumulativeForming() { return cumulativeForming; }
         int getCumulativeVulcanize() { return cumulativeVulcanize; }
+        void setCumulativeForming(int val) { this.cumulativeForming = val; }
+        void setCumulativeVulcanize(int val) { this.cumulativeVulcanize = val; }
         void addFormingProduction(int qty) { this.cumulativeForming += qty; }
         void addVulcanizeConsumption(int qty) { this.cumulativeVulcanize += qty; }
         int getHourlyCapacity() { return hourlyCapacity; }
