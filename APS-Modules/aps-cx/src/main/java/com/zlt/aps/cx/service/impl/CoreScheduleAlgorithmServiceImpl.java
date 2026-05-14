@@ -9,12 +9,14 @@ import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.mapper.CxPrecisionPlanMapper;
 import com.zlt.aps.cx.mapper.LhScheduleResultMapper;
+import com.zlt.aps.cx.mapper.MdmSkuConstructionRefMapper;
 import com.zlt.aps.cx.service.engine.*;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,6 +74,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     private final BalancingService balancingService;
     private final CxPrecisionPlanMapper precisionPlanMapper;
     private final LhScheduleResultMapper lhScheduleResultMapper;
+    private final MdmSkuConstructionRefMapper skuConstructionRefMapper;
 
     /** 构造函数注入 */
     @Autowired
@@ -84,7 +87,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             ScheduleDayTypeHelper scheduleDayTypeHelper,
             @Lazy BalancingService balancingService,
             CxPrecisionPlanMapper precisionPlanMapper,
-            LhScheduleResultMapper lhScheduleResultMapper) {
+            LhScheduleResultMapper lhScheduleResultMapper,
+            MdmSkuConstructionRefMapper skuConstructionRefMapper) {
         this.continueTaskProcessor = continueTaskProcessor;
         this.trialTaskProcessor = trialTaskProcessor;
         this.newTaskProcessor = newTaskProcessor;
@@ -94,6 +98,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         this.balancingService = balancingService;
         this.precisionPlanMapper = precisionPlanMapper;
         this.lhScheduleResultMapper = lhScheduleResultMapper;
+        this.skuConstructionRefMapper = skuConstructionRefMapper;
     }
 
     /** 默认排程天数 */
@@ -1414,6 +1419,26 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
 
+        // ---- SKU与示方书关系映射（materialCode+embryoNo -> embryoType） ----
+        Map<String, String> skuRecipeTypeMap = new HashMap<>();
+        try {
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MdmSkuConstructionRef> skuQueryWrapper =
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            skuQueryWrapper.eq(MdmSkuConstructionRef::getIsDelete, 0);
+            List<MdmSkuConstructionRef> skuRefList = skuConstructionRefMapper.selectList(skuQueryWrapper);
+            if (skuRefList != null) {
+                for (MdmSkuConstructionRef ref : skuRefList) {
+                    if (ref.getMaterialCode() != null && ref.getEmbryoNo() != null && ref.getEmbryoType() != null) {
+                        String mapKey = ref.getMaterialCode() + "|" + ref.getEmbryoNo();
+                        skuRecipeTypeMap.putIfAbsent(mapKey, ref.getEmbryoType());
+                    }
+                }
+            }
+            log.info("SKU与示方书关系映射加载完成，共 {} 条记录", skuRecipeTypeMap.size());
+        } catch (Exception e) {
+            log.warn("加载SKU与示方书关系映射失败，将回退使用constructionStage作为recipeType: {}", e.getMessage());
+        }
+
         // ==================== 构建最终的 CxScheduleResult 列表 ====================
         List<CxScheduleResult> results = new ArrayList<>();
         LocalDate startDate = context.getScheduleDate();
@@ -1610,8 +1635,25 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 result.setMarkCloseOutTip("1");
             }
 
-            // ---- 示方书类型直接取 constructionStage ----
+            // ---- 示方书类型从SKU与示方书关系获取，查不到则回退constructionStage ----
             String recipeType = constructionStage;
+            String embryoNo = (primaryLh != null) ? primaryLh.getEmbryoNo() : null;
+            if (embryoNo == null && materialCode != null) {
+                MdmMaterialInfo matInfo = materialByCodeMap.get(materialCode);
+                if (matInfo != null) {
+                    embryoNo = matInfo.getEmbryoNo();
+                }
+            }
+            if (materialCode != null && embryoNo != null) {
+                String skuKey = materialCode + "|" + embryoNo;
+                String skuEmbryoType = skuRecipeTypeMap.get(skuKey);
+                if (skuEmbryoType != null) {
+                    recipeType = skuEmbryoType;
+                    log.debug("物料{}制造示方书号{}从SKU关系获取示方书类型: {}", materialCode, embryoNo, skuEmbryoType);
+                } else {
+                    log.debug("物料{}制造示方书号{}未在SKU关系中找到示方书类型，回退使用constructionStage: {}", materialCode, embryoNo, constructionStage);
+                }
+            }
 
             // ---- 映射班次排量到 CLASS1~8 ----
             for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
@@ -1801,7 +1843,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 for (int i = 1; i <= tripCount; i++) {
                     int tripPlanQty = Math.min(tripCapacity, planQty - (i - 1) * tripCapacity);
 
-                    // 计算当前车次前的库存可供硫化时长
+                    // 【先更新成型累计】：stockHours 反映排完本车次之后的库存水位
+                    tracker.addFormingProduction(tripPlanQty);
+
+                    // 计算当前车次后的库存可供硫化时长（= 期初 + 包含本车次在内的累计成型 - 硫化累计）
                     int currentStock = tracker.getCurrentStock();
                     double stockHours = calculateStockHours(
                             currentStock, tracker.getCumulativeForming(),
@@ -1851,7 +1896,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     record.setVulcanizeMachineCount(tracker.getVulcanizeMachineCount());
 
                     currentShiftTrips.add(record);
-                    tracker.addFormingProduction(tripPlanQty);
+
+                    // 最后一个车次才加硫化消耗（影响下一个班次）
                     if (i == tripCount && vulcanizeClassConsumption > 0) {
                         tracker.addVulcanizeConsumption(vulcanizeClassConsumption);
                     }
