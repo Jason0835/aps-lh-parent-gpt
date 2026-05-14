@@ -17,7 +17,6 @@ import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.*;
-import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
@@ -363,14 +362,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (adjustPlanQty < 0) {
                 errorMessages.add(String.format("第%s班计划量不能小于0", shiftIndex));
             }
-            /*Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(record, shiftIndex);
-            if (Objects.isNull(shiftEndTime)) {
-                errorMessages.add(String.format("第%s班结束时间缺失，禁止调量", shiftIndex));
-            } else if (!now.before(shiftEndTime)) {
-                errorMessages.add(String.format("第%s班已结束，历史班次不可调量", shiftIndex));
-            }*/
-            Integer finishQty = Optional.ofNullable(ShiftFieldUtil.getShiftFinishQty(record, shiftIndex)).orElse(0);
-            if (adjustPlanQty < finishQty) {
+            // 历史班次允许调量低于完成量，非历史班次仍需保护完成量下限。
+            boolean historyShift = isHistoryShift(record, shiftIndex, now);
+            Integer finishQty = Optional.ofNullable(ShiftFieldUtil.getShiftFinishQty(record, shiftIndex))
+                    .orElse(0);
+            if (!historyShift && adjustPlanQty < finishQty) {
                 errorMessages.add(String.format("第%s班计划量不能小于完成量%s", shiftIndex, finishQty));
             }
         }
@@ -382,6 +378,22 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return AjaxResult.error(String.join("；", errorMessages));
         }
         return AjaxResult.success();
+    }
+
+    /**
+     * 判断指定班次是否已经成为历史班次。
+     *
+     * @param record     排程结果记录
+     * @param shiftIndex 班次索引（1~8）
+     * @param now        当前校验时间
+     * @return true表示班次结束时间已到或已过，false表示结束时间缺失或班次尚未结束
+     */
+    private boolean isHistoryShift(LhScheduleResult record, int shiftIndex, Date now) {
+        Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(record, shiftIndex);
+        if (Objects.isNull(shiftEndTime) || Objects.isNull(now)) {
+            return false;
+        }
+        return !now.before(shiftEndTime);
     }
 
     /**
