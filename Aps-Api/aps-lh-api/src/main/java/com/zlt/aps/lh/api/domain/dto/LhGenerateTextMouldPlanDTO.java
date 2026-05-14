@@ -7,12 +7,12 @@ import lombok.Data;
 import java.io.Serializable;
 
 /**
- * 生成文字示方换模计划入参对象。
+ * 文字示方更新入参对象。
  *
  * @author Codex
  */
 @Data
-@ApiModel(value = "生成文字示方换模计划入参")
+@ApiModel(value = "文字示方更新入参")
 public class LhGenerateTextMouldPlanDTO implements Serializable {
 
     private static final long serialVersionUID = -3450678844871646003L;
