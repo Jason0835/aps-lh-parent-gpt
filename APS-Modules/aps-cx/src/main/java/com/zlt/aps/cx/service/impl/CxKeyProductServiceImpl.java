@@ -113,10 +113,24 @@ public class CxKeyProductServiceImpl extends AbstractDocService<CxKeyProduct> im
                             errorNum, message, importErrorLogs);
                 }
 
-                // 必填字段校验 - 结构名称
+                // 必填字段校验 - 结构
                 if (StringUtil.isBlank(docEntity.getStructureName())) {
                     isCan = false;
                     String message = String.format(I18nUtil.getMessage("ui.data.alert.cxKeyProduct.structureNameRequired"), errorNum);
+                    ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                            errorNum, message, importErrorLogs);
+                }
+
+                // 必填字段校验 - 是否启用
+                if (docEntity.getIsActive() == null) {
+                    isCan = false;
+                    String message = String.format(I18nUtil.getMessage("ui.data.alert.cxKeyProduct.isActiveRequired"), errorNum);
+                    ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                            errorNum, message, importErrorLogs);
+                } else if (docEntity.getIsActive() != 0 && docEntity.getIsActive() != 1) {
+                    // 下拉值校验 - 是否启用只能为0或1
+                    isCan = false;
+                    String message = String.format(I18nUtil.getMessage("ui.data.alert.cxKeyProduct.isActiveNotDict"), errorNum);
                     ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                             errorNum, message, importErrorLogs);
                 }

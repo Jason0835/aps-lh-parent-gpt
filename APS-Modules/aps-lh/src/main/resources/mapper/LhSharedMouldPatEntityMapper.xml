@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper">
+
+    <resultMap type="com.zlt.aps.lh.api.domain.entity.LhSharedMouldPat" id="LhSharedMouldPatResult">
+        <result property="id" column="ID"/>
+        <result property="factoryCode" column="FACTORY_CODE"/>
+        <result property="materialCode" column="MATERIAL_CODE"/>
+        <result property="materialDesc" column="MATERIAL_DESC"/>
+        <result property="specifications" column="SPECIFICATIONS"/>
+        <result property="mainPattern" column="MAIN_PATTERN"/>
+        <result property="mouldType" column="MOULD_TYPE"/>
+        <result property="mouldNo" column="MOULD_NO"/>
+        <result property="patternBlock" column="PATTERN_BLOCK"/>
+        <result property="companyCode" column="COMPANY_CODE"/>
+        <result property="createBy" column="CREATE_BY"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateBy" column="UPDATE_BY"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+        <result property="isDelete" column="IS_DELETE"/>
+        <result property="remark" column="REMARK"/>
+    </resultMap>
+
+    <sql id="selectLhSharedMouldPatVo">
+        SELECT ID, FACTORY_CODE, MATERIAL_CODE, MATERIAL_DESC, SPECIFICATIONS,
+               MAIN_PATTERN, MOULD_TYPE, MOULD_NO, PATTERN_BLOCK, COMPANY_CODE,
+               CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, IS_DELETE, REMARK
+        FROM T_LH_SHARED_MOULD_PAT
+    </sql>
+
+    <insert id="insertBatch">
+        INSERT INTO T_LH_SHARED_MOULD_PAT (
+            FACTORY_CODE,
+            MATERIAL_CODE,
+            MATERIAL_DESC,
+            SPECIFICATIONS,
+            MAIN_PATTERN,
+            MOULD_TYPE,
+            MOULD_NO,
+            PATTERN_BLOCK,
+            COMPANY_CODE,
+            CREATE_BY,
+            CREATE_TIME,
+            UPDATE_BY,
+            UPDATE_TIME,
+            REMARK
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.factoryCode},
+                #{item.materialCode},
+                #{item.materialDesc},
+                #{item.specifications},
+                #{item.mainPattern},
+                #{item.mouldType},
+                #{item.mouldNo},
+                #{item.patternBlock},
+                #{item.companyCode},
+                #{item.createBy},
+                #{item.createTime},
+                #{item.updateBy},
+                #{item.updateTime},
+                #{item.remark}
+            )
+        </foreach>
+    </insert>
+
+    <update id="updateBatch">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE T_LH_SHARED_MOULD_PAT
+            <set>
+                FACTORY_CODE = #{item.factoryCode},
+                MATERIAL_CODE = #{item.materialCode},
+                MATERIAL_DESC = #{item.materialDesc},
+                SPECIFICATIONS = #{item.specifications},
+                MAIN_PATTERN = #{item.mainPattern},
+                MOULD_TYPE = #{item.mouldType},
+                MOULD_NO = #{item.mouldNo},
+                PATTERN_BLOCK = #{item.patternBlock},
+                COMPANY_CODE = #{item.companyCode},
+                UPDATE_BY = #{item.updateBy},
+                UPDATE_TIME = #{item.updateTime},
+                REMARK = #{item.remark}
+            </set>
+            WHERE ID = #{item.id}
+        </foreach>
+    </update>
+
+</mapper>

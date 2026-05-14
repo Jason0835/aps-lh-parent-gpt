@@ -55,6 +55,18 @@ public class LhInsertOrderValidateResultDTO implements Serializable {
     private Integer mouldSurplusQty;
 
     /**
+     * 胎胚库存
+     */
+    @ApiModelProperty(value = "胎胚库存", name = "embryoStock")
+    private Integer embryoStock;
+
+    /**
+     * 左右模标识（L-左模，R-右模）
+     */
+    @ApiModelProperty(value = "左右模标识", name = "leftRightMould")
+    private String leftRightMould;
+
+    /**
      * 班次产能信息
      */
     @Data

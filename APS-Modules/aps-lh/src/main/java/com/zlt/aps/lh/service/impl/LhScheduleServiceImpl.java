@@ -17,7 +17,6 @@ import com.zlt.aps.cx.service.ICxScheduleResultService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.*;
-import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
@@ -47,11 +46,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.io.ByteArrayInputStream;
@@ -363,14 +364,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (adjustPlanQty < 0) {
                 errorMessages.add(String.format("第%s班计划量不能小于0", shiftIndex));
             }
-            /*Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(record, shiftIndex);
-            if (Objects.isNull(shiftEndTime)) {
-                errorMessages.add(String.format("第%s班结束时间缺失，禁止调量", shiftIndex));
-            } else if (!now.before(shiftEndTime)) {
-                errorMessages.add(String.format("第%s班已结束，历史班次不可调量", shiftIndex));
-            }*/
-            Integer finishQty = Optional.ofNullable(ShiftFieldUtil.getShiftFinishQty(record, shiftIndex)).orElse(0);
-            if (adjustPlanQty < finishQty) {
+            // 历史班次允许调量低于完成量，非历史班次仍需保护完成量下限。
+            boolean historyShift = isHistoryShift(record, shiftIndex, now);
+            Integer finishQty = Optional.ofNullable(ShiftFieldUtil.getShiftFinishQty(record, shiftIndex))
+                    .orElse(0);
+            if (!historyShift && adjustPlanQty < finishQty) {
                 errorMessages.add(String.format("第%s班计划量不能小于完成量%s", shiftIndex, finishQty));
             }
         }
@@ -382,6 +380,22 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return AjaxResult.error(String.join("；", errorMessages));
         }
         return AjaxResult.success();
+    }
+
+    /**
+     * 判断指定班次是否已经成为历史班次。
+     *
+     * @param record     排程结果记录
+     * @param shiftIndex 班次索引（1~8）
+     * @param now        当前校验时间
+     * @return true表示班次结束时间已到或已过，false表示结束时间缺失或班次尚未结束
+     */
+    private boolean isHistoryShift(LhScheduleResult record, int shiftIndex, Date now) {
+        Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(record, shiftIndex);
+        if (Objects.isNull(shiftEndTime) || Objects.isNull(now)) {
+            return false;
+        }
+        return !now.before(shiftEndTime);
     }
 
     /**
@@ -645,9 +659,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 if (Objects.isNull(row)) {
                     row = sheet.createRow(rowIndex);
                 }
-                setFormulaCell(row, 9, "CF" + excelRowNum + "-CE" + excelRowNum);
-                setFormulaCell(row, 77, "BC" + excelRowNum + "+BK" + excelRowNum + "+BS" + excelRowNum);
-                setFormulaCell(row, 78, "BL" + excelRowNum + "+BT" + excelRowNum + "+BD" + excelRowNum);
+                // J 列后续需要参与导入，不能保留公式；这里直接按 CF-CE 写入静态数值。
+                setNumericCell(row, 9, readNumericCell(row.getCell(83)).subtract(readNumericCell(row.getCell(82))));
+                // BZ/CA 后续同样需要导入，直接写入静态合计值，避免导入端读取公式为空。
+                setNumericCell(row, 77, sumNumericCells(row, 54, 62, 70));
+                setNumericCell(row, 78, sumNumericCells(row, 63, 71, 55));
                 setFormulaCell(row, 79, "O" + excelRowNum + "+W" + excelRowNum + "+AE" + excelRowNum
                         + "+AM" + excelRowNum + "+AU" + excelRowNum + "+BC" + excelRowNum
                         + "+BK" + excelRowNum + "+BS" + excelRowNum);
@@ -764,8 +780,81 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         cell.setCellFormula(formula);
     }
 
+    /**
+     * 设置数值单元格。
+     * <p>用于导出后还会被系统再次导入的列，避免 Excel 公式在导入端无法计算或公式缓存为空。</p>
+     *
+     * @param row 当前数据行
+     * @param columnIndex 数值所在列下标，POI 从 0 开始计数
+     * @param value 写入的数值
+     */
+    private void setNumericCell(Row row, int columnIndex, BigDecimal value) {
+        Cell cell = row.getCell(columnIndex);
+        CellStyle cellStyle = Objects.nonNull(cell) ? cell.getCellStyle() : null;
+        if (Objects.nonNull(cell)) {
+            row.removeCell(cell);
+        }
+        cell = row.createCell(columnIndex);
+        if (Objects.nonNull(cellStyle)) {
+            cell.setCellStyle(cellStyle);
+        }
+        cell.setCellValue(Objects.nonNull(value) ? value.doubleValue() : BigDecimal.ZERO.doubleValue());
+    }
+
+    /**
+     * 安全读取单元格数值。
+     * <p>模板写入后的 CE/CF 可能是数字，也可能因为占位符替换被写成字符串；
+     * 这里统一转换为 BigDecimal，转换失败时按 0 处理，保证 J 列静态值可稳定生成。</p>
+     *
+     * @param cell 待读取的单元格
+     * @return 单元格数值，读取不到时返回 0
+     */
+    private BigDecimal readNumericCell(Cell cell) {
+        if (Objects.isNull(cell)) {
+            return BigDecimal.ZERO;
+        }
+        try {
+            CellType cellType = cell.getCellType();
+            if (CellType.FORMULA.equals(cellType)) {
+                cellType = cell.getCachedFormulaResultType();
+            }
+            if (CellType.NUMERIC.equals(cellType)) {
+                return BigDecimal.valueOf(cell.getNumericCellValue());
+            }
+            if (CellType.STRING.equals(cellType)) {
+                String value = StringUtils.trimToEmpty(cell.getStringCellValue());
+                return StringUtils.isNotBlank(value) ? new BigDecimal(value) : BigDecimal.ZERO;
+            }
+            if (CellType.BOOLEAN.equals(cellType)) {
+                return cell.getBooleanCellValue() ? BigDecimal.ONE : BigDecimal.ZERO;
+            }
+        } catch (Exception e) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.ZERO;
+    }
+
+    /**
+     * 汇总同一行多个数字单元格。
+     *
+     * @param row 当前数据行
+     * @param columnIndexes 需要汇总的列下标，POI 从 0 开始计数
+     * @return 汇总值
+     */
+    private BigDecimal sumNumericCells(Row row, int... columnIndexes) {
+        if (Objects.isNull(row) || Objects.isNull(columnIndexes)) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        for (int columnIndex : columnIndexes) {
+            total = total.add(readNumericCell(row.getCell(columnIndex)));
+        }
+        return total;
+    }
+
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public AjaxResult importScheduleTemplate(List<LhScheduleResultTemplateImportVO> list, LhScheduleResult result, boolean updateSupport, Long id) {
         if (Objects.isNull(result) || StringUtils.isBlank(result.getFactoryCode()) || Objects.isNull(result.getScheduleDate())) {
             return AjaxResult.error("导入条件中的工厂和排程日期不能为空");
@@ -804,39 +893,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Map<Integer, Date[]> shiftTimeMap = buildShiftTimeMap(scheduleDate);
         Set<String> importUniqueKeys = new HashSet<>();
 
-        List<String> machineCodes = list.stream()
+        boolean hasValidRow = list.stream()
                 .filter(Objects::nonNull)
-                .filter(item -> !Objects.equals(item.getId(), -999L))
-                .map(LhScheduleResultTemplateImportVO::getLhMachineCode)
-                .filter(StringUtils::isNotBlank)
-                .map(String::trim)
-                .distinct()
-                .collect(Collectors.toList());
-        List<String> materialCodes = list.stream()
-                .filter(Objects::nonNull)
-                .filter(item -> !Objects.equals(item.getId(), -999L))
-                .map(LhScheduleResultTemplateImportVO::getMaterialCode)
-                .filter(StringUtils::isNotBlank)
-                .map(String::trim)
-                .distinct()
-                .collect(Collectors.toList());
-
-        Map<String, LhScheduleResult> existMap = new HashMap<>(16);
-        if (!machineCodes.isEmpty() && !materialCodes.isEmpty()) {
-            List<LhScheduleResult> exists = scheduleResultMapper.selectList(new LambdaQueryWrapper<LhScheduleResult>()
+                .anyMatch(item -> !Objects.equals(item.getId(), -999L));
+        if (hasValidRow) {
+            // 模板导入以指定排程日期为整体覆盖范围，先逻辑删除旧排程，再插入本次导入的新排程。
+            scheduleResultMapper.update(null, new LambdaUpdateWrapper<LhScheduleResult>()
                     .eq(LhScheduleResult::getFactoryCode, factoryCode)
                     .eq(LhScheduleResult::getScheduleDate, scheduleDate)
-                    .in(LhScheduleResult::getLhMachineCode, machineCodes)
-                    .in(LhScheduleResult::getMaterialCode, materialCodes)
-                    .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
-            existMap = exists.stream().collect(Collectors.toMap(
-                    this::buildImportUniqueKey,
-                    item -> item,
-                    (oldValue, newValue) -> oldValue,
-                    LinkedHashMap::new
-            ));
+                    .set(LhScheduleResult::getIsDelete, DeleteFlagEnum.DELETED.getCode()));
         }
 
+        List<LhScheduleResult> insertList = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             LhScheduleResultTemplateImportVO row = list.get(i);
             int rowNum = i + 9;
@@ -850,16 +918,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 continue;
             }
 
-            String uniqueKey = buildImportUniqueKey(factoryCode, scheduleDate, row.getLhMachineCode(), row.getMaterialCode());
-            LhScheduleResult target = existMap.get(uniqueKey);
-            boolean isInsert = Objects.isNull(target);
-
-            if (isInsert) {
-                target = new LhScheduleResult();
-                target.setIsDelete(DeleteFlagEnum.NORMAL.getCode());
-                target.setIsRelease(ReleaseStatusEnum.NOT_RELEASED.getCode());
-                target.setDataSource("2");
-            }
+            LhScheduleResult target = new LhScheduleResult();
+            target.setIsRelease(ReleaseStatusEnum.NOT_RELEASED.getCode());
+            target.setDataSource("2");
             target.setFactoryCode(factoryCode);
             target.setScheduleDate(scheduleDate);
             target.setLhMachineCode(row.getLhMachineCode().trim());
@@ -868,15 +929,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             copyImportRowToEntity(row, target);
             fillShiftTimes(target, shiftTimeMap);
 
-            if (isInsert) {
-                scheduleResultMapper.insert(target);
-                existMap.put(uniqueKey, target);
-            } else {
-                scheduleResultMapper.updateById(target);
-            }
+//            scheduleResultMapper.insert(target);
+            insertList.add(target);
             successNum++;
         }
-
+        this.baseDao.insertBatch(insertList);
         if (failureNum > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         }

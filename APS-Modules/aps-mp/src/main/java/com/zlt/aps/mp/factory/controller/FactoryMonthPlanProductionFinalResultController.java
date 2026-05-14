@@ -163,7 +163,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         Integer pageSize = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageSize"), ServletUtils.getHeader("pageSize")));
         pageNum = pageNum == null ? 1 : pageNum;
         pageSize = pageSize == null ? 10000000 : pageSize;
-        List<FactoryMonthPlanProductionFinal4AdjustVo> page = CollUtil.page(pageNum, pageSize, list);
+        List<FactoryMonthPlanProductionFinal4AdjustVo> page = CollUtil.page(pageNum - 1, pageSize, list);
         TableDataInfo rspData = new TableDataInfo();
         rspData.setCode(200);
         rspData.setRows(page);

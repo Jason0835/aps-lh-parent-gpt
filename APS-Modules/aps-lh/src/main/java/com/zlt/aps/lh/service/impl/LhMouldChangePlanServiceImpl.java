@@ -8,6 +8,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.RowStateEnum;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
@@ -31,6 +32,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import cn.hutool.core.date.DateUtil;
 
 import javax.annotation.Resource;
 import java.util.*;
@@ -319,14 +322,17 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
 
     /**
      * 排程发布
+     * 校验规则：
+     * 1. 未勾选记录时返回提示
+     * 2. 勾选记录中包含历史记录（排程日期早于当前日期）时返回明确提示
+     * 3. 已发布的数据不允许重复发布
      */
     @Override
     public AjaxResult issueSchedule(List<Long> ids) {
         if (CollectionUtils.isEmpty(ids)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.param.error"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.noSelection"));
         }
 
-        // 1. 加锁防止多次下发
         Long[] idArray = ids.toArray(new Long[0]);
         String lockKey = "lhMouldChangePlan:issue:lock" + Arrays.toString(idArray);
         if (redisService.getCacheObject(lockKey)!=null) {
@@ -334,7 +340,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
         }
         try {
             redisService.setCacheObject(lockKey,"1");
-            // 2. 查询选中记录
+            // 查询选中记录
             QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
             wrapper.in("ID", ids);
             List<LhMouldChangePlan> planList = lhMouldChangePlanMapper.selectList(wrapper);
@@ -342,7 +348,23 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.noData"));
             }
 
-            // 3. 校验是否存在已发布的数据
+            // 校验是否包含历史记录（排程日期早于当前日期）
+            Date today = DateUtil.beginOfDay(new Date());
+            List<LhMouldChangePlan> historyList = planList.stream()
+                    .filter(item -> item.getScheduleDate() != null && item.getScheduleDate().before(today))
+                    .collect(Collectors.toList());
+            if (CollectionUtils.isNotEmpty(historyList)) {
+                String historyDetails = historyList.stream()
+                        .map(item -> String.format("%s/%s",
+                                StringUtil.isNotBlank(item.getLhResultBatchNo()) ? item.getLhResultBatchNo() : "-",
+                                StringUtil.isNotBlank(item.getOrderNo()) ? item.getOrderNo() : "-"))
+                        .collect(Collectors.joining("; "));
+                String msg = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.hasHistoryData");
+                msg = StringUtils.format(msg, historyDetails);
+                return AjaxResult.error(msg);
+            }
+
+            // 校验是否存在已发布的数据
             List<LhMouldChangePlan> releasedList = planList.stream()
                     .filter(item -> ApsConstant.IS_RELEASE.equals(item.getIsRelease()))
                     .collect(Collectors.toList());
@@ -350,7 +372,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.hasReleasedData"));
             }
 
-            // 4. 转换为MdmMoldAlterPlan
+            // 转换为MdmMoldAlterPlan
             List<MdmMoldAlterPlan> moldAlterPlanList = new ArrayList<>();
             for (LhMouldChangePlan plan : planList) {
                 MdmMoldAlterPlan moldAlterPlan = new MdmMoldAlterPlan();
@@ -367,11 +389,11 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 moldAlterPlanList.add(moldAlterPlan);
             }
 
-            // 5. 调用MES接口下发
+            // 调用MES接口下发
             try {
                 AjaxResult result = mesItfService.issueMoldAlterPlan(moldAlterPlanList);
                 if (AjaxResult.Type.ERROR.value() != Integer.parseInt(result.get(AjaxResult.CODE_TAG).toString())) {
-                    // 6. 更新发布状态为已发布
+                    // 更新发布状态为已发布
                     for (LhMouldChangePlan plan : planList) {
                         plan.setIsRelease(ApsConstant.IS_RELEASE);
                     }

@@ -31,10 +31,10 @@ public class LhSpecialMaterialBom extends BaseEntity implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 分厂编号
+     * 工厂编号
      */
     @Excel(name = "ui.data.column.lhSpecialMaterialBom.factoryCode", dictType = "biz_factory_name")
-    @ApiModelProperty(value = "分厂编号")
+    @ApiModelProperty(value = "工厂编号")
     @TableField(value = "FACTORY_CODE")
     @ImportExcelValidated(required = true)
     private String factoryCode;

@@ -51,7 +51,7 @@ export default {
         machineCode: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
         precisionType: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
         planDate: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
-        actualDate: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }],
+        actualDate: [{ required: false, message: this.$t('common.rule.select'), trigger: 'change' }],
         dataSource: [{ required: true, message: this.$t('common.rule.select'), trigger: 'change' }]
       }
     }
@@ -109,8 +109,7 @@ export default {
           prop: 'actualDate',
           label: this.$t('ui.lh.precision.plan.actual.date'),
           type: 'date',
-          valueFormat: 'yyyy-MM-dd',
-          required: true
+          valueFormat: 'yyyy-MM-dd'
         },
         {
           prop: 'scheduleDate',

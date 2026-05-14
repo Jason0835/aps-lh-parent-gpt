@@ -95,6 +95,7 @@ public class LhRepairCapsuleController extends AbstractDocBizController<LhRepair
         if (PubUtil.isNotEmpty(obtainTimeEnd)) {
             queryWrapper.le("OBTAIN_TIME", DateUtil.endOfDay(DateUtil.parse(obtainTimeEnd, "yyyy-MM-dd")));
         }
+        queryWrapper.orderByDesc("UPDATE_TIME");
         queryWrapper.orderByAsc("LH_CODE");
     }
 
@@ -110,6 +111,6 @@ public class LhRepairCapsuleController extends AbstractDocBizController<LhRepair
 
     @Override
     protected String getOrderBy() {
-        return "LH_CODE asc";
+        return "UPDATE_TIME desc, LH_CODE asc";
     }
 }

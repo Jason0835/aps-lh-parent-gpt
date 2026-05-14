@@ -48,7 +48,6 @@
             plain
             v-hasPermi="['lh:lhMouldChangePlan:issue']"
             @click="handleIssueSchedule"
-            :disabled="!canIssueSchedule"
           >{{ $t("ui.data.btn.lhMouldChangePlan.issueSchedule") }}</el-button>
        </template>
     </page-table>
@@ -66,7 +65,7 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule, issueScheduleByQuery } from "@/api/lh/lhMouldChangePlan";
+import { listLhMouldChangePlan, removeLhMouldChangePlan, issueScheduleByQuery } from "@/api/lh/lhMouldChangePlan";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -384,9 +383,7 @@ export default {
         },
       ];
     },
-    canIssueSchedule() {
-      return (this.selection && this.selection.length > 0) || !!(this.query && this.query.scheduleDate);
-    },
+
   },
   methods: {
     getTodayDate() {
@@ -474,6 +471,10 @@ export default {
         ...this.query,
         ...this.sort,
       };
+      if (!params.orderByColumn) {
+        params.orderByColumn = "updateTime,lhMachineCode";
+        params.isAsc = "desc,asc";
+      }
       if (hasPage) {
         params.pageSize = this.page.pageSize;
         params.pageNum = this.page.current;
@@ -493,20 +494,15 @@ export default {
             }
         },
         handleIssueSchedule() {
-            const hasSelection = this.selection && this.selection.length > 0;
-            if (!hasSelection && !(this.query && this.query.scheduleDate)) {
-                this.$modal.msgWarning(this.$t("ui.message.param.error"));
+            if (!this.data || this.data.length === 0) {
+                this.$modal.msgWarning(this.$t("ui.data.alert.lhMouldChangePlan.noData"));
                 return;
             }
 
             this.$confirm(this.$t("ui.data.alert.lhMouldChangePlan.issueConfirm"), {
                 type: "warning",
             }).then(() => {
-                const request = hasSelection
-                  ? issueSchedule(this.selection.map((item) => item.id))
-                  : issueScheduleByQuery({ ...this.query });
-
-                request.then((res) => {
+                issueScheduleByQuery(this.formatParams(false)).then((res) => {
                     this.$modal.msgSuccess(res.msg);
                     this.$set(this.page, "current", 1);
                     this.getList();

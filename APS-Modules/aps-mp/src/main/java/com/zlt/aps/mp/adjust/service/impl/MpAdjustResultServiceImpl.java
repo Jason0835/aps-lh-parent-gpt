@@ -108,7 +108,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         entity.setEndDay(realEndDay);
         entity.setTotalQty(totalQty);
         // 如果版本号没有值，更新调整类型=人工调整
-        if (StrUtil.isNotBlank(entity.getVersion())) {
+        if (StrUtil.isBlank(entity.getVersion())) {
             entity.setAdjustType(ApsConstant.APS_ZERO_3);
             entity.setVersion(adjVersion);
         }

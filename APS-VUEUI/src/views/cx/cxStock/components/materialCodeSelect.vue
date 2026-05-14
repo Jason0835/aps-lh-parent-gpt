@@ -98,7 +98,12 @@ export default {
         {
           prop: "embryoCode",
           label: this.$t("ui.data.rubberMaterial.embryoCode"),
-          minWidth: 200,
+          minWidth: 160,
+        },
+        {
+          prop: "embryoDesc",
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          minWidth: 260,
         },
       ];
       if (this.multiple) {

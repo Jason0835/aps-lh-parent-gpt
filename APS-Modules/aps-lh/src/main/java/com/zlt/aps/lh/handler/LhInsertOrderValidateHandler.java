@@ -3,12 +3,14 @@ package com.zlt.aps.lh.handler;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.LhInsertOrderValidateResultDTO;
 import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
+import com.zlt.aps.lh.mapper.CxStockMapper;
 import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
@@ -79,6 +81,9 @@ public class LhInsertOrderValidateHandler {
 
     @Resource
     private MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
+
+    @Resource
+    private CxStockMapper cxStockMapper;
 
     /** 排产版本已定稿 */
     private static final String PRODUCTION_VERSION_IS_FINAL = "1";
@@ -376,12 +381,36 @@ public class LhInsertOrderValidateHandler {
         LhMachineInfo machineInfo = lhMachineInfoMapper.selectOne(machineWrapper);
 
         if (Objects.isNull(machineInfo)) {
-            result.addWarning(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.machineNotExist"), dto.getLhMachineCode()));
+            LambdaQueryWrapper<LhMachineInfo> likeWrapper = new LambdaQueryWrapper<>();
+            likeWrapper.likeRight(LhMachineInfo::getMachineCode, dto.getLhMachineCode());
+            if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+                likeWrapper.eq(LhMachineInfo::getFactoryCode, dto.getFactoryCode());
+            }
+            List<LhMachineInfo> likeMachines = lhMachineInfoMapper.selectList(likeWrapper);
+            if (CollectionUtils.isNotEmpty(likeMachines)) {
+                List<String> machineCodes = likeMachines.stream()
+                        .map(LhMachineInfo::getMachineCode)
+                        .collect(Collectors.toList());
+                result.addError(String.format(
+                        I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.machineNotExist"),
+                        dto.getLhMachineCode() + "，相似机台：" + String.join("、", machineCodes) + "，请选择具体机台"));
+            } else {
+                result.addError(String.format(
+                        I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.machineNotExist"),
+                        dto.getLhMachineCode()));
+            }
             return;
         }
 
         if (!"0".equals(machineInfo.getStatus())) {
-            result.addWarning(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.machineUnavailable"), dto.getLhMachineCode()));
+            result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.machineUnavailable"), dto.getLhMachineCode()));
+        }
+
+        if (machineInfo.getMaxMoldNum() != null && machineInfo.getMaxMoldNum() == 1) {
+            String lrMould = resolveLeftRightMould(dto.getLhMachineCode());
+            if (StringUtils.isNotBlank(lrMould)) {
+                result.setLeftRightMould(lrMould);
+            }
         }
 
         Integer machineQuota = machineInfo.getQuota();
@@ -489,9 +518,32 @@ public class LhInsertOrderValidateHandler {
         }
         result.setMouldSurplusQty(surplusQty);
 
+        LambdaQueryWrapper<MdmMaterialInfo> materialWrapper = new LambdaQueryWrapper<>();
+        materialWrapper.eq(MdmMaterialInfo::getMaterialCode, materialCode);
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            materialWrapper.eq(MdmMaterialInfo::getFactoryCode, dto.getFactoryCode());
+        }
+        materialWrapper.last("LIMIT 1");
+        MdmMaterialInfo materialInfo = mdmMaterialInfoMapper.selectOne(materialWrapper);
+        if (materialInfo != null && StringUtils.isNotBlank(materialInfo.getEmbryoCode())) {
+            LambdaQueryWrapper<CxStock> stockWrapper = new LambdaQueryWrapper<>();
+            stockWrapper.eq(CxStock::getEmbryoCode, materialInfo.getEmbryoCode());
+            if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+                stockWrapper.eq(CxStock::getFactoryCode, dto.getFactoryCode());
+            }
+            if (dto.getScheduleDate() != null) {
+                stockWrapper.eq(CxStock::getStockDate, dto.getScheduleDate());
+            }
+            List<CxStock> stockList = cxStockMapper.selectList(stockWrapper);
+            int totalStock = stockList.stream()
+                    .mapToInt(s -> s.getStockNum() != null ? s.getStockNum() : 0)
+                    .sum();
+            result.setEmbryoStock(totalStock);
+        }
+
         int totalInsertQty = calculateTotalInsertQty(dto);
         if (surplusQty > 0 && totalInsertQty > surplusQty) {
-            result.addWarning(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldSurplusExceeded"), surplusQty, totalInsertQty, (totalInsertQty - surplusQty)));
+            result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldSurplusExceeded"), surplusQty, totalInsertQty, (totalInsertQty - surplusQty)));
         }
     }
 
@@ -628,5 +680,26 @@ public class LhInsertOrderValidateHandler {
             return shift.getShiftName();
         }
         return String.format("第%d班", shiftIndex);
+    }
+
+    /**
+     * 根据机台编码解析左右模标识
+     * 机台编码以L结尾为左模，以R结尾为右模
+     *
+     * @param machineCode 机台编码
+     * @return 左右模标识（L-左模，R-右模），无法解析时返回null
+     */
+    private String resolveLeftRightMould(String machineCode) {
+        if (StringUtils.isBlank(machineCode) || machineCode.length() < 2) {
+            return null;
+        }
+        String lastChar = machineCode.substring(machineCode.length() - 1).toUpperCase();
+        if ("L".equals(lastChar)) {
+            return "L";
+        }
+        if ("R".equals(lastChar)) {
+            return "R";
+        }
+        return null;
     }
 }

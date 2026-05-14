@@ -40,7 +40,7 @@ public class LhPrecisionPlanImportVO extends BaseEntity implements Serializable 
     private Date planDate;
 
     @Excel(name = "ui.data.column.lhPrecisionPlan.actualDate", dateFormat = "yyyy-MM-dd")
-    @ImportValidated(required = true, date = true)
+    @ImportValidated(date = true)
     @ApiModelProperty(value = "实际执行日期")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date actualDate;

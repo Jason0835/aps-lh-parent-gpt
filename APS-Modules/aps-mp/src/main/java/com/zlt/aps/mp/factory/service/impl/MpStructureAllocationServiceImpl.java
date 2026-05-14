@@ -23,6 +23,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
+import com.zlt.aps.common.core.utils.ApsNumberUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
@@ -32,14 +33,19 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.adjust.service.impl.MpMonthPlanStaticService;
+import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.api.enums.AlternativeTypeEnum;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
+import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.engine.basedata.assemble.construction.ConstructionSelector;
+import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductConstructionInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.mp.engine.enums.DayVulcanizationModeEnum;
@@ -791,6 +797,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         queryWrapper.eq(MdmWorkCalendar::getYear, queryVO.getYear());
         queryWrapper.eq(MdmWorkCalendar::getMonth, queryVO.getMonth());
         queryWrapper.eq(MdmWorkCalendar::getIsDelete, YesOrNoEnum.NO.getValue());
+        queryWrapper.eq(MdmWorkCalendar::getProcCode, "01");
     }
 
     /**
@@ -2336,6 +2343,41 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             insertResults = moldResult.get(0).getInsertResults();
         }
         
+        MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
+        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
+
+        // 加载排产参数
+        LambdaQueryWrapper<FactoryParam> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(FactoryParam::getFactoryCode, factoryCode);
+        queryWrapper.eq(FactoryParam::getIsDelete, YesOrNoEnum.NO.getValue());
+        queryWrapper.in(FactoryParam::getParamCode, MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode(), MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode());
+        Map<String, Object> paramMap = factoryParamMapper.selectList(queryWrapper).stream()
+                .collect(Collectors.toMap(FactoryParam::getParamCode, FactoryParamUtils::getParamValue));
+        
+        // 加载日历
+        MpStructureAllocation mpStructureAllocation = new MpStructureAllocation();
+        mpStructureAllocation.setFactoryCode(factoryCode);
+        mpStructureAllocation.setYear(year);
+        mpStructureAllocation.setMonth(month);
+        List<MdmWorkCalendar> calendarList = this.queryMdmWorkCalendar(mpStructureAllocation);
+        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = new HashMap<>();
+        Set<Integer> stopDaySet = new HashSet<>();
+        for (MdmWorkCalendar workCalendar: calendarList) {
+            MpDailyCapacityLimitVo limitVo = new MpDailyCapacityLimitVo();
+            Integer day = workCalendar.getDay();
+            Integer lastDay = day - 1;
+            boolean isOpenProductionFirstDay = false;
+            if (Objects.equals(workCalendar.getDayFlag(), YesOrNoEnum.YES.getCode())) { // 在产
+                if (stopDaySet.contains(lastDay)) { // 检查上一天是否停产
+                    isOpenProductionFirstDay = true;
+                }
+            } else { // 停产
+                stopDaySet.add(day);
+            }
+            limitVo.setDayProductionRate(workCalendar.getRate());
+            limitVo.setOpenProductionFirstDay(isOpenProductionFirstDay);
+            dailyCapacityMap.put(day, limitVo);
+        }
         
         for (FactoryMonthPlanMouldDayResult insertItem: insertList) {
             String structureName = insertItem.getStructureName();
@@ -2402,6 +2444,22 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             
             // 各排产量倒推，高优先级排产数量 = min(高优先级，剩余排产量) ->中优先级排产数量 = min(中优先级，剩余排产量) ->周期排产储备排产 = min(周期储备量，剩余排产量) -> 常规储备排产 = 剩余排产量；
             insertItem.allocateProductionByPriority();
+            
+            // 模具变化信息
+            FactoryMonthPlanFinalAdjustVo mpFinalVo = new FactoryMonthPlanFinalAdjustVo();
+            mpFinalVo.setDayVulcanizationQty(insertItem.getDayVulcanizationQty());
+            int startDay = 0;
+            for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
+                String dayField = FactoryConstant.DAY_FIELD + day;
+                int planQty = ApsNumberUtils.intValue(insertItem.getFieldValueByFieldName(dayField));
+                mpFinalVo.setFieldValueByFieldName(dayField, planQty);
+                if (planQty > 0 && startDay == 0) {
+                    startDay = day;
+                }
+            }
+            weekRollAdjustEngine.setMouldChangeInfo(adjustDailyCapacityLimitObj, paramMap, startDay, mpFinalVo,
+                    dailyCapacityMap);
+            insertItem.setMouldChangeInfo(mpFinalVo.getMouldChangeInfo());
         }
         // 生成统计信息（handleMonthPlanStatistics）
         mpMonthPlanStaticService.handleMonthPlanStatistics(insertList);

@@ -29,7 +29,7 @@ public class CxKeyProduct extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     @Excel(name = "ui.data.column.cxKeyProduct.structureName")
-    @ApiModelProperty(value = "结构名称")
+    @ApiModelProperty(value = "结构")
     @TableField("STRUCTURE_NAME")
     @ImportValidated(required = true, maxLength = 100)
     private String structureName;

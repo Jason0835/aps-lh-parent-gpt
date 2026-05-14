@@ -141,7 +141,6 @@ public class LhGroupProductionRangeCalculator {
         }
         Integer continueDays = 2;
         return handlerChangeMouldContinueControl(productionContext, intersectionSet, stopDaySet, materialDesc, isChangeMould, continueDays);
-//        return handlerChangeMouldNoContinue(productionContext, intersectionSet, stopDaySet, materialDesc, isChangeMould);
     }
 
     /**
@@ -236,7 +235,7 @@ public class LhGroupProductionRangeCalculator {
             return new MouldProductionDayLimitHelper(earliestContinuousSet, MouldProductionLimitTypeEnum.CONTINUE_DAY_LIMIT);
         }
         //7、20260313 换模能力
-        MouldProductionDayLimitHelper handlerMould = handlerChangeMouldCapacity(isChangeMould, productionContext, materialDesc, intersectionSet);
+        MouldProductionDayLimitHelper handlerMould = handlerChangeMouldCapacity(isChangeMould, productionContext, materialDesc, earliestContinuousSet);
         if (MouldProductionLimitTypeEnum.NO_LIMIT == handlerMould.getLimitType()) {
             return handlerMould;
         }

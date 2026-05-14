@@ -108,7 +108,7 @@ export default {
           prop: "structureName",
           align: "center",
           label: this.$t("结构"),
-          // sortable: "custom",
+          minWidth: 180,
         },
         {
           prop: "embryoCode",
