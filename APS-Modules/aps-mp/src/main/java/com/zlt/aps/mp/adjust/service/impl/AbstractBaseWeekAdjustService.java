@@ -38,10 +38,7 @@ import com.zlt.aps.mp.adjust.service.*;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
-import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
-import com.zlt.aps.mp.api.domain.vo.MpAdjustDetailVo;
-import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
+import com.zlt.aps.mp.api.domain.vo.*;
 import com.zlt.aps.mp.api.enums.AdjustItemSourceEnum;
 import com.zlt.aps.mp.common.utils.DistributedVersionGenerator;
 import com.zlt.aps.mp.common.utils.StringUtil;
@@ -931,7 +928,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             BeanUtil.copyProperties(contextDTO, params);
             params.setYear(contextDTO.getMpYear());
             params.setMonth(contextDTO.getMpMonth());
-            finalResultService.list4Adjust(params);
+            List<FactoryMonthPlanProductionFinal4AdjustVo> adjustVos = finalResultService.list4Adjust(params);
+            List<FactoryMonthPlanFinalAdjustVo> adjustVoList = BeanUtil.copyToList(adjustVos, FactoryMonthPlanFinalAdjustVo.class);
+            contextDTO.setFactoryMonthPlanProdFinalList(adjustVoList);
             // 处理月计划统计结果
             if (isHandleMonthPlanStatistics) {
                 handleMonthPlanStatistics(contextDTO);
