@@ -49,6 +49,7 @@ import com.zlt.aps.maindata.mapper.RawSpecialMaterialStockEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
@@ -64,6 +65,7 @@ import com.zlt.aps.mp.engine.mapper.MpStructureAllocationMapper;
 import com.zlt.aps.mp.enums.MonthPlanExportDataTypeEnum;
 import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
+import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.SpecialMaterialResultEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanMouldDayResultService;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -99,7 +101,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     @Autowired
     private SpecialMaterialResultEntityMapper specialMaterialResultEntityMapper;
     @Autowired
-    private MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
+    private FactoryMonthPlanProductionFinalResultEntityMapper factoryMonthPlanProductionFinalResultEntityMapper;
     @Autowired
     protected RawSpecialMaterialRecordEntityMapper rawSpecialMaterialRecordMapper;
     @Autowired
@@ -355,18 +357,17 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      * @param params
      */
     private void loadFinalExportTableData(FactoryMonthPlanMouldDayResult params) {
-        QueryWrapper<MpAdjustResult> resultQueryWrapper = new QueryWrapper<>();
-        resultQueryWrapper.select("YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE");
-        resultQueryWrapper.groupBy("YEAR", "MONTH", "MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE");
-        resultQueryWrapper.eq("FACTORY_CODE", params.getFactoryCode());
-        resultQueryWrapper.eq("PRODUCTION_VERSION", params.getProductionVersion());
-        List<MpAdjustResult> headList = mpAdjustResultEntityMapper.selectList(resultQueryWrapper);
+        QueryWrapper<FactoryMonthPlanProductionFinalResult> resultQueryWrapper = new QueryWrapper<>();
+        resultQueryWrapper.select("LAST_MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE", "PRODUCTION_VERSION");
+        resultQueryWrapper.groupBy("LAST_MONTH_PLAN_VERSION", "PRODUCT_TYPE_CODE", "PRODUCTION_VERSION");
+        resultQueryWrapper.eq("YEAR", params.getYear());
+        resultQueryWrapper.eq("MONTH", params.getMonth());
+        List<FactoryMonthPlanProductionFinalResult> headList = factoryMonthPlanProductionFinalResultEntityMapper.selectList(resultQueryWrapper);
         if (!CollectionUtils.isEmpty(headList)) {
-            MpAdjustResult head = headList.get(0);
-            params.setYear(head.getYear());
-            params.setMonth(head.getMonth());
+            FactoryMonthPlanProductionFinalResult head = headList.get(0);
             params.setProductTypeCode(head.getProductTypeCode());
-            params.setMonthPlanVersion(head.getMonthPlanVersion());
+            params.setMonthPlanVersion(head.getLastMonthPlanVersion());
+            params.setProductionVersion(head.getProductionVersion());
         }
     }
 
