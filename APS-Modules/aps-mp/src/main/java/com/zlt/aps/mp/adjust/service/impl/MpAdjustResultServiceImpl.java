@@ -8,11 +8,13 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustResultService;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.bill.common.service.AbstractDocService;
+import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -89,7 +91,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         String dayField;
         int realBeginDay = FactoryConstant.MONTH_MAX_DAY+1;
         int realEndDay = 0;
-        int totalQty = 0;
+        int accTotalQty = 0;
         for (int i = FactoryConstant.MONTH_START_DAY; i <= FactoryConstant.MONTH_MAX_DAY; i++){
             dayField = FactoryConstant.DAY_FIELD + i;
             if (entity.getFieldValueByFieldName(dayField) != null &&
@@ -101,16 +103,28 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
                     realEndDay = i;
                 }
 
-                totalQty += (Integer) entity.getFieldValueByFieldName(dayField);
+                accTotalQty += (Integer) entity.getFieldValueByFieldName(dayField);
             }
         }
         entity.setBeginDay(realBeginDay==FactoryConstant.MONTH_MAX_DAY+1 ? 0:realBeginDay);
         entity.setEndDay(realEndDay);
-        entity.setTotalQty(totalQty);
+         //实际调整量 = 累计排产量 - 原实际排产量
+        int oriTotalQty = entity.getTotalQty()== null ? 0:entity.getTotalQty();
+        entity.setAdjustFlag(oriTotalQty != accTotalQty ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
+
         // 如果版本号没有值，更新调整类型=人工调整
         if (StrUtil.isBlank(entity.getVersion())) {
             entity.setAdjustType(ApsConstant.APS_ZERO_3);
             entity.setVersion(adjVersion);
+        }
+        if (StrUtil.isBlank(entity.getAdjustType())){
+            LambdaQueryWrapper<MpAdjustResult> queryWrapper2 = new LambdaQueryWrapper<>();
+            queryWrapper2.eq(MpAdjustResult::getFactoryCode, entity.getFactoryCode());
+            queryWrapper2.eq(MpAdjustResult::getVersion, adjVersion);
+            List<MpAdjustResult> mpAdjustResultList2 = mpAdjustResultEntityMapper.selectList(queryWrapper2);
+            if (PubUtil.isNotEmpty(mpAdjustResultList2)){
+                entity.setAdjustType(mpAdjustResultList2.get(0).getAdjustType());
+            }
         }
         // 计算各排产量
         MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();

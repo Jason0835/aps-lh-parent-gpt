@@ -925,9 +925,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 contextDTO.getEndDay(), contextDTO.getAdjustStartDay(), contextDTO.getAdjustEndDay());
         try{
             FactoryMonthPlanProductionFinalResult params = new FactoryMonthPlanProductionFinalResult();
-            BeanUtil.copyProperties(contextDTO, params);
+            params.setFactoryCode(contextDTO.getFactoryCode());
             params.setYear(contextDTO.getMpYear());
             params.setMonth(contextDTO.getMpMonth());
+            params.setVersion(contextDTO.getVersion());
+            params.setStructureName(contextDTO.getStructureName());
             List<FactoryMonthPlanProductionFinal4AdjustVo> adjustVos = finalResultService.list4Adjust(params);
             List<FactoryMonthPlanFinalAdjustVo> adjustVoList = BeanUtil.copyToList(adjustVos, FactoryMonthPlanFinalAdjustVo.class);
             contextDTO.setFactoryMonthPlanProdFinalList(adjustVoList);
