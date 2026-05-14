@@ -2723,7 +2723,7 @@
   "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedListData": "请先查询出列表数据后再确认调整",
   "ui.data.column.monthPlanFinalAdjustQuery.recalculateNeedListData": "请先查询出列表数据后再重新计算",
   "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedMachine": "请先选择当前调整机台",
-  "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedVersion": "列表数据缺少调整版本或排产版本，无法提交",
+  "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedVersion": "列表数据缺少版本号，无法提交",
   "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleYearMonth": "请选择年月",
   "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleFactory": "请选择分厂",
   "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesRuleProductionVersion": "请选择月计划版本",
