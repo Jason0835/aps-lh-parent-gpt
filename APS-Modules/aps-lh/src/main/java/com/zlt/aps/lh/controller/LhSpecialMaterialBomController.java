@@ -16,6 +16,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -47,6 +48,7 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
      * 查询特殊物料清单配置列表
      */
     @ApiOperation("查询列表")
+    @RequiresPermissions("lh:lhSpecialMaterialBom:list")
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody LhSpecialMaterialBom queryVO) {
@@ -58,6 +60,7 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
      */
     @Log(title = "ui.data.column.lhSpecialMaterialBom.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("保存")
+    @RequiresPermissions({"lh:lhSpecialMaterialBom:edit", "lh:lhSpecialMaterialBom:add"})
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody LhSpecialMaterialBom entity) {
@@ -69,6 +72,7 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
      */
     @Log(title = "ui.data.column.lhSpecialMaterialBom.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
+    @RequiresPermissions("lh:lhSpecialMaterialBom:remove")
     @DeleteMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
@@ -115,6 +119,7 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
      */
     @Log(title = "ui.data.column.lhSpecialMaterialBom.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
+    @RequiresPermissions("lh:lhSpecialMaterialBom:import")
     @PostMapping("/importData/{updateSupport}")
     @Override
     public AjaxResult importData(@RequestBody com.ruoyi.api.gateway.system.domain.vo.ImportContext importContext,
@@ -127,6 +132,7 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
      */
     @Log(title = "ui.data.column.lhSpecialMaterialBom.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
+    @RequiresPermissions("lh:lhSpecialMaterialBom:export")
     @PostMapping("/exportData/{fileName}")
     @Override
     public byte[] exportData(@RequestBody LhSpecialMaterialBom queryVO, @PathVariable("fileName") String fileName,
@@ -154,7 +160,7 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
      */
     @Override
     protected void builderCondition(QueryWrapper<LhSpecialMaterialBom> queryWrapper, LhSpecialMaterialBom queryVO) {
-        // 分厂编号精确查询
+        // 工厂编号精确查询
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
         // 结构名称模糊查询
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));

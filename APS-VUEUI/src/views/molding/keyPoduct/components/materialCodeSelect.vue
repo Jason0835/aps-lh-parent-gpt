@@ -147,11 +147,10 @@ export default {
 
         let that = this;
         if (isFirst && this.multiple) {
-          // if (this.multiple) {
           let topItems = [];
           if (this.oldList) {
             let res = await listProductinfo({ materialCodes: this.oldList });
-            topItems = res.rows;
+            topItems = this.deduplicateByEmbryoCode(res.rows);
           }
 
           this.$nextTick(() => {
@@ -161,10 +160,9 @@ export default {
             });
             this.getFirstList();
           });
-          // }
         } else {
           const data = await listProductinfo(this.formatParams());
-          this.data = data.rows;
+          this.data = this.deduplicateByEmbryoCode(data.rows);
           this.page.total = data.total;
           this.loading = false;
         }
@@ -177,12 +175,22 @@ export default {
     async getFirstList() {
       try {
         const data = await listProductinfo(this.formatParams());
-        this.data = data.rows;
+        this.data = this.deduplicateByEmbryoCode(data.rows);
         this.page.total = data.total;
       } catch (err) {}
       finally{
         this.loading = false;
       }
+    },
+    deduplicateByEmbryoCode(rows) {
+      if (!Array.isArray(rows)) return [];
+      const map = new Map();
+      rows.forEach(item => {
+        if (!map.has(item.embryoCode)) {
+          map.set(item.embryoCode, item);
+        }
+      });
+      return Array.from(map.values());
     },
     //
     formatParams() {

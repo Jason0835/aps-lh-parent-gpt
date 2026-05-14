@@ -157,15 +157,6 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
                 continue;
             }
 
-            if (importVO.getActualDate() == null) {
-                failureNum++;
-                String message = I18nUtil.getMessage("ui.lh.precision.plan.actualDateRequired");
-                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                    errorNum, String.format(message, errorNum), importErrorLogs);
-                importVO.setRowNum(-999);
-                continue;
-            }
-
             // Excel内部重复校验：工厂+硫化机台+计划日期
             String uniqueKey = importVO.getFactoryCode() + "-" + importVO.getMachineCode() + "-" + importVO.getPlanDate();
             if (excelUniqueSet.contains(uniqueKey)) {

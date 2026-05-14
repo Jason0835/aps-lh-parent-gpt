@@ -14,6 +14,8 @@ import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
+import com.zlt.aps.lh.util.LeftRightMouldUtil;
+import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import org.apache.commons.collections4.CollectionUtils;
@@ -277,13 +279,15 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         plan.setPlanOrder(1);
         plan.setLhMachineCode(dto.getLhMachineCode());
         plan.setLhMachineName(dto.getLhMachineName());
-        plan.setLeftRightMould(dto.getLeftRightMold());
+        plan.setLeftRightMould(LeftRightMouldUtil.resolveLeftRightMould(dto.getLeftRightMold(), dto.getLhMachineCode()));
+        plan.setClassIndex("03");
+        plan.setChangeTime(LhScheduleTimeUtil.getAfternoonShiftStart(null, dto.getScheduleDate()));
         plan.setBeforeMaterialCode(beforeMaterialCode);
         plan.setBeforeMaterialDesc(beforeMaterialDesc);
         plan.setAfterMaterialCode(afterMaterialCode);
         plan.setChangeMouldType("01");
         plan.setMouldCode(mouldCode);
-        plan.setIsRelease(ReleaseStatusEnum.PENDING_RELEASE.getCode());
+        plan.setIsRelease(ReleaseStatusEnum.NOT_RELEASED.getCode());
         plan.setMouldStatus("0");
         plan.setIsDelete(DeleteFlagEnum.NORMAL.getCode());
 

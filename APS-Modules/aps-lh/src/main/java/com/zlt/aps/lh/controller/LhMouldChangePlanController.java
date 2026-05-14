@@ -455,19 +455,21 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     /**
      * 排程发布
+     * 未勾选记录或勾选记录包含历史记录时，返回发布失败提示
      */
     @Log(title = "ui.data.column.lhMouldChangePlan.modelName", businessType = BusinessType.PUBLISH)
     @ApiOperation("排程发布")
     @PostMapping("/issueSchedule")
     public AjaxResult issueSchedule(@RequestBody List<Long> ids) {
         if (CollectionUtils.isEmpty(ids)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.param.error"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.noSelection"));
         }
         return lhMouldChangePlanService.issueSchedule(ids);
     }
 
     /**
      * 按查询条件排程发布（仅支持单日排程日期）
+     * 排程日期早于当前日期的历史记录不允许发布
      */
     @Log(title = "ui.data.column.lhMouldChangePlan.modelName", businessType = BusinessType.PUBLISH)
     @ApiOperation("按查询条件排程发布")
@@ -480,6 +482,12 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         if (PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scheduleDateStart"))
                 || PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scheduleDateEnd"))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.param.error"));
+        }
+
+        // 校验排程日期是否为历史日期
+        Date today = DateUtil.beginOfDay(new Date());
+        if (queryVO.getScheduleDate() != null && queryVO.getScheduleDate().before(today)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.hasHistoryDataByQuery"));
         }
 
         // 忽略前端的发布状态筛选，强制下发 未发布/待发布
