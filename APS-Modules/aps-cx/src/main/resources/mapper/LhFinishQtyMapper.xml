@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.cx.mapper.LhFinishQtyMapper">
+
+    <select id="sumDayFinishQty" resultType="java.util.HashMap">
+        SELECT
+            FACTORY_CODE,
+            MATERIAL_CODE,
+            SUM(DAY_FINISH_QTY) AS TOTAL_FINISH_QTY
+        FROM T_LH_DAY_FINISH_QTY
+        WHERE FINISH_DATE &gt;= #{monthStart}
+          AND FINISH_DATE &lt; #{nextDayStart}
+          AND FACTORY_CODE IN
+        <foreach item="code" collection="factoryCodes" open="(" separator="," close=")">
+            #{code}
+        </foreach>
+          AND MATERIAL_CODE IN
+        <foreach item="code" collection="materialCodes" open="(" separator="," close=")">
+            #{code}
+        </foreach>
+          AND (IS_DELETE = 0 OR IS_DELETE IS NULL)
+        GROUP BY FACTORY_CODE, MATERIAL_CODE
+    </select>
+
+    <select id="sumScheFinishQty" resultType="java.util.HashMap">
+        SELECT
+            FACTORY_CODE,
+            MATERIAL_CODE,
+            SUM(CLASS1_FINISH_QTY) AS TOTAL_FINISH_QTY
+        FROM T_LH_SCHE_FINISH_QTY
+        WHERE SCHEDULE_DATE &gt;= #{scheduleDate}
+          AND SCHEDULE_DATE &lt; #{nextDayStart}
+          AND FACTORY_CODE IN
+        <foreach item="code" collection="factoryCodes" open="(" separator="," close=")">
+            #{code}
+        </foreach>
+          AND MATERIAL_CODE IN
+        <foreach item="code" collection="materialCodes" open="(" separator="," close=")">
+            #{code}
+        </foreach>
+          AND (IS_DELETE = 0 OR IS_DELETE IS NULL)
+        GROUP BY FACTORY_CODE, MATERIAL_CODE
+    </select>
+
+</mapper>

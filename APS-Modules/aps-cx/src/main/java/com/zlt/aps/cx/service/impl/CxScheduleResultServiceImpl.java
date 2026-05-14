@@ -760,7 +760,6 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return Collections.emptyMap();
         }
 
-        // 提取去重的工厂编码和物料编码
         List<String> factoryCodes = list.stream()
                 .map(CxScheduleResult::getFactoryCode)
                 .filter(StringUtils::isNotBlank)
@@ -774,7 +773,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 .distinct()
                 .collect(Collectors.toList());
 
+        log.info("buildTodayNightFinishQtyMap factoryCodes:{}, materialCodes:{}, scheduleDate:{}",
+                factoryCodes, materialCodes, scheduleDate);
+
         if (factoryCodes.isEmpty() || materialCodes.isEmpty()) {
+            log.warn("buildTodayNightFinishQtyMap empty factoryCodes or materialCodes, return empty");
             return Collections.emptyMap();
         }
 
@@ -784,15 +787,20 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         Date monthStart = DateUtil.beginOfMonth(targetScheduleDate);
         Date nextDayStart = DateUtil.offsetDay(targetScheduleDate, 1);
 
+        log.info("buildTodayNightFinishQtyMap monthStart:{}, targetScheduleDate:{}, nextDayStart:{}",
+                monthStart, targetScheduleDate, nextDayStart);
+
         Map<String, BigDecimal> resultMap = new HashMap<>();
 
-        // 第一步：查询 T_LH_DAY_FINISH_QTY，本月1日 ~ T日当天
         List<Map<String, Object>> dayFinishList = lhFinishQtyMapper.sumDayFinishQty(
                 factoryCodes, materialCodes, monthStart, nextDayStart);
+        log.info("buildTodayNightFinishQtyMap dayFinishList size:{}", dayFinishList != null ? dayFinishList.size() : 0);
         for (Map<String, Object> row : dayFinishList) {
             String fCode = (String) row.get("FACTORY_CODE");
             String mCode = (String) row.get("MATERIAL_CODE");
             if (StringUtils.isEmpty(fCode) || StringUtils.isEmpty(mCode)) {
+                log.warn("buildTodayNightFinishQtyMap dayFinishList row has empty fCode:{}, mCode:{}, row keys:{}",
+                        fCode, mCode, row.keySet());
                 continue;
             }
             String key = fCode.trim() + "|" + mCode.trim();
@@ -801,13 +809,15 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             resultMap.merge(key, val, BigDecimal::add);
         }
 
-        // 第二步：查询 T_LH_SCHE_FINISH_QTY，T日当天1班（夜班）完成量
         List<Map<String, Object>> scheFinishList = lhFinishQtyMapper.sumScheFinishQty(
                 factoryCodes, materialCodes, targetScheduleDate, nextDayStart);
+        log.info("buildTodayNightFinishQtyMap scheFinishList size:{}", scheFinishList != null ? scheFinishList.size() : 0);
         for (Map<String, Object> row : scheFinishList) {
             String fCode = (String) row.get("FACTORY_CODE");
             String mCode = (String) row.get("MATERIAL_CODE");
             if (StringUtils.isEmpty(fCode) || StringUtils.isEmpty(mCode)) {
+                log.warn("buildTodayNightFinishQtyMap scheFinishList row has empty fCode:{}, mCode:{}, row keys:{}",
+                        fCode, mCode, row.keySet());
                 continue;
             }
             String key = fCode.trim() + "|" + mCode.trim();
@@ -815,6 +825,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             BigDecimal val = totalObj != null ? new BigDecimal(totalObj.toString()) : BigDecimal.ZERO;
             resultMap.merge(key, val, BigDecimal::add);
         }
+
+        log.info("buildTodayNightFinishQtyMap resultMap size:{}, keys:{}", resultMap.size(), resultMap.keySet());
 
         return resultMap;
     }
