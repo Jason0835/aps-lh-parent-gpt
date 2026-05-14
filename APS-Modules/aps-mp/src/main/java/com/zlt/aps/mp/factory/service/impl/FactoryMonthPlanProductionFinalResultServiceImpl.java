@@ -883,7 +883,11 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         queryWrapper.eq(MpAdjustResult::getYear, condition.getYear());
         queryWrapper.eq(MpAdjustResult::getMonth, condition.getMonth());
         // 前端传入 version 时表示调整版本号，对应调整结果表 VERSION 字段。
-        queryWrapper.eq(MpAdjustResult::getVersion, matchVersion);
+        queryWrapper.eq(StringUtils.isNotBlank(matchVersion), MpAdjustResult::getVersion, matchVersion);
+        queryWrapper.like(StringUtils.isNotBlank(condition.getCxMachineCode()), MpAdjustResult::getCxMachineCode, condition.getCxMachineCode());
+        queryWrapper.like(StringUtils.isNotBlank(condition.getStructureName()), MpAdjustResult::getStructureName, condition.getStructureName());
+        queryWrapper.like(StringUtils.isNotBlank(condition.getMaterialCode()), MpAdjustResult::getMaterialCode, condition.getMaterialCode());
+        queryWrapper.like(StringUtils.isNotBlank(condition.getMaterialDesc()), MpAdjustResult::getMaterialDesc, condition.getMaterialDesc());
         queryWrapper.eq(MpAdjustResult::getIsDelete, YesOrNoEnum.NO.getCode());
         List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
 
@@ -939,7 +943,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
         Set<String> monthPlanVersionSet = mpAdjustResultList.stream()
-                .map(MpAdjustResult::getMonthPlanVersion)
+                .map(MpAdjustResult::getVersion)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(materialCodeSet) || CollectionUtils.isEmpty(monthPlanVersionSet)) {
