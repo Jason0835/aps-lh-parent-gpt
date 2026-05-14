@@ -29,4 +29,14 @@ public interface ILhSpecialMaterialBomService extends IDocService<LhSpecialMater
      * @return 唯一性结果
      */
     String checkUnique(LhSpecialMaterialBom query);
+
+    /**
+     * 校验分类冲突。
+     * 同一工厂+物料/结构组合下，只能有一条芯片胎分类和一条非芯片胎分类的数据，
+     * 不能同时存在芯片胎、19.5寸宽基和22.5寸宽基。
+     *
+     * @param entity 待校验实体
+     * @return 冲突结果，null表示无冲突，非null表示冲突描述
+     */
+    String checkCategoryConflict(LhSpecialMaterialBom entity);
 }

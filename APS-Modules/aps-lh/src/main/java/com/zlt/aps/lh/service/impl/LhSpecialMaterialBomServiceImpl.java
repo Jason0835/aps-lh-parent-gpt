@@ -6,10 +6,11 @@ import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.utils.SecurityUtils;
 import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
+import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
 import com.zlt.aps.lh.mapper.LhSpecialMaterialBomEntityMapper;
 import com.zlt.aps.lh.service.ILhSpecialMaterialBomService;
 import com.zlt.bill.common.service.AbstractDocService;
@@ -26,8 +27,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -136,7 +139,21 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
                             && StringUtil.isNotBlank(item.getMaterialCode()))
                     .collect(Collectors.groupingBy(item -> item.getFactoryCode() + "_" + item.getMaterialCode()));
 
-            // 2.4 遍历进行校验
+            // 2.4 按工厂+物料编码分组（分类冲突校验用，含结构和物料的情况也按物料维度校验）
+            Map<String, List<LhSpecialMaterialBom>> materialCategoryGroupMap = validList.stream()
+                    .filter(item -> StringUtil.isNotBlank(item.getFactoryCode())
+                            && StringUtil.isNotBlank(item.getMaterialCode())
+                            && StringUtil.isNotBlank(item.getCategory()))
+                    .collect(Collectors.groupingBy(item -> item.getFactoryCode() + "_" + item.getMaterialCode()));
+
+            // 2.5 按工厂+结构名称分组（分类冲突校验用，含物料和结构的情况也按结构维度校验）
+            Map<String, List<LhSpecialMaterialBom>> structureCategoryGroupMap = validList.stream()
+                    .filter(item -> StringUtil.isNotBlank(item.getFactoryCode())
+                            && StringUtil.isNotBlank(item.getStructureName())
+                            && StringUtil.isNotBlank(item.getCategory()))
+                    .collect(Collectors.groupingBy(item -> item.getFactoryCode() + "_" + item.getStructureName()));
+
+            // 2.6 遍历进行校验
             List<LhSpecialMaterialBom> checkList = new ArrayList<>();
             for (LhSpecialMaterialBom docEntity : validList) {
                 int errorNum = docEntity.getRowNo();
@@ -215,6 +232,59 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
                                         .map(item -> String.valueOf(item.getRowNo()))
                                         .filter(row -> !row.equals(String.valueOf(errorNum)))
                                         .collect(Collectors.joining(", ")));
+                        ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                                errorNum, message, importErrorLogs);
+                    }
+                }
+
+                // Excel内分类冲突校验 - 按物料编码维度
+                if (isCan && StringUtil.isNotBlank(docEntity.getFactoryCode())
+                        && StringUtil.isNotBlank(docEntity.getMaterialCode())
+                        && StringUtil.isNotBlank(docEntity.getCategory())) {
+                    String key = docEntity.getFactoryCode() + "_" + docEntity.getMaterialCode();
+                    List<LhSpecialMaterialBom> groupList = materialCategoryGroupMap.get(key);
+                    if (CollectionUtils.isNotEmpty(groupList)) {
+                        Set<String> categorySet = groupList.stream()
+                                .map(LhSpecialMaterialBom::getCategory)
+                                .filter(StringUtil::isNotBlank)
+                                .collect(Collectors.toSet());
+                        String conflictMsg = checkCategorySetConstraint(categorySet, "物料编码", docEntity.getMaterialCode());
+                        if (conflictMsg != null) {
+                            isCan = false;
+                            String message = String.format(I18nUtil.getMessage("ui.data.alert.lhSpecialMaterialBom.categoryConflict.withRow"), errorNum, conflictMsg);
+                            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                                    errorNum, message, importErrorLogs);
+                        }
+                    }
+                }
+
+                // Excel内分类冲突校验 - 按结构名称维度
+                if (isCan && StringUtil.isNotBlank(docEntity.getFactoryCode())
+                        && StringUtil.isNotBlank(docEntity.getStructureName())
+                        && StringUtil.isNotBlank(docEntity.getCategory())) {
+                    String key = docEntity.getFactoryCode() + "_" + docEntity.getStructureName();
+                    List<LhSpecialMaterialBom> groupList = structureCategoryGroupMap.get(key);
+                    if (CollectionUtils.isNotEmpty(groupList)) {
+                        Set<String> categorySet = groupList.stream()
+                                .map(LhSpecialMaterialBom::getCategory)
+                                .filter(StringUtil::isNotBlank)
+                                .collect(Collectors.toSet());
+                        String conflictMsg = checkCategorySetConstraint(categorySet, "结构名称", docEntity.getStructureName());
+                        if (conflictMsg != null) {
+                            isCan = false;
+                            String message = String.format(I18nUtil.getMessage("ui.data.alert.lhSpecialMaterialBom.categoryConflict.withRow"), errorNum, conflictMsg);
+                            ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                                    errorNum, message, importErrorLogs);
+                        }
+                    }
+                }
+
+                // 数据库分类冲突校验
+                if (isCan) {
+                    String dbConflict = checkCategoryConflict(docEntity);
+                    if (dbConflict != null) {
+                        isCan = false;
+                        String message = String.format(I18nUtil.getMessage("ui.data.alert.lhSpecialMaterialBom.categoryConflict.withRow"), errorNum, dbConflict);
                         ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                                 errorNum, message, importErrorLogs);
                     }
@@ -344,5 +414,108 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
     @Override
     protected List<String> getCheckUniqueFields() {
         return Arrays.asList("factoryCode", "structureName", "materialCode");
+    }
+
+    /**
+     * 校验分类冲突。
+     * 同一工厂+物料/结构组合下，只能有一条芯片胎分类和一条非芯片胎分类的数据，
+     * 不能同时存在芯片胎、19.5寸宽基和22.5寸宽基。
+     *
+     * @param entity 待校验实体
+     * @return 冲突结果，null表示无冲突，非null表示冲突描述
+     */
+    @Override
+    public String checkCategoryConflict(LhSpecialMaterialBom entity) {
+        if (entity == null || StringUtil.isBlank(entity.getFactoryCode()) || StringUtil.isBlank(entity.getCategory())) {
+            return null;
+        }
+
+        // 按物料编码维度校验
+        if (StringUtil.isNotBlank(entity.getMaterialCode())) {
+            String conflict = checkCategoryConflictByMaterial(entity);
+            if (conflict != null) {
+                return conflict;
+            }
+        }
+
+        // 按结构名称维度校验
+        if (StringUtil.isNotBlank(entity.getStructureName())) {
+            String conflict = checkCategoryConflictByStructure(entity);
+            if (conflict != null) {
+                return conflict;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 按物料编码维度校验分类冲突。
+     * 查询同一工厂+物料编码下已存在的所有分类，与当前实体分类合并后校验约束。
+     *
+     * @param entity 待校验实体
+     * @return 冲突结果，null表示无冲突，非null表示冲突描述
+     */
+    private String checkCategoryConflictByMaterial(LhSpecialMaterialBom entity) {
+        LambdaQueryWrapper<LhSpecialMaterialBom> wrapper = Wrappers.lambdaQuery();
+        wrapper.ne(entity.getId() != null, LhSpecialMaterialBom::getId, entity.getId());
+        wrapper.eq(LhSpecialMaterialBom::getFactoryCode, entity.getFactoryCode());
+        wrapper.eq(LhSpecialMaterialBom::getMaterialCode, entity.getMaterialCode());
+        List<LhSpecialMaterialBom> existList = lhSpecialMaterialBomEntityMapper.selectList(wrapper);
+
+        Set<String> categorySet = existList.stream()
+                .map(LhSpecialMaterialBom::getCategory)
+                .filter(StringUtil::isNotBlank)
+                .collect(Collectors.toCollection(HashSet::new));
+        categorySet.add(entity.getCategory());
+
+        return checkCategorySetConstraint(categorySet, "物料编码", entity.getMaterialCode());
+    }
+
+    /**
+     * 按结构名称维度校验分类冲突。
+     * 查询同一工厂+结构名称下已存在的所有分类，与当前实体分类合并后校验约束。
+     *
+     * @param entity 待校验实体
+     * @return 冲突结果，null表示无冲突，非null表示冲突描述
+     */
+    private String checkCategoryConflictByStructure(LhSpecialMaterialBom entity) {
+        LambdaQueryWrapper<LhSpecialMaterialBom> wrapper = Wrappers.lambdaQuery();
+        wrapper.ne(entity.getId() != null, LhSpecialMaterialBom::getId, entity.getId());
+        wrapper.eq(LhSpecialMaterialBom::getFactoryCode, entity.getFactoryCode());
+        wrapper.eq(LhSpecialMaterialBom::getStructureName, entity.getStructureName());
+        List<LhSpecialMaterialBom> existList = lhSpecialMaterialBomEntityMapper.selectList(wrapper);
+
+        Set<String> categorySet = existList.stream()
+                .map(LhSpecialMaterialBom::getCategory)
+                .filter(StringUtil::isNotBlank)
+                .collect(Collectors.toCollection(HashSet::new));
+        categorySet.add(entity.getCategory());
+
+        return checkCategorySetConstraint(categorySet, "结构名称", entity.getStructureName());
+    }
+
+    /**
+     * 校验分类集合约束。
+     * 同一维度下只能有一条芯片胎分类和一条非芯片胎分类的数据，
+     * 即非芯片胎分类（19.5寸宽基、22.5寸宽基）最多只能出现一种。
+     *
+     * @param categorySet 分类编码集合
+     * @param dimensionName 维度名称（物料编码/结构名称）
+     * @param dimensionValue 维度值
+     * @return 冲突结果，null表示无冲突，非null表示冲突描述
+     */
+    private String checkCategorySetConstraint(Set<String> categorySet, String dimensionName, String dimensionValue) {
+        // 统计非芯片胎分类数量（19.5寸宽基01、22.5寸宽基02）
+        long nonChipTireCount = categorySet.stream()
+                .filter(c -> !StringUtil.equals(LhSpecialMaterialCategoryEnum.CHIP_TIRE.getCode(), c))
+                .count();
+
+        if (nonChipTireCount > 1) {
+            return String.format(I18nUtil.getMessage("ui.data.alert.lhSpecialMaterialBom.categoryConflict"),
+                    dimensionName, dimensionValue);
+        }
+
+        return null;
     }
 }

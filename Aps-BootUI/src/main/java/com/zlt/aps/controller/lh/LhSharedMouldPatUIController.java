@@ -8,8 +8,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
-import com.zlt.aps.lh.api.service.ILhSpecialMaterialBomRemoteService;
+import com.zlt.aps.lh.api.domain.entity.LhSharedMouldPat;
+import com.zlt.aps.lh.api.service.ILhSharedMouldPatRemoteService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -27,19 +27,19 @@ import java.io.IOException;
 import java.util.Arrays;
 
 /**
- * 特殊物料清单配置 UI控制层
+ * 共用模具花纹配置 UI控制层
  *
  * @author zlt
- * @date 2026-05-06
+ * @date 2026-05-14
  */
 @Slf4j
-@Api(tags = "特殊物料清单配置管理")
+@Api(tags = "共用模具花纹配置管理")
 @Controller
-@RequestMapping("/lh/lhSpecialMaterialBom")
-public class LhSpecialMaterialBomUIController extends BaseUIController<LhSpecialMaterialBom> {
+@RequestMapping("/lh/lhSharedMouldPat")
+public class LhSharedMouldPatUIController extends BaseUIController<LhSharedMouldPat> {
 
     @Autowired
-    private ILhSpecialMaterialBomRemoteService iLhSpecialMaterialBomService;
+    private ILhSharedMouldPatRemoteService iLhSharedMouldPatService;
 
     /**
      * 根据条件查询主表数据
@@ -47,39 +47,34 @@ public class LhSpecialMaterialBomUIController extends BaseUIController<LhSpecial
     @ApiOperation("根据条件查询主表数据")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(LhSpecialMaterialBom lhSpecialMaterialBom) {
-        return iLhSpecialMaterialBomService.list(lhSpecialMaterialBom);
+    public TableDataInfo list(LhSharedMouldPat lhSharedMouldPat) {
+        return iLhSharedMouldPatService.list(lhSharedMouldPat);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions({"lh:lhSpecialMaterialBom:edit", "lh:lhSpecialMaterialBom:add"})
+    @RequiresPermissions({"lh:lhSharedMouldPat:edit", "lh:lhSharedMouldPat:add"})
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(LhSpecialMaterialBom lhSpecialMaterialBom) {
-        if (UserConstants.NOT_UNIQUE.equals(iLhSpecialMaterialBomService.checkUnique(lhSpecialMaterialBom))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhSpecialMaterialBom.notUnique"));
+    public AjaxResult save(LhSharedMouldPat lhSharedMouldPat) {
+        if (UserConstants.NOT_UNIQUE.equals(iLhSharedMouldPatService.checkUnique(lhSharedMouldPat))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhSharedMouldPat.notUnique"));
         }
-        // 分类冲突校验：同一物料/结构下不能同时存在芯片胎、19.5寸宽基和22.5寸宽基
-        String categoryConflict = iLhSpecialMaterialBomService.checkCategoryConflict(lhSpecialMaterialBom);
-        if (categoryConflict != null) {
-            return AjaxResult.error(categoryConflict);
-        }
-        return iLhSpecialMaterialBomService.save(lhSpecialMaterialBom);
+        return iLhSharedMouldPatService.save(lhSharedMouldPat);
     }
 
     /**
-     * 删除特殊物料清单配置
+     * 删除共用模具花纹配置
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("lh:lhSpecialMaterialBom:remove")
+    @RequiresPermissions("lh:lhSharedMouldPat:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(@RequestParam String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iLhSpecialMaterialBomService.removeByIds(Arrays.asList(arr));
+        return iLhSharedMouldPatService.removeByIds(Arrays.asList(arr));
     }
 
     /**
@@ -88,18 +83,8 @@ public class LhSpecialMaterialBomUIController extends BaseUIController<LhSpecial
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(LhSpecialMaterialBom lhSpecialMaterialBom) {
-        return iLhSpecialMaterialBomService.checkUnique(lhSpecialMaterialBom);
-    }
-
-    /**
-     * 校验分类冲突
-     */
-    @ApiOperation("校验分类冲突")
-    @PostMapping("/checkCategoryConflict")
-    @ResponseBody
-    public String checkCategoryConflict(LhSpecialMaterialBom lhSpecialMaterialBom) {
-        return iLhSpecialMaterialBomService.checkCategoryConflict(lhSpecialMaterialBom);
+    public String checkUnique(LhSharedMouldPat lhSharedMouldPat) {
+        return iLhSharedMouldPatService.checkUnique(lhSharedMouldPat);
     }
 
     /**
@@ -123,7 +108,7 @@ public class LhSpecialMaterialBomUIController extends BaseUIController<LhSpecial
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.lhSpecialMaterialBom.modelName");
+        return I18nUtil.getMessage("ui.data.column.lhSharedMouldPat.modelName");
     }
 
     /**
@@ -133,7 +118,7 @@ public class LhSpecialMaterialBomUIController extends BaseUIController<LhSpecial
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<LhSpecialMaterialBom> util = new ExcelUtil<>(LhSpecialMaterialBom.class);
+        ExcelUtil<LhSharedMouldPat> util = new ExcelUtil<>(LhSharedMouldPat.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -142,13 +127,13 @@ public class LhSpecialMaterialBomUIController extends BaseUIController<LhSpecial
      * 数据导出
      */
     @ApiOperation("数据导出")
-    @RequiresPermissions("lh:lhSpecialMaterialBom:export")
+    @RequiresPermissions("lh:lhSharedMouldPat:export")
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, LhSpecialMaterialBom entity) throws IOException {
+    public void export(HttpServletResponse response, LhSharedMouldPat entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iLhSpecialMaterialBomService.exportData(entity, fileName);
+        byte[] excelBytes = iLhSharedMouldPatService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -158,7 +143,7 @@ public class LhSpecialMaterialBomUIController extends BaseUIController<LhSpecial
     /**
      * 数据导入
      */
-    @RequiresPermissions("lh:lhSpecialMaterialBom:import")
+    @RequiresPermissions("lh:lhSharedMouldPat:import")
     @PostMapping({"/importData"})
     @ResponseBody
     @ApiOperation("数据导入")
@@ -171,7 +156,7 @@ public class LhSpecialMaterialBomUIController extends BaseUIController<LhSpecial
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iLhSpecialMaterialBomService.importData(context, updateSupport);
+        AjaxResult ajaxResult = iLhSharedMouldPatService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

@@ -46,3 +46,11 @@ export function checkUniqueSpecialMaterialBom(data) {
     data: data
   })
 }
+
+export function checkCategoryConflictSpecialMaterialBom(data) {
+  return request({
+    url: '/lh/lhSpecialMaterialBom/checkCategoryConflict',
+    method: 'post',
+    data: data
+  })
+}
