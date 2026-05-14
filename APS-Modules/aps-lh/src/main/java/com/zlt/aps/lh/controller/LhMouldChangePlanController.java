@@ -8,6 +8,8 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
 import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
@@ -89,6 +91,9 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     @Autowired
     private ILhMachineOnlineInfoService lhMachineOnlineInfoService;
+
+    @Autowired
+    private ISysDictDataCacheService iSysDictDataCacheService;
 
     private final List<String> redMouldNoList = Arrays.asList(
             "HM20220503621",
@@ -301,13 +306,21 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     }
 
     public List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list) {
+        // 查询字典用于转义
+        List<SysDictData> classNumDictList = iSysDictDataCacheService.getType("class_num_two_mm");
+        Map<String, String> classNumDictDictMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(classNumDictList)) {
+            classNumDictDictMap = classNumDictList.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+        }
+
         List<Map<String, Object>> dataList = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             LhMouldChangePlanVo item = list.get(i);
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("seq", i + 1);
-            row.put("planDate", item.getPlanDate());
-            row.put("classIndex", item.getClassIndex());
+            row.put("planDate", DateUtil.format(item.getPlanDate(), "yyyy-MM-dd"));
+            String classIndex = item.getClassIndex();
+            row.put("classIndex", classNumDictDictMap.getOrDefault(classIndex, classIndex));
             row.put("lhMachineCode", item.getLhMachineCode());
             row.put("planOrder", item.getPlanOrder());
             row.put("leftRightMould", item.getLeftRightMould());
@@ -316,9 +329,9 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             row.put("afterMaterialCode", item.getAfterMaterialCode());
             row.put("afterMaterialDesc", item.getAfterMaterialDesc());
             row.put("changeType", item.getChangeType());
-            row.put("isDryIceClean", item.getIsDryIceClean());
-            row.put("isSandblastingClean", item.getIsSandblastingClean());
-            row.put("isReplaceBlock", item.getIsReplaceBlock());
+            row.put("isDryIceClean", YesOrNoEnum.getEnumByValue(item.getIsDryIceClean()).getName());
+            row.put("isSandblastingClean", YesOrNoEnum.getEnumByValue(item.getIsSandblastingClean()).getName());
+            row.put("isReplaceBlock", YesOrNoEnum.getEnumByValue(item.getIsReplaceBlock()).getName());
             String mouldCodeStr = item.getMouldCode();
             row.put("mouldCode", mouldCodeStr);
             row.put("remark", item.getRemark());
