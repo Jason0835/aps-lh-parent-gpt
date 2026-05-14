@@ -1471,11 +1471,17 @@ export default {
       }
       return "";
     },
-    /** 跳转月计划结构内调整页 */
+    /** 跳转月计划结构内调整页（仅同步年月，与当前查询条件一致） */
     handleStructureInnerAdjust() {
+      const ymRaw = this.query.yearMonth || this.search.yearMonth;
+      const ym = this.formatYearMonthForPicker(ymRaw);
+      const query = { pageType: "inner" };
+      if (ym) {
+        query.yearMonth = ym;
+      }
       this.$router.push({
         path: "/newPage/monthPlanStructureInnerAdjust",
-        query: { pageType: "inner" },
+        query,
       });
     },
     /** 结构调整弹窗保存新增结构并写入 Redis 后，同步主页面机台与列表 */
