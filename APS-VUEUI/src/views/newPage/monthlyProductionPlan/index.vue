@@ -910,6 +910,27 @@ export default {
           console.error(err);
         });
     },
+    /**
+     * 查询区「调整版本」当前值（与 searchColumns 中 prop: version 一致）；
+     * 优先取 HeaderSearch 表单，避免用户改了下拉未点查询时与 this.search 不同步。
+     */
+    resolveSearchColumnsVersion() {
+      const pt = this.$refs.monthPlanPageTableRef;
+      const searchRef = pt && pt.$refs && pt.$refs.searchRef;
+      if (searchRef && typeof searchRef.getValues === "function") {
+        const form = searchRef.getValues();
+        if (form && form.version != null && String(form.version).trim() !== "") {
+          return String(form.version).trim();
+        }
+      }
+      return String(
+        this.query.version != null
+          ? this.query.version
+          : this.search.version != null
+            ? this.search.version
+            : ""
+      ).trim();
+    },
     /** 记录 1–31 号列编辑前的原始值 */
     onDayEditFocus(row, prop) {
       this.dayEditOriginalValue = row[prop];
@@ -1076,7 +1097,13 @@ export default {
       }
       try {
         this.recalculateBeginEndDay(row);
-        await saveAdjustResult(row);
+        const versionFromSearch = this.resolveSearchColumnsVersion();
+        await saveAdjustResult({
+          ...row,
+          version:
+            versionFromSearch ||
+            (row.version != null ? String(row.version).trim() : ""),
+        });
         this.allocateProductionByPriority(row);
       } catch (err) {
         console.error(err);
