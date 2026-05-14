@@ -1773,8 +1773,46 @@ export default {
       };
     },
     /**
+     * 将 Redis 中的调整日字符串转为 Integer（与 MpWeekRollAdjustDTO.startDay 等一致）
+     */
+    parseAdjustDayToInt(val) {
+      if (val == null || String(val).trim() === "") {
+        return null;
+      }
+      const n = parseInt(String(val).trim(), 10);
+      return Number.isNaN(n) ? null : n;
+    },
+    /**
+     * 月计划调整查询页「确认调整」请求体：核心业务字段按查询区 query + Redis 上下文组装；
+     * 另含 adjustType、productionVersion、startDay/endDay（后端 confirmAdjust 策略与 queryAdjustResult 依赖）。
+     */
+    buildMonthPlanConfirmAdjustPayload() {
+      const ym = this.normalizeYearMonth(this.query.yearMonth);
+      if (!ym || !this.query.factoryCode) {
+        return null;
+      }
+      const version =
+        String(this.currentAdjustMonthPlanVersion || "").trim() ||
+        String(this.query.version != null ? this.query.version : "").trim();
+      const adjustStartDay = this.parseAdjustDayToInt(this.currentAdjustBeginDay);
+      const adjustEndDay = this.parseAdjustDayToInt(this.currentAdjustEndDay);
+      return {
+        factoryCode: this.query.factoryCode,
+        version,
+        mpYear: ym.year,
+        mpMonth: ym.month,
+        adjustStartDay,
+        adjustEndDay,
+        structureName: this.currentAdjustStructure || "",
+        scheduledMachines: (this.currentAdjustMachine || "").trim(),
+        adjustType: "01",
+        startDay: adjustStartDay,
+        endDay: adjustEndDay,
+      };
+    },
+    /**
      * 组装与周程滚动「结构内调整 -> 调整结果 -> 确定」confirmResult 一致的入参（adjustType=01）。
-     * 供「确认调整」与「重新计算」共用，与 POST /monthplan/mpWeekRollAdjust/confirmAdjust 请求体一致。
+     * 供「重新计算」等与 POST /monthplan/mpWeekRollAdjust 共用的历史入参结构。
      */
     buildWeekRollConfirmPayload() {
       const params = {
@@ -1820,11 +1858,10 @@ export default {
       return params;
     },
     /**
-     * 确认调整 / 重新计算 前置校验，通过则返回与 confirmAdjust 相同的请求体，否则提示并返回 null
-     * @param {"confirmAdjust"|"recalculate"} weekRollSubmitKind 当前操作类型，用于区分无列表数据时的提示文案
+     * 「重新计算」前置校验：通过则返回 buildWeekRollConfirmPayload() 请求体，否则提示并返回 null
+     * @param {"recalculate"} weekRollSubmitKind 当前仅用于区分无列表数据时的提示文案
      */
-    prepareWeekRollSubmitPayloadOrWarn(weekRollSubmitKind = "confirmAdjust") {
-      const machine = (this.currentAdjustMachine || "").trim();
+    prepareWeekRollSubmitPayloadOrWarn(weekRollSubmitKind = "recalculate") {
       if (!this.data || !this.data.length) {
         const listDataMsgKey =
           weekRollSubmitKind === "recalculate"
@@ -1849,17 +1886,29 @@ export default {
       return payload;
     },
     async handleConfirmAdjust() {
-      const payload = this.prepareWeekRollSubmitPayloadOrWarn("confirmAdjust");
-      if (!payload) {
+      if (!this.data || !this.data.length) {
+        this.$modal.msgWarning(
+          this.$t("ui.data.column.monthPlanFinalAdjustQuery.confirmNeedListData")
+        );
         return;
       }
-      Object.assign(payload, {
-        startDay: this.currentAdjustBeginDay,
-        endDay: this.currentAdjustEndDay,
-        version: this.currentAdjustMonthPlanVersion,
-        scheduledMachines: (this.currentAdjustMachine || "").trim(),
-        structureName: this.currentAdjustStructure,
-      });
+      const payload = this.buildMonthPlanConfirmAdjustPayload();
+      if (!payload) {
+        this.$modal.msgWarning(
+          this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.pleaseSelectYearMonth"
+          )
+        );
+        return;
+      }
+      if (!payload.version) {
+        this.$modal.msgWarning(
+          this.$t(
+            "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedVersion"
+          )
+        );
+        return;
+      }
       this.confirmAdjustLoading = true;
       try {
         const res = await confirmAdjust(payload);
