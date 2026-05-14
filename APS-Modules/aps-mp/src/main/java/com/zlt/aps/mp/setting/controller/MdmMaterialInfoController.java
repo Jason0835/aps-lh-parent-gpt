@@ -167,8 +167,7 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     /**
      * 查询物料信息表列表
      * 关联查询配置模具，配置施工
-     *
-     * @param productInfo
+     * @param productInfo 查询条件
      */
     @PostMapping("/getTableList")
     @ApiOperation("根据条件查询物料信息-关联查询配置模具，配置施工")
@@ -511,5 +510,36 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     @PostMapping("/updateQualityStateCodeName")
     public AjaxResult updateQualityStateCodeName(@RequestBody MdmMaterialInfo materialInfo) {
         return iproductInfoService.updateQualityStateCodeName(materialInfo);
+    }
+
+    /**
+     * 查询胎胚编码列表（去重）
+     *
+     * @param productInfo 查询条件
+     * @return 胎胚编码列表
+     */
+    @ApiOperation("查询胎胚编码列表（去重）")
+    @PostMapping("/listEmbryoCode")
+    public TableDataInfo listEmbryoCode(@RequestBody MdmMaterialInfo productInfo) {
+        startPage("embryo_code asc");
+        LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(PubUtil.isNotEmpty(productInfo.getFactoryCode()), MdmSkuConstructionRef::getFactoryCode, productInfo.getFactoryCode());
+        queryWrapper.isNotNull(MdmSkuConstructionRef::getEmbryoCode);
+        queryWrapper.ne(MdmSkuConstructionRef::getEmbryoCode, "");
+        queryWrapper.like(PubUtil.isNotEmpty(productInfo.getEmbryoCode()), MdmSkuConstructionRef::getEmbryoCode, productInfo.getEmbryoCode());
+        queryWrapper.select(MdmSkuConstructionRef::getEmbryoCode);
+        queryWrapper.groupBy(MdmSkuConstructionRef::getEmbryoCode);
+        List<MdmSkuConstructionRef> list = skuConstructionRefEntityMapper.selectList(queryWrapper);
+        // 将SKU施工关系对象列表转换为只包含胎胚编码的Map列表
+        List<Map<String, Object>> resultList = list.stream()
+                .map(item -> {
+                    // 创建Map，用于存储简化后的数据
+                    Map<String, Object> map = new HashMap<>();
+                    // 将embryoNo字段以embryoCode为key存入Map，保持与前端字段名的一致性
+                    map.put("embryoCode", item.getEmbryoCode());
+                    return map;
+                })
+                .collect(Collectors.toList());
+        return getDataTable(resultList);
     }
 }

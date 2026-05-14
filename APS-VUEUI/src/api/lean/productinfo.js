@@ -34,8 +34,16 @@ export function exportData(query) {
 }
 
 export function updateQualityState(query) {
+    return request({
+        url: '/lean/productinfo/updateQualityStateCodeName',
+        method: 'post',
+        data: query
+    })
+}
+
+export function listEmbryoCode(query) {
   return request({
-    url: '/lean/productinfo/updateQualityStateCodeName',
+    url: '/lean/productinfo/listEmbryoCode',
     method: 'post',
     data: query
   })

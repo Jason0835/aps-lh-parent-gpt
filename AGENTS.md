@@ -16,6 +16,7 @@ utf-8 no bom
 - 使用LambdaQueryWrapper、LambdaUpdateWrapper
 - 尽可能使用Lambda写法（例如：LambdaQueryWrapper、LambdaUpdateWrapper、LambdaQueryChainWrapper、LambdaUpdateChainWrapper），减少字符串字段名硬编码
 ### 注释规范
+- 优先重要,主要逻辑方法需加注释
 - 注释用中文，尽可能的详细
 - 实体类的字段需要加注释
 - 方法需要加注释，方法参数需要加注释

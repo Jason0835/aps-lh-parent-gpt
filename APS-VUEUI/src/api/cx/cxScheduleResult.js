@@ -155,7 +155,10 @@ export function publishScheduleResult(query) {
   return request({
     url: 'cx/cxScheduleResult/publish',
     method: 'post',
-    data: query
+    data: { scheduleDate: query.scheduleDate, factoryCode: query.factoryCode, ids: query.ids },
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    }
   })
 }
 

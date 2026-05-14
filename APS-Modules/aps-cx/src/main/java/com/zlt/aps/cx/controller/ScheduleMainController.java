@@ -7,6 +7,8 @@ import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.constant.HttpStatus;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cx.api.domain.vo.*;
@@ -26,9 +28,15 @@ import com.zlt.aps.mp.api.domain.entity.CxScheduleResultIssue;
 import com.zlt.aps.mp.api.domain.entity.MdmCxMachineFixed;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.cx.component.ScheduleExecutionGuard;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
+import com.ruoyi.common.utils.StringUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +53,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 排程管理Controller
@@ -86,6 +95,15 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
     @Resource
     private MdmMonthPlanProductLhCapacityMapper monthPlanProductLhCapacityMapper;
+
+    @Autowired
+    private ScheduleExecutionGuard scheduleExecutionGuard;
+
+    @Resource
+    private MdmMaterialInfoMapper mdmMaterialInfoMapper;
+
+    @Resource
+    private MdmSkuConstructionRefMapper mdmSkuConstructionRefMapper;
 
     /**
      * 查询成型排程结果列表，同时填充各班次的开始/结束时间
@@ -353,6 +371,267 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
+     * 发布选中的排程结果到MES
+     * 发布流程：1.更新发布状态为"待发布" → 2.调用issueToMes下发MES → 3.根据MES反馈更新发布状态
+     * 参考硫化排程发布逻辑，支持按勾选ID发布
+     * 业务规则：
+     * 每条成型排程结果自带8班数据，覆盖排程日期前2天到排程日期当天：
+     * - T-2日（窗口首日）：更新夜早中3班
+     * - T-1日（窗口次日）：更新夜早中3班
+     * - T日（排程日期）：下发早中2班（夜班尚未排产）
+     *
+     * @param dto 排程结果对象（含scheduleDate、factoryCode）
+     * @param ids 选中的记录ID，多个用逗号分隔
+     * @return 操作结果
+     */
+    @Log(title = "ui.data.column.cxScheduleResult.modelName", businessType = BusinessType.PUBLISH)
+    @ApiOperation("发布排程")
+    @PostMapping("/publish")
+    public AjaxResult publish(@RequestBody CxScheduleResult dto, @RequestParam(value = "ids", required = false) String ids) {
+        if (dto.getScheduleDate() == null) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.errorPublish"));
+        }
+
+        LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(dto.getScheduleDate()).toLocalDate();
+
+        List<CxScheduleResult> list = cxScheduleResultService.listByScheduleDateAndFactory(
+                dto.getScheduleDate(), dto.getFactoryCode());
+
+        if (StringUtils.isNotEmpty(ids)) {
+            List<Long> idList = Arrays.stream(ids.split(","))
+                    .map(String::trim)
+                    .map(Long::parseLong)
+                    .collect(Collectors.toList());
+            list = list.stream()
+                    .filter(item -> idList.contains(item.getId()))
+                    .collect(Collectors.toList());
+        }
+
+        List<CxScheduleResult> filteredList = list.stream()
+                .filter(item -> ApsConstant.NO_RELEASE.equals(item.getIsRelease())
+                        || ApsConstant.FAILURE_RELEASE.equals(item.getIsRelease())
+                        || ApsConstant.WAIT_RELEASING.equals(item.getIsRelease()))
+                .collect(Collectors.toList());
+
+        if (CollectionUtils.isEmpty(filteredList)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.errorPublish"));
+        }
+
+        List<CxScheduleResult> invalidRecords = filteredList.stream()
+                .filter(item -> StringUtils.isEmpty(item.getCxMachineCode()) || item.getCxMachineCode().contains(","))
+                .collect(Collectors.toList());
+        if (!invalidRecords.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.hasMultipleIds"));
+        }
+
+        List<Long> selectedIds = filteredList.stream().map(item -> item.getId()).collect(Collectors.toList());
+
+        try {
+            String token = scheduleExecutionGuard.acquire(dto.getFactoryCode(), scheduleLocalDate);
+            if (token == null) {
+                return AjaxResult.error("排程下发操作正在进行中，请稍后再试");
+            }
+            try {
+                AjaxResult issueResult = doIssueCxScheduleResultToMes(dto.getScheduleDate(), selectedIds);
+                if (issueResult != null && Objects.equals(HttpStatus.SUCCESS, issueResult.get(AjaxResult.CODE_TAG))) {
+                    for (CxScheduleResult item : filteredList) {
+                        item.setIsRelease(ApsConstant.IS_RELEASE);
+                        cxScheduleResultService.updateReleaseStatus(item);
+                    }
+                    return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
+                } else {
+                    for (CxScheduleResult item : filteredList) {
+                        item.setIsRelease(ApsConstant.FAILURE_RELEASE);
+                        cxScheduleResultService.updateReleaseStatus(item);
+                    }
+                    return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
+                }
+            } finally {
+                scheduleExecutionGuard.release(dto.getFactoryCode(), scheduleLocalDate, token);
+            }
+        } catch (Exception e) {
+            log.error("成型排程发布失败", e);
+            for (CxScheduleResult item : filteredList) {
+                item.setIsRelease(ApsConstant.FAILURE_RELEASE);
+                cxScheduleResultService.updateReleaseStatus(item);
+            }
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
+        }
+    }
+
+    /**
+     * 执行成型排程结果下发到MES
+     * 支持两种模式：
+     * 1. 按选中ID下发：selectedIds不为空时，按ID查询选中记录下发
+     * 2. 按排程日期全量下发：selectedIds为空时，查询排程日期下所有未下发记录
+     * 日期推导：从排程日期(scheduleDate=T)推导T-2、T-1、T三天
+     *
+     * @param scheduleDate 排程日期
+     * @param selectedIds  选中的记录ID列表，为空时按日期全量查询
+     * @return 下发结果
+     */
+    private AjaxResult doIssueCxScheduleResultToMes(Date scheduleDate, List<Long> selectedIds) {
+        LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
+        LocalDate day1 = scheduleLocalDate.minusDays(2);
+        LocalDate day2 = scheduleLocalDate.minusDays(1);
+        LocalDate day3 = scheduleLocalDate;
+
+        List<CxScheduleResult> scheduleResultList;
+        if (CollectionUtils.isNotEmpty(selectedIds)) {
+            scheduleResultList = cxScheduleResultService.listByIds(selectedIds);
+        } else {
+            scheduleResultList = cxScheduleResultService.listByScheduleDate(scheduleLocalDate);
+            scheduleResultList = scheduleResultList.stream()
+                    .filter(item -> !ApsConstant.IS_RELEASE.equals(item.getIsRelease()))
+                    .collect(Collectors.toList());
+        }
+
+        if (scheduleResultList.isEmpty()) {
+            return AjaxResult.error("没有需要下发的成型排程结果数据");
+        }
+
+        List<CxScheduleResultIssue> day1IssueList = new ArrayList<>();
+        List<CxScheduleResultIssue> day2IssueList = new ArrayList<>();
+        List<CxScheduleResultIssue> day3IssueList = new ArrayList<>();
+
+        for (CxScheduleResult source : scheduleResultList) {
+            CxScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, day1);
+            if (day1Issue != null) {
+                day1IssueList.add(day1Issue);
+            }
+
+            CxScheduleResultIssue day2Issue = convertToDay2IssueEntity(source, day2);
+            if (day2Issue != null) {
+                day2IssueList.add(day2Issue);
+            }
+
+            CxScheduleResultIssue day3Issue = convertToDay3IssueEntity(source, day3);
+            if (day3Issue != null) {
+                day3IssueList.add(day3Issue);
+            }
+        }
+
+        if (day1IssueList.isEmpty() && day2IssueList.isEmpty() && day3IssueList.isEmpty()) {
+            return AjaxResult.error("没有需要下发的成型排程结果数据");
+        }
+
+        List<CxScheduleResultIssue> allIssueList = new ArrayList<>();
+        allIssueList.addAll(day1IssueList);
+        allIssueList.addAll(day2IssueList);
+        allIssueList.addAll(day3IssueList);
+
+        // 下发前补全MES物料编码和示方号
+        enrichMaterialAndExampleInfo(allIssueList);
+
+        return mesItfService.issueCxScheduleResult(allIssueList);
+    }
+
+    /**
+     * 补全MES物料编码和示方号
+     * 1. 通过物料编码关联物料信息表(MdmMaterialInfo)获取MES物料编码
+     * 2. 通过物料编码关联SKU与示方书关系表(MdmSkuConstructionRef)获取制造示方书号(embryoNo)作为成型示方号
+     * 3个班的示方号都取同一个值
+     *
+     * @param issueList 成型排程结果下发列表
+     */
+    private void enrichMaterialAndExampleInfo(List<CxScheduleResultIssue> issueList) {
+        if (CollectionUtils.isEmpty(issueList)) {
+            return;
+        }
+
+        List<String> materialCodeList = issueList.stream()
+                .map(CxScheduleResultIssue::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (CollectionUtils.isEmpty(materialCodeList)) {
+            return;
+        }
+
+        Map<String, String> materialCodeToMesCodeMap = getMaterialCodeToMesCodeMap(materialCodeList);
+        Map<String, String> materialCodeToCxNoMap = getMaterialCodeToCxNoMap(materialCodeList);
+
+        for (CxScheduleResultIssue item : issueList) {
+            String materialCode = item.getMaterialCode();
+            if (StringUtils.isNotBlank(materialCode)) {
+                String mesMaterialCode = materialCodeToMesCodeMap.get(materialCode);
+                if (StringUtils.isNotBlank(mesMaterialCode)) {
+                    item.setMesMaterialCode(mesMaterialCode);
+                }
+
+                String cxNo = materialCodeToCxNoMap.get(materialCode);
+                if (StringUtils.isNotBlank(cxNo)) {
+                    item.setClass1ExampleNo(cxNo);
+                    item.setClass2ExampleNo(cxNo);
+                    item.setClass3ExampleNo(cxNo);
+                }
+            }
+        }
+    }
+
+    /**
+     * 获取物料编码到MES物料编码的映射
+     *
+     * @param materialCodeList 物料编码列表
+     * @return 物料编码 -> MES物料编码的映射
+     */
+    private Map<String, String> getMaterialCodeToMesCodeMap(List<String> materialCodeList) {
+        if (CollectionUtils.isEmpty(materialCodeList)) {
+            return new HashMap<>();
+        }
+
+        LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(MdmMaterialInfo::getMaterialCode, materialCodeList)
+                .select(MdmMaterialInfo::getMaterialCode, MdmMaterialInfo::getMesMaterialCode);
+
+        List<MdmMaterialInfo> materialInfoList = mdmMaterialInfoMapper.selectList(queryWrapper);
+
+        if (CollectionUtils.isEmpty(materialInfoList)) {
+            return new HashMap<>();
+        }
+
+        return materialInfoList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getMesMaterialCode()))
+                .collect(Collectors.toMap(
+                        MdmMaterialInfo::getMaterialCode,
+                        MdmMaterialInfo::getMesMaterialCode,
+                        (v1, v2) -> v1
+                ));
+    }
+
+    /**
+     * 获取物料编码到成型示方号的映射
+     * 通过物料编码关联SKU与示方书关系表(MdmSkuConstructionRef)获取制造示方书号(embryoNo)作为成型示方号
+     *
+     * @param materialCodeList 物料编码列表
+     * @return 物料编码 -> 成型示方号的映射
+     */
+    private Map<String, String> getMaterialCodeToCxNoMap(List<String> materialCodeList) {
+        if (CollectionUtils.isEmpty(materialCodeList)) {
+            return new HashMap<>();
+        }
+
+        LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeList)
+                .select(MdmSkuConstructionRef::getMaterialCode, MdmSkuConstructionRef::getEmbryoNo);
+
+        List<MdmSkuConstructionRef> constructionRefList = mdmSkuConstructionRefMapper.selectList(queryWrapper);
+
+        if (CollectionUtils.isEmpty(constructionRefList)) {
+            return new HashMap<>();
+        }
+
+        return constructionRefList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getEmbryoNo()))
+                .collect(Collectors.toMap(
+                        MdmSkuConstructionRef::getMaterialCode,
+                        MdmSkuConstructionRef::getEmbryoNo,
+                        (v1, v2) -> v1
+                ));
+    }
+
+    /**
      * 成型排程结果下发到MES中间表
      * 业务规则：
      * 1. 查询当天的排程日期，获取8班数据
@@ -417,6 +696,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         allIssueList.addAll(day1IssueList);
         allIssueList.addAll(day2IssueList);
         allIssueList.addAll(day3IssueList);
+
+        // 下发前补全MES物料编码和示方号
+        enrichMaterialAndExampleInfo(allIssueList);
 
         // 通过Feign客户端调用itf模块的下发接口
         return mesItfService.issueCxScheduleResult(allIssueList);
@@ -1513,9 +1795,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         String sheetName = "成型计划";
         ExcelUtil<CxScheduleResultTemplateImportVO> util = new ExcelUtil<>(CxScheduleResultTemplateImportVO.class);
         // 使用3参数版本: sheetName, InputStream, headRowNum
-        List<CxScheduleResultTemplateImportVO> list = util.importExcel(
-                sheetName, new java.io.ByteArrayInputStream(fileBytes), 0);
-        return cxScheduleResultService.importScheduleTemplate(list, scheduleResult, updateSupport, null);
+//        List<CxScheduleResultTemplateImportVO> list = util.importExcel(
+//                sheetName, new java.io.ByteArrayInputStream(fileBytes), 0, 7, -1);
+        return null;
     }
 
     /**

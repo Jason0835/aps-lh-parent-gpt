@@ -357,14 +357,36 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             if (totalPlan <= 0 || totalPlan <= sku.getEmbryoStock()) {
                 continue;
             }
-            // 库存不足，按比例削减各班次计划量
-            double ratio = (double) sku.getEmbryoStock() / totalPlan;
-            for (LhScheduleResult result : skuResultMap.get(sku)) {
-                scaleShiftPlanQty(context, result, ratio, shifts);
+            List<LhScheduleResult> skuResults = skuResultMap.get(sku);
+            if (shouldKeepFormalContinuousFullCapacity(sku, skuResults)) {
+                log.info("正式续作跳过胎胚库存后置裁减, materialCode: {}, totalPlan: {}, embryoStock: {}",
+                        sku.getMaterialCode(), totalPlan, sku.getEmbryoStock());
+                continue;
+            }
+            // 库存不足时按来源SKU整体裁剪，避免逐条逐班取整导致总量丢失。
+            ShiftFieldUtil.scaleGroupedShiftPlanQty(skuResults, shifts, sku.getEmbryoStock());
+            for (LhScheduleResult result : skuResults) {
                 refreshResultSummary(context, result, shifts);
             }
         }
         refreshContinuousEndingFlagByResult(context);
+    }
+
+    /**
+     * 正式续作在非试制场景下保留满班补齐结果，不做胎胚库存后置裁减。
+     *
+     * @param sku 来源SKU
+     * @param skuResults 该SKU对应的续作结果
+     * @return true-保留满班结果，不做库存裁减
+     */
+    private boolean shouldKeepFormalContinuousFullCapacity(SkuScheduleDTO sku, List<LhScheduleResult> skuResults) {
+        if (sku == null || CollectionUtils.isEmpty(skuResults)) {
+            return false;
+        }
+        if (sku.isTrial()) {
+            return false;
+        }
+        return true;
     }
 
     @Override
@@ -1339,25 +1361,6 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 按比例削减各班次计划量（用于库存裁剪或降模）。
-     *
-     * @param result 排程结果
-     * @param ratio  削减比例
-     * @param shifts 班次列表
-     */
-    private void scaleShiftPlanQty(LhScheduleContext context, LhScheduleResult result, double ratio, List<LhShiftConfigVO> shifts) {
-        for (LhShiftConfigVO shift : shifts) {
-            int idx = shift.getShiftIndex();
-            Integer qty = ShiftFieldUtil.getShiftPlanQty(result, idx);
-            if (qty != null && qty > 0) {
-                setShiftPlanQty(result, idx, (int) (qty * ratio),
-                        ShiftFieldUtil.getShiftStartTime(result, idx),
-                        ShiftFieldUtil.getShiftEndTime(result, idx));
-            }
-        }
-    }
-
-    /**
      * 刷新结果行的汇总计划量和收尾时间。
      *
      * @param result 排程结果
@@ -1570,11 +1573,15 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             if (overQty <= 0) {
                 continue;
             }
-            trimShiftPlanQty(result, shift.getShiftIndex(), consumedQty);
             quota.setShiftFillOverQty(quota.getShiftFillOverQty() + overQty);
             totalShiftFillOverQty += overQty;
             log.debug("续作班次满班补齐超排, materialCode: {}, 日期: {}, 班次: {}, 排产量: {}, 超排: {}",
                     sku.getMaterialCode(), productionDate, shift.getShiftIndex(), planQty, overQty);
+            // 正式续作非试制、非收尾且满排模式下保留满班补齐产量，不做额度回裁
+            if (sku.isTrial() || sku.isStrictTargetQty()
+                    || !getTargetScheduleQtyResolver().isFullCapacityMode(context)) {
+                trimShiftPlanQty(result, shift.getShiftIndex(), consumedQty);
+            }
         }
         if (totalShiftFillOverQty > 0) {
             sku.setShiftFillOverQty(sku.getShiftFillOverQty() + totalShiftFillOverQty);
