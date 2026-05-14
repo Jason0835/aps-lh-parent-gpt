@@ -71,11 +71,12 @@ export default {
       },
       plan1Disabled: false,
       plan2Disabled: false,
+      plan3Disabled: false,
       plan4Disabled: false,
       plan5Disabled: false,
-      plan1Disabled: false,
-      nightDisabled: false,
-      dayDisabled: false,
+      plan6Disabled: false,
+      plan7Disabled: false,
+      plan8Disabled: false,
       dateList: [
         { shift: 1, shiftDate: "" },
         { shift: 2, shiftDate: "" },
@@ -305,7 +306,7 @@ export default {
         {
           label: this.lhShiftInlineFieldLabel(3, "planQty"),
           prop: "class3PlanQty",
-          disabled: this.isChangeQty ? this.plan2Disabled : true,
+          disabled: this.isChangeQty ? this.plan3Disabled : true,
           span: 12,
         },
         {
@@ -482,7 +483,7 @@ export default {
         {
           label: this.lhShiftInlineFieldLabel(6, "planQty"),
           prop: "class6PlanQty",
-          disabled: this.isChangeQty ? this.plan5Disabled : true,
+          disabled: this.isChangeQty ? this.plan6Disabled : true,
           span: 12,
         },
         {
@@ -541,7 +542,7 @@ export default {
         {
           label: this.lhShiftInlineFieldLabel(7, "planQty"),
           prop: "class7PlanQty",
-          disabled: this.isChangeQty ? this.plan5Disabled : true,
+          disabled: this.isChangeQty ? this.plan7Disabled : true,
           span: 12,
         },
         {
@@ -600,7 +601,7 @@ export default {
         {
           label: this.lhShiftInlineFieldLabel(8, "planQty"),
           prop: "class8PlanQty",
-          disabled: this.isChangeQty ? this.plan5Disabled : true,
+          disabled: this.isChangeQty ? this.plan8Disabled : true,
           span: 12,
         },
         {
@@ -831,38 +832,28 @@ export default {
         this.fetchScheduleShiftDates(data.scheduleDate);
 
         if (data.scheduleDate) {
-          if (moment().isAfter(data.scheduleDate + " 19:00:00")) {
-            this.plan1Disabled = true;
-          }
-          if (
-            moment().isAfter(
-              moment(data.scheduleDate).add(1, 'days"').format("yyyy-MM-dd") +
-                " 07:00:00"
-            )
-          ) {
-            this.plan2Disabled = true;
-          }
-          if (
-            moment().isAfter(
-              moment(data.scheduleDate).add(1, 'days"').format("yyyy-MM-dd") +
-                " 19:00:00"
-            )
-          ) {
-            this.plan4Disabled = true;
-          }
-          if (
-            moment().isAfter(
-              moment(data.scheduleDate).add(2, 'days"').format("yyyy-MM-dd") +
-                " 07:00:00"
-            )
-          ) {
-            this.plan5Disabled = true;
-          }
+          const now = moment();
+          const sd = moment(data.scheduleDate);
+          const day1 = sd.format("YYYY-MM-DD");
+          const day2 = sd.clone().add(1, "days").format("YYYY-MM-DD");
+          const day3 = sd.clone().add(2, "days").format("YYYY-MM-DD");
+          this.plan1Disabled = now.isAfter(day1 + " 19:00:00");
+          this.plan2Disabled = now.isAfter(day2 + " 07:00:00");
+          this.plan3Disabled = now.isAfter(day2 + " 19:00:00");
+          this.plan4Disabled = now.isAfter(day2 + " 19:00:00");
+          this.plan5Disabled = now.isAfter(day3 + " 07:00:00");
+          this.plan6Disabled = now.isAfter(day3 + " 19:00:00");
+          this.plan7Disabled = now.isAfter(day3 + " 19:00:00");
+          this.plan8Disabled = now.isAfter(sd.clone().add(3, "days").format("YYYY-MM-DD") + " 07:00:00");
         } else {
           this.plan1Disabled = true;
           this.plan2Disabled = true;
+          this.plan3Disabled = true;
           this.plan4Disabled = true;
           this.plan5Disabled = true;
+          this.plan6Disabled = true;
+          this.plan7Disabled = true;
+          this.plan8Disabled = true;
         }
       }
     },
@@ -885,8 +876,12 @@ export default {
       this.visible = false;
       this.plan1Disabled = false;
       this.plan2Disabled = false;
+      this.plan3Disabled = false;
       this.plan4Disabled = false;
       this.plan5Disabled = false;
+      this.plan6Disabled = false;
+      this.plan7Disabled = false;
+      this.plan8Disabled = false;
     },
 
     handleConfirm() {

@@ -187,7 +187,8 @@ export default {
           return;
         }
         const checkData = {
-          structureCode: params.structureName,
+          factoryCode: params.factoryCode,
+          structureName: params.structureName,
           materialCode: params.materialCode,
           category: params.category,
           id: this.form.id || null,

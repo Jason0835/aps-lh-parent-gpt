@@ -385,7 +385,6 @@ export default {
           filterable: true,
         },
         {
-          /** 与 rollingCycle/index.backup-legacy.vue 结构调整 Tab（activeName==second）一致：字段名为 productionVersion */
           prop: "version",
           label: this.$t(
             "ui.data.column.monthPlanFinalAdjustQuery.productionVersion"
@@ -751,13 +750,14 @@ export default {
     if (rq.yearMonth) {
       defaults.yearMonth = String(rq.yearMonth);
     }
+    /** 兼容旧链接 productionVersion；与 version 同时存在时以 version 为准 */
     if (rq.productionVersion) {
-      defaults.productionVersion = String(rq.productionVersion);
+      defaults.version = String(rq.productionVersion);
     }
     if (rq.structureName) {
       defaults.structureName = String(rq.structureName);
     }
-    /** 调整版本号（ADJ…），随路由带入时参与 list4Adjust 等查询入参 */
+    /** 调整版本号（ADJ…），随路由带入 */
     if (rq.version) {
       defaults.version = String(rq.version);
     }
@@ -769,6 +769,13 @@ export default {
   },
   methods: {
     async handleBaseQueryChange() {
+      const pt = this.$refs.monthPlanPageTableRef;
+      const searchRef = pt && pt.$refs && pt.$refs.searchRef;
+      if (searchRef && typeof searchRef.getValues === "function") {
+        const vals = searchRef.getValues();
+        this.search = { ...this.search, ...vals };
+        this.query = { ...this.query, ...vals };
+      }
       await this.loadVersionOptions();
       this.fetchCurrentAdjustMachineFromRedis();
     },
@@ -982,16 +989,18 @@ export default {
 
       const heightQty = Number(row.heightQty || 0);
       if (heightQty > 0) {
-        row.heightProductionQty = Math.min(remainingQty, heightQty);
-        remainingQty -= row.heightProductionQty;
+        const allocated = Math.min(remainingQty, heightQty);
+        row.heightProductionQty = allocated;
+        remainingQty -= allocated;
         scmPriorities.push("height");
       }
 
       if (remainingQty > 0) {
         const midQty = Number(row.midQty || 0);
         if (midQty > 0) {
-          row.midProductionQty = Math.min(remainingQty, midQty);
-          remainingQty -= row.midProductionQty;
+          const allocated = Math.min(remainingQty, midQty);
+          row.midProductionQty = allocated;
+          remainingQty -= allocated;
           scmPriorities.push("mid");
         }
       }
@@ -999,8 +1008,9 @@ export default {
       if (remainingQty > 0) {
         const cycleReserveQty = Number(row.cycleReserveQty || 0);
         if (cycleReserveQty > 0) {
-          row.cycleProductionQty = Math.min(remainingQty, cycleReserveQty);
-          remainingQty -= row.cycleProductionQty;
+          const allocated = Math.min(remainingQty, cycleReserveQty);
+          row.cycleProductionQty = allocated;
+          remainingQty -= allocated;
           scmPriorities.push("cycle");
         }
       }
@@ -1009,8 +1019,9 @@ export default {
       if (adjustPriority > 0 && remainingQty > 0) {
         const postponeQty = Number(row.postponeQty || 0);
         if (postponeQty > 0) {
-          row.postponeProductionQty = Math.min(remainingQty, postponeQty);
-          remainingQty -= row.postponeProductionQty;
+          const allocated = Math.min(remainingQty, postponeQty);
+          row.postponeProductionQty = allocated;
+          remainingQty -= allocated;
           scmPriorities.push("postpone");
         }
       }
@@ -1018,11 +1029,9 @@ export default {
       if (remainingQty > 0) {
         const conventionReserveQty = Number(row.conventionReserveQty || 0);
         if (conventionReserveQty > 0) {
-          row.conventionProductionQty = Math.min(
-            remainingQty,
-            conventionReserveQty
-          );
-          remainingQty -= row.conventionProductionQty;
+          const allocated = Math.min(remainingQty, conventionReserveQty);
+          row.conventionProductionQty = allocated;
+          remainingQty -= allocated;
           scmPriorities.push("convention");
         }
       }
@@ -1032,23 +1041,23 @@ export default {
         switch (lastPriority) {
           case "convention":
             row.conventionProductionQty =
-              (row.conventionProductionQty || 0) + remainingQty;
+              Number(row.conventionProductionQty || 0) + remainingQty;
             break;
           case "postpone":
             row.postponeProductionQty =
-              (row.postponeProductionQty || 0) + remainingQty;
+              Number(row.postponeProductionQty || 0) + remainingQty;
             break;
           case "mid":
             row.midProductionQty =
-              (row.midProductionQty || 0) + remainingQty;
+              Number(row.midProductionQty || 0) + remainingQty;
             break;
           case "cycle":
             row.cycleProductionQty =
-              (row.cycleProductionQty || 0) + remainingQty;
+              Number(row.cycleProductionQty || 0) + remainingQty;
             break;
           default:
             row.heightProductionQty =
-              (row.heightProductionQty || 0) + remainingQty;
+              Number(row.heightProductionQty || 0) + remainingQty;
             break;
         }
       }
@@ -1075,22 +1084,21 @@ export default {
     },
     /**
      * 版本号下拉：与 rollingCycle/index.backup-legacy.vue 结构调整 Tab 的 getVersionList 一致，
-     * 调用 versionStructure（即 /monthplan/factoryMonthPlanFinalResult/getVersionList），
-     * 选项为每行的 productionVersion（label/value 均为 productionVersion），默认取列表首项；
-     * 若当前 query/search 中 productionVersion 仍在列表中则保留。
+     * 调用 resultVersion（版本列表接口）；选项来自接口行的 version 字段；
+     * 前端 query/search 统一使用字段 version（与 HeaderSearch prop 一致），默认取列表首项；
+     * 若当前 version 仍在列表中则保留。
      */
     async loadVersionOptions() {
       const factoryCode = this.query.factoryCode || this.search.factoryCode;
       const yearMonth = this.query.yearMonth || this.search.yearMonth;
       if (!factoryCode || !yearMonth) {
         this.versionOptions = [];
-        this.search = { ...this.search, productionVersion: "" };
-        this.query = { ...this.query, productionVersion: "" };
+        this.search = { ...this.search, version: "" };
+        this.query = { ...this.query, version: "" };
         return;
       }
       try {
         const res = await resultVersion(this.formatParamsForStructureVersionList());
-        console.log('res版本获取', res)
         const rows = res.rows || [];
         const list = [];
         for (let i = 0; i < rows.length; i++) {
@@ -1107,9 +1115,7 @@ export default {
 
         if (list.length > 0) {
           const currentPv = String(
-            this.query.productionVersion ||
-              this.search.productionVersion ||
-              ""
+            this.query.version || this.search.version || ""
           ).trim();
 
           if (currentPv) {
@@ -1117,25 +1123,23 @@ export default {
               (item) => String(item.value) === currentPv
             );
             if (hasVersion) {
-              this.search = { ...this.search, productionVersion: currentPv };
-              this.query = { ...this.query, productionVersion: currentPv };
+              this.search = { ...this.search, version: currentPv };
+              this.query = { ...this.query, version: currentPv };
               return;
             }
           }
           const defaultPv = list[0].value;
-          console.log('defaultPv', defaultPv)
-          console.log('list', list)
-          this.search = { ...this.search, productionVersion: defaultPv };
-          this.query = { ...this.query, productionVersion: defaultPv };
+          this.search = { ...this.search, version: defaultPv };
+          this.query = { ...this.query, version: defaultPv };
         } else {
-          this.search = { ...this.search, productionVersion: "" };
-          this.query = { ...this.query, productionVersion: "" };
+          this.search = { ...this.search, version: "" };
+          this.query = { ...this.query, version: "" };
         }
       } catch (e) {
         console.error(e);
         this.versionOptions = [];
-        this.search = { ...this.search, productionVersion: "" };
-        this.query = { ...this.query, productionVersion: "" };
+        this.search = { ...this.search, version: "" };
+        this.query = { ...this.query, version: "" };
       }
     },
     normalizeYearMonth(yearMonth) {
@@ -1149,7 +1153,7 @@ export default {
       return { year: m.year(), month: m.month() + 1 };
     },
     async handleSearch(data) {
-      /** 与 query 一并维护 search，保证 PageTable → HeaderSearch 的 defaultValue 含当前表单中的版本号 */
+      /** 与 query 一并维护 search，保证 HeaderSearch defaultValue 含表单中的 version */
       this.search = { ...this.search, ...data };
       this.query = { ...data };
       this.$set(this.page, "current", 1);
@@ -1173,7 +1177,25 @@ export default {
       this.$set(this.page, "pageSize", pageSize);
       this.getList();
     },
-    /** 列表 list4Adjust 入参 */
+    /**
+     * 排产明细导出接口 FactoryMonthPlanMouldDayResult 查询条件字段名为 productionVersion；
+     * 本页 query 统一使用 version，导出前将 version 写入 productionVersion 并移除 version。
+     * list4Adjust / getVersionList 等直接使用 version（与后端 FactoryMonthPlanProductionFinalResult 一致）。
+     * @param {Object} params 即将请求的参数（就地修改）
+     */
+    applyProductionVersionAlias(params) {
+      if (!params || typeof params !== "object") {
+        return params;
+      }
+      const v =
+        params.version != null ? String(params.version).trim() : "";
+      if (v) {
+        params.productionVersion = v;
+      }
+      delete params.version;
+      return params;
+    },
+    /** 列表 list4Adjust 入参（直接传 version，与后端 list4Adjust 优先使用调整版本号一致） */
     formatParams() {
       const params = {
         ...this.query,
@@ -1197,8 +1219,8 @@ export default {
     },
     /**
      * 版本号下拉数据请求入参：与 rollingCycle/index.backup-legacy.vue 结构调整 Tab 下
-     * getVersionList → versionStructure(this.formatParams()) 一致（含分页与 year/month 拆分方式）。
-     * 仅用于拉取版本列表，不影响本页其它接口的 formatParams。
+     * getVersionList 请求方式一致（含分页与 year/month 拆分）。
+     * 仍携带 query.version，由后端 MpAdjustResult/getVersionList 按年月厂过滤（不按版本号过滤列表）。
      */
     formatParamsForStructureVersionList() {
       const params = {
@@ -1244,7 +1266,7 @@ export default {
       } else {
         delete params.cxMachineCode;
       }
-      return params;
+      return this.applyProductionVersionAlias(params);
     },
     async getList() {
       const ym = this.normalizeYearMonth(this.query.yearMonth);
@@ -1253,7 +1275,7 @@ export default {
       }
       try {
         this.loading = true;
-        /** list4Adjust 不传 productionVersion；与 query 解耦，不影响 mpMonthPlanStatistics 使用的 resolveProductionVersionForStatistics */
+        /** list4Adjust：请求体携带 version（调整版本号），与后端 condition.version 一致 */
         const listParams = { ...this.formatParams() };
         const res = await listMonthPlanFinal4Adjust(listParams);
         const rawRows = res.rows || [];
@@ -1316,11 +1338,7 @@ export default {
       ) {
         return String(firstRow.productionVersion).trim();
       }
-      const q = String(
-        this.query.productionVersion ||
-          this.search.productionVersion ||
-          ""
-      ).trim();
+      const q = String(this.query.version || this.search.version || "").trim();
       if (q) {
         return q;
       }
@@ -1444,8 +1462,8 @@ export default {
     buildStructureDialogListVersionParams() {
       const row = this.data && this.data.length ? this.data[0] : null;
       const qpv = (
-        this.query.productionVersion ||
-        this.search.productionVersion ||
+        this.query.version ||
+        this.search.version ||
         ""
       ).trim();
       const rowPv =
@@ -1514,7 +1532,7 @@ export default {
       this.$refs.adjustVersionDialogRef.show(q);
     },
     /**
-     * 查看调整版本弹窗中点击版本号：同步到查询条件 productionVersion 并拉列表
+     * 查看调整版本弹窗中点击版本号：同步到查询条件 version 并拉列表
      */
     async onAdjustVersionDialogSelectProductionVersion(productionVersion) {
       const v =
@@ -1522,8 +1540,8 @@ export default {
       if (!v) {
         return;
       }
-      this.search = { ...this.search, productionVersion: v };
-      this.query = { ...this.query, productionVersion: v };
+      this.search = { ...this.search, version: v };
+      this.query = { ...this.query, version: v };
       const opts = this.versionOptions || [];
       if (!opts.some((item) => String(item.value) === v)) {
         this.versionOptions = [...opts, { label: v, value: v }];
@@ -1557,7 +1575,8 @@ export default {
       // );
       this.syncDialog.form.factoryCode =
         this.query.factoryCode || this.search.factoryCode || "";
-      this.syncDialog.form.productionVersion = "";
+      this.syncDialog.form.productionVersion =
+        (this.query.version || this.search.version || "").trim();
       this.syncDialog.form.lastMonthPlanVersion = "";
       this.syncDialog.form.monthPlanVersion = "";
       this.syncDialog.versionList = [];
@@ -1750,7 +1769,7 @@ export default {
       params.adjustType = "01";
       params.version = row.version;
       params.productionVersion =
-        row.productionVersion || this.query.productionVersion;
+        row.productionVersion || this.query.version;
       params.startDay = row.beginDay;
       params.endDay = row.endDay;
       params.adjustStartDay =

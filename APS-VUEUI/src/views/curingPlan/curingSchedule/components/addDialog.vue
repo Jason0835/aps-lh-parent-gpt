@@ -156,6 +156,38 @@ export default {
           prop: "materialDesc",
           disabled: true,
         },
+        {
+          label: this.$t("ui.data.column.scheduleResult.totalSurplusQty"),
+          prop: "mouldSurplusQty",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.embryoStock"),
+          prop: "embryoStock",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.lhShiftQty"),
+          prop: "machineShiftCapacity",
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          prop: "constructionStage",
+          type: "select",
+          dictData: this.parentDict.type.biz_construction_stage,
+          disabled: true,
+          span: 12,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
+          prop: "leftRightMould",
+          disabled: true,
+          span: 12,
+        },
       ];
 
       for (let i = 1; i <= 8; i += 1) {
@@ -263,6 +295,18 @@ export default {
         };
         const validateRes = await validateInsertOrder(saveParams);
         if (validateRes.valid) {
+          if (validateRes.machineShiftCapacity != null) {
+            this.$set(this.form, "machineShiftCapacity", validateRes.machineShiftCapacity);
+          }
+          if (validateRes.mouldSurplusQty != null) {
+            this.$set(this.form, "mouldSurplusQty", validateRes.mouldSurplusQty);
+          }
+          if (validateRes.embryoStock != null) {
+            this.$set(this.form, "embryoStock", validateRes.embryoStock);
+          }
+          if (validateRes.leftRightMould != null) {
+            this.$set(this.form, "leftRightMould", validateRes.leftRightMould);
+          }
           if (validateRes.warningMessages && validateRes.warningMessages.length > 0) {
             const warningMsg = validateRes.warningMessages.join('\n');
             const confirmResult = await this.$confirm(warningMsg, this.$t('ui.data.column.lhScheduleResult.insertOrder.validateFail'), {
@@ -307,6 +351,9 @@ export default {
           "materialDesc",
           "mouldSurplusQty",
           "embryoStock",
+          "machineShiftCapacity",
+          "constructionStage",
+          "leftRightMould",
         ];
         for (let i = 1; i <= 8; i++) {
           keys.push(`class${i}PlanQty`, `class${i}Analysis`);
