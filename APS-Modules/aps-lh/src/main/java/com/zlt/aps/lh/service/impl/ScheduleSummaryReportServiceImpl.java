@@ -472,7 +472,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             rubberTypeEmbryoMap.put(rubberType, embryoCodes);
         }
 
-        // 查询物料主数据，构建胎胚→规格+花纹映射
+        // 查询物料主数据，构建胎胚→物料列表映射
         Set<String> allRelevantEmbryoCodes = rubberTypeEmbryoMap.values().stream()
                 .flatMap(Set::stream)
                 .filter(scheduleEmbryoCodes::contains)
@@ -508,19 +508,21 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
             Map<String, Set<String>> specPatternMap = new LinkedHashMap<>();
             for (String embryoCode : scheduledEmbryos) {
-                MdmMaterialInfo materialInfo = materialInfoMap.get(embryoCode);
-                if (materialInfo == null) {
+                List<MdmMaterialInfo> materialInfoList = materialInfoMap.get(embryoCode);
+                if (materialInfoList == null || materialInfoList.isEmpty()) {
                     log.warn("胎胚代码[{}]未找到物料主数据", embryoCode);
                     continue;
                 }
-                String spec = StringUtils.defaultString(materialInfo.getSpecifications()).trim();
-                String pattern = StringUtils.defaultString(materialInfo.getPattern()).trim();
-                if (StringUtils.isBlank(spec)) {
-                    continue;
-                }
-                specPatternMap.computeIfAbsent(spec, k -> new LinkedHashSet<>());
-                if (StringUtils.isNotBlank(pattern)) {
-                    specPatternMap.get(spec).add(pattern);
+                for (MdmMaterialInfo materialInfo : materialInfoList) {
+                    String spec = StringUtils.defaultString(materialInfo.getSpecifications()).trim();
+                    String pattern = StringUtils.defaultString(materialInfo.getPattern()).trim();
+                    if (StringUtils.isBlank(spec)) {
+                        continue;
+                    }
+                    specPatternMap.computeIfAbsent(spec, k -> new LinkedHashSet<>());
+                    if (StringUtils.isNotBlank(pattern)) {
+                        specPatternMap.get(spec).add(pattern);
+                    }
                 }
             }
 
