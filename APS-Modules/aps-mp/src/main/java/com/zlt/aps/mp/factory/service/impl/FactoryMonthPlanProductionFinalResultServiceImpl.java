@@ -30,6 +30,7 @@ import com.zlt.aps.mp.api.domain.dto.MonthPlanFinalizedEventDto;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanProductionFinal4AdjustVo;
 import com.zlt.aps.mp.common.utils.GroupedMapWithOrder;
+import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.common.utils.poi.WorksheetData;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanSumEntityMapper;
 import com.zlt.aps.mp.demand.mapper.MpPredictionDetailEntityMapper;
@@ -903,10 +904,13 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             if (adjustVo == null) {
                 adjustVo = new FactoryMonthPlanProductionFinal4AdjustVo();
                 finalResultMap.put(entry.getKey(), adjustVo);
+                // 相同业务Key时以调整结果为准；调整独有数据转换为同一VO后追加返回。
+                BeanUtil.copyProperties(entry.getValue(), adjustVo);
+                fillDemandQty(adjustVo, demandPlanSumMap.get(buildDemandPlanSumMapKey(entry.getValue().getMonthPlanVersion(), entry.getValue().getMaterialCode())));
+            }else{
+                BeanUtil.copyProperties(entry.getValue(), adjustVo);
             }
-            // 相同业务Key时以调整结果为准；调整独有数据转换为同一VO后追加返回。
-            BeanUtil.copyProperties(entry.getValue(), adjustVo);
-            fillDemandQty(adjustVo, demandPlanSumMap.get(buildDemandPlanSumMapKey(entry.getValue().getMonthPlanVersion(), entry.getValue().getMaterialCode())));
+
         }
         List<FactoryMonthPlanProductionFinal4AdjustVo> resultList = new ArrayList<>(finalResultMap.values());
         if (CollectionUtils.isNotEmpty(resultList)) {
@@ -942,11 +946,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 .map(MpAdjustResult::getMaterialCode)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
-        Set<String> monthPlanVersionSet = mpAdjustResultList.stream()
-                .map(MpAdjustResult::getVersion)
-                .filter(StringUtils::isNotBlank)
-                .collect(Collectors.toSet());
-        if (CollectionUtils.isEmpty(materialCodeSet) || CollectionUtils.isEmpty(monthPlanVersionSet)) {
+        String lastMonthPlanVersion = mpAdjustResultList.get(0).getMonthPlanVersion();
+        if (CollectionUtils.isEmpty(materialCodeSet) || StringUtil.isEmptyWithTrim(lastMonthPlanVersion)) {
             return Collections.emptyMap();
         }
         LambdaQueryWrapper<DpDemandPlanSum> queryWrapper = new LambdaQueryWrapper<>();
@@ -954,7 +955,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         queryWrapper.eq(DpDemandPlanSum::getYear, condition.getYear());
         queryWrapper.eq(DpDemandPlanSum::getMonth, condition.getMonth());
         queryWrapper.in(DpDemandPlanSum::getMaterialCode, materialCodeSet);
-        queryWrapper.in(DpDemandPlanSum::getMonthPlanVersion, monthPlanVersionSet);
+        queryWrapper.eq(DpDemandPlanSum::getMonthPlanVersion, lastMonthPlanVersion);
         queryWrapper.eq(DpDemandPlanSum::getIsDelete, YesOrNoEnum.NO.getCode());
         List<DpDemandPlanSum> demandPlanSumList = dpDemandPlanSumEntityMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(demandPlanSumList)) {
