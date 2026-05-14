@@ -120,8 +120,6 @@ export default {
           minWidth: 140,
           align: "center",
         },
-        { label: this.$t("工单号"), prop: "orderNo", align: "center", minWidth: 180 },
-        { label: this.$t("成型批次号"), prop: "cxBatchNo", align: "center", minWidth: 150 },
       ];
 
       const shiftColumns = Array.from({ length: SHIFT_COUNT }, (_, idx) => {
@@ -136,7 +134,12 @@ export default {
         };
       });
 
-      return [...fixedColumns, ...shiftColumns];
+      const trailingColumns = [
+        { label: this.$t("工单号"), prop: "orderNo", align: "center", minWidth: 180 },
+        { label: this.$t("成型批次号"), prop: "cxBatchNo", align: "center", minWidth: 150 },
+      ];
+
+      return [...fixedColumns, ...shiftColumns, ...trailingColumns];
     },
     searchColumns() {
       return [
@@ -274,12 +277,9 @@ export default {
         },
       };
     },
-    getShiftFromProp(prop) {
-      const matched = /^class(\d+)(PlanQty|StockHours|Sequence)$/.exec(prop);
-      return matched ? Number(matched[1]) : null;
-    },
     canEditField(row, prop) {
-      return !!this.getShiftFromProp(prop);
+      // 班次计划量、库存时长、顺位仅展示，不允许编辑
+      return false;
     },
     buildEditableSnapshot(row) {
       const snapshot = {};
