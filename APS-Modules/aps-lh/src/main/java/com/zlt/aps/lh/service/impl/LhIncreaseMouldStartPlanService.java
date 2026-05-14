@@ -36,7 +36,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * 换模开产增加计划服务。
+ * 计划更新服务。
  * <p>负责校验模具交替计划完成状态，并在完成后回写当前排程记录中班及后续班次计划量。</p>
  *
  * @author Codex
@@ -76,7 +76,7 @@ public class LhIncreaseMouldStartPlanService {
     private MdmSkuConstructionRefEntityMapper mdmSkuConstructionRefEntityMapper;
 
     /**
-     * 换模开产增加计划。
+     * 计划更新。
      *
      * @param scheduleResult 前端传入的当前排程结果
      * @return 处理结果

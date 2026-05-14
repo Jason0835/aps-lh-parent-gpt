@@ -1,4 +1,4 @@
-import request,{ downloadLink } from '@/utils/request'
+import request, {downloadLink} from '@/utils/request'
 
 /**
  * 根据条件查询硫化排程结果列表
@@ -357,7 +357,7 @@ export function adjustTextNo(query) {
 }
 
 /**
- * 生成文字示方换模计划
+ * 文字示方更新
  * @param {*} query
  * @returns
  */
@@ -373,7 +373,7 @@ export function generateTextMouldChangePlan(query) {
 }
 
 /**
- * 换模开产增加计划
+ * 计划更新
  * @param {*} query
  * @returns
  */

@@ -9,11 +9,11 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.lh.api.domain.dto.*;
-import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
 import com.zlt.aps.lh.api.service.ILhScheduleResultRemoteService;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -23,14 +23,6 @@ import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
@@ -265,13 +257,13 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     }
 
     /**
-     * 生成文字示方换模计划
+     * 文字示方更新
      *
      * @param dto 生成入参
      * @return 处理结果
      */
     @RequiresPermissions("lh:lhScheduleResult:generateTextPlan")
-    @ApiOperation("生成文字示方换模计划")
+    @ApiOperation("文字示方更新")
     @PostMapping("/generateTextMouldChangePlan")
     @ResponseBody
     public AjaxResult generateTextMouldChangePlan(@RequestBody LhGenerateTextMouldPlanDTO dto) {
@@ -279,13 +271,13 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     }
 
     /**
-     * 换模开产增加计划
+     * 计划更新
      *
      * @param scheduleResult 当前硫化排程结果
      * @return 处理结果
      */
     @RequiresPermissions("lh:lhScheduleResult:increaseMouldStartPlan")
-    @ApiOperation("换模开产增加计划")
+    @ApiOperation("计划更新")
     @PostMapping("/increaseMouldStartPlan")
     @ResponseBody
     public AjaxResult increaseMouldStartPlan(@RequestBody LhScheduleResult scheduleResult) {

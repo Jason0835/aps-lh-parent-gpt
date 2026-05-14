@@ -5,14 +5,13 @@ import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.lh.api.domain.dto.*;
-import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
-import com.zlt.aps.lh.api.domain.dto.LhTransferDeskDTO;
 
 import java.util.List;
 
@@ -115,22 +114,22 @@ public interface ILhScheduleResultRemoteService {
     AjaxResult adjustTextNo(@RequestBody LhTransferDeskDTO dto);
 
     /**
-     * 生成文字示方换模计划
+     * 文字示方更新
      *
      * @param dto 生成入参
      * @return 处理结果
      */
-    @ApiOperation("生成文字示方换模计划")
+    @ApiOperation("文字示方更新")
     @PostMapping("/lhScheduleResult/generateTextMouldChangePlan")
     AjaxResult generateTextMouldChangePlan(@RequestBody LhGenerateTextMouldPlanDTO dto);
 
     /**
-     * 换模开产增加计划
+     * 计划更新
      *
      * @param scheduleResult 当前硫化排程结果
      * @return 处理结果
      */
-    @ApiOperation("换模开产增加计划")
+    @ApiOperation("计划更新")
     @PostMapping("/lhScheduleResult/increaseMouldStartPlan")
     AjaxResult increaseMouldStartPlan(@RequestBody LhScheduleResult scheduleResult);
 
