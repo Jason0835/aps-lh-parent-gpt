@@ -769,6 +769,13 @@ export default {
   },
   methods: {
     async handleBaseQueryChange() {
+      const pt = this.$refs.monthPlanPageTableRef;
+      const searchRef = pt && pt.$refs && pt.$refs.searchRef;
+      if (searchRef && typeof searchRef.getValues === "function") {
+        const vals = searchRef.getValues();
+        this.search = { ...this.search, ...vals };
+        this.query = { ...this.query, ...vals };
+      }
       await this.loadVersionOptions();
       this.fetchCurrentAdjustMachineFromRedis();
     },
