@@ -221,6 +221,14 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     private Integer class1FinishQty;
 
     /**
+     * 1班示方类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class1MouldMethod", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "1班示方类型", name = "class1MouldMethod")
+    @TableField(value = "CLASS1_MOULD_METHOD")
+    private String class1MouldMethod;
+
+    /**
      * 2班计划量
      */
     @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class2PlanQty")
@@ -259,6 +267,14 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     @ApiModelProperty(value = "2班完成量", name = "class2FinishQty")
     @TableField(value = "CLASS2_FINISH_QTY")
     private Integer class2FinishQty;
+
+    /**
+     * 2班示方类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class2MouldMethod", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "2班示方类型", name = "class2MouldMethod")
+    @TableField(value = "CLASS2_MOULD_METHOD")
+    private String class2MouldMethod;
 
     /**
      * 3班计划量
@@ -301,6 +317,14 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     private Integer class3FinishQty;
 
     /**
+     * 3班示方类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class3MouldMethod", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "3班示方类型", name = "class3MouldMethod")
+    @TableField(value = "CLASS3_MOULD_METHOD")
+    private String class3MouldMethod;
+
+    /**
      * 4班计划量
      */
     @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class4PlanQty")
@@ -339,6 +363,14 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     @ApiModelProperty(value = "4班完成量", name = "class4FinishQty")
     @TableField(value = "CLASS4_FINISH_QTY")
     private Integer class4FinishQty;
+
+    /**
+     * 4班示方类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class4MouldMethod", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "4班示方类型", name = "class4MouldMethod")
+    @TableField(value = "CLASS4_MOULD_METHOD")
+    private String class4MouldMethod;
 
     /**
      * 5班计划量
@@ -381,6 +413,14 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     private Integer class5FinishQty;
 
     /**
+     * 5班示方类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class5MouldMethod", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "5班示方类型", name = "class5MouldMethod")
+    @TableField(value = "CLASS5_MOULD_METHOD")
+    private String class5MouldMethod;
+
+    /**
      * 6班计划量
      */
     @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class6PlanQty")
@@ -419,6 +459,14 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     @ApiModelProperty(value = "6班完成量", name = "class6FinishQty")
     @TableField(value = "CLASS6_FINISH_QTY")
     private Integer class6FinishQty;
+
+    /**
+     * 6班示方类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class6MouldMethod", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "6班示方类型", name = "class6MouldMethod")
+    @TableField(value = "CLASS6_MOULD_METHOD")
+    private String class6MouldMethod;
 
     /**
      * 7班计划量
@@ -461,6 +509,14 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     private Integer class7FinishQty;
 
     /**
+     * 7班示方类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class7MouldMethod", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "7班示方类型", name = "class7MouldMethod")
+    @TableField(value = "CLASS7_MOULD_METHOD")
+    private String class7MouldMethod;
+
+    /**
      * 8班计划量
      */
     @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class8PlanQty")
@@ -499,6 +555,14 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     @ApiModelProperty(value = "8班完成量", name = "class8FinishQty")
     @TableField(value = "CLASS8_FINISH_QTY")
     private Integer class8FinishQty;
+
+    /**
+     * 8班示方类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class8MouldMethod", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "8班示方类型", name = "class8MouldMethod")
+    @TableField(value = "CLASS8_MOULD_METHOD")
+    private String class8MouldMethod;
 
     /**
      * 是否交期，0--否，1--是
