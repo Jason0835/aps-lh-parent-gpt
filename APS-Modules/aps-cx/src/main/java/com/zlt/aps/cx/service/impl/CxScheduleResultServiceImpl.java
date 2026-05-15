@@ -290,7 +290,24 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // Sheet 1: 成型日计划
         Map<String, Object> planTableMap = buildCxTemplateTableMap(exportList);
         List<List<Map<String, Object>>> planDataList = new ArrayList<>();
-        planDataList.add(buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap));
+        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap);
+        planDataList.add(planRows);
+
+        // 为小计行添加 DAEEF3 背景色标识
+        List<CellStyle> subtotalCellStyleList = new ArrayList<>();
+        int templateListStartRow = 4;
+        for (int i = 0; i < planRows.size(); i++) {
+            if ("小计".equals(planRows.get(i).get("cxMachineCode"))) {
+                subtotalCellStyleList.add(new CellStyle(
+                        templateListStartRow + i, templateListStartRow + i,
+                        0, 59,
+                        "#DAEEF3", true));
+            }
+        }
+        if (!subtotalCellStyleList.isEmpty()) {
+            planTableMap.put("CELL_STYLE", subtotalCellStyleList);
+        }
+
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes = ExcelUtils.writeMultiList(inputStream, 1, planTableMap, planDataList);
 
