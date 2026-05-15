@@ -48,6 +48,7 @@
             plain
             v-hasPermi="['lh:lhMouldChangePlan:issue']"
             @click="handleIssueSchedule"
+            :disabled="!canIssueSchedule"
           >{{ $t("ui.data.btn.lhMouldChangePlan.issueSchedule") }}</el-button>
        </template>
     </page-table>
@@ -65,7 +66,7 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listLhMouldChangePlan, removeLhMouldChangePlan, issueScheduleByQuery } from "@/api/lh/lhMouldChangePlan";
+import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule } from "@/api/lh/lhMouldChangePlan";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -383,7 +384,9 @@ export default {
         },
       ];
     },
-
+    canIssueSchedule() {
+      return this.selection && this.selection.length > 0;
+    },
   },
   methods: {
     getTodayDate() {
@@ -494,15 +497,30 @@ export default {
             }
         },
         handleIssueSchedule() {
-            if (!this.data || this.data.length === 0) {
-                this.$modal.msgWarning(this.$t("ui.data.alert.lhMouldChangePlan.noData"));
+            const hasSelection = this.selection && this.selection.length > 0;
+            if (!hasSelection) {
+                this.$modal.msgWarning(this.$t("ui.data.alert.lhMouldChangePlan.noSelection"));
+                return;
+            }
+
+            // 校验勾选记录是否包含历史记录（排程日期早于当前日期）
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const historyRecords = this.selection.filter(item => {
+                if (!item.scheduleDate) return false;
+                const scheduleDate = new Date(item.scheduleDate);
+                scheduleDate.setHours(0, 0, 0, 0);
+                return scheduleDate.getTime() < today.getTime();
+            });
+            if (historyRecords.length > 0) {
+                this.$modal.msgWarning(this.$t("ui.data.alert.lhMouldChangePlan.hasHistoryData"));
                 return;
             }
 
             this.$confirm(this.$t("ui.data.alert.lhMouldChangePlan.issueConfirm"), {
                 type: "warning",
             }).then(() => {
-                issueScheduleByQuery(this.formatParams(false)).then((res) => {
+                issueSchedule(this.selection.map((item) => item.id)).then((res) => {
                     this.$modal.msgSuccess(res.msg);
                     this.$set(this.page, "current", 1);
                     this.getList();

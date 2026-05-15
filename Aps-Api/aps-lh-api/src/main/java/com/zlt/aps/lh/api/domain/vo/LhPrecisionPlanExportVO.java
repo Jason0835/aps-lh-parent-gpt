@@ -36,6 +36,10 @@ public class LhPrecisionPlanExportVO extends BaseEntity implements Serializable 
     @ApiModelProperty(value = "机台编号")
     private String machineCode;
 
+    @Excel(name = "ui.data.column.lhPrecisionPlan.mainMaterialCode")
+    @ApiModelProperty(value = "胎胚编码")
+    private String mainMaterialCode;
+
     @Excel(name = "ui.data.column.lhPrecisionPlan.precisionType")
     @ApiModelProperty(value = "精度类型")
     private String precisionType;

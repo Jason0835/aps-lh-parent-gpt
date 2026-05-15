@@ -146,6 +146,7 @@ export default {
               <materialCodeSelect
                 key={form.materialCode}
                 v-model={form.materialCode}
+                scheduleDate={form.scheduleDate}
                 onChange={this.handleMaterialCodeChange}
               />
             );

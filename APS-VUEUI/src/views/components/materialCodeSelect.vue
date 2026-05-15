@@ -56,6 +56,7 @@ export default {
       default: false,
     },
     oldList: Array | [],
+    scheduleDate: String,
   },
   data() {
     return {
@@ -229,13 +230,16 @@ export default {
     },
     //
     formatParams() {
-      return {
+      const params = {
         pageSize: this.page.pageSize,
         pageNum: this.page.current,
         ...this.query,
-        // userName: this.filterKey,
-        status: 0, //过滤，只显示启用的用户
+        status: 0,
       };
+      if (this.scheduleDate) {
+        params.scheduleDate = this.scheduleDate;
+      }
+      return params;
     },
     getTitle() {
       return this.title

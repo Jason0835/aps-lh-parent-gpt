@@ -115,6 +115,13 @@ public interface MonthProductionDataService {
     void saveMouldUsedLog(List<MpMouldUsedStatusLog> usedLogList);
 
     /**
+     * 保存Sku模具产能受限日志信息
+     *
+     * @param skuMoldCapacityLogList
+     */
+    void saveMoldCapacityLog(List<MpSkuMoldCapacityAllocateLog> skuMoldCapacityLogList);
+
+    /**
      * 获取分厂在指定年份、月份的不排产物料信息，并按物料分组
      *
      * @param factoryCode

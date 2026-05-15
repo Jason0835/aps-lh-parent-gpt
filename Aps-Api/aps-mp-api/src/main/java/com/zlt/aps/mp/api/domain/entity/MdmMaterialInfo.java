@@ -381,6 +381,13 @@ public class MdmMaterialInfo extends BaseEntity {
     private BigDecimal oeGrossRate;
 
     /**
+     * 排程日期，用于关联月计划定稿数据过滤物料
+     */
+    @ApiModelProperty(value = "排程日期，用于关联月计划定稿数据过滤物料", name = "scheduleDate")
+    @TableField(exist = false)
+    private String scheduleDate;
+
+    /**
      * 是否查询轮胎类型空数据，0-否，1-是
      */
     @ApiModelProperty(value = "是否查询轮胎类型空数据，0-否，1-是", name = "isTireTypeNullData")

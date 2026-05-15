@@ -63,7 +63,7 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
     public TableDataInfo list(@RequestBody LhPrecisionPlan queryVO) {
         QueryWrapper<LhPrecisionPlan> queryWrapper = new QueryWrapper<>();
         this.builderCondition(queryWrapper, queryVO);
-        PageUtils.startPage(true, "UPDATE_TIME desc, MACHINE_CODE asc");
+        PageUtils.startPage(true, "PLAN_DATE asc");
         List<LhPrecisionPlan> list = lhPrecisionPlanMapper.selectList(queryWrapper);
         PageUtils.clearPage();
         return getDataTable(list);

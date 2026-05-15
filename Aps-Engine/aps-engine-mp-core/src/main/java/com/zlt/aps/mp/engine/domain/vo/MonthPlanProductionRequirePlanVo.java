@@ -128,6 +128,10 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
      * 20260430+ 是否先高优先级排产
      */
     private Integer isPriorityHeight;
+    /**
+     * 20260515+ 原计划的原始数量信息对象
+     */
+    private RequirePlanOriginalVo originalRequirePlan;
 
     /**
      * 根据需求Sku构建虚拟的续作计划对象
@@ -160,6 +164,16 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
         productionQty = cxCapacityRequireQty;
         originHeightProductionQty = heightProductionQty;
         originProductionQty = productionQty;
+        //记录原始数据，分摊
+        RequirePlanOriginalVo originalData = new RequirePlanOriginalVo();
+        originalData.setHeightProductionQty(originHeightProductionQty);
+        originalData.setProductionQty(originProductionQty);
+        originalData.setHeightQty(getHeightQty());
+        originalData.setMidQty(getMidQty());
+        originalData.setPostponeQty(getPostponeQty());
+        originalData.setCycleReserveQty(getCycleReserveQty());
+        originalData.setConventionReserveQty(getConventionReserveQty());
+        originalRequirePlan = originalData;
     }
 
     /**
