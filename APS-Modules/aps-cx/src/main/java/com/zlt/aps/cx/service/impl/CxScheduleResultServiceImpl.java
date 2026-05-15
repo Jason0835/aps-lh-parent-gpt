@@ -39,14 +39,12 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -253,11 +251,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     /**
-     * 导出成型余量数据（含三个Sheet页：成型余量 + 成型计划明细 + 成型结构切换）。
-     * 填充模式：
-     *   1. 以成型计划主表模板(cxjhtemplate.xlsx)为基体，writeMultiList填充后作为最终工作簿
-     *   2. 成型余量模板(cxyl.xlsx)独立填充后，通过copySheet合并到基体，setSheetOrder移到第一位
-     *   3. 成型结构切换模板(cxStructureChangeExportTemp.xlsx)独立填充后，通过copySheet追加到基体末尾
+     * 导出成型余量数据（含多个Sheet页：成型余量 + 成型日计划 + 硫化产量 + 成型结构切换等）。
+     * 填充模式与 LH 模块一致：使用 CxExport.xlsx 统一多Sheet模板，
+     * 依次调用 writeMultiList 写入各 sheetIndex，保留模板原始样式。
      *
      * @param queryVO 查询条件，按成型排程结果列表查询口径筛选数据
      * @param fileName 导出文件名，保留用于对齐远程调用契约
@@ -266,78 +262,54 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     @Override
     public byte[] exportCxRemainQty(CxScheduleResult queryVO, String fileName) {
         List<CxScheduleResult> list = cxScheduleResultMapper.selectList(buildCxRemainQtyQueryWrapper(queryVO));
+        List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
-        // 第一步：以成型计划主表模板为基体，writeMultiList填充后作为最终工作簿
-        XSSFWorkbook finalWorkbook = buildFinalWorkbookFromTemplate(list);
-
-        // 第二步：成型余量模板独立填充后，copySheet合并到基体，setSheetOrder移到第一位
-        byte[] firstSheetBytes = buildFirstSheetBytes(list);
-        try {
-            XSSFWorkbook firstWorkbook = new XSSFWorkbook(new ByteArrayInputStream(firstSheetBytes));
-            ExcelUtils.copySheet(firstWorkbook, 0, finalWorkbook);
-            finalWorkbook.setSheetOrder(finalWorkbook.getSheetName(finalWorkbook.getNumberOfSheets() - 1), 0);
-            firstWorkbook.close();
-        } catch (Exception e) {
-            throw new ServiceException("合并成型余量Sheet失败", e);
+        InputStream inputStream = this.getClass().getClassLoader()
+                .getResourceAsStream("excelModel/CxExport.xlsx");
+        if (Objects.isNull(inputStream)) {
+            throw new ServiceException("成型导出模板不存在");
         }
 
-        // 第三步：成型结构切换模板独立填充后，copySheet追加到基体末尾（成型计划主表后面）
-        byte[] thirdSheetBytes = buildStructureChangeSheetBytes(queryVO);
-        try {
-            XSSFWorkbook thirdWorkbook = new XSSFWorkbook(new ByteArrayInputStream(thirdSheetBytes));
-            ExcelUtils.copySheet(thirdWorkbook, 0, finalWorkbook);
-            // 设置第三个sheet名称为"成型结构切换"
-            int thirdSheetIndex = finalWorkbook.getNumberOfSheets() - 1;
-            finalWorkbook.setSheetName(thirdSheetIndex, "成型结构切换");
-            thirdWorkbook.close();
-        } catch (Exception e) {
-            throw new ServiceException("合并成型结构切换Sheet失败", e);
-        }
+        Map<String, String> recipeTypeMap = loadRecipeTypeDictMap();
 
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            finalWorkbook.write(out);
-            finalWorkbook.close();
-            return out.toByteArray();
-        } catch (Exception e) {
-            throw new ServiceException("导出Excel失败", e);
-        }
+        Date scheduleDate = exportList.stream()
+                .map(CxScheduleResult::getScheduleDate)
+                .filter(Objects::nonNull)
+                .max(Date::compareTo)
+                .orElse(DateUtil.date());
+
+        Map<String, BigDecimal> totalDailyPlanQtyMap = buildTotalDailyPlanQtyMap(exportList);
+        Map<String, BigDecimal> todayNightFinishQtyMap = buildTodayNightFinishQtyMap(exportList, scheduleDate);
+
+        // Sheet 0: 成型余量-按机台
+        Map<String, Object> remainQtyTableMap = new HashMap<>(16);
+        List<List<Map<String, Object>>> remainQtyDataList = new ArrayList<>();
+        remainQtyDataList.add(buildCxRemainQtyExportDataList(exportList));
+        byte[] exportBytes = ExcelUtils.writeMultiList(inputStream, 0, remainQtyTableMap, remainQtyDataList);
+
+        // Sheet 1: 成型日计划
+        Map<String, Object> planTableMap = buildCxTemplateTableMap(exportList);
+        List<List<Map<String, Object>>> planDataList = new ArrayList<>();
+        planDataList.add(buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap));
+        inputStream = new ByteArrayInputStream(exportBytes);
+        exportBytes = ExcelUtils.writeMultiList(inputStream, 1, planTableMap, planDataList);
+
+        // Sheet 7: 成型结构切换
+        Map<String, Object> structureTableMap = new HashMap<>();
+        List<List<Map<String, Object>>> structureDataList = buildStructureChangeSheetData(queryVO);
+        inputStream = new ByteArrayInputStream(exportBytes);
+        exportBytes = ExcelUtils.writeMultiList(inputStream, 7, structureTableMap, structureDataList);
+
+        return exportBytes;
     }
 
     /**
-     * 构建第一页（成型余量）数据。
-     * 填充模式：独立加载模板 → writeMultiList填充 → 返回byte[]
+     * 构建成型结构切换Sheet的数据列表（用于写入 CxExport.xlsx 的 Sheet 7）。
      *
-     * @param list 成型排程结果明细列表
-     * @return 成型余量Sheet的字节数组
+     * @param queryVO 查询条件
+     * @return 结构切换数据列表
      */
-    private byte[] buildFirstSheetBytes(List<CxScheduleResult> list) {
-        InputStream inputStream = this.getClass().getClassLoader()
-                .getResourceAsStream("excelModel/cxyl.xlsx");
-        if (Objects.isNull(inputStream)) {
-            throw new ServiceException("成型余量导出模板不存在");
-        }
-        Map<String, Object> tableMap = new HashMap<>(16);
-        List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-        excelDataList.add(buildCxRemainQtyExportDataList(list));
-        return ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
-    }
-
-    /**
-     * 构建第三页（成型结构切换）数据。
-     * 填充模式与buildFirstSheetBytes完全一致：独立加载模板 → writeMultiList填充 → 返回byte[]
-     * 逻辑来源于exportStructureChange方法，将结构切换数据填充到cxStructureChangeExportTemp.xlsx模板后返回字节数组，
-     * 供exportCxRemainQty方法通过copySheet合并到最终工作簿的第3个sheet。
-     *
-     * @param queryVO 查询条件，按成型排程结果列表查询口径筛选数据
-     * @return 成型结构切换Sheet的字节数组
-     */
-    private byte[] buildStructureChangeSheetBytes(CxScheduleResult queryVO) {
-        InputStream inputStream = this.getClass().getClassLoader()
-                .getResourceAsStream("excelModel/cxStructureChangeExportTemp.xlsx");
-        if (Objects.isNull(inputStream)) {
-            throw new ServiceException("成型结构切换导出模板不存在");
-        }
-
+    private List<List<Map<String, Object>>> buildStructureChangeSheetData(CxScheduleResult queryVO) {
         MpStructureAllocation structureQuery = buildStructureAllocationQuery(queryVO);
         TableDataInfo structureDataInfo = mpStructureAllocationRemoteService.list(structureQuery);
         List<MpStructureAllocation> structureList = structureDataInfo != null
@@ -345,9 +317,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 : Collections.emptyList();
 
         if (CollectionUtils.isEmpty(structureList)) {
-            List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-            excelDataList.add(new ArrayList<>());
-            return ExcelUtils.writeMultiList(inputStream, 0, new HashMap<>(), excelDataList);
+            List<List<Map<String, Object>>> emptyList = new ArrayList<>();
+            emptyList.add(new ArrayList<>());
+            return emptyList;
         }
 
         Map<String, List<MpStructureAllocation>> machineGroupMap = structureList.stream()
@@ -366,63 +338,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<Map<String, Object>> dataList = buildStructureChangeDataListV2(
                 machineGroupMap, scheduleDate);
 
-        Map<String, Object> tableMap = new HashMap<>();
-        List<CellStyle> cellStyleList = buildCellStyleListForStructureChange(dataList);
-        if (PubUtil.isNotEmpty(cellStyleList)) {
-            tableMap.put("CELL_STYLE", cellStyleList);
-        }
-
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         excelDataList.add(dataList);
-        return ExcelUtils.writeMultiList(inputStream, 0, tableMap, excelDataList);
-    }
-
-    /**
-     * 加载模板并通过占位符替换填充数据，返回最终工作簿。
-     * 参考 LH 导出模式：writeMultiList 会保留模板中的图片、隐藏列等属性。
-     */
-    private XSSFWorkbook buildFinalWorkbookFromTemplate(List<CxScheduleResult> list) {
-        InputStream templateInput = this.getClass().getClassLoader()
-                .getResourceAsStream("excelModel/cxjhtemplate.xlsx");
-        if (Objects.isNull(templateInput)) {
-            throw new ServiceException("成型计划模板不存在");
-        }
-        try {
-            List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
-
-            // 加载示方类型字典（biz_construction_stage），用于导出时 code → label 转义
-            Map<String, String> recipeTypeMap = loadRecipeTypeDictMap();
-
-            // 提取排程日期，用于 todayNightFinishQty 计算
-            Date scheduleDate = exportList.stream()
-                    .map(CxScheduleResult::getScheduleDate)
-                    .filter(Objects::nonNull)
-                    .max(Date::compareTo)
-                    .orElse(DateUtil.date());
-
-            // 查询 LH 排程结果，按 lhScheduleIds 汇总 totalDailyPlanQty
-            // key=lhScheduleIds逗号串, value=汇总后的总计划数量
-            Map<String, BigDecimal> totalDailyPlanQtyMap = buildTotalDailyPlanQtyMap(exportList);
-
-            // 查询 LH 日完成量和班次完成量表，按工厂+物料聚合 todayNightFinishQty
-            // key=工厂编码|物料编码, value=今天夜班完成量
-            Map<String, BigDecimal> todayNightFinishQtyMap = buildTodayNightFinishQtyMap(exportList, scheduleDate);
-
-            // 构建表头占位符数据（{shiftDate1}~{shiftDate8}、{yearmonthday}等）
-            Map<String, Object> tableMap = buildCxTemplateTableMap(exportList);
-
-            // 构建列表数据（按机台分组 + 小计行），key 对应模板中的 {.xxx} 占位符
-            List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
-            excelDataList.add(buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap));
-
-            // writeMultiList 读取模板 → 替换占位符 → 输出字节
-            byte[] bytes = ExcelUtils.writeMultiList(templateInput, 0, tableMap, excelDataList);
-            return new XSSFWorkbook(new ByteArrayInputStream(bytes));
-        } catch (ServiceException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ServiceException("生成成型计划Sheet失败", e);
-        }
+        return excelDataList;
     }
 
     /**
