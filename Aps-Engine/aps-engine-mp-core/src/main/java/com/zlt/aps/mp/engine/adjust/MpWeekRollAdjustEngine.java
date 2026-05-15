@@ -2822,7 +2822,7 @@ public class MpWeekRollAdjustEngine {
     private int getNearEndDay(int startDay, int endDay, FactoryMonthPlanFinalAdjustVo mpFinalVo){
         String dayField;
         int newEndDay = 0;
-        for (int i = startDay; i <= endDay; i++){
+        for (int i = FactoryConstant.MONTH_START_DAY; i <= endDay; i++){
             dayField = FactoryConstant.DAY_FIELD + i;
             if (mpFinalVo.getFieldValueByFieldName(dayField) != null &&
                     (Integer) mpFinalVo.getFieldValueByFieldName(dayField) != 0){
