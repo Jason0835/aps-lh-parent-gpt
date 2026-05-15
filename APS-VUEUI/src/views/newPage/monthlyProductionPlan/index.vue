@@ -650,7 +650,8 @@ export default {
                 ? ""
                 : String(row[prop]);
             if (!row.id) {
-              return <span>{text}</span>;
+              const isOver = row._overDays && row._overDays[prop];
+              return <span style={isOver ? { color: "red" } : {}}>{text}</span>;
             }
             return (
               <el-input
@@ -1444,6 +1445,7 @@ export default {
                 structureName: current.structureName,
                 showBackground: "light-blue",
                 materialCode: "硫化机台数",
+                _overDays: {},
               };
               for (let j = 1; j <= 31; j++) {
                 const key = `day${j}`;
@@ -1451,6 +1453,13 @@ export default {
                   const dayData = JSON.parse(statistList[s][key]);
                   embryoCount[key] = dayData.embryoCount;
                   lhMachines[key] = dayData.lhMachines;
+                  if (
+                    dayData.lhMachines != null &&
+                    dayData.maxLhMachines != null &&
+                    Number(dayData.lhMachines) > Number(dayData.maxLhMachines)
+                  ) {
+                    lhMachines._overDays[key] = true;
+                  }
                 }
               }
               result.push(embryoCount);
