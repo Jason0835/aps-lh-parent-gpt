@@ -904,7 +904,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         queryWrapper.eq(MpAdjustResult::getIsDelete, YesOrNoEnum.NO.getCode());
         List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
 
-        Map<String, DpDemandPlanSum> demandPlanSumMap = buildDemandPlanSumMap(condition, mpAdjustResultList);
+        Map<String, DpDemandPlanSum> demandPlanSumMap = buildDemandPlanSumMap(condition);
         Map<String, MpAdjustResult> mpAdjustResultMap = new LinkedHashMap<>();
         if (CollectionUtils.isNotEmpty(mpAdjustResultList)) {
             for (MpAdjustResult mpAdjustResult : mpAdjustResultList) {
@@ -918,11 +918,15 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 finalResultMap.put(entry.getKey(), adjustVo);
                 // 相同业务Key时以调整结果为准；调整独有数据转换为同一VO后追加返回。
                 BeanUtil.copyProperties(entry.getValue(), adjustVo);
-                fillDemandQty(adjustVo, demandPlanSumMap.get(buildDemandPlanSumMapKey(entry.getValue().getMonthPlanVersion(), entry.getValue().getMaterialCode())));
-            }else{
+            } else {
                 BeanUtil.copyProperties(entry.getValue(), adjustVo);
             }
-
+            MpAdjustResult value = entry.getValue();
+            String defaultVersion = StringUtils.defaultIfBlank(value.getVersion(), value.getProductionVersion());
+            fillDemandQty(adjustVo, demandPlanSumMap.get(buildDemandPlanSumMapKey(defaultVersion, entry.getValue().getMaterialCode())));
+            // 日硫化量固定*2
+            int dayVulcanizationQty = adjustVo.getDayVulcanizationQty() == null ? 0 : adjustVo.getDayVulcanizationQty();
+            adjustVo.setDayVulcanizationQty(dayVulcanizationQty * 2);
         }
         List<FactoryMonthPlanProductionFinal4AdjustVo> resultList = new ArrayList<>(finalResultMap.values());
         if (CollectionUtils.isNotEmpty(resultList)) {
@@ -1026,27 +1030,18 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * 批量查询调整结果对应的需求计划汇总数据，避免逐条查询数据库。
      *
      * @param condition          调整列表查询条件
-     * @param mpAdjustResultList 调整结果列表
      * @return 需求计划版本号和物料编码组成的需求计划汇总映射
      */
-    private Map<String, DpDemandPlanSum> buildDemandPlanSumMap(FactoryMonthPlanProductionFinalResult condition, List<MpAdjustResult> mpAdjustResultList) {
-        if (CollectionUtils.isEmpty(mpAdjustResultList)) {
-            return Collections.emptyMap();
-        }
-        Set<String> materialCodeSet = mpAdjustResultList.stream()
-                .map(MpAdjustResult::getMaterialCode)
-                .filter(StringUtils::isNotBlank)
-                .collect(Collectors.toSet());
-        String lastMonthPlanVersion = mpAdjustResultList.get(0).getMonthPlanVersion();
-        if (CollectionUtils.isEmpty(materialCodeSet) || StringUtil.isEmptyWithTrim(lastMonthPlanVersion)) {
+    private Map<String, DpDemandPlanSum> buildDemandPlanSumMap(FactoryMonthPlanProductionFinalResult condition) {
+        String matchVersion = StringUtils.defaultIfBlank(condition.getVersion(), condition.getProductionVersion());
+        if (StringUtil.isEmptyWithTrim(matchVersion)) {
             return Collections.emptyMap();
         }
         LambdaQueryWrapper<DpDemandPlanSum> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(DpDemandPlanSum::getFactoryCode, condition.getFactoryCode());
         queryWrapper.eq(DpDemandPlanSum::getYear, condition.getYear());
         queryWrapper.eq(DpDemandPlanSum::getMonth, condition.getMonth());
-        queryWrapper.in(DpDemandPlanSum::getMaterialCode, materialCodeSet);
-        queryWrapper.eq(DpDemandPlanSum::getMonthPlanVersion, lastMonthPlanVersion);
+        queryWrapper.eq(DpDemandPlanSum::getMonthPlanVersion, matchVersion);
         queryWrapper.eq(DpDemandPlanSum::getIsDelete, YesOrNoEnum.NO.getCode());
         List<DpDemandPlanSum> demandPlanSumList = dpDemandPlanSumEntityMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(demandPlanSumList)) {

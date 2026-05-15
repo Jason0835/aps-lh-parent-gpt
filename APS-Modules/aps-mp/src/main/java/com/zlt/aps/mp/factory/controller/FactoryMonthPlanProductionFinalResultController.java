@@ -68,7 +68,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StopWatch;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -155,7 +154,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
      */
     @ApiOperation("查询最终排产计划定稿-调整使用")
     @PostMapping("/list4Adjust")
-    public TableDataInfo list4Adjust(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition, HttpServletRequest request) {
+    public TableDataInfo list4Adjust(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition) {
         List<FactoryMonthPlanProductionFinal4AdjustVo> list = factoryMonthPlanProductionFinalResultService.list4Adjust(queryCondition);
         // 排序 按英寸->结构->最大型腔数->主花纹->活块数->物料描述
         mpWeekRollAdjustController.sortAdjustResultList(list);
