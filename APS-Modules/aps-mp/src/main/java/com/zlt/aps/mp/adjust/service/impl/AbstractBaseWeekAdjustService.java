@@ -969,6 +969,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (StringUtils.isNotEmpty(monthPlan.getProductTypeCode())) {
             productType = monthPlan.getProductTypeCode();
         }
+        if (StringUtils.isEmpty(contextDTO.getProductionVersion())){
+            contextDTO.setProductionVersion(monthPlan.getProductionVersion());
+        }
 
         contextDTO.setLogDetail(new StringBuilder());
         // 设置周程滚动参数
@@ -1031,14 +1034,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             weekRollAdjustEngine.initDayProductionInfo(contextDTO, dailyCapacityLimitVoMap);
             // 设置日产能限制Map
             contextDTO.setDailyCapacityLimitVoMap(ObjectUtils.defaultIfNull(dailyCapacityLimitVoMap, new HashMap<Integer, MpDailyCapacityLimitVo>()));
-            StringBuilder errorSb = new StringBuilder();
+            /*StringBuilder errorSb = new StringBuilder();
             for (FactoryMonthPlanFinalAdjustVo mpFinalVo : targetMonthPlanList){
                 //检查产能限
                 checkCapacityLimit(contextDTO, mpFinalVo, targetMonthPlanList, dailyCapacityLimitVoMap,errorSb);
-            }
-            if (!StringUtil.isEmptyWithTrim(errorSb.toString())){
+            }*/
+            /*if (!StringUtil.isEmptyWithTrim(errorSb.toString())){
                 throw new BusinessException(errorSb.toString());
-            }
+            }*/
             // 重算每日产能限制，包括硫化机台数、胎胚种类数、换模次数
             reCalcAdjustDailyCapacityLimit(contextDTO, targetMonthPlanList, adjustDailyCapacityLimitObj);
 
