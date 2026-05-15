@@ -296,7 +296,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         // Sheet 7: 成型结构切换
         Map<String, Object> structureTableMap = new HashMap<>();
-        List<List<Map<String, Object>>> structureDataList = buildStructureChangeSheetData(queryVO);
+        List<List<Map<String, Object>>> structureDataList = buildStructureChangeSheetData(queryVO, structureTableMap);
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes = ExcelUtils.writeMultiList(inputStream, 7, structureTableMap, structureDataList);
 
@@ -305,11 +305,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 构建成型结构切换Sheet的数据列表（用于写入 CxExport.xlsx 的 Sheet 7）。
+     * 同时将颜色标识（CELL_STYLE）写入 tableMap，供 writeMultiList 渲染单元格背景色。
      *
      * @param queryVO 查询条件
+     * @param tableMap 表头/样式数据容器，方法会向其中写入 CELL_STYLE
      * @return 结构切换数据列表
      */
-    private List<List<Map<String, Object>>> buildStructureChangeSheetData(CxScheduleResult queryVO) {
+    private List<List<Map<String, Object>>> buildStructureChangeSheetData(CxScheduleResult queryVO,
+                                                                          Map<String, Object> tableMap) {
         MpStructureAllocation structureQuery = buildStructureAllocationQuery(queryVO);
         TableDataInfo structureDataInfo = mpStructureAllocationRemoteService.list(structureQuery);
         List<MpStructureAllocation> structureList = structureDataInfo != null
@@ -337,6 +340,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         List<Map<String, Object>> dataList = buildStructureChangeDataListV2(
                 machineGroupMap, scheduleDate);
+
+        List<CellStyle> cellStyleList = buildCellStyleListForStructureChange(dataList);
+        if (PubUtil.isNotEmpty(cellStyleList)) {
+            tableMap.put("CELL_STYLE", cellStyleList);
+        }
 
         List<List<Map<String, Object>>> excelDataList = new ArrayList<>();
         excelDataList.add(dataList);
