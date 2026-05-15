@@ -63,7 +63,6 @@
             fin.TYPE_BLOCK_QTY,
             fin.DYNAMIC_BALANCE_QTY,
             fin.UNIFORMITY_QTY,
-            fin.HEIGHT_QTY,
             fin.AVERAGE_SALE_QTY,
             fin.INVENTORY_SALES_RATIO,
             fin.DAY_VULCANIZATION_QTY,

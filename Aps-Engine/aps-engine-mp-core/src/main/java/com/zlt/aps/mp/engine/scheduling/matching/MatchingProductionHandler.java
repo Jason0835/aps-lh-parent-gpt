@@ -2056,6 +2056,8 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                 }
                 // 2.1.2.2、构建当天的产能统计
                 MpDayProductionStatisticsDetailVo statisticsDetailVo = new MpDayProductionStatisticsDetailVo();
+                statisticsDetailVo.setMaxEmbryoTypes(daylyCapacityLimit.getMaxEmbryoTypes());
+                statisticsDetailVo.setMaxLhMachines(daylyCapacityLimit.getMaxLhMachines());
                 statisticsDetailVo.setEmbryoCount(daylyCapacityLimit.getEmbryoCodes().size());
                 statisticsDetailVo.setLhMachines(daylyCapacityLimit.getUsedLhMachines());
                 statisticsDetailVo.setChangeMould(daylyCapacityLimit.getUsedChangeMould());
