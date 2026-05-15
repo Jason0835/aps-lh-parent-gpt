@@ -52,7 +52,6 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
 
     /**
      * 从缓存中获取调整机台
-     * @param redisKey
      * @return
      */
     AdjustsCxMachineVo getAdjustsCxMachineFromRedis();

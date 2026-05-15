@@ -894,6 +894,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 2、查询调整明细
             queryAdjustDetailList(contextDTO);
             // 3、查询月度生产计划
+            if (StringUtil.isEmptyWithTrim(contextDTO.getProductionVersion())){
+                if (PubUtil.isNotEmpty(contextDTO.getAdjustResultList())){
+                    contextDTO.setProductionVersion(contextDTO.getAdjustResultList().get(0).getProductionVersion());
+                }
+            }
             queryMonthPlanList(contextDTO);
             // 4、更新试制量制计划
             updateTrialPlanList(contextDTO);
@@ -2432,7 +2437,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     private void queryAdjustResult(MpRollAdjustContextDTO contextDTO) {
         if (contextDTO.getMpYear() == null || contextDTO.getMpMonth() == null
-                || StringUtils.isEmpty(contextDTO.getVersion()) || StringUtils.isEmpty(contextDTO.getProductionVersion())) {
+                || StringUtils.isEmpty(contextDTO.getVersion()) ) {
             log.warn("查询周程调整结果：年份或者月份为空，直接返回");
             return;
         }
@@ -2445,23 +2450,23 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 版本
         String version = contextDTO.getVersion();
         // 排产版本
-        String productionVersion = contextDTO.getProductionVersion();
+        //String productionVersion = contextDTO.getProductionVersion();
 
         MpAdjustResult queryVO = new MpAdjustResult();
         queryVO.setFactoryCode(factoryCode);
         queryVO.setYear(year);
         queryVO.setMonth(month);
         queryVO.setVersion(version);
-        queryVO.setProductionVersion(productionVersion);
+        //queryVO.setProductionVersion(productionVersion);
 
         LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
         buildAdjustResultCondition(queryWrapper, queryVO);
 
         try {
             List<MpAdjustResult> resultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
-            if (Boolean.TRUE.equals(contextDTO.getFrontScheduledMachinesFlag())) {
+            /*if (Boolean.TRUE.equals(contextDTO.getFrontScheduledMachinesFlag())) {
                 resultList = WeekRollAdjustMachineCrossChecker.filterAdjustResultByMachine(resultList, contextDTO.getScheduledMachines());
-            }
+            }*/
             Set<String> structureNameSet = resultList.stream().map(x->x.getStructureName()).collect(Collectors.toSet());
             if (structureNameSet != null && structureNameSet.size() == 1){
                 //若调整结果只有一个结果，直接设置为当前结构
@@ -2540,8 +2545,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     private void queryMonthPlanList(MpRollAdjustContextDTO contextDTO) {
-        if (contextDTO.getMpYear() == null || contextDTO.getMpMonth() == null
-                || StringUtils.isEmpty(contextDTO.getProductionVersion())) {
+        if (contextDTO.getMpYear() == null || contextDTO.getMpMonth() == null) {
             log.warn("查询月度生产计划：年份或者月份为空，直接返回");
             return;
         }
@@ -2552,13 +2556,13 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 月份
         Integer month = contextDTO.getMpMonth();
         // 月度计划排产版本
-        String productionVersion = contextDTO.getProductionVersion();
+        //String productionVersion = contextDTO.getProductionVersion();
 
         FactoryMonthPlanProductionFinalResult queryVO = new FactoryMonthPlanProductionFinalResult();
         queryVO.setFactoryCode(factoryCode);
         queryVO.setYear(year);
         queryVO.setMonth(month);
-        queryVO.setProductionVersion(productionVersion);
+        //queryVO.setProductionVersion(productionVersion);
 
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = new LambdaQueryWrapper<>();
         buildMonthPlanCondition(queryWrapper, queryVO);
@@ -2568,7 +2572,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             List<FactoryMonthPlanFinalAdjustVo> resultList = BeanUtil.copyToList(factoryMonthPlanProdFinalList, FactoryMonthPlanFinalAdjustVo.class);
             contextDTO.setFactoryMonthPlanProdFinalList(resultList);
         } catch (Exception e) {
-            log.error("查询月度生产计划异常，年份：{}，月份：{}，版本：{}", year, month, productionVersion, e);
+            log.error("查询月度生产计划异常，年份：{}，月份：{}", year, month, e);
             throw new RuntimeException("查询月度生产计划失败", e);
         }
     }

@@ -17,6 +17,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingAdjuestProductionHandler;
@@ -32,6 +33,7 @@ import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
+import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +53,9 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
     @Autowired
     private IMpAdjustStructureOutService mpAdjustStructureOutService;
+
+    @Autowired
+    private IMpStructureAllocationService mpStructureAllocationService;
 
     @Autowired
     private MatchingAdjuestProductionHandler matchingAdjuestProductionHandler;
@@ -445,6 +450,15 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
                 //更新结构转产表对应成型机台的调整开始日、结束日
                 structureAllocation.setBeginDay(contextDTO.getAdjustStartDay());
                 structureAllocation.setEndDay(contextDTO.getAdjustEndDay());
+
+                //设置 机台缓存信息
+                AdjustsCxMachineVo adjustsCxMachineVo = new AdjustsCxMachineVo();
+                adjustsCxMachineVo.setCxMachineCode(structureAllocation.getCxMachineCode());
+                adjustsCxMachineVo.setStructureName(structureAllocation.getStructureName());
+                adjustsCxMachineVo.setBeginDay(structureAllocation.getBeginDay());
+                adjustsCxMachineVo.setEndDay(structureAllocation.getEndDay());
+                adjustsCxMachineVo.setVersion(contextDTO.getVersion());
+                mpStructureAllocationService.setAdjustsCxMachineFromRedis(adjustsCxMachineVo);
                 return;
             }
         }
