@@ -255,7 +255,6 @@ import {
   recalculateWeekRollAdjust,
   resultVersion,
   saveAdjustResult,
-  setAdjustsCxMachineFromRedis,
   statisticsResult
 } from "@/api/monthplan/adjustStructure";
 import structureAdjustDialog from "./components/structureAdjustDialog.vue";
@@ -1905,18 +1904,30 @@ export default {
           (res && res.msg) ||
             this.$t("common.msg.ajax.operation.success")
         );
-        await setAdjustsCxMachineFromRedis({
-          cxMachineCode: "",
-          structureName: "",
-          beginDay: null,
-          endDay: null,
-          version: "",
-        });
+        /** 成功后不主动清空 Redis 中的当前调整机台，便于继续结构调整 */
         if (this.$refs.structureAdjustDialogRef) {
           this.$refs.structureAdjustDialogRef.dialogVisible = false;
         }
         await this.getList();
         await this.fetchCurrentAdjustMachineFromRedis();
+        const machineTrim = (this.currentAdjustMachine || "").trim();
+        if (
+          machineTrim &&
+          this.$refs.structureAdjustDialogRef
+        ) {
+          const ym = this.query.yearMonth || this.search.yearMonth;
+          const fc = this.query.factoryCode || this.search.factoryCode || "116";
+          if (ym) {
+            this.$refs.structureAdjustDialogRef.show({
+              factoryCode: fc,
+              yearMonth: ym,
+              ...this.buildStructureDialogListVersionParams(),
+              prefillCxMachineCode: this.extractFirstCxMachineCode(
+                this.currentAdjustMachine
+              ),
+            });
+          }
+        }
       } catch (e) {
         console.error(e);
       } finally {
