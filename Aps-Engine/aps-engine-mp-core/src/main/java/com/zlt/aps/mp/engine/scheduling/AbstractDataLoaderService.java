@@ -158,12 +158,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         List<LhMachineInfo> lhMachineInfoList = productionContext.getBaseDataContainer().getLhMachineInfoList();
         Integer lhMachineCount = lhMachineInfoList.size();
         // 有配置单控机台的情况，需要扣减掉配置的有效硫化机台总数的一半
-        Set<String> singleControlLhMachineCode = productionContext.getBaseDataContainer().getParamConfiguration()
-                .getSingleControlLhMachineCode();
-        if (!CollectionUtils.isEmpty(singleControlLhMachineCode)) {
-            Set<String> lhMachineCodeSet = lhMachineInfoList.stream().map(LhMachineInfo::getMachineCode).distinct()
-                    .collect(Collectors.toSet()); // 硫化机台号集合
-            long singleControlMachineCount = singleControlLhMachineCode.stream().filter(lhMachineCodeSet::contains).count(); // 校验单控机台编号，只保留有效的
+        long singleControlMachineCount = lhMachineInfoList.stream().filter(m -> !Objects.equals(m.getMaxMoldNum(), ProductionConstant.DOUBLE_MOULD_PRODUCTION)).count();
+        if (singleControlMachineCount > 0) {
             int reduceMachineCount = BigDecimalUtils
                     .div(singleControlMachineCount, ProductionConstant.DOUBLE_MOULD_PRODUCTION, 4)
                     .setScale(0, RoundingMode.DOWN).intValue(); // 单控机台数的一半需要扣除掉（向下取整）
