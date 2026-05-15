@@ -39,6 +39,8 @@ public class ExcelStyleVo {
 
     private Short color;
 
+    private RgbColor rgbColor;
+
 
     public boolean getBold() {
         return bold;
@@ -49,4 +51,16 @@ public class ExcelStyleVo {
     }
 
 
+    @Data
+    public static class RgbColor {
+        private int red;
+        private int green;
+        private int blue;
+
+        public RgbColor(int red, int green, int blue) {
+            this.red = red;
+            this.green = green;
+            this.blue = blue;
+        }
+    }
 }

@@ -95,6 +95,13 @@ public class LhMouldChangePlanVo extends BaseEntity implements Serializable {
     @TableField(value = "CHANGE_MOULD_TYPE")
     private String changeMouldType;
 
+    /**
+     * 收尾类型（0-正常 1-收尾）
+     */
+    @ApiModelProperty(value = "收尾类型", name = "endType", notes = "0-正常 1-收尾")
+    @TableField(value = "END_TYPE")
+    private String endType;
+
     @ApiModelProperty(value = "换模类型")
     @Excel(name = "ui.data.column.lhMouldChangePlan.changeType", width = 25)
     @TableField(exist = false)

@@ -5,7 +5,6 @@ import com.zlt.aps.common.core.domain.BorderStyleVo;
 import com.zlt.aps.common.core.domain.ExcelCellRangeAddress;
 import com.zlt.aps.common.core.domain.ExcelImg;
 import com.zlt.aps.common.core.domain.ExcelStyleVo;
-
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -18,11 +17,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.URLEncoder;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -254,9 +249,20 @@ public class ExcelUtils {
                                     // 设置样式
 
                                     if(map.containsKey("style")){
+                                        // 为当前单元格创建独立样式，避免修改模板共享样式后导致其它行一起变色。
                                         CellStyle style = workbook.createCellStyle();
+                                        style.cloneStyleFrom(newCell.getCellStyle());
                                         //创建字体样式
                                         Font font = workbook.createFont();
+                                        Font oldFont = workbook.getFontAt(newCell.getCellStyle().getFontIndexAsInt());
+                                        if (oldFont != null) {
+                                            font.setFontName(oldFont.getFontName());
+                                            font.setBold(oldFont.getBold());
+                                            font.setFontHeightInPoints(oldFont.getFontHeightInPoints());
+                                            font.setColor(oldFont.getColor());
+                                            font.setItalic(oldFont.getItalic());
+                                            font.setUnderline(oldFont.getUnderline());
+                                        }
 
                                         //true为加粗，默认为不加粗
 
@@ -265,6 +271,9 @@ public class ExcelUtils {
                                         if (cellStyleObj != null) {
                                             String jsonStr = com.alibaba.fastjson.JSON.toJSONString(cellStyleObj);
                                             excelStyleVo = com.alibaba.fastjson.JSON.parseObject(jsonStr, com.zlt.aps.common.core.domain.ExcelStyleVo.class);
+                                        }
+                                        if (excelStyleVo == null) {
+                                            continue;
                                         }
 
                                         if(StringUtils.isNotEmpty(excelStyleVo.getFontName())){
@@ -311,11 +320,21 @@ public class ExcelUtils {
                                             style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
                                         }
                                         //设置居中
-                                        style.setAlignment(HorizontalAlignment.CENTER);
-                                        style.setVerticalAlignment(VerticalAlignment.CENTER);
+//                                        style.setAlignment(HorizontalAlignment.CENTER);
+//                                        style.setVerticalAlignment(VerticalAlignment.CENTER);
                                         //给单元格添加样式
                                         newCell.setCellStyle(style);
 
+                                        if(excelStyleVo.getRgbColor() != null) {
+                                            ExcelStyleVo.RgbColor rgbColor = excelStyleVo.getRgbColor();
+                                            XSSFCellStyle style1 = (XSSFCellStyle) style;
+                                            byte[] rgb = new byte[]{(byte) rgbColor.getRed(), (byte) rgbColor.getGreen(), (byte) rgbColor.getBlue()};
+                                            XSSFColor xssfColor = new XSSFColor(rgb, null);
+                                            style1.setFillForegroundColor(xssfColor);
+                                            style1.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+                                            newCell.setCellStyle(style1);
+                                        }
                                     }
 
 
@@ -810,7 +829,7 @@ public class ExcelUtils {
                 cellStyle.setVerticalAlignment(oldStyle.getVerticalAlignment());
                 cellStyle.setDataFormat(oldStyle.getDataFormat());
             }
-            
+
             // 修改字体样式
             if (bold || StringUtils.isNotEmpty(fontName)) {
                 Font font = workbook.createFont();
@@ -873,14 +892,14 @@ public class ExcelUtils {
         }
         return result.toString();
     }
-    
+
     /**
      * 将源工作簿中的指定Sheet，完整复制到目标工作簿中
      * @param sourceWorkbook 源工作簿
      * @param sheetIdex 要复制的Sheet下表下标，0开始
      * @param targetWorkbook 目标工作簿
      */
-    public static void copySheet(Workbook sourceWorkbook, int sheetIdex, 
+    public static void copySheet(Workbook sourceWorkbook, int sheetIdex,
                                  Workbook targetWorkbook) {
         // 1. 获取源Sheet
         Sheet sourceSheet = sourceWorkbook.getSheetAt(sheetIdex);
@@ -889,10 +908,10 @@ public class ExcelUtils {
         }
         // 样式映射表（工作簿级别）
         Map<Integer, CellStyle> styleMapping = new HashMap<>();
-        
+
         // 2. 在目标工作簿中创建新Sheet
         Sheet targetSheet = targetWorkbook.createSheet(sourceSheet.getSheetName());
-        
+
         // 3. 复制列宽（这一步能保证排版不错位）
         for (int i = 0; i <= sourceSheet.getLastRowNum(); i++) {
             Row sourceRow = sourceSheet.getRow(i);
@@ -900,7 +919,7 @@ public class ExcelUtils {
                 targetSheet.setColumnWidth(i, sourceSheet.getColumnWidth(i));
             }
         }
-        
+
         // 4. 复制行（包含行高、样式和值）
         for (int i = 0; i <= sourceSheet.getLastRowNum(); i++) {
             Row sourceRow = sourceSheet.getRow(i);
@@ -909,20 +928,20 @@ public class ExcelUtils {
                 targetSheet.createRow(i);
                 continue;
             }
-            
+
             Row targetRow = targetSheet.createRow(i);
             targetRow.setHeight(sourceRow.getHeight());
-            
+
             // 复制该行的所有单元格
             for (int j = 0; j < sourceRow.getLastCellNum(); j++) {
                 Cell sourceCell = sourceRow.getCell(j);
                 if (sourceCell == null) continue;
-                
+
                 Cell targetCell = targetRow.createCell(j);
                 copyCell(sourceCell, targetCell, sourceWorkbook, targetWorkbook, styleMapping);
             }
         }
-        
+
         // 5. 复制合并单元格区域
         for (int i = 0; i < sourceSheet.getNumMergedRegions(); i++) {
             CellRangeAddress region = sourceSheet.getMergedRegion(i);
@@ -964,7 +983,7 @@ public class ExcelUtils {
     /**
      * 复制单元格（处理值、样式、公式）
      */
-    private static void copyCell(Cell sourceCell, Cell targetCell, 
+    private static void copyCell(Cell sourceCell, Cell targetCell,
                                  Workbook sourceWorkbook, Workbook targetWorkbook, Map<Integer, CellStyle> styleMapping) {
         // 如果源单元格使用默认样式，直接跳过
         CellStyle sourceStyle = sourceCell.getCellStyle();
