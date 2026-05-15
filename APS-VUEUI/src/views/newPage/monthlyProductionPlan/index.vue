@@ -1813,7 +1813,7 @@ export default {
         adjustEndDay,
         structureName: this.currentAdjustStructure || "",
         scheduledMachines: (this.currentAdjustMachine || "").trim(),
-        adjustType: "01",
+        adjustType: "02",
         startDay: adjustStartDay,
         endDay: adjustEndDay,
       };
@@ -1845,7 +1845,7 @@ export default {
       if (!row) {
         return null;
       }
-      params.adjustType = "01";
+      params.adjustType = "02";
       params.version = row.version || this.query.version;
       params.productionVersion =
         row.productionVersion || this.query.version;
