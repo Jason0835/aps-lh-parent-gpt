@@ -301,7 +301,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 subtotalCellStyleList.add(new CellStyle(
                         templateListStartRow + i, templateListStartRow + i,
                         0, 59,
-                        "#DAEEF3", true));
+                        "#DAEEF3", true, true, null));
             }
         }
         if (!subtotalCellStyleList.isEmpty()) {
