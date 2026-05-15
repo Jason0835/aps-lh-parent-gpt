@@ -421,12 +421,20 @@ public class ExcelUtils {
                     for (com.zlt.aps.common.core.domain.CellStyle cs : cellStyleList) {
                         boolean bold = cs.getBold() != null ? cs.getBold() : false;
                         String fontName = cs.getFontName();
-                        CellStyle oldStyle = null;
-                        if (cs.getStartRowNum() <= sheet.getLastRowNum()) {
-                            oldStyle = sheet.getRow(cs.getStartRowNum()).getCell(cs.getStartCellNum()).getCellStyle(); // 加载原单元格
+                        for (int colIdx = cs.getStartCellNum(); colIdx <= cs.getEndCellNum(); colIdx++) {
+                            CellStyle oldStyle = null;
+                            if (cs.getStartRowNum() <= sheet.getLastRowNum()) {
+                                Row row = sheet.getRow(cs.getStartRowNum());
+                                if (row != null) {
+                                    Cell cell = row.getCell(colIdx);
+                                    if (cell != null) {
+                                        oldStyle = cell.getCellStyle();
+                                    }
+                                }
+                            }
+                            CellStyle style2 = createColorCellStyle(workbook, cs.getColor(), cs.getWithBorder(), bold, fontName, oldStyle);
+                            setCellRangeColor(sheet, cs.getStartRowNum(), colIdx, cs.getEndRowNum(), colIdx, style2);
                         }
-                        CellStyle style2 = createColorCellStyle(workbook, cs.getColor(), cs.getWithBorder(), bold, fontName, oldStyle);
-                        setCellRangeColor(sheet, cs.getStartRowNum(), cs.getStartCellNum(), cs.getEndRowNum(), cs.getEndCellNum(), style2);
                     }
                 }
             }
