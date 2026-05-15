@@ -1461,12 +1461,12 @@ export default {
       }
       return result;
     },
-    /** 统计行背景色（与 PageTable / 周程滚动一致） */
+    /** 统计行 / 调整标记行背景色（与 rollingCycle 结构内调整「调整结果」tableRowClassName 一致） */
     tableRowClassName({ row }) {
       if (row.showBackground) {
         return row.showBackground;
       }
-      if (row.adjustFlag === 1) {
+      if (row.adjustFlag == 1) {
         return "warning-row";
       }
       return "";
@@ -1998,5 +1998,32 @@ export default {
   align-items: center;
   gap: 12px;
   padding: 8px 0 4px;
+}
+
+/* 与 rollingCycle/index.vue「调整结果」表格行颜色一致（含固定列） */
+::v-deep .el-table__fixed,
+::v-deep .el-table__fixed-right {
+  background-color: #fff;
+}
+.el-table__fixed-body-wrapper .light-green > td,
+.el-table__fixed-right-body-wrapper .light-green > td {
+  background-color: #e2efda !important;
+}
+.el-table__fixed-body-wrapper .light-blue > td,
+.el-table__fixed-right-body-wrapper .light-blue > td {
+  background-color: #9bc2e6 !important;
+}
+.el-table__fixed-body-wrapper .warning-row > td,
+.el-table__fixed-right-body-wrapper .warning-row > td {
+  background-color: #ffcccc !important;
+}
+::v-deep .light-green {
+  background-color: #e2efda !important;
+}
+::v-deep .light-blue {
+  background-color: #9bc2e6 !important;
+}
+::v-deep .warning-row {
+  background-color: #ffcccc !important;
 }
 </style>
