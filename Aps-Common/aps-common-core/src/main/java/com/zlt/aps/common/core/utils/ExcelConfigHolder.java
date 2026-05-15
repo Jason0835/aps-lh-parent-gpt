@@ -2,6 +2,7 @@ package com.zlt.aps.common.core.utils;
 
 import javax.annotation.PostConstruct;
 
+import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,7 @@ public class ExcelConfigHolder {
     
     @PostConstruct
     public void init() {
+        ZipSecureFile.setMinInflateRatio(Double.MIN_VALUE); // 跳过poi的解压倍数校验
         HEAD_GROUND_COLOR = this.headGroundColor;
         FONT_NAME = this.fontName;
         FONT_HEIGHT_IN_POINTS = this.fontHeightInPoints;

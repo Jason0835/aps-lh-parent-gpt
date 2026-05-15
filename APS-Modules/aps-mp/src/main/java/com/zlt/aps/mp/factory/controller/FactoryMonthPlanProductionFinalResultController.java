@@ -59,7 +59,6 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
@@ -312,7 +311,6 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
 //        importLog.setId(-99L);
         ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(fileBytes, importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
         importLog = this.iImportLogService.add(importLog);
-        ZipSecureFile.setMinInflateRatio(Double.MIN_VALUE); // 跳过poi的解压倍数校验
         try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
             Sheet sheet = wb.getSheetAt(0); // 取第一个页签
             ExcelUtil<FactoryMonthPlanProductionFinalResult> util4DayResult = new ExcelUtil<>(FactoryMonthPlanProductionFinalResult.class);

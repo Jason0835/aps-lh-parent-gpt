@@ -21,12 +21,10 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
@@ -47,7 +45,6 @@ import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -341,7 +338,6 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         String[] params4DayResult;
         String monthPlanVersion;
         String productVersion = "I" + DateUtils.dateTimeNow();
-        ZipSecureFile.setMinInflateRatio(Double.MIN_VALUE); // 跳过poi的解压倍数校验
         try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
             Sheet sheet = wb.getSheet(sheetName);
             if (sheet == null || sheet.getRow(0) == null) {
