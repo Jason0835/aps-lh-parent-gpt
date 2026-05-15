@@ -62,6 +62,7 @@ import { listSharedMouldPat, removeSharedMouldPat } from "@/api/lh/sharedMouldPa
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
+
 export default {
   name: "LhSharedMouldPat",
   components: {
