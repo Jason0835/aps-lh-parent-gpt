@@ -34,6 +34,7 @@ import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 
 import { editSharedMouldPat, checkUniqueSharedMouldPat } from "@/api/lh/sharedMouldPat";
 
+
 export default {
   components: { infoForm, materialCodeSelect },
   inject: ["parentDict"],

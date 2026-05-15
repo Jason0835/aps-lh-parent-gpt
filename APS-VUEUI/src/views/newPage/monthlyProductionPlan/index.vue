@@ -1871,18 +1871,6 @@ export default {
         return null;
       }
       const payload = this.buildWeekRollConfirmPayload();
-      if (
-        !payload ||
-        payload.version == null ||
-        payload.version === ""
-      ) {
-        this.$modal.msgWarning(
-          this.$t(
-            "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedVersion"
-          )
-        );
-        return null;
-      }
       return payload;
     },
     async handleConfirmAdjust() {
@@ -1897,14 +1885,6 @@ export default {
         this.$modal.msgWarning(
           this.$t(
             "ui.data.column.monthPlanFinalAdjustQuery.pleaseSelectYearMonth"
-          )
-        );
-        return;
-      }
-      if (!payload.version) {
-        this.$modal.msgWarning(
-          this.$t(
-            "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedVersion"
           )
         );
         return;
@@ -1951,14 +1931,6 @@ export default {
       if (!machineTrim || !structureTrim) {
         const version =
           this.currentAdjustMonthPlanVersion || this.query.version;
-        if (version == null || version === "") {
-          this.$modal.msgWarning(
-            this.$t(
-              "ui.data.column.monthPlanFinalAdjustQuery.confirmNeedVersion"
-            )
-          );
-          return;
-        }
         /** 优先当前调整结构，否则用查询条件产品结构 structureName，再无则传空 */
         const structureNameForRecalculate =
           structureTrim ||

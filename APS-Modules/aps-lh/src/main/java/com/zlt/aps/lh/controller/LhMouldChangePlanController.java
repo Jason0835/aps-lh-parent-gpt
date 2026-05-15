@@ -50,6 +50,10 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -414,7 +418,14 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFactoryCode()), "FACTORY_CODE", queryVO.getFactoryCode());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getLhResultBatchNo()), "LH_RESULT_BATCH_NO", queryVO.getLhResultBatchNo());
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getOrderNo()), "ORDER_NO", queryVO.getOrderNo());
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getPlanDate()), "PLAN_DATE", queryVO.getPlanDate());
+        if (PubUtil.isNotEmpty(queryVO.getPlanDate())) {
+            LocalDate localDate = queryVO.getPlanDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            // 计算出当天的起始和结束时刻
+            LocalDateTime startOfDay = localDate.atStartOfDay();
+            LocalDateTime endOfDay = localDate.atTime(LocalTime.MAX);
+            queryWrapper.between("PLAN_DATE", startOfDay, endOfDay);
+        }
+
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getPlanOrder()), "PLAN_ORDER", queryVO.getPlanOrder());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getScheduleDate()), "SCHEDULE_DATE", queryVO.getScheduleDate());
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getLeftRightMould()), "LEFT_RIGHT_MOULD", queryVO.getLeftRightMould());
