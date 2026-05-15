@@ -2256,11 +2256,7 @@ export default {
         const raw = await autoAdjust(params);
         const list = this.normalizeAutoAdjustResponse(raw);
         console.log("autoAdjust", raw, list);
-        this.data = list;
-        this.show = true;
-        this.loading = false;
-        this.autoLoading = false;
-        /** 结构内独立页：自动调整成功后关闭当前页签并回到月计划调整查询；版本号、结构与页头查询区、表单一致 */
+        /** 结构内独立页：closeOpenPage 之前勿改 data/show，避免表格随 list 重绘闪屏 */
         if (this.pageVariant === "structureInner") {
           const queryExtra = {};
           const structureName =
@@ -2282,8 +2278,14 @@ export default {
           this.$tab.closeOpenPage(
             this.getMonthPlanFinalAdjustQueryRoute(queryExtra)
           );
+          this.loading = false;
+          this.autoLoading = false;
           return;
         }
+        this.data = list;
+        this.show = true;
+        this.loading = false;
+        this.autoLoading = false;
         /** 月计划结构调整独立路由：自动调整成功后关当前页并回到月计划调整查询，携带工厂/年月/版本/结构等 */
         if (this.pageVariant === "structureAdjust") {
           const queryExtra =
