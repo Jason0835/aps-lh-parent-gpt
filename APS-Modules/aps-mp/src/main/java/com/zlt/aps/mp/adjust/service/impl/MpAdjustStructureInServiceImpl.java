@@ -20,6 +20,7 @@ import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.engine.domain.vo.CycleStructureMinLhMachineQtyVo;
+import com.zlt.aps.mp.engine.handler.LhMachineInfoCalculateHelper;
 import com.zlt.aps.mp.engine.service.DpRequireDataService;
 import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -44,6 +45,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -409,6 +411,7 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         queryWrapper.eq("FACTORY_CODE", contextDTO.getFactoryCode());
         queryWrapper.eq("STATUS", YesOrNoEnum.YES.getValue());
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
-        return lhMachineInfoEntityMapper.selectCount(queryWrapper).intValue();
+        List<LhMachineInfo> lhMachineInfoList = lhMachineInfoEntityMapper.selectList(queryWrapper);
+        return LhMachineInfoCalculateHelper.getLhMachineCount(lhMachineInfoList);
     }
 }
