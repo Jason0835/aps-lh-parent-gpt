@@ -134,7 +134,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
     }
 
     /**
-     * 搭配排产（计划调整入口）
+     * 搭配排产（月计划排产入口）
      *
      * @param planList
      */
@@ -147,7 +147,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         List<MonthPlanProductionRequirePlanVo> requirePlanList = this.selectRequirePlan(productionContext, detailLogList); // 查询需求计划
         this.buildProductionContext(productionContext, planList, detailLogList, requirePlanList); // 填充上下文各项必要数据
 
-        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList); // 分配成型产能
+        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList, false); // 分配成型产能
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         this.resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap);
         Map<String, CxContinueInfoHelper> cxContinueInfoMap = this.getContinueInfo(productionContext); // 加载续作规格

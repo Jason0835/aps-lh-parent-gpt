@@ -23,29 +23,18 @@ import java.util.List;
  */
 @Mapper
 public interface MpFactoryProductionVersionMapper extends CommBaseMapper<MpFactoryProductionVersion> {
-    /**
-     * 根据分厂、年份、月份。需求版本，删除需求版本计划
-     * t_mp_product_require_plan
-     * t_mp_order_plan_allocation
-     * t_mp_month_require_stock
-     *
-     * @param factoryProductionParam
-     * @return
-     */
-    @Deprecated
-    int deletedMonthPlanRequireVersion(FactoryProductionParamVo factoryProductionParam);
 
     /**
      * 根据分厂、年份、月份。需求版本，排产版本，删除对应的排产版本计划
      * t_mp_proc_version
-     * t_mp_proc_month_plan_init
-     * t_mp_structure_allocation
-     * t_mp_proc_no_production_record
-     * t_mp_proc_no_production_plan
-     * t_mp_moulding_day_result
-     * t_mp_moulding_day_result_detail
-     * t_mp_moulding_helper
-     * t_mp_month_plan_statistics
+     * t_mp_proc_month_plan_init 初始化需求版本的所有删除
+     * t_mp_proc_no_production_plan 未排产计划需求版本的所有删除
+     * t_mp_moulding_day_result  需求版本对应的模具排产版本 所有删除
+     * t_mp_mould_day_detail_log 需求版本对应的模具排产版本日志 所有删除
+     * t_mp_mould_use_status_log 模具状态日志 所有删除
+     * t_mp_mold_capacity_log 模具产能日志 所有删除
+     * t_mp_mould_lh_log 模具硫化组日志 所有删除
+     * t_mp_month_plan_statistics 排产统计 所有删除
      *
      * @param factoryProductionParam
      * @return
@@ -55,14 +44,14 @@ public interface MpFactoryProductionVersionMapper extends CommBaseMapper<MpFacto
     /**
      * 根据分厂、年份、月份。需求版本，排产版本，删除对应的排产版本计划（针对只有最后一个版本的情况，不能直接删除版本表的数据）
      * t_mp_proc_version
-     * t_mp_proc_month_plan_init
-     * t_mp_structure_allocation
-     * t_mp_proc_no_production_record
-     * t_mp_proc_no_production_plan
-     * t_mp_moulding_day_result
-     * t_mp_moulding_day_result_detail
-     * t_mp_moulding_helper
-     * t_mp_month_plan_statistics
+     * t_mp_proc_month_plan_init 初始化需求版本的所有删除
+     * t_mp_proc_no_production_plan 未排产计划需求版本的所有删除
+     * t_mp_moulding_day_result  需求版本对应的模具排产版本 所有删除
+     * t_mp_mould_day_detail_log 需求版本对应的模具排产版本日志 所有删除
+     * t_mp_mould_use_status_log 模具状态日志 所有删除
+     * t_mp_mold_capacity_log 模具产能日志 所有删除
+     * t_mp_mould_lh_log 模具硫化组日志 所有删除
+     * t_mp_month_plan_statistics 排产统计 所有删除
      *
      * @param factoryProductionParam
      * @return
@@ -85,6 +74,7 @@ public interface MpFactoryProductionVersionMapper extends CommBaseMapper<MpFacto
      * t_mp_moulding_day_result  需求版本对应的模具排产版本 所有删除
      * t_mp_mould_day_detail_log 需求版本对应的模具排产版本日志 所有删除
      * t_mp_mould_use_status_log 模具状态日志 所有删除
+     * t_mp_mold_capacity_log 模具产能日志 所有删除
      * t_mp_mould_lh_log 模具硫化组日志 所有删除
      * t_mp_month_plan_statistics 排产统计 所有删除
      *

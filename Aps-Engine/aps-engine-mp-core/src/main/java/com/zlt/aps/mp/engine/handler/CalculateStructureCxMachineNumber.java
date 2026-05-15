@@ -4,6 +4,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.api.domain.entity.MpSkuMoldCapacityAllocateLog;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.MouldAllocationInfoVo;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
@@ -14,6 +15,7 @@ import com.zlt.aps.mp.engine.logrecorder.PlanRequireLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -41,28 +43,33 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class CalculateStructureCxMachineNumber {
+
+    private final MoldCapacityLimitAllocateHandler moldCapacityLimitAllocateHandler;
 
     /**
      * 6、粗算结构成型机台数
      *
-     * @param productionContext 排产上下文
-     * @param requirePlanList   需求计划
+     * @param productionContext     排产上下文
+     * @param requirePlanList       需求计划
+     * @param isHandlerMoldCapacity 是否需要处理模具产能 true 表示要处理 false表示不用处理
      * @return 结构分组
      */
-    public Map<String, ProductionPlanGroupInfo> calculateStructureCxMachineNumber(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+    public Map<String, ProductionPlanGroupInfo> calculateStructureCxMachineNumber(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList, boolean isHandlerMoldCapacity) {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyMap();
         }
-        return buildGroupPlanInfoMap(productionContext, requirePlanList);
+        return buildGroupPlanInfoMap(productionContext, requirePlanList, isHandlerMoldCapacity);
     }
 
     /**
-     * @param productionContext
-     * @param requirePlanList
+     * @param productionContext     排产上下文
+     * @param requirePlanList       需求计划
+     * @param isHandlerMoldCapacity 是否处理模具产能
      * @return
      */
-    private Map<String, ProductionPlanGroupInfo> buildGroupPlanInfoMap(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList) {
+    private Map<String, ProductionPlanGroupInfo> buildGroupPlanInfoMap(TbrProductionContext productionContext, List<MonthPlanProductionRequirePlanVo> requirePlanList, boolean isHandlerMoldCapacity) {
         if (CollectionUtils.isEmpty(requirePlanList)) {
             return Collections.emptyMap();
         }
@@ -76,6 +83,7 @@ public class CalculateStructureCxMachineNumber {
         //得到结构主花纹下最大可用模具数-按物料描述分组取最大
         Map<String, Integer> maxEnableMouldNumberMap = calculateMaxEnableMouldNumber(productionContext);
         Map<String, MonthPlanStructureLhRatioVo> minLhRatioMap = getMinLhRatioMap(productionContext);
+        List<MpSkuMoldCapacityAllocateLog> moldCapacityResultList = Lists.newArrayList();
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         Integer minProductionDays = paramConfiguration.getMinProductionDays();
         mapGroupByStructureName.forEach((structureName, groupDatas) -> {
@@ -89,6 +97,13 @@ public class CalculateStructureCxMachineNumber {
                 groupInfo.setNoProductionNoCxMachineLhRatio();
             }
             groupInfo.setCxMachineLhRationMap(cxMachineLhRationMap);
+            //20260515+ 增加模具产能分摊计算
+            if (isHandlerMoldCapacity) {
+                List<MpSkuMoldCapacityAllocateLog> singleGroupResultList = moldCapacityLimitAllocateHandler.moldCapacityAllocate(groupInfo, groupDatas, maxEnableMouldNumberMap, productionContext);
+                if (!CollectionUtils.isEmpty(singleGroupResultList)) {
+                    moldCapacityResultList.addAll(singleGroupResultList);
+                }
+            }
             // 计算结构净需求量
             groupInfo.setSumPlanQty(calculateMaxMouldCapacity(groupInfo, groupDatas, maxEnableMouldNumberMap, productionContext));
             //20260430+ 设置是否按高优先级先排产，按结构高优先级需求占比
@@ -133,6 +148,8 @@ public class CalculateStructureCxMachineNumber {
                         groupInfo.getMinLhDayCapacityQty(), groupInfo.getTheoryDays(), groupInfo.getNeedCxCapacityMachineCount()));
             }
         });
+        //20260515+ 保存
+        moldCapacityLimitAllocateHandler.saveMoldCapacityResult(productionContext, moldCapacityResultList);
         return groupInfoMap;
     }
 
@@ -332,7 +349,7 @@ public class CalculateStructureCxMachineNumber {
             // （2）计算结构向下主花纹模具的最大可排产量 = MIN { SUM（结构向下主花纹对应的所有SKU的净需求量），主花纹模具的最大产能}；
             totalMaxMouldCapacity.add(Math.min(maxMouldCapacity, sumNetQty));
             //20260430+ 高优先级需求量
-            Integer sumHeightQty = requirePlanList.stream().filter(x->x.getHeightCapacityRequireQty() != null).mapToInt(MonthPlanProductionRequirePlanVo::getHeightCapacityRequireQty).sum();
+            Integer sumHeightQty = requirePlanList.stream().filter(x -> x.getHeightCapacityRequireQty() != null).mapToInt(MonthPlanProductionRequirePlanVo::getHeightCapacityRequireQty).sum();
 
             totalHeightRequire.add(Math.min(sumHeightQty, maxMouldCapacity));
         });

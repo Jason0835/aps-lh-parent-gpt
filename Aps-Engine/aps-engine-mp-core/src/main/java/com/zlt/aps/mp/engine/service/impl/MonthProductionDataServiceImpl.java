@@ -52,6 +52,8 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
 
     private final FactoryMonthPlanContinueProductInfoMapper factoryMonthPlanContinueProductInfoMapper;
 
+    private final IFactoryMoldCapacityLogService factoryMoldCapacityLogService;
+
     private final IFactoryMouldUsedStatusLogService factoryMouldUsedStatusLogService;
 
     private final IFactoryProductionMonthPlanInitService factoryProductionMonthPlanInitService;
@@ -193,6 +195,14 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
             return;
         }
         factoryMouldUsedStatusLogService.saveBatch(usedLogList);
+    }
+
+    @Override
+    public void saveMoldCapacityLog(List<MpSkuMoldCapacityAllocateLog> skuMoldCapacityLogList) {
+        if (CollectionUtils.isEmpty(skuMoldCapacityLogList)) {
+            return;
+        }
+        factoryMoldCapacityLogService.saveBatch(skuMoldCapacityLogList);
     }
 
     @Override

@@ -2,22 +2,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper">
 
-    <delete id="deletedMonthPlanRequireVersion" parameterType="com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo">
-       DELETE FROM t_mp_product_require_plan
-        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-          AND YEAR = #{year,jdbcType=DECIMAL}
-          AND MONTH = #{month,jdbcType=DECIMAL}
-          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR};
-       DELETE FROM t_mp_order_plan_allocation
-        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-          AND YEAR = #{year,jdbcType=DECIMAL}
-          AND MONTH = #{month,jdbcType=DECIMAL}
-          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR};
-       DELETE FROM t_mp_month_require_stock
-        WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
-          AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR};
-    </delete>
-
     <delete id="deletedByProductionVersion" parameterType="com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo">
         DELETE FROM t_mp_proc_version
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
@@ -56,6 +40,12 @@
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
         DELETE FROM t_mp_mould_use_status_log
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_mold_capacity_log
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
            AND MONTH = #{month,jdbcType=DECIMAL}
@@ -130,6 +120,12 @@
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
            AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_mold_capacity_log
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
         DELETE FROM t_mp_mould_lh_log
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
@@ -182,6 +178,11 @@
            AND MONTH = #{month,jdbcType=DECIMAL}
            AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR};
         DELETE FROM t_mp_mould_use_status_log
+         WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR};
+        DELETE FROM t_mp_mold_capacity_log
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
            AND YEAR = #{year,jdbcType=DECIMAL}
            AND MONTH = #{month,jdbcType=DECIMAL}

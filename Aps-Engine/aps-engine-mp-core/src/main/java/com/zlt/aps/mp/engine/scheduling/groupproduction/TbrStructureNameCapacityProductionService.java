@@ -115,7 +115,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         saveMouldUsedLog(productionContext);
         //3、按结构分组，汇总结构净需求量，粗算需要的机台数 记录日志-粗算成型机台数，并赋值结构指定的机台集合
         log.info(TbrProductionGroupLogRecorder.addStartGroupCalculateCapacityLog(productionContext));
-        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList);
+        Map<String, ProductionPlanGroupInfo> estimateGroupCxAllocationMap = calculateStructureCxMachineNumber.calculateStructureCxMachineNumber(productionContext, requirePlanList, true);
         productionContext.setGroupProductionInfo(estimateGroupCxAllocationMap);
         groupFixedInfoHandler.setGroupPlanFixedCxMachineInfo(productionContext);
         /**
