@@ -135,6 +135,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
             mpAdjustResultEntityMapper.insert(entity);
         } else {
             //2、更新每日调整值
+            entity.setId(mpAdjustResultList.get(0).getId());
             mpAdjustResultEntityMapper.forceUpdateById(entity);
         }
     }
