@@ -7,7 +7,10 @@ import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.vo.FactoryParamVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -46,6 +49,13 @@ public interface IFactoryParamRemoteService {
     @ApiOperation("复制分厂排产设定")
     @PostMapping("/factoryParam/copy")
     AjaxResult copy(@RequestBody FactoryParamVo factoryParamVo);
+
+    /**
+     * 根据工厂、产品品类和参数编码查询系统参数
+     */
+    @ApiOperation("根据参数编码查询系统参数")
+    @PostMapping("/factoryParam/getByParamCode")
+    FactoryParam getByParamCode(@RequestBody FactoryParam factoryParam);
 
     /**
      * 根据ID获取详细信息

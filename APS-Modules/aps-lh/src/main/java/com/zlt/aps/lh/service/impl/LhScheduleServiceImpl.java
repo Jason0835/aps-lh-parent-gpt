@@ -614,7 +614,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         Map<String, Object> mouldChangePlanTableMap = lhMouldChangePlanController.buildExportTableMap(mouldChangePlanExportList, result.getScheduleDate());
         List<List<Map<String, Object>>> mouldChangePlanExcelDataList = new ArrayList<>();
-        mouldChangePlanExcelDataList.add(lhMouldChangePlanController.buildExportDataList(mouldChangePlanExportList));
+        mouldChangePlanExcelDataList.add(lhMouldChangePlanController.buildExportDataList(mouldChangePlanExportList, mouldChangePlan));
 
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes =  ExcelUtils.writeMultiList(inputStream, 1, mouldChangePlanTableMap, mouldChangePlanExcelDataList);

@@ -86,6 +86,20 @@ public class FactoryParamUIController extends BaseUIController<FactoryParam> {
         return iFactoryParamService.copy(vo);
     }
 
+    /**
+     * 根据工厂、产品品类和参数编码查询系统参数
+     *
+     * @param factoryParam 查询条件，需包含工厂编码、产品品类和参数编码
+     * @return 查询到的系统参数结果
+     * @throws RuntimeException 远程服务调用异常时抛出
+     */
+    @ApiOperation("根据参数编码查询系统参数")
+    @PostMapping("/getByParamCode")
+    @ResponseBody
+    public AjaxResult getByParamCode(FactoryParam factoryParam) {
+        return AjaxResult.success(iFactoryParamService.getByParamCode(factoryParam));
+    }
+
     @Autowired
     private IMesItfService iMesItfService;
 

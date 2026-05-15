@@ -16,7 +16,6 @@ import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
-import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -48,10 +47,10 @@ import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.engine.basedata.assemble.construction.ConstructionSelector;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
-import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductConstructionInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.mp.engine.enums.DayVulcanizationModeEnum;
+import com.zlt.aps.mp.engine.handler.LhMachineInfoCalculateHelper;
 import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductConstructionMapper;
 import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductLhCapacityMapper;
 import com.zlt.aps.mp.engine.mapper.FactoryMouldingDayResultMapper;
@@ -79,7 +78,6 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StopWatch;
 
 import java.io.InputStream;
-import java.math.RoundingMode;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
@@ -1150,16 +1148,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 1.1、加载硫化机总数
         LambdaQueryWrapper<LhMachineInfo> lhMachineQueryWrapper = new LambdaQueryWrapper<>();
         lhMachineQueryWrapper.eq(LhMachineInfo::getFactoryCode, param.getFactoryCode());
-        List<LhMachineInfo> lhMachineInfoList = lhMachineInfoEntityMapper.selectList(lhMachineQueryWrapper);
-        long singleControlMachineCount = lhMachineInfoList.stream()
-                .filter(m -> !Objects.equals(m.getMaxMoldNum(), ProductionConstant.DOUBLE_MOULD_PRODUCTION)).count();
-        Integer lhmachineCount = lhMachineInfoList.size();
-        if (singleControlMachineCount > 0) {
-            int reduceMachineCount = BigDecimalUtils
-                    .div(singleControlMachineCount, ProductionConstant.DOUBLE_MOULD_PRODUCTION, 4)
-                    .setScale(0, RoundingMode.DOWN).intValue(); // 单控机台数的一半需要扣除掉（向下取整）
-            lhmachineCount -= reduceMachineCount;
-        }
+        Integer lhmachineCount = LhMachineInfoCalculateHelper
+                .getLhMachineCount(lhMachineInfoEntityMapper.selectList(lhMachineQueryWrapper));
         // 1.2、加载月计划模具排产明细
         List<MpStructureAllocationExportVo> recordList = entityMapper.getExportList(param);
         // 1.3、加载本次版本已生成的统计记录

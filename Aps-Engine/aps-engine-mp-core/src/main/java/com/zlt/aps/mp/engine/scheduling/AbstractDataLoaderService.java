@@ -3,7 +3,6 @@ package com.zlt.aps.mp.engine.scheduling;
 import com.google.common.collect.Maps;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.constant.Constant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
@@ -24,6 +23,7 @@ import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.*;
+import com.zlt.aps.mp.engine.handler.LhMachineInfoCalculateHelper;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.mp.engine.service.DpRequireDataService;
@@ -156,16 +156,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
     protected Integer getLhMachineCount(TbrProductionContext productionContext) {
         // 取出硫化机列表，统计总台数
         List<LhMachineInfo> lhMachineInfoList = productionContext.getBaseDataContainer().getLhMachineInfoList();
-        Integer lhMachineCount = lhMachineInfoList.size();
-        // 有配置单控机台的情况，需要扣减掉配置的有效硫化机台总数的一半
-        long singleControlMachineCount = lhMachineInfoList.stream().filter(m -> !Objects.equals(m.getMaxMoldNum(), ProductionConstant.DOUBLE_MOULD_PRODUCTION)).count();
-        if (singleControlMachineCount > 0) {
-            int reduceMachineCount = BigDecimalUtils
-                    .div(singleControlMachineCount, ProductionConstant.DOUBLE_MOULD_PRODUCTION, 4)
-                    .setScale(0, RoundingMode.DOWN).intValue(); // 单控机台数的一半需要扣除掉（向下取整）
-            lhMachineCount -= reduceMachineCount;
-        }
-        return lhMachineCount;
+        return LhMachineInfoCalculateHelper.getLhMachineCount(lhMachineInfoList);
     }
 
     /**
