@@ -83,6 +83,19 @@ public class FactoryParamController extends BaseController<FactoryParam> {
         return factoryParamService.copy(factoryParamVo);
     }
 
+    /**
+     * 根据工厂、产品品类和参数编码查询系统参数
+     *
+     * @param entity 查询条件，需包含工厂编码、产品品类和参数编码
+     * @return 查询到的系统参数，不存在时返回空
+     * @throws RuntimeException 查询系统参数异常时抛出
+     */
+    @ApiOperation("根据参数编码查询系统参数")
+    @PostMapping("/getByParamCode")
+    public FactoryParam getByParamCode(@RequestBody FactoryParam entity) {
+        return factoryParamService.getFacParamSingle(entity);
+    }
+
     private void checkValidParams(@RequestBody FactoryParam entity) {
         SysParamDataTypeEnum sysParamDataTypeEnum = SysParamDataTypeEnum.getEnumByValue(entity.getDataType().intValue());
         if (SysParamDataTypeEnum.NUMBER.equals(sysParamDataTypeEnum)) {
