@@ -33,13 +33,10 @@ import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -1073,6 +1070,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("cxMachineCode", first.getCxMachineCode());
             row.put("materialCode", first.getMaterialCode());
+            row.put("embryoCode", first.getEmbryoCode());
             row.put("mainMaterialDesc", firstNonBlank(groupList, "mainMaterialDesc"));
             // 小胶种暂未明确来源，按需求先导出空值，避免误用其他业务字段。
             row.put("smallGlue", "");
