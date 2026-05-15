@@ -386,7 +386,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                 row.put("mouldCode", String.join(",\n", mouldCodeList));
 
                 ExcelStyleVo excelStyleVo = new ExcelStyleVo();
-                excelStyleVo.setRgbColor(new ExcelStyleVo.RgbColor(255, 153, 153));
+                excelStyleVo.setRgbColor(new ExcelStyleVo.RgbColor(230, 184, 183));
                 row.put("style", excelStyleVo);
             } else {
                 row.put("mouldCode", "");
