@@ -925,8 +925,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             String defaultVersion = StringUtils.defaultIfBlank(value.getVersion(), value.getProductionVersion());
             fillDemandQty(adjustVo, demandPlanSumMap.get(buildDemandPlanSumMapKey(defaultVersion, entry.getValue().getMaterialCode())));
             // 日硫化量固定*2
-            int dayVulcanizationQty = adjustVo.getDayVulcanizationQty() == null ? 0 : adjustVo.getDayVulcanizationQty();
-            adjustVo.setDayVulcanizationQty(dayVulcanizationQty * 2);
+            /*int dayVulcanizationQty = adjustVo.getDayVulcanizationQty() == null ? 0 : adjustVo.getDayVulcanizationQty();
+            adjustVo.setDayVulcanizationQty(dayVulcanizationQty * 2);*/
         }
         List<FactoryMonthPlanProductionFinal4AdjustVo> resultList = new ArrayList<>(finalResultMap.values());
         if (CollectionUtils.isNotEmpty(resultList)) {
