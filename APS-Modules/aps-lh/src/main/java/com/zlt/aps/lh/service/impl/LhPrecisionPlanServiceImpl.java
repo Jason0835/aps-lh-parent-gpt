@@ -980,28 +980,6 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
 
         log.info("开始根据设备保养计划生成硫化精度计划，共{}条", maintenancePlans.size());
 
-        maintenancePlans.sort((p1, p2) -> {
-            LocalDate date1 = parseDate(p1.getOperTime());
-            if (date1 == null) {
-                date1 = parseDate(p1.getFirstWashTime());
-            }
-            LocalDate date2 = parseDate(p2.getOperTime());
-            if (date2 == null) {
-                date2 = parseDate(p2.getFirstWashTime());
-            }
-            if (date1 == null && date2 == null) {
-                return 0;
-            }
-            if (date1 == null) {
-                return 1;
-            }
-            if (date2 == null) {
-                return -1;
-            }
-            return date1.compareTo(date2);
-        });
-        log.info("设备保养计划已按计划日期升序排序完成");
-
         int intervalYears = getIntervalYears();
 
         List<Long> mesSourceIds = maintenancePlans.stream()

@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.setting.controller;
 
 import cn.hutool.core.collection.ListUtil;
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
@@ -26,12 +27,16 @@ import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.service.IMdmMaterialInfoService;
 import com.zlt.aps.maindata.utils.ScmListUtils;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmProductConstruction;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.vo.ConfigConstructionVo;
 import com.zlt.aps.mp.api.domain.vo.MaterialInfoGrossRateVo;
 import com.zlt.aps.mp.api.domain.vo.TableProductInfoVo;
+import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
+import com.zlt.aps.mp.factory.service.IFactoryProductionVersionService;
 import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -42,6 +47,7 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -81,9 +87,14 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     private MdmSkuConstructionRefEntityMapper skuConstructionRefEntityMapper;
     @Autowired
     private IScmItfService iScmItfService;
+    @Autowired
+    private IFactoryProductionVersionService factoryProductionVersionService;
+    @Resource
+    private FactoryMonthPlanProductionFinalResultEntityMapper monthPlanProdFinalMapper;
 
     /**
      * 查询物料信息表列表
+     * 当传入scheduleDate时，关联T_MP_MONTH_PLAN_PROD_FINAL定稿表过滤物料编码
      */
     @PostMapping("/list")
     @Override
@@ -91,10 +102,50 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
         startPage("create_time desc, id desc");
         QueryWrapper<MdmMaterialInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, productInfo);
+        this.filterByMonthPlanFinal(wrapper, productInfo);
         List<MdmMaterialInfo> list = iproductInfoService.selectList(wrapper);
         this.setSkuConstructionRefField(productInfo, list);
-//        this.setQualityStateCodeName(productInfo, list);
         return getDataTable(list);
+    }
+
+    /**
+     * 根据排程日期关联月计划定稿表过滤物料编码
+     * 只有在T_MP_MONTH_PLAN_PROD_FINAL定稿表中对应年月存在的物料编码才能查出
+     *
+     * @param wrapper     查询条件包装器
+     * @param productInfo 查询参数（含scheduleDate排程日期）
+     */
+    private void filterByMonthPlanFinal(QueryWrapper<MdmMaterialInfo> wrapper, MdmMaterialInfo productInfo) {
+        if (StringUtils.isBlank(productInfo.getScheduleDate())) {
+            return;
+        }
+        Date scheduleDate = DateUtil.parse(productInfo.getScheduleDate());
+        String factoryCode = productInfo.getFactoryCode();
+        MpFactoryProductionVersion finalVersion = factoryProductionVersionService.getFinalVersion(factoryCode, scheduleDate);
+        if (null == finalVersion) {
+            wrapper.eq("MATERIAL_CODE", "NO_FINAL_VERSION_DATA");
+            return;
+        }
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> finalWrapper = new LambdaQueryWrapper<>();
+        finalWrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, factoryCode);
+        finalWrapper.eq(FactoryMonthPlanProductionFinalResult::getYear, finalVersion.getYear());
+        finalWrapper.eq(FactoryMonthPlanProductionFinalResult::getMonth, finalVersion.getMonth());
+        finalWrapper.select(FactoryMonthPlanProductionFinalResult::getMaterialCode);
+        List<FactoryMonthPlanProductionFinalResult> finalList = monthPlanProdFinalMapper.selectList(finalWrapper);
+        if (CollectionUtils.isEmpty(finalList)) {
+            wrapper.eq("MATERIAL_CODE", "NO_FINAL_DATA");
+            return;
+        }
+        List<String> materialCodes = finalList.stream()
+                .map(FactoryMonthPlanProductionFinalResult::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(materialCodes)) {
+            wrapper.eq("MATERIAL_CODE", "NO_FINAL_DATA");
+            return;
+        }
+        wrapper.in("MATERIAL_CODE", materialCodes);
     }
 
     /**

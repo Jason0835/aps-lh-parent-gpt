@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -114,6 +116,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     @Resource
     private IScheduleSummaryReportService scheduleSummaryReportService;
+
+    @Autowired
+    private ISysDictDataCacheService sysDictDataCacheService;
 
     @Override
     public LhScheduleResponseDTO executeSchedule(LhScheduleRequestDTO request) {
@@ -1364,6 +1369,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Map<String, LhRepairCapsule> capsuleMap = buildRepairCapsuleExportMap(list);
         Map<Long, String> cxMachineCodeMap = buildCxMachineCodeExportMap(list);
         Map<String, Object> todayNightFinishQtyMap = buildTodayNightFinishQtyExportMap(list, scheduleDate);
+        Map<String, String> recipeTypeMap = loadLhTrialStatusDictMap();
 
         // 模板要求第一条数据行不是具体机台明细，而是整张表的汇总行：
         // 各班计划/实际取所有明细对应班次的合计，后面的每条才是原始排程明细。
@@ -1387,7 +1393,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             row.put("replaceCapsuleCount2", Objects.nonNull(repairCapsule) ? repairCapsule.getReplaceCapsuleCount2() : "");
             row.put("replaceCapsuleCountLeftRight", buildCapsuleCountLeftRight(repairCapsule));
 
-            // 成型机台号来自成型排程结果的 LH_SCHEDULE_IDS 反查，多个成型机台用中文分号拼接。
+            // 成型机台号来自成型排程结果的 LH_SCHEDULE_IDS 反查，多个成型机台用分号拼接。
             row.put("cxMachineCode", cxMachineCodeMap.get(result.getId()));
             row.put("todayNightFinishQty", todayNightFinishQtyMap.get(buildMaterialFactoryExportKey(result.getFactoryCode(), result.getMaterialCode())));
             row.put("mouldSurplusQty", result.getMouldSurplusQty());
@@ -1414,7 +1420,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 row.put("class" + shift + "PlanQty", getClassPlanQty(result, shift));
                 row.put("class" + shift + "FinishQty", getClassFinishQty(result, shift));
                 row.put("class" + shift + "Type", buildShiftType(result, shift));
-                row.put("class" + shift + "MouldMethod", buildShiftMouldMethod(result, shift));
+                row.put("class" + shift + "MouldMethod", buildShiftMouldMethod(result, shift, recipeTypeMap));
                 row.put("class" + shift + "Analysis", getClassAnalysis(result, shift));
                 row.put("class" + shift + "Dot", "");
             }
@@ -1561,7 +1567,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         return machineCodeMap.entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
-                        entry -> String.join("；", entry.getValue()),
+                        entry -> String.join(";", entry.getValue()),
                         (oldValue, newValue) -> oldValue,
                         HashMap::new
                 ));
@@ -1942,16 +1948,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 构建班次维度的示方类型/施工阶段导出值。
-     * <p>模板当前列占位符是 mouldMethod，但前端同一位置使用 constructionStage 并通过
-     * shiftConstructionStageFormatter 展示 biz_construction_stage 字典。这里按前端规则处理：
-     * 收尾后的班次不展示；没有计划量的班次不展示；有计划量时，空值按无工艺处理。</p>
+     * 构建班次维度的示方类型导出值。
+     * <p>模板当前列占位符是 mouldMethod，使用新字典 lh_trial_status（S=正规示方、T=量试示方、X=试验示方）。
+     * 数据库字段 constructionStage 存储的是施工阶段编码（00/01/02/03），
+     * 需要先转换为标记值（S/X/T），再通过字典翻译为对应的中文展示文本。
+     * 收尾后的班次不展示；没有计划量的班次不展示。</p>
      *
      * @param result 排程结果明细
      * @param shift  班次序号，范围 1~8
-     * @return 当前班次示方类型/施工阶段展示值
+     * @param recipeTypeMap lh_trial_status 字典映射，key=标记值(S/X/T)，value=字典标签
+     * @return 当前班次示方类型展示值
      */
-    private Object buildShiftMouldMethod(LhScheduleResult result, int shift) {
+    private Object buildShiftMouldMethod(LhScheduleResult result, int shift, Map<String, String> recipeTypeMap) {
         if (Objects.isNull(result) || isShiftAfterEnding(result, shift)) {
             return "";
         }
@@ -1959,32 +1967,69 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (Objects.isNull(planQty) || planQty <= 0) {
             return "";
         }
-        return buildConstructionStageName(result.getConstructionStage());
+        return buildLhTrialStatusName(result.getConstructionStage(), recipeTypeMap);
     }
 
     /**
-     * 将施工阶段字典值转换为导出展示文本。
-     * <p>前端字典 biz_construction_stage：00=无工艺、01=试制、02=量试、03=正式。
-     * 前端空值会兜底到无工艺，这里同时兼容历史值 0 和标准值 00。</p>
+     * 将施工阶段编码转换为 lh_trial_status 字典的展示文本。
+     * <p>constructionStage 编码与 lh_trial_status 标记值的对应关系：
+     * 00/0 → 无工艺（不在字典中，直接返回"无工艺"）
+     * 01 → X（试验示方）
+     * 02 → T（量试示方）
+     * 03 → S（正规示方）
+     * 先将 constructionStage 转为标记值，再从字典映射中取标签。</p>
      *
      * @param constructionStage 施工阶段字典值
-     * @return 施工阶段展示文本
+     * @param recipeTypeMap lh_trial_status 字典映射
+     * @return 示方类型展示文本
      */
-    private String buildConstructionStageName(String constructionStage) {
+    private String buildLhTrialStatusName(String constructionStage, Map<String, String> recipeTypeMap) {
         String dictValue = StringUtils.defaultIfBlank(constructionStage, "00");
-        if ("0".equals(dictValue) || "00".equals(dictValue)) {
+        String markFlag = convertConstructionStageToMarkFlag(dictValue);
+        if ("00".equals(markFlag)) {
             return "无工艺";
         }
-        if ("01".equals(dictValue)) {
-            return "试制";
+        return recipeTypeMap.getOrDefault(markFlag, markFlag);
+    }
+
+    /**
+     * 将施工阶段编码转换为 lh_trial_status 字典的标记值。
+     * <p>映射关系：00/0→00（无工艺），01→X（试验），02→T（量试），03→S（正规）</p>
+     *
+     * @param constructionStage 施工阶段编码
+     * @return 标记值（S/X/T/00）
+     */
+    private String convertConstructionStageToMarkFlag(String constructionStage) {
+        if ("0".equals(constructionStage) || "00".equals(constructionStage)) {
+            return "00";
         }
-        if ("02".equals(dictValue)) {
-            return "量试";
+        if ("01".equals(constructionStage)) {
+            return "X";
         }
-        if ("03".equals(dictValue)) {
-            return "正式";
+        if ("02".equals(constructionStage)) {
+            return "T";
         }
-        return dictValue;
+        if ("03".equals(constructionStage)) {
+            return "S";
+        }
+        return constructionStage;
+    }
+
+    /**
+     * 加载硫化示方类型字典（lh_trial_status），构建标记值→标签的映射。
+     * <p>字典值：S=正规示方、T=量试示方、X=试验示方</p>
+     *
+     * @return 标记值→标签映射
+     */
+    private Map<String, String> loadLhTrialStatusDictMap() {
+        List<SysDictData> dictList = sysDictDataCacheService.getType("lh_trial_status");
+        if (dictList == null || dictList.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return dictList.stream()
+                .filter(d -> StringUtils.isNotEmpty(d.getDictValue()))
+                .collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel,
+                        (a, b) -> a, LinkedHashMap::new));
     }
 
     /**
