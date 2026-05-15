@@ -72,6 +72,8 @@ public class DayProductionStatisticsHandler {
             dayCapacityLimitMap.forEach((day, dayCapacityLimit) -> {
                 // 3.2.2.2、构建当天的产能统计
                 MpDayProductionStatisticsDetailVo detail = new MpDayProductionStatisticsDetailVo();
+                detail.setMaxEmbryoTypes(dayCapacityLimit.getMaxEmbryoTypes());
+                detail.setMaxLhMachines(dayCapacityLimit.getMaxLhMachines());
                 detail.setEmbryoCount(dayCapacityLimit.getEmbryoCodes().size());
                 detail.setLhMachines(dayCapacityLimit.getUsedLhMachines());
                 detail.setChangeMould(dayCapacityLimit.getUsedChangeMould());
@@ -380,6 +382,8 @@ public class DayProductionStatisticsHandler {
         }
         detail.setEmbryoCount(embryoCodeSize);
         detail.setLhMachines(lhMachineCount);
+        detail.setMaxLhMachines(dayLimitInfo.getMaxLhMachineCount());
+        detail.setMaxEmbryoTypes(dayLimitInfo.getMaxEmbryoCodeCount());
         return detail;
     }
 }

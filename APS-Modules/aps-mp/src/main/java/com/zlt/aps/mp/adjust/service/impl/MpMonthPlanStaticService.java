@@ -193,6 +193,12 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
             if (capacityVo != null) {
                 MpDayProductionStatisticsDetailVo dayProductionStatisticsDetailVo = new MpDayProductionStatisticsDetailVo();
                 dayProductionStatisticsDetailVo
+                        .setMaxLhMachines(Convert.toInt(capacityVo.getMaxLhMachines(), 0).equals(0) ? null
+                                : capacityVo.getMaxLhMachines());
+                dayProductionStatisticsDetailVo
+                        .setMaxEmbryoTypes(Convert.toInt(capacityVo.getMaxEmbryoTypes(), 0).equals(0) ? null
+                                : capacityVo.getMaxEmbryoTypes());
+                dayProductionStatisticsDetailVo
                         .setLhMachines(Convert.toInt(capacityVo.getUsedLhMachines(), 0).equals(0) ? null
                                 : capacityVo.getUsedLhMachines());
                 dayProductionStatisticsDetailVo
