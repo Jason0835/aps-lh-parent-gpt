@@ -27,6 +27,7 @@ import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.ProductionQtyModelEnum;
 import com.zlt.aps.mp.engine.handler.CalculateStructureCxMachineNumber;
 import com.zlt.aps.mp.engine.handler.CxLhMouldProductionCalculator;
+import com.zlt.aps.mp.engine.handler.GroupPlanDeductionDayHandler;
 import com.zlt.aps.mp.engine.handler.MouldProductionResultHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanMouldDayDetailMapper;
@@ -79,6 +80,8 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
 
     @Autowired
     private MonthProductionDataService monthProductionDataService;
+    @Autowired
+    private GroupPlanDeductionDayHandler groupPlanDeductionDayHandler;
     @Autowired
     private ISysConfigService sysConfigService;
     @Autowired
@@ -440,6 +443,9 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         Map<String, List<MonthPlanProductionRequirePlanVo>> productionPlanMap = groupPlanData.stream()
                 .collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
         Set<String> scheduleMaterialDesc = new HashSet<>(); // 记录已排规格，防止重复执行死循环
+        // 记录本次续作设计的模具以及排产天数
+        Map<String, ProductionMouldInfoVo> useMouldMap = new HashMap<>();
+        Set<Integer> productDaySet = new HashSet<>();
         do {
             // 1、获取优先级最高的SKU信息
             String materialDesc = this.getSelectedAddSku(productionContext, startDay, endDay, groupPlanData,
@@ -504,17 +510,13 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                         productionQty = productionQty > totalProductionQty ? productionQty - totalProductionQty : 0;
                         limitHelper.setPlanQty(limitHelper.getPlanQty() + totalProductionQty);
                         if (totalProductionQty > 0) {
+                            productDaySet.add(usedBeginDate);
+                            useMouldMap.putAll(continueMouldList.stream().collect(
+                                    Collectors.toMap(ProductionMouldInfoVo::getMouldCode, Function.identity())));
                             productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, totalProductionQty); // 更新特殊材料占用
                             String mainPattern = CollectionUtils.firstElement(productionPlanList).getMainPattern(); // 主花纹
                             String embryoCode = CollectionUtils.firstElement(productionPlanList).getEmbryoCode(); // 胎胚号
                             groupInfo.reCalcMpDailyCapacityLimitByDay(productionContext, usedBeginDate, mainPattern,embryoCode); // 重新计算统计产能
-//                            this.updateMatchDay(productionPlanList, usedBeginDate); // 更新搭配日期
-//                            if (plan.getMatchEndDay() == realEndDay) { // 如果区间最后一天有排产，且往后结构还没有结束，则继续尝试往后延一天
-//                                Integer nextEndDay = this.getNextDay(productionContext, realEndDay, endDay);
-//                                if (nextEndDay > 0 && nextEndDay <= endDay) {
-//                                    realEndDay = nextEndDay;
-//                                }
-//                            }
                         }
                     }
                 }
@@ -525,6 +527,86 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                 }
             } while (true);
         } while (true);
+        this.clearProductionByLowDays(productionContext, groupInfo, checkMaterialDesc, startDay, productionPlanMap, useMouldMap, productDaySet);
+    }
+
+    /**
+     * 撤销排产日不足5天的新模搭配
+     * 
+     * @param productionContext 排产上下文
+     * @param groupInfo         结构
+     * @param checkMaterialDesc 本次增模的SKU
+     * @param startDay          结构开始日期
+     * @param productionPlanMap 需求计划列表
+     * @param useMouldMap       本次增模列表
+     * @param productDaySet     本次增模排产日期（只包含模具续作日，上模日需要后续单独添加）
+     */
+    protected void clearProductionByLowDays(TbrProductionContext productionContext, ProductionPlanGroupInfo groupInfo,
+                                            String checkMaterialDesc, Integer startDay,
+                                            Map<String, List<MonthPlanProductionRequirePlanVo>> productionPlanMap,
+                                            Map<String, ProductionMouldInfoVo> useMouldMap,
+                                            Set<Integer> productDaySet) {
+        if (StringUtils.isEmpty(checkMaterialDesc)) { // 有指定SKU，说明有多新增模具并尝试补量，需要检查是否符合最低天数要求
+            return;
+        }
+        // 判断是否第二台硫化机
+        boolean hasMoreLhMachine = groupInfo.getDayProductionLimitInfo().values().stream().anyMatch(p -> {
+            SkuDayProductionInfoHelper productionInfo = p.getProductionSkuQtyInfo().get(checkMaterialDesc);
+            if (productionInfo == null) {
+                return false;
+            }
+            if (CollectionUtils.isEmpty(productionInfo.getUsedMouldSet())) {
+                return false;
+            }
+            return productionInfo.getUsedMouldSet().size() > ProductionConstant.DOUBLE_MOULD_PRODUCTION;
+        });
+        if (!hasMoreLhMachine) { // 没有多台硫化机，不需要判断
+            return;
+        }
+
+        // 有多台硫化机，需要判断上机日期是否达到最低标准
+        Integer skuShortestProductionDays = productionContext.getBaseDataContainer().getParamConfiguration()
+                .getSkuShortestProductionDays(); // SKU非首次上模最短在机天数
+        DayCapacityLimitVo dayCapacityLimit = productionContext.getBaseDataContainer().getDayCapacityLimit();
+        List<Integer> productDayList = productDaySet.stream().sorted(Integer::compareTo).collect(Collectors.toList());
+        Integer firstDay = CollectionUtils.firstElement(productDayList);
+        Integer newMouldDay = this.getLastDay(productionContext, firstDay, startDay); // 取出模具续作的上一天为上模日
+        if (newMouldDay > 0) {
+            productDayList.add(0, newMouldDay); // 添加上模日
+        }
+        if (productDayList.size() >= skuShortestProductionDays) { // 判断排产日是否达到最低标准，没有达到则需要全部取消掉
+            return;
+        }
+
+        // 遍历每一天
+        for (Integer day : productDayList) {
+            GroupPlanCxLhCapacityLimitHelper productionDayLimit = groupInfo.getDayProductionLimitInfo().get(day);
+            // 排产统计量扣除需撤销的量
+            Map<String, SkuDayProductionInfoHelper> productionSkuQtyInfo = productionDayLimit.getProductionSkuQtyInfo();
+            Integer clearProductQty = useMouldMap.values().stream().mapToInt(m -> {
+                List<CxMouldDayProductionHelper> productList = m.getDayProductionInfo().get(day);
+                if (CollectionUtils.isEmpty(productList)) {
+                    return 0;
+                }
+                // 统计该模具当天同SKU的排产量
+                return productList.stream().filter(p -> Objects.equals(p.getMaterialDesc(), checkMaterialDesc))
+                        .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
+            }).sum();
+            // 执行撤销逻辑
+            groupPlanDeductionDayHandler.clearProductionInfoByDay(productionContext, groupInfo, dayCapacityLimit,
+                    productionDayLimit, useMouldMap, day);
+
+            // 统计值扣减待撤销量
+            SkuDayProductionInfoHelper dayProductionInfo = productionSkuQtyInfo.get(checkMaterialDesc);
+            if (dayProductionInfo != null) {
+                dayProductionInfo.addProductionDayQty(-clearProductQty, 0);
+            }
+        }
+        List<MonthPlanProductionRequirePlanVo> productionPlanList = productionPlanMap.get(checkMaterialDesc);
+        productionPlanList.forEach(p -> p.setProductionQty(0)); // 如果需要撤销，则直接清空该SKU的未排量，不会进入下一次循环。
+        String scheduleLogName = productionContext.getIsActualOrder() ? "实单补量" : "搭配排产";
+        this.addTempLog(productionContext, String.format("结构:%s,【%s】,规格:%s,上机天数不足%s天，撤销排产日%s", groupInfo.getGroupName(),
+                scheduleLogName, checkMaterialDesc, skuShortestProductionDays, productDayList));
     }
     
 //    /**
@@ -2289,6 +2371,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                         .mapToInt(FactoryMonthPlanMouldDayDetail::getTotalQty).sum();
             }
             requirePlan.setOriginProductionQty(demandPlan.getNetQty());
+            requirePlan.setOriginHeightProductionQty(demandPlan.getHeightQty());
             requirePlan.setProductionQty(0);
             requirePlan.setProducedQty(productionQty);
             requirePlan.resetProductionDataInfo();

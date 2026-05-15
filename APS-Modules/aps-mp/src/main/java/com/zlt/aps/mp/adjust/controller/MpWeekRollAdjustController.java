@@ -212,7 +212,7 @@ public class MpWeekRollAdjustController extends BaseController {
         for (IFinalAndAdjustResultInterface adjustResult: mpAdjustResultList) {
             //记录主花纹的最大型腔数
             Integer maxMouldCavityQty = maxMouldCavityQtyMap.getOrDefault(adjustResult.getMainPattern(), 0);
-            maxMouldCavityQtyMap.put(adjustResult.getMainPattern(), Math.max(maxMouldCavityQty, adjustResult.getMouldCavityQty()));
+            maxMouldCavityQtyMap.put(adjustResult.getMainPattern(), Math.max(maxMouldCavityQty, adjustResult.getMouldCavityQty() == null ? 0:adjustResult.getMouldCavityQty()));
         }
         mpAdjustResultList.stream().forEach(s -> { // 设置对应的最大型腔数和最大活块数
             s.setMaxMouldCavityQty(maxMouldCavityQtyMap.getOrDefault(s.getMainPattern(), 0));

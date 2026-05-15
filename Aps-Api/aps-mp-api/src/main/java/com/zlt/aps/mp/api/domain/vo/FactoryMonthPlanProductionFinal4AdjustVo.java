@@ -77,4 +77,11 @@ public class FactoryMonthPlanProductionFinal4AdjustVo extends FactoryMonthPlanPr
     @ApiModelProperty(value = "版本规则：ADJ+年月日+3位流水号；", name = "version")
     @TableField(value = "VERSION")
     private String version;
+
+    /**
+     * 调整标识，0-没有调整,1-有调整
+     */
+    @ApiModelProperty(value = "调整标识", name = "adjustFlag")
+    @TableField(exist = false)
+    private String adjustFlag;
 }
