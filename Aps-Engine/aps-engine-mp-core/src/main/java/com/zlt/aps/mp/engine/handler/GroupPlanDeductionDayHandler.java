@@ -154,7 +154,7 @@ public class GroupPlanDeductionDayHandler {
      * @param allMouldInfoMap    模具排产集合对象
      * @param singleDeductionDay 清除日
      */
-    private void clearProductionInfoByDay(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, DayCapacityLimitVo dayCapacityLimit, GroupPlanCxLhCapacityLimitHelper productionDayLimit, Map<String, ProductionMouldInfoVo> allMouldInfoMap, Integer singleDeductionDay) {
+    public void clearProductionInfoByDay(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, DayCapacityLimitVo dayCapacityLimit, GroupPlanCxLhCapacityLimitHelper productionDayLimit, Map<String, ProductionMouldInfoVo> allMouldInfoMap, Integer singleDeductionDay) {
         Map<String, SkuDayProductionInfoHelper> productionSkuQtyInfo = productionDayLimit.getProductionSkuQtyInfo();
         if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
             return;
