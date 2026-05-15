@@ -566,6 +566,10 @@ public class MpWeekRollAdjustEngine {
      * @param structureIn
      */
     private void checkDayLhQtyWithMainPattern(StringBuffer sbError, MpAdjustStructureIn structureIn){
+        if (structureIn.getConfirmAdjustQty() == null || structureIn.getConfirmAdjustQty() == 0){
+            //若确认调整为空或0，则不检查
+            return;
+        }
         //物料编码：[%s]，没有日硫化量！
         if (structureIn.getDayVulcanizationQty() == null || structureIn.getDayVulcanizationQty() == 0){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
