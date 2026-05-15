@@ -8,6 +8,7 @@ import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -15,15 +16,20 @@ import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.domain.CellStyle;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
+import com.zlt.aps.cx.mapper.CxParamConfigMapper;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
 import com.zlt.aps.cx.mapper.LhFinishQtyMapper;
 import com.zlt.aps.cx.mapper.LhScheduleResultMapper;
 import com.zlt.aps.cx.service.CxScheduleDetailService;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
+import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.service.IFactoryMonthPlanProductionFinalResultRemoteService;
 import com.zlt.aps.mp.api.service.IMpStructureAllocationRemoteService;
@@ -38,6 +44,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.Resource;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -76,6 +83,12 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     @Autowired
     private LhFinishQtyMapper lhFinishQtyMapper;
+
+    @Resource
+    private CxParamConfigMapper cxParamConfigMapper;
+
+    @Resource
+    private MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
 
     @Override
     public List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate) {
@@ -1056,10 +1069,41 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @return 模板列表行数据，字段名与cxyl.xlsx中的列表占位符保持一致
      */
     private List<Map<String, Object>> buildCxRemainQtyExportDataList(List<CxScheduleResult> list) {
-        List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
+        List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() :
+                list.stream().sorted(Comparator.comparing(CxScheduleResult::getCxMachineCode)
+                                .thenComparing(CxScheduleResult::getMaterialCode))
+                        .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(list)) {
+            return Collections.emptyList();
+        }
+
         Map<String, List<CxScheduleResult>> groupMap = exportList.stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(this::buildCxRemainQtyGroupKey, LinkedHashMap::new, Collectors.toList()));
+
+        // 查询胶种，使用胎胚代码关联，取对应的花纹等
+        CxParamConfig config = cxParamConfigMapper.selectOne(
+                new LambdaQueryWrapper<CxParamConfig>()
+                        .eq(CxParamConfig::getParamCode, "RUBBER_TYPE_CODES")
+                        .eq(CxParamConfig::getIsActive, 1));
+
+        Map<String, String> smallGlueMap = new HashMap<>();
+        if (config != null && StringUtils.isNotBlank(config.getParamValue())) {
+            List<String> codes = Arrays.stream(config.getParamValue().split(","))
+                    .map(String::trim)
+                    .filter(StringUtils::isNotBlank)
+                    .map(item -> "AQ" + item)
+                    .collect(Collectors.toList());
+            List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = mdmMaterialConsumeDetailMapper.selectList(new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
+                    .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
+                    .eq(MdmMaterialConsumeDetail::getFactoryCode, list.get(0).getFactoryCode())
+                    .in(MdmMaterialConsumeDetail::getChildMaterialName, codes));
+
+            if(CollectionUtils.isNotEmpty(mdmMaterialConsumeDetailList)) {
+                smallGlueMap = mdmMaterialConsumeDetailList.stream().collect(Collectors.toMap(MdmMaterialConsumeDetail::getEmbryoCode, MdmMaterialConsumeDetail::getChildMaterialName));
+            }
+        }
+
 
         List<Map<String, Object>> dataList = new ArrayList<>();
         for (List<CxScheduleResult> groupList : groupMap.values()) {
@@ -1070,10 +1114,17 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("cxMachineCode", first.getCxMachineCode());
             row.put("materialCode", first.getMaterialCode());
-            row.put("embryoCode", first.getEmbryoCode());
+            String embryoCode = first.getEmbryoCode();
+            row.put("embryoCode", embryoCode);
             row.put("mainMaterialDesc", firstNonBlank(groupList, "mainMaterialDesc"));
             // 小胶种暂未明确来源，按需求先导出空值，避免误用其他业务字段。
-            row.put("smallGlue", "");
+            if (smallGlueMap.containsKey(embryoCode)) {
+                String smallGlue = smallGlueMap.get(embryoCode);
+                smallGlue = smallGlue.substring(2);
+                row.put("smallGlue", smallGlue);
+            } else {
+                row.put("smallGlue", "");
+            }
             row.put("cxRemainQty", sumCxRemainQty(groupList));
             row.put("remark", buildCxRemainQtyRemark(groupList));
             dataList.add(row);

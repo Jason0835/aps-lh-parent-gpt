@@ -24,6 +24,7 @@ import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.enums.EventModuleTypeEnum;
 import com.zlt.aps.maindata.enums.ReleaseStatusEnum;
 import com.zlt.aps.maindata.event.publisher.EventPublisher;
+import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
 import com.zlt.aps.mp.api.domain.dto.MonthPlanFinalizedEventDto;
@@ -40,6 +41,8 @@ import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
+import com.zlt.aps.mp.mdm.dto.DataDTO;
+import com.zlt.aps.mp.mdm.handler.DataManager;
 import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.utils.IncrementService;
 import com.zlt.aps.utils.JsonUtils;
@@ -52,12 +55,15 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StopWatch;
 
 import javax.annotation.Resource;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -105,6 +111,10 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     private MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
     @Autowired
     private DpDemandPlanSumEntityMapper dpDemandPlanSumEntityMapper;
+    @Autowired
+    private IRawSpecialMaterialRecordService rawSpecialMaterialRecordService;
+    @Autowired
+    private DataManager dataManager;
 
     @Override
     protected String getDocTypeCode() {
@@ -871,6 +881,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         // 调整列表以传入的调整版本号优先匹配；没有调整版本号时使用排产版本号匹配。
         String matchVersion = StringUtils.defaultIfBlank(condition.getVersion(), condition.getProductionVersion());
         List<FactoryMonthPlanProductionFinal4AdjustVo> dataList = this.finalMapper.list4Adjust(condition);
+        // 设置是否特殊材料
+        setSpecialMaterial(condition.getFactoryCode(), dataList);
         // 先放入定稿数据，保证定稿独有数据不会丢失，并保留原列表顺序。
         Map<String, FactoryMonthPlanProductionFinal4AdjustVo> finalResultMap = new LinkedHashMap<>();
         if (CollectionUtils.isNotEmpty(dataList)) {
@@ -918,6 +930,85 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             JsonUtils.parseJsonRemarkList(resultList, language.toString(), "reason");
         }
         return resultList;
+    }
+
+    /**
+     * 设置是否特殊材料
+     * @param factoryCode 分厂编号
+     * @param mpFinalAdjustList 定稿列表
+     */
+    public void setSpecialMaterial(String factoryCode, List<FactoryMonthPlanProductionFinal4AdjustVo> mpFinalAdjustList) {
+        if (com.zlt.aps.mp.common.utils.PubUtil.isEmpty(mpFinalAdjustList)) {
+            return;
+        }
+
+        // 创建计时器
+        StopWatch watch = new StopWatch();
+        watch.start();
+
+        // 查询BOM物料消耗明细
+        CompletableFuture<List<MdmMaterialConsumeDetail>> materialConsumeDetailFuture = CompletableFuture.supplyAsync(
+                () -> queryMaterialConsumeDetailList(factoryCode)
+        );
+        // 查询特殊材料记录
+        CompletableFuture<List<RawSpecialMaterialRecord>> rawSpecialMaterialRecordFuture = CompletableFuture.supplyAsync(
+                () -> querySpecialMaterialRecordList(factoryCode)
+        );
+
+        try {
+            // 等待所有异步任务执行完成
+            CompletableFuture.allOf(
+                    materialConsumeDetailFuture,
+                    rawSpecialMaterialRecordFuture
+            ).join();
+
+            log.info("设置是否特殊材料 ==> 并行查询数据执行完成");
+
+        } catch (CompletionException e) {
+            // 异常处理
+            Throwable throwable = e.getCause();
+            log.error("查询数据失败! 失败原因:{}", throwable.getMessage(), throwable);
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.initDataFailure"), throwable);
+        } finally {
+            watch.stop();
+        }
+
+        List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = materialConsumeDetailFuture.join();
+        List<RawSpecialMaterialRecord> specialMaterialList = rawSpecialMaterialRecordFuture.join();
+
+        for (FactoryMonthPlanProductionFinal4AdjustVo monthPlan : mpFinalAdjustList) {
+            // 设置是否含有特殊材料
+            boolean isHasSpecialMaterial = rawSpecialMaterialRecordService.hasSpecialMaterial(monthPlan.getEmbryoCode(), mdmMaterialConsumeDetailList, specialMaterialList);
+            monthPlan.setHasSpecialMaterial(isHasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
+        }
+    }
+
+    /**
+     * 查询BOM物料消耗明细
+     *
+     * @param factoryCode 分厂编号
+     */
+    private List<MdmMaterialConsumeDetail> queryMaterialConsumeDetailList(String factoryCode) {
+        MdmMaterialConsumeDetail queryVO = new MdmMaterialConsumeDetail();
+        queryVO.setFactoryCode(factoryCode);
+
+        String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
+        return dataManager.listMaterialConsumeDetails(dataDTO);
+    }
+
+    /**
+     * 查询特殊材料记录
+     *
+     * @param factoryCode 分厂编号
+     */
+    private List<RawSpecialMaterialRecord> querySpecialMaterialRecordList(String factoryCode) {
+        RawSpecialMaterialRecord queryVO = new RawSpecialMaterialRecord();
+        queryVO.setFactoryCode(factoryCode);
+
+        String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
+        return dataManager.listSpecialMaterials(dataDTO);
     }
 
     /**
