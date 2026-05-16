@@ -16,9 +16,11 @@ import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.domain.CellStyle;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
+import com.zlt.aps.cx.mapper.CxKeyProductMapper;
 import com.zlt.aps.cx.mapper.CxParamConfigMapper;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
 import com.zlt.aps.cx.mapper.LhFinishQtyMapper;
@@ -81,6 +83,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     @Autowired
     private LhFinishQtyMapper lhFinishQtyMapper;
+
+    @Autowired
+    private CxKeyProductMapper cxKeyProductMapper;
 
     @Resource
     private CxParamConfigMapper cxParamConfigMapper;
@@ -280,6 +285,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         Map<String, BigDecimal> totalDailyPlanQtyMap = buildTotalDailyPlanQtyMap(exportList);
         Map<String, BigDecimal> todayNightFinishQtyMap = buildTodayNightFinishQtyMap(exportList, scheduleDate);
+        Map<String, Map<String, String>> smallGlueMaps = buildSmallGlueMaps(exportList);
+        Map<String, String> smallGlueMap = smallGlueMaps.getOrDefault("smallGlue", Collections.emptyMap());
+        Map<String, String> placeholderMap = smallGlueMaps.getOrDefault("placeholder", Collections.emptyMap());
+
+        Set<String> keyProductEmbryoCodes = loadKeyProductEmbryoCodes();
 
         // Sheet 0: 成型余量-按机台
         Map<String, Object> remainQtyTableMap = new HashMap<>(16);
@@ -290,7 +300,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // Sheet 1: 成型日计划
         Map<String, Object> planTableMap = buildCxTemplateTableMap(exportList);
         List<List<Map<String, Object>>> planDataList = new ArrayList<>();
-        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap);
+        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, keyProductEmbryoCodes);
         planDataList.add(planRows);
 
         // 为小计行添加 DAEEF3 背景色标识
@@ -421,7 +431,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      */
     private List<Map<String, Object>> buildCxTemplateDataList(List<CxScheduleResult> list, Map<String, String> recipeTypeMap,
                                                                Map<String, BigDecimal> totalDailyPlanQtyMap,
-                                                               Map<String, BigDecimal> todayNightFinishQtyMap) {
+                                                               Map<String, BigDecimal> todayNightFinishQtyMap,
+                                                               Map<String, String> smallGlueMap,
+                                                               Map<String, String> placeholderMap,
+                                                               Set<String> keyProductEmbryoCodes) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
         Map<String, List<CxScheduleResult>> groupMap = exportList.stream()
@@ -439,7 +452,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     String::compareTo));
 
             for (CxScheduleResult item : groupList) {
-                dataList.add(buildCxTemplateRow(item, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap));
+                dataList.add(buildCxTemplateRow(item, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, keyProductEmbryoCodes));
             }
             dataList.add(buildCxTemplateSubtotalRow(groupList));
         }
@@ -452,7 +465,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      */
     private Map<String, Object> buildCxTemplateRow(CxScheduleResult item, Map<String, String> recipeTypeMap,
                                                       Map<String, BigDecimal> totalDailyPlanQtyMap,
-                                                      Map<String, BigDecimal> todayNightFinishQtyMap) {
+                                                      Map<String, BigDecimal> todayNightFinishQtyMap,
+                                                      Map<String, String> smallGlueMap,
+                                                      Map<String, String> placeholderMap,
+                                                      Set<String> keyProductEmbryoCodes) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("cxMachineCode", item.getCxMachineCode());
         row.put("structureName", item.getStructureName());
@@ -465,53 +481,64 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         row.put("totalStock", item.getTotalStock());
         row.put("lhClassQty", item.getLhClassQty());
 
+        boolean keyProduct = keyProductEmbryoCodes != null
+                && keyProductEmbryoCodes.contains(StringUtils.defaultString(item.getEmbryoCode()).trim());
+
         row.put("class1PlanQty", zeroToEmpty(item.getClass1PlanQty()));
         row.put("class1FinishQty", zeroToEmpty(item.getClass1FinishQty()));
         row.put("class1Analysis", item.getClass1Analysis());
         row.put("class1RecipeType", dictLabel(recipeTypeMap, item.getClass1RecipeType()));
         row.put("class1RecipeNo", item.getClass1RecipeNo());
+        row.put("class1Remark", keyProduct && isPositivePlan(item.getClass1PlanQty()) ? "SPQT" : "");
 
         row.put("class2PlanQty", zeroToEmpty(item.getClass2PlanQty()));
         row.put("class2FinishQty", zeroToEmpty(item.getClass2FinishQty()));
         row.put("class2Analysis", item.getClass2Analysis());
         row.put("class2RecipeType", dictLabel(recipeTypeMap, item.getClass2RecipeType()));
         row.put("class2RecipeNo", item.getClass2RecipeNo());
+        row.put("class2Remark", keyProduct && isPositivePlan(item.getClass2PlanQty()) ? "SPQT" : "");
 
         row.put("class3PlanQty", zeroToEmpty(item.getClass3PlanQty()));
         row.put("class3FinishQty", zeroToEmpty(item.getClass3FinishQty()));
         row.put("class3Analysis", item.getClass3Analysis());
         row.put("class3RecipeType", dictLabel(recipeTypeMap, item.getClass3RecipeType()));
         row.put("class3RecipeNo", item.getClass3RecipeNo());
+        row.put("class3Remark", keyProduct && isPositivePlan(item.getClass3PlanQty()) ? "SPQT" : "");
 
         row.put("class4PlanQty", zeroToEmpty(item.getClass4PlanQty()));
         row.put("class4FinishQty", zeroToEmpty(item.getClass4FinishQty()));
         row.put("class4Analysis", item.getClass4Analysis());
         row.put("class4RecipeType", dictLabel(recipeTypeMap, item.getClass4RecipeType()));
         row.put("class4RecipeNo", item.getClass4RecipeNo());
+        row.put("class4Remark", keyProduct && isPositivePlan(item.getClass4PlanQty()) ? "SPQT" : "");
 
         row.put("class5PlanQty", zeroToEmpty(item.getClass5PlanQty()));
         row.put("class5FinishQty", zeroToEmpty(item.getClass5FinishQty()));
         row.put("class5Analysis", item.getClass5Analysis());
         row.put("class5RecipeType", dictLabel(recipeTypeMap, item.getClass5RecipeType()));
         row.put("class5RecipeNo", item.getClass5RecipeNo());
+        row.put("class5Remark", keyProduct && isPositivePlan(item.getClass5PlanQty()) ? "SPQT" : "");
 
         row.put("class6PlanQty", zeroToEmpty(item.getClass6PlanQty()));
         row.put("class6FinishQty", zeroToEmpty(item.getClass6FinishQty()));
         row.put("class6Analysis", item.getClass6Analysis());
         row.put("class6RecipeType", dictLabel(recipeTypeMap, item.getClass6RecipeType()));
         row.put("class6RecipeNo", item.getClass6RecipeNo());
+        row.put("class6Remark", keyProduct && isPositivePlan(item.getClass6PlanQty()) ? "SPQT" : "");
 
         row.put("class7PlanQty", zeroToEmpty(item.getClass7PlanQty()));
         row.put("class7FinishQty", zeroToEmpty(item.getClass7FinishQty()));
         row.put("class7Analysis", item.getClass7Analysis());
         row.put("class7RecipeType", dictLabel(recipeTypeMap, item.getClass7RecipeType()));
         row.put("class7RecipeNo", item.getClass7RecipeNo());
+        row.put("class7Remark", keyProduct && isPositivePlan(item.getClass7PlanQty()) ? "SPQT" : "");
 
         row.put("class8PlanQty", zeroToEmpty(item.getClass8PlanQty()));
         row.put("class8FinishQty", zeroToEmpty(item.getClass8FinishQty()));
         row.put("class8Analysis", item.getClass8Analysis());
         row.put("class8RecipeType", dictLabel(recipeTypeMap, item.getClass8RecipeType()));
         row.put("class8RecipeNo", item.getClass8RecipeNo());
+        row.put("class8Remark", keyProduct && isPositivePlan(item.getClass8PlanQty()) ? "SPQT" : "");
 
         BigDecimal totalPlan = sumPlan(item);
         BigDecimal totalFinish = sumFinish(item);
@@ -528,6 +555,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 + StringUtils.defaultString(item.getMaterialCode()).trim();
         BigDecimal tnfq = todayNightFinishQtyMap.get(tnfKey);
         row.put("todayNightFinishQty", zeroToEmpty(tnfq));
+
+        String embryoCode = item.getEmbryoCode();
+        row.put("smallGlue", smallGlueMap.getOrDefault(embryoCode, ""));
+        row.put("placeholder", placeholderMap.getOrDefault(embryoCode, ""));
 
         return row;
     }
@@ -787,6 +818,104 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         log.info("buildTodayNightFinishQtyMap resultMap size:{}, keys:{}", resultMap.size(), resultMap.keySet());
 
         return resultMap;
+    }
+
+    /**
+     * 构建小胶种和占位符映射。
+     * <p>smallGlue：依据 embryoCode 关联 MdmMaterialConsumeDetail，过滤 CHILD_MATERIAL_NAME 以 AQ 开头，
+     * 去掉 AQ 前缀后得到胶种名称，多胶种用 "/" 连接。</p>
+     * <p>placeholder：同样依据 embryoCode 关联 MdmMaterialConsumeDetail，过滤 CHILD_MATERIAL_NAME 以 AQ 开头，
+     * 直接取 CHILD_MATERIAL_NAME 完整值，多个用 "/" 连接。</p>
+     *
+     * @param exportList 成型排程结果列表
+     * @return key=smallGlue/placeholder, value=embryoCode→字符串的映射
+     */
+    private Map<String, Map<String, String>> buildSmallGlueMaps(List<CxScheduleResult> exportList) {
+        Map<String, Map<String, String>> result = new HashMap<>(2);
+        result.put("smallGlue", new HashMap<>());
+        result.put("placeholder", new HashMap<>());
+
+        if (PubUtil.isEmpty(exportList)) {
+            return result;
+        }
+
+        Set<String> embryoCodes = exportList.stream()
+                .map(CxScheduleResult::getEmbryoCode)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+
+        if (embryoCodes.isEmpty()) {
+            return result;
+        }
+
+        // 查询原材料消耗明细，过滤 CHILD_MATERIAL_NAME 以 AQ 开头且未删除
+        List<MdmMaterialConsumeDetail> consumeDetails = mdmMaterialConsumeDetailMapper.selectList(
+                new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
+                        .in(MdmMaterialConsumeDetail::getEmbryoCode, embryoCodes)
+                        .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQ")
+                        .and(w -> w.eq(MdmMaterialConsumeDetail::getIsDelete, 0)
+                                .or().isNull(MdmMaterialConsumeDetail::getIsDelete)));
+
+        if (CollectionUtils.isEmpty(consumeDetails)) {
+            return result;
+        }
+
+        // 构建 embryoCode → 胶种名称集合 映射（smallGlue 去掉 AQ 前缀，placeholder 保留完整值）
+        Map<String, Set<String>> smallGlueMap = consumeDetails.stream()
+                .filter(d -> StringUtils.isNotBlank(d.getEmbryoCode())
+                        && StringUtils.isNotBlank(d.getChildMaterialName())
+                        && d.getChildMaterialName().startsWith("AQ"))
+                .collect(Collectors.groupingBy(
+                        MdmMaterialConsumeDetail::getEmbryoCode,
+                        HashMap::new,
+                        Collectors.mapping(d -> d.getChildMaterialName().substring(2), Collectors.toCollection(LinkedHashSet::new))));
+
+        smallGlueMap.forEach((embryoCode, rubberTypes) ->
+                result.get("smallGlue").put(embryoCode, String.join("/", rubberTypes)));
+
+        Map<String, Set<String>> placeholderMap = consumeDetails.stream()
+                .filter(d -> StringUtils.isNotBlank(d.getEmbryoCode())
+                        && StringUtils.isNotBlank(d.getChildMaterialName())
+                        && d.getChildMaterialName().startsWith("AQ"))
+                .collect(Collectors.groupingBy(
+                        MdmMaterialConsumeDetail::getEmbryoCode,
+                        HashMap::new,
+                        Collectors.mapping(MdmMaterialConsumeDetail::getChildMaterialName, Collectors.toCollection(LinkedHashSet::new))));
+
+        placeholderMap.forEach((embryoCode, names) ->
+                result.get("placeholder").put(embryoCode, String.join("/", names)));
+
+        return result;
+    }
+
+    /**
+     * 加载关键产品胎胚编码集合。
+     * 取数逻辑与 ScheduleServiceImpl.loadKeyProducts 一致：查询 T_CX_KEY_PRODUCT，
+     * 过滤 isActive = 1 且 isDelete = 0 的记录，收集胚胎编码。
+     *
+     * @return 关键产品胎胚编码集合
+     */
+    private Set<String> loadKeyProductEmbryoCodes() {
+        List<CxKeyProduct> keyProducts = cxKeyProductMapper.selectList(
+                new LambdaQueryWrapper<CxKeyProduct>()
+                        .eq(CxKeyProduct::getIsActive, 1)
+                        .eq(CxKeyProduct::getIsDelete, "0"));
+        if (CollectionUtils.isEmpty(keyProducts)) {
+            return Collections.emptySet();
+        }
+        return keyProducts.stream()
+                .map(CxKeyProduct::getEmbryoCode)
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 判断计划量是否为有效值（非 null 且不为 0），
+     * 用于决定是否需要标注 SPQT。
+     */
+    private boolean isPositivePlan(BigDecimal val) {
+        return val != null && val.compareTo(BigDecimal.ZERO) != 0;
     }
 
     @Override
