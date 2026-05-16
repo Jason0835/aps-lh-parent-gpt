@@ -124,6 +124,7 @@
     <structure-adjust-dialog
       ref="structureAdjustDialogRef"
       @structure-adjust-saved="onStructureAdjustSaved"
+      @plan-downtime-applied="onPlanDowntimeApplied"
     />
     <adjust-version-dialog
       ref="adjustVersionDialogRef"
@@ -1523,6 +1524,9 @@ export default {
     onStructureAdjustSaved() {
       this.fetchCurrentAdjustMachineFromRedis();
       this.getList();
+    },
+    onPlanDowntimeApplied() {
+      this.fetchCurrentAdjustMachineFromRedis();
     },
     /**
      * 与周程滚动「结构调整」listAdjusts 入参对齐：productionVersion + version + adjVersion（列表首行 version 一般为调整版本 ADJ…）

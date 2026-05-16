@@ -30,6 +30,15 @@
             {{ $t("ui.data.column.monthPlanFinalAdjustQuery.addStructure") }}
           </el-button>
         </el-form-item>
+        <el-form-item>
+          <el-button
+            type="warning"
+            plain
+            @click="handlePlanDowntime"
+          >
+            {{ $t("ui.data.column.monthPlanFinalAdjustQuery.planDowntime") }}
+          </el-button>
+        </el-form-item>
       </el-form>
 
       <el-table :data="tableRows" border size="small" max-height="420">
@@ -106,24 +115,18 @@
         </el-table-column>
         <el-table-column
           :label="$t('ui.data.btn.option')"
-          width="220"
+          width="140"
           align="center"
           fixed="right"
         >
           <template slot-scope="scope">
-            <template v-if="!scope.row._isNew">
-              <el-button type="text" @click="handleSelect(scope.row)">{{
-                $t("ui.data.column.monthPlanFinalAdjustQuery.btnSelect")
-              }}</el-button>
-            </template>
-            <template v-else>
-              <el-button type="text" @click="handlePlanDowntime(scope.row)">{{
-                $t("ui.data.column.monthPlanFinalAdjustQuery.planDowntime")
-              }}</el-button>
-              <el-button type="text" @click="handleSaveRow(scope.row)">{{
-                $t("common.button.save")
-              }}</el-button>
-            </template>
+            <el-button
+              type="text"
+              :disabled="scope.row._isNew && (!scope.row.structureName || scope.row.beginDay == null || scope.row.endDay == null)"
+              @click="handleSelect(scope.row)"
+            >{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.btnSelect")
+            }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -137,8 +140,8 @@ import formingCapacitySelect from "@/views/components/formingCapacitySelect.vue"
 /** listOutsideStructure → POST /monthplan/mpStructureAllocation/listAdjusts；outGetStayDay/versionOutHistory 与周程单结构调整一致 */
 import {
   listOutsideStructure,
-  addAdjust,
   setAdjustsCxMachineFromRedis,
+  getAdjustsCxMachineFromRedis,
   outGetStayDay,
   versionOutHistory,
 } from "@/api/monthplan/adjustStructure";
@@ -186,14 +189,6 @@ function getFirstGap(allIntervals, maxDay = MONTH_STANDARD_MAX) {
     return { begin: cur, end: maxDay };
   }
   return null;
-}
-
-function intervalsOverlap(a, b) {
-  const b1 = Math.min(Number(a.begin), Number(a.end));
-  const e1 = Math.max(Number(a.begin), Number(a.end));
-  const b2 = Math.min(Number(b.begin), Number(b.end));
-  const e2 = Math.max(Number(b.begin), Number(b.end));
-  return Math.max(b1, b2) <= Math.min(e1, e2);
 }
 
 let tmpId = 1;
@@ -425,48 +420,24 @@ export default {
         endDay: null,
       });
     },
-    /** 计划停机：按当前表格内全部结构（含未保存新增）计算第一段空隙 */
-    handlePlanDowntime(row) {
-      const others = this.tableRows.filter((r) => r !== row);
-      const gap = getFirstGap(
-        others.map((r) => ({ begin: r.beginDay, end: r.endDay }))
-      );
-      if (!gap) {
-        this.$modal.msgWarning(
-          this.$t("ui.data.column.monthPlanFinalAdjustQuery.noGapForDowntime")
-        );
-        return;
+    async handlePlanDowntime() {
+      try {
+        this.loading = true;
+        await setAdjustsCxMachineFromRedis({
+          cxMachineCode: "",
+          structureName: "",
+          beginDay: null,
+          endDay: null,
+          version: "",
+        });
+        this.dialogVisible = false;
+        await getAdjustsCxMachineFromRedis();
+        this.$emit("plan-downtime-applied");
+      } catch (e) {
+        console.error(e);
+      } finally {
+        this.loading = false;
       }
-      this.$set(row, "beginDay", gap.begin);
-      this.$set(row, "endDay", gap.end);
-    },
-    /** 同一结构名称下日期区间不得重叠 */
-    validateNoOverlapForStructure(row) {
-      const name = (row.structureName || "").trim();
-      if (!name) {
-        this.$modal.msgWarning(this.$t("common.rule.input"));
-        return false;
-      }
-      if (row.beginDay == null || row.endDay == null) {
-        this.$modal.msgWarning(this.$t("common.rule.select"));
-        return false;
-      }
-      const cur = { begin: row.beginDay, end: row.endDay };
-      const sameNameRows = this.tableRows.filter(
-        (r) => (r.structureName || "").trim() === name && r !== row
-      );
-      for (const o of sameNameRows) {
-        if (o.beginDay == null || o.endDay == null) {
-          continue;
-        }
-        if (intervalsOverlap(cur, { begin: o.beginDay, end: o.endDay })) {
-          this.$modal.msgWarning(
-            this.$t("ui.data.column.monthPlanFinalAdjustQuery.structureDateOverlap")
-          );
-          return false;
-        }
-      }
-      return true;
     },
     /**
      * 组装 getPreviousStructure（outGetStayDay）入参：与周程旧版一致，传 **listAdjusts 行全部字段**，
@@ -579,59 +550,6 @@ export default {
         })
       );
       await Promise.all(tasks);
-    },
-    async handleSaveRow(row) {
-      if (!this.validateNoOverlapForStructure(row)) {
-        return;
-      }
-      try {
-        this.loading = true;
-        const params = {
-          factoryCode: this.factoryCode,
-          cxMachineCode: this.cxMachineCode,
-          structureName: row.structureName,
-          beginDay: row.beginDay,
-          endDay: row.endDay,
-          yearMonth: this.yearMonth,
-        };
-        if (params.yearMonth) {
-          const arr = params.yearMonth.split("-");
-          params.year = arr[0];
-          params.month = arr[1];
-          delete params.yearMonth;
-        }
-        const res = await addAdjust(params);
-        /** 新增结构保存成功后，将调整上下文写入 Redis（与 AdjustsCxMachineVo 一致，主页面仅读展示） */
-        const adjVer = (this.listAdjustsAdjVersion || "").trim();
-        const listVer = (this.listAdjustsVersion || "").trim();
-        const prodVer = (this.productionVersion || "").trim();
-        await setAdjustsCxMachineFromRedis({
-          cxMachineCode: String(this.cxMachineCode || "").trim(),
-          structureName:
-            row.structureName != null ? String(row.structureName).trim() : "",
-          beginDay:
-            row.beginDay != null && row.beginDay !== ""
-              ? Number(row.beginDay)
-              : null,
-          endDay:
-            row.endDay != null && row.endDay !== ""
-              ? Number(row.endDay)
-              : null,
-          /** 与后端 AdjustsCxMachineVo.version 对应（JSON 键为 version，勿写 verison） */
-          version: listVer || adjVer || prodVer,
-        });
-        this.$modal.msgSuccess(
-          res.msg || this.$t("common.msg.success.operate")
-        );
-        this.newRows = this.newRows.filter((r) => r._tmpId !== row._tmpId);
-        await this.loadMachineStructureList();
-        this.$emit("structure-adjust-saved");
-        this.dialogVisible = false;
-      } catch (e) {
-        console.error(e);
-      } finally {
-        this.loading = false;
-      }
     },
     async handleSelect(row) {
       if (!this.yearMonth) {
