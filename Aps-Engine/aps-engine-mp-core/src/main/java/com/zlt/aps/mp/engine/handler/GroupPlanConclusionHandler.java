@@ -455,9 +455,11 @@ public class GroupPlanConclusionHandler {
         List<GroupPlanCxLhCapacityLimitHelper> lowHeightPriorityLhMachineList = new ArrayList<>();
         TreeMap<Integer, List<GroupPlanCxLhCapacityLimitHelper>> dayLimitMap = dayLimitList.stream().collect(
                 Collectors.groupingBy(GroupPlanCxLhCapacityLimitHelper::getDay, TreeMap::new, Collectors.toList()));
-        // 遍历各排产日，找出每天排高优先级的SKU的机台占用是否小于阈值（默认2）
+        Integer latestDay = 0;
+        // 遍历各排产日，找出高优先级的SKU的机台占用超过阈值的最晚日期（默认2）
         for (Entry<Integer, List<GroupPlanCxLhCapacityLimitHelper>> entry: dayLimitMap.entrySet()) {
             GroupPlanCxLhCapacityLimitHelper singleDay = CollectionUtils.firstElement(entry.getValue());
+            Integer day = singleDay.getDay();
             // 取出当天的排产量
             Map<String, SkuDayProductionInfoHelper> productionSkuQtyMap = singleDay.getProductionSkuQtyInfo();
             // 高优先级排产机台数
@@ -480,17 +482,21 @@ public class GroupPlanConclusionHandler {
                     heightQtyMap.put(materialDesc, remainHeightQty);
                 }
             }
-            // 判断高优先级排产机台数是否小于阈值
-            if (heightPriorityMachineCount < groupPlanInfo.getMinHeightPriorityLhMachineCount()) {
-                // 满足条件则添加后续天数到列表中
-                Integer currentDay = singleDay.getDay();
-                while(currentDay != null) {
-                    lowHeightPriorityLhMachineList.addAll(dayLimitMap.get(currentDay));
-                    currentDay = dayLimitMap.higherKey(currentDay); // 取下一个天
-                } 
-                break;
+            // 判断高优先级排产机台数是否达到阈值，达到了则更新最晚达标天数
+            if (heightPriorityMachineCount >= groupPlanInfo.getMinHeightPriorityLhMachineCount() && latestDay < day) {
+                latestDay = day;
             }
         }
+        
+        if (latestDay > 0) {
+            // 检查最晚满足天数后是否还有其他日期，如果有则说明后续天数是不达标的，需要添加到收尾列表中
+            Integer currentDay = dayLimitMap.higherKey(latestDay);
+            while(currentDay != null) {
+                lowHeightPriorityLhMachineList.addAll(dayLimitMap.get(currentDay));
+                currentDay = dayLimitMap.higherKey(currentDay); // 取下一个天
+            } 
+        }
+        
         return lowHeightPriorityLhMachineList;
     }
 
