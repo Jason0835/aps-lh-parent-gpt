@@ -1585,6 +1585,12 @@ export default {
           payload.prefillCxMachineCode = firstMachine;
         }
       }
+      if (!payload.prefillCxMachineCode) {
+        const redisMachine = (this.currentAdjustMachine || "").trim();
+        if (redisMachine) {
+          payload.prefillCxMachineCode = this.extractFirstCxMachineCode(redisMachine);
+        }
+      }
       this.$refs.structureAdjustDialogRef.show(payload);
     },
     handleViewAdjustVersion() {
