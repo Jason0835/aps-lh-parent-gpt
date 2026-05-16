@@ -91,7 +91,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected FactoryMonthPlanProductionFinalResultEntityMapper factoryMonthPlanProdFinalMapper;
-
+    @Autowired
+    protected IBatchMpProductionFinalResultService batchMpProductionFinalResultService;
     @Autowired
     protected MdmMonthSurplusEntityMapper mdmMonthSurplusEntityMapper;
 
@@ -888,8 +889,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 contextDTO.getEndDay(), contextDTO.getAdjustStartDay(), contextDTO.getAdjustEndDay());
         // 1、查询周程调整结果
         queryAdjustResult(contextDTO);
-        // 根据优先级顺序分配生产数量
-        allocateProductionByPriority(contextDTO);
+
         // 2、查询调整明细
         queryAdjustDetailList(contextDTO);
         // 3、查询月度生产计划
@@ -899,9 +899,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
         }
         queryMonthPlanList(contextDTO);
-        // 4、更新试制量制计划
+        // 4、更新试制量制计划--排产日期
         updateTrialPlanList(contextDTO);
-        // 5、更新调整明细
+        // 5、更新调整明细--实际调整量
         updateAdjustDetailList(contextDTO);
         // 6、更新月度生产计划
         updateMonthPlanList(contextDTO);
@@ -911,7 +911,34 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         updateStructureAllocationList(contextDTO);
         // 9、处理月计划统计结果
         handleMonthPlanStatistics(contextDTO);
+        // 10、合并至定稿月度生产计划
+        // 根据优先级顺序分配生产数量
+        allocateProductionByPriority(contextDTO);
+        saveMpProductionFinalResult(contextDTO);
+
         log.info("周程调整确认流程执行完成");
+    }
+
+    /**
+     * 合并至定稿月度生产计划,同时过滤掉总排产量为0的数据
+     * @param contextDTO
+     */
+    private void saveMpProductionFinalResult(MpRollAdjustContextDTO contextDTO) {
+        //先删除
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> finalLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        finalLambdaQueryWrapper.eq(FactoryMonthPlanProductionFinalResult::getYear, contextDTO.getMpYear());
+        finalLambdaQueryWrapper.eq(FactoryMonthPlanProductionFinalResult::getMonth, contextDTO.getMpMonth());
+        finalLambdaQueryWrapper.eq(!StringUtil.isEmptyWithTrim(contextDTO.getStructureName()),FactoryMonthPlanProductionFinalResult::getStructureName, contextDTO.getStructureName());
+        factoryMonthPlanProdFinalMapper.delete(finalLambdaQueryWrapper);
+        //后插入
+        List<FactoryMonthPlanProductionFinalResult> finalResultList = BeanUtil.copyToList(contextDTO.getFactoryMonthPlanProdFinalList(), FactoryMonthPlanProductionFinalResult.class);
+        if (!StringUtil.isEmptyWithTrim(contextDTO.getStructureName())){
+            finalResultList = finalResultList.stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName()) &&
+                    x.getTotalQty() != null && x.getTotalQty() != 0).collect(Collectors.toList());
+        }else {
+            finalResultList = finalResultList.stream().filter(x->x.getTotalQty() != null && x.getTotalQty() != 0).collect(Collectors.toList());
+        }
+        batchMpProductionFinalResultService.insertBatchData(finalResultList);
     }
 
     /**
@@ -1410,18 +1437,21 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<FactoryMonthPlanProductionFinalResult> matchingProductionMonthPlanList = buildMatchingProductionMonthPlan(adjustDetailList, adjustResultList, contextDTO);
         insertMonthPlanList.addAll(matchingProductionMonthPlanList);
         // 获取调整结果计划总量为0的月度计划列表
-        List<FactoryMonthPlanProductionFinalResult> adjustResultMonthPlanList = buildAdjustResultMonthPlan(adjustResultList);
+        //List<FactoryMonthPlanProductionFinalResult> adjustResultMonthPlanList = buildAdjustResultMonthPlan(adjustResultList);
         // 需要删除月度生产计划列表
-        List<FactoryMonthPlanProductionFinalResult> deleteMonthPlanList = new ArrayList<>();
+        /*List<FactoryMonthPlanProductionFinalResult> deleteMonthPlanList = new ArrayList<>();
         deleteMonthPlanList.addAll(insertMonthPlanList);
-        deleteMonthPlanList.addAll(adjustResultMonthPlanList);
+        deleteMonthPlanList.addAll(adjustResultMonthPlanList);*/
 
         // 将日期字段中值为0的字段设为null
         for (FactoryMonthPlanProductionFinalResult monthPlan : insertMonthPlanList) {
             handleZeroToNull(monthPlan);
         }
 
-        try {
+        // 添加到月计划上下文
+        contextDTO.getFactoryMonthPlanProdFinalList().addAll(BeanUtil.copyToList(insertMonthPlanList, FactoryMonthPlanFinalAdjustVo.class));
+
+        /*try {
             // 删除月度生产计划
             deleteMonthPlanList(contextDTO, deleteMonthPlanList);
             // 新增月度生产计划
@@ -1432,7 +1462,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         } catch (Exception e) {
             log.error("新增月度生产计划批量操作异常", e);
             throw new RuntimeException("新增月度生产计划失败", e);
-        }
+        }*/
 
     }
 
@@ -2274,7 +2304,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
 
 
-        try {
+        /*try {
             // 更新月度生产计划
             baseDao.updateBatch(monthPlanResultList);
             log.info("更新月度生产计划成功，共更新:{}条记录", monthPlanResultList.size());
@@ -2286,7 +2316,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         } catch (Exception e) {
             log.error("更新月度生产计划批量操作异常", e);
             throw new RuntimeException("更新月度生产计划失败", e);
-        }
+        }*/
 
     }
 
