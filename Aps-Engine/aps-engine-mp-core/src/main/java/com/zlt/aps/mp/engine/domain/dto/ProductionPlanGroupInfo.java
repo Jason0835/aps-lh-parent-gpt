@@ -461,7 +461,14 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(dayProductionLimitInfo)) {
             return context.getMonthDays();
         }
-        List<Integer> productionDayList = new ArrayList<>(dayProductionLimitInfo.keySet());
+        //20260516+ 防止中间断开导致续作时间不对
+        Set<Integer> dayProductionLimitSet = dayProductionLimitInfo.keySet();
+        Set<Integer> stopDayInfo = Optional.ofNullable(context.getStopDays()).orElse(Collections.emptySet());
+        Set<Integer> effectiveContinueProductionDay = ContinuousProductionDayHandler.getEarliestContinuousRangeResultExcludeStop(dayProductionLimitSet, stopDayInfo);
+        if (CollectionUtils.isEmpty(effectiveContinueProductionDay)) {
+            return null;
+        }
+        List<Integer> productionDayList = new ArrayList<>(effectiveContinueProductionDay);
         Collections.sort(productionDayList);
         return productionDayList.get(productionDayList.size() - BigDecimal.ONE.intValue());
     }
