@@ -1,12 +1,20 @@
 package com.zlt.aps.mp.engine.logrecorder;
 
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanLogDto;
+import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
 import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * TBR 模拟排产日志记录器
@@ -79,6 +87,38 @@ public class TbrSimulateProductionLogRecorder {
         return logContent;
     }
 
+    /**
+     * 增加 分组匹配优先级最高机台 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，订单高优先级交付优先：分组名 %s 最适配机台 %s====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addHeightPriorityMatchLog(Context context, String groupName, CxMachineBaseInfoVo cxMachineInfo){
+        Set<Integer> preDaySet = Optional.ofNullable(cxMachineInfo.getSelectedProductionDaySet()).orElse(Collections.emptySet());
+        String productionDays = preDaySet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，订单高优先级交付优先：分组名 %s 最适配机台 %s 预期排产日：%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, cxMachineInfo.getCxMachineCode(), productionDays);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 交付优先排产 结束 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产模式模拟排产结束====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addEndDeliveryPriorityLog(Context context) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产模式模拟排产结束====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
     /**
      * 增加 交付优先排产模式因结构固定重排续作日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产因结构固定重排续作====
