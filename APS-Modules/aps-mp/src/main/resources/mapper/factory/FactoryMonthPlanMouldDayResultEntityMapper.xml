@@ -37,6 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    sum( d.MID_QTY ) MID_QTY,
 		    sum( d.CYCLE_RESERVE_QTY ) CYCLE_RESERVE_QTY,
 		    sum( case when d.IS_SCHEDULE = '1' then d.CONVENTION_RESERVE_QTY else 0 end) CONVENTION_RESERVE_QTY,
+		    mc.NET_QTY UN_RESTRICTED_NET_QTY,
 		    r.TOTAL_QTY,
 		    r.HEIGHT_PRODUCTION_QTY,
 		    r.MID_PRODUCTION_QTY,
@@ -116,6 +117,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND m.FACTORY_CODE = r.FACTORY_CODE 
 		    AND r.production_version = #{dayResult.productionVersion}
 		    AND r.IS_DELETE = 0 
+		    LEFT JOIN T_MP_MOLD_CAPACITY_LOG mc ON mc.IS_DELETE = 0
+            AND mc.FACTORY_CODE = r.FACTORY_CODE 
+            AND mc.production_version = r.production_version
+            AND mc.MATERIAL_CODE = m.MATERIAL_CODE
 		    LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL f ON f.IS_DELETE = 0
 		    AND f.MATERIAL_CODE = m.MATERIAL_CODE
             AND f.`YEAR_MONTH` = DATE_FORMAT(DATE_SUB(concat(#{dayResult.year},'-',#{dayResult.month},'-1'),INTERVAL 1 month), '%Y%m')
@@ -163,6 +168,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.SINGLE_TIRE_WEIGHT,
 		    m.PRODUCT_CATEGORY,
             m.SECTION_WIDTH,
+            mc.NET_QTY,
 		    r.MOULD_CAVITY_QTY,
 		    r.TYPE_BLOCK_QTY,
 		    r.TOTAL_QTY,

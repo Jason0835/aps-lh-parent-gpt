@@ -137,4 +137,15 @@ public class FactoryMonthPlanMouldDayResultExportVo extends FactoryMonthPlanMoul
      */
     @ApiModelProperty(value = "第4周调整量", name = "adjustQty4")
     private Integer adjustQty4;
+    
+    /**
+     * 净需求(不含模具受限)
+     */
+    @ApiModelProperty(value = "净需求(不含模具受限)", name = "unRestrictedNetQty")
+    private Integer unRestrictedNetQty;
+    /**
+     * 模具产能受限
+     */
+    @ApiModelProperty(value = "模具产能受限", name = "restrictedNetQty")
+    private Integer restrictedNetQty;
 }
