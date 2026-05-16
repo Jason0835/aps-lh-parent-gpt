@@ -1382,6 +1382,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             Map<String, Object> row = new HashMap<>(112);
             row.put("lhMachineCode", result.getLhMachineCode());
             row.put("materialCode", result.getMaterialCode());
+            row.put("embryoCode", result.getEmbryoCode());
             row.put("materialDesc", result.getMaterialDesc());
             row.put("mainMaterialDesc", result.getMainMaterialDesc());
 //            row.put("scheduleType", buildScheduleTypeName(result.getScheduleType()));

@@ -7,7 +7,6 @@
     <resultMap type="com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan" id="LhPrecisionPlanResult">
         <id property="id" column="ID"/>
         <result property="machineCode" column="MACHINE_CODE"/>
-        <result property="mainMaterialCode" column="MAIN_MATERIAL_CODE"/>
         <result property="precisionType" column="PRECISION_TYPE"/>
         <result property="planDate" column="PLAN_DATE"/>
         <result property="actualDate" column="ACTUAL_DATE"/>
@@ -35,7 +34,6 @@
     <sql id="selectLhPrecisionPlanVo">
         select ID,
                MACHINE_CODE,
-               MAIN_MATERIAL_CODE,
                PRECISION_TYPE,
                PLAN_DATE,
                ACTUAL_DATE,

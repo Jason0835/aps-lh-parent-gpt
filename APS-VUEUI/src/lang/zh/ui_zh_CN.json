@@ -2659,7 +2659,6 @@
   "ui.data.column.lhScheduleResult.insertOrder.monthPlanVersionNotFound": "当前排程月[{}]未找到定稿排产版本，无法校验月度计划",
   "ui.data.column.lhPrecisionPlan.factoryCode": "分厂",
   "ui.data.column.lhPrecisionPlan.machineCode": "机台编号",
-  "ui.data.column.lhPrecisionPlan.mainMaterialCode": "胎胚编码",
   "ui.data.column.lhPrecisionPlan.precisionType": "精度类型",
   "ui.data.column.lhPrecisionPlan.planDate": "计划日期",
   "ui.data.column.lhPrecisionPlan.actualDate": "实际日期",
