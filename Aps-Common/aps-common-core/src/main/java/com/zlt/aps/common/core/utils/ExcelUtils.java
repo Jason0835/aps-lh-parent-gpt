@@ -437,6 +437,8 @@ public class ExcelUtils {
                     cellStyleList = com.alibaba.fastjson.JSON.parseArray(jsonStr, com.zlt.aps.common.core.domain.CellStyle.class);
                 }
                 if (cellStyleList != null) {
+                    // 优化样式处理：建立样式缓存，根据传入的样式定义缓存相同的样式
+                    Map<com.zlt.aps.common.core.domain.CellStyle, CellStyle> styleMap = new HashMap<>();
                     for (com.zlt.aps.common.core.domain.CellStyle cs : cellStyleList) {
                         boolean bold = cs.getBold() != null ? cs.getBold() : false;
                         String fontName = cs.getFontName();
@@ -451,7 +453,9 @@ public class ExcelUtils {
                                     }
                                 }
                             }
-                            CellStyle style2 = createColorCellStyle(workbook, cs.getColor(), cs.getWithBorder(), bold, fontName, oldStyle);
+                            // 先从缓存中获取相同字体、底色、粗体、边框的样式
+                            CellStyle copyStyle = oldStyle;
+                            CellStyle style2 = styleMap.computeIfAbsent(cs, k -> createColorCellStyle(workbook, cs.getColor(), cs.getWithBorder(), bold, fontName, copyStyle));
                             setCellRangeColor(sheet, cs.getStartRowNum(), colIdx, cs.getEndRowNum(), colIdx, style2);
                         }
                     }

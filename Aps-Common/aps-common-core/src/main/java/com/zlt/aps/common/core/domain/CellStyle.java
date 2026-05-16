@@ -1,6 +1,7 @@
 package com.zlt.aps.common.core.domain;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Data
 public class CellStyle {
@@ -28,18 +29,22 @@ public class CellStyle {
     /**
      * 开始行
      */
+    @EqualsAndHashCode.Exclude
     private int startRowNum;
     /**
      * 结束行
      */
+    @EqualsAndHashCode.Exclude
     private int endRowNum;
     /**
      * 开始列
      */
+    @EqualsAndHashCode.Exclude
     private int startCellNum;
     /**
      * 结束列
      */
+    @EqualsAndHashCode.Exclude
     private int endCellNum;
 
     /**
