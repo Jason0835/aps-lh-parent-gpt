@@ -921,7 +921,8 @@ export default {
         return false;
       }
       const today = new Date().getDate();
-      return day >= today && day < today + this.lockedDays;
+      const lockEndDay = today + this.lockedDays - 1;
+      return day <= lockEndDay;
     },
     /**
      * 修改优先上机（原锁定上机），与 rollingCycle/index.backup-legacy.vue 一致调用 mpAdjustResult/save
