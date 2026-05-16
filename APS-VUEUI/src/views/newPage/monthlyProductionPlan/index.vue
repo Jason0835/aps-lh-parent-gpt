@@ -652,7 +652,7 @@ export default {
               row[prop] === null || row[prop] === undefined
                 ? ""
                 : String(row[prop]);
-            if (!row.id) {
+            if (!row.id || this.isDayLocked(i)) {
               const isOver = row._overDays && row._overDays[prop];
               return <span style={isOver ? { color: "red" } : {}}>{text}</span>;
             }
@@ -660,7 +660,6 @@ export default {
               <el-input
                 size="mini"
                 value={text}
-                disabled={this.isDayLocked(i)}
                 onInput={(value) => {
                   const n = String(value).replace(/[^\d]/g, "");
                   row[prop] = n === "" ? null : Number(n);
