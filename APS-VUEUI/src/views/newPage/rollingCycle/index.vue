@@ -1155,12 +1155,13 @@ export default {
           // },
           {
             align: "center",
-            label: this.$t("ui.data.btn.option1"),
+            label: this.$t("ui.data.btn.option"),
             fixed: "right",
             render: ({ row }) => {
               return (
                 <div>
                   <el-button
+                    v-hasPermi={["monthplan:mpStructureAllocation:remove"]}
                     class="minus"
                     type="danger"
                     onClick={() => this.handleOutDelete(row)}
@@ -3363,7 +3364,6 @@ export default {
     } else {
       this.getVersionList(true);
     }
-    console.log('this.activeName', this.activeName)
   },
 };
 </script>
