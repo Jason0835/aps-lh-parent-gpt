@@ -1155,13 +1155,12 @@ export default {
           // },
           {
             align: "center",
-            label: this.$t("ui.data.btn.option"),
+            label: this.$t("ui.data.btn.option1"),
             fixed: "right",
             render: ({ row }) => {
               return (
                 <div>
                   <el-button
-                    v-hasPermi={["monthplan:ProductMoldingLimit:remove"]}
                     class="minus"
                     type="danger"
                     onClick={() => this.handleOutDelete(row)}
@@ -3364,6 +3363,7 @@ export default {
     } else {
       this.getVersionList(true);
     }
+    console.log('this.activeName', this.activeName)
   },
 };
 </script>
