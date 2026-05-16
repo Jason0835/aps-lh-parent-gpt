@@ -511,9 +511,9 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         contextDTO.setStructureStartDay(beginDay);
         contextDTO.setStructureDeadLine(endDay);
         //若结构收尾日小于锁定日，提示
-        if (contextDTO.getLockEndDay() != null && contextDTO.getStructureDeadLine() <= contextDTO.getLockEndDay()){
+        /*if (contextDTO.getLockEndDay() != null && contextDTO.getStructureDeadLine() <= contextDTO.getLockEndDay()){
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.adjustDayLtLockEndDay"),
                     contextDTO.getStructureDeadLine(),contextDTO.getLockEndDay()));
-        }
+        }*/
     }
 }

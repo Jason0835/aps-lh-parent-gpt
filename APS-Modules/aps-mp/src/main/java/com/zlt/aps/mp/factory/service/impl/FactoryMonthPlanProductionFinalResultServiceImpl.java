@@ -29,7 +29,7 @@ import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
 import com.zlt.aps.mp.api.domain.dto.MonthPlanFinalizedEventDto;
 import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanProductionFinal4AdjustVo;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.common.utils.GroupedMapWithOrder;
 import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.common.utils.poi.WorksheetData;
@@ -877,16 +877,16 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * @return 结果
      */
     @Override
-    public List<FactoryMonthPlanProductionFinal4AdjustVo> list4Adjust(FactoryMonthPlanProductionFinalResult condition) {
+    public List<FactoryMonthPlanFinalAdjustVo> list4Adjust(FactoryMonthPlanProductionFinalResult condition) {
         // 调整列表以传入的调整版本号优先匹配；没有调整版本号时使用排产版本号匹配。
         String matchVersion = StringUtils.defaultIfBlank(condition.getVersion(), condition.getProductionVersion());
-        List<FactoryMonthPlanProductionFinal4AdjustVo> dataList = this.finalMapper.list4Adjust(condition);
+        List<FactoryMonthPlanFinalAdjustVo> dataList = this.finalMapper.list4Adjust(condition);
         // 设置是否特殊材料
         setSpecialMaterial(condition.getFactoryCode(), dataList);
         // 先放入定稿数据，保证定稿独有数据不会丢失，并保留原列表顺序。
-        Map<String, FactoryMonthPlanProductionFinal4AdjustVo> finalResultMap = new LinkedHashMap<>();
+        Map<String, FactoryMonthPlanFinalAdjustVo> finalResultMap = new LinkedHashMap<>();
         if (CollectionUtils.isNotEmpty(dataList)) {
-            for (FactoryMonthPlanProductionFinal4AdjustVo adjustVo : dataList) {
+            for (FactoryMonthPlanFinalAdjustVo adjustVo : dataList) {
                 finalResultMap.putIfAbsent(buildAdjustMapKey(matchVersion, adjustVo), adjustVo);
             }
         }
@@ -912,9 +912,9 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             }
         }
         for (Map.Entry<String, MpAdjustResult> entry : mpAdjustResultMap.entrySet()) {
-            FactoryMonthPlanProductionFinal4AdjustVo adjustVo = finalResultMap.get(entry.getKey());
+            FactoryMonthPlanFinalAdjustVo adjustVo = finalResultMap.get(entry.getKey());
             if (adjustVo == null) {
-                adjustVo = new FactoryMonthPlanProductionFinal4AdjustVo();
+                adjustVo = new FactoryMonthPlanFinalAdjustVo();
                 finalResultMap.put(entry.getKey(), adjustVo);
                 // 相同业务Key时以调整结果为准；调整独有数据转换为同一VO后追加返回。
                 BeanUtil.copyProperties(entry.getValue(), adjustVo);
@@ -928,7 +928,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             /*int dayVulcanizationQty = adjustVo.getDayVulcanizationQty() == null ? 0 : adjustVo.getDayVulcanizationQty();
             adjustVo.setDayVulcanizationQty(dayVulcanizationQty * 2);*/
         }
-        List<FactoryMonthPlanProductionFinal4AdjustVo> resultList = new ArrayList<>(finalResultMap.values());
+        List<FactoryMonthPlanFinalAdjustVo> resultList = new ArrayList<>(finalResultMap.values());
         if (CollectionUtils.isNotEmpty(resultList)) {
             Locale language = SecurityUtils.getUserLang();
             JsonUtils.parseJsonRemarkList(resultList, language.toString(), "reason");
@@ -941,7 +941,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * @param factoryCode 分厂编号
      * @param mpFinalAdjustList 定稿列表
      */
-    public void setSpecialMaterial(String factoryCode, List<FactoryMonthPlanProductionFinal4AdjustVo> mpFinalAdjustList) {
+    public void setSpecialMaterial(String factoryCode, List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList) {
         if (com.zlt.aps.mp.common.utils.PubUtil.isEmpty(mpFinalAdjustList)) {
             return;
         }
@@ -980,7 +980,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = materialConsumeDetailFuture.join();
         List<RawSpecialMaterialRecord> specialMaterialList = rawSpecialMaterialRecordFuture.join();
 
-        for (FactoryMonthPlanProductionFinal4AdjustVo monthPlan : mpFinalAdjustList) {
+        for (FactoryMonthPlanFinalAdjustVo monthPlan : mpFinalAdjustList) {
             // 设置是否含有特殊材料
             boolean isHasSpecialMaterial = rawSpecialMaterialRecordService.hasSpecialMaterial(monthPlan.getEmbryoCode(), mdmMaterialConsumeDetailList, specialMaterialList);
             monthPlan.setHasSpecialMaterial(isHasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
@@ -1060,7 +1060,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * @param adjustVo      调整列表返回对象
      * @param demandPlanSum 需求计划汇总数据
      */
-    private void fillDemandQty(FactoryMonthPlanProductionFinal4AdjustVo adjustVo, DpDemandPlanSum demandPlanSum) {
+    private void fillDemandQty(FactoryMonthPlanFinalAdjustVo adjustVo, DpDemandPlanSum demandPlanSum) {
         if (demandPlanSum == null) {
             return;
         }

@@ -2635,6 +2635,32 @@ public class MpWeekRollAdjustEngine {
 
     /**
      * 重置各优先级总排产量
+     * @param mpFinalVo 定稿记录
+     */
+    public void resetTotalProductionQty(FactoryMonthPlanFinalAdjustVo mpFinalVo){
+        //1.初始调整需求；
+        MpAdjustResult adjustResult = new MpAdjustResult();
+        adjustResult.setTotalQty(mpFinalVo.getTotalQty());
+        adjustResult.setConstructionStage(mpFinalVo.getConstructionStage());
+        adjustResult.setAdjustPriority(mpFinalVo.getAdjustPriority());
+        adjustResult.setHeightQty(mpFinalVo.getHeightQty());
+        adjustResult.setMidQty(mpFinalVo.getMidQty());
+        adjustResult.setCycleReserveQty(mpFinalVo.getCycleReserveQty());
+        adjustResult.setPostponeQty(mpFinalVo.getPostponeQty());
+        adjustResult.setConventionReserveQty(mpFinalVo.getConventionReserveQty());
+        //2.执行排产分配
+        allocateProductionByPriority(adjustResult);
+        //3.分摊排产量
+        mpFinalVo.setTrialProductionQty(adjustResult.getTrialProductionQty());
+        mpFinalVo.setHeightProductionQty(adjustResult.getHeightProductionQty());
+        mpFinalVo.setMidProductionQty(adjustResult.getMidProductionQty());
+        mpFinalVo.setCycleProductionQty(adjustResult.getCycleProductionQty());
+        mpFinalVo.setConventionProductionQty(adjustResult.getConventionProductionQty());
+        mpFinalVo.setPostponeProductionQty(adjustResult.getPostponeProductionQty());
+    }
+
+    /**
+     * 重置各优先级总排产量
      * @param adjustStructInVo 调整记录
      * @param mpFinalVo 定稿记录
      * @param productionQty 排产量

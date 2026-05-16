@@ -31,9 +31,11 @@ import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.dto.MpWeekRollAdjustDTO;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
 import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingAdjuestProductionHandler;
+import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.common.utils.ExcelReadUtils;
 import com.zlt.common.utils.PubUtil;
@@ -95,6 +97,9 @@ public class MpWeekRollAdjustController extends BaseController {
     private MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
     @Autowired
     private IExportLogService iExportLogService;
+
+    @Autowired
+    private IMpStructureAllocationService mpStructureAllocationService;
 
     /**
      * 获取调整明细列表
@@ -446,6 +451,9 @@ public class MpWeekRollAdjustController extends BaseController {
     @ApiOperation("重新计算")
     @PostMapping("/recalculate")
     public AjaxResult recalculate(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        /*AdjustsCxMachineVo adjustsCxMachineVo = mpStructureAllocationService.getAdjustsCxMachineFromRedis();
+        String adjustType = adjustsCxMachineVo == null ? WeekAdjustTypeEnum.STRUCTURE_IN.getCode() : WeekAdjustTypeEnum.STRUCTURE_OUT.getCode();
+        weekRollAdjustDTO.setAdjustType(adjustType);*/
         // 获取周程滚动调整策略
         IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
         if (weekAdjustStrategy == null) {

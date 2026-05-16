@@ -38,7 +38,6 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustExportVo;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
-import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanProductionFinal4AdjustVo;
 import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
 import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
@@ -154,9 +153,9 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @ApiOperation("查询最终排产计划定稿-调整使用")
     @PostMapping("/list4Adjust")
     public TableDataInfo list4Adjust(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition) {
-        List<FactoryMonthPlanProductionFinal4AdjustVo> list = factoryMonthPlanProductionFinalResultService.list4Adjust(queryCondition);
+        List<FactoryMonthPlanFinalAdjustVo> list = factoryMonthPlanProductionFinalResultService.list4Adjust(queryCondition);
         if (PubUtil.isNotEmpty(list)) {
-            for (FactoryMonthPlanProductionFinal4AdjustVo adjustVo:list){
+            for (FactoryMonthPlanFinalAdjustVo adjustVo:list){
                 // 日硫化量固定*2
                 int dayVulcanizationQty = adjustVo.getDayVulcanizationQty() == null ? 0 : adjustVo.getDayVulcanizationQty();
                 adjustVo.setDayVulcanizationQty(dayVulcanizationQty * 2);
@@ -168,7 +167,7 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
         Integer pageSize = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageSize"), ServletUtils.getHeader("pageSize")));
         pageNum = pageNum == null ? 1 : pageNum;
         pageSize = pageSize == null ? 10000000 : pageSize;
-        List<FactoryMonthPlanProductionFinal4AdjustVo> page = CollUtil.page(pageNum - 1, pageSize, list);
+        List<FactoryMonthPlanFinalAdjustVo> page = CollUtil.page(pageNum - 1, pageSize, list);
         TableDataInfo rspData = new TableDataInfo();
         rspData.setCode(200);
         rspData.setRows(page);
