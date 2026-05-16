@@ -16,6 +16,7 @@ import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.domain.CellStyle;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
@@ -23,6 +24,7 @@ import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.mapper.CxKeyProductMapper;
 import com.zlt.aps.cx.mapper.CxParamConfigMapper;
 import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
+import com.zlt.aps.cx.mapper.CxStructureTreadConfigMapper;
 import com.zlt.aps.cx.mapper.LhFinishQtyMapper;
 import com.zlt.aps.cx.mapper.LhScheduleResultMapper;
 import com.zlt.aps.cx.service.CxScheduleDetailService;
@@ -86,6 +88,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     @Autowired
     private CxKeyProductMapper cxKeyProductMapper;
+
+    @Autowired
+    private CxStructureTreadConfigMapper cxStructureTreadConfigMapper;
 
     @Resource
     private CxParamConfigMapper cxParamConfigMapper;
