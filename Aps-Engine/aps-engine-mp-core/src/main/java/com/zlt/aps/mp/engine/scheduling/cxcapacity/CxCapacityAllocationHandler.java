@@ -472,7 +472,7 @@ public class CxCapacityAllocationHandler {
             hasProductionDayList.sort(Comparator.comparing(CxMachineBaseInfoVo::getSelectedProductionDays, Comparator.reverseOrder()));
             return hasProductionDayList.get(BigDecimal.ZERO.intValue());
         }
-        //排序：优先级级别(值越低越在前)->差值小的
+        //排序：优先级级别(值越低越在前) -> 差值小的
         Comparator sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSelectedPriorityValue)
                 .thenComparing(CxMachineBaseInfoVo::getSelectedPriorityDiffValue);
         //从指定中获取
@@ -481,6 +481,10 @@ public class CxCapacityAllocationHandler {
             if (CollectionUtils.isEmpty(fixedList)) {
                 return null;
             }
+            //20260516+ 指定按排产时间最长 -> 优先级级别(值越低越在前) -> 差值小的
+            sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSelectedProductionDays, Comparator.reverseOrder())
+                    .thenComparing(CxMachineBaseInfoVo::getSelectedPriorityValue)
+                    .thenComparing(CxMachineBaseInfoVo::getSelectedPriorityDiffValue);
             fixedList.sort(sortComparator);
             return fixedList.get(BigDecimal.ZERO.intValue());
         }
