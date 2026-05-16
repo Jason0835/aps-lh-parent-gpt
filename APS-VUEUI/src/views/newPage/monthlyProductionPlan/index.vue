@@ -1268,12 +1268,6 @@ export default {
         params.month = Number(arr[1]);
         delete params.yearMonth;
       }
-      const scheduled = (this.currentAdjustMachine || "").trim();
-      if (scheduled) {
-        params.cxMachineCode = scheduled;
-      } else {
-        delete params.cxMachineCode;
-      }
       return params;
     },
     /**
