@@ -23,6 +23,14 @@ export function removeFactoryParam(query) {
   })
 }
 
+export function getByParamCode(query) {
+  return request({
+    url: '/monthplan/factoryParam/getByParamCode',
+    method: 'post',
+    data: query
+  })
+}
+
 export function exportData(query) {
   downloadLink('/monthplan/factoryParam/export', query)
 }

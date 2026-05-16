@@ -257,6 +257,7 @@ import {
   saveAdjustResult,
   statisticsResult
 } from "@/api/monthplan/adjustStructure";
+import { getByParamCode } from "@/api/monthplan/factoryParam";
 import structureAdjustDialog from "./components/structureAdjustDialog.vue";
 import adjustVersionDialog from "./components/adjustVersionDialog.vue";
 
@@ -321,6 +322,8 @@ export default {
       },
       /** 1–31 号列编辑前原始值，用于失焦时与 rollingCycle 一致判断是否调用 save */
       dayEditOriginalValue: null,
+      /** 锁定天数：从接口获取，控制 1-31 号哪些日期不可编辑 */
+      lockedDays: 0,
       /** 结构调整：表格多选勾选行（统计行不可选）；超过 1 条时禁用「结构调整」按钮 */
       structureAdjustSelection: [],
     };
@@ -656,6 +659,7 @@ export default {
               <el-input
                 size="mini"
                 value={text}
+                disabled={this.isDayLocked(i)}
                 onInput={(value) => {
                   const n = String(value).replace(/[^\d]/g, "");
                   row[prop] = n === "" ? null : Number(n);
@@ -765,6 +769,7 @@ export default {
     this.query = { ...defaults };
     await this.loadVersionOptions();
     await this.fetchCurrentAdjustMachineFromRedis();
+    this.fetchLockedDays();
     this.getList();
   },
   methods: {
@@ -778,6 +783,7 @@ export default {
       }
       await this.loadVersionOptions();
       this.fetchCurrentAdjustMachineFromRedis();
+      this.fetchLockedDays();
     },
     handleProductionVersionChange() {
       this.fetchCurrentAdjustMachineFromRedis();
@@ -891,6 +897,31 @@ export default {
         this.currentAdjustEndDay = "";
         this.currentAdjustMonthPlanVersion = "";
       }
+    },
+    async fetchLockedDays() {
+      const factoryCode = this.query.factoryCode || this.search.factoryCode;
+      if (!factoryCode) {
+        this.lockedDays = 0;
+        return;
+      }
+      try {
+        const res = await getByParamCode({
+          factoryCode,
+          productTypeCode: "TBR",
+          paramCode: "SYS0206001",
+        });
+        this.lockedDays = Number(res?.paramValue) || 0;
+      } catch (e) {
+        console.error("获取锁定天数失败:", e);
+        this.lockedDays = 0;
+      }
+    },
+    isDayLocked(day) {
+      if (!this.lockedDays || this.lockedDays <= 0) {
+        return false;
+      }
+      const today = new Date().getDate();
+      return day >= today && day < today + this.lockedDays;
     },
     /**
      * 修改优先上机（原锁定上机），与 rollingCycle/index.backup-legacy.vue 一致调用 mpAdjustResult/save
@@ -1186,6 +1217,7 @@ export default {
       this.$set(this.page, "current", 1);
       await this.loadVersionOptions();
       await this.fetchCurrentAdjustMachineFromRedis();
+      this.fetchLockedDays();
       this.getList();
     },
     handleSortChange({ column, prop, order }) {
