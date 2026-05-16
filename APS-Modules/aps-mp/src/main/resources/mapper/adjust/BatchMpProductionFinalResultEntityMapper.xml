@@ -10,7 +10,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             FACTORY_CODE,
             YEAR,
             MONTH,
-            YEAR_MONTH,
+            `YEAR_MONTH`,
             MONTH_PLAN_VERSION,
             LAST_MONTH_PLAN_VERSION,
             PRODUCTION_VERSION,

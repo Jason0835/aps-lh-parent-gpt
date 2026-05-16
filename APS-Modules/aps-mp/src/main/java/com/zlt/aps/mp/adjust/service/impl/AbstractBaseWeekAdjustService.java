@@ -910,7 +910,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 8、更新结构转产
         updateStructureAllocationList(contextDTO);
         // 9、处理月计划统计结果
-        handleMonthPlanStatistics(contextDTO);
+        handleMonthPlanStatistics(contextDTO,null);
         // 10、合并至定稿月度生产计划
         // 根据优先级顺序分配生产数量
         allocateProductionByPriority(contextDTO);
@@ -954,24 +954,19 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 contextDTO.getMpMonth(), contextDTO.getVersion(), contextDTO.getProductionVersion(),
                 contextDTO.getStructureName(), contextDTO.getScheduledMachines(), contextDTO.getStartDay(),
                 contextDTO.getEndDay(), contextDTO.getAdjustStartDay(), contextDTO.getAdjustEndDay());
-        try{
-            FactoryMonthPlanProductionFinalResult params = new FactoryMonthPlanProductionFinalResult();
-            params.setFactoryCode(contextDTO.getFactoryCode());
-            params.setYear(contextDTO.getMpYear());
-            params.setMonth(contextDTO.getMpMonth());
-            params.setVersion(contextDTO.getVersion());
-            params.setStructureName(contextDTO.getStructureName());
-            List<FactoryMonthPlanFinalAdjustVo> adjustVos = finalResultService.list4Adjust(params);
-            contextDTO.setFactoryMonthPlanProdFinalList(adjustVos);
-            // 处理月计划统计结果
-            if (isHandleMonthPlanStatistics) {
-                handleMonthPlanStatistics(contextDTO);
-            }
-            log.info("周程调整确认流程执行完成");
-        }catch (Exception e) {
-            log.error("周程调整确认流程执行异常", e);
-            throw new BusinessException(e.getMessage());
+        FactoryMonthPlanProductionFinalResult params = new FactoryMonthPlanProductionFinalResult();
+        params.setFactoryCode(contextDTO.getFactoryCode());
+        params.setYear(contextDTO.getMpYear());
+        params.setMonth(contextDTO.getMpMonth());
+        params.setVersion(contextDTO.getVersion());
+        params.setStructureName(contextDTO.getStructureName());
+        List<FactoryMonthPlanFinalAdjustVo> adjustVos = finalResultService.list4Adjust(params);
+        contextDTO.setFactoryMonthPlanProdFinalList(adjustVos);
+        // 2、处理月计划统计结果
+        if (isHandleMonthPlanStatistics) {
+            handleMonthPlanStatistics(contextDTO,YesOrNoEnum.YES.getCode());
         }
+        log.info("周程调整确认流程执行完成");
     }
 
     /**
@@ -979,7 +974,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      *
      * @param contextDTO
      */
-    protected void handleMonthPlanStatistics(MpRollAdjustContextDTO contextDTO) {
+    protected void handleMonthPlanStatistics(MpRollAdjustContextDTO contextDTO,String tempFlag) {
         // 获取月度生产计划
         List<FactoryMonthPlanFinalAdjustVo> monthPLanList = contextDTO.getFactoryMonthPlanProdFinalList();
         if (PubUtil.isEmpty(monthPLanList)) {
@@ -1010,6 +1005,16 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<MpStructureAllocation> oneStructureAllocationList = structureAllocationList.stream()
                 .filter(vo -> StringUtils.isEmpty(structureNameParam) || structureNameParam.equals(vo.getStructureName()))
                 .collect(Collectors.toList());
+        if (!StringUtil.isEmptyWithTrim(contextDTO.getScheduledMachines())){
+            //若有当前调整机台
+            for (MpStructureAllocation structureAllocation:oneStructureAllocationList){
+                if (contextDTO.getScheduledMachines().equals(structureAllocation.getCxMachineCode())){
+                    //更新它最新的调整日期
+                    structureAllocation.setBeginDay(contextDTO.getAdjustStartDay());
+                    structureAllocation.setEndDay(contextDTO.getAdjustEndDay());
+                }
+            }
+        }
         contextDTO.setOneStructureAllocationList(oneStructureAllocationList);
         // 设置总的硫化机台数
         contextDTO.setTotalLhMachines(mpAdjustStructureInService.getLhMachineCount(contextDTO));
@@ -1085,7 +1090,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
         // 保存月计划统计结果
-        saveMonthPlanStatisticsResult(contextDTO, null);
+        saveMonthPlanStatisticsResult(contextDTO, tempFlag);
     }
 
     /**
