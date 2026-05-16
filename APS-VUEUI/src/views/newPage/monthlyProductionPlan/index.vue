@@ -89,6 +89,32 @@
               placeholder="当前调整结构"
             />
           </div>
+          <div class="current-machine-wrap">
+            <span class="current-machine-label">{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.adjustStartDay")
+            }}</span>
+            <el-input
+              class="current-machine-input"
+              :value="currentAdjustBeginDay"
+              disabled
+              :placeholder="
+                $t('ui.data.column.monthPlanFinalAdjustQuery.adjustStartDay')
+              "
+            />
+          </div>
+          <div class="current-machine-wrap">
+            <span class="current-machine-label">{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.adjustEndDay")
+            }}</span>
+            <el-input
+              class="current-machine-input"
+              :value="currentAdjustEndDay"
+              disabled
+              :placeholder="
+                $t('ui.data.column.monthPlanFinalAdjustQuery.adjustEndDay')
+              "
+            />
+          </div>
         </div>
       </template>
       <template slot="footer">
@@ -1887,14 +1913,12 @@ export default {
         row.productionVersion || this.query.version;
       params.startDay = row.beginDay;
       params.endDay = row.endDay;
-      params.adjustStartDay =
-        row.adjustStartDay != null && row.adjustStartDay !== ""
-          ? row.adjustStartDay
-          : row.beginDay;
-      params.adjustEndDay =
-        row.adjustEndDay != null && row.adjustEndDay !== ""
-          ? row.adjustEndDay
-          : row.endDay;
+      params.adjustStartDay = this.parseAdjustDayToInt(
+        this.currentAdjustBeginDay
+      );
+      params.adjustEndDay = this.parseAdjustDayToInt(
+        this.currentAdjustEndDay
+      );
       params.structureName =
         row.structureName || this.query.structureName;
       const sm = (this.currentAdjustMachine || "").trim();
@@ -2001,8 +2025,12 @@ export default {
           productionVersion: "",
           startDay: "",
           endDay: "",
-          adjustStartDay: this.currentAdjustBeginDay,
-          adjustEndDay: this.currentAdjustEndDay,
+          adjustStartDay: this.parseAdjustDayToInt(
+            this.currentAdjustBeginDay
+          ),
+          adjustEndDay: this.parseAdjustDayToInt(
+            this.currentAdjustEndDay
+          ),
           structureName: structureNameForRecalculate,
           scheduledMachines: machineTrim,
         };
