@@ -287,11 +287,11 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             // 2.1.4、本月统计信息汇总
             MpMonthPlanStatistics statistics = statisticsMap.get(structureName);
             this.buildStatisticsRecord(embryoCountStatisticsRecord, lhMachinesStatisticsRecord, FactoryConstant.MONTH_START_DAY, statistics,
-                    changeMouldMap);
+                    changeMouldMap, DAY_FIELD_NAME_FORMAT);
             // 2.1.5、上个月统计信息汇总
             MpMonthPlanStatistics lastStatistics = lastStatisticsMap.get(structureName);
             this.buildStatisticsRecord(embryoCountStatisticsRecord, lhMachinesStatisticsRecord, LAST_MONTH_FIRST_DAY, lastStatistics,
-                    lastChangeMouldMap);
+                    lastChangeMouldMap, LAST_FIELD_NAME_FORMAT);
             
             totalRecordList.add(embryoCountStatisticsRecord);
             totalRecordList.add(lhMachinesStatisticsRecord);
@@ -383,18 +383,19 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     private void buildStatisticsRecord(FactoryMonthPlanMouldDayResultExportVo embryoCountStatisticsRecord,
                                        FactoryMonthPlanMouldDayResultExportVo lhMachinesStatisticsRecord,
                                        Integer startDay, MpMonthPlanStatistics statistics,
-                                       Map<Integer, Integer> changeMouldMap) {
+                                       Map<Integer, Integer> changeMouldMap, String preFix) {
         if (statistics == null) {
             return;
         }
         for (int day = startDay; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
-            String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
-            String dayStatisticsStr = (String) statistics.getFieldValueByFieldName(dayFieldName);
+            String dayFieldGetterName = String.format(DAY_FIELD_NAME_FORMAT, day);
+            String dayFieldSetterName = String.format(preFix, day);
+            String dayStatisticsStr = (String) statistics.getFieldValueByFieldName(dayFieldGetterName);
             if (StringUtils.isNotEmpty(dayStatisticsStr) && JSONValidator.from(dayStatisticsStr).validate()) {
                 MpDayProductionStatisticsDetailVo dayStatistics = JSONObject.parseObject(dayStatisticsStr,
                         MpDayProductionStatisticsDetailVo.class);
-                embryoCountStatisticsRecord.setFieldValueByFieldName(dayFieldName, dayStatistics.getEmbryoCount());
-                lhMachinesStatisticsRecord.setFieldValueByFieldName(dayFieldName, dayStatistics.getLhMachines());
+                embryoCountStatisticsRecord.setFieldValueByFieldName(dayFieldSetterName, dayStatistics.getEmbryoCount());
+                lhMachinesStatisticsRecord.setFieldValueByFieldName(dayFieldSetterName, dayStatistics.getLhMachines());
                 Integer changeMould = Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0);
                 if (changeMould > 0) {
                     changeMouldMap.put(day, changeMouldMap.getOrDefault(day, 0) + Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0));
