@@ -294,6 +294,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         Map<String, String> smallGlueMap = smallGlueMaps.getOrDefault("smallGlue", Collections.emptyMap());
         Map<String, String> placeholderMap = smallGlueMaps.getOrDefault("placeholder", Collections.emptyMap());
 
+        Map<String, String> shiftCapacitiesMap = buildShiftCapacitiesMap();
+
         Set<String> keyProductEmbryoCodes = loadKeyProductEmbryoCodes();
 
         // Sheet 0: 成型余量-按机台
@@ -305,7 +307,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // Sheet 1: 成型日计划
         Map<String, Object> planTableMap = buildCxTemplateTableMap(exportList);
         List<List<Map<String, Object>>> planDataList = new ArrayList<>();
-        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, keyProductEmbryoCodes);
+        List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes);
         planDataList.add(planRows);
 
         // 为小计行添加 DAEEF3 背景色标识
@@ -439,6 +441,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                                                                Map<String, BigDecimal> todayNightFinishQtyMap,
                                                                Map<String, String> smallGlueMap,
                                                                Map<String, String> placeholderMap,
+                                                               Map<String, String> shiftCapacitiesMap,
                                                                Set<String> keyProductEmbryoCodes) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() : list;
 
@@ -457,7 +460,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     String::compareTo));
 
             for (CxScheduleResult item : groupList) {
-                dataList.add(buildCxTemplateRow(item, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, keyProductEmbryoCodes));
+                dataList.add(buildCxTemplateRow(item, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes));
             }
             dataList.add(buildCxTemplateSubtotalRow(groupList));
         }
@@ -473,6 +476,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                                                       Map<String, BigDecimal> todayNightFinishQtyMap,
                                                       Map<String, String> smallGlueMap,
                                                       Map<String, String> placeholderMap,
+                                                      Map<String, String> shiftCapacitiesMap,
                                                       Set<String> keyProductEmbryoCodes) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("cxMachineCode", item.getCxMachineCode());
@@ -564,6 +568,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         String embryoCode = item.getEmbryoCode();
         row.put("smallGlue", smallGlueMap.getOrDefault(embryoCode, ""));
         row.put("placeholder", placeholderMap.getOrDefault(embryoCode, ""));
+
+        String shiftCapKey = StringUtils.defaultString(item.getStructureName()).trim() + "|"
+                + StringUtils.defaultString(embryoCode).trim();
+        row.put("shiftCapacities", shiftCapacitiesMap.getOrDefault(shiftCapKey, ""));
 
         return row;
     }
@@ -827,10 +835,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 构建小胶种和占位符映射。
-     * <p>smallGlue：依据 embryoCode 关联 MdmMaterialConsumeDetail，过滤 CHILD_MATERIAL_NAME 以 AQ 开头，
-     * 去掉 AQ 前缀后得到胶种名称，多胶种用 "/" 连接。</p>
-     * <p>placeholder：同样依据 embryoCode 关联 MdmMaterialConsumeDetail，过滤 CHILD_MATERIAL_NAME 以 AQ 开头，
-     * 直接取 CHILD_MATERIAL_NAME 完整值，多个用 "/" 连接。</p>
+     * <p>smallGlue 与 placeholder 取值逻辑相同：依据 embryoCode 关联 MdmMaterialConsumeDetail，
+     * 过滤 CHILD_MATERIAL_NAME 以 AQ 开头且 isDelete = 0 的记录，去掉 AQ 前缀后得到胶种名称，
+     * 多胶种用 "/" 连接。</p>
      *
      * @param exportList 成型排程结果列表
      * @return key=smallGlue/placeholder, value=embryoCode→字符串的映射
@@ -865,8 +872,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return result;
         }
 
-        // 构建 embryoCode → 胶种名称集合 映射（smallGlue 去掉 AQ 前缀，placeholder 保留完整值）
-        Map<String, Set<String>> smallGlueMap = consumeDetails.stream()
+        // 构建 embryoCode → 胶种名称集合 映射（去掉 AQ 前缀）
+        Map<String, Set<String>> rubberTypeMap = consumeDetails.stream()
                 .filter(d -> StringUtils.isNotBlank(d.getEmbryoCode())
                         && StringUtils.isNotBlank(d.getChildMaterialName())
                         && d.getChildMaterialName().startsWith("AQ"))
@@ -875,21 +882,36 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                         HashMap::new,
                         Collectors.mapping(d -> d.getChildMaterialName().substring(2), Collectors.toCollection(LinkedHashSet::new))));
 
-        smallGlueMap.forEach((embryoCode, rubberTypes) ->
-                result.get("smallGlue").put(embryoCode, String.join("/", rubberTypes)));
+        rubberTypeMap.forEach((embryoCode, names) -> {
+            String joined = String.join("/", names);
+            result.get("smallGlue").put(embryoCode, joined);
+            result.get("placeholder").put(embryoCode, joined);
+        });
 
-        Map<String, Set<String>> placeholderMap = consumeDetails.stream()
-                .filter(d -> StringUtils.isNotBlank(d.getEmbryoCode())
-                        && StringUtils.isNotBlank(d.getChildMaterialName())
-                        && d.getChildMaterialName().startsWith("AQ"))
-                .collect(Collectors.groupingBy(
-                        MdmMaterialConsumeDetail::getEmbryoCode,
-                        HashMap::new,
-                        Collectors.mapping(MdmMaterialConsumeDetail::getChildMaterialName, Collectors.toCollection(LinkedHashSet::new))));
+        return result;
+    }
 
-        placeholderMap.forEach((embryoCode, names) ->
-                result.get("placeholder").put(embryoCode, String.join("/", names)));
-
+    /**
+     * 构建整车胎面条数映射，依据 structureCode|embryoCode 关联 CxStructureTreadConfig，
+     * 取 treadCount 作为整车条数。取数逻辑与 ScheduleServiceImpl.loadStructureTreadConfigs 一致。
+     *
+     * @return key=结构编码|胎胚编码, value=整车胎面条数
+     */
+    private Map<String, String> buildShiftCapacitiesMap() {
+        List<CxStructureTreadConfig> treadConfigs = cxStructureTreadConfigMapper.selectList(
+                new LambdaQueryWrapper<CxStructureTreadConfig>()
+                        .eq(CxStructureTreadConfig::getIsDelete, "0"));
+        if (CollectionUtils.isEmpty(treadConfigs)) {
+            return Collections.emptyMap();
+        }
+        Map<String, String> result = new HashMap<>();
+        for (CxStructureTreadConfig config : treadConfigs) {
+            if (config.getStructureCode() != null && config.getTreadCount() != null
+                    && StringUtils.isNotBlank(config.getEmbryoCode())) {
+                String key = config.getStructureCode().trim() + "|" + config.getEmbryoCode().trim();
+                result.put(key, String.valueOf(config.getTreadCount()));
+            }
+        }
         return result;
     }
 
