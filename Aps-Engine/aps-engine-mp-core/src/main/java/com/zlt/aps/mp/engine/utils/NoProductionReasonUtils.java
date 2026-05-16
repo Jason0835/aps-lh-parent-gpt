@@ -38,7 +38,7 @@ public class NoProductionReasonUtils {
                 newParams.add(param);
             }
         }
-        return errorCode;
+        return JsonUtils.getLanguageJsonObject(i18nKey, newParams.toArray()).toString();
     }
 
     /**
