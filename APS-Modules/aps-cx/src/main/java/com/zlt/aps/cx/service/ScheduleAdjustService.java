@@ -64,4 +64,23 @@ public interface ScheduleAdjustService {
      * @return 需要调整的班次列表
      */
     java.util.List<String> getAdjustShiftRange(String currentShiftClass);
+
+    /**
+     * 以机台维度滚动重排程
+     *
+     * <p>三阶段逻辑：
+     * <ol>
+     *   <li><b>阶段A（班次1~N）</b>：应用已完成班次的 FINISH_QTY，更新库存和成型余量</li>
+     *   <li><b>阶段B（班次N+1）</b>：基于交班库存时长检查，补1车/减1车（跳过收尾/停产/试制任务）</li>
+     *   <li><b>阶段C（班次N+2~8）</b>：逐班次重新排程（仅first-fit，不均衡）</li>
+     * </ol>
+     *
+     * @param factoryCode        工厂编码
+     * @param scheduleDate       排程日期
+     * @param triggerShiftClass  触发班次（如 CLASS3，已完成班次=1~3，调整班次=4，重排班次=5~8）
+     * @param machineCode        目标成型机台编码
+     * @return 调整结果
+     */
+    ScheduleAdjustResultVo rescheduleByMachine(String factoryCode, String scheduleDate,
+                                               String triggerShiftClass, String machineCode);
 }

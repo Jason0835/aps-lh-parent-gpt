@@ -52,7 +52,7 @@ public class BalancingService {
     public static final int DEFAULT_MAX_LH_MACHINE_QTY = 10;
 
     /** 参数编码：机台最大硫化机数 */
-    private static final String PARAM_MAX_LH_MACHINE_QTY = "MAX_LH_MACHINE_QTY";
+    private static final String PARAM_MAX_LH_MACHINE_QTY = "SYS04020003";
 
     /** 参数编码：强制保留历史任务  */
     private static final String PARAM_FORCE_KEEP_HISTORY = "FORCE_KEEP_HISTORY_TASK";
@@ -328,8 +328,7 @@ public class BalancingService {
             log.warn("  配比数据为空，所有机台将使用默认值");
         }
 
-        Integer maxEmbryoTypesValue = context.getMaxEmbryoTypesValue();
-        String maxEmbryoTypesMachinePrefix = context.getMaxEmbryoTypesMachinePrefix();
+        Map<String, Integer> machineMaxEmbryoTypes = context.getMachineMaxEmbryoTypes();
 
         for (MdmMoldingMachine machine : machines) {
             String machineCode = machine.getCxMachineCode();
@@ -337,11 +336,16 @@ public class BalancingService {
 
             // 自定义机台前缀匹配：使用专用最大胎胚种类数
             Integer maxTypes = null;
-            if (maxEmbryoTypesValue != null && machineCode != null
-                    && maxEmbryoTypesMachinePrefix != null
-                    && machineCode.startsWith(maxEmbryoTypesMachinePrefix)) {
-                maxTypes = maxEmbryoTypesValue;
-                log.info("  机台 {} (机型={}): 使用{}专用最大胎胚种类数={}", machineCode, machineType, maxEmbryoTypesMachinePrefix, maxTypes);
+            if (machineMaxEmbryoTypes != null && machineCode != null) {
+                for (Map.Entry<String, Integer> entry : machineMaxEmbryoTypes.entrySet()) {
+                    if (machineCode.startsWith(entry.getKey())) {
+                        maxTypes = entry.getValue();
+                        log.info("  机台 {} (机型={}): 使用{}专用最大胎胚种类数={}", machineCode, machineType, entry.getKey(), maxTypes);
+                        break;
+                    }
+                }
+            }
+            if (maxTypes != null) {
                 result.put(machineCode, maxTypes);
                 continue;
             }

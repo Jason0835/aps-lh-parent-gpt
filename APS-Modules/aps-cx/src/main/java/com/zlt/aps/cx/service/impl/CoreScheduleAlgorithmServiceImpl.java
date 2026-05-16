@@ -113,12 +113,14 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /** 排程起始偏移天数：前端传入最后一天，需要往前推2天开始排产 */
     private static final int SCHEDULE_START_OFFSET_DAYS = 2;
 
-    /** 单日试制+量试SKU上限（按胎胚编码计，跨班次跨机台统一上限） */
-    private static final int MAX_TRIAL_SKU_PER_DAY = 2;
+    private static final int DEFAULT_MAX_TRIAL_SKU_PER_DAY = 2;
 
     @Override
     public List<CxScheduleResult> executeSchedule(ScheduleContextVo context) {
         log.info("开始执行排程算法，日期: {}", context.getScheduleDate());
+
+        int maxTrialSkuPerDay = context.getMaxTrialSkuPerDay() != null ? context.getMaxTrialSkuPerDay() : DEFAULT_MAX_TRIAL_SKU_PER_DAY;
+        boolean trialAllowedOnSunday = context.getTrialAllowedOnSunday() != null ? context.getTrialAllowedOnSunday() : false;
 
         // 预加载工作日历缓存，避免后续频繁数据库查询
         LocalDate scheduleDate = context.getScheduleDate();
@@ -443,7 +445,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /**
      * 单日试制/量试SKU上限过滤
      *
-     * <p>单日最多 {@value #MAX_TRIAL_SKU_PER_DAY} 个试制+量试SKU（按胎胚编码计），
+     * <p>单日最多 maxTrialSkuPerDay 个试制+量试SKU（按胎胚编码计），
      * 跨机台、跨班次统一上限。超过上限的试制/量试任务直接跳过不排产。
      *
      * @param context   排程上下文（含当日已分配SKU集合）
@@ -452,7 +454,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     private void applyDailyTrialSkuLimit(ScheduleContextVo context, TaskGroupService.TaskGroupResult taskGroup) {
         // ==================== 周日不安排试制/量试 ====================
         LocalDate scheduleDate = context.getCurrentScheduleDate();
-        if (scheduleDate != null && scheduleDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
+        boolean sundayTrialBlocked = scheduleDate != null && scheduleDate.getDayOfWeek() == DayOfWeek.SUNDAY
+                && !context.getTrialAllowedOnSunday();
+        if (sundayTrialBlocked) {
             int continueTrialCount = (int) taskGroup.getContinueTasks().stream()
                     .filter(t -> Boolean.TRUE.equals(t.getIsTrialTask()) || Boolean.TRUE.equals(t.getIsProductionTrial()))
                     .count();
@@ -468,6 +472,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             return;
         }
 
+        int maxTrialSku = context.getMaxTrialSkuPerDay() != null ? context.getMaxTrialSkuPerDay() : DEFAULT_MAX_TRIAL_SKU_PER_DAY;
+
         Set<String> dailySet = context.getDailyTrialAssignedMaterialCodes();
         if (dailySet == null) {
             dailySet = new HashSet<>();
@@ -480,11 +486,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         List<CoreScheduleAlgorithmService.DailyEmbryoTask> filteredTrialTasks = new ArrayList<>();
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getTrialTasks()) {
             String mc = task.getMaterialCode();
-            if (dailySet.contains(mc) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
+            if (dailySet.contains(mc) || dailySet.size() < maxTrialSku) {
                 dailySet.add(mc);
                 filteredTrialTasks.add(task);
             } else {
-                log.warn("试制任务 物料{} 已超过单日上限{}个SKU，跳过", mc, MAX_TRIAL_SKU_PER_DAY);
+                log.warn("试制任务 物料{} 已超过单日上限{}个SKU，跳过", mc, maxTrialSku);
             }
         }
         taskGroup.getTrialTasks().clear();
@@ -495,11 +501,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         for (CoreScheduleAlgorithmService.DailyEmbryoTask task : taskGroup.getNewTasks()) {
             if (Boolean.TRUE.equals(task.getIsProductionTrial())) {
                 String mc = task.getMaterialCode();
-                if (dailySet.contains(mc) || dailySet.size() < MAX_TRIAL_SKU_PER_DAY) {
+                if (dailySet.contains(mc) || dailySet.size() < maxTrialSku) {
                     dailySet.add(mc);
                     filteredNewTasks.add(task);
                 } else {
-                    log.warn("量试任务 物料{} 已超过单日上限{}个SKU，跳过", mc, MAX_TRIAL_SKU_PER_DAY);
+                    log.warn("量试任务 物料{} 已超过单日上限{}个SKU，跳过", mc, maxTrialSku);
                 }
             } else {
                 filteredNewTasks.add(task);
@@ -526,7 +532,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         taskGroup.getContinueTasks().addAll(filteredContinueTasks);
 
         if (dailySet.size() > initialSize) {
-            log.info("单日试制/量试SKU上限过滤: 当日已分配 {} / {} 个SKU", dailySet.size(), MAX_TRIAL_SKU_PER_DAY);
+            log.info("单日试制/量试SKU上限过滤: 当日已分配 {} / {} 个SKU", dailySet.size(), maxTrialSku);
         }
     }
 
@@ -839,14 +845,14 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     : 0;
             int totalAvailable = stock + newQty;
             if (totalAvailable < currentClassPlan) {
-                // 不扣减硫化计划量，只在原因分析中记录精度影响
                 String precisionNote = String.format("成型精度影响: 库存%d+产量%d=%d<硫化计划%d, 缺口%d条",
                         stock, newQty, totalAvailable, currentClassPlan, currentClassPlan - totalAvailable);
                 appendClassAnalysisByIndex(lhResult, classIndex, precisionNote);
+                setClassPlanQtyByIndex(lhResult, classIndex, totalAvailable);
                 modifiedLhResults.add(lhResult);
-                log.info("  硫化联动写入原因分析: 胎胚={}, lhId={}, CLASS{}硫化计划={}, 库存={}+扣后产量={}={}, 缺口={}条, 原因={}",
+                log.info("  硫化联动写入原因分析+更新计划量: 胎胚={}, lhId={}, CLASS{}硫化计划{}→{}, 库存={}+扣后产量={}={}, 缺口={}条, 原因={}",
                         taskAlloc.getEmbryoCode(), lhId, classIndex,
-                        currentClassPlan, stock, newQty, totalAvailable, currentClassPlan - totalAvailable, precisionNote);
+                        currentClassPlan, totalAvailable, stock, newQty, totalAvailable, currentClassPlan - totalAvailable, precisionNote);
             } else {
                 log.info("  硫化联动检查通过: 胎胚={}, lhId={}, CLASS{}硫化计划={}, 库存={}+扣后产量={}={}, 供应充足无缺口",
                         taskAlloc.getEmbryoCode(), lhId, classIndex,
@@ -1623,16 +1629,39 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
             // ---- 收尾提示 ----
             boolean isUrgentEnding = false;
+            boolean hasTrialOrProductionTrial = false;
+            boolean hasFirstTask = false;
+            boolean hasNearEnding = false;
             for (ShiftScheduleService.ShiftProductionResult spr : classSprMap.values()) {
-                if (spr != null && spr.getSourceTask() != null && Boolean.TRUE.equals(spr.getSourceTask().getIsUrgentEnding())) {
-                    isUrgentEnding = true;
-                    break;
+                if (spr != null && spr.getSourceTask() != null) {
+                    CoreScheduleAlgorithmService.DailyEmbryoTask srcTask = spr.getSourceTask();
+                    if (Boolean.TRUE.equals(srcTask.getIsUrgentEnding())) {
+                        isUrgentEnding = true;
+                    }
+                    if (Boolean.TRUE.equals(srcTask.getIsNearEnding())) {
+                        hasNearEnding = true;
+                    }
+                    if (Boolean.TRUE.equals(srcTask.getIsTrialTask()) || Boolean.TRUE.equals(srcTask.getIsProductionTrial())) {
+                        hasTrialOrProductionTrial = true;
+                    }
+                    if (Boolean.TRUE.equals(srcTask.getIsFirstTask())) {
+                        hasFirstTask = true;
+                    }
                 }
             }
             if (isUrgentEnding || (result.getCxRemainQty() != null && result.getCxRemainQty().compareTo(BigDecimal.ZERO) <= 0)) {
                 result.setMarkCloseOutTip("0");
             } else {
                 result.setMarkCloseOutTip("1");
+            }
+
+            // ---- 颜色标记（前端展示用） ----
+            if (hasTrialOrProductionTrial) {
+                result.setColorTag("blue");
+            } else if (hasFirstTask) {
+                result.setColorTag("yellow");
+            } else if (isUrgentEnding || hasNearEnding) {
+                result.setColorTag("orange");
             }
 
             // ---- 示方书类型从SKU与示方书关系获取，查不到则回退constructionStage ----
@@ -3417,7 +3446,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      */
     private int getEndingDiscardThresholdFromContext(ScheduleContextVo context) {
         if (context.getParamConfigMap() != null) {
-            CxParamConfig config = context.getParamConfigMap().get("ENDING_DISCARD_THRESHOLD");
+            CxParamConfig config = context.getParamConfigMap().get("SYS04050001");
             if (config != null && config.getParamValue() != null) {
                 try {
                     return Integer.parseInt(config.getParamValue());

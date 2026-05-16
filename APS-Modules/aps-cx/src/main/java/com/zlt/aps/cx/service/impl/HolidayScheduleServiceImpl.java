@@ -636,7 +636,6 @@ public class HolidayScheduleServiceImpl implements HolidayScheduleService {
                 if (predictedParkingHours.compareTo(BigDecimal.valueOf(maxParkingHours)) > 0) {
                     EmbryoConsumptionSuggestion suggestion = new EmbryoConsumptionSuggestion();
                     suggestion.setEmbryoCode(stock.getEmbryoCode());
-                    suggestion.setEmbryoName(stock.getEmbryoDesc());
                     suggestion.setCurrentStock(stock.getStockNum());
                     suggestion.setParkingHours(parkingHours);
                     suggestion.setSuggestedConsumption(stock.getEffectiveStock());
@@ -759,7 +758,7 @@ public class HolidayScheduleServiceImpl implements HolidayScheduleService {
     private Integer getReservedDigestHours() {
         CxParamConfig config = paramConfigMapper.selectOne(
                 new LambdaQueryWrapper<CxParamConfig>()
-                        .eq(CxParamConfig::getParamCode, "RESERVED_DIGEST_HOURS")
+                        .eq(CxParamConfig::getParamCode, "SYS04030003")
                         .eq(CxParamConfig::getIsActive, 1));
 
         if (config != null && config.getParamValue() != null) {
@@ -797,7 +796,7 @@ public class HolidayScheduleServiceImpl implements HolidayScheduleService {
     private BigDecimal getLossRate() {
         CxParamConfig config = paramConfigMapper.selectOne(
                 new LambdaQueryWrapper<CxParamConfig>()
-                        .eq(CxParamConfig::getParamCode, "LOSS_RATE")
+                        .eq(CxParamConfig::getParamCode, "SYS04020001")
                         .eq(CxParamConfig::getIsActive, 1));
 
         if (config != null && config.getParamValue() != null) {

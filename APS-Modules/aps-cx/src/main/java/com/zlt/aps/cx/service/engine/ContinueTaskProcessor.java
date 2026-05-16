@@ -377,8 +377,7 @@ public class ContinueTaskProcessor {
         }
 
         // 自定义最大胎胚种类数：按机台前缀匹配，优先于配比默认值
-        Integer maxEmbryoTypesValue = context.getMaxEmbryoTypesValue();
-        String maxEmbryoTypesMachinePrefix = context.getMaxEmbryoTypesMachinePrefix();
+        Map<String, Integer> machineMaxEmbryoTypes = context.getMachineMaxEmbryoTypes();
 
         // 为每台机台获取对应的最大胎胚种类数
         for (MpCxCapacityConfiguration config : machineConfigs) {
@@ -386,17 +385,24 @@ public class ContinueTaskProcessor {
             String machineType = machineTypeMap.get(machineCode);
 
             // 自定义机台前缀匹配：使用专用最大胎胚种类数
-            if (maxEmbryoTypesValue != null && machineCode != null
-                    && maxEmbryoTypesMachinePrefix != null
-                    && machineCode.startsWith(maxEmbryoTypesMachinePrefix)) {
-                log.info("  机台 {} (机型={}): 使用{}专用最大胎胚种类数={}", machineCode, machineType, maxEmbryoTypesMachinePrefix, maxEmbryoTypesValue);
-                result.put(machineCode, maxEmbryoTypesValue);
+            Integer maxTypes = null;
+            if (machineMaxEmbryoTypes != null && machineCode != null) {
+                for (Map.Entry<String, Integer> entry : machineMaxEmbryoTypes.entrySet()) {
+                    if (machineCode.startsWith(entry.getKey())) {
+                        maxTypes = entry.getValue();
+                        log.info("  机台 {} (机型={}): 使用{}专用最大胎胚种类数={}", machineCode, machineType, entry.getKey(), maxTypes);
+                        break;
+                    }
+                }
+            }
+            if (maxTypes != null) {
+                result.put(machineCode, maxTypes);
                 continue;
             }
 
             // 根据机型+结构查找
             String key = machineType + "_" + structureName;
-            Integer maxTypes = typeStructureMap.get(key);
+            maxTypes = typeStructureMap.get(key);
 
             // 如果找不到，尝试只按结构查找（向后兼容）
             if (maxTypes == null && context.getStructureLhRatioMap() != null) {

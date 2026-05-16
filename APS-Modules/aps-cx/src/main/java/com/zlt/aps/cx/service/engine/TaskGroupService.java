@@ -9,6 +9,8 @@ import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
+import com.zlt.aps.mp.api.domain.entity.MpCxCapacityConfiguration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 任务分组服务 — 成型排程 S5.2 阶段
@@ -57,26 +60,30 @@ public class TaskGroupService {
     /** 紧急收尾天数阈值默认值（3 天内） */
     private static final int DEFAULT_URGENT_ENDING_DAYS = 3;
 
+    /** 推荐机台最大硫化机数默认值 */
+    private static final int DEFAULT_MAX_LH_MACHINE_QTY = 10;
+
     // ==================== 参数配置编码 ====================
 
     /** 参数编码：收尾舍弃阈值 */
-    private static final String PARAM_ENDING_DISCARD_THRESHOLD = "ENDING_DISCARD_THRESHOLD";
+    private static final String PARAM_ENDING_DISCARD_THRESHOLD = "SYS04050001";
 
     /** 参数编码：成型余量紧急阈值 */
-    private static final String PARAM_ENDING_URGENT_FORMING_REMAINDER = "ENDING_URGENT_FORMING_REMAINDER";
+    private static final String PARAM_ENDING_URGENT_FORMING_REMAINDER = "SYS04050002";
 
     /** 参数编码：近期收尾天数阈值 */
-    private static final String PARAM_ENDING_DAYS_THRESHOLD = "ENDING_DAYS_THRESHOLD";
+    private static final String PARAM_ENDING_DAYS_THRESHOLD = "SYS04050003";
 
     /** 参数编码：紧急收尾天数阈值 */
-    private static final String PARAM_URGENT_ENDING_DAYS = "URGENT_ENDING_DAYS";
+    private static final String PARAM_URGENT_ENDING_DAYS = "SYS04050004";
 
-    /** 库存低水位阈值（小时）：低于此值提升优先级 */
-    private static final BigDecimal STOCK_LOW_HOURS_THRESHOLD = new BigDecimal("4");
+    private static final String PARAM_EMBRYO_WAREHOUSE_CAPACITY = "SYS04060001";
 
-    /** 库存中等水位阈值（小时） */
-    private static final BigDecimal STOCK_MEDIUM_HOURS_THRESHOLD = new BigDecimal("6");
-    private static final BigDecimal ZERO_NET_DEMAND_ENDING_MAX_HOURS = new BigDecimal("6");
+    private static final String PARAM_EMBRYO_WAREHOUSE_CAPACITY_RATIO = "SYS04060002";
+
+    private static final int DEFAULT_EMBRYO_WAREHOUSE_CAPACITY = 0;
+
+    private static final double DEFAULT_EMBRYO_WAREHOUSE_CAPACITY_RATIO = 0.9;
 
     /** 库存高水位阈值（小时）：超过此值降低优先级 */
     private static final int STOCK_HIGH_HOURS_THRESHOLD = 18;
@@ -89,35 +96,35 @@ public class TaskGroupService {
 
     // ==================== 优先级分值常量 ====================
 
-    /** 紧急收尾优先级加分 */
-    private static final int PRIORITY_URGENT_ENDING = 3000;
+    /** 补充计划任务基础优先级（最高层级） */
+    private static final int PRIORITY_SUPPLEMENT_BASE = 10000;
 
-    /** 普通收尾优先级加分 */
-    private static final int PRIORITY_ENDING = 2000;
+    /** 有计划量+3天内收尾 基础优先级 */
+    private static final int PRIORITY_HAS_PLAN_URGENT = 9000;
 
-    /** 试制任务优先级加分 */
+    /** 有计划量+10天内收尾 基础优先级 */
+    private static final int PRIORITY_HAS_PLAN_NEAR = 8000;
+
+    /** 有计划量+大于10天收尾 基础优先级 */
+    private static final int PRIORITY_HAS_PLAN_NORMAL = 7000;
+
+    /** 无计划量+3天内紧急收尾 基础优先级 */
+    private static final int PRIORITY_NO_PLAN_URGENT = 6000;
+
+    /** 无计划量+10天内收尾 基础优先级 */
+    private static final int PRIORITY_NO_PLAN_NEAR = 5000;
+
+    /** 无计划量+大于10天收尾 基础优先级 */
+    private static final int PRIORITY_NO_PLAN_NORMAL = 4000;
+
+    /** 试制量试任务优先级加分（层级内细分：试制量试 > 续作 > 非续作） */
     private static final int PRIORITY_TRIAL = 1500;
-
-    /** 近期收尾优先级加分 */
-    private static final int PRIORITY_NEAR_ENDING = 1000;
 
     /** 续作任务优先级加分 */
     private static final int PRIORITY_CONTINUE = 800;
 
-    /** 库存紧张优先级加分 */
-    private static final int PRIORITY_STOCK_LOW = 800;
-
-    /** 首排任务优先级加分 */
-    private static final int PRIORITY_FIRST_TASK = 500;
-
-    /** 库存高预警优先级减分 */
-    private static final int PRIORITY_STOCK_HIGH_PENALTY = 500;
-
-    /** 库存中等紧张优先级加分 */
-    private static final int PRIORITY_STOCK_MEDIUM = 400;
-
-    /** 主销产品优先级加分 */
-    private static final int PRIORITY_MAIN_PRODUCT = 200;
+    /** 库存第三层细分封顶值（库存扣分上限，确保不覆盖第二层细分） */
+    private static final int PRIORITY_STOCK_TIEBREAKER_MAX = 499;
 
     // ==================== 施工阶段常量 ====================
 
@@ -223,6 +230,48 @@ public class TaskGroupService {
         // 跟踪每个物料已处理的任务列表（用于回溯更新 isLastEndingBatch）
         Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> materialTasksMap = new HashMap<>();
 
+        // 零净需求暂存列表（第一轮完成后按结构分组分配剩余产能）
+        List<CoreScheduleAlgorithmService.DailyEmbryoTask> deferredTasks = new ArrayList<>();
+
+        // 跟踪每个结构的推荐机台产能管控（遍历中累计）
+        Map<String, List<MpCxCapacityConfiguration>> structureRecommendedMachinesCache = new HashMap<>();
+        Map<String, Integer> structureTotalMaxLhCache = new HashMap<>();
+        Map<String, BigDecimal> structureAvgRatioCache = new HashMap<>();
+        Map<String, Integer> structureTaskCountMap = new HashMap<>();
+        Map<String, BigDecimal> structureCumulativeTimeMap = new HashMap<>();
+        int skippedCapacityExceeded = 0;
+
+        // 成型胎胚立库库容管控
+        int warehouseCapacity = getEmbryoWarehouseCapacity(context);
+        double warehouseCapacityRatio = getEmbryoWarehouseCapacityRatio(context);
+        int totalExcessStock = 0;
+        if (context.getStocks() != null && context.getMaterialStockMap() != null) {
+            for (CxStock stock : context.getStocks()) {
+                Integer stockNum = stock.getStockNum();
+                if (stockNum == null || stockNum <= 0) {
+                    continue;
+                }
+                String embryoCode = stock.getEmbryoCode();
+                Integer demand = null;
+                if (embryoCode != null && context.getMaterialStockMap() != null) {
+                    demand = context.getMaterialStockMap().get(embryoCode);
+                }
+                int effectiveDemand = demand != null ? demand : 0;
+                int excess = stockNum - effectiveDemand;
+                if (excess > 0) {
+                    totalExcessStock += excess;
+                }
+            }
+        }
+        int warehouseThreshold = (int) Math.floor(warehouseCapacity * warehouseCapacityRatio);
+        boolean warehouseCapacityExceeded = warehouseCapacity > 0 && totalExcessStock >= warehouseThreshold;
+        int skippedWarehouseFull = 0;
+        if (warehouseCapacity > 0) {
+            log.info("【立库库容】超额库存(超过需求部分)={}, 立库库容={}, 阈值比例={}%, 库容上限={}{}",
+                    totalExcessStock, warehouseCapacity, (int)(warehouseCapacityRatio * 100),
+                    warehouseThreshold, warehouseCapacityExceeded ? " [已超限]" : "");
+        }
+
         // 预计算：哪些结构的全部胎胚都是关键产品（开产班次时不进行过滤，否则整个结构无任务可排）
         Set<String> allKeyProductStructures = new HashSet<>();
         if (isOpeningShift && context.getKeyProductCodes() != null && !context.getKeyProductCodes().isEmpty()) {
@@ -246,6 +295,59 @@ public class TaskGroupService {
                 }
             }
         }
+
+        // 按三层优先级对 lhScheduleResults 排序（降序，高优先级先处理）
+        final int sortUrgentDays = getUrgentEndingDays(context);
+        final int sortNearDays = getEndingDaysThreshold(context);
+        final LocalDate sortScheduleDate = scheduleDate;
+        final Map<String, Set<String>> sortMachineOnlineEmbryoMap = machineOnlineEmbryoMap;
+        lhScheduleResults.sort(Comparator.comparingInt(
+                (LhScheduleResult lh) -> {
+                    int score = 0;
+                    boolean isSupplement = "3".equals(lh.getDataSource());
+                    boolean hasPlanQty = getShiftPlanQty(lh, dayShifts) > 0;
+
+                    LocalDate endingDate = findEndingDate(lh.getMaterialCode(), context);
+                    int daysToEnding = (endingDate != null)
+                            ? (int) java.time.temporal.ChronoUnit.DAYS.between(sortScheduleDate, endingDate)
+                            : Integer.MAX_VALUE;
+                    boolean isUrgentEnding = daysToEnding >= 0 && daysToEnding <= sortUrgentDays;
+                    boolean isNearEnding = daysToEnding >= 0 && daysToEnding <= sortNearDays;
+
+                    if (isSupplement) {
+                        score += PRIORITY_SUPPLEMENT_BASE;
+                    } else if (hasPlanQty && isUrgentEnding) {
+                        score += PRIORITY_HAS_PLAN_URGENT;
+                    } else if (hasPlanQty && isNearEnding) {
+                        score += PRIORITY_HAS_PLAN_NEAR;
+                    } else if (hasPlanQty) {
+                        score += PRIORITY_HAS_PLAN_NORMAL;
+                    } else if (isUrgentEnding) {
+                        score += PRIORITY_NO_PLAN_URGENT;
+                    } else if (isNearEnding) {
+                        score += PRIORITY_NO_PLAN_NEAR;
+                    } else {
+                        score += PRIORITY_NO_PLAN_NORMAL;
+                    }
+
+                    String stage = lh.getConstructionStage();
+                    if (STAGE_TRIAL.equals(stage) || STAGE_PRODUCTION_TRIAL.equals(stage)) {
+                        score += PRIORITY_TRIAL;
+                    }
+
+                    List<String> contMachines = findContinueMachines(
+                            lh.getMaterialCode(), lh.getEmbryoCode(), sortMachineOnlineEmbryoMap);
+                    if (!contMachines.isEmpty()) {
+                        score += PRIORITY_CONTINUE;
+                    }
+
+                    int stockQty = getCurrentStock(context, lh.getId());
+                    score -= Math.min(stockQty, PRIORITY_STOCK_TIEBREAKER_MAX);
+
+                    return -score;
+                }
+        ));
+        log.info("按三层优先级排序完成：补充计划 > 有计划量+3天内收尾 > ... > 无计划量+>10天收尾，层级内试制量试 > 续作 > 非续作 > 库存少优先");
 
         for (LhScheduleResult lhResult : lhScheduleResults) {
             if (lhResult.getEmbryoCode() == null) {
@@ -277,13 +379,6 @@ public class TaskGroupService {
                 continue;
             }
 
-            CoreScheduleAlgorithmService.DailyEmbryoTask task = buildSingleTask(
-                    lhResult, materialMap, stockMap, context, dayShifts);
-            if (task == null) {
-                skippedNullTask++;
-                continue;
-            }
-
             // 开产班次提前过滤关键产品（不在分组中保留，直接在循环中跳过）
             // 但如果该结构全部为关键产品，则不进行过滤（避免整个结构无任务可排）
             if (isOpeningShift && context.getKeyProductCodes() != null
@@ -291,6 +386,66 @@ public class TaskGroupService {
                     && context.getKeyProductCodes().contains(lhResult.getEmbryoCode())
                     && !allKeyProductStructures.contains(lhResult.getStructureName())) {
                 log.info("开产班次关键产品跳过: 胎胚={}", lhResult.getEmbryoCode());
+                continue;
+            }
+
+
+            // 检查3：月计划推荐的机台总产能管控
+            String structureName = lhResult.getStructureName();
+            if (structureName != null && context.getStructureAllocationMap() != null) {
+                List<MpCxCapacityConfiguration> recommendedMachines = structureRecommendedMachinesCache
+                        .computeIfAbsent(structureName, k -> getRecommendedMachinesForStructure(k, scheduleDate, context));
+
+                if (recommendedMachines != null && !recommendedMachines.isEmpty()) {
+                    int totalMaxLh = structureTotalMaxLhCache
+                            .computeIfAbsent(structureName, k -> calculateStructureTotalMaxLh(recommendedMachines, k, context));
+                    BigDecimal avgRatio = structureAvgRatioCache
+                            .computeIfAbsent(structureName, k -> calculateStructureAvgRatio(recommendedMachines, k, context));
+
+                    int currentCount = structureTaskCountMap.getOrDefault(structureName, 0);
+                    if (currentCount >= totalMaxLh) {
+                        log.info("结构 {} 已达推荐机台总硫化机数上限 {}/{}，跳过胎胚={}",
+                                structureName, currentCount, totalMaxLh, lhResult.getEmbryoCode());
+                        skippedCapacityExceeded++;
+                        continue;
+                    }
+
+                    BigDecimal totalCapacitySeconds = BigDecimal.valueOf(recommendedMachines.size())
+                            .multiply(BigDecimal.valueOf(86400));
+                    Integer dailyLhCapacity = getDailyLhCapacityForMaterial(materialCode, context);
+                    if (dailyLhCapacity != null && dailyLhCapacity > 0
+                            && avgRatio.compareTo(BigDecimal.ZERO) > 0) {
+                        BigDecimal timePerTire = BigDecimal.valueOf(86400)
+                                .divide(avgRatio.multiply(BigDecimal.valueOf(dailyLhCapacity)), 2, java.math.RoundingMode.HALF_UP);
+                        int shiftPlanQty = getShiftPlanQty(lhResult, dayShifts);
+                        BigDecimal itemTimeSeconds = timePerTire.multiply(BigDecimal.valueOf(shiftPlanQty));
+                        BigDecimal cumulativeTime = structureCumulativeTimeMap.getOrDefault(structureName, BigDecimal.ZERO);
+
+                        if (cumulativeTime.add(itemTimeSeconds).compareTo(totalCapacitySeconds) > 0) {
+                            log.info("结构 {} 已达推荐机台总产能上限 (累计耗时={}s > 总产能={}s)，跳过胎胚={}",
+                                    structureName, cumulativeTime.add(itemTimeSeconds).toBigInteger(),
+                                    totalCapacitySeconds.toBigInteger(), lhResult.getEmbryoCode());
+                            skippedCapacityExceeded++;
+                            continue;
+                        }
+                        structureCumulativeTimeMap.put(structureName, cumulativeTime.add(itemTimeSeconds));
+                    }
+                    structureTaskCountMap.merge(structureName, 1, Integer::sum);
+                }
+            }
+
+            // 检查4：成型胎胚立库库容管控（超额库存 >= 库容×比例阈值时跳过）
+            if (warehouseCapacityExceeded) {
+                log.info("胎胚立库库容已超限 (超额库存={} >= 上限={})，跳过胎胚={}",
+                        totalExcessStock, warehouseThreshold, lhResult.getEmbryoCode());
+                skippedWarehouseFull++;
+                continue;
+            }
+
+            CoreScheduleAlgorithmService.DailyEmbryoTask task = buildSingleTask(
+                    lhResult, materialMap, stockMap, context, dayShifts);
+            if (task == null) {
+                skippedNullTask++;
                 continue;
             }
 
@@ -318,6 +473,29 @@ public class TaskGroupService {
             // S5.2.4 计算收尾属性（传入已使用的成型余量）
             int usedRemainder = materialUsedFormingRemainder.getOrDefault(materialCode, 0);
             calculateEndingInfo(task, context, scheduleDate, usedRemainder);
+
+            // S5.2.4.2 暂存待第二轮分配：
+            //   1. 零净需求（库存已覆盖需求）→ 按收尾余量一车一车补
+            //   2. 补充计划任务（dataSource=3）→ 按需求量一车一车补
+            int taskVulcanizeDemand = task.getVulcanizeDemand() != null ? task.getVulcanizeDemand() : 0;
+            int taskCurrentStock = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
+            int taskNetDemand = Math.max(0, taskVulcanizeDemand - taskCurrentStock);
+            boolean isTrialLikeTask = isTrialTask || isProductionTrial;
+            boolean isSupplement = Boolean.TRUE.equals(task.getIsSupplementTask());
+            boolean shouldDefer = (taskNetDemand == 0 && !isTrialLikeTask) || isSupplement;
+            if (shouldDefer) {
+                int deferredQty = isSupplement ? taskNetDemand : (task.getEndingSurplusQty() != null ? task.getEndingSurplusQty() : 0);
+                task.setDeferredRemainingDemand(deferredQty);
+                task.setPlannedProduction(0);
+                task.setRequiredCars(0);
+                task.setEndingExtraInventory(0);
+                log.info("暂存待第二轮分配: 胎胚={}, 物料={}, 原因={}, 剩余需求={}, 收尾余量={}",
+                        embryoCode, materialCode,
+                        isSupplement ? "补充计划" : "零净需求",
+                        deferredQty, task.getEndingSurplusQty());
+                deferredTasks.add(task);
+                continue;
+            }
 
             // S5.2.4.1 开产班次：更新 vulcanizeDemand 为下一个有计划的 CLASS 的量
 //            if (isOpeningShift) {
@@ -428,11 +606,194 @@ public class TaskGroupService {
             }
         }
 
-        log.info("【任务分组结果】续作:{}个 | 试制:{}个 | 新增:{}个 | 跳过无效胚胎:{}个 | 跳过空任务:{}个 | 跳过硫化余量<=0:{}个 | 跳过成型余量<=0:{}个",
+        // ==================== 第二轮：零净需求暂存任务的剩余产能分配 ====================
+        if (!deferredTasks.isEmpty()) {
+            log.info("【第二轮分配】开始处理 {} 个零净需求暂存任务", deferredTasks.size());
+            int deferredAllocated = 0;
+            int deferredSkippedCapacity = 0;
+            int deferredSkippedForming = 0;
+            int deferredSkippedEnding = 0;
+            int deferredSkippedWarehouse = 0;
+
+            // 按结构分组
+            Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> structureDeferredMap = new LinkedHashMap<>();
+            for (CoreScheduleAlgorithmService.DailyEmbryoTask dt : deferredTasks) {
+                String structName = dt.getStructureName() != null ? dt.getStructureName() : "";
+                structureDeferredMap.computeIfAbsent(structName, k -> new ArrayList<>()).add(dt);
+            }
+
+            // 计算每个结构的剩余产能
+            Map<String, BigDecimal> structureRemainingCapacityMap = new HashMap<>();
+            for (String structName : structureDeferredMap.keySet()) {
+                if (structName.isEmpty() || context.getStructureAllocationMap() == null) {
+                    structureRemainingCapacityMap.put(structName, BigDecimal.valueOf(Long.MAX_VALUE));
+                    continue;
+                }
+                List<MpCxCapacityConfiguration> recommendedMachines = structureRecommendedMachinesCache
+                        .computeIfAbsent(structName, k -> getRecommendedMachinesForStructure(k, scheduleDate, context));
+                if (recommendedMachines == null || recommendedMachines.isEmpty()) {
+                    structureRemainingCapacityMap.put(structName, BigDecimal.valueOf(Long.MAX_VALUE));
+                    continue;
+                }
+                BigDecimal totalCapacitySeconds = BigDecimal.valueOf(recommendedMachines.size())
+                        .multiply(BigDecimal.valueOf(SECONDS_PER_DAY));
+                BigDecimal cumulativeTime = structureCumulativeTimeMap.getOrDefault(structName, BigDecimal.ZERO);
+                BigDecimal remaining = totalCapacitySeconds.subtract(cumulativeTime);
+                structureRemainingCapacityMap.put(structName, remaining.compareTo(BigDecimal.ZERO) > 0 ? remaining : BigDecimal.ZERO);
+                log.info("  结构 {} 剩余产能: 总={}s, 第一轮已用={}s, 剩余={}s",
+                        structName, totalCapacitySeconds.toBigInteger(), cumulativeTime.toBigInteger(), remaining.toBigInteger());
+            }
+
+            // 轮询分配：每个结构下轮询安排一车，直到产能耗尽
+            Map<String, BigDecimal> structureDeferredTimeMap = new HashMap<>();
+            boolean anyProgress = true;
+            while (anyProgress) {
+                anyProgress = false;
+                for (Map.Entry<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> entry : structureDeferredMap.entrySet()) {
+                    String structName = entry.getKey();
+                    List<CoreScheduleAlgorithmService.DailyEmbryoTask> taskList = entry.getValue();
+                    BigDecimal remainingCapacity = structureRemainingCapacityMap.getOrDefault(structName, BigDecimal.ZERO);
+
+                    if (remainingCapacity.compareTo(BigDecimal.ZERO) <= 0) {
+                        continue;
+                    }
+
+                    Iterator<CoreScheduleAlgorithmService.DailyEmbryoTask> iter = taskList.iterator();
+                    while (iter.hasNext()) {
+                        CoreScheduleAlgorithmService.DailyEmbryoTask dt = iter.next();
+
+                        // 检查：成型余量是否已耗尽
+                        String dtMaterialCode = dt.getMaterialCode();
+                        Integer dtFormingRemainder = getFormingRemainder(dtMaterialCode, context);
+                        int usedRemainderForMaterial = materialUsedFormingRemainder.getOrDefault(dtMaterialCode, 0);
+                        if (dtFormingRemainder != null && (dtFormingRemainder - usedRemainderForMaterial) <= 0) {
+                            log.info("  第二轮跳过(成型余量耗尽): 胎胚={}, 物料={}", dt.getEmbryoCode(), dtMaterialCode);
+                            iter.remove();
+                            deferredSkippedForming++;
+                            continue;
+                        }
+
+                        // 检查：剩余需求
+                        int remainingDemand = dt.getDeferredRemainingDemand() != null ? dt.getDeferredRemainingDemand() : 0;
+                        if (remainingDemand <= 0) {
+                            log.info("  第二轮跳过(剩余需求<=0): 胎胚={}", dt.getEmbryoCode());
+                            iter.remove();
+                            deferredSkippedEnding++;
+                            continue;
+                        }
+
+                        // 检查：立库库容
+                        if (warehouseCapacityExceeded) {
+                            deferredSkippedWarehouse++;
+                            iter.remove();
+                            continue;
+                        }
+
+                        // 分配一车：min(整车条数, 剩余需求)
+                        int tripCapacity = getTripCapacity(dt.getStructureName(), dt.getEmbryoCode(), context);
+                        int fallbackProduction = Math.min(tripCapacity, remainingDemand);
+                        if (fallbackProduction <= 0) {
+                            iter.remove();
+                            continue;
+                        }
+
+                        // 检查剩余产能是否够一车
+                        Integer dailyLhCapacity = getDailyLhCapacityForMaterial(dtMaterialCode, context);
+                        BigDecimal avgRatio = structureAvgRatioCache
+                                .computeIfAbsent(structName, k -> {
+                                    List<MpCxCapacityConfiguration> machines = structureRecommendedMachinesCache.get(k);
+                                    return machines != null ? calculateStructureAvgRatio(machines, k, context) : BigDecimal.ONE;
+                                });
+                        if (dailyLhCapacity != null && dailyLhCapacity > 0 && avgRatio.compareTo(BigDecimal.ZERO) > 0) {
+                            BigDecimal timePerTire = BigDecimal.valueOf(SECONDS_PER_DAY)
+                                    .divide(avgRatio.multiply(BigDecimal.valueOf(dailyLhCapacity)), 2, java.math.RoundingMode.HALF_UP);
+                            BigDecimal itemTimeSeconds = timePerTire.multiply(BigDecimal.valueOf(fallbackProduction));
+                            BigDecimal deferredTime = structureDeferredTimeMap.getOrDefault(structName, BigDecimal.ZERO);
+                            if (deferredTime.add(itemTimeSeconds).compareTo(remainingCapacity) > 0) {
+                                log.info("  第二轮结构 {} 剩余产能不足以安排一车 (已用={}s + 本项={}s > 剩余={}s)，该结构本轮跳过",
+                                        structName, deferredTime.toBigInteger(), itemTimeSeconds.toBigInteger(),
+                                        remainingCapacity.toBigInteger());
+                                deferredSkippedCapacity++;
+                                break;
+                            }
+                            structureDeferredTimeMap.put(structName, deferredTime.add(itemTimeSeconds));
+                        }
+
+                        // 确认分配
+                        dt.setPlannedProduction(fallbackProduction);
+                        dt.setRequiredCars(calculateRequiredCars(fallbackProduction, tripCapacity));
+                        dt.setEndingExtraInventory(fallbackProduction);
+                        deferredAllocated++;
+                        anyProgress = true;
+
+                        // 更新剩余需求
+                        int newRemaining = remainingDemand - fallbackProduction;
+                        dt.setDeferredRemainingDemand(newRemaining);
+
+                        boolean dtIsSupplement = Boolean.TRUE.equals(dt.getIsSupplementTask());
+                        log.info("  第二轮分配: 结构={}, 胎胚={}, 原因={}, 安排一车={}, 剩余需求={}, 需车={}",
+                                structName, dt.getEmbryoCode(),
+                                dtIsSupplement ? "补充计划" : "零净需求",
+                                fallbackProduction, newRemaining, dt.getRequiredCars());
+
+                        // 收尾余量处理
+                        handleEndingRemainder(dt, context);
+
+                        // 收尾余量处理后回溯更新 isLastEndingBatch
+                        if (Boolean.TRUE.equals(dt.getIsLastEndingBatch())) {
+                            List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
+                            if (allTasksForMaterial != null) {
+                                for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
+                                    if (prevTask != dt && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
+                                        prevTask.setIsLastEndingBatch(true);
+                                        log.info("  第二轮回溯更新 isLastEndingBatch: 物料={}, 胎胚={} → true", dtMaterialCode, prevTask.getEmbryoCode());
+                                    }
+                                }
+                            }
+                        }
+
+                        // 更新已使用的成型余量
+                        if (dt.getEndingExtraInventory() != null && dt.getEndingExtraInventory() > 0) {
+                            materialUsedFormingRemainder.merge(dtMaterialCode, dt.getEndingExtraInventory(), Integer::sum);
+                        }
+
+                        // 收尾舍弃的任务(plannedProduction=0)不加入分组
+                        if (dt.getPlannedProduction() != null && dt.getPlannedProduction() > 0) {
+                            boolean dtIsContinue = Boolean.TRUE.equals(dt.getIsContinueTask());
+                            boolean dtIsTrial = Boolean.TRUE.equals(dt.getIsTrialTask());
+                            if (dtIsContinue) {
+                                result.getContinueTasks().add(dt);
+                            } else if (dtIsTrial) {
+                                result.getTrialTasks().add(dt);
+                            } else {
+                                result.getNewTasks().add(dt);
+                            }
+                        } else {
+                            log.info("  第二轮分配后收尾舍弃: 胎胚={}, plannedProduction={}", dt.getEmbryoCode(), dt.getPlannedProduction());
+                        }
+
+                        // 剩余需求耗尽则移除，否则下轮继续补
+                        if (newRemaining <= 0) {
+                            iter.remove();
+                        }
+                        break;
+                    }
+                }
+            }
+
+            int remainingDeferred = 0;
+            for (List<CoreScheduleAlgorithmService.DailyEmbryoTask> remaining : structureDeferredMap.values()) {
+                remainingDeferred += remaining.size();
+            }
+            log.info("【第二轮分配结果】暂存:{}个 | 已分配:{}个 | 未分配:{}个 | 跳过产能不足:{}个 | 跳过成型余量耗尽:{}个 | 跳过收尾余量<=0:{}个 | 跳过立库满:{}个",
+                    deferredTasks.size(), deferredAllocated, remainingDeferred, deferredSkippedCapacity, deferredSkippedForming, deferredSkippedEnding, deferredSkippedWarehouse);
+        }
+
+        log.info("【任务分组结果】续作:{}个 | 试制:{}个 | 新增:{}个 | 跳过无效胚胎:{}个 | 跳过空任务:{}个 | 跳过硫化余量<=0:{}个 | 跳过成型余量<=0:{}个 | 跳过产能超限:{}个 | 跳过立库满:{}个",
                 result.getContinueTasks().size(),
                 result.getTrialTasks().size(),
                 result.getNewTasks().size(),
-                skippedNullEmbryo, skippedNullTask, skippedVulcanizeSurplusZero, skippedFormingRemainderZero);
+                skippedNullEmbryo, skippedNullTask, skippedVulcanizeSurplusZero, skippedFormingRemainderZero, skippedCapacityExceeded, skippedWarehouseFull);
         return result;
     }
 
@@ -513,18 +874,22 @@ public class TaskGroupService {
     /**
      * 计算任务优先级分数
      *
-     * <p>优先级评分规则：
+     * <p>优先级分层规则（从高到低）：
+     * <ol>
+     *   <li>补充计划任务（延误物料补充，dataSource=3）</li>
+     *   <li>有计划量 + 3天内紧急收尾</li>
+     *   <li>有计划量 + 10天内收尾</li>
+     *   <li>有计划量 + 大于10天收尾</li>
+     *   <li>无计划量 + 3天内紧急收尾</li>
+     *   <li>无计划量 + 10天内收尾</li>
+     *   <li>无计划量 + 大于10天收尾</li>
+     * </ol>
+     *
+     * <p>每个层级内部细分排序（试制量试 > 续作 > 非续作 > 库存少的优先），以及叠加细化加分：
      * <ul>
-     *   <li>紧急收尾: +3000</li>
-     *   <li>普通收尾: +2000</li>
-     *   <li>试制任务: +1500</li>
-     *   <li>近期收尾(10天内): +1000</li>
+     *   <li>试制量试任务: +1500（层级内最高）</li>
      *   <li>续作任务: +800</li>
-     *   <li>库存紧张(&lt;4h): +800</li>
-     *   <li>首排任务: +500</li>
-     *   <li>库存高预警(&gt;18h): -500</li>
-     *   <li>库存中等紧张(&lt;6h): +400</li>
-     *   <li>主销产品: +200</li>
+     *   <li>库存量扣分: -min(currentStock, 499)（库存越少优先级越高）</li>
      * </ul>
      *
      * @param task    胎胚任务
@@ -537,52 +902,37 @@ public class TaskGroupService {
 
         int score = 0;
 
-        // 紧急收尾最高优先级
-        if (Boolean.TRUE.equals(task.getIsUrgentEnding())) {
-            score += PRIORITY_URGENT_ENDING;
-        } else if (Boolean.TRUE.equals(task.getIsEndingTask())) {
-            score += PRIORITY_ENDING;
+        boolean hasPlanQty = task.getVulcanizeDemand() != null && task.getVulcanizeDemand() > 0;
+        boolean isUrgentEnding = Boolean.TRUE.equals(task.getIsUrgentEnding());
+        boolean isNearEnding = Boolean.TRUE.equals(task.getIsNearEnding());
+
+        if (Boolean.TRUE.equals(task.getIsSupplementTask())) {
+            score += PRIORITY_SUPPLEMENT_BASE;
+        } else if (hasPlanQty && isUrgentEnding) {
+            score += PRIORITY_HAS_PLAN_URGENT;
+        } else if (hasPlanQty && isNearEnding) {
+            score += PRIORITY_HAS_PLAN_NEAR;
+        } else if (hasPlanQty) {
+            score += PRIORITY_HAS_PLAN_NORMAL;
+        } else if (isUrgentEnding) {
+            score += PRIORITY_NO_PLAN_URGENT;
+        } else if (isNearEnding) {
+            score += PRIORITY_NO_PLAN_NEAR;
+        } else {
+            score += PRIORITY_NO_PLAN_NORMAL;
         }
 
-        // 近期收尾
-        if (Boolean.TRUE.equals(task.getIsNearEnding())) {
-            score += PRIORITY_NEAR_ENDING;
-        }
-
-        // 试制任务
-        if (Boolean.TRUE.equals(task.getIsTrialTask())) {
+        if (Boolean.TRUE.equals(task.getIsTrialTask()) || Boolean.TRUE.equals(task.getIsProductionTrial())) {
             score += PRIORITY_TRIAL;
         }
 
-        // 续作任务
         if (Boolean.TRUE.equals(task.getIsContinueTask())) {
             score += PRIORITY_CONTINUE;
         }
 
-        // 首排任务
-        if (Boolean.TRUE.equals(task.getIsFirstTask())) {
-            score += PRIORITY_FIRST_TASK;
-        }
-
-        // 库存紧张（低库存时长 = 高优先级）
-        if (task.getStockHours() != null) {
-            if (task.getStockHours().compareTo(STOCK_LOW_HOURS_THRESHOLD) < 0) {
-                score += PRIORITY_STOCK_LOW;
-            } else if (task.getStockHours().compareTo(STOCK_MEDIUM_HOURS_THRESHOLD) < 0) {
-                score += PRIORITY_STOCK_MEDIUM;
-            }
-        }
-
-        // 库存高预警（>18小时 = 低优先级）
-        if (Boolean.TRUE.equals(task.getIsStockHighWarning())) {
-            score -= PRIORITY_STOCK_HIGH_PENALTY;
-            log.debug("胎胚 {} 库存水位过高，优先级降低{}分", task.getEmbryoCode(), PRIORITY_STOCK_HIGH_PENALTY);
-        }
-
-        // 主销产品
-        if (Boolean.TRUE.equals(task.getIsMainProduct())) {
-            score += PRIORITY_MAIN_PRODUCT;
-        }
+        // 第三层细分：按库存量排序，库存少的优先
+        int stockQty = task.getCurrentStock() != null ? task.getCurrentStock() : 0;
+        score -= Math.min(stockQty, PRIORITY_STOCK_TIEBREAKER_MAX);
 
         return score;
     }
@@ -744,7 +1094,8 @@ public class TaskGroupService {
         task.setVulcanizeDemand(vulcanizeDemand);
         task.setCurrentStock(currentStock);
         task.setProductionVersion(lhResult.getProductionVersion());
-        task.setMaterialCode(finalMaterialCode);  // 直接使用 lhResult 或 materialMap 中的 materialCode
+        task.setMaterialCode(finalMaterialCode);
+        task.setIsSupplementTask("3".equals(lhResult.getDataSource()));
         
         if (materialDesc != null) {
             task.setMaterialDesc(materialDesc);
@@ -1023,17 +1374,10 @@ public class TaskGroupService {
                 || Boolean.TRUE.equals(task.getIsProductionTrial());
 
         if (netDemand == 0 && !isTrialLikeTask) {
-            int endingFallbackProduction = calculateEndingFallbackProduction(task, context);
-            if (endingFallbackProduction > 0) {
-                int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
-                task.setPlannedProduction(endingFallbackProduction);
-                task.setRequiredCars(calculateRequiredCars(endingFallbackProduction, tripCapacity));
-                task.setEndingExtraInventory(endingFallbackProduction);
-                log.info("库存已覆盖当前硫化需求，按收尾余量补产: 胎胚={}, 收尾余量={}, 6h封顶补产={}, 需车={}",
-                        task.getEmbryoCode(), task.getEndingSurplusQty(),
-                        endingFallbackProduction, task.getRequiredCars());
-                return;
-            }
+            task.setPlannedProduction(0);
+            task.setRequiredCars(0);
+            task.setEndingExtraInventory(0);
+            return;
         }
 
         // Step 2: 乘以(1 + 损耗率)，但试制任务不考虑损耗率
@@ -1079,21 +1423,8 @@ public class TaskGroupService {
      * <p>这条分支仍按整车下，但为了不突破“收尾余量”和“6小时封顶”两个约束，
      * 会在上限内向下取到可下的最大整车量。
      */
-    private int calculateEndingFallbackProduction(CoreScheduleAlgorithmService.DailyEmbryoTask task,
-                                                  ScheduleContextVo context) {
-        Integer endingSurplusQty = task.getEndingSurplusQty();
-        if (endingSurplusQty == null || endingSurplusQty <= 0) {
-            return 0;
-        }
-
-        int maxQtyByHours = calculateQuantityByStockHours(task, context, ZERO_NET_DEMAND_ENDING_MAX_HOURS);
-        if (maxQtyByHours <= 0) {
-            return 0;
-        }
-
-        int upperBound = Math.min(endingSurplusQty, maxQtyByHours);
-        int tripCapacity = getTripCapacity(task.getStructureName(), task.getEmbryoCode(), context);
-        return productionCalculator.roundToTrip(upperBound, tripCapacity, "FLOOR");
+    private int calculateEndingFallbackProduction_REMOVED() {
+        return 0;
     }
 
     /**
@@ -1703,7 +2034,7 @@ public class TaskGroupService {
         return allShifts.stream()
                 .filter(c -> c.getScheduleDay() != null && c.getScheduleDay() == 1)
                 .sorted(Comparator.comparingInt(c -> c.getDayShiftOrder() != null ? c.getDayShiftOrder() : 0))
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
     }
 
     /**
@@ -1756,7 +2087,7 @@ public class TaskGroupService {
     private int getStructureLhRatio(CoreScheduleAlgorithmService.DailyEmbryoTask task,
                                      ScheduleContextVo context) {
         if (context.getStructureLhRatioMap() != null && task.getStructureName() != null) {
-            com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio lhRatio =
+            MdmStructureLhRatio lhRatio =
                     context.getStructureLhRatioMap().get(task.getStructureName());
             if (lhRatio != null && lhRatio.getLhMachineMaxQty() != null && lhRatio.getLhMachineMaxQty() > 0) {
                 return lhRatio.getLhMachineMaxQty();
@@ -1914,5 +2245,98 @@ public class TaskGroupService {
             }
         }
         return DEFAULT_URGENT_ENDING_DAYS;
+    }
+
+    private List<MpCxCapacityConfiguration> getRecommendedMachinesForStructure(
+            String structureName, LocalDate scheduleDate, ScheduleContextVo context) {
+        Map<String, List<MpCxCapacityConfiguration>> allocationMap = context.getStructureAllocationMap();
+        if (allocationMap == null) {
+            return Collections.emptyList();
+        }
+        List<MpCxCapacityConfiguration> configs = allocationMap.get(structureName);
+        if (configs == null || configs.isEmpty()) {
+            return Collections.emptyList();
+        }
+        int dayOfMonth = scheduleDate.getDayOfMonth();
+        return configs.stream()
+                .filter(c -> c.getBeginDay() != null && c.getEndDay() != null
+                        && c.getBeginDay() <= dayOfMonth && c.getEndDay() >= dayOfMonth)
+                .collect(Collectors.toList());
+    }
+
+    private int calculateStructureTotalMaxLh(
+            List<MpCxCapacityConfiguration> machines, String structureName, ScheduleContextVo context) {
+        int total = 0;
+        for (MpCxCapacityConfiguration config : machines) {
+            Integer maxLh = getMachineLhMaxQty(config.getCxMachineCode(), structureName, context);
+            total += (maxLh != null ? maxLh : DEFAULT_MAX_LH_MACHINE_QTY);
+        }
+        return total;
+    }
+
+    private BigDecimal calculateStructureAvgRatio(
+            List<MpCxCapacityConfiguration> machines, String structureName, ScheduleContextVo context) {
+        if (machines.isEmpty()) {
+            return BigDecimal.ONE;
+        }
+        BigDecimal totalRatio = BigDecimal.ZERO;
+        for (MpCxCapacityConfiguration config : machines) {
+            Integer ratio = getMachineLhMaxQty(config.getCxMachineCode(), structureName, context);
+            totalRatio = totalRatio.add(BigDecimal.valueOf(ratio != null && ratio > 0 ? ratio : 1));
+        }
+        return totalRatio.divide(BigDecimal.valueOf(machines.size()), 4, java.math.RoundingMode.HALF_UP);
+    }
+
+    private Integer getMachineLhMaxQty(String machineCode, String structureName, ScheduleContextVo context) {
+        if (context.getStructureLhRatioMap() != null && structureName != null && machineCode != null) {
+            Map<String, String> machineTypeCodeMap = context.getMachineTypeCodeMap();
+            String machineTypeCode = machineTypeCodeMap != null ? machineTypeCodeMap.get(machineCode) : null;
+            if (machineTypeCode != null) {
+                MdmStructureLhRatio lhRatio = context.getStructureLhRatioMap().get(machineTypeCode + "|" + structureName);
+                if (lhRatio != null && lhRatio.getLhMachineMaxQty() != null && lhRatio.getLhMachineMaxQty() > 0) {
+                    return lhRatio.getLhMachineMaxQty();
+                }
+            }
+        }
+        return null;
+    }
+
+    private Integer getDailyLhCapacityForMaterial(String materialCode, ScheduleContextVo context) {
+        if (context.getMaterialLhCapacityMap() == null || materialCode == null) {
+            return null;
+        }
+        MonthPlanProductLhCapacityVo capacityVo = context.getMaterialLhCapacityMap().get(materialCode);
+        if (capacityVo != null) {
+            return capacityVo.getDefaultDayVulcanizationQty();
+        }
+        return null;
+    }
+
+    private int getEmbryoWarehouseCapacity(ScheduleContextVo context) {
+        if (context.getParamConfigMap() != null) {
+            CxParamConfig config = context.getParamConfigMap().get(PARAM_EMBRYO_WAREHOUSE_CAPACITY);
+            if (config != null && config.getParamValue() != null) {
+                try {
+                    return Integer.parseInt(config.getParamValue());
+                } catch (NumberFormatException e) {
+                    log.warn("解析成型胎胚立库库容配置失败: {}", config.getParamValue());
+                }
+            }
+        }
+        return DEFAULT_EMBRYO_WAREHOUSE_CAPACITY;
+    }
+
+    private double getEmbryoWarehouseCapacityRatio(ScheduleContextVo context) {
+        if (context.getParamConfigMap() != null) {
+            CxParamConfig config = context.getParamConfigMap().get(PARAM_EMBRYO_WAREHOUSE_CAPACITY_RATIO);
+            if (config != null && config.getParamValue() != null) {
+                try {
+                    return Double.parseDouble(config.getParamValue());
+                } catch (NumberFormatException e) {
+                    log.warn("解析成型胎胚立库库容比例配置失败: {}", config.getParamValue());
+                }
+            }
+        }
+        return DEFAULT_EMBRYO_WAREHOUSE_CAPACITY_RATIO;
     }
 }

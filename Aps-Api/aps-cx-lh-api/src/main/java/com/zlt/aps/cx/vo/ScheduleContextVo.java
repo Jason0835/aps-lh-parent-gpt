@@ -431,27 +431,23 @@ public class ScheduleContextVo {
     private LocalDateTime vulcanizingOpenDateTime;
 
     /**
-     * 自定义最大胎胚种类数（从参数 MAX_EMBRYO_TYPES_VALUE 加载，未配置则按配比默认值）
+     * 机台最大胎胚种类数映射（key=机台编码前缀, value=最大种类数）
+     * 从参数 SYS04040001 解析，格式: H15,3;H14,5
+     * 默认包含 H15=3
      */
-    private Integer maxEmbryoTypesValue;
-
-    /**
-     * 自定义最大胎胚种类数适用的机台前缀（从参数 MAX_EMBRYO_TYPES_MACHINE_PREFIX 加载，默认 "H15"）
-     */
-    private String maxEmbryoTypesMachinePrefix;
-
-    /**
-     * H15开头机台最大胎胚种类数（已废弃，由 maxEmbryoTypesValue + maxEmbryoTypesMachinePrefix 替代）
-     * @deprecated 保留仅用于兼容旧参数 H15_MAX_EMBRYO_TYPES
-     */
-    @Deprecated
-    private Integer h15MaxEmbryoTypes;
+    private Map<String, Integer> machineMaxEmbryoTypes;
 
     /**
      * 库存可供硫化时长预警阈值（小时），默认18小时
      * 当胎胚预计库存可供硫化时长超过此值时进行预警
      */
     private Integer stockHoursWarningThreshold;
+
+    /** 单日试制+量试SKU上限（按胎胚编码计，默认2） */
+    private Integer maxTrialSkuPerDay;
+
+    /** 试制/量试是否允许在周日排产（Y=允许, N=不允许, 默认N） */
+    private Boolean trialAllowedOnSunday;
 
     // ==================== 收尾相关数据 ====================
 
