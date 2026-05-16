@@ -310,19 +310,33 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes);
         planDataList.add(planRows);
 
-        // 为小计行添加 DAEEF3 背景色标识
-        List<CellStyle> subtotalCellStyleList = new ArrayList<>();
+        // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 红色背景
+        List<CellStyle> cellStyleList = new ArrayList<>();
         int templateListStartRow = 4;
         for (int i = 0; i < planRows.size(); i++) {
-            if ("小计".equals(planRows.get(i).get("cxMachineCode"))) {
-                subtotalCellStyleList.add(new CellStyle(
-                        templateListStartRow + i, templateListStartRow + i,
+            Map<String, Object> rowMap = planRows.get(i);
+            int rowNum = templateListStartRow + i;
+
+            if ("小计".equals(rowMap.get("cxMachineCode"))) {
+                cellStyleList.add(new CellStyle(
+                        rowNum, rowNum,
                         0, 59,
                         "#DAEEF3", true, true, null));
+            } else {
+                Object cxRemainVal = rowMap.get("cxRemainQty");
+                if (cxRemainVal instanceof Number) {
+                    BigDecimal remainQty = new BigDecimal(cxRemainVal.toString());
+                    if (remainQty.compareTo(new BigDecimal("400")) < 0) {
+                        cellStyleList.add(new CellStyle(
+                                rowNum, rowNum,
+                                8, 8,
+                                "#FF0000", true, false, null));
+                    }
+                }
             }
         }
-        if (!subtotalCellStyleList.isEmpty()) {
-            planTableMap.put("CELL_STYLE", subtotalCellStyleList);
+        if (!cellStyleList.isEmpty()) {
+            planTableMap.put("CELL_STYLE", cellStyleList);
         }
 
         inputStream = new ByteArrayInputStream(exportBytes);
@@ -564,6 +578,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 + StringUtils.defaultString(item.getMaterialCode()).trim();
         BigDecimal tnfq = todayNightFinishQtyMap.get(tnfKey);
         row.put("todayNightFinishQty", zeroToEmpty(tnfq));
+
+        BigDecimal ylSum = (tnfq != null ? tnfq : BigDecimal.ZERO)
+                .subtract(tdpq != null ? tdpq : BigDecimal.ZERO);
+        row.put("ylSum", zeroToEmpty(ylSum));
 
         String embryoCode = item.getEmbryoCode();
         String smallGlueVal = smallGlueMap.getOrDefault(embryoCode, "");
