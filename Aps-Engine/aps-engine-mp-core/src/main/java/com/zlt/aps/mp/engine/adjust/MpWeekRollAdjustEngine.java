@@ -2979,6 +2979,9 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setProductionVersion(adjustStructInVo.getProductionVersion());
         mpFinalVo.setLastMonthPlanVersion(adjustStructInVo.getVersion());
         mpFinalVo.setStructureName(adjustStructInVo.getStructureName());
+        Set<String> cycleStructureNameSet = contextDTO.getCycleStructureMinLhMachinesMap().keySet();
+        String structureType = cycleStructureNameSet.contains(adjustStructInVo.getStructureName()) ? FactoryConstant.STRUCTURE_TYPE_CYCL : FactoryConstant.STRUCTURE_TYPE_COMMON;
+        mpFinalVo.setStructureType(structureType);
         mpFinalVo.setCxMachineCode(adjustStructInVo.getScheduledMachines());
         mpFinalVo.setProductTypeCode(adjustStructInVo.getProductTypeCode());
         mpFinalVo.setProductionType(adjustStructInVo.getProductionType());
@@ -3039,6 +3042,9 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setProductionVersion(adjustStructOutVo.getProductionVersion());
         mpFinalVo.setLastMonthPlanVersion(adjustStructOutVo.getVersion());
         mpFinalVo.setStructureName(adjustStructOutVo.getStructureName());
+        Set<String> cycleStructureNameSet = contextDTO.getCycleStructureMinLhMachinesMap().keySet();
+        String structureType = cycleStructureNameSet.contains(adjustStructOutVo.getStructureName()) ? FactoryConstant.STRUCTURE_TYPE_CYCL : FactoryConstant.STRUCTURE_TYPE_COMMON;
+        mpFinalVo.setStructureType(structureType);
         mpFinalVo.setCxMachineCode(adjustStructOutVo.getScheduledMachines());
         mpFinalVo.setProductTypeCode(adjustStructOutVo.getProductTypeCode());
         mpFinalVo.setProductionType(adjustStructOutVo.getProductionType());

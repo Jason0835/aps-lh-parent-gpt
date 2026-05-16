@@ -7,6 +7,17 @@ package com.zlt.aps.constant;
  * @date 20250220
  */
 public class FactoryConstant {
+
+    /**
+     * 周期
+     */
+    public final static String STRUCTURE_TYPE_CYCL = "01";
+
+    /**
+     * 常规
+     */
+    public final static String STRUCTURE_TYPE_COMMON = "02";
+
     /**
      * 月起始天数常量
      * 1

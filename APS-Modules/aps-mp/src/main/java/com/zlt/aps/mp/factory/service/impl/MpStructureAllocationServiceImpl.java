@@ -750,7 +750,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      *
      * @param mpStructureAllocation
      */
-    private List<MdmStructureLhRatio> queryMdmStructureLhRatio(MpStructureAllocation mpStructureAllocation) {
+    public List<MdmStructureLhRatio> queryMdmStructureLhRatio(MpStructureAllocation mpStructureAllocation) {
         LambdaQueryWrapper<MdmStructureLhRatio> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MdmStructureLhRatio::getFactoryCode, mpStructureAllocation.getFactoryCode())
                 .eq(MdmStructureLhRatio::getStructureName, mpStructureAllocation.getStructureName());

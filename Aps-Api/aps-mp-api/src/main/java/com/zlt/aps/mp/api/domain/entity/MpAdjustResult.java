@@ -92,6 +92,13 @@ public class MpAdjustResult extends BaseEntity implements IFinalAndAdjustResultI
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
 
+    /**
+     * 结构类型 01 周期结构 02 常规结构
+     */
+    @ApiModelProperty(value = "结构类型", name = "structureType")
+    @TableField(value = "STRUCTURE_TYPE")
+    private String structureType;
+
     /** MES物料编码 */
     @Excel(name = "ui.data.column.mpAdjustResult.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")

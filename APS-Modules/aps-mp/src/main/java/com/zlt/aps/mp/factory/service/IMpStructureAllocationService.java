@@ -3,6 +3,7 @@ package com.zlt.aps.mp.factory.service;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
@@ -86,6 +87,12 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
      */
     byte[] getMpStructureAllocationExportByte(MpStructureAllocationExportStatisticsVo list);
 
+    /**
+     * 查询结构的比例配比
+     * @param mpStructureAllocation
+     * @return
+     */
+    List<MdmStructureLhRatio> queryMdmStructureLhRatio(MpStructureAllocation mpStructureAllocation);
     /**
      * 导入
      * @param list 列表数据
