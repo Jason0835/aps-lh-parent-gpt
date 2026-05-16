@@ -566,8 +566,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         row.put("todayNightFinishQty", zeroToEmpty(tnfq));
 
         String embryoCode = item.getEmbryoCode();
-        row.put("smallGlue", smallGlueMap.getOrDefault(embryoCode, ""));
-        row.put("placeholder", placeholderMap.getOrDefault(embryoCode, ""));
+        String smallGlueVal = smallGlueMap.getOrDefault(embryoCode, "");
+        row.put("smallGlue", smallGlueVal);
+        row.put("placeholder", smallGlueVal);
 
         String shiftCapKey = StringUtils.defaultString(item.getStructureName()).trim() + "|"
                 + StringUtils.defaultString(embryoCode).trim();
@@ -835,9 +836,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     /**
      * 构建小胶种和占位符映射。
-     * <p>smallGlue 与 placeholder 取值逻辑相同：依据 embryoCode 关联 MdmMaterialConsumeDetail，
-     * 过滤 CHILD_MATERIAL_NAME 以 AQ 开头且 isDelete = 0 的记录，去掉 AQ 前缀后得到胶种名称，
-     * 多胶种用 "/" 连接。</p>
+     * <p>取值逻辑与 Sheet0 成型余量-按机台 的 smallGlue 完全一致：
+     * 从 CxParamConfig 读取 RUBBER_TYPE_CODES，加 AQ 前缀后精确匹配 MdmMaterialConsumeDetail，
+     * 去掉 AQ 前缀得到胶种名称，同胎胚多胶种用 "/" 连接。</p>
      *
      * @param exportList 成型排程结果列表
      * @return key=smallGlue/placeholder, value=embryoCode→字符串的映射
@@ -851,22 +852,38 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return result;
         }
 
-        Set<String> embryoCodes = exportList.stream()
-                .map(CxScheduleResult::getEmbryoCode)
-                .filter(StringUtils::isNotBlank)
-                .collect(Collectors.toSet());
+        // 从参数配置表读取胶种类型编码
+        CxParamConfig config = cxParamConfigMapper.selectOne(
+                new LambdaQueryWrapper<CxParamConfig>()
+                        .eq(CxParamConfig::getParamCode, "RUBBER_TYPE_CODES")
+                        .eq(CxParamConfig::getIsActive, 1));
 
-        if (embryoCodes.isEmpty()) {
+        if (config == null || StringUtils.isBlank(config.getParamValue())) {
             return result;
         }
 
-        // 查询原材料消耗明细，过滤 CHILD_MATERIAL_NAME 以 AQ 开头且未删除
+        // 加 AQ 前缀后精确匹配 CHILD_MATERIAL_NAME
+        List<String> codes = Arrays.stream(config.getParamValue().split(","))
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .map(item -> "AQ" + item)
+                .collect(Collectors.toList());
+
+        if (codes.isEmpty()) {
+            return result;
+        }
+
+        String factoryCode = exportList.stream()
+                .map(CxScheduleResult::getFactoryCode)
+                .filter(StringUtils::isNotBlank)
+                .findFirst()
+                .orElse(null);
+
         List<MdmMaterialConsumeDetail> consumeDetails = mdmMaterialConsumeDetailMapper.selectList(
                 new LambdaQueryWrapper<MdmMaterialConsumeDetail>()
-                        .in(MdmMaterialConsumeDetail::getEmbryoCode, embryoCodes)
-                        .likeRight(MdmMaterialConsumeDetail::getChildMaterialName, "AQ")
-                        .and(w -> w.eq(MdmMaterialConsumeDetail::getIsDelete, 0)
-                                .or().isNull(MdmMaterialConsumeDetail::getIsDelete)));
+                        .eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
+                        .eq(factoryCode != null, MdmMaterialConsumeDetail::getFactoryCode, factoryCode)
+                        .in(MdmMaterialConsumeDetail::getChildMaterialName, codes));
 
         if (CollectionUtils.isEmpty(consumeDetails)) {
             return result;
