@@ -593,13 +593,18 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                         .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum();
             }).sum();
             // 执行撤销逻辑
-            groupPlanDeductionDayHandler.clearProductionInfoByDay(productionContext, groupInfo, dayCapacityLimit,
+            groupPlanDeductionDayHandler.clearProductionInfoByDay(productionContext, groupInfo, null,
                     productionDayLimit, useMouldMap, day);
 
             // 统计值扣减待撤销量
-            SkuDayProductionInfoHelper dayProductionInfo = productionSkuQtyInfo.get(checkMaterialDesc);
-            if (dayProductionInfo != null) {
-                dayProductionInfo.addProductionDayQty(-clearProductQty, 0);
+            SkuDayProductionInfoHelper skuDayProductionInfo = productionSkuQtyInfo.get(checkMaterialDesc);
+            if (skuDayProductionInfo != null && dayCapacityLimit != null) {
+                skuDayProductionInfo.addProductionDayQty(-clearProductQty, 0);
+                dayCapacityLimit.deductionSkuDayProductionQty(productionContext, day, checkMaterialDesc,
+                        useMouldMap.keySet(), clearProductQty, skuDayProductionInfo.getLossQty(),
+                        skuDayProductionInfo.getBrand());
+                // 特殊材料的消耗量释放(Sku已排产量对应释放)
+                productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupInfo, -clearProductQty);
             }
         }
         List<MonthPlanProductionRequirePlanVo> productionPlanList = productionPlanMap.get(checkMaterialDesc);
