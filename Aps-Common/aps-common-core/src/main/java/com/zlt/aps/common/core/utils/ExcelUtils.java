@@ -347,7 +347,7 @@ public class ExcelUtils {
                                     } else if (cellType == CellType.STRING.getCode()) {
                                         newCell.setCellValue(cell.getStringCellValue());
                                     } else if (cellType == CellType.FORMULA.getCode()) {
-                                        // 处理公式，待实现
+                                        newCell.setCellFormula(cell.getCellFormula());
                                     } else {
                                         newCell.setCellValue(cell.getStringCellValue());
                                     }
