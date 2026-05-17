@@ -477,15 +477,17 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     public void autoAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
         //1、执行自动调整
         doAutoAdjust(contextDTO);
-        //2、保存调整结果
+        //2、按结构维度更新硫化机台信息；
+        updateLhMachinesByStructure(contextDTO);
+        //3、保存调整结果
         saveMpAdjustResult(contextDTO);
-        //3、保存调整过程日志
+        //4、保存调整过程日志
         saveMpAdjustProcLog(contextDTO);
-        //4、回填实际调整
+        //5、回填实际调整
         backfillRealAdjustResult(contextDTO);
-        //5、保存月计划统计结果
+        //6、保存月计划统计结果
         saveMonthPlanStatisticsResult(contextDTO,YesOrNoEnum.YES.getCode());
-        //6、发送消息
+        //7、发送消息
         if (!StringUtil.isEmptyWithTrim(contextDTO.getMsgRemainQtyNoFull().toString())){
             //发送 SKU原余量小于调整次日至锁定截止日的计划量提醒
             sendMsgRemainQtyNoFull(contextDTO);
@@ -496,6 +498,42 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
     }
 
+    /**
+     * 按结构维度更新硫化机台信息；
+     * 存在中间插入新结构，故重新刷新一下
+     * @param contextDTO
+     */
+    private void updateLhMachinesByStructure(MpRollAdjustContextDTO contextDTO){
+        List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList();
+        List<FactoryMonthPlanFinalAdjustVo> saveMpProdFinalList = contextDTO.getSaveMpProdFinalList();
+        if (PubUtil.isEmpty(structureAllocationList) || PubUtil.isEmpty(saveMpProdFinalList)){
+            return;
+        }
+        // 1. 按 structureName 分组，收集唯一的 cxMachineCode 并用逗号连接
+        Map<String, String> structureToMachineCodes = structureAllocationList.stream()
+                .filter(s -> s != null && StringUtils.isNotBlank(s.getStructureName()) && StringUtils.isNotBlank(s.getCxMachineCode()))
+                .collect(Collectors.groupingBy(
+                        MpStructureAllocation::getStructureName,
+                        Collectors.mapping(MpStructureAllocation::getCxMachineCode, Collectors.toSet())
+                ))
+                .entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue().stream()
+                                .sorted()  // 机台排序，保证结果稳定
+                                .collect(Collectors.joining(","))
+                ));
+
+        // 2. 遍历待更新的列表，匹配 structureName 并设置 cxMachineCode
+        for (FactoryMonthPlanFinalAdjustVo vo : saveMpProdFinalList) {
+            if (vo != null && StringUtils.isNotBlank(vo.getStructureName())) {
+                String machineCodes = structureToMachineCodes.get(vo.getStructureName());
+                if (machineCodes != null) {
+                    vo.setCxMachineCode(machineCodes);
+                }
+            }
+        }
+    }
     /**
      * 发送 SKU原余量小于调整次日至锁定截止日的计划量提醒
      * @param contextDTO
