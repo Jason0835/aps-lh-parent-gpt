@@ -295,6 +295,9 @@ public class SupplementCxMachineDistributionHandler {
      * @return
      */
     private CxMachineAllocationPlanHelper handlerAllocation(TbrProductionContext productionContext, ProductionPlanGroupInfo addPlanGroup, CxMachineBaseInfoVo selectCxMachine) {
+        if(null == selectCxMachine){
+            return null;
+        }
         //判断切换结构的点
         CxMachineAllocationPlanHelper lastGroup = selectCxMachine.getLastAllocationInfo();
         if (null == lastGroup) {
