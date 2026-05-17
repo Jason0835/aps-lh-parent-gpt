@@ -957,10 +957,7 @@ export default {
       if (!row || !row.id) {
         return;
       }
-      saveAdjustResult({
-        id: row.id,
-        isLockSchedule: row.isLockSchedule,
-      })
+      saveAdjustResult({ ...row })
         .then((res) => {
           this.$modal.msgSuccess(res.msg);
         })
