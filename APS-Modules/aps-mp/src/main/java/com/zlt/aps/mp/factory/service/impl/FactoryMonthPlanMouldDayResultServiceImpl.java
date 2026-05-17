@@ -981,6 +981,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             subtotal.setLast29(safeAdd(subtotal.getLast29(), result.getLast29()));
             subtotal.setLast30(safeAdd(subtotal.getLast30(), result.getLast30()));
             subtotal.setLast31(safeAdd(subtotal.getLast31(), result.getLast31()));
+            subtotal.setUnRestrictedNetQty(safeAdd(subtotal.getUnRestrictedNetQty(), result.getUnRestrictedNetQty()));
+            subtotal.setRestrictedNetQty(safeAdd(subtotal.getRestrictedNetQty(), result.getRestrictedNetQty()));
             subtotal.setAdjustQty1(safeAdd(subtotal.getAdjustQty1(), result.getAdjustQty1()));
             subtotal.setAdjustQty2(safeAdd(subtotal.getAdjustQty2(), result.getAdjustQty2()));
             subtotal.setAdjustQty3(safeAdd(subtotal.getAdjustQty3(), result.getAdjustQty3()));
