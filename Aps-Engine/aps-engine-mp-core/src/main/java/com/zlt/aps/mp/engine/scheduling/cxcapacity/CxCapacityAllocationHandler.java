@@ -20,6 +20,7 @@ import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrSpecialMaterialProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.utils.ProductionComparatorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -467,28 +468,23 @@ public class CxCapacityAllocationHandler {
             singleMachine.setFixedPriority(singleMachine.getFixedPriorityValue(selectedGroup));
             singleMachine.setSelectedPriorityValue(context, selectedGroup, diffValue);
         });
-        //按生产最长时间优先
+        //按生产最长时间优先 -> 优先级级别(值越低越在前) -> 差值小的
         if (isMoreProductionDay) {
-            hasProductionDayList.sort(Comparator.comparing(CxMachineBaseInfoVo::getSelectedProductionDays, Comparator.reverseOrder()));
+            hasProductionDayList.sort(ProductionComparatorUtils.getMatchPrioritySort(true));
             return hasProductionDayList.get(BigDecimal.ZERO.intValue());
         }
-        //排序：优先级级别(值越低越在前) -> 差值小的
-        Comparator sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSelectedPriorityValue)
-                .thenComparing(CxMachineBaseInfoVo::getSelectedPriorityDiffValue);
-        //从指定中获取
         if (isFixed) {
+            //从指定中获取
             List<CxMachineBaseInfoVo> fixedList = hasProductionDayList.stream().filter(singleMachine -> singleMachine.getFixedPriority() < CxMachineFixedPriorityEnum.FIXED_STRUCTURE_FOUR.getPriorityValue()).collect(Collectors.toList());
             if (CollectionUtils.isEmpty(fixedList)) {
                 return null;
             }
             //20260516+ 指定按排产时间最长 -> 优先级级别(值越低越在前) -> 差值小的
-            sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSelectedProductionDays, Comparator.reverseOrder())
-                    .thenComparing(CxMachineBaseInfoVo::getSelectedPriorityValue)
-                    .thenComparing(CxMachineBaseInfoVo::getSelectedPriorityDiffValue);
-            fixedList.sort(sortComparator);
+            fixedList.sort(ProductionComparatorUtils.getMatchPrioritySort(true));
             return fixedList.get(BigDecimal.ZERO.intValue());
         }
-        hasProductionDayList.sort(sortComparator);
+        //排序：优先级级别(值越低越在前) -> 差值小的
+        hasProductionDayList.sort(ProductionComparatorUtils.getMatchPrioritySort(false));
         return hasProductionDayList.get(BigDecimal.ZERO.intValue());
     }
 
@@ -761,5 +757,6 @@ public class CxCapacityAllocationHandler {
         }
         return productionDayInfo.size() >= minAllocationDays;
     }
+
 
 }
