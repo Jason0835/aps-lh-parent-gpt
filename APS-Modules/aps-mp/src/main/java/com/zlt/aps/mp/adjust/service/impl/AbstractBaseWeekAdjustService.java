@@ -809,6 +809,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (PubUtil.isEmpty(saveMpProdFinalList)){
             return;
         }
+        String lastMonthPlanVersion = contextDTO.getAdjustMonthPlanVersion();
         //1、根据调整版本 先删除(物理)
         mpAdjustResultEntityMapper.deleteAdjustResultByVersion(contextDTO.getFactoryCode(),
                 String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getVersion());
@@ -821,6 +822,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             mpAdjustResult.setId(null);
             mpAdjustResult.setAdjustType(contextDTO.getAdjustType());
             mpAdjustResult.setVersion(contextDTO.getVersion());
+            mpAdjustResult.setMonthPlanVersion(lastMonthPlanVersion);
             mpAdjustResult.setTotalPlanQty(finalAdjustVo.getTotalQty());
 
             mpAdjustResult.setAdjustFlag((finalAdjustVo.getActualAdjustQty() != null && Math.abs(finalAdjustVo.getActualAdjustQty())>0) ? YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
@@ -956,11 +958,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         updateStructureAllocationList(contextDTO);
         // 9、处理月计划统计结果
         handleMonthPlanStatistics(contextDTO,null);
-        // 10、合并至定稿月度生产计划
+        // 10、合并至定稿月度生产计划并更新最新版本号
         // 根据优先级顺序分配生产数量
         allocateProductionByPriority(contextDTO);
         saveMpProductionFinalResult(contextDTO);
-
+        updateMonthPlanVersion(contextDTO);
         log.info("周程调整确认流程执行完成");
     }
 
@@ -2460,32 +2462,36 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
-     * 通过结构名称更新月度生产计划
+     * 更新最新的月度生产计划版本
      * @param contextDTO
-     * @param adjustResultList
      */
-    private void updateMonthPlanByStructureName(MpRollAdjustContextDTO contextDTO, List<MpAdjustResult> adjustResultList) {
-        if (PubUtil.isEmpty(adjustResultList) || StringUtils.isEmpty(contextDTO.getAdjustMonthPlanVersion())) {
+    private void updateMonthPlanVersion(MpRollAdjustContextDTO contextDTO) {
+        List<MpAdjustResult> adjustResultList = contextDTO.getAdjustResultList();
+        if (PubUtil.isEmpty(adjustResultList)) {
+            return;
+        }
+        //获取调整结果最新的需求计划版本
+        String adjustMonthPlanVersion =  adjustResultList.get(0).getMonthPlanVersion();
+        if (StringUtils.isBlank(adjustMonthPlanVersion)){
             return;
         }
         // 获取最新需求计划版本
-        String adjustMonthPlanVersion = contextDTO.getAdjustMonthPlanVersion();
+        //String adjustMonthPlanVersion = contextDTO.getAdjustMonthPlanVersion();
         // 收集结构名称Set（筛选结构名称不为空且有调整）
-        Set<String> structureNameSet = adjustResultList.stream()
+        /*Set<String> structureNameSet = adjustResultList.stream()
                 .filter(vo -> StringUtils.isNotEmpty(vo.getStructureName())
                         && ApsConstant.TRUE.equals(vo.getAdjustFlag()))
                 .map(MpAdjustResult::getStructureName)
                 .collect(Collectors.toSet());
         if (PubUtil.isEmpty(structureNameSet)) {
             return;
-        }
+        }*/
         // 通过结构名称更新月度生产计划最新需求计划版本
         LambdaUpdateWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, contextDTO.getFactoryCode())
                 .eq(FactoryMonthPlanProductionFinalResult::getYear, contextDTO.getMpYear())
                 .eq(FactoryMonthPlanProductionFinalResult::getMonth, contextDTO.getMpMonth())
                 .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, contextDTO.getProductionVersion())
-                .in(FactoryMonthPlanProductionFinalResult::getStructureName, structureNameSet)
                 .set(FactoryMonthPlanProductionFinalResult::getLastMonthPlanVersion, adjustMonthPlanVersion);
         factoryMonthPlanProdFinalMapper.update(null, wrapper);
     }

@@ -150,9 +150,10 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
         if (StringUtil.isEmptyWithTrim(billVO.getFactoryCode()) && billVO.getYear() == null && billVO.getMonth() == null){
             //若工厂、年月为空，暂判断为 只是调整 锁定上机日期（优先上机）
             //前端只传ID及 锁定上机日期（优先上机）
-            return super.save(billVO);
+            super.save(billVO);
+        }else{
+            mpAdjustResultService.forceUpdateById(billVO);
         }
-        mpAdjustResultService.forceUpdateById(billVO);
         return AjaxResult.success();
     }
 
