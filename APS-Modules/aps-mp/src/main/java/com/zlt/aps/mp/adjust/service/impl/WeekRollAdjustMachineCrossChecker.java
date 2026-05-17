@@ -1,7 +1,9 @@
 package com.zlt.aps.mp.adjust.service.impl;
 
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.common.utils.PubUtil;
 import org.apache.commons.lang3.StringUtils;
 
@@ -129,6 +131,14 @@ class WeekRollAdjustMachineCrossChecker {
             if (next.getBeginDay() != curr.getEndDay() + 1) {
                 return false; // 存在空闲间隔
             }
+        }
+        //获取第1个结构和最后1个结构
+        MpStructureAllocation firstStructure = sorted.get(0);
+        MpStructureAllocation lastStructure = sorted.get(sorted.size() -1);
+        int maxDays = DateUtils.getDaysByYearMonth(lastStructure.getYear(),lastStructure.getMonth());
+        if (firstStructure.getBeginDay() != FactoryConstant.MONTH_START_DAY || lastStructure.getEndDay() != maxDays){
+            //若第1个结构的第1天不是1或最后1个结构的结束日不是当月最大天数，说明存在间隔
+            return false;
         }
         return true;
     }

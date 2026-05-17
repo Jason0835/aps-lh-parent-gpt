@@ -504,7 +504,15 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param contextDTO
      */
     private void updateLhMachinesByStructure(MpRollAdjustContextDTO contextDTO){
-        List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList();
+        List<MpStructureAllocation> structureAllocationList = new ArrayList<>(contextDTO.getStructureAllocationList());
+        //补充新增结构的机台信息
+        AdjustsCxMachineVo cxMachineVo = mpStructureAllocationService.getAdjustsCxMachineFromRedis();
+        if (cxMachineVo != null){
+            MpStructureAllocation newStructureAlloction = new MpStructureAllocation();
+            newStructureAlloction.setStructureName(cxMachineVo.getStructureName());
+            newStructureAlloction.setCxMachineCode(cxMachineVo.getCxMachineCode());
+            structureAllocationList.add(newStructureAlloction);
+        }
         List<FactoryMonthPlanFinalAdjustVo> saveMpProdFinalList = contextDTO.getSaveMpProdFinalList();
         if (PubUtil.isEmpty(structureAllocationList) || PubUtil.isEmpty(saveMpProdFinalList)){
             return;
@@ -1283,6 +1291,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             targetAllocation.setDataSource(DataSourceEnum.HAND.getCode());
             //mpStructureAllocationEntityMapper.insert(targetAllocation);
             mpStructureAllocationService.save(targetAllocation);
+            //重置结构转产表数据
+            contextDTO.setStructureAllocationList(mpAdjustStructureInService.selectMpStructureAllocationList(contextDTO));
             return;
         }
         mpStructureAllocationEntityMapper.updateById(targetAllocation);
@@ -1400,6 +1410,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
 
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> keyToListMap = contextDTO.getFactoryMonthPlanProdFinalList().stream()
+                .collect(Collectors.groupingBy(vo -> {
+                    String structureName = StringUtils.defaultString(vo.getStructureName());
+                    String materialCode = StringUtils.defaultString(vo.getMaterialCode());
+                    String constructionStage = StringUtils.defaultString(vo.getConstructionStage());
+                    return String.join(BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY, structureName, materialCode, constructionStage);
+                }));
+
         // 需要新增月度生产计划列表
         List<FactoryMonthPlanProductionFinalResult> insertMonthPlanList = new ArrayList<>();
         // 批次号前缀
@@ -1414,12 +1432,15 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         Map<String, MpAdjustResult> summaryAdjustResult = summaryAdjustResult(adjustResultList, adjustDetailList);
         // 遍历调整明细，获取新增的SKU并新增到月度生产计划
         for (MpAdjustDetailVo adjustDetailVo : summaryAdjustDetailList) {
-            String isSkuAdd = adjustDetailVo.getIsSkuAdd();
+           /* String isSkuAdd = adjustDetailVo.getIsSkuAdd();
             if (!ApsConstant.TRUE.equals(isSkuAdd)) {
                 continue;
-            }
+            }*/
             // 构建分组key
             String groupKey = buildGroupKey(adjustDetailVo);
+            if (PubUtil.isNotEmpty(keyToListMap.get(groupKey))){
+                continue;
+            }
             // 匹配汇总后调整结果
             MpAdjustResult adjustResult = summaryAdjustResult.getOrDefault(groupKey, null);
             if (adjustResult == null) {
