@@ -154,13 +154,6 @@ public class FactoryMonthPlanProductionFinalResultController extends AbstractDoc
     @PostMapping("/list4Adjust")
     public TableDataInfo list4Adjust(@RequestBody FactoryMonthPlanProductionFinalResult queryCondition) {
         List<FactoryMonthPlanFinalAdjustVo> list = factoryMonthPlanProductionFinalResultService.list4Adjust(queryCondition);
-        if (PubUtil.isNotEmpty(list)) {
-            for (FactoryMonthPlanFinalAdjustVo adjustVo:list){
-                // 日硫化量固定*2
-                int dayVulcanizationQty = adjustVo.getDayVulcanizationQty() == null ? 0 : adjustVo.getDayVulcanizationQty();
-                adjustVo.setDayVulcanizationQty(dayVulcanizationQty * 2);
-            }
-        }
         // 排序 按英寸->结构->最大型腔数->主花纹->活块数->物料描述
         mpWeekRollAdjustController.sortAdjustResultList(list);
         Integer pageNum = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageNum"), ServletUtils.getHeader("pageNum")));

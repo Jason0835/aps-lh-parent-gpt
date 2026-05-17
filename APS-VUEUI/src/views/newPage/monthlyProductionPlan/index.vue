@@ -528,7 +528,7 @@ export default {
           width: 80,
         },
         {
-          prop: "dayVulcanizationQty",
+          prop: "dayLhQty",
           label: this.$t("ui.data.monthlyProductionPlan.dayVulcanizationQty"),
           width: 100,
         },

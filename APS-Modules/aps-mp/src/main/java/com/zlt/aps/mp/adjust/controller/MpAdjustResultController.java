@@ -6,6 +6,7 @@ import com.zlt.aps.mp.adjust.service.IMpAdjustResultService;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
+import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.common.utils.PubUtil;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import lombok.extern.slf4j.Slf4j;
@@ -146,10 +147,13 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody MpAdjustResult billVO){
-
+        if (StringUtil.isEmptyWithTrim(billVO.getFactoryCode()) && billVO.getYear() == null && billVO.getMonth() == null){
+            //若工厂、年月为空，暂判断为 只是调整 锁定上机日期（优先上机）
+            //前端只传ID及 锁定上机日期（优先上机）
+            return super.save(billVO);
+        }
         mpAdjustResultService.forceUpdateById(billVO);
         return AjaxResult.success();
-        //return super.save(billVO);
     }
 
     /**

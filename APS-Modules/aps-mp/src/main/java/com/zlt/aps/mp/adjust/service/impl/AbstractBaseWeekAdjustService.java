@@ -1119,7 +1119,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
 
             // 构建月计划统计结果
-            MpMonthPlanStatistics monthPlanStatistics = buildMonthPlanStatistics(contextDTO, targetMonthPlanList, YesOrNoEnum.NO.getCode());
+            MpMonthPlanStatistics monthPlanStatistics = buildMonthPlanStatistics(contextDTO, targetMonthPlanList, tempFlag);
             if (Objects.nonNull(monthPlanStatistics)) {
                 monthPlanStatisticsList.add(monthPlanStatistics);
             }
