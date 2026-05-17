@@ -153,18 +153,7 @@ public class SupplementCxMachineDistributionHandler {
         Set<String> rejectGroupPlan = new HashSet<>();
         selectGroupList.forEach(singleGroupPlan -> {
             String structureName = singleGroupPlan.getGroupName();
-            List<CxMachineBaseInfoVo> enableCxMachineList = GroupPlanCxMachineSelector.getEnableCxMachineListByAppoint(productionContext, singleGroupPlan, realLeftOverCxMachineList);
-            if (CollectionUtils.isEmpty(enableCxMachineList)) {
-                rejectGroupPlan.add(structureName);
-                return;
-            }
-            //挑选机台
-            CxMachineBaseInfoVo selectCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlanByAppoint(productionContext, enableCxMachineList, singleGroupPlan);
-            if (null == selectCxMachine) {
-                rejectGroupPlan.add(structureName);
-                return;
-            }
-            CxMachineAllocationPlanHelper allocationResult = handlerAllocation(productionContext, singleGroupPlan, selectCxMachine);
+            CxMachineAllocationPlanHelper allocationResult = selectedCxMachineAndHandlerAllocation(productionContext, realLeftOverCxMachineList, singleGroupPlan);
             if (null == allocationResult) {
                 rejectGroupPlan.add(structureName);
             } else {
@@ -255,6 +244,46 @@ public class SupplementCxMachineDistributionHandler {
                 }));
 
         hasLeftOverGroupList.sort(sort);
+    }
+
+    /**
+     * 从selectedCxMachineList列表中获取最合适的机台进行分配
+     * 1、先看是否有续作机台(即机台最后结构相同的剩余产能机台)
+     * 2、再看其它匹配机台
+     *
+     * @param productionContext     排产上下文
+     * @param selectedCxMachineList 可挑选机台
+     * @param selectedGroupPlan     需要排产的分组
+     * @return
+     */
+    private CxMachineAllocationPlanHelper selectedCxMachineAndHandlerAllocation(TbrProductionContext productionContext, List<CxMachineBaseInfoVo> selectedCxMachineList, ProductionPlanGroupInfo selectedGroupPlan) {
+        if (CollectionUtils.isEmpty(selectedCxMachineList) || null == selectedGroupPlan) {
+            return null;
+        }
+        List<CxMachineBaseInfoVo> enableCxMachineList = GroupPlanCxMachineSelector.getEnableCxMachineListByAppoint(productionContext, selectedGroupPlan, selectedCxMachineList);
+        if (CollectionUtils.isEmpty(enableCxMachineList)) {
+            return null;
+        }
+        //20260517+ 同机台优先->获取续作机台
+        List<CxMachineBaseInfoVo> sameConnectionList = enableCxMachineList.stream().filter(singleCxMachine -> singleCxMachine.isSameGroupByLastAllocation(selectedGroupPlan)).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(sameConnectionList)) {
+            //没有续作机台：从符合条件的selectedCxMachineList列表中挑选最合适机台
+            CxMachineBaseInfoVo selectCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlanByAppoint(productionContext, enableCxMachineList, selectedGroupPlan);
+            if (null == selectCxMachine) {
+                return null;
+            }
+            return handlerAllocation(productionContext, selectedGroupPlan, selectCxMachine);
+        }
+        //有续作机台
+        CxMachineBaseInfoVo selectCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlanByAppoint(productionContext, sameConnectionList, selectedGroupPlan);
+        if (null != selectCxMachine) {
+            CxMachineAllocationPlanHelper allocationResult = handlerAllocation(productionContext, selectedGroupPlan, selectCxMachine);
+            if (null != allocationResult) {
+                return allocationResult;
+            }
+            selectCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlanByAppoint(productionContext, enableCxMachineList, selectedGroupPlan);
+        }
+        return handlerAllocation(productionContext, selectedGroupPlan, selectCxMachine);
     }
 
     /**

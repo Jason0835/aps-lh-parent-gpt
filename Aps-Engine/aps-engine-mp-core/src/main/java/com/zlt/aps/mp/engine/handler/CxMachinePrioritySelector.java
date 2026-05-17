@@ -9,6 +9,7 @@ import com.zlt.aps.mp.engine.enums.GroupCxMachineSelectedTypeEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrSpecialMaterialProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.utils.ProductionComparatorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -139,14 +140,7 @@ public class CxMachinePrioritySelector {
             return selected;
         }
         //同规格优先 -> 同英寸优先 -> 断面宽优先 -> 历史最近优先 -> n个月生产最多优先 -> 非零度优先 -> 机台编号
-        Comparator sortComparator = Comparator.comparing(CxMachineBaseInfoVo::getSameSpecifications, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(CxMachineBaseInfoVo::getSameProSize, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(CxMachineBaseInfoVo::getSectionWidthCondition, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(CxMachineBaseInfoVo::getLastBoardingDate, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(CxMachineBaseInfoVo::getProductionCount, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(CxMachineBaseInfoVo::getIsZeroRack)
-                .thenComparing(CxMachineBaseInfoVo::getCxMachineCode, Comparator.reverseOrder());
-        sectionWidthList.sort(sortComparator);
+        sectionWidthList.sort(ProductionComparatorUtils.getEfficiencyPrioritySort());
         CxMachineBaseInfoVo selected = sectionWidthList.get(BigDecimal.ZERO.intValue());
         TbrProductionGroupLogRecorder.addGroupSelectedFixedFinalCxMachineCodeLog(context, structureName, isZeroRack, selected.getCxMachineCode(), selected.getCxMachineTypeCode(), GroupCxMachineSelectedTypeEnum.HISTORY_QUALITY_PRIORITY);
         return selected;
