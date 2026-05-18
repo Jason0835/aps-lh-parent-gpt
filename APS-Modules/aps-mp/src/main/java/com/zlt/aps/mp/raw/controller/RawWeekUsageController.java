@@ -26,7 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/rawWeekUsage")
 @Api(tags = "周维度原材料用量管理")
-public class RawWeekUsageController extends AbstractDocBizController<RawWeekUsage> {
+public class    RawWeekUsageController extends AbstractDocBizController<RawWeekUsage> {
 
     @Autowired
     private RawWeekUsageEntityMapper entityMapper;
@@ -89,6 +89,7 @@ public class RawWeekUsageController extends AbstractDocBizController<RawWeekUsag
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("warningLevel")), "WARNING_LEVEL", queryVO.getFieldValueByFieldName("warningLevel"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("startDate")), "START_DATE", queryVO.getFieldValueByFieldName("startDate"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("endDate")), "END_DATE", queryVO.getFieldValueByFieldName("endDate"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("version")), "VERSION", queryVO.getFieldValueByFieldName("version"));
     }
 
 
