@@ -350,7 +350,7 @@ export default {
       /** 1–31 号列编辑前原始值，用于失焦时与 rollingCycle 一致判断是否调用 save */
       dayEditOriginalValue: null,
       /** 锁定天数：从接口获取，控制 1-31 号哪些日期不可编辑 */
-      lockedDays: 0,
+      lockedDays: { single: 0, multi: 0 },
       /** 结构调整：表格多选勾选行（统计行不可选）；超过 1 条时禁用「结构调整」按钮 */
       structureAdjustSelection: [],
     };
@@ -678,7 +678,7 @@ export default {
               row[prop] === null || row[prop] === undefined
                 ? ""
                 : String(row[prop]);
-            if (!row.id || this.isDayLocked(i)) {
+            if (!row.id || this.isDayLocked(i, row)) {
               const isOver = row._overDays && row._overDays[prop];
               return <span style={isOver ? { color: "red" } : {}}>{text}</span>;
             }
@@ -927,27 +927,44 @@ export default {
     async fetchLockedDays() {
       const factoryCode = this.query.factoryCode || this.search.factoryCode;
       if (!factoryCode) {
-        this.lockedDays = 0;
+        this.lockedDays = { single: 0, multi: 0 };
         return;
       }
+      const baseParams = {
+        factoryCode,
+        productTypeCode: "TBR",
+      };
       try {
-        const res = await getByParamCode({
-          factoryCode,
-          productTypeCode: "TBR",
-          paramCode: "SYS0206001",
-        });
-        this.lockedDays = Number(res?.paramValue) || 0;
+        const [resSingle, resMulti] = await Promise.all([
+          getByParamCode({ ...baseParams, paramCode: "SYS0206001" }),
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve(
+                  getByParamCode({ ...baseParams, paramCode: "SYS0206002" })
+                ),
+              300
+            )
+          ),
+        ]);
+        this.lockedDays = {
+          single: Number(resSingle?.paramValue) || 0,
+          multi: Number(resMulti?.paramValue) || 0,
+        };
       } catch (e) {
         console.error("获取锁定天数失败:", e);
-        this.lockedDays = 0;
+        this.lockedDays = { single: 0, multi: 0 };
       }
     },
-    isDayLocked(day) {
-      if (!this.lockedDays || this.lockedDays <= 0) {
+    isDayLocked(day, row) {
+      const cxMachineCode = (row && row.cxMachineCode) ? String(row.cxMachineCode).trim() : "";
+      const isMulti = cxMachineCode.includes(",");
+      const lockDays = isMulti ? this.lockedDays.multi : this.lockedDays.single;
+      if (!lockDays || lockDays <= 0) {
         return false;
       }
       const today = new Date().getDate();
-      const lockEndDay = today + this.lockedDays - 1;
+      const lockEndDay = today + lockDays - 1;
       return day <= lockEndDay;
     },
     /**
@@ -957,7 +974,13 @@ export default {
       if (!row || !row.id) {
         return;
       }
-      saveAdjustResult({ ...row })
+      const versionFromSearch = this.resolveSearchColumnsVersion();
+      saveAdjustResult({
+        ...row,
+        version:
+          versionFromSearch ||
+          (row.version != null ? String(row.version).trim() : ""),
+      })
         .then((res) => {
           this.$modal.msgSuccess(res.msg);
         })
