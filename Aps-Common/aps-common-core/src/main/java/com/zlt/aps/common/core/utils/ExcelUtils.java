@@ -502,7 +502,8 @@ public class ExcelUtils {
                                     + "|" + (oldStyle != null ? oldStyle.getAlignment().ordinal() : -1)
                                     + "|" + (oldStyle != null ? oldStyle.getVerticalAlignment().ordinal() : -1)
                                     + "|" + colIdx;
-                            CellStyle style2 = styleMap.computeIfAbsent(cacheKey, k -> createColorCellStyle(workbook, cs.getColor(), cs.getWithBorder(), bold, fontName, oldStyle));
+                            CellStyle finalOldStyle = oldStyle;
+                            CellStyle style2 = styleMap.computeIfAbsent(cacheKey, k -> createColorCellStyle(workbook, cs.getColor(), cs.getWithBorder(), bold, fontName, finalOldStyle));
                             setCellRangeColor(sheet, cs.getStartRowNum(), colIdx, cs.getEndRowNum(), colIdx, style2);
                         }
                     }
