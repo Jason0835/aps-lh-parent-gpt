@@ -59,14 +59,14 @@ export default {
             trigger: "change",
           },
         ],
-        mainPattern: [
+        mouldNo: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
         ],
-        mouldNo: [
+        patternBlock: [
           {
             required: true,
             message: this.$t("common.rule.input"),

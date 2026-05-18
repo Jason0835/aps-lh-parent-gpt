@@ -11,11 +11,13 @@ import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
 import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.common.constant.UserConstants;
+import com.github.pagehelper.PageHelper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.text.Convert;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
@@ -99,7 +101,13 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MdmMaterialInfo productInfo) {
-        startPage("create_time desc, id desc");
+        Integer pageNum = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageNum"), ServletUtils.getHeader("pageNum")));
+        Integer pageSize = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageSize"), ServletUtils.getHeader("pageSize")));
+        if (pageNum != null && pageSize != null) {
+            PageHelper.startPage(pageNum, pageSize, "create_time desc, id desc");
+        } else {
+            startPage("create_time desc, id desc");
+        }
         QueryWrapper<MdmMaterialInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, productInfo);
         this.filterByMonthPlanFinal(wrapper, productInfo);
