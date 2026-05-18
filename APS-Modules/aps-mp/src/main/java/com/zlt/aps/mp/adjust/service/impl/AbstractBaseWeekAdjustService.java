@@ -957,7 +957,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 8、更新结构转产
         updateStructureAllocationList(contextDTO);
         // 9、处理月计划统计结果
+        String bakStructureName = contextDTO.getStructureName();
         handleMonthPlanStatistics(contextDTO,null);
+        contextDTO.setStructureName(bakStructureName);
         // 10、合并至定稿月度生产计划并更新最新版本号
         // 根据优先级顺序分配生产数量
         allocateProductionByPriority(contextDTO);
