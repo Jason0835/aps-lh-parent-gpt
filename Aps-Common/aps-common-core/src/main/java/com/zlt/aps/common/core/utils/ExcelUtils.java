@@ -130,6 +130,52 @@ public class ExcelUtils {
     private static final Pattern PATTERN = Pattern.compile(REG);
     private static final Pattern PATTERN_LIST = Pattern.compile(REG_LIST);
 
+    /**
+     * 扫描模板中第一个包含 {.xxx} 占位符的行，返回占位符名称到列索引（0起始）的映射。
+     * <p>用于导出时动态定位列位置，避免因模板列增删导致硬编码列索引失效。</p>
+     * <p>映射中包含特殊键 {@code _templateRowIndex}，值为占位符所在行的 POI 行号（0起始），
+     * 供调用方确定数据写入起始行。</p>
+     *
+     * @param is 模板输入流（调用方负责关闭）
+     * @param sheetIndex sheet 索引
+     * @return 占位符名称（不含 "{." 和 "}"）→ 列索引（0起始）的有序映射，
+     *         包含特殊键 {@code _templateRowIndex} 表示占位符行号
+     */
+    public static Map<String, Integer> scanTemplateRowPlaceholders(InputStream is, int sheetIndex) {
+        Map<String, Integer> placeholderMap = new LinkedHashMap<>();
+        try {
+            XSSFWorkbook workbook = new XSSFWorkbook(is);
+            Sheet sheet = workbook.getSheetAt(sheetIndex);
+            for (int i = sheet.getFirstRowNum(); i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) {
+                    continue;
+                }
+                for (int j = 0; j < row.getLastCellNum(); j++) {
+                    Cell cell = row.getCell(j);
+                    if (cell != null && cell.getCellType() == CellType.STRING) {
+                        String cellValue = cell.getStringCellValue();
+                        if (cellValue != null && cellValue.contains("{.")) {
+                            Matcher matcher = PATTERN_LIST.matcher(cellValue);
+                            while (matcher.find()) {
+                                String key = matcher.group(1);
+                                placeholderMap.put(key, j);
+                            }
+                        }
+                    }
+                }
+                if (!placeholderMap.isEmpty()) {
+                    placeholderMap.put("_templateRowIndex", i);
+                    break;
+                }
+            }
+            workbook.close();
+        } catch (Exception e) {
+            throw new RuntimeException("扫描模板占位符失败", e);
+        }
+        return placeholderMap;
+    }
+
     //图片
     public static final String IMG = "IMG";
 
@@ -437,8 +483,7 @@ public class ExcelUtils {
                     cellStyleList = com.alibaba.fastjson.JSON.parseArray(jsonStr, com.zlt.aps.common.core.domain.CellStyle.class);
                 }
                 if (cellStyleList != null) {
-                    // 优化样式处理：建立样式缓存，根据传入的样式定义缓存相同的样式
-                    Map<com.zlt.aps.common.core.domain.CellStyle, CellStyle> styleMap = new HashMap<>();
+                    Map<String, CellStyle> styleMap = new HashMap<>();
                     for (com.zlt.aps.common.core.domain.CellStyle cs : cellStyleList) {
                         boolean bold = cs.getBold() != null ? cs.getBold() : false;
                         String fontName = cs.getFontName();
@@ -453,9 +498,12 @@ public class ExcelUtils {
                                     }
                                 }
                             }
-                            // 先从缓存中获取相同字体、底色、粗体、边框的样式
-                            CellStyle copyStyle = oldStyle;
-                            CellStyle style2 = styleMap.computeIfAbsent(cs, k -> createColorCellStyle(workbook, cs.getColor(), cs.getWithBorder(), bold, fontName, copyStyle));
+                            String cacheKey = cs.getColor() + "|" + cs.getWithBorder() + "|" + bold + "|" + fontName
+                                    + "|" + (oldStyle != null ? oldStyle.getAlignment().ordinal() : -1)
+                                    + "|" + (oldStyle != null ? oldStyle.getVerticalAlignment().ordinal() : -1)
+                                    + "|" + colIdx;
+                            CellStyle finalOldStyle = oldStyle;
+                            CellStyle style2 = styleMap.computeIfAbsent(cacheKey, k -> createColorCellStyle(workbook, cs.getColor(), cs.getWithBorder(), bold, fontName, finalOldStyle));
                             setCellRangeColor(sheet, cs.getStartRowNum(), colIdx, cs.getEndRowNum(), colIdx, style2);
                         }
                     }

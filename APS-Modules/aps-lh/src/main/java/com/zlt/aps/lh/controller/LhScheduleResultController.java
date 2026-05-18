@@ -23,6 +23,7 @@ import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
@@ -384,6 +385,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @Override
     protected List<LhScheduleResult> listExportData(LhScheduleResult obj) {
         QueryWrapper<LhScheduleResult> wrapper = new QueryWrapper<>();
+        wrapper.eq("IS_DELETE", DeleteFlagEnum.NORMAL.getCode());
         this.builderCondition(wrapper, obj);
         startPage(getOrderBy());
         return lhScheduleResultMapper.selectList(wrapper);

@@ -310,19 +310,33 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes);
         planDataList.add(planRows);
 
-        // 为小计行添加 DAEEF3 背景色标识
-        List<CellStyle> subtotalCellStyleList = new ArrayList<>();
+        // 为小计行添加 DAEEF3 背景色标识 + 胎胚余量<400 红色背景
+        List<CellStyle> cellStyleList = new ArrayList<>();
         int templateListStartRow = 4;
         for (int i = 0; i < planRows.size(); i++) {
-            if ("小计".equals(planRows.get(i).get("cxMachineCode"))) {
-                subtotalCellStyleList.add(new CellStyle(
-                        templateListStartRow + i, templateListStartRow + i,
+            Map<String, Object> rowMap = planRows.get(i);
+            int rowNum = templateListStartRow + i;
+
+            if ("小计".equals(rowMap.get("cxMachineCode"))) {
+                cellStyleList.add(new CellStyle(
+                        rowNum, rowNum,
                         0, 59,
                         "#DAEEF3", true, true, null));
+            } else {
+                Object cxRemainVal = rowMap.get("cxRemainQty");
+                if (cxRemainVal instanceof Number) {
+                    BigDecimal remainQty = new BigDecimal(cxRemainVal.toString());
+                    if (remainQty.compareTo(new BigDecimal("400")) < 0) {
+                        cellStyleList.add(new CellStyle(
+                                rowNum, rowNum,
+                                8, 8,
+                                "#FF0000", true, false, null));
+                    }
+                }
             }
         }
-        if (!subtotalCellStyleList.isEmpty()) {
-            planTableMap.put("CELL_STYLE", subtotalCellStyleList);
+        if (!cellStyleList.isEmpty()) {
+            planTableMap.put("CELL_STYLE", cellStyleList);
         }
 
         inputStream = new ByteArrayInputStream(exportBytes);
@@ -330,7 +344,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         // Sheet 7: 成型结构切换
         Map<String, Object> structureTableMap = new HashMap<>();
-        List<List<Map<String, Object>>> structureDataList = buildStructureChangeSheetData(queryVO, structureTableMap);
+        // 结构切换Sheet需要查询当月更大范围的排程数据，确保前后结构的班次记录都能覆盖
+        LocalDate scheduleLocalDate = cn.hutool.core.date.DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
+        List<CxScheduleResult> monthExportList = queryMonthScheduleResultsForStructure(scheduleLocalDate);
+        List<List<Map<String, Object>>> structureDataList = buildStructureChangeSheetData(queryVO, structureTableMap, monthExportList);
         inputStream = new ByteArrayInputStream(exportBytes);
         exportBytes = ExcelUtils.writeMultiList(inputStream, 7, structureTableMap, structureDataList);
 
@@ -343,10 +360,12 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      *
      * @param queryVO 查询条件
      * @param tableMap 表头/样式数据容器，方法会向其中写入 CELL_STYLE
+     * @param exportList 成型排程结果列表，用于计算余量和班次日期
      * @return 结构切换数据列表
      */
     private List<List<Map<String, Object>>> buildStructureChangeSheetData(CxScheduleResult queryVO,
-                                                                          Map<String, Object> tableMap) {
+                                                                          Map<String, Object> tableMap,
+                                                                          List<CxScheduleResult> exportList) {
         MpStructureAllocation structureQuery = buildStructureAllocationQuery(queryVO);
         TableDataInfo structureDataInfo = mpStructureAllocationRemoteService.list(structureQuery);
         List<MpStructureAllocation> structureList = structureDataInfo != null
@@ -373,7 +392,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 : LocalDate.now();
 
         List<Map<String, Object>> dataList = buildStructureChangeDataListV2(
-                machineGroupMap, scheduleDate);
+                machineGroupMap, scheduleDate, exportList);
 
         List<CellStyle> cellStyleList = buildCellStyleListForStructureChange(dataList);
         if (PubUtil.isNotEmpty(cellStyleList)) {
@@ -564,6 +583,10 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 + StringUtils.defaultString(item.getMaterialCode()).trim();
         BigDecimal tnfq = todayNightFinishQtyMap.get(tnfKey);
         row.put("todayNightFinishQty", zeroToEmpty(tnfq));
+
+        BigDecimal ylSum = (tnfq != null ? tnfq : BigDecimal.ZERO)
+                .subtract(tdpq != null ? tdpq : BigDecimal.ZERO);
+        row.put("ylSum", zeroToEmpty(ylSum));
 
         String embryoCode = item.getEmbryoCode();
         String smallGlueVal = smallGlueMap.getOrDefault(embryoCode, "");
@@ -1179,6 +1202,37 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     /**
+     * 查询当月更大范围的成型排程结果，用于结构切换Sheet的前后结构余量和班次日期计算。
+     * 不限制scheduleDate精确匹配，而是查询整个月的数据，确保前后结构的所有班次记录都能覆盖。
+     *
+     * @param scheduleDate 排程日期（取年月范围）
+     * @return 当月成型排程结果列表
+     */
+    private List<CxScheduleResult> queryMonthScheduleResultsForStructure(LocalDate scheduleDate) {
+        if (scheduleDate == null) {
+            scheduleDate = LocalDate.now();
+        }
+        // 当月第一天
+        LocalDate monthStart = scheduleDate.withDayOfMonth(1);
+        // 当月最后一天
+        LocalDate monthEnd = scheduleDate.withDayOfMonth(scheduleDate.lengthOfMonth());
+        Date startDate = cn.hutool.core.date.DateUtil.parse(monthStart.toString(), "yyyy-MM-dd");
+        Date endDate = cn.hutool.core.date.DateUtil.parse(monthEnd.toString(), "yyyy-MM-dd");
+        // 结束日期设为当天23:59:59以包含整天
+        endDate = cn.hutool.core.date.DateUtil.endOfDay(endDate);
+
+        List<CxScheduleResult> result = cxScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<CxScheduleResult>()
+                        .between(CxScheduleResult::getScheduleDate, startDate, endDate)
+                        .eq(CxScheduleResult::getIsDelete, "0")
+                        .orderByAsc(CxScheduleResult::getCxMachineCode)
+                        .orderByAsc(CxScheduleResult::getMaterialCode));
+        log.info("查询当月成型排程结果用于结构切换: scheduleDate={}, 月份范围={}~{}, 返回{}条",
+                scheduleDate, monthStart, monthEnd, result != null ? result.size() : 0);
+        return result != null ? result : Collections.emptyList();
+    }
+
+    /**
      * 构建成型余量模板列表数据。
      *
      * @param list 成型排程结果明细列表
@@ -1365,8 +1419,11 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 ? cn.hutool.core.date.DateUtil.toLocalDateTime(queryVO.getScheduleDate()).toLocalDate()
                 : LocalDate.now();
 
+        // 查询当月更大范围的成型排程结果，用于计算余量和班次日期（不限制scheduleDate精确匹配）
+        List<CxScheduleResult> exportList = queryMonthScheduleResultsForStructure(scheduleDate);
+
         List<Map<String, Object>> dataList = buildStructureChangeDataListV2(
-                machineGroupMap, scheduleDate);
+                machineGroupMap, scheduleDate, exportList);
 
         Map<String, Object> tableMap = new HashMap<>();
         List<CellStyle> cellStyleList = buildCellStyleListForStructureChange(dataList);
@@ -1482,7 +1539,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      */
     private List<Map<String, Object>> buildStructureChangeDataListV2(
             Map<String, List<MpStructureAllocation>> machineGroupMap,
-            LocalDate scheduleDate) {
+            LocalDate scheduleDate,
+            List<CxScheduleResult> exportList) {
 
         List<Map<String, Object>> dataList = new ArrayList<>();
         int scheduleDayOfMonth = scheduleDate.getDayOfMonth();
@@ -1518,7 +1576,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             MpStructureAllocation nextStructure = structures.get(currentIndex + 1);
 
             Map<String, Object> row = buildStructureChangeRow(
-                    machineCode, prevStructure, nextStructure, scheduleDate);
+                    machineCode, prevStructure, nextStructure, scheduleDate, exportList);
             dataList.add(row);
         }
 
@@ -1538,9 +1596,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * 构建单条结构切换导出行数据。
      *
      * 字段取值说明：
-     *   remainQty        - 余量，需成型排程接口提供（包含在提供预计收尾/开产时间的接口中，暂输出空串，待接口对接）
-     *   receiveEstDate   - 预计收尾时间，需成型排程接口提供（暂输出空串，待接口对接）
-     *   startEstDate     - 预计开产时间，需成型排程接口提供（暂输出空串，待接口对接）
+     *   remainQty        - 成型余量，依据机台+前结构从CxScheduleResult汇总计算
+     *   receiveEstDate   - 预计收尾时间，取机台+前结构分组中最后一个有值班次的日期
+     *   startEstDate     - 预计开产时间，取机台+后结构分组中第一个有值班次的日期
      *   receiveMonthPlan - 收尾月计划时间，取转产表第1条（切换前结构）的结束日期
      *   remark           - 收尾备注，取转产表第1条（切换前结构）的REMARK字段
      *   nextStructure    - 后结构，取合并第2条（切换后结构）的结构名称
@@ -1551,13 +1609,15 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * @param prevStructure 前结构（当前正在执行的结构，即切换前的结构）
      * @param nextStructure 后结构（即将切换到的结构，即切换后的结构）
      * @param scheduleDate 排程日期
+     * @param exportList 成型排程结果列表
      * @return 单行导出数据
      */
     private Map<String, Object> buildStructureChangeRow(
             String machineCode,
             MpStructureAllocation prevStructure,
             MpStructureAllocation nextStructure,
-            LocalDate scheduleDate) {
+            LocalDate scheduleDate,
+            List<CxScheduleResult> exportList) {
 
         String prevStructureName = StringUtils.defaultString(prevStructure.getStructureName()).trim();
         String nextStructureName = StringUtils.defaultString(nextStructure.getStructureName()).trim();
@@ -1569,10 +1629,37 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 ? LocalDate.of(year, month, Math.min(nextStructure.getBeginDay(), LocalDate.of(year, month, 1).lengthOfMonth()))
                 : scheduleDate;
 
-        // TODO: 余量、预计收尾时间和预计开产时间需成型排程接口提供，当前暂输出空串，待接口对接后替换
-        String remainQty = "";
-        String receiveEstDate = "";
-        String startEstDate = "";
+        // 按机台+结构对成型排程结果分组，用于计算余量和班次日期
+        Map<String, List<CxScheduleResult>> machineStructureGroup = Collections.emptyMap();
+        if (CollectionUtils.isNotEmpty(exportList)) {
+            machineStructureGroup = exportList.stream()
+                    .filter(r -> StringUtils.isNotBlank(r.getCxMachineCode()))
+                    .collect(Collectors.groupingBy(
+                            r -> r.getCxMachineCode().trim() + "|" + StringUtils.defaultString(r.getStructureName()).trim()));
+        }
+
+        String prevKey = machineCode + "|" + prevStructureName;
+        String nextKey = machineCode + "|" + nextStructureName;
+        List<CxScheduleResult> prevGroupList = machineStructureGroup.getOrDefault(prevKey, Collections.emptyList());
+        List<CxScheduleResult> nextGroupList = machineStructureGroup.getOrDefault(nextKey, Collections.emptyList());
+
+        log.debug("结构切换行: machineCode={}, prevStructure={}, nextStructure={}, prevKey={}, nextKey={}, prevGroupSize={}, nextGroupSize={}",
+                machineCode, prevStructureName, nextStructureName, prevKey, nextKey, prevGroupList.size(), nextGroupList.size());
+        if (machineStructureGroup.isEmpty()) {
+            log.warn("结构切换: machineStructureGroup为空, exportList.size={}", exportList.size());
+        } else {
+            log.debug("结构切换: machineStructureGroup keys={}", machineStructureGroup.keySet());
+        }
+
+        // 计算机台+前结构的成型余量（按物料去重后汇总）
+        BigDecimal remainQtyVal = calculateStructureRemainQty(prevGroupList);
+        String remainQty = remainQtyVal.compareTo(BigDecimal.ZERO) > 0 ? remainQtyVal.toString() : "";
+
+        // 预计收尾时间：前结构分组中最后一个有值班次对应的日期
+        String receiveEstDate = findLastShiftDateStr(prevGroupList);
+
+        // 预计开产时间：后结构分组中第一个有值班次对应的日期
+        String startEstDate = findFirstShiftDateStr(nextGroupList);
 
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("stt", 0);
@@ -1616,6 +1703,141 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return "";
         }
         return String.format("%02d.%02d", month, day);
+    }
+
+    /**
+     * 获取指定班次的计划量。
+     *
+     * @param result 成型排程结果
+     * @param classIndex 班次索引（1-8）
+     * @return 计划量
+     */
+    private BigDecimal getClassPlanQtyByIndex(CxScheduleResult result, int classIndex) {
+        switch (classIndex) {
+            case 1: return result.getClass1PlanQty();
+            case 2: return result.getClass2PlanQty();
+            case 3: return result.getClass3PlanQty();
+            case 4: return result.getClass4PlanQty();
+            case 5: return result.getClass5PlanQty();
+            case 6: return result.getClass6PlanQty();
+            case 7: return result.getClass7PlanQty();
+            case 8: return result.getClass8PlanQty();
+            default: return null;
+        }
+    }
+
+    /**
+     * 获取指定班次的完成量。
+     *
+     * @param result 成型排程结果
+     * @param classIndex 班次索引（1-8）
+     * @return 完成量
+     */
+    private BigDecimal getClassFinishQtyByIndex(CxScheduleResult result, int classIndex) {
+        switch (classIndex) {
+            case 1: return result.getClass1FinishQty();
+            case 2: return result.getClass2FinishQty();
+            case 3: return result.getClass3FinishQty();
+            case 4: return result.getClass4FinishQty();
+            case 5: return result.getClass5FinishQty();
+            case 6: return result.getClass6FinishQty();
+            case 7: return result.getClass7FinishQty();
+            case 8: return result.getClass8FinishQty();
+            default: return null;
+        }
+    }
+
+    /**
+     * 判断 BigDecimal 是否有值（非null且大于0）。
+     *
+     * @param val 数值
+     * @return true表示有值
+     */
+    private boolean hasShiftValue(BigDecimal val) {
+        return val != null && val.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    /**
+     * 计算机台+结构分组下的成型余量总和（按物料去重，取最大余量后汇总）。
+     * 逻辑参考 ScheduleServiceImpl.calculateFormingRemainderMap，基于已排程结果中的 cxRemainQty 汇总。
+     *
+     * @param groupList 该机台+结构下的成型排程结果列表
+     * @return 成型余量总和
+     */
+    private BigDecimal calculateStructureRemainQty(List<CxScheduleResult> groupList) {
+        if (CollectionUtils.isEmpty(groupList)) {
+            return BigDecimal.ZERO;
+        }
+        return groupList.stream()
+                .filter(r -> StringUtils.isNotBlank(r.getMaterialCode()))
+                .collect(Collectors.groupingBy(CxScheduleResult::getMaterialCode))
+                .values().stream()
+                .map(materialList -> materialList.stream()
+                        .map(CxScheduleResult::getCxRemainQty)
+                        .filter(Objects::nonNull)
+                        .max(Comparator.naturalOrder())
+                        .orElse(BigDecimal.ZERO))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * 查找分组记录中最后一个有值班次对应的日期。
+     * 遍历每条记录的班次（从class8到class1），找到最后一个planQty或finishQty大于0的班次，
+     * 取对应记录中日期最靠后的那条。
+     *
+     * @param groupList 机台+结构分组记录
+     * @return 格式化后的日期字符串（yyyy-MM-dd），无数据返回空串
+     */
+    private String findLastShiftDateStr(List<CxScheduleResult> groupList) {
+        if (CollectionUtils.isEmpty(groupList)) {
+            return "";
+        }
+        Date lastDate = null;
+        for (CxScheduleResult r : groupList) {
+            if (r.getScheduleDate() == null) {
+                continue;
+            }
+            // 从最后一个班次往前找，找到该记录最后一个有值的班次
+            for (int i = 8; i >= 1; i--) {
+                if (hasShiftValue(getClassPlanQtyByIndex(r, i)) || hasShiftValue(getClassFinishQtyByIndex(r, i))) {
+                    if (lastDate == null || r.getScheduleDate().after(lastDate)) {
+                        lastDate = r.getScheduleDate();
+                    }
+                    break;
+                }
+            }
+        }
+        return lastDate != null ? cn.hutool.core.date.DateUtil.format(lastDate, "yyyy-MM-dd") : "";
+    }
+
+    /**
+     * 查找分组记录中第一个有值班次对应的日期。
+     * 遍历每条记录的班次（从class1到class8），找到第一个planQty或finishQty大于0的班次，
+     * 取对应记录中日期最靠前的那条。
+     *
+     * @param groupList 机台+结构分组记录
+     * @return 格式化后的日期字符串（yyyy-MM-dd），无数据返回空串
+     */
+    private String findFirstShiftDateStr(List<CxScheduleResult> groupList) {
+        if (CollectionUtils.isEmpty(groupList)) {
+            return "";
+        }
+        Date firstDate = null;
+        for (CxScheduleResult r : groupList) {
+            if (r.getScheduleDate() == null) {
+                continue;
+            }
+            // 从第一个班次往后找，找到该记录第一个有值的班次
+            for (int i = 1; i <= 8; i++) {
+                if (hasShiftValue(getClassPlanQtyByIndex(r, i)) || hasShiftValue(getClassFinishQtyByIndex(r, i))) {
+                    if (firstDate == null || r.getScheduleDate().before(firstDate)) {
+                        firstDate = r.getScheduleDate();
+                    }
+                    break;
+                }
+            }
+        }
+        return firstDate != null ? cn.hutool.core.date.DateUtil.format(firstDate, "yyyy-MM-dd") : "";
     }
 
     /**

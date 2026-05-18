@@ -38,19 +38,3 @@ export function removeSpecialMaterialBom(ids) {
 export function exportSpecialMaterialBom(query) {
   return downloadLink('/lh/lhSpecialMaterialBom/export', query)
 }
-
-export function checkUniqueSpecialMaterialBom(data) {
-  return request({
-    url: '/lh/lhSpecialMaterialBom/checkUnique',
-    method: 'post',
-    data: data
-  })
-}
-
-export function checkCategoryConflictSpecialMaterialBom(data) {
-  return request({
-    url: '/lh/lhSpecialMaterialBom/checkCategoryConflict',
-    method: 'post',
-    data: data
-  })
-}
