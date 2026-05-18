@@ -1055,6 +1055,29 @@ export default {
       }
       return String(val);
     },
+    /** 是否为「可视为空」的单元格（未填） */
+    isDayCellEmptyish(val) {
+      return val == null || val === "";
+    },
+    /** 是否为数值 0（展示为 0） */
+    isDayCellZeroish(val) {
+      return val === 0 || val === "0";
+    },
+    /**
+     * 1–31 号列失焦时是否应认为「有改动」。
+     * normalizeDayValue 会把 0 与空都变成 ""，仅靠归一化比较会漏掉「删掉 0」或「空格里输入 0」等需落库的场景。
+     */
+    dayCellValueChangedForSave(oldVal, newVal) {
+      const oldNorm = this.normalizeDayValue(oldVal);
+      const newNorm = this.normalizeDayValue(newVal);
+      if (oldNorm !== newNorm) {
+        return true;
+      }
+      const crossZeroEmptyBoundary =
+        (this.isDayCellZeroish(oldVal) && this.isDayCellEmptyish(newVal)) ||
+        (this.isDayCellEmptyish(oldVal) && this.isDayCellZeroish(newVal));
+      return crossZeroEmptyBoundary;
+    },
     /** 按后端规则本地重算开始/结束日期 */
     recalculateBeginEndDay(row) {
       if (!row) {
@@ -1203,9 +1226,9 @@ export default {
       if (!row.id) {
         return;
       }
-      const oldVal = this.normalizeDayValue(this.dayEditOriginalValue);
-      const newVal = this.normalizeDayValue(row[prop]);
-      if (newVal === oldVal) {
+      if (
+        !this.dayCellValueChangedForSave(this.dayEditOriginalValue, row[prop])
+      ) {
         return;
       }
       try {
