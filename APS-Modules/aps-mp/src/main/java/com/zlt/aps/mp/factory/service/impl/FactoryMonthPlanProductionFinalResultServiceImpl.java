@@ -1096,9 +1096,14 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             }
             insertItem.setCxMachineCode(cxMachineCode);
             insertItem.setMonthPlanVersion(monthPlanVersion);
+            insertItem.setLastMonthPlanVersion(monthPlanVersion);
             insertItem.setProductionVersion(productionVersion);
             insertItem.setStructureName(structureName);
             insertItem.setMaterialDesc(materialDesc);
+            insertItem.setFactoryCode(factoryCode);
+            insertItem.setYear(year);
+            insertItem.setMonth(month);
+            insertItem.setProductTypeCode(productTypeCode);
             if (demandPlan != null) {
                 insertItem.setMesMaterialCode(demandPlan.getMesMaterialCode());
                 insertItem.setProductTypeCode(demandPlan.getProductTypeCode());
