@@ -901,7 +901,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * 构建小胶种和占位符映射。
      * <p>取值逻辑与 Sheet0 成型余量-按机台 的 smallGlue 完全一致：
      * 从 CxParamConfig 读取 RUBBER_TYPE_CODES，加 AQ 前缀后精确匹配 MdmMaterialConsumeDetail，
-     * 去掉 AQ 前缀得到胶种名称，同胎胚多胶种用 "/" 连接。</p>
+     * 再根据胎胚编码查询 MdmMaterialInfo，拼接 规格/花纹 展示胶种。</p>
      *
      * @param exportList 成型排程结果列表
      * @return key=smallGlue/placeholder, value=embryoCode→字符串的映射
@@ -952,20 +952,47 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return result;
         }
 
-        // 构建 embryoCode → 胶种名称集合 映射（去掉 AQ 前缀）
-        Map<String, Set<String>> rubberTypeMap = consumeDetails.stream()
-                .filter(d -> StringUtils.isNotBlank(d.getEmbryoCode())
-                        && StringUtils.isNotBlank(d.getChildMaterialName())
-                        && d.getChildMaterialName().startsWith("AQ"))
-                .collect(Collectors.groupingBy(
-                        MdmMaterialConsumeDetail::getEmbryoCode,
-                        HashMap::new,
-                        Collectors.mapping(d -> d.getChildMaterialName().substring(2), Collectors.toCollection(LinkedHashSet::new))));
+        // 收集胎胚编码，查询 MdmMaterialInfo 关联规格+花纹
+        List<String> embryoCodeList = consumeDetails.stream()
+                .map(MdmMaterialConsumeDetail::getEmbryoCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
 
-        rubberTypeMap.forEach((embryoCode, names) -> {
-            String joined = String.join("/", names);
-            result.get("smallGlue").put(embryoCode, joined);
-            result.get("placeholder").put(embryoCode, joined);
+        Map<String, List<MdmMaterialInfo>> materialInfoMap = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(embryoCodeList)) {
+            LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
+                    .eq(factoryCode != null, MdmMaterialInfo::getFactoryCode, factoryCode)
+                    .in(MdmMaterialInfo::getEmbryoCode, embryoCodeList);
+            List<MdmMaterialInfo> mdmMaterialInfoList = materialInfoEntityMapper.selectList(queryWrapper);
+            if (CollectionUtils.isNotEmpty(mdmMaterialInfoList)) {
+                materialInfoMap = mdmMaterialInfoList.stream()
+                        .filter(i -> StringUtils.isNotBlank(i.getEmbryoCode()))
+                        .collect(Collectors.groupingBy(MdmMaterialInfo::getEmbryoCode));
+            }
+        }
+
+        // 构建 embryoCode → 规格/花纹 映射
+        Map<String, List<MdmMaterialInfo>> finalMaterialInfoMap = materialInfoMap;
+        Map<String, String> glueMap = consumeDetails.stream()
+                .filter(d -> StringUtils.isNotBlank(d.getEmbryoCode()))
+                .collect(Collectors.toMap(
+                        MdmMaterialConsumeDetail::getEmbryoCode,
+                        item -> {
+                            List<MdmMaterialInfo> materialInfoList = finalMaterialInfoMap.getOrDefault(item.getEmbryoCode(), new ArrayList<>());
+                            List<String> resultList = materialInfoList.stream()
+                                    .map(i -> StringUtils.defaultIfBlank(i.getSpecifications(), "") + "/" + StringUtils.defaultIfBlank(i.getPattern(), ""))
+                                    .collect(Collectors.toList());
+                            return String.join(",", resultList);
+                        },
+                        (a, b) -> a));
+
+        glueMap.forEach((embryoCode, val) -> {
+            // smallGlue 去掉前两个字符（AQ前缀），placeholder 同步
+            String displayVal = val.length() > 2 ? val.substring(2) : val;
+            result.get("smallGlue").put(embryoCode, displayVal);
+            result.get("placeholder").put(embryoCode, displayVal);
         });
 
         return result;
