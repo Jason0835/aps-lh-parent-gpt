@@ -2262,7 +2262,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<MpAdjustResult> adjustResultList = contextDTO.getAdjustResultList();
         List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList = contextDTO.getFactoryMonthPlanProdFinalList();
         List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
-        if (PubUtil.isEmpty(adjustResultList) || PubUtil.isEmpty(factoryMonthPlanProdFinalList) || PubUtil.isEmpty(adjustDetailList)) {
+        if (PubUtil.isEmpty(adjustResultList) || PubUtil.isEmpty(factoryMonthPlanProdFinalList)) {
             log.warn("更新月度生产计划：调整结果列表或月度计划列表或调整明细列表为空，直接返回");
             return;
         }
