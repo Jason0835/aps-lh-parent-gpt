@@ -19,6 +19,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
@@ -205,9 +206,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
 
-
     /**
      * 导入数据
+     *
      * @param importContext 导入上下文
      * @param updateSupport 已存在记录是否更新
      * @return 结果
@@ -217,12 +218,13 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @PostMapping("/importData/{updateSupport}")
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext, @PathVariable("updateSupport") boolean updateSupport) throws Exception {
-        return super.importData(importContext,updateSupport);
+        return super.importData(importContext, updateSupport);
     }
 
 
     /**
      * 导入数据
+     *
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
@@ -241,7 +243,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         // 模板第1行为key表头，第9行开始是明细数据，因此表头行数传9，并关闭二级表头。
         List<LhScheduleResultTemplateImportVO> list = util.importExcel(
                 sheetName, new ByteArrayInputStream(fileBytes), 0, 7, -1);
-        AjaxResult ajaxResult = lhScheduleService.importScheduleTemplate(list,result, updateSupport, importLog.getId());
+        AjaxResult ajaxResult = lhScheduleService.importScheduleTemplate(list, result, updateSupport, importLog.getId());
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(list.size());
         importLog.setBeginTime(beginTime);
@@ -253,10 +255,10 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
 
-    @ApiOperation(value = "模板下载" , notes = "导入模板下载")
+    @ApiOperation(value = "模板下载", notes = "导入模板下载")
     @PostMapping("/downloadTemplate/{fileName}")
     public byte[] downloadTemplate(@RequestBody LhScheduleResult queryVO, @PathVariable("fileName") String fileName,
-                             HttpServletResponse response) throws IOException {
+                                   HttpServletResponse response) throws IOException {
         queryVO = queryVO == null ? new LhScheduleResult() : queryVO;
         List<LhScheduleResult> list = new ArrayList<>();
 //        LhScheduleResult  lhScheduleResult = new LhScheduleResult();
@@ -350,7 +352,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     /**
      * 定位收尾班次：逐班扣减基准量，基准量耗尽的班次即为收尾班
      *
-     * @param result       排程结果
+     * @param result     排程结果
      * @param surplusQty 基准量（硫化余量与胎胚库存的较大值）
      * @return 收尾班次索引（1~8），无收尾返回8
      */
@@ -383,6 +385,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
             }
         }
     }
+
     @Override
     protected List<LhScheduleResult> listExportData(LhScheduleResult obj) {
         QueryWrapper<LhScheduleResult> wrapper = new QueryWrapper<>();
@@ -391,6 +394,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         startPage(getOrderBy());
         return lhScheduleResultMapper.selectList(wrapper);
     }
+
     @Log(title = "ui.data.column.lhParams.modelName")
     @ApiOperation("插单查询可用机台列表")
     @PostMapping("/getScheduleMachineInfo")
@@ -458,7 +462,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         return list;
     }
 
-    /** 插单可用机台模拟：请求未带分厂时的默认分厂编码 */
+    /**
+     * 插单可用机台模拟：请求未带分厂时的默认分厂编码
+     */
     private static final String MOCK_SCHEDULE_MACHINE_FACTORY_DEFAULT = "116";
 
     /**
@@ -472,11 +478,11 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
             return null;
         }
         return remark.replace("__PERCENT__", "%")
-                     .replace("__AMP__", "&")
-                     .replace("__LT__", "<")
-                     .replace("__GT__", ">")
-                     .replace("__QUOT__", "\"")
-                     .replace("__APOS__", "'");
+                .replace("__AMP__", "&")
+                .replace("__LT__", "<")
+                .replace("__GT__", ">")
+                .replace("__QUOT__", "\"")
+                .replace("__APOS__", "'");
     }
 
     /**
@@ -490,21 +496,38 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
             ShiftFieldUtil.setShiftAnalysis(result, i, decodeRemark(ShiftFieldUtil.getShiftAnalysis(result, i)));
         }
     }
-    /** 插单可用机台模拟：字典 sys_enable_disable 启用 */
-    private static final String MOCK_SCHEDULE_MACHINE_STATUS_ENABLED = "0";
-    /** 插单可用机台模拟：字典 IS_HAVE 有向心机构 */
+
+    /**
+     * 插单可用机台模拟：字典 sys_enable_disable 启用（1-启用，0-停用）
+     */
+    private static final String MOCK_SCHEDULE_MACHINE_STATUS_ENABLED = "1";
+    /**
+     * 插单可用机台模拟：字典 IS_HAVE 有向心机构
+     */
     private static final String MOCK_SCHEDULE_MACHINE_IS_HAVE_YES = "1";
-    /** 插单可用机台模拟：字典 IS_HAVE 无向心机构 */
+    /**
+     * 插单可用机台模拟：字典 IS_HAVE 无向心机构
+     */
     private static final String MOCK_SCHEDULE_MACHINE_IS_HAVE_NO = "0";
-    /** 插单可用机台模拟：字典 CLASS_SHIFT 三班制（示例值，以现场字典为准） */
+    /**
+     * 插单可用机台模拟：字典 CLASS_SHIFT 三班制（示例值，以现场字典为准）
+     */
     private static final String MOCK_SCHEDULE_MACHINE_CLASS_SHIFT_THREE = "1";
-    /** 插单可用机台模拟：字典 CLASS_NUM 早班（示例值） */
+    /**
+     * 插单可用机台模拟：字典 CLASS_NUM 早班（示例值）
+     */
     private static final String MOCK_SCHEDULE_MACHINE_OPEN_CLASS_MORNING = "1";
-    /** 插单可用机台模拟：字典 CLASS_NUM 中班（示例值） */
+    /**
+     * 插单可用机台模拟：字典 CLASS_NUM 中班（示例值）
+     */
     private static final String MOCK_SCHEDULE_MACHINE_OPEN_CLASS_MIDDLE = "2";
-    /** 插单可用机台模拟：字典 LH_MACHINE_TYPE 全钢（示例值） */
+    /**
+     * 插单可用机台模拟：字典 LH_MACHINE_TYPE 全钢（示例值）
+     */
     private static final String MOCK_SCHEDULE_MACHINE_TYPE_ALL_STEEL = "1";
-    /** 插单可用机台模拟：字典 LH_MACHINE_TYPE 半钢（示例值） */
+    /**
+     * 插单可用机台模拟：字典 LH_MACHINE_TYPE 半钢（示例值）
+     */
     private static final String MOCK_SCHEDULE_MACHINE_TYPE_HALF_STEEL = "2";
     private static final String MOCK_SCHEDULE_MACHINE_CODE_ALL_STEEL = "LH-VUL-001";
     private static final String MOCK_SCHEDULE_MACHINE_CODE_HALF_STEEL = "LH-VUL-002";
@@ -523,7 +546,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @Log(title = "ui.data.column.lhParams.modelName")
     @ApiOperation("插单")
     @PostMapping("/insertOrder")
-    public AjaxResult insertOrder(@RequestBody LhOrderInsertDTO insertDTO){
+    public AjaxResult insertOrder(@RequestBody LhOrderInsertDTO insertDTO) {
         LhInsertOrderValidateResultDTO validateResult = lhScheduleResultService.validateInsertOrder(insertDTO);
         if (!validateResult.isValid()) {
             return AjaxResult.error(String.join(";", validateResult.getErrorMessages()));
@@ -545,6 +568,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     /**
      * 转机台
+     *
      * @param dto 请求参数
      * @return 结果
      */
@@ -583,6 +607,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     /**
      * 文字示方调整
+     *
      * @param dto
      * @return
      */
@@ -660,44 +685,69 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
                 .filter(item -> StringUtils.isEmpty(item.getLhMachineCode()) || item.getLhMachineCode().contains(","))
                 .collect(Collectors.toList());
         if (!invalidRecords.isEmpty()) {
+            log.warn("排产发布校验失败，以下记录的硫化机台编码异常: {}",
+                    invalidRecords.stream()
+                            .map(item -> String.format("ID=%d, MaterialCode=%s, LhMachineCode=%s",
+                                    item.getId(), item.getMaterialCode(), item.getLhMachineCode()))
+                            .collect(Collectors.joining("; ")));
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.hasMultipleIds"));
         }
 
         List<Long> selectedIds = filteredList.stream().map(BaseEntity::getId).collect(Collectors.toList());
+        log.info("开始硫化排程发布, scheduleDate={}, factoryCode={}, 待发布记录数={}",
+                dto.getScheduleDate(), dto.getFactoryCode(), filteredList.size());
 
-        try {
-            String token = scheduleExecutionGuard.acquireIssueLock();
-            if (token == null) {
-                return AjaxResult.error("排程下发操作正在进行中，请稍后再试");
-            }
+        int maxRetries = 3;
+        int retryCount = 0;
+        AjaxResult issueResult = null;
+
+        while (retryCount < maxRetries) {
             try {
-                AjaxResult issueResult = doIssueLhScheduleResultToMes(dto.getScheduleDate(), selectedIds);
-                if (issueResult != null && Objects.equals(HttpStatus.SUCCESS, issueResult.get(AjaxResult.CODE_TAG))) {
-                    for (LhScheduleResult item : filteredList) {
-                        item.setIsRelease(ApsConstant.IS_RELEASE);
-                        lhScheduleResultService.updateReleaseStatus(item);
-                    }
-                    return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
-                } else {
-                    for (LhScheduleResult item : filteredList) {
-                        item.setIsRelease(ApsConstant.FAILURE_RELEASE);
-                        lhScheduleResultService.updateReleaseStatus(item);
-                    }
-                    return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
+                String token = scheduleExecutionGuard.acquireIssueLock();
+                if (token == null) {
+                    log.warn("第{}次尝试获取下发锁失败，等待重试, retryCount={}", retryCount + 1, retryCount);
+                    Thread.sleep(1000);
+                    retryCount++;
+                    continue;
                 }
-            } finally {
-                scheduleExecutionGuard.releaseIssueLock(token);
-            }
-        } catch (Exception e) {
-            log.error("硫化排程发布失败", e);
-            for (LhScheduleResult item : filteredList) {
-                item.setIsRelease(ApsConstant.FAILURE_RELEASE);
-                lhScheduleResultService.updateReleaseStatus(item);
-            }
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
-        }
-    }
 
+                try {
+                    long startTime = System.currentTimeMillis();
+                    log.info("第{}次尝试下发硫化排程结果到MES, selectedIds={}", retryCount + 1, selectedIds);
+                    issueResult = doIssueLhScheduleResultToMes(dto.getScheduleDate(), selectedIds);
+                    long costTime = System.currentTimeMillis() - startTime;
+
+                    if (issueResult != null && Objects.equals(HttpStatus.SUCCESS, issueResult.get(AjaxResult.CODE_TAG))) {
+                        log.info("硫化排程发布成功, 耗时={}ms, 记录数={}", costTime, filteredList.size());
+                        for (LhScheduleResult item : filteredList) {
+                            item.setIsRelease(ApsConstant.IS_RELEASE);
+                            lhScheduleResultService.updateReleaseStatus(item);
+                        }
+                        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
+                    } else {
+                        log.warn("第{}次硫化排程发布失败, 耗时={}ms, 原因: {}", retryCount + 1, costTime, issueResult);
+                        retryCount++;
+                    }
+                } finally {
+                    scheduleExecutionGuard.releaseIssueLock(token);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("硫化排程发布被中断", e);
+                break;
+            } catch (Exception e) {
+                log.error("第{}次硫化排程发布异常, retryCount={}", retryCount + 1, e);
+                retryCount++;
+            }
+        }
+
+        log.error("硫化排程发布最终失败，已重试{}次", maxRetries);
+        for (LhScheduleResult item : filteredList) {
+            item.setIsRelease(ApsConstant.FAILURE_RELEASE);
+            lhScheduleResultService.updateReleaseStatus(item);
+        }
+        return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
+    }
 
 
     /**
@@ -705,9 +755,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * 背景逻辑：
      * 1. 每条硫化排程结果自带8班数据，覆盖排程日期前2天到排程日期当天
      * 2. 8班对应关系（使用aps-cx-lh-api实体）：
-     *    - 1-3班：T-2日的夜、早、中班（窗口首日，更新）
-     *    - 4-6班：T-1日的夜、早、中班（窗口次日，更新）
-     *    - 7-8班：T日的早、中班（排程日期当天，下发，夜班尚未排产不下发）
+     * - 1-3班：T-2日的夜、早、中班（窗口首日，更新）
+     * - 4-6班：T-1日的夜、早、中班（窗口次日，更新）
+     * - 7-8班：T日的早、中班（排程日期当天，下发，夜班尚未排产不下发）
      * 3. 中间表映射：1班=夜班，2班=早班，3班=中班
      * 4. T-2日、T-1日数据更新（存在则更新，不存在则插入）
      * 5. T日数据下发（先删除后插入）
@@ -851,7 +901,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
                 }
 
                 // 设置3个班的示方号（硫化示方书号），3个班的示方号都取同一个值
-                // 按物料编码+示方类型查找对应的硫化示方书号
+                // 根据施工阶段对应的示方类型精确匹配：正规取正规、量试取量试、试制取试制
                 String exampleType = item.getClass1ExampleType();
                 if (StringUtils.isNotBlank(exampleType)) {
                     String compositeKey = materialCode + "_" + exampleType;
@@ -860,6 +910,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
                         item.setClass1ExampleNo(lhNo);
                         item.setClass2ExampleNo(lhNo);
                         item.setClass3ExampleNo(lhNo);
+                    } else {
+                        log.warn("物料{}未找到示方类型{}对应的硫化示方书号, 请检查SKU与示方书关系表数据", materialCode, exampleType);
                     }
                 }
             }
@@ -905,7 +957,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * Map的key格式：物料编码_示方类型（如 "MAT001_S"）
      *
      * @param materialCodeList 物料编码列表
-     * @param factoryCode 分厂编码
+     * @param factoryCode      分厂编码
      * @return "物料编码_示方类型" -> 硫化示方书号的映射
      */
     private Map<String, String> getMaterialCodeAndTypeToLhNoMap(List<String> materialCodeList, String factoryCode) {
@@ -990,7 +1042,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setLhTime(source.getLhTime());
 
         target.setDataVersion(null);
-        target.setCompanyCode("116");
+        target.setCompanyCode(FactoryConstant.DEFAULT_COMPANY_CODE);
         target.setFactoryCode(source.getFactoryCode());
 
         return target;
@@ -1057,7 +1109,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setLhTime(source.getLhTime());
 
         target.setDataVersion(null);
-        target.setCompanyCode("116");
+        target.setCompanyCode(FactoryConstant.DEFAULT_COMPANY_CODE);
         target.setFactoryCode(source.getFactoryCode());
 
         return target;
@@ -1124,7 +1176,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setLhTime(source.getLhTime());
 
         target.setDataVersion(null);
-        target.setCompanyCode("116");
+        target.setCompanyCode(FactoryConstant.DEFAULT_COMPANY_CODE);
         target.setFactoryCode(source.getFactoryCode());
 
         return target;
@@ -1188,7 +1240,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     /**
      * 排产小结报表导出
      *
-     * @param queryVO 查询条件，包含排程日期和分厂编码
+     * @param queryVO  查询条件，包含排程日期和分厂编码
      * @param fileName 导出文件名
      * @return Excel文件字节数组
      */
@@ -1196,7 +1248,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     @ApiOperation("排产小结报表导出")
     @PostMapping("/exportScheduleSummaryReport/{fileName}")
     public byte[] exportScheduleSummaryReport(@RequestBody ScheduleSummaryReportVO queryVO,
-                                               @PathVariable("fileName") String fileName) {
+                                              @PathVariable("fileName") String fileName) {
         return scheduleSummaryReportService.exportScheduleSummaryReport(queryVO);
     }
 

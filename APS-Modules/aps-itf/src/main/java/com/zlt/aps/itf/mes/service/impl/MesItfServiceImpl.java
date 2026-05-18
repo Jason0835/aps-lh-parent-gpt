@@ -1757,8 +1757,9 @@ public class MesItfServiceImpl implements MesItfService {
 
     /**
      * 模具交替计划下发到MES
-     * 1. 写入APS中间表MOLD_ALTER_PLAN（建在jy_aps_mid主库）
-     * 2. 发送MQ通知MES来获取数据
+     * 1. 清理中间表中同工单号的旧数据，避免脏数据残留
+     * 2. 写入APS中间表MOLD_ALTER_PLAN（建在jy_aps_mid主库）
+     * 3. 发送MQ通知MES来获取数据
      * @param moldAlterPlanList 模具交替计划列表
      * @return 结果
      */
@@ -1775,6 +1776,13 @@ public class MesItfServiceImpl implements MesItfService {
         String factoryCode = moldAlterPlanList.get(0).getFactoryCode();
         String companyCode = moldAlterPlanList.get(0).getCompanyCode();
 
+        // 收集工单号列表，用于清理中间表旧数据
+        List<String> orderNos = moldAlterPlanList.stream()
+                .map(MdmMoldAlterPlan::getOrderNo)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+
         // 转换为中间表实体
         List<MoldAlterPlanIssue> issueList = new ArrayList<>();
         for (MdmMoldAlterPlan plan : moldAlterPlanList) {
@@ -1785,6 +1793,13 @@ public class MesItfServiceImpl implements MesItfService {
         }
 
         try {
+            // 先清理中间表中同工单号的旧数据，避免脏数据残留导致MES消费异常
+            if (CollectionUtils.isNotEmpty(orderNos) && StringUtils.isNotBlank(factoryCode)) {
+                int deleted = moldAlterPlanIssueMapper.deleteByOrderNosAndFactoryCode(orderNos, factoryCode);
+                if (deleted > 0) {
+                    log.info("清理模具交替计划中间表旧数据, 分厂: {}, 工单号: {}, 删除数量: {}", factoryCode, orderNos, deleted);
+                }
+            }
             // MOLD_ALTER_PLAN表建在jy_aps_mid主库，使用@DS(DataSource.MASTER)的独立Mapper直接写入
             moldAlterPlanIssueMapper.insertMoldAlterPlanList(issueList);
         } catch (Exception e) {

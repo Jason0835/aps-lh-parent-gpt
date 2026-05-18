@@ -58,6 +58,7 @@ export default {
     },
     oldList: Array | [],
     scheduleDate: String,
+    structureName: String,
   },
   data() {
     return {
@@ -103,6 +104,10 @@ export default {
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
           prop: "materialDesc",
         },
+        {
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.structureName"),
+          prop: "structureName",
+        },
       ];
     },
     columns: function () {
@@ -124,6 +129,12 @@ export default {
           align: "center",
           width: 120,
           label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+        },
+        {
+          prop: "structureName",
+          align: "center",
+          width: 120,
+          label: this.$t("ui.data.column.lhSpecialMaterialBom.structureName"),
         },
         {
           prop: "specifications",
@@ -243,6 +254,9 @@ export default {
       };
       if (this.scheduleDate) {
         params.scheduleDate = this.scheduleDate;
+      }
+      if (this.structureName) {
+        params.structureName = this.structureName;
       }
       return params;
     },

@@ -296,6 +296,15 @@ public class MpTrialPlan extends BaseEntity {
     private String deptIdName;
 
     /**
+     * 责任部门 手工录入，例如：生胎部门、技术部门
+     */
+    @ImportExcelValidated(maxLength = 64)
+    @Excel(name = "ui.data.column.mpTrialPlan.responsibleDept")
+    @ApiModelProperty(value = "责任部门", name = "responsibleDept")
+    @TableField(value = "RESPONSIBLE_DEPT")
+    private String responsibleDept;
+
+    /**
      * 备注
      */
     @Excel(name = "ui.data.column.sale.remark")

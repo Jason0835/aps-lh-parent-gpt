@@ -97,22 +97,33 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     /**
      * 查询物料信息表列表
      * 当传入scheduleDate时，关联T_MP_MONTH_PLAN_PROD_FINAL定稿表过滤物料编码
+     * 分页参数优先从请求体获取，其次从URL查询参数和请求头获取，默认第1页10条
      */
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MdmMaterialInfo productInfo) {
-        Integer pageNum = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageNum"), ServletUtils.getHeader("pageNum")));
-        Integer pageSize = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageSize"), ServletUtils.getHeader("pageSize")));
-        if (pageNum != null && pageSize != null) {
-            PageHelper.startPage(pageNum, pageSize, "create_time desc, id desc");
-        } else {
-            startPage("create_time desc, id desc");
+        Integer pageNum = productInfo.getPageNum();
+        Integer pageSize = productInfo.getPageSize();
+        if (pageNum == null) {
+            pageNum = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageNum"), ServletUtils.getHeader("pageNum")));
         }
+        if (pageSize == null) {
+            pageSize = Convert.toInt(StringUtils.defaultIfBlank(ServletUtils.getParameter("pageSize"), ServletUtils.getHeader("pageSize")));
+        }
+        // 如果仍然获取不到分页参数，使用默认值
+        if (pageNum == null) {
+            pageNum = 1;
+        }
+        if (pageSize == null) {
+            pageSize = 10;
+        }
+        PageHelper.startPage(pageNum, pageSize, "create_time desc, id desc");
         QueryWrapper<MdmMaterialInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, productInfo);
         this.filterByMonthPlanFinal(wrapper, productInfo);
         List<MdmMaterialInfo> list = iproductInfoService.selectList(wrapper);
         this.setSkuConstructionRefField(productInfo, list);
+        this.clearPage();
         return getDataTable(list);
     }
 

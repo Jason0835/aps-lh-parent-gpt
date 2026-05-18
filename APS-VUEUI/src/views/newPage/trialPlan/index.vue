@@ -249,6 +249,11 @@ export default {
           width: 120,
         },
         {
+          prop: "responsibleDept",
+          label: this.$t("ui.data.column.trialPlan.responsibleDept"),
+          width: 120,
+        },
+        {
           prop: "embryoReleaseDate",
           label: this.$t("ui.data.column.trialPlan.madeInfo"),
           width: 180,
@@ -392,6 +397,10 @@ export default {
         {
           prop: "pattern",
           label: this.$t("ui.data.column.modelinfo.pattern"),
+        },
+        {
+          prop: "responsibleDept",
+          label: this.$t("ui.data.column.trialPlan.responsibleDept"),
         },
       ];
     },
