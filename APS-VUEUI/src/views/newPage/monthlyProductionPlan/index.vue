@@ -321,6 +321,8 @@ export default {
       search: {},
       query: {},
       versionOptions: [],
+      /** getVersionList 原始行：供弹窗选版本后补全 versionOptions 的 adjustType（仅本页） */
+      monthPlanMpAdjustVersionRawRows: [],
       /** 当前调整机台（只读，来自 Redis） */
       currentAdjustMachine: "",
       /** 当前调整结构（来自 Redis） */
@@ -1009,6 +1011,39 @@ export default {
             : ""
       ).trim();
     },
+    /**
+     * 仅本页「确认调整」「重新计算」：adjustType 取 versionOptions 中与当前选中版本对应项的 adjustType。
+     * 查询区版本号下拉清空后须传 "03"；原先 resolveSearchColumnsVersion 会在表单清空后仍回落 query.version，
+     * 此处仅以 HeaderSearch 表单为准（无 ref 时再退回 query.version）。
+     * 有选中版本但未匹配到项、或该项无 adjustType 时返回 ""（不再默认 "02"）。
+     */
+    pickAdjustTypeOnlyMonthPlanConfirmRecalculate() {
+      let selectedVersion = "";
+      const pt = this.$refs.monthPlanPageTableRef;
+      const searchRef = pt && pt.$refs && pt.$refs.searchRef;
+      if (searchRef && typeof searchRef.getValues === "function") {
+        const form = searchRef.getValues();
+        if (form) {
+          const raw = form.version;
+          selectedVersion =
+            raw != null && String(raw).trim() !== ""
+              ? String(raw).trim()
+              : "";
+        }
+      } else {
+        selectedVersion = String(this.query.version ?? "").trim();
+      }
+      if (!selectedVersion) {
+        return "03";
+      }
+      const opts = this.versionOptions || [];
+      const hit = opts.find(
+        (o) => o && String(o.value).trim() === selectedVersion
+      );
+      const at =
+        hit && hit.adjustType != null ? String(hit.adjustType).trim() : "";
+      return at;
+    },
     /** 记录 1–31 号列编辑前的原始值 */
     onDayEditFocus(row, prop) {
       this.dayEditOriginalValue = row[prop];
@@ -1198,6 +1233,7 @@ export default {
       const yearMonth = this.query.yearMonth || this.search.yearMonth;
       if (!factoryCode || !yearMonth) {
         this.versionOptions = [];
+        this.monthPlanMpAdjustVersionRawRows = [];
         this.search = { ...this.search, version: "" };
         this.query = { ...this.query, version: "" };
         return;
@@ -1205,15 +1241,21 @@ export default {
       try {
         const res = await resultVersion(this.formatParamsForStructureVersionList());
         const rows = res.rows || [];
+        this.monthPlanMpAdjustVersionRawRows = rows;
         const list = [];
         for (let i = 0; i < rows.length; i++) {
           const pv = rows[i].version;
           if (pv == null || String(pv).trim() === "") {
             continue;
           }
+          const adj =
+            rows[i].adjustType != null
+              ? String(rows[i].adjustType).trim()
+              : "";
           list.push({
             label: pv,
             value: pv,
+            adjustType: adj,
           });
         }
         this.versionOptions = list;
@@ -1243,6 +1285,7 @@ export default {
       } catch (e) {
         console.error(e);
         this.versionOptions = [];
+        this.monthPlanMpAdjustVersionRawRows = [];
         this.search = { ...this.search, version: "" };
         this.query = { ...this.query, version: "" };
       }
@@ -1667,7 +1710,14 @@ export default {
       this.query = { ...this.query, version: v };
       const opts = this.versionOptions || [];
       if (!opts.some((item) => String(item.value) === v)) {
-        this.versionOptions = [...opts, { label: v, value: v }];
+        const raw = (this.monthPlanMpAdjustVersionRawRows || []).find(
+          (r) => r && String(r.version).trim() === v
+        );
+        const adj =
+          raw && raw.adjustType != null
+            ? String(raw.adjustType).trim()
+            : "";
+        this.versionOptions = [...opts, { label: v, value: v, adjustType: adj }];
       }
       this.$set(this.page, "current", 1);
       await this.fetchCurrentAdjustMachineFromRedis();
@@ -1874,7 +1924,7 @@ export default {
     },
     /**
      * 月计划调整查询页「确认调整」请求体：核心业务字段按查询区 query + Redis 上下文组装；
-     * 另含 adjustType、productionVersion、startDay/endDay（后端 confirmAdjust 策略与 queryAdjustResult 依赖）。
+     * adjustType：查询区版本下拉清空时为 "03"；否则为 versionOptions 中对应项的 adjustType；无匹配或接口未返回时传空字符串。
      */
     buildMonthPlanConfirmAdjustPayload() {
       const ym = this.normalizeYearMonth(this.query.yearMonth);
@@ -1895,14 +1945,14 @@ export default {
         adjustEndDay,
         structureName: this.currentAdjustStructure || "",
         scheduledMachines: (this.currentAdjustMachine || "").trim(),
-        adjustType: "02",
+        adjustType: this.pickAdjustTypeOnlyMonthPlanConfirmRecalculate(),
         startDay: adjustStartDay,
         endDay: adjustEndDay,
       };
     },
     /**
-     * 组装与周程滚动「结构内调整 -> 调整结果 -> 确定」confirmResult 一致的入参（adjustType=01）。
-     * 供「重新计算」等与 POST /monthplan/mpWeekRollAdjust 共用的历史入参结构。
+     * 组装「重新计算」POST /monthplan/mpWeekRollAdjust/recalculate 入参；
+     * adjustType 解析规则与本页确认调整一致。
      */
     buildWeekRollConfirmPayload() {
       const params = {
@@ -1927,7 +1977,7 @@ export default {
       if (!row) {
         return null;
       }
-      params.adjustType = "02";
+      params.adjustType = this.pickAdjustTypeOnlyMonthPlanConfirmRecalculate();
       params.version = row.version || this.query.version;
       params.productionVersion =
         row.productionVersion || this.query.version;
