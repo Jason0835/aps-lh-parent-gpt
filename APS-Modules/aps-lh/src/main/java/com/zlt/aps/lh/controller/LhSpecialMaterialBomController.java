@@ -113,7 +113,7 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
     /**
      * 根据集合导入特殊物料清单配置数据
      *
-     * @param importContext  导入上下文
+     * @param importContext 导入上下文
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
@@ -179,7 +179,7 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
     @PostMapping("/checkUniqueSpecialMaterialBom")
     public AjaxResult checkUniqueSpecialMaterialBom(@RequestBody LhSpecialMaterialBom entity) {
         String result = lhSpecialMaterialBomService.checkUnique(entity);
-        return AjaxResult.success().put("exist", UserConstants.NOT_UNIQUE.equals(result));
+        return AjaxResult.success(UserConstants.NOT_UNIQUE.equals(result));
     }
 
     /**
@@ -187,9 +187,8 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
      */
     @ApiOperation("分类冲突校验")
     @PostMapping("/checkCategoryConflict")
-    public AjaxResult checkCategoryConflict(@RequestBody LhSpecialMaterialBom entity) {
-        String conflict = lhSpecialMaterialBomService.checkCategoryConflict(entity);
-        return AjaxResult.success().put("conflict", conflict);
+    public String checkCategoryConflict(@RequestBody LhSpecialMaterialBom entity) {
+        return lhSpecialMaterialBomService.checkCategoryConflict(entity);
     }
 
     @Override
