@@ -24,7 +24,9 @@ import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.cx.vo.ScheduleRequestVo;
 import com.zlt.aps.itf.mes.IMesItfService;
+import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.mp.api.domain.entity.CxScheduleResultIssue;
+import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmCxMachineFixed;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
@@ -86,6 +88,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
     @Autowired
     private CxParamConfigMapper cxParamConfigMapper;
+
+    @Resource
+    private FactoryParamMapper factoryParamMapper;
 
     @Resource
     private MdmCxMachineFixedMapper mdmCxMachineFixedMapper;
@@ -1830,23 +1835,72 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
     /**
      * 加载工厂的日硫化量数据
+     * <p>优先级：T_MP_FACTORY_PARAM(SYS0202002) → T_CX_PARAM_CONFIG(SYS04010001) → 代码默认值(STANDARD_CAPACITY)</p>
      * @return [capacityList, mode]
      */
     private Object[] loadCapacityData(String factoryCode) {
         List<MonthPlanProductLhCapacityVo> capacityList = null;
         DayVulcanizationModeEnum mode = DayVulcanizationModeEnum.STANDARD_CAPACITY;
         if (factoryCode != null) {
-            CxParamConfig modeConfig = cxParamConfigMapper.selectOne(
-                    new LambdaQueryWrapper<CxParamConfig>()
-                            .eq(CxParamConfig::getParamCode, "DAY_VULCANIZATION_MODE")
-                            .eq(CxParamConfig::getIsActive, 1));
-            if (modeConfig != null && modeConfig.getParamValue() != null) {
-                mode = DayVulcanizationModeEnum.getByCode(modeConfig.getParamValue());
-                if (mode == null) mode = DayVulcanizationModeEnum.STANDARD_CAPACITY;
-            }
+            mode = loadDayVulcanizationMode(factoryCode);
             capacityList = monthPlanProductLhCapacityMapper.selectByFactoryCode(factoryCode);
         }
         return new Object[]{capacityList, mode};
+    }
+
+    /**
+     * 加载日硫化量计算模式（按参数治理体系优先级）
+     * 优先级：T_MP_FACTORY_PARAM → T_CX_PARAM_CONFIG → 代码默认值
+     */
+    private DayVulcanizationModeEnum loadDayVulcanizationMode(String factoryCode) {
+        // 1. 优先从工厂月计划参数表(T_MP_FACTORY_PARAM)读取，需要做 M/S/A → 1/2/3 映射
+        try {
+            LambdaQueryWrapper<FactoryParam> wrapper = new LambdaQueryWrapper<FactoryParam>()
+                    .eq(FactoryParam::getFactoryCode, factoryCode)
+                    .eq(FactoryParam::getProductTypeCode, "TBR")
+                    .eq(FactoryParam::getParamCode, "SYS0202002")
+                    .eq(FactoryParam::getIsDelete, "0");
+            FactoryParam param = factoryParamMapper.selectOne(wrapper);
+            if (param != null && param.getParamValue() != null && !param.getParamValue().trim().isEmpty()) {
+                String mpValue = param.getParamValue().trim();
+                String converted = convertDayVulcanizationMode(mpValue);
+                DayVulcanizationModeEnum result = DayVulcanizationModeEnum.getByCode(converted);
+                if (result != null) {
+                    log.info("日硫化量计算模式（来自T_MP_FACTORY_PARAM SYS0202002）: {} -> {}", mpValue, converted);
+                    return result;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("从T_MP_FACTORY_PARAM加载日硫化量模式失败: factoryCode={}, error={}", factoryCode, e.getMessage());
+        }
+
+        // 2. 兜底从成型参数配置表(T_CX_PARAM_CONFIG)读取
+        CxParamConfig modeConfig = cxParamConfigMapper.selectOne(
+                new LambdaQueryWrapper<CxParamConfig>()
+                        .eq(CxParamConfig::getParamCode, "SYS04010001")
+                        .eq(CxParamConfig::getIsActive, 1));
+        if (modeConfig != null && modeConfig.getParamValue() != null) {
+            log.info("日硫化量计算模式（来自T_CX_PARAM_CONFIG）: {}", modeConfig.getParamValue());
+            DayVulcanizationModeEnum result = DayVulcanizationModeEnum.getByCode(modeConfig.getParamValue());
+            if (result != null) return result;
+        }
+
+        // 3. 最后兜底：标准日硫化量
+        return DayVulcanizationModeEnum.STANDARD_CAPACITY;
+    }
+
+    /**
+     * 转换日硫化量模式编码：M→1、S→2、A→3
+     * 工厂参数表使用字母，成型参数表使用数字
+     */
+    private String convertDayVulcanizationMode(String mpValue) {
+        if (mpValue == null) return null;
+        switch (mpValue.toUpperCase().trim()) {
+            case "M": return "1";
+            case "S": return "2";
+            case "A": return "3";
+            default: return mpValue;
+        }
     }
 
     /**

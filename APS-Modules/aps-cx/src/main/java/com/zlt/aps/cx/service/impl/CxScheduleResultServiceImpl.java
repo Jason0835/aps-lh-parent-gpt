@@ -900,7 +900,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     /**
      * 构建小胶种和占位符映射。
      * <p>取值逻辑与 Sheet0 成型余量-按机台 的 smallGlue 完全一致：
-     * 从 CxParamConfig 读取 RUBBER_TYPE_CODES，加 AQ 前缀后精确匹配 MdmMaterialConsumeDetail，
+     * 从 CxParamConfig 读取 SYS04010002，加 AQ 前缀后精确匹配 MdmMaterialConsumeDetail，
      * 再根据胎胚编码查询 MdmMaterialInfo，拼接 规格/花纹 展示胶种。</p>
      *
      * @param exportList 成型排程结果列表
@@ -918,7 +918,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // 从参数配置表读取胶种类型编码
         CxParamConfig config = cxParamConfigMapper.selectOne(
                 new LambdaQueryWrapper<CxParamConfig>()
-                        .eq(CxParamConfig::getParamCode, "RUBBER_TYPE_CODES")
+                        .eq(CxParamConfig::getParamCode, "SYS04010002")
                         .eq(CxParamConfig::getIsActive, 1));
 
         if (config == null || StringUtils.isBlank(config.getParamValue())) {
@@ -1321,7 +1321,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // 查询胶种，使用胎胚代码关联，取对应的花纹等
         CxParamConfig config = cxParamConfigMapper.selectOne(
                 new LambdaQueryWrapper<CxParamConfig>()
-                        .eq(CxParamConfig::getParamCode, "RUBBER_TYPE_CODES")
+                        .eq(CxParamConfig::getParamCode, "SYS04010002")
                         .eq(CxParamConfig::getIsActive, 1));
 
         Map<String, String> smallGlueMap = new HashMap<>();
