@@ -295,42 +295,42 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
     }
 
     @Override
-    @ApiOperation("逻辑删除硫化在机今天之前所有数据")
+    @ApiOperation("逻辑删除硫化在机今天及今天之前所有数据")
     @PostMapping("/logicDeleteLhMachineOnlineAllBeforeToday")
     public AjaxResult logicDeleteLhMachineOnlineAllBeforeToday() {
-        log.info("开始逻辑删除硫化在机今天之前所有数据...");
+        log.info("开始逻辑删除硫化在机今天及今天之前所有数据...");
         int deleteCount = lhMachineOnlineInfoMapper.logicDeleteAllBeforeToday();
-        log.info("逻辑删除硫化在机今天之前所有数据完成，删除记录数={}", deleteCount);
+        log.info("逻辑删除硫化在机今天及今天之前所有数据完成，删除记录数={}", deleteCount);
         return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("逻辑删除胶囊已使用次数今天之前所有数据")
+    @ApiOperation("逻辑删除胶囊已使用次数今天及今天之前所有数据")
     @PostMapping("/logicDeleteLhRepairCapsuleAllBeforeToday")
     public AjaxResult logicDeleteLhRepairCapsuleAllBeforeToday() {
-        log.info("开始逻辑删除胶囊已使用次数今天之前所有数据...");
+        log.info("开始逻辑删除胶囊已使用次数今天及今天之前所有数据...");
         int deleteCount = lhRepairCapsuleMapper.logicDeleteAllBeforeToday();
-        log.info("逻辑删除胶囊已使用次数今天之前所有数据完成，删除记录数={}", deleteCount);
+        log.info("逻辑删除胶囊已使用次数今天及今天之前所有数据完成，删除记录数={}", deleteCount);
         return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("逻辑删除硫化排程完成量今天之前所有数据")
+    @ApiOperation("逻辑删除硫化排程完成量今天及今天之前所有数据")
     @PostMapping("/logicDeleteLhScheFinishQtyAllBeforeToday")
     public AjaxResult logicDeleteLhScheFinishQtyAllBeforeToday() {
-        log.info("开始逻辑删除硫化排程完成量今天之前所有数据...");
+        log.info("开始逻辑删除硫化排程完成量今天及今天之前所有数据...");
         int deleteCount = lhScheFinishQtyMapper.logicDeleteAllBeforeToday();
-        log.info("逻辑删除硫化排程完成量今天之前所有数据完成，删除记录数={}", deleteCount);
+        log.info("逻辑删除硫化排程完成量今天及今天之前所有数据完成，删除记录数={}", deleteCount);
         return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("逻辑删除硫化排程日完成量今天之前所有数据")
+    @ApiOperation("逻辑删除硫化排程日完成量今天及今天之前所有数据")
     @PostMapping("/logicDeleteLhDayFinishQtyAllBeforeToday")
     public AjaxResult logicDeleteLhDayFinishQtyAllBeforeToday() {
-        log.info("开始逻辑删除硫化排程日完成量今天之前所有数据...");
+        log.info("开始逻辑删除硫化排程日完成量今天及今天之前所有数据...");
         int deleteCount = lhDayFinishQtyMapper.logicDeleteAllBeforeToday();
-        log.info("逻辑删除硫化排程日完成量今天之前所有数据完成，删除记录数={}", deleteCount);
+        log.info("逻辑删除硫化排程日完成量今天及今天之前所有数据完成，删除记录数={}", deleteCount);
         return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 

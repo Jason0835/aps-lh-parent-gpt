@@ -487,6 +487,7 @@ public class ExcelUtils {
                     for (com.zlt.aps.common.core.domain.CellStyle cs : cellStyleList) {
                         boolean bold = cs.getBold() != null ? cs.getBold() : false;
                         String fontName = cs.getFontName();
+                        String fontColor = cs.getFontColor();
                         for (int colIdx = cs.getStartCellNum(); colIdx <= cs.getEndCellNum(); colIdx++) {
                             CellStyle oldStyle = null;
                             if (cs.getStartRowNum() <= sheet.getLastRowNum()) {
@@ -499,11 +500,12 @@ public class ExcelUtils {
                                 }
                             }
                             String cacheKey = cs.getColor() + "|" + cs.getWithBorder() + "|" + bold + "|" + fontName
+                                    + "|" + fontColor
                                     + "|" + (oldStyle != null ? oldStyle.getAlignment().ordinal() : -1)
                                     + "|" + (oldStyle != null ? oldStyle.getVerticalAlignment().ordinal() : -1)
                                     + "|" + colIdx;
                             CellStyle finalOldStyle = oldStyle;
-                            CellStyle style2 = styleMap.computeIfAbsent(cacheKey, k -> createColorCellStyle(workbook, cs.getColor(), cs.getWithBorder(), bold, fontName, finalOldStyle));
+                            CellStyle style2 = styleMap.computeIfAbsent(cacheKey, k -> createColorCellStyle(workbook, cs.getColor(), cs.getWithBorder(), bold, fontName, fontColor, finalOldStyle));
                             setCellRangeColor(sheet, cs.getStartRowNum(), colIdx, cs.getEndRowNum(), colIdx, style2);
                         }
                     }
@@ -849,18 +851,24 @@ public class ExcelUtils {
      * @return
      */
     private static CellStyle createColorCellStyle(Workbook workbook, String colorCode, boolean withBorder) {
-        return createColorCellStyle(workbook, colorCode, withBorder, false, null, null);
+        return createColorCellStyle(workbook, colorCode, withBorder, false, null, null, null);
     }
 
     private static CellStyle createColorCellStyle(Workbook workbook, String colorCode, boolean withBorder, boolean bold, String fontName, CellStyle oldStyle) {
+        return createColorCellStyle(workbook, colorCode, withBorder, bold, fontName, null, oldStyle);
+    }
+
+    private static CellStyle createColorCellStyle(Workbook workbook, String colorCode, boolean withBorder, boolean bold, String fontName, String fontColor, CellStyle oldStyle) {
         XSSFCellStyle cellStyle = (XSSFCellStyle) workbook.createCellStyle();
         cellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
         try {
-            java.awt.Color color = java.awt.Color.decode(colorCode);
-            byte[] rgb = new byte[]{(byte) color.getRed(), (byte) color.getGreen(), (byte) color.getBlue()};
-            XSSFColor xssfColor = new XSSFColor(rgb, null);
-            cellStyle.setFillForegroundColor(xssfColor);
+            if (StringUtils.isNotEmpty(colorCode)) {
+                java.awt.Color color = java.awt.Color.decode(colorCode);
+                byte[] rgb = new byte[]{(byte) color.getRed(), (byte) color.getGreen(), (byte) color.getBlue()};
+                XSSFColor xssfColor = new XSSFColor(rgb, null);
+                cellStyle.setFillForegroundColor(xssfColor);
+            }
             // 添加边框
             if (withBorder) {
                 cellStyle.setBorderBottom(BorderStyle.THIN);
@@ -883,7 +891,8 @@ public class ExcelUtils {
             }
 
             // 修改字体样式
-            if (bold || StringUtils.isNotEmpty(fontName)) {
+            boolean hasFontColor = StringUtils.isNotEmpty(fontColor);
+            if (bold || StringUtils.isNotEmpty(fontName) || hasFontColor) {
                 Font font = workbook.createFont();
                 if (oldStyle != null) { // 原单元格样式复制过去
                     XSSFFont oldFont = (XSSFFont) workbook.getFontAt(oldStyle.getFontIndexAsInt());
@@ -898,6 +907,12 @@ public class ExcelUtils {
                 }
                 if (bold) {
                     font.setBold(true);
+                }
+                if (hasFontColor) {
+                    java.awt.Color fColor = java.awt.Color.decode(fontColor);
+                    byte[] fRgb = new byte[]{(byte) fColor.getRed(), (byte) fColor.getGreen(), (byte) fColor.getBlue()};
+                    XSSFColor xssfFontColor = new XSSFColor(fRgb, null);
+                    ((XSSFFont) font).setColor(xssfFontColor);
                 }
                 cellStyle.setFont(font);
             } else if (oldStyle != null) { // 否则将原单元格字体原样设置到样式中

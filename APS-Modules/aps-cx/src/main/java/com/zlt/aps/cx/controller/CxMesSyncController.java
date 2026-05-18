@@ -275,42 +275,42 @@ public class CxMesSyncController implements ICxMesSyncRemoteService {
     }
 
     @Override
-    @ApiOperation("逻辑删除成型在机今天之前所有数据")
+    @ApiOperation("逻辑删除成型在机今天及今天之前所有数据")
     @PostMapping("/logicDeleteCxMachineOnlineAllBeforeToday")
     public AjaxResult logicDeleteCxMachineOnlineAllBeforeToday() {
-        log.info("开始逻辑删除成型在机今天之前所有数据...");
+        log.info("开始逻辑删除成型在机今天及今天之前所有数据...");
         int deleteCount = cxMachineOnlineInfoMapper.logicDeleteAllBeforeToday();
-        log.info("逻辑删除成型在机今天之前所有数据完成，删除记录数={}", deleteCount);
+        log.info("逻辑删除成型在机今天及今天之前所有数据完成，删除记录数={}", deleteCount);
         return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("逻辑删除生胎库存今天之前所有数据")
+    @ApiOperation("逻辑删除生胎库存今天及今天之前所有数据")
     @PostMapping("/logicDeleteCxStockAllBeforeToday")
     public AjaxResult logicDeleteCxStockAllBeforeToday() {
-        log.info("开始逻辑删除生胎库存今天之前所有数据...");
+        log.info("开始逻辑删除生胎库存今天及今天之前所有数据...");
         int deleteCount = cxStockMapper.logicDeleteAllBeforeToday();
-        log.info("逻辑删除生胎库存今天之前所有数据完成，删除记录数={}", deleteCount);
+        log.info("逻辑删除生胎库存今天及今天之前所有数据完成，删除记录数={}", deleteCount);
         return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("逻辑删除成型排程完成量今天之前所有数据")
+    @ApiOperation("逻辑删除成型排程完成量今天及今天之前所有数据")
     @PostMapping("/logicDeleteCxScheFinishQtyAllBeforeToday")
     public AjaxResult logicDeleteCxScheFinishQtyAllBeforeToday() {
-        log.info("开始逻辑删除成型排程完成量今天之前所有数据...");
+        log.info("开始逻辑删除成型排程完成量今天及今天之前所有数据...");
         int deleteCount = cxScheFinishQtyMapper.logicDeleteAllBeforeToday();
-        log.info("逻辑删除成型排程完成量今天之前所有数据完成，删除记录数={}", deleteCount);
+        log.info("逻辑删除成型排程完成量今天及今天之前所有数据完成，删除记录数={}", deleteCount);
         return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 
     @Override
-    @ApiOperation("逻辑删除成型排程日完成量今天之前所有数据")
+    @ApiOperation("逻辑删除成型排程日完成量今天及今天之前所有数据")
     @PostMapping("/logicDeleteCxDayFinishQtyAllBeforeToday")
     public AjaxResult logicDeleteCxDayFinishQtyAllBeforeToday() {
-        log.info("开始逻辑删除成型排程日完成量今天之前所有数据...");
+        log.info("开始逻辑删除成型排程日完成量今天及今天之前所有数据...");
         int deleteCount = cxDayFinishQtyMapper.logicDeleteAllBeforeToday();
-        log.info("逻辑删除成型排程日完成量今天之前所有数据完成，删除记录数={}", deleteCount);
+        log.info("逻辑删除成型排程日完成量今天及今天之前所有数据完成，删除记录数={}", deleteCount);
         return AjaxResult.success("逻辑删除记录数：" + deleteCount);
     }
 

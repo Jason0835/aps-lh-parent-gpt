@@ -41,11 +41,11 @@ public interface LhMachineOnlineInfoMapper extends CommBaseMapper<LhMachineOnlin
     int logicDeleteByFactoryCodeAndOnlineDate(@Param("factoryCode") String factoryCode, @Param("onlineDate") Date onlineDate, @Param("updateBy") String updateBy, @Param("updateTime") Date updateTime);
 
     /**
-     * 逻辑删除今天之前所有数据（将IS_DELETE置为1）
-     * 用于清理任务：先删除所有历史数据，再从MES重新抓取每天最新版本数据
+     * 逻辑删除今天及今天之前所有数据（将IS_DELETE置为1）
+     * 用于清理任务：先删除所有历史数据（含今天），再从MES重新抓取每天最新版本数据
      *
      * @return 更新的记录数
      */
-    @Update("UPDATE T_LH_MACHINE_ONLINE_INFO SET IS_DELETE = 1, UPDATE_BY = 'CLEAN_TASK', UPDATE_TIME = NOW() WHERE DATE(ONLINE_DATE) < CURDATE() AND IS_DELETE = 0")
+    @Update("UPDATE T_LH_MACHINE_ONLINE_INFO SET IS_DELETE = 1, UPDATE_BY = 'CLEAN_TASK', UPDATE_TIME = NOW() WHERE DATE(ONLINE_DATE) <= CURDATE() AND IS_DELETE = 0")
     int logicDeleteAllBeforeToday();
 }

@@ -91,12 +91,16 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
         List<String> materialCodeList = list.stream().map(MpTrialPlan::getMaterialCode).distinct().collect(Collectors.toList());
         if (CollectionUtils.isNotEmpty(materialCodeList)) {
             // 查询SKU与施工关系，用于写入 制造示方、文字示方、硫化示方
+            // 使用 materialCode_trialStatus 作为key，因为同一物料可能有多条不同产品状态的示方书记录
             LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeList);
             List<MdmSkuConstructionRef> mdmSkuConstructionRefList = skuConstructionRefEntityMapper.selectList(queryWrapper);
             Map<String, MdmSkuConstructionRef> skuConstructionRefMap = new HashMap<>();
             if (CollectionUtils.isNotEmpty(mdmSkuConstructionRefList)) {
-                skuConstructionRefMap = mdmSkuConstructionRefList.stream().collect(Collectors.toMap(MdmSkuConstructionRef::getMaterialCode, Function.identity(), (old, now) -> old));
+                skuConstructionRefMap = mdmSkuConstructionRefList.stream()
+                        .collect(Collectors.toMap(
+                                ref -> ref.getMaterialCode() + "_" + ref.getTrialStatus(),
+                                Function.identity(), (old, now) -> old));
             }
             serviceCheckParams.put("skuConstructionRefMap", skuConstructionRefMap);
 
@@ -132,8 +136,10 @@ public class MpTrialPlanServiceImpl extends AbstractDocService<MpTrialPlan> impl
         String materialCode = importDocEntity.getMaterialCode();
         if (serviceCheckParams.containsKey("skuConstructionRefMap")) {
             Map<String, MdmSkuConstructionRef> skuConstructionRefMap = (Map<String, MdmSkuConstructionRef>) serviceCheckParams.get("skuConstructionRefMap");
-            if (skuConstructionRefMap.containsKey(materialCode)) {
-                MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(materialCode);
+            // 使用 materialCode_trialStatus 作为key查找对应的示方书记录
+            String refKey = materialCode + "_" + importDocEntity.getTrialStatus();
+            if (skuConstructionRefMap.containsKey(refKey)) {
+                MdmSkuConstructionRef mdmSkuConstructionRef = skuConstructionRefMap.get(refKey);
                 String embryoNo = importDocEntity.getEmbryoNo();
                 if (StringUtils.isNotBlank(embryoNo) && !embryoNo.equals(mdmSkuConstructionRef.getEmbryoNo())) {
                     String message = I18nUtil.getMessage("ui.data.alert.mpTrialPlan.embryoNo.error");

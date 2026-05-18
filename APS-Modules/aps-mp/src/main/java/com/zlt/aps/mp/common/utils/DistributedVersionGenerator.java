@@ -39,4 +39,18 @@ public class DistributedVersionGenerator {
         int seqInt = seq != null ? seq.intValue() : 1;
         return String.format("%s%s%03d", prefix, today, seqInt);
     }
+
+    /**
+     * 预览下一个版本号（不递增计数器）
+     * 仅读取当前Redis中的值+1，不会真正递增，用于预览版本号
+     * @return 格式：prefix + 年月日 + 3位流水号
+     */
+    public String peekVersion(String prefix) {
+        String today = LocalDate.now().format(DATE_FORMATTER);
+        String redisKey = prefix + REDIS_KEY_PREFIX + today;
+        String currentValue = stringRedisTemplate.opsForValue().get(redisKey);
+        // 当前值+1作为下一个版本号，如果不存在则从1开始
+        int nextSeq = (currentValue != null) ? Integer.parseInt(currentValue) + 1 : 1;
+        return String.format("%s%s%03d", prefix, today, nextSeq);
+    }
 }

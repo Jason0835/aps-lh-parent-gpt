@@ -37,6 +37,7 @@ import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
@@ -835,8 +836,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         // 查询物料信息表，构建物料编码 -> MES物料编码的映射
         Map<String, String> materialCodeToMesCodeMap = getMaterialCodeToMesCodeMap(materialCodeList);
 
-        // 查询SKU与示方书关系表，构建物料编码 -> 硫化示方书号的映射
-        Map<String, String> materialCodeToLhNoMap = getMaterialCodeToLhNoMap(materialCodeList, factoryCode);
+        // 查询SKU与示方书关系表，构建"物料编码+示方类型" -> 硫化示方书号的映射
+        // 示方号需按示方类型(lhType)过滤：S-正规示方、T-量试示方、X-试验示方
+        Map<String, String> materialCodeAndTypeToLhNoMap = getMaterialCodeAndTypeToLhNoMap(materialCodeList, factoryCode);
 
         // 补全每条记录的MES物料编码和示方号
         for (LhScheduleResultIssue item : issueList) {
@@ -849,11 +851,16 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
                 }
 
                 // 设置3个班的示方号（硫化示方书号），3个班的示方号都取同一个值
-                String lhNo = materialCodeToLhNoMap.get(materialCode);
-                if (StringUtils.isNotBlank(lhNo)) {
-                    item.setClass1ExampleNo(lhNo);
-                    item.setClass2ExampleNo(lhNo);
-                    item.setClass3ExampleNo(lhNo);
+                // 按物料编码+示方类型查找对应的硫化示方书号
+                String exampleType = item.getClass1ExampleType();
+                if (StringUtils.isNotBlank(exampleType)) {
+                    String compositeKey = materialCode + "_" + exampleType;
+                    String lhNo = materialCodeAndTypeToLhNoMap.get(compositeKey);
+                    if (StringUtils.isNotBlank(lhNo)) {
+                        item.setClass1ExampleNo(lhNo);
+                        item.setClass2ExampleNo(lhNo);
+                        item.setClass3ExampleNo(lhNo);
+                    }
                 }
             }
         }
@@ -891,15 +898,17 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
     /**
-     * 获取物料编码到硫化示方书号的映射
+     * 获取"物料编码+示方类型"到硫化示方书号的映射
      * 通过物料编码关联SKU与示方书关系表(MdmSkuConstructionRef)获取硫化示方书号
+     * 按示方类型(lhType)过滤：S-正规示方、T-量试示方、X-试验示方
      * 过滤条件：分厂编码 + 未删除
+     * Map的key格式：物料编码_示方类型（如 "MAT001_S"）
      *
      * @param materialCodeList 物料编码列表
      * @param factoryCode 分厂编码
-     * @return 物料编码 -> 硫化示方书号的映射
+     * @return "物料编码_示方类型" -> 硫化示方书号的映射
      */
-    private Map<String, String> getMaterialCodeToLhNoMap(List<String> materialCodeList, String factoryCode) {
+    private Map<String, String> getMaterialCodeAndTypeToLhNoMap(List<String> materialCodeList, String factoryCode) {
         if (CollectionUtils.isEmpty(materialCodeList)) {
             return new HashMap<>();
         }
@@ -908,7 +917,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         queryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeList)
                 .eq(StringUtils.isNotBlank(factoryCode), MdmSkuConstructionRef::getFactoryCode, factoryCode)
                 .eq(MdmSkuConstructionRef::getIsDelete, 0)
-                .select(MdmSkuConstructionRef::getMaterialCode, MdmSkuConstructionRef::getLhNo);
+                .isNotNull(MdmSkuConstructionRef::getLhType)
+                .select(MdmSkuConstructionRef::getMaterialCode, MdmSkuConstructionRef::getLhNo, MdmSkuConstructionRef::getLhType);
 
         List<MdmSkuConstructionRef> constructionRefList = mdmSkuConstructionRefEntityMapper.selectList(queryWrapper);
 
@@ -917,9 +927,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         }
 
         return constructionRefList.stream()
-                .filter(item -> StringUtils.isNotBlank(item.getLhNo()))
+                .filter(item -> StringUtils.isNotBlank(item.getLhNo()) && StringUtils.isNotBlank(item.getLhType()))
                 .collect(Collectors.toMap(
-                        MdmSkuConstructionRef::getMaterialCode,
+                        item -> item.getMaterialCode() + "_" + item.getLhType(),
                         MdmSkuConstructionRef::getLhNo,
                         (v1, v2) -> v1
                 ));
@@ -958,12 +968,15 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
         // T-2日无夜班，中间表1班(夜)不赋值
 
+        // 示方类型：将施工阶段编码(01/02/03)转换为MES字典值(X/T/S)
+        String exampleTypeMarkFlag = ConstructionStageEnum.getInstance(source.getConstructionStage()).getMarkFlag();
+
         // 中间表2班 = 早班（对应APS 1班）
         target.setClass2PlanQtySeq(2);
         target.setClass2AnalysisInput(null);
         target.setClass2Analysis(source.getClass1Analysis());
         target.setClass2PlanQty(source.getClass1PlanQty());
-        target.setClass2ExampleType(source.getConstructionStage());
+        target.setClass2ExampleType(exampleTypeMarkFlag);
         target.setClass2ExampleNo(null);
 
         // 中间表3班 = 中班（对应APS 2班）
@@ -971,7 +984,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass3AnalysisInput(null);
         target.setClass3Analysis(source.getClass2Analysis());
         target.setClass3PlanQty(source.getClass2PlanQty());
-        target.setClass3ExampleType(source.getConstructionStage());
+        target.setClass3ExampleType(exampleTypeMarkFlag);
         target.setClass3ExampleNo(null);
 
         target.setLhTime(source.getLhTime());
@@ -1014,12 +1027,15 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         int day2DailyPlanQty = safeAdd(source.getClass3PlanQty(), source.getClass4PlanQty(), source.getClass5PlanQty());
         target.setDailyPlanQty(day2DailyPlanQty);
 
+        // 示方类型：将施工阶段编码(01/02/03)转换为MES字典值(X/T/S)
+        String exampleTypeMarkFlag = ConstructionStageEnum.getInstance(source.getConstructionStage()).getMarkFlag();
+
         // 中间表1班 = 夜班（对应APS 3班）
         target.setClass1PlanQtySeq(1);
         target.setClass1AnalysisInput(null);
         target.setClass1Analysis(source.getClass3Analysis());
         target.setClass1PlanQty(source.getClass3PlanQty());
-        target.setClass1ExampleType(source.getConstructionStage());
+        target.setClass1ExampleType(exampleTypeMarkFlag);
         target.setClass1ExampleNo(null);
 
         // 中间表2班 = 早班（对应APS 4班）
@@ -1027,7 +1043,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass2AnalysisInput(null);
         target.setClass2Analysis(source.getClass4Analysis());
         target.setClass2PlanQty(source.getClass4PlanQty());
-        target.setClass2ExampleType(source.getConstructionStage());
+        target.setClass2ExampleType(exampleTypeMarkFlag);
         target.setClass2ExampleNo(null);
 
         // 中间表3班 = 中班（对应APS 5班）
@@ -1035,7 +1051,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass3AnalysisInput(null);
         target.setClass3Analysis(source.getClass5Analysis());
         target.setClass3PlanQty(source.getClass5PlanQty());
-        target.setClass3ExampleType(source.getConstructionStage());
+        target.setClass3ExampleType(exampleTypeMarkFlag);
         target.setClass3ExampleNo(null);
 
         target.setLhTime(source.getLhTime());
@@ -1078,12 +1094,15 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         int day3DailyPlanQty = safeAdd(source.getClass6PlanQty(), source.getClass7PlanQty(), source.getClass8PlanQty());
         target.setDailyPlanQty(day3DailyPlanQty);
 
+        // 示方类型：将施工阶段编码(01/02/03)转换为MES字典值(X/T/S)
+        String exampleTypeMarkFlag = ConstructionStageEnum.getInstance(source.getConstructionStage()).getMarkFlag();
+
         // 中间表1班 = 夜班（对应APS 6班）
         target.setClass1PlanQtySeq(1);
         target.setClass1AnalysisInput(null);
         target.setClass1Analysis(source.getClass6Analysis());
         target.setClass1PlanQty(source.getClass6PlanQty());
-        target.setClass1ExampleType(source.getConstructionStage());
+        target.setClass1ExampleType(exampleTypeMarkFlag);
         target.setClass1ExampleNo(null);
 
         // 中间表2班 = 早班（对应APS 7班）
@@ -1091,7 +1110,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass2AnalysisInput(null);
         target.setClass2Analysis(source.getClass7Analysis());
         target.setClass2PlanQty(source.getClass7PlanQty());
-        target.setClass2ExampleType(source.getConstructionStage());
+        target.setClass2ExampleType(exampleTypeMarkFlag);
         target.setClass2ExampleNo(null);
 
         // 中间表3班 = 中班（对应APS 8班）
@@ -1099,7 +1118,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setClass3AnalysisInput(null);
         target.setClass3Analysis(source.getClass8Analysis());
         target.setClass3PlanQty(source.getClass8PlanQty());
-        target.setClass3ExampleType(source.getConstructionStage());
+        target.setClass3ExampleType(exampleTypeMarkFlag);
         target.setClass3ExampleNo(null);
 
         target.setLhTime(source.getLhTime());

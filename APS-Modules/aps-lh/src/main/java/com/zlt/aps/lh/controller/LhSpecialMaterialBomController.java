@@ -48,7 +48,6 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
      * 查询特殊物料清单配置列表
      */
     @ApiOperation("查询列表")
-    @RequiresPermissions("lh:lhSpecialMaterialBom:list")
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody LhSpecialMaterialBom queryVO) {
@@ -60,7 +59,6 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
      */
     @Log(title = "ui.data.column.lhSpecialMaterialBom.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("保存")
-    @RequiresPermissions({"lh:lhSpecialMaterialBom:edit", "lh:lhSpecialMaterialBom:add"})
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody LhSpecialMaterialBom entity) {
@@ -72,7 +70,6 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
      */
     @Log(title = "ui.data.column.lhSpecialMaterialBom.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
-    @RequiresPermissions("lh:lhSpecialMaterialBom:remove")
     @DeleteMapping("/remove")
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
@@ -132,7 +129,6 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
      */
     @Log(title = "ui.data.column.lhSpecialMaterialBom.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
-    @RequiresPermissions("lh:lhSpecialMaterialBom:export")
     @PostMapping("/exportData/{fileName}")
     @Override
     public byte[] exportData(@RequestBody LhSpecialMaterialBom queryVO, @PathVariable("fileName") String fileName,

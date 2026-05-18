@@ -317,10 +317,10 @@ public interface MesItfService {
     AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefix(String versionPrefix, Integer year);
 
     /**
-     * 清理并重新同步所有MES历史数据
+     * 清理并重新同步所有MES历史数据（含今天）
      * 执行步骤：
-     * 1. 逻辑删除APS库中今天之前的所有数据（6张表）
-     * 2. 从MES库重新抓取今天之前每天最新版本数据
+     * 1. 逻辑删除APS库中今天及今天之前的所有数据（8张表）
+     * 2. 从MES库重新抓取每天（含今天）最新版本数据
      * 3. 将MES数据插入到APS库
      *
      * @return 执行结果

@@ -185,6 +185,9 @@ export default {
           prop: "updateTime",
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
           width: 180,
+          formatter: (row, column, value) => {
+            return this.parseTime(value);
+          },
         },
         {
           align: "center",

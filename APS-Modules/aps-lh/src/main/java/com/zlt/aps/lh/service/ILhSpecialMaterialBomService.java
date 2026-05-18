@@ -32,8 +32,8 @@ public interface ILhSpecialMaterialBomService extends IDocService<LhSpecialMater
 
     /**
      * 校验分类冲突。
-     * 同一工厂+物料/结构组合下，只能有一条芯片胎分类和一条非芯片胎分类的数据，
-     * 不能同时存在芯片胎、19.5寸宽基和22.5寸宽基。
+     * 有物料情况：同一工厂+物料编码下，19.5寸宽基和22.5寸宽基互斥，芯片胎可与它们组合。
+     * 有结构无物料情况：同一工厂+结构下，19.5寸宽基和22.5寸宽基互斥，芯片胎可与它们组合。
      *
      * @param entity 待校验实体
      * @return 冲突结果，null表示无冲突，非null表示冲突描述
