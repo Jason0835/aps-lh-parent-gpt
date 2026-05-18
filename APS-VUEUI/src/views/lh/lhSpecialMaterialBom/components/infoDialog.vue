@@ -33,7 +33,7 @@ import infoForm from "@/views/components/infoForm.vue";
 import structureSelect from "@/views/components/structureSelect.vue";
 import materialCodeSelect from "@/views/components/materialCodeSelect.vue";
 
-import { editSpecialMaterialBom, checkUniqueSpecialMaterialBom, checkCategoryConflictSpecialMaterialBom } from "@/api/lh/specialMaterialBom";
+import { editSpecialMaterialBom } from "@/api/lh/specialMaterialBom";
 
 export default {
   components: { infoForm, structureSelect, materialCodeSelect },
@@ -153,9 +153,11 @@ export default {
       try {
         this.loading = true;
         const res = await editSpecialMaterialBom(params);
-        this.$modal.msgSuccess(res.msg);
-        this.$emit("success");
-        this.hide();
+        if (res.code === 200) {
+          this.$modal.msgSuccess(res.msg);
+          this.$emit("success");
+          this.hide();
+        }
       } catch (error) {
         console.log(error);
       } finally {
@@ -184,24 +186,6 @@ export default {
       this.$refs.form.triggerConfirm(async (params) => {
         if (!params.structureName && !params.materialCode) {
           this.$modal.msgError(this.$t("ui.data.alert.lhSpecialMaterialBom.needOne"));
-          return;
-        }
-        const checkData = {
-          factoryCode: params.factoryCode,
-          structureName: params.structureName,
-          materialCode: params.materialCode,
-          category: params.category,
-          id: this.form.id || null,
-        };
-        const checkRes = await checkUniqueSpecialMaterialBom(checkData);
-        if (checkRes.data && checkRes.data.exist) {
-          this.$modal.msgError(this.$t("ui.data.alert.lhSpecialMaterialBom.notUnique"));
-          return;
-        }
-        // 分类冲突校验：同一物料/结构下不能同时存在芯片胎、19.5寸宽基和22.5寸宽基
-        const categoryCheckRes = await checkCategoryConflictSpecialMaterialBom(checkData);
-        if (categoryCheckRes.data && categoryCheckRes.data.conflict) {
-          this.$modal.msgError(categoryCheckRes.data.conflict);
           return;
         }
         this.save(params);

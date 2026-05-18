@@ -2659,7 +2659,6 @@
   "ui.data.column.lhScheduleResult.insertOrder.monthPlanVersionNotFound": "当前排程月[{}]未找到定稿排产版本，无法校验月度计划",
   "ui.data.column.lhPrecisionPlan.factoryCode": "分厂",
   "ui.data.column.lhPrecisionPlan.machineCode": "机台编号",
-  "ui.data.column.lhPrecisionPlan.mainMaterialCode": "胎胚编码",
   "ui.data.column.lhPrecisionPlan.precisionType": "精度类型",
   "ui.data.column.lhPrecisionPlan.planDate": "计划日期",
   "ui.data.column.lhPrecisionPlan.actualDate": "实际日期",
@@ -2733,5 +2732,7 @@
   "ui.data.column.monthPlanFinalAdjustQuery.confirmPushAdjustedMonthPlanToScmMes": "确定推送调整后的月计划到SCM/MES？",
   "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesPlaceholderProductionVersion": "请选择月计划版本",
   "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesPlaceholderDemandVersion": "请选择需求计划版本",
-  "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesOk": "确定"
+  "ui.data.column.monthPlanFinalAdjustQuery.issueScmMesOk": "确定",
+  "ui.data.column.monthPlanFinalAdjustQuery.adjustStartDay": "调整开始时间",
+  "ui.data.column.monthPlanFinalAdjustQuery.adjustEndDay": "调整结束时间"
 }

@@ -123,15 +123,16 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //1、按高优先级，获取预期排产的分组信息
         Set<String> preSelectedGroupSet = Sets.newHashSet();
         Map<String, Set<CxMachineAllocationPlanHelper>> preSelectedGroupAllocationMap = Maps.newHashMap();
-        log.info(TbrSimulateProductionLogRecorder.addStartDeliveryPriorityLog(productionContext));
+        TbrSimulateProductionLogRecorder.addStartDeliveryPriorityLog(productionContext);
         groupPriorityProductionScheduler.allocationCxMachine(productionContext, Sets.newHashSet(), preSelectedGroupSet, preSelectedGroupAllocationMap, Sets.newHashSet());
+        TbrSimulateProductionLogRecorder.addEndDeliveryPriorityLog(productionContext);
         //2、判断预期排产分组中是否有设置固定1~3的分组和排产间断的二次上机
         List<ProductionPlanGroupInfo> discontinueGroupList = getDiscontinuePreSelectedGroup(productionContext, preSelectedGroupAllocationMap);
         List<ProductionPlanGroupInfo> hasFixedPriorityCxMachineList = getGroupFixedCxMachine(productionContext, preSelectedGroupSet);
-        if (CollectionUtils.isEmpty(hasFixedPriorityCxMachineList) && CollectionUtils.isEmpty(discontinueGroupList)) {
+        Set<String> multipleRangeGroupSet = getMultipleRangeGroup(preSelectedGroupAllocationMap);
+        if (CollectionUtils.isEmpty(hasFixedPriorityCxMachineList) && CollectionUtils.isEmpty(discontinueGroupList) && CollectionUtils.isEmpty(multipleRangeGroupSet)) {
             return;
         }
-        Set<String> multipleRangeGroupSet = getMultipleRangeGroup(preSelectedGroupAllocationMap);
         Set<String> discontinueGroupSet = discontinueGroupList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.toSet());
         //3、开始重排在产分组在产机台续作
         resetProduction(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);

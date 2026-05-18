@@ -31,9 +31,11 @@ import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.dto.MpWeekRollAdjustDTO;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
 import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingAdjuestProductionHandler;
+import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.common.utils.ExcelReadUtils;
 import com.zlt.common.utils.PubUtil;
@@ -96,6 +98,9 @@ public class MpWeekRollAdjustController extends BaseController {
     @Autowired
     private IExportLogService iExportLogService;
 
+    @Autowired
+    private IMpStructureAllocationService mpStructureAllocationService;
+
     /**
      * 获取调整明细列表
      */
@@ -157,6 +162,9 @@ public class MpWeekRollAdjustController extends BaseController {
             sortAdjustResultList(contextDTO.getAdjustResultList());
             if (StringUtil.isEmptyWithTrim(contextDTO.getMsgStructureAdjustPreClose().toString())){
                 return AjaxResult.success(contextDTO.getMsgStructureAdjustPreClose().toString(),contextDTO.getAdjustResultList());
+            }
+            if (!StringUtil.isEmptyWithTrim(contextDTO.getLogCheck().toString())){
+                return AjaxResult.success(contextDTO.getLogCheck().toString(),contextDTO.getAdjustResultList());
             }
             return AjaxResult.success(contextDTO.getAdjustResultList());
         }finally {
@@ -247,6 +255,8 @@ public class MpWeekRollAdjustController extends BaseController {
     @ApiOperation("确认调整结果")
     @PostMapping("/confirmAdjust")
     public AjaxResult confirmAdjust(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        AdjustsCxMachineVo cxMachineVo = mpStructureAllocationService.getAdjustsCxMachineFromRedis();
+        weekRollAdjustDTO.setAdjustType(cxMachineVo == null ? WeekAdjustTypeEnum.STRUCTURE_IN.getCode():WeekAdjustTypeEnum.STRUCTURE_OUT.getCode());
         // 获取周程滚动调整策略
         IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
         if (weekAdjustStrategy == null) {
@@ -369,6 +379,7 @@ public class MpWeekRollAdjustController extends BaseController {
         contextDTO.setAdjustType(weekRollAdjustDTO.getAdjustType());
         // 初始调整过程日志
         contextDTO.setAdjustProcLogList(new ArrayList<>());
+        contextDTO.setLogCheck(new StringBuilder());
         // 设置OEM配置集合（依赖 paramMap）
         initOemParam(contextDTO);
         // 加载搭配排产的必要基础数据（依赖以上所有数据）
@@ -446,6 +457,9 @@ public class MpWeekRollAdjustController extends BaseController {
     @ApiOperation("重新计算")
     @PostMapping("/recalculate")
     public AjaxResult recalculate(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        AdjustsCxMachineVo adjustsCxMachineVo = mpStructureAllocationService.getAdjustsCxMachineFromRedis();
+        String adjustType = adjustsCxMachineVo == null ? WeekAdjustTypeEnum.STRUCTURE_IN.getCode() : WeekAdjustTypeEnum.STRUCTURE_OUT.getCode();
+        weekRollAdjustDTO.setAdjustType(adjustType);
         // 获取周程滚动调整策略
         IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
         if (weekAdjustStrategy == null) {

@@ -1,7 +1,7 @@
 package com.zlt.aps.mp.factory.mapper;
 
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanProductionFinal4AdjustVo;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.core.dao.basemapper.CommBaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -35,5 +35,5 @@ public interface FactoryMonthPlanProductionFinalResultEntityMapper extends CommB
      * @param queryVO 查询条件
      * @return 结果
      */
-    List<FactoryMonthPlanProductionFinal4AdjustVo> list4Adjust(FactoryMonthPlanProductionFinalResult queryVO);
+    List<FactoryMonthPlanFinalAdjustVo> list4Adjust(FactoryMonthPlanProductionFinalResult queryVO);
 }

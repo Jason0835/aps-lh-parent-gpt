@@ -1,6 +1,8 @@
 package com.zlt.aps.mp.api.domain.vo;
 
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.ruoyi.common.core.annotation.Excel;
+import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -139,8 +141,55 @@ public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFin
     /**
      * 调整明细ID
      */
-    @TableField(exist = false)
     @ApiModelProperty(value = "调整明细ID", name = "adjustDetailId")
+    @TableField(exist = false)
     private String adjustDetailId;
+
+    /** 排产净需求 */
+    @ApiModelProperty(value = "排产净需求", name = "netQty")
+    @TableField(exist = false)
+    private Integer netQty;
+
+    /** 高优先级 */
+    @ApiModelProperty(value = "高优先级", name = "heightQty")
+    @TableField(exist = false)
+    private Integer heightQty;
+
+    /** 中优先级 */
+    @ApiModelProperty(value = "中优先级", name = "midQty")
+    @TableField(exist = false)
+    private Integer midQty;
+
+    /** 周期排产储备 */
+    @ApiModelProperty(value = "周期排产储备", name = "cycleReserveQty")
+    @TableField(exist = false)
+    private Integer cycleReserveQty;
+
+    /** 常规储备 */
+    @ApiModelProperty(value = "常规储备", name = "conventionReserveQty")
+    @TableField(exist = false)
+    private Integer conventionReserveQty;
+
+    /** 暂缓订单 */
+    @ApiModelProperty(value = "暂缓订单", name = "POSTPONE_QTY")
+    @TableField(exist = false)
+    private Integer postponeQty;
+
+    /** 是否锁定上机日期：0-否，1-是 */
+    @ApiModelProperty(value = "是否锁定上机日期：0-否，1-是", name = "isLockSchedule")
+    @TableField(exist = false)
+    private String isLockSchedule;
+
+    /** 版本规则：ADJ+年月日+3位流水号； */
+    @ApiModelProperty(value = "版本规则：ADJ+年月日+3位流水号；", name = "version")
+    @TableField(value = "VERSION")
+    private String version;
+
+    /**
+     * 调整标识，0-没有调整,1-有调整
+     */
+    @ApiModelProperty(value = "调整标识", name = "adjustFlag")
+    @TableField(exist = false)
+    private String adjustFlag;
 
 }

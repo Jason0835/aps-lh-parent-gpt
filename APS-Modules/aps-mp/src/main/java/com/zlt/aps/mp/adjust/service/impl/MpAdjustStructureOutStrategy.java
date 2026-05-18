@@ -16,7 +16,10 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
+import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
+import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingAdjuestProductionHandler;
@@ -32,6 +35,7 @@ import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.api.domain.vo.MpAdjustDetailVo;
 import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
+import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.common.utils.PubUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +55,9 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
     @Autowired
     private IMpAdjustStructureOutService mpAdjustStructureOutService;
+
+    @Autowired
+    private IMpStructureAllocationService mpStructureAllocationService;
 
     @Autowired
     private MatchingAdjuestProductionHandler matchingAdjuestProductionHandler;
@@ -134,9 +141,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             return;
         }
 
-        CollUtil.filter(adjustDetailList, item -> StringUtils.equals(item.getStructureName(), contextDTO.getStructureName())
-                && (StringUtils.isEmpty(item.getScheduledMachines())
-                || StringUtils.contains(item.getScheduledMachines(), contextDTO.getScheduledMachines())));
+        CollUtil.filter(adjustDetailList, item -> StringUtils.equals(item.getStructureName(), contextDTO.getStructureName()));
     }
 
     /**
@@ -307,7 +312,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.orderAdjustRecordNotFound"),
                     contextDTO.getMpYear(),contextDTO.getMpMonth()));
         }
-
+        String lastMonthPlanVersion = contextDTO.getMpAdjustStructureOutList().get(0).getLastMonthPlanVersion();
         //2.按结构序列化分组
         //Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap =  convertToMap(contextDTO.getFactoryMonthPlanProdFinalList());
@@ -323,6 +328,10 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             setSpecStructureTotalQty(contextDTO,oneStructMpFinalList);
         }
         List<MpStructureAllocation> structureAllocationList = contextDTO.getStructureAllocationList().stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
+        if (PubUtil.isEmpty(structureAllocationList)){
+            structureAllocationList = new ArrayList<>();
+            contextDTO.setStructureAllocationList(structureAllocationList);
+        }
         //3.更新结构转产表对应成型机台的调整开始日、结束日
         updateStructureAdjustDayByMachine(structureAllocationList,contextDTO);
         //4.补充更新周程滚动上下文
@@ -367,7 +376,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
         contextDTO.setSaveMpProdFinalList(oneStructMpFinalList);
         contextDTO.setSaveAdjustProcLogList(contextDTO.getAdjustProcLogList());
-
+        contextDTO.setAdjustMonthPlanVersion(lastMonthPlanVersion);
         //10.保存调整日志
         saveMpAdjustLog(contextDTO);
     }
@@ -437,17 +446,42 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
      * @param contextDTO
      */
     private void updateStructureAdjustDayByMachine(List<MpStructureAllocation> structureAllocationList,MpRollAdjustContextDTO contextDTO){
-        if (PubUtil.isEmpty(structureAllocationList)){
+        if (StringUtil.isEmptyWithTrim(contextDTO.getScheduledMachines())){
             return;
         }
-        for (MpStructureAllocation structureAllocation:structureAllocationList){
-            if (structureAllocation.getCxMachineCode().equals(contextDTO.getScheduledMachines())){
-                //更新结构转产表对应成型机台的调整开始日、结束日
-                structureAllocation.setBeginDay(contextDTO.getAdjustStartDay());
-                structureAllocation.setEndDay(contextDTO.getAdjustEndDay());
-                return;
+        MpStructureAllocation structureAllocation = structureAllocationList.stream().filter(x->x.getCxMachineCode().equals(contextDTO.getScheduledMachines())).findFirst().orElse(null);
+        if (structureAllocation == null){
+            // 新增结构
+            structureAllocation = new MpStructureAllocation();
+            structureAllocation.setFactoryCode(contextDTO.getFactoryCode());
+            structureAllocation.setStructureName(contextDTO.getStructureName());
+            structureAllocation.setCxMachineCode(contextDTO.getScheduledMachines());
+            structureAllocation.setYear(contextDTO.getMpYear());
+            structureAllocation.setMonth(contextDTO.getMpMonth());
+            structureAllocation.setBeginDay(contextDTO.getAdjustStartDay());
+            structureAllocation.setEndDay(contextDTO.getAdjustEndDay());
+            structureAllocation.setProductionVersion(contextDTO.getProductionVersion());
+
+            List<MdmStructureLhRatio> structureLhRatioList = mpStructureAllocationService.queryMdmStructureLhRatio(structureAllocation);
+            if (PubUtil.isNotEmpty(structureLhRatioList)){
+                MdmStructureLhRatio mdmStructureLhRatio = structureLhRatioList.get(0);
+                structureAllocation.setMaxEmbryoCodeCount(mdmStructureLhRatio.getMaxEmbryoQty());
+                structureAllocation.setMaxLhMachineCount(mdmStructureLhRatio.getLhMachineMaxQty());
             }
+            structureAllocationList.add(structureAllocation);
+        }else{
+            //更新结构转产表对应成型机台的调整开始日、结束日
+            structureAllocation.setBeginDay(contextDTO.getAdjustStartDay());
+            structureAllocation.setEndDay(contextDTO.getAdjustEndDay());
         }
+        //设置 机台缓存信息
+        AdjustsCxMachineVo adjustsCxMachineVo = new AdjustsCxMachineVo();
+        adjustsCxMachineVo.setCxMachineCode(structureAllocation.getCxMachineCode());
+        adjustsCxMachineVo.setStructureName(structureAllocation.getStructureName());
+        adjustsCxMachineVo.setBeginDay(structureAllocation.getBeginDay());
+        adjustsCxMachineVo.setEndDay(structureAllocation.getEndDay());
+        adjustsCxMachineVo.setVersion(contextDTO.getVersion());
+        mpStructureAllocationService.setAdjustsCxMachineFromRedis(adjustsCxMachineVo);
     }
 
 
@@ -497,9 +531,9 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         contextDTO.setStructureStartDay(beginDay);
         contextDTO.setStructureDeadLine(endDay);
         //若结构收尾日小于锁定日，提示
-        if (contextDTO.getLockEndDay() != null && contextDTO.getStructureDeadLine() <= contextDTO.getLockEndDay()){
+        /*if (contextDTO.getLockEndDay() != null && contextDTO.getStructureDeadLine() <= contextDTO.getLockEndDay()){
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.adjustDayLtLockEndDay"),
                     contextDTO.getStructureDeadLine(),contextDTO.getLockEndDay()));
-        }
+        }*/
     }
 }

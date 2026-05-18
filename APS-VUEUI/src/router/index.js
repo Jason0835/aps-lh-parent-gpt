@@ -65,37 +65,37 @@ export const constantRoutes = [
   {
     path: "/largescreen/home",
     component: () => import("@/views/largescreen/home"),
-    name: 'largescreenIndex',
+    name: "largescreenIndex",
     hidden: true,
   },
   {
     path: "/largescreen/vulcanization",
     component: () => import("@/views/largescreen/vulcanization"),
-    name: 'largescreenIndex',
+    name: "largescreenIndex",
     hidden: true,
   },
   {
     path: "/largescreen/monthPlan",
     component: () => import("@/views/largescreen/monthPlan"),
-    name: 'largescreenIndex',
+    name: "largescreenIndex",
     hidden: true,
   },
   {
     path: "/largescreen/semiComponent",
     component: () => import("@/views/largescreen/semiComponent"),
-    name: 'largescreenIndex',
+    name: "largescreenIndex",
     hidden: true,
   },
   {
     path: "/largescreen/sulfur",
     component: () => import("@/views/largescreen/sulfur"),
-    name: 'largescreenIndex',
+    name: "largescreenIndex",
     hidden: true,
   },
   {
     path: "/largescreen/forming",
     component: () => import("@/views/largescreen/forming"),
-    name: 'largescreenIndex',
+    name: "largescreenIndex",
     hidden: true,
   },
   {
@@ -128,43 +128,43 @@ export const constantRoutes = [
   },
 ];
 if (process.env.NODE_ENV == "development") {
-  constantRoutes.push(
-    {
-      path: "/dev-month-plan/monthPlanFinalAdjustQuery",
-      component: Layout,
-      hidden: false,
-      children: [
-        {
-          path: "",
-          name: "MonthProductionPlanDevLegacy",
-          component: () =>
-            import("@/views/newPage/monthlyProductionPlan/index.backup-legacy"),
-          meta: {
-            title: "月计划查询",
-            i18n: "ui.data.column.monthPlanFinalAdjustQuery.modelName",
-          },
-        },
-      ],
-    },
-    {
-      path: "/newPage/rollingCycle",
-      component: Layout,
-      hidden: false,
-      children: [
-        {
-          path: "",
-          /** 开发环境专用：旧版合并页备份，勿与正式路由 name 冲突 */
-          name: "MonthPlanRollingCycleDevLegacy",
-          component: () =>
-            import("@/views/newPage/rollingCycle/index.backup-legacy"),
-          meta: {
-            title: "月计划调整(旧)",
-            i18n: "ui.data.column.monthPlanStructureInnerAdjust.modelName",
-          },
-        },
-      ],
-    }
-  );
+  // constantRoutes.push(
+  //   {
+  //     path: "/dev-month-plan/monthPlanFinalAdjustQuery",
+  //     component: Layout,
+  //     hidden: false,
+  //     children: [
+  //       {
+  //         path: "",
+  //         name: "MonthProductionPlanDevLegacy",
+  //         component: () =>
+  //           import("@/views/newPage/monthlyProductionPlan/index.backup-legacy"),
+  //         meta: {
+  //           title: "月计划查询",
+  //           i18n: "ui.data.column.monthPlanFinalAdjustQuery.modelName",
+  //         },
+  //       },
+  //     ],
+  //   },
+  //   {
+  //     path: "/newPage/rollingCycle",
+  //     component: Layout,
+  //     hidden: false,
+  //     children: [
+  //       {
+  //         path: "",
+  //         /** 开发环境专用：旧版合并页备份，勿与正式路由 name 冲突 */
+  //         name: "MonthPlanRollingCycleDevLegacy",
+  //         component: () =>
+  //           import("@/views/newPage/rollingCycle/index.backup-legacy"),
+  //         meta: {
+  //           title: "月计划调整(旧)",
+  //           i18n: "ui.data.column.monthPlanStructureInnerAdjust.modelName",
+  //         },
+  //       },
+  //     ],
+  //   }
+  // );
 }
 
 constantRoutes.push(
@@ -622,10 +622,12 @@ constantRoutes.push(
     children: [
       {
         path: "mdmMoldingMachineClsB/:id",
-        component: () => import("@/views/masterdata/mdmMoldingMachineClsB/index"),
+        component: () =>
+          import("@/views/masterdata/mdmMoldingMachineClsB/index"),
         name: "MdmMoldingMachineClsB",
         meta: { title: "单机班产额度配置" },
-      }],
+      },
+    ],
   },
   {
     path: "/monthlydata",
@@ -638,7 +640,8 @@ constantRoutes.push(
         component: () => import("@/views/monthlydata/mdmStockUpPlan/create"),
         name: "mdmStockUpPlanCreate",
         meta: { title: "生成备货计划" },
-      }],
+      },
+    ],
   },
   {
     path: "/curingPlan",
@@ -656,21 +659,24 @@ constantRoutes.push(
       },
       {
         path: "curingUnscheduleResult",
-        component: () => import("@/views/curingPlan/curingUnscheduleResult/index"),
+        component: () =>
+          import("@/views/curingPlan/curingUnscheduleResult/index"),
         name: "CuringUnscheduleResult",
         hidden: true,
         meta: { title: "未排结果" },
       },
       {
         path: "machineGantChart",
-        component: () => import("@/views/curingPlan/curingSchedule/machineGantChart"),
+        component: () =>
+          import("@/views/curingPlan/curingSchedule/machineGantChart"),
         name: "MachineGantChart",
         hidden: true,
         meta: { title: "机台甘特图" },
       },
       {
         path: "specDescGantChart",
-        component: () => import("@/views/curingPlan/curingSchedule/specDescGantChart"),
+        component: () =>
+          import("@/views/curingPlan/curingSchedule/specDescGantChart"),
         name: "SpecDescGantChart",
         hidden: true,
         meta: { title: "规格甘特图" },
@@ -709,10 +715,12 @@ constantRoutes.push(
     children: [
       {
         path: "console/console/productionMonthPlanInit/:id",
-        component: () => import("@/views/monthPlanManagement/console/productionMonthPlanInit"),
+        component: () =>
+          import("@/views/monthPlanManagement/console/productionMonthPlanInit"),
         name: "ProductionMonthPlanInit",
         meta: { title: "排结构明细" },
-      }],
+      },
+    ],
   },
   {
     path: "/monthPlanManagement",
@@ -725,7 +733,8 @@ constantRoutes.push(
         component: () => import("@/views/newPage/insertOrderDetail"),
         name: "InsertOrderDetail",
         meta: { title: "明细" },
-      }],
+      },
+    ],
   },
   /** 月计划结构内调整、结构调整 */
   {
@@ -773,10 +782,12 @@ constantRoutes.push(
     children: [
       {
         path: "console/mouldingDayResult/:id",
-        component: () => import("@/views/monthPlanManagement/mouldingDayResult"),
+        component: () =>
+          import("@/views/monthPlanManagement/mouldingDayResult"),
         name: "MouldingDayResult",
         meta: { title: "排程明细" },
-      }],
+      },
+    ],
   },
   {
     path: "/monthPlanManagement",
@@ -787,10 +798,12 @@ constantRoutes.push(
     children: [
       {
         path: "console/monthPlanNoProductionPlan/:id",
-        component: () => import("@/views/monthPlanManagement/monthPlanNoProductionPlan"),
+        component: () =>
+          import("@/views/monthPlanManagement/monthPlanNoProductionPlan"),
         name: "MonthPlanNoProductionPlan",
         meta: { title: "未排产排程明细" },
-      }],
+      },
+    ],
   },
   {
     path: "/monthPlanManagement",
@@ -804,7 +817,8 @@ constantRoutes.push(
         component: () => import("@/views/monthPlanManagement/console/report"),
         name: "versionReport",
         meta: { title: "报表" },
-      }],
+      },
+    ],
   },
   {
     path: "/system/user-auth",
@@ -816,7 +830,11 @@ constantRoutes.push(
         path: "role/:userId(\\d+)",
         component: () => import("@/views/system/user/authRole"),
         name: "AuthRole",
-        meta: { title: "分配角色", activeMenu: "/system/user", i18n: "common.api.user.columnname.assignRole" },
+        meta: {
+          title: "分配角色",
+          activeMenu: "/system/user",
+          i18n: "common.api.user.columnname.assignRole",
+        },
       },
     ],
   },
@@ -830,7 +848,11 @@ constantRoutes.push(
         path: "user/:roleId(\\d+)",
         component: () => import("@/views/system/role/authUser"),
         name: "AuthUser",
-        meta: { title: "分配用户", activeMenu: "/system/role", i18n: "common.api.role.columnname.assignUsers" },
+        meta: {
+          title: "分配用户",
+          activeMenu: "/system/role",
+          i18n: "common.api.role.columnname.assignUsers",
+        },
       },
     ],
   },
@@ -844,7 +866,11 @@ constantRoutes.push(
         path: "index/:dictId(\\d+)",
         component: () => import("@/views/system/dict/data"),
         name: "Data",
-        meta: { title: "字典数据", activeMenu: "/system/dict", i18n: "common.system.title.dictdata" },
+        meta: {
+          title: "字典数据",
+          activeMenu: "/system/dict",
+          i18n: "common.system.title.dictdata",
+        },
       },
     ],
   },
@@ -858,7 +884,11 @@ constantRoutes.push(
         path: "index/:jobId(\\d+)",
         component: () => import("@/views/monitor/job/log"),
         name: "JobLog",
-        meta: { title: "调度日志", activeMenu: "/monitor/job", i18n: "common.job.button.jobLog" },
+        meta: {
+          title: "调度日志",
+          activeMenu: "/monitor/job",
+          i18n: "common.job.button.jobLog",
+        },
       },
     ],
   },
@@ -875,8 +905,8 @@ constantRoutes.push(
         meta: { title: "修改生成配置", activeMenu: "/tool/gen" },
       },
     ],
-  },
-)
+  }
+);
 
 // 动态路由，基于用户权限动态去加载
 export const dynamicRoutes = [

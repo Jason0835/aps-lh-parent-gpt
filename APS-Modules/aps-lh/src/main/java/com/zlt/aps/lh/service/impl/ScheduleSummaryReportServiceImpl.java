@@ -419,7 +419,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 构建模具清洗日期
      *
-     * <p>查询前一天日期范围内的清洗计划，返回清洗日期（如"14日"）</p>
+     * <p>固定返回查询日期（排程日期减一天）的日期格式，如"04日"</p>
+     * <p>无论是否存在清洗计划数据，都固定显示该日期</p>
      *
      * @param scheduleDate 查询日期（排程日期的前一天）
      * @param factoryCode  分厂编码
@@ -441,11 +442,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         log.info("模具清洗计划查询完成, 日期范围: {} ~ {}, 数量: {}",
                 DateUtil.formatDateTime(rangeStart), DateUtil.formatDateTime(rangeEnd), cleanPlans.size());
 
-        if (cleanPlans.isEmpty()) {
-            return "";
-        }
-
-        return DateUtil.format(scheduleDate, "dd日");
+        return DateUtil.format(scheduleDate, "MM月dd日");
     }
 
     /**

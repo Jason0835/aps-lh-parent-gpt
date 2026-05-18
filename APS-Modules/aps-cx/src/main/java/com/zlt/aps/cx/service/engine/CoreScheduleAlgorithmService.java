@@ -178,6 +178,10 @@ public interface CoreScheduleAlgorithmService {
         private List<String> recommendedMachines;
         /** 施工阶段（00 无工艺 01 试制 02 量试 03 正式），来自硫化任务 */
         private String constructionStage;
+        /** 是否补充计划任务（从延误物料补充进来的硫化任务，dataSource=3） */
+        private Boolean isSupplementTask;
+        /** 暂存任务的剩余待排产需求量（第二轮一车一车分配时递减） */
+        private Integer deferredRemainingDemand;
     }
 
     /**

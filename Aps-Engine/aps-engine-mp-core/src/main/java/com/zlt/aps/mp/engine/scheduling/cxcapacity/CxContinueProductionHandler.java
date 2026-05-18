@@ -54,6 +54,9 @@ public class CxContinueProductionHandler {
     public static void productionContinueSku(TbrProductionContext context, ProductionStageEnum productionStage, ProductionPlanGroupInfo groupPlanInfo, Map<String, CxContinueSkuInfoHelper> continueSkuInfoMap) {
         Set<Integer> stopDays = context.getStopDays();
         Integer continueSkuDeadLineDays = groupPlanInfo.getContinueSkuDeadLineDay(context);
+        if (null == continueSkuDeadLineDays) {
+            return;
+        }
         ProductionCapacityParamConfiguration paramConfiguration = context.getBaseDataContainer().getParamConfiguration();
         //续作Sku轮询排产
         String groupName = groupPlanInfo.getGroupName();

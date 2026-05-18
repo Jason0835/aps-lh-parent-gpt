@@ -162,7 +162,10 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
             }
 
             try {
-                // 3. 检查月度生产计划是否已定稿
+                // 3. 真正消费版本号（递增计数器），使用实际生成的版本号
+                String actualVersion = versionGenerator.generateVersion(VERSION_PREFIX);
+
+                // 4. 检查月度生产计划是否已定稿
                 if (!checkMonthPlanFinalized(factoryCode, year, month)) {
                     String message = StringUtils.format(
                             I18nUtil.getMessage("raw.material.require.plan.month.plan.not.finalized"),
@@ -171,16 +174,16 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
                     return AjaxResult.error(message);
                 }
 
-                // 3.1补充版本重复校验
-                if (checkVersionExist(factoryCode, year, month, version)) {
+                // 4.1补充版本重复校验
+                if (checkVersionExist(factoryCode, year, month, actualVersion)) {
                     String message = StringUtils.format(
                             I18nUtil.getMessage("raw.material.require.plan.version.exist"),
-                            year, String.format("%02d", month), version
+                            year, String.format("%02d", month), actualVersion
                     );
                     return AjaxResult.error(message);
                 }
 
-                // 4. 检查订单预测生产计划
+                // 5. 检查订单预测生产计划
                 AjaxResult predictionCheck = checkOrderPrediction(year, month, isSpringFestivalMonth);
                 if (isSuccess(predictionCheck)) {
                     return predictionCheck;
@@ -213,13 +216,13 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
 
                 // 9. 汇总并保存需求计划
                 saveRawMaterialRequirePlan(year, month, currentMonthRequirements,
-                        t1Requirements, t2Requirements, factoryCode,  version);
+                        t1Requirements, t2Requirements, factoryCode,  actualVersion);
 
                 // 10. 生成差异数据
-                generateDifferenceData(year, month, factoryCode, version);
+                generateDifferenceData(year, month, factoryCode, actualVersion);
 
                 // 11. 生成周维度原材料用量记录
-                generateWeekUsageRecords(factoryCode, year, month, version);
+                generateWeekUsageRecords(factoryCode, year, month, actualVersion);
 
                 String message = StringUtils.format(
                         I18nUtil.getMessage("raw.material.require.plan.generate.success"),
@@ -329,14 +332,15 @@ public class RawMaterialRequirePlanServiceImpl extends AbstractDocService<RawMat
     }
 
     /**
-     * 生成原材料需求计划版本
+     * 生成原材料需求计划版本（仅预览，不递增计数器）
+     * 真正递增计数器在 generateRawMaterialRequirePlan 实际生成时触发
      *
      * @param billVO
      */
     @Override
     public AjaxResult generateVersion(RawMaterialRequirePlan billVO) {
         try {
-            String version = versionGenerator.generateVersion(VERSION_PREFIX);
+            String version = versionGenerator.peekVersion(VERSION_PREFIX);
             billVO.setVersion(version);
             return AjaxResult.success(version);
         } catch (Exception e) {

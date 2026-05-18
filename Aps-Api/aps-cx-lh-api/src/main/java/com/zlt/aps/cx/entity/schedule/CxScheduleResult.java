@@ -528,6 +528,10 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @TableField(exist = false)
     private Date class8EndTime;
 
+    @ApiModelProperty(value = "颜色标记：orange-快收尾(余量小于阈值)；yellow-新开规格；blue-试制量试；空-普通")
+    @TableField("COLOR_TAG")
+    private String colorTag;
+
     @ApiModelProperty(value = "子表明细列表")
     @TableField(exist = false)
     private List<CxScheduleDetail> details;

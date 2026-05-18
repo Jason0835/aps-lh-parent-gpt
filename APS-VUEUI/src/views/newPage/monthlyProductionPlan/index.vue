@@ -89,6 +89,32 @@
               placeholder="当前调整结构"
             />
           </div>
+          <div class="current-machine-wrap">
+            <span class="current-machine-label">{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.adjustStartDay")
+            }}</span>
+            <el-input
+              class="current-machine-input"
+              :value="currentAdjustBeginDay"
+              disabled
+              :placeholder="
+                $t('ui.data.column.monthPlanFinalAdjustQuery.adjustStartDay')
+              "
+            />
+          </div>
+          <div class="current-machine-wrap">
+            <span class="current-machine-label">{{
+              $t("ui.data.column.monthPlanFinalAdjustQuery.adjustEndDay")
+            }}</span>
+            <el-input
+              class="current-machine-input"
+              :value="currentAdjustEndDay"
+              disabled
+              :placeholder="
+                $t('ui.data.column.monthPlanFinalAdjustQuery.adjustEndDay')
+              "
+            />
+          </div>
         </div>
       </template>
       <template slot="footer">
@@ -124,6 +150,7 @@
     <structure-adjust-dialog
       ref="structureAdjustDialogRef"
       @structure-adjust-saved="onStructureAdjustSaved"
+      @plan-downtime-applied="onPlanDowntimeApplied"
     />
     <adjust-version-dialog
       ref="adjustVersionDialogRef"
@@ -255,9 +282,9 @@ import {
   recalculateWeekRollAdjust,
   resultVersion,
   saveAdjustResult,
-  setAdjustsCxMachineFromRedis,
   statisticsResult
 } from "@/api/monthplan/adjustStructure";
+import { getByParamCode } from "@/api/monthplan/factoryParam";
 import structureAdjustDialog from "./components/structureAdjustDialog.vue";
 import adjustVersionDialog from "./components/adjustVersionDialog.vue";
 
@@ -322,6 +349,8 @@ export default {
       },
       /** 1–31 号列编辑前原始值，用于失焦时与 rollingCycle 一致判断是否调用 save */
       dayEditOriginalValue: null,
+      /** 锁定天数：从接口获取，控制 1-31 号哪些日期不可编辑 */
+      lockedDays: { single: 0, multi: 0 },
       /** 结构调整：表格多选勾选行（统计行不可选）；超过 1 条时禁用「结构调整」按钮 */
       structureAdjustSelection: [],
     };
@@ -499,7 +528,7 @@ export default {
           width: 80,
         },
         {
-          prop: "dayVulcanizationQty",
+          prop: "dayLhQty",
           label: this.$t("ui.data.monthlyProductionPlan.dayVulcanizationQty"),
           width: 100,
         },
@@ -649,7 +678,7 @@ export default {
               row[prop] === null || row[prop] === undefined
                 ? ""
                 : String(row[prop]);
-            if (!row.id) {
+            if (!row.id || this.isDayLocked(i, row)) {
               const isOver = row._overDays && row._overDays[prop];
               return <span style={isOver ? { color: "red" } : {}}>{text}</span>;
             }
@@ -766,6 +795,7 @@ export default {
     this.query = { ...defaults };
     await this.loadVersionOptions();
     await this.fetchCurrentAdjustMachineFromRedis();
+    this.fetchLockedDays();
     this.getList();
   },
   methods: {
@@ -779,6 +809,7 @@ export default {
       }
       await this.loadVersionOptions();
       this.fetchCurrentAdjustMachineFromRedis();
+      this.fetchLockedDays();
     },
     handleProductionVersionChange() {
       this.fetchCurrentAdjustMachineFromRedis();
@@ -893,6 +924,49 @@ export default {
         this.currentAdjustMonthPlanVersion = "";
       }
     },
+    async fetchLockedDays() {
+      const factoryCode = this.query.factoryCode || this.search.factoryCode;
+      if (!factoryCode) {
+        this.lockedDays = { single: 0, multi: 0 };
+        return;
+      }
+      const baseParams = {
+        factoryCode,
+        productTypeCode: "TBR",
+      };
+      try {
+        const [resSingle, resMulti] = await Promise.all([
+          getByParamCode({ ...baseParams, paramCode: "SYS0206001" }),
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve(
+                  getByParamCode({ ...baseParams, paramCode: "SYS0206002" })
+                ),
+              300
+            )
+          ),
+        ]);
+        this.lockedDays = {
+          single: Number(resSingle?.paramValue) || 0,
+          multi: Number(resMulti?.paramValue) || 0,
+        };
+      } catch (e) {
+        console.error("获取锁定天数失败:", e);
+        this.lockedDays = { single: 0, multi: 0 };
+      }
+    },
+    isDayLocked(day, row) {
+      const cxMachineCode = (row && row.cxMachineCode) ? String(row.cxMachineCode).trim() : "";
+      const isMulti = cxMachineCode.includes(",");
+      const lockDays = isMulti ? this.lockedDays.multi : this.lockedDays.single;
+      if (!lockDays || lockDays <= 0) {
+        return false;
+      }
+      const today = new Date().getDate();
+      const lockEndDay = today + lockDays - 1;
+      return day <= lockEndDay;
+    },
     /**
      * 修改优先上机（原锁定上机），与 rollingCycle/index.backup-legacy.vue 一致调用 mpAdjustResult/save
      */
@@ -900,9 +974,12 @@ export default {
       if (!row || !row.id) {
         return;
       }
+      const versionFromSearch = this.resolveSearchColumnsVersion();
       saveAdjustResult({
-        id: row.id,
-        isLockSchedule: row.isLockSchedule,
+        ...row,
+        version:
+          versionFromSearch ||
+          (row.version != null ? String(row.version).trim() : ""),
       })
         .then((res) => {
           this.$modal.msgSuccess(res.msg);
@@ -1187,6 +1264,7 @@ export default {
       this.$set(this.page, "current", 1);
       await this.loadVersionOptions();
       await this.fetchCurrentAdjustMachineFromRedis();
+      this.fetchLockedDays();
       this.getList();
     },
     handleSortChange({ column, prop, order }) {
@@ -1236,12 +1314,6 @@ export default {
         params.year = Number(arr[0]);
         params.month = Number(arr[1]);
         delete params.yearMonth;
-      }
-      const scheduled = (this.currentAdjustMachine || "").trim();
-      if (scheduled) {
-        params.cxMachineCode = scheduled;
-      } else {
-        delete params.cxMachineCode;
       }
       return params;
     },
@@ -1498,6 +1570,9 @@ export default {
       this.fetchCurrentAdjustMachineFromRedis();
       this.getList();
     },
+    onPlanDowntimeApplied() {
+      this.fetchCurrentAdjustMachineFromRedis();
+    },
     /**
      * 与周程滚动「结构调整」listAdjusts 入参对齐：productionVersion + version + adjVersion（列表首行 version 一般为调整版本 ADJ…）
      */
@@ -1554,6 +1629,12 @@ export default {
         );
         if (firstMachine) {
           payload.prefillCxMachineCode = firstMachine;
+        }
+      }
+      if (!payload.prefillCxMachineCode) {
+        const redisMachine = (this.currentAdjustMachine || "").trim();
+        if (redisMachine) {
+          payload.prefillCxMachineCode = this.extractFirstCxMachineCode(redisMachine);
         }
       }
       this.$refs.structureAdjustDialogRef.show(payload);
@@ -1814,7 +1895,7 @@ export default {
         adjustEndDay,
         structureName: this.currentAdjustStructure || "",
         scheduledMachines: (this.currentAdjustMachine || "").trim(),
-        adjustType: "01",
+        adjustType: "02",
         startDay: adjustStartDay,
         endDay: adjustEndDay,
       };
@@ -1846,20 +1927,18 @@ export default {
       if (!row) {
         return null;
       }
-      params.adjustType = "01";
+      params.adjustType = "02";
       params.version = row.version || this.query.version;
       params.productionVersion =
         row.productionVersion || this.query.version;
       params.startDay = row.beginDay;
       params.endDay = row.endDay;
-      params.adjustStartDay =
-        row.adjustStartDay != null && row.adjustStartDay !== ""
-          ? row.adjustStartDay
-          : row.beginDay;
-      params.adjustEndDay =
-        row.adjustEndDay != null && row.adjustEndDay !== ""
-          ? row.adjustEndDay
-          : row.endDay;
+      params.adjustStartDay = this.parseAdjustDayToInt(
+        this.currentAdjustBeginDay
+      );
+      params.adjustEndDay = this.parseAdjustDayToInt(
+        this.currentAdjustEndDay
+      );
       params.structureName =
         row.structureName || this.query.structureName;
       const sm = (this.currentAdjustMachine || "").trim();
@@ -1905,18 +1984,30 @@ export default {
           (res && res.msg) ||
             this.$t("common.msg.ajax.operation.success")
         );
-        await setAdjustsCxMachineFromRedis({
-          cxMachineCode: "",
-          structureName: "",
-          beginDay: null,
-          endDay: null,
-          version: "",
-        });
+        /** 成功后不主动清空 Redis 中的当前调整机台，便于继续结构调整 */
         if (this.$refs.structureAdjustDialogRef) {
           this.$refs.structureAdjustDialogRef.dialogVisible = false;
         }
         await this.getList();
         await this.fetchCurrentAdjustMachineFromRedis();
+        const machineTrim = (this.currentAdjustMachine || "").trim();
+        if (
+          machineTrim &&
+          this.$refs.structureAdjustDialogRef
+        ) {
+          const ym = this.query.yearMonth || this.search.yearMonth;
+          const fc = this.query.factoryCode || this.search.factoryCode || "116";
+          if (ym) {
+            this.$refs.structureAdjustDialogRef.show({
+              factoryCode: fc,
+              yearMonth: ym,
+              ...this.buildStructureDialogListVersionParams(),
+              prefillCxMachineCode: this.extractFirstCxMachineCode(
+                this.currentAdjustMachine
+              ),
+            });
+          }
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -1954,8 +2045,12 @@ export default {
           productionVersion: "",
           startDay: "",
           endDay: "",
-          adjustStartDay: this.currentAdjustBeginDay,
-          adjustEndDay: this.currentAdjustEndDay,
+          adjustStartDay: this.parseAdjustDayToInt(
+            this.currentAdjustBeginDay
+          ),
+          adjustEndDay: this.parseAdjustDayToInt(
+            this.currentAdjustEndDay
+          ),
           structureName: structureNameForRecalculate,
           scheduledMachines: machineTrim,
         };

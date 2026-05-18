@@ -15,6 +15,10 @@ import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.cx.mapper.*;
+import com.zlt.aps.lh.api.domain.entity.LhParams;
+import com.zlt.aps.cx.mapper.LhParamsMapper;
+import com.zlt.aps.maindata.mapper.FactoryParamMapper;
+import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.cx.service.ConstraintCheckService;
 import com.zlt.aps.cx.service.CxScheduleDetailService;
 import com.zlt.aps.cx.service.HolidayScheduleService;
@@ -77,32 +81,38 @@ public class ScheduleServiceImpl implements ScheduleService {
     private static final String MACHINE_TYPE_MOLDING = "成型";
 
     /** 参数编码：日硫化量计算模式 */
-    private static final String PARAM_CODE_DAY_VULCANIZATION_MODE = "DAY_VULCANIZATION_MODE";
+    private static final String PARAM_CODE_DAY_VULCANIZATION_MODE = "SYS04010001";
 
     /** 参数编码：损耗率 */
-    private static final String PARAM_CODE_LOSS_RATE = "LOSS_RATE";
+    private static final String PARAM_CODE_LOSS_RATE = "SYS04020001";
 
     /** 参数编码：机台种类上限 */
-    private static final String PARAM_CODE_MAX_TYPES_PER_MACHINE = "MAX_TYPES_PER_MACHINE";
+    private static final String PARAM_CODE_MAX_TYPES_PER_MACHINE = "SYS04020002";
 
     /** 参数编码：机台默认最大硫化机数 */
-    private static final String PARAM_CODE_MAX_LH_MACHINE_QTY = "MAX_LH_MACHINE_QTY";
+    private static final String PARAM_CODE_MAX_LH_MACHINE_QTY = "SYS04020003";
 
     /** 参数编码：硫化机停锅时间（停产日硫化停止时刻，HH:mm格式） */
-    private static final String PARAM_CODE_VULCANIZING_STOP_TIME = "VULCANIZING_STOP_TIME";
+    private static final String PARAM_CODE_VULCANIZING_STOP_TIME = "SYS04030001";
 
     /** 参数编码：硫化开模时间（开产日硫化开始时刻，HH:mm格式） */
-    private static final String PARAM_CODE_VULCANIZING_OPEN_TIME = "VULCANIZING_OPEN_TIME";
+    private static final String PARAM_CODE_VULCANIZING_OPEN_TIME = "SYS04030002";
+
+    /** 硫化参数编码：停锅时间（T_LH_PARAMS） */
+    private static final String LH_PARAM_CODE_STOP_TIME = "SYS0310007";
+
+    /** 硫化参数编码：开模时间（T_LH_PARAMS） */
+    private static final String LH_PARAM_CODE_OPEN_TIME = "SYS0310006";
 
     /** 参数编码：预留消化时间（小时，成型停机早于硫化停锅的时长） */
-    private static final String PARAM_CODE_RESERVED_DIGEST_HOURS = "RESERVED_DIGEST_HOURS";
+    private static final String PARAM_CODE_RESERVED_DIGEST_HOURS = "SYS04030003";
 
-    /** 参数编码：自定义最大胎胚种类数（旧参数，保留兼容） */
-    private static final String PARAM_CODE_H15_MAX_EMBRYO_TYPES = "H15_MAX_EMBRYO_TYPES";
-    /** 参数编码：自定义最大胎胚种类数（新参数，未配置则回退到 H15_MAX_EMBRYO_TYPES） */
-    private static final String PARAM_CODE_MAX_EMBRYO_TYPES_VALUE = "MAX_EMBRYO_TYPES_VALUE";
-    /** 参数编码：自定义最大胎胚种类数适用的机台前缀（默认 "H15"） */
-    private static final String PARAM_CODE_MAX_EMBRYO_TYPES_MACHINE_PREFIX = "MAX_EMBRYO_TYPES_MACHINE_PREFIX";
+    /** 参数编码：机台最大胎胚种类数（格式: H15,3;H14,5，每段=前缀,数量） */
+    private static final String PARAM_CODE_MACHINE_MAX_EMBRYO_TYPES = "SYS04040001";
+
+    /** 默认机台最大胎胚种类数（H15前缀） */
+    private static final int DEFAULT_MAX_EMBRYO_TYPES = 3;
+    private static final String DEFAULT_MAX_EMBRYO_PREFIX = "H15";
 
     /** 默认损耗率 */
     private static final BigDecimal DEFAULT_LOSS_RATE = new BigDecimal("0.02");
@@ -144,6 +154,8 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final CxScheduleResultMapper scheduleResultMapper;
     private final CxScheduleDetailService scheduleDetailService;
     private final CxParamConfigMapper paramConfigMapper;
+    private final LhParamsMapper lhParamsMapper;
+    private final FactoryParamMapper factoryParamMapper;
     private final CxStructureTreadConfigMapper structureShiftCapacityMapper;
     private final CxKeyProductMapper keyProductMapper;
     private final LhScheduleResultMapper lhScheduleResultMapper;
@@ -293,7 +305,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     private void loadPrecisionPlans(ScheduleContextVo context, LocalDate scheduleDate) {
         int precisionAdvanceDays = 3;
         CxParamConfig advanceDaysConfig = context.getParamConfigMap() != null
-                ? context.getParamConfigMap().get("PRECISION_ADVANCE_DAYS") : null;
+                ? context.getParamConfigMap().get("SYS04030004") : null;
         if (advanceDaysConfig != null && advanceDaysConfig.getParamValue() != null) {
             try {
                 precisionAdvanceDays = Integer.parseInt(advanceDaysConfig.getParamValue());
@@ -522,6 +534,13 @@ public class ScheduleServiceImpl implements ScheduleService {
                 loadMaterialEndings(context, scheduleDate);
             } catch (Exception e) {
                 log.warn("加载物料收尾信息失败，继续执行：{}", e.getMessage());
+            }
+
+            // 16.5 补充延误物料到硫化任务
+            try {
+                supplementDelayMaterialTasks(context, scheduleDate);
+            } catch (Exception e) {
+                log.warn("补充延误物料任务失败，继续执行：{}", e.getMessage());
             }
 
             // 17. 过滤已收尾物料（成型余量<=0的物料不参与排程）
@@ -838,12 +857,19 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
         }
 
-        // 加载硫化机停锅时间（支持 yyyy-MM-dd HH:mm 完整日期时间格式，也兼容 HH:mm 格式）
-        CxParamConfig vulcanizingStopTimeConfig = paramConfigMap.get(PARAM_CODE_VULCANIZING_STOP_TIME);
-        if (vulcanizingStopTimeConfig != null && vulcanizingStopTimeConfig.getParamValue() != null) {
-            String stopTimeValue = vulcanizingStopTimeConfig.getParamValue().trim();
+        // 加载硫化机停锅时间（优先从 T_LH_PARAMS 取，兜底从 T_CX_PARAM_CONFIG 取）
+        String stopTimeValue = loadLhParamValue(lhParamsMapper, context.getFactoryCode(), LH_PARAM_CODE_STOP_TIME);
+        if (stopTimeValue == null) {
+            CxParamConfig vulcanizingStopTimeConfig = paramConfigMap.get(PARAM_CODE_VULCANIZING_STOP_TIME);
+            if (vulcanizingStopTimeConfig != null && vulcanizingStopTimeConfig.getParamValue() != null) {
+                stopTimeValue = vulcanizingStopTimeConfig.getParamValue().trim();
+                log.info("硫化停锅时间（来自成型参数配置）: {}", stopTimeValue);
+            }
+        } else {
+            log.info("硫化停锅时间（来自硫化参数配置 SYS0310007）: {}", stopTimeValue);
+        }
+        if (stopTimeValue != null) {
             context.setVulcanizingStopTimeStr(stopTimeValue);
-            // 尝试解析为完整日期时间格式 yyyy-MM-dd HH:mm
             try {
                 if (stopTimeValue.contains("-") && stopTimeValue.contains(":")) {
                     LocalDateTime stopDateTime = parseFlexibleDateTime(stopTimeValue);
@@ -861,12 +887,19 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
         }
 
-        // 加载硫化开模时间（支持 yyyy-MM-dd HH:mm 完整日期时间格式，也兼容 HH:mm 格式）
-        CxParamConfig vulcanizingOpenTimeConfig = paramConfigMap.get(PARAM_CODE_VULCANIZING_OPEN_TIME);
-        if (vulcanizingOpenTimeConfig != null && vulcanizingOpenTimeConfig.getParamValue() != null) {
-            String openTimeValue = vulcanizingOpenTimeConfig.getParamValue().trim();
+        // 加载硫化开模时间（优先从 T_LH_PARAMS 取，兜底从 T_CX_PARAM_CONFIG 取）
+        String openTimeValue = loadLhParamValue(lhParamsMapper, context.getFactoryCode(), LH_PARAM_CODE_OPEN_TIME);
+        if (openTimeValue == null) {
+            CxParamConfig vulcanizingOpenTimeConfig = paramConfigMap.get(PARAM_CODE_VULCANIZING_OPEN_TIME);
+            if (vulcanizingOpenTimeConfig != null && vulcanizingOpenTimeConfig.getParamValue() != null) {
+                openTimeValue = vulcanizingOpenTimeConfig.getParamValue().trim();
+                log.info("硫化开模时间（来自成型参数配置）: {}", openTimeValue);
+            }
+        } else {
+            log.info("硫化开模时间（来自硫化参数配置 SYS0310006）: {}", openTimeValue);
+        }
+        if (openTimeValue != null) {
             context.setVulcanizingOpenTimeStr(openTimeValue);
-            // 尝试解析为完整日期时间格式 yyyy-MM-dd HH:mm
             try {
                 if (openTimeValue.contains("-") && openTimeValue.contains(":")) {
                     LocalDateTime openDateTime = parseFlexibleDateTime(openTimeValue);
@@ -895,32 +928,13 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
         }
 
-        // 加载自定义最大胎胚种类数：优先从新参数 MAX_EMBRYO_TYPES_VALUE 读取，未配置则回退到旧参数 H15_MAX_EMBRYO_TYPES
-        CxParamConfig maxEmbryoTypesConfig = paramConfigMap.get(PARAM_CODE_MAX_EMBRYO_TYPES_VALUE);
-        if (maxEmbryoTypesConfig == null) {
-            maxEmbryoTypesConfig = paramConfigMap.get(PARAM_CODE_H15_MAX_EMBRYO_TYPES);
-        }
-        if (maxEmbryoTypesConfig != null && maxEmbryoTypesConfig.getParamValue() != null) {
-            try {
-                context.setMaxEmbryoTypesValue(Integer.parseInt(maxEmbryoTypesConfig.getParamValue()));
-                log.info("自定义最大胎胚种类数：{}", maxEmbryoTypesConfig.getParamValue());
-            } catch (NumberFormatException e) {
-                log.warn("解析最大胎胚种类数配置失败: {}", maxEmbryoTypesConfig.getParamValue());
-            }
-        }
-
-        // 加载自定义最大胎胚种类数适用的机台前缀（默认 "H15"）
-        CxParamConfig machinePrefixConfig = paramConfigMap.get(PARAM_CODE_MAX_EMBRYO_TYPES_MACHINE_PREFIX);
-        if (machinePrefixConfig != null && machinePrefixConfig.getParamValue() != null) {
-            context.setMaxEmbryoTypesMachinePrefix(machinePrefixConfig.getParamValue().trim());
-            log.info("自定义最大胎胚种类数机台前缀：{}", machinePrefixConfig.getParamValue().trim());
-        } else {
-            context.setMaxEmbryoTypesMachinePrefix("H15");
-            log.info("未配置自定义最大胎胚种类数机台前缀，使用默认值：H15");
-        }
+        // 加载机台最大胎胚种类数（格式: H15,3;H14,5）
+        Map<String, Integer> machineMaxTypesMap = loadMachineMaxEmbryoTypes(context, paramConfigMap);
+        context.setMachineMaxEmbryoTypes(machineMaxTypesMap);
+        log.info("机台最大胎胚种类数: {}", machineMaxTypesMap);
 
         // 加载库存可供硫化时长预警阈值（默认18小时）
-        CxParamConfig stockHoursWarningConfig = paramConfigMap.get("STOCK_HOURS_WARNING_THRESHOLD");
+        CxParamConfig stockHoursWarningConfig = paramConfigMap.get("SYS04070001");
         if (stockHoursWarningConfig != null && stockHoursWarningConfig.getParamValue() != null) {
             try {
                 context.setStockHoursWarningThreshold(Integer.parseInt(stockHoursWarningConfig.getParamValue()));
@@ -928,6 +942,32 @@ public class ScheduleServiceImpl implements ScheduleService {
             } catch (NumberFormatException e) {
                 log.warn("解析库存可供硫化时长预警阈值配置失败: {}", stockHoursWarningConfig.getParamValue());
             }
+        }
+
+        // 加载单日试制/量试SKU上限（优先从T_MP_FACTORY_PARAM取）
+        String trialSkuLimit = loadFactoryParamValue(factoryParamMapper, context.getFactoryCode(), "TBR", "SYS0206003");
+        if (trialSkuLimit != null) {
+            try {
+                context.setMaxTrialSkuPerDay(Integer.parseInt(trialSkuLimit));
+                log.info("单日试制/量试SKU上限（来自T_MP_FACTORY_PARAM SYS0206003）: {}", trialSkuLimit);
+            } catch (NumberFormatException e) {
+                log.warn("解析试制SKU上限失败: {}", trialSkuLimit);
+            }
+        }
+        if (context.getMaxTrialSkuPerDay() == null) {
+            context.setMaxTrialSkuPerDay(2);
+            log.info("单日试制/量试SKU上限（使用默认值）: 2");
+        }
+
+        // 加载试制/量试周日是否允许排产（优先从T_MP_FACTORY_PARAM取）
+        String trialSundayAllowed = loadFactoryParamValue(factoryParamMapper, context.getFactoryCode(), "TBR", "SYS0206005");
+        if (trialSundayAllowed != null) {
+            context.setTrialAllowedOnSunday("Y".equalsIgnoreCase(trialSundayAllowed));
+            log.info("试制/量试周日是否允许（来自T_MP_FACTORY_PARAM SYS0206005）: {}", trialSundayAllowed);
+        }
+        if (context.getTrialAllowedOnSunday() == null) {
+            context.setTrialAllowedOnSunday(false);
+            log.info("试制/量试周日是否允许（使用默认值）: N");
         }
     }
 
@@ -1271,6 +1311,13 @@ public class ScheduleServiceImpl implements ScheduleService {
      * 获取日硫化量计算模式
      */
     private DayVulcanizationModeEnum getDayVulcanizationMode(ScheduleContextVo context) {
+        String mpValue = loadFactoryParamValue(factoryParamMapper, context.getFactoryCode(), "TBR", "SYS0202002");
+        if (mpValue != null) {
+            String converted = convertDayVulcanizationMode(mpValue);
+            log.info("日硫化量计算模式（来自T_MP_FACTORY_PARAM SYS0202002）: {} -> {}", mpValue, converted);
+            return DayVulcanizationModeEnum.getByCode(converted);
+        }
+
         Map<String, CxParamConfig> paramConfigMap = context.getParamConfigMap();
         if (paramConfigMap == null) {
             return DayVulcanizationModeEnum.STANDARD_CAPACITY;
@@ -1278,6 +1325,7 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         CxParamConfig modeConfig = paramConfigMap.get(PARAM_CODE_DAY_VULCANIZATION_MODE);
         if (modeConfig != null && modeConfig.getParamValue() != null) {
+            log.info("日硫化量计算模式（来自T_CX_PARAM_CONFIG）: {}", modeConfig.getParamValue());
             return DayVulcanizationModeEnum.getByCode(modeConfig.getParamValue());
         }
 
@@ -1866,6 +1914,112 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     /**
+     * 补充延误物料到硫化任务列表
+     *
+     * <p>从物料收尾信息中找出 delayQuantity > 0 且不在当前 lhScheduleResults 中的物料，
+     * 往前查找该物料最近一条硫化排程记录，加入今日硫化任务，使延误物料参与成型排程。
+     *
+     * <p>流程：
+     * <ol>
+     *   <li>获取 materialEndings 中 delayQuantity > 0 的物料</li>
+     *   <li>排除已在 lhScheduleResults 中存在的物料</li>
+     *   <li>对每个缺失物料，查询历史硫化排程中最近一条记录</li>
+     *   <li>将历史记录调整日期后加入 lhScheduleResults</li>
+     * </ol>
+     *
+     * @param context      排程上下文
+     * @param scheduleDate 排程日期
+     */
+    private void supplementDelayMaterialTasks(ScheduleContextVo context, LocalDate scheduleDate) {
+        List<CxMaterialEnding> materialEndings = context.getMaterialEndings();
+        if (materialEndings == null || materialEndings.isEmpty()) {
+            log.debug("物料收尾信息为空，无需补充延误物料");
+            return;
+        }
+
+        List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
+        if (lhScheduleResults == null) {
+            lhScheduleResults = new ArrayList<>();
+            context.setLhScheduleResults(lhScheduleResults);
+        }
+
+        Set<String> existingMaterialCodes = lhScheduleResults.stream()
+                .filter(r -> r.getMaterialCode() != null)
+                .map(LhScheduleResult::getMaterialCode)
+                .collect(Collectors.toSet());
+
+        List<CxMaterialEnding> delayEndings = materialEndings.stream()
+                .filter(e -> e.getDelayQuantity() != null && e.getDelayQuantity() > 0)
+                .filter(e -> e.getMaterialCode() != null)
+                .filter(e -> !existingMaterialCodes.contains(e.getMaterialCode()))
+                .collect(Collectors.toList());
+
+        if (delayEndings.isEmpty()) {
+            log.debug("没有需要补充的延误物料");
+            return;
+        }
+
+        log.info("发现 {} 个延误物料不在今日硫化任务中，尝试补充", delayEndings.size());
+
+        int supplemented = 0;
+        int notFound = 0;
+        for (CxMaterialEnding ending : delayEndings) {
+            String materialCode = ending.getMaterialCode();
+            LhScheduleResult historicalRecord = lhScheduleResultMapper.selectLatestBeforeDate(materialCode, scheduleDate);
+
+            if (historicalRecord == null) {
+                log.warn("延误物料 {} 在历史硫化排程中未找到记录，无法补充", materialCode);
+                notFound++;
+                continue;
+            }
+
+            LhScheduleResult newRecord = new LhScheduleResult();
+            newRecord.setFactoryCode(historicalRecord.getFactoryCode());
+            newRecord.setMaterialCode(materialCode);
+            newRecord.setEmbryoCode(historicalRecord.getEmbryoCode());
+            newRecord.setStructureName(historicalRecord.getStructureName());
+            newRecord.setMaterialDesc(historicalRecord.getMaterialDesc());
+            newRecord.setMainMaterialDesc(historicalRecord.getMainMaterialDesc());
+            newRecord.setSpecCode(historicalRecord.getSpecCode());
+            newRecord.setSpecDesc(historicalRecord.getSpecDesc());
+            newRecord.setLhTime(historicalRecord.getLhTime());
+            newRecord.setMouldQty(historicalRecord.getMouldQty());
+            newRecord.setSingleMouldShiftQty(historicalRecord.getSingleMouldShiftQty());
+            newRecord.setMouldInfo(historicalRecord.getMouldInfo());
+            newRecord.setMouldMethod(historicalRecord.getMouldMethod());
+            newRecord.setConstructionStage(historicalRecord.getConstructionStage());
+            newRecord.setEmbryoNo(historicalRecord.getEmbryoNo());
+            newRecord.setTextNo(historicalRecord.getTextNo());
+            newRecord.setLhNo(historicalRecord.getLhNo());
+            newRecord.setProductionVersion(historicalRecord.getProductionVersion());
+            newRecord.setMouldCode(historicalRecord.getMouldCode());
+            newRecord.setIsTrial(historicalRecord.getIsTrial());
+
+            newRecord.setScheduleDate(java.sql.Date.valueOf(scheduleDate));
+            newRecord.setProductionStatus("0");
+            newRecord.setIsDelivery("0");
+            newRecord.setIsRelease("0");
+            newRecord.setIsEnd("0");
+            newRecord.setIsSplit("0");
+            newRecord.setIsFirst("0");
+            newRecord.setDataSource("3");
+
+            newRecord.setDailyPlanQty(ending.getDistributedQuantity());
+            newRecord.setTotalDailyPlanQty(ending.getDistributedQuantity());
+            newRecord.setMouldSurplusQty(ending.getFormingRemainder());
+
+            lhScheduleResults.add(newRecord);
+            supplemented++;
+            log.info("补充延误物料: 物料={}, 胎胚={}, 历史排程日期={}, 补充排产量={}, 来源延误量={}",
+                    materialCode, historicalRecord.getEmbryoCode(),
+                    historicalRecord.getScheduleDate(),
+                    ending.getDistributedQuantity(), ending.getDelayQuantity());
+        }
+
+        log.info("延误物料补充完成：成功补充 {} 个，未找到历史记录 {} 个", supplemented, notFound);
+    }
+
+    /**
      * 过滤已收尾物料
      *
      * <p>成型余量 <= 0 的物料表示已经收尾完成，不参与排程。
@@ -2066,6 +2220,114 @@ public class ScheduleServiceImpl implements ScheduleService {
      * @param dateTimeStr 日期时间字符串，如 "2026-05-19 5:30" 或 "2026-05-19 05:30"
      * @return 解析后的 LocalDateTime，无法解析时返回 null
      */
+    private String loadLhParamValue(LhParamsMapper mapper, String factoryCode, String paramCode) {
+        try {
+            LhParams param = mapper.selectOne(
+                    new LambdaQueryWrapper<LhParams>()
+                            .eq(LhParams::getFactoryCode, factoryCode)
+                            .eq(LhParams::getParamCode, paramCode)
+                            .eq(LhParams::getIsDelete, "0")
+                            .last("LIMIT 1"));
+            if (param != null && param.getParamValue() != null && !param.getParamValue().trim().isEmpty()) {
+                return param.getParamValue().trim();
+            }
+        } catch (Exception e) {
+            log.warn("从T_LH_PARAMS加载参数失败: factoryCode={}, paramCode={}, error={}", factoryCode, paramCode, e.getMessage());
+        }
+        return null;
+    }
+
+    private Map<String, Integer> loadMachineMaxEmbryoTypes(ScheduleContextVo context, Map<String, CxParamConfig> paramConfigMap) {
+        CxParamConfig newConfig = paramConfigMap.get(PARAM_CODE_MACHINE_MAX_EMBRYO_TYPES);
+        if (newConfig != null && newConfig.getParamValue() != null && newConfig.getParamValue().contains(",")) {
+            Map<String, Integer> result = parseMachineMaxTypes(newConfig.getParamValue());
+            if (!result.isEmpty()) {
+                log.info("机台最大胎胚种类数（新格式 SYS04040001）: {}", result);
+                return result;
+            }
+        }
+
+        CxParamConfig valueConfig = paramConfigMap.get("SYS04040002");
+        CxParamConfig prefixConfig = paramConfigMap.get("SYS04040003");
+        if (valueConfig != null && valueConfig.getParamValue() != null) {
+            try {
+                int value = Integer.parseInt(valueConfig.getParamValue());
+                String prefix = prefixConfig != null && prefixConfig.getParamValue() != null
+                        ? prefixConfig.getParamValue().trim() : DEFAULT_MAX_EMBRYO_PREFIX;
+                Map<String, Integer> result = new LinkedHashMap<>();
+                result.put(prefix, value);
+                log.info("机台最大胎胚种类数（旧格式兼容 SYS04040002+40003）: {}={}", prefix, value);
+                return result;
+            } catch (NumberFormatException e) {
+                log.warn("解析旧参数 SYS04040002 失败: {}", valueConfig.getParamValue());
+            }
+        }
+
+        if (newConfig != null && newConfig.getParamValue() != null) {
+            try {
+                int value = Integer.parseInt(newConfig.getParamValue());
+                Map<String, Integer> result = new LinkedHashMap<>();
+                result.put(DEFAULT_MAX_EMBRYO_PREFIX, value);
+                log.info("机台最大胎胚种类数（旧单值格式 SYS04040001）: {}={}", DEFAULT_MAX_EMBRYO_PREFIX, value);
+                return result;
+            } catch (NumberFormatException ignored) {}
+        }
+
+        Map<String, Integer> result = new LinkedHashMap<>();
+        result.put(DEFAULT_MAX_EMBRYO_PREFIX, DEFAULT_MAX_EMBRYO_TYPES);
+        log.info("机台最大胎胚种类数（默认）: {}={}", DEFAULT_MAX_EMBRYO_PREFIX, DEFAULT_MAX_EMBRYO_TYPES);
+        return result;
+    }
+
+    private Map<String, Integer> parseMachineMaxTypes(String value) {
+        Map<String, Integer> result = new LinkedHashMap<>();
+        if (value == null || value.trim().isEmpty()) return result;
+        for (String seg : value.trim().split(";")) {
+            String[] parts = seg.trim().split(",");
+            if (parts.length == 2) {
+                try {
+                    String prefix = parts[0].trim();
+                    int maxTypes = Integer.parseInt(parts[1].trim());
+                    if (!prefix.isEmpty() && maxTypes > 0) {
+                        result.put(prefix, maxTypes);
+                    }
+                } catch (NumberFormatException e) {
+                    log.warn("解析机台最大胎胚种类数分段失败: {}", seg);
+                }
+            }
+        }
+        return result;
+    }
+
+    private String loadFactoryParamValue(FactoryParamMapper mapper, String factoryCode, String productTypeCode, String paramCode) {
+        try {
+            LambdaQueryWrapper<FactoryParam> wrapper = new LambdaQueryWrapper<FactoryParam>()
+                    .eq(FactoryParam::getFactoryCode, factoryCode)
+                    .eq(FactoryParam::getParamCode, paramCode)
+                    .eq(FactoryParam::getIsDelete, "0");
+            if (productTypeCode != null) {
+                wrapper.eq(FactoryParam::getProductTypeCode, productTypeCode);
+            }
+            FactoryParam param = mapper.selectOne(wrapper);
+            if (param != null && param.getParamValue() != null && !param.getParamValue().trim().isEmpty()) {
+                return param.getParamValue().trim();
+            }
+        } catch (Exception e) {
+            log.warn("从T_MP_FACTORY_PARAM加载参数失败: factoryCode={}, paramCode={}, error={}", factoryCode, paramCode, e.getMessage());
+        }
+        return null;
+    }
+
+    private String convertDayVulcanizationMode(String mpValue) {
+        if (mpValue == null) return null;
+        switch (mpValue.toUpperCase().trim()) {
+            case "M": return "1";
+            case "S": return "2";
+            case "A": return "3";
+            default: return mpValue;
+        }
+    }
+
     private LocalDateTime parseFlexibleDateTime(String dateTimeStr) {
         if (dateTimeStr == null || dateTimeStr.isEmpty()) {
             return null;

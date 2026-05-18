@@ -260,6 +260,13 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 // 2.1.2.6、记录胎胚的最大活块数
                 Integer maxTypeBlockQty = maxTypeBlockQtyMap.getOrDefault(result.getMainMaterialDesc(), 0);
                 maxTypeBlockQtyMap.put(result.getMainMaterialDesc(), Math.max(maxTypeBlockQty, result.getTypeBlockQty()));
+                // 2.1.2.7、计算模具产能受限
+                Integer unRestrictedNetQty = result.getUnRestrictedNetQty();
+                if (unRestrictedNetQty != null) {
+                    Integer restrictedNetQty = intValue(result.getProdReqPlan()) - unRestrictedNetQty;
+                    restrictedNetQty = restrictedNetQty < 0? 0: restrictedNetQty;
+                    result.setRestrictedNetQty(restrictedNetQty);
+                }
             }
             // 2.1.2.6、重新对结构内的数据排序：主花纹分组，按型胎胚描述，最大腔数倒序、主花纹、最大活块数倒序，主花纹组内按型腔数倒序、活块数倒序排序
             structureList.stream().forEach(s -> { // 设置对应的最大型腔数和最大活块数
@@ -287,11 +294,11 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             // 2.1.4、本月统计信息汇总
             MpMonthPlanStatistics statistics = statisticsMap.get(structureName);
             this.buildStatisticsRecord(embryoCountStatisticsRecord, lhMachinesStatisticsRecord, FactoryConstant.MONTH_START_DAY, statistics,
-                    changeMouldMap);
+                    changeMouldMap, DAY_FIELD_NAME_FORMAT);
             // 2.1.5、上个月统计信息汇总
             MpMonthPlanStatistics lastStatistics = lastStatisticsMap.get(structureName);
             this.buildStatisticsRecord(embryoCountStatisticsRecord, lhMachinesStatisticsRecord, LAST_MONTH_FIRST_DAY, lastStatistics,
-                    lastChangeMouldMap);
+                    lastChangeMouldMap, LAST_FIELD_NAME_FORMAT);
             
             totalRecordList.add(embryoCountStatisticsRecord);
             totalRecordList.add(lhMachinesStatisticsRecord);
@@ -383,18 +390,19 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     private void buildStatisticsRecord(FactoryMonthPlanMouldDayResultExportVo embryoCountStatisticsRecord,
                                        FactoryMonthPlanMouldDayResultExportVo lhMachinesStatisticsRecord,
                                        Integer startDay, MpMonthPlanStatistics statistics,
-                                       Map<Integer, Integer> changeMouldMap) {
+                                       Map<Integer, Integer> changeMouldMap, String preFix) {
         if (statistics == null) {
             return;
         }
         for (int day = startDay; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
-            String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);
-            String dayStatisticsStr = (String) statistics.getFieldValueByFieldName(dayFieldName);
+            String dayFieldGetterName = String.format(DAY_FIELD_NAME_FORMAT, day);
+            String dayFieldSetterName = String.format(preFix, day);
+            String dayStatisticsStr = (String) statistics.getFieldValueByFieldName(dayFieldGetterName);
             if (StringUtils.isNotEmpty(dayStatisticsStr) && JSONValidator.from(dayStatisticsStr).validate()) {
                 MpDayProductionStatisticsDetailVo dayStatistics = JSONObject.parseObject(dayStatisticsStr,
                         MpDayProductionStatisticsDetailVo.class);
-                embryoCountStatisticsRecord.setFieldValueByFieldName(dayFieldName, dayStatistics.getEmbryoCount());
-                lhMachinesStatisticsRecord.setFieldValueByFieldName(dayFieldName, dayStatistics.getLhMachines());
+                embryoCountStatisticsRecord.setFieldValueByFieldName(dayFieldSetterName, dayStatistics.getEmbryoCount());
+                lhMachinesStatisticsRecord.setFieldValueByFieldName(dayFieldSetterName, dayStatistics.getLhMachines());
                 Integer changeMould = Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0);
                 if (changeMould > 0) {
                     changeMouldMap.put(day, changeMouldMap.getOrDefault(day, 0) + Optional.ofNullable(dayStatistics.getChangeMould()).orElse(0));
@@ -699,6 +707,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         tableMap.put("inventorySalesRatio", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.inventorySalesRatio"));
         tableMap.put("dayVulcanizationQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.dayVulcanizationQty"));
         tableMap.put("prodReqPlan", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.prodReqPlan"));
+        tableMap.put("restrictedNetQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.restrictedNetQty"));
+        tableMap.put("unRestrictedNetQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.unRestrictedNetQty"));
         tableMap.put("heightQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.heightQty"));
         tableMap.put("midQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.midQty"));
         tableMap.put("cycleReserveQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.cycleReserveQty"));
@@ -851,6 +861,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         listDataMap.put(this.getRealFieldName("inventorySalesRatio", suffix), exportVo.getInventorySalesRatio());
         listDataMap.put(this.getRealFieldName("dayVulcanizationQty", suffix), exportVo.getDayVulcanizationQty());
         listDataMap.put(this.getRealFieldName("prodReqPlan", suffix), exportVo.getProdReqPlan());
+        listDataMap.put(this.getRealFieldName("restrictedNetQty", suffix), exportVo.getRestrictedNetQty());
+        listDataMap.put(this.getRealFieldName("unRestrictedNetQty", suffix), exportVo.getUnRestrictedNetQty());
         listDataMap.put(this.getRealFieldName("heightQty", suffix), exportVo.getHeightQty());
         listDataMap.put(this.getRealFieldName("midQty", suffix), exportVo.getMidQty());
         listDataMap.put(this.getRealFieldName("cycleReserveQty", suffix), exportVo.getCycleReserveQty());
@@ -969,6 +981,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             subtotal.setLast29(safeAdd(subtotal.getLast29(), result.getLast29()));
             subtotal.setLast30(safeAdd(subtotal.getLast30(), result.getLast30()));
             subtotal.setLast31(safeAdd(subtotal.getLast31(), result.getLast31()));
+            subtotal.setUnRestrictedNetQty(safeAdd(subtotal.getUnRestrictedNetQty(), result.getUnRestrictedNetQty()));
+            subtotal.setRestrictedNetQty(safeAdd(subtotal.getRestrictedNetQty(), result.getRestrictedNetQty()));
             subtotal.setAdjustQty1(safeAdd(subtotal.getAdjustQty1(), result.getAdjustQty1()));
             subtotal.setAdjustQty2(safeAdd(subtotal.getAdjustQty2(), result.getAdjustQty2()));
             subtotal.setAdjustQty3(safeAdd(subtotal.getAdjustQty3(), result.getAdjustQty3()));

@@ -1161,7 +1161,7 @@ export default {
               return (
                 <div>
                   <el-button
-                    v-hasPermi={["monthplan:ProductMoldingLimit:remove"]}
+                    v-hasPermi={["monthplan:mpStructureAllocation:remove"]}
                     class="minus"
                     type="danger"
                     onClick={() => this.handleOutDelete(row)}

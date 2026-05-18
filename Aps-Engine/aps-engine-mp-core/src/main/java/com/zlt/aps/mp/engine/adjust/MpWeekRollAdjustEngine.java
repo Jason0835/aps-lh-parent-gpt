@@ -74,10 +74,12 @@ public class MpWeekRollAdjustEngine {
         }
         List<String> onMaterialCodeList = mpProdFinalList.stream().map(x -> x.getMaterialCode()).collect(Collectors.toList());
         Date startTime,endTime;
-        StringBuffer sbError = new StringBuffer();
+        //StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureIn adjustStructureIn:mpAdjustStructureInList){
             //1.0 检查日硫化量及主花纹
-            checkDayLhQtyWithMainPattern(sbError,adjustStructureIn);
+            if (!checkDayLhQtyWithMainPattern(contextDTO,adjustStructureIn)){
+                continue;
+            }
 
             if (ConstructionStageEnum.MEASUREMENT.getStage().equals(adjustStructureIn.getConstructionStage())){
                 if (adjustStructureIn.getConfirmAdjustQty() > 0){
@@ -101,9 +103,9 @@ public class MpWeekRollAdjustEngine {
             }
 
         }
-        if (!StringUtil.isEmptyWithTrim(sbError.toString())){
+        /*if (!StringUtil.isEmptyWithTrim(sbError.toString())){
             throw new BusinessException(sbError.toString());
-        }
+        }*/
         //2.减量调整
         startTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】,开始时间:%s",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,startTime))).append(ApsConstant.DIVISION);
@@ -492,7 +494,9 @@ public class MpWeekRollAdjustEngine {
         StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureOut adjustStructureOut:mpAdjustStructureOutList){
             //1.0 检查日硫化量
-            checkDayLhQtyWithMainPattern(sbError,adjustStructureOut);
+            if (!checkDayLhQtyWithMainPattern(contextDTO,adjustStructureOut)) {
+                continue;
+            }
 
             if (adjustStructureOut.getConfirmAdjustQty() < 0){
                 //1.1 减量
@@ -562,50 +566,60 @@ public class MpWeekRollAdjustEngine {
 
     /**
      * 检查日硫化量及主花纹是否为空
-     * @param sbError
+     * @param contextDTO
      * @param structureIn
      */
-    private void checkDayLhQtyWithMainPattern(StringBuffer sbError, MpAdjustStructureIn structureIn){
+    private boolean checkDayLhQtyWithMainPattern(MpRollAdjustContextDTO contextDTO, MpAdjustStructureIn structureIn){
         if (structureIn.getConfirmAdjustQty() == null || structureIn.getConfirmAdjustQty() == 0){
             //若确认调整为空或0，则不检查
-            return;
+            return false;
         }
         //物料编码：[%s]，没有日硫化量！
         if (structureIn.getDayVulcanizationQty() == null || structureIn.getDayVulcanizationQty() == 0){
-            sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
+            contextDTO.getLogCheck().append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
                     structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+            return false;
         }
         //物料编码：[%s]，没有主花纹！
         if (StringUtil.isEmptyWithTrim(structureIn.getMainPattern())){
-            sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notMainPattern"),
+            contextDTO.getLogCheck().append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notMainPattern"),
                     structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+            return false;
         }
         //物料编码：[%s]，确认调整量非偶数！
        /* if (structureIn.getConfirmAdjustQty() != null && !isEven(structureIn.getConfirmAdjustQty())){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.confirmQtyNotEven"),
                     structureIn.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }*/
+        return true;
     }
 
     /**
      * 检查日硫化量及主花纹是否为空
-     * @param sbError
+     * @param contextDTO
      * @param structureOut
      */
-    private void checkDayLhQtyWithMainPattern(StringBuffer sbError, MpAdjustStructureOut structureOut){
+    private boolean checkDayLhQtyWithMainPattern(MpRollAdjustContextDTO contextDTO, MpAdjustStructureOut structureOut){
+        if (structureOut.getConfirmAdjustQty() == null || structureOut.getConfirmAdjustQty() == 0){
+            //若确认调整为空或0，则不检查
+            return false;
+        }
         if (structureOut.getDayVulcanizationQty() == null || structureOut.getDayVulcanizationQty() == 0){
-            sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
+            contextDTO.getLogCheck().append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),
                     structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+            return false;
         }
         if (StringUtil.isEmptyWithTrim(structureOut.getMainPattern())){
-            sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notMainPattern"),
+            contextDTO.getLogCheck().append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notMainPattern"),
                     structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+            return false;
         }
         //物料编码：[%s]，确认调整量非偶数！
         /*if (structureOut.getConfirmAdjustQty() != null && !isEven(structureOut.getConfirmAdjustQty())){
             sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.confirmQtyNotEven"),
                     structureOut.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
         }*/
+        return true;
     }
 
     /**
@@ -2635,6 +2649,32 @@ public class MpWeekRollAdjustEngine {
 
     /**
      * 重置各优先级总排产量
+     * @param mpFinalVo 定稿记录
+     */
+    public void resetTotalProductionQty(FactoryMonthPlanFinalAdjustVo mpFinalVo){
+        //1.初始调整需求；
+        MpAdjustResult adjustResult = new MpAdjustResult();
+        adjustResult.setTotalQty(mpFinalVo.getTotalQty());
+        adjustResult.setConstructionStage(mpFinalVo.getConstructionStage());
+        adjustResult.setAdjustPriority(mpFinalVo.getAdjustPriority());
+        adjustResult.setHeightQty(mpFinalVo.getHeightQty());
+        adjustResult.setMidQty(mpFinalVo.getMidQty());
+        adjustResult.setCycleReserveQty(mpFinalVo.getCycleReserveQty());
+        adjustResult.setPostponeQty(mpFinalVo.getPostponeQty());
+        adjustResult.setConventionReserveQty(mpFinalVo.getConventionReserveQty());
+        //2.执行排产分配
+        allocateProductionByPriority(adjustResult);
+        //3.分摊排产量
+        mpFinalVo.setTrialProductionQty(adjustResult.getTrialProductionQty());
+        mpFinalVo.setHeightProductionQty(adjustResult.getHeightProductionQty());
+        mpFinalVo.setMidProductionQty(adjustResult.getMidProductionQty());
+        mpFinalVo.setCycleProductionQty(adjustResult.getCycleProductionQty());
+        mpFinalVo.setConventionProductionQty(adjustResult.getConventionProductionQty());
+        mpFinalVo.setPostponeProductionQty(adjustResult.getPostponeProductionQty());
+    }
+
+    /**
+     * 重置各优先级总排产量
      * @param adjustStructInVo 调整记录
      * @param mpFinalVo 定稿记录
      * @param productionQty 排产量
@@ -2953,6 +2993,9 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setProductionVersion(adjustStructInVo.getProductionVersion());
         mpFinalVo.setLastMonthPlanVersion(adjustStructInVo.getVersion());
         mpFinalVo.setStructureName(adjustStructInVo.getStructureName());
+        Set<String> cycleStructureNameSet = contextDTO.getCycleStructureMinLhMachinesMap().keySet();
+        String structureType = cycleStructureNameSet.contains(adjustStructInVo.getStructureName()) ? FactoryConstant.STRUCTURE_TYPE_CYCL : FactoryConstant.STRUCTURE_TYPE_COMMON;
+        mpFinalVo.setStructureType(structureType);
         mpFinalVo.setCxMachineCode(adjustStructInVo.getScheduledMachines());
         mpFinalVo.setProductTypeCode(adjustStructInVo.getProductTypeCode());
         mpFinalVo.setProductionType(adjustStructInVo.getProductionType());
@@ -3013,6 +3056,9 @@ public class MpWeekRollAdjustEngine {
         mpFinalVo.setProductionVersion(adjustStructOutVo.getProductionVersion());
         mpFinalVo.setLastMonthPlanVersion(adjustStructOutVo.getVersion());
         mpFinalVo.setStructureName(adjustStructOutVo.getStructureName());
+        Set<String> cycleStructureNameSet = contextDTO.getCycleStructureMinLhMachinesMap().keySet();
+        String structureType = cycleStructureNameSet.contains(adjustStructOutVo.getStructureName()) ? FactoryConstant.STRUCTURE_TYPE_CYCL : FactoryConstant.STRUCTURE_TYPE_COMMON;
+        mpFinalVo.setStructureType(structureType);
         mpFinalVo.setCxMachineCode(adjustStructOutVo.getScheduledMachines());
         mpFinalVo.setProductTypeCode(adjustStructOutVo.getProductTypeCode());
         mpFinalVo.setProductionType(adjustStructOutVo.getProductionType());

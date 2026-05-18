@@ -27,7 +27,7 @@
         GROUP BY FACTORY_CODE, YEAR, MONTH, MONTH_PLAN_VERSION, LAST_MONTH_PLAN_VERSION, PRODUCTION_VERSION
 </select>
 
-    <select id="list4Adjust" resultType="com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanProductionFinal4AdjustVo">
+    <select id="list4Adjust" resultType="com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo">
         SELECT
             fin.ID,
             fin.PRODUCTION_NO,
@@ -125,15 +125,16 @@
             fin.UPDATE_TIME,
             fin.CREATE_BY,
             fin.UPDATE_BY,
-            fin.ADJUST_QTY1,
-            fin.ADJUST_QTY2,
-            fin.ADJUST_QTY3,
-            fin.ADJUST_QTY4,
+        NULLIF(fin.ADJUST_QTY1, 0) AS ADJUST_QTY1,
+        NULLIF(fin.ADJUST_QTY2, 0) AS ADJUST_QTY2,
+        NULLIF(fin.ADJUST_QTY3, 0) AS ADJUST_QTY3,
+        NULLIF(fin.ADJUST_QTY4, 0) AS ADJUST_QTY4,
             ddps.NET_QTY,
             ddps.HEIGHT_QTY,
             ddps.MID_QTY,
             ddps.CYCLE_RESERVE_QTY,
-            ddps.CONVENTION_RESERVE_QTY
+            ddps.CONVENTION_RESERVE_QTY,
+            ddps.POSTPONE_QTY
 
         FROM T_MP_MONTH_PLAN_PROD_FINAL fin
 

@@ -463,7 +463,7 @@ public class BaseDataContainer implements Serializable {
         }
         TireDrumMatchVo tireDrumMatch = getTireDrumMatchInfo(cxMachineCode, proSize);
         tireDrumInfoMap.forEach((workWeakType, limitGroupMap) -> {
-            TireDrumDayInfoHelper dayLimitInfo = getDayLimitInfo(limitGroupMap, tireDrumMatch, productionDay);
+            TireDrumDayInfoHelper dayLimitInfo = getDayLimitInfo(limitGroupMap, tireDrumMatch, productionDay, false);
             if (null == dayLimitInfo) {
                 return;
             }
@@ -485,7 +485,7 @@ public class BaseDataContainer implements Serializable {
         }
         TireDrumMatchVo tireDrumMatch = getTireDrumMatchInfo(cxMachineCode, proSize);
         tireDrumInfoMap.forEach((workWeakType, limitGroupMap) -> {
-            TireDrumDayInfoHelper dayLimitInfo = getDayLimitInfo(limitGroupMap, tireDrumMatch, productionDay);
+            TireDrumDayInfoHelper dayLimitInfo = getDayLimitInfo(limitGroupMap, tireDrumMatch, productionDay, true);
             if (null == dayLimitInfo) {
                 return;
             }
@@ -500,14 +500,21 @@ public class BaseDataContainer implements Serializable {
      * @param workWeakTypeLimitInfo 某种成型工装类型限制对象
      * @param tireDrumMatch         工装匹配对象
      * @param productionDay         排产日
+     * @param isReleaseSource       是否释放资源(增加时 = false， 扣减时 = true)
      * @return
      */
-    private TireDrumDayInfoHelper getDayLimitInfo(Map<String, TireDrumInfoVo> workWeakTypeLimitInfo, TireDrumMatchVo tireDrumMatch, Integer productionDay) {
+    private TireDrumDayInfoHelper getDayLimitInfo(Map<String, TireDrumInfoVo> workWeakTypeLimitInfo, TireDrumMatchVo tireDrumMatch, Integer productionDay, boolean isReleaseSource) {
         if (CollectionUtils.isEmpty(workWeakTypeLimitInfo) || null == tireDrumMatch || tireDrumMatch.isEmptyValue() || null == productionDay) {
             return null;
         }
         //增加规格型号、使用类型匹配及还有剩余量的匹配
-        List<TireDrumInfoVo> limitGroupList = workWeakTypeLimitInfo.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(tireDrumMatch) && singleGroupLimit.hasLeftOverQty(productionDay)).collect(Collectors.toList());
+        List<TireDrumInfoVo> limitGroupList = workWeakTypeLimitInfo.values().stream().filter(singleGroupLimit -> singleGroupLimit.isMatch(tireDrumMatch)).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(limitGroupList)) {
+            return null;
+        }
+        if (!isReleaseSource) {
+            limitGroupList = limitGroupList.stream().filter(singleGroupLimit -> singleGroupLimit.hasLeftOverQty(productionDay)).collect(Collectors.toList());
+        }
         if (CollectionUtils.isEmpty(limitGroupList)) {
             //没有找到与tireDrumMatch匹配的成型工装限制信息
             return null;

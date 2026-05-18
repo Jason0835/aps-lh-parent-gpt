@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.google.common.collect.Lists;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
@@ -19,7 +20,6 @@ import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -28,6 +28,7 @@ import org.springframework.util.CollectionUtils;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -448,33 +449,18 @@ public class MouldProductionResultHandler {
         String materialDesc = result.getMaterialDesc();
         //使用排产量进行推算不准，直接换成使用模具数 getSkuProductionMouldNumberInfoByProductionQty(result);
         List<MouldDayUsedNumber> resultList = getSkuProductionMouldNumberInfoByMould(groupInfo, materialDesc);
-        //对排产量，保留第一个排产日，日期从小到大
-        Map<Integer, Integer> lhMachineNumberDayMap = new HashMap<>();
-        resultList.sort(Comparator.comparing(MouldDayUsedNumber::getProductionDay));
-        resultList.forEach(mouldDayUsedNumber -> {
-            Integer lhMachineCount = mouldDayUsedNumber.getUsedLhMachineCount();
-            if (null == lhMachineCount) {
-                return;
-            }
-            Integer day = mouldDayUsedNumber.getProductionDay();
-            if (null == day) {
-                return;
-            }
-            if (lhMachineNumberDayMap.containsKey(lhMachineCount)) {
-                return;
-            }
-            lhMachineNumberDayMap.put(lhMachineCount, day);
-        });
-        if (CollectionUtils.isEmpty(lhMachineNumberDayMap)) {
+        List<MouldDayUsedNumber> changeUsedList = getChangeMouldInfoIgnore(resultList);
+//        //20260517+ 将中间断开也纳入变化
+//        List<MouldDayUsedNumber> changeUsedList = getChangeMouldInfo(groupInfo, result, resultList);
+        if (CollectionUtils.isEmpty(changeUsedList)) {
             return;
         }
         //获取模具使用数变化集合，按排产日由小到大顺序遍历
-        List<String> resultLhMachineCount = new ArrayList<>();
-        lhMachineNumberDayMap.entrySet().stream().sorted(Map.Entry.comparingByValue()).forEach(entry -> {
-            Integer mouldNumber = entry.getKey() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-            resultLhMachineCount.add(String.valueOf(mouldNumber));
+        List<String> resultMoldNumber = new ArrayList<>();
+        changeUsedList.forEach(change -> {
+            resultMoldNumber.add(String.valueOf(change.getUsedMoldNumber()));
         });
-        result.setMouldChangeInfo(String.join(StringConstant.DASH, resultLhMachineCount));
+        result.setMouldChangeInfo(String.join(StringConstant.DASH, resultMoldNumber));
     }
 
     /**
@@ -495,13 +481,6 @@ public class MouldProductionResultHandler {
             return "";
         }
         return allNoProductionReason;
-//        String midValue = String.format(",%s,", rejectNoProductionReason);
-//        String result = allNoProductionReason.replaceAll(midValue, ",");
-//        String startWithValue = String.format("%s,", rejectNoProductionReason);
-//        result = result.replaceAll(startWithValue, ",");
-//        String endWithValue = String.format(",%s", rejectNoProductionReason);
-//        result = result.replaceAll(endWithValue, "");
-//        return result;
     }
 
     /**
@@ -529,65 +508,136 @@ public class MouldProductionResultHandler {
             if (CollectionUtils.isEmpty(skuProductionSet)) {
                 return;
             }
-            Integer usedLhMachineNumber = skuProductionSet.size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-            MouldDayUsedNumber used = new MouldDayUsedNumber(productionDay, usedLhMachineNumber);
+            Integer usedMoldNumber = skuProductionSet.size();
+            MouldDayUsedNumber used = new MouldDayUsedNumber(productionDay, usedMoldNumber);
             lhMachineCountList.add(used);
         });
         return lhMachineCountList;
     }
 
-    /**
-     * 根据排产量来计算使用硫化机台数
+    /***
+     * 获取模具变化数据集合
+     * 只取第一个变化日信息
      *
-     * @param result
+     * @param resultList
      * @return
      */
-    private static List<MouldDayUsedNumber> getSkuProductionMouldNumberInfoByProductionQty(FactoryMonthPlanMouldDayResult result) {
-        Map<Integer, Integer> dayProductionQty = DayProductionHandler.getDayQty(result, FactoryConstant.PRODUCTION_CYCLE);
-        if (CollectionUtils.isEmpty(dayProductionQty)) {
+    private static List<MouldDayUsedNumber> getChangeMouldInfoIgnore(List<MouldDayUsedNumber> resultList) {
+        //对日排产信息排序，日期从小到大
+        resultList.sort(Comparator.comparing(MouldDayUsedNumber::getProductionDay));
+        //构建模具变化集合数据
+        List<MouldDayUsedNumber> changeUsedList = Lists.newArrayList();
+        resultList.forEach(mouldDayUsedNumber -> {
+            Integer lhMachineCount = mouldDayUsedNumber.getUsedLhMachineCount();
+            if (null == lhMachineCount) {
+                return;
+            }
+            Integer day = mouldDayUsedNumber.getProductionDay();
+            if (null == day) {
+                return;
+            }
+            Integer dayMoldNumber = mouldDayUsedNumber.getUsedMoldNumber();
+            Integer lastDayMoldNumber = getLastUsedMoldNumber(changeUsedList);
+            if (null == lastDayMoldNumber) {
+                changeUsedList.add(mouldDayUsedNumber);
+                return;
+            }
+            //不相等则表示有变化
+            if (!dayMoldNumber.equals(lastDayMoldNumber)) {
+                changeUsedList.add(mouldDayUsedNumber);
+                return;
+            }
+        });
+        if (CollectionUtils.isEmpty(changeUsedList)) {
             return Collections.emptyList();
         }
-        //硫化机台产能 = 单模产能 * 2
-        Integer singleLhMachineCapacity = result.getDayVulcanizationQty() * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        List<MouldDayUsedNumber> lhMachineCountList = new ArrayList<>();
-        dayProductionQty.forEach((day, productionQty) -> {
-            //转化使用硫化机台数
-            Integer usedLhMachineNumber = BigDecimal.valueOf(productionQty).divide(BigDecimal.valueOf(singleLhMachineCapacity), 0, RoundingMode.UP).intValue();
-            MouldDayUsedNumber used = new MouldDayUsedNumber(day, usedLhMachineNumber);
-            lhMachineCountList.add(used);
-        });
-        //日期从小到大，判断第一天如果小于第二天则舍弃第一天的模具数
-        lhMachineCountList.sort(Comparator.comparing(MouldDayUsedNumber::getProductionDay));
-        int size = lhMachineCountList.size();
-        int startIndex = BigDecimal.ZERO.intValue();
-        if (size > BigDecimal.ONE.intValue()) {
-            Integer firstMouldNumber = lhMachineCountList.get(BigDecimal.ZERO.intValue()).getUsedLhMachineCount();
-            Integer secondMouldNumber = lhMachineCountList.get(BigDecimal.ONE.intValue()).getUsedLhMachineCount();
-            if (firstMouldNumber < secondMouldNumber) {
-                startIndex = BigDecimal.ONE.intValue();
-            }
+        return changeUsedList;
+    }
+
+    /**
+     * 获取模具变化信息--首次出现变化的日期
+     *
+     * @param groupInfo  分组信息
+     * @param result     单Sku信息
+     * @param resultList 单Sku日排产集合
+     * @return
+     */
+    private static List<MouldDayUsedNumber> getChangeMouldInfo(ProductionPlanGroupInfo groupInfo, FactoryMonthPlanMouldDayResult result, List<MouldDayUsedNumber> resultList) {
+        if (null == groupInfo || null == result || CollectionUtils.isEmpty(resultList)) {
+            return Collections.emptyList();
         }
-        List<MouldDayUsedNumber> resultList = lhMachineCountList.subList(startIndex, size - startIndex);
-        return resultList;
+        //转换成Map
+        Map<Integer, MouldDayUsedNumber> skuProductionDayMap = resultList.stream().collect(Collectors.toMap(MouldDayUsedNumber::getProductionDay, Function.identity()));
+        //排产开始-结束日
+        Integer productionDay = result.getBeginDay();
+        Integer endDay = result.getEndDay();
+        //构建模具变化集合数据
+        List<MouldDayUsedNumber> changeUsedList = Lists.newArrayList();
+        for (; productionDay <= endDay; productionDay++) {
+            MouldDayUsedNumber productionInfo = skuProductionDayMap.get(productionDay);
+            MouldDayUsedNumber changeInfo = getHasChangeInfo(groupInfo, productionDay, productionInfo, changeUsedList);
+            if (null == changeInfo) {
+                continue;
+            }
+            changeUsedList.add(changeInfo);
+        }
+        if (CollectionUtils.isEmpty(changeUsedList)) {
+            return Collections.emptyList();
+        }
+        return changeUsedList;
     }
-}
 
-/**
- * 模具日使用数
- */
-@Getter
-class MouldDayUsedNumber {
     /**
-     * 排产日
+     * 得到模具数有变化的第一个数据
+     *
+     * @param groupInfo      分组信息
+     * @param productionDay  排产日
+     * @param productionInfo 排产信息
+     * @param changeUsedList 模具变化集合
+     * @return
      */
-    private Integer productionDay;
-    /**
-     * 使用的硫化机台数
-     */
-    private Integer usedLhMachineCount;
-
-    public MouldDayUsedNumber(Integer productionDay, Integer usedLhMachineCount) {
-        this.productionDay = productionDay;
-        this.usedLhMachineCount = usedLhMachineCount;
+    private static MouldDayUsedNumber getHasChangeInfo(ProductionPlanGroupInfo groupInfo, Integer productionDay, MouldDayUsedNumber productionInfo, List<MouldDayUsedNumber> changeUsedList) {
+        //不在排产范围，则不算变化
+        if (!groupInfo.getDayProductionLimitInfo().containsKey(productionDay)) {
+            return null;
+        }
+        //没有排产信息，算变化
+        if (null == productionInfo) {
+            return MouldDayUsedNumber.buildEmpty(productionDay);
+        }
+        //没有硫化机台 --数据错误
+        Integer lhMachineCount = productionInfo.getUsedLhMachineCount();
+        if (null == lhMachineCount) {
+            return null;
+        }
+        Integer dayMoldNumber = productionInfo.getUsedMoldNumber();
+        Integer lastDayMoldNumber = getLastUsedMoldNumber(changeUsedList);
+        if (null == lastDayMoldNumber) {
+            return null;
+        }
+        //不相等则表示有变化
+        if (!dayMoldNumber.equals(lastDayMoldNumber)) {
+            return productionInfo;
+        }
+        return null;
     }
+
+    /**
+     * 获取模具变化集合最后一个使用模具数
+     *
+     * @param changeUsedList
+     * @return
+     */
+    private static Integer getLastUsedMoldNumber(List<MouldDayUsedNumber> changeUsedList) {
+        if (CollectionUtils.isEmpty(changeUsedList)) {
+            return null;
+        }
+        int size = changeUsedList.size();
+        MouldDayUsedNumber last = changeUsedList.get(size - BigDecimal.ONE.intValue());
+        if (null == last) {
+            return null;
+        }
+        return last.getUsedMoldNumber();
+    }
+
 }

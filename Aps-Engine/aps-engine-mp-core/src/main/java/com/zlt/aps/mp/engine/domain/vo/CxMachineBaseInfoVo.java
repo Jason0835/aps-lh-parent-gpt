@@ -1166,6 +1166,28 @@ public class CxMachineBaseInfoVo implements Serializable {
     }
 
     /**
+     * 月尾补量分配使用：是否结构同机台
+     * 前提条件：机台还有剩余分配时间
+     *
+     * @param selectedGroup 当前选中的机台
+     * @return
+     */
+    public boolean isSameGroupByLastAllocation(ProductionPlanGroupInfo selectedGroup) {
+        if (null == selectedGroup) {
+            return false;
+        }
+        if (CollectionUtils.isEmpty(allocationList)) {
+            return false;
+        }
+        allocationList.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getStartDay));
+        CxMachineAllocationPlanHelper last = getLastAllocationInfo();
+        if (null == last) {
+            return false;
+        }
+        return selectedGroup == last.getProductionPlanInfo();
+    }
+
+    /**
      * 获取前结构是否需要延长
      * 因每日结构切换限制导致延长
      *
