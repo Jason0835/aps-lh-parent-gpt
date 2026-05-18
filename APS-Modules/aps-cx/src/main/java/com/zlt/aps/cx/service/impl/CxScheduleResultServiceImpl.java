@@ -454,6 +454,24 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             tableMap.put("yearmonthday", cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyy年MM月dd日"));
         }
 
+        BigDecimal[] planTotals = new BigDecimal[9];
+        for (int i = 1; i <= 8; i++) {
+            planTotals[i] = BigDecimal.ZERO;
+        }
+        for (CxScheduleResult item : list) {
+            planTotals[1] = safeAdd(planTotals[1], item.getClass1PlanQty());
+            planTotals[2] = safeAdd(planTotals[2], item.getClass2PlanQty());
+            planTotals[3] = safeAdd(planTotals[3], item.getClass3PlanQty());
+            planTotals[4] = safeAdd(planTotals[4], item.getClass4PlanQty());
+            planTotals[5] = safeAdd(planTotals[5], item.getClass5PlanQty());
+            planTotals[6] = safeAdd(planTotals[6], item.getClass6PlanQty());
+            planTotals[7] = safeAdd(planTotals[7], item.getClass7PlanQty());
+            planTotals[8] = safeAdd(planTotals[8], item.getClass8PlanQty());
+        }
+        for (int i = 1; i <= 8; i++) {
+            tableMap.put("class" + i + "PlanQtyTotal", zeroToEmpty(planTotals[i]));
+        }
+
         return tableMap;
     }
 
