@@ -62,6 +62,11 @@ public class LhSpecialMaterialBomController extends AbstractDocBizController<LhS
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody LhSpecialMaterialBom entity) {
+        // 分类冲突校验：同一工厂+物料/结构下，19.5寸宽基和22.5寸宽基互斥，芯片胎可与它们组合
+        String conflict = lhSpecialMaterialBomService.checkCategoryConflict(entity);
+        if (conflict != null) {
+            return AjaxResult.error(conflict);
+        }
         return super.save(entity);
     }
 

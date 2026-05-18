@@ -8,6 +8,7 @@ import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
 import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
@@ -58,6 +59,12 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
 
     @Override
     public int save(LhSpecialMaterialBom entity) {
+        // 分类冲突校验：同一工厂+物料/结构下，19.5寸宽基和22.5寸宽基互斥，芯片胎可与它们组合
+        String conflict = checkCategoryConflict(entity);
+        if (conflict != null) {
+            throw new ServiceException(conflict);
+        }
+
         if (entity.getId() != null) {
             entity.setBaseVale(entity.getId());
         } else {
