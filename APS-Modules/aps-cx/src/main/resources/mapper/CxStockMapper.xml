@@ -104,7 +104,7 @@
         SET IS_DELETE = 1,
             UPDATE_BY = 'CLEAN_TASK',
             UPDATE_TIME = NOW()
-        WHERE DATE(STOCK_DATE) &lt; CURDATE()
+        WHERE DATE(STOCK_DATE) &lt;= CURDATE()
           AND IS_DELETE = 0
     </update>
 

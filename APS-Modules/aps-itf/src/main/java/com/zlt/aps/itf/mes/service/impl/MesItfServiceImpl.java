@@ -2251,10 +2251,10 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
-     * 清理并重新同步所有MES历史数据
+     * 临时任务：清理并重新同步所有MES历史数据（含今天）
      * 执行步骤：
-     * 1. 逻辑删除APS库中今天之前的所有数据（8张表）
-     * 2. 从MES库重新抓取今天之前每天最新版本数据
+     * 1. 逻辑删除APS库中今天及今天之前的所有数据（8张表）
+     * 2. 从MES库重新抓取每天（含今天）最新版本数据
      * 3. 将MES数据插入到APS库
      * 涉及表：成型在机、硫化在机、胶囊已使用次数、生胎库存、成型排程完成量、成型排程日完成量、硫化排程完成量、硫化排程日完成量
      *
@@ -2262,7 +2262,7 @@ public class MesItfServiceImpl implements MesItfService {
      */
     @Override
     public AjaxResult cleanAndResyncAllHistory() {
-        log.info("===== 开始清理并重新同步所有MES历史数据 =====");
+        log.info("===== 开始清理并重新同步所有MES历史数据（含今天） =====");
         StringBuilder resultMsg = new StringBuilder();
 
         resultMsg.append(resyncCxMachineOnlineHistory());
@@ -2274,14 +2274,14 @@ public class MesItfServiceImpl implements MesItfService {
         resultMsg.append(resyncLhScheFinishQtyHistory());
         resultMsg.append(resyncLhDayFinishQtyHistory());
 
-        log.info("===== 清理并重新同步所有MES历史数据完成 =====");
+        log.info("===== 清理并重新同步所有MES历史数据（含今天）完成 =====");
         return AjaxResult.success(resultMsg.toString());
     }
 
     /**
-     * 重新同步成型在机历史数据
-     * 1. 逻辑删除APS库今天之前所有成型在机数据
-     * 2. 从MES库查询今天之前每天最新版本的成型在机数据
+     * 重新同步成型在机历史数据（含今天）
+     * 1. 逻辑删除APS库今天及今天之前所有成型在机数据
+     * 2. 从MES库查询每天（含今天）最新版本的成型在机数据
      * 3. 插入到APS库
      */
     private String resyncCxMachineOnlineHistory() {
@@ -2290,7 +2290,7 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             FeignTokenHelper.runWithToken(() -> {
                 AjaxResult deleteResult = cxMesSyncRemoteService.logicDeleteCxMachineOnlineAllBeforeToday();
-                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+                log.info("逻辑删除{}今天及今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
             });
 
             DynamicDataSourceContextHolder.push(DataSource.MES);
@@ -2326,9 +2326,9 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
-     * 重新同步硫化在机历史数据
-     * 1. 逻辑删除APS库今天之前所有硫化在机数据
-     * 2. 从MES库查询今天之前每天最新版本的硫化在机数据
+     * 重新同步硫化在机历史数据（含今天）
+     * 1. 逻辑删除APS库今天及今天之前所有硫化在机数据
+     * 2. 从MES库查询每天（含今天）最新版本的硫化在机数据
      * 3. 插入到APS库
      */
     private String resyncLhMachineOnlineHistory() {
@@ -2337,7 +2337,7 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             FeignTokenHelper.runWithToken(() -> {
                 AjaxResult deleteResult = lhMesSyncRemoteService.logicDeleteLhMachineOnlineAllBeforeToday();
-                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+                log.info("逻辑删除{}今天及今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
             });
 
             DynamicDataSourceContextHolder.push(DataSource.MES);
@@ -2373,9 +2373,9 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
-     * 重新同步胶囊已使用次数历史数据
-     * 1. 逻辑删除APS库今天之前所有胶囊已使用次数数据
-     * 2. 从MES库查询今天之前每天最新版本的胶囊已使用次数数据
+     * 重新同步胶囊已使用次数历史数据（含今天）
+     * 1. 逻辑删除APS库今天及今天之前所有胶囊已使用次数数据
+     * 2. 从MES库查询每天（含今天）最新版本的胶囊已使用次数数据
      * 3. 插入到APS库
      */
     private String resyncLhRepairCapsuleHistory() {
@@ -2384,7 +2384,7 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             FeignTokenHelper.runWithToken(() -> {
                 AjaxResult deleteResult = lhMesSyncRemoteService.logicDeleteLhRepairCapsuleAllBeforeToday();
-                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+                log.info("逻辑删除{}今天及今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
             });
 
             DynamicDataSourceContextHolder.push(DataSource.MES);
@@ -2443,9 +2443,9 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
-     * 重新同步生胎库存历史数据
-     * 1. 逻辑删除APS库今天之前所有生胎库存数据
-     * 2. 从MES库查询今天之前的生胎库存数据
+     * 重新同步生胎库存历史数据（含今天）
+     * 1. 逻辑删除APS库今天及今天之前所有生胎库存数据
+     * 2. 从MES库查询每天（含今天）的生胎库存数据
      * 3. 插入到APS库
      */
     private String resyncCxStockHistory() {
@@ -2454,7 +2454,7 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             FeignTokenHelper.runWithToken(() -> {
                 AjaxResult deleteResult = cxMesSyncRemoteService.logicDeleteCxStockAllBeforeToday();
-                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+                log.info("逻辑删除{}今天及今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
             });
 
             DynamicDataSourceContextHolder.push(DataSource.MES);
@@ -2512,7 +2512,7 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             FeignTokenHelper.runWithToken(() -> {
                 AjaxResult deleteResult = lhMesSyncRemoteService.logicDeleteLhScheFinishQtyAllBeforeToday();
-                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+                log.info("逻辑删除{}今天及今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
             });
 
             DynamicDataSourceContextHolder.push(DataSource.MES);
@@ -2560,7 +2560,7 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             FeignTokenHelper.runWithToken(() -> {
                 AjaxResult deleteResult = lhMesSyncRemoteService.logicDeleteLhDayFinishQtyAllBeforeToday();
-                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+                log.info("逻辑删除{}今天及今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
             });
 
             DynamicDataSourceContextHolder.push(DataSource.MES);
@@ -2616,7 +2616,7 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             FeignTokenHelper.runWithToken(() -> {
                 AjaxResult deleteResult = cxMesSyncRemoteService.logicDeleteCxScheFinishQtyAllBeforeToday();
-                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+                log.info("逻辑删除{}今天及今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
             });
 
             DynamicDataSourceContextHolder.push(DataSource.MES);
@@ -2653,9 +2653,9 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
-     * 重新同步成型排程日完成量历史数据
-     * 1. 逻辑删除APS库今天之前所有成型排程日完成量数据
-     * 2. 从MES库查询今天之前每天最新版本的成型排程日完成量数据
+     * 重新同步成型排程日完成量历史数据（含今天）
+     * 1. 逻辑删除APS库今天及今天之前所有成型排程日完成量数据
+     * 2. 从MES库查询每天（含今天）最新版本的成型排程日完成量数据
      * 3. 插入到APS库
      */
     private String resyncCxDayFinishQtyHistory() {
@@ -2664,7 +2664,7 @@ public class MesItfServiceImpl implements MesItfService {
         try {
             FeignTokenHelper.runWithToken(() -> {
                 AjaxResult deleteResult = cxMesSyncRemoteService.logicDeleteCxDayFinishQtyAllBeforeToday();
-                log.info("逻辑删除{}今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
+                log.info("逻辑删除{}今天及今天之前所有数据结果：{}", tableName, deleteResult.get("msg"));
             });
 
             DynamicDataSourceContextHolder.push(DataSource.MES);

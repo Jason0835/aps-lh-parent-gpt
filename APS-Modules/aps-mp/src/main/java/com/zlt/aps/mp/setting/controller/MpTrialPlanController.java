@@ -12,7 +12,6 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.maindata.mapper.MpTrialPlanEntityMapper;
 import com.zlt.aps.maindata.service.IMpTrialPlanService;
@@ -97,41 +96,28 @@ public class MpTrialPlanController extends AbstractDocBizController<MpTrialPlan>
             LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.eq(MdmSkuConstructionRef::getMaterialCode, materialCode);
             List<MdmSkuConstructionRef> mdmSkuConstructionRefList = skuConstructionRefEntityMapper.selectList(queryWrapper);
-            List<MdmSkuConstructionRef> skuStatusRefList = null;
-            if (billVO.getTrialStatus().equals(ConstructionStageEnum.MEASUREMENT.getStage())){
-                //试制
-                if (StringUtils.isNotBlank(billVO.getEmbryoNo())){
-                    skuStatusRefList = mdmSkuConstructionRefList.stream().filter(x->billVO.getEmbryoNo().equals(x.getEmbryoNo()) && x.getTrialStatus().equals(ConstructionStageEnum.MEASUREMENT_FLAG)).collect(Collectors.toList());
-                }else{
-                    skuStatusRefList = mdmSkuConstructionRefList.stream().filter(x->x.getTrialStatus().equals(ConstructionStageEnum.MEASUREMENT_FLAG)).collect(Collectors.toList());
-                }
+            // 根据产品状态过滤对应的示方书号（lh_trial_status字典值X/T/S与MdmSkuConstructionRef.trialStatus一致）
+            List<MdmSkuConstructionRef> skuStatusRefList;
+            if (StringUtils.isNotBlank(billVO.getEmbryoNo())) {
+                skuStatusRefList = mdmSkuConstructionRefList.stream()
+                        .filter(x -> billVO.getEmbryoNo().equals(x.getEmbryoNo()) && billVO.getTrialStatus().equals(x.getTrialStatus()))
+                        .collect(Collectors.toList());
+            } else {
+                skuStatusRefList = mdmSkuConstructionRefList.stream()
+                        .filter(x -> billVO.getTrialStatus().equals(x.getTrialStatus()))
+                        .collect(Collectors.toList());
             }
-            if (billVO.getTrialStatus().equals(ConstructionStageEnum.TRIAL_PRODUCTION.getStage())){
-                //量试
-                if (StringUtils.isNotBlank(billVO.getEmbryoNo())){
-                    skuStatusRefList = mdmSkuConstructionRefList.stream().filter(x->billVO.getEmbryoNo().equals(x.getEmbryoNo()) && x.getTrialStatus().equals(ConstructionStageEnum.TRIAL_FLAG)).collect(Collectors.toList());
-                }else{
-                    skuStatusRefList = mdmSkuConstructionRefList.stream().filter(x->x.getTrialStatus().equals(ConstructionStageEnum.TRIAL_FLAG)).collect(Collectors.toList());
-                }
-
-            }
-            if (PubUtil.isEmpty(skuStatusRefList)){
+            if (PubUtil.isEmpty(skuStatusRefList)) {
                 String message = I18nUtil.getMessage("ui.data.alert.mpTrialPlan.embryoNo.error");
                 throw new RuntimeException(message);
             }
-            MdmSkuConstructionRef mdmSkuConstructionRef;
-            if (skuStatusRefList.size() >= 1){
-                mdmSkuConstructionRef = skuStatusRefList.get(0);
-                billVO.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
-                billVO.setEmbryoReleaseDate(mdmSkuConstructionRef.getEmbryoReleaseDate());
-                billVO.setTextNo(mdmSkuConstructionRef.getTextNo());
-                billVO.setTextReleaseDate(mdmSkuConstructionRef.getTextReleaseDate());
-                billVO.setLhNo(mdmSkuConstructionRef.getLhNo());
-                billVO.setLhReleaseDate(mdmSkuConstructionRef.getLhReleaseDate());
-            }else {
-                String message = I18nUtil.getMessage("ui.data.alert.mpTrialPlan.embryoNo.error");
-                throw new RuntimeException(message);
-            }
+            MdmSkuConstructionRef mdmSkuConstructionRef = skuStatusRefList.get(0);
+            billVO.setEmbryoNo(mdmSkuConstructionRef.getEmbryoNo());
+            billVO.setEmbryoReleaseDate(mdmSkuConstructionRef.getEmbryoReleaseDate());
+            billVO.setTextNo(mdmSkuConstructionRef.getTextNo());
+            billVO.setTextReleaseDate(mdmSkuConstructionRef.getTextReleaseDate());
+            billVO.setLhNo(mdmSkuConstructionRef.getLhNo());
+            billVO.setLhReleaseDate(mdmSkuConstructionRef.getLhReleaseDate());
         }
         return super.save(billVO);
     }

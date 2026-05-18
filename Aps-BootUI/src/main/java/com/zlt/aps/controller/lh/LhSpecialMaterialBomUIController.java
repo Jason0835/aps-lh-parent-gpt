@@ -46,6 +46,7 @@ public class LhSpecialMaterialBomUIController extends BaseUIController<LhSpecial
      */
     @ApiOperation("根据条件查询主表数据")
     @PostMapping("/list")
+    @RequiresPermissions("lh:lhSpecialMaterialBom:list")
     @ResponseBody
     public TableDataInfo list(LhSpecialMaterialBom lhSpecialMaterialBom) {
         return iLhSpecialMaterialBomService.list(lhSpecialMaterialBom);

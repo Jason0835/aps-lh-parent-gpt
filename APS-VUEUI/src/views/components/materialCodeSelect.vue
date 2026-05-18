@@ -8,6 +8,7 @@
     :disabled="disabled"
     @show="handleShow"
     @cancel="handleCancel"
+    dialogWidth="900px"
   >
     <div class="table-container" v-loading="loading">
       <page-table
@@ -147,7 +148,7 @@ export default {
         {
           prop: "proSize",
           align: "center",
-          width: 120,
+          minWidth: 100,
           label: this.$t("ui.data.column.scheduleAdjust.proSize"),
         },
         // {
@@ -372,5 +373,8 @@ export default {
 }
 .table-container {
   height: 450px;
+  :deep(.el-table) {
+    width: 100% !important;
+  }
 }
 </style>

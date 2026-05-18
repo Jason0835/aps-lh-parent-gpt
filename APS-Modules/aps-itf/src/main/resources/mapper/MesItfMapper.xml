@@ -444,12 +444,12 @@
         INNER JOIN (
             SELECT CONVERT(DATE, ONLINE_DATE) AS online_day, CX_CODE, MAX(DATA_VERSION) AS MAX_VERSION
             FROM CX_MACHINE_ONLINE_SYNC
-            WHERE CONVERT(DATE, ONLINE_DATE) &lt; CONVERT(DATE, GETDATE())
+            WHERE CONVERT(DATE, ONLINE_DATE) &lt;= CONVERT(DATE, GETDATE())
             <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
             <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
             GROUP BY CONVERT(DATE, ONLINE_DATE), CX_CODE
         ) latest ON CONVERT(DATE, t.ONLINE_DATE) = latest.online_day AND t.CX_CODE = latest.CX_CODE AND t.DATA_VERSION = latest.MAX_VERSION
-        WHERE CONVERT(DATE, t.ONLINE_DATE) &lt; CONVERT(DATE, GETDATE())
+        WHERE CONVERT(DATE, t.ONLINE_DATE) &lt;= CONVERT(DATE, GETDATE())
         <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
         <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
     </select>
@@ -470,12 +470,12 @@
         INNER JOIN (
             SELECT CONVERT(DATE, ONLINE_DATE) AS online_day, LH_CODE, MAX(DATA_VERSION) AS MAX_VERSION
             FROM LH_MACHINE_ONLINE_SYNC
-            WHERE CONVERT(DATE, ONLINE_DATE) &lt; CONVERT(DATE, GETDATE())
+            WHERE CONVERT(DATE, ONLINE_DATE) &lt;= CONVERT(DATE, GETDATE())
             <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
             <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
             GROUP BY CONVERT(DATE, ONLINE_DATE), LH_CODE
         ) latest ON CONVERT(DATE, t.ONLINE_DATE) = latest.online_day AND t.LH_CODE = latest.LH_CODE AND t.DATA_VERSION = latest.MAX_VERSION
-        WHERE CONVERT(DATE, t.ONLINE_DATE) &lt; CONVERT(DATE, GETDATE())
+        WHERE CONVERT(DATE, t.ONLINE_DATE) &lt;= CONVERT(DATE, GETDATE())
         <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
         <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
     </select>
@@ -495,10 +495,10 @@
         INNER JOIN (
             SELECT CONVERT(DATE, OBTAIN_TIME) AS obtain_day, LH_CODE, MAX(DATA_VERSION) AS MAX_VERSION
             FROM LH_REPAIR_CAPSULE
-            WHERE CONVERT(DATE, OBTAIN_TIME) &lt; CONVERT(DATE, GETDATE())
+            WHERE CONVERT(DATE, OBTAIN_TIME) &lt;= CONVERT(DATE, GETDATE())
             GROUP BY CONVERT(DATE, OBTAIN_TIME), LH_CODE
         ) latest ON CONVERT(DATE, t.OBTAIN_TIME) = latest.obtain_day AND t.LH_CODE = latest.LH_CODE AND t.DATA_VERSION = latest.MAX_VERSION
-        WHERE CONVERT(DATE, t.OBTAIN_TIME) &lt; CONVERT(DATE, GETDATE())
+        WHERE CONVERT(DATE, t.OBTAIN_TIME) &lt;= CONVERT(DATE, GETDATE())
     </select>
 
     <select id="selectMesCxStockHistoryList" resultType="com.zlt.aps.cx.api.domain.entity.CxMesStock">
@@ -507,7 +507,7 @@
         EMBRYO_CODE,
         STOCK_NUM
         FROM MES_CX_STOCK
-        WHERE CONVERT(DATE, STOCK_DATE) &lt; CONVERT(DATE, GETDATE())
+        WHERE CONVERT(DATE, STOCK_DATE) &lt;= CONVERT(DATE, GETDATE())
     </select>
 
     <select id="selectLhClassShiftFinishQtyHistoryList" resultType="com.zlt.aps.lh.api.domain.entity.LhScheFinishQty">
@@ -533,7 +533,7 @@
         INNER JOIN (
             SELECT CONVERT(DATE, SCHEDULE_DATE) AS schedule_day, LH_MACHINE_CODE, ORDER_NO, MAX(DATA_VERSION) AS MAX_VERSION
             FROM MES_LH_CLASS_SHIFT_FINISH_QTY
-            WHERE CONVERT(DATE, SCHEDULE_DATE) &lt; CONVERT(DATE, GETDATE())
+            WHERE CONVERT(DATE, SCHEDULE_DATE) &lt;= CONVERT(DATE, GETDATE())
             <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
             <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
             GROUP BY CONVERT(DATE, SCHEDULE_DATE), LH_MACHINE_CODE, ORDER_NO
@@ -541,7 +541,7 @@
             AND t.LH_MACHINE_CODE = latest.LH_MACHINE_CODE
             AND t.ORDER_NO = latest.ORDER_NO
             AND t.DATA_VERSION = latest.MAX_VERSION
-        WHERE CONVERT(DATE, t.SCHEDULE_DATE) &lt; CONVERT(DATE, GETDATE())
+        WHERE CONVERT(DATE, t.SCHEDULE_DATE) &lt;= CONVERT(DATE, GETDATE())
         <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
         <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
     </select>
@@ -559,12 +559,12 @@
         INNER JOIN (
             SELECT CONVERT(DATE, FINISH_DATE) AS finish_day, FACTORY_CODE, MAX(DATA_VERSION) AS MAX_VERSION
             FROM MES_LH_DAY_FINISH_QTY
-            WHERE CONVERT(DATE, FINISH_DATE) &lt; CONVERT(DATE, GETDATE())
+            WHERE CONVERT(DATE, FINISH_DATE) &lt;= CONVERT(DATE, GETDATE())
             GROUP BY CONVERT(DATE, FINISH_DATE), FACTORY_CODE
         ) latest ON CONVERT(DATE, t.FINISH_DATE) = latest.finish_day
             AND t.FACTORY_CODE = latest.FACTORY_CODE
             AND t.DATA_VERSION = latest.MAX_VERSION
-        WHERE CONVERT(DATE, t.FINISH_DATE) &lt; CONVERT(DATE, GETDATE())
+        WHERE CONVERT(DATE, t.FINISH_DATE) &lt;= CONVERT(DATE, GETDATE())
     </select>
 
     <select id="selectCxClassShiftFinishQtyHistoryList" resultType="com.zlt.aps.cx.api.domain.entity.CxScheFinishQty">
@@ -591,7 +591,7 @@
         INNER JOIN (
             SELECT CONVERT(DATE, SCHEDULE_DATE) AS schedule_day, CX_MACHINE_CODE, ORDER_NO, MAX(DATA_VERSION) AS MAX_VERSION
             FROM MES_CX_CLASS_SHIFT_FINISH_QTY
-            WHERE CONVERT(DATE, SCHEDULE_DATE) &lt; CONVERT(DATE, GETDATE())
+            WHERE CONVERT(DATE, SCHEDULE_DATE) &lt;= CONVERT(DATE, GETDATE())
             <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
             <if test="companyCode != null and companyCode != ''">AND COMPANY_CODE = #{companyCode}</if>
             GROUP BY CONVERT(DATE, SCHEDULE_DATE), CX_MACHINE_CODE, ORDER_NO
@@ -599,7 +599,7 @@
             AND t.CX_MACHINE_CODE = latest.CX_MACHINE_CODE
             AND t.ORDER_NO = latest.ORDER_NO
             AND t.DATA_VERSION = latest.MAX_VERSION
-        WHERE CONVERT(DATE, t.SCHEDULE_DATE) &lt; CONVERT(DATE, GETDATE())
+        WHERE CONVERT(DATE, t.SCHEDULE_DATE) &lt;= CONVERT(DATE, GETDATE())
         <if test="factoryCode != null and factoryCode != ''">AND t.FACTORY_CODE = #{factoryCode}</if>
         <if test="companyCode != null and companyCode != ''">AND t.COMPANY_CODE = #{companyCode}</if>
     </select>
@@ -618,14 +618,14 @@
         INNER JOIN (
             SELECT CONVERT(DATE, FINISH_DATE) AS finish_day, FACTORY_CODE, EMBRYO_CODE, BOM_DATA_VERSION, MAX(DATA_VERSION) AS MAX_VERSION
             FROM MES_CX_DAY_FINISH_QTY
-            WHERE CONVERT(DATE, FINISH_DATE) &lt; CONVERT(DATE, GETDATE())
+            WHERE CONVERT(DATE, FINISH_DATE) &lt;= CONVERT(DATE, GETDATE())
             GROUP BY CONVERT(DATE, FINISH_DATE), FACTORY_CODE, EMBRYO_CODE, BOM_DATA_VERSION
         ) latest ON CONVERT(DATE, t.FINISH_DATE) = latest.finish_day
             AND t.FACTORY_CODE = latest.FACTORY_CODE
             AND t.EMBRYO_CODE = latest.EMBRYO_CODE
             AND t.BOM_DATA_VERSION = latest.BOM_DATA_VERSION
             AND t.DATA_VERSION = latest.MAX_VERSION
-        WHERE CONVERT(DATE, t.FINISH_DATE) &lt; CONVERT(DATE, GETDATE())
+        WHERE CONVERT(DATE, t.FINISH_DATE) &lt;= CONVERT(DATE, GETDATE())
     </select>
 
     <select id="selectAllDataVersionsFromMouldCleanPlan" resultType="java.lang.String">

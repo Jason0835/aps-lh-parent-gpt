@@ -54,9 +54,9 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
      * 下发硫化排程结果到MES
      * 业务规则：
      * 每条硫化排程结果自带8班数据，覆盖排程日期前2天到排程日期当天：
-     * 1. T-2日（窗口首日）数据：更新（存在则更新，不存在则插入），包含夜早中3班
+     * 1. T-2日（窗口首日）数据：更新（仅更新早中班，不覆盖夜班），不存在则插入
      * 2. T-1日（窗口次日）数据：更新（存在则更新，不存在则插入），包含夜早中3班
-     * 3. T日（排程日期当天）数据：先删除后插入，只包含早中2班（夜班尚未排产不下发）
+     * 3. T日（排程日期当天）数据：先删除后插入，包含夜早中3班
      * 日期从下发数据中推导，不再依赖LocalDate.now()
      *
      * @param lhScheduleResultIssueList 硫化排程结果列表
@@ -106,8 +106,9 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
         // 处理排程日期当天数据：转换为MES实体
         List<MesLhScheduleResult> day3MesList = convertToMesList(day3List, dataVersion, companyCode, factoryCode);
 
-        // 窗口首日和次日数据：更新（存在则更新，不存在则插入）
-        upsertLhScheduleResult(day1MesList, dataVersion);
+        // 窗口首日数据：仅更新早中班（不覆盖夜班），不存在则插入
+        upsertDay1LhScheduleResult(day1MesList, dataVersion);
+        // 窗口次日数据：更新（存在则更新，不存在则插入）
         upsertLhScheduleResult(day2MesList, dataVersion);
 
         // 排程日期当天数据：先删除后插入（确保数据干净）
@@ -183,6 +184,26 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
         }
         for (MesLhScheduleResult mesItem : mesList) {
             int updateCount = lhScheduleResultIssueMapper.updateByScheduleDateAndMachine(mesItem);
+            if (updateCount == 0) {
+                List<MesLhScheduleResult> insertList = new ArrayList<>();
+                insertList.add(mesItem);
+                lhScheduleResultIssueMapper.batchInsertLhScheduleResult(insertList);
+            }
+        }
+    }
+
+    /**
+     * T-2日（窗口首日）更新或插入数据
+     * 仅更新早中班（class2、class3），不覆盖夜班（class1）数据
+     * T-2日无夜班排产数据，避免将MES已有的夜班数据覆盖为空
+     * 中间表MES_LH_SCHEDULE_RESULT建在jy_aps_mid主库，Mapper已通过@DS(DataSource.MASTER)指定数据源
+     */
+    private void upsertDay1LhScheduleResult(List<MesLhScheduleResult> mesList, String dataVersion) {
+        if (CollectionUtils.isEmpty(mesList)) {
+            return;
+        }
+        for (MesLhScheduleResult mesItem : mesList) {
+            int updateCount = lhScheduleResultIssueMapper.updateDay1ByScheduleDateAndMachine(mesItem);
             if (updateCount == 0) {
                 List<MesLhScheduleResult> insertList = new ArrayList<>();
                 insertList.add(mesItem);

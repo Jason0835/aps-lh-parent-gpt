@@ -107,19 +107,19 @@ public interface ILhMesSyncRemoteService {
     @PostMapping("/mesSync/writeBackMouldChangePlanFinishStatus")
     AjaxResult writeBackMouldChangePlanFinishStatus(@RequestBody List<LhMoldAlterPlanFinish> list);
 
-    @ApiOperation("逻辑删除硫化在机今天之前所有数据")
+    @ApiOperation("逻辑删除硫化在机今天及今天之前所有数据")
     @PostMapping("/mesSync/logicDeleteLhMachineOnlineAllBeforeToday")
     AjaxResult logicDeleteLhMachineOnlineAllBeforeToday();
 
-    @ApiOperation("逻辑删除胶囊已使用次数今天之前所有数据")
+    @ApiOperation("逻辑删除胶囊已使用次数今天及今天之前所有数据")
     @PostMapping("/mesSync/logicDeleteLhRepairCapsuleAllBeforeToday")
     AjaxResult logicDeleteLhRepairCapsuleAllBeforeToday();
 
-    @ApiOperation("逻辑删除硫化排程完成量今天之前所有数据")
+    @ApiOperation("逻辑删除硫化排程完成量今天及今天之前所有数据")
     @PostMapping("/mesSync/logicDeleteLhScheFinishQtyAllBeforeToday")
     AjaxResult logicDeleteLhScheFinishQtyAllBeforeToday();
 
-    @ApiOperation("逻辑删除硫化排程日完成量今天之前所有数据")
+    @ApiOperation("逻辑删除硫化排程日完成量今天及今天之前所有数据")
     @PostMapping("/mesSync/logicDeleteLhDayFinishQtyAllBeforeToday")
     AjaxResult logicDeleteLhDayFinishQtyAllBeforeToday();
 

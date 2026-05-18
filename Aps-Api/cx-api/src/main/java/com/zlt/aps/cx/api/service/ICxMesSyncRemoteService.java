@@ -115,19 +115,19 @@ public interface ICxMesSyncRemoteService {
                                          @RequestParam("dataSource") String dataSource,
                                          @RequestParam("updateBy") String updateBy);
 
-    @ApiOperation("逻辑删除成型在机今天之前所有数据")
+    @ApiOperation("逻辑删除成型在机今天及今天之前所有数据")
     @PostMapping("/mesSync/logicDeleteCxMachineOnlineAllBeforeToday")
     AjaxResult logicDeleteCxMachineOnlineAllBeforeToday();
 
-    @ApiOperation("逻辑删除生胎库存今天之前所有数据")
+    @ApiOperation("逻辑删除生胎库存今天及今天之前所有数据")
     @PostMapping("/mesSync/logicDeleteCxStockAllBeforeToday")
     AjaxResult logicDeleteCxStockAllBeforeToday();
 
-    @ApiOperation("逻辑删除成型排程完成量今天之前所有数据")
+    @ApiOperation("逻辑删除成型排程完成量今天及今天之前所有数据")
     @PostMapping("/mesSync/logicDeleteCxScheFinishQtyAllBeforeToday")
     AjaxResult logicDeleteCxScheFinishQtyAllBeforeToday();
 
-    @ApiOperation("逻辑删除成型排程日完成量今天之前所有数据")
+    @ApiOperation("逻辑删除成型排程日完成量今天及今天之前所有数据")
     @PostMapping("/mesSync/logicDeleteCxDayFinishQtyAllBeforeToday")
     AjaxResult logicDeleteCxDayFinishQtyAllBeforeToday();
 

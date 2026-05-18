@@ -37,9 +37,8 @@ import java.util.stream.Collectors;
  * 特殊物料清单配置服务实现类
  * <p>
  * 唯一性校验逻辑（工厂为必要条件）：
- * - 有结构和物料情况：工厂 + 结构 + 物料编码
- * - 只有结构情况：工厂 + 结构
- * - 只有物料情况：工厂 + 物料编码
+ * - 有物料情况：工厂 + 物料编码 + 分类（分类只有19.5寸宽基和22.5寸宽基互斥，芯片胎可组合）
+ * - 有结构无物料情况：工厂 + 结构 + 分类（分类只有19.5寸宽基和22.5寸宽基互斥，芯片胎可组合）
  *
  * @author zlt
  * @date 2026-05-06
@@ -88,9 +87,9 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
      * 2. 分类必填
      * 3. 工厂必填
      * 4. 唯一性校验（工厂为必要条件）：
-     *    - 有结构和物料：工厂 + 结构 + 物料编码
-     *    - 只有结构：工厂 + 结构
-     *    - 只有物料：工厂 + 物料编码
+     *    - 有物料：工厂 + 物料编码 + 分类
+     *    - 有结构无物料：工厂 + 结构 + 分类
+     * 5. 分类冲突校验：19.5寸宽基和22.5寸宽基互斥，芯片胎可与它们组合
      */
     @Override
     public AjaxResult importData(List<LhSpecialMaterialBom> list, boolean updateSupport, Long importLogId) {
@@ -118,38 +117,33 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
                 .collect(Collectors.toList());
 
         if (CollectionUtils.isNotEmpty(validList)) {
-            // 2.1 按工厂+结构+物料编码分组（有结构和物料情况）
-            Map<String, List<LhSpecialMaterialBom>> factoryStructureMaterialRepeatMap = validList.stream()
+            // 2.1 按工厂+物料编码+分类分组（有物料情况）
+            Map<String, List<LhSpecialMaterialBom>> factoryMaterialCategoryRepeatMap = validList.stream()
+                    .filter(item -> StringUtil.isNotBlank(item.getFactoryCode())
+                            && StringUtil.isNotBlank(item.getMaterialCode())
+                            && StringUtil.isNotBlank(item.getCategory()))
+                    .collect(Collectors.groupingBy(item -> item.getFactoryCode() + "_" + item.getMaterialCode() + "_" + item.getCategory()));
+
+            // 2.2 按工厂+结构+分类分组（有结构无物料情况）
+            Map<String, List<LhSpecialMaterialBom>> factoryStructureCategoryRepeatMap = validList.stream()
                     .filter(item -> StringUtil.isNotBlank(item.getFactoryCode())
                             && StringUtil.isNotBlank(item.getStructureName())
-                            && StringUtil.isNotBlank(item.getMaterialCode()))
-                    .collect(Collectors.groupingBy(item -> item.getFactoryCode() + "_" + item.getStructureName() + "_" + item.getMaterialCode()));
+                            && StringUtil.isBlank(item.getMaterialCode())
+                            && StringUtil.isNotBlank(item.getCategory()))
+                    .collect(Collectors.groupingBy(item -> item.getFactoryCode() + "_" + item.getStructureName() + "_" + item.getCategory()));
 
-            // 2.2 按工厂+结构分组（只有结构情况）
-            Map<String, List<LhSpecialMaterialBom>> factoryStructureRepeatMap = validList.stream()
-                    .filter(item -> StringUtil.isNotBlank(item.getFactoryCode())
-                            && StringUtil.isNotBlank(item.getStructureName())
-                            && StringUtil.isBlank(item.getMaterialCode()))
-                    .collect(Collectors.groupingBy(item -> item.getFactoryCode() + "_" + item.getStructureName()));
-
-            // 2.3 按工厂+物料编码分组（只有物料情况）
-            Map<String, List<LhSpecialMaterialBom>> factoryMaterialRepeatMap = validList.stream()
-                    .filter(item -> StringUtil.isNotBlank(item.getFactoryCode())
-                            && StringUtil.isBlank(item.getStructureName())
-                            && StringUtil.isNotBlank(item.getMaterialCode()))
-                    .collect(Collectors.groupingBy(item -> item.getFactoryCode() + "_" + item.getMaterialCode()));
-
-            // 2.4 按工厂+物料编码分组（分类冲突校验用，含结构和物料的情况也按物料维度校验）
+            // 2.3 按工厂+物料编码分组（分类冲突校验用，有物料情况）
             Map<String, List<LhSpecialMaterialBom>> materialCategoryGroupMap = validList.stream()
                     .filter(item -> StringUtil.isNotBlank(item.getFactoryCode())
                             && StringUtil.isNotBlank(item.getMaterialCode())
                             && StringUtil.isNotBlank(item.getCategory()))
                     .collect(Collectors.groupingBy(item -> item.getFactoryCode() + "_" + item.getMaterialCode()));
 
-            // 2.5 按工厂+结构名称分组（分类冲突校验用，含物料和结构的情况也按结构维度校验）
+            // 2.4 按工厂+结构名称分组（分类冲突校验用，有结构无物料情况）
             Map<String, List<LhSpecialMaterialBom>> structureCategoryGroupMap = validList.stream()
                     .filter(item -> StringUtil.isNotBlank(item.getFactoryCode())
                             && StringUtil.isNotBlank(item.getStructureName())
+                            && StringUtil.isBlank(item.getMaterialCode())
                             && StringUtil.isNotBlank(item.getCategory()))
                     .collect(Collectors.groupingBy(item -> item.getFactoryCode() + "_" + item.getStructureName()));
 
@@ -183,12 +177,31 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
                             errorNum, message, importErrorLogs);
                 }
 
-                // Excel内重复校验 - 有结构和物料情况：工厂+结构+物料编码
-                if (StringUtil.isNotBlank(docEntity.getFactoryCode())
+                // Excel内重复校验 - 有物料情况：工厂+物料编码+分类
+                if (isCan && StringUtil.isNotBlank(docEntity.getFactoryCode())
+                        && StringUtil.isNotBlank(docEntity.getMaterialCode())
+                        && StringUtil.isNotBlank(docEntity.getCategory())) {
+                    String key = docEntity.getFactoryCode() + "_" + docEntity.getMaterialCode() + "_" + docEntity.getCategory();
+                    List<LhSpecialMaterialBom> repeatList = factoryMaterialCategoryRepeatMap.get(key);
+                    if (CollectionUtils.isNotEmpty(repeatList) && repeatList.size() > 1) {
+                        isCan = false;
+                        String message = String.format(I18nUtil.getMessage("import.validated.repeat"), errorNum,
+                                repeatList.stream()
+                                        .map(item -> String.valueOf(item.getRowNo()))
+                                        .filter(row -> !row.equals(String.valueOf(errorNum)))
+                                        .collect(Collectors.joining(", ")));
+                        ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                                errorNum, message, importErrorLogs);
+                    }
+                }
+
+                // Excel内重复校验 - 有结构无物料情况：工厂+结构+分类
+                if (isCan && StringUtil.isNotBlank(docEntity.getFactoryCode())
                         && StringUtil.isNotBlank(docEntity.getStructureName())
-                        && StringUtil.isNotBlank(docEntity.getMaterialCode())) {
-                    String key = docEntity.getFactoryCode() + "_" + docEntity.getStructureName() + "_" + docEntity.getMaterialCode();
-                    List<LhSpecialMaterialBom> repeatList = factoryStructureMaterialRepeatMap.get(key);
+                        && StringUtil.isBlank(docEntity.getMaterialCode())
+                        && StringUtil.isNotBlank(docEntity.getCategory())) {
+                    String key = docEntity.getFactoryCode() + "_" + docEntity.getStructureName() + "_" + docEntity.getCategory();
+                    List<LhSpecialMaterialBom> repeatList = factoryStructureCategoryRepeatMap.get(key);
                     if (CollectionUtils.isNotEmpty(repeatList) && repeatList.size() > 1) {
                         isCan = false;
                         String message = String.format(I18nUtil.getMessage("import.validated.repeat"), errorNum,
@@ -201,43 +214,7 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
                     }
                 }
 
-                // Excel内重复校验 - 只有结构情况：工厂+结构
-                if (StringUtil.isNotBlank(docEntity.getFactoryCode())
-                        && StringUtil.isNotBlank(docEntity.getStructureName())
-                        && StringUtil.isBlank(docEntity.getMaterialCode())) {
-                    String key = docEntity.getFactoryCode() + "_" + docEntity.getStructureName();
-                    List<LhSpecialMaterialBom> repeatList = factoryStructureRepeatMap.get(key);
-                    if (CollectionUtils.isNotEmpty(repeatList) && repeatList.size() > 1) {
-                        isCan = false;
-                        String message = String.format(I18nUtil.getMessage("import.validated.repeat"), errorNum,
-                                repeatList.stream()
-                                        .map(item -> String.valueOf(item.getRowNo()))
-                                        .filter(row -> !row.equals(String.valueOf(errorNum)))
-                                        .collect(Collectors.joining(", ")));
-                        ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                                errorNum, message, importErrorLogs);
-                    }
-                }
-
-                // Excel内重复校验 - 只有物料情况：工厂+物料编码
-                if (StringUtil.isNotBlank(docEntity.getFactoryCode())
-                        && StringUtil.isBlank(docEntity.getStructureName())
-                        && StringUtil.isNotBlank(docEntity.getMaterialCode())) {
-                    String key = docEntity.getFactoryCode() + "_" + docEntity.getMaterialCode();
-                    List<LhSpecialMaterialBom> repeatList = factoryMaterialRepeatMap.get(key);
-                    if (CollectionUtils.isNotEmpty(repeatList) && repeatList.size() > 1) {
-                        isCan = false;
-                        String message = String.format(I18nUtil.getMessage("import.validated.repeat"), errorNum,
-                                repeatList.stream()
-                                        .map(item -> String.valueOf(item.getRowNo()))
-                                        .filter(row -> !row.equals(String.valueOf(errorNum)))
-                                        .collect(Collectors.joining(", ")));
-                        ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
-                                errorNum, message, importErrorLogs);
-                    }
-                }
-
-                // Excel内分类冲突校验 - 按物料编码维度
+                // Excel内分类冲突校验 - 按物料编码维度（有物料情况）
                 if (isCan && StringUtil.isNotBlank(docEntity.getFactoryCode())
                         && StringUtil.isNotBlank(docEntity.getMaterialCode())
                         && StringUtil.isNotBlank(docEntity.getCategory())) {
@@ -258,9 +235,10 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
                     }
                 }
 
-                // Excel内分类冲突校验 - 按结构名称维度
+                // Excel内分类冲突校验 - 按结构名称维度（有结构无物料情况）
                 if (isCan && StringUtil.isNotBlank(docEntity.getFactoryCode())
                         && StringUtil.isNotBlank(docEntity.getStructureName())
+                        && StringUtil.isBlank(docEntity.getMaterialCode())
                         && StringUtil.isNotBlank(docEntity.getCategory())) {
                     String key = docEntity.getFactoryCode() + "_" + docEntity.getStructureName();
                     List<LhSpecialMaterialBom> groupList = structureCategoryGroupMap.get(key);
@@ -296,20 +274,21 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
                         checkList.add(docEntity);
                     } else {
                         if (updateSupport) {
-                            // 查询已存在记录进行更新
+                            // 查询已存在记录进行更新（按新的唯一性规则：有物料=工厂+物料+分类，有结构无物料=工厂+结构+分类）
                             LambdaQueryWrapper<LhSpecialMaterialBom> queryWrapper = Wrappers.lambdaQuery();
                             queryWrapper.eq(LhSpecialMaterialBom::getFactoryCode, docEntity.getFactoryCode());
-                            if (StringUtil.isNotBlank(docEntity.getStructureName())) {
-                                queryWrapper.eq(LhSpecialMaterialBom::getStructureName, docEntity.getStructureName());
-                            } else {
-                                queryWrapper.isNull(LhSpecialMaterialBom::getStructureName)
-                                        .or().eq(LhSpecialMaterialBom::getStructureName, "");
-                            }
+                            queryWrapper.eq(LhSpecialMaterialBom::getCategory, docEntity.getCategory());
                             if (StringUtil.isNotBlank(docEntity.getMaterialCode())) {
                                 queryWrapper.eq(LhSpecialMaterialBom::getMaterialCode, docEntity.getMaterialCode());
                             } else {
                                 queryWrapper.isNull(LhSpecialMaterialBom::getMaterialCode)
                                         .or().eq(LhSpecialMaterialBom::getMaterialCode, "");
+                            }
+                            if (StringUtil.isNotBlank(docEntity.getStructureName())) {
+                                queryWrapper.eq(LhSpecialMaterialBom::getStructureName, docEntity.getStructureName());
+                            } else {
+                                queryWrapper.isNull(LhSpecialMaterialBom::getStructureName)
+                                        .or().eq(LhSpecialMaterialBom::getStructureName, "");
                             }
                             LhSpecialMaterialBom existEntity = lhSpecialMaterialBomEntityMapper.selectOne(queryWrapper);
                             if (existEntity != null) {
@@ -368,39 +347,32 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
      * 校验唯一性
      * <p>
      * 唯一性规则（工厂为必要条件）：
-     * - 有结构和物料情况：工厂 + 结构 + 物料编码
-     * - 只有结构情况：工厂 + 结构
-     * - 只有物料情况：工厂 + 物料编码
+     * - 有物料情况：工厂 + 物料编码 + 分类（分类只有19.5寸宽基和22.5寸宽基互斥，芯片胎可组合）
+     * - 有结构无物料情况：工厂 + 结构 + 分类（分类只有19.5寸宽基和22.5寸宽基互斥，芯片胎可组合）
      *
      * @param entity 校验对象
      * @return 唯一性结果
      */
     @Override
     public String checkUnique(LhSpecialMaterialBom entity) {
-        if (entity == null || StringUtil.isBlank(entity.getFactoryCode())) {
+        if (entity == null || StringUtil.isBlank(entity.getFactoryCode()) || StringUtil.isBlank(entity.getCategory())) {
             return UserConstants.NOT_UNIQUE;
         }
 
         LambdaQueryWrapper<LhSpecialMaterialBom> wrapper = Wrappers.lambdaQuery();
         wrapper.ne(entity.getId() != null, LhSpecialMaterialBom::getId, entity.getId());
         wrapper.eq(LhSpecialMaterialBom::getFactoryCode, entity.getFactoryCode());
+        wrapper.eq(LhSpecialMaterialBom::getCategory, entity.getCategory());
 
-        // 有结构和物料情况：工厂 + 结构 + 物料编码
-        if (StringUtil.isNotBlank(entity.getStructureName()) && StringUtil.isNotBlank(entity.getMaterialCode())) {
-            wrapper.eq(LhSpecialMaterialBom::getStructureName, entity.getStructureName());
+        // 有物料情况：工厂 + 物料编码 + 分类
+        if (StringUtil.isNotBlank(entity.getMaterialCode())) {
             wrapper.eq(LhSpecialMaterialBom::getMaterialCode, entity.getMaterialCode());
         }
-        // 只有结构情况：工厂 + 结构
+        // 有结构无物料情况：工厂 + 结构 + 分类
         else if (StringUtil.isNotBlank(entity.getStructureName())) {
             wrapper.eq(LhSpecialMaterialBom::getStructureName, entity.getStructureName());
             wrapper.and(w -> w.isNull(LhSpecialMaterialBom::getMaterialCode)
                     .or().eq(LhSpecialMaterialBom::getMaterialCode, ""));
-        }
-        // 只有物料情况：工厂 + 物料编码
-        else if (StringUtil.isNotBlank(entity.getMaterialCode())) {
-            wrapper.eq(LhSpecialMaterialBom::getMaterialCode, entity.getMaterialCode());
-            wrapper.and(w -> w.isNull(LhSpecialMaterialBom::getStructureName)
-                    .or().eq(LhSpecialMaterialBom::getStructureName, ""));
         }
 
         Long count = lhSpecialMaterialBomEntityMapper.selectCount(wrapper);
@@ -413,13 +385,13 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("factoryCode", "structureName", "materialCode");
+        return Arrays.asList("factoryCode", "materialCode", "structureName", "category");
     }
 
     /**
      * 校验分类冲突。
-     * 同一工厂+物料/结构组合下，只能有一条芯片胎分类和一条非芯片胎分类的数据，
-     * 不能同时存在芯片胎、19.5寸宽基和22.5寸宽基。
+     * 有物料情况：同一工厂+物料编码下，19.5寸宽基和22.5寸宽基互斥，芯片胎可与它们组合。
+     * 有结构无物料情况：同一工厂+结构下，19.5寸宽基和22.5寸宽基互斥，芯片胎可与它们组合。
      *
      * @param entity 待校验实体
      * @return 冲突结果，null表示无冲突，非null表示冲突描述
@@ -430,7 +402,7 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
             return null;
         }
 
-        // 按物料编码维度校验
+        // 有物料情况：按物料编码维度校验分类冲突
         if (StringUtil.isNotBlank(entity.getMaterialCode())) {
             String conflict = checkCategoryConflictByMaterial(entity);
             if (conflict != null) {
@@ -438,8 +410,8 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
             }
         }
 
-        // 按结构名称维度校验
-        if (StringUtil.isNotBlank(entity.getStructureName())) {
+        // 有结构无物料情况：按结构名称维度校验分类冲突
+        if (StringUtil.isNotBlank(entity.getStructureName()) && StringUtil.isBlank(entity.getMaterialCode())) {
             String conflict = checkCategoryConflictByStructure(entity);
             if (conflict != null) {
                 return conflict;
@@ -473,8 +445,8 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
     }
 
     /**
-     * 按结构名称维度校验分类冲突。
-     * 查询同一工厂+结构名称下已存在的所有分类，与当前实体分类合并后校验约束。
+     * 按结构名称维度校验分类冲突（有结构无物料情况）。
+     * 查询同一工厂+结构名称下（物料编码为空）已存在的所有分类，与当前实体分类合并后校验约束。
      *
      * @param entity 待校验实体
      * @return 冲突结果，null表示无冲突，非null表示冲突描述
@@ -484,6 +456,8 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
         wrapper.ne(entity.getId() != null, LhSpecialMaterialBom::getId, entity.getId());
         wrapper.eq(LhSpecialMaterialBom::getFactoryCode, entity.getFactoryCode());
         wrapper.eq(LhSpecialMaterialBom::getStructureName, entity.getStructureName());
+        wrapper.and(w -> w.isNull(LhSpecialMaterialBom::getMaterialCode)
+                .or().eq(LhSpecialMaterialBom::getMaterialCode, ""));
         List<LhSpecialMaterialBom> existList = lhSpecialMaterialBomEntityMapper.selectList(wrapper);
 
         Set<String> categorySet = existList.stream()
@@ -497,8 +471,8 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
 
     /**
      * 校验分类集合约束。
-     * 同一维度下只能有一条芯片胎分类和一条非芯片胎分类的数据，
-     * 即非芯片胎分类（19.5寸宽基、22.5寸宽基）最多只能出现一种。
+     * 19.5寸宽基(01)和22.5寸宽基(02)互斥，芯片胎(03)可与它们组合。
+     * 即非芯片胎分类最多只能出现一种。
      *
      * @param categorySet 分类编码集合
      * @param dimensionName 维度名称（物料编码/结构名称）

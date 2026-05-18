@@ -35,6 +35,15 @@ public interface LhScheduleResultIssueMapper {
     int updateByScheduleDateAndMachine(MesLhScheduleResult mesItem);
 
     /**
+     * 根据排程日期和机台更新数据（仅更新早中班，不覆盖夜班）
+     * 用于T-2日（窗口首日）下发，T-2日无夜班数据，避免将MES已有的夜班数据覆盖为空
+     *
+     * @param mesItem 数据项
+     * @return 影响行数
+     */
+    int updateDay1ByScheduleDateAndMachine(MesLhScheduleResult mesItem);
+
+    /**
      * 根据排程日期删除数据
      *
      * @param scheduleDate 排程日期

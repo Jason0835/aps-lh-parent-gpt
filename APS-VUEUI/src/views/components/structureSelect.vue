@@ -8,6 +8,7 @@
     :disabled="disabled"
     @show="handleShow"
     @cancel="handleCancel"
+    dialogWidth="600px"
   >
     <div class="table-container" v-loading="loading">
       <page-table
@@ -112,7 +113,7 @@ export default {
         {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
-          width:800
+          minWidth: 200
 
         },
       ];
@@ -313,7 +314,9 @@ export default {
   }
 }
 .table-container {
-  height: 450px;
-
+  height: 400px;
+  :deep(.el-table) {
+    width: 100% !important;
+  }
 }
 </style>

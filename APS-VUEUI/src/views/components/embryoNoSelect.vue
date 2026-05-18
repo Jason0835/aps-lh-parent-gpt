@@ -52,6 +52,7 @@ export default {
     title: String,
     disabled: Boolean,
     materialCode:String,
+    trialStatus:String,
     label: String,
     multiple: {
       type: Boolean,
@@ -89,13 +90,15 @@ export default {
               {
           prop: "factoryCode",
           label: this.$t("common.factory"),
-          type: "select", //GLUE_TYPE
+          type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
-        // {
-        //   label: this.$t("ui.data.colume.wms.unused.productCode"),
-        //   prop: "materialCode",
-        // },
+        {
+          prop: "trialStatus",
+          label: this.$t("ui.data.column.trialPlan.trialStatus"),
+          type: "select",
+          dictData: this.parentDict.type.lh_trial_status,
+        },
       ];
     },
     columns: function () {
@@ -122,7 +125,7 @@ export default {
           prop: "trialStatus",
           label: this.$t("ui.data.column.trialPlan.trialStatus"),
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.parentDict.type.trial_status, value);
+            return this.selectDictLabel(this.parentDict.type.lh_trial_status, value);
           },
         },
         {
@@ -222,7 +225,8 @@ export default {
     handleShow() {
       let defaultParams = {
         factoryCode: "116",
-        materialCode:this.materialCode
+        materialCode:this.materialCode,
+        trialStatus:this.trialStatus,
       };
       this.search = {
         ...defaultParams,
