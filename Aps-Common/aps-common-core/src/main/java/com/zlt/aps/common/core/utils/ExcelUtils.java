@@ -912,7 +912,7 @@ public class ExcelUtils {
                     java.awt.Color fColor = java.awt.Color.decode(fontColor);
                     byte[] fRgb = new byte[]{(byte) fColor.getRed(), (byte) fColor.getGreen(), (byte) fColor.getBlue()};
                     XSSFColor xssfFontColor = new XSSFColor(fRgb, null);
-                    font.setColor(xssfFontColor);
+                    ((XSSFFont) font).setColor(xssfFontColor);
                 }
                 cellStyle.setFont(font);
             } else if (oldStyle != null) { // 否则将原单元格字体原样设置到样式中
