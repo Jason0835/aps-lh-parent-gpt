@@ -1155,6 +1155,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             insertItem.setTypeBlockQty(insertResults.getOrDefault(materialDesc, 0));
             insertItem.setYearMonth(yearMonth);
         }
+        
+        this.setSpecialMaterial(factoryCode, new ArrayList<>(resultMap.values()));
     }
 
     /**
@@ -1226,6 +1228,12 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 noPlanVo.setPattern(mdmMaterialInfo.getPattern());
                 noPlanVo.setBrand(mdmMaterialInfo.getBrand());
                 noPlanVo.setMainPattern(mdmMaterialInfo.getMainPattern());
+            }
+            
+            // 过滤条件有结构的，结构要匹配上
+            if (StringUtils.isNotEmpty(condition.getStructureName())
+                    && !Objects.equals(condition.getStructureName(), noPlanVo.getStructureName())) {
+                continue;
             }
             // 结构类型
             String structureType;
