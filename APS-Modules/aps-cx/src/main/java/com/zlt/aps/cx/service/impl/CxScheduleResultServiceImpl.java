@@ -978,6 +978,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                             List<MdmMaterialInfo> materialInfoList = finalMaterialInfoMap.getOrDefault(item.getEmbryoCode(), new ArrayList<>());
                             List<String> resultList = materialInfoList.stream()
                                     .map(i -> StringUtils.defaultIfBlank(i.getSpecifications(), "") + "/" + StringUtils.defaultIfBlank(i.getPattern(), ""))
+                                    .distinct()
                                     .collect(Collectors.toList());
                             return String.join(",", resultList);
                         },
