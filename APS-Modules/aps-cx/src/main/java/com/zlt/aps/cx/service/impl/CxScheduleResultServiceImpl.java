@@ -330,7 +330,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                         cellStyleList.add(new CellStyle(
                                 rowNum, rowNum,
                                 8, 8,
-                                "#FF0000", true, false, null));
+                                null, true, false, null, "#FF0000"));
                     }
                 }
             }

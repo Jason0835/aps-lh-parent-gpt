@@ -26,6 +26,18 @@ public class CellStyle {
         this.fontName = fontName;
     }
 
+    public CellStyle(int startRowNum, int endRowNum, int startCellNum, int endCellNum, String color, boolean withBorder, boolean bold, String fontName, String fontColor) {
+        this.startRowNum = startRowNum;
+        this.endRowNum = endRowNum;
+        this.startCellNum = startCellNum;
+        this.endCellNum = endCellNum;
+        this.color = color;
+        this.withBorder = withBorder;
+        this.bold = bold;
+        this.fontName = fontName;
+        this.fontColor = fontColor;
+    }
+
     /**
      * 开始行
      */
@@ -65,5 +77,10 @@ public class CellStyle {
      * 字体名称
      */
     private String fontName;
+
+    /**
+     * 字体颜色，设置后字体将以该颜色显示
+     */
+    private String fontColor;
 
 }
