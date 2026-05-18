@@ -497,7 +497,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     log.warn("新增SKU多机台排产未全部完成, materialCode: {}, 已排: {}, 剩余: {}, 满班超排: {}, 候选机台已耗尽",
                             sku.getMaterialCode(), totalScheduledQty, remainingQty, sku.getShiftFillOverQty());
                     // 剩余未排量计入未排结果
-                    addUnscheduledResult(context, sku, "多机台产能不足，剩余" + remainingQty + "未排", unscheduledReasonCountMap);
+                    addUnscheduledResult(context, sku, remainingQty,
+                            "多机台产能不足，剩余" + remainingQty + "未排", unscheduledReasonCountMap);
                     iterator.remove();
                 } else if (remainingQty > 0) {
                     // 总量上仍有剩余（可能来自欠产传导），但日计划额度已满足，移出待排队列
@@ -575,6 +576,17 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                     sku.getMaterialCode(), preferredTrialMachine.getMachineCode());
             return preferredTrialMachine;
         }
+        if (isTrialConstructionStage(sku) && hasSingleControlCandidate(candidates)) {
+            MachineScheduleDTO singleControlMachine = selectAvailableSingleControlMachine(candidates, excludedMachineCodes);
+            if (singleControlMachine != null) {
+                log.info("新增排产试制SKU仅尝试单控机台, materialCode: {}, machineCode: {}",
+                        sku.getMaterialCode(), singleControlMachine.getMachineCode());
+                return singleControlMachine;
+            }
+            log.info("新增排产试制SKU单控候选均已排除，不回落普通机台, materialCode: {}",
+                    sku.getMaterialCode());
+            return null;
+        }
         if (quantityPolicy != null && quantityPolicy.isFullRunForNonTailMachine()) {
             return machineMatch.selectBestMachine(context, sku, candidates, excludedMachineCodes);
         }
@@ -595,6 +607,59 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return tailConcentratedMachine;
         }
         return machineMatch.selectBestMachine(context, sku, candidates, excludedMachineCodes);
+    }
+
+    /**
+     * 判断是否为试制施工阶段。
+     *
+     * @param sku 待排SKU
+     * @return true-试制阶段
+     */
+    private boolean isTrialConstructionStage(SkuScheduleDTO sku) {
+        return sku != null && StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage());
+    }
+
+    /**
+     * 判断候选机台中是否存在单控机台。
+     *
+     * @param candidates 候选机台
+     * @return true-存在单控机台
+     */
+    private boolean hasSingleControlCandidate(List<MachineScheduleDTO> candidates) {
+        if (CollectionUtils.isEmpty(candidates)) {
+            return false;
+        }
+        for (MachineScheduleDTO candidate : candidates) {
+            if (candidate != null && LhSingleControlMachineUtil.isSingleMouldMachine(candidate.getMachineCode())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 选择尚未排除的单控机台。
+     *
+     * @param candidates 候选机台
+     * @param excludedMachineCodes 已排除机台
+     * @return 可尝试的单控机台
+     */
+    private MachineScheduleDTO selectAvailableSingleControlMachine(List<MachineScheduleDTO> candidates,
+                                                                   Set<String> excludedMachineCodes) {
+        if (CollectionUtils.isEmpty(candidates)) {
+            return null;
+        }
+        for (MachineScheduleDTO candidate : candidates) {
+            if (candidate == null || !LhSingleControlMachineUtil.isSingleMouldMachine(candidate.getMachineCode())) {
+                continue;
+            }
+            if (!CollectionUtils.isEmpty(excludedMachineCodes)
+                    && excludedMachineCodes.contains(candidate.getMachineCode())) {
+                continue;
+            }
+            return candidate;
+        }
+        return null;
     }
 
     /**
@@ -922,6 +987,21 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         return StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())
                 || StringUtils.equals(ConstructionStageEnum.MASS_TRIAL.getCode(), sku.getConstructionStage());
+    }
+
+    /**
+     * 判断 SKU 是否属于试制/量试。
+     *
+     * @param sku SKU
+     * @return true-试制或量试
+     */
+    private boolean isTrialOrMassTrialSku(SkuScheduleDTO sku) {
+        if (sku == null) {
+            return false;
+        }
+        return StringUtils.equals(ConstructionStageEnum.TRIAL.getCode(), sku.getConstructionStage())
+                || StringUtils.equals(ConstructionStageEnum.MASS_TRIAL.getCode(), sku.getConstructionStage())
+                || sku.isTrial();
     }
 
     /**
@@ -1705,7 +1785,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @return true-跳过排产
      */
     private boolean shouldSkipTrialSku(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (sku == null || !sku.isTrial()) {
+        if (sku == null || !isTrialOrMassTrialSku(sku)) {
             return false;
         }
         ITrialProductionStrategy strategy = getTrialProductionStrategy();
@@ -2102,6 +2182,19 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * 添加未排产记录
      */
     private void addUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku, String reason) {
+        addUnscheduledResult(context, sku, sku.resolveTargetScheduleQty(), reason);
+    }
+
+    /**
+     * 添加未排产记录
+     *
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param unscheduledQty 未排数量
+     * @param reason 未排原因
+     */
+    private void addUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku,
+                                      int unscheduledQty, String reason) {
         LhUnscheduledResult unscheduled = new LhUnscheduledResult();
         unscheduled.setFactoryCode(context.getFactoryCode());
         unscheduled.setBatchNo(context.getBatchNo());
@@ -2109,7 +2202,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         unscheduled.setMaterialDesc(sku.getMaterialDesc());
         unscheduled.setScheduleDate(context.getScheduleTargetDate());
         unscheduled.setUnscheduledReason(reason);
-        unscheduled.setUnscheduledQty(sku.resolveTargetScheduleQty());
+        unscheduled.setUnscheduledQty(Math.max(0, unscheduledQty));
         unscheduled.setStructureName(sku.getStructureName());
         unscheduled.setMainMaterialDesc(sku.getMainMaterialDesc());
         unscheduled.setSpecCode(sku.getSpecCode());
@@ -2118,7 +2211,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         unscheduled.setDataSource(AUTO_DATA_SOURCE);
         unscheduled.setIsDelete(0);
         context.getUnscheduledResultList().add(unscheduled);
-        log.debug("新增SKU未排产, SKU: {}, 原因: {}", sku.getMaterialCode(), reason);
+        log.debug("新增SKU未排产, SKU: {}, 未排数量: {}, 原因: {}",
+                sku.getMaterialCode(), Math.max(0, unscheduledQty), reason);
     }
 
     /**
@@ -2127,6 +2221,22 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private void addUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku, String reason,
                                       Map<String, Integer> reasonCountMap) {
         addUnscheduledResult(context, sku, reason);
+        reasonCountMap.merge(reason, 1, Integer::sum);
+    }
+
+    /**
+     * 添加指定数量的未排产记录并累计原因分布。
+     *
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param unscheduledQty 未排数量
+     * @param reason 未排原因
+     * @param reasonCountMap 原因分布
+     */
+    private void addUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku,
+                                      int unscheduledQty, String reason,
+                                      Map<String, Integer> reasonCountMap) {
+        addUnscheduledResult(context, sku, unscheduledQty, reason);
         reasonCountMap.merge(reason, 1, Integer::sum);
     }
 
