@@ -133,6 +133,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         // 没有数据，需新增
         if (CollUtil.isEmpty(mpAdjustResultList)) {
             entity.setId(null);
+            entity.setAdjustFlag(YesOrNoEnum.YES.getCode());
             mpAdjustResultEntityMapper.insert(entity);
         } else {
             //2、更新每日调整值
