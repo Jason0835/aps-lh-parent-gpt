@@ -934,6 +934,17 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             for (FactoryMonthPlanFinalAdjustVo adjustVo : dataList) {
                 finalResultMap.putIfAbsent(buildAdjustMapKey(matchVersion, adjustVo), adjustVo);
             }
+        } else {
+            FactoryMonthPlanProductionFinalResult param = new FactoryMonthPlanProductionFinalResult();
+            param.setYear(condition.getYear());
+            param.setMonth(condition.getMonth());
+            List<FactoryMonthPlanFinalAdjustVo> versionList = this.finalMapper.list4Adjust(param);
+            if (CollectionUtils.isNotEmpty(versionList)) {
+                FactoryMonthPlanFinalAdjustVo firstAdjust = versionList.get(0);
+                condition.setLastMonthPlanVersion(firstAdjust.getLastMonthPlanVersion());
+                condition.setProductionVersion(firstAdjust.getProductionVersion());
+                condition.setProductTypeCode(firstAdjust.getProductTypeCode());
+            }
         }
         
         // 查询调整
@@ -1031,7 +1042,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         if (resultMap.isEmpty()) {
             return;
         }
-        Map<String, DpDemandPlanSum> demandPlanMap = demandPlanSumMap.values().stream().collect(Collectors.toMap(DpDemandPlanSum::getMaterialCode, Function.identity()));
+        Map<String, DpDemandPlanSum> demandPlanMap = demandPlanSumMap.values().stream().collect(Collectors.toMap(DpDemandPlanSum::getMaterialCode, Function.identity(), (p1, p2) -> p1));
         List<Entry<String, FactoryMonthPlanFinalAdjustVo>> insertList = new ArrayList<>(resultMap.entrySet());
         // 计划类型、产品品类、MES物料编码、产品分类、排产分类、规格、花纹、品牌、SUM(高优先级数量)、月均销量、库销比、SUM(生产需求计划)、SUM(实际生产需求（含损耗）)、结构类型 --- 数据源：需求计划
         String monthPlanVersion = condition.getLastMonthPlanVersion();
