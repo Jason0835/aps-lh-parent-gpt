@@ -20,6 +20,7 @@ import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.IncrementConstant;
+import com.zlt.aps.enums.ProductionGroupTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.itf.mes.IMesItfService;
@@ -28,6 +29,8 @@ import com.zlt.aps.maindata.enums.EventModuleTypeEnum;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.enums.ReleaseStatusEnum;
 import com.zlt.aps.maindata.event.publisher.EventPublisher;
+import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.mapper.MpTrialPlanEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -145,7 +148,9 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     @Autowired
     private FactoryMonthPlanProductLhCapacityMapper factoryMonthPlanProductLhCapacityMapper;
     @Autowired
-    private MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
+    @Autowired
+    private MdmCycleSchStruConfEntityMapper mdmCycleSchStruConfEntityMapper;
     @Autowired
     private DataManager dataManager;
 
@@ -988,10 +993,6 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         this.fillMonthPlanMouldResult(condition, demandPlanSumMap, newSkuResultMap, structureAllocationMap);
         finalResultMap.putAll(newSkuResultMap);
         List<FactoryMonthPlanFinalAdjustVo> resultList = new ArrayList<>(finalResultMap.values());
-        // 根据成型机台过滤数据
-        if (StringUtils.isNotEmpty(condition.getCxMachineCode())) {
-            
-        }
         
         if (CollectionUtils.isNotEmpty(resultList)) {
             Locale language = SecurityUtils.getUserLang();
@@ -1069,55 +1070,25 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             insertResults = moldResult.get(0).getInsertResults();
         }
         
-        // 加载日历
-        LambdaQueryWrapper<MdmWorkCalendar> calendarQueryWrapper = new LambdaQueryWrapper<>();
-        calendarQueryWrapper.eq(MdmWorkCalendar::getFactoryCode, factoryCode);
-        calendarQueryWrapper.eq(MdmWorkCalendar::getYear, year);
-        calendarQueryWrapper.eq(MdmWorkCalendar::getMonth, month);
-        calendarQueryWrapper.eq(MdmWorkCalendar::getIsDelete, YesOrNoEnum.NO.getValue());
-        calendarQueryWrapper.eq(MdmWorkCalendar::getProcCode, "01");
-        List<MdmWorkCalendar> calendarList = mdmWorkCalendarEntityMapper.selectList(calendarQueryWrapper);
-        Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = new HashMap<>();
-        Set<Integer> stopDaySet = new HashSet<>();
-        for (MdmWorkCalendar workCalendar: calendarList) {
-            MpDailyCapacityLimitVo limitVo = new MpDailyCapacityLimitVo();
-            Integer day = workCalendar.getDay();
-            Integer lastDay = day - 1;
-            boolean isOpenProductionFirstDay = false;
-            if (Objects.equals(workCalendar.getDayFlag(), YesOrNoEnum.YES.getCode())) { // 在产
-                if (stopDaySet.contains(lastDay)) { // 检查上一天是否停产
-                    isOpenProductionFirstDay = true;
-                }
-            } else { // 停产
-                stopDaySet.add(day);
-            }
-            limitVo.setDayProductionRate(workCalendar.getRate());
-            limitVo.setOpenProductionFirstDay(isOpenProductionFirstDay);
-            dailyCapacityMap.put(day, limitVo);
-        }
-        
         for (Entry<String, FactoryMonthPlanFinalAdjustVo> entry: insertList) {
-            String key = entry.getKey();
             FactoryMonthPlanFinalAdjustVo insertItem = entry.getValue();
-            String structureName = insertItem.getStructureName();
             String materialCode = insertItem.getMaterialCode();
-            String materialDesc = insertItem.getMaterialDesc();
-            String cxMachineCode = structureAllocationMap.get(structureName);
+            DpDemandPlanSum demandPlan = demandPlanMap.get(materialCode);
+            String structureName = demandPlan != null? demandPlan.getStructureName(): insertItem.getStructureName();
+            String materialDesc = demandPlan != null? demandPlan.getMaterialDesc(): insertItem.getMaterialDesc();
             // 成型机条件过滤
+            String cxMachineCode = structureAllocationMap.get(structureName);
             if (StringUtils.isNotEmpty(condition.getCxMachineCode())) {
                 if (StringUtils.isEmpty(cxMachineCode) || !cxMachineCode.contains(condition.getCxMachineCode()))
-                structureAllocationMap.remove(key);
+                structureAllocationMap.remove(entry.getKey());
                 continue;
             }
-            
-            DpDemandPlanSum demandPlan = demandPlanMap.get(materialCode);
+            insertItem.setCxMachineCode(cxMachineCode);
+            insertItem.setMonthPlanVersion(monthPlanVersion);
+            insertItem.setProductionVersion(productionVersion);
+            insertItem.setStructureName(structureName);
+            insertItem.setMaterialDesc(materialDesc);
             if (demandPlan != null) {
-                structureName = demandPlan.getStructureName();
-                materialDesc = demandPlan.getMaterialDesc();
-                insertItem.setMonthPlanVersion(monthPlanVersion);
-                insertItem.setProductionVersion(productionVersion);
-                insertItem.setStructureName(structureName);
-                insertItem.setMaterialDesc(materialDesc);
                 insertItem.setMesMaterialCode(demandPlan.getMesMaterialCode());
                 insertItem.setProductTypeCode(demandPlan.getProductTypeCode());
                 insertItem.setSpecifications(demandPlan.getSpecifications());
@@ -1133,7 +1104,6 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 // 计算库销比
                 insertItem.setInventorySalesRatio(BigDecimalUtils.div(demandPlan.getStockQty(), demandPlan.getAverageSaleQty(), 1));
             }
-            insertItem.setCxMachineCode(cxMachineCode);
             // 胎胚号、施工阶段、是否零度材料、制造示方书号、文字示方书号、硫化示方书号---数据源：SKU与示方书关系，关联：SKU+胎胚描述
             List<MonthPlanProductConstructionInfoVo> constructionConfigurationList = constructionInfoMap.get(materialCode);
             if (!CollectionUtils.isEmpty(constructionConfigurationList)) {
@@ -1181,6 +1151,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     protected Map<String, FactoryMonthPlanFinalAdjustVo> fillTrialPlanSku(String matchVersion,
                                                                           FactoryMonthPlanProductionFinalResult condition,
                                                                           Map<String, FactoryMonthPlanFinalAdjustVo> finalResultMap) {
+        Map<String, FactoryMonthPlanFinalAdjustVo> resultMap = new HashMap<>();
         LambdaQueryWrapper<MpTrialPlan> mpTrialPlanQueryWrapper = new LambdaQueryWrapper<>();
         mpTrialPlanQueryWrapper.eq(MpTrialPlan::getFactoryCode, condition.getFactoryCode());
         mpTrialPlanQueryWrapper.eq(MpTrialPlan::getYear, condition.getYear());
@@ -1189,9 +1160,27 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         mpTrialPlanQueryWrapper.like(StringUtils.isNotEmpty(condition.getMaterialDesc()), MpTrialPlan::getMaterialDesc, condition.getMaterialDesc());
         mpTrialPlanQueryWrapper.isNull(MpTrialPlan::getProductionDate);
         List<MpTrialPlan> trialPlanList = mpTrialPlanEntityMapper.selectList(mpTrialPlanQueryWrapper);
-        Map<String, FactoryMonthPlanFinalAdjustVo> resultMap = new HashMap<>();
+        if (CollectionUtils.isEmpty(trialPlanList)) {
+            return resultMap;
+        }
+
+        // 加载SKU与结构关系
+        List<String> materialCodeList = trialPlanList.stream().map(MpTrialPlan::getMaterialCode).distinct().collect(Collectors.toList());
+        LambdaQueryWrapper<MdmMaterialInfo> mdmMaterialInfoQueryWrapper = new LambdaQueryWrapper<>();
+        mdmMaterialInfoQueryWrapper.eq(MdmMaterialInfo::getFactoryCode, condition.getFactoryCode());
+        mdmMaterialInfoQueryWrapper.in(MdmMaterialInfo::getFactoryCode, materialCodeList);
+        mdmMaterialInfoQueryWrapper.isNotNull(MdmMaterialInfo::getStructureName);
+        Map<String, MdmMaterialInfo> materialInfoMap = mdmMaterialInfoEntityMapper
+                .selectList(mdmMaterialInfoQueryWrapper).stream()
+                .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (m1, m2) -> m1));
+        
+        // 加载周期结构
+        LambdaQueryWrapper<MdmCycleSchStruConf> mdmCycleSchStruConfQueryWrapper = new LambdaQueryWrapper<>();
+        mdmCycleSchStruConfQueryWrapper.eq(MdmCycleSchStruConf::getFactoryCode, condition.getFactoryCode());
+        Set<String> cycleSchStruSet = mdmCycleSchStruConfEntityMapper.selectList(mdmCycleSchStruConfQueryWrapper).stream().map(MdmCycleSchStruConf::getStructureName).distinct().collect(Collectors.toSet());
 
         for (MpTrialPlan trialPlan : trialPlanList) {
+            String materialCode = trialPlan.getMaterialCode();
             // 产品状态与施工类型映射
             String constructionStage;
             if (com.zlt.aps.enums.ConstructionStageEnum.TRIAL_FLAG.equals(trialPlan.getTrialStatus())) {
@@ -1203,14 +1192,34 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             } else {
                 constructionStage = ConstructionStageEnum.NO_PROCESS.getCode();
             }
-            String matchKey = matchVersion + "|" + trialPlan.getMaterialCode() + "|" + constructionStage;
+            String matchKey = matchVersion + "|" + materialCode + "|" + constructionStage;
             FactoryMonthPlanFinalAdjustVo adjustVo = finalResultMap.get(matchKey);
             if (adjustVo != null) {
                 continue;
             }
+            MdmMaterialInfo mdmMaterialInfo = materialInfoMap.get(materialCode);
             FactoryMonthPlanFinalAdjustVo noPlanVo = new FactoryMonthPlanFinalAdjustVo();
-            noPlanVo.setMaterialCode(trialPlan.getMaterialCode());
-            noPlanVo.setMonthPlanVersion(matchVersion);
+            noPlanVo.setMaterialCode(materialCode);
+            noPlanVo.setMaterialDesc(trialPlan.getMaterialDesc());
+            // 物料基础信息
+            if (mdmMaterialInfo != null) {
+                noPlanVo.setStructureName(mdmMaterialInfo.getStructureName());
+                noPlanVo.setMesMaterialCode(mdmMaterialInfo.getMesMaterialCode());
+                noPlanVo.setProductTypeCode(mdmMaterialInfo.getProductTypeCode());
+                noPlanVo.setSpecifications(mdmMaterialInfo.getSpecifications());
+                noPlanVo.setPattern(mdmMaterialInfo.getPattern());
+                noPlanVo.setBrand(mdmMaterialInfo.getBrand());
+                noPlanVo.setMainPattern(mdmMaterialInfo.getMainPattern());
+            }
+            // 结构类型
+            String structureType;
+            if (CollectionUtils.isNotEmpty(cycleSchStruSet) && cycleSchStruSet.contains(noPlanVo.getStructureName())) {
+                structureType = ProductionGroupTypeEnum.CYCLE.getGroupType();
+            } else {
+                structureType = ProductionGroupTypeEnum.CONVENTION.getGroupType();
+            }
+            noPlanVo.setStructureType(structureType);
+            
             noPlanVo.setConstructionStage(constructionStage);
             finalResultMap.put(matchKey, noPlanVo);
             resultMap.put(matchKey, noPlanVo);
