@@ -177,6 +177,13 @@ export default {
           minWidth: 120,
         },
         {
+          prop: "remark",
+          align: "left",
+          halign: "center",
+          label: this.$t("ui.data.column.lhSharedMouldPat.remark"),
+          minWidth: 150,
+        },
+        {
           prop: "updateTime",
           align: "center",
           halign: "center",
@@ -227,6 +234,10 @@ export default {
         {
           label: this.$t("ui.data.column.lhSharedMouldPat.materialCode"),
           prop: "materialCode",
+        },
+        {
+          label: this.$t("ui.data.column.lhSharedMouldPat.materialDesc"),
+          prop: "materialDesc",
         },
         {
           label: this.$t("ui.data.column.lhSharedMouldPat.mainPattern"),

@@ -48,12 +48,11 @@ public class LhSharedMouldPat extends BaseEntity implements Serializable {
     private String materialCode;
 
     /**
-     * 物料描述
+     * 物料描述（根据物料编码从物料主数据反显，导入模板中不需要填写）
      */
-    @Excel(name = "ui.data.column.lhSharedMouldPat.materialDesc", width = 60, align = Excel.Align.LEFT)
+    @Excel(name = "ui.data.column.lhSharedMouldPat.materialDesc", width = 60, align = Excel.Align.LEFT, type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "物料描述")
     @TableField(value = "MATERIAL_DESC")
-    @ImportExcelValidated(maxLength = 300)
     private String materialDesc;
 
     /**
@@ -71,7 +70,7 @@ public class LhSharedMouldPat extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.lhSharedMouldPat.mainPattern")
     @ApiModelProperty(value = "主花纹")
     @TableField(value = "MAIN_PATTERN")
-    @ImportExcelValidated(required = true, maxLength = 50)
+    @ImportExcelValidated(maxLength = 50)
     private String mainPattern;
 
     /**
@@ -98,7 +97,7 @@ public class LhSharedMouldPat extends BaseEntity implements Serializable {
     @Excel(name = "ui.data.column.lhSharedMouldPat.patternBlock")
     @ApiModelProperty(value = "花纹块")
     @TableField(value = "PATTERN_BLOCK")
-    @ImportExcelValidated(maxLength = 64)
+    @ImportExcelValidated(required = true, maxLength = 64)
     private String patternBlock;
 
     /**
@@ -116,13 +115,22 @@ public class LhSharedMouldPat extends BaseEntity implements Serializable {
     private String updateBy;
 
     /**
-     * 修改时间
+     * 修改时间（仅导出显示，导入时不读取，避免清空）
      */
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @Excel(name = "ui.data.column.lhSharedMouldPat.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss", type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "修改时间")
     @TableField(value = "UPDATE_TIME")
     private Date updateTime;
+
+    /**
+     * 备注
+     */
+    @Excel(name = "ui.data.column.lhSharedMouldPat.remark", width = 40, align = Excel.Align.LEFT)
+    @ApiModelProperty(value = "备注")
+    @TableField(value = "REMARK")
+    private String remark;
 
     /**
      * 行号（导入时使用，非数据库字段）

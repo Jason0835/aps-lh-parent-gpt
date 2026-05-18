@@ -12,6 +12,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.domain.entity.LhSharedMouldPat;
 import com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper;
 import com.zlt.aps.lh.service.ILhSharedMouldPatService;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -26,8 +29,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -46,6 +51,9 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
     @Autowired
     private LhSharedMouldPatEntityMapper lhSharedMouldPatEntityMapper;
 
+    @Autowired
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
+
     @Override
     protected String getDocTypeCode() {
         return "LH_SHARED_MOULD_PAT";
@@ -53,6 +61,9 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
 
     @Override
     public int save(LhSharedMouldPat entity) {
+        // 字段长度边界校验
+        validateFieldLength(entity);
+
         if (entity.getId() != null) {
             entity.setBaseVale(entity.getId());
         } else {
@@ -61,6 +72,35 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
             entity.setUpdateTime(new Date());
         }
         return super.save(entity);
+    }
+
+    /**
+     * 字段长度边界校验
+     * <p>
+     * 校验规格、主花纹、模具号、花纹块字段是否超过最大长度限制
+     *
+     * @param entity 校验对象
+     */
+    private void validateFieldLength(LhSharedMouldPat entity) {
+        if (entity == null) {
+            return;
+        }
+        // 规格最大长度300
+        if (StringUtil.isNotBlank(entity.getSpecifications()) && entity.getSpecifications().length() > 300) {
+            throw new RuntimeException(I18nUtil.getMessage("ui.data.alert.lhSharedMouldPat.specificationsOverflow"));
+        }
+        // 主花纹最大长度50
+        if (StringUtil.isNotBlank(entity.getMainPattern()) && entity.getMainPattern().length() > 50) {
+            throw new RuntimeException(I18nUtil.getMessage("ui.data.alert.lhSharedMouldPat.mainPatternOverflow"));
+        }
+        // 模具号最大长度64
+        if (StringUtil.isNotBlank(entity.getMouldNo()) && entity.getMouldNo().length() > 64) {
+            throw new RuntimeException(I18nUtil.getMessage("ui.data.alert.lhSharedMouldPat.mouldNoOverflow"));
+        }
+        // 花纹块最大长度64
+        if (StringUtil.isNotBlank(entity.getPatternBlock()) && entity.getPatternBlock().length() > 64) {
+            throw new RuntimeException(I18nUtil.getMessage("ui.data.alert.lhSharedMouldPat.patternBlockOverflow"));
+        }
     }
 
     /**
@@ -80,7 +120,7 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
      * 校验逻辑：
      * 1. 工厂编号必填
      * 2. 物料编码必填
-     * 3. 主花纹必填
+     * 3. 花纹块必填
      * 4. 模具号必填
      * 5. 唯一性校验：工厂编号 + 物料编码 + 主花纹 + 模具号
      */
@@ -104,22 +144,46 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
             }
         }
 
-        // Step2: Excel内数据重复校验
+        // Step2: 获取校验通过的数据列表
         List<LhSharedMouldPat> validList = list.stream()
                 .filter(item -> item.getId() == null || item.getId() != -999L)
                 .collect(Collectors.toList());
 
+        // Step3: 批量预取物料主数据，用于反显物料描述
+        Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(validList)) {
-            // 按工厂+物料编码+主花纹+模具号分组
+            List<String> materialCodeList = validList.stream()
+                    .map(LhSharedMouldPat::getMaterialCode)
+                    .filter(StringUtil::isNotBlank)
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (CollectionUtils.isNotEmpty(materialCodeList)) {
+                List<List<String>> splitList = com.zlt.aps.maindata.utils.CollectionUtils.splitList(materialCodeList, 900);
+                List<MdmMaterialInfo> materialInfoList = new ArrayList<>();
+                for (List<String> codes : splitList) {
+                    LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<MdmMaterialInfo>()
+                            .in(MdmMaterialInfo::getMaterialCode, codes);
+                    materialInfoList.addAll(mdmMaterialInfoEntityMapper.selectList(wrapper));
+                }
+                if (CollectionUtils.isNotEmpty(materialInfoList)) {
+                    materialInfoMap = materialInfoList.stream()
+                            .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (s1, s2) -> s1));
+                }
+            }
+        }
+
+        // Step4: Excel内数据重复校验
+
+        if (CollectionUtils.isNotEmpty(validList)) {
+            // 按工厂+物料编码+模具号+主花纹分组（主花纹可为空，用空字符串占位）
             Map<String, List<LhSharedMouldPat>> repeatMap = validList.stream()
                     .filter(item -> StringUtil.isNotBlank(item.getFactoryCode())
                             && StringUtil.isNotBlank(item.getMaterialCode())
-                            && StringUtil.isNotBlank(item.getMainPattern())
                             && StringUtil.isNotBlank(item.getMouldNo()))
                     .collect(Collectors.groupingBy(item -> item.getFactoryCode() + "_"
                             + item.getMaterialCode() + "_"
-                            + item.getMainPattern() + "_"
-                            + item.getMouldNo()));
+                            + item.getMouldNo() + "_"
+                            + (StringUtil.isNotBlank(item.getMainPattern()) ? item.getMainPattern() : "")));
 
             // 遍历进行校验
             List<LhSharedMouldPat> checkList = new ArrayList<>();
@@ -143,10 +207,18 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
                             errorNum, message, importErrorLogs);
                 }
 
-                // 必填字段校验 - 主花纹
-                if (StringUtil.isBlank(docEntity.getMainPattern())) {
+                // 物料编码存在性校验 - 物料编码必须在物料主数据中存在
+                if (StringUtil.isNotBlank(docEntity.getMaterialCode()) && !materialInfoMap.containsKey(docEntity.getMaterialCode())) {
                     isCan = false;
-                    String message = String.format(I18nUtil.getMessage("ui.data.alert.lhSharedMouldPat.mainPatternRequired"), errorNum);
+                    String message = String.format(I18nUtil.getMessage("ui.data.alert.lhSharedMouldPat.materialCodeNotExist"), errorNum);
+                    ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                            errorNum, message, importErrorLogs);
+                }
+
+                // 必填字段校验 - 花纹块
+                if (StringUtil.isBlank(docEntity.getPatternBlock())) {
+                    isCan = false;
+                    String message = String.format(I18nUtil.getMessage("ui.data.alert.lhSharedMouldPat.patternBlockRequired"), errorNum);
                     ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                             errorNum, message, importErrorLogs);
                 }
@@ -159,15 +231,14 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
                             errorNum, message, importErrorLogs);
                 }
 
-                // Excel内重复校验 - 工厂+物料编码+主花纹+模具号
+                // Excel内重复校验 - 工厂+物料编码+模具号+主花纹（主花纹可为空）
                 if (StringUtil.isNotBlank(docEntity.getFactoryCode())
                         && StringUtil.isNotBlank(docEntity.getMaterialCode())
-                        && StringUtil.isNotBlank(docEntity.getMainPattern())
                         && StringUtil.isNotBlank(docEntity.getMouldNo())) {
                     String key = docEntity.getFactoryCode() + "_"
                             + docEntity.getMaterialCode() + "_"
-                            + docEntity.getMainPattern() + "_"
-                            + docEntity.getMouldNo();
+                            + docEntity.getMouldNo() + "_"
+                            + (StringUtil.isNotBlank(docEntity.getMainPattern()) ? docEntity.getMainPattern() : "");
                     List<LhSharedMouldPat> repeatList = repeatMap.get(key);
                     if (CollectionUtils.isNotEmpty(repeatList) && repeatList.size() > 1) {
                         isCan = false;
@@ -191,7 +262,12 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
                             LambdaQueryWrapper<LhSharedMouldPat> queryWrapper = Wrappers.lambdaQuery();
                             queryWrapper.eq(LhSharedMouldPat::getFactoryCode, docEntity.getFactoryCode());
                             queryWrapper.eq(LhSharedMouldPat::getMaterialCode, docEntity.getMaterialCode());
-                            queryWrapper.eq(LhSharedMouldPat::getMainPattern, docEntity.getMainPattern());
+                            // 主花纹可为空，为空时使用isNull条件
+                            if (StringUtil.isNotBlank(docEntity.getMainPattern())) {
+                                queryWrapper.eq(LhSharedMouldPat::getMainPattern, docEntity.getMainPattern());
+                            } else {
+                                queryWrapper.isNull(LhSharedMouldPat::getMainPattern);
+                            }
                             queryWrapper.eq(LhSharedMouldPat::getMouldNo, docEntity.getMouldNo());
                             LhSharedMouldPat existEntity = lhSharedMouldPatEntityMapper.selectOne(queryWrapper);
                             if (existEntity != null) {
@@ -221,7 +297,7 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         }
 
-        // Step3: 批量导入 - 分离新增和更新数据
+        // Step5: 批量导入 - 分离新增和更新数据
         List<LhSharedMouldPat> insertList = importList.stream()
                 .filter(entity -> entity.getId() == null)
                 .collect(Collectors.toList());
@@ -229,13 +305,35 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
                 .filter(entity -> entity.getId() != null)
                 .collect(Collectors.toList());
 
-        // 批量插入
+        // 设置物料描述（根据物料编码从物料主数据反显）
+        String currentUser = SecurityUtils.getUsername();
+        Date currentTime = new Date();
+        for (LhSharedMouldPat entity : importList) {
+            // 根据物料编码反显物料描述
+            if (StringUtil.isNotBlank(entity.getMaterialCode()) && materialInfoMap.containsKey(entity.getMaterialCode())) {
+                MdmMaterialInfo materialInfo = materialInfoMap.get(entity.getMaterialCode());
+                entity.setMaterialDesc(materialInfo.getMaterialDesc());
+            }
+        }
+
+        // 批量插入 - 设置审计字段和逻辑删除标识
         if (CollectionUtils.isNotEmpty(insertList)) {
+            for (LhSharedMouldPat entity : insertList) {
+                entity.setIsDelete(Integer.valueOf(ApsConstant.DEL_FLAG_NORMAL));
+                entity.setCreateBy(currentUser);
+                entity.setCreateTime(currentTime);
+                entity.setUpdateBy(currentUser);
+                entity.setUpdateTime(currentTime);
+            }
             lhSharedMouldPatEntityMapper.insertBatch(insertList);
         }
 
-        // 批量更新
+        // 批量更新 - 设置更新审计字段
         if (CollectionUtils.isNotEmpty(updateList)) {
+            for (LhSharedMouldPat entity : updateList) {
+                entity.setUpdateBy(currentUser);
+                entity.setUpdateTime(currentTime);
+            }
             lhSharedMouldPatEntityMapper.updateBatch(updateList);
         }
 
@@ -264,7 +362,12 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
         wrapper.ne(entity.getId() != null, LhSharedMouldPat::getId, entity.getId());
         wrapper.eq(LhSharedMouldPat::getFactoryCode, entity.getFactoryCode());
         wrapper.eq(LhSharedMouldPat::getMaterialCode, entity.getMaterialCode());
-        wrapper.eq(LhSharedMouldPat::getMainPattern, entity.getMainPattern());
+        // 主花纹可为空，为空时使用isNull条件
+        if (StringUtil.isNotBlank(entity.getMainPattern())) {
+            wrapper.eq(LhSharedMouldPat::getMainPattern, entity.getMainPattern());
+        } else {
+            wrapper.isNull(LhSharedMouldPat::getMainPattern);
+        }
         wrapper.eq(LhSharedMouldPat::getMouldNo, entity.getMouldNo());
 
         Long count = lhSharedMouldPatEntityMapper.selectCount(wrapper);
