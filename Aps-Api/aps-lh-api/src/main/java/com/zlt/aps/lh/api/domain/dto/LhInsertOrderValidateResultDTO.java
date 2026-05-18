@@ -67,6 +67,18 @@ public class LhInsertOrderValidateResultDTO implements Serializable {
     private String leftRightMould;
 
     /**
+     * 示方类型（字典 lh_trial_status：S-正规示方，T-量试示方，X-试验示方）
+     */
+    @ApiModelProperty(value = "示方类型", name = "constructionStage")
+    private String constructionStage;
+
+    /**
+     * 单模硫化班产（单模机台=双模班产/2向下取整，双模机台=双模班产）
+     */
+    @ApiModelProperty(value = "单模硫化班产", name = "singleMouldShiftQty")
+    private Integer singleMouldShiftQty;
+
+    /**
      * 班次产能信息
      */
     @Data

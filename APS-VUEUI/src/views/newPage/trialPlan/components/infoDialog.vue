@@ -216,7 +216,8 @@ export default {
           prop: "trialStatus",
           label: this.$t("ui.data.column.trialPlan.trialStatus"),
           type: "select",
-          dictData: this.parentDict.type.trial_construction_stage,
+          dictData: this.parentDict.type.lh_trial_status,
+          onChange: this.handleTrialStatusChange,
         },
         {
           prop: "trialQty",
@@ -254,6 +255,7 @@ export default {
                 v-model={form.embryoNo}
                 onChange={this.handleEmBryNoChange}
                 materialCode={form.materialCode}
+                trialStatus={form.trialStatus}
               />
             );
           },
@@ -365,8 +367,30 @@ export default {
     handleConfirm() {
       this.$refs.form.triggerConfirm(this.save);
     },
-    handleEmBryNoChange(){
-
+    handleEmBryNoChange(val, row) {
+      if (val && row) {
+        this.$set(this.form, "embryoNo", row.embryoNo);
+        this.$set(this.form, "embryoReleaseDate", row.embryoReleaseDate);
+        this.$set(this.form, "textNo", row.textNo);
+        this.$set(this.form, "textReleaseDate", row.textReleaseDate);
+        this.$set(this.form, "lhNo", row.lhNo);
+        this.$set(this.form, "lhReleaseDate", row.lhReleaseDate);
+      } else {
+        this.$set(this.form, "embryoNo", "");
+        this.$set(this.form, "embryoReleaseDate", "");
+        this.$set(this.form, "textNo", "");
+        this.$set(this.form, "textReleaseDate", "");
+        this.$set(this.form, "lhNo", "");
+        this.$set(this.form, "lhReleaseDate", "");
+      }
+    },
+    handleTrialStatusChange() {
+      this.$set(this.form, "embryoNo", "");
+      this.$set(this.form, "embryoReleaseDate", "");
+      this.$set(this.form, "textNo", "");
+      this.$set(this.form, "textReleaseDate", "");
+      this.$set(this.form, "lhNo", "");
+      this.$set(this.form, "lhReleaseDate", "");
     },
     handleMaterialCodeChange(val, row) {
       if (val) {

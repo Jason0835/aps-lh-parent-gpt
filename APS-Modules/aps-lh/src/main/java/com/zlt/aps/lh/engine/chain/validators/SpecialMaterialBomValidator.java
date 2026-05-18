@@ -63,14 +63,14 @@ public class SpecialMaterialBomValidator implements IDataValidator {
                 addErrorDetail(invalidCategoryErrorList, buildRowText(rowIndex, bom));
                 continue;
             }
-            // 按物料编码维度收集分类冲突
+            // 按物料编码维度收集分类冲突（有物料情况）
             if (StringUtils.isNotEmpty(materialCode)) {
                 collectCategoryConflict(categoryConflictErrorList, materialCategoryMap,
                         materialCategoryFirstRowMap, materialConflictKeySet,
                         materialCode, bom.getCategory(), "物料编码", rowIndex);
             }
-            // 按结构名称维度收集分类冲突
-            if (StringUtils.isNotEmpty(structureName)) {
+            // 按结构名称维度收集分类冲突（有结构无物料情况）
+            if (StringUtils.isNotEmpty(structureName) && StringUtils.isEmpty(materialCode)) {
                 collectCategoryConflict(categoryConflictErrorList, structureCategoryMap,
                         structureCategoryFirstRowMap, structureConflictKeySet,
                         structureName, bom.getCategory(), "结构名称", rowIndex);
@@ -88,7 +88,7 @@ public class SpecialMaterialBomValidator implements IDataValidator {
         }
         if (!CollectionUtils.isEmpty(categoryConflictErrorList)) {
             context.addValidationError("[" + getValidatorName()
-                    + "] 同一物料/结构下只能有一条芯片胎加一条非芯片胎分类的数据，不能同时存在芯片胎、19.5寸宽基和22.5寸宽基: "
+                    + "] 同一物料/结构下19.5寸宽基和22.5寸宽基互斥，芯片胎可与它们组合: "
                     + String.join("；", categoryConflictErrorList));
         }
         boolean passed = CollectionUtils.isEmpty(emptyKeyErrorList)

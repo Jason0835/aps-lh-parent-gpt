@@ -94,6 +94,7 @@ public class LhSpecialMaterialBom extends BaseEntity implements Serializable {
      */
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @Excel(name = "ui.data.column.lhSpecialMaterialBom.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty(value = "修改时间")
     @TableField(value = "UPDATE_TIME")
     private Date updateTime;

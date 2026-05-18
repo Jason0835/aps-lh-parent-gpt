@@ -164,25 +164,25 @@ public class MesTask {
     }
 
     /**
-     * 临时任务：清理并重新同步所有MES历史数据
+     * 临时任务：清理并重新同步所有MES历史数据（含今天）
      * 执行步骤：
-     * 1. 逻辑删除APS库中今天之前的所有数据（8张表）
-     * 2. 从MES库重新抓取今天之前每天最新版本数据
+     * 1. 逻辑删除APS库中今天及今天之前的所有数据（8张表）
+     * 2. 从MES库重新抓取每天（含今天）最新版本数据
      * 3. 将MES数据插入到APS库
      * 涉及表：成型在机、硫化在机、胶囊已使用次数、生胎库存、成型排程完成量、成型排程日完成量、硫化排程完成量、硫化排程日完成量
      */
-    @ApiOperation("临时任务-清理并重新同步所有MES历史数据")
+    @ApiOperation("临时任务-清理并重新同步所有MES历史数据（含今天）")
     public void cleanAllHistoryDuplicate() {
-        log.info("临时任务-开始清理并重新同步所有MES历史数据");
+        log.info("临时任务-开始清理并重新同步所有MES历史数据（含今天）");
         try {
             FeignTokenHelper.runWithToken(() -> {
                 com.ruoyi.common.core.web.domain.AjaxResult result = iMesItfService.cleanAndResyncAllHistory();
-                log.info("临时任务-清理并重新同步所有MES历史数据结果：{}", result);
+                log.info("临时任务-清理并重新同步所有MES历史数据（含今天）结果：{}", result);
             });
         } catch (Exception e) {
             log.error("临时任务-清理并重新同步所有MES历史数据异常", e);
         }
-        log.info("临时任务-清理并重新同步所有MES历史数据完成");
+        log.info("临时任务-清理并重新同步所有MES历史数据（含今天）完成");
     }
 
     /**

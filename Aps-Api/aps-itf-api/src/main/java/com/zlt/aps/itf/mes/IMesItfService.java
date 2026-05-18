@@ -390,7 +390,7 @@ public interface IMesItfService {
      *
      * @return 执行结果
      */
-    @ApiOperation("清理并重新同步所有MES历史数据")
+    @ApiOperation("清理并重新同步所有MES历史数据（含今天）")
     @PostMapping("/mesItf/cleanAndResyncAllHistory")
     AjaxResult cleanAndResyncAllHistory();
 

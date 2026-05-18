@@ -382,7 +382,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                     .filter(StringUtils::isNotBlank)
                     .forEach(allSpecs::add);
         }
-        return String.join("，", allSpecs);
+        String result = String.join("，", allSpecs);
+        return StringUtils.isNotBlank(result) ? result : "无";
     }
 
     /**
