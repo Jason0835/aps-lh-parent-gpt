@@ -484,6 +484,14 @@ export default {
           width: 300,
           align: "left",
         },
+        // {
+        //   prop: "constructionStage",
+        //   label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+        //   minWidth: 100,
+        //   formatter: (row, column, value) => {
+        //     return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+        //   },
+        // }, // 排产类型
         {
           prop: "embryoCode",
           label: "胎胚号",
@@ -625,18 +633,6 @@ export default {
           ),
           width: 120,
           render: ({ row }) => {
-            if (!row.id) {
-              return (
-                <span>
-                  {row.isLockSchedule != null && row.isLockSchedule !== ""
-                    ? this.selectDictLabel(
-                        this.dict.type.biz_yes_no,
-                        row.isLockSchedule
-                      )
-                    : ""}
-                </span>
-              );
-            }
             return (
               <el-select
                 v-model={row.isLockSchedule}
@@ -978,15 +974,12 @@ export default {
     },
     /** 日排产失焦保存：需有持久化主键 */
     canSaveDayCell(row) {
-      return !this.isStatisticsRow(row) && row.id != null && row.id !== "";
+      return !this.isStatisticsRow(row);
     },
     /**
      * 修改优先上机（原锁定上机），与 rollingCycle/index.backup-legacy.vue 一致调用 mpAdjustResult/save
      */
     handleLockScheduleChange(row) {
-      if (!row || !row.id) {
-        return;
-      }
       const versionFromSearch = this.resolveSearchColumnsVersion();
       saveAdjustResult({
         ...row,
