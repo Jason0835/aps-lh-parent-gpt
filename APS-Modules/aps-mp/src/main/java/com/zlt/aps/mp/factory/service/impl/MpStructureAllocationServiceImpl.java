@@ -50,6 +50,7 @@ import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductConstructionInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.mp.engine.enums.DayVulcanizationModeEnum;
+import com.zlt.aps.mp.engine.handler.GroupProductionConversionHandler;
 import com.zlt.aps.mp.engine.handler.LhMachineInfoCalculateHelper;
 import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductConstructionMapper;
 import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductLhCapacityMapper;
@@ -605,6 +606,24 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 .orElse(null);
         boolean isHasSpecialMaterial = hasSpecialMaterial(embryoCode, mdmMaterialConsumeDetailList, specialMaterialList);
         mpStructureAllocation.setIsHasSpecialMaterial(isHasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
+
+        //处理当前机台，当前结构及前后结构的交替类型
+        //获取上个月最后机台结构信息
+        Map<String, MpStructureAllocation> lastMachineStructureMap = getLastMachineStructureMap(mpStructureAllocation.getFactoryCode(),mpStructureAllocation.getYear(),mpStructureAllocation.getMonth());
+        Map<String,String> continueStructureMap = new HashMap<>();
+        if (PubUtil.isNotEmpty(lastMachineStructureMap)){
+            MpStructureAllocation lastMachineStructure = lastMachineStructureMap.get(mpStructureAllocation.getCxMachineCode());
+            if (lastMachineStructure != null){
+                continueStructureMap.put(lastMachineStructure.getCxMachineCode(),lastMachineStructure.getStructureName());
+            }
+        }
+        List<MpStructureAllocation> machineStructureList = structureAllocationList.stream().filter(x->x.getCxMachineCode().equals(mpStructureAllocation.getCxMachineCode())).collect(Collectors.toList());
+        if (PubUtil.isEmpty(machineStructureList)){
+            machineStructureList = new ArrayList<>();
+        }
+        machineStructureList.add(mpStructureAllocation);
+        GroupProductionConversionHandler.setAlternatingType(machineStructureList,continueStructureMap);
+        baseDao.updateBatch(machineStructureList);
         return baseDao.save(mpStructureAllocation);
     }
 
@@ -750,7 +769,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
      *
      * @param mpStructureAllocation
      */
-    private List<MdmStructureLhRatio> queryMdmStructureLhRatio(MpStructureAllocation mpStructureAllocation) {
+    public List<MdmStructureLhRatio> queryMdmStructureLhRatio(MpStructureAllocation mpStructureAllocation) {
         LambdaQueryWrapper<MdmStructureLhRatio> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MdmStructureLhRatio::getFactoryCode, mpStructureAllocation.getFactoryCode())
                 .eq(MdmStructureLhRatio::getStructureName, mpStructureAllocation.getStructureName());

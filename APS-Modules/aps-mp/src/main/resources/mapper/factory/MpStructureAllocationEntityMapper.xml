@@ -35,7 +35,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		WHERE
 		    t.factory_code = #{factoryCode}
 		    AND t.PRODUCTION_VERSION = #{productionVersion}
-		    AND t.MONTH_PLAN_VERSION = #{monthPlanVersion}
 		    AND t.YEAR = #{year}
 		    AND t.MONTH = #{month}
 		    AND t.IS_DELETE = 0

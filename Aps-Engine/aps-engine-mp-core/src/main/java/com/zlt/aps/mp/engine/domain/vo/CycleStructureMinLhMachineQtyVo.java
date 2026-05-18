@@ -16,6 +16,7 @@ public class CycleStructureMinLhMachineQtyVo implements Serializable {
      * 产品结构
      */
     private String structureName;
+
     /**
      * 最低硫化配比值
      */

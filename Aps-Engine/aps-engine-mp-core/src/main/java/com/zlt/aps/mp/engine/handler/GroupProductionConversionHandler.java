@@ -77,7 +77,7 @@ public class GroupProductionConversionHandler {
      * @param structureAllocationList 结构分配列表
      * @param continueStructureMap 机台续作结构Map
      */
-    private static void setAlternatingType(List<MpStructureAllocation> structureAllocationList,Map<String,String> continueStructureMap){
+    public static void setAlternatingType(List<MpStructureAllocation> structureAllocationList,Map<String,String> continueStructureMap){
         List<MpStructureAllocation> machineStructureAllocationList;
         //按机台维度序列化
         Map<String, List< MpStructureAllocation>> structureAllocationMap = structureAllocationList.stream().collect(Collectors.groupingBy(MpStructureAllocation::getCxMachineCode));

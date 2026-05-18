@@ -13,7 +13,7 @@ import lombok.Data;
  * @date 2025-12-22
  */
 @Data
-public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFinalResult implements IFinalAndAdjustResultInterface {
+public class FactoryMonthPlanFinalAdjustVo extends FactoryMonthPlanProductionFinalResult {
 
     @ApiModelProperty(value = "是否含特殊材料", name = "hasSpecialMaterial")
     @TableField(exist = false)

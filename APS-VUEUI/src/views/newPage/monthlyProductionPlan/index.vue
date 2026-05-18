@@ -528,7 +528,7 @@ export default {
           width: 80,
         },
         {
-          prop: "dayVulcanizationQty",
+          prop: "dayLhQty",
           label: this.$t("ui.data.monthlyProductionPlan.dayVulcanizationQty"),
           width: 100,
         },
@@ -957,10 +957,7 @@ export default {
       if (!row || !row.id) {
         return;
       }
-      saveAdjustResult({
-        id: row.id,
-        isLockSchedule: row.isLockSchedule,
-      })
+      saveAdjustResult({ ...row })
         .then((res) => {
           this.$modal.msgSuccess(res.msg);
         })

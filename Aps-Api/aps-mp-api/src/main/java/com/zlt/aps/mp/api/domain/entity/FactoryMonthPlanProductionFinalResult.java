@@ -777,6 +777,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
     @TableField(value = "IS_RELEASE")
     private String isRelease;
 
+    @ApiModelProperty(value = "双模日硫化量", name = "dayLhQty")
     public Integer getDayLhQty() {
         if(null == this.dayVulcanizationQty) {
             return 0;

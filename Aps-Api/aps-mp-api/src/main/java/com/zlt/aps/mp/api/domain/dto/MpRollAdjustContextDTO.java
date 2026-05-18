@@ -207,6 +207,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "排程过程日志")
     private StringBuilder logDetail;
 
+    @ApiModelProperty(value = "检查日志")
+    private StringBuilder logCheck;
+
     @ApiModelProperty(value = "SKU原余量未满消息")
     private StringBuilder msgRemainQtyNoFull;
 

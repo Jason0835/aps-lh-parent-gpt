@@ -447,6 +447,11 @@ public class GroupPriorityProductionScheduler {
             if (CollectionUtils.isEmpty(addAllocationHelperList)) {
                 return;
             }
+            //20260516+ 起始时间不是多个时，则按指定Top3规则挑选
+            Set<Integer> startDaySet = addAllocationHelperList.stream().map(CxMachineAllocationPlanHelper::getStartDay).collect(Collectors.toSet());
+            if (startDaySet.size() <= BigDecimal.ONE.intValue()) {
+                return;
+            }
             addAllocationHelperList.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getStartDay));
             earlyList.add(groupMap.get(addAllocationHelperList.get(BigDecimal.ZERO.intValue()).getProductionPlanInfo()));
         });
@@ -477,6 +482,7 @@ public class GroupPriorityProductionScheduler {
             boolean isMoreProductionDay = realDiscontinueGroupSet.contains(topGroup.getGroupName());
             CxMachineBaseInfoVo preSelectedCxMachine = cxCapacityAllocationHandler.selectedCxMachineForGroupPlanAppoint(context, topGroup, isMoreProductionDay, isFixed);
             if (null != preSelectedCxMachine) {
+                TbrSimulateProductionLogRecorder.addHeightPriorityMatchLog(context, topGroup.getGroupName(), preSelectedCxMachine);
                 GroupPrioritySchedulerResultHelper singleResult = new GroupPrioritySchedulerResultHelper(topGroup, preSelectedCxMachine);
                 resultList.add(singleResult);
             }

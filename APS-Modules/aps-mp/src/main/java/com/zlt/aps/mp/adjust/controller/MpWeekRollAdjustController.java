@@ -163,6 +163,9 @@ public class MpWeekRollAdjustController extends BaseController {
             if (StringUtil.isEmptyWithTrim(contextDTO.getMsgStructureAdjustPreClose().toString())){
                 return AjaxResult.success(contextDTO.getMsgStructureAdjustPreClose().toString(),contextDTO.getAdjustResultList());
             }
+            if (!StringUtil.isEmptyWithTrim(contextDTO.getLogCheck().toString())){
+                return AjaxResult.success(contextDTO.getLogCheck().toString(),contextDTO.getAdjustResultList());
+            }
             return AjaxResult.success(contextDTO.getAdjustResultList());
         }finally {
             redisService.setCacheObject(key, ApsConstant.FALSE, ApsConstant.EXPIRE_ONE, TimeUnit.HOURS);
@@ -374,6 +377,7 @@ public class MpWeekRollAdjustController extends BaseController {
         contextDTO.setAdjustType(weekRollAdjustDTO.getAdjustType());
         // 初始调整过程日志
         contextDTO.setAdjustProcLogList(new ArrayList<>());
+        contextDTO.setLogCheck(new StringBuilder());
         // 设置OEM配置集合（依赖 paramMap）
         initOemParam(contextDTO);
         // 加载搭配排产的必要基础数据（依赖以上所有数据）
