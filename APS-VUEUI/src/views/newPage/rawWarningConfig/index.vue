@@ -186,7 +186,7 @@ export default {
           label: this.$t("ui.data.column.scheduleAdjust.updata"),
           width: 180,
           formatter: (row, column, value) => {
-            return parseTime(value);
+            return this.parseTime(value);
           },
         },
         {
