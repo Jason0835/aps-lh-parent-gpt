@@ -108,11 +108,10 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         }
         entity.setBeginDay(realBeginDay==FactoryConstant.MONTH_MAX_DAY+1 ? 0:realBeginDay);
         entity.setEndDay(realEndDay);
-        entity.setTotalQty(accTotalQty);
          //实际调整量 = 累计排产量 - 原实际排产量
         int oriTotalQty = entity.getTotalQty()== null ? 0:entity.getTotalQty();
         entity.setAdjustFlag(oriTotalQty != accTotalQty ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
-
+        entity.setTotalQty(accTotalQty);
         // 如果版本号没有值，更新调整类型=人工调整
         if (StrUtil.isBlank(entity.getVersion())) {
             entity.setAdjustType(ApsConstant.APS_ZERO_3);
