@@ -575,7 +575,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         BigDecimal totalPlan = sumPlan(item);
         BigDecimal totalFinish = sumFinish(item);
-        row.put("totalPlanQty", zeroToEmpty(totalPlan));
+        row.put("totalPlanQty", zeroToEmpty(sumLast3ShiftsPlan(item)));
         row.put("totalFinishQty", zeroToEmpty(totalFinish));
         row.put("dailyPlanQty", zeroToEmpty(totalPlan));
         row.put("remark", item.getRemark());
@@ -659,7 +659,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             totalPlan = safeAdd(totalPlan, planSums[i]);
             totalFinish = safeAdd(totalFinish, finishSums[i]);
         }
-        row.put("totalPlanQty", zeroToEmpty(totalPlan));
+        row.put("totalPlanQty", zeroToEmpty(safeAdd(safeAdd(planSums[6], planSums[7]), planSums[8])));
         row.put("totalFinishQty", zeroToEmpty(totalFinish));
         row.put("dailyPlanQty", zeroToEmpty(totalPlan));
 
@@ -672,6 +672,18 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                 item.getClass3PlanQty()), item.getClass4PlanQty()),
                 item.getClass5PlanQty()), item.getClass6PlanQty()),
                 item.getClass7PlanQty()), item.getClass8PlanQty());
+    }
+
+    /**
+     * 汇总最后3个班次（class6、class7、class8）的计划量。
+     *
+     * @param item 成型排程结果
+     * @return 最后3个班次计划量之和
+     */
+    private BigDecimal sumLast3ShiftsPlan(CxScheduleResult item) {
+        return safeAdd(safeAdd(
+                item.getClass6PlanQty(), item.getClass7PlanQty()),
+                item.getClass8PlanQty());
     }
 
     private BigDecimal sumFinish(CxScheduleResult item) {
@@ -750,11 +762,16 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         List<LhScheduleResult> lhResults = lhScheduleResultMapper.selectBatchIds(allLhIds);
 
         // lhScheduleId → totalDailyPlanQty
-        Map<Long, Integer> lhIdToPlanQty = lhResults.stream()
-                .collect(Collectors.toMap(
-                        LhScheduleResult::getId,
-                        r -> r.getTotalDailyPlanQty() != null ? r.getTotalDailyPlanQty() : 0,
-                        (a, b) -> a));
+        Map<Long, Integer> lhIdToPlanQty = new LinkedHashMap<>();
+        Set<Integer> usedQtySet = new HashSet<>();
+        for (LhScheduleResult r : lhResults) {
+            Integer qty = r.getTotalDailyPlanQty() != null ? r.getTotalDailyPlanQty() : 0;
+            if (qty == 0 || !usedQtySet.add(qty)) {
+                lhIdToPlanQty.put(r.getId(), 0);
+            } else {
+                lhIdToPlanQty.put(r.getId(), qty);
+            }
+        }
 
         // 按 lhScheduleIds 原字符串汇总
         Map<String, BigDecimal> resultMap = new HashMap<>();
