@@ -13,6 +13,8 @@ import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.Data;
 import lombok.Getter;
+import org.apache.commons.compress.utils.Lists;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -185,6 +187,27 @@ public class GroupPlanCxLhCapacityLimitHelper {
         }
         GroupPlanCxLhCapacityLimitHelper limitHelper = new GroupPlanCxLhCapacityLimitHelper(day, maxEmbryoCodeCount, maxLhMachineCount);
         return limitHelper;
+    }
+
+    /**
+     * 构造函数
+     *
+     * @param day                排产日
+     * @param maxEmbryoCodeCount 最大胎胚种类数
+     * @param maxLhMachineCount  最大硫化机台数
+     */
+    public GroupPlanCxLhCapacityLimitHelper(Integer day, Integer maxEmbryoCodeCount, Integer maxLhMachineCount) {
+        this.day = day;
+        this.maxEmbryoCodeCount = maxEmbryoCodeCount;
+        this.maxLhMachineCount = maxLhMachineCount;
+        this.dayMinLhMachineCount = BigDecimal.ZERO.intValue();
+        this.minLhMachineInfo = new HashMap<>();
+        this.productionEmbryoCodeSet = new HashSet<>();
+        this.productionMouldSet = new HashSet<>();
+        this.cxMachineCodeSet = new HashSet<>();
+        this.skuProductionMouldMap = new HashMap<>();
+        this.productionSkuQtyInfo = new HashMap<>();
+        this.skuProductionDetailInfo = new HashMap<>();
     }
 
     /**
@@ -481,24 +504,22 @@ public class GroupPlanCxLhCapacityLimitHelper {
     }
 
     /**
-     * 构造函数
+     * 20260518+
+     * 收尾时，需要清除的模具使用信息
+     * materialDesc为空，则清除所有使用clearUsedMouldInfoSet
      *
-     * @param day                排产日
-     * @param maxEmbryoCodeCount 最大胎胚种类数
-     * @param maxLhMachineCount  最大硫化机台数
+     * @param clearUsedMouldInfoSet 需要清除的模具集合
+     * @param materialDesc          指定Sku
+     * @param
      */
-    public GroupPlanCxLhCapacityLimitHelper(Integer day, Integer maxEmbryoCodeCount, Integer maxLhMachineCount) {
-        this.day = day;
-        this.maxEmbryoCodeCount = maxEmbryoCodeCount;
-        this.maxLhMachineCount = maxLhMachineCount;
-        this.dayMinLhMachineCount = BigDecimal.ZERO.intValue();
-        this.minLhMachineInfo = new HashMap<>();
-        this.productionEmbryoCodeSet = new HashSet<>();
-        this.productionMouldSet = new HashSet<>();
-        this.cxMachineCodeSet = new HashSet<>();
-        this.skuProductionMouldMap = new HashMap<>();
-        this.productionSkuQtyInfo = new HashMap<>();
-        this.skuProductionDetailInfo = new HashMap<>();
+    public void clearAllUsedMouldInfo(Set<String> clearUsedMouldInfoSet, String materialDesc) {
+        if (CollectionUtils.isEmpty(clearUsedMouldInfoSet)) {
+            return;
+        }
+        //清除各Sku使用模具的明细信息
+        clearSkuUsedMouldDetailInfo(clearUsedMouldInfoSet, materialDesc);
+        //清除各Sku使用的模具信息
+        clearSkuUsedMouldInfo(clearUsedMouldInfoSet, materialDesc);
     }
 
     /**
@@ -1034,6 +1055,71 @@ public class GroupPlanCxLhCapacityLimitHelper {
         Integer theoryMaxLhMachineCount = Optional.ofNullable(maxTheoryLhMachineCount).orElse(realMaxLhMachineCount);
         return realMaxLhMachineCount - theoryMaxLhMachineCount;
     }
+
+    /**
+     * 清除Sku使用的mouldCode
+     *
+     * @param clearUsedMouldInfoSet 需要清除的模具集合
+     * @param matchMaterialDesc     指定Sku
+     */
+    private void clearSkuUsedMouldInfo(Set<String> clearUsedMouldInfoSet, String matchMaterialDesc) {
+        if (CollectionUtils.isEmpty(skuProductionMouldMap) || CollectionUtils.isEmpty(clearUsedMouldInfoSet)) {
+            return;
+        }
+        skuProductionMouldMap.forEach((materialDesc, usedMoldInfo) -> {
+            if (CollectionUtils.isEmpty(usedMoldInfo)) {
+                return;
+            }
+            //单独指定Sku：matchMaterialDesc
+            if (!StringUtils.isBlank(matchMaterialDesc) && !matchMaterialDesc.equals(materialDesc)) {
+                return;
+            }
+            Set<String> deletedSet = Sets.newHashSet();
+            usedMoldInfo.forEach(usedSingleMouldCode -> {
+                if (clearUsedMouldInfoSet.contains(usedSingleMouldCode)) {
+                    deletedSet.add(usedSingleMouldCode);
+                }
+            });
+            if (CollectionUtils.isEmpty(deletedSet)) {
+                return;
+            }
+            usedMoldInfo.removeAll(deletedSet);
+        });
+    }
+
+    /**
+     * 清除各sku使用明细信息
+     *
+     * @param clearUsedMouldInfoSet 需要清除的模具集合
+     * @param matchMaterialDesc     指定Sku
+     */
+    private void clearSkuUsedMouldDetailInfo(Set<String> clearUsedMouldInfoSet, String matchMaterialDesc) {
+        if (CollectionUtils.isEmpty(skuProductionDetailInfo) || CollectionUtils.isEmpty(clearUsedMouldInfoSet)) {
+            return;
+        }
+        skuProductionDetailInfo.forEach((materialDesc, detailInfoList) -> {
+            if (CollectionUtils.isEmpty(detailInfoList)) {
+                return;
+            }
+            //单独指定Sku：matchMaterialDesc
+            if (!StringUtils.isBlank(matchMaterialDesc) && !matchMaterialDesc.equals(materialDesc)) {
+                return;
+            }
+            List<SkuDayProductionInfoHelper> deleteList = Lists.newArrayList();
+            detailInfoList.forEach(singleDetail -> {
+                Set<String> usedMouldSet = Optional.ofNullable(singleDetail.getUsedMouldSet()).orElse(Collections.emptySet());
+                Set<String> intersectionSet = usedMouldSet.stream().filter(clearUsedMouldInfoSet::contains).collect(Collectors.toSet());
+                if (!CollectionUtils.isEmpty(intersectionSet)) {
+                    deleteList.add(singleDetail);
+                }
+            });
+            if (CollectionUtils.isEmpty(deleteList)) {
+                return;
+            }
+            detailInfoList.removeAll(deleteList);
+        });
+    }
+
 }
 
 /**
@@ -1149,4 +1235,5 @@ class SkuUsedLhMachineInfo {
         //多台，看余量变，减
         return BigDecimal.ZERO.intValue() - nextDayInfo.getLeftOverMachineCount();
     }
+
 }

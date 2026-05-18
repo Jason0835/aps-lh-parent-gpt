@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.handler;
 
+import com.google.common.collect.Sets;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.engine.daylimit.DayCapacityLimitVo;
 import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
@@ -95,6 +96,32 @@ public class GroupPlanDeductionDayHandler {
     }
 
     /**
+     * 对groupPlanInfo清除在singleDeductionDay日的排产信息
+     *
+     * @param productionContext  排产上下文
+     * @param groupPlanInfo      分组计划
+     * @param dayCapacityLimit   日产能控制信息对象
+     * @param productionDayLimit 分组日排产对象
+     * @param allMouldInfoMap    模具排产集合对象
+     * @param singleDeductionDay 清除日
+     */
+    public void clearProductionInfoBySkuMoldDay(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, String materialDesc, DayCapacityLimitVo dayCapacityLimit, GroupPlanCxLhCapacityLimitHelper productionDayLimit, Map<String, ProductionMouldInfoVo> allMouldInfoMap, Integer singleDeductionDay) {
+        if (StringUtils.isBlank(materialDesc)) {
+            return;
+        }
+        Map<String, SkuDayProductionInfoHelper> productionSkuQtyInfo = productionDayLimit.getProductionSkuQtyInfo();
+        if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
+            return;
+        }
+        //分组计划在singleDeductionDay排产materialDescSku信息
+        SkuDayProductionInfoHelper skuDayProductionInfo = productionSkuQtyInfo.get(materialDesc);
+        if (null == skuDayProductionInfo) {
+            return;
+        }
+        clearSkuProductionInfoByDay(productionContext, groupPlanInfo, materialDesc, skuDayProductionInfo, dayCapacityLimit, productionDayLimit, allMouldInfoMap, singleDeductionDay);
+    }
+
+    /**
      * 校验参数是否有效
      * allocationInfo分配信息与成型机台、分组计划都得匹配上才有效
      *
@@ -154,51 +181,73 @@ public class GroupPlanDeductionDayHandler {
      * @param allMouldInfoMap    模具排产集合对象
      * @param singleDeductionDay 清除日
      */
-    public void clearProductionInfoByDay(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, DayCapacityLimitVo dayCapacityLimit, GroupPlanCxLhCapacityLimitHelper productionDayLimit, Map<String, ProductionMouldInfoVo> allMouldInfoMap, Integer singleDeductionDay) {
+    private void clearProductionInfoByDay(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, DayCapacityLimitVo dayCapacityLimit, GroupPlanCxLhCapacityLimitHelper productionDayLimit, Map<String, ProductionMouldInfoVo> allMouldInfoMap, Integer singleDeductionDay) {
         Map<String, SkuDayProductionInfoHelper> productionSkuQtyInfo = productionDayLimit.getProductionSkuQtyInfo();
         if (CollectionUtils.isEmpty(productionSkuQtyInfo)) {
             return;
         }
         //分组计划在singleDeductionDay的排产Sku信息
-        productionSkuQtyInfo.forEach((materialDesc, skuDayProductionInfo) -> {
-            //使用的模具信息
-            Set<String> usedMouldSet = skuDayProductionInfo.getUsedMouldSet();
-            if (CollectionUtils.isEmpty(usedMouldSet)) {
+        productionSkuQtyInfo.forEach((materialDesc, skuDayProductionInfo) -> clearSkuProductionInfoByDay(productionContext, groupPlanInfo, materialDesc, skuDayProductionInfo, dayCapacityLimit, productionDayLimit, allMouldInfoMap, singleDeductionDay));
+    }
+
+    /**
+     * 清除Sku指定日的排产信息
+     *
+     * @param productionContext    排产上下文
+     * @param groupPlanInfo        分组计划信息对象
+     * @param materialDesc         清除的Sku
+     * @param skuDayProductionInfo sku日排产信息
+     * @param dayCapacityLimit     日产限制对象
+     * @param productionDayLimit   单结构日排产限制对象
+     * @param allMouldInfoMap      模具排产信息对象集合
+     * @param singleDeductionDay   清除日
+     */
+    private void clearSkuProductionInfoByDay(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, String materialDesc, SkuDayProductionInfoHelper skuDayProductionInfo, DayCapacityLimitVo dayCapacityLimit, GroupPlanCxLhCapacityLimitHelper productionDayLimit, Map<String, ProductionMouldInfoVo> allMouldInfoMap, Integer singleDeductionDay) {
+        if (StringUtils.isBlank(materialDesc) || null == skuDayProductionInfo || !materialDesc.equals(skuDayProductionInfo.getMaterialDesc())) {
+            return;
+        }
+        //使用的模具信息
+        Set<String> usedMouldSet = skuDayProductionInfo.getUsedMouldSet();
+        if (CollectionUtils.isEmpty(usedMouldSet)) {
+            return;
+        }
+        //需要清除的使用模具信息
+        Set<String> clearUsedMouldSet = Sets.newHashSet();
+        usedMouldSet.forEach(mouldCode -> {
+            ProductionMouldInfoVo mouldInfo = allMouldInfoMap.get(mouldCode);
+            if (null == mouldInfo) {
                 return;
             }
-            usedMouldSet.forEach(mouldCode -> {
-                ProductionMouldInfoVo mouldInfo = allMouldInfoMap.get(mouldCode);
-                if (null == mouldInfo) {
-                    return;
+            clearUsedMouldSet.add(mouldCode);
+            List<CxMouldDayProductionHelper> dayProductionList = mouldInfo.getDayProductionInfo().get(singleDeductionDay);
+            if (CollectionUtils.isEmpty(dayProductionList)) {
+                return;
+            }
+            //20260119 释放，模具分配比例、模壳标准、胶囊卡盘、换模次数
+            CxLhMouldProductionCalculator.handlerBeforeConclusion(productionContext, groupPlanInfo, singleDeductionDay, mouldInfo, materialDesc);
+            List<CxMouldDayProductionHelper> reserveList = new ArrayList<>();
+            dayProductionList.forEach(singleProduction -> {
+                if (!materialDesc.equals(singleProduction.getMaterialDesc())) {
+                    reserveList.add(singleProduction);
                 }
-                List<CxMouldDayProductionHelper> dayProductionList = mouldInfo.getDayProductionInfo().get(singleDeductionDay);
-                if (CollectionUtils.isEmpty(dayProductionList)) {
-                    return;
-                }
-                //20260119 释放，模具分配比例、模壳标准、胶囊卡盘、换模次数
-                CxLhMouldProductionCalculator.handlerBeforeConclusion(productionContext, groupPlanInfo, singleDeductionDay, mouldInfo, materialDesc);
-                List<CxMouldDayProductionHelper> reserveList = new ArrayList<>();
-                dayProductionList.forEach(singleProduction -> {
-                    if (!materialDesc.equals(singleProduction.getMaterialDesc())) {
-                        reserveList.add(singleProduction);
-                    }
-                    returnMonthPlanProductionQty(productionContext, materialDesc, singleProduction);
-                });
-                mouldInfo.getFinishDaySet().remove(singleDeductionDay);
-                if (CollectionUtils.isEmpty(reserveList)) {
-                    mouldInfo.getDayProductionInfo().remove(singleDeductionDay);
-                } else {
-                    mouldInfo.getDayProductionInfo().put(singleDeductionDay, reserveList);
-                }
+                returnMonthPlanProductionQty(productionContext, materialDesc, singleProduction);
             });
-            //20260125 释放，日产能占用量
-            if (null != dayCapacityLimit) {
-                Integer sumProductionQty = skuDayProductionInfo.getSumProductionQty();
-                dayCapacityLimit.deductionSkuDayProductionQty(productionContext, singleDeductionDay, materialDesc, usedMouldSet, sumProductionQty, skuDayProductionInfo.getLossQty(), skuDayProductionInfo.getBrand());
-                //20260211 特殊材料的消耗量释放(Sku已排产量对应释放)
-                productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupPlanInfo, -sumProductionQty);
+            mouldInfo.getFinishDaySet().remove(singleDeductionDay);
+            if (CollectionUtils.isEmpty(reserveList)) {
+                mouldInfo.getDayProductionInfo().remove(singleDeductionDay);
+            } else {
+                mouldInfo.getDayProductionInfo().put(singleDeductionDay, reserveList);
             }
         });
+        //20260518+ 清除结构日排产使用模具信息
+        productionDayLimit.clearAllUsedMouldInfo(clearUsedMouldSet, materialDesc);
+        //20260125 释放，日产能占用量
+        if (null != dayCapacityLimit) {
+            Integer sumProductionQty = skuDayProductionInfo.getSumProductionQty();
+            dayCapacityLimit.deductionSkuDayProductionQty(productionContext, singleDeductionDay, materialDesc, usedMouldSet, sumProductionQty, skuDayProductionInfo.getLossQty(), skuDayProductionInfo.getBrand());
+            //20260211 特殊材料的消耗量释放(Sku已排产量对应释放)
+            productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupPlanInfo, -sumProductionQty);
+        }
     }
 
     /**
