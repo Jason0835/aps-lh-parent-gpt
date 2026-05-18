@@ -39,6 +39,7 @@
   "ui.data.column.monthplan.forceOutBoundQty": "强制出库数量",
   "ui.data.column.monthplan.shipmentDate": "计划发货日期",
   "ui.data.column.monthplan.boardingDate": "计划上机日期",
+  "ui.data.column.monthplan.constructionStage": "排产类型",
   "ui.data.column.boom.fatherCode": "父物料编码",
   "ui.data.column.boom.fatherName": "父物料名称",
   "ui.data.column.boom.boomVersion": "BOM版本",
