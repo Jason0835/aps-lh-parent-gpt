@@ -982,6 +982,7 @@ export default {
         version:
           versionFromSearch ||
           (row.version != null ? String(row.version).trim() : ""),
+        adjustType: this.pickAdjustTypeOnlyMonthPlanConfirmRecalculate(),
       })
         .then((res) => {
           this.$modal.msgSuccess(res.msg);
@@ -1012,10 +1013,9 @@ export default {
       ).trim();
     },
     /**
-     * 仅本页「确认调整」「重新计算」：adjustType 取 versionOptions 中与当前选中版本对应项的 adjustType。
-     * 查询区版本号下拉清空后须传 "03"；原先 resolveSearchColumnsVersion 会在表单清空后仍回落 query.version，
-     * 此处仅以 HeaderSearch 表单为准（无 ref 时再退回 query.version）。
-     * 有选中版本但未匹配到项、或该项无 adjustType 时返回 ""（不再默认 "02"）。
+     * 月计划页 mpAdjustResult/save、确认调整、重新计算 共用的 adjustType：
+     * 查询区版本下拉清空 → "03"；否则为 versionOptions 对应项的 adjustType；无则 ""。
+     * 以 HeaderSearch 表单 version 为准（无 ref 时退回 query.version）。
      */
     pickAdjustTypeOnlyMonthPlanConfirmRecalculate() {
       let selectedVersion = "";
@@ -1216,6 +1216,7 @@ export default {
           version:
             versionFromSearch ||
             (row.version != null ? String(row.version).trim() : ""),
+          adjustType: this.pickAdjustTypeOnlyMonthPlanConfirmRecalculate(),
         });
         this.allocateProductionByPriority(row);
       } catch (err) {
@@ -1924,7 +1925,7 @@ export default {
     },
     /**
      * 月计划调整查询页「确认调整」请求体：核心业务字段按查询区 query + Redis 上下文组装；
-     * adjustType：查询区版本下拉清空时为 "03"；否则为 versionOptions 中对应项的 adjustType；无匹配或接口未返回时传空字符串。
+     * adjustType：与本页 mpAdjustResult/save、确认调整、重新计算一致，见 pickAdjustTypeOnlyMonthPlanConfirmRecalculate。
      */
     buildMonthPlanConfirmAdjustPayload() {
       const ym = this.normalizeYearMonth(this.query.yearMonth);
@@ -1952,7 +1953,7 @@ export default {
     },
     /**
      * 组装「重新计算」POST /monthplan/mpWeekRollAdjust/recalculate 入参；
-     * adjustType 解析规则与本页确认调整一致。
+     * adjustType 与本页 mpAdjustResult/save、确认调整一致。
      */
     buildWeekRollConfirmPayload() {
       const params = {
