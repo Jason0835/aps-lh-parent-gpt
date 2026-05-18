@@ -49,6 +49,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             TRIAL_PRODUCTION_QTY = #{trialProductionQty},
             IS_LOCK_SCHEDULE = #{isLockSchedule},
             TOTAL_QTY = #{totalQty},
+            ADJUST_FLAG = #{adjustFlag},
             UPDATE_BY = #{updateBy},
             UPDATE_TIME = NOW()
         WHERE ID = #{id}

@@ -99,6 +99,10 @@ export default {
           label: this.$t("ui.data.colume.wms.unused.productCode"),
           prop: "materialCode",
         },
+        {
+          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
+          prop: "materialDesc",
+        },
       ];
     },
     columns: function () {
