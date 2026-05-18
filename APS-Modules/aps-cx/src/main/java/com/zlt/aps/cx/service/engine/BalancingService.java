@@ -55,13 +55,13 @@ public class BalancingService {
     private static final String PARAM_MAX_LH_MACHINE_QTY = "SYS04020003";
 
     /** 参数编码：强制保留历史任务  */
-    private static final String PARAM_FORCE_KEEP_HISTORY = "FORCE_KEEP_HISTORY_TASK";
+    private static final String PARAM_FORCE_KEEP_HISTORY = "SYS04070003";
     
     /** 参数编码：胎胚种类数允许差额（均衡阈值） */
-    private static final String PARAM_TYPE_DIFF_THRESHOLD = "BALANCE_TYPE_DIFF_THRESHOLD";
+    private static final String PARAM_TYPE_DIFF_THRESHOLD = "SYS04070001";
     
     /** 参数编码：硫化机台数允许差额（均衡阈值） */
-    private static final String PARAM_LOAD_DIFF_THRESHOLD = "BALANCE_LOAD_DIFF_THRESHOLD";
+    private static final String PARAM_LOAD_DIFF_THRESHOLD = "SYS04070002";
     
     /** 默认：胎胚种类数允许差额（最多差1种） */
     private static final int DEFAULT_TYPE_DIFF_THRESHOLD = 1;

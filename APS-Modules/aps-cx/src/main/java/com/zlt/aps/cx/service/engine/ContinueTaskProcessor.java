@@ -57,7 +57,7 @@ public class ContinueTaskProcessor {
     private static final int DEFAULT_HOURLY_CAPACITY = 50;
 
     /** 参数编码：强制保留历史任务 */
-    private static final String PARAM_FORCE_KEEP_HISTORY = "FORCE_KEEP_HISTORY_TASK";
+    private static final String PARAM_FORCE_KEEP_HISTORY = "SYS04070003";
 
     /**
      * 处理续作任务
@@ -231,7 +231,7 @@ public class ContinueTaskProcessor {
             CxParamConfig config = context.getParamConfigMap().get(PARAM_FORCE_KEEP_HISTORY);
             if (config != null && config.getParamValue() != null) {
                 boolean result = "Y".equalsIgnoreCase(config.getParamValue()) || "true".equalsIgnoreCase(config.getParamValue());
-                log.info("FORCE_KEEP_HISTORY_TASK 数据库配置值: {}, 解析结果: {}", config.getParamValue(), result);
+                log.info("SYS04070003 数据库配置值: {}, 解析结果: {}", config.getParamValue(), result);
                 return result;
             }
         }
