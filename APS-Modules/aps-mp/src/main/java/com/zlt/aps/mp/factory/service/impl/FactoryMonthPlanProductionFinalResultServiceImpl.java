@@ -1179,8 +1179,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         List<String> materialCodeList = trialPlanList.stream().map(MpTrialPlan::getMaterialCode).distinct().collect(Collectors.toList());
         LambdaQueryWrapper<MdmMaterialInfo> mdmMaterialInfoQueryWrapper = new LambdaQueryWrapper<>();
         mdmMaterialInfoQueryWrapper.eq(MdmMaterialInfo::getFactoryCode, condition.getFactoryCode());
-        mdmMaterialInfoQueryWrapper.in(MdmMaterialInfo::getFactoryCode, materialCodeList);
-        mdmMaterialInfoQueryWrapper.isNotNull(MdmMaterialInfo::getStructureName);
+        mdmMaterialInfoQueryWrapper.in(MdmMaterialInfo::getMaterialCode, materialCodeList);
+//        mdmMaterialInfoQueryWrapper.isNotNull(MdmMaterialInfo::getStructureName);
         Map<String, MdmMaterialInfo> materialInfoMap = mdmMaterialInfoEntityMapper
                 .selectList(mdmMaterialInfoQueryWrapper).stream()
                 .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (m1, m2) -> m1));
