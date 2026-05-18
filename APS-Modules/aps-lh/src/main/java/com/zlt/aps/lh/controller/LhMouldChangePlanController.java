@@ -1,6 +1,7 @@
 package com.zlt.aps.lh.controller;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -25,7 +26,6 @@ import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.ExcelStyleVo;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
-import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
@@ -33,6 +33,7 @@ import com.zlt.aps.lh.api.domain.entity.LhSharedMouldPat;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
+import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhSharedMouldPatEntityMapper;
 import com.zlt.aps.lh.service.ILhMachineOnlineInfoService;
@@ -109,6 +110,9 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     @Autowired
     private LhSharedMouldPatEntityMapper lhSharedMouldPatEntityMapper;
+
+    @Autowired
+    private LhMachineOnlineInfoMapper lhMachineOnlineInfoMapper;
 
     /**
      * 查询模具交替计划列表
@@ -284,6 +288,10 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         return tableMap;
     }
 
+    private String buildOnlineMachineKey(String machineCode, Date date) {
+        return StringUtils.defaultIfBlank(machineCode, "") + "|" + StringUtils.defaultIfBlank(DateUtil.format(date, "yyyy-MM-dd"), "");
+    }
+
     public List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list, LhMouldChangePlan queryVO) {
         // 按计划日期、班次、机台排序
         list = list.stream().sorted(Comparator.comparing(LhMouldChangePlanVo::getPlanDate)
@@ -295,6 +303,12 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         Map<String, String> classNumDictDictMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(classNumDictList)) {
             classNumDictDictMap = classNumDictList.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
+        }
+        // 查询字典用于转义
+        List<SysDictData> lhTrialStatusDictList = iSysDictDataCacheService.getType("lh_trial_status");
+        Map<String, String> lhTrialStatusDictDictMap = new HashMap<>(16);
+        if (CollectionUtils.isNotEmpty(lhTrialStatusDictList)) {
+            lhTrialStatusDictDictMap = lhTrialStatusDictList.stream().collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel));
         }
         // 查询SKU与示方关系，取后规格示方类型
         List<String> materialCodeList = new ArrayList<>();
@@ -313,7 +327,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             skuConstructionRefMap = skuConstructionRefList.stream()
                     .sorted(Comparator.comparing(MdmSkuConstructionRef::getTrialStatus))
                     .collect(Collectors.toMap(MdmSkuConstructionRef::getMaterialCode,
-                            MdmSkuConstructionRef::getTrialStatus,
+                            MdmSkuConstructionRef::getLhType,
                     (s1, s2) -> s1));
         }
         // 查询共用模具
@@ -346,7 +360,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             row.put("afterMaterialDesc", afterMaterialDesc);
             // 示方类型
             String constructionType = skuConstructionRefMap.getOrDefault(afterMaterialCode, "");
-            row.put("afterMaterialType", ConstructionStageEnum.matchByMarkFlag(constructionType).getDesc());
+            row.put("afterMaterialType", lhTrialStatusDictDictMap.getOrDefault(constructionType, ""));
             // 按时间下机
             String endType = item.getEndType();
             if (YesOrNoEnum.NO.getCode().equals(endType)) {
@@ -366,14 +380,17 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             } else {
                 row.put("isSandblastingClean", "");
             }
+
+            List<String> mouldCodeList = new ArrayList<>();
+
             Integer isReplaceBlock = item.getIsReplaceBlock();
             if (YesOrNoEnum.YES.getValue().equals(isReplaceBlock)) {
                 row.put("isReplaceBlock", "是Có");
+                mouldCodeList.add(item.getMouldCode());
             } else {
                 row.put("isReplaceBlock", "");
             }
 
-            List<String> mouldCodeList = new ArrayList<>();
             if (lhSharedMouldPatMap.containsKey(afterMaterialDesc)) {
                 List<LhSharedMouldPat> sharedMouldPatList = lhSharedMouldPatMap.get(afterMaterialDesc);
                 for (LhSharedMouldPat lhSharedMouldPat : sharedMouldPatList) {
@@ -383,14 +400,12 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                     mouldCodeList.add(mouldCode);
                 }
 
-                row.put("mouldCode", String.join(",\n", mouldCodeList));
-
                 ExcelStyleVo excelStyleVo = new ExcelStyleVo();
                 excelStyleVo.setRgbColor(new ExcelStyleVo.RgbColor(230, 184, 183));
                 row.put("style", excelStyleVo);
-            } else {
-                row.put("mouldCode", "");
             }
+
+            row.put("mouldCode", CollUtil.isNotEmpty(mouldCodeList) ? String.join(",\n", mouldCodeList) : "");
 
             row.put("remark", item.getRemark());
 
@@ -403,24 +418,35 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         List<LhMouldChangePlanVo> resultList = new ArrayList<>();
         int seq = 1;
         // 查询硫化在机数据，通过日期+机台，取在机模号，拼接后回写模具号字段
-        HashMap<String, Object> map = new HashMap<>();
-        map.put("ONLINE_DATE", queryVO.getPlanDate());
-        List<LhMachineOnlineInfo> lhMachineOnlineInfoList = baseDao.selectByMap(LhMachineOnlineInfo.class, map);
+        List<String> planDateList = new ArrayList<>();
+        for (LhMouldChangePlan mouldChangePlan : list) {
+            Date planDate = mouldChangePlan.getPlanDate();
+            String format = DateUtil.format(planDate, "yyyy-MM-dd");
+            if (!planDateList.contains(format)) {
+                planDateList.add(format);
+            }
+        }
+        LambdaQueryWrapper<LhMachineOnlineInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(LhMachineOnlineInfo::getOnlineDate, planDateList);
+        List<LhMachineOnlineInfo> lhMachineOnlineInfoList = lhMachineOnlineInfoMapper.selectList(wrapper);
         Map<String, List<LhMachineOnlineInfo>> lhMachineOnlineInfoMap = new HashMap<>();
         if (CollectionUtils.isNotEmpty(lhMachineOnlineInfoList)) {
-            lhMachineOnlineInfoMap = lhMachineOnlineInfoList.stream().collect(Collectors.groupingBy(LhMachineOnlineInfo::getLhCode));
+            lhMachineOnlineInfoMap = lhMachineOnlineInfoList.stream().collect(Collectors.groupingBy(item -> buildOnlineMachineKey(item.getLhCode(), item.getOnlineDate())));
         }
         for (LhMouldChangePlan lhMouldChangePlan : list) {
             LhMouldChangePlanVo lhMouldChangePlanVo = new LhMouldChangePlanVo();
             BeanUtil.copyProperties(lhMouldChangePlan, lhMouldChangePlanVo);
 
-            String machineCode = lhMouldChangePlan.getLhMachineCode();
-            if (lhMachineOnlineInfoMap.containsKey(machineCode)) {
-                List<LhMachineOnlineInfo> onlineInfoList = lhMachineOnlineInfoMap.get(machineCode);
+            String key = buildOnlineMachineKey(lhMouldChangePlan.getLhMachineCode(), lhMouldChangePlan.getPlanDate());
+            if (lhMachineOnlineInfoMap.containsKey(key)) {
+                List<LhMachineOnlineInfo> onlineInfoList = lhMachineOnlineInfoMap.get(key);
                 String mouldCode = onlineInfoList.stream().map(LhMachineOnlineInfo::getInMachineMouldCode)
                         .filter(StringUtils::isNotBlank).distinct()
                         .collect(Collectors.joining(","));
                 lhMouldChangePlanVo.setMouldCode(mouldCode);
+            } else {
+                // 从模具变更计划赋值过来的要清空
+                lhMouldChangePlanVo.setMouldCode("");
             }
 
             lhMouldChangePlanVo.setSeq(seq++);
