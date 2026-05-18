@@ -62,7 +62,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="getVersionList" resultType="com.zlt.aps.mp.api.domain.entity.MpAdjustResult">
         SELECT DISTINCT
-        VERSION
+        VERSION,
+        ADJUST_TYPE
         FROM
         T_MP_ADJUST_RESULT
         WHERE
