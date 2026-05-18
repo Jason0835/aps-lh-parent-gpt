@@ -21,12 +21,7 @@ import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
-import com.zlt.aps.cx.mapper.CxKeyProductMapper;
-import com.zlt.aps.cx.mapper.CxParamConfigMapper;
-import com.zlt.aps.cx.mapper.CxScheduleResultMapper;
-import com.zlt.aps.cx.mapper.CxStructureTreadConfigMapper;
-import com.zlt.aps.cx.mapper.LhFinishQtyMapper;
-import com.zlt.aps.cx.mapper.LhScheduleResultMapper;
+import com.zlt.aps.cx.mapper.*;
 import com.zlt.aps.cx.service.CxScheduleDetailService;
 import com.zlt.aps.cx.service.CxScheduleResultService;
 import com.zlt.aps.cx.vo.CxScheduleResultTemplateImportVO;
@@ -1362,6 +1357,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                                 List<MdmMaterialInfo> materialInfoList = finalMaterialInfoMap.getOrDefault(item.getEmbryoCode(), new ArrayList<>());
                                 List<String> resultList = materialInfoList.stream()
                                         .map(i -> StringUtils.defaultIfBlank(i.getSpecifications(), "") + "/" + StringUtils.defaultIfBlank(i.getPattern(), ""))
+                                        .distinct()
                                         .collect(Collectors.toList());
                                 return String.join(",", resultList);
                             }));
