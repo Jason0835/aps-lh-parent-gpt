@@ -1459,8 +1459,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
-            BeanUtils.copyProperties(adjustDetailVo, monthPlan);
-            monthPlan.setTotalQty(adjustResult.getTotalPlanQty());
+            if (!StringUtil.isEmptyWithTrim(adjustDetailVo.getMaterialCode())){
+                BeanUtils.copyProperties(adjustDetailVo, monthPlan);
+            }
+            monthPlan.setTotalQty(adjustResult.getTotalQty());
             if (adjustDetailVo.getYear() != null && adjustDetailVo.getMonth() != null) {
                 monthPlan.setYearMonth(Integer.valueOf(String.format("%d%02d", adjustDetailVo.getYear(), adjustDetailVo.getMonth())));
             }
@@ -1502,9 +1504,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             monthPlan.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, actualAdjustQty);
             // 设置最新需求计划版本
-            monthPlan.setLastMonthPlanVersion(adjustDetailVo.getLastMonthPlanVersion());
+            monthPlan.setLastMonthPlanVersion(adjustResult.getMonthPlanVersion());
             // 设置月度计划开始日期、结束日期
             setBeginDayAndEndDay(monthPlan);
+
             insertMonthPlanList.add(monthPlan);
         }
 
@@ -1910,6 +1913,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         }
         monthPlan.setBeginDay(realBeginDay==FactoryConstant.MONTH_MAX_DAY+1 ? 0:realBeginDay);
         monthPlan.setEndDay(realEndDay);
+        monthPlan.setTotalQty(totalQty);
     }
 
 
