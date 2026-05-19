@@ -1815,7 +1815,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         importLog = this.iImportLogService.add(importLog);
         ExcelUtil<CxScheduleResultTemplateImportVO> util = new ExcelUtil<>(CxScheduleResultTemplateImportVO.class);
         List<CxScheduleResultTemplateImportVO> list = util.importExcel(
-                sheetName, new ByteArrayInputStream(fileBytes), 0, 2, -1);
+                sheetName, new ByteArrayInputStream(fileBytes), 2);
         AjaxResult ajaxResult = cxScheduleResultService.importScheduleTemplate(
                 list, scheduleResult, updateSupport, importLog.getId());
         Date endTime = DateUtils.getNowDate();
