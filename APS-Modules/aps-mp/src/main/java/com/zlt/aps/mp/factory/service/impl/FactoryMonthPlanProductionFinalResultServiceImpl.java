@@ -31,6 +31,8 @@ import com.zlt.aps.maindata.enums.ReleaseStatusEnum;
 import com.zlt.aps.maindata.event.publisher.EventPublisher;
 import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmSkuLhCapacityEntityMapper;
 import com.zlt.aps.maindata.mapper.MpTrialPlanEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
@@ -140,11 +142,11 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     @Autowired
     private MpTrialPlanEntityMapper mpTrialPlanEntityMapper;
     @Autowired
-    private FactoryMonthPlanProductConstructionMapper factoryMonthPlanProductConstructionMapper;
+    private MdmSkuConstructionRefEntityMapper mdmSkuConstructionRefEntityMapper;
     @Autowired
     private IFactoryParamService factoryParamService;
     @Autowired
-    private FactoryMonthPlanProductLhCapacityMapper factoryMonthPlanProductLhCapacityMapper;
+    private MdmSkuLhCapacityEntityMapper mdmSkuLhCapacityEntityMapper;
     @Autowired
     private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
     @Autowired
@@ -1059,6 +1061,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         }
         Map<String, DpDemandPlanSum> demandPlanMap = demandPlanSumMap.values().stream().collect(Collectors.toMap(DpDemandPlanSum::getMaterialCode, Function.identity(), (p1, p2) -> p1));
         List<Entry<String, FactoryMonthPlanFinalAdjustVo>> insertList = new ArrayList<>(resultMap.entrySet());
+        Set<String> materialCodeSet = resultMap.values().stream().map(FactoryMonthPlanFinalAdjustVo::getMaterialCode).distinct().collect(Collectors.toSet());
         // 计划类型、产品品类、MES物料编码、产品分类、排产分类、规格、花纹、品牌、SUM(高优先级数量)、月均销量、库销比、SUM(生产需求计划)、SUM(实际生产需求（含损耗）)、结构类型 --- 数据源：需求计划
         String monthPlanVersion = condition.getLastMonthPlanVersion();
         String productionVersion = condition.getProductionVersion();
@@ -1068,10 +1071,15 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         Integer month = condition.getMonth();
         Integer yearMonth = Convert.toInt(String.format("%s%02d", year, month));
 
-        // 加载sku与施工关系
-        Map<String, List<MonthPlanProductConstructionInfoVo>> constructionInfoMap = factoryMonthPlanProductConstructionMapper
-                .getConstructionByRequire(factoryCode, year, month, monthPlanVersion).stream()
-                .collect(Collectors.groupingBy(MonthPlanProductConstructionInfoVo::getMaterialCode));
+        // 加载sku与施工关系，数据格式：map<物料号, map<施工阶段, 施工列表>
+        LambdaQueryWrapper<MdmSkuConstructionRef> skuConstructionRefQueryWrapper = new LambdaQueryWrapper<>();
+        skuConstructionRefQueryWrapper.eq(MdmSkuConstructionRef::getFactoryCode, factoryCode);
+        skuConstructionRefQueryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeSet);
+        Map<String, Map<String, List<MdmSkuConstructionRef>>> constructionInfoMap = mdmSkuConstructionRefEntityMapper
+                .selectList(skuConstructionRefQueryWrapper).stream()
+                .collect(Collectors.groupingBy(MdmSkuConstructionRef::getMaterialCode,
+                        Collectors.collectingAndThen(Collectors.toList(), list -> list.stream()
+                                .collect(Collectors.groupingBy(i -> this.transferTrialStatusToStage(i.getTrialStatus()))))));
         // 日硫化量获取
         DayVulcanizationModeEnum mode = null;
         FactoryParam dayVulcanizationParam = factoryParamService.getFactoryParamByCondition(factoryCode,
@@ -1082,9 +1090,13 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         } else {
             mode = DayVulcanizationModeEnum.STANDARD_CAPACITY;
         }
-        Map<String, MonthPlanProductLhCapacityVo> productLhCapacityMap = factoryMonthPlanProductLhCapacityMapper
-                .getProductionLhCapacityInfo(factoryCode, year, month, monthPlanVersion).stream().collect(Collectors
-                        .toMap(MonthPlanProductLhCapacityVo::getMaterialCode, Function.identity(), (m1, m2) -> m1));
+        LambdaQueryWrapper<MdmSkuLhCapacity> skuLhCapacityQueryWrapper = new LambdaQueryWrapper<>();
+        skuLhCapacityQueryWrapper.eq(MdmSkuLhCapacity::getFactoryCode, factoryCode);
+        skuLhCapacityQueryWrapper.in(MdmSkuLhCapacity::getMaterialCode, materialCodeSet);
+        Map<String, MdmSkuLhCapacity> productLhCapacityMap = mdmSkuLhCapacityEntityMapper
+                .selectList(skuLhCapacityQueryWrapper).stream().collect(Collectors
+                        .toMap(MdmSkuLhCapacity::getMaterialCode, Function.identity(), (m1, m2) -> m1));
+        
         // 加载型腔活块数
         Map<String, Integer> cavityResults = new HashMap<>(0); // 型腔可用量（按结构+主花纹分组）
         Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
@@ -1105,9 +1117,10 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             // 成型机条件过滤
             String cxMachineCode = structureAllocationMap.get(structureName);
             if (StringUtils.isNotEmpty(condition.getCxMachineCode())) {
-                if (StringUtils.isEmpty(cxMachineCode) || !cxMachineCode.contains(condition.getCxMachineCode()))
+                if (StringUtils.isEmpty(cxMachineCode) || !cxMachineCode.contains(condition.getCxMachineCode())) {
                     structureAllocationMap.remove(entry.getKey());
-                continue;
+                    continue;
+                }
             }
             insertItem.setCxMachineCode(cxMachineCode);
             insertItem.setMonthPlanVersion(monthPlanVersion);
@@ -1119,6 +1132,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             insertItem.setYear(year);
             insertItem.setMonth(month);
             insertItem.setProductTypeCode(productTypeCode);
+            insertItem.setBeginDay(0);
+            insertItem.setEndDay(0);
             if (demandPlan != null) {
                 insertItem.setMesMaterialCode(demandPlan.getMesMaterialCode());
                 insertItem.setProductTypeCode(demandPlan.getProductTypeCode());
@@ -1136,22 +1151,27 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 insertItem.setInventorySalesRatio(BigDecimalUtils.div(demandPlan.getStockQty(), demandPlan.getAverageSaleQty(), 1));
             }
             // 胎胚号、施工阶段、是否零度材料、制造示方书号、文字示方书号、硫化示方书号---数据源：SKU与示方书关系，关联：SKU+胎胚描述
-            List<MonthPlanProductConstructionInfoVo> constructionConfigurationList = constructionInfoMap.get(materialCode);
-            if (!CollectionUtils.isEmpty(constructionConfigurationList)) {
-                MonthPlanProductConstructionInfoVo constructionInfo = ConstructionSelector.selectOneConstruction(constructionConfigurationList, insertItem.getProductTypeCode());
-                if (constructionInfo != null) {
+            Map<String, List<MdmSkuConstructionRef>> constructionStatusGroup = constructionInfoMap.get(materialCode);
+            if (constructionStatusGroup != null) {
+                List<MdmSkuConstructionRef> constructionConfigurationList = constructionStatusGroup.get(insertItem.getConstructionStage());
+                if (!CollectionUtils.isEmpty(constructionConfigurationList)) {
+                    MdmSkuConstructionRef constructionInfo = constructionConfigurationList.get(0);
                     insertItem.setEmbryoCode(constructionInfo.getEmbryoCode());
                     insertItem.setIsZeroRack(constructionInfo.getIsZeroRack());
                     insertItem.setEmbryoNo(constructionInfo.getEmbryoNo());
                     insertItem.setTextNo(constructionInfo.getTextNo());
                     insertItem.setLhNo(constructionInfo.getLhNo());
-                    insertItem.setProductStatus(constructionInfo.getProductStatus());
+                    insertItem.setProductStatus(constructionInfo.getTrialStatus());
                     insertItem.setMainMaterialDesc(constructionInfo.getMainMaterialDesc());
                 }
             }
             // 日硫化量（单模），单条硫化时间---数据源：SKU双模日硫化量， 日标准产量/2，硫化总时间(s)
-            MonthPlanProductLhCapacityVo capacityVo = productLhCapacityMap.get(materialCode);
-            if (capacityVo != null) {
+            MdmSkuLhCapacity mdmSkuLhCapacity = productLhCapacityMap.get(materialCode);
+            if (mdmSkuLhCapacity != null) {
+                MonthPlanProductLhCapacityVo capacityVo = new MonthPlanProductLhCapacityVo();
+                capacityVo.setMesCapacity(mdmSkuLhCapacity.getMesCapacity());
+                capacityVo.setStandardCapacity(mdmSkuLhCapacity.getStandardCapacity());
+                capacityVo.setApsCapacity(mdmSkuLhCapacity.getApsCapacity());
                 capacityVo.calculateDayVulcanizationQty(mode);
                 insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty() / 2);
             }
@@ -1167,6 +1187,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
             // 型腔数量---同结构主花纹最大的型腔数量
             insertItem.setMouldCavityQty(cavityResults.getOrDefault(insertItem.getStructureName() + insertItem.getMainPattern(), 0));
+            insertItem.setMaxMouldCavityQty(insertItem.getMouldCavityQty());
             insertItem.setTypeBlockQty(insertResults.getOrDefault(materialDesc, 0));
             insertItem.setYearMonth(yearMonth);
         }
@@ -1215,16 +1236,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         for (MpTrialPlan trialPlan : trialPlanList) {
             String materialCode = trialPlan.getMaterialCode();
             // 产品状态与施工类型映射
-            String constructionStage;
-            if (com.zlt.aps.enums.ConstructionStageEnum.TRIAL_FLAG.equals(trialPlan.getTrialStatus())) {
-                constructionStage = ConstructionStageEnum.MASS_TRIAL.getCode();
-            } else if (com.zlt.aps.enums.ConstructionStageEnum.MEASUREMENT_FLAG.equals(trialPlan.getTrialStatus())) {
-                constructionStage = ConstructionStageEnum.TRIAL.getCode();
-            } else if (com.zlt.aps.enums.ConstructionStageEnum.FORMAL_FLAG.equals(trialPlan.getTrialStatus())) {
-                constructionStage = ConstructionStageEnum.FORMAL.getCode();
-            } else {
-                constructionStage = ConstructionStageEnum.NO_PROCESS.getCode();
-            }
+            String constructionStage = this.transferTrialStatusToStage(trialPlan.getTrialStatus());
             String matchKey = matchVersion + "|" + materialCode + "|" + constructionStage;
             FactoryMonthPlanFinalAdjustVo adjustVo = finalResultMap.get(matchKey);
             if (adjustVo != null) {
@@ -1264,6 +1276,25 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             resultMap.put(matchKey, noPlanVo);
         }
         return resultMap;
+    }
+
+    /**
+     * 产品状态与施工类型映射
+     * @param trialStatus
+     * @return
+     */
+    protected String transferTrialStatusToStage(String trialStatus) {
+        String constructionStage;
+        if (com.zlt.aps.enums.ConstructionStageEnum.TRIAL_FLAG.equals(trialStatus)) {
+            constructionStage = ConstructionStageEnum.MASS_TRIAL.getCode();
+        } else if (com.zlt.aps.enums.ConstructionStageEnum.MEASUREMENT_FLAG.equals(trialStatus)) {
+            constructionStage = ConstructionStageEnum.TRIAL.getCode();
+        } else if (com.zlt.aps.enums.ConstructionStageEnum.FORMAL_FLAG.equals(trialStatus)) {
+            constructionStage = ConstructionStageEnum.FORMAL.getCode();
+        } else {
+            constructionStage = ConstructionStageEnum.NO_PROCESS.getCode();
+        }
+        return constructionStage;
     }
 
     /**
