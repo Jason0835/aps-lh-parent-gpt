@@ -1,4 +1,5 @@
 import request, {downloadLink} from '@/utils/request'
+import moment from 'moment'
 
 /**
  * 根据条件查询硫化排程结果列表
@@ -94,6 +95,25 @@ export function autoPlan(query) {
 export function validateInsertOrder(query) {
   return request({
     url: '/lh/lhScheduleResult/validateInsertOrder',
+    method: 'post',
+    data: query,
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8'
+    },
+  })
+}
+
+/**
+ * 获取SKU关联数据（硫化余量/胎胚库存/硫化班产/示方类型）
+ * @param {Object} query
+ * @param {string} query.factoryCode 工厂编码
+ * @param {string} query.materialCode 物料编码
+ * @param {string} query.scheduleDate 排程日期
+ * @returns
+ */
+export function getSkuRelatedData(query) {
+  return request({
+    url: '/lh/lhScheduleResult/getSkuRelatedData',
     method: 'post',
     data: query,
     headers: {
@@ -274,7 +294,9 @@ export function selectListMdmProductConstruction(query) {
  * @returns
  */
 export function exportScheduleResult(params) {
-  return downloadLink("/lh/lhScheduleResult/export", params);
+  const dateStr = moment().format('YYYYMMDD')
+  const filename = `硫化计划数据表${dateStr}.xlsx`
+  return downloadLink("/lh/lhScheduleResult/export", params, filename);
 }
 /**
  * 导出硫化排程结果

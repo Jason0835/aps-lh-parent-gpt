@@ -323,11 +323,14 @@ public class MdmMaterialInfoController extends BaseUIController<MdmMaterialInfo>
 
     /**
      * 查询胎胚编码列表（去重）
+     *
+     * @param entity 查询条件
+     * @return 胎胚编码列表
      */
     @ApiOperation("查询胎胚编码列表（去重）")
     @PostMapping("/listEmbryoCode")
     @ResponseBody
-    public TableDataInfo listEmbryoCode(MdmMaterialInfo entity) {
+    public TableDataInfo listEmbryoCode(@RequestBody MdmMaterialInfo entity) {
         return iMaterialInfoService.listEmbryoCode(entity);
     }
 }

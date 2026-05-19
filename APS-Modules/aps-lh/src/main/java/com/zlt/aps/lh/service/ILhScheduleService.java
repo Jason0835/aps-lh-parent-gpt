@@ -90,11 +90,19 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
     /**
      * 导出数据
      *
-     * @param list 数据列表
+     @param list 数据列表
      * @param result 排程日期
      * @return 导出数据
      */
     byte[] exportData(List<LhScheduleResult> list, LhScheduleResult result);
+
+    /**
+     * 下载导入模板（不含物料描述列，物料描述通过物料编码自动带出）
+     *
+     * @param result 查询条件（工厂、排程日期等）
+     * @return 导入模板Excel字节数组
+     */
+    byte[] downloadImportTemplate(LhScheduleResult result);
 
 
     AjaxResult importScheduleTemplate(List<LhScheduleResultTemplateImportVO> list, LhScheduleResult result, boolean updateSupport, Long id);

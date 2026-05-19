@@ -209,7 +209,6 @@ export default {
     "biz_factory_name",
     "MACHINE_TYPE",
     "trial_status",
-    "molding_method",
     "biz_yes_no",
   ],
   provide() {
@@ -426,7 +425,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.molding_method, value);
+                return this.selectDictLabel(this.dict.type.trial_status, value);
               },
             },
 
@@ -463,7 +462,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.molding_method, value);
+                return this.selectDictLabel(this.dict.type.trial_status, value);
               },
             },
 
@@ -500,7 +499,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.molding_method, value);
+                return this.selectDictLabel(this.dict.type.trial_status, value);
               },
             },
 
@@ -537,7 +536,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.molding_method, value);
+                return this.selectDictLabel(this.dict.type.trial_status, value);
               },
             },
 
@@ -574,7 +573,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.molding_method, value);
+                return this.selectDictLabel(this.dict.type.trial_status, value);
               },
             },
 
@@ -611,7 +610,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.molding_method, value);
+                return this.selectDictLabel(this.dict.type.trial_status, value);
               },
             },
 
@@ -648,7 +647,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.molding_method, value);
+                return this.selectDictLabel(this.dict.type.trial_status, value);
               },
             },
 
@@ -685,7 +684,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.molding_method, value);
+                return this.selectDictLabel(this.dict.type.trial_status, value);
               },
             },
 

@@ -73,7 +73,7 @@ public class CxScheduleResultTemplateImportVO extends BaseEntity {
     @Excel(name = "ui.data.column.cxScheduleResult.class1Analysis")
     private String class1Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class1RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class1RecipeType", dictType = "trial_status")
     private String class1RecipeType;
 
     @Excel(name = "ui.data.column.cxScheduleResult.class1RecipeNo")
@@ -89,7 +89,7 @@ public class CxScheduleResultTemplateImportVO extends BaseEntity {
     @Excel(name = "ui.data.column.cxScheduleResult.class2Analysis")
     private String class2Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class2RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class2RecipeType", dictType = "trial_status")
     private String class2RecipeType;
 
     @Excel(name = "ui.data.column.cxScheduleResult.class2RecipeNo")
@@ -105,7 +105,7 @@ public class CxScheduleResultTemplateImportVO extends BaseEntity {
     @Excel(name = "ui.data.column.cxScheduleResult.class3Analysis")
     private String class3Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class3RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class3RecipeType", dictType = "trial_status")
     private String class3RecipeType;
 
     @Excel(name = "ui.data.column.cxScheduleResult.class3RecipeNo")
@@ -121,7 +121,7 @@ public class CxScheduleResultTemplateImportVO extends BaseEntity {
     @Excel(name = "ui.data.column.cxScheduleResult.class4Analysis")
     private String class4Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class4RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class4RecipeType", dictType = "trial_status")
     private String class4RecipeType;
 
     // ===== class5 =====
@@ -134,7 +134,7 @@ public class CxScheduleResultTemplateImportVO extends BaseEntity {
     @Excel(name = "ui.data.column.cxScheduleResult.class5Analysis")
     private String class5Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class5RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class5RecipeType", dictType = "trial_status")
     private String class5RecipeType;
 
     // ===== class6 =====
@@ -147,7 +147,7 @@ public class CxScheduleResultTemplateImportVO extends BaseEntity {
     @Excel(name = "ui.data.column.cxScheduleResult.class6Analysis")
     private String class6Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class6RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class6RecipeType", dictType = "trial_status")
     private String class6RecipeType;
 
     // ===== class7 =====
@@ -160,7 +160,7 @@ public class CxScheduleResultTemplateImportVO extends BaseEntity {
     @Excel(name = "ui.data.column.cxScheduleResult.class7Analysis")
     private String class7Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class7RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class7RecipeType", dictType = "trial_status")
     private String class7RecipeType;
 
     // ===== class8 =====
@@ -173,7 +173,7 @@ public class CxScheduleResultTemplateImportVO extends BaseEntity {
     @Excel(name = "ui.data.column.cxScheduleResult.class8Analysis")
     private String class8Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class8RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class8RecipeType", dictType = "trial_status")
     private String class8RecipeType;
 
     // ===== 其他 =====

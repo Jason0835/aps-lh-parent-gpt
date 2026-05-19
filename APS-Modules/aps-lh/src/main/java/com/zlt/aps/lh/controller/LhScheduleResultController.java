@@ -255,17 +255,12 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
 
-    @ApiOperation(value = "模板下载", notes = "导入模板下载")
+    @ApiOperation(value = "模板下载", notes = "导入模板下载（不含物料描述列，物料描述通过物料编码自动带出）")
     @PostMapping("/downloadTemplate/{fileName}")
     public byte[] downloadTemplate(@RequestBody LhScheduleResult queryVO, @PathVariable("fileName") String fileName,
                                    HttpServletResponse response) throws IOException {
         queryVO = queryVO == null ? new LhScheduleResult() : queryVO;
-        List<LhScheduleResult> list = new ArrayList<>();
-//        LhScheduleResult  lhScheduleResult = new LhScheduleResult();
-//        lhScheduleResult.setScheduleDate(queryVO.getScheduleDate());
-//        list.add(lhScheduleResult);
-        byte[] resultBytes = lhScheduleService.exportData(list, queryVO);
-        return resultBytes;
+        return lhScheduleService.downloadImportTemplate(queryVO);
     }
 
 
@@ -553,6 +548,13 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         }
         lhScheduleResultService.insertOrder(insertDTO);
         return AjaxResult.success();
+    }
+
+    @ApiOperation("获取SKU关联数据（硫化余量/胎胚库存/硫化班产/示方类型）")
+    @PostMapping("/getSkuRelatedData")
+    public AjaxResult getSkuRelatedData(@RequestBody LhOrderInsertDTO insertDTO) {
+        LhInsertOrderValidateResultDTO result = lhScheduleResultService.getSkuRelatedData(insertDTO);
+        return AjaxResult.success(result);
     }
 
 

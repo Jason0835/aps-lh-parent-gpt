@@ -140,6 +140,11 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     }
 
     @Override
+    public LhInsertOrderValidateResultDTO getSkuRelatedData(LhOrderInsertDTO dto) {
+        return insertOrderValidateHandler.getSkuRelatedData(dto);
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void insertOrder(LhOrderInsertDTO dto) {
         log.info("执行插单操作, 工厂: {}, 机台: {}, 物料: {}, 排程日期: {}",

@@ -421,7 +421,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      * 加载示方类型字典，构建 code → label 映射。
      */
     private Map<String, String> loadRecipeTypeDictMap() {
-        List<SysDictData> dictList = sysDictDataCacheService.getType("biz_construction_stage");
+        List<SysDictData> dictList = sysDictDataCacheService.getType("trial_status");
         if (CollectionUtils.isEmpty(dictList)) {
             return Collections.emptyMap();
         }

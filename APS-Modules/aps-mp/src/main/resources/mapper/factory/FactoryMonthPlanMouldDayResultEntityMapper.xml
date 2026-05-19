@@ -102,6 +102,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND d.FACTORY_CODE = m.FACTORY_CODE 
 		    AND d.MATERIAL_CODE = m.MATERIAL_CODE 
 		    AND d.is_delete = 0
+            LEFT JOIN T_MP_MOLD_CAPACITY_LOG mc ON mc.IS_DELETE = 0
+            AND mc.FACTORY_CODE = m.FACTORY_CODE 
+            AND mc.production_version = #{dayResult.productionVersion}
+            AND mc.MATERIAL_CODE = m.MATERIAL_CODE
 		    LEFT JOIN T_MP_PROC_MONTH_PLAN_INIT i on i.MONTH_PLAN_ID = d.id
             AND m.FACTORY_CODE = i.FACTORY_CODE 
 		    AND i.PRODUCTION_VERSION = #{dayResult.productionVersion}
@@ -117,10 +121,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND m.FACTORY_CODE = r.FACTORY_CODE 
 		    AND r.production_version = #{dayResult.productionVersion}
 		    AND r.IS_DELETE = 0 
-		    LEFT JOIN T_MP_MOLD_CAPACITY_LOG mc ON mc.IS_DELETE = 0
-            AND mc.FACTORY_CODE = r.FACTORY_CODE 
-            AND mc.production_version = r.production_version
-            AND mc.MATERIAL_CODE = m.MATERIAL_CODE
 		    LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL f ON f.IS_DELETE = 0
 		    AND f.MATERIAL_CODE = m.MATERIAL_CODE
             AND f.`YEAR_MONTH` = DATE_FORMAT(DATE_SUB(concat(#{dayResult.year},'-',#{dayResult.month},'-1'),INTERVAL 1 month), '%Y%m')
