@@ -261,9 +261,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         String cxTrialSpecs = buildCxSetupOrTrialInfo(cxResults, "量试");
         String lhTrialSpecs = buildLhSetupOrTrialInfo(lhResults, "量试");
         map.put("cxTrialInfo", combineSpecInfo(cxTrialSpecs, lhTrialSpecs));
-        // 成型规格切换：参考成型日计划生成页面的成型结构切换导出逻辑，从T_MP_STRUCTURE_ALLOCATION取切换结构数据
-        // 排产小结查的是前一天数据，所以用reportDate
-        map.put("cxSpecSwitch", buildCxSpecSwitch(reportDate, factoryCode));
+        // 成型规格切换：从T_MP_STRUCTURE_ALLOCATION取切换结构数据
+        // 需同时传入reportDate和scheduleDate，支持非跨月和跨月两种场景
+        map.put("cxSpecSwitch", buildCxSpecSwitch(reportDate, actualScheduleDate, factoryCode));
 
         BigDecimal lhNightTotal = BigDecimal.ZERO;
         BigDecimal lhMorningTotal = BigDecimal.ZERO;
@@ -505,16 +505,16 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return dataList;
         }
 
-        // 成型排程结果需按排程日期的前一天查询
-        Date cxScheduleDate = DateUtil.offsetDay(scheduleDate, -1);
-        log.info("查询成型排程结果，排程日期: {}, 前一天: {}", scheduleDate, cxScheduleDate);
+        // 成型排程结果按排程日期查询，过滤掉3、4、5班次都没排计划量的胎胚
+        Date cxScheduleDate = scheduleDate;
+        log.info("查询成型排程结果，排程日期: {}", scheduleDate);
 
-        // 查询本次成型排程结果的胎胚列表
         List<CxScheduleResult> cxResults = cxScheduleResultMapper.selectList(
                 new LambdaQueryWrapper<CxScheduleResult>()
                         .eq(CxScheduleResult::getScheduleDate, cxScheduleDate)
                         .eq(CxScheduleResult::getFactoryCode, factoryCode));
         Set<String> scheduleEmbryoCodes = cxResults.stream()
+                .filter(this::hasAnyPlanQtyInShift345)
                 .map(CxScheduleResult::getEmbryoCode)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
@@ -649,6 +649,20 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 .collect(Collectors.toList());
         log.info("TD胶种类型配置（成型参数配置SYS04010002）: {}", codes);
         return codes;
+    }
+
+    /**
+     * 判断成型排程结果的3、4、5班次中是否有任意一个班次排了计划量。
+     * 3、4、5班次对应排程日期前一天的夜、早、中班次，
+     * 三个班次都没排计划量的胎胚需要过滤掉。
+     *
+     * @param result 成型排程结果
+     * @return true=至少一个班次有计划量，false=三个班次都没计划量
+     */
+    private boolean hasAnyPlanQtyInShift345(CxScheduleResult result) {
+        return nvl(result.getClass3PlanQty()).compareTo(BigDecimal.ZERO) > 0
+                || nvl(result.getClass4PlanQty()).compareTo(BigDecimal.ZERO) > 0
+                || nvl(result.getClass5PlanQty()).compareTo(BigDecimal.ZERO) > 0;
     }
 
     /**
@@ -953,26 +967,39 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     /**
      * 构建成型规格切换信息。
-     * 参考成型日计划生成页面的成型结构切换导出逻辑（CxScheduleResultServiceImpl.buildStructureChangeDataListV2），
-     * 从T_MP_STRUCTURE_ALLOCATION表获取结构排产数据，
-     * 按成型机台分组，根据报告日期（前一天）找到当前正在运行的结构和下一个切换结构，
-     * 展示格式为"前结构 换 后结构"，多个切换用"；"隔开。
+     * 从T_MP_STRUCTURE_ALLOCATION表获取结构排产数据，按成型机台分组，
+     * 找到结束日等于前一天日号的前结构，以及开始日等于前一天日号或排程日期日号的后结构，
+     * 只展示第二天切换的数据，展示格式为"前结构 换 后结构"，多个切换用"；"隔开。
      *
-     * @param reportDate  报告日期（排程日期的前一天）
-     * @param factoryCode 分厂编码
+     * <p>两种场景：</p>
+     * <ul>
+     *   <li>非跨月场景：排程日期21号，取5月转产数据，找endDay=20的前结构，
+     *       后结构先查beginDay=20，20号没有再查beginDay=21</li>
+     *   <li>跨月场景：排程日期6月1号，取6月转产数据，找endDay=1且后结构beginDay=1</li>
+     * </ul>
+     *
+     * @param reportDate   报告日期（排程日期的前一天）
+     * @param scheduleDate 排程日期
+     * @param factoryCode  分厂编码
      * @return 规格切换信息字符串，如"结构A 换 结构B；结构C 换 结构D"
      */
-    private String buildCxSpecSwitch(Date reportDate, String factoryCode) {
-        LocalDate localScheduleDate = DateUtil.toLocalDateTime(reportDate).toLocalDate();
+    private String buildCxSpecSwitch(Date reportDate, Date scheduleDate, String factoryCode) {
+        LocalDate localReportDate = DateUtil.toLocalDateTime(reportDate).toLocalDate();
+        LocalDate localScheduleDate = DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
+
+        // 跨月场景：排程日期是1号时，直接取排程日期所在月的转产数据；否则取前一天所在月的数据
+        LocalDate queryMonthBase = localScheduleDate.getDayOfMonth() == 1
+                ? localScheduleDate : localReportDate;
 
         MpStructureAllocation structureQuery = new MpStructureAllocation();
         structureQuery.setFactoryCode(factoryCode);
-        structureQuery.setYear(localScheduleDate.getYear());
-        structureQuery.setMonth(localScheduleDate.getMonthValue());
+        structureQuery.setYear(queryMonthBase.getYear());
+        structureQuery.setMonth(queryMonthBase.getMonthValue());
 
         List<MpStructureAllocation> structureList = queryStructureAllocationList(structureQuery);
         if (structureList.isEmpty()) {
-            log.info("成型规格切换：未查询到结构排产数据, 日期: {}, 分厂: {}", DateUtil.formatDate(reportDate), factoryCode);
+            log.info("成型规格切换：未查询到结构排产数据, 查询年月: {}-{}, 分厂: {}",
+                    queryMonthBase.getYear(), queryMonthBase.getMonthValue(), factoryCode);
             return "";
         }
 
@@ -985,6 +1012,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                         Collectors.toList()));
 
         List<String> switchList = new ArrayList<>();
+        int reportDayOfMonth = localReportDate.getDayOfMonth();
         int scheduleDayOfMonth = localScheduleDate.getDayOfMonth();
 
         for (Map.Entry<String, List<MpStructureAllocation>> entry : machineGroupMap.entrySet()) {
@@ -992,22 +1020,31 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                     .sorted(Comparator.comparing(MpStructureAllocation::getBeginDay, Comparator.nullsLast(Comparator.naturalOrder())))
                     .collect(Collectors.toList());
 
-            int currentIndex = -1;
-            for (int i = 0; i < structures.size(); i++) {
-                MpStructureAllocation s = structures.get(i);
-                if (s.getBeginDay() != null && s.getEndDay() != null
-                        && scheduleDayOfMonth >= s.getBeginDay() && scheduleDayOfMonth <= s.getEndDay()) {
-                    currentIndex = i;
-                    break;
-                }
-            }
-
-            if (currentIndex == -1 || currentIndex >= structures.size() - 1) {
+            // 同一机台必须有2条及以上转产数据才说明有结构切换
+            if (structures.size() < 2) {
                 continue;
             }
 
-            MpStructureAllocation prevStructure = structures.get(currentIndex);
-            MpStructureAllocation nextStructure = structures.get(currentIndex + 1);
+            // 查找前结构：结束日等于前一天日号（跨月场景下为排程日期日号1号）
+            int prevEndDay = localScheduleDate.getDayOfMonth() == 1
+                    ? scheduleDayOfMonth : reportDayOfMonth;
+            MpStructureAllocation prevStructure = null;
+            for (MpStructureAllocation s : structures) {
+                if (s.getEndDay() != null && s.getEndDay() == prevEndDay) {
+                    prevStructure = s;
+                    break;
+                }
+            }
+            if (prevStructure == null) {
+                continue;
+            }
+
+            // 查找后结构：先查开始日等于前一天日号，没有再查开始日等于排程日期日号
+            MpStructureAllocation nextStructure = findNextStructure(structures, prevStructure,
+                    reportDayOfMonth, scheduleDayOfMonth);
+            if (nextStructure == null) {
+                continue;
+            }
 
             String prevStructureName = StringUtils.defaultString(prevStructure.getStructureName()).trim();
             String nextStructureName = StringUtils.defaultString(nextStructure.getStructureName()).trim();
@@ -1020,6 +1057,41 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         String result = String.join("；", switchList);
         log.info("成型规格切换: {}", result);
         return result;
+    }
+
+    /**
+     * 查找下一个结构切换数据。
+     * 优先查找开始日等于前一天日号的结构，若没有则查找开始日等于排程日期日号的结构。
+     *
+     * @param structures       按beginDay排序的转产数据列表
+     * @param prevStructure    前结构（已确定结束日的前结构）
+     * @param reportDayOfMonth 前一天的日号
+     * @param scheduleDayOfMonth 排程日期的日号
+     * @return 下一个结构切换数据，未找到返回null
+     */
+    private MpStructureAllocation findNextStructure(List<MpStructureAllocation> structures,
+                                                    MpStructureAllocation prevStructure,
+                                                    int reportDayOfMonth,
+                                                    int scheduleDayOfMonth) {
+        // 优先查找开始日等于前一天日号的结构
+        for (MpStructureAllocation s : structures) {
+            if (s == prevStructure) {
+                continue;
+            }
+            if (s.getBeginDay() != null && s.getBeginDay() == reportDayOfMonth) {
+                return s;
+            }
+        }
+        // 前一天日号没有匹配，再查找开始日等于排程日期日号的结构
+        for (MpStructureAllocation s : structures) {
+            if (s == prevStructure) {
+                continue;
+            }
+            if (s.getBeginDay() != null && s.getBeginDay() == scheduleDayOfMonth) {
+                return s;
+            }
+        }
+        return null;
     }
 
     /**

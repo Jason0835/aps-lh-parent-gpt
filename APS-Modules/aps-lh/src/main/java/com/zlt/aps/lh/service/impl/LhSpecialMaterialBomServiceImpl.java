@@ -15,6 +15,8 @@ import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
 import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
 import com.zlt.aps.lh.mapper.LhSpecialMaterialBomEntityMapper;
 import com.zlt.aps.lh.service.ILhSpecialMaterialBomService;
+import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -29,10 +31,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -52,6 +56,9 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
 
     @Autowired
     private LhSpecialMaterialBomEntityMapper lhSpecialMaterialBomEntityMapper;
+
+    @Autowired
+    private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -326,13 +333,42 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         }
 
-        // Step3: 批量导入 - 分离新增和更新数据
+        // Step3: 批量预取物料主数据，用于反显物料描述
+        Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>(16);
+        List<String> materialCodeList = importList.stream()
+                .map(LhSpecialMaterialBom::getMaterialCode)
+                .filter(StringUtil::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isNotEmpty(materialCodeList)) {
+            List<List<String>> splitList = com.zlt.aps.maindata.utils.CollectionUtils.splitList(materialCodeList, 900);
+            List<MdmMaterialInfo> materialInfoList = new ArrayList<>();
+            for (List<String> codes : splitList) {
+                LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<MdmMaterialInfo>()
+                        .in(MdmMaterialInfo::getMaterialCode, codes);
+                materialInfoList.addAll(mdmMaterialInfoEntityMapper.selectList(wrapper));
+            }
+            if (CollectionUtils.isNotEmpty(materialInfoList)) {
+                materialInfoMap = materialInfoList.stream()
+                        .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (s1, s2) -> s1));
+            }
+        }
+
+        // Step4: 批量导入 - 分离新增和更新数据
         List<LhSpecialMaterialBom> insertList = importList.stream()
                 .filter(entity -> entity.getId() == null)
                 .collect(Collectors.toList());
         List<LhSpecialMaterialBom> updateList = importList.stream()
                 .filter(entity -> entity.getId() != null)
                 .collect(Collectors.toList());
+
+        // 设置物料描述（根据物料编码从物料主数据反显）
+        for (LhSpecialMaterialBom entity : importList) {
+            if (StringUtil.isNotBlank(entity.getMaterialCode()) && materialInfoMap.containsKey(entity.getMaterialCode())) {
+                MdmMaterialInfo materialInfo = materialInfoMap.get(entity.getMaterialCode());
+                entity.setMaterialDesc(materialInfo.getMaterialDesc());
+            }
+        }
 
         // 批量插入 - 设置逻辑删除标识和审计字段
         if (CollectionUtils.isNotEmpty(insertList)) {
