@@ -253,7 +253,7 @@ public class LhIncreaseMouldStartPlanService {
             return;
         }
         // 主数据表当前保存的是硫化示方类型标记（S/T/X），这里按项目既有枚举口径转换成硫化结果使用的施工阶段（03/02/01/00）。
-        scheduleResult.setConstructionStage(
+        scheduleResult.setChangedConstructionStage(
                 ConstructionStageEnum.matchByMarkFlag(skuConstructionRef.getLhType()).getStage());
     }
 

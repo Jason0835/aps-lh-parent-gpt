@@ -180,7 +180,7 @@ public class LhTextMouldChangePlanGenerator {
                 if (StringUtils.equals(machineCode, targetPlan.getLhMachineCode())) {
                     return message("ui.data.alert.lhMouldChangePlan.generateTextPlan.sameMachineReleasedExists");
                 }
-                return message("ui.data.alert.lhMouldChangePlan.generateTextPlan.targetShiftReleasedExists");
+//                return message("ui.data.alert.lhMouldChangePlan.generateTextPlan.targetShiftReleasedExists");
             }
         }
         return null;
