@@ -1075,7 +1075,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .collect(Collectors.toSet());
         // 收集月计划列表
         monthPLanList = monthPLanList.stream()
-                .filter(vo -> structureNameSet.contains(vo.getStructureName()))
+                .filter(vo -> structureNameSet.contains(vo.getStructureName()) &&
+                        vo.getDayVulcanizationQty() != null)
                 .collect(Collectors.toList());
 
         MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
@@ -1210,6 +1211,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         //检查：物料编码：[%s]，排产日超出结构起产日[%s]-收尾日[%s]！
         StringBuilder beginDaySb = new StringBuilder();
         for (FactoryMonthPlanFinalAdjustVo finalAdjustVo:monthPlanList){
+            if (finalAdjustVo.getBeginDay() == null || finalAdjustVo.getEndDay() == null){
+                continue;
+            }
             if (finalAdjustVo.getBeginDay() == 0 && finalAdjustVo.getEndDay() == 0){
                 continue;
             }
