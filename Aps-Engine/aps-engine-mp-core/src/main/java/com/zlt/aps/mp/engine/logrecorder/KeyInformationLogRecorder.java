@@ -1,17 +1,18 @@
 package com.zlt.aps.mp.engine.logrecorder;
 
+import com.google.common.collect.Lists;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.*;
+import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
+import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -48,6 +49,36 @@ public class KeyInformationLogRecorder {
     }
 
     /**
+     * 记录模拟排产后，机台的分配情况
+     *
+     * @param context             排产上下文
+     * @param allGroupPlanMap     所有分组
+     * @param allContinueGroupMap 续作分组信息
+     */
+    public static void recorderContinueCxMachineProductionLog(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanMap, Map<String, CxContinueInfoHelper> allContinueGroupMap) {
+        if (CollectionUtils.isEmpty(allGroupPlanMap)) {
+            return;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        if (CollectionUtils.isEmpty(allCxMachineInfo)) {
+            return;
+        }
+        List<CxMachineAllocationPlanHelper> continueAllocationList = Lists.newArrayList();
+        allCxMachineInfo.forEach((cxMachineCode, cxMachineInfo) -> {
+            List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
+            if (CollectionUtils.isEmpty(allocationList)) {
+                return;
+            }
+            continueAllocationList.addAll(allocationList);
+        });
+        if (CollectionUtils.isEmpty(continueAllocationList)) {
+            return;
+        }
+        recorderContinueAllocationGroupInfoLog(productionContext, allGroupPlanMap, allContinueGroupMap, continueAllocationList);
+    }
+
+    /**
      * 记录初始构建后的各结构情形
      *
      * @param context                排产上下文
@@ -67,6 +98,55 @@ public class KeyInformationLogRecorder {
             }
             List<CxMachineAllocationPlanHelper> allocationInfo = groupAllocationMap.get(structureName);
             addAllocationResultInfo(context, groupPlanInfo, allocationInfo);
+        });
+    }
+
+    /**
+     * 结构新增机台分配情形
+     *
+     * @param context                       排产上下文
+     * @param preSelectedGroupAllocationMap 新增分配机台信息
+     */
+    public static void recorderInsertAllocationGroupInfoLog(Context context, Map<String, Set<CxMachineAllocationPlanHelper>> preSelectedGroupAllocationMap) {
+        if (CollectionUtils.isEmpty(preSelectedGroupAllocationMap)) {
+            return;
+        }
+        preSelectedGroupAllocationMap.forEach((groupName, allocationList) -> {
+            if (CollectionUtils.isEmpty(allocationList)) {
+                return;
+            }
+            addNewAllocationResultInfo(context, groupName, new ArrayList<>(allocationList), "新增");
+        });
+    }
+
+    /**
+     * 月尾补量分配前的分组机台分配结果信息日志
+     *
+     * @param context 排产上下文
+     */
+    public static void recorderAllAllocationGroupInfoLog(Context context) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
+        if (CollectionUtils.isEmpty(allCxMachineInfo)) {
+            return;
+        }
+        List<CxMachineAllocationPlanHelper> allAllocationList = Lists.newArrayList();
+        allCxMachineInfo.forEach((cxMachineCode, cxMachineInfo) -> {
+            List<CxMachineAllocationPlanHelper> allocationList = cxMachineInfo.getAllocationList();
+            if (CollectionUtils.isEmpty(allocationList)) {
+                return;
+            }
+            allAllocationList.addAll(allocationList);
+        });
+        if (CollectionUtils.isEmpty(allAllocationList)) {
+            return;
+        }
+        Map<String, List<CxMachineAllocationPlanHelper>> groupAllocationMap = getAllocationInfoByGroupName(allAllocationList);
+        groupAllocationMap.forEach((groupName, allocationList) -> {
+            if (CollectionUtils.isEmpty(allocationList)) {
+                return;
+            }
+            addNewAllocationResultInfo(context, groupName, allocationList, "");
         });
     }
 
@@ -151,5 +231,26 @@ public class KeyInformationLogRecorder {
                 continueGroupPlanInfo.getGroupName(), onLineMachineInfo, cxMachineAllocationInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_CONTINUE_CX_MACHINE_SUMMARY_INFO_SUM, logContent);
+    }
+
+    /**
+     * 增加 非在机 机构初始化信息日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构 %s %s机台分配信息：%s ====
+     * 分配信息：分配机台：%s 分配天数 %s 从%s~%s
+     *
+     * @param context        排程上下文
+     * @param groupName      分组名
+     * @param allocationInfo 分配信息
+     * @param contentText    文本信息
+     */
+    private static void addNewAllocationResultInfo(Context context, String groupName, List<CxMachineAllocationPlanHelper> allocationInfo, String contentText) {
+        StringBuilder cxMachineAllocationInfo = new StringBuilder();
+        String onLineMachineFormat = "分配机台：%s 分配天数 %s 从%s~%s";
+        allocationInfo.forEach(singleAllocation -> cxMachineAllocationInfo.append(System.lineSeparator()).append(String.format(onLineMachineFormat, singleAllocation.getCxMachineCode(), singleAllocation.getAllocationDay(), singleAllocation.getStartDay(), singleAllocation.getEndDay())));
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构 %s %s机台分配信息：%s ====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, contentText, cxMachineAllocationInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_NO_CONTINUE_GROUP_INFO, logContent);
     }
 }

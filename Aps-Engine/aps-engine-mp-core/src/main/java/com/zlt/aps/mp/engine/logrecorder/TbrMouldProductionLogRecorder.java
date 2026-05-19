@@ -351,7 +351,7 @@ public class TbrMouldProductionLogRecorder {
      * @param groupName         分组名-结构
      * @param onLineMachineInfo 成型机台编码
      * @param skuInfo           Sku信息
-     * @param limitDays    限制天数
+     * @param limitDays         限制天数
      * @return
      */
     public static String addAgainProductionSkuLimitLog(Context context, String groupName, String onLineMachineInfo, MonthPlanProductionRequirePlanVo skuInfo, Integer limitDays) {
@@ -502,20 +502,23 @@ public class TbrMouldProductionLogRecorder {
 
     /**
      * 增加分组结构排产成型机台硫化组使用模具排产Sku日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 物料：%s 使用模具[%s]排产 %s~%s====
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 物料：%s 使用模具[%s]排产 %s~%s 待排产量 %s====
      *
-     * @param context       排程上下文
-     * @param groupName     分组名-结构
-     * @param cxMachineCode 成型机台编码
-     * @param materialDesc  Sku信息
-     * @param mouldInfo     模具信息
-     * @param startDay      开始日
-     * @param endDay        结束日
+     * @param context          排程上下文
+     * @param groupName        分组名-结构
+     * @param cxMachineCode    成型机台编码
+     * @param materialDesc     Sku信息
+     * @param mouldInfo        模具信息
+     * @param startDay         开始日
+     * @param endDay           结束日
+     * @param sumProductionQty 待排产量
      * @return
+     * @pa
      */
-    public static String addLhGroupSkuUsedFindMouldProductionLog(Context context, String groupName, String cxMachineCode, String materialDesc, String mouldInfo, Integer startDay, Integer endDay) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 物料：%s 使用模具[%s]排产 %s~%s====";
-        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, cxMachineCode, materialDesc, mouldInfo, startDay, endDay);
+    public static String addLhGroupSkuUsedFindMouldProductionLog(Context context, String groupName, String cxMachineCode, String materialDesc, String mouldInfo, Integer startDay, Integer endDay, Integer sumProductionQty) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 对成型机台：%s 物料：%s 使用模具[%s]排产 %s~%s 待排产量 %s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, cxMachineCode, materialDesc, mouldInfo, startDay, endDay, sumProductionQty);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_MOULD_SKU_USED_FIND_MOULD_PRODUCTION, logContent);
         return logContent;

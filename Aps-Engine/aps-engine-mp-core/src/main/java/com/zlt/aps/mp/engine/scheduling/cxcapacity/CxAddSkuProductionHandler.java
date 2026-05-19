@@ -267,8 +267,8 @@ public class CxAddSkuProductionHandler {
         startDay = newLh.getProductionDay();
         endDay = newLh.getEndDay();
         String mouldInfo = doubleMouldList.stream().map(ProductionMouldInfoVo::getMouldCode).collect(Collectors.joining(StringConstant.COMMA));
-        log.info(TbrMouldProductionLogRecorder.addLhGroupSkuUsedFindMouldProductionLog(context, groupName, cxMachineCode, materialDesc, mouldInfo, startDay, endDay));
         Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
+        TbrMouldProductionLogRecorder.addLhGroupSkuUsedFindMouldProductionLog(context, groupName, cxMachineCode, materialDesc, mouldInfo, startDay, endDay, sumProductionQty);
         Integer dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
         //实际排产量
         Integer realSumProductionQty = BigDecimal.ZERO.intValue();
