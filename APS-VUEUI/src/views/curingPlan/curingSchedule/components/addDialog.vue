@@ -36,6 +36,7 @@ import {
   selectListMdmProductConstruction,
   getScheduleMachineInfo,
   getScheduleDate,
+  getSkuRelatedData,
 } from "@/api/lh/scheduleResult";
 export default {
   components: { infoForm, materialCodeSelect },
@@ -256,8 +257,47 @@ export default {
     handleMaterialCodeChange(val, row) {
       if (val) {
         this.$set(this.form, "materialDesc", row.materialDesc);
+        this.loadSkuRelatedData(val);
       } else {
         this.$set(this.form, "materialDesc", "");
+        this.$set(this.form, "mouldSurplusQty", null);
+        this.$set(this.form, "embryoStock", null);
+        this.$set(this.form, "machineShiftCapacity", null);
+        this.$set(this.form, "constructionStage", null);
+        this.$set(this.form, "leftRightMould", null);
+      }
+    },
+    async loadSkuRelatedData(materialCode) {
+      if (!materialCode || !this.form.factoryCode || !this.form.scheduleDate) {
+        return;
+      }
+      try {
+        const params = {
+          factoryCode: this.form.factoryCode,
+          materialCode: materialCode,
+          scheduleDate: this.form.scheduleDate,
+        };
+        const res = await getSkuRelatedData(params);
+        if (res && res.data) {
+          const data = res.data;
+          if (data.mouldSurplusQty != null) {
+            this.$set(this.form, "mouldSurplusQty", data.mouldSurplusQty);
+          }
+          if (data.embryoStock != null) {
+            this.$set(this.form, "embryoStock", data.embryoStock);
+          }
+          if (data.machineShiftCapacity != null) {
+            this.$set(this.form, "machineShiftCapacity", data.machineShiftCapacity);
+          }
+          if (data.constructionStage != null) {
+            this.$set(this.form, "constructionStage", data.constructionStage);
+          }
+          if (data.leftRightMould != null) {
+            this.$set(this.form, "leftRightMould", data.leftRightMould);
+          }
+        }
+      } catch (error) {
+        console.error("获取SKU关联数据失败:", error);
       }
     },
     decodeRemark(remark) {

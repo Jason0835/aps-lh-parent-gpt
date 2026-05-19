@@ -124,7 +124,7 @@ public class ExportUtil {
             String uri = ServletUtils.getRequest().getRequestURI();
             exportLog.setFunctionCode(uri.split("/")[2]);
             exportLog.setFunctionName(fileName);
-            exportLog.setFileName(fileName + "-" + DateUtils.dateTimeNow() + ".xlsx");
+            exportLog.setFileName(fileName + DateUtils.dateTimeNow() + ".xlsx");
             exportLog.setFileUrl(pathFileName);
         } catch (Exception e) {
             log.error(e.getMessage());

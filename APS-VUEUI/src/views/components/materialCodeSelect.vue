@@ -93,20 +93,12 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t("common.factory"),
-          type: "select", //GLUE_TYPE
+          type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
           label: this.$t("ui.data.colume.wms.unused.productCode"),
           prop: "materialCode",
-        },
-        {
-          label: this.$t("ui.data.column.scheduleAdjust.productCodeDesc"),
-          prop: "materialDesc",
-        },
-        {
-          label: this.$t("ui.data.column.lhSpecialMaterialBom.structureName"),
-          prop: "structureName",
         },
       ];
     },

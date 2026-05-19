@@ -94,6 +94,15 @@ public interface ILhScheduleResultService {
     LhInsertOrderValidateResultDTO validateInsertOrder(LhOrderInsertDTO dto);
 
     /**
+     * 获取SKU关联数据（硫化余量/胎胚库存/硫化班产/示方类型）
+     * <p>用于插单页面选择新物料时实时获取关联信息</p>
+     *
+     * @param dto 包含factoryCode、materialCode、scheduleDate的请求对象
+     * @return SKU关联数据
+     */
+    LhInsertOrderValidateResultDTO getSkuRelatedData(LhOrderInsertDTO dto);
+
+    /**
      * 执行插单操作
      * <p>保存排程结果到硫化排程结果表，数据来源记录为插单，发布状态默认为待发布</p>
      *

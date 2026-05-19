@@ -206,12 +206,12 @@ export default {
         {
           label: this.$t("ui.data.column.machine.dimensionSize"),
           prop: "dimensionSize",
-          maxlength:20,
+          maxlength: 10,
         },
         {
           label: this.$t("ui.data.column.machine.hotPlateDiameter"),
           prop: "hotPlateDiameter",
-          maxlength:20,
+          maxlength: 50,
         },
         {
           label: this.$t("ui.data.column.machine.shellStandard"),

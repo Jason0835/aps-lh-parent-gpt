@@ -65,11 +65,35 @@ export default {
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
+          {
+            max: 64,
+            message: this.$t("ui.data.alert.lhSharedMouldPat.mouldNoOverflow"),
+            trigger: "blur",
+          },
         ],
         patternBlock: [
           {
             required: true,
             message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+          {
+            max: 64,
+            message: this.$t("ui.data.alert.lhSharedMouldPat.patternBlockOverflow"),
+            trigger: "blur",
+          },
+        ],
+        specifications: [
+          {
+            max: 300,
+            message: this.$t("ui.data.alert.lhSharedMouldPat.specificationsOverflow"),
+            trigger: "blur",
+          },
+        ],
+        mainPattern: [
+          {
+            max: 50,
+            message: this.$t("ui.data.alert.lhSharedMouldPat.mainPatternOverflow"),
             trigger: "blur",
           },
         ],
