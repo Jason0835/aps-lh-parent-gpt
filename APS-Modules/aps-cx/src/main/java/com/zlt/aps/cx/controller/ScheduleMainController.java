@@ -4,6 +4,10 @@ import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -37,6 +41,7 @@ import com.zlt.aps.cx.component.ScheduleExecutionGuard;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.common.utils.ImportExcelUtils;
 import com.ruoyi.common.utils.StringUtils;
 import org.apache.commons.collections4.CollectionUtils;
 import io.swagger.annotations.Api;
@@ -47,6 +52,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -106,6 +112,12 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
     @Resource
     private MdmMaterialInfoMapper mdmMaterialInfoMapper;
+
+    @Autowired
+    private IImportLogService iImportLogService;
+
+    @Autowired
+    private IImportErrorLogService iImportErrorLogService;
 
     @Resource
     private MdmSkuConstructionRefMapper mdmSkuConstructionRefMapper;
@@ -1788,21 +1800,32 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     @Log(title = "成型排程导入", businessType = BusinessType.IMPORT)
     public AjaxResult importDataByCust(@PathVariable("updateSupport") boolean updateSupport,
                                        @RequestBody CxScheduleImportDTO importDTO) throws Exception {
+        Date beginTime = DateUtils.getNowDate();
         ImportContext importContext = importDTO.getImportContext();
-        if (importContext == null) {
-            return AjaxResult.error("导入上下文不能为空");
-        }
         CxScheduleResult scheduleResult = importDTO.getScheduleResult();
         if (scheduleResult == null) {
             scheduleResult = new CxScheduleResult();
         }
         byte[] fileBytes = importContext.getFileBytes();
         String sheetName = "成型计划";
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(
+                importContext.getFileBytes(), importContext.getImportFilePath(),
+                importContext.getProcedureCode(), importContext.getFunctionName(),
+                importContext.getOriFileName(), 1);
+        importLog = this.iImportLogService.add(importLog);
         ExcelUtil<CxScheduleResultTemplateImportVO> util = new ExcelUtil<>(CxScheduleResultTemplateImportVO.class);
-        // 使用3参数版本: sheetName, InputStream, headRowNum
-//        List<CxScheduleResultTemplateImportVO> list = util.importExcel(
-//                sheetName, new java.io.ByteArrayInputStream(fileBytes), 0, 7, -1);
-        return null;
+        List<CxScheduleResultTemplateImportVO> list = util.importExcel(
+                sheetName, new ByteArrayInputStream(fileBytes), 0, 2, -1);
+        AjaxResult ajaxResult = cxScheduleResultService.importScheduleTemplate(
+                list, scheduleResult, updateSupport, importLog.getId());
+        Date endTime = DateUtils.getNowDate();
+        importLog.setRowCount(list.size());
+        importLog.setBeginTime(beginTime);
+        importLog.setEndTime(endTime);
+        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
+        ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
+        return ajaxResult;
     }
 
     /**
