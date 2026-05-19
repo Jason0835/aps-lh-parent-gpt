@@ -103,6 +103,7 @@ export default {
               <materialCodeSelect
                 key={form.materialCode}
                 v-model={form.materialCode}
+                structureName={form.structureName}
                 onChange={this.handleMaterialCodeChange}
               />
             );

@@ -77,6 +77,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -957,7 +958,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 8、更新结构转产
         updateStructureAllocationList(contextDTO);
         // 9、处理月计划统计结果
+        String bakStructureName = contextDTO.getStructureName();
         handleMonthPlanStatistics(contextDTO,null);
+        contextDTO.setStructureName(bakStructureName);
         // 10、合并至定稿月度生产计划并更新最新版本号
         // 根据优先级顺序分配生产数量
         allocateProductionByPriority(contextDTO);
@@ -980,10 +983,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         //后插入
         List<FactoryMonthPlanProductionFinalResult> finalResultList = BeanUtil.copyToList(contextDTO.getFactoryMonthPlanProdFinalList(), FactoryMonthPlanProductionFinalResult.class);
         if (!StringUtil.isEmptyWithTrim(contextDTO.getStructureName())){
-            finalResultList = finalResultList.stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName()) &&
-                    x.getTotalQty() != null && x.getTotalQty() != 0).collect(Collectors.toList());
-        }else {
-            finalResultList = finalResultList.stream().filter(x->x.getTotalQty() != null && x.getTotalQty() != 0).collect(Collectors.toList());
+            finalResultList = finalResultList.stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
         }
         batchMpProductionFinalResultService.insertBatchData(finalResultList);
     }
@@ -1407,7 +1407,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     protected void insertMonthPlanList(MpRollAdjustContextDTO contextDTO) {
         List<MpAdjustDetailVo> adjustDetailList = contextDTO.getAdjustDetailList();
         List<MpAdjustResult> adjustResultList = contextDTO.getAdjustResultList();
-        if (PubUtil.isEmpty(adjustDetailList) || PubUtil.isEmpty(adjustResultList)) {
+        if (PubUtil.isEmpty(adjustResultList)) {
             log.warn("新增月度生产计划：调整明细列表或者调整结果列表为空，直接返回");
             return;
         }
@@ -1430,25 +1430,29 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         initSkuConstructionRef(contextDTO);
         // 汇总调整明细
         List<MpAdjustDetailVo> summaryAdjustDetailList = sumByStructureAndMaterial(adjustDetailList, Boolean.TRUE);
+        Map<String, MpAdjustDetailVo> adjustDetailVoMap = summaryAdjustDetailList.stream()
+                .collect(Collectors.toMap(
+                        vo -> (vo.getStructureName() == null ? "" : vo.getStructureName())
+                                + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY
+                                + (vo.getMaterialCode() == null ? "" : vo.getMaterialCode())
+                                + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY
+                                + (vo.getConstructionStage() == null ? "" : vo.getConstructionStage()),
+                        Function.identity(),
+                        (existing, replacement) -> replacement  // 遇到重复 Key 时保留后出现的元素
+                ));
         // 汇总调整结果
-        Map<String, MpAdjustResult> summaryAdjustResult = summaryAdjustResult(adjustResultList, adjustDetailList);
+        Map<String, MpAdjustResult> summaryAdjustResultMap = summaryAdjustResult(adjustResultList, adjustDetailList);
         // 遍历调整明细，获取新增的SKU并新增到月度生产计划
-        for (MpAdjustDetailVo adjustDetailVo : summaryAdjustDetailList) {
-           /* String isSkuAdd = adjustDetailVo.getIsSkuAdd();
-            if (!ApsConstant.TRUE.equals(isSkuAdd)) {
-                continue;
-            }*/
+        for (Map.Entry<String, MpAdjustResult> entry : summaryAdjustResultMap.entrySet()) {
+            MpAdjustResult adjustResult = entry.getValue();
             // 构建分组key
-            String groupKey = buildGroupKey(adjustDetailVo);
+            String groupKey = buildGroupKey(adjustResult);
             if (PubUtil.isNotEmpty(keyToListMap.get(groupKey))){
                 continue;
             }
-            // 匹配汇总后调整结果
-            MpAdjustResult adjustResult = summaryAdjustResult.getOrDefault(groupKey, null);
-            if (adjustResult == null) {
-                log.warn("新增月度生产计划 ==> 物料编码:{} 对应的调整结果为空，跳过不处理", adjustDetailVo.getMaterialCode());
-                continue;
-            }
+
+            MpAdjustDetailVo adjustDetailVo = adjustDetailVoMap.get(groupKey) == null ? new MpAdjustDetailVo():adjustDetailVoMap.get(groupKey);
+
             FactoryMonthPlanProductionFinalResult monthPlan = new FactoryMonthPlanProductionFinalResult();
             BeanUtils.copyProperties(adjustResult, monthPlan);
             BeanUtils.copyProperties(adjustDetailVo, monthPlan);
@@ -1939,7 +1943,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 continue;
             }
             // 构建分组key
-            String groupKey = buildGroupKey(detailVo);
+            String groupKey = buildGroupKey(result);
             // 获取或初始化汇总对象
             MpAdjustResult summaryResult = summaryMap.getOrDefault(groupKey, new MpAdjustResult());
             if (summaryResult.getMaterialCode() == null) {
@@ -2003,10 +2007,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     /**
      * 构建分组key
      */
-    private String buildGroupKey(MpAdjustDetailVo detailVo) {
-        String structureName = Optional.ofNullable(detailVo.getStructureName()).orElse("");
-        String materialCode = Optional.ofNullable(detailVo.getMaterialCode()).orElse("");
-        String constructionStage = Optional.ofNullable(detailVo.getConstructionStage()).orElse("");
+    private String buildGroupKey(MpAdjustResult resultVo) {
+        String structureName = Optional.ofNullable(resultVo.getStructureName()).orElse("");
+        String materialCode = Optional.ofNullable(resultVo.getMaterialCode()).orElse("");
+        String constructionStage = Optional.ofNullable(resultVo.getConstructionStage()).orElse("");
         return String.join(BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY, structureName, materialCode, constructionStage);
     }
 

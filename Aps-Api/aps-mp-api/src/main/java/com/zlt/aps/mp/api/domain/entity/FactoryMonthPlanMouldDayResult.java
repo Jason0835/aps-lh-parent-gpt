@@ -9,6 +9,7 @@ import com.zlt.aps.mp.api.constants.MonthPlanConstants;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -724,13 +725,13 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     private Integer displaySeq;
 
     @TableField(exist = false)
-    private Integer  heightLossQty;
+    private Integer heightLossQty;
 
     @TableField(exist = false)
-    private Integer  cycleReserveLossQty;
+    private Integer cycleReserveLossQty;
 
     @TableField(exist = false)
-    private Integer  midLossQty;
+    private Integer midLossQty;
     @TableField(exist = false)
     private Integer conventionReserveQty;
     @TableField(exist = false)
@@ -750,7 +751,45 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @TableField(exist = false)
     private Integer nonEudrQty;
 
+    /**
+     * 是否增模又降膜又增模
+     *
+     * @return
+     */
+    public Integer isDisturb() {
+        if (StringUtils.isBlank(mouldChangeInfo)) {
+            return BigDecimal.ZERO.intValue();
+        }
+        String[] splitList = mouldChangeInfo.split("-");
+        int changeSize = splitList.length;
+        List<Integer> mouldChangeList = Lists.newArrayList();
+        for (String mouldNumber : splitList) {
+            try {
+                Integer mouldNumberValue = Integer.valueOf(mouldNumber);
+                mouldChangeList.add(mouldNumberValue);
+            } catch (NumberFormatException exception) {
 
+            }
+        }
+        if (changeSize != mouldChangeList.size()) {
+            return BigDecimal.ZERO.intValue();
+        }
+        int both = BigDecimal.ONE.intValue() + BigDecimal.ONE.intValue();
+        if (changeSize <= both) {
+            return BigDecimal.ZERO.intValue();
+        }
+        int index = BigDecimal.ONE.intValue();
+        int endIndex = changeSize - BigDecimal.ONE.intValue();
+        for (; index < endIndex; index++) {
+            Integer before = mouldChangeList.get(index - BigDecimal.ONE.intValue());
+            Integer current = mouldChangeList.get(index);
+            Integer after = mouldChangeList.get(index + BigDecimal.ONE.intValue());
+            if (before > current && current < after) {
+                return BigDecimal.ONE.intValue();
+            }
+        }
+        return BigDecimal.ZERO.intValue();
+    }
 
     /**
      * 根据优先级顺序分配生产数量
@@ -792,7 +831,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
 
 
         // 4. 分配暂缓优先级
-        if (!NORMAL_PLAN_TYPE.equals(this.planType)  &&   remainingQty > 0 && this.postponeQty != null && this.postponeQty > 0) {
+        if (!NORMAL_PLAN_TYPE.equals(this.planType) && remainingQty > 0 && this.postponeQty != null && this.postponeQty > 0) {
             this.postponeProductionQty = Math.min(remainingQty, this.postponeQty);
             remainingQty -= this.postponeProductionQty;
             scmPriorities.add(MonthPlanConstants.SAL_PRIORITY_POSTPONE);
@@ -803,22 +842,22 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
             remainingQty -= this.conventionProductionQty;
             scmPriorities.add(MonthPlanConstants.SAL_PRIORITY_PRECEDENT_STOCK_UP);
         }
-        if(remainingQty > 0 && !CollectionUtils.isEmpty(scmPriorities)) {
-            String  scmPriority = scmPriorities.get(scmPriorities.size() - 1);
-            if(MonthPlanConstants.SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(scmPriority)) {
-                this.conventionProductionQty = (this.conventionProductionQty==null?0:this.conventionProductionQty) + remainingQty;
-            }else if(MonthPlanConstants.SAL_PRIORITY_POSTPONE.equals(scmPriority)) {
+        if (remainingQty > 0 && !CollectionUtils.isEmpty(scmPriorities)) {
+            String scmPriority = scmPriorities.get(scmPriorities.size() - 1);
+            if (MonthPlanConstants.SAL_PRIORITY_PRECEDENT_STOCK_UP.equals(scmPriority)) {
+                this.conventionProductionQty = (this.conventionProductionQty == null ? 0 : this.conventionProductionQty) + remainingQty;
+            } else if (MonthPlanConstants.SAL_PRIORITY_POSTPONE.equals(scmPriority)) {
                 this.postponeProductionQty = this.postponeProductionQty + remainingQty;
-            }else if(MonthPlanConstants.SAL_PRIORITY_MID.equals(scmPriority)) {
+            } else if (MonthPlanConstants.SAL_PRIORITY_MID.equals(scmPriority)) {
                 this.midProductionQty = this.midProductionQty + remainingQty;
-            }else if(MonthPlanConstants.SAL_PRIORITY_CYCLE_STOCK_UP.equals(scmPriority)) {
+            } else if (MonthPlanConstants.SAL_PRIORITY_CYCLE_STOCK_UP.equals(scmPriority)) {
                 this.cycleProductionQty = this.cycleProductionQty + remainingQty;
-            }else{
+            } else {
                 this.heightProductionQty = this.heightProductionQty + remainingQty;
             }
         }
     }
-    
+
     /**
      * 重新统计总排产量
      */
@@ -855,7 +894,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
                 Optional.ofNullable(this.day30).orElse(0) +
                 Optional.ofNullable(this.day31).orElse(0);
     }
-    
+
     /**
      * 分组|*|主花纹
      * TBR 为结构

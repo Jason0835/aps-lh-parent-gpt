@@ -24,6 +24,7 @@
           <el-button
             type="primary"
             plain
+            :disabled="adjustFlowInProgress"
             v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
             @click="handleStructureInnerAdjust"
             >{{
@@ -61,6 +62,7 @@
           >
           <el-button
             :loading="syncLoading"
+            :disabled="adjustFlowInProgress"
             v-hasPermi="['monthplan:factoryMonthPlanFinalResult:sync']"
             @click="handleIssueScmMes"
             >{{
@@ -351,8 +353,8 @@ export default {
       },
       /** 1–31 号列编辑前原始值，用于失焦时与 rollingCycle 一致判断是否调用 save */
       dayEditOriginalValue: null,
-      /** 锁定天数：从接口获取，控制 1-31 号哪些日期不可编辑 */
-      lockedDays: { single: 0, multi: 0 },
+      /** 锁定天数（SYS0206001）：>0 含今天起向后；0 表示仅锁定今天之前的日期 */
+      lockedDays: 0,
       /** 结构调整：表格多选勾选行（统计行不可选）；超过 1 条时禁用「结构调整」按钮 */
       structureAdjustSelection: [],
     };
@@ -484,6 +486,15 @@ export default {
           width: 300,
           align: "left",
         },
+        { 
+          prop: "constructionStage",
+          label: this.$t("ui.data.column.monthplan.constructionStage"),
+          minWidth: 100,
+          align: "left",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+          },
+        }, // 排产类型
         {
           prop: "embryoCode",
           label: "胎胚号",
@@ -625,18 +636,6 @@ export default {
           ),
           width: 120,
           render: ({ row }) => {
-            if (!row.id) {
-              return (
-                <span>
-                  {row.isLockSchedule != null && row.isLockSchedule !== ""
-                    ? this.selectDictLabel(
-                        this.dict.type.biz_yes_no,
-                        row.isLockSchedule
-                      )
-                    : ""}
-                </span>
-              );
-            }
             return (
               <el-select
                 v-model={row.isLockSchedule}
@@ -680,7 +679,7 @@ export default {
               row[prop] === null || row[prop] === undefined
                 ? ""
                 : String(row[prop]);
-            if (!row.id || this.isDayLocked(i, row)) {
+            if (!this.canEditDayCell(row, i)) {
               const isOver = row._overDays && row._overDays[prop];
               return <span style={isOver ? { color: "red" } : {}}>{text}</span>;
             }
@@ -929,7 +928,7 @@ export default {
     async fetchLockedDays() {
       const factoryCode = this.query.factoryCode || this.search.factoryCode;
       if (!factoryCode) {
-        this.lockedDays = { single: 0, multi: 0 };
+        this.lockedDays = 0;
         return;
       }
       const baseParams = {
@@ -937,45 +936,53 @@ export default {
         productTypeCode: "TBR",
       };
       try {
-        const [resSingle, resMulti] = await Promise.all([
-          getByParamCode({ ...baseParams, paramCode: "SYS0206001" }),
-          new Promise((resolve) =>
-            setTimeout(
-              () =>
-                resolve(
-                  getByParamCode({ ...baseParams, paramCode: "SYS0206002" })
-                ),
-              300
-            )
-          ),
-        ]);
-        this.lockedDays = {
-          single: Number(resSingle?.paramValue) || 0,
-          multi: Number(resMulti?.paramValue) || 0,
-        };
+        const res = await getByParamCode({ ...baseParams, paramCode: "SYS0206001" });
+        this.lockedDays = Number(res?.paramValue) || 0;
       } catch (e) {
         console.error("获取锁定天数失败:", e);
-        this.lockedDays = { single: 0, multi: 0 };
+        this.lockedDays = 0;
       }
     },
-    isDayLocked(day, row) {
-      const cxMachineCode = (row && row.cxMachineCode) ? String(row.cxMachineCode).trim() : "";
-      const isMulti = cxMachineCode.includes(",");
-      const lockDays = isMulti ? this.lockedDays.multi : this.lockedDays.single;
-      if (!lockDays || lockDays <= 0) {
-        return false;
+    /**
+     * 全表统一：根据 SYS0206001 计算锁定截止日（与行数据、机台号无关）。
+     * lockedDays > 0：锁定 1 号至（今天 + lockedDays - 1）号；
+     * lockedDays === 0：锁定当月今天之前的日期（如今天 18 号则锁定 1–17 号）。
+     */
+    getLockEndDay() {
+      const lockDays = Number(this.lockedDays);
+      if (Number.isNaN(lockDays) || lockDays < 0) {
+        return 0;
       }
       const today = new Date().getDate();
-      const lockEndDay = today + lockDays - 1;
+      return lockDays === 0 ? today - 1 : today + lockDays - 1;
+    },
+    /** 某日是否在锁定期内（全表同一规则） */
+    isDayLocked(day) {
+      const lockEndDay = this.getLockEndDay();
+      if (lockEndDay < 1) {
+        return false;
+      }
       return day <= lockEndDay;
+    },
+    /** 统计行（胎胚种类数、硫化机台数等）不可编辑日排产 */
+    isStatisticsRow(row) {
+      return !!(row && row.showBackground);
+    },
+    /** 日排产是否显示编辑框：全表仅按锁定日期判断，与单元格有无值、机台号、row.id 无关 */
+    canEditDayCell(row, day) {
+      if (!row || this.isStatisticsRow(row)) {
+        return false;
+      }
+      return !this.isDayLocked(day);
+    },
+    /** 日排产失焦保存：需有持久化主键 */
+    canSaveDayCell(row) {
+      return !this.isStatisticsRow(row);
     },
     /**
      * 修改优先上机（原锁定上机），与 rollingCycle/index.backup-legacy.vue 一致调用 mpAdjustResult/save
      */
     handleLockScheduleChange(row) {
-      if (!row || !row.id) {
-        return;
-      }
       const versionFromSearch = this.resolveSearchColumnsVersion();
       saveAdjustResult({
         ...row,
@@ -1223,7 +1230,8 @@ export default {
      * 修改 1–31 号日排产后实时保存，与 rollingCycle handleResultDayEdit 一致
      */
     async handleResultDayEdit(row, prop) {
-      if (!row.id) {
+      const dayNum = Number(String(prop).replace(/^day/, ""));
+      if (!this.canSaveDayCell(row) || this.isDayLocked(dayNum)) {
         return;
       }
       if (

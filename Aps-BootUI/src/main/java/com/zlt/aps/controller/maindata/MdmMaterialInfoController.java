@@ -89,7 +89,7 @@ public class MdmMaterialInfoController extends BaseUIController<MdmMaterialInfo>
     @ApiOperation("根据条件查询物料信息表列表")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(TableProductInfoVo entity) {
+    public TableDataInfo list(@RequestBody TableProductInfoVo entity) {
         return iMaterialInfoService.list(entity);
     }
 

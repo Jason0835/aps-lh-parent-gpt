@@ -651,6 +651,22 @@ public final class LhScheduleTimeUtil {
     }
 
     /**
+     * 获取指定日期的结束时间（23:59:59.999）
+     *
+     * @param date 日期时间
+     * @return 当天结束时间（23:59:59.999）
+     */
+    public static Date getEndTime(Date date) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(date);
+        cal.set(Calendar.HOUR_OF_DAY, 23);
+        cal.set(Calendar.MINUTE, 59);
+        cal.set(Calendar.SECOND, 59);
+        cal.set(Calendar.MILLISECOND, 999);
+        return cal.getTime();
+    }
+
+    /**
      * 在指定日期基础上加N天
      *
      * @param date 基础日期

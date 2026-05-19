@@ -53,4 +53,13 @@
         </foreach>
     </insert>
 
+    <delete id="deleteByOrderNosAndFactoryCode">
+        DELETE FROM MOLD_ALTER_PLAN
+        WHERE FACTORY_CODE = #{factoryCode}
+        AND ORDER_NO IN
+        <foreach collection="orderNos" item="orderNo" open="(" separator="," close=")">
+            #{orderNo}
+        </foreach>
+    </delete>
+
 </mapper>
