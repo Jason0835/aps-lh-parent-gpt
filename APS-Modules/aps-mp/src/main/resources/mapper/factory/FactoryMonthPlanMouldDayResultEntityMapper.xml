@@ -236,7 +236,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    MAIN_PATTERN 
     </select>
 
-	<update id="backUpGroupAllocationInfo" parameterType="com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult">
+	<update id="deletedOldBackUp" parameterType="com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult">
 		DELETE FROM t_mp_final_structure_allocation_log
 		 WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
 		   AND YEAR = #{year,jdbcType=DECIMAL}
@@ -249,6 +249,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		   AND MONTH = #{month,jdbcType=DECIMAL}
 		   AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
 		   AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+	</update>
+
+	<insert id="insertAllocationBackUp" parameterType="com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult">
 		INSERT INTO t_mp_final_structure_allocation_log(
 			   FACTORY_CODE,
 			   `YEAR`,
@@ -303,6 +306,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		   AND MONTH = #{month,jdbcType=DECIMAL}
 		   AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
 		   AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+	</insert>
+
+	<insert id="insertStatisticsBackUp" parameterType="com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult">
 		INSERT INTO t_mp_final_statistics_log(
 			   FACTORY_CODE,
 			   `YEAR`,
@@ -403,5 +409,5 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		   AND MONTH = #{month,jdbcType=DECIMAL}
 		   AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
 		   AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
-	</update>
+	</insert>
 </mapper>

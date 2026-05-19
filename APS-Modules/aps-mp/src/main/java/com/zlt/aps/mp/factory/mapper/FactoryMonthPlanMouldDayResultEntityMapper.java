@@ -38,10 +38,27 @@ public interface FactoryMonthPlanMouldDayResultEntityMapper extends CommBaseMapp
                                                                @Param("isFinal") Boolean isFinal);
 
     /**
-     * 备份定稿的结构分配及排产统计信息
+     * 删除旧有的备份
      *
-     * @param finalizedVersion 定稿版本信息
+     * @param finalizedVersion
      * @return
      */
-    int backUpGroupAllocationInfo(FactoryMonthPlanProductionFinalResult finalizedVersion);
+    int deletedOldBackUp(FactoryMonthPlanProductionFinalResult finalizedVersion);
+
+    /**
+     * 删除旧有的备份
+     *
+     * @param finalizedVersion
+     * @return
+     */
+    int insertAllocationBackUp(FactoryMonthPlanProductionFinalResult finalizedVersion);
+
+    /**
+     * 删除旧有的备份
+     *
+     * @param finalizedVersion
+     * @return
+     */
+    int insertStatisticsBackUp(FactoryMonthPlanProductionFinalResult finalizedVersion);
+
 }
