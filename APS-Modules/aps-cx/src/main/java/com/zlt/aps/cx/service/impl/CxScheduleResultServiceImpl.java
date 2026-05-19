@@ -787,33 +787,32 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // 批量查询 LH 排程结果
         List<LhScheduleResult> lhResults = lhScheduleResultMapper.selectBatchIds(allLhIds);
 
-        // lhScheduleId → totalDailyPlanQty
+        // lhScheduleId → totalDailyPlanQty（仅做ID映射，不去重）
         Map<Long, Integer> lhIdToPlanQty = new LinkedHashMap<>();
-        Set<Integer> usedQtySet = new HashSet<>();
         for (LhScheduleResult r : lhResults) {
             Integer qty = r.getTotalDailyPlanQty() != null ? r.getTotalDailyPlanQty() : 0;
-            if (qty == 0 || !usedQtySet.add(qty)) {
-                lhIdToPlanQty.put(r.getId(), 0);
-            } else {
-                lhIdToPlanQty.put(r.getId(), qty);
-            }
+            lhIdToPlanQty.put(r.getId(), qty);
         }
 
-        // 按 lhScheduleIds 原字符串汇总
+        // 按 lhScheduleIds 原字符串汇总（行内量去重）
         Map<String, BigDecimal> resultMap = new HashMap<>();
         for (CxScheduleResult item : list) {
             String ids = item.getLhScheduleIds();
             if (StringUtils.isEmpty(ids) || resultMap.containsKey(ids)) {
                 continue;
             }
-            BigDecimal sum = Arrays.stream(ids.split("[,，]"))
-                    .map(String::trim)
-                    .filter(StringUtils::isNotEmpty)
-                    .map(Long::parseLong)
-                    .map(lhIdToPlanQty::get)
-                    .filter(Objects::nonNull)
-                    .map(BigDecimal::valueOf)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            Set<Integer> rowUsedQtySet = new HashSet<>();
+            BigDecimal sum = BigDecimal.ZERO;
+            for (String idStr : ids.split("[,，]")) {
+                String trimmed = idStr.trim();
+                if (StringUtils.isEmpty(trimmed)) continue;
+                Long lhId = Long.parseLong(trimmed);
+                Integer qty = lhIdToPlanQty.get(lhId);
+                if (qty == null || qty == 0) continue;
+                if (rowUsedQtySet.add(qty)) {
+                    sum = sum.add(BigDecimal.valueOf(qty));
+                }
+            }
             resultMap.put(ids, sum);
         }
         return resultMap;
