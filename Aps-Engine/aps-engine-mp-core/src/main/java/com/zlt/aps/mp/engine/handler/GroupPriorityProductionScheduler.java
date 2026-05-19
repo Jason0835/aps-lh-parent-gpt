@@ -82,14 +82,17 @@ public class GroupPriorityProductionScheduler {
      */
     public void allocationCxMachine(Context context, Set<String> excludeGroupPlan, Set<String> preSelectedGroupSet, Map<String, Set<CxMachineAllocationPlanHelper>> preSelectedGroupAllocationMap, Set<String> discontinueGroupSet) {
         //1、获取还需排产分组的当前Top列表
+        TbrSimulateProductionLogRecorder.addHeightPriorityExcludeGroupInfo(context, excludeGroupPlan);
         List<ProductionPlanGroupInfo> topList = getTopList(context, excludeGroupPlan);
         if (CollectionUtils.isEmpty(topList)) {
             return;
         }
+        Set<String> topGroupSet = topList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.toSet());
+        TbrSimulateProductionLogRecorder.addSelectedHeightPriorityGroupInfo(context, topGroupSet);
         //2、获取各分组对应匹配的合适机台
         List<GroupPrioritySchedulerResultHelper> topSelectedCxMachineList = getGroupSelectedCxMachine(context, topList, false, discontinueGroupSet);
         if (CollectionUtils.isEmpty(topSelectedCxMachineList)) {
-            excludeGroupPlan.addAll(topList.stream().map(ProductionPlanGroupInfo::getGroupName).collect(Collectors.toSet()));
+            excludeGroupPlan.addAll(topGroupSet);
             allocationCxMachine(context, excludeGroupPlan, preSelectedGroupSet, preSelectedGroupAllocationMap, discontinueGroupSet);
             return;
         }
@@ -116,6 +119,7 @@ public class GroupPriorityProductionScheduler {
             allocationCxMachine(context, excludeGroupPlan, preSelectedGroupSet, preSelectedGroupAllocationMap, discontinueGroupSet);
             return;
         }
+        TbrSimulateProductionLogRecorder.addFinalSelectedGroupLog(context, finalSelected);
         //5、对成型机台进行模拟模具排产
         cxMouldProductionHandler.noContinueGroupPlanMouldProduction(context, selectedCxMachine.getCxMachineCode(), addHelper, new HashSet<>());
         //重新获取剩余天数：可能因提前收尾变化，导致计划实际没有排，下轮直接排除,不能设置分配完成
