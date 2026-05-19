@@ -997,11 +997,27 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                         (a, b) -> a));
 
         glueMap.forEach((embryoCode, val) -> {
-            // smallGlue 去掉前两个字符（AQ前缀），placeholder 同步
+            // smallGlue 去掉前两个字符（AQ前缀）
             String displayVal = val.length() > 2 ? val.substring(2) : val;
             result.get("smallGlue").put(embryoCode, displayVal);
-            result.get("placeholder").put(embryoCode, displayVal);
         });
+
+        // placeholder: embryoCode → 匹配到的参数值（去掉AQ前缀，逗号连接，去重）
+        Map<String, String> placeholderMap = consumeDetails.stream()
+                .filter(d -> StringUtils.isNotBlank(d.getEmbryoCode()))
+                .collect(Collectors.groupingBy(
+                        MdmMaterialConsumeDetail::getEmbryoCode,
+                        Collectors.mapping(
+                                d -> {
+                                    String name = StringUtils.defaultString(d.getChildMaterialName());
+                                    return name.startsWith("AQ") ? name.substring(2) : name;
+                                },
+                                Collectors.collectingAndThen(
+                                        Collectors.toList(),
+                                        list -> list.stream().distinct().collect(Collectors.joining(","))
+                                )
+                        )));
+        result.get("placeholder").putAll(placeholderMap);
 
         return result;
     }
