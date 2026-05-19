@@ -202,6 +202,9 @@ public class ContinueTaskProcessor {
         taskAllocation.setIsContinueTask(true);  // 标记为续作预留
         taskAllocation.setLhId(task.getLhId());
         taskAllocation.setConstructionStage(task.getConstructionStage());
+        taskAllocation.setIsFirstTask(task.getIsFirstTask());  // 传递是否首任务（新开规格）
+        taskAllocation.setIsUrgentEnding(task.getIsUrgentEnding());  // 传递是否紧急收尾
+        taskAllocation.setIsNearEnding(task.getIsNearEnding());  // 传递是否临近收尾
 
         allocation.getTaskAllocations().add(taskAllocation);
         // 注意：这里占用的是硫化机数，不是胎胚数量
@@ -647,6 +650,9 @@ public class ContinueTaskProcessor {
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
         taskAllocation.setLhId(task.getLhId());
         taskAllocation.setConstructionStage(task.getConstructionStage());
+        taskAllocation.setIsFirstTask(task.getIsFirstTask());  // 传递是否首任务（新开规格）
+        taskAllocation.setIsUrgentEnding(task.getIsUrgentEnding());  // 传递是否紧急收尾
+        taskAllocation.setIsNearEnding(task.getIsNearEnding());  // 传递是否临近收尾
 
         allocation.getTaskAllocations().add(taskAllocation);
         allocation.setUsedCapacity(allocation.getUsedCapacity() + quantity);

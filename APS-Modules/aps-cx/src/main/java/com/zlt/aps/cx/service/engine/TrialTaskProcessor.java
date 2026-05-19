@@ -349,6 +349,9 @@ public class TrialTaskProcessor {
         taskAllocation.setIsMainProduct(task.getIsMainProduct());
         taskAllocation.setLhId(task.getLhId());
         taskAllocation.setConstructionStage(task.getConstructionStage());
+        taskAllocation.setIsFirstTask(task.getIsFirstTask());  // 传递是否首任务（新开规格）
+        taskAllocation.setIsUrgentEnding(task.getIsUrgentEnding());  // 传递是否紧急收尾
+        taskAllocation.setIsNearEnding(task.getIsNearEnding());  // 传递是否临近收尾
 
         allocation.getTaskAllocations().add(taskAllocation);
         allocation.setUsedCapacity(allocation.getUsedCapacity() + task.getPlannedProduction());

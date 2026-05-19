@@ -865,6 +865,10 @@ public class TaskGroupService {
                     || (remainingFormingRemainder != null && remainingFormingRemainder <= getEndingUrgentFormingRemainder(context));
             task.setIsUrgentEnding(isUrgentEnding);
 
+        } else if (isEndingTask) {
+            // 没有收尾日记录但已判定为收尾任务（成型余量<=0），仍需标记为紧急收尾和临近收尾
+            task.setIsNearEnding(true);
+            task.setIsUrgentEnding(true);
         }
 
         // 计算优先级
