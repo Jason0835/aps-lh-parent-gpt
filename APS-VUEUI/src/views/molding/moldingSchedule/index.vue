@@ -1183,13 +1183,13 @@ export default {
       //  TODO 更新表头标题
     },
     rowStyle({ row }) {
-      // console.log(row.markCloseOutTip);
-      //标记收尾背景色
-      if (row.markCloseOutTip == "0") {
+      if (row.colorTag === "orange") {
+        return { "background-color": "#FFECD2" };
+      }
+      if (row.colorTag === "yellow") {
         return { "background-color": "#FFFFBF" };
       }
-      //插单背景色
-      if (row.dataSource == "1") {
+      if (row.colorTag === "blue") {
         return { "background-color": "#BFE0F7" };
       }
       return {};
@@ -1238,9 +1238,6 @@ export default {
       if (column.property === "specDesc") {
         if (row.colorType == "1") {
           return { background: row.colorCode };
-        }
-        if (row.markCloseOutTip == "0") {
-          return { "background-color": "#FFFFBF" };
         }
       }
       if (column.property === "embryoCode") {
