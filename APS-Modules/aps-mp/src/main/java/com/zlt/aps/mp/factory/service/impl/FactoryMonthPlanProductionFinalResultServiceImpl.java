@@ -31,13 +31,11 @@ import com.zlt.aps.maindata.enums.ReleaseStatusEnum;
 import com.zlt.aps.maindata.event.publisher.EventPublisher;
 import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.mapper.MpTrialPlanEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
-import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.dto.MonthPlanFinalizedEventDto;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
@@ -128,7 +126,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     @Autowired
     private FactoryProductionVersionServiceImpl factoryProductionVersionService;
     @Autowired
-    private  MpPredictionDetailEntityMapper mpPredictionDetailEntityMapper;
+    private MpPredictionDetailEntityMapper mpPredictionDetailEntityMapper;
     @Autowired
     private MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
     @Autowired
@@ -163,7 +161,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     public List<FactoryMonthPlanProductionFinalResult> getDataList(FactoryMonthPlanProductionFinalResult condition) {
         QueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = new QueryWrapper<>();
         builderCondition(queryWrapper, condition);
-        queryWrapper.orderByAsc("STRUCTURE_NAME", "MAIN_PATTERN","MAIN_MATERIAL_DESC");
+        queryWrapper.orderByAsc("STRUCTURE_NAME", "MAIN_PATTERN", "MAIN_MATERIAL_DESC");
         List<FactoryMonthPlanProductionFinalResult> dataList = this.finalMapper.selectList(queryWrapper);
         dealList(dataList);
         return dataList;
@@ -210,7 +208,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     }
 
     @Override
-    public Map<String, Integer> calculateMonthSurplus(String requireVersion, List<MdmProductStock> finishedProductStocks,Map<String, MdmMaterialInfo> materialInfoMap) {
+    public Map<String, Integer> calculateMonthSurplus(String requireVersion, List<MdmProductStock> finishedProductStocks, Map<String, MdmMaterialInfo> materialInfoMap) {
         if (CollectionUtils.isEmpty(finishedProductStocks)) {
             return Collections.emptyMap();
         }
@@ -253,7 +251,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             entity.setMonth(value.get(0).getMonth());
             entity.setRequireVersion(requireVersion);
             entity.setProductTypeCode(value.get(0).getProductTypeCode());
-            if(materialInfoMap.containsKey(value.get(0).getMaterialCode())) {
+            if (materialInfoMap.containsKey(value.get(0).getMaterialCode())) {
                 entity.setBrand(materialInfoMap.get(value.get(0).getMaterialCode()).getBrand());
             }
             entity.setMaterialCode(value.get(0).getMaterialCode());
@@ -288,7 +286,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         int month = DateUtils.getMonthsByYear(maxDate);
         int stockDay = DateUtils.getDaysByMonth(maxDate);
         // 获取当前年月
-         yearMonth = String.format("%s%02d", year, month);
+        yearMonth = String.format("%s%02d", year, month);
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper = Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
                 .eq(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
@@ -346,38 +344,38 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 .eq(FactoryMonthPlanMouldDayResult::getFactoryCode, finalVersion.getFactoryCode())
                 .eq(FactoryMonthPlanMouldDayResult::getYear, finalVersion.getYear())
                 .eq(FactoryMonthPlanMouldDayResult::getMonth, finalVersion.getMonth())
-               .eq(FactoryMonthPlanMouldDayResult::getMonthPlanVersion, finalVersion.getMonthPlanVersion())
+                .eq(FactoryMonthPlanMouldDayResult::getMonthPlanVersion, finalVersion.getMonthPlanVersion())
                 .eq(FactoryMonthPlanMouldDayResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         return resultMapper.selectList(queryWrapper);
     }
 
     @Override
-    public List<FactoryMonthPlanMouldDayResult> findProductionFinalResult(MpFactoryProductionVersion currentFinalVersion,Set<String> monthPlanVersions) {
+    public List<FactoryMonthPlanMouldDayResult> findProductionFinalResult(MpFactoryProductionVersion currentFinalVersion, Set<String> monthPlanVersions) {
         if (null == currentFinalVersion) {
             return Collections.emptyList();
         }
         List<FactoryMonthPlanMouldDayResult> result = new ArrayList<>();
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper =
-            Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
-                .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, currentFinalVersion.getMonthPlanVersion())
-                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+                Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
+                        .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, currentFinalVersion.getMonthPlanVersion())
+                        .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         List<FactoryMonthPlanProductionFinalResult> list = this.finalMapper.selectList(queryWrapper);
-        if(!CollectionUtils.isEmpty(list)) {
+        if (!CollectionUtils.isEmpty(list)) {
             list.forEach(item -> {
                 FactoryMonthPlanMouldDayResult entity = BeanCopyUtils.copyBean(item, FactoryMonthPlanMouldDayResult.class);
                 result.add(entity);
             });
         }
-        if(!CollectionUtils.isEmpty(monthPlanVersions)) {
+        if (!CollectionUtils.isEmpty(monthPlanVersions)) {
             final int batchSize = 1000;
             List<String> versionList = new ArrayList<>(monthPlanVersions);
             for (int i = 0; i < versionList.size(); i += batchSize) {
                 int end = Math.min(i + batchSize, versionList.size());
                 List<String> batchVersions = versionList.subList(i, end);
                 LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> wrapper =
-                    Wrappers.lambdaQuery(FactoryMonthPlanMouldDayResult.class)
-                        .in(FactoryMonthPlanMouldDayResult::getMonthPlanVersion, batchVersions)
-                        .eq(FactoryMonthPlanMouldDayResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+                        Wrappers.lambdaQuery(FactoryMonthPlanMouldDayResult.class)
+                                .in(FactoryMonthPlanMouldDayResult::getMonthPlanVersion, batchVersions)
+                                .eq(FactoryMonthPlanMouldDayResult::getIsDelete, ApsConstant.APS_YES_NO_0);
                 result.addAll(resultMapper.selectList(wrapper));
             }
         }
@@ -448,6 +446,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         this.checkFinalizedParam(param);
         // 2、更新版本表=定稿
         this.updateProVersion(param);
+        //20260518+ 备份定稿版本的结构分配及排产统计数据
+        backUpGroupAllocationInfo(param);
         // 3、将排产结果表数据新增到定稿表
         List<FactoryMonthPlanProductionFinalResult> finalList = insertFinalList(param);
         // 4、调用世超的分摊接口
@@ -464,11 +464,11 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     public List<FactoryMonthPlanMouldDayResult> findFinalProductionResult(MpFactoryProductionVersion finalVersion) {
         List<FactoryMonthPlanMouldDayResult> result = new ArrayList<>();
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> queryWrapper =
-            Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
-                .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, finalVersion.getMonthPlanVersion())
-                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+                Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
+                        .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, finalVersion.getMonthPlanVersion())
+                        .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         List<FactoryMonthPlanProductionFinalResult> list = this.finalMapper.selectList(queryWrapper);
-        if(!CollectionUtils.isEmpty(list)) {
+        if (!CollectionUtils.isEmpty(list)) {
             list.forEach(item -> {
                 FactoryMonthPlanMouldDayResult entity = BeanCopyUtils.copyBean(item, FactoryMonthPlanMouldDayResult.class);
                 result.add(entity);
@@ -562,6 +562,18 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     }
 
     /**
+     * 对定稿版本的结构分配及排产统计进行备份
+     * 用以调整后，查询结构分配及排产统计信息还能正确
+     *
+     * @param param
+     */
+    private void backUpGroupAllocationInfo(FactoryMonthPlanProductionFinalResult param) {
+        resultMapper.deletedOldBackUp(param);
+        resultMapper.insertAllocationBackUp(param);
+        resultMapper.insertStatisticsBackUp(param);
+    }
+
+    /**
      * 发布定稿事件
      *
      * @param param     参数
@@ -601,6 +613,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
     /**
      * 获取定稿版本的月度计划
+     *
      * @param param
      * @return
      */
@@ -631,11 +644,11 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             int end = Math.min(i + batchSize, skus.size());
             List<String> batchSkus = skuList.subList(i, end);
             LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper =
-                Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
-                    .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, factoryCode)
-                    .in(FactoryMonthPlanProductionFinalResult::getMaterialCode, batchSkus)
-                    .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
-                    .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+                    Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
+                            .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, factoryCode)
+                            .in(FactoryMonthPlanProductionFinalResult::getMaterialCode, batchSkus)
+                            .ge(FactoryMonthPlanProductionFinalResult::getYearMonth, Integer.valueOf(yearMonth))
+                            .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
             list.addAll(finalMapper.selectList(wrapper));
         }
         if (CollectionUtils.isEmpty(list)) {
@@ -651,35 +664,35 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     }
 
     @Override
-    public void listExportData(MpSimulatedResult queryVO,  String   batchNumber,List<WorksheetData> result) {
+    public void listExportData(MpSimulatedResult queryVO, String batchNumber, List<WorksheetData> result) {
         MpFactoryProductionVersion finalProductionVersion = this.getProductionVersionFinalized(queryVO);
-        if(null == finalProductionVersion) {
+        if (null == finalProductionVersion) {
             return;
         }
         LambdaQueryWrapper<MpPredictionDetail> wrapper =
-            Wrappers.lambdaQuery(MpPredictionDetail.class)
-                .eq(MpPredictionDetail::getBatchNumber, batchNumber)
-                .eq(MpPredictionDetail::getIsDelete, ApsConstant.APS_YES_NO_0);
+                Wrappers.lambdaQuery(MpPredictionDetail.class)
+                        .eq(MpPredictionDetail::getBatchNumber, batchNumber)
+                        .eq(MpPredictionDetail::getIsDelete, ApsConstant.APS_YES_NO_0);
         List<MpPredictionDetail> predictionDetailList = this.mpPredictionDetailEntityMapper.selectList(wrapper);
-        if(CollectionUtils.isEmpty(predictionDetailList)) {
+        if (CollectionUtils.isEmpty(predictionDetailList)) {
             return;
         }
-        List<FactoryMonthPlanMouldDayResult> finalMouldDayResultList =  this.getFinalExportData(queryVO,finalProductionVersion);
-        if(!CollectionUtils.isEmpty(finalMouldDayResultList)) {
+        List<FactoryMonthPlanMouldDayResult> finalMouldDayResultList = this.getFinalExportData(queryVO, finalProductionVersion);
+        if (!CollectionUtils.isEmpty(finalMouldDayResultList)) {
             WorksheetData worksheetData = new WorksheetData();
             worksheetData.setSheetName(String.format(SHEET_NAME, finalProductionVersion.getYear(), finalProductionVersion.getMonth()));
             worksheetData.setMouldDayResults(finalMouldDayResultList);
             result.add(worksheetData);
         }
-        List<FactoryMonthPlanMouldDayResult> notFinalMouldDayResultList = this.findNotFinalMouldDayResult(queryVO,finalProductionVersion,predictionDetailList);
-        if(!CollectionUtils.isEmpty(notFinalMouldDayResultList)) {
-            addNotFinalExportData(notFinalMouldDayResultList,result);
+        List<FactoryMonthPlanMouldDayResult> notFinalMouldDayResultList = this.findNotFinalMouldDayResult(queryVO, finalProductionVersion, predictionDetailList);
+        if (!CollectionUtils.isEmpty(notFinalMouldDayResultList)) {
+            addNotFinalExportData(notFinalMouldDayResultList, result);
         }
     }
 
     private void addNotFinalExportData(List<FactoryMonthPlanMouldDayResult> notFinalMouldDayResultList, List<WorksheetData> result) {
-         Map<String,List<FactoryMonthPlanMouldDayResult>> map = GroupedMapWithOrder.groupWithOrder(notFinalMouldDayResultList);
-         map.forEach((yearMonth, value) -> result.add(this.buildSimulatedResult(value)));
+        Map<String, List<FactoryMonthPlanMouldDayResult>> map = GroupedMapWithOrder.groupWithOrder(notFinalMouldDayResultList);
+        map.forEach((yearMonth, value) -> result.add(this.buildSimulatedResult(value)));
     }
 
     private WorksheetData buildSimulatedResult(List<FactoryMonthPlanMouldDayResult> value) {
@@ -692,39 +705,39 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
     private List<FactoryMonthPlanMouldDayResult> getFinalExportData(MpSimulatedResult queryVO, MpFactoryProductionVersion finalProductionVersion) {
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper =
-            Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
-                .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, finalProductionVersion.getFactoryCode())
-                .eq(FactoryMonthPlanProductionFinalResult::getYear, finalProductionVersion.getYear())
-                .eq(FactoryMonthPlanProductionFinalResult::getMonth, finalProductionVersion.getMonth())
-                .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, finalProductionVersion.getMonthPlanVersion())
-                .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, finalProductionVersion.getProductionVersion())
-                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        if(StringUtils.isNotBlank(queryVO.getStructureName())) {
+                Wrappers.lambdaQuery(FactoryMonthPlanProductionFinalResult.class)
+                        .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, finalProductionVersion.getFactoryCode())
+                        .eq(FactoryMonthPlanProductionFinalResult::getYear, finalProductionVersion.getYear())
+                        .eq(FactoryMonthPlanProductionFinalResult::getMonth, finalProductionVersion.getMonth())
+                        .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, finalProductionVersion.getMonthPlanVersion())
+                        .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, finalProductionVersion.getProductionVersion())
+                        .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+        if (StringUtils.isNotBlank(queryVO.getStructureName())) {
             wrapper.eq(FactoryMonthPlanProductionFinalResult::getStructureName, queryVO.getStructureName());
         }
-        if(StringUtils.isNotBlank(queryVO.getProductTypeCode())) {
+        if (StringUtils.isNotBlank(queryVO.getProductTypeCode())) {
             wrapper.eq(FactoryMonthPlanProductionFinalResult::getProductTypeCode, queryVO.getProductTypeCode());
         }
-        if(StringUtils.isNotBlank(queryVO.getSpecifications())) {
+        if (StringUtils.isNotBlank(queryVO.getSpecifications())) {
             wrapper.like(FactoryMonthPlanProductionFinalResult::getSpecifications, queryVO.getSpecifications());
         }
-        if(StringUtils.isNotBlank(queryVO.getPattern())) {
+        if (StringUtils.isNotBlank(queryVO.getPattern())) {
             wrapper.like(FactoryMonthPlanProductionFinalResult::getPattern, queryVO.getPattern());
         }
-        if(StringUtils.isNotBlank(queryVO.getMainPattern())) {
+        if (StringUtils.isNotBlank(queryVO.getMainPattern())) {
             wrapper.like(FactoryMonthPlanProductionFinalResult::getMainPattern, queryVO.getMainPattern());
         }
-        if(StringUtils.isNotBlank(queryVO.getMaterialCode())) {
+        if (StringUtils.isNotBlank(queryVO.getMaterialCode())) {
             wrapper.like(FactoryMonthPlanProductionFinalResult::getMaterialCode, queryVO.getMaterialCode());
         }
-        if(StringUtils.isNotBlank(queryVO.getMaterialDesc())) {
+        if (StringUtils.isNotBlank(queryVO.getMaterialDesc())) {
             wrapper.like(FactoryMonthPlanProductionFinalResult::getMaterialDesc, queryVO.getMaterialDesc());
         }
         if (StringUtils.isNotBlank(queryVO.getBrand())) {
             wrapper.eq(FactoryMonthPlanProductionFinalResult::getBrand, queryVO.getBrand());
         }
         List<FactoryMonthPlanProductionFinalResult> list = this.finalMapper.selectList(wrapper);
-        if(CollectionUtils.isEmpty(list)) {
+        if (CollectionUtils.isEmpty(list)) {
             return Collections.emptyList();
         }
         List<FactoryMonthPlanMouldDayResult> result = Lists.newArrayList();
@@ -735,9 +748,9 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         return result;
     }
 
-    private List<FactoryMonthPlanMouldDayResult> findNotFinalMouldDayResult(MpSimulatedResult queryVO, MpFactoryProductionVersion finalProductionVersion,List<MpPredictionDetail> predictionDetailList) {
-        Set<String> finalProductionVersions  = predictionDetailList.stream().map(MpPredictionDetail::getProductionVersion).filter(productionVersion -> !finalProductionVersion.getProductionVersion().equals(productionVersion)).collect(Collectors.toSet());
-        if(CollectionUtils.isEmpty(finalProductionVersions)) {
+    private List<FactoryMonthPlanMouldDayResult> findNotFinalMouldDayResult(MpSimulatedResult queryVO, MpFactoryProductionVersion finalProductionVersion, List<MpPredictionDetail> predictionDetailList) {
+        Set<String> finalProductionVersions = predictionDetailList.stream().map(MpPredictionDetail::getProductionVersion).filter(productionVersion -> !finalProductionVersion.getProductionVersion().equals(productionVersion)).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(finalProductionVersions)) {
             return Collections.emptyList();
         }
         List<FactoryMonthPlanMouldDayResult> list = new ArrayList<>();
@@ -747,28 +760,28 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             int end = Math.min(i + batchSize, versionList.size());
             List<String> batchVersions = versionList.subList(i, end);
             LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> wrapper =
-                Wrappers.lambdaQuery(FactoryMonthPlanMouldDayResult.class)
-                    .in(FactoryMonthPlanMouldDayResult::getProductionVersion, batchVersions)
-                    .eq(FactoryMonthPlanMouldDayResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-            if(StringUtils.isNotBlank(queryVO.getStructureName())) {
+                    Wrappers.lambdaQuery(FactoryMonthPlanMouldDayResult.class)
+                            .in(FactoryMonthPlanMouldDayResult::getProductionVersion, batchVersions)
+                            .eq(FactoryMonthPlanMouldDayResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+            if (StringUtils.isNotBlank(queryVO.getStructureName())) {
                 wrapper.eq(FactoryMonthPlanMouldDayResult::getStructureName, queryVO.getStructureName());
             }
-            if(StringUtils.isNotBlank(queryVO.getProductTypeCode())) {
+            if (StringUtils.isNotBlank(queryVO.getProductTypeCode())) {
                 wrapper.eq(FactoryMonthPlanMouldDayResult::getProductTypeCode, queryVO.getProductTypeCode());
             }
-            if(StringUtils.isNotBlank(queryVO.getSpecifications())) {
+            if (StringUtils.isNotBlank(queryVO.getSpecifications())) {
                 wrapper.like(FactoryMonthPlanMouldDayResult::getSpecifications, queryVO.getSpecifications());
             }
-            if(StringUtils.isNotBlank(queryVO.getPattern())) {
+            if (StringUtils.isNotBlank(queryVO.getPattern())) {
                 wrapper.like(FactoryMonthPlanMouldDayResult::getPattern, queryVO.getPattern());
             }
-            if(StringUtils.isNotBlank(queryVO.getMainPattern())) {
+            if (StringUtils.isNotBlank(queryVO.getMainPattern())) {
                 wrapper.like(FactoryMonthPlanMouldDayResult::getMainPattern, queryVO.getMainPattern());
             }
-            if(StringUtils.isNotBlank(queryVO.getMaterialCode())) {
+            if (StringUtils.isNotBlank(queryVO.getMaterialCode())) {
                 wrapper.like(FactoryMonthPlanMouldDayResult::getMaterialCode, queryVO.getMaterialCode());
             }
-            if(StringUtils.isNotBlank(queryVO.getMaterialDesc())) {
+            if (StringUtils.isNotBlank(queryVO.getMaterialDesc())) {
                 wrapper.like(FactoryMonthPlanMouldDayResult::getMaterialDesc, queryVO.getMaterialDesc());
             }
             if (StringUtils.isNotBlank(queryVO.getBrand())) {
@@ -782,11 +795,11 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
     private MpFactoryProductionVersion getProductionVersionFinalized(MpSimulatedResult queryVO) {
         List<MpFactoryProductionVersion> finalProductionVersions = factoryProductionVersionMapper.selectList(
-            Wrappers.<MpFactoryProductionVersion>lambdaQuery()
-                .eq(MpFactoryProductionVersion::getFactoryCode, queryVO.getFactoryCode())
-                .eq(MpFactoryProductionVersion::getYear, queryVO.getYear())
-                .eq(MpFactoryProductionVersion::getMonth, queryVO.getMonth())
-                .eq(MpFactoryProductionVersion::getIsFinal,YesOrNoEnum.YES.getCode())
+                Wrappers.<MpFactoryProductionVersion>lambdaQuery()
+                        .eq(MpFactoryProductionVersion::getFactoryCode, queryVO.getFactoryCode())
+                        .eq(MpFactoryProductionVersion::getYear, queryVO.getYear())
+                        .eq(MpFactoryProductionVersion::getMonth, queryVO.getMonth())
+                        .eq(MpFactoryProductionVersion::getIsFinal, YesOrNoEnum.YES.getCode())
         );
         return CollectionUtils.isEmpty(finalProductionVersions) ? null : finalProductionVersions.get(0);
     }
@@ -856,10 +869,11 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
     /**
      * 导入定稿
-     * @param list 列表数据
+     *
+     * @param list          列表数据
      * @param updateSupport 覆盖
-     * @param importLogId 导入日志ID
-     * @param params 导入参数
+     * @param importLogId   导入日志ID
+     * @param params        导入参数
      * @return 结果
      */
     @Override
@@ -877,14 +891,14 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         List<FactoryMonthPlanProductionFinalResult> updateList = new ArrayList<>();
         Map<String, FactoryMonthPlanProductionFinalResult> importMap = list.stream().collect(Collectors.toMap(FactoryMonthPlanProductionFinalResult::getMaterialCode, Function.identity(), (p1, p2) -> p1));
         int successNum = 0;
-        for (FactoryMonthPlanProductionFinalResult finalResult: finalList) {
+        for (FactoryMonthPlanProductionFinalResult finalResult : finalList) {
             String materialCode = finalResult.getMaterialCode();
             FactoryMonthPlanProductionFinalResult finalImport = importMap.get(materialCode);
             if (finalImport == null) {
                 continue;
             }
             boolean isChange = false;
-            for (int day = FactoryConstant.MONTH_START_DAY; day < FactoryConstant.MONTH_MAX_DAY; day ++) {
+            for (int day = FactoryConstant.MONTH_START_DAY; day < FactoryConstant.MONTH_MAX_DAY; day++) {
                 String fieldName = FactoryConstant.DAY_FIELD + day;
                 int oldValue = intValue(finalResult.getFieldValueByFieldName(fieldName));
                 int newValue = intValue(finalImport.getFieldValueByFieldName(fieldName));
@@ -895,7 +909,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                         finalResult.setFieldValueByFieldName(fieldName, null);
                     }
                     isChange = true;
-                    successNum ++;
+                    successNum++;
                 }
             }
             if (isChange) { // 如果有有更新，需要重算部分栏位并添加到更新列表中
@@ -946,7 +960,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 condition.setProductTypeCode(firstAdjust.getProductTypeCode());
             }
         }
-        
+
         // 查询调整
         LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MpAdjustResult::getFactoryCode, condition.getFactoryCode());
@@ -985,11 +999,11 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             /*int dayVulcanizationQty = adjustVo.getDayVulcanizationQty() == null ? 0 : adjustVo.getDayVulcanizationQty();
             adjustVo.setDayVulcanizationQty(dayVulcanizationQty * 2);*/
         }
-        
+
         // 尝试把试制量试、以及有订单的SKU补充到列表中
         Map<String, FactoryMonthPlanFinalAdjustVo> copyResultMap = finalResultMap.entrySet().stream()
                 .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-        
+
         // 加载结构转产表的结构清单
         Map<String, String> structureAllocationMap = this.loadStructureAllocationMap(condition);
         // 补充试制量试计划SKU
@@ -999,12 +1013,12 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         // 合并两种新增的SKU
         Map<String, FactoryMonthPlanFinalAdjustVo> newSkuResultMap = new HashMap<>();
         newSkuResultMap.putAll(trialResultMap);
-        newSkuResultMap.putAll(noPlanResultMap); 
+        newSkuResultMap.putAll(noPlanResultMap);
         // 新增SKU填充必要栏位
         this.fillMonthPlanMouldResult(condition, demandPlanSumMap, newSkuResultMap, structureAllocationMap);
         finalResultMap.putAll(newSkuResultMap);
         List<FactoryMonthPlanFinalAdjustVo> resultList = new ArrayList<>(finalResultMap.values());
-        
+
         if (CollectionUtils.isNotEmpty(resultList)) {
             Locale language = SecurityUtils.getUserLang();
             JsonUtils.parseJsonRemarkList(resultList, language.toString(), "reason");
@@ -1014,6 +1028,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
     /**
      * 加载结构与成型机台的对应关系
+     *
      * @param condition
      * @return
      */
@@ -1029,10 +1044,10 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                                 list -> list.stream().map(MpStructureAllocation::getCxMachineCode)
                                         .sorted(String::compareTo).collect(Collectors.joining(",")))));
     }
-    
+
     /**
      * 填充导入月计划数据的关联栏位
-     * 
+     *
      * @param insertList
      */
     private void fillMonthPlanMouldResult(FactoryMonthPlanProductionFinalResult condition,
@@ -1052,7 +1067,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         Integer year = condition.getYear();
         Integer month = condition.getMonth();
         Integer yearMonth = Convert.toInt(String.format("%s%02d", year, month));
-        
+
         // 加载sku与施工关系
         Map<String, List<MonthPlanProductConstructionInfoVo>> constructionInfoMap = factoryMonthPlanProductConstructionMapper
                 .getConstructionByRequire(factoryCode, year, month, monthPlanVersion).stream()
@@ -1062,7 +1077,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         FactoryParam dayVulcanizationParam = factoryParamService.getFactoryParamByCondition(factoryCode,
                 productTypeCode, Collections.singletonList(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode())).get(0);
         if (dayVulcanizationParam != null) {
-            String dayVulcanizationCode = StringUtils.isNoneEmpty(dayVulcanizationParam.getParamValue())? dayVulcanizationParam.getParamValue(): dayVulcanizationParam.getDefauleValue();
+            String dayVulcanizationCode = StringUtils.isNoneEmpty(dayVulcanizationParam.getParamValue()) ? dayVulcanizationParam.getParamValue() : dayVulcanizationParam.getDefauleValue();
             mode = DayVulcanizationModeEnum.getInstance(dayVulcanizationCode);
         } else {
             mode = DayVulcanizationModeEnum.STANDARD_CAPACITY;
@@ -1080,18 +1095,18 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             cavityResults = moldResult.get(0).getCavityResults();
             insertResults = moldResult.get(0).getInsertResults();
         }
-        
-        for (Entry<String, FactoryMonthPlanFinalAdjustVo> entry: insertList) {
+
+        for (Entry<String, FactoryMonthPlanFinalAdjustVo> entry : insertList) {
             FactoryMonthPlanFinalAdjustVo insertItem = entry.getValue();
             String materialCode = insertItem.getMaterialCode();
             DpDemandPlanSum demandPlan = demandPlanMap.get(materialCode);
-            String structureName = demandPlan != null? demandPlan.getStructureName(): insertItem.getStructureName();
-            String materialDesc = demandPlan != null? demandPlan.getMaterialDesc(): insertItem.getMaterialDesc();
+            String structureName = demandPlan != null ? demandPlan.getStructureName() : insertItem.getStructureName();
+            String materialDesc = demandPlan != null ? demandPlan.getMaterialDesc() : insertItem.getMaterialDesc();
             // 成型机条件过滤
             String cxMachineCode = structureAllocationMap.get(structureName);
             if (StringUtils.isNotEmpty(condition.getCxMachineCode())) {
                 if (StringUtils.isEmpty(cxMachineCode) || !cxMachineCode.contains(condition.getCxMachineCode()))
-                structureAllocationMap.remove(entry.getKey());
+                    structureAllocationMap.remove(entry.getKey());
                 continue;
             }
             insertItem.setCxMachineCode(cxMachineCode);
@@ -1138,28 +1153,30 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             MonthPlanProductLhCapacityVo capacityVo = productLhCapacityMap.get(materialCode);
             if (capacityVo != null) {
                 capacityVo.calculateDayVulcanizationQty(mode);
-                insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty()/2);
+                insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty() / 2);
             }
-            
+
             // 英寸---根据结构名称解析
-            if (!StringUtil.isEmptyWithTrim(structureName)){
+            if (!StringUtil.isEmptyWithTrim(structureName)) {
                 // 正则：R后面跟数字（可能带小数点）
                 Pattern pattern = Pattern.compile("R\\d+(?:\\.\\d+)?");
                 Matcher matcher = pattern.matcher(structureName);
                 String proSize = matcher.find() ? matcher.group() : "";
                 insertItem.setProSize(proSize);
             }
-            
+
             // 型腔数量---同结构主花纹最大的型腔数量
             insertItem.setMouldCavityQty(cavityResults.getOrDefault(insertItem.getStructureName() + insertItem.getMainPattern(), 0));
             insertItem.setTypeBlockQty(insertResults.getOrDefault(materialDesc, 0));
             insertItem.setYearMonth(yearMonth);
         }
+
+        this.setSpecialMaterial(factoryCode, new ArrayList<>(resultMap.values()));
     }
 
     /**
      * 补充试制量试计划
-     * 
+     *
      * @param condition
      * @param matchVersion
      * @param finalResultMap
@@ -1189,7 +1206,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         Map<String, MdmMaterialInfo> materialInfoMap = mdmMaterialInfoEntityMapper
                 .selectList(mdmMaterialInfoQueryWrapper).stream()
                 .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (m1, m2) -> m1));
-        
+
         // 加载周期结构
         LambdaQueryWrapper<MdmCycleSchStruConf> mdmCycleSchStruConfQueryWrapper = new LambdaQueryWrapper<>();
         mdmCycleSchStruConfQueryWrapper.eq(MdmCycleSchStruConf::getFactoryCode, condition.getFactoryCode());
@@ -1227,6 +1244,12 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 noPlanVo.setBrand(mdmMaterialInfo.getBrand());
                 noPlanVo.setMainPattern(mdmMaterialInfo.getMainPattern());
             }
+
+            // 过滤条件有结构的，结构要匹配上
+            if (StringUtils.isNotEmpty(condition.getStructureName())
+                    && !Objects.equals(condition.getStructureName(), noPlanVo.getStructureName())) {
+                continue;
+            }
             // 结构类型
             String structureType;
             if (CollectionUtils.isNotEmpty(cycleSchStruSet) && cycleSchStruSet.contains(noPlanVo.getStructureName())) {
@@ -1235,7 +1258,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 structureType = ProductionGroupTypeEnum.CONVENTION.getGroupType();
             }
             noPlanVo.setStructureType(structureType);
-            
+
             noPlanVo.setConstructionStage(constructionStage);
             finalResultMap.put(matchKey, noPlanVo);
             resultMap.put(matchKey, noPlanVo);
@@ -1245,7 +1268,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
     /**
      * 补充有需求计划但是没有定稿、没有调整的sku
-     * 
+     *
      * @param matchVersion
      * @param demandPlanSumMap
      * @param resultList
@@ -1282,7 +1305,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
     /**
      * 设置是否特殊材料
-     * @param factoryCode 分厂编号
+     *
+     * @param factoryCode       分厂编号
      * @param mpFinalAdjustList 定稿列表
      */
     public void setSpecialMaterial(String factoryCode, List<FactoryMonthPlanFinalAdjustVo> mpFinalAdjustList) {
@@ -1373,7 +1397,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     /**
      * 批量查询调整结果对应的需求计划汇总数据，避免逐条查询数据库。
      *
-     * @param condition          调整列表查询条件
+     * @param condition 调整列表查询条件
      * @return 需求计划版本号和物料编码组成的需求计划汇总映射
      */
     private Map<String, DpDemandPlanSum> buildDemandPlanSumMap(FactoryMonthPlanProductionFinalResult condition) {

@@ -24,6 +24,7 @@
           <el-button
             type="primary"
             plain
+            :disabled="adjustFlowInProgress"
             v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
             @click="handleStructureInnerAdjust"
             >{{
@@ -61,6 +62,7 @@
           >
           <el-button
             :loading="syncLoading"
+            :disabled="adjustFlowInProgress"
             v-hasPermi="['monthplan:factoryMonthPlanFinalResult:sync']"
             @click="handleIssueScmMes"
             >{{
@@ -484,14 +486,15 @@ export default {
           width: 300,
           align: "left",
         },
-        // {
-        //   prop: "constructionStage",
-        //   label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-        //   minWidth: 100,
-        //   formatter: (row, column, value) => {
-        //     return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
-        //   },
-        // }, // 排产类型
+        { 
+          prop: "constructionStage",
+          label: this.$t("ui.data.column.monthplan.constructionStage"),
+          minWidth: 100,
+          align: "left",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+          },
+        }, // 排产类型
         {
           prop: "embryoCode",
           label: "胎胚号",

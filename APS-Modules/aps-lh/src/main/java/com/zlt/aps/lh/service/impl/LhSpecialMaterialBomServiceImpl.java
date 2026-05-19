@@ -10,6 +10,7 @@ import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
 import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
 import com.zlt.aps.lh.mapper.LhSpecialMaterialBomEntityMapper;
@@ -333,13 +334,28 @@ public class LhSpecialMaterialBomServiceImpl extends AbstractDocService<LhSpecia
                 .filter(entity -> entity.getId() != null)
                 .collect(Collectors.toList());
 
-        // 批量插入
+        // 批量插入 - 设置逻辑删除标识和审计字段
         if (CollectionUtils.isNotEmpty(insertList)) {
+            String currentUser = SecurityUtils.getUsername();
+            Date currentTime = new Date();
+            for (LhSpecialMaterialBom entity : insertList) {
+                entity.setIsDelete(Integer.valueOf(ApsConstant.DEL_FLAG_NORMAL));
+                entity.setCreateBy(currentUser);
+                entity.setCreateTime(currentTime);
+                entity.setUpdateBy(currentUser);
+                entity.setUpdateTime(currentTime);
+            }
             lhSpecialMaterialBomEntityMapper.insertBatch(insertList);
         }
 
-        // 批量更新
+        // 批量更新 - 设置更新审计字段
         if (CollectionUtils.isNotEmpty(updateList)) {
+            String currentUser = SecurityUtils.getUsername();
+            Date currentTime = new Date();
+            for (LhSpecialMaterialBom entity : updateList) {
+                entity.setUpdateBy(currentUser);
+                entity.setUpdateTime(currentTime);
+            }
             lhSpecialMaterialBomEntityMapper.updateBatch(updateList);
         }
 

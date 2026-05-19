@@ -246,6 +246,11 @@ export default {
           maxlength:50
         },
         {
+          prop: "responsibleDept",
+          label: this.$t("ui.data.column.trialPlan.responsibleDept"),
+          maxlength:64,
+        },
+        {
           prop: "embryoNo",
           label: this.$t("ui.data.column.trialPlan.embryoNo"),
           render: (form) => {

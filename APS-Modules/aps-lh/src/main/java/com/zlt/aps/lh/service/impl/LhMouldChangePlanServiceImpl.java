@@ -326,6 +326,7 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
      * 1. 未勾选记录时返回提示
      * 2. 勾选记录中包含历史记录（排程日期早于当前日期）时返回明确提示
      * 3. 已发布的数据不允许重复发布
+     * 4. 班次为空的数据不允许发布
      */
     @Override
     public AjaxResult issueSchedule(List<Long> ids) {
@@ -370,6 +371,21 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                     .collect(Collectors.toList());
             if (CollectionUtils.isNotEmpty(releasedList)) {
                 return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.hasReleasedData"));
+            }
+
+            // 校验班次是否为空，班次为空不允许发布
+            List<LhMouldChangePlan> noClassIndexList = planList.stream()
+                    .filter(item -> StringUtils.isBlank(item.getClassIndex()))
+                    .collect(Collectors.toList());
+            if (CollectionUtils.isNotEmpty(noClassIndexList)) {
+                String noClassIndexDetails = noClassIndexList.stream()
+                        .map(item -> String.format("%s/%s",
+                                StringUtil.isNotBlank(item.getLhMachineCode()) ? item.getLhMachineCode() : "-",
+                                StringUtil.isNotBlank(item.getOrderNo()) ? item.getOrderNo() : "-"))
+                        .collect(Collectors.joining("; "));
+                String msg = I18nUtil.getMessage("ui.data.alert.lhMouldChangePlan.classIndexRequired");
+                msg = StringUtils.format(msg, noClassIndexDetails);
+                return AjaxResult.error(msg);
             }
 
             // 转换为MdmMoldAlterPlan

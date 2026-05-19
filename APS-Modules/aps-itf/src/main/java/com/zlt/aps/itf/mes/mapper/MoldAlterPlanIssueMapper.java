@@ -25,4 +25,13 @@ public interface MoldAlterPlanIssueMapper {
      * @return 插入数量
      */
     int insertMoldAlterPlanList(@Param("list") List<MoldAlterPlanIssue> moldAlterPlanList);
+
+    /**
+     * 按工单号和分厂编码删除中间表中的旧数据，避免脏数据残留导致MES消费异常
+     *
+     * @param orderNos 工单号列表
+     * @param factoryCode 分厂编码
+     * @return 删除数量
+     */
+    int deleteByOrderNosAndFactoryCode(@Param("orderNos") List<String> orderNos, @Param("factoryCode") String factoryCode);
 }
