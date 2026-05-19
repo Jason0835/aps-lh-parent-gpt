@@ -447,11 +447,10 @@ public class MouldProductionResultHandler {
      */
     private static void setMouldUsedInfo(ProductionPlanGroupInfo groupInfo, FactoryMonthPlanMouldDayResult result) {
         String materialDesc = result.getMaterialDesc();
-        //使用排产量进行推算不准，直接换成使用模具数 getSkuProductionMouldNumberInfoByProductionQty(result);
+        //使用排产量进行推算不准，直接换成使用模具数 替换getSkuProductionMouldNumberInfoByProductionQty方法
         List<MouldDayUsedNumber> resultList = getSkuProductionMouldNumberInfoByMould(groupInfo, materialDesc);
-        List<MouldDayUsedNumber> changeUsedList = getChangeMouldInfoIgnore(resultList);
-//        //20260517+ 将中间断开也纳入变化
-//        List<MouldDayUsedNumber> changeUsedList = getChangeMouldInfo(groupInfo, result, resultList);
+        //20260517+ 将中间断开也纳入变化，替换getChangeMouldInfoIgnore方法
+        List<MouldDayUsedNumber> changeUsedList = getChangeMouldInfo(groupInfo, result, resultList);
         if (CollectionUtils.isEmpty(changeUsedList)) {
             return;
         }
@@ -601,9 +600,15 @@ public class MouldProductionResultHandler {
         if (!groupInfo.getDayProductionLimitInfo().containsKey(productionDay)) {
             return null;
         }
+        Integer lastDayMoldNumber = getLastUsedMoldNumber(changeUsedList);
         //没有排产信息，算变化
         if (null == productionInfo) {
-            return MouldDayUsedNumber.buildEmpty(productionDay);
+            MouldDayUsedNumber emptyData = MouldDayUsedNumber.buildEmpty(productionDay);
+            //前面也是没排产，则不算变化
+            if (null != lastDayMoldNumber && emptyData.getUsedMoldNumber().equals(lastDayMoldNumber)) {
+                return null;
+            }
+            return emptyData;
         }
         //没有硫化机台 --数据错误
         Integer lhMachineCount = productionInfo.getUsedLhMachineCount();
@@ -611,14 +616,15 @@ public class MouldProductionResultHandler {
             return null;
         }
         Integer dayMoldNumber = productionInfo.getUsedMoldNumber();
-        Integer lastDayMoldNumber = getLastUsedMoldNumber(changeUsedList);
+        //没有，则表示首次，算变化
         if (null == lastDayMoldNumber) {
-            return null;
+            return productionInfo;
         }
         //不相等则表示有变化
         if (!dayMoldNumber.equals(lastDayMoldNumber)) {
             return productionInfo;
         }
+        //相等表示没有变化
         return null;
     }
 

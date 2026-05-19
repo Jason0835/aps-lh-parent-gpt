@@ -445,4 +445,18 @@ public class MdmMaterialInfo extends BaseEntity {
     @ApiModelProperty(value = "质控状态", name = "qualityStateCode")
     @TableField(value = "QUALITY_STATE_CODE")
     private String qualityStateCode;
+
+    /**
+     * 当前页码
+     */
+    @ApiModelProperty(value = "当前页码", name = "pageNum")
+    @TableField(exist = false)
+    private Integer pageNum;
+
+    /**
+     * 每页条数
+     */
+    @ApiModelProperty(value = "每页条数", name = "pageSize")
+    @TableField(exist = false)
+    private Integer pageSize;
 }

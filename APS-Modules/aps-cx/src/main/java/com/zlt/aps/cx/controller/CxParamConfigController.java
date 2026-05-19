@@ -138,6 +138,6 @@ public class CxParamConfigController extends AbstractDocBizController<CxParamCon
 
     @Override
     protected String getOrderBy() {
-        return "create_time desc";
+        return "PARAM_CODE asc";
     }
 }

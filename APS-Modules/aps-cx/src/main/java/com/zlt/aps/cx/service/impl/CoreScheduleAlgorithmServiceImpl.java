@@ -3416,6 +3416,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             spr.setMaterialDesc(foundTask.getMaterialDesc());
             spr.setMainMaterialDesc(foundTask.getMainMaterialDesc());
             spr.setStructureName(foundTask.getStructureName());
+            spr.setConstructionStage(foundTask.getConstructionStage());
             spr.setQuantity(0);
             spr.setIsEndingTask(true);
             spr.setIsLastEndingBatch(true);

@@ -8,7 +8,6 @@ import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
-import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
 import com.zlt.aps.lh.api.domain.entity.LhShiftConfig;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
@@ -17,7 +16,6 @@ import com.zlt.aps.lh.mapper.CxLhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.CxParamConfigMapper;
 import com.zlt.aps.lh.mapper.CxScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
-import com.zlt.aps.lh.mapper.LhMouldCleanPlanMapper;
 import com.zlt.aps.lh.mapper.LhShiftConfigMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
@@ -97,9 +95,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     private LhShiftConfigMapper lhShiftConfigMapper;
 
     @Resource
-    private LhMouldCleanPlanMapper lhMouldCleanPlanMapper;
-
-    @Resource
     private LhMouldChangePlanEntityMapper lhMouldChangePlanEntityMapper;
 
     @Resource
@@ -162,14 +157,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         List<LhShiftConfig> shiftConfigs = loadShiftConfigs(factoryCode);
         Map<Integer, String> classShiftTypeMap = buildClassShiftTypeMap(shiftConfigs);
 
-        int maxDateOffset = shiftConfigs.stream()
-                .map(LhShiftConfig::getDateOffset)
-                .filter(Objects::nonNull)
-                .max(Integer::compareTo)
-                .orElse(0);
-
-        Map<String, Object> tableMap = buildTableMap(previousDate, factoryCode, classShiftTypeMap, maxDateOffset);
-        List<List<Map<String, Object>>> dataList = buildDataList(previousDate, factoryCode);
+        Map<String, Object> tableMap = buildTableMap(previousDate, scheduleDate, factoryCode, classShiftTypeMap);
+        List<List<Map<String, Object>>> dataList = buildDataList(scheduleDate, factoryCode);
 
         // 小胶种列表数据处理：无数据时隐藏第7行，有数据时合并B7到B列结束行
         List<Map<String, Object>> smallRubberList = dataList.isEmpty() ? Collections.emptyList() : dataList.get(0);
@@ -198,29 +187,38 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     /**
      * 构建模板参数映射表（普通占位符）
+     *
+     * @param reportDate         报告日期（排程日期的前一天，如排程5/3则报告日期为5/2）
+     * @param actualScheduleDate 实际排程日期（如5/3）
+     * @param factoryCode        分厂编码
+     * @param classShiftTypeMap  班次类型映射
+     * @return 模板参数映射
      */
-    private Map<String, Object> buildTableMap(Date scheduleDate, String factoryCode,
-                                              Map<Integer, String> classShiftTypeMap, int maxDateOffset) {
+    private Map<String, Object> buildTableMap(Date reportDate, Date actualScheduleDate, String factoryCode,
+                                              Map<Integer, String> classShiftTypeMap) {
         Map<String, Object> map = new HashMap<>(32);
 
-        map.put("titleDate", DateUtil.format(scheduleDate, "MM月dd日") + "计划排产\n"
-                + "Ke hoach san xuat ngay " + DateUtil.format(scheduleDate, "dd/MM"));
+        map.put("titleDate", DateUtil.format(reportDate, "MM月dd日") + "计划排产\n"
+                + "Ke hoach san xuat ngay " + DateUtil.format(reportDate, "dd/MM"));
 
-        // 成型排程结果：CxScheduleResult没有isDelete字段，无需过滤
+        // 成型排程结果：查询排程日期（actualScheduleDate）的数据，
+        // 取3/4/5班次汇总作为报告日期（reportDate）的夜/早/中班产量
+        // 排程日期5/3的数据中，3/4/5班次对应5/2的夜/早/中班
         List<CxScheduleResult> cxResults = cxScheduleResultMapper.selectList(
                 new LambdaQueryWrapper<CxScheduleResult>()
-                        .eq(CxScheduleResult::getScheduleDate, scheduleDate)
+                        .eq(CxScheduleResult::getScheduleDate, actualScheduleDate)
                         .eq(CxScheduleResult::getFactoryCode, factoryCode));
-        log.info("成型排程结果查询完成, 日期: {}, 数量: {}", DateUtil.formatDate(scheduleDate), cxResults.size());
+        log.info("成型排程结果查询完成, 排程日期: {}, 报告日期: {}, 数量: {}",
+                DateUtil.formatDate(actualScheduleDate), DateUtil.formatDate(reportDate), cxResults.size());
 
         BigDecimal cxNightTotal = BigDecimal.ZERO;
         BigDecimal cxMorningTotal = BigDecimal.ZERO;
         BigDecimal cxMiddleTotal = BigDecimal.ZERO;
 
         for (CxScheduleResult result : cxResults) {
-            cxNightTotal = cxNightTotal.add(sumCxQtyByShiftType(result, classShiftTypeMap, "01"));
-            cxMorningTotal = cxMorningTotal.add(sumCxQtyByShiftType(result, classShiftTypeMap, "02"));
-            cxMiddleTotal = cxMiddleTotal.add(sumCxQtyByShiftType(result, classShiftTypeMap, "03"));
+            cxNightTotal = cxNightTotal.add(nvl(result.getClass3PlanQty()));
+            cxMorningTotal = cxMorningTotal.add(nvl(result.getClass4PlanQty()));
+            cxMiddleTotal = cxMiddleTotal.add(nvl(result.getClass5PlanQty()));
         }
 
         map.put("cxNightQty", cxNightTotal.toString());
@@ -232,13 +230,13 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 cxNightTotal, cxMorningTotal, cxMiddleTotal,
                 cxNightTotal.add(cxMorningTotal).add(cxMiddleTotal));
 
-        // 硫化排程结果：cx-lh-api的LhScheduleResult有isDelete字段，需要过滤
+        // 硫化排程结果：查询排程日期（actualScheduleDate）的数据
         List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> lhResults = cxLhScheduleResultMapper.selectList(
                 new LambdaQueryWrapper<com.zlt.aps.cx.entity.schedule.LhScheduleResult>()
-                        .eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getScheduleDate, scheduleDate)
+                        .eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getScheduleDate, actualScheduleDate)
                         .eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getFactoryCode, factoryCode)
                         .eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
-        log.info("硫化排程结果查询完成, 日期: {}, 数量: {}", DateUtil.formatDate(scheduleDate), lhResults.size());
+        log.info("硫化排程结果查询完成, 日期: {}, 数量: {}", DateUtil.formatDate(actualScheduleDate), lhResults.size());
 
         // 成型试制/量试信息：从成型原因分析字段和硫化施工阶段字段匹配，合并去重后按逗号隔开
         String cxSetupSpecs = buildCxSetupOrTrialInfo(cxResults, "试制");
@@ -249,7 +247,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         String lhTrialSpecs = buildLhSetupOrTrialInfo(lhResults, "量试");
         map.put("cxTrialInfo", combineSpecInfo(cxTrialSpecs, lhTrialSpecs));
         // 成型规格切换：参考成型日计划生成页面的成型结构切换导出逻辑，从T_MP_STRUCTURE_ALLOCATION取切换结构数据
-        map.put("cxSpecSwitch", buildCxSpecSwitch(scheduleDate, factoryCode));
+        map.put("cxSpecSwitch", buildCxSpecSwitch(actualScheduleDate, factoryCode));
 
         BigDecimal lhNightTotal = BigDecimal.ZERO;
         BigDecimal lhMorningTotal = BigDecimal.ZERO;
@@ -280,12 +278,12 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 nightMachines, morningMachines, middleMachines,
                 nightMachines + morningMachines + middleMachines);
 
-        // 模具交模信息：从换模计划表查询，需过滤isDelete
-        map.put("mouldChangeInfo", buildMouldChangeInfo(scheduleDate, factoryCode));
+        // 模具交替信息：取计划日期=reportDate且排程日期=actualScheduleDate且更换类型01/02的硫化机台(去重)
+        map.put("mouldChangeInfo", buildMouldChangeInfo(reportDate, actualScheduleDate, factoryCode));
 
-        // 模具清洗日期和清洗信息：参考LhBaseDataServiceImpl的查询方式
-        map.put("mouldCleanDate", buildMouldCleanDate(scheduleDate, factoryCode, maxDateOffset));
-        map.put("mouldCleanInfo", buildMouldCleanInfo(scheduleDate, factoryCode, maxDateOffset));
+        // 模具清洗日期和清洗信息：取计划日期=reportDate且排程日期=actualScheduleDate且更换类型03/04的硫化机台(去重)
+        map.put("mouldCleanDate", DateUtil.format(reportDate, "MM月dd日"));
+        map.put("mouldCleanInfo", buildMouldCleanInfo(reportDate, actualScheduleDate, factoryCode));
 
         // 成型/硫化备注
         map.put("cxRemark", buildCxRemark(cxResults));
@@ -383,27 +381,35 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                     .forEach(allSpecs::add);
         }
         String result = String.join("，", allSpecs);
-        return StringUtils.isNotBlank(result) ? result : "无";
+        return StringUtils.isNotBlank(result) ? result : "无 Không";
     }
 
     /**
-     * 构建模具交模信息
+     * 构建模具交替信息
      *
-     * <p>查询排程日期对应的换模计划，取出去重的机台编码，逗号隔开</p>
-     * <p>参考LhBaseDataServiceImpl的查询方式，添加isDelete过滤</p>
+     * <p>查询计划日期区间=reportDate当天（00:00:00~23:59:59）、排程日期=actualScheduleDate、更换类型为01或02的模具交替计划，
+     * 取出去重的硫化机台编码，用"；"隔开，上限15台</p>
      *
-     * @param scheduleDate 排程日期
-     * @param factoryCode  分厂编码
+     * @param planDate           计划日期（报告日期，如5月2日）
+     * @param actualScheduleDate 排程日期（如5月3日）
+     * @param factoryCode        分厂编码
      * @return 去重机台编码字符串，用"；"隔开，上限15台
      */
-    private String buildMouldChangeInfo(Date scheduleDate, String factoryCode) {
+    private String buildMouldChangeInfo(Date planDate, Date actualScheduleDate, String factoryCode) {
+        Date planDateStart = LhScheduleTimeUtil.clearTime(planDate);
+        Date planDateEnd = LhScheduleTimeUtil.getEndTime(planDate);
         List<LhMouldChangePlan> changePlans = lhMouldChangePlanEntityMapper.selectList(
                 new LambdaQueryWrapper<LhMouldChangePlan>()
                         .eq(LhMouldChangePlan::getFactoryCode, factoryCode)
-                        .eq(LhMouldChangePlan::getScheduleDate, scheduleDate)
+                        .ge(LhMouldChangePlan::getPlanDate, planDateStart)
+                        .le(LhMouldChangePlan::getPlanDate, planDateEnd)
+                        .eq(LhMouldChangePlan::getScheduleDate, actualScheduleDate)
+                        .in(LhMouldChangePlan::getChangeMouldType, "01", "02")
                         .and(w -> w.eq(LhMouldChangePlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
                                 .or().isNull(LhMouldChangePlan::getIsDelete)));
-        log.info("模具交替计划查询完成, 日期: {}, 数量: {}", DateUtil.formatDate(scheduleDate), changePlans.size());
+        log.info("模具交替计划查询完成, 计划日期: {}~{}, 排程日期: {}, 更换类型: 01/02, 数量: {}",
+                DateUtil.formatDateTime(planDateStart), DateUtil.formatDateTime(planDateEnd),
+                DateUtil.formatDate(actualScheduleDate), changePlans.size());
 
         if (changePlans.isEmpty()) {
             return "";
@@ -418,63 +424,38 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 构建模具清洗日期
-     *
-     * <p>固定返回查询日期（排程日期减一天）的日期格式，如"04日"</p>
-     * <p>无论是否存在清洗计划数据，都固定显示该日期</p>
-     *
-     * @param scheduleDate 查询日期（排程日期的前一天）
-     * @param factoryCode  分厂编码
-     * @param maxDateOffset 最大日期偏移量（来自班次配置）
-     * @return 清洗日期字符串
-     */
-    private String buildMouldCleanDate(Date scheduleDate, String factoryCode, int maxDateOffset) {
-        Date rangeStart = LhScheduleTimeUtil.clearTime(scheduleDate);
-        Date rangeEnd = LhScheduleTimeUtil.addDays(rangeStart, maxDateOffset + 1);
-
-        List<LhMouldCleanPlan> cleanPlans = lhMouldCleanPlanMapper.selectList(
-                new LambdaQueryWrapper<LhMouldCleanPlan>()
-                        .eq(LhMouldCleanPlan::getFactoryCode, factoryCode)
-                        .ge(LhMouldCleanPlan::getCleanTime, rangeStart)
-                        .lt(LhMouldCleanPlan::getCleanTime, rangeEnd)
-                        .and(w -> w.eq(LhMouldCleanPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                                .or().isNull(LhMouldCleanPlan::getIsDelete))
-                        .orderByAsc(LhMouldCleanPlan::getCleanTime));
-        log.info("模具清洗计划查询完成, 日期范围: {} ~ {}, 数量: {}",
-                DateUtil.formatDateTime(rangeStart), DateUtil.formatDateTime(rangeEnd), cleanPlans.size());
-
-        return DateUtil.format(scheduleDate, "MM月dd日");
-    }
-
-    /**
      * 构建模具清洗信息
      *
-     * <p>查询前一天日期范围内的清洗计划，取出去重的机台编码，用"；"隔开</p>
+     * <p>查询计划日期区间=planDate当天（00:00:00~23:59:59）、排程日期=actualScheduleDate、更换类型为03或04的模具交替计划，
+     * 取出去重的硫化机台编码，用"；"隔开</p>
      *
-     * @param scheduleDate 查询日期（排程日期的前一天）
-     * @param factoryCode  分厂编码
-     * @param maxDateOffset 最大日期偏移量（来自班次配置）
+     * @param planDate           计划日期（报告日期，如5月2日）
+     * @param actualScheduleDate 排程日期（如5月3日）
+     * @param factoryCode        分厂编码
      * @return 去重机台编码字符串，用"；"隔开
      */
-    private String buildMouldCleanInfo(Date scheduleDate, String factoryCode, int maxDateOffset) {
-        Date rangeStart = LhScheduleTimeUtil.clearTime(scheduleDate);
-        Date rangeEnd = LhScheduleTimeUtil.addDays(rangeStart, maxDateOffset + 1);
-
-        List<LhMouldCleanPlan> cleanPlans = lhMouldCleanPlanMapper.selectList(
-                new LambdaQueryWrapper<LhMouldCleanPlan>()
-                        .eq(LhMouldCleanPlan::getFactoryCode, factoryCode)
-                        .ge(LhMouldCleanPlan::getCleanTime, rangeStart)
-                        .lt(LhMouldCleanPlan::getCleanTime, rangeEnd)
-                        .and(w -> w.eq(LhMouldCleanPlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                                .or().isNull(LhMouldCleanPlan::getIsDelete))
-                        .orderByAsc(LhMouldCleanPlan::getCleanTime));
+    private String buildMouldCleanInfo(Date planDate, Date actualScheduleDate, String factoryCode) {
+        Date planDateStart = LhScheduleTimeUtil.clearTime(planDate);
+        Date planDateEnd = LhScheduleTimeUtil.getEndTime(planDate);
+        List<LhMouldChangePlan> cleanPlans = lhMouldChangePlanEntityMapper.selectList(
+                new LambdaQueryWrapper<LhMouldChangePlan>()
+                        .eq(LhMouldChangePlan::getFactoryCode, factoryCode)
+                        .ge(LhMouldChangePlan::getPlanDate, planDateStart)
+                        .le(LhMouldChangePlan::getPlanDate, planDateEnd)
+                        .eq(LhMouldChangePlan::getScheduleDate, actualScheduleDate)
+                        .in(LhMouldChangePlan::getChangeMouldType, "03", "04")
+                        .and(w -> w.eq(LhMouldChangePlan::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                                .or().isNull(LhMouldChangePlan::getIsDelete)));
+        log.info("模具清洗计划查询完成, 计划日期: {}~{}, 排程日期: {}, 更换类型: 03/04, 数量: {}",
+                DateUtil.formatDateTime(planDateStart), DateUtil.formatDateTime(planDateEnd),
+                DateUtil.formatDate(actualScheduleDate), cleanPlans.size());
 
         if (cleanPlans.isEmpty()) {
             return "";
         }
 
         return cleanPlans.stream()
-                .map(LhMouldCleanPlan::getLhCode)
+                .map(LhMouldChangePlan::getLhMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .collect(Collectors.joining(";"));

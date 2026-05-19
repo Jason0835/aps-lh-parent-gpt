@@ -1,6 +1,8 @@
 package com.zlt.aps.mp.adjust.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustResultService;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
@@ -147,6 +149,12 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody MpAdjustResult billVO){
+        if (StringUtil.isEmptyWithTrim(billVO.getStructureName())){
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.structureNameEmpty"));
+        }
+        if (billVO.getDayVulcanizationQty() == null || billVO.getDayVulcanizationQty() <=0){
+            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notDayLhQty"),billVO.getMaterialCode()));
+        }
         mpAdjustResultService.forceUpdateById(billVO);
         return AjaxResult.success();
         //return super.save(billVO);

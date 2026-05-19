@@ -209,7 +209,7 @@ export default {
     "biz_factory_name",
     "MACHINE_TYPE",
     "trial_status",
-    "biz_construction_stage",
+    "molding_method",
     "biz_yes_no",
   ],
   provide() {
@@ -426,7 +426,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+                return this.selectDictLabel(this.dict.type.molding_method, value);
               },
             },
 
@@ -463,7 +463,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+                return this.selectDictLabel(this.dict.type.molding_method, value);
               },
             },
 
@@ -500,7 +500,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+                return this.selectDictLabel(this.dict.type.molding_method, value);
               },
             },
 
@@ -537,7 +537,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+                return this.selectDictLabel(this.dict.type.molding_method, value);
               },
             },
 
@@ -574,7 +574,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+                return this.selectDictLabel(this.dict.type.molding_method, value);
               },
             },
 
@@ -611,7 +611,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+                return this.selectDictLabel(this.dict.type.molding_method, value);
               },
             },
 
@@ -648,7 +648,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+                return this.selectDictLabel(this.dict.type.molding_method, value);
               },
             },
 
@@ -685,7 +685,7 @@ export default {
               label: this.$t("示方类型"),
               align: "center",
               formatter: (row, column, value) => {
-                return this.selectDictLabel(this.dict.type.biz_construction_stage, value);
+                return this.selectDictLabel(this.dict.type.molding_method, value);
               },
             },
 

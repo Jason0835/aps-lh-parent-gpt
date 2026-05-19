@@ -285,7 +285,7 @@ export default {
       )
         ? String(payload.fixedCxMachineCode).trim()
         : "";
-      /** 月计划列表勾选行带入的首台机台（可改）；与 fixed 互斥 */
+      /** 月计划页外部默认带入的首台机台（勾选行 / Redis 当前机台等）；与 fixed 互斥 */
       const prefill =
         !fixed &&
         payload &&
@@ -293,7 +293,8 @@ export default {
         String(payload.prefillCxMachineCode).trim() !== ""
           ? String(payload.prefillCxMachineCode).trim()
           : "";
-      this.adjustMachineLocked = !!fixed;
+      /** 外部带入或继续调整固定机台时不可编辑 */
+      this.adjustMachineLocked = !!fixed || !!prefill;
       this.serverRows = [];
       this.newRows = [];
       this.dialogVisible = true;
@@ -323,6 +324,9 @@ export default {
      * 成型机台弹窗点「确定」后触发：此处同时写入机台号并请求 listAdjusts（不用 v-model，避免与 change 时序问题）。
      */
     onAdjustMachineChange(val) {
+      if (this.adjustMachineLocked) {
+        return;
+      }
       const code =
         val != null && val !== undefined && String(val).trim() !== ""
           ? String(val).trim()
