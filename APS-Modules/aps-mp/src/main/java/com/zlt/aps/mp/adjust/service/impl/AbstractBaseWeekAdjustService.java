@@ -823,7 +823,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             mpAdjustResult.setId(null);
             mpAdjustResult.setAdjustType(contextDTO.getAdjustType());
             mpAdjustResult.setVersion(contextDTO.getVersion());
-            mpAdjustResult.setMonthPlanVersion(lastMonthPlanVersion);
+            mpAdjustResult.setMonthPlanVersion(contextDTO.getMonthPlanVersion());
+            mpAdjustResult.setLastMonthPlanVersion(lastMonthPlanVersion);
             mpAdjustResult.setTotalPlanQty(finalAdjustVo.getTotalQty());
 
             mpAdjustResult.setAdjustFlag((finalAdjustVo.getActualAdjustQty() != null && Math.abs(finalAdjustVo.getActualAdjustQty())>0) ? YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
@@ -1504,7 +1505,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
             monthPlan.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, actualAdjustQty);
             // 设置最新需求计划版本
-            monthPlan.setLastMonthPlanVersion(adjustResult.getMonthPlanVersion());
+            monthPlan.setLastMonthPlanVersion(adjustResult.getLastMonthPlanVersion());
             // 设置月度计划开始日期、结束日期
             setBeginDayAndEndDay(monthPlan);
 
@@ -2483,7 +2484,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         //获取调整结果最新的需求计划版本
-        String adjustMonthPlanVersion =  adjustResultList.get(0).getMonthPlanVersion();
+        String adjustMonthPlanVersion =  adjustResultList.get(0).getLastMonthPlanVersion();
         if (StringUtils.isBlank(adjustMonthPlanVersion)){
             return;
         }
@@ -3184,7 +3185,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         queryVO.setFactoryCode(contextDTO.getFactoryCode());
         queryVO.setYear(contextDTO.getMpYear());
         queryVO.setMonth(contextDTO.getMpMonth());
-        queryVO.setMonthPlanVersion(factoryProductionVersion.getMonthPlanVersion());
+        //queryVO.setMonthPlanVersion(factoryProductionVersion.getMonthPlanVersion());
 
         DataDTO dataDTO = dataManager.buildDataDTO(queryVO);
         List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList = dataManager.listMonthPlans(dataDTO);

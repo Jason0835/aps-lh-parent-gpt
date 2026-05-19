@@ -67,6 +67,12 @@ public class MpAdjustResult extends BaseEntity implements IFinalAndAdjustResultI
     private String monthPlanVersion;
 
     /**
+     * 最新需求计划版本(每次调整后变化)
+     */
+    @ApiModelProperty(value = "最新需求计划版本(每次调整后变化)", name = "lastMonthPlanVersion")
+    @TableField(value = "LAST_MONTH_PLAN_VERSION")
+    private String lastMonthPlanVersion;
+    /**
      * 排产计划版本
      */
     @Excel(name = "ui.data.column.mpAdjustResult.productionVersion")
