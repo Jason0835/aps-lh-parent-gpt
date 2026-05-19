@@ -98,6 +98,7 @@ import { changeMachine, listCxScheduleResult } from "@/api/cx/cxScheduleResult";
 import { getScheduleDate } from "@/api/lh/scheduleResult";
 
 export default {
+  dicts: ["trial_status"],
   data() {
     return {
       visible: false,
@@ -147,7 +148,7 @@ export default {
             { prop: "class1PlanQty", label: this.$t("计划"), align: "center" },
             { prop: "class1FinishQty", label: this.$t("实际"), align: "center" },
             { prop: "class1Analysis", label: this.$t("原因分析"), align: "center", minWidth: 140 },
-            { prop: "class1RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100 },
+            { prop: "class1RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100, formatter: (row, column, value) => { return this.selectDictLabel(this.dict.type.trial_status, value); } },
           ],
         },
         {
@@ -156,7 +157,7 @@ export default {
             { prop: "class2PlanQty", label: this.$t("计划"), align: "center" },
             { prop: "class2FinishQty", label: this.$t("实际"), align: "center" },
             { prop: "class2Analysis", label: this.$t("原因分析"), align: "center", minWidth: 140 },
-            { prop: "class2RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100 },
+            { prop: "class2RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100, formatter: (row, column, value) => { return this.selectDictLabel(this.dict.type.trial_status, value); } },
           ],
         },
         {
@@ -165,7 +166,7 @@ export default {
             { prop: "class3PlanQty", label: this.$t("计划"), align: "center" },
             { prop: "class3FinishQty", label: this.$t("实际"), align: "center" },
             { prop: "class3Analysis", label: this.$t("原因分析"), align: "center", minWidth: 140 },
-            { prop: "class3RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100 },
+            { prop: "class3RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100, formatter: (row, column, value) => { return this.selectDictLabel(this.dict.type.trial_status, value); } },
           ],
         },
         {
@@ -174,7 +175,7 @@ export default {
             { prop: "class4PlanQty", label: this.$t("计划"), align: "center" },
             { prop: "class4FinishQty", label: this.$t("实际"), align: "center" },
             { prop: "class4Analysis", label: this.$t("原因分析"), align: "center", minWidth: 140 },
-            { prop: "class4RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100 },
+            { prop: "class4RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100, formatter: (row, column, value) => { return this.selectDictLabel(this.dict.type.trial_status, value); } },
           ],
         },
         {
@@ -183,7 +184,7 @@ export default {
             { prop: "class5PlanQty", label: this.$t("计划"), align: "center" },
             { prop: "class5FinishQty", label: this.$t("实际"), align: "center" },
             { prop: "class5Analysis", label: this.$t("原因分析"), align: "center", minWidth: 140 },
-            { prop: "class5RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100 },
+            { prop: "class5RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100, formatter: (row, column, value) => { return this.selectDictLabel(this.dict.type.trial_status, value); } },
           ],
         },
         {
@@ -192,7 +193,7 @@ export default {
             { prop: "class6PlanQty", label: this.$t("计划"), align: "center" },
             { prop: "class6FinishQty", label: this.$t("实际"), align: "center" },
             { prop: "class6Analysis", label: this.$t("原因分析"), align: "center", minWidth: 140 },
-            { prop: "class6RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100 },
+            { prop: "class6RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100, formatter: (row, column, value) => { return this.selectDictLabel(this.dict.type.trial_status, value); } },
           ],
         },
         {
@@ -201,7 +202,7 @@ export default {
             { prop: "class7PlanQty", label: this.$t("计划"), align: "center" },
             { prop: "class7FinishQty", label: this.$t("实际"), align: "center" },
             { prop: "class7Analysis", label: this.$t("原因分析"), align: "center", minWidth: 140 },
-            { prop: "class7RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100 },
+            { prop: "class7RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100, formatter: (row, column, value) => { return this.selectDictLabel(this.dict.type.trial_status, value); } },
           ],
         },
         {
@@ -210,7 +211,7 @@ export default {
             { prop: "class8PlanQty", label: this.$t("计划"), align: "center" },
             { prop: "class8FinishQty", label: this.$t("实际"), align: "center" },
             { prop: "class8Analysis", label: this.$t("原因分析"), align: "center", minWidth: 140 },
-            { prop: "class8RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100 },
+            { prop: "class8RecipeType", label: this.$t("示方类型"), align: "center", minWidth: 100, formatter: (row, column, value) => { return this.selectDictLabel(this.dict.type.trial_status, value); } },
           ],
         },
       ];
