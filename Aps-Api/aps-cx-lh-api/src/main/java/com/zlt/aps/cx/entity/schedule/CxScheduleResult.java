@@ -202,7 +202,7 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @TableField("CLASS1_ANALYSIS")
     private String class1Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class1RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class1RecipeType", dictType = "trial_status")
     @ApiModelProperty(value = "一班示方书类型")
     @TableField("CLASS1_RECIPE_TYPE")
     private String class1RecipeType;
@@ -232,7 +232,7 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @TableField("CLASS2_ANALYSIS")
     private String class2Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class2RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class2RecipeType", dictType = "trial_status")
     @ApiModelProperty(value = "二班示方书类型")
     @TableField("CLASS2_RECIPE_TYPE")
     private String class2RecipeType;
@@ -262,7 +262,7 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @TableField("CLASS3_ANALYSIS")
     private String class3Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class3RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class3RecipeType", dictType = "trial_status")
     @ApiModelProperty(value = "三班示方书类型")
     @TableField("CLASS3_RECIPE_TYPE")
     private String class3RecipeType;
@@ -291,7 +291,7 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @TableField("CLASS4_ANALYSIS")
     private String class4Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class4RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class4RecipeType", dictType = "trial_status")
     @ApiModelProperty(value = "四班示方书类型")
     @TableField("CLASS4_RECIPE_TYPE")
     private String class4RecipeType;
@@ -321,7 +321,7 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @TableField("CLASS5_ANALYSIS")
     private String class5Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class5RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class5RecipeType", dictType = "trial_status")
     @ApiModelProperty(value = "五班示方书类型")
     @TableField("CLASS5_RECIPE_TYPE")
     private String class5RecipeType;
@@ -350,7 +350,7 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @TableField("CLASS6_ANALYSIS")
     private String class6Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class6RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class6RecipeType", dictType = "trial_status")
     @ApiModelProperty(value = "六班示方书类型")
     @TableField("CLASS6_RECIPE_TYPE")
     private String class6RecipeType;
@@ -379,7 +379,7 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @TableField("CLASS7_ANALYSIS")
     private String class7Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class7RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class7RecipeType", dictType = "trial_status")
     @ApiModelProperty(value = "七班示方书类型")
     @TableField("CLASS7_RECIPE_TYPE")
     private String class7RecipeType;
@@ -408,7 +408,7 @@ public class CxScheduleResult extends BaseEntity implements Serializable {
     @TableField("CLASS8_ANALYSIS")
     private String class8Analysis;
 
-    @Excel(name = "ui.data.column.cxScheduleResult.class8RecipeType")
+    @Excel(name = "ui.data.column.cxScheduleResult.class8RecipeType", dictType = "trial_status")
     @ApiModelProperty(value = "八班示方书类型")
     @TableField("CLASS8_RECIPE_TYPE")
     private String class8RecipeType;

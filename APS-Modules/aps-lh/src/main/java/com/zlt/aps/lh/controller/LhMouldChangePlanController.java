@@ -427,7 +427,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         }
         Map<String, LhMachineOnlineInfo> lhMachineOnlineInfoMap = new HashMap<>();
         if (CollectionUtils.isNotEmpty(machineCodeList) && queryVO != null && queryVO.getScheduleDate() != null) {
-            Date scheduleDateEnd = DateUtil.endOfDay(queryVO.getScheduleDate());
+            Date scheduleDateEnd = DateUtils.addDays(DateUtil.endOfDay(queryVO.getScheduleDate()), -3);
             LambdaQueryWrapper<LhMachineOnlineInfo> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(StringUtils.isNotBlank(queryVO.getFactoryCode()), LhMachineOnlineInfo::getFactoryCode, queryVO.getFactoryCode());
             wrapper.in(LhMachineOnlineInfo::getLhCode, machineCodeList);
