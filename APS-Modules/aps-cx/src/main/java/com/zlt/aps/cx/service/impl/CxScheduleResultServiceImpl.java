@@ -98,6 +98,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     @Autowired
     private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
 
+    @Autowired
+    private FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
+
     @Override
     public List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate) {
         return cxScheduleResultMapper.selectList(new LambdaQueryWrapper<CxScheduleResult>()
@@ -306,6 +309,16 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         // Sheet 1: 成型日计划
         Map<String, Object> planTableMap = buildCxTemplateTableMap(exportList);
+
+        // 从月计划数据获取productionVersion
+        LocalDate planLocalDate = cn.hutool.core.date.DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
+        List<FactoryMonthPlanProductionFinalResult> monthPlans = monthPlanMapper.selectByYearAndMonth(
+                planLocalDate.getYear(), planLocalDate.getMonthValue());
+        String productionVersion = null;
+        if (CollectionUtils.isNotEmpty(monthPlans)) {
+            productionVersion = monthPlans.get(0).getProductionVersion();
+        }
+        planTableMap.put("version", productionVersion != null ? productionVersion : "");
         List<List<Map<String, Object>>> planDataList = new ArrayList<>();
         List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes);
         planDataList.add(planRows);
