@@ -2,6 +2,7 @@ package com.zlt.aps.mp.engine.logrecorder;
 
 import com.zlt.aps.mp.engine.daylimit.GroupAllocationCapacityLimitTypeEnum;
 import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.dto.CxMouldDayProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
@@ -142,6 +143,27 @@ public class DayLimitLogRecorder {
         String logContent = String.format(logContentFormat,
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 changeMouldDay, changeMouldInfo, sumUsedCount);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加释放计划排产量日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，物料 %s 在[%s]日 释放排产量 %s ====
+     *
+     * @param context       排程上下文
+     * @param productionDay 排产日
+     * @param productionSku 排产Sku信息
+     * @return
+     */
+    public static String addDeductionProductionQtyLog(Context context, Integer productionDay, CxMouldDayProductionHelper productionSku) {
+        if (null == productionDay || null == productionSku) {
+            return "";
+        }
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，物料 %s 在[%s]日使用模具[%s] 释放排产量 %s ====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                productionSku.getMaterialDesc(), productionDay, productionSku.getMouldCode(), productionSku.getProductionQty());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.DAY_LIMIT_CONTROL, logContent);
         return logContent;

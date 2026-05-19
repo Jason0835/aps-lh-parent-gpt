@@ -13,6 +13,7 @@ import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.enums.DeductionDayProductionTypeEnum;
+import com.zlt.aps.mp.engine.logrecorder.DayLimitLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.DeductionDayProductionInfoLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -22,7 +23,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -225,18 +225,20 @@ public class GroupPlanDeductionDayHandler {
             }
             //20260119 释放，模具分配比例、模壳标准、胶囊卡盘、换模次数
             CxLhMouldProductionCalculator.handlerBeforeConclusion(productionContext, groupPlanInfo, singleDeductionDay, mouldInfo, materialDesc);
-            List<CxMouldDayProductionHelper> reserveList = new ArrayList<>();
-            dayProductionList.forEach(singleProduction -> {
-                if (!materialDesc.equals(singleProduction.getMaterialDesc())) {
-                    reserveList.add(singleProduction);
-                }
-                returnMonthPlanProductionQty(productionContext, materialDesc, singleProduction);
-            });
             mouldInfo.getFinishDaySet().remove(singleDeductionDay);
-            if (CollectionUtils.isEmpty(reserveList)) {
+            //计划量释放还原
+            List<CxMouldDayProductionHelper> releaseSkuList = dayProductionList.stream().filter(singlePlan -> materialDesc.equals(singlePlan.getMaterialDesc())).collect(Collectors.toList());
+            if (!CollectionUtils.isEmpty(releaseSkuList)) {
+                releaseSkuList.forEach(singleProduction -> {
+                    DayLimitLogRecorder.addDeductionProductionQtyLog(productionContext, singleDeductionDay, singleProduction);
+                    returnMonthPlanProductionQty(productionContext, materialDesc, singleProduction);
+                });
+            }
+            List<CxMouldDayProductionHelper> otherSkuList = dayProductionList.stream().filter(singlePlan -> !materialDesc.equals(singlePlan.getMaterialDesc())).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(otherSkuList)) {
                 mouldInfo.getDayProductionInfo().remove(singleDeductionDay);
             } else {
-                mouldInfo.getDayProductionInfo().put(singleDeductionDay, reserveList);
+                mouldInfo.getDayProductionInfo().put(singleDeductionDay, otherSkuList);
             }
         });
         //20260518+ 清除结构日排产使用模具信息

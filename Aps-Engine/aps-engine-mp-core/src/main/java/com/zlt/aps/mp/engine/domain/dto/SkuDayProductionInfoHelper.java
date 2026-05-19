@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.domain.dto;
 
+import com.google.common.collect.Sets;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
@@ -96,7 +97,10 @@ public class SkuDayProductionInfoHelper implements Serializable {
         SkuDayProductionInfoHelper helper = new SkuDayProductionInfoHelper(productionDay, materialDesc, materialCode, groupName, dayVulcanizationQty);
         helper.sumProductionQty = productionQty;
         helper.embryoCode = productionPlan.getEmbryoCode();
-        helper.usedMouldSet = usedMouldSet;
+        //20260519+ 不能直接赋值，因usedMouldSet同对排时，Set地址没变
+        Set<String> currentMouldInfo = Sets.newHashSet();
+        currentMouldInfo.addAll(usedMouldSet);
+        helper.usedMouldSet = currentMouldInfo;
         helper.lossQty = lossQty;
         helper.mainMaterialDesc = productionPlan.getMainMaterialDesc();
         helper.mainPattern = productionPlan.getMainPattern();
