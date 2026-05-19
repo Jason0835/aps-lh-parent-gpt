@@ -58,12 +58,11 @@ public class LhSpecialMaterialBom extends BaseEntity implements Serializable {
     private String materialCode;
 
     /**
-     * 物料描述
+     * 物料描述（通过物料编码自动带出，导入时无需填写）
      */
-    @Excel(name = "ui.data.column.lhSpecialMaterialBom.materialDesc", width = 60, align = Excel.Align.LEFT)
+    @Excel(name = "ui.data.column.lhSpecialMaterialBom.materialDesc", width = 60, align = Excel.Align.LEFT, type = Excel.Type.EXPORT)
     @ApiModelProperty(value = "物料描述")
     @TableField(value = "MATERIAL_DESC")
-    @ImportExcelValidated(maxLength = 300)
     private String materialDesc;
 
     /**

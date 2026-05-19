@@ -53,6 +53,17 @@ public interface ILhScheduleResultRemoteService {
     AjaxResult validateInsertOrder(@RequestBody LhOrderInsertDTO insertDTO);
 
     /**
+     * 获取SKU关联数据（硫化余量/胎胚库存/硫化班产/示方类型）
+     * <p>用于插单页面选择新物料时实时获取关联信息</p>
+     *
+     * @param insertDTO 包含factoryCode、materialCode、scheduleDate的请求对象
+     * @return SKU关联数据
+     */
+    @ApiOperation("获取SKU关联数据")
+    @PostMapping("/lhScheduleResult/getSkuRelatedData")
+    AjaxResult getSkuRelatedData(@RequestBody LhOrderInsertDTO insertDTO);
+
+    /**
      * 插单
      * @param insertDTO
      * @return

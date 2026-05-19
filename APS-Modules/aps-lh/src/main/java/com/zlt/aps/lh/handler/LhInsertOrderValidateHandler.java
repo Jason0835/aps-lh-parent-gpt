@@ -125,6 +125,21 @@ public class LhInsertOrderValidateHandler {
     }
 
     /**
+     * 获取SKU关联数据（硫化余量/胎胚库存/硫化班产/示方类型）
+     * <p>用于插单页面选择新物料时实时获取关联信息，不进行业务校验</p>
+     *
+     * @param dto 包含factoryCode、materialCode、scheduleDate的请求对象
+     * @return SKU关联数据（仅包含mouldSurplusQty、embryoStock、machineShiftCapacity、constructionStage、leftRightMould等字段）
+     */
+    public LhInsertOrderValidateResultDTO getSkuRelatedData(LhOrderInsertDTO dto) {
+        LhInsertOrderValidateResultDTO result = new LhInsertOrderValidateResultDTO();
+        result.setValid(true);
+        checkMouldSurplus(dto, result);
+        fillSkuRelatedData(dto, result);
+        return result;
+    }
+
+    /**
      * 获取物料编码（优先使用productCode，其次使用materialCode）
      *
      * @param dto 插单数据

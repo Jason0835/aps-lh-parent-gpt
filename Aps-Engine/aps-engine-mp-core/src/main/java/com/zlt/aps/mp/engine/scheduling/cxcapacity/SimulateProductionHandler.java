@@ -19,6 +19,7 @@ import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
 import com.zlt.aps.mp.engine.handler.GroupPreAllocationInfoHelper;
 import com.zlt.aps.mp.engine.handler.GroupPriorityProductionScheduler;
 import com.zlt.aps.mp.engine.handler.SupplementCxMachineDistributionHandler;
+import com.zlt.aps.mp.engine.logrecorder.KeyInformationLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionGroupLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -85,6 +86,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         log.info(TbrSimulateProductionLogRecorder.addResetDataFinishLog(productionContext));
         //2、在机结构对在产成型机台进行模拟模具排产
         mouldProductionByContinueGroup(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
+        KeyInformationLogRecorder.recorderContinueCxMachineProductionLog(productionContext, allGroupPlanMap, allContinueMap);
         TbrSimulateProductionLogRecorder.addProductionModeLog(productionContext, productionMode);
         if (YesOrNoEnum.YES.getValue().equals(productionMode)) {
             //交付优先，在机分组之后，按分组的高优先级排序，优先级高的分组先进行排产
@@ -93,6 +95,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
             //效率优先，在机分组之后，按收尾机台(排除空机台)的切换匹配分组待需分配排产
             efficiencyPriorityProduction(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         }
+        KeyInformationLogRecorder.recorderAllAllocationGroupInfoLog(productionContext);
         //6、对成型剩余不满足最短上机天数的机台进行分配结构处理
         supplementCxMachineDistributionHandler.handlerTailCapacity(productionContext, allGroupPlanMap);
     }
@@ -126,6 +129,7 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         TbrSimulateProductionLogRecorder.addStartDeliveryPriorityLog(productionContext);
         groupPriorityProductionScheduler.allocationCxMachine(productionContext, Sets.newHashSet(), preSelectedGroupSet, preSelectedGroupAllocationMap, Sets.newHashSet());
         TbrSimulateProductionLogRecorder.addEndDeliveryPriorityLog(productionContext);
+        KeyInformationLogRecorder.recorderInsertAllocationGroupInfoLog(productionContext, preSelectedGroupAllocationMap);
         //2、判断预期排产分组中是否有设置固定1~3的分组和排产间断的二次上机
         List<ProductionPlanGroupInfo> discontinueGroupList = getDiscontinuePreSelectedGroup(productionContext, preSelectedGroupAllocationMap);
         List<ProductionPlanGroupInfo> hasFixedPriorityCxMachineList = getGroupFixedCxMachine(productionContext, preSelectedGroupSet);

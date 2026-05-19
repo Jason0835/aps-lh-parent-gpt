@@ -7,10 +7,11 @@ import com.zlt.aps.mp.engine.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
+import com.zlt.aps.mp.engine.handler.GroupPrioritySchedulerResultHelper;
 import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
@@ -94,12 +95,73 @@ public class TbrSimulateProductionLogRecorder {
      * @param context 排程上下文
      * @return
      */
-    public static String addHeightPriorityMatchLog(Context context, String groupName, CxMachineBaseInfoVo cxMachineInfo){
+    public static String addHeightPriorityMatchLog(Context context, String groupName, CxMachineBaseInfoVo cxMachineInfo) {
         Set<Integer> preDaySet = Optional.ofNullable(cxMachineInfo.getSelectedProductionDaySet()).orElse(Collections.emptySet());
         String productionDays = preDaySet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，订单高优先级交付优先：分组名 %s 最适配机台 %s 预期排产日：%s====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName, cxMachineInfo.getCxMachineCode(), productionDays);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 交付优先排产需要剔除的分组信息 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产模式需要排产的分组信息：%s====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addHeightPriorityExcludeGroupInfo(Context context, Set<String> excludeGroupPlan) {
+        if (CollectionUtils.isEmpty(excludeGroupPlan)) {
+            return "";
+        }
+        String groupInfo = excludeGroupPlan.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产模式需要排产的分组信息：%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+
+    /**
+     * 增加 交付优先排产获取到的Top列表 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产当前Top选择的分组信息：%s====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addSelectedHeightPriorityGroupInfo(Context context, Set<String> selectedTopInfo) {
+        if (CollectionUtils.isEmpty(selectedTopInfo)) {
+            return "";
+        }
+        String groupInfo = selectedTopInfo.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产当前Top选择的分组信息：%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+    /**
+     * 增加 分组匹配优先级最高机台 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，订单高优先级交付优先：Top3最终选定 分组名 %s 选定机台 %s====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addFinalSelectedGroupLog(Context context, GroupPrioritySchedulerResultHelper finalSelected) {
+        if (null == finalSelected) {
+            return "";
+        }
+        String groupName = finalSelected.getPreSelectedGroupName();
+        String cxMachineCode = finalSelected.getSelectedCxMachineCode();
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，订单高优先级交付优先：Top3最终选定 分组名 %s 选定机台 %s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, cxMachineCode);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
         return logContent;
@@ -119,6 +181,7 @@ public class TbrSimulateProductionLogRecorder {
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
         return logContent;
     }
+
     /**
      * 增加 交付优先排产模式因结构固定重排续作日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产因结构固定重排续作====
@@ -156,7 +219,7 @@ public class TbrSimulateProductionLogRecorder {
      *
      * @param context   排程上下文
      * @param groupInfo 分组信息
-     * @param typeText 分段信息
+     * @param typeText  分段信息
      * @return
      */
     public static String addDeliveryPriorityTypeLog(Context context, String groupInfo, String typeText) {

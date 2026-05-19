@@ -5,24 +5,30 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.core.domain.ExcelCellRangeAddress;
 import com.zlt.aps.common.core.utils.ExcelUtils;
+import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.entity.LhShiftConfig;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.mapper.CxLhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.CxParamConfigMapper;
+import com.zlt.aps.lh.mapper.CxPrecisionPlanMapper;
 import com.zlt.aps.lh.mapper.CxScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
+import com.zlt.aps.lh.mapper.LhPrecisionPlanMapper;
 import com.zlt.aps.lh.mapper.LhShiftConfigMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialConsumeDetailMapper;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.service.IMpStructureAllocationRemoteService;
@@ -81,9 +87,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     private static final int SMALL_RUBBER_TITLE_ROW_INDEX = 6;
 
-    private static final int SMALL_RUBBER_START_COL = 1;
+    private static final int SMALL_RUBBER_START_COL = 0;
 
-    private static final int SMALL_RUBBER_END_COL = 1;
+    private static final int SMALL_RUBBER_END_COL = 0;
 
     @Resource
     private CxLhScheduleResultMapper cxLhScheduleResultMapper;
@@ -98,7 +104,13 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     private LhMouldChangePlanEntityMapper lhMouldChangePlanEntityMapper;
 
     @Resource
-    private CxParamConfigMapper cxParamConfigMapper;
+    private CxPrecisionPlanMapper cxPrecisionPlanMapper;
+
+    @Resource
+    private LhPrecisionPlanMapper lhPrecisionPlanMapper;
+
+    @Resource
+    private FactoryParamMapper factoryParamMapper;
 
     @Resource
     private MdmMaterialConsumeDetailMapper mdmMaterialConsumeDetailMapper;
@@ -108,6 +120,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     @Resource
     private IMpStructureAllocationRemoteService mpStructureAllocationRemoteService;
+
+    @Resource
+    private CxParamConfigMapper cxParamConfigMapper;
 
     @Override
     public byte[] exportScheduleSummaryReport(ScheduleSummaryReportVO queryVO) {
@@ -246,8 +261,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         String cxTrialSpecs = buildCxSetupOrTrialInfo(cxResults, "量试");
         String lhTrialSpecs = buildLhSetupOrTrialInfo(lhResults, "量试");
         map.put("cxTrialInfo", combineSpecInfo(cxTrialSpecs, lhTrialSpecs));
-        // 成型规格切换：参考成型日计划生成页面的成型结构切换导出逻辑，从T_MP_STRUCTURE_ALLOCATION取切换结构数据
-        map.put("cxSpecSwitch", buildCxSpecSwitch(actualScheduleDate, factoryCode));
+        // 成型规格切换：从T_MP_STRUCTURE_ALLOCATION取切换结构数据
+        // 需同时传入reportDate和scheduleDate，支持非跨月和跨月两种场景
+        map.put("cxSpecSwitch", buildCxSpecSwitch(reportDate, actualScheduleDate, factoryCode));
 
         BigDecimal lhNightTotal = BigDecimal.ZERO;
         BigDecimal lhMorningTotal = BigDecimal.ZERO;
@@ -285,9 +301,10 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         map.put("mouldCleanDate", DateUtil.format(reportDate, "MM月dd日"));
         map.put("mouldCleanInfo", buildMouldCleanInfo(reportDate, actualScheduleDate, factoryCode));
 
-        // 成型/硫化备注
-        map.put("cxRemark", buildCxRemark(cxResults));
-        map.put("lhRemark", buildLhRemark(lhResults));
+        // 成型备注：取成型精度计划的排程日期在报告日期（前一天）时间范围内要做的机台，成型精度做的时间固定在6:00~14:00
+        map.put("cxRemark", buildCxRemark(reportDate, factoryCode));
+        // 硫化备注：取硫化精度计划的排程日期在报告日期（前一天）时间范围内要做的机台，时间及开产时间根据参数计算
+        map.put("lhRemark", buildLhRemark(reportDate, factoryCode));
 
         return map;
     }
@@ -466,7 +483,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      *
      * <p>取数逻辑：</p>
      * <ol>
-     *   <li>从成型参数配置表读取胶种类型编码（PARAM_CODE=RUBBER_TYPE_CODES）</li>
+     *   <li>从系统参数表读取TD胶种类型编码（PARAM_CODE=SYS04010002）</li>
      *   <li>从原材料消耗明细表按胶种类型查对应的胎胚（CHILD_MATERIAL_NAME='AQ'+胶种类型）</li>
      *   <li>匹配本次成型排程结果中的胎胚</li>
      *   <li>通过胎胚编号关联物料主数据取规格+花纹</li>
@@ -480,20 +497,24 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     private List<List<Map<String, Object>>> buildDataList(Date scheduleDate, String factoryCode) {
         List<Map<String, Object>> smallRubberList = new ArrayList<>();
 
-        List<String> rubberTypeCodes = loadRubberTypeCodes();
+        List<String> rubberTypeCodes = loadRubberTypeCodes(factoryCode);
         if (rubberTypeCodes.isEmpty()) {
-            log.warn("未配置胶种类型编码（RUBBER_TYPE_CODES），小胶种列表为空");
+            log.warn("未配置TD胶种类型编码（SYS04010002），小胶种列表为空");
             List<List<Map<String, Object>>> dataList = new ArrayList<>();
             dataList.add(smallRubberList);
             return dataList;
         }
 
-        // 查询本次成型排程结果的胎胚列表
+        // 成型排程结果按排程日期查询，过滤掉3、4、5班次都没排计划量的胎胚
+        Date cxScheduleDate = scheduleDate;
+        log.info("查询成型排程结果，排程日期: {}", scheduleDate);
+
         List<CxScheduleResult> cxResults = cxScheduleResultMapper.selectList(
                 new LambdaQueryWrapper<CxScheduleResult>()
-                        .eq(CxScheduleResult::getScheduleDate, scheduleDate)
+                        .eq(CxScheduleResult::getScheduleDate, cxScheduleDate)
                         .eq(CxScheduleResult::getFactoryCode, factoryCode));
         Set<String> scheduleEmbryoCodes = cxResults.stream()
+                .filter(this::hasAnyPlanQtyInShift345)
                 .map(CxScheduleResult::getEmbryoCode)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
@@ -591,6 +612,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             Map<String, Object> item = new HashMap<>();
             item.put("rubberTypeName", rubberType);
             item.put("specPattern", String.join(",", specParts));
+            item.put("height", 30);
             smallRubberList.add(item);
         }
 
@@ -600,29 +622,47 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 从成型参数配置表读取胶种类型编码
+     * 从系统参数表（T_MP_FACTORY_PARAM）读取TD胶种类型编码
      *
-     * <p>参数编码：RUBBER_TYPE_CODES，值为逗号分隔的胶种类型（如 T101,T133,T601）</p>
+     * <p>参数编码：SYS04010002，值为逗号分隔的胶种类型（如 T101,T133,T601）</p>
+     * <p>TD胶种数据取数逻辑：通过胎胚关联t_mdm_material_consume_detail，
+     * 如果CHILD_MATERIAL_NAME为AQ+参数配置里key为SYS04010002的任意一个值，
+     * 满足胎胚及CHILD_MATERIAL_NAME的数据即为本次要展示的TD胶种数据</p>
      *
+     * @param factoryCode 分厂编码
      * @return 胶种类型列表
      */
-    private List<String> loadRubberTypeCodes() {
-        CxParamConfig config = cxParamConfigMapper.selectOne(
+    private List<String> loadRubberTypeCodes(String factoryCode) {
+        CxParamConfig paramConfig = cxParamConfigMapper.selectOne(
                 new LambdaQueryWrapper<CxParamConfig>()
-                        .eq(CxParamConfig::getParamCode, "RUBBER_TYPE_CODES")
-                        .eq(CxParamConfig::getIsActive, 1));
-
-        if (config == null || StringUtils.isBlank(config.getParamValue())) {
-            log.warn("未找到胶种类型配置（PARAM_CODE=RUBBER_TYPE_CODES）");
+                        .eq(CxParamConfig::getParamCode, "SYS04010002")
+                        .eq(CxParamConfig::getIsActive, 1)
+        );
+        if (paramConfig == null || StringUtils.isBlank(paramConfig.getParamValue())) {
+            log.warn("未找到TD胶种类型配置（成型参数配置表T_CX_PARAM_CONFIG，PARAM_CODE=SYS04010002）");
             return Collections.emptyList();
         }
 
-        List<String> codes = Arrays.stream(config.getParamValue().split(","))
+        List<String> codes = Arrays.stream(paramConfig.getParamValue().split(","))
                 .map(String::trim)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toList());
-        log.info("胶种类型配置: {}", codes);
+        log.info("TD胶种类型配置（成型参数配置SYS04010002）: {}", codes);
         return codes;
+    }
+
+    /**
+     * 判断成型排程结果的3、4、5班次中是否有任意一个班次排了计划量。
+     * 3、4、5班次对应排程日期前一天的夜、早、中班次，
+     * 三个班次都没排计划量的胎胚需要过滤掉。
+     *
+     * @param result 成型排程结果
+     * @return true=至少一个班次有计划量，false=三个班次都没计划量
+     */
+    private boolean hasAnyPlanQtyInShift345(CxScheduleResult result) {
+        return nvl(result.getClass3PlanQty()).compareTo(BigDecimal.ZERO) > 0
+                || nvl(result.getClass4PlanQty()).compareTo(BigDecimal.ZERO) > 0
+                || nvl(result.getClass5PlanQty()).compareTo(BigDecimal.ZERO) > 0;
     }
 
     /**
@@ -634,15 +674,32 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             if (shiftType.equals(entry.getValue())) {
                 int shiftIndex = entry.getKey();
                 switch (shiftIndex) {
-                    case 1: total = total.add(nvl(result.getClass1PlanQty())); break;
-                    case 2: total = total.add(nvl(result.getClass2PlanQty())); break;
-                    case 3: total = total.add(nvl(result.getClass3PlanQty())); break;
-                    case 4: total = total.add(nvl(result.getClass4PlanQty())); break;
-                    case 5: total = total.add(nvl(result.getClass5PlanQty())); break;
-                    case 6: total = total.add(nvl(result.getClass6PlanQty())); break;
-                    case 7: total = total.add(nvl(result.getClass7PlanQty())); break;
-                    case 8: total = total.add(nvl(result.getClass8PlanQty())); break;
-                    default: break;
+                    case 1:
+                        total = total.add(nvl(result.getClass1PlanQty()));
+                        break;
+                    case 2:
+                        total = total.add(nvl(result.getClass2PlanQty()));
+                        break;
+                    case 3:
+                        total = total.add(nvl(result.getClass3PlanQty()));
+                        break;
+                    case 4:
+                        total = total.add(nvl(result.getClass4PlanQty()));
+                        break;
+                    case 5:
+                        total = total.add(nvl(result.getClass5PlanQty()));
+                        break;
+                    case 6:
+                        total = total.add(nvl(result.getClass6PlanQty()));
+                        break;
+                    case 7:
+                        total = total.add(nvl(result.getClass7PlanQty()));
+                        break;
+                    case 8:
+                        total = total.add(nvl(result.getClass8PlanQty()));
+                        break;
+                    default:
+                        break;
                 }
             }
         }
@@ -659,15 +716,32 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             if (shiftType.equals(entry.getValue())) {
                 int shiftIndex = entry.getKey();
                 switch (shiftIndex) {
-                    case 1: total = total.add(nvlInt(result.getClass1PlanQty())); break;
-                    case 2: total = total.add(nvlInt(result.getClass2PlanQty())); break;
-                    case 3: total = total.add(nvlInt(result.getClass3PlanQty())); break;
-                    case 4: total = total.add(nvlInt(result.getClass4PlanQty())); break;
-                    case 5: total = total.add(nvlInt(result.getClass5PlanQty())); break;
-                    case 6: total = total.add(nvlInt(result.getClass6PlanQty())); break;
-                    case 7: total = total.add(nvlInt(result.getClass7PlanQty())); break;
-                    case 8: total = total.add(nvlInt(result.getClass8PlanQty())); break;
-                    default: break;
+                    case 1:
+                        total = total.add(nvlInt(result.getClass1PlanQty()));
+                        break;
+                    case 2:
+                        total = total.add(nvlInt(result.getClass2PlanQty()));
+                        break;
+                    case 3:
+                        total = total.add(nvlInt(result.getClass3PlanQty()));
+                        break;
+                    case 4:
+                        total = total.add(nvlInt(result.getClass4PlanQty()));
+                        break;
+                    case 5:
+                        total = total.add(nvlInt(result.getClass5PlanQty()));
+                        break;
+                    case 6:
+                        total = total.add(nvlInt(result.getClass6PlanQty()));
+                        break;
+                    case 7:
+                        total = total.add(nvlInt(result.getClass7PlanQty()));
+                        break;
+                    case 8:
+                        total = total.add(nvlInt(result.getClass8PlanQty()));
+                        break;
+                    default:
+                        break;
                 }
             }
         }
@@ -694,15 +768,32 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 int shiftIndex = entry.getKey();
                 BigDecimal qty = BigDecimal.ZERO;
                 switch (shiftIndex) {
-                    case 1: qty = nvlInt(result.getClass1PlanQty()); break;
-                    case 2: qty = nvlInt(result.getClass2PlanQty()); break;
-                    case 3: qty = nvlInt(result.getClass3PlanQty()); break;
-                    case 4: qty = nvlInt(result.getClass4PlanQty()); break;
-                    case 5: qty = nvlInt(result.getClass5PlanQty()); break;
-                    case 6: qty = nvlInt(result.getClass6PlanQty()); break;
-                    case 7: qty = nvlInt(result.getClass7PlanQty()); break;
-                    case 8: qty = nvlInt(result.getClass8PlanQty()); break;
-                    default: break;
+                    case 1:
+                        qty = nvlInt(result.getClass1PlanQty());
+                        break;
+                    case 2:
+                        qty = nvlInt(result.getClass2PlanQty());
+                        break;
+                    case 3:
+                        qty = nvlInt(result.getClass3PlanQty());
+                        break;
+                    case 4:
+                        qty = nvlInt(result.getClass4PlanQty());
+                        break;
+                    case 5:
+                        qty = nvlInt(result.getClass5PlanQty());
+                        break;
+                    case 6:
+                        qty = nvlInt(result.getClass6PlanQty());
+                        break;
+                    case 7:
+                        qty = nvlInt(result.getClass7PlanQty());
+                        break;
+                    case 8:
+                        qty = nvlInt(result.getClass8PlanQty());
+                        break;
+                    default:
+                        break;
                 }
                 if (qty.compareTo(BigDecimal.ZERO) > 0) {
                     return true;
@@ -722,24 +813,131 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     /**
      * 构建成型备注信息
+     *
+     * <p>取成型精度计划的排程日期在报告日期（前一天）时间范围内要做的机台，
+     * 成型精度做的时间固定在6:00~14:00</p>
+     *
+     * @param reportDate  报告日期（排程日期的前一天）
+     * @param factoryCode 分厂编码
+     * @return 成型备注字符串，格式如："机台A、机台B 做精度 6:00-14:00"
      */
-    private String buildCxRemark(List<CxScheduleResult> cxResults) {
-        return cxResults.stream()
-                .map(CxScheduleResult::getSpecialRequirements)
+    private String buildCxRemark(Date reportDate, String factoryCode) {
+        Date dayStart = LhScheduleTimeUtil.clearTime(reportDate);
+        Date dayEnd = LhScheduleTimeUtil.getEndTime(reportDate);
+
+        List<CxPrecisionPlan> precisionPlans = cxPrecisionPlanMapper.selectList(
+                new LambdaQueryWrapper<CxPrecisionPlan>()
+                        .eq(CxPrecisionPlan::getFactoryCode, factoryCode)
+                        .ge(CxPrecisionPlan::getScheduleDate, dayStart)
+                        .le(CxPrecisionPlan::getScheduleDate, dayEnd));
+        log.info("成型精度计划查询完成, 报告日期(前一天): {}, 分厂: {}, 数量: {}",
+                DateUtil.formatDate(reportDate), factoryCode, precisionPlans.size());
+
+        if (precisionPlans.isEmpty()) {
+            return "";
+        }
+
+        List<String> machineCodes = precisionPlans.stream()
+                .map(CxPrecisionPlan::getMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
-                .collect(Collectors.joining("；"));
+                .collect(Collectors.toList());
+
+        if (machineCodes.isEmpty()) {
+            return "";
+        }
+
+        String machineStr = String.join("、", machineCodes);
+        return machineStr + " 6:00-14:00精度校验";
     }
 
     /**
      * 构建硫化备注信息
+     *
+     * <p>取硫化精度计划的排程日期在报告日期（前一天）时间范围内要做的机台，
+     * 硫化精度做的时间及开产时间根据以下三个参数来定：</p>
+     * <ul>
+     *   <li>胶囊预热时间（小时）SYS0307009，如：2.5</li>
+     *   <li>保养开始小时 SYS0307002，如：8</li>
+     *   <li>保养耗时（小时）SYS0307001，如：7</li>
+     * </ul>
+     * <p>开产为保养完后胶囊预热完后开产。
+     * 例如：保养8:00开始，保养7小时到15:00结束，胶囊预热2.5小时，开产时间17:30</p>
+     *
+     * @param reportDate  报告日期（排程日期的前一天）
+     * @param factoryCode 分厂编码
+     * @return 硫化备注字符串，格式如："机台A、机台B 做精度 8:00-15:00，开产17:30"
      */
-    private String buildLhRemark(List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> lhResults) {
-        return lhResults.stream()
-                .map(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getRemark)
+    private String buildLhRemark(Date reportDate, String factoryCode) {
+        Date dayStart = LhScheduleTimeUtil.clearTime(reportDate);
+        Date dayEnd = LhScheduleTimeUtil.getEndTime(reportDate);
+
+        List<LhPrecisionPlan> precisionPlans = lhPrecisionPlanMapper.selectList(
+                new LambdaQueryWrapper<LhPrecisionPlan>()
+                        .eq(LhPrecisionPlan::getFactoryCode, factoryCode)
+                        .ge(LhPrecisionPlan::getScheduleDate, dayStart)
+                        .le(LhPrecisionPlan::getScheduleDate, dayEnd));
+        log.info("硫化精度计划查询完成, 报告日期(前一天): {}, 分厂: {}, 数量: {}",
+                DateUtil.formatDate(reportDate), factoryCode, precisionPlans.size());
+
+        if (precisionPlans.isEmpty()) {
+            return "";
+        }
+
+        List<String> machineCodes = precisionPlans.stream()
+                .map(LhPrecisionPlan::getMachineCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
-                .collect(Collectors.joining("；"));
+                .collect(Collectors.toList());
+
+        if (machineCodes.isEmpty()) {
+            return "";
+        }
+
+        String maintenanceStartHourStr = loadFactoryParamValue(factoryCode, null, "SYS0307002");
+        String maintenanceDurationStr = loadFactoryParamValue(factoryCode, null, "SYS0307001");
+        String capsulePreheatStr = loadFactoryParamValue(factoryCode, null, "SYS0307009");
+
+        int maintenanceStartHour = 8;
+        int maintenanceDuration = 7;
+        double capsulePreheatHours = 2.5;
+
+        try {
+            if (StringUtils.isNotBlank(maintenanceStartHourStr)) {
+                maintenanceStartHour = Integer.parseInt(maintenanceStartHourStr.trim());
+            }
+        } catch (NumberFormatException e) {
+            log.warn("解析保养开始小时参数（SYS0307002）失败: {}, 使用默认值8", maintenanceStartHourStr);
+        }
+        try {
+            if (StringUtils.isNotBlank(maintenanceDurationStr)) {
+                maintenanceDuration = Integer.parseInt(maintenanceDurationStr.trim());
+            }
+        } catch (NumberFormatException e) {
+            log.warn("解析保养耗时参数（SYS0307001）失败: {}, 使用默认值7", maintenanceDurationStr);
+        }
+        try {
+            if (StringUtils.isNotBlank(capsulePreheatStr)) {
+                capsulePreheatHours = Double.parseDouble(capsulePreheatStr.trim());
+            }
+        } catch (NumberFormatException e) {
+            log.warn("解析胶囊预热时间参数（SYS0307009）失败: {}, 使用默认值2.5", capsulePreheatStr);
+        }
+
+        int maintenanceEndHour = maintenanceStartHour + maintenanceDuration;
+        String maintenanceTimeRange = maintenanceStartHour + ":00-" + maintenanceEndHour + ":00";
+
+        double productionStartTotalHours = maintenanceEndHour + capsulePreheatHours;
+        int productionStartHour = (int) productionStartTotalHours;
+        int productionStartMinute = (int) Math.round((productionStartTotalHours - productionStartHour) * 60);
+        String productionStartTime = String.format("%d:%02d", productionStartHour, productionStartMinute);
+
+        log.info("硫化备注时间计算 - 保养开始: {}小时, 保养耗时: {}小时, 胶囊预热: {}小时, 保养时段: {}, 开产时间: {}",
+                maintenanceStartHour, maintenanceDuration, capsulePreheatHours,
+                maintenanceTimeRange, productionStartTime);
+
+        String machineStr = String.join("、", machineCodes);
+        return machineStr + maintenanceTimeRange + " 维保," + productionStartTime + "开产";
     }
 
     /**
@@ -769,26 +967,39 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     /**
      * 构建成型规格切换信息。
-     * 参考成型日计划生成页面的成型结构切换导出逻辑（CxScheduleResultServiceImpl.buildStructureChangeDataListV2），
-     * 从T_MP_STRUCTURE_ALLOCATION表获取结构排产数据，
-     * 按成型机台分组，根据排程日期找到当前正在运行的结构和下一个切换结构，
-     * 展示格式为"前结构 换 后结构"，多个切换用"；"隔开。
+     * 从T_MP_STRUCTURE_ALLOCATION表获取结构排产数据，按成型机台分组，
+     * 找到结束日等于前一天日号的前结构，以及开始日等于前一天日号或排程日期日号的后结构，
+     * 只展示第二天切换的数据，展示格式为"前结构 换 后结构"，多个切换用"；"隔开。
      *
+     * <p>两种场景：</p>
+     * <ul>
+     *   <li>非跨月场景：排程日期21号，取5月转产数据，找endDay=20的前结构，
+     *       后结构先查beginDay=20，20号没有再查beginDay=21</li>
+     *   <li>跨月场景：排程日期6月1号，取6月转产数据，找endDay=1且后结构beginDay=1</li>
+     * </ul>
+     *
+     * @param reportDate   报告日期（排程日期的前一天）
      * @param scheduleDate 排程日期
      * @param factoryCode  分厂编码
      * @return 规格切换信息字符串，如"结构A 换 结构B；结构C 换 结构D"
      */
-    private String buildCxSpecSwitch(Date scheduleDate, String factoryCode) {
+    private String buildCxSpecSwitch(Date reportDate, Date scheduleDate, String factoryCode) {
+        LocalDate localReportDate = DateUtil.toLocalDateTime(reportDate).toLocalDate();
         LocalDate localScheduleDate = DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
+
+        // 跨月场景：排程日期是1号时，直接取排程日期所在月的转产数据；否则取前一天所在月的数据
+        LocalDate queryMonthBase = localScheduleDate.getDayOfMonth() == 1
+                ? localScheduleDate : localReportDate;
 
         MpStructureAllocation structureQuery = new MpStructureAllocation();
         structureQuery.setFactoryCode(factoryCode);
-        structureQuery.setYear(localScheduleDate.getYear());
-        structureQuery.setMonth(localScheduleDate.getMonthValue());
+        structureQuery.setYear(queryMonthBase.getYear());
+        structureQuery.setMonth(queryMonthBase.getMonthValue());
 
         List<MpStructureAllocation> structureList = queryStructureAllocationList(structureQuery);
         if (structureList.isEmpty()) {
-            log.info("成型规格切换：未查询到结构排产数据, 日期: {}, 分厂: {}", DateUtil.formatDate(scheduleDate), factoryCode);
+            log.info("成型规格切换：未查询到结构排产数据, 查询年月: {}-{}, 分厂: {}",
+                    queryMonthBase.getYear(), queryMonthBase.getMonthValue(), factoryCode);
             return "";
         }
 
@@ -801,6 +1012,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                         Collectors.toList()));
 
         List<String> switchList = new ArrayList<>();
+        int reportDayOfMonth = localReportDate.getDayOfMonth();
         int scheduleDayOfMonth = localScheduleDate.getDayOfMonth();
 
         for (Map.Entry<String, List<MpStructureAllocation>> entry : machineGroupMap.entrySet()) {
@@ -808,22 +1020,31 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                     .sorted(Comparator.comparing(MpStructureAllocation::getBeginDay, Comparator.nullsLast(Comparator.naturalOrder())))
                     .collect(Collectors.toList());
 
-            int currentIndex = -1;
-            for (int i = 0; i < structures.size(); i++) {
-                MpStructureAllocation s = structures.get(i);
-                if (s.getBeginDay() != null && s.getEndDay() != null
-                        && scheduleDayOfMonth >= s.getBeginDay() && scheduleDayOfMonth <= s.getEndDay()) {
-                    currentIndex = i;
-                    break;
-                }
-            }
-
-            if (currentIndex == -1 || currentIndex >= structures.size() - 1) {
+            // 同一机台必须有2条及以上转产数据才说明有结构切换
+            if (structures.size() < 2) {
                 continue;
             }
 
-            MpStructureAllocation prevStructure = structures.get(currentIndex);
-            MpStructureAllocation nextStructure = structures.get(currentIndex + 1);
+            // 查找前结构：结束日等于前一天日号（跨月场景下为排程日期日号1号）
+            int prevEndDay = localScheduleDate.getDayOfMonth() == 1
+                    ? scheduleDayOfMonth : reportDayOfMonth;
+            MpStructureAllocation prevStructure = null;
+            for (MpStructureAllocation s : structures) {
+                if (s.getEndDay() != null && s.getEndDay() == prevEndDay) {
+                    prevStructure = s;
+                    break;
+                }
+            }
+            if (prevStructure == null) {
+                continue;
+            }
+
+            // 查找后结构：先查开始日等于前一天日号，没有再查开始日等于排程日期日号
+            MpStructureAllocation nextStructure = findNextStructure(structures, prevStructure,
+                    reportDayOfMonth, scheduleDayOfMonth);
+            if (nextStructure == null) {
+                continue;
+            }
 
             String prevStructureName = StringUtils.defaultString(prevStructure.getStructureName()).trim();
             String nextStructureName = StringUtils.defaultString(nextStructure.getStructureName()).trim();
@@ -836,6 +1057,41 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         String result = String.join("；", switchList);
         log.info("成型规格切换: {}", result);
         return result;
+    }
+
+    /**
+     * 查找下一个结构切换数据。
+     * 优先查找开始日等于前一天日号的结构，若没有则查找开始日等于排程日期日号的结构。
+     *
+     * @param structures       按beginDay排序的转产数据列表
+     * @param prevStructure    前结构（已确定结束日的前结构）
+     * @param reportDayOfMonth 前一天的日号
+     * @param scheduleDayOfMonth 排程日期的日号
+     * @return 下一个结构切换数据，未找到返回null
+     */
+    private MpStructureAllocation findNextStructure(List<MpStructureAllocation> structures,
+                                                    MpStructureAllocation prevStructure,
+                                                    int reportDayOfMonth,
+                                                    int scheduleDayOfMonth) {
+        // 优先查找开始日等于前一天日号的结构
+        for (MpStructureAllocation s : structures) {
+            if (s == prevStructure) {
+                continue;
+            }
+            if (s.getBeginDay() != null && s.getBeginDay() == reportDayOfMonth) {
+                return s;
+            }
+        }
+        // 前一天日号没有匹配，再查找开始日等于排程日期日号的结构
+        for (MpStructureAllocation s : structures) {
+            if (s == prevStructure) {
+                continue;
+            }
+            if (s.getBeginDay() != null && s.getBeginDay() == scheduleDayOfMonth) {
+                return s;
+            }
+        }
+        return null;
     }
 
     /**
@@ -881,5 +1137,33 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             }
         }
         return entityList;
+    }
+
+    /**
+     * 从系统参数表（T_MP_FACTORY_PARAM）加载参数值
+     *
+     * @param factoryCode     分厂编码
+     * @param productTypeCode 产品品类编码（可为null）
+     * @param paramCode       参数编码
+     * @return 参数值，未找到返回null
+     */
+    private String loadFactoryParamValue(String factoryCode, String productTypeCode, String paramCode) {
+        try {
+            LambdaQueryWrapper<FactoryParam> wrapper = new LambdaQueryWrapper<FactoryParam>()
+                    .eq(FactoryParam::getFactoryCode, factoryCode)
+                    .eq(FactoryParam::getParamCode, paramCode)
+                    .eq(FactoryParam::getIsDelete, "0");
+            if (productTypeCode != null) {
+                wrapper.eq(FactoryParam::getProductTypeCode, productTypeCode);
+            }
+            FactoryParam param = factoryParamMapper.selectOne(wrapper);
+            if (param != null && param.getParamValue() != null && !param.getParamValue().trim().isEmpty()) {
+                return param.getParamValue().trim();
+            }
+        } catch (Exception e) {
+            log.warn("从T_MP_FACTORY_PARAM加载参数失败: factoryCode={}, paramCode={}, error={}",
+                    factoryCode, paramCode, e.getMessage());
+        }
+        return null;
     }
 }

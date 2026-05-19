@@ -654,6 +654,113 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
+     * 下载导入模板（不含物料描述列）
+     * <p>物料描述通过物料编码自动带出，导入时用户无需填写物料描述</p>
+     *
+     * @param result 查询条件（工厂、排程日期等）
+     * @return 导入模板Excel字节数组
+     */
+    @Override
+    public byte[] downloadImportTemplate(LhScheduleResult result) {
+        byte[] templateBytes = exportData(Collections.emptyList(), result);
+        return removeMaterialDescColumn(templateBytes);
+    }
+
+    /**
+     * 从Excel中移除物料描述列
+     * <p>扫描模板占位符行定位materialDesc列索引，然后删除该列的所有单元格</p>
+     *
+     * @param excelBytes 原始Excel字节数组
+     * @return 移除物料描述列后的Excel字节数组
+     */
+    private byte[] removeMaterialDescColumn(byte[] excelBytes) {
+        if (Objects.isNull(excelBytes) || excelBytes.length == 0) {
+            return excelBytes;
+        }
+        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(excelBytes);
+             XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.getSheetAt(0);
+            Map<String, Integer> placeholderMap = ExcelUtils.scanTemplateRowPlaceholders(
+                    new ByteArrayInputStream(excelBytes), 0);
+            Integer materialDescCol = placeholderMap.get("materialDesc");
+            if (Objects.isNull(materialDescCol) || materialDescCol < 0) {
+                log.warn("未在模板中找到materialDesc列，跳过移除操作");
+                return excelBytes;
+            }
+            log.info("开始移除导入模板中的物料描述列，列索引: {}", materialDescCol);
+            for (Row row : sheet) {
+                Cell cell = row.getCell(materialDescCol);
+                if (Objects.nonNull(cell)) {
+                    row.removeCell(cell);
+                }
+                shiftCellsLeft(row, materialDescCol);
+            }
+            workbook.write(outputStream);
+            log.info("成功移除导入模板中的物料描述列");
+            return outputStream.toByteArray();
+        } catch (IOException e) {
+            log.error("移除物料描述列失败", e);
+            throw new ServiceException("生成导入模板失败");
+        }
+    }
+
+    /**
+     * 将指定列索引右侧的所有单元格左移一位
+     *
+     * @param row      当前行
+     * @param colIndex 被删除列的索引
+     */
+    private void shiftCellsLeft(Row row, int colIndex) {
+        int lastCellNum = row.getLastCellNum();
+        for (int col = colIndex + 1; col < lastCellNum; col++) {
+            Cell sourceCell = row.getCell(col);
+            Cell targetCell = row.getCell(col - 1);
+            if (Objects.nonNull(sourceCell)) {
+                if (Objects.isNull(targetCell)) {
+                    targetCell = row.createCell(col - 1, sourceCell.getCellType());
+                }
+                copyCellValue(sourceCell, targetCell);
+                row.removeCell(sourceCell);
+            } else if (Objects.nonNull(targetCell)) {
+                row.removeCell(targetCell);
+            }
+        }
+    }
+
+    /**
+     * 复制源单元格的值和样式到目标单元格
+     *
+     * @param source 源单元格
+     * @param target 目标单元格
+     */
+    private void copyCellValue(Cell source, Cell target) {
+        CellStyle style = source.getCellStyle();
+        if (Objects.nonNull(style)) {
+            target.setCellStyle(style);
+        }
+        switch (source.getCellType()) {
+            case STRING:
+                target.setCellValue(source.getStringCellValue());
+                break;
+            case NUMERIC:
+                target.setCellValue(source.getNumericCellValue());
+                break;
+            case BOOLEAN:
+                target.setCellValue(source.getBooleanCellValue());
+                break;
+            case FORMULA:
+                target.setCellFormula(source.getCellFormula());
+                break;
+            case BLANK:
+                target.setBlank();
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
      * 回填导出结果中的明细行公式。
      * <p>通用模板写入工具在复制列表行时，只会识别字符串占位符；遇到公式单元格时不会复制公式，
      * 因此 J/BZ/CA/CB 这几个模板公式在生成阶段会被清掉。这里在最终 xlsx 字节生成后重新打开工作簿，

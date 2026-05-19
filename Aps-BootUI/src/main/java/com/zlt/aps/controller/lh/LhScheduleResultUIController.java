@@ -147,6 +147,13 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
         return iLhScheduleResultRemoteService.validateInsertOrder(insertDTO);
     }
 
+    @ApiOperation("获取SKU关联数据（硫化余量/胎胚库存/硫化班产/示方类型）")
+    @PostMapping("/getSkuRelatedData")
+    @ResponseBody
+    public AjaxResult getSkuRelatedData(@RequestBody LhOrderInsertDTO insertDTO) {
+        return iLhScheduleResultRemoteService.getSkuRelatedData(insertDTO);
+    }
+
     @ApiOperation("插单")
 //    @RequiresPermissions("lh:lhScheduleResult:insertOrder")
     @PostMapping("/insertOrder")

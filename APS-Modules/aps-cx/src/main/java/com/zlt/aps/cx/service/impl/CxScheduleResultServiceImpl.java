@@ -1345,36 +1345,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     .in(MdmMaterialConsumeDetail::getChildMaterialName, codes));
 
             if(CollectionUtils.isNotEmpty(mdmMaterialConsumeDetailList)) {
-                List<String> embryoCodeList = mdmMaterialConsumeDetailList.stream()
-                        .map(MdmMaterialConsumeDetail::getEmbryoCode)
-                        .filter(StringUtils::isNotBlank)
-                        .distinct()
-                        .collect(Collectors.toList());
-                if (CollectionUtils.isNotEmpty(embryoCodeList)) {
-                    // 根据胎胚编码查询物料信息，关联规格+花纹展示胶种
-                    LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
-                    queryWrapper.eq(BaseEntity::getIsDelete, YesOrNoEnum.NO.getCode())
-                            .eq(MdmMaterialInfo::getFactoryCode, list.get(0).getFactoryCode())
-                            .in(MdmMaterialInfo::getEmbryoCode, embryoCodeList);
-                    List<MdmMaterialInfo> mdmMaterialInfoList = materialInfoEntityMapper.selectList(queryWrapper);
-                    Map<String, List<MdmMaterialInfo>> materialInfoMap = new HashMap<>();
-                    if (CollectionUtils.isNotEmpty(mdmMaterialInfoList)) {
-                        materialInfoMap = mdmMaterialInfoList.stream()
-                                .filter(item -> StringUtils.isNotBlank(item.getEmbryoCode()))
-                                .collect(Collectors.groupingBy(MdmMaterialInfo::getEmbryoCode));
-                    }
-
-                    Map<String, List<MdmMaterialInfo>> finalMaterialInfoMap = materialInfoMap;
-                    smallGlueMap = mdmMaterialConsumeDetailList.stream().collect(Collectors.toMap(MdmMaterialConsumeDetail::getEmbryoCode,
-                            item -> {
-                                List<MdmMaterialInfo> materialInfoList = finalMaterialInfoMap.getOrDefault(item.getEmbryoCode(), new ArrayList<>());
-                                List<String> resultList = materialInfoList.stream()
-                                        .map(i -> StringUtils.defaultIfBlank(i.getSpecifications(), "") + "/" + StringUtils.defaultIfBlank(i.getPattern(), ""))
-                                        .distinct()
-                                        .collect(Collectors.toList());
-                                return String.join(",", resultList);
-                            }));
-                }
+                smallGlueMap = mdmMaterialConsumeDetailList.stream().collect(Collectors.toMap(MdmMaterialConsumeDetail::getEmbryoCode, MdmMaterialConsumeDetail::getChildMaterialName));
             }
         }
 
@@ -1393,7 +1364,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             row.put("mainMaterialDesc", firstNonBlank(groupList, "mainMaterialDesc"));
             // 胶种展示胎胚对应规格+花纹，在t_mdm_material_consume_detail表存在对应的胶种才展示
             if (smallGlueMap.containsKey(embryoCode)) {
-                String smallGlue = smallGlueMap.get(embryoCode);
+                String smallGlue = StringUtils.defaultIfBlank(smallGlueMap.get(embryoCode), "");
                 smallGlue = smallGlue.substring(2);
                 row.put("smallGlue", smallGlue);
             } else {

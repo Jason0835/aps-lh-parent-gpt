@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 /**
  * 共用模具花纹配置服务实现类
  * <p>
- * 唯一性校验逻辑：工厂编号 + 物料编码 + 主花纹 + 模具号
+ * 唯一性校验逻辑：工厂编号 + 物料编码 + 模具号 + 花纹块
  *
  * @author zlt
  * @date 2026-05-14
@@ -122,7 +122,7 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
      * 2. 物料编码必填
      * 3. 花纹块必填
      * 4. 模具号必填
-     * 5. 唯一性校验：工厂编号 + 物料编码 + 主花纹 + 模具号
+     * 5. 唯一性校验：工厂编号 + 物料编码 + 模具号 + 花纹块
      */
     @Override
     public AjaxResult importData(List<LhSharedMouldPat> list, boolean updateSupport, Long importLogId) {
@@ -175,7 +175,7 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
         // Step4: Excel内数据重复校验
 
         if (CollectionUtils.isNotEmpty(validList)) {
-            // 按工厂+物料编码+模具号+主花纹分组（主花纹可为空，用空字符串占位）
+            // 按工厂+物料编码+模具号+花纹块分组（花纹块可为空，用空字符串占位）
             Map<String, List<LhSharedMouldPat>> repeatMap = validList.stream()
                     .filter(item -> StringUtil.isNotBlank(item.getFactoryCode())
                             && StringUtil.isNotBlank(item.getMaterialCode())
@@ -183,7 +183,7 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
                     .collect(Collectors.groupingBy(item -> item.getFactoryCode() + "_"
                             + item.getMaterialCode() + "_"
                             + item.getMouldNo() + "_"
-                            + (StringUtil.isNotBlank(item.getMainPattern()) ? item.getMainPattern() : "")));
+                            + (StringUtil.isNotBlank(item.getPatternBlock()) ? item.getPatternBlock() : "")));
 
             // 遍历进行校验
             List<LhSharedMouldPat> checkList = new ArrayList<>();
@@ -231,14 +231,14 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
                             errorNum, message, importErrorLogs);
                 }
 
-                // Excel内重复校验 - 工厂+物料编码+模具号+主花纹（主花纹可为空）
+                // Excel内重复校验 - 工厂+物料编码+模具号+花纹块（花纹块可为空）
                 if (StringUtil.isNotBlank(docEntity.getFactoryCode())
                         && StringUtil.isNotBlank(docEntity.getMaterialCode())
                         && StringUtil.isNotBlank(docEntity.getMouldNo())) {
                     String key = docEntity.getFactoryCode() + "_"
                             + docEntity.getMaterialCode() + "_"
                             + docEntity.getMouldNo() + "_"
-                            + (StringUtil.isNotBlank(docEntity.getMainPattern()) ? docEntity.getMainPattern() : "");
+                            + (StringUtil.isNotBlank(docEntity.getPatternBlock()) ? docEntity.getPatternBlock() : "");
                     List<LhSharedMouldPat> repeatList = repeatMap.get(key);
                     if (CollectionUtils.isNotEmpty(repeatList) && repeatList.size() > 1) {
                         isCan = false;
@@ -262,11 +262,11 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
                             LambdaQueryWrapper<LhSharedMouldPat> queryWrapper = Wrappers.lambdaQuery();
                             queryWrapper.eq(LhSharedMouldPat::getFactoryCode, docEntity.getFactoryCode());
                             queryWrapper.eq(LhSharedMouldPat::getMaterialCode, docEntity.getMaterialCode());
-                            // 主花纹可为空，为空时使用isNull条件
-                            if (StringUtil.isNotBlank(docEntity.getMainPattern())) {
-                                queryWrapper.eq(LhSharedMouldPat::getMainPattern, docEntity.getMainPattern());
+                            // 花纹块可为空，为空时使用isNull条件
+                            if (StringUtil.isNotBlank(docEntity.getPatternBlock())) {
+                                queryWrapper.eq(LhSharedMouldPat::getPatternBlock, docEntity.getPatternBlock());
                             } else {
-                                queryWrapper.isNull(LhSharedMouldPat::getMainPattern);
+                                queryWrapper.isNull(LhSharedMouldPat::getPatternBlock);
                             }
                             queryWrapper.eq(LhSharedMouldPat::getMouldNo, docEntity.getMouldNo());
                             LhSharedMouldPat existEntity = lhSharedMouldPatEntityMapper.selectOne(queryWrapper);
@@ -347,7 +347,7 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
     /**
      * 校验唯一性
      * <p>
-     * 唯一性规则：工厂编号 + 物料编码 + 主花纹 + 模具号
+     * 唯一性规则：工厂编号 + 物料编码 + 模具号 + 花纹块
      *
      * @param entity 校验对象
      * @return 唯一性结果
@@ -362,11 +362,11 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
         wrapper.ne(entity.getId() != null, LhSharedMouldPat::getId, entity.getId());
         wrapper.eq(LhSharedMouldPat::getFactoryCode, entity.getFactoryCode());
         wrapper.eq(LhSharedMouldPat::getMaterialCode, entity.getMaterialCode());
-        // 主花纹可为空，为空时使用isNull条件
-        if (StringUtil.isNotBlank(entity.getMainPattern())) {
-            wrapper.eq(LhSharedMouldPat::getMainPattern, entity.getMainPattern());
+        // 花纹块可为空，为空时使用isNull条件
+        if (StringUtil.isNotBlank(entity.getPatternBlock())) {
+            wrapper.eq(LhSharedMouldPat::getPatternBlock, entity.getPatternBlock());
         } else {
-            wrapper.isNull(LhSharedMouldPat::getMainPattern);
+            wrapper.isNull(LhSharedMouldPat::getPatternBlock);
         }
         wrapper.eq(LhSharedMouldPat::getMouldNo, entity.getMouldNo());
 
@@ -380,6 +380,6 @@ public class LhSharedMouldPatServiceImpl extends AbstractDocService<LhSharedMoul
 
     @Override
     protected List<String> getCheckUniqueFields() {
-        return Arrays.asList("factoryCode", "materialCode", "mainPattern", "mouldNo");
+        return Arrays.asList("factoryCode", "materialCode", "mouldNo", "patternBlock");
     }
 }
