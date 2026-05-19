@@ -152,22 +152,21 @@
 <script>
 //lib
 import moment from "moment";
-import { mapState } from "vuex";
+import {mapState} from "vuex";
 //utils
-import { downloadLink } from "@/utils/request";
+import {downloadLink} from "@/utils/request";
 //interface
 import {
-  listCxScheduleResult,
-  publishScheduleResult,
-  modifyQty,
-  manualClose,
-  producingIssue,
-  validateConstruction,
   hasRecordValidate,
-  removeCxScheduleResult,
+  listCxScheduleResult,
+  manualClose,
   parseCxScheduleResult,
+  producingIssue,
+  publishScheduleResult,
+  removeCxScheduleResult,
+  validateConstruction,
 } from "@/api/cx/cxScheduleResult";
-import { getScheduleDate } from "@/api/lh/scheduleResult";
+import {getScheduleDate} from "@/api/lh/scheduleResult";
 //components
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
@@ -1099,7 +1098,9 @@ export default {
       downloadLink("/cx/cxScheduleResult/export", this.formatParams(false));
     },
     handleExport() {
-      downloadLink("/cx/cxScheduleResult/exportCxRemainQty", this.formatParams(false));
+      downloadLink("/cx/cxScheduleResult/exportCxRemainQty", {
+        scheduleDate: this.query.scheduleDate,
+      });
     },
     handleGotoMoldingScheduleSequence() {
       this.$router.push({
