@@ -1617,7 +1617,7 @@ public class MesItfServiceImpl implements MesItfService {
     /**
      * 同步硫化排程日完成量
      * 采用逻辑删除后插入模式
-     * 同步完成后根据参数配置CHIP_CODE_STOCK_UPDATE里的芯片编码，过滤物料编码对应的编码数据累加到芯片库存的完成量
+     * 同步完成后根据参数配置CHIP_CODE_STOCK_UPDATE里的芯片编码，过滤物料编码对应的编码数据增量更新芯片库存的完成量
      * @param syncDataLogs 同步参数
      * @return 结果
      */
@@ -1688,10 +1688,10 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
-     * 根据参数配置CHIP_CODE_STOCK_UPDATE里的芯片编码，过滤物料编码对应的日完成量数据插入芯片库存
-     * 采用逻辑删除+插入方案（参考生胎库存同步syncMesCxStock）：
-     *   步骤1：逻辑删除该分厂下数据来源为MES的所有芯片库存数据（IS_DELETE置为1）
-     *   步骤2：将过滤后的芯片库存数据批量插入（新记录，IS_DELETE=0，DATA_SOURCE=MES）
+     * 根据参数配置CHIP_CODE_STOCK_UPDATE里的芯片编码，过滤物料编码对应的日完成量数据增量更新芯片库存
+     * 采用增量更新模式：
+     *   已存在（分厂+芯片编码匹配）：累加完成量
+     *   不存在：新增记录（仅设置完成量，库存量由用户手动维护）
      * @param factoryCode 分厂编码
      * @param syncList 硫化排程日完成量列表
      */
@@ -1731,27 +1731,22 @@ public class MesItfServiceImpl implements MesItfService {
                         Collectors.summingInt(item -> item.getDayFinishQty().intValue())
                 ));
 
-        List<LhChipStock> chipStockInsertList = chipFinishQtyMap.entrySet().stream().map(entry -> {
+        List<LhChipStock> chipStockList = chipFinishQtyMap.entrySet().stream().map(entry -> {
             LhChipStock chipStock = new LhChipStock();
             chipStock.setFactoryCode(factoryCode);
             chipStock.setChipCode(entry.getKey());
             chipStock.setFinishQty(entry.getValue());
-            chipStock.setDataSource(ApsConstant.DATA_SOURCE_MES);
-            chipStock.setCreateBy("MES");
-            chipStock.setUpdateBy("MES");
-            chipStock.setCreateTime(DateUtils.getNowDate());
-            chipStock.setUpdateTime(DateUtils.getNowDate());
             return chipStock;
         }).collect(Collectors.toList());
 
         try {
             FeignTokenHelper.runWithToken(() -> {
-                log.info("芯片库存同步：开始同步，factoryCode={}, 待插入数量={}", factoryCode, chipStockInsertList.size());
-                lhChipStockRemoteService.logicDeleteAndSaveByDataSource(factoryCode, ApsConstant.DATA_SOURCE_MES, "MES", chipStockInsertList);
-                log.info("芯片库存同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, chipStockInsertList.size());
+                log.info("芯片库存增量更新：开始同步，factoryCode={}, 待处理数量={}", factoryCode, chipStockList.size());
+                lhChipStockRemoteService.upsertFinishQty(factoryCode, chipStockList);
+                log.info("芯片库存增量更新：同步完成，factoryCode={}, 处理数量={}", factoryCode, chipStockList.size());
             });
         } catch (Exception e) {
-            log.error("同步芯片库存异常, factoryCode={}", factoryCode, e);
+            log.error("芯片库存增量更新异常, factoryCode={}", factoryCode, e);
         }
     }
 

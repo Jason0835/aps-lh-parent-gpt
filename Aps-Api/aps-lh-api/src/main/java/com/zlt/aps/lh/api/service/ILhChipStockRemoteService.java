@@ -102,6 +102,15 @@ public interface ILhChipStockRemoteService {
                                               @RequestBody List<LhChipStock> list);
 
     /**
+     * 增量更新芯片库存完成量
+     * 根据分厂编号+芯片编码匹配：已存在则累加完成量，不存在则新增记录
+     */
+    @ApiOperation("增量更新芯片库存完成量")
+    @PostMapping("/lhChipStock/upsertFinishQty")
+    AjaxResult upsertFinishQty(@RequestParam("factoryCode") String factoryCode,
+                               @RequestBody List<LhChipStock> list);
+
+    /**
      * 合并保存 - 新增时检测到重复，将库存量和完成量累加到已有数据上
      */
     @ApiOperation("合并保存")
