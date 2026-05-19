@@ -460,7 +460,9 @@ public class DpDemandPlan extends BaseEntity {
     private boolean includePostpone;
 
 
-
+    @ApiModelProperty(value = "不冲减余量标识", name = "noDeductRemainQtyFlag")
+    @TableField(exist = false)
+    private boolean noDeductRemainQtyFlag = false;
 
 
     /**

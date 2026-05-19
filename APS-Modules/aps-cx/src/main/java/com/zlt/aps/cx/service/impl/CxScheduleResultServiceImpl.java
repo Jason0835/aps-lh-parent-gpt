@@ -98,6 +98,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     @Autowired
     private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
 
+    @Autowired
+    private FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
+
     @Override
     public List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate) {
         return cxScheduleResultMapper.selectList(new LambdaQueryWrapper<CxScheduleResult>()
@@ -306,6 +309,16 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         // Sheet 1: 成型日计划
         Map<String, Object> planTableMap = buildCxTemplateTableMap(exportList);
+
+        // 从月计划数据获取productionVersion
+        LocalDate planLocalDate = cn.hutool.core.date.DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
+        List<FactoryMonthPlanProductionFinalResult> monthPlans = monthPlanMapper.selectByYearAndMonth(
+                planLocalDate.getYear(), planLocalDate.getMonthValue());
+        String productionVersion = null;
+        if (CollectionUtils.isNotEmpty(monthPlans)) {
+            productionVersion = monthPlans.get(0).getProductionVersion();
+        }
+        planTableMap.put("version", productionVersion != null ? productionVersion : "");
         List<List<Map<String, Object>>> planDataList = new ArrayList<>();
         List<Map<String, Object>> planRows = buildCxTemplateDataList(exportList, recipeTypeMap, totalDailyPlanQtyMap, todayNightFinishQtyMap, smallGlueMap, placeholderMap, shiftCapacitiesMap, keyProductEmbryoCodes);
         planDataList.add(planRows);
@@ -774,33 +787,32 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
         // 批量查询 LH 排程结果
         List<LhScheduleResult> lhResults = lhScheduleResultMapper.selectBatchIds(allLhIds);
 
-        // lhScheduleId → totalDailyPlanQty
+        // lhScheduleId → totalDailyPlanQty（仅做ID映射，不去重）
         Map<Long, Integer> lhIdToPlanQty = new LinkedHashMap<>();
-        Set<Integer> usedQtySet = new HashSet<>();
         for (LhScheduleResult r : lhResults) {
             Integer qty = r.getTotalDailyPlanQty() != null ? r.getTotalDailyPlanQty() : 0;
-            if (qty == 0 || !usedQtySet.add(qty)) {
-                lhIdToPlanQty.put(r.getId(), 0);
-            } else {
-                lhIdToPlanQty.put(r.getId(), qty);
-            }
+            lhIdToPlanQty.put(r.getId(), qty);
         }
 
-        // 按 lhScheduleIds 原字符串汇总
+        // 按 lhScheduleIds 原字符串汇总（行内量去重）
         Map<String, BigDecimal> resultMap = new HashMap<>();
         for (CxScheduleResult item : list) {
             String ids = item.getLhScheduleIds();
             if (StringUtils.isEmpty(ids) || resultMap.containsKey(ids)) {
                 continue;
             }
-            BigDecimal sum = Arrays.stream(ids.split("[,，]"))
-                    .map(String::trim)
-                    .filter(StringUtils::isNotEmpty)
-                    .map(Long::parseLong)
-                    .map(lhIdToPlanQty::get)
-                    .filter(Objects::nonNull)
-                    .map(BigDecimal::valueOf)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            Set<Integer> rowUsedQtySet = new HashSet<>();
+            BigDecimal sum = BigDecimal.ZERO;
+            for (String idStr : ids.split("[,，]")) {
+                String trimmed = idStr.trim();
+                if (StringUtils.isEmpty(trimmed)) continue;
+                Long lhId = Long.parseLong(trimmed);
+                Integer qty = lhIdToPlanQty.get(lhId);
+                if (qty == null || qty == 0) continue;
+                if (rowUsedQtySet.add(qty)) {
+                    sum = sum.add(BigDecimal.valueOf(qty));
+                }
+            }
             resultMap.put(ids, sum);
         }
         return resultMap;
