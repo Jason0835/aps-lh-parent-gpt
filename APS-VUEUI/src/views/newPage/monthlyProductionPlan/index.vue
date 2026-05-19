@@ -24,6 +24,7 @@
           <el-button
             type="primary"
             plain
+            :disabled="adjustFlowInProgress"
             v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
             @click="handleStructureInnerAdjust"
             >{{
@@ -61,6 +62,7 @@
           >
           <el-button
             :loading="syncLoading"
+            :disabled="adjustFlowInProgress"
             v-hasPermi="['monthplan:factoryMonthPlanFinalResult:sync']"
             @click="handleIssueScmMes"
             >{{
