@@ -381,7 +381,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                     new HashMap<>(16) :
                     finishedProductStocks.stream()
                         .collect(Collectors.groupingBy(MdmProductStock::getGroupKey));
-            Map<String, Integer> monthSurplusMap = factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(createCondition.getMonthPlanVersion(),finishedProductStocks,materialInfoMap);
+
+            Map<String, Integer> monthSurplusMap = new HashMap<>();
+            if (!createCondition.isNoDeductRemainQtyFlag()){
+                monthSurplusMap = factoryMonthPlanProductionFinalResultService.calculateMonthSurplus(createCondition.getMonthPlanVersion(),finishedProductStocks,materialInfoMap);
+            }
+
             // 按优先级分离销售订单
             Map<Boolean, List<SalesOrderPool>> partitionedOrders =
                 partitionSalesOrdersByPriority(salesOrders);
