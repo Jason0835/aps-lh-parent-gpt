@@ -1035,7 +1035,7 @@ public class MpWeekRollAdjustEngine {
         machines += dayQty % dayVulcanizationQty > 0 ? 1:0;
 
         //使用前日机台数，防止前后日机台数偏差过大
-        String preDayField = FactoryConstant.DAY_FIELD+(iDay - 1);
+        String preDayField = iDay ==1 ? FactoryConstant.DAY_FIELD+iDay : FactoryConstant.DAY_FIELD+(iDay - 1);
         Integer preDayQty = (Integer)prodFinal.getFieldValueByFieldName(preDayField);
         if (preDayQty != null && preDayQty != 0){
             machines = preDayQty / dayVulcanizationQty;
