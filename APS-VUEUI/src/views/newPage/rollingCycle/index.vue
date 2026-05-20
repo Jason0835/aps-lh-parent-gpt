@@ -1766,13 +1766,23 @@ export default {
       try {
         let res = await editOutHistory(row);
         // this.$modal.msgSuccess(res.msg);
-        this.getSingleList({
+        const structureName = (
+          (this.formInline && this.formInline.structureName) ||
+          ""
+        )
+          .toString()
+          .trim();
+        const listParams = {
           factoryCode: row.factoryCode,
           year: row.year,
           month: row.month,
           version: row.version,
           productionVersion: row.productionVersion,
-        });
+        };
+        if (structureName) {
+          listParams.structureName = structureName;
+        }
+        this.getSingleList(listParams);
       } catch (err) {}
     },
 
