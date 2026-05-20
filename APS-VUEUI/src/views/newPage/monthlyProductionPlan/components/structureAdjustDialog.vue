@@ -123,7 +123,7 @@
             <el-button
               type="text"
               :disabled="scope.row._isNew && (!scope.row.structureName || scope.row.beginDay == null || scope.row.endDay == null)"
-              @click="handleSelect(scope.row)"
+              @click="handleSelect(scope.row, scope.$index)"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.btnSelect")
             }}</el-button>
@@ -441,8 +441,99 @@ export default {
         this.loading = false;
       }
     },
-    handleSelect(row) {
+    getDaysInMonth(year, month) {
+      return new Date(year, month, 0).getDate();
+    },
+
+    resolveYearMonthFromRow(row) {
+      let year = row.year != null && row.year !== "" ? Number(row.year) : NaN;
+      let month = row.month != null && row.month !== "" ? Number(row.month) : NaN;
+      if ((Number.isNaN(year) || Number.isNaN(month)) && this.yearMonth) {
+        const arr = String(this.yearMonth).trim().split("-");
+        if (arr.length >= 2) {
+          year = Number(arr[0]);
+          month = Number(arr[1]);
+        }
+      }
+      return { year, month };
+    },
+
+    /**
+     * 前结构 = 弹窗表格当前行的上一行（必须用表格行号，scope.row 与 serverRows 引用可能不一致）。
+     */
+    findPreviousStructureInMachineList(tableIndex) {
+      const list = this.tableRows;
+      if (
+        tableIndex == null ||
+        tableIndex <= 0 ||
+        tableIndex >= list.length
+      ) {
+        return null;
+      }
+      const prev = list[tableIndex - 1];
+      if (
+        !prev ||
+        prev.beginDay == null ||
+        prev.endDay == null
+      ) {
+        return null;
+      }
+      return prev;
+    },
+
+    isAdjustStartDayEmpty(value) {
+      return value == null || value === "";
+    },
+
+    /**
+     * 选择时根据弹窗表格计算调整开始/结束日（仅用于跳转页展示）：
+     * 当前行 adjustStartDay 为空且有上一行 → 上一行 endDay+1；
+     * 无前一行 → 当前行 beginDay；
+     * 调整结束日 → 当前行 endDay。
+     */
+    resolveAdjustDaysOnSelect(row, tableIndex) {
+      const beginDay = Number(row.beginDay);
+      const endDay = Number(row.endDay);
+      const adjustEndDay = endDay;
+      let adjustStartDay = beginDay;
+      let hasPreviousStructure = false;
+      let prevBeginDay = null;
+      let prevEndDay = null;
+
+      const prev = this.findPreviousStructureInMachineList(tableIndex);
+      const rowAdjustStartEmpty = this.isAdjustStartDayEmpty(row.adjustStartDay);
+
+      if (prev && rowAdjustStartEmpty) {
+        hasPreviousStructure = true;
+        prevBeginDay = Number(prev.beginDay);
+        prevEndDay = Number(prev.endDay);
+        if (!Number.isNaN(prevEndDay)) {
+          const { year, month } = this.resolveYearMonthFromRow(row);
+          const monthMax =
+            !Number.isNaN(year) && !Number.isNaN(month)
+              ? this.getDaysInMonth(year, month)
+              : MONTH_STANDARD_MAX;
+          adjustStartDay = Math.min(prevEndDay + 1, monthMax);
+        }
+      } else if (!this.isAdjustStartDayEmpty(row.adjustStartDay)) {
+        adjustStartDay = Number(row.adjustStartDay);
+      }
+
+      return {
+        hasPreviousStructure,
+        prevBeginDay,
+        prevEndDay,
+        adjustStartDay,
+        adjustEndDay,
+      };
+    },
+
+    handleSelect(row, tableIndex) {
       if (!this.yearMonth) {
+        this.$modal.msgWarning(this.$t("common.rule.select"));
+        return;
+      }
+      if (row.beginDay == null || row.endDay == null) {
         this.$modal.msgWarning(this.$t("common.rule.select"));
         return;
       }
@@ -454,15 +545,28 @@ export default {
         this.extractFirstCxMachineCode(rawSched);
       const schedFirst =
         this.extractFirstCxMachineCode(rawSched) || cxFirst;
-      /** 整行写入 sessionStorage，目标页与周程「勾选 → 单结构调整」同样使用完整 listAdjusts 行 */
+
+      const adjustContext = this.resolveAdjustDaysOnSelect(row, tableIndex);
+      const prefillRow = {
+        ...row,
+        cxMachineCode: cxFirst,
+        scheduledMachines: schedFirst,
+        productionVersion: this.resolveProductionVersionForJump(row),
+      };
       try {
         sessionStorage.setItem(
           MP_STRUCTURE_ADJUST_PREFILL_STORAGE_KEY,
-          JSON.stringify(row)
+          JSON.stringify({
+            row: prefillRow,
+            adjustContext,
+          })
         );
       } catch (e) {
         console.warn("结构行写入 sessionStorage 失败", e);
+        this.$modal.msgError(this.$t("common.msg.fail"));
+        return;
       }
+
       /** 跳转月计划结构调整页（与路由 path 一致），多机台时 query 只带第一台成型机 */
       this.$router.push({
         path: "/newPage/monthPlanStructureAdjust",
@@ -477,6 +581,14 @@ export default {
           structureName: row.structureName || "",
           beginDay: row.beginDay != null ? String(row.beginDay) : "",
           endDay: row.endDay != null ? String(row.endDay) : "",
+          adjustStartDay:
+            adjustContext.adjustStartDay != null
+              ? String(adjustContext.adjustStartDay)
+              : "",
+          adjustEndDay:
+            adjustContext.adjustEndDay != null
+              ? String(adjustContext.adjustEndDay)
+              : "",
           productionVersion: this.resolveProductionVersionForJump(row),
         },
       });
