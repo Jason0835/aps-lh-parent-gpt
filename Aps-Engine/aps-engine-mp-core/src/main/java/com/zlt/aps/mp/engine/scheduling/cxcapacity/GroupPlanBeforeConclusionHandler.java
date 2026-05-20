@@ -125,7 +125,6 @@ public class GroupPlanBeforeConclusionHandler {
         String cxMachineCode = cxMachineInfo.getCxMachineCode();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         addGroupStartBeforeConclusionLog(context, groupName, cxMachineCode);
-
         GroupConclusionInfoVo groupConclusionInfo = groupPlanConclusionHandler.getConclusionInfoByProductionInfo(productionContext, groupPlanInfo, cxMachineInfo, cxLhRatio, conclusionRange);
         if (null == groupConclusionInfo) {
             addBeforeConclusionConditionErrorInfoLog(context, groupName);
@@ -169,7 +168,7 @@ public class GroupPlanBeforeConclusionHandler {
      * @param groupPlanInfo                   分组计划
      * @param cxMachineInfo                   成型机台
      * @param allocationInfo                  成型机台分配详情
-     * @param isProductionCxMachineAllocation 是否在产机台分配阶段
+     * @param isProductionCxMachineAllocation 是否单机台分配
      */
     private void updateInfoByBeforeConclusion(TbrProductionContext productionContext, Integer minLhMachineCount, BeforeConclusionInfoHelper beforeConclusionInfo, ProductionPlanGroupInfo groupPlanInfo, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper allocationInfo, boolean isProductionCxMachineAllocation) {
         //重新计算(分组)分配的天数: 需要排产天数 - 还需排产天数 - 收尾天数

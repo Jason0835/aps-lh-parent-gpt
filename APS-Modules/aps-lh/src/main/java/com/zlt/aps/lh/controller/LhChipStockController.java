@@ -216,6 +216,19 @@ public class LhChipStockController extends AbstractDocBizController<LhChipStock>
         return AjaxResult.success();
     }
 
+    /**
+     * 增量更新芯片库存完成量
+     * 根据分厂编号+芯片编码匹配：已存在则累加完成量，不存在则新增记录
+     */
+    @ApiOperation("增量更新芯片库存完成量")
+    @PostMapping("/upsertFinishQty")
+    @ResponseBody
+    public AjaxResult upsertFinishQty(@RequestParam("factoryCode") String factoryCode,
+                                      @RequestBody List<LhChipStock> list) {
+        lhChipStockService.upsertFinishQty(factoryCode, list);
+        return AjaxResult.success();
+    }
+
     @Override
     protected List<LhChipStock> listExportData(LhChipStock obj) {
         QueryWrapper<LhChipStock> wrapper = new QueryWrapper<>();

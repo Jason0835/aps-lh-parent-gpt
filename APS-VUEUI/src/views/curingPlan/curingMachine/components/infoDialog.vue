@@ -62,6 +62,31 @@ export default {
 
       callback();
     };
+
+    const validateManufacturer = (rule, value, callback) => {
+      if (!value) {
+        return callback();
+      }
+      const strValue = String(value);
+      let chineseCount = 0;
+      let asciiCount = 0;
+
+      for (const char of strValue) {
+        if (/[\u4e00-\u9fa5]/.test(char)) {
+          chineseCount++;
+        } else {
+          asciiCount++;
+        }
+      }
+
+      if (chineseCount > 10) {
+        return callback(new Error("中文不能超过10个字符"));
+      }
+      if (asciiCount > 30) {
+        return callback(new Error("字母/数字不能超过30个字符"));
+      }
+      callback();
+    };
     return {
       loading: false,
       visible: false,
@@ -92,6 +117,12 @@ export default {
             message: this.$t("common.rule.input"),
             trigger: "change",
 
+          },
+        ],
+        manufacturer: [
+          {
+            validator: validateManufacturer,
+            trigger: ["change", "blur"],
           },
         ],
         dimension: [
@@ -195,7 +226,7 @@ export default {
         {
           label: this.$t("ui.data.column.machine.manufacturer"),
           prop: "manufacturer",
-          maxlength:50,
+          maxlength: 30,
         },
         {
           label: this.$t("ui.data.column.machine.lhMachineType"),

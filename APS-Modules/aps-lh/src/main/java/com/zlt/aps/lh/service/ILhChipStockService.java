@@ -41,4 +41,13 @@ public interface ILhChipStockService extends IDocService<LhChipStock> {
      * @param insertList  待插入的数据列表
      */
     void logicDeleteAndSaveBatch(String factoryCode, String dataSource, String updateBy, List<LhChipStock> insertList);
+
+    /**
+     * 增量更新芯片库存完成量
+     * 根据分厂编号+芯片编码匹配：已存在则累加完成量，不存在则新增记录
+     *
+     * @param factoryCode 分厂编号
+     * @param list        待更新的芯片库存列表（需设置chipCode和finishQty）
+     */
+    void upsertFinishQty(String factoryCode, List<LhChipStock> list);
 }

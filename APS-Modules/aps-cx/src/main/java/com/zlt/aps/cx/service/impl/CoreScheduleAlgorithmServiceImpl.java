@@ -377,6 +377,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 task.setConstructionStage(taskAlloc.getConstructionStage());  // 设置施工阶段
                 task.setEndingAbandoned(taskAlloc.getEndingAbandoned());  // 设置收尾是否被舍弃
                 task.setPrecisionDeducted(taskAlloc.getPrecisionDeducted());  // 设置精度扣量标记
+                task.setIsFirstTask(taskAlloc.getIsFirstTask());  // 设置是否首任务（新开规格）
+                task.setIsUrgentEnding(taskAlloc.getIsUrgentEnding());  // 设置是否紧急收尾
+                task.setIsNearEnding(taskAlloc.getIsNearEnding());  // 设置是否临近收尾
                 // 优先保留 TaskGroupService 设置的标记，仅 null 时用班次类型兜底
                 task.setIsOpeningDayTask(taskAlloc.getIsOpeningDayTask());
                 task.setIsClosingDayTask(taskAlloc.getIsClosingDayTask());
@@ -1334,10 +1337,16 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                                 mergedTask.setEmbryoCode(existingTask != null ? existingTask.getEmbryoCode() : (sprTask != null ? sprTask.getEmbryoCode() : null));
                                 mergedTask.setMaterialCode(existingTask != null ? existingTask.getMaterialCode() : (sprTask != null ? sprTask.getMaterialCode() : null));
                                 mergedTask.setIsUrgentEnding(hasUrgentEnding);
+                                mergedTask.setIsNearEnding((existingTask != null && Boolean.TRUE.equals(existingTask.getIsNearEnding()))
+                                        || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsNearEnding())));
                                 mergedTask.setIsEndingTask((existingTask != null && Boolean.TRUE.equals(existingTask.getIsEndingTask()))
                                         || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsEndingTask())));
                                 mergedTask.setIsTrialTask((existingTask != null && Boolean.TRUE.equals(existingTask.getIsTrialTask()))
                                         || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsTrialTask())));
+                                mergedTask.setIsFirstTask((existingTask != null && Boolean.TRUE.equals(existingTask.getIsFirstTask()))
+                                        || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsFirstTask())));
+                                mergedTask.setIsContinueTask((existingTask != null && Boolean.TRUE.equals(existingTask.getIsContinueTask()))
+                                        || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsContinueTask())));
                                 // ---- 合并 isOpeningDayTask：任一记录有 isOpeningDayTask=true 则保留 ----
                                 mergedTask.setIsOpeningDayTask((existingTask != null && Boolean.TRUE.equals(existingTask.getIsOpeningDayTask()))
                                         || (sprTask != null && Boolean.TRUE.equals(sprTask.getIsOpeningDayTask())));
@@ -1430,6 +1439,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         try {
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MdmSkuConstructionRef> skuQueryWrapper =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            skuQueryWrapper.select(MdmSkuConstructionRef::getMaterialCode,
+                    MdmSkuConstructionRef::getEmbryoNo,
+                    MdmSkuConstructionRef::getEmbryoType);
             skuQueryWrapper.eq(MdmSkuConstructionRef::getIsDelete, 0);
             List<MdmSkuConstructionRef> skuRefList = skuConstructionRefMapper.selectList(skuQueryWrapper);
             if (skuRefList != null) {
@@ -1632,20 +1644,29 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             boolean hasTrialOrProductionTrial = false;
             boolean hasFirstTask = false;
             boolean hasNearEnding = false;
+            log.info("开始遍历classSprMap.values()设置颜色标记: machineCode={}, embryoCode={}, materialCode={}, classSprMap.size={}",
+                    machineCode, embryoCode, materialCode, classSprMap.size());
+            int sprIndex = 0;
             for (ShiftScheduleService.ShiftProductionResult spr : classSprMap.values()) {
-                if (spr != null && spr.getSourceTask() != null) {
+                sprIndex++;
+                if (spr != null) {
                     CoreScheduleAlgorithmService.DailyEmbryoTask srcTask = spr.getSourceTask();
-                    if (Boolean.TRUE.equals(srcTask.getIsUrgentEnding())) {
-                        isUrgentEnding = true;
-                    }
-                    if (Boolean.TRUE.equals(srcTask.getIsNearEnding())) {
-                        hasNearEnding = true;
-                    }
-                    if (Boolean.TRUE.equals(srcTask.getIsTrialTask()) || Boolean.TRUE.equals(srcTask.getIsProductionTrial())) {
-                        hasTrialOrProductionTrial = true;
-                    }
-                    if (Boolean.TRUE.equals(srcTask.getIsFirstTask())) {
-                        hasFirstTask = true;
+                    if (srcTask != null) {
+                        log.info("  spr[{}] sourceTask: isFirstTask={}, isUrgentEnding={}, isNearEnding={}, isTrialTask={}, isProductionTrial={}",
+                                sprIndex, srcTask.getIsFirstTask(), srcTask.getIsUrgentEnding(), srcTask.getIsNearEnding(),
+                                srcTask.getIsTrialTask(), srcTask.getIsProductionTrial());
+                        if (Boolean.TRUE.equals(srcTask.getIsUrgentEnding())) {
+                            isUrgentEnding = true;
+                        }
+                        if (Boolean.TRUE.equals(srcTask.getIsNearEnding())) {
+                            hasNearEnding = true;
+                        }
+                        if (Boolean.TRUE.equals(srcTask.getIsTrialTask()) || Boolean.TRUE.equals(srcTask.getIsProductionTrial())) {
+                            hasTrialOrProductionTrial = true;
+                        }
+                        if (Boolean.TRUE.equals(srcTask.getIsFirstTask())) {
+                            hasFirstTask = true;
+                        }
                     }
                 }
             }
@@ -1656,12 +1677,14 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
 
             // ---- 颜色标记（前端展示用） ----
+            log.info("设置颜色标记: machineCode={}, embryoCode={}, materialCode={}, hasTrialOrProductionTrial={}, isUrgentEnding={}, hasNearEnding={}, hasFirstTask={}",
+                    machineCode, embryoCode, materialCode, hasTrialOrProductionTrial, isUrgentEnding, hasNearEnding, hasFirstTask);
             if (hasTrialOrProductionTrial) {
                 result.setColorTag("blue");
-            } else if (hasFirstTask) {
-                result.setColorTag("yellow");
             } else if (isUrgentEnding || hasNearEnding) {
                 result.setColorTag("orange");
+            } else if (hasFirstTask) {
+                result.setColorTag("yellow");
             }
 
             // ---- 示方书类型从SKU与示方书关系获取，查不到则回退constructionStage ----

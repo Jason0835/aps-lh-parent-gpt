@@ -52,32 +52,32 @@ public class CxMouldProductionHandler {
         TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionPlanGroupInfo productionPlanInfo = productionPlan.getProductionPlanInfo();
         String groupName = productionPlanInfo.getGroupName();
-        log.info(TbrMouldProductionLogRecorder.addStartCxMachineMouldProductionPlanLog(context, cxMachineCode, groupName));
+        TbrMouldProductionLogRecorder.addStartCxMachineMouldProductionPlanLog(context, cxMachineCode, groupName);
         List<MonthPlanProductionRequirePlanVo> groupPlanData = productionPlanInfo.getGroupPlanData();
         List<MonthPlanProductionRequirePlanVo> hasProductionPlanList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProduction()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(hasProductionPlanList)) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldNoPlanLog(context, groupName, cxMachineCode));
+            TbrMouldProductionLogRecorder.addGroupCxMachineMouldNoPlanLog(context, groupName, cxMachineCode);
             return;
         }
         CxMachineBaseInfoVo cxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo().get(cxMachineCode);
         if (null == cxMachineInfo) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldNoFindMachineInfoLog(context, groupName, cxMachineCode));
+            TbrMouldProductionLogRecorder.addGroupCxMachineMouldNoFindMachineInfoLog(context, groupName, cxMachineCode);
             return;
         }
         //根据新的分组计划，构建新的硫化配比
         Map<String, MonthPlanStructureLhRatioVo> cxMachineLhRationMap = productionPlanInfo.getCxMachineLhRationMap();
         if (CollectionUtils.isEmpty(cxMachineLhRationMap)) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldGroupNoRatioLog(context, groupName, cxMachineCode));
+            TbrMouldProductionLogRecorder.addGroupCxMachineMouldGroupNoRatioLog(context, groupName, cxMachineCode);
             return;
         }
         String machineTypeCode = cxMachineInfo.getCxMachineTypeCode();
         MonthPlanStructureLhRatioVo cxLhRatio = productionPlanInfo.getLhRatio(cxMachineInfo);
         if (null == cxLhRatio) {
             //记录日志
-            log.info(TbrMouldProductionLogRecorder.addGroupCxMachineMouldGroupNoBrandRatioLog(context, groupName, cxMachineCode, machineTypeCode));
+            TbrMouldProductionLogRecorder.addGroupCxMachineMouldGroupNoBrandRatioLog(context, groupName, cxMachineCode, machineTypeCode);
             return;
         }
         cxMachineInfo.setRatio(cxLhRatio.getLhMachineMaxQty());

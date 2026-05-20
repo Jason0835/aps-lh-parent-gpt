@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
@@ -15,6 +16,7 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.vo.AdjustStructureOrderVo;
 import com.zlt.aps.mp.engine.adjust.AdjustStructureOrderSorter;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
@@ -137,6 +139,9 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.orderAdjustRecordNotFound"),
                     contextDTO.getMpYear(),contextDTO.getMpMonth()));
         }
+        //检查是否已执行自动调整
+        //checkHasDoAutoAdjust(contextDTO);
+
         String lastMonthPlanVersion = contextDTO.getMpAdjustStructureInList().get(0).getLastMonthPlanVersion();
         //2.按结构序列化分组
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap =  convertToMap(contextDTO.getFactoryMonthPlanProdFinalList());
@@ -228,6 +233,21 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         contextDTO.setSaveAdjustProcLogList(newMpLogList);
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsResultList);
         contextDTO.setAdjustMonthPlanVersion(lastMonthPlanVersion);
+    }
+
+    /**
+     * 检查是否已执行自动调整
+     * @param contextDTO
+     */
+    private void checkHasDoAutoAdjust(MpRollAdjustContextDTO contextDTO) {
+        LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MpAdjustResult::getFactoryCode, contextDTO.getFactoryCode());
+        queryWrapper.eq(MpAdjustResult::getVersion, contextDTO.getVersion());
+        List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
+        if (PubUtil.isNotEmpty(mpAdjustResultList)){
+            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.findAutoAdjustRecord"),
+                    contextDTO.getVersion()));
+        }
     }
 
     /**

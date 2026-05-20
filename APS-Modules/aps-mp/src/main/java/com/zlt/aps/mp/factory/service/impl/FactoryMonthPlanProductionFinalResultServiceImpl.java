@@ -995,7 +995,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 BeanUtil.copyProperties(entry.getValue(), adjustVo);
             }
             MpAdjustResult value = entry.getValue();
-            String defaultVersion = StringUtils.defaultIfBlank(value.getLastMonthPlanVersion(), value.getMonthPlanVersion());
+            String defaultVersion = StringUtils.defaultIfBlank(value.getLastMonthPlanVersion(), value.getLastMonthPlanVersion());
             fillDemandQty(adjustVo, demandPlanSumMap.get(this.buildDemandPlanSumMapKey(defaultVersion, entry.getValue().getMaterialCode())));
             // 日硫化量固定*2
             /*int dayVulcanizationQty = adjustVo.getDayVulcanizationQty() == null ? 0 : adjustVo.getDayVulcanizationQty();

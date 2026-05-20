@@ -5,9 +5,11 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.RowStateEnum;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.lh.api.domain.entity.LhChipStock;
 import com.zlt.aps.lh.mapper.LhChipStockMapper;
@@ -24,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 芯片库存 Service实现
@@ -269,5 +272,62 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
             }
         }
         log.info("芯片库存同步-事务完成：分厂{}，插入数量={}", factoryCode, CollectionUtils.size(insertList));
+    }
+
+    /**
+     * 增量更新芯片库存完成量
+     * 根据分厂编号+芯片编码匹配：已存在则累加完成量，不存在则新增记录
+     *
+     * @param factoryCode 分厂编号
+     * @param list        待更新的芯片库存列表（需设置chipCode和finishQty）
+     */
+    @Override
+    public void upsertFinishQty(String factoryCode, List<LhChipStock> list) {
+        if (CollectionUtils.isEmpty(list)) {
+            return;
+        }
+        List<String> chipCodes = list.stream()
+                .map(LhChipStock::getChipCode)
+                .filter(StringUtil::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(chipCodes)) {
+            return;
+        }
+        LambdaQueryWrapper<LhChipStock> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(LhChipStock::getFactoryCode, factoryCode);
+        queryWrapper.in(LhChipStock::getChipCode, chipCodes);
+        List<LhChipStock> existingList = lhChipStockMapper.selectList(queryWrapper);
+        Map<String, LhChipStock> existingMap = existingList.stream()
+                .collect(Collectors.toMap(LhChipStock::getChipCode, e -> e, (v1, v2) -> v1));
+
+        List<LhChipStock> insertList = new ArrayList<>();
+        for (LhChipStock item : list) {
+            if (StringUtil.isBlank(item.getChipCode())) {
+                continue;
+            }
+            LhChipStock existing = existingMap.get(item.getChipCode());
+            if (existing != null) {
+                int newFinishQty = (existing.getFinishQty() != null ? existing.getFinishQty() : 0)
+                        + (item.getFinishQty() != null ? item.getFinishQty() : 0);
+                existing.setFinishQty(newFinishQty);
+                lhChipStockMapper.updateById(existing);
+                log.info("芯片库存增量更新：分厂={}, 芯片编码={}, 累加完成量={}, 更新后完成量={}",
+                        factoryCode, item.getChipCode(), item.getFinishQty(), newFinishQty);
+            } else {
+                item.setFactoryCode(factoryCode);
+                item.setDataSource(ApsConstant.DATA_SOURCE_MES);
+                item.setCreateBy("MES");
+                item.setUpdateBy("MES");
+                item.setCreateTime(DateUtils.getNowDate());
+                item.setUpdateTime(DateUtils.getNowDate());
+                insertList.add(item);
+                log.info("芯片库存新增：分厂={}, 芯片编码={}, 完成量={}", factoryCode, item.getChipCode(), item.getFinishQty());
+            }
+        }
+        if (CollectionUtils.isNotEmpty(insertList)) {
+            baseDao.saveBatch(insertList);
+            log.info("芯片库存增量更新-批量插入完成：分厂={}, 新增数量={}", factoryCode, insertList.size());
+        }
     }
 }

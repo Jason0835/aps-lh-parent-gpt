@@ -543,6 +543,16 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("补充延误物料任务失败，继续执行：{}", e.getMessage());
             }
 
+            // 16.6 补充加载延误物料的物料信息
+            // 补充延误物料后，lhScheduleResults中可能新增了materialCode，
+            // 但loadMaterials已经在步骤4执行完毕，context.getMaterials()中不包含这些延误物料的信息
+            // 需要补充加载，否则校验会报"物料在T_MDM_MATERIAL_INFO中没有配置"
+            try {
+                supplementDelayMaterialInfo(context);
+            } catch (Exception e) {
+                log.warn("补充延误物料信息失败，继续执行：{}", e.getMessage());
+            }
+
             // 17. 过滤已收尾物料（成型余量<=0的物料不参与排程）
             try {
                 filterCompletedMaterials(context);
@@ -2017,6 +2027,74 @@ public class ScheduleServiceImpl implements ScheduleService {
         }
 
         log.info("延误物料补充完成：成功补充 {} 个，未找到历史记录 {} 个", supplemented, notFound);
+    }
+
+    /**
+     * 补充加载延误物料的物料信息
+     *
+     * <p>supplementDelayMaterialTasks 会往 lhScheduleResults 中新增延误物料记录，
+     * 但 loadMaterials 在补充之前已执行完毕，context.getMaterials() 中不包含这些延误物料。
+     * 本方法查找新增的 materialCode，从 T_MDM_MATERIAL_INFO 补充加载到 context.getMaterials() 中，
+     * 避免校验报"物料在T_MDM_MATERIAL_INFO中没有配置"。
+     */
+    private void supplementDelayMaterialInfo(ScheduleContextVo context) {
+        List<LhScheduleResult> lhScheduleResults = context.getLhScheduleResults();
+        List<MdmMaterialInfo> materials = context.getMaterials();
+
+        if (lhScheduleResults == null || lhScheduleResults.isEmpty()) {
+            return;
+        }
+
+        // 已加载的物料编码集合
+        Set<String> loadedMaterialCodes = new HashSet<>();
+        if (materials != null) {
+            for (MdmMaterialInfo m : materials) {
+                if (m.getMaterialCode() != null) {
+                    loadedMaterialCodes.add(m.getMaterialCode());
+                }
+            }
+        }
+
+        // 找出硫化任务中未加载的物料编码
+        Set<String> missingMaterialCodes = new HashSet<>();
+        for (LhScheduleResult lh : lhScheduleResults) {
+            String mc = lh.getMaterialCode();
+            if (mc != null && !loadedMaterialCodes.contains(mc)) {
+                missingMaterialCodes.add(mc);
+            }
+        }
+
+        if (missingMaterialCodes.isEmpty()) {
+            return;
+        }
+
+        log.info("补充加载 {} 个延误物料的物料信息：{}", missingMaterialCodes.size(), missingMaterialCodes);
+
+        // 从 T_MDM_MATERIAL_INFO 查询缺失的物料
+        List<MdmMaterialInfo> supplementMaterials = materialInfoMapper.selectList(
+                new LambdaQueryWrapper<MdmMaterialInfo>()
+                        .in(MdmMaterialInfo::getMaterialCode, missingMaterialCodes)
+                        .eq(MdmMaterialInfo::getIsDelete, "0"));
+
+        if (supplementMaterials != null && !supplementMaterials.isEmpty()) {
+            if (materials == null) {
+                materials = new ArrayList<>();
+                context.setMaterials(materials);
+            }
+            materials.addAll(supplementMaterials);
+            log.info("成功补充加载 {} 条物料信息", supplementMaterials.size());
+        }
+
+        // 仍然缺失的物料（T_MDM_MATERIAL_INFO 中确实没有）
+        Set<String> stillMissing = new HashSet<>(missingMaterialCodes);
+        if (supplementMaterials != null) {
+            for (MdmMaterialInfo m : supplementMaterials) {
+                stillMissing.remove(m.getMaterialCode());
+            }
+        }
+        if (!stillMissing.isEmpty()) {
+            log.warn("以下延误物料在 T_MDM_MATERIAL_INFO 表中不存在：{}", stillMissing);
+        }
     }
 
     /**

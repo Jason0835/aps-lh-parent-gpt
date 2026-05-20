@@ -117,10 +117,10 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
         if (pageSize == null) {
             pageSize = 10;
         }
-        PageHelper.startPage(pageNum, pageSize, "create_time desc, id desc");
         QueryWrapper<MdmMaterialInfo> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, productInfo);
         this.filterByMonthPlanFinal(wrapper, productInfo);
+        PageHelper.startPage(pageNum, pageSize, "create_time desc, id desc");
         List<MdmMaterialInfo> list = iproductInfoService.selectList(wrapper);
         this.setSkuConstructionRefField(productInfo, list);
         this.clearPage();

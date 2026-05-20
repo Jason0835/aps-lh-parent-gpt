@@ -23,7 +23,13 @@ import java.util.List;
  */
 @Mapper
 public interface MpFactoryProductionVersionMapper extends CommBaseMapper<MpFactoryProductionVersion> {
-
+    /**
+     * 判断对应排产版本是否定稿版本
+     * 0 不是定稿版本 >0 定稿版本
+     * @param factoryProductionParam
+     * @return
+     */
+    int isFinalVersion(FactoryProductionParamVo factoryProductionParam);
     /**
      * 根据分厂、年份、月份。需求版本，排产版本，删除对应的排产版本计划
      * t_mp_proc_version

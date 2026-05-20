@@ -2,6 +2,18 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper">
 
+    <select id="isFinalVersion" parameterType="com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo" resultType="java.lang.Integer">
+        SELECT COUNT(ID)
+          FROM t_mp_proc_version
+         WHERE IFNULL(IS_DELETE, 0) = 0
+           AND IS_FINAL = 1
+           AND FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND YEAR = #{year,jdbcType=DECIMAL}
+           AND MONTH = #{month,jdbcType=DECIMAL}
+           AND MONTH_PLAN_VERSION = #{monthPlanVersion,jdbcType=VARCHAR}
+           AND PRODUCTION_VERSION = #{productionVersion,jdbcType=VARCHAR};
+    </select>
+
     <delete id="deletedByProductionVersion" parameterType="com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo">
         DELETE FROM t_mp_proc_version
          WHERE FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}

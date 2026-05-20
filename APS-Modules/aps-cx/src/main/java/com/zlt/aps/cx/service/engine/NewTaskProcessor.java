@@ -263,6 +263,9 @@ public class NewTaskProcessor {
                     taskAlloc.setIsOpeningDayTask(task.getIsOpeningDayTask());
                     taskAlloc.setIsClosingDayTask(task.getIsClosingDayTask());
                     taskAlloc.setConstructionStage(task.getConstructionStage());
+                    taskAlloc.setIsFirstTask(task.getIsFirstTask());  // 传递是否首任务（新开规格）
+                    taskAlloc.setIsUrgentEnding(task.getIsUrgentEnding());  // 传递是否紧急收尾
+                    taskAlloc.setIsNearEnding(task.getIsNearEnding());  // 传递是否临近收尾
 
                     result.getTaskAllocations().add(taskAlloc);
                 }

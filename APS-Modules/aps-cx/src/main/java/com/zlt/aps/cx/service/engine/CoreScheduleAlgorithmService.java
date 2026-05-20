@@ -253,6 +253,12 @@ public interface CoreScheduleAlgorithmService {
         private Boolean precisionDeducted;
         /** 施工阶段（00 无工艺 01 试制 02 量试 03 正式），来自硫化任务 */
         private String constructionStage;
+        /** 是否首任务（新开规格：非续作、非试制、非量试） */
+        private Boolean isFirstTask;
+        /** 是否紧急收尾（3天内收尾或成型余量<=阈值） */
+        private Boolean isUrgentEnding;
+        /** 是否临近收尾（10天内收尾） */
+        private Boolean isNearEnding;
     }
 
     /**
