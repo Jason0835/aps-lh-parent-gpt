@@ -76,7 +76,7 @@ import java.util.stream.Collectors;
  * <p>列表占位符清单：</p>
  * <ul>
  *   <li>{.rubberTypeName} - 胶种名称</li>
- *   <li>{.specPattern} - 规格+花纹</li>
+ *   <li>{.specPattern} - 规格+花纹（按示方类型分组，每组前加标题前缀，如"正规 Chinh quy：规格 花纹"）</li>
  * </ul>
  *
  * @author APS Team
@@ -488,6 +488,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      *   <li>匹配本次成型排程结果中的胎胚</li>
      *   <li>通过胎胚编号关联物料主数据取规格+花纹</li>
      *   <li>按胶种分组，同规格多花纹用"/"隔开，不同规格用","隔开</li>
+     *   <li>按示方类型（正规/量试/试制）分组，每组规格花纹前加标题前缀，不同组用换行隔开</li>
      * </ol>
      *
      * @param scheduleDate 排程日期
@@ -525,6 +526,10 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             dataList.add(smallRubberList);
             return dataList;
         }
+
+        // 构建胎胚→示方类型映射（基于成型排程结果3/4/5班次的示方书类型）
+        Map<String, String> embryoRecipeTypeMap = buildEmbryoRecipeTypeMap(cxResults);
+        log.info("胎胚示方类型映射构建完成, 映射数量: {}", embryoRecipeTypeMap.size());
 
         // 按胶种类型查询对应的胎胚，构建胶种→胎胚映射
         Map<String, Set<String>> rubberTypeEmbryoMap = new LinkedHashMap<>();
@@ -580,38 +585,63 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 continue;
             }
 
-            Map<String, Set<String>> specPatternMap = new LinkedHashMap<>();
+            // 按示方类型分组胎胚代码
+            Map<String, Set<String>> recipeTypeEmbryoGroupMap = new LinkedHashMap<>();
             for (String embryoCode : scheduledEmbryos) {
-                List<MdmMaterialInfo> materialInfoList = materialInfoMap.get(embryoCode);
-                if (materialInfoList == null || materialInfoList.isEmpty()) {
-                    log.warn("胎胚代码[{}]未找到物料主数据", embryoCode);
-                    continue;
-                }
-                for (MdmMaterialInfo materialInfo : materialInfoList) {
-                    String spec = StringUtils.defaultString(materialInfo.getSpecifications()).trim();
-                    String pattern = StringUtils.defaultString(materialInfo.getPattern()).trim();
-                    if (StringUtils.isBlank(spec)) {
-                        continue;
-                    }
-                    specPatternMap.computeIfAbsent(spec, k -> new LinkedHashSet<>());
-                    if (StringUtils.isNotBlank(pattern)) {
-                        specPatternMap.get(spec).add(pattern);
-                    }
-                }
+                String recipeType = embryoRecipeTypeMap.getOrDefault(embryoCode, "S");
+                recipeTypeEmbryoGroupMap.computeIfAbsent(recipeType, k -> new LinkedHashSet<>()).add(embryoCode);
             }
 
-            List<String> specParts = new ArrayList<>();
-            for (Map.Entry<String, Set<String>> entry : specPatternMap.entrySet()) {
-                StringBuilder sb = new StringBuilder(entry.getKey());
-                if (!entry.getValue().isEmpty()) {
-                    sb.append(" ").append(String.join("/", entry.getValue()));
+            // 按示方类型顺序构建规格花纹字符串：正规 → 量试 → 试制
+            List<String> recipeTypeOrder = Arrays.asList("S", "T", "X");
+            List<String> groupParts = new ArrayList<>();
+
+            for (String recipeType : recipeTypeOrder) {
+                Set<String> embryosForType = recipeTypeEmbryoGroupMap.get(recipeType);
+                if (embryosForType == null || embryosForType.isEmpty()) {
+                    continue;
                 }
-                specParts.add(sb.toString());
+
+                Map<String, Set<String>> specPatternMap = new LinkedHashMap<>();
+                for (String embryoCode : embryosForType) {
+                    List<MdmMaterialInfo> materialInfoList = materialInfoMap.get(embryoCode);
+                    if (materialInfoList == null || materialInfoList.isEmpty()) {
+                        log.warn("胎胚代码[{}]未找到物料主数据", embryoCode);
+                        continue;
+                    }
+                    for (MdmMaterialInfo materialInfo : materialInfoList) {
+                        String spec = StringUtils.defaultString(materialInfo.getSpecifications()).trim();
+                        String pattern = StringUtils.defaultString(materialInfo.getPattern()).trim();
+                        if (StringUtils.isBlank(spec)) {
+                            continue;
+                        }
+                        specPatternMap.computeIfAbsent(spec, k -> new LinkedHashSet<>());
+                        if (StringUtils.isNotBlank(pattern)) {
+                            specPatternMap.get(spec).add(pattern);
+                        }
+                    }
+                }
+
+                if (specPatternMap.isEmpty()) {
+                    continue;
+                }
+
+                List<String> specParts = new ArrayList<>();
+                for (Map.Entry<String, Set<String>> entry : specPatternMap.entrySet()) {
+                    StringBuilder sb = new StringBuilder(entry.getKey());
+                    if (!entry.getValue().isEmpty()) {
+                        sb.append(" ").append(String.join("/", entry.getValue()));
+                    }
+                    specParts.add(sb.toString());
+                }
+
+                String title = getRecipeTypeTitle(recipeType);
+                groupParts.add(title + String.join(",", specParts));
             }
 
             Map<String, Object> item = new HashMap<>();
             item.put("rubberTypeName", rubberType);
-            item.put("specPattern", String.join(",", specParts));
+            item.put("specPattern", String.join("\n", groupParts));
             item.put("height", 30);
             smallRubberList.add(item);
         }
@@ -663,6 +693,93 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         return nvl(result.getClass3PlanQty()).compareTo(BigDecimal.ZERO) > 0
                 || nvl(result.getClass4PlanQty()).compareTo(BigDecimal.ZERO) > 0
                 || nvl(result.getClass5PlanQty()).compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    /**
+     * 构建胎胚→示方类型映射
+     *
+     * <p>根据成型排程结果的3/4/5班次示方书类型确定每个胎胚的示方类型。
+     * 优先级：X（试制）> T（量试）> S（正规），即如果同一胎胚在不同班次有不同示方类型，
+     * 取优先级最高的示方类型。</p>
+     *
+     * @param cxResults 成型排程结果列表
+     * @return 胎胚代码→示方类型编码映射（S-正规，T-量试，X-试制）
+     */
+    private Map<String, String> buildEmbryoRecipeTypeMap(List<CxScheduleResult> cxResults) {
+        Map<String, String> embryoRecipeTypeMap = new HashMap<>();
+        for (CxScheduleResult result : cxResults) {
+            if (!hasAnyPlanQtyInShift345(result)) {
+                continue;
+            }
+            String embryoCode = result.getEmbryoCode();
+            if (StringUtils.isBlank(embryoCode)) {
+                continue;
+            }
+
+            // 收集3/4/5班次中有计划量的班次对应的示方书类型
+            Set<String> recipeTypes = new HashSet<>();
+            if (nvl(result.getClass3PlanQty()).compareTo(BigDecimal.ZERO) > 0) {
+                recipeTypes.add(StringUtils.defaultString(result.getClass3RecipeType()));
+            }
+            if (nvl(result.getClass4PlanQty()).compareTo(BigDecimal.ZERO) > 0) {
+                recipeTypes.add(StringUtils.defaultString(result.getClass4RecipeType()));
+            }
+            if (nvl(result.getClass5PlanQty()).compareTo(BigDecimal.ZERO) > 0) {
+                recipeTypes.add(StringUtils.defaultString(result.getClass5RecipeType()));
+            }
+
+            // 确定示方类型优先级：X（试制）> T（量试）> S（正规）
+            String determinedType = "S";
+            if (recipeTypes.contains("X")) {
+                determinedType = "X";
+            } else if (recipeTypes.contains("T")) {
+                determinedType = "T";
+            }
+
+            // 同一胎胚可能有多条排程结果记录（不同机台），保留优先级最高的示方类型
+            String existingType = embryoRecipeTypeMap.get(embryoCode);
+            if (existingType == null || getRecipeTypePriority(determinedType) < getRecipeTypePriority(existingType)) {
+                embryoRecipeTypeMap.put(embryoCode, determinedType);
+            }
+        }
+        return embryoRecipeTypeMap;
+    }
+
+    /**
+     * 获取示方类型优先级（数值越小优先级越高）
+     *
+     * @param recipeType 示方类型编码
+     * @return 优先级数值
+     */
+    private int getRecipeTypePriority(String recipeType) {
+        switch (StringUtils.defaultString(recipeType)) {
+            case "X": return 1;
+            case "T": return 2;
+            case "S": return 3;
+            default: return 4;
+        }
+    }
+
+    /**
+     * 根据示方类型编码获取导出标题文本
+     *
+     * <p>示方类型与标题的对应关系：</p>
+     * <ul>
+     *   <li>S（正规）→ "正规 Chinh quy："</li>
+     *   <li>T（量试）→ "量试 Thi nghiem s5 luong："</li>
+     *   <li>X（试制）→ "试制 Thử sản xuất："</li>
+     * </ul>
+     *
+     * @param recipeType 示方类型编码（S-正规，T-量试，X-试制）
+     * @return 标题文本
+     */
+    private String getRecipeTypeTitle(String recipeType) {
+        switch (StringUtils.defaultString(recipeType)) {
+            case "S": return "正规 Chinh quy：";
+            case "T": return "量试 Thi nghiem s5 luong：";
+            case "X": return "试制 Thử sản xuất：";
+            default: return "正规 Chinh quy：";
+        }
     }
 
     /**
