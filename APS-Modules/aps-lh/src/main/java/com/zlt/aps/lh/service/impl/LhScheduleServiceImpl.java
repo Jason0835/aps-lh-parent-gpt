@@ -427,8 +427,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 调量后同步汇总计划量，并回置为未发布状态，确保后续重新发布
         ShiftFieldUtil.syncDailyPlanQty(record);
-        // 发布状态是已发布的话，需要更新为待发布
-        if (ReleaseStatusEnum.RELEASED.getCode().equals(record.getIsRelease())) {
+        // 发布状态不是未发布的话，需要更新为待发布
+        if (!ReleaseStatusEnum.NOT_RELEASED.getCode().equals(record.getIsRelease())) {
             record.setIsRelease(ReleaseStatusEnum.PENDING_RELEASE.getCode());
         }
 
