@@ -603,6 +603,20 @@ export default {
     isStructureAdjustPage() {
       return this.pageVariant === "structureAdjust";
     },
+    /**
+     * 月计划结构内/结构调整独立页：版本号查询绑定 version（与 mpAdjustStructureIn/Out getVersionList 一致）；
+     * 周程原结构调整 Tab 仍为 productionVersion。
+     */
+    versionSearchProp() {
+      if (this.isStructureInnerPage || this.isStructureAdjustPage) {
+        return "version";
+      }
+      return this.activeName === "second" ? "productionVersion" : "version";
+    },
+    /** 结构内/结构调整独立页版本号不可清空，与结构内默认逻辑一致 */
+    versionSelectClearable() {
+      return !(this.isStructureInnerPage || this.isStructureAdjustPage);
+    },
     columns() {
       if (!this.show) {
         return [];
@@ -1225,11 +1239,10 @@ export default {
         });
       }
       list.push({
-        prop:
-          this.activeName == "second" ? "productionVersion" : "version",
+        prop: this.versionSearchProp,
         label: this.$t("版本号"),
         type: "select",
-        clearable: this.activeName == "first" ? false : true,
+        clearable: this.versionSelectClearable,
         filterable: true,
         dictData: this.versionList,
         listeners: {
@@ -1771,25 +1784,14 @@ export default {
       }
     },
     handleVersionChange(val) {
-      if (this.activeName == "second") {
-        this.search = {
-          ...this.search,
-          productionVersion: val,
-        };
-        this.query = {
-          ...this.search,
-          productionVersion: val,
-        };
-      } else {
-        this.search = {
-          ...this.search,
-          version: val,
-        };
-        this.query = {
-          ...this.search,
-          version: val,
-        };
-      }
+      const prop = this.versionSearchProp;
+      this.search = {
+        ...this.search,
+        [prop]: val,
+      };
+      this.query = {
+        ...this.search,
+      };
     },
 
     handleYearMonthChange(val) {
@@ -1828,6 +1830,40 @@ export default {
 
       this.getVersionList();
     },
+    /**
+     * 结构内/结构调整版本号默认值：接口列表首项；isNewVersion 强制首项；
+     * 若 query.version 仍在列表中则保留（与结构内调整一致）。
+     */
+    applyAdjustVersionDefault(list, isNewVersion = false) {
+      if (!list || list.length === 0) {
+        return;
+      }
+      if (isNewVersion) {
+        this.$set(this.search, "version", list[0].value);
+        this.$set(this.query, "version", list[0].value);
+        return;
+      }
+      if (this.query.version) {
+        const hasVersion = list.some(
+          (item) => item.value == this.query.version
+        );
+        if (hasVersion) {
+          this.$set(this.search, "version", this.query.version);
+          this.$set(this.query, "version", this.query.version);
+          return;
+        }
+      }
+      this.$set(this.search, "version", list[0].value);
+      this.$set(this.query, "version", list[0].value);
+    },
+    clearVersionSearchFields() {
+      this.$set(this.search, "version", "");
+      this.$set(this.query, "version", "");
+      this.$set(this.search, "adjVersion", "");
+      this.$set(this.query, "adjVersion", "");
+      this.$set(this.search, "productionVersion", "");
+      this.$set(this.query, "productionVersion", "");
+    },
     //获取版本列表
     async getVersionList(isGet = false, isNewVersion = false) {
       this.loading = true;
@@ -1836,7 +1872,11 @@ export default {
         if (this.activeName == "first") {
           res = await versionAdjust(this.formatParams());
         } else if (this.activeName == "second") {
-          res = await versionStructure(this.formatParams());
+          if (this.isStructureAdjustPage) {
+            res = await versionOutHistory(this.formatParams());
+          } else {
+            res = await versionStructure(this.formatParams());
+          }
         } else if (this.activeName == "three") {
           if (!this.isTabChange) return;
           res = await resultVersion(this.formatParams());
@@ -1849,63 +1889,33 @@ export default {
           return;
         }
 
+        const useProductionVersionField =
+          this.activeName == "second" && !this.isStructureAdjustPage;
         let list = [];
         for (let i = 0; i < res.rows.length; i++) {
-          let obj = {
-            label:
-              this.activeName == "second"
-                ? res.rows[i].productionVersion
-                : res.rows[i].version,
-            value:
-              this.activeName == "second"
-                ? res.rows[i].productionVersion
-                : res.rows[i].version,
-          };
-          list.push(obj);
+          const raw = useProductionVersionField
+            ? res.rows[i].productionVersion
+            : res.rows[i].version;
+          if (raw == null || String(raw).trim() === "") {
+            continue;
+          }
+          list.push({
+            label: raw,
+            value: raw,
+          });
         }
 
         this.versionList = list;
 
         if (list.length > 0) {
-          if (this.activeName == "second") {
+          if (useProductionVersionField) {
             this.$set(this.search, "productionVersion", list[0].value);
             this.$set(this.query, "productionVersion", list[0].value);
           } else {
-            if (isNewVersion) {
-              this.$set(this.search, "version", list[0].value);
-              this.$set(this.query, "version", list[0].value);
-              return;
-            }
-            if (this.query.version) {
-              let hasVersion = list.some(
-                (item) => item.value == this.query.version
-              );
-              if (hasVersion) {
-                this.$set(this.search, "version", this.query.version);
-                this.$set(this.query, "version", this.query.version);
-                return;
-              }
-            }
-            this.$set(this.search, "version", list[0].value);
-            this.$set(this.query, "version", list[0].value);
+            this.applyAdjustVersionDefault(list, isNewVersion);
           }
         } else {
-          this.$set(this.search, "version", "");
-          this.$set(this.query, "version", "");
-          this.$set(this.search, "adjVersion", "");
-          this.$set(this.query, "adjVersion", "");
-          this.$set(this.search, "productionVersion", "");
-          this.$set(this.query, "productionVersion", "");
-          // if (this.activeName != "second") {
-          //   this.$set(this.search, "version", "");
-          //   this.$set(this.query, "version", "");
-          // } else if (this.activeName == "four") {
-          //   this.$set(this.search, "adjVersion", "");
-          //   this.$set(this.query, "adjVersion", "");
-          // } else {
-          //   this.$set(this.search, "productionVersion", "");
-          //   this.$set(this.query, "productionVersion", "");
-          // }
+          this.clearVersionSearchFields();
         }
       } catch (err) {
         console.log(err);
@@ -1941,18 +1951,14 @@ export default {
         }
 
         this.versionList = list;
-        // if (list.length > 0) {
-        //   this.$set(this.search, "version", list[0].value);
-        //   this.$set(this.query, "version", list[0].value);
-        // } else {
-        //   this.$set(this.search, "version", "");
-        //   this.$set(this.query, "version", "");
-        // }
-        if (isGet) {
-          await this.getOutHistoryList();
+        if (list.length > 0) {
+          this.applyAdjustVersionDefault(list, false);
         } else {
           this.$set(this.search, "version", "");
           this.$set(this.query, "version", "");
+        }
+        if (isGet) {
+          await this.getOutHistoryList();
         }
       } catch (err) {
         console.log(err);
@@ -2292,8 +2298,7 @@ export default {
           if (structureName) {
             queryExtra.structureName = structureName;
           }
-          const versionProp =
-            this.activeName === "second" ? "productionVersion" : "version";
+          const versionProp = this.versionSearchProp;
           const versionVal = this.search[versionProp] ?? this.query[versionProp];
           if (
             versionVal != null &&
@@ -3325,7 +3330,7 @@ export default {
         yearMonth: q.yearMonth || this.search.yearMonth,
         scheduledMachines: q.scheduledMachines || q.cxMachineCode || "",
         structureName: q.structureName || "",
-        /** 与周程结构调整 Tab getVersionList 写入 query 一致，保证 getOutList 的 ...this.query 带定稿版本 */
+        /** 月计划弹窗路由可能带 productionVersion；单结构流程仍用 formInline，列表查询版本由 getVersionList 写入 version */
         productionVersion: qPv,
       };
       this.query = { ...this.search };
