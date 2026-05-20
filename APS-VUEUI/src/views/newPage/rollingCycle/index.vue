@@ -569,9 +569,6 @@ export default {
       actionDate: {},
       /** 从月计划调整查询「选择」进入，用于取消时清理路由参数 */
       monthPlanFromFinalSelect: false,
-      /** 结构内调整页默认拉单防重入 */
-      _structureInnerInitPending: false,
-      _structureInnerRouteStamp: "",
 
       syncLoading: false,
       /** 下发 SCM/MES 弹窗（与月计划调整查询页同源接口；弹窗年月独立按 backup-legacy 默认下月初始化） */
@@ -1216,6 +1213,20 @@ export default {
           dictData: this.structureList,
           filterable: true,
         })
+      }
+      /** 结构调整页：查询区展示成型机台、产品结构（与单选结构 listOutHistory 入参一致） */
+      if (this.isStructureAdjustPage) {
+        list.push({
+          prop: "scheduledMachines",
+          label: this.$t("ui.data.column.monthPlanStructureAdjust.cxMachineCode"),
+        });
+        list.push({
+          prop: "structureName",
+          label: this.$t("产品结构"),
+          type: "select",
+          dictData: this.structureList,
+          filterable: true,
+        });
       }
       list.push({
         prop:
@@ -1942,9 +1953,7 @@ export default {
         //   this.$set(this.query, "version", "");
         // }
         if (isGet) {
-          this.$nextTick(() => {
-            this.getOutHistoryList();
-          });
+          await this.getOutHistoryList();
         } else {
           this.$set(this.search, "version", "");
           this.$set(this.query, "version", "");
@@ -2039,50 +2048,7 @@ export default {
       }
     },
     /**
-     * 结构内调整独立页：从路由同步工厂/年月/版本号到查询区
-     */
-    applyStructureInnerRouteQuery() {
-      const rq = this.$route.query || {};
-      const next = { ...this.search };
-      if (rq.yearMonth != null && String(rq.yearMonth).trim() !== "") {
-        const normalized = this.formatYearMonthForPicker(
-          String(rq.yearMonth).trim()
-        );
-        if (normalized) {
-          next.yearMonth = normalized;
-        }
-      }
-      if (rq.factoryCode != null && String(rq.factoryCode).trim() !== "") {
-        next.factoryCode = String(rq.factoryCode).trim();
-      }
-      if (rq.version != null && String(rq.version).trim() !== "") {
-        next.version = String(rq.version).trim();
-      }
-      this.search = next;
-      this.query = { ...next };
-    },
-    /**
-     * 结构内调整独立页初始化：先加载版本号下拉并回显，再默认获取调整订单
-     */
-    async initStructureInnerPage() {
-      if (this._structureInnerInitPending) {
-        return;
-      }
-      this._structureInnerInitPending = true;
-      try {
-        await this.$nextTick();
-        try {
-          await this.getVersionList(false);
-        } catch (e) {
-          console.error(e);
-        }
-        await this.adjustOrder();
-      } finally {
-        this._structureInnerInitPending = false;
-      }
-    },
-    /**
-     * 月计划弹窗「选择」进入结构调整页：拉版本号后默认获取调整订单
+     * 月计划弹窗「选择」进入结构调整页：拉版本号后默认查询单选结构历史列表
      */
     async bootstrapStructureAdjustSingleFlow() {
       const productionVersion = (
@@ -2100,8 +2066,7 @@ export default {
         }, 500);
         return;
       }
-      await this.getOutVersionList();
-      await this.getOutList();
+      await this.getOutVersionList(true);
     },
     //获取调整订单
     async adjustOrder() {
@@ -2507,23 +2472,72 @@ export default {
         this.loading = false;
       }
     },
+    /** 单选结构调整 listOutHistory 入参：合并 query 与 formInline */
+    buildOutHistoryListParams() {
+      let params = {
+        ...this.query,
+        ...this.sort,
+      };
+      if (params.yearMonth) {
+        let arr = params.yearMonth.split("-");
+        params.mpYear = arr[0];
+        params.mpMonth = arr[1];
+        params.yearMonth = "";
+      }
+      const form = this.formInline || {};
+      const sched =
+        params.scheduledMachines != null &&
+        String(params.scheduledMachines).trim() !== ""
+          ? String(params.scheduledMachines).trim()
+          : form.scheduledMachines != null &&
+              String(form.scheduledMachines).trim() !== ""
+            ? String(form.scheduledMachines).trim()
+            : form.cxMachineCode != null &&
+                String(form.cxMachineCode).trim() !== ""
+              ? String(form.cxMachineCode).trim()
+              : "";
+      if (sched) {
+        params.scheduledMachines = sched;
+      }
+      if (
+        (params.structureName == null ||
+          String(params.structureName).trim() === "") &&
+        form.structureName != null &&
+        String(form.structureName).trim() !== ""
+      ) {
+        params.structureName = String(form.structureName).trim();
+      }
+      const qPv =
+        params.productionVersion != null &&
+        String(params.productionVersion).trim() !== ""
+          ? String(params.productionVersion).trim()
+          : "";
+      const fPv =
+        form.productionVersion != null &&
+        String(form.productionVersion).trim() !== ""
+          ? String(form.productionVersion).trim()
+          : "";
+      if (!qPv && fPv) {
+        params.productionVersion = fPv;
+      }
+      const qpVer =
+        params.version != null && String(params.version).trim() !== ""
+          ? String(params.version).trim()
+          : "";
+      const fVer =
+        form.version != null && String(form.version).trim() !== ""
+          ? String(form.version).trim()
+          : "";
+      if (!qpVer && fVer) {
+        params.version = fVer;
+      }
+      params.adjustType = this.adjustType;
+      return params;
+    },
     //获取结构外调整历史列表
     async getOutHistoryList() {
       try {
-        let params = {
-          ...this.query,
-          ...this.sort,
-        };
-        if (params.yearMonth) {
-          let arr = params.yearMonth.split("-");
-          params.mpYear = arr[0];
-          params.mpMonth = arr[1];
-          params.yearMonth = "";
-        }
-        // params.scheduledMachines = this.actionDate.cxMachineCode;
-        // params.structureName = this.actionDate.structureName;
-
-        params.adjustType = this.adjustType;
+        let params = this.buildOutHistoryListParams();
         this.isEdit = false;
         let res = await listOutHistory(params);
         this.page = null;
@@ -2541,20 +2555,7 @@ export default {
     async resizeOutHistoryList() {
       this.loading = true;
       try {
-        let params = {
-          ...this.query,
-          ...this.sort,
-        };
-        if (params.yearMonth) {
-          let arr = params.yearMonth.split("-");
-          params.mpYear = arr[0];
-          params.mpMonth = arr[1];
-          params.yearMonth = "";
-        }
-        // params.scheduledMachines = this.actionDate.cxMachineCode;
-        // params.structureName = this.actionDate.structureName;
-
-        params.adjustType = this.adjustType;
+        let params = this.buildOutHistoryListParams();
         let res = await listOutHistory(params);
         this.page = null;
         this.data = res.rows;
@@ -2716,12 +2717,18 @@ export default {
 
     handleSearch(data) {
       this.query = data;
+      this.search = { ...this.search, ...data };
       console.log('this.activeName', this.activeName)
       if (this.activeName == "second") {
         this.$set(this.page, "current", 1);
       }
       if (this.activeName == "singleResult") {
-        /** 与 index.backup-legacy 一致：单结构调整不重拉历史，避免 isEdit 被置 false 导致确认调整量/调整优先级不可编辑 */
+        /** 结构调整单结构流程：查询区调用 listOutHistory */
+        if (this.isStructureAdjustPage) {
+          this.loadText = this.$t("正在加载中，请稍候");
+          this.resizeOutHistoryList();
+          return;
+        }
         return;
       }
       this.loadText = this.$t("正在加载中，请稍候");
@@ -2962,6 +2969,9 @@ export default {
     },
     // api
     async getList() {
+      if (this.activeName == "singleResult" && this.isStructureAdjustPage) {
+        return this.resizeOutHistoryList();
+      }
       try {
         this.loading = true;
         console.log('this.activeName', this.activeName)
@@ -3282,6 +3292,11 @@ export default {
           yearMonth: q.yearMonth || this.search.yearMonth,
           scheduledMachines: sched,
           productionVersion: mergedPv,
+          structureName:
+            q.structureName ||
+            this.formInline.structureName ||
+            this.search.structureName ||
+            "",
         };
         const rowAdjVer =
           this.formInline.version != null &&
@@ -3313,6 +3328,7 @@ export default {
         factoryCode: q.factoryCode || this.search.factoryCode,
         yearMonth: q.yearMonth || this.search.yearMonth,
         scheduledMachines: q.scheduledMachines || q.cxMachineCode || "",
+        structureName: q.structureName || "",
         /** 与周程结构调整 Tab getVersionList 写入 query 一致，保证 getOutList 的 ...this.query 带定稿版本 */
         productionVersion: qPv,
       };
@@ -3354,30 +3370,10 @@ export default {
       await this.bootstrapStructureAdjustSingleFlow();
     },
 
-    /**
-     * 结构内调整页进入时默认拉取调整订单（mounted / activated 触发，避免 created 过早）
-     * @param {boolean} fromMount 首次挂载
-     */
-    tryBootstrapStructureInnerPage(fromMount) {
-      const stamp = JSON.stringify(this.$route.query || {});
-      if (!fromMount && stamp === this._structureInnerRouteStamp) {
-        return;
-      }
-      this._structureInnerRouteStamp = stamp;
-      this.applyStructureInnerRouteQuery();
-      this.initStructureInnerPage();
-    },
-
   },
   mounted() {
-    if (this.isStructureInnerPage) {
-      this.tryBootstrapStructureInnerPage(true);
-    }
-  },
-  activated() {
-    if (this.isStructureInnerPage) {
-      this.tryBootstrapStructureInnerPage(false);
-    }
+    // console.log("mounted");
+    // this.getList();
   },
   created() {
     const now = new Date();
@@ -3387,14 +3383,22 @@ export default {
       yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
       factoryCode: "116",
     };
+    /** 从月计划调整查询页「结构内调整」进入时，路由仅带 yearMonth，需与来源页查询年月一致 */
+    const rq = this.$route.query || {};
+    if (rq.yearMonth != null && String(rq.yearMonth).trim() !== "") {
+      const normalized = this.formatYearMonthForPicker(
+        String(rq.yearMonth).trim()
+      );
+      if (normalized) {
+        defaultParams.yearMonth = normalized;
+      }
+    }
     this.search = {
       ...defaultParams,
     };
     this.query = {
       ...defaultParams,
     };
-    /** 从月计划调整查询页「结构内调整」进入时，路由携带工厂/年月/版本号，需与来源页查询条件一致 */
-    this.applyStructureInnerRouteQuery();
     if (this.pageVariant === "structureAdjust") {
       this.adjustType = "02";
       this.activeName = "second";
@@ -3413,7 +3417,7 @@ export default {
       this.$route.query.fromSelect === "1";
     if (isMpPrefill) {
       this.applyMonthPlanFinalSelectPrefill();
-    } else if (!this.isStructureInnerPage) {
+    } else {
       this.getVersionList(true);
     }
   },
