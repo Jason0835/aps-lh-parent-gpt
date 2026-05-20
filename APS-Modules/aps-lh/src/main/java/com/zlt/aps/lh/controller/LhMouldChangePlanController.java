@@ -291,8 +291,8 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     }
 
     public List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list, LhMouldChangePlan queryVO) {
-        // 按计划日期、班次、机台排序
-        list = list.stream().sorted(Comparator.comparing(LhMouldChangePlanVo::getPlanDate)
+        // 按计划日期、班次、机台排序，计划日期仅按年月日比较，避免时分秒影响导出顺序
+        list = list.stream().sorted(Comparator.comparing((LhMouldChangePlanVo item) -> DateUtil.beginOfDay(item.getPlanDate()))
                 .thenComparing(LhMouldChangePlanVo::getClassIndex)
                 .thenComparing(LhMouldChangePlanVo::getLhMachineCode))
                 .collect(Collectors.toList());
@@ -545,7 +545,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     @Override
     protected String getOrderBy() {
-        return " LH_MACHINE_CODE ASC";
+        return " DATE(PLAN_DATE), CLASS_INDEX, LH_MACHINE_CODE";
     }
 
     /**
