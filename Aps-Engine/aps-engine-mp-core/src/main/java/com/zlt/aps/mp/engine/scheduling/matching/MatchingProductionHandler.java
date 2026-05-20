@@ -9,6 +9,7 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.*;
@@ -35,6 +36,7 @@ import com.zlt.aps.mp.engine.mapper.MpStructureAllocationMapper;
 import com.zlt.aps.mp.engine.scheduling.AbstractDataLoaderService;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
+import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.SkuNeedProductionInfo;
 import com.zlt.aps.mp.engine.scheduling.init.ProductionInitParamConfiguration;
 import com.zlt.aps.mp.engine.service.DpRequireDataService;
@@ -550,6 +552,30 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         if (StringUtils.isEmpty(checkMaterialDesc)) { // 有指定SKU，说明有多新增模具并尝试补量，需要检查是否符合最低天数要求
             return;
         }
+        // 取排产参数
+        ProductionCapacityParamConfiguration params = productionContext.getBaseDataContainer().getParamConfiguration();
+        Integer minProductionQty = params.getMinProductionQty(); // 最小投产量
+        Integer skuShortestProductionDays = params.getSkuShortestProductionDays(); // SKU非首次上模最短在机天数
+        DayCapacityLimitVo dayCapacityLimit = productionContext.getBaseDataContainer().getDayCapacityLimit(); // 日产能
+        
+        // 计算实际排产日期列表
+        List<Integer> productDayList = productDaySet.stream().sorted(Integer::compareTo).collect(Collectors.toList());
+        Integer firstDay = CollectionUtils.firstElement(productDayList);
+        Integer newMouldDay = this.getLastDay(productionContext, firstDay, startDay); // 取出模具续作的上一天为上模日
+        if (newMouldDay > 0) {
+            productDayList.add(0, newMouldDay); // 添加上模日
+        }
+        
+        // 判断是否达到最小排产量
+        Integer sumProductionQty = useMouldMap.values().stream().mapToInt(mouldInfo -> {
+            int sumProductQty = 0;
+            for (Integer day: productDayList) {
+                sumProductQty += this.sumMouldMaterialProductQty(mouldInfo, day, checkMaterialDesc);
+            }
+            return sumProductQty;
+        }).sum();
+        boolean overMinProductionQty = sumProductionQty >= minProductionQty;
+        
         // 判断是否第二台硫化机
         boolean hasMoreLhMachine = groupInfo.getDayProductionLimitInfo().values().stream().anyMatch(p -> {
             SkuDayProductionInfoHelper productionInfo = p.getProductionSkuQtyInfo().get(checkMaterialDesc);
@@ -561,25 +587,21 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             }
             return productionInfo.getUsedMouldSet().size() > ProductionConstant.DOUBLE_MOULD_PRODUCTION;
         });
-        if (!hasMoreLhMachine) { // 没有多台硫化机，不需要判断
+        
+        boolean clearFlag = false; // 撤销标记，默认不需要
+        // 至少上机2天，没有达到则需要撤销
+        if (productDayList.size() <= 1) {
+            clearFlag = true;
+        } else if (!overMinProductionQty) { // 没有达到最低起排量，需要撤销
+            clearFlag = true;
+        } else if (hasMoreLhMachine && productDayList.size() < skuShortestProductionDays) { // 有多台硫化机，需要判断上机日期是否达到最低标准
+            clearFlag = true;
+        }
+        if (!clearFlag) {
             return;
         }
-
-        // 有多台硫化机，需要判断上机日期是否达到最低标准
-        Integer skuShortestProductionDays = productionContext.getBaseDataContainer().getParamConfiguration()
-                .getSkuShortestProductionDays(); // SKU非首次上模最短在机天数
-        DayCapacityLimitVo dayCapacityLimit = productionContext.getBaseDataContainer().getDayCapacityLimit();
-        List<Integer> productDayList = productDaySet.stream().sorted(Integer::compareTo).collect(Collectors.toList());
-        Integer firstDay = CollectionUtils.firstElement(productDayList);
-        Integer newMouldDay = this.getLastDay(productionContext, firstDay, startDay); // 取出模具续作的上一天为上模日
-        if (newMouldDay > 0) {
-            productDayList.add(0, newMouldDay); // 添加上模日
-        }
-        if (productDayList.size() >= skuShortestProductionDays) { // 判断排产日是否达到最低标准，没有达到则需要全部取消掉
-            return;
-        }
-
-        // 遍历每一天
+       
+        // 不符合上述条件的，需要遍历每一天进行撤销排产处理
         for (Integer day : productDayList) {
             GroupPlanCxLhCapacityLimitHelper productionDayLimit = groupInfo.getDayProductionLimitInfo().get(day);
             // 排产统计量扣除需撤销的量
@@ -1054,7 +1076,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
             return 0; // 模具空闲，没生成该SKU
         }
         return dayProduction.stream().filter(s -> s.getMaterialDesc().equals(materialDesc))
-                .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum(); // 模具不空闲，但是生产的是同一个规格，可以尝试补量
+                .mapToInt(CxMouldDayProductionHelper::getProductionQty).sum(); // 合计排产量
     }
 
     /**

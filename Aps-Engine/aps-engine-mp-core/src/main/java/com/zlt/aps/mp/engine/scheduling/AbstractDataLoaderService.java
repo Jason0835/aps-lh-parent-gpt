@@ -483,7 +483,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.HEIGHT_PRIORITY_SKU_PRODUCTION_MODE.getCode());
         paramCodeList.add(MonthPlanEnums.MIN_HEIGHT_PRIORITY_LH_MACHINE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.CONTINUE_SKU_HEIGHT_REQUIRE_QTY.getCode());
-        paramCodeList.add(MonthPlanEnums.SINGLE_CONTROL_LH_MACHINE_CODE.getCode());
+        paramCodeList.add(MonthPlanEnums.MIN_PRODUCTION_QTY.getCode());
 
         //获取数据
         Map<String, Object> paramConfigurationMap = getDataService().getFactoryParamByCondition(productionContext, paramCodeList);
@@ -619,14 +619,9 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             }
             configuration.setContinueSkuProductionHeightRequire(continueSkuProductionHeightValue);
         }
-        //20260512+ 单控硫化机配置
-        String singleControlLhMachineCodeValue = (String)paramConfigurationMap.get(MonthPlanEnums.SINGLE_CONTROL_LH_MACHINE_CODE.getCode());
-        String singleControlLhMachineCode = (String) Optional.ofNullable(singleControlLhMachineCodeValue).orElse("");
-        if (StringUtils.isBlank(singleControlLhMachineCode)) {
-            configuration.setSingleControlLhMachineCode(Collections.emptySet());
-        } else {
-            configuration.setSingleControlLhMachineCode(Stream.of(singleControlLhMachineCode.split(StringConstant.COMMA)).collect(Collectors.toSet()));
-        }
+        //20260512+ 最小起排量
+        Integer minProductionQty = (Integer)paramConfigurationMap.get(MonthPlanEnums.MIN_PRODUCTION_QTY.getCode());
+        configuration.setMinProductionQty(minProductionQty);
 
         return configuration;
     }

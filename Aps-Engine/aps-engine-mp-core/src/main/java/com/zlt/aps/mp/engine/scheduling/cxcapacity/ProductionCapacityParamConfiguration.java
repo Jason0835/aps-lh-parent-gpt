@@ -237,9 +237,9 @@ public class ProductionCapacityParamConfiguration {
      */
     private Integer continueSkuProductionHeightRequire;
     /**
-     * SYS0209014 单控硫化机机台号
+     * SYS0103001 最小投产量
      */
-    private Set<String> singleControlLhMachineCode;
+    private Integer minProductionQty;
 
     /**
      * 设置额外处理的配比值

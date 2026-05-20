@@ -300,11 +300,7 @@ public enum MonthPlanEnums {
     /**
      * SYS0209013 单位：台，续作SKU当前硫化机台数超过该值时，且结构高优级需求量占比符合SYS0209011值，则续作先排产高优级量
      */
-    CONTINUE_SKU_HEIGHT_REQUIRE_QTY("SYS0209013", "单位：台，续作SKU当前硫化机台数超过该值时，且结构高优级需求量占比符合SYS0209011值，则续作先排产高优级量"),
-    /**
-     * SYS0209013 单控硫化机机台号，多个用逗号隔开
-     */
-    SINGLE_CONTROL_LH_MACHINE_CODE("SYS0209014", "单控硫化机机台号，多个用逗号隔开");
+    CONTINUE_SKU_HEIGHT_REQUIRE_QTY("SYS0209013", "单位：台，续作SKU当前硫化机台数超过该值时，且结构高优级需求量占比符合SYS0209011值，则续作先排产高优级量");
 
     private final String code;
     private final String name;
