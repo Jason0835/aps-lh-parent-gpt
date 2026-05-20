@@ -99,7 +99,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 //        }
 
         // 4、通过排产机台、结构筛选结构外调整明细
-        filterAdjustDetailList(contextDTO,resultList);
+        //filterAdjustDetailList(contextDTO,resultList);
         // 未获取到调整记录，抛出异常
         Assert.isFalse(PubUtil.isEmpty(resultList), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindAdjustDetailList"),
@@ -287,21 +287,6 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         }
     }
 
-    /**
-     * 筛选：|净需求 - 计划已排产量| > 0的数据
-     * @param adjustList
-     */
-    private void filterAdjustList(List<MpAdjustDetailVo> adjustList) {
-        if (PubUtil.isEmpty(adjustList)) {
-            return;
-        }
-        adjustList.removeIf(adjust -> {
-            Integer currentNetQty = Convert.toInt(adjust.getCurrentNetQty(),0);
-            Integer monthScheduledQty = Convert.toInt(adjust.getMonthScheduledQty(),0);
-            boolean isOnlyConventionReserveHasValue = isOnlyConventionReserveHasValue(adjust);
-            return (Math.abs(currentNetQty - monthScheduledQty) == 0) || isOnlyConventionReserveHasValue;
-        });
-    }
 
     @Override
     public void doAutoAdjust(MpRollAdjustContextDTO contextDTO) {
@@ -312,6 +297,10 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.orderAdjustRecordNotFound"),
                     contextDTO.getMpYear(),contextDTO.getMpMonth()));
         }
+
+        //检查是否已执行自动调整
+        checkHasDoAutoAdjust(contextDTO);
+
         String lastMonthPlanVersion = contextDTO.getMpAdjustStructureOutList().get(0).getLastMonthPlanVersion();
         //2.按结构序列化分组
         //Map<String, List<FactoryMonthPlanFinalAdjustVo>> mpProdFinalMap = contextDTO.getFactoryMonthPlanProdFinalList().stream().collect(Collectors.groupingBy(item->item.getStructureName()));
@@ -458,8 +447,12 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             structureAllocation.setCxMachineCode(contextDTO.getScheduledMachines());
             structureAllocation.setYear(contextDTO.getMpYear());
             structureAllocation.setMonth(contextDTO.getMpMonth());
-            structureAllocation.setBeginDay(contextDTO.getAdjustStartDay());
-            structureAllocation.setEndDay(contextDTO.getAdjustEndDay());
+            if (contextDTO.getAdjustStartDay() != null){
+                structureAllocation.setBeginDay(contextDTO.getAdjustStartDay());
+            }
+            if (contextDTO.getAdjustEndDay() != null){
+                structureAllocation.setEndDay(contextDTO.getAdjustEndDay());
+            }
             structureAllocation.setProductionVersion(contextDTO.getProductionVersion());
 
             List<MdmStructureLhRatio> structureLhRatioList = mpStructureAllocationService.queryMdmStructureLhRatio(structureAllocation);
@@ -471,8 +464,12 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             structureAllocationList.add(structureAllocation);
         }else{
             //更新结构转产表对应成型机台的调整开始日、结束日
-            structureAllocation.setBeginDay(contextDTO.getAdjustStartDay());
-            structureAllocation.setEndDay(contextDTO.getAdjustEndDay());
+            if (contextDTO.getAdjustStartDay() != null){
+                structureAllocation.setBeginDay(contextDTO.getAdjustStartDay());
+            }
+            if (contextDTO.getAdjustEndDay() != null){
+                structureAllocation.setEndDay(contextDTO.getAdjustEndDay());
+            }
         }
         //设置 机台缓存信息
         AdjustsCxMachineVo adjustsCxMachineVo = new AdjustsCxMachineVo();
@@ -502,8 +499,15 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         if (PubUtil.isEmpty(contextDTO.getAdjustDetailList())) {
             return;
         }
+        //结构内、结构间 调整订单列表，同时插入
+        baseDao.insertBatch(contextDTO.getAdjustDetailList());
+        contextDTO.getAdjustDetailList().forEach(x->{
+            x.setId(null);
+        });
         List<MpAdjustStructureOut> adjustStructureOutList = baseDao.saveWithQuery(BeanUtil.copyToList(contextDTO.getAdjustDetailList(), MpAdjustStructureOut.class));
         List<MpAdjustDetailVo> resultList = BeanUtil.copyToList(adjustStructureOutList, MpAdjustDetailVo.class);
+        filterAdjustDetailList(contextDTO,resultList);
+
         contextDTO.setAdjustDetailList(resultList);
     }
 
