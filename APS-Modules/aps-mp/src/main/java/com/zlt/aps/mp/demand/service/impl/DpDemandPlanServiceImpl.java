@@ -63,6 +63,8 @@ import com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.sysdef.domain.SysDocType;
+
+import cn.hutool.core.convert.Convert;
 import lombok.RequiredArgsConstructor;
 
 
@@ -648,14 +650,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         Map<String, List<DpDemandPlan>> currentDemandPlanMap = currentDemandPlanList.stream()
                 .collect(Collectors.groupingBy(DpDemandPlan::getMaterialCode));
         if (CollectionUtils.isEmpty(currentDemandPlanList)) {
-            AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.noExistVersion"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.noExistVersion"));
         }
         LambdaQueryWrapper<DpDemandPlanSum> sumQueryWrapper = new LambdaQueryWrapper<>();
         sumQueryWrapper.eq(DpDemandPlanSum::getFactoryCode, factoryCode);
         sumQueryWrapper.eq(DpDemandPlanSum::getMonthPlanVersion, monthPlanVersion);
         List<DpDemandPlanSum> currentDemandPlanSumList = dpDemandPlanSumEntityMapper.selectList(sumQueryWrapper);
         if (CollectionUtils.isEmpty(currentDemandPlanSumList)) {
-            AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.noExistVersion"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.noExistVersion"));
         }
         
         // 2、加载待处理需求计划版本的上一个版本（同年、月、工厂、计划类型）
@@ -1088,17 +1090,28 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             if(null == template || !skuMap.containsKey(template.getMaterialCode())) {
                 return;
             }
-            list.add(buildMergedDemandPlan(
-                template,
-                value,
-                minProductionQty,
-                skuMap,
-                finishedProductStockMap,
-                mdmMonthSurplusMap,
-                productionTypeMap,
-                monthlySaleQty,
-                cycleSchStruConfs,
-                orderQtyMap));
+            DpDemandPlan mergedDemandPlan = this.buildMergedDemandPlan(
+                    template,
+                    value,
+                    minProductionQty,
+                    skuMap,
+                    finishedProductStockMap,
+                    mdmMonthSurplusMap,
+                    productionTypeMap,
+                    monthlySaleQty,
+                    cycleSchStruConfs,
+                    orderQtyMap);
+            // 20260520+ 月计划调整入口，需要把储备量从净需求中排除掉
+            if (createCondition.isNoDeductRemainQtyFlag()) {
+                Integer netQty = Convert.toInt(mergedDemandPlan.getNetQty());
+                Integer cycleReserveQty = Convert.toInt(mergedDemandPlan.getCycleReserveQty());
+                Integer conventionReserveQty = Convert.toInt(mergedDemandPlan.getConventionReserveQty());
+                Integer newNetQty = netQty - cycleReserveQty - conventionReserveQty;
+                newNetQty = newNetQty > 0? newNetQty: 0;
+                createCondition.setNetQty(newNetQty);
+            }
+            
+            list.add(mergedDemandPlan);
         });
         log.info("groupKeys:{}",groupMap.keySet());
         return list;
