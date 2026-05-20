@@ -20,7 +20,8 @@ export function listOutsideStructure(query) {
   return request({
     url: '/monthplan/mpStructureAllocation/listAdjusts',
     method: 'post',
-    data: query
+    data: query,
+    headers: { repeatSubmit: false }
   })
 }
 
@@ -176,7 +177,8 @@ export function listOutHistory(query) {
   return request({
     url: '/monthplan/mpAdjustStructureOut/list',
     method: 'post',
-    data: query
+    data: query,
+    headers: { repeatSubmit: false }
   })
 }
 
@@ -202,7 +204,8 @@ export function versionOutHistory(query) {
   return request({
     url: '/monthplan/mpAdjustStructureOut/getVersionList',
     method: 'post',
-    data: query
+    data: query,
+    headers: { repeatSubmit: false }
   })
 }
 

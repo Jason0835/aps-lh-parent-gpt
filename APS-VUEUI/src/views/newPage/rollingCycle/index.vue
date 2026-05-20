@@ -33,21 +33,20 @@
           v-if="isStructureInnerPage"
           class="mp-structure-inner-header"
         >
-          <div class="mp-structure-inner-toolbar">
-            <el-button
-              @click="adjustOrder"
-              :loading="getLoading"
-              v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
-              >{{ $t("获取调整订单") }}</el-button
-            >
-            <el-button
-              @click="handShowResult"
-              :loading="autoLoading"
-              :disabled="data.length == 0"
-              v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
-              >{{ $t("自动调整") }}</el-button
-            >
-          </div>
+          <el-button
+            @click="adjustOrder"
+            type="primary"
+            :loading="getLoading"
+            v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
+            >{{ $t("获取调整订单") }}</el-button
+          >
+          <el-button
+            @click="handShowResult"
+            :loading="autoLoading"
+            :disabled="data.length == 0"
+            v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
+            >{{ $t("自动调整") }}</el-button
+          >
         </div>
         <!-- 结构调整页：列表工具栏或单结构流程表单 -->
         <div
@@ -170,13 +169,13 @@
                   >获取调整订单</el-button
                 >
               </el-form-item>
-              <el-button
+              <!-- <el-button
                 @click="handShowResult"
                 :loading="autoLoading"
                 :disabled="data.length == 0"
                 v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
                 >{{ $t("自动调整") }}</el-button
-              >
+              > -->
               <!-- <el-form-item v-if="showOutResult">
                 <el-button
                   type="primary"
@@ -1795,6 +1794,9 @@ export default {
     },
 
     handleYearMonthChange(val) {
+      if (!val || val === this.query.yearMonth) {
+        return;
+      }
       this.search = {
         ...this.search,
         yearMonth: val,
@@ -1804,7 +1806,45 @@ export default {
         yearMonth: val,
       };
 
-      this.getVersionList(true);
+      this.scheduleYearMonthQueryRefresh();
+    },
+    /**
+     * 年月切换后合并刷新，避免同一接口在 200ms 内重复触发 request.js 防重复提交。
+     */
+    scheduleYearMonthQueryRefresh() {
+      if (this._yearMonthRefreshTimer) {
+        clearTimeout(this._yearMonthRefreshTimer);
+      }
+      this._yearMonthRefreshTimer = setTimeout(() => {
+        this._yearMonthRefreshTimer = null;
+        this.refreshAfterYearMonthChange();
+      }, 300);
+    },
+    async refreshAfterYearMonthChange() {
+      if (this._yearMonthRefreshing) {
+        this._yearMonthRefreshPending = true;
+        return;
+      }
+      this._yearMonthRefreshing = true;
+      try {
+        if (
+          this.isStructureAdjustPage &&
+          this.isShowResult &&
+          this.activeName === "singleResult"
+        ) {
+          await this.getOutVersionList(true);
+          return;
+        }
+        await this.getVersionList(true);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        this._yearMonthRefreshing = false;
+        if (this._yearMonthRefreshPending) {
+          this._yearMonthRefreshPending = false;
+          await this.refreshAfterYearMonthChange();
+        }
+      }
     },
     handleMaterialCodeChange(val) {
       this.search = {
@@ -1866,26 +1906,39 @@ export default {
     },
     //获取版本列表
     async getVersionList(isGet = false, isNewVersion = false) {
+      if (this._versionListPromise) {
+        return this._versionListPromise;
+      }
+      this._versionListPromise = this._loadVersionList(isGet, isNewVersion);
+      try {
+        return await this._versionListPromise;
+      } finally {
+        this._versionListPromise = null;
+      }
+    },
+    async _loadVersionList(isGet = false, isNewVersion = false) {
       this.loading = true;
       let res;
+      let shouldLoadList = false;
       try {
         if (this.activeName == "first") {
           res = await versionAdjust(this.formatParams());
+          shouldLoadList = isGet;
         } else if (this.activeName == "second") {
           if (this.isStructureAdjustPage) {
             res = await versionOutHistory(this.formatParams());
           } else {
             res = await versionStructure(this.formatParams());
           }
+          shouldLoadList = isGet;
         } else if (this.activeName == "three") {
-          if (!this.isTabChange) return;
-          res = await resultVersion(this.formatParams());
-        } else {
-          if (isGet) {
-            this.getList();
-          } else {
-            this.loading = false;
+          if (!this.isTabChange) {
+            return;
           }
+          res = await resultVersion(this.formatParams());
+          shouldLoadList = isGet;
+        } else {
+          shouldLoadList = isGet;
           return;
         }
 
@@ -1920,9 +1973,9 @@ export default {
       } catch (err) {
         console.log(err);
       } finally {
-        if (isGet) {
-          this.getList();
-        } else {
+        if (shouldLoadList) {
+          await this.getList();
+        } else if (!isGet) {
           this.loading = false;
         }
       }
@@ -2481,8 +2534,8 @@ export default {
       };
       if (params.yearMonth) {
         let arr = params.yearMonth.split("-");
-        params.mpYear = arr[0];
-        params.mpMonth = arr[1];
+        params.year = arr[0];
+        params.month = arr[1];
         params.yearMonth = "";
       }
       const form = this.formInline || {};
@@ -3420,6 +3473,12 @@ export default {
       this.applyMonthPlanFinalSelectPrefill();
     } else {
       this.getVersionList(true);
+    }
+  },
+  beforeDestroy() {
+    if (this._yearMonthRefreshTimer) {
+      clearTimeout(this._yearMonthRefreshTimer);
+      this._yearMonthRefreshTimer = null;
     }
   },
 };
