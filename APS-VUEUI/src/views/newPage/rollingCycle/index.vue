@@ -188,7 +188,7 @@
           </el-form>
         </div>
       </template>
-      <template slot="footer" v-if="isShowFoot">
+      <template slot="footer" v-if="showPageFooter">
         <div
           style="
             display: flex;
@@ -601,6 +601,16 @@ export default {
     /** 结构调整独立页 */
     isStructureAdjustPage() {
       return this.pageVariant === "structureAdjust";
+    },
+    /**
+     * 页脚确定/取消：结构调整单结构流程进入后即显示；
+     * 结构内自动调整等流程仍依赖 isShowFoot。
+     */
+    showPageFooter() {
+      if (this.isStructureAdjustPage && this.isShowResult) {
+        return true;
+      }
+      return this.isShowFoot;
     },
     /**
      * 月计划结构内/结构调整独立页：版本号查询绑定 version（与 mpAdjustStructureIn/Out getVersionList 一致）；
@@ -1090,7 +1100,6 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  {this.isEdit && (
                     <el-input
                       key={row.id}
                       v-model={row.confirmAdjustQty}
@@ -1107,8 +1116,6 @@ export default {
                       }}
                       size="mini"
                     ></el-input>
-                  )}
-                  {!this.isEdit && <span>{row.confirmAdjustQty}</span>}
                 </div>
               );
             },
@@ -1119,7 +1126,6 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  {this.isEdit && (
                     <el-input
                       key={row.id}
                       v-model={row.adjustPriority}
@@ -1141,8 +1147,6 @@ export default {
                       }}
                       size="mini"
                     ></el-input>
-                  )}
-                  {!this.isEdit && <span>{row.adjustPriority}</span>}
                 </div>
               );
             },
@@ -1981,8 +1985,8 @@ export default {
       }
     },
 
-    //获取单选历史列表的版本号
-    async getOutVersionList(isGet) {
+    //获取单选历史列表的版本号（mpAdjustStructureOut/getVersionList）
+    async getOutVersionList(isGet = false, isNewVersion = false) {
       try {
         const params = {
           ...this.query,
@@ -2005,7 +2009,7 @@ export default {
 
         this.versionList = list;
         if (list.length > 0) {
-          this.applyAdjustVersionDefault(list, false);
+          this.applyAdjustVersionDefault(list, isNewVersion);
         } else {
           this.$set(this.search, "version", "");
           this.$set(this.query, "version", "");
@@ -2676,12 +2680,27 @@ export default {
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
 
-        this.data = res.rows;
-        this.getOutResultList(
-          res.rows[0].productionVersion,
-          res.rows[0].version
-        );
-        this.isShowFoot = true;
+        const rows = res.rows || [];
+        if (rows.length > 0) {
+          const first = rows[0];
+          if (first.version != null && String(first.version).trim() !== "") {
+            const ver = String(first.version).trim();
+            this.$set(this.query, "version", ver);
+            this.$set(this.search, "version", ver);
+          }
+          if (
+            first.productionVersion != null &&
+            String(first.productionVersion).trim() !== ""
+          ) {
+            const pv = String(first.productionVersion).trim();
+            this.$set(this.query, "productionVersion", pv);
+            this.$set(this.search, "productionVersion", pv);
+          }
+          await this.getOutResultList(
+            first.productionVersion,
+            first.version
+          );
+        }
         this.showOutResult = true;
         if (!this.formInline.adjustStartDay) {
           this.formInline.adjustStartDay = this.formInline.beginDay;
@@ -2690,7 +2709,9 @@ export default {
           this.formInline.adjustEndDay = this.formInline.endDay;
         }
 
-        this.getOutVersionList();
+        /** 获取调整订单后：重新拉取版本号列表，再按最新版本查询 list */
+        await this.getOutVersionList(true, true);
+        this.isEdit = true;
       } catch (err) {
         console.log(err);
       } finally {
