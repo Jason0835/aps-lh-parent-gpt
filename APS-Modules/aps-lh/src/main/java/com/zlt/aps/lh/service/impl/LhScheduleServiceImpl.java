@@ -22,6 +22,7 @@ import com.zlt.aps.lh.api.domain.entity.*;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
+import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.FactoryCodeEnum;
 import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
@@ -354,6 +355,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         }
 
         Date now = new Date();
+        LhScheduleContext shiftContext = buildAdjustQuantityShiftContext(record);
         boolean hasAdjustField = false;
         List<String> errorMessages = new ArrayList<>();
         for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
@@ -366,7 +368,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 errorMessages.add(String.format("第%s班计划量不能小于0", shiftIndex));
             }
             // 历史班次允许调量低于完成量，非历史班次仍需保护完成量下限。
-            boolean historyShift = isHistoryShift(record, shiftIndex, now);
+            boolean historyShift = isHistoryShift(record, shiftIndex, now, shiftContext);
             Integer finishQty = Optional.ofNullable(ShiftFieldUtil.getShiftFinishQty(record, shiftIndex))
                     .orElse(0);
             if (!historyShift && adjustPlanQty < finishQty) {
@@ -389,14 +391,69 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param record     排程结果记录
      * @param shiftIndex 班次索引（1~8）
      * @param now        当前校验时间
-     * @return true表示班次结束时间已到或已过，false表示结束时间缺失或班次尚未结束
+     * @param context    轻量排程上下文
+     * @return true表示班次结束时间已到或已过，false表示无法推导结束时间或班次尚未结束
      */
-    private boolean isHistoryShift(LhScheduleResult record, int shiftIndex, Date now) {
-        Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(record, shiftIndex);
+    private boolean isHistoryShift(LhScheduleResult record, int shiftIndex, Date now, LhScheduleContext context) {
+        Date shiftEndTime = resolveAdjustQuantityShiftEndTime(record, shiftIndex, context);
         if (Objects.isNull(shiftEndTime) || Objects.isNull(now)) {
             return false;
         }
         return !now.before(shiftEndTime);
+    }
+
+    /**
+     * 获取调量校验使用的班次结束时间。
+     * <p>优先使用排程结果中已有的班次结束时间；历史数据缺失时，根据排程目标日、硫化参数和默认班次窗口推导结束时间。</p>
+     *
+     * @param record     排程结果记录
+     * @param shiftIndex 班次索引（1~8）
+     * @param context    轻量排程上下文
+     * @return 班次结束时间，无法获取或推导时返回 null
+     */
+    private Date resolveAdjustQuantityShiftEndTime(LhScheduleResult record, int shiftIndex, LhScheduleContext context) {
+        if (Objects.isNull(record) || shiftIndex < 1 || shiftIndex > LhScheduleConstant.MAX_SHIFT_SLOT_COUNT) {
+            return null;
+        }
+        Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(record, shiftIndex);
+        if (Objects.nonNull(shiftEndTime)) {
+            return shiftEndTime;
+        }
+        if (Objects.isNull(record.getScheduleDate())) {
+            return null;
+        }
+        Date scheduleBaseDate = resolveScheduleBaseDate(record.getScheduleDate(), context);
+        LhShiftConfigVO shift = LhScheduleTimeUtil.getShiftByIndex(context, scheduleBaseDate, shiftIndex);
+        return Objects.nonNull(shift) ? shift.getShiftEndDateTime() : null;
+    }
+
+    /**
+     * 构建调量历史班次判断所需的轻量排程上下文。
+     * <p>仅解析硫化参数配置，用于让班次开始时间、结束时间与当前工厂参数保持一致。</p>
+     *
+     * @param record 排程结果记录
+     * @return 轻量排程上下文
+     */
+    private LhScheduleContext buildAdjustQuantityShiftContext(LhScheduleResult record) {
+        LhScheduleContext context = new LhScheduleContext();
+        context.setFactoryCode(record.getFactoryCode());
+        if (StringUtils.isNotEmpty(record.getFactoryCode())) {
+            scheduleConfigResolver.resolveAndAttach(context);
+        }
+        return context;
+    }
+
+    /**
+     * 根据排程目标日反推班次窗口起点 T 日。
+     *
+     * @param scheduleTargetDate 排程目标日
+     * @param context            轻量排程上下文
+     * @return 班次窗口起点 T 日
+     */
+    private Date resolveScheduleBaseDate(Date scheduleTargetDate, LhScheduleContext context) {
+        int scheduleDays = LhScheduleTimeUtil.getScheduleDays(context);
+        int offsetDays = Math.max(0, scheduleDays - 1);
+        return DateUtil.offsetDay(DateUtil.beginOfDay(scheduleTargetDate), -offsetDays);
     }
 
     /**
