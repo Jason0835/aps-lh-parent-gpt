@@ -137,13 +137,11 @@
 <script>
 import { mapGetters } from "vuex";
 import formingCapacitySelect from "@/views/components/formingCapacitySelect.vue";
-/** listOutsideStructure → POST /monthplan/mpStructureAllocation/listAdjusts；outGetStayDay/versionOutHistory 与周程单结构调整一致 */
+/** listOutsideStructure → POST /monthplan/mpStructureAllocation/listAdjusts */
 import {
   listOutsideStructure,
   setAdjustsCxMachineFromRedis,
   getAdjustsCxMachineFromRedis,
-  outGetStayDay,
-  versionOutHistory,
 } from "@/api/monthplan/adjustStructure";
 
 const MONTH_STANDARD_MAX = 31;
@@ -443,119 +441,7 @@ export default {
         this.loading = false;
       }
     },
-    /**
-     * 组装 getPreviousStructure（outGetStayDay）入参：与周程旧版一致，传 **listAdjusts 行全部字段**，
-     * 再补弹窗上下文（factory、年月、首台机台、定稿版本）；去掉 UI 临时字段。
-     * @param {object} row 列表行
-     * @param {string} cxFirst 成型机编码（首台，与跳转 query 一致）
-     * @returns {object|null} 无行则 null
-     */
-    buildGetPreviousStructurePayload(row, cxFirst) {
-      if (!row || typeof row !== "object") {
-        return null;
-      }
-      const payload = { ...row };
-      delete payload._isNew;
-      delete payload._tmpId;
-
-      if (this.factoryCode && !payload.factoryCode) {
-        payload.factoryCode = this.factoryCode;
-      }
-      const needYm =
-        payload.year == null ||
-        payload.year === "" ||
-        payload.month == null ||
-        payload.month === "";
-      if (needYm && this.yearMonth) {
-        const arr = String(this.yearMonth).trim().split("-");
-        if (arr.length >= 2) {
-          payload.year = Number(arr[0]);
-          payload.month = Number(arr[1]);
-        }
-      } else {
-        if (payload.year != null && payload.year !== "") {
-          payload.year = Number(payload.year);
-        }
-        if (payload.month != null && payload.month !== "") {
-          payload.month = Number(payload.month);
-        }
-      }
-      if (cxFirst != null && String(cxFirst).trim() !== "") {
-        payload.cxMachineCode = String(cxFirst).trim();
-      }
-      const pv = this.resolveProductionVersionForJump(row);
-      if (
-        pv &&
-        (!payload.productionVersion ||
-          String(payload.productionVersion).trim() === "")
-      ) {
-        payload.productionVersion = pv;
-      }
-      if (
-        payload.beginDay !== undefined &&
-        payload.beginDay !== "" &&
-        payload.beginDay != null
-      ) {
-        payload.beginDay = Number(payload.beginDay);
-      }
-      if (
-        payload.endDay !== undefined &&
-        payload.endDay !== "" &&
-        payload.endDay != null
-      ) {
-        payload.endDay = Number(payload.endDay);
-      }
-      return payload;
-    },
-    /**
-     * 组装 mpAdjustStructureOut/getVersionList 入参，与 rollingCycle 的 getOutVersionList 中 params 处理一致。
-     * @param {string} schedFirst 排产机台（首台）
-     * @param {object} row 列表行（取 productionVersion）
-     */
-    buildOutVersionListParams(schedFirst, row) {
-      const params = {
-        factoryCode: this.factoryCode,
-        yearMonth: this.yearMonth,
-        scheduledMachines: schedFirst || "",
-      };
-      const pv = this.resolveProductionVersionForJump(row);
-      if (pv) {
-        params.productionVersion = pv;
-      }
-      if (params.yearMonth) {
-        const arr = String(params.yearMonth).split("-");
-        if (arr.length >= 2) {
-          params.year = arr[0];
-          params.month = arr[1];
-        }
-      }
-      return params;
-    },
-    /**
-     * 跳转月计划结构调整页前，与周程「结构调整 → 单结构调整」一致预拉 getPreviousStructure、单结构版本列表。
-     * @param {object} row 当前行
-     * @param {string} cxFirst 成型机首台
-     * @param {string} schedFirst 排产机台首台
-     */
-    async prefetchSingleStructureApis(row, cxFirst, schedFirst) {
-      const prevPayload = this.buildGetPreviousStructurePayload(row, cxFirst);
-      const versionParams = this.buildOutVersionListParams(schedFirst, row);
-      const tasks = [];
-      if (prevPayload) {
-        tasks.push(
-          outGetStayDay(prevPayload).catch((err) => {
-            console.warn("getPreviousStructure 预请求失败", err);
-          })
-        );
-      }
-      tasks.push(
-        versionOutHistory(versionParams).catch((err) => {
-          console.warn("mpAdjustStructureOut/getVersionList 预请求失败", err);
-        })
-      );
-      await Promise.all(tasks);
-    },
-    async handleSelect(row) {
+    handleSelect(row) {
       if (!this.yearMonth) {
         this.$modal.msgWarning(this.$t("common.rule.select"));
         return;
@@ -568,14 +454,6 @@ export default {
         this.extractFirstCxMachineCode(rawSched);
       const schedFirst =
         this.extractFirstCxMachineCode(rawSched) || cxFirst;
-      try {
-        this.loading = true;
-        await this.prefetchSingleStructureApis(row, cxFirst, schedFirst);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        this.loading = false;
-      }
       /** 整行写入 sessionStorage，目标页与周程「勾选 → 单结构调整」同样使用完整 listAdjusts 行 */
       try {
         sessionStorage.setItem(
