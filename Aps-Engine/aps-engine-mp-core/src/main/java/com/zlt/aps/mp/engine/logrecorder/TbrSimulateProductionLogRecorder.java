@@ -108,7 +108,7 @@ public class TbrSimulateProductionLogRecorder {
 
     /**
      * 增加 交付优先排产需要剔除的分组信息 日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产模式需要排产的分组信息：%s====
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产模式已剔除的分组信息：%s====
      *
      * @param context 排程上下文
      * @return
@@ -118,7 +118,7 @@ public class TbrSimulateProductionLogRecorder {
             return "";
         }
         String groupInfo = excludeGroupPlan.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
-        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产模式需要排产的分组信息：%s====",
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产模式已剔除的分组信息：%s====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
