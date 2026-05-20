@@ -378,7 +378,7 @@ public class CxMachineBaseInfoVo implements Serializable {
         Set<String> skuProductionMouldSet = dayLimit.getSkuProductionMouldMap().get(materialDesc);
         if (null == skuProductionMouldSet) {
             skuProductionMouldSet = new HashSet<>();
-            dayLimit.getSkuProductionMouldMap().put(materialDesc, currentUsedMouldSet);
+            dayLimit.getSkuProductionMouldMap().put(materialDesc, skuProductionMouldSet);
         }
         skuProductionMouldSet.addAll(currentUsedMouldSet);
         //更新排产Sku信息
