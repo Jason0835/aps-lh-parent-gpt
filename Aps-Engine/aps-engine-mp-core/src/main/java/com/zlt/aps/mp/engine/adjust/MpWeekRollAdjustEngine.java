@@ -884,7 +884,53 @@ public class MpWeekRollAdjustEngine {
         int emptyQty = needDeductQty > oriRealOrdQty ? oriRealOrdQty:needDeductQty;
         //将调减量置到实际调整量
         prodFinal.setActualAdjustQty(emptyQty);
+        //若存在周期排产或储备排产，则将调减量转移到高或中优先级，防止后面重复挤搭配
+        if (prodFinal.getCycleProductionQty() > 0 || prodFinal.getConventionProductionQty() >0){
+            transferProductionQty(prodFinal, emptyQty);
+        }
         contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】--扣减各总排产量,物料编码:%s,调减后,高优先级排产量:%s,中优级排产量:%s,暂缓排产量:%s,空出产能:%s",contextDTO.getStructureName(), prodFinal.getMaterialCode(),prodFinal.getHeightProductionQty(),prodFinal.getMidProductionQty(),prodFinal.getPostponeProductionQty(),prodFinal.getActualAdjustQty())).append(ApsConstant.DIVISION);
+    }
+
+    /**
+     * 转移排产量
+     * @param prodFinal
+     * @param emptyQty
+     */
+    private static void transferProductionQty(FactoryMonthPlanFinalAdjustVo prodFinal, int emptyQty) {
+        int transferValue = 0;
+        //1.处理转移的周期排产量
+        if (prodFinal.getCycleProductionQty() > 0){
+            if (prodFinal.getCycleProductionQty() >= emptyQty){
+                prodFinal.setCycleProductionQty(prodFinal.getCycleProductionQty() - emptyQty);
+                transferValue += emptyQty;
+                emptyQty = 0;
+            }else{
+                emptyQty -= prodFinal.getCycleProductionQty();
+                transferValue += prodFinal.getCycleProductionQty();
+                prodFinal.setCycleProductionQty(0);
+            }
+        }
+        //2.处理转移的储备排产量
+        if (prodFinal.getConventionProductionQty() > 0 && emptyQty >0){
+            if (prodFinal.getConventionProductionQty() >= emptyQty){
+                prodFinal.setConventionProductionQty(prodFinal.getConventionProductionQty() - emptyQty);
+                transferValue += emptyQty;
+                emptyQty = 0;
+            }else{
+                emptyQty -= prodFinal.getConventionProductionQty();
+                transferValue += prodFinal.getConventionProductionQty();
+                prodFinal.setConventionProductionQty(0);
+            }
+        }
+
+        //3.将获取的转移量置到 高、中优先级
+        if (transferValue > 0 ){
+            if (prodFinal.getHeightProductionQty() > 0 ){
+                prodFinal.setHeightProductionQty(prodFinal.getHeightProductionQty() + transferValue);
+            }else{
+                prodFinal.setMidProductionQty(prodFinal.getMidProductionQty() + transferValue);
+            }
+        }
     }
 
     /**
