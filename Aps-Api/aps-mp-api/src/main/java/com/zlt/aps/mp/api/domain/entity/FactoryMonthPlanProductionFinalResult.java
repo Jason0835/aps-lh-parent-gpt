@@ -412,6 +412,15 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
     @ApiModelProperty(value = "生产实际排产量", name = "totalQty")
     @TableField(value = "TOTAL_QTY")
     private Integer totalQty;
+    ;
+
+    /**
+     * 定稿生产实际排产量，后续调整不会变
+     */
+    @Excel(name = "ui.data.column.FactoryMonthPlanFinalResult.originalTotalQty")
+    @ApiModelProperty(value = "定稿生产实际排产量", name = "originalTotalQty")
+    @TableField(value = "ORIGINAL_TOTAL_QTY")
+    private Integer originalTotalQty;
 
     /**
      * 中优先级排产数量

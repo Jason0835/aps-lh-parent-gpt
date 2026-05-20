@@ -199,7 +199,7 @@ public class GroupPlanDeductionDayHandler {
      * @param skuDayProductionInfo sku日排产信息
      * @param dayCapacityLimit     日产限制对象
      * @param productionDayLimit   单结构日排产限制对象
-     * @param allMouldInfoMap      模具排产信息对象集合
+     * @param allMouldInfoMap      模具排产信息对象集合（指定清除的模具）
      * @param singleDeductionDay   清除日
      */
     private void clearSkuProductionInfoByDay(TbrProductionContext productionContext, ProductionPlanGroupInfo groupPlanInfo, String materialDesc, SkuDayProductionInfoHelper skuDayProductionInfo, DayCapacityLimitVo dayCapacityLimit, GroupPlanCxLhCapacityLimitHelper productionDayLimit, Map<String, ProductionMouldInfoVo> allMouldInfoMap, Integer singleDeductionDay) {
@@ -241,15 +241,15 @@ public class GroupPlanDeductionDayHandler {
                 mouldInfo.getDayProductionInfo().put(singleDeductionDay, otherSkuList);
             }
         });
-        //20260518+ 清除结构日排产使用模具信息
-        productionDayLimit.clearAllUsedMouldInfo(clearUsedMouldSet, materialDesc);
         //20260125 释放，日产能占用量
         if (null != dayCapacityLimit) {
             Integer sumProductionQty = skuDayProductionInfo.getSumProductionQty();
-            dayCapacityLimit.deductionSkuDayProductionQty(productionContext, singleDeductionDay, materialDesc, usedMouldSet, sumProductionQty, skuDayProductionInfo.getLossQty(), skuDayProductionInfo.getBrand());
+            dayCapacityLimit.deductionSkuDayProductionQty(productionContext, singleDeductionDay, materialDesc, clearUsedMouldSet, sumProductionQty, skuDayProductionInfo.getLossQty(), skuDayProductionInfo.getBrand());
             //20260211 特殊材料的消耗量释放(Sku已排产量对应释放)
             productionContext.updateSpecialMaterialInfoSkuAllocateQty(groupPlanInfo, -sumProductionQty);
         }
+        //20260518+ 清除结构日排产使用模具信息
+        productionDayLimit.clearAllUsedMouldInfo(clearUsedMouldSet, materialDesc);
     }
 
     /**

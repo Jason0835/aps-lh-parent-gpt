@@ -569,6 +569,9 @@ export default {
       actionDate: {},
       /** 从月计划调整查询「选择」进入，用于取消时清理路由参数 */
       monthPlanFromFinalSelect: false,
+      /** 结构内调整页默认拉单防重入 */
+      _structureInnerInitPending: false,
+      _structureInnerRouteStamp: "",
 
       syncLoading: false,
       /** 下发 SCM/MES 弹窗（与月计划调整查询页同源接口；弹窗年月独立按 backup-legacy 默认下月初始化） */
@@ -1214,21 +1217,18 @@ export default {
           filterable: true,
         })
       }
-      /** 月计划结构调整独立路由：不展示查询区「版本号」（定稿版本仍可由 getVersionList 写入 query 供列表接口使用） */
-      if (!this.isStructureAdjustPage) {
-        list.push({
-          prop:
-            this.activeName == "second" ? "productionVersion" : "version",
-          label: this.$t("版本号"),
-          type: "select",
-          clearable: this.activeName == "first" ? false : true,
-          filterable: true,
-          dictData: this.versionList,
-          listeners: {
-            change: this.handleVersionChange,
-          },
-        });
-      }
+      list.push({
+        prop:
+          this.activeName == "second" ? "productionVersion" : "version",
+        label: this.$t("版本号"),
+        type: "select",
+        clearable: this.activeName == "first" ? false : true,
+        filterable: true,
+        dictData: this.versionList,
+        listeners: {
+          change: this.handleVersionChange,
+        },
+      });
       list.push(
         {
           prop: "materialCode",
@@ -2037,6 +2037,71 @@ export default {
         this.loading = false;
         this.show = true;
       }
+    },
+    /**
+     * 结构内调整独立页：从路由同步工厂/年月/版本号到查询区
+     */
+    applyStructureInnerRouteQuery() {
+      const rq = this.$route.query || {};
+      const next = { ...this.search };
+      if (rq.yearMonth != null && String(rq.yearMonth).trim() !== "") {
+        const normalized = this.formatYearMonthForPicker(
+          String(rq.yearMonth).trim()
+        );
+        if (normalized) {
+          next.yearMonth = normalized;
+        }
+      }
+      if (rq.factoryCode != null && String(rq.factoryCode).trim() !== "") {
+        next.factoryCode = String(rq.factoryCode).trim();
+      }
+      if (rq.version != null && String(rq.version).trim() !== "") {
+        next.version = String(rq.version).trim();
+      }
+      this.search = next;
+      this.query = { ...next };
+    },
+    /**
+     * 结构内调整独立页初始化：先加载版本号下拉并回显，再默认获取调整订单
+     */
+    async initStructureInnerPage() {
+      if (this._structureInnerInitPending) {
+        return;
+      }
+      this._structureInnerInitPending = true;
+      try {
+        await this.$nextTick();
+        try {
+          await this.getVersionList(false);
+        } catch (e) {
+          console.error(e);
+        }
+        await this.adjustOrder();
+      } finally {
+        this._structureInnerInitPending = false;
+      }
+    },
+    /**
+     * 月计划弹窗「选择」进入结构调整页：拉版本号后默认获取调整订单
+     */
+    async bootstrapStructureAdjustSingleFlow() {
+      const productionVersion = (
+        this.formInline.productionVersion || ""
+      ).trim();
+      if (!productionVersion) {
+        this.page = null;
+        setTimeout(() => {
+          this.page = null;
+          this.data = [];
+          this.show = true;
+          this.loading = false;
+          this.isShowResult = true;
+          this.activeName = "singleResult";
+        }, 500);
+        return;
+      }
+      await this.getOutVersionList();
+      await this.getOutList();
     },
     //获取调整订单
     async adjustOrder() {
@@ -3145,7 +3210,7 @@ export default {
     /**
      * 月计划调整查询弹窗中点击「选择」后携带参数进入：展示单结构调整表单并走与「单选结构调整」相同的数据加载逻辑
      */
-    applyMonthPlanFinalSelectPrefill() {
+    async applyMonthPlanFinalSelectPrefill() {
       const q = this.$route.query || {};
       this.monthPlanFromFinalSelect = true;
 
@@ -3234,20 +3299,7 @@ export default {
         this.data = [];
         this.actionDate = { ...this.formInline };
         this.getStartDay(this.formInline);
-        /** 与 handleAdd 一致：仅拉版本下拉，不 getOutHistoryList(true)，否则 isEdit=false 主表只读 */
-        if ((this.formInline.productionVersion || "").trim()) {
-          this.getOutVersionList();
-        } else {
-          this.page = null;
-          setTimeout(() => {
-            this.page = null;
-            this.data = [];
-            this.show = true;
-            this.loading = false;
-            this.isShowResult = true;
-            this.activeName = "singleResult";
-          }, 500);
-        }
+        await this.bootstrapStructureAdjustSingleFlow();
         return;
       }
 
@@ -3299,25 +3351,33 @@ export default {
       this.isEdit = false;
       this.data = [];
       this.getStartDay(row);
-      if (row.productionVersion) {
-        this.getOutVersionList();
-      } else {
-        this.page = null;
-        setTimeout(() => {
-          this.page = null;
-          this.data = [];
-          this.show = true;
-          this.loading = false;
-          this.isShowResult = true;
-          this.activeName = "singleResult";
-        }, 500);
+      await this.bootstrapStructureAdjustSingleFlow();
+    },
+
+    /**
+     * 结构内调整页进入时默认拉取调整订单（mounted / activated 触发，避免 created 过早）
+     * @param {boolean} fromMount 首次挂载
+     */
+    tryBootstrapStructureInnerPage(fromMount) {
+      const stamp = JSON.stringify(this.$route.query || {});
+      if (!fromMount && stamp === this._structureInnerRouteStamp) {
+        return;
       }
+      this._structureInnerRouteStamp = stamp;
+      this.applyStructureInnerRouteQuery();
+      this.initStructureInnerPage();
     },
 
   },
   mounted() {
-    // console.log("mounted");
-    // this.getList();
+    if (this.isStructureInnerPage) {
+      this.tryBootstrapStructureInnerPage(true);
+    }
+  },
+  activated() {
+    if (this.isStructureInnerPage) {
+      this.tryBootstrapStructureInnerPage(false);
+    }
   },
   created() {
     const now = new Date();
@@ -3327,22 +3387,14 @@ export default {
       yearMonth: `${year}-${month < 10 ? "0" + month : month}`,
       factoryCode: "116",
     };
-    /** 从月计划调整查询页「结构内调整」进入时，路由仅带 yearMonth，需与来源页查询年月一致 */
-    const rq = this.$route.query || {};
-    if (rq.yearMonth != null && String(rq.yearMonth).trim() !== "") {
-      const normalized = this.formatYearMonthForPicker(
-        String(rq.yearMonth).trim()
-      );
-      if (normalized) {
-        defaultParams.yearMonth = normalized;
-      }
-    }
     this.search = {
       ...defaultParams,
     };
     this.query = {
       ...defaultParams,
     };
+    /** 从月计划调整查询页「结构内调整」进入时，路由携带工厂/年月/版本号，需与来源页查询条件一致 */
+    this.applyStructureInnerRouteQuery();
     if (this.pageVariant === "structureAdjust") {
       this.adjustType = "02";
       this.activeName = "second";
@@ -3361,7 +3413,7 @@ export default {
       this.$route.query.fromSelect === "1";
     if (isMpPrefill) {
       this.applyMonthPlanFinalSelectPrefill();
-    } else {
+    } else if (!this.isStructureInnerPage) {
       this.getVersionList(true);
     }
   },

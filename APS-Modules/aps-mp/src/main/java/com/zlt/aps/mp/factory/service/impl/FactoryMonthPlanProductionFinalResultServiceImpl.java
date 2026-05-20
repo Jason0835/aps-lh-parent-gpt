@@ -552,6 +552,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             finalResult.setLastMonthPlanVersion(dayResult.getMonthPlanVersion());
             finalResult.setIsRelease(ReleaseStatusEnum.UN_RELEASE.getCode());
             finalResult.setRemark(dayResult.getRemark());
+            finalResult.setOriginalTotalQty(dayResult.getTotalQty());
             finalResult.setAdjustQty1(0);
             finalResult.setAdjustQty2(0);
             finalResult.setAdjustQty3(0);
