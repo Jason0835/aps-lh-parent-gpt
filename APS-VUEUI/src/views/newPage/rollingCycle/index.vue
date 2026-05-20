@@ -170,13 +170,13 @@
                   >获取调整订单</el-button
                 >
               </el-form-item>
-              <!-- <el-button
+              <el-button
                 @click="handShowResult"
                 :loading="autoLoading"
                 :disabled="data.length == 0"
                 v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
                 >{{ $t("自动调整") }}</el-button
-              > -->
+              >
               <!-- <el-form-item v-if="showOutResult">
                 <el-button
                   type="primary"
@@ -1214,12 +1214,8 @@ export default {
           filterable: true,
         })
       }
-      /** 结构调整页：查询区展示成型机台、产品结构（与单选结构 listOutHistory 入参一致） */
+      /** 结构调整页：查询区展示产品结构 */
       if (this.isStructureAdjustPage) {
-        list.push({
-          prop: "scheduledMachines",
-          label: this.$t("ui.data.column.monthPlanStructureAdjust.cxMachineCode"),
-        });
         list.push({
           prop: "structureName",
           label: this.$t("产品结构"),
