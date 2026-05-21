@@ -1284,8 +1284,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (StringUtils.isNotBlank(source.getIsEnd())) {
             target.setIsEnd(source.getIsEnd());
         }
-        if (StringUtils.isNotBlank(source.getConstructionStage())) {
-            target.setConstructionStage(source.getConstructionStage());
+        if (StringUtils.isNotBlank(source.getTrialStatus())) {
+            target.setConstructionStage(source.getTrialStatus());
         }
         if (StringUtils.isNotBlank(source.getScheduleOrder())) {
             target.setScheduleOrder(source.getScheduleOrder());
