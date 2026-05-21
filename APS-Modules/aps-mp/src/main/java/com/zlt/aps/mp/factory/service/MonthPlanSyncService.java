@@ -139,7 +139,7 @@ public class MonthPlanSyncService {
      */
     private AjaxResult validateAdjustedSyncParam(FactoryMonthPlanProductionFinalResult param) {
         if (param == null || param.getYear() == null || param.getMonth() == null
-                || StringUtils.isBlank(param.getFactoryCode()) || StringUtils.isBlank(param.getMonthPlanVersion())
+                || StringUtils.isBlank(param.getFactoryCode()) || StringUtils.isBlank(param.getProductionVersion())
                 || StringUtils.isBlank(param.getLastMonthPlanVersion())) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.checkParam"));
         }
