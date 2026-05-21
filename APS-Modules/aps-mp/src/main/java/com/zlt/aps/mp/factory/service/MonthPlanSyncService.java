@@ -162,7 +162,7 @@ public class MonthPlanSyncService {
                 .eq(FactoryMonthPlanProductionFinalResult::getYear, param.getYear())
                 .eq(FactoryMonthPlanProductionFinalResult::getMonth, param.getMonth())
                 .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, param.getMonthPlanVersion())
-                .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, param.getProductionVersion())
+                .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, param.getLastMonthPlanVersion())
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, YesOrNoEnum.NO.getValue());
         return finalResultMapper.selectList(queryWrapper);
     }
