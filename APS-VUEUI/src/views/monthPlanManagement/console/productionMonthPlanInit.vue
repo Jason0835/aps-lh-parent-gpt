@@ -108,6 +108,7 @@ export default {
       query: {},
       importDefaultValue: {},
       importRules: {},
+      lastRouteLoadKey: "",
     };
   },
   computed: {
@@ -229,6 +230,14 @@ export default {
           label: this.$t("ui.data.monthlyProductionPlan.cxMachineCode"),
         },
       ];
+    },
+  },
+  watch: {
+    $route: {
+      immediate: false,
+      handler() {
+        this.initByRouteAndLoad();
+      },
     },
   },
   methods: {
@@ -353,12 +362,16 @@ export default {
         this.loading = false;
       }
     },
-  },
-  created() {
-    console.log(this.$route.query);
-    if (this.$route.query) {
-      let defaultParams = {
-        ...this.$route.query,
+    initByRouteAndLoad() {
+      const routeQuery = this.$route.query || {};
+      const routePath = this.$route.path || "";
+      const routeKey = `${routePath}?${JSON.stringify(routeQuery)}`;
+      if (routeKey === this.lastRouteLoadKey) {
+        return;
+      }
+      this.lastRouteLoadKey = routeKey;
+      const defaultParams = {
+        ...routeQuery,
       };
       this.search = {
         ...defaultParams,
@@ -366,10 +379,16 @@ export default {
       this.query = {
         ...defaultParams,
       };
-    }
-    this.getList();
+      this.$set(this.page, "current", 1);
+      this.getList();
+    },
   },
-  activated() {},
+  created() {
+    this.initByRouteAndLoad();
+  },
+  activated() {
+    this.initByRouteAndLoad();
+  },
 };
 </script>
 <style lang="scss" scoped>

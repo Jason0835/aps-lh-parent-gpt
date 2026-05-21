@@ -239,7 +239,8 @@ export default {
       ],
       stat:{
 
-      }
+      },
+      lastRouteLoadKey: "",
     };
   },
   computed: {
@@ -719,6 +720,14 @@ export default {
       ];
     },
   },
+  watch: {
+    $route: {
+      immediate: false,
+      handler() {
+        this.initByRouteAndLoad();
+      },
+    },
+  },
   methods: {
     async handleSubmit(){
       try {
@@ -1079,45 +1088,50 @@ export default {
         }
       }
     },
+    initByRouteAndLoad() {
+      const routeQuery = this.$route.query || {};
+      const routePath = this.$route.path || "";
+      const routeKey = `${routePath}?${JSON.stringify(routeQuery)}`;
+      if (routeKey === this.lastRouteLoadKey) {
+        return;
+      }
+      this.lastRouteLoadKey = routeKey;
+      if (routeQuery.yearMonth) {
+        const defaultParams = {
+          ...routeQuery,
+        };
+        this.search = {
+          ...defaultParams,
+        };
+        this.query = {
+          ...defaultParams,
+        };
+        this.getVersionList(true, false);
+      } else {
+        const now = new Date();
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const year = nextMonth.getFullYear();
+        const month = nextMonth.getMonth() + 1;
+        const defaultParams = {
+          factoryCode: "116",
+          yearMonth: `${year}-${month}`,
+        };
+        this.search = {
+          ...defaultParams,
+        };
+        this.query = {
+          ...defaultParams,
+        };
+        this.getVersionList(true);
+      }
+    },
   },
   created() {
-    console.log(this.$route.query);
-    if (this.$route.query.yearMonth) {
-      let defaultParams = {
-        ...this.$route.query,
-      };
-      this.search = {
-        ...defaultParams,
-      };
-      this.query = {
-        ...defaultParams,
-      };
-      this.getVersionList(true,false);
-    } else {
-      const now = new Date();
-      // now.setMonth(now.getMonth() + 1);
-      // const year = now.getFullYear();
-      // const month = String(now.getMonth() + 1).padStart(2, "0"); // 月份从0开始，需要+1
-      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      const year = nextMonth.getFullYear();
-      const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
-      let defaultParams = {
-        factoryCode: "116",
-        yearMonth: `${year}-${month}`,
-      };
-      this.search = {
-        ...defaultParams,
-      };
-      this.query = {
-        ...defaultParams,
-      };
-      this.getVersionList(true);
-    }
-
-
-    // this.getList();
+    this.initByRouteAndLoad();
   },
-  activated() {},
+  activated() {
+    this.initByRouteAndLoad();
+  },
 };
 </script>
 <style lang="scss" scoped>

@@ -112,6 +112,7 @@ export default {
       verList: [],
       dailyVisible: false,
       productionVersion: null,
+      lastRouteLoadKey: "",
     };
   },
   computed: {
@@ -379,6 +380,14 @@ export default {
       ];
     },
   },
+  watch: {
+    $route: {
+      immediate: false,
+      handler() {
+        this.initByRouteAndLoad();
+      },
+    },
+  },
   methods: {
     handleAdd() {
       if (this.$refs.infoRef) {
@@ -539,25 +548,25 @@ export default {
         this.verList = [];
       }
     },
+    initByRouteAndLoad() {
+      const routePath = this.$route.path || "";
+      const routeKey = routePath;
+      if (routeKey === this.lastRouteLoadKey) {
+        return;
+      }
+      this.lastRouteLoadKey = routeKey;
+      if (this.$route.params.id) {
+        this.productionVersion = this.$route.params.id;
+      }
+      this.$set(this.page, "current", 1);
+      this.getList();
+    },
   },
   created() {
-    // const date = moment();
-    // let defaultParams = {
-    //   year: date.format("yyyy"),
-    //   month: date.format("MM"),
-    // };
-    // this.search = {
-    //   ...defaultParams,
-    // };
-    // this.query = {
-    //   ...defaultParams,
-    // };
-    if (this.$route.params.id) {
-      this.productionVersion = this.$route.params.id;
-    }
+    this.initByRouteAndLoad();
   },
   activated() {
-    this.getList();
+    this.initByRouteAndLoad();
   },
 };
 </script>
