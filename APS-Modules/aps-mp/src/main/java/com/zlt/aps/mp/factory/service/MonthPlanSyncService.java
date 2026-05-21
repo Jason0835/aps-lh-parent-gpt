@@ -161,7 +161,7 @@ public class MonthPlanSyncService {
         queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode())
                 .eq(FactoryMonthPlanProductionFinalResult::getYear, param.getYear())
                 .eq(FactoryMonthPlanProductionFinalResult::getMonth, param.getMonth())
-                .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, param.getLastMonthPlanVersion())
+                .eq(FactoryMonthPlanProductionFinalResult::getLastMonthPlanVersion, param.getLastMonthPlanVersion())
                 .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, param.getProductionVersion())
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, YesOrNoEnum.NO.getValue());
         return finalResultMapper.selectList(queryWrapper);
