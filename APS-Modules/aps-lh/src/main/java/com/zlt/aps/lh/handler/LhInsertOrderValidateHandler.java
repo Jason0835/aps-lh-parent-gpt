@@ -15,6 +15,7 @@ import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
+import com.zlt.aps.lh.mapper.MdmModelInfoMapper;
 import com.zlt.aps.lh.mapper.MdmMonthSurplusMapper;
 import com.zlt.aps.lh.mapper.MdmSkuLhCapacityMapper;
 import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
@@ -26,6 +27,7 @@ import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
@@ -94,11 +96,17 @@ public class LhInsertOrderValidateHandler {
     @Resource
     private MdmSkuConstructionRefEntityMapper mdmSkuConstructionRefEntityMapper;
 
+    @Resource
+    private MdmModelInfoMapper mdmModelInfoMapper;
+
     /** 排产版本已定稿 */
     private static final String PRODUCTION_VERSION_IS_FINAL = "1";
 
     /** 生产状态：生产中 */
     private static final String PRODUCTION_STATUS_IN_PRODUCTION = "1";
+
+    /** 模具状态：可用 */
+    private static final int MOULD_STATUS_AVAILABLE = 1;
 
     /**
      * 执行插单校验
@@ -129,11 +137,12 @@ public class LhInsertOrderValidateHandler {
      * <p>用于插单页面选择新物料时实时获取关联信息，不进行业务校验</p>
      *
      * @param dto 包含factoryCode、materialCode、scheduleDate的请求对象
-     * @return SKU关联数据（仅包含mouldSurplusQty、embryoStock、machineShiftCapacity、constructionStage、leftRightMould等字段）
+     * @return SKU关联数据（仅包含mouldSurplusQty、embryoStock、machineShiftCapacity、trialStatus、leftRightMould等字段）
      */
     public LhInsertOrderValidateResultDTO getSkuRelatedData(LhOrderInsertDTO dto) {
         LhInsertOrderValidateResultDTO result = new LhInsertOrderValidateResultDTO();
         result.setValid(true);
+        checkMachineAvailability(dto, result);
         checkMouldSurplus(dto, result);
         fillSkuRelatedData(dto, result);
         return result;
@@ -561,7 +570,7 @@ public class LhInsertOrderValidateHandler {
         fillEmbryoStock(dto, result, monthPlan, year, month, finalVersion);
 
         int totalInsertQty = calculateTotalInsertQty(dto);
-        if (surplusQty > 0 && totalInsertQty > surplusQty) {
+        if (totalInsertQty > surplusQty) {
             result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldSurplusExceeded"), surplusQty, totalInsertQty, (totalInsertQty - surplusQty)));
         }
     }
@@ -723,18 +732,31 @@ public class LhInsertOrderValidateHandler {
                 .collect(Collectors.toList());
 
         if (CollectionUtils.isNotEmpty(unavailableMoulds)) {
-            result.addWarning(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldUnavailable"), materialCode, String.join(",", unavailableMoulds)));
+            result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldUnavailable"), materialCode, String.join(",", unavailableMoulds)));
         }
     }
 
     /**
      * 判断模具是否可用
+     * <p>查询模具台账表（T_MDM_MOULD_INFO），根据mouldStatus判断模具是否可用</p>
+     * <p>mouldStatus=1表示可用，其他值表示不可用</p>
      *
      * @param mouldCode 模具编号
      * @return true-可用，false-不可用
      */
     private boolean isMouldEnabled(String mouldCode) {
-        return true;
+        if (StringUtils.isBlank(mouldCode)) {
+            return false;
+        }
+        LambdaQueryWrapper<MdmModelInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmModelInfo::getMouldCode, mouldCode)
+                .eq(MdmModelInfo::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .last("LIMIT 1");
+        MdmModelInfo mouldInfo = mdmModelInfoMapper.selectOne(wrapper);
+        if (mouldInfo == null) {
+            return false;
+        }
+        return mouldInfo.getMouldStatus() != null && mouldInfo.getMouldStatus() == MOULD_STATUS_AVAILABLE;
     }
 
     /**
@@ -881,7 +903,7 @@ public class LhInsertOrderValidateHandler {
                 .map(list -> list.get(0))
                 .orElse(null);
         if (Objects.nonNull(skuConstructionRef) && StringUtils.isNotBlank(skuConstructionRef.getLhType())) {
-            result.setConstructionStage(skuConstructionRef.getLhType());
+            result.setTrialStatus(skuConstructionRef.getLhType());
         }
     }
 }

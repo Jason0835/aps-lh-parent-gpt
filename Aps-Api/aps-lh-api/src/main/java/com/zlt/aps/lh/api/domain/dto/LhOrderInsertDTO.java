@@ -52,6 +52,7 @@ public class LhOrderInsertDTO implements Serializable {
     /**
      * 存储当前左右模情况，如果非单模单规格的则可为空，单模单规格则存储对应的模信息，如：存储内容，L/R、L1/R1
      */
+    @JsonProperty(value = "leftRightMould")
     @ApiModelProperty(value = "左右模", name = "leftRightMold")
     private String leftRightMold;
 

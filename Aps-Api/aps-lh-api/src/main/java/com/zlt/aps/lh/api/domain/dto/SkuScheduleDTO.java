@@ -72,8 +72,10 @@ public class SkuScheduleDTO {
     private String scheduleType;
     /** 是否试制量试 */
     private boolean trial;
-    /** 施工阶段 */
+    /** 施工阶段（排程引擎内部使用，00/01/02/03） */
     private String constructionStage;
+    /** 示方类型（字典 lh_trial_status：S-正规示方，T-量试示方，X-试验示方） */
+    private String trialStatus;
     /** 试制量试需求量 */
     private int trialDemandQty;
     /** 是否小批量验证SKU */

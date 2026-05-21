@@ -902,6 +902,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             }
             workbook.setForceFormulaRecalculation(true);
             sheet.setForceFormulaRecalculation(true);
+            workbook.setActiveSheet(0);
             workbook.write(outputStream);
             return removeCalcChain(outputStream.toByteArray());
         } catch (Exception e) {

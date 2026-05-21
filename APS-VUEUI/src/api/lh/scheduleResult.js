@@ -294,8 +294,8 @@ export function selectListMdmProductConstruction(query) {
  * @returns
  */
 export function exportScheduleResult(params) {
-  const dateStr = moment().format('YYYYMMDD')
-  const filename = `硫化计划数据表${dateStr}.xlsx`
+  const scheduleDate = params && params.scheduleDate ? moment(params.scheduleDate).format('YYYYMMDD') : moment().format('YYYYMMDD')
+  const filename = `硫化日计划${scheduleDate}.xlsx`
   return downloadLink("/lh/lhScheduleResult/export", params, filename);
 }
 /**
