@@ -1485,6 +1485,9 @@ public class MatchingAdjuestProductionHandler {
                 remainMaxDayProductionQty, day); // 构建产能检查器
         dayTotalCapacityChecker.doCheck(); // 执行产能检查
         Integer realTotalPlanQty = dayTotalCapacityChecker.getTotalPlanQty();
+        if (realTotalPlanQty == null){
+            realTotalPlanQty = 0;
+        }
         // 计算剩余的可用产能
         return remainMaxDayProductionQty > realTotalPlanQty ? remainMaxDayProductionQty - realTotalPlanQty : 0;
     }
