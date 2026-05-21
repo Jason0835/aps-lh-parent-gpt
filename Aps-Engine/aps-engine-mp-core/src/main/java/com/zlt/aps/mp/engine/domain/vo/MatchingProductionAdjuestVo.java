@@ -15,6 +15,10 @@ public class MatchingProductionAdjuestVo {
      */
     private Boolean isFirstDay;
     /**
+     * 是否二次上模
+     */
+    private Boolean isSecondMold;
+    /**
      * 物料编码
      */
     private String materialCode;

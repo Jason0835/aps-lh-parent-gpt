@@ -188,7 +188,7 @@
           </el-form>
         </div>
       </template>
-      <template slot="footer" v-if="isShowFoot">
+      <template slot="footer" v-if="showPageFooter">
         <div
           style="
             display: flex;
@@ -568,6 +568,8 @@ export default {
       actionDate: {},
       /** 从月计划调整查询「选择」进入，用于取消时清理路由参数 */
       monthPlanFromFinalSelect: false,
+      /** 月计划弹窗「选择」带入的调整日期快照，进入页即赋值且 bootstrap 后回写 */
+      _monthPlanAdjustDaySnapshot: null,
 
       syncLoading: false,
       /** 下发 SCM/MES 弹窗（与月计划调整查询页同源接口；弹窗年月独立按 backup-legacy 默认下月初始化） */
@@ -601,6 +603,16 @@ export default {
     /** 结构调整独立页 */
     isStructureAdjustPage() {
       return this.pageVariant === "structureAdjust";
+    },
+    /**
+     * 页脚确定/取消：结构调整单结构流程进入后即显示；
+     * 结构内自动调整等流程仍依赖 isShowFoot。
+     */
+    showPageFooter() {
+      if (this.isStructureAdjustPage && this.isShowResult) {
+        return true;
+      }
+      return this.isShowFoot;
     },
     /**
      * 月计划结构内/结构调整独立页：版本号查询绑定 version（与 mpAdjustStructureIn/Out getVersionList 一致）；
@@ -1090,7 +1102,6 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  {this.isEdit && (
                     <el-input
                       key={row.id}
                       v-model={row.confirmAdjustQty}
@@ -1107,8 +1118,6 @@ export default {
                       }}
                       size="mini"
                     ></el-input>
-                  )}
-                  {!this.isEdit && <span>{row.confirmAdjustQty}</span>}
                 </div>
               );
             },
@@ -1119,7 +1128,6 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  {this.isEdit && (
                     <el-input
                       key={row.id}
                       v-model={row.adjustPriority}
@@ -1141,8 +1149,6 @@ export default {
                       }}
                       size="mini"
                     ></el-input>
-                  )}
-                  {!this.isEdit && <span>{row.adjustPriority}</span>}
                 </div>
               );
             },
@@ -1762,13 +1768,23 @@ export default {
       try {
         let res = await editOutHistory(row);
         // this.$modal.msgSuccess(res.msg);
-        this.getSingleList({
+        const structureName = (
+          (this.formInline && this.formInline.structureName) ||
+          ""
+        )
+          .toString()
+          .trim();
+        const listParams = {
           factoryCode: row.factoryCode,
           year: row.year,
           month: row.month,
           version: row.version,
           productionVersion: row.productionVersion,
-        });
+        };
+        if (structureName) {
+          listParams.structureName = structureName;
+        }
+        this.getSingleList(listParams);
       } catch (err) {}
     },
 
@@ -1981,8 +1997,8 @@ export default {
       }
     },
 
-    //获取单选历史列表的版本号
-    async getOutVersionList(isGet) {
+    //获取单选历史列表的版本号（mpAdjustStructureOut/getVersionList）
+    async getOutVersionList(isGet = false, isNewVersion = false) {
       try {
         const params = {
           ...this.query,
@@ -2005,7 +2021,7 @@ export default {
 
         this.versionList = list;
         if (list.length > 0) {
-          this.applyAdjustVersionDefault(list, false);
+          this.applyAdjustVersionDefault(list, isNewVersion);
         } else {
           this.$set(this.search, "version", "");
           this.$set(this.query, "version", "");
@@ -2676,12 +2692,27 @@ export default {
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
 
-        this.data = res.rows;
-        this.getOutResultList(
-          res.rows[0].productionVersion,
-          res.rows[0].version
-        );
-        this.isShowFoot = true;
+        const rows = res.rows || [];
+        if (rows.length > 0) {
+          const first = rows[0];
+          if (first.version != null && String(first.version).trim() !== "") {
+            const ver = String(first.version).trim();
+            this.$set(this.query, "version", ver);
+            this.$set(this.search, "version", ver);
+          }
+          if (
+            first.productionVersion != null &&
+            String(first.productionVersion).trim() !== ""
+          ) {
+            const pv = String(first.productionVersion).trim();
+            this.$set(this.query, "productionVersion", pv);
+            this.$set(this.search, "productionVersion", pv);
+          }
+          await this.getOutResultList(
+            first.productionVersion,
+            first.version
+          );
+        }
         this.showOutResult = true;
         if (!this.formInline.adjustStartDay) {
           this.formInline.adjustStartDay = this.formInline.beginDay;
@@ -2690,7 +2721,9 @@ export default {
           this.formInline.adjustEndDay = this.formInline.endDay;
         }
 
-        this.getOutVersionList();
+        /** 获取调整订单后：重新拉取版本号列表，再按最新版本查询 list */
+        await this.getOutVersionList(true, true);
+        this.isEdit = true;
       } catch (err) {
         console.log(err);
       } finally {
@@ -3195,6 +3228,35 @@ export default {
     },
 
     /**
+     * 月计划结构调整弹窗「选择」带入的调整日期（见 structureAdjustDialog.resolveAdjustDaysOnSelect）
+     */
+    applyMonthPlanSelectAdjustDays(formInline, adjustContext) {
+      if (!formInline || !adjustContext) {
+        return;
+      }
+      if (
+        adjustContext.adjustStartDay != null &&
+        adjustContext.adjustStartDay !== ""
+      ) {
+        this.$set(
+          formInline,
+          "adjustStartDay",
+          Number(adjustContext.adjustStartDay)
+        );
+      }
+      if (
+        adjustContext.adjustEndDay != null &&
+        adjustContext.adjustEndDay !== ""
+      ) {
+        this.$set(
+          formInline,
+          "adjustEndDay",
+          Number(adjustContext.adjustEndDay)
+        );
+      }
+    },
+
+    /**
      * 调用 getPreviousStructure（outGetStayDay）：与旧版一致，传 **listAdjusts 选中行全部字段**（id、monthPlanVersion、planType 等），
      * 仅合并 this.query 补缺并从 yearMonth 解析年月；去掉 UI 临时字段；beginDay/endDay/year/month 做数值化。
      */
@@ -3272,24 +3334,84 @@ export default {
     },
 
     /**
-     * 月计划调整查询弹窗中点击「选择」后携带参数进入：展示单结构调整表单并走与「单选结构调整」相同的数据加载逻辑
+     * 仅月计划结构调整弹窗「选择」跳转（路由 fromSelect=1）时执行：带入行数据 + 弹窗已算好的调整开始/结束日。
      */
     async applyMonthPlanFinalSelectPrefill() {
       const q = this.$route.query || {};
+      if (q.fromSelect !== "1") {
+        return;
+      }
       this.monthPlanFromFinalSelect = true;
 
       let storedRow = null;
+      let adjustContext = null;
       if (q.prefillStore === "1") {
         try {
           const raw = sessionStorage.getItem(
             MP_STRUCTURE_ADJUST_PREFILL_STORAGE_KEY
           );
           if (raw) {
-            storedRow = JSON.parse(raw);
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.row && typeof parsed.row === "object") {
+              storedRow = parsed.row;
+              adjustContext = parsed.adjustContext || null;
+            } else if (parsed && typeof parsed === "object") {
+              storedRow = parsed;
+            }
           }
         } catch (e) {
           console.warn("结构行缓存解析失败", e);
         }
+      }
+
+      /** 仅调整开始/结束日：进入页立即赋值（不等待 bootstrap） */
+      if (adjustContext) {
+        this._monthPlanAdjustDaySnapshot = {
+          adjustStartDay: adjustContext.adjustStartDay,
+          adjustEndDay: adjustContext.adjustEndDay,
+        };
+      } else {
+        const adjustStartDay =
+          q.adjustStartDay !== undefined && q.adjustStartDay !== ""
+            ? Number(q.adjustStartDay)
+            : null;
+        const adjustEndDay =
+          q.adjustEndDay !== undefined && q.adjustEndDay !== ""
+            ? Number(q.adjustEndDay)
+            : null;
+        this._monthPlanAdjustDaySnapshot = {
+          adjustStartDay:
+            adjustStartDay != null && !Number.isNaN(adjustStartDay)
+              ? adjustStartDay
+              : null,
+          adjustEndDay:
+            adjustEndDay != null && !Number.isNaN(adjustEndDay)
+              ? adjustEndDay
+              : null,
+        };
+      }
+      this.formInline = {
+        cxMachineCode: q.cxMachineCode || "",
+        scheduledMachines: q.scheduledMachines || "",
+        structureName: q.structureName || "",
+        beginDay:
+          q.beginDay !== undefined && q.beginDay !== ""
+            ? Number(q.beginDay)
+            : "",
+        endDay:
+          q.endDay !== undefined && q.endDay !== "" ? Number(q.endDay) : "",
+        factoryCode: q.factoryCode || this.search.factoryCode,
+      };
+      this.applyMonthPlanSelectAdjustDays(
+        this.formInline,
+        this._monthPlanAdjustDaySnapshot
+      );
+      this.isShowResult = true;
+      this.activeName = "singleResult";
+      this.show = false;
+      this.loading = true;
+
+      if (q.prefillStore === "1") {
         try {
           sessionStorage.removeItem(MP_STRUCTURE_ADJUST_PREFILL_STORAGE_KEY);
         } catch (e) {
@@ -3299,7 +3421,10 @@ export default {
 
       /** 与周程 handleAdd 一致：formInline = 完整 listAdjusts 行；路由仅覆盖首台机台等导航字段 */
       if (storedRow && typeof storedRow === "object") {
-        this.formInline = { ...storedRow };
+        const rowRest = { ...storedRow };
+        delete rowRest.adjustStartDay;
+        delete rowRest.adjustEndDay;
+        this.formInline = { ...this.formInline, ...rowRest };
         if (q.cxMachineCode) {
           this.formInline.cxMachineCode = q.cxMachineCode;
         }
@@ -3315,6 +3440,10 @@ export default {
         if (q.endDay !== undefined && q.endDay !== "") {
           this.formInline.endDay = Number(q.endDay);
         }
+        this.applyMonthPlanSelectAdjustDays(
+          this.formInline,
+          this._monthPlanAdjustDaySnapshot
+        );
         const qPv =
           q.productionVersion != null &&
           String(q.productionVersion).trim() !== ""
@@ -3367,8 +3496,13 @@ export default {
         this.isEdit = false;
         this.data = [];
         this.actionDate = { ...this.formInline };
-        this.getStartDay(this.formInline);
         await this.bootstrapStructureAdjustSingleFlow();
+        if (this._monthPlanAdjustDaySnapshot) {
+          this.applyMonthPlanSelectAdjustDays(
+            this.formInline,
+            this._monthPlanAdjustDaySnapshot
+          );
+        }
         return;
       }
 

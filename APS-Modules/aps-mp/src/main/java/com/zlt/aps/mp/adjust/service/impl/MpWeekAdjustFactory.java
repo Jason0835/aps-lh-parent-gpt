@@ -26,7 +26,8 @@ public class MpWeekAdjustFactory {
     public IMpWeekAdjustService getStrategy(String code) {
         WeekAdjustTypeEnum weekAdjustTypeEnum = WeekAdjustTypeEnum.getByCode(code);
         if (weekAdjustTypeEnum == null) {
-            return null;
+            //默认按结构内调整
+            weekAdjustTypeEnum = WeekAdjustTypeEnum.STRUCTURE_IN;
         }
         return strategyMap.get(weekAdjustTypeEnum);
     }

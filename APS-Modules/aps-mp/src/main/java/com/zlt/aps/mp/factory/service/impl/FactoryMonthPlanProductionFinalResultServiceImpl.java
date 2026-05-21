@@ -1174,7 +1174,9 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 capacityVo.setStandardCapacity(mdmSkuLhCapacity.getStandardCapacity());
                 capacityVo.setApsCapacity(mdmSkuLhCapacity.getApsCapacity());
                 capacityVo.calculateDayVulcanizationQty(mode);
-                insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty() / 2);
+                if (capacityVo.getDayVulcanizationQty() != null){
+                    insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty() / 2);
+                }
             }
 
             // 英寸---根据结构名称解析

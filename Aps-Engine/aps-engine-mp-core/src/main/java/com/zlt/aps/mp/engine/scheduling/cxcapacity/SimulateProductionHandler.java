@@ -215,8 +215,10 @@ public class SimulateProductionHandler extends OnLineGroupOnLineMachineHandler {
         //2、还原设置(包涵在产机台对在产分配的续作分配)
         clearProductionInfoHandler.resetProductionBySimulateProductionHandler(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
         TbrSimulateProductionLogRecorder.addDeliveryPriorityResetContinueLog(productionContext);
+        KeyInformationLogRecorder.recorderContinueAllocationGroupInfoLog(productionContext, allGroupPlanMap, allContinueMap, continueAllocationList);
         //3、在机结构对在产成型机台进行模拟模具排产
         mouldProductionByContinueGroup(productionContext, allGroupPlanMap, continueAllocationList, allContinueMap);
+        KeyInformationLogRecorder.recorderContinueCxMachineProductionLog(productionContext, allGroupPlanMap, allContinueMap);
     }
 
     /**

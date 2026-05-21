@@ -123,7 +123,7 @@
             <el-button
               type="text"
               :disabled="scope.row._isNew && (!scope.row.structureName || scope.row.beginDay == null || scope.row.endDay == null)"
-              @click="handleSelect(scope.row)"
+              @click="handleSelect(scope.row, scope.$index)"
             >{{
               $t("ui.data.column.monthPlanFinalAdjustQuery.btnSelect")
             }}</el-button>
@@ -137,13 +137,11 @@
 <script>
 import { mapGetters } from "vuex";
 import formingCapacitySelect from "@/views/components/formingCapacitySelect.vue";
-/** listOutsideStructure → POST /monthplan/mpStructureAllocation/listAdjusts；outGetStayDay/versionOutHistory 与周程单结构调整一致 */
+/** listOutsideStructure → POST /monthplan/mpStructureAllocation/listAdjusts */
 import {
   listOutsideStructure,
   setAdjustsCxMachineFromRedis,
   getAdjustsCxMachineFromRedis,
-  outGetStayDay,
-  versionOutHistory,
 } from "@/api/monthplan/adjustStructure";
 
 const MONTH_STANDARD_MAX = 31;
@@ -443,120 +441,99 @@ export default {
         this.loading = false;
       }
     },
-    /**
-     * 组装 getPreviousStructure（outGetStayDay）入参：与周程旧版一致，传 **listAdjusts 行全部字段**，
-     * 再补弹窗上下文（factory、年月、首台机台、定稿版本）；去掉 UI 临时字段。
-     * @param {object} row 列表行
-     * @param {string} cxFirst 成型机编码（首台，与跳转 query 一致）
-     * @returns {object|null} 无行则 null
-     */
-    buildGetPreviousStructurePayload(row, cxFirst) {
-      if (!row || typeof row !== "object") {
-        return null;
-      }
-      const payload = { ...row };
-      delete payload._isNew;
-      delete payload._tmpId;
+    getDaysInMonth(year, month) {
+      return new Date(year, month, 0).getDate();
+    },
 
-      if (this.factoryCode && !payload.factoryCode) {
-        payload.factoryCode = this.factoryCode;
-      }
-      const needYm =
-        payload.year == null ||
-        payload.year === "" ||
-        payload.month == null ||
-        payload.month === "";
-      if (needYm && this.yearMonth) {
+    resolveYearMonthFromRow(row) {
+      let year = row.year != null && row.year !== "" ? Number(row.year) : NaN;
+      let month = row.month != null && row.month !== "" ? Number(row.month) : NaN;
+      if ((Number.isNaN(year) || Number.isNaN(month)) && this.yearMonth) {
         const arr = String(this.yearMonth).trim().split("-");
         if (arr.length >= 2) {
-          payload.year = Number(arr[0]);
-          payload.month = Number(arr[1]);
-        }
-      } else {
-        if (payload.year != null && payload.year !== "") {
-          payload.year = Number(payload.year);
-        }
-        if (payload.month != null && payload.month !== "") {
-          payload.month = Number(payload.month);
+          year = Number(arr[0]);
+          month = Number(arr[1]);
         }
       }
-      if (cxFirst != null && String(cxFirst).trim() !== "") {
-        payload.cxMachineCode = String(cxFirst).trim();
-      }
-      const pv = this.resolveProductionVersionForJump(row);
-      if (
-        pv &&
-        (!payload.productionVersion ||
-          String(payload.productionVersion).trim() === "")
-      ) {
-        payload.productionVersion = pv;
-      }
-      if (
-        payload.beginDay !== undefined &&
-        payload.beginDay !== "" &&
-        payload.beginDay != null
-      ) {
-        payload.beginDay = Number(payload.beginDay);
-      }
-      if (
-        payload.endDay !== undefined &&
-        payload.endDay !== "" &&
-        payload.endDay != null
-      ) {
-        payload.endDay = Number(payload.endDay);
-      }
-      return payload;
+      return { year, month };
     },
+
     /**
-     * 组装 mpAdjustStructureOut/getVersionList 入参，与 rollingCycle 的 getOutVersionList 中 params 处理一致。
-     * @param {string} schedFirst 排产机台（首台）
-     * @param {object} row 列表行（取 productionVersion）
+     * 前结构 = 弹窗表格当前行的上一行（必须用表格行号，scope.row 与 serverRows 引用可能不一致）。
      */
-    buildOutVersionListParams(schedFirst, row) {
-      const params = {
-        factoryCode: this.factoryCode,
-        yearMonth: this.yearMonth,
-        scheduledMachines: schedFirst || "",
+    findPreviousStructureInMachineList(tableIndex) {
+      const list = this.tableRows;
+      if (
+        tableIndex == null ||
+        tableIndex <= 0 ||
+        tableIndex >= list.length
+      ) {
+        return null;
+      }
+      const prev = list[tableIndex - 1];
+      if (
+        !prev ||
+        prev.beginDay == null ||
+        prev.endDay == null
+      ) {
+        return null;
+      }
+      return prev;
+    },
+
+    isAdjustStartDayEmpty(value) {
+      return value == null || value === "";
+    },
+
+    /**
+     * 选择时根据弹窗表格计算调整开始/结束日（仅用于跳转页展示）：
+     * 当前行 adjustStartDay 为空且有上一行 → 上一行 endDay+1；
+     * 无前一行 → 当前行 beginDay；
+     * 调整结束日 → 当前行 endDay。
+     */
+    resolveAdjustDaysOnSelect(row, tableIndex) {
+      const beginDay = Number(row.beginDay);
+      const endDay = Number(row.endDay);
+      const adjustEndDay = endDay;
+      let adjustStartDay = beginDay;
+      let hasPreviousStructure = false;
+      let prevBeginDay = null;
+      let prevEndDay = null;
+
+      const prev = this.findPreviousStructureInMachineList(tableIndex);
+      const rowAdjustStartEmpty = this.isAdjustStartDayEmpty(row.adjustStartDay);
+
+      if (prev && rowAdjustStartEmpty) {
+        hasPreviousStructure = true;
+        prevBeginDay = Number(prev.beginDay);
+        prevEndDay = Number(prev.endDay);
+        if (!Number.isNaN(prevEndDay)) {
+          const { year, month } = this.resolveYearMonthFromRow(row);
+          const monthMax =
+            !Number.isNaN(year) && !Number.isNaN(month)
+              ? this.getDaysInMonth(year, month)
+              : MONTH_STANDARD_MAX;
+          adjustStartDay = Math.min(prevEndDay + 1, monthMax);
+        }
+      } else if (!this.isAdjustStartDayEmpty(row.adjustStartDay)) {
+        adjustStartDay = Number(row.adjustStartDay);
+      }
+
+      return {
+        hasPreviousStructure,
+        prevBeginDay,
+        prevEndDay,
+        adjustStartDay,
+        adjustEndDay,
       };
-      const pv = this.resolveProductionVersionForJump(row);
-      if (pv) {
-        params.productionVersion = pv;
-      }
-      if (params.yearMonth) {
-        const arr = String(params.yearMonth).split("-");
-        if (arr.length >= 2) {
-          params.year = arr[0];
-          params.month = arr[1];
-        }
-      }
-      return params;
     },
-    /**
-     * 跳转月计划结构调整页前，与周程「结构调整 → 单结构调整」一致预拉 getPreviousStructure、单结构版本列表。
-     * @param {object} row 当前行
-     * @param {string} cxFirst 成型机首台
-     * @param {string} schedFirst 排产机台首台
-     */
-    async prefetchSingleStructureApis(row, cxFirst, schedFirst) {
-      const prevPayload = this.buildGetPreviousStructurePayload(row, cxFirst);
-      const versionParams = this.buildOutVersionListParams(schedFirst, row);
-      const tasks = [];
-      if (prevPayload) {
-        tasks.push(
-          outGetStayDay(prevPayload).catch((err) => {
-            console.warn("getPreviousStructure 预请求失败", err);
-          })
-        );
-      }
-      tasks.push(
-        versionOutHistory(versionParams).catch((err) => {
-          console.warn("mpAdjustStructureOut/getVersionList 预请求失败", err);
-        })
-      );
-      await Promise.all(tasks);
-    },
-    async handleSelect(row) {
+
+    handleSelect(row, tableIndex) {
       if (!this.yearMonth) {
+        this.$modal.msgWarning(this.$t("common.rule.select"));
+        return;
+      }
+      if (row.beginDay == null || row.endDay == null) {
         this.$modal.msgWarning(this.$t("common.rule.select"));
         return;
       }
@@ -568,23 +545,28 @@ export default {
         this.extractFirstCxMachineCode(rawSched);
       const schedFirst =
         this.extractFirstCxMachineCode(rawSched) || cxFirst;
-      try {
-        this.loading = true;
-        await this.prefetchSingleStructureApis(row, cxFirst, schedFirst);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        this.loading = false;
-      }
-      /** 整行写入 sessionStorage，目标页与周程「勾选 → 单结构调整」同样使用完整 listAdjusts 行 */
+
+      const adjustContext = this.resolveAdjustDaysOnSelect(row, tableIndex);
+      const prefillRow = {
+        ...row,
+        cxMachineCode: cxFirst,
+        scheduledMachines: schedFirst,
+        productionVersion: this.resolveProductionVersionForJump(row),
+      };
       try {
         sessionStorage.setItem(
           MP_STRUCTURE_ADJUST_PREFILL_STORAGE_KEY,
-          JSON.stringify(row)
+          JSON.stringify({
+            row: prefillRow,
+            adjustContext,
+          })
         );
       } catch (e) {
         console.warn("结构行写入 sessionStorage 失败", e);
+        this.$modal.msgError(this.$t("common.msg.fail"));
+        return;
       }
+
       /** 跳转月计划结构调整页（与路由 path 一致），多机台时 query 只带第一台成型机 */
       this.$router.push({
         path: "/newPage/monthPlanStructureAdjust",
@@ -599,6 +581,14 @@ export default {
           structureName: row.structureName || "",
           beginDay: row.beginDay != null ? String(row.beginDay) : "",
           endDay: row.endDay != null ? String(row.endDay) : "",
+          adjustStartDay:
+            adjustContext.adjustStartDay != null
+              ? String(adjustContext.adjustStartDay)
+              : "",
+          adjustEndDay:
+            adjustContext.adjustEndDay != null
+              ? String(adjustContext.adjustEndDay)
+              : "",
           productionVersion: this.resolveProductionVersionForJump(row),
         },
       });

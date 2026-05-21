@@ -40,7 +40,8 @@ public interface MpAdjustResultEntityMapper extends CommBaseMapper<MpAdjustResul
     void deleteAdjustResultByVersion(@Param("factoryCode") String factoryCode,
                                             @Param("year") String year,
                                             @Param("month") String month,
-                                            @Param("version") String version);
+                                            @Param("version") String version,
+                                            @Param("structureName") String structureName);
 
     /**
      * 查询版本列表

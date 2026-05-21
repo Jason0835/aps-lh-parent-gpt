@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.adjust.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.Assert;
@@ -17,6 +18,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
 import com.zlt.aps.mp.api.domain.vo.AdjustStructureOrderVo;
 import com.zlt.aps.mp.engine.adjust.AdjustStructureOrderSorter;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
@@ -100,7 +102,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
 //            });
 //        }
         // 5、通过结构过滤调整明细
-        filterAdjustDetailList(contextDTO,resultList);
+        //filterAdjustDetailList(contextDTO,resultList);
         // 未获取到调整记录，抛出异常
         Assert.isFalse(PubUtil.isEmpty(resultList), () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFindAdjustDetailList"),
@@ -140,7 +142,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                     contextDTO.getMpYear(),contextDTO.getMpMonth()));
         }
         //检查是否已执行自动调整
-        //checkHasDoAutoAdjust(contextDTO);
+        checkHasDoAutoAdjust(contextDTO);
 
         String lastMonthPlanVersion = contextDTO.getMpAdjustStructureInList().get(0).getLastMonthPlanVersion();
         //2.按结构序列化分组
@@ -233,21 +235,6 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         contextDTO.setSaveAdjustProcLogList(newMpLogList);
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsResultList);
         contextDTO.setAdjustMonthPlanVersion(lastMonthPlanVersion);
-    }
-
-    /**
-     * 检查是否已执行自动调整
-     * @param contextDTO
-     */
-    private void checkHasDoAutoAdjust(MpRollAdjustContextDTO contextDTO) {
-        LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(MpAdjustResult::getFactoryCode, contextDTO.getFactoryCode());
-        queryWrapper.eq(MpAdjustResult::getVersion, contextDTO.getVersion());
-        List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
-        if (PubUtil.isNotEmpty(mpAdjustResultList)){
-            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.findAutoAdjustRecord"),
-                    contextDTO.getVersion()));
-        }
     }
 
     /**
@@ -451,27 +438,15 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         return resultList;
     }
 
-    /**
-     * 筛选：|净需求 - 计划剩余排产量| > 0的数据
-     * @param adjustList
-     */
-    private void filterAdjustList(List<MpAdjustDetailVo> adjustList) {
-        if (PubUtil.isEmpty(adjustList)) {
-            return;
-        }
-        adjustList.removeIf(adjust -> {
-            Integer currentNetQty = Convert.toInt(adjust.getCurrentNetQty(),0);
-            Integer monthUnScheduledQty = Convert.toInt(adjust.getMonthUnScheduledQty(),0);
-            boolean isOnlyConventionReserveHasValue = isOnlyConventionReserveHasValue(adjust);
-            return (Math.abs(currentNetQty - monthUnScheduledQty) == 0) || isOnlyConventionReserveHasValue;
-        });
-    }
-
     @Override
     public void saveAdjustDetailList(MpRollAdjustContextDTO contextDTO) {
         if (PubUtil.isEmpty(contextDTO.getAdjustDetailList())) {
             return;
         }
+        //结构内、结构间 调整订单列表，同时插入
+        List<MpAdjustStructureOut> adjustStructureOutList = BeanUtil.copyToList(contextDTO.getAdjustDetailList(), MpAdjustStructureOut.class);
+        baseDao.insertBatch(adjustStructureOutList);
+
         List<MpAdjustDetailVo> resultList = baseDao.saveWithQuery(contextDTO.getAdjustDetailList());
         contextDTO.setAdjustDetailList(resultList);
     }

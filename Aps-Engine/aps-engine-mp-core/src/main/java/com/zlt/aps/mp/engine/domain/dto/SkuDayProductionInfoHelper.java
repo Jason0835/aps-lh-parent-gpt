@@ -7,6 +7,7 @@ import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
 import lombok.Getter;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
@@ -173,6 +174,20 @@ public class SkuDayProductionInfoHelper implements Serializable {
     public String getGroupMainPatternKey() {
         String keyFormat = "%s|*|%s";
         return String.format(keyFormat, groupName, mainPattern);
+    }
+
+    /**
+     * 增加 日排产信息
+     * 包含 日排产量，模具信息等
+     *
+     * @param skuDayProductionInfo 需要增加的排产信息
+     */
+    public void addDayProductionInfo(SkuDayProductionInfoHelper skuDayProductionInfo) {
+        if (!isSameProductionInfo(skuDayProductionInfo)) {
+            return;
+        }
+        usedMouldSet.addAll(skuDayProductionInfo.getUsedMouldSet());
+        addProductionDayQty(skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
     }
 
     /**
@@ -395,6 +410,35 @@ public class SkuDayProductionInfoHelper implements Serializable {
         this.groupName = groupName;
         this.sumProductionQty = BigDecimal.ZERO.intValue();
         this.dayVulcanizationQty = dayVulcanizationQty;
+    }
+
+    /**
+     * 是否相同排产信息
+     * 排产日和排产Sku需一致
+     *
+     * @param compareInfo
+     * @return
+     */
+    private boolean isSameProductionInfo(SkuDayProductionInfoHelper compareInfo) {
+        if (null == compareInfo) {
+            return false;
+        }
+        if (!compareInfo.isEffectiveProductionInfo()) {
+            return false;
+        }
+        return compareInfo.getMaterialDesc().equals(materialDesc) && compareInfo.getProductionDay().equals(productionDay);
+    }
+
+    /**
+     * 是否有效排产信息
+     *
+     * @return
+     */
+    private boolean isEffectiveProductionInfo() {
+        if (StringUtils.isBlank(materialDesc) || null == productionDay) {
+            return false;
+        }
+        return true;
     }
 
     /**
