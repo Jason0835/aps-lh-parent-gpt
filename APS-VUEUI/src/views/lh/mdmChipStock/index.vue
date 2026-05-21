@@ -230,14 +230,6 @@ export default {
           label: this.$t("ui.data.column.lhChipStock.chipCode"),
           prop: "chipCode",
         },
-        {
-          label: this.$t("ui.data.column.lhChipStock.dataSource"),
-          prop: "dataSource",
-          type: "select",
-          dictData: this.dict.type.lh_precision_data_source,
-          filterable: true,
-          clearable: true,
-        },
       ];
     },
   },
