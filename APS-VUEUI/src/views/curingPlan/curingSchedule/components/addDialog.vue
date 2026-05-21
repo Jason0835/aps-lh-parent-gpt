@@ -1,4 +1,4 @@
-﻿<template>
+﻿﻿<template>
   <el-dialog
     :title="title"
     :visible="visible"
@@ -276,24 +276,30 @@ export default {
           factoryCode: this.form.factoryCode,
           materialCode: materialCode,
           scheduleDate: this.form.scheduleDate,
+          lhMachineCode: this.form.lhMachineCode,
         };
         const res = await getSkuRelatedData(params);
-        if (res && res.data) {
-          const data = res.data;
-          if (data.mouldSurplusQty != null) {
-            this.$set(this.form, "mouldSurplusQty", data.mouldSurplusQty);
+        if (res) {
+          if (res.mouldSurplusQty != null) {
+            this.$set(this.form, "mouldSurplusQty", res.mouldSurplusQty);
           }
-          if (data.embryoStock != null) {
-            this.$set(this.form, "embryoStock", data.embryoStock);
+          if (res.embryoStock != null) {
+            this.$set(this.form, "embryoStock", res.embryoStock);
           }
-          if (data.machineShiftCapacity != null) {
-            this.$set(this.form, "machineShiftCapacity", data.machineShiftCapacity);
+          if (res.machineShiftCapacity != null) {
+            this.$set(this.form, "machineShiftCapacity", res.machineShiftCapacity);
           }
-          if (data.trialStatus != null) {
-            this.$set(this.form, "trialStatus", data.trialStatus);
+          if (res.trialStatus != null) {
+            this.$set(this.form, "trialStatus", res.trialStatus);
           }
-          if (data.leftRightMould != null) {
-            this.$set(this.form, "leftRightMould", data.leftRightMould);
+          if (res.leftRightMould != null) {
+            this.$set(this.form, "leftRightMould", res.leftRightMould);
+          }
+          if (res.errorMessages && res.errorMessages.length > 0) {
+            this.$modal.msgError(res.errorMessages.join('\n'));
+          }
+          if (res.warningMessages && res.warningMessages.length > 0) {
+            this.$modal.msgWarning(res.warningMessages.join('\n'));
           }
         }
       } catch (error) {

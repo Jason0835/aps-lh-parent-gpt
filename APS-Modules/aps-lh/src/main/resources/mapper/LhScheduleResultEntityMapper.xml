@@ -24,7 +24,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="isReleasingOrTimeoutByIds" parameterType="string" resultType="int">
         select count(1) from t_lh_schedule_result
-        where is_delete = 0 and (IS_RELEASE = 3 or IS_RELEASE = 4)
+        where is_delete = 0 and IS_RELEASE = #{releaseStatus}
         and id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
