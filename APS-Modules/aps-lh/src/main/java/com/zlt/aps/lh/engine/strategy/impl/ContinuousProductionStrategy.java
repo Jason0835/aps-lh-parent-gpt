@@ -36,6 +36,7 @@ import com.zlt.aps.lh.util.LhSpecialMaterialUtil;
 import com.zlt.aps.lh.util.LhSpecifyMachineUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
+import com.zlt.aps.lh.util.ResultDowntimeSummaryUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.lh.util.ShiftProductionControlUtil;
@@ -2316,6 +2317,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             // 零计划结果不参与完工时刻语义。
             result.setSpecEndTime(null);
             result.setTdaySpecEndTime(null);
+            ResultDowntimeSummaryUtil.clearDowntimeSummary(result);
             return;
         }
         int lhTimeSeconds = result.getLhTime() != null ? result.getLhTime() : 0;
@@ -2328,6 +2330,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         }
         result.setSpecEndTime(specEndTime);
         result.setTdaySpecEndTime(specEndTime);
+        syncResultDowntimeSummary(context, result);
     }
 
     /**
@@ -3126,6 +3129,36 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             return new ArrayList<>();
         }
         return machine.getMaintenanceWindowList();
+    }
+
+    private List<MdmDevicePlanShut> resolveMachineShutdownWindowList(LhScheduleContext context, String machineCode) {
+        if (context == null || CollectionUtils.isEmpty(context.getDevicePlanShutList())
+                || StringUtils.isEmpty(machineCode)) {
+            return new ArrayList<>();
+        }
+        List<MdmDevicePlanShut> shutdownWindowList = new ArrayList<>(4);
+        for (MdmDevicePlanShut planShut : context.getDevicePlanShutList()) {
+            if (planShut != null && StringUtils.equals(machineCode, planShut.getMachineCode())) {
+                shutdownWindowList.add(planShut);
+            }
+        }
+        return shutdownWindowList;
+    }
+
+    private void syncResultDowntimeSummary(LhScheduleContext context, LhScheduleResult result) {
+        if (context == null || result == null) {
+            return;
+        }
+        Date firstPlannedShiftStartTime = resolveFirstPlannedShiftStartTime(result);
+        if (firstPlannedShiftStartTime == null || result.getSpecEndTime() == null) {
+            ResultDowntimeSummaryUtil.clearDowntimeSummary(result);
+            return;
+        }
+        ResultDowntimeSummaryUtil.fillDowntimeSummary(
+                result,
+                resolveMachineMaintenanceWindowList(context, result.getLhMachineCode()),
+                resolveEffectiveCleaningWindowList(context, result, firstPlannedShiftStartTime),
+                resolveMachineShutdownWindowList(context, result.getLhMachineCode()));
     }
 
     /**
