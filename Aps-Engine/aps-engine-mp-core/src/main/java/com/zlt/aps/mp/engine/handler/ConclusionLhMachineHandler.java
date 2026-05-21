@@ -103,7 +103,12 @@ public class ConclusionLhMachineHandler {
         if (CollectionUtils.isEmpty(conclusionSkuInfo)) {
             return null;
         }
-        return findBeforeSkuProductionInfoByChangeTypeBlock(context, conclusionSkuInfo, productionDay, materialDesc);
+        //20260521+ 续作换活字块，一定要有前Sku
+        BeforeSkuProductionInfo beforeSku = findBeforeSkuProductionInfoByChangeTypeBlock(context, conclusionSkuInfo, productionDay, materialDesc);
+        if(null == beforeSku || StringUtils.isBlank(beforeSku.getMaterialDesc())){
+            return null;
+        }
+        return beforeSku;
     }
 
     /**
