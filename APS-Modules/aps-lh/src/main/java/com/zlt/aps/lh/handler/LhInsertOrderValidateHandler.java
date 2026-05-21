@@ -144,6 +144,7 @@ public class LhInsertOrderValidateHandler {
         result.setValid(true);
         checkMachineAvailability(dto, result);
         checkMouldSurplus(dto, result);
+        checkMouldAvailability(dto, result);
         fillSkuRelatedData(dto, result);
         return result;
     }

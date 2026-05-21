@@ -206,11 +206,12 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             if (validateResult.getEmbryoStock() != null) {
                 result.setEmbryoStock(validateResult.getEmbryoStock());
             }
-            if (validateResult.getMachineShiftCapacity() != null) {
+            if (validateResult.getSingleMouldShiftQty() != null) {
                 result.setSingleMouldShiftQty(validateResult.getSingleMouldShiftQty());
             }
             if (StringUtils.isNotBlank(validateResult.getTrialStatus())) {
                 result.setTrialStatus(validateResult.getTrialStatus());
+                result.setChangedTrialStatus(validateResult.getTrialStatus());
             }
             if (StringUtils.isNotBlank(validateResult.getLeftRightMould())) {
                 result.setLeftRightMould(validateResult.getLeftRightMould());
