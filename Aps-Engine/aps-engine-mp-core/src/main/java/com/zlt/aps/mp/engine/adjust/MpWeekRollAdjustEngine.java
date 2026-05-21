@@ -1294,6 +1294,9 @@ public class MpWeekRollAdjustEngine {
             if (!hasPlanByDay(mpFinalVo,i) || i < contextDTO.getLockEndDay()){
                 continue;
             }
+            if (i < contextDTO.getAdjustDay()){
+                continue;
+            }
             dayField = FactoryConstant.DAY_FIELD + i;
             intPart = (Integer)mpFinalVo.getFieldValueByFieldName(dayField) / dailyQty;
             remainPart = (Integer)mpFinalVo.getFieldValueByFieldName(dayField) % dailyQty;

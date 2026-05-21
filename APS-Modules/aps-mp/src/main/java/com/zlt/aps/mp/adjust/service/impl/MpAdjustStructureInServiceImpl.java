@@ -327,6 +327,9 @@ public class MpAdjustStructureInServiceImpl extends AbstractDocService<MpAdjustS
         }
         // 今天算在内，故-1;
         lockDays = contextDTO.getAdjustDay() + lockDays -1;
+        if (lockDays == 0){
+            lockDays = contextDTO.getAdjustDay() ;
+        }
         return lockDays > FactoryConstant.MONTH_MAX_DAY ? FactoryConstant.MONTH_MAX_DAY:lockDays;
     }
 
