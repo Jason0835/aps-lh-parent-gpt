@@ -106,7 +106,7 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
         versionMap.put("year", param.getYear());
         versionMap.put("month", param.getMonth());
         versionMap.put("factory_code", param.getFactoryCode());
-//        versionMap.put("month_plan_version", param.getMonthPlanVersion());
+        versionMap.put("month_plan_version", param.getMonthPlanVersion());
         versionMap.put("production_version", param.getProductionVersion());
         List<MpFactoryProductionVersion> productionVersionList = baseDao.selectByMap(MpFactoryProductionVersion.class, versionMap);
         if (CollectionUtils.isEmpty(productionVersionList)) {
