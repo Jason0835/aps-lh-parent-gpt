@@ -388,6 +388,10 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
                 //试制或量试，略过
                 continue;
             }
+            if (structureOut.getConfirmAdjustQty() <=0){
+                continue;
+            }
+
             if (isEven(structureOut.getConfirmAdjustQty())){
                 //偶数 + 2
                 structureOut.setConfirmAdjustQty(structureOut.getConfirmAdjustQty() + ProductionConstant.ADD_LOSS_QTY_EVEN_NUMBER);

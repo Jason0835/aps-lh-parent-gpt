@@ -2773,8 +2773,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         adjustList.removeIf(adjust -> {
             Integer currentNetQty = Convert.toInt(adjust.getCurrentNetQty(),0);
             Integer monthUnScheduledQty = Convert.toInt(adjust.getMonthUnScheduledQty(),0);
+            Integer adjustQty = Math.abs(currentNetQty - monthUnScheduledQty);
             boolean isOnlyConventionReserveHasValue = isOnlyConventionReserveHasValue(adjust);
-            return (Math.abs(currentNetQty - monthUnScheduledQty) == 0) || isOnlyConventionReserveHasValue;
+            //return (Math.abs(currentNetQty - monthUnScheduledQty) == 0) || isOnlyConventionReserveHasValue;
+            return (adjustQty == 0 && currentNetQty == 0 && monthUnScheduledQty == 0) || isOnlyConventionReserveHasValue;
         });
     }
 

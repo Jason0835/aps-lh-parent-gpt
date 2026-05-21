@@ -178,4 +178,9 @@ public class FactoryMonthPlanMouldDayResultExportVo extends FactoryMonthPlanMoul
      */
     @ApiModelProperty(value = "本月生产余量", name = "productSurplus")
     private Integer productSurplus;
+    /**
+     * 待调整
+     */
+    @ApiModelProperty(value = "待调整", name = "pendingQty")
+    private Integer pendingQty;
 }
