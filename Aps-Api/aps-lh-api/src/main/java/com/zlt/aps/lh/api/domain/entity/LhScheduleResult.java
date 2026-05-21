@@ -601,8 +601,8 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     /**
      * 产品状态
      */
-//    @Excel(name = "ui.data.column.lhScheduleResult.trialStatus", dictType = "trial_status")
-    @ApiModelProperty(value = "施工阶段 00 无工艺 01 试制 02 量试 03 正式", name = "changedTrialStatus")
+//    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "产品状态 X 试验示方 T 量试示方 S 正规示方", name = "changedTrialStatus")
     @TableField(value = "CHANGED_TRIAL_STATUS")
     private String changedTrialStatus;
 
