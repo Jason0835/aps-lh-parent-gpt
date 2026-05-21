@@ -486,9 +486,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      *   <li>从系统参数表读取TD胶种类型编码（PARAM_CODE=SYS04010002）</li>
      *   <li>从原材料消耗明细表按胶种类型查对应的胎胚（CHILD_MATERIAL_NAME='AQ'+胶种类型）</li>
      *   <li>匹配本次成型排程结果中的胎胚</li>
-     *   <li>通过胎胚编号关联物料主数据取规格+花纹</li>
+     *   <li>通过胎胚编号关联物料主数据取规格+花纹，仅保留本次实际排产的物料</li>
      *   <li>按胶种分组，同规格多花纹用"/"隔开，不同规格用","隔开</li>
-     *   <li>按示方类型（正规/量试/试制）分组，每组规格花纹前加标题前缀，不同组用换行隔开</li>
+     *   <li>按示方类型（正规/量试/试制）在物料级别分组，每组规格花纹前加标题前缀，不同组用换行隔开</li>
      * </ol>
      *
      * @param scheduleDate 排程日期
@@ -520,6 +520,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
 
+        // 收集已排产的物料编码集合，用于过滤物料主数据中未排产的SKU
+        Set<String> scheduledMaterialCodes = cxResults.stream()
+                .filter(this::hasAnyPlanQtyInShift345)
+                .map(CxScheduleResult::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+        log.info("已排产胎胚代码数量: {}, 已排产物料编码数量: {}", scheduleEmbryoCodes.size(), scheduledMaterialCodes.size());
+
         if (scheduleEmbryoCodes.isEmpty()) {
             log.warn("成型排程结果中无胎胚代码，小胶种列表为空");
             List<List<Map<String, Object>>> dataList = new ArrayList<>();
@@ -527,9 +535,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return dataList;
         }
 
-        // 构建胎胚→示方类型映射（基于成型排程结果3/4/5班次的示方书类型）
-        Map<String, String> embryoRecipeTypeMap = buildEmbryoRecipeTypeMap(cxResults);
-        log.info("胎胚示方类型映射构建完成, 映射数量: {}", embryoRecipeTypeMap.size());
+        // 构建物料→示方类型映射（基于成型排程结果3/4/5班次的示方书类型，按物料级别映射）
+        Map<String, String> materialRecipeTypeMap = buildMaterialRecipeTypeMap(cxResults);
+        log.info("物料示方类型映射构建完成, 映射数量: {}", materialRecipeTypeMap.size());
 
         // 按胶种类型查询对应的胎胚，构建胶种→胎胚映射
         Map<String, Set<String>> rubberTypeEmbryoMap = new LinkedHashMap<>();
@@ -560,6 +568,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         log.info("需要查询物料主数据的胎胚代码数量: {}", allRelevantEmbryoCodes.size());
 
         // 查询物料主数据，构建胎胚→物料列表映射（一个胎胚代码可能对应多条物料记录）
+        // 仅保留本次实际排产的物料（scheduledMaterialCodes过滤），避免展示未排产的SKU
         Map<String, List<MdmMaterialInfo>> materialInfoMap = new HashMap<>();
         if (!allRelevantEmbryoCodes.isEmpty()) {
             List<MdmMaterialInfo> materialInfoList = mdmMaterialInfoMapper.selectList(
@@ -569,8 +578,10 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                                     .or().isNull(MdmMaterialInfo::getIsDelete)));
             materialInfoMap = materialInfoList.stream()
                     .filter(m -> StringUtils.isNotBlank(m.getEmbryoCode()))
+                    .filter(m -> scheduledMaterialCodes.contains(m.getMaterialCode()))
                     .collect(Collectors.groupingBy(MdmMaterialInfo::getEmbryoCode, HashMap::new, Collectors.toList()));
-            log.info("物料主数据查询完成, 数量: {}, 胎胚分组数: {}", materialInfoList.size(), materialInfoMap.size());
+            log.info("物料主数据查询完成(已过滤未排产SKU), 数量: {}, 胎胚分组数: {}",
+                    materialInfoMap.values().stream().mapToLong(List::size).sum(), materialInfoMap.size());
         }
 
         // 按胶种分组构建列表数据
@@ -585,11 +596,25 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 continue;
             }
 
-            // 按示方类型分组胎胚代码
-            Map<String, Set<String>> recipeTypeEmbryoGroupMap = new LinkedHashMap<>();
+            // 收集该胶种下所有已排产物料，按物料级别确定示方类型
+            // 同一胎胚下不同物料可能有不同的示方类型（如正规和量试），需要分别展示
+            List<MdmMaterialInfo> rubberTypeMaterials = new ArrayList<>();
             for (String embryoCode : scheduledEmbryos) {
-                String recipeType = embryoRecipeTypeMap.getOrDefault(embryoCode, "S");
-                recipeTypeEmbryoGroupMap.computeIfAbsent(recipeType, k -> new LinkedHashSet<>()).add(embryoCode);
+                List<MdmMaterialInfo> materials = materialInfoMap.get(embryoCode);
+                if (materials != null) {
+                    rubberTypeMaterials.addAll(materials);
+                }
+            }
+
+            if (rubberTypeMaterials.isEmpty()) {
+                continue;
+            }
+
+            // 按示方类型对物料进行分组（物料级别，而非胎胚级别）
+            Map<String, List<MdmMaterialInfo>> recipeTypeMaterialGroupMap = new LinkedHashMap<>();
+            for (MdmMaterialInfo materialInfo : rubberTypeMaterials) {
+                String recipeType = materialRecipeTypeMap.getOrDefault(materialInfo.getMaterialCode(), "S");
+                recipeTypeMaterialGroupMap.computeIfAbsent(recipeType, k -> new ArrayList<>()).add(materialInfo);
             }
 
             // 按示方类型顺序构建规格花纹字符串：正规 → 量试 → 试制
@@ -597,28 +622,21 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             List<String> groupParts = new ArrayList<>();
 
             for (String recipeType : recipeTypeOrder) {
-                Set<String> embryosForType = recipeTypeEmbryoGroupMap.get(recipeType);
-                if (embryosForType == null || embryosForType.isEmpty()) {
+                List<MdmMaterialInfo> materialsForType = recipeTypeMaterialGroupMap.get(recipeType);
+                if (materialsForType == null || materialsForType.isEmpty()) {
                     continue;
                 }
 
                 Map<String, Set<String>> specPatternMap = new LinkedHashMap<>();
-                for (String embryoCode : embryosForType) {
-                    List<MdmMaterialInfo> materialInfoList = materialInfoMap.get(embryoCode);
-                    if (materialInfoList == null || materialInfoList.isEmpty()) {
-                        log.warn("胎胚代码[{}]未找到物料主数据", embryoCode);
+                for (MdmMaterialInfo materialInfo : materialsForType) {
+                    String spec = StringUtils.defaultString(materialInfo.getSpecifications()).trim();
+                    String pattern = StringUtils.defaultString(materialInfo.getPattern()).trim();
+                    if (StringUtils.isBlank(spec)) {
                         continue;
                     }
-                    for (MdmMaterialInfo materialInfo : materialInfoList) {
-                        String spec = StringUtils.defaultString(materialInfo.getSpecifications()).trim();
-                        String pattern = StringUtils.defaultString(materialInfo.getPattern()).trim();
-                        if (StringUtils.isBlank(spec)) {
-                            continue;
-                        }
-                        specPatternMap.computeIfAbsent(spec, k -> new LinkedHashSet<>());
-                        if (StringUtils.isNotBlank(pattern)) {
-                            specPatternMap.get(spec).add(pattern);
-                        }
+                    specPatternMap.computeIfAbsent(spec, k -> new LinkedHashSet<>());
+                    if (StringUtils.isNotBlank(pattern)) {
+                        specPatternMap.get(spec).add(pattern);
                     }
                 }
 
@@ -696,23 +714,25 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 构建胎胚→示方类型映射
+     * 构建物料→示方类型映射
      *
-     * <p>根据成型排程结果的3/4/5班次示方书类型确定每个胎胚的示方类型。
-     * 优先级：X（试制）> T（量试）> S（正规），即如果同一胎胚在不同班次有不同示方类型，
+     * <p>根据成型排程结果的3/4/5班次示方书类型确定每个物料的示方类型。
+     * 同一胎胚下不同物料可能有不同的示方类型（如正规和量试），因此按物料级别映射，
+     * 确保每种物料都能正确归入对应的示方类型分组。</p>
+     * <p>优先级：X（试制）> T（量试）> S（正规），即如果同一物料在不同班次有不同示方类型，
      * 取优先级最高的示方类型。</p>
      *
      * @param cxResults 成型排程结果列表
-     * @return 胎胚代码→示方类型编码映射（S-正规，T-量试，X-试制）
+     * @return 物料编码→示方类型编码映射（S-正规，T-量试，X-试制）
      */
-    private Map<String, String> buildEmbryoRecipeTypeMap(List<CxScheduleResult> cxResults) {
-        Map<String, String> embryoRecipeTypeMap = new HashMap<>();
+    private Map<String, String> buildMaterialRecipeTypeMap(List<CxScheduleResult> cxResults) {
+        Map<String, String> materialRecipeTypeMap = new HashMap<>();
         for (CxScheduleResult result : cxResults) {
             if (!hasAnyPlanQtyInShift345(result)) {
                 continue;
             }
-            String embryoCode = result.getEmbryoCode();
-            if (StringUtils.isBlank(embryoCode)) {
+            String materialCode = result.getMaterialCode();
+            if (StringUtils.isBlank(materialCode)) {
                 continue;
             }
 
@@ -736,13 +756,13 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 determinedType = "T";
             }
 
-            // 同一胎胚可能有多条排程结果记录（不同机台），保留优先级最高的示方类型
-            String existingType = embryoRecipeTypeMap.get(embryoCode);
+            // 同一物料可能有多条排程结果记录（不同机台），保留优先级最高的示方类型
+            String existingType = materialRecipeTypeMap.get(materialCode);
             if (existingType == null || getRecipeTypePriority(determinedType) < getRecipeTypePriority(existingType)) {
-                embryoRecipeTypeMap.put(embryoCode, determinedType);
+                materialRecipeTypeMap.put(materialCode, determinedType);
             }
         }
-        return embryoRecipeTypeMap;
+        return materialRecipeTypeMap;
     }
 
     /**

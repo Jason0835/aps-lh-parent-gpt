@@ -8,6 +8,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.zlt.aps.lh.api.domain.entity.LhParams;
+import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhPrecisionPlanVo;
@@ -575,7 +576,7 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
     }
 
     private int getIntervalYears() {
-        LhParams params = lhParamsService.selectOneByParamCode("PRECISION_PLAN_INTERVAL_YEARS", null);
+        LhParams params = lhParamsService.selectOneByParamCode(LhScheduleParamConstant.PRECISION_PLAN_INTERVAL_YEARS, null);
         if (params != null && params.getParamValue() != null) {
             try {
                 return Integer.parseInt(params.getParamValue());
