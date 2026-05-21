@@ -349,7 +349,7 @@ public class MonthPlanSyncService {
         for (FactoryMonthPlanProductionFinalResult result : finalList) {
             SyncOutFacScheduleVersionVo versionVo = new SyncOutFacScheduleVersionVo();
             versionVo.setFactory(result.getFactoryCode());
-            versionVo.setPlanVersion(Boolean.TRUE.equals(useAdjustVersion) ? result.getMonthPlanVersion() : result.getProductionVersion());
+            versionVo.setPlanVersion(Boolean.TRUE.equals(useAdjustVersion) ? result.getLastMonthPlanVersion() : result.getProductionVersion());
             versionVo.setProductPlanNo(result.getProductionNo());
             versionVo.setStatus(ApsConstant.APS_STRING_0);
             Integer year = result.getYear();
