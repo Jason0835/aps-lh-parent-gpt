@@ -7,7 +7,6 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish;
@@ -252,9 +251,8 @@ public class LhIncreaseMouldStartPlanService {
         if (Objects.isNull(skuConstructionRef)) {
             return;
         }
-        // 主数据表当前保存的是硫化示方类型标记（S/T/X），这里按项目既有枚举口径转换成硫化结果使用的施工阶段（03/02/01/00）。
-        scheduleResult.setChangedConstructionStage(
-                ConstructionStageEnum.matchByMarkFlag(skuConstructionRef.getLhType()).getStage());
+        // 主数据表当前保存的是硫化示方类型标记（S/T/X）
+        scheduleResult.setChangedTrialStatus(skuConstructionRef.getLhType());
     }
 
     /**

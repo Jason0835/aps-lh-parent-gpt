@@ -311,7 +311,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 5),
             },
             {
-              prop: "changedConstructionStage",
+              prop: "changedTrialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 5),
             },
@@ -346,7 +346,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 6),
             },
             {
-              prop: "changedConstructionStage",
+              prop: "changedTrialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 6),
             },
@@ -381,7 +381,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 7),
             },
             {
-              prop: "changedConstructionStage",
+              prop: "changedTrialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 7),
             },
@@ -416,7 +416,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 8),
             },
             {
-              prop: "changedConstructionStage",
+              prop: "changedTrialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 8),
             },

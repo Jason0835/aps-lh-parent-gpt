@@ -575,7 +575,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 5),
             }, // 第5班-左右模
             {
-              prop: "changedConstructionStage",
+              prop: "changedTrialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 5),
             }, // 第5班-施工阶段
@@ -611,7 +611,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 6),
             }, // 第6班-左右模
             {
-              prop: "changedConstructionStage",
+              prop: "changedTrialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 6),
             }, // 第6班-施工阶段
@@ -647,7 +647,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 7),
             }, // 第7班-左右模
             {
-              prop: "changedConstructionStage",
+              prop: "changedTrialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 7),
             }, // 第7班-施工阶段
@@ -683,7 +683,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 8),
             }, // 第8班-左右模
             {
-              prop: "changedConstructionStage",
+              prop: "changedTrialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 8),
             }, // 第8班-施工阶段
