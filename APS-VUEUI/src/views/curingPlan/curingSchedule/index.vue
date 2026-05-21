@@ -246,7 +246,7 @@ export default {
     "IS_RELEASE_LH",
     "biz_factory_name",
     "biz_end_type",
-    "biz_construction_stage",
+    "lh_trial_status",
     "lh_schedule_type",
     "biz_mould_Type",
   ],
@@ -432,7 +432,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 1),
             }, // 第1班-左右模
             {
-              prop: "constructionStage",
+              prop: "trialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 1),
             }, // 第1班-施工阶段
@@ -467,7 +467,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 2),
             }, // 第2班-左右模
             {
-              prop: "constructionStage",
+              prop: "trialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 2),
             }, // 第2班-施工阶段
@@ -503,7 +503,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 3),
             }, // 第3班-左右模
             {
-              prop: "constructionStage",
+              prop: "trialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 3),
             }, // 第3班-施工阶段
@@ -539,7 +539,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 4),
             }, // 第4班-左右模
             {
-              prop: "constructionStage",
+              prop: "trialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 4),
             }, // 第4班-施工阶段
@@ -974,7 +974,7 @@ export default {
       const planQty = row['class' + shiftIndex + 'PlanQty'];
       if (planQty == null || planQty <= 0) return '';
       const dictValue = value || "0";
-      return this.selectDictLabel(this.dict.type.biz_construction_stage, dictValue);
+      return this.selectDictLabel(this.dict.type.lh_trial_status, dictValue);
     },
     shiftPlanQtyFormatter(row, column, value, shiftIndex) {
       if (this.isShiftAfterEnding(row, shiftIndex)) return '';

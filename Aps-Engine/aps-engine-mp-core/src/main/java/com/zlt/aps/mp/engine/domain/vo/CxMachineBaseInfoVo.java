@@ -387,8 +387,8 @@ public class CxMachineBaseInfoVo implements Serializable {
             dayLimit.getProductionSkuQtyInfo().put(materialDesc, skuDayProductionInfo);
             return;
         }
-        //更新数量
-        planned.addProductionDayQty(skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
+        //更新使用模具和排产数量
+        planned.addDayProductionInfo(skuDayProductionInfo);
     }
 
     /**

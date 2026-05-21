@@ -119,24 +119,44 @@ public class FactoryMonthPlanMouldDayResultExportVo extends FactoryMonthPlanMoul
      */
     @ApiModelProperty(value = "第1周调整量", name = "adjustQty1")
     private Integer adjustQty1;
+    /**
+     * 调整1排产量
+     */
+    @ApiModelProperty(value = "调整1排产量", name = "adjustProductQty1")
+    private Integer adjustProductQty1;
 
     /**
      * 第2周调整量
      */
     @ApiModelProperty(value = "第2周调整量", name = "adjustQty2")
     private Integer adjustQty2;
+    /**
+     * 调整2排产量
+     */
+    @ApiModelProperty(value = "调整2排产量", name = "adjustProductQty2")
+    private Integer adjustProductQty2;
 
     /**
      * 第3周调整量
      */
     @ApiModelProperty(value = "第3周调整量", name = "adjustQty3")
     private Integer adjustQty3;
+    /**
+     * 调整3排产量
+     */
+    @ApiModelProperty(value = "调整3排产量", name = "adjustProductQty3")
+    private Integer adjustProductQty3;
 
     /**
      * 第4周调整量
      */
     @ApiModelProperty(value = "第4周调整量", name = "adjustQty4")
     private Integer adjustQty4;
+    /**
+     * 调整4排产量
+     */
+    @ApiModelProperty(value = "调整4排产量", name = "adjustProductQty4")
+    private Integer adjustProductQty4;
     
     /**
      * 净需求(不含模具受限)
@@ -148,4 +168,14 @@ public class FactoryMonthPlanMouldDayResultExportVo extends FactoryMonthPlanMoul
      */
     @ApiModelProperty(value = "模具产能受限", name = "restrictedNetQty")
     private Integer restrictedNetQty;
+    /**
+     * 定稿生产实际排产量
+     */
+    @ApiModelProperty(value = "定稿生产实际排产量", name = "originalTotalQty")
+    private Integer originalTotalQty;
+    /**
+     * 本月生产余量
+     */
+    @ApiModelProperty(value = "本月生产余量", name = "productSurplus")
+    private Integer productSurplus;
 }

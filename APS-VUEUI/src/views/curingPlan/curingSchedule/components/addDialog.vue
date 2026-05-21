@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-dialog
     :title="title"
     :visible="visible"
@@ -178,9 +178,9 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-          prop: "constructionStage",
+          prop: "trialStatus",
           type: "select",
-          dictData: this.parentDict.type.biz_construction_stage,
+          dictData: this.parentDict.type.lh_trial_status,
           disabled: true,
           span: 12,
         },
@@ -263,7 +263,7 @@ export default {
         this.$set(this.form, "mouldSurplusQty", null);
         this.$set(this.form, "embryoStock", null);
         this.$set(this.form, "machineShiftCapacity", null);
-        this.$set(this.form, "constructionStage", null);
+        this.$set(this.form, "trialStatus", null);
         this.$set(this.form, "leftRightMould", null);
       }
     },
@@ -289,8 +289,8 @@ export default {
           if (data.machineShiftCapacity != null) {
             this.$set(this.form, "machineShiftCapacity", data.machineShiftCapacity);
           }
-          if (data.constructionStage != null) {
-            this.$set(this.form, "constructionStage", data.constructionStage);
+          if (data.trialStatus != null) {
+            this.$set(this.form, "trialStatus", data.trialStatus);
           }
           if (data.leftRightMould != null) {
             this.$set(this.form, "leftRightMould", data.leftRightMould);
@@ -393,7 +393,7 @@ export default {
           "mouldSurplusQty",
           "embryoStock",
           "machineShiftCapacity",
-          "constructionStage",
+          "trialStatus",
           "leftRightMould",
         ];
         for (let i = 1; i <= 8; i++) {

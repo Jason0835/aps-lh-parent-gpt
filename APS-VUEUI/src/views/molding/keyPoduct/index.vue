@@ -77,7 +77,7 @@ export default {
     infoDialog,
     structureSelect,
   },
-  dicts: ['biz_yes_no','biz_factory_name'],
+  dicts: ['biz_yes_no'],
   provide() {
     return {
       parentDict: this.dict,
@@ -125,7 +125,6 @@ export default {
           prop: "isActive",
           align: "center",
           label: this.$t("是否启用"),
-          // sortable: "custom",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -139,9 +138,7 @@ export default {
 
         {
           align: "center",
-          align: "center",
           label: this.$t("ui.data.btn.option"),
-
           fixed: "right",
           render: ({ row }) => {
             return (
@@ -177,7 +174,6 @@ export default {
             return (
               <structureSelect
                 v-model={form[item.prop]}
-                factoryCode={form.factoryCode || "116"}
                 machineType="CX"
                 clearable
               />
@@ -199,6 +195,7 @@ export default {
           prop: "isActive",
           type: "select",
           dictData: this.dict.type.biz_yes_no,
+          filterable: true,
         },
       ];
     },
@@ -308,14 +305,11 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const res = await listMoldingParams(this.formatParams());
-        const data = res?.data ?? res;
-        this.data = Array.isArray(data?.rows) ? data.rows : (Array.isArray(data) ? data : []);
-        this.page.total = data?.total ?? 0;
+        const data = await listMoldingParams(this.formatParams());
+        this.data = data.rows;
+        this.page.total = data.total;
       } catch (error) {
         console.error(error);
-        this.data = [];
-        this.page.total = 0;
       } finally {
         this.loading = false;
       }

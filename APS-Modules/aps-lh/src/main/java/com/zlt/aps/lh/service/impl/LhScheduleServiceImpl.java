@@ -902,6 +902,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             }
             workbook.setForceFormulaRecalculation(true);
             sheet.setForceFormulaRecalculation(true);
+            workbook.setActiveSheet(0);
             workbook.write(outputStream);
             return removeCalcChain(outputStream.toByteArray());
         } catch (Exception e) {
@@ -1283,8 +1284,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (StringUtils.isNotBlank(source.getIsEnd())) {
             target.setIsEnd(source.getIsEnd());
         }
-        if (StringUtils.isNotBlank(source.getConstructionStage())) {
-            target.setConstructionStage(source.getConstructionStage());
+        if (StringUtils.isNotBlank(source.getTrialStatus())) {
+            target.setConstructionStage(source.getTrialStatus());
         }
         if (StringUtils.isNotBlank(source.getScheduleOrder())) {
             target.setScheduleOrder(source.getScheduleOrder());

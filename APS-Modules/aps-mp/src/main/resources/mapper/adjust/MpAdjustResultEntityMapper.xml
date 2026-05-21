@@ -59,6 +59,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         DELETE FROM T_MP_ADJUST_RESULT
         WHERE FACTORY_CODE = #{factoryCode} AND YEAR= #{year} AND MONTH= #{month}
         AND VERSION= #{version}
+        <if test="structureName != null and structureName != ''">AND STRUCTURE_NAME = #{structureName}</if>
     </delete>
 
     <select id="getVersionList" resultType="com.zlt.aps.mp.api.domain.entity.MpAdjustResult">

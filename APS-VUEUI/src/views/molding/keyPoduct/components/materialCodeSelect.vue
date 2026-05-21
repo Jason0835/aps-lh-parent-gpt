@@ -8,6 +8,7 @@
     :disabled="disabled"
     @show="handleShow"
     @cancel="handleCancel"
+    dialogWidth="900px"
   >
     <div class="table-container" v-loading="loading">
       <page-table
@@ -25,7 +26,7 @@
         @pageChange="handlePageChange"
         @selection-change="handleSelectionChange"
         @search="handleSearch"
-        row-key="id"
+        row-key="embryoCode"
         :reserve-selection="true"
       >
       </page-table>
@@ -34,11 +35,10 @@
 </template>
 
 <script>
-//物料选择
 import { deepClone } from "@/utils";
 
 import selectDialog from "@/components/Table/SelectDialog.vue";
-import { listProductinfo, listEmbryoCode } from "@/api/lean/productinfo";
+import { listEmbryoCode } from "@/api/lean/productinfo";
 export default {
   components: { selectDialog },
   inject: ["parentDict"],
@@ -62,13 +62,6 @@ export default {
     return {
       search: {},
       searchKey: "",
-      // searchColumns: [
-
-      //   {
-      //     label: this.$t("ui.data.colume.wms.unused.productCode"),
-      //     prop: "materialCode",
-      //   },
-      // ],
       filterKey: "",
       page: {
         current: 1,
@@ -81,7 +74,6 @@ export default {
       valueProp: "embryoCode",
       labelProp: "embryoCode",
       data: [],
-
       allSelectData: [],
     };
   },
@@ -93,10 +85,15 @@ export default {
           label: this.$t("common.factory"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
+          filterable: true,
         },
         {
           label: this.$t("ui.data.rubberMaterial.embryoCode"),
           prop: "embryoCode",
+        },
+        {
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          prop: "embryoDesc",
         },
       ];
     },
@@ -104,13 +101,15 @@ export default {
       const list = [
         {
           prop: "embryoCode",
+          align: "center",
+          width: 150,
           label: this.$t("ui.data.rubberMaterial.embryoCode"),
-          width: 120,
         },
         {
           prop: "embryoDesc",
-          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
+          align: "left",
           minWidth: 260,
+          label: this.$t("ui.data.rubberMaterial.embryoDesc"),
         },
       ];
       if (this.multiple) {
@@ -145,7 +144,6 @@ export default {
       try {
         this.loading = true;
 
-        let that = this;
         if (isFirst && this.multiple) {
           let topItems = [];
           if (this.oldList) {
@@ -169,7 +167,6 @@ export default {
       } catch (error) {
         console.log(error);
       } finally {
-
       }
     },
     async getFirstList() {
@@ -177,21 +174,22 @@ export default {
         const data = await listEmbryoCode(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
-      } catch (err) {}
-      finally{
+      } catch (err) {
+      } finally {
         this.loading = false;
       }
     },
-    //
     formatParams() {
-      return {
+      const params = {
         pageSize: this.page.pageSize,
         pageNum: this.page.current,
         ...this.query,
-        // userName: this.filterKey,
-        status: 0, //过滤，只显示启用的用户
-        structureName: this.structureName,
+        status: 0,
       };
+      if (this.structureName) {
+        params.structureName = this.structureName;
+      }
+      return params;
     },
     getTitle() {
       return this.title
@@ -199,9 +197,6 @@ export default {
         : this.$t("common.materialCodeSelect.title");
     },
 
-    /**
-     * 重置
-     */
     handleSearchReset() {
       this.searchKey = "";
       let query = {};
@@ -209,8 +204,6 @@ export default {
     },
     handleSearch(query) {
       this.query = query;
-      // this.filterKey = this.searchKey;
-
       this.$set(this.page, "current", 1);
       this.getList();
     },
@@ -257,7 +250,6 @@ export default {
       });
     },
     handleSelectionChange(rows) {
-      console.log(rows);
       this.selection = rows;
     },
     handleClear() {
@@ -303,7 +295,6 @@ export default {
     } else {
       this.showValue = this.value;
     }
-    // this.getList();
   },
 };
 </script>
@@ -324,5 +315,8 @@ export default {
 }
 .table-container {
   height: 450px;
+  :deep(.el-table) {
+    width: 100% !important;
+  }
 }
 </style>

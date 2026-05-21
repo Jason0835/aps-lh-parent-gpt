@@ -591,12 +591,20 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     private String mouldMethod;
 
     /**
-     * 施工阶段 00 无工艺 01 试制 02 量试 03 正式
+     * 示方类型（字典 lh_trial_status：S-正规示方，T-量试示方，X-试验示方）
      */
-    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", dictType = "biz_construction_stage")
-    @ApiModelProperty(value = "施工阶段 00 无工艺 01 试制 02 量试 03 正式", name = "constructionStage")
+    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", dictType = "lh_trial_status")
+    @ApiModelProperty(value = "施工阶段 S-正规示方 T-量试示方 X-试验示方", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
+
+    /**
+     * 示方类型（字典 lh_trial_status：S-正规示方，T-量试示方，X-试验示方）
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", dictType = "lh_trial_status")
+    @ApiModelProperty(value = "示方类型", name = "trialStatus")
+    @TableField(value = "TRIAL_STATUS")
+    private String trialStatus;
 
     /**
      * 制造示方书号

@@ -2,6 +2,7 @@ package com.zlt.aps.mdm.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.github.pagehelper.PageHelper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -461,21 +462,24 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     @ApiOperation("查询胎胚编码列表（去重）")
     @PostMapping("/listEmbryoCode")
     public TableDataInfo listEmbryoCode(@RequestBody MdmMaterialInfo productInfo) {
-        startPage("embryo_no asc");
-        LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(PubUtil.isNotEmpty(productInfo.getFactoryCode()), MdmSkuConstructionRef::getFactoryCode, productInfo.getFactoryCode());
-        queryWrapper.like(PubUtil.isNotEmpty(productInfo.getEmbryoCode()), MdmSkuConstructionRef::getEmbryoCode, productInfo.getEmbryoCode());
-        queryWrapper.select(MdmSkuConstructionRef::getEmbryoCode);
-        queryWrapper.groupBy(MdmSkuConstructionRef::getEmbryoCode);
-
-        List<MdmSkuConstructionRef> list = skuConstructionRefEntityMapper.selectList(queryWrapper);
-        // 将SKU施工关系对象列表转换为只包含胎胚编码的Map列表
+        LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(PubUtil.isNotEmpty(productInfo.getFactoryCode()), MdmMaterialInfo::getFactoryCode, productInfo.getFactoryCode());
+        queryWrapper.isNotNull(MdmMaterialInfo::getEmbryoCode);
+        queryWrapper.ne(MdmMaterialInfo::getEmbryoCode, "");
+        queryWrapper.like(PubUtil.isNotEmpty(productInfo.getEmbryoCode()), MdmMaterialInfo::getEmbryoCode, productInfo.getEmbryoCode());
+        queryWrapper.like(PubUtil.isNotEmpty(productInfo.getEmbryoDesc()), MdmMaterialInfo::getEmbryoDesc, productInfo.getEmbryoDesc());
+        queryWrapper.eq(PubUtil.isNotEmpty(productInfo.getStructureName()), MdmMaterialInfo::getStructureName, productInfo.getStructureName());
+        queryWrapper.select(MdmMaterialInfo::getEmbryoCode, MdmMaterialInfo::getEmbryoDesc);
+        queryWrapper.groupBy(MdmMaterialInfo::getEmbryoCode, MdmMaterialInfo::getEmbryoDesc);
+        PageHelper.startPage(productInfo.getPageNum(), productInfo.getPageSize(), "embryo_code asc");
+        List<MdmMaterialInfo> list = mdmMaterialInfoEntityMapper.selectList(queryWrapper);
+        // 将物料信息对象列表转换为只包含胎胚编码和胎胚描述的Map列表
         List<Map<String, Object>> resultList = list.stream()
                 .map(item -> {
                     // 创建Map，用于存储简化后的数据
                     Map<String, Object> map = new HashMap<>();
-                    // 将embryoNo字段以embryoCode为key存入Map，保持与前端字段名的一致性
-                    map.put("embryoCode", item.getEmbryoNo());
+                    map.put("embryoCode", item.getEmbryoCode());
+                    map.put("embryoDesc", item.getEmbryoDesc());
                     return map;
                 })
                 .collect(Collectors.toList());

@@ -141,7 +141,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     }
 
     @Override
-    public void deleteAdjustResultByVersion(String factoryCode, String year, String month, String version) {
-        mpAdjustResultEntityMapper.deleteAdjustResultByVersion(factoryCode,year,month,version);
+    public void deleteAdjustResultByVersion(String factoryCode, String year, String month, String version,String structureName) {
+        mpAdjustResultEntityMapper.deleteAdjustResultByVersion(factoryCode,year,month,version,structureName);
     }
 }

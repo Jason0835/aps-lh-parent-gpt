@@ -192,7 +192,8 @@ public class LhScheduleResultUIController extends BaseUIController<LhScheduleRes
     @ResponseBody
     @Override
     public void export(HttpServletResponse response, LhScheduleResult entity) throws IOException {
-        String fileName = this.getExportTemplateFileName();
+        Date scheduleDate = entity != null && entity.getScheduleDate() != null ? entity.getScheduleDate() : new Date();
+        String fileName = "硫化日计划" + cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyyMMdd");
         byte[] excelBytes = iLhScheduleResultRemoteService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");

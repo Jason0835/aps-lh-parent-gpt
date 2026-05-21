@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-dialog
     :title="title"
     :visible="visible"
@@ -147,10 +147,10 @@ export default {
         },
         {
           label: this.$t("示方类型"),
-          prop: "constructionStage",
+          prop: "trialStatus",
           formatter: (row, column, value) => {
             return this.selectDictLabel(
-              this.parentDict.type.biz_construction_stage,
+              this.parentDict.type.lh_trial_status,
               value
             );
           },
@@ -171,7 +171,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 1),
             },
             {
-              prop: "constructionStage",
+              prop: "trialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 1),
             },
@@ -206,7 +206,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 2),
             },
             {
-              prop: "constructionStage",
+              prop: "trialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 2),
             },
@@ -241,7 +241,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 3),
             },
             {
-              prop: "constructionStage",
+              prop: "trialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 3),
             },
@@ -276,7 +276,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 4),
             },
             {
-              prop: "constructionStage",
+              prop: "trialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 4),
             },
@@ -518,7 +518,7 @@ export default {
       const planQty = row["class" + shiftIndex + "PlanQty"];
       if (planQty == null || planQty <= 0) return "";
       const dictValue = value || "0";
-      return this.selectDictLabel(this.parentDict.type.biz_construction_stage, dictValue);
+      return this.selectDictLabel(this.parentDict.type.lh_trial_status, dictValue);
     },
     shiftPlanQtyFormatter(row, column, value, shiftIndex) {
       if (this.isShiftAfterEnding(row, shiftIndex)) return "";

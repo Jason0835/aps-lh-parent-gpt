@@ -1927,7 +1927,7 @@ public class MesItfServiceImpl implements MesItfService {
             if (CollectionUtils.isNotEmpty(orderList)) {
                 Map<String, Object> map = new HashMap<>();
                 map.put("FACTORY_CODE", outbountOrdersNotScan.getFactoryCode());
-                map.put("STOCK_DATE", DateUtils.getNowDate("yyyy-MM-dd"));
+//                map.put("STOCK_DATE", DateUtils.getNowDate("yyyy-MM-dd"));
                 baseDao.deleteByMap(MdmOutbountOrdersNotScan.class, map);
 
                 // 转换为APS实体并设置创建信息

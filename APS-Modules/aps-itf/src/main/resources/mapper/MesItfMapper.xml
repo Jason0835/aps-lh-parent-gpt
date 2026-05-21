@@ -398,7 +398,6 @@
 
     <select id="selectLhPrecisionPlanActualList" resultType="com.zlt.aps.itf.vo.DevMaintenancePlan">
         SELECT
-        ID,
         DEV_CODE,
         PRECISION_TYPE,
         OPER_TIME,
