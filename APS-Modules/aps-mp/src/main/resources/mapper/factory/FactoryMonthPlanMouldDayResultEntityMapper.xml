@@ -88,7 +88,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             r.ADJUST_QTY3,
             r.ADJUST_QTY4,
             r.ORIGINAL_TOTAL_QTY,
-            r.total_qty - pm.PRODUCTION_QTY PRODUCT_SURPLUS,
+            ifnull(r.total_qty, 0) - ifnull(pm.PRODUCTION_QTY,0) PRODUCT_SURPLUS,
             </if>
 		    F.PRODUCTION_VERSION LAST_PRODUCTION_VERSION,
 		    '1' DATA_TYPE,
