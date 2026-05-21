@@ -18,6 +18,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
@@ -850,7 +851,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         // 下发前补全MES物料编码和示方号（数据准备应在aps-lh模块完成，而非itf层）
         enrichMaterialAndExampleInfo(allIssueList);
 
-        return mesItfService.issueLhScheduleResult(allIssueList);
+        return FeignTokenHelper.callWithToken(() -> mesItfService.issueLhScheduleResult(allIssueList));
     }
 
 
@@ -1044,7 +1045,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setLhTime(source.getLhTime());
 
         target.setDataVersion(null);
-        target.setCompanyCode(FactoryConstant.DEFAULT_COMPANY_CODE);
+        target.setCompanyCode(source.getFactoryCode());
         target.setFactoryCode(source.getFactoryCode());
 
         return target;
@@ -1111,7 +1112,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setLhTime(source.getLhTime());
 
         target.setDataVersion(null);
-        target.setCompanyCode(FactoryConstant.DEFAULT_COMPANY_CODE);
+        target.setCompanyCode(source.getFactoryCode());
         target.setFactoryCode(source.getFactoryCode());
 
         return target;

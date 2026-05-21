@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.adjust;
 
+import cn.hutool.core.convert.Convert;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONValidator;
 import com.google.common.collect.Lists;
@@ -72,6 +73,7 @@ public class MpWeekRollAdjustEngine {
         if (PubUtil.isEmpty(mpProdFinalList)) {
             mpProdFinalList = new ArrayList<>();
         }
+
         List<String> onMaterialCodeList = mpProdFinalList.stream().map(x -> x.getMaterialCode()).collect(Collectors.toList());
         Date startTime,endTime;
         //StringBuffer sbError = new StringBuffer();
@@ -85,6 +87,13 @@ public class MpWeekRollAdjustEngine {
                 if (adjustStructureIn.getConfirmAdjustQty() > 0){
                     trialAdjustList.add(adjustStructureIn);
                 }
+                continue;
+            }
+            if (adjustStructureIn.getConfirmAdjustQty() >= 0){
+                //若待调整量>=0,则根据实单，重新转移搭配
+                doTransferConvertionQty(mpProdFinalList);
+            }
+            if (adjustStructureIn.getConfirmAdjustQty() == 0){
                 continue;
             }
             if (adjustStructureIn.getConfirmAdjustQty() < 0){
@@ -126,6 +135,7 @@ public class MpWeekRollAdjustEngine {
                 beginDaySb.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.monthPlanFinalRecord.notBeginDay"),
                         x.getMaterialCode())).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
             }
+
             if (isConvertionProd(x) && x.getConventionProductionQty() >0) {
                 splitMatchQtyByDay(contextDTO,x.getConventionProductionQty(), lockNextDay,x);
             }else if (x.getCycleProductionQty() >0){
@@ -165,6 +175,28 @@ public class MpWeekRollAdjustEngine {
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
+    }
+
+    /**
+     * 根据新的实单，转移搭配
+     * @param mpProdFinalList
+     */
+    private void doTransferConvertionQty(List<FactoryMonthPlanFinalAdjustVo> mpProdFinalList) {
+        if (PubUtil.isEmpty(mpProdFinalList)){
+            return;
+        }
+
+        for (FactoryMonthPlanFinalAdjustVo mpFinalVo : mpProdFinalList){
+            //若存在周期排产或储备排产，则将调减量转移到高或中优先级，防止后面重复挤搭配
+            if (mpFinalVo.getCycleProductionQty() > 0 || mpFinalVo.getConventionProductionQty() >0){
+                Integer cycleProductionQty = Convert.toInt(mpFinalVo.getCycleProductionQty(),0);
+                Integer conventionProductionQty = Convert.toInt(mpFinalVo.getConventionProductionQty(),0);
+                int emptyQty = cycleProductionQty + conventionProductionQty;
+                if (emptyQty  > 0){
+                    transferProductionQty(mpFinalVo, emptyQty);
+                }
+            }
+        }
     }
 
     /**
@@ -490,6 +522,7 @@ public class MpWeekRollAdjustEngine {
         if (PubUtil.isNotEmpty(mpProdFinalList)){
             onMaterialCodeList = mpProdFinalList.stream().map(x->x.getMaterialCode()).collect(Collectors.toList());
         }
+
         Date startTime,endTime;
         StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureOut adjustStructureOut:mpAdjustStructureOutList){
@@ -497,7 +530,13 @@ public class MpWeekRollAdjustEngine {
             if (!checkDayLhQtyWithMainPattern(contextDTO,adjustStructureOut)) {
                 continue;
             }
-
+            if (adjustStructureOut.getConfirmAdjustQty() >= 0){
+                //若待调整量>=0,则根据实单，重新转移搭配
+                doTransferConvertionQty(mpProdFinalList);
+            }
+            if (adjustStructureOut.getConfirmAdjustQty() == 0){
+                continue;
+            }
             if (adjustStructureOut.getConfirmAdjustQty() < 0){
                 //1.1 减量
                 deductAdjustList.add(adjustStructureOut);
@@ -837,7 +876,8 @@ public class MpWeekRollAdjustEngine {
      */
     private int calcAllowDeductQty(FactoryMonthPlanFinalAdjustVo mpFinalVo){
         //允许扣减量  = 实单-锁定
-        int allowDeductQty = getRealBillQty(mpFinalVo);
+        //int allowDeductQty = getRealBillQty(mpFinalVo);
+        int allowDeductQty = mpFinalVo.getTotalQty();
         allowDeductQty -= mpFinalVo.getLockQty();
         return allowDeductQty < 0 ? 0:allowDeductQty;
     }
@@ -852,42 +892,52 @@ public class MpWeekRollAdjustEngine {
     }
 
     /**
-     * 按需要扣减的量，分别扣减高优先级，再扣减中优先级
+     * 按需要扣减的量，分别扣减储备->高优先级，再扣减中优先级
      * @param needDeductQty 需要扣减的量
      * @param prodFinal 定额记录
      */
     private void doNeedDeductProductionQty(MpRollAdjustContextDTO contextDTO, int needDeductQty, FactoryMonthPlanFinalAdjustVo prodFinal) {
         int tmpNeedDeductQty = needDeductQty;
-        int oriRealOrdQty = prodFinal.getHeightProductionQty() + prodFinal.getMidProductionQty() + prodFinal.getPostponeProductionQty();
-        //根据 需要扣减量，从高优先级->中优先级->暂缓
-        if (prodFinal.getHeightProductionQty() >= tmpNeedDeductQty) {
-            prodFinal.setHeightProductionQty(prodFinal.getHeightProductionQty() - tmpNeedDeductQty);
-        } else {
-            //高优先级不够，自身清0，继续扣减中优先级
-            tmpNeedDeductQty = tmpNeedDeductQty - prodFinal.getHeightProductionQty();
-            prodFinal.setHeightProductionQty(0);
-            if (prodFinal.getMidProductionQty() >= tmpNeedDeductQty) {
-                prodFinal.setMidProductionQty(prodFinal.getMidProductionQty() - tmpNeedDeductQty);
-            }else{
-                //中优先级不够，自身清0，继续扣减暂缓优先级
-                tmpNeedDeductQty = tmpNeedDeductQty - prodFinal.getMidProductionQty();
-                prodFinal.setMidProductionQty(0);
+        //int oriRealOrdQty = prodFinal.getHeightProductionQty() + prodFinal.getMidProductionQty() + prodFinal.getPostponeProductionQty();
+        //int oriRealOrdQty = prodFinal.getTotalQty();
 
-                if (prodFinal.getPostponeProductionQty() >= tmpNeedDeductQty) {
-                    prodFinal.setPostponeProductionQty(prodFinal.getPostponeProductionQty() - tmpNeedDeductQty);
-                }else {
-                    prodFinal.setPostponeProductionQty(0);
+        //根据 需要扣减量，从储备->高优先级->中优先级->暂缓
+        if (prodFinal.getCycleProductionQty() >= tmpNeedDeductQty) {
+            prodFinal.setCycleProductionQty(prodFinal.getCycleProductionQty() - tmpNeedDeductQty);
+        }else{
+            tmpNeedDeductQty = tmpNeedDeductQty - prodFinal.getCycleProductionQty();
+            prodFinal.setCycleProductionQty(0);
+            if (prodFinal.getConventionProductionQty() >= tmpNeedDeductQty){
+                prodFinal.setConventionProductionQty(prodFinal.getConventionProductionQty() - tmpNeedDeductQty);
+            }else{
+                tmpNeedDeductQty = tmpNeedDeductQty - prodFinal.getConventionProductionQty();
+                prodFinal.setConventionProductionQty(0);
+                if (prodFinal.getHeightProductionQty() >= tmpNeedDeductQty) {
+                    prodFinal.setHeightProductionQty(prodFinal.getHeightProductionQty() - tmpNeedDeductQty);
+                } else {
+                    //高优先级不够，自身清0，继续扣减中优先级
+                    tmpNeedDeductQty = tmpNeedDeductQty - prodFinal.getHeightProductionQty();
+                    prodFinal.setHeightProductionQty(0);
+                    if (prodFinal.getMidProductionQty() >= tmpNeedDeductQty) {
+                        prodFinal.setMidProductionQty(prodFinal.getMidProductionQty() - tmpNeedDeductQty);
+                    }else{
+                        //中优先级不够，自身清0，继续扣减暂缓优先级
+                        tmpNeedDeductQty = tmpNeedDeductQty - prodFinal.getMidProductionQty();
+                        prodFinal.setMidProductionQty(0);
+
+                        if (prodFinal.getPostponeProductionQty() >= tmpNeedDeductQty) {
+                            prodFinal.setPostponeProductionQty(prodFinal.getPostponeProductionQty() - tmpNeedDeductQty);
+                        }else {
+                            prodFinal.setPostponeProductionQty(0);
+                        }
+                    }
                 }
             }
         }
-
-        int emptyQty = needDeductQty > oriRealOrdQty ? oriRealOrdQty:needDeductQty;
+        //int emptyQty = needDeductQty > oriRealOrdQty ? oriRealOrdQty:needDeductQty;
         //将调减量置到实际调整量
-        prodFinal.setActualAdjustQty(emptyQty);
-        //若存在周期排产或储备排产，则将调减量转移到高或中优先级，防止后面重复挤搭配
-        if (prodFinal.getCycleProductionQty() > 0 || prodFinal.getConventionProductionQty() >0){
-            transferProductionQty(prodFinal, emptyQty);
-        }
+        prodFinal.setActualAdjustQty(tmpNeedDeductQty);
+
         contextDTO.getLogDetail().append(String.format("结构:%s,【减量调整】--扣减各总排产量,物料编码:%s,调减后,高优先级排产量:%s,中优级排产量:%s,暂缓排产量:%s,空出产能:%s",contextDTO.getStructureName(), prodFinal.getMaterialCode(),prodFinal.getHeightProductionQty(),prodFinal.getMidProductionQty(),prodFinal.getPostponeProductionQty(),prodFinal.getActualAdjustQty())).append(ApsConstant.DIVISION);
     }
 

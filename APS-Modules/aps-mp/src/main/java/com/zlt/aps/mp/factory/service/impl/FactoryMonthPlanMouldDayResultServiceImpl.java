@@ -284,6 +284,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     result.setAdjustProductQty3(adjustProductQty3);
                     Integer adjustProductQty4 = adjustProductQty3 + intValue(result.getAdjustQty4()); 
                     result.setAdjustProductQty4(adjustProductQty4);
+                    // 待调整量 = 净需求量 - 剩余量
+                    result.setPendingQty(intValue(result.getProdReqPlan()) - intValue(result.getProductSurplus()));
                 }
             }
             // 2.1.2.6、重新对结构内的数据排序：主花纹分组，按型胎胚描述，最大腔数倒序、主花纹、最大活块数倒序，主花纹组内按型腔数倒序、活块数倒序排序
@@ -523,7 +525,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             }
             
             // 3.2、加载表头国际化标签
-            this.loadExportI18nTableName(tableMap);
+            this.loadExportI18nTableName(tableMap, isFinal);
             
             // 3.3、需要增加的第二部分表头统计
             List<Map<String, Object>> headSummaryData = new ArrayList<>();
@@ -701,7 +703,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
      * 加载表头国际化标签 
      * @param tableMap
      */
-    private void loadExportI18nTableName(Map<String, Object> tableMap) {
+    private void loadExportI18nTableName(Map<String, Object> tableMap, boolean isFinal) {
         tableMap.put("locationType", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.locationType"));
         tableMap.put("materialCode", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.materialCode"));
         tableMap.put("mesMaterialCode", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.mesMaterialCode"));
@@ -724,9 +726,14 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         tableMap.put("averageSaleQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.averageSaleQty"));
         tableMap.put("inventorySalesRatio", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.inventorySalesRatio"));
         tableMap.put("dayVulcanizationQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.dayVulcanizationQty"));
-        tableMap.put("prodReqPlan", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.prodReqPlan"));
         tableMap.put("restrictedNetQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.restrictedNetQty"));
-        tableMap.put("unRestrictedNetQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.unRestrictedNetQty"));
+        if (isFinal) {
+            tableMap.put("prodReqPlan", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.realProdReqPlan"));
+            tableMap.put("unRestrictedNetQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.realUnRestrictedNetQty"));
+        } else {
+            tableMap.put("prodReqPlan", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.prodReqPlan"));
+            tableMap.put("unRestrictedNetQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.unRestrictedNetQty"));
+        }
         tableMap.put("heightQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.heightQty"));
         tableMap.put("midQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.midQty"));
         tableMap.put("cycleReserveQty", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.cycleReserveQty"));
@@ -782,6 +789,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         tableMap.put("adjustProductQty4", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.adjustProductQty4"));
         tableMap.put("originalTotalQty", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.originalTotalQty"));
         tableMap.put("productSurplus", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.productSurplus"));
+        tableMap.put("pendingQty", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.pendingQty"));
+        
         
         
         tableMap.put("totalAll", I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.totalAll"));
@@ -888,9 +897,11 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         listDataMap.put(this.getRealFieldName("dayVulcanizationQty", suffix), exportVo.getDayVulcanizationQty());
         listDataMap.put(this.getRealFieldName("prodReqPlan", suffix), exportVo.getProdReqPlan());
         listDataMap.put(this.getRealFieldName("unRestrictedNetQty", suffix), exportVo.getUnRestrictedNetQty());
+        listDataMap.put(this.getRealFieldName("restrictedNetQty", suffix), exportVo.getRestrictedNetQty());
         if (isFinal) {
             listDataMap.put(this.getRealFieldName("originalTotalQty", suffix), exportVo.getOriginalTotalQty());
             listDataMap.put(this.getRealFieldName("productSurplus", suffix), exportVo.getProductSurplus());
+            listDataMap.put(this.getRealFieldName("pendingQty", suffix), exportVo.getPendingQty());
             listDataMap.put(this.getRealFieldName("adjustQty1", suffix), exportVo.getAdjustQty1());
             listDataMap.put(this.getRealFieldName("adjustQty2", suffix), exportVo.getAdjustQty2());
             listDataMap.put(this.getRealFieldName("adjustQty3", suffix), exportVo.getAdjustQty3());
@@ -911,7 +922,6 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             listDataMap.put(this.getRealFieldName("conventionProductionQty", suffix), exportVo.getConventionProductionQty());
             listDataMap.put(this.getRealFieldName("postponeProductionQty", suffix), exportVo.getPostponeProductionQty());
             listDataMap.put(this.getRealFieldName("actualOrderUnproduced", suffix), exportVo.getActualOrderUnproduced());
-            listDataMap.put(this.getRealFieldName("restrictedNetQty", suffix), exportVo.getRestrictedNetQty());
             listDataMap.put(this.getRealFieldName("differenceQty", suffix), exportVo.getDifferenceQty());
         }
         listDataMap.put(this.getRealFieldName("beginDay", suffix), exportVo.getBeginDay());
@@ -1025,7 +1035,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             subtotal.setAdjustProductQty3(safeAdd(subtotal.getAdjustProductQty3(), result.getAdjustProductQty3()));
             subtotal.setAdjustProductQty4(safeAdd(subtotal.getAdjustProductQty4(), result.getAdjustProductQty4()));
             subtotal.setOriginalTotalQty(safeAdd(subtotal.getOriginalTotalQty(), result.getOriginalTotalQty()));
-            subtotal.setOriginalTotalQty(safeAdd(subtotal.getProductSurplus(), result.getProductSurplus()));
+            subtotal.setProductSurplus(safeAdd(subtotal.getProductSurplus(), result.getProductSurplus()));
+            subtotal.setPendingQty(safeAdd(subtotal.getPendingQty(), result.getPendingQty()));
             
             for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day ++) {
                 String dayFieldName = String.format(DAY_FIELD_NAME_FORMAT, day);

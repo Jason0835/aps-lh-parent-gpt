@@ -56,6 +56,20 @@ public class TbrSimulateProductionLogRecorder {
     }
 
     /**
+     * 增加 分组计划模拟模具排产续作排产完毕 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，分组计划模拟模具排产续作排产完毕====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addEndContinueSkuProductionLog(Context context){
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，分组计划模拟模具排产续作排产完毕====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+    /**
      * 增加 排产模式 效率优先或是交付优先 日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，采用%s模式进行排产====
      *
