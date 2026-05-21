@@ -573,10 +573,10 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     private String isDelivery;
 
     /**
-     * 是否发布，0-未发布，1-已发布 2-发布失败 3-超时发布 4-待发布
+     * 是否发布，0-未发布，1-已发布，2-发布失败，3-超时失败，4-待发布
      */
     @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.isRelease")
-    @ApiModelProperty(value = "是否发布，0-未发布，1-已发布 2-发布失败 3-超时发布 4-待发布", name = "isRelease")
+    @ApiModelProperty(value = "是否发布，0-未发布，1-已发布，2-发布失败，3-超时失败，4-待发布", name = "isRelease")
     @TableField(value = "IS_RELEASE")
     private String isRelease;
 

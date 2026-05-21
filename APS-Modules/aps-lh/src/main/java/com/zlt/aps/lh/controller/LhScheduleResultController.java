@@ -26,6 +26,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
+import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
@@ -677,7 +678,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         List<LhScheduleResult> filteredList = list.stream()
                 .filter(item -> ApsConstant.NO_RELEASE.equals(item.getIsRelease())
                         || ApsConstant.FAILURE_RELEASE.equals(item.getIsRelease())
-                        || ApsConstant.WAIT_RELEASING.equals(item.getIsRelease()))
+                        || ReleaseStatusEnum.TIMEOUT_FAILED.getCode().equals(item.getIsRelease())
+                        || ReleaseStatusEnum.PENDING_RELEASE.getCode().equals(item.getIsRelease()))
                 .collect(Collectors.toList());
 
         if (CollectionUtils.isEmpty(filteredList)) {

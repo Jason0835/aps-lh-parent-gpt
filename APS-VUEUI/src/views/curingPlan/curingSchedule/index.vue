@@ -973,8 +973,8 @@ export default {
       if (this.isShiftAfterEnding(row, shiftIndex)) return '';
       const planQty = row['class' + shiftIndex + 'PlanQty'];
       if (planQty == null || planQty <= 0) return '';
-      const dictValue = value || "0";
-      return this.selectDictLabel(this.dict.type.lh_trial_status, dictValue);
+      if (value == null || value === '') return '';
+      return this.selectDictLabel(this.dict.type.lh_trial_status, value);
     },
     shiftPlanQtyFormatter(row, column, value, shiftIndex) {
       if (this.isShiftAfterEnding(row, shiftIndex)) return '';
