@@ -636,6 +636,16 @@ export default {
           ),
           width: 120,
           render: ({ row }) => {
+            if (this.isStatisticsRow(row)) {
+              return (
+                <span>
+                  {this.selectDictLabel(
+                    this.dict.type.biz_yes_no,
+                    row.isLockSchedule
+                  )}
+                </span>
+              );
+            }
             return (
               <el-select
                 v-model={row.isLockSchedule}
