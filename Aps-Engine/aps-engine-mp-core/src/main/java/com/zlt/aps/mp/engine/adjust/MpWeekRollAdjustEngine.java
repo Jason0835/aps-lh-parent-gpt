@@ -31,6 +31,7 @@ import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.check.DayTotalCapacityChecker;
 import com.zlt.aps.mp.engine.check.OemTotalCapacityChecker;
 import com.zlt.aps.mp.engine.check.SkuSecondChecker;
+import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.deduct.DeductMouldScheduler;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.common.utils.StringUtil;
@@ -892,12 +893,25 @@ public class MpWeekRollAdjustEngine {
     }
 
     /**
+     * 检查偶数
+     * @param number
+     * @return
+     */
+    protected boolean isEven(int number) {
+        return (number & 1) == 0;
+    }
+
+    /**
      * 按需要扣减的量，分别扣减储备->高优先级，再扣减中优先级
      * @param needDeductQty 需要扣减的量
      * @param prodFinal 定额记录
      */
     private void doNeedDeductProductionQty(MpRollAdjustContextDTO contextDTO, int needDeductQty, FactoryMonthPlanFinalAdjustVo prodFinal) {
         int tmpNeedDeductQty = needDeductQty;
+        if (!isEven(tmpNeedDeductQty)){
+            //若非偶数，多扣1
+            tmpNeedDeductQty += 1;
+        }
         //int oriRealOrdQty = prodFinal.getHeightProductionQty() + prodFinal.getMidProductionQty() + prodFinal.getPostponeProductionQty();
         //int oriRealOrdQty = prodFinal.getTotalQty();
 
