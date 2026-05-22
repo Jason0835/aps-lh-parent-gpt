@@ -4,6 +4,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.HashMap;
 
 /**
  * @author Sandy
@@ -19,15 +20,21 @@ public class IncMouldContext implements Serializable {
     @ApiModelProperty(value = "首次增模标识")
     private boolean bFirstAddMould = true;
 
-    @ApiModelProperty(value = "按硫化机维度，记录前日排产量")
-    private Integer beforeProductionQty = 0;
+   /* @ApiModelProperty(value = "按硫化机维度，记录前日排产量")
+    private Integer beforeProductionQty = 0;*/
 
     @ApiModelProperty(value = "按硫化机维度，记录前日排产量位置")
     private Integer beforeProductionPosition = 0;
 
-    @ApiModelProperty(value = "按硫化机维度，记录已排产天数")
-    private Integer usedProductionDays = 0;
+    /*@ApiModelProperty(value = "按硫化机维度，记录已排产天数")
+    private Integer usedProductionDays = 0;*/
 
     @ApiModelProperty(value = "已排产计划量")
     private Integer hasProductionQty = 0;
+
+    /**
+     * 当前模已排产信息 Map<排产天，排产量>
+     */
+    @ApiModelProperty(value = "当前模已排产信息")
+    private HashMap<Integer,Integer> usedProductionMap = new HashMap<>();
 }

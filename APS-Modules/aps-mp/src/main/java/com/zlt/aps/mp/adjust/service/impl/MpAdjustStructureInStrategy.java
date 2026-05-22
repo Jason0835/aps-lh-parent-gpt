@@ -142,7 +142,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
                     contextDTO.getMpYear(),contextDTO.getMpMonth()));
         }
         //检查是否已执行自动调整
-        checkHasDoAutoAdjust(contextDTO);
+        //checkHasDoAutoAdjust(contextDTO);
 
         String lastMonthPlanVersion = contextDTO.getMpAdjustStructureInList().get(0).getLastMonthPlanVersion();
         //2.按结构序列化分组
