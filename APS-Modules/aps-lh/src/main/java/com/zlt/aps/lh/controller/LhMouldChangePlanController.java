@@ -332,10 +332,10 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             List<LhScheduleResult> lhScheduleResultList = lhScheduleResultMapper.selectList(queryWrapper);
             if (CollectionUtils.isNotEmpty(lhScheduleResultList)) {
                 lhScheduleResultMap = lhScheduleResultList.stream()
-                        .sorted(Comparator.comparing(LhScheduleResult::getConstructionStage))
-                        .collect(Collectors.toMap(LhScheduleResult::getMaterialCode,
-                                LhScheduleResult::getConstructionStage,
-                        (s1, s2) -> s1));
+                        .sorted(Comparator.comparing(item -> StringUtils.defaultIfBlank(item.getConstructionStage(), "")))
+                        .collect(Collectors.toMap(item -> StringUtils.defaultIfBlank(item.getMaterialCode(), ""),
+                                item -> StringUtils.defaultIfBlank(item.getConstructionStage(), ""),
+                                (s1, s2) -> s1));
             }
         }
         // 查询共用模具

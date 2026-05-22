@@ -106,6 +106,11 @@ public class ProductionCapacityParamConfiguration {
      */
     private Integer singleCxMachineChangeProSizeRepeatMaxCount;
     /**
+     * SYS0203016
+     * 前后两个SKU，同规格同花纹换活字块时是否算换模能力次数 Y是算，其它不算
+     */
+    private boolean addChangeMoldCountBySameSpecificationsPattern;
+    /**
      * 最小批量值
      */
     private Integer minQty;

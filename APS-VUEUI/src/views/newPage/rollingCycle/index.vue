@@ -131,7 +131,6 @@
                 <el-select
                   v-model="formInline.adjustStartDay"
                   style="width: 100px"
-                  disabled
                   filterable
                 >
                   <el-option
@@ -2435,10 +2434,25 @@ export default {
         }
       }
       if (
+        this.formInline.adjustStartDay == null ||
+        this.formInline.adjustStartDay === ""
+      ) {
+        return this.$modal.msgWarning("请选择调整开始日期");
+      }
+      if (
         this.formInline.adjustEndDay == null ||
         this.formInline.adjustEndDay == ""
       ) {
         return this.$modal.msgWarning("请选择调整结束日期");
+      }
+      const adjustStart = Number(this.formInline.adjustStartDay);
+      const adjustEnd = Number(this.formInline.adjustEndDay);
+      if (
+        !Number.isNaN(adjustStart) &&
+        !Number.isNaN(adjustEnd) &&
+        adjustStart > adjustEnd
+      ) {
+        return this.$modal.msgWarning("调整开始日期不能大于调整结束日期");
       }
       this.loading = true;
       try {

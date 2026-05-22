@@ -845,10 +845,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 new LambdaQueryWrapper<LhDayFinishQty>()
                         .eq(LhDayFinishQty::getFactoryCode, factoryCode)
                         .ge(LhDayFinishQty::getFinishDate, dayStart)
-                        .lt(LhDayFinishQty::getFinishDate, nextDayStart)
-                        .and(wrapper -> wrapper.eq(LhDayFinishQty::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                                .or()
-                                .isNull(LhDayFinishQty::getIsDelete)));
+                        .lt(LhDayFinishQty::getFinishDate, nextDayStart));
         Map<String, Integer> materialDayFinishedQtyMap = new HashMap<>(64);
         if (!CollectionUtils.isEmpty(dayFinishQtyList)) {
             for (LhDayFinishQty finishQty : dayFinishQtyList) {
@@ -883,10 +880,7 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 new LambdaQueryWrapper<LhDayFinishQty>()
                         .eq(LhDayFinishQty::getFactoryCode, factoryCode)
                         .ge(LhDayFinishQty::getFinishDate, monthStart)
-                        .lt(LhDayFinishQty::getFinishDate, nextTargetDay)
-                        .and(wrapper -> wrapper.eq(LhDayFinishQty::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                                .or()
-                                .isNull(LhDayFinishQty::getIsDelete)));
+                        .lt(LhDayFinishQty::getFinishDate, nextTargetDay));
 
         Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>(64);
         if (!CollectionUtils.isEmpty(monthFinishList)) {

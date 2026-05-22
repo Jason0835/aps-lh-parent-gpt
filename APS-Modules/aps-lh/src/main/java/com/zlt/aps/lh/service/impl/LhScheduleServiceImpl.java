@@ -2,6 +2,8 @@ package com.zlt.aps.lh.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.json.JSON;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -676,8 +678,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         List<Map<String, Object>> exportDataList = buildExportDataList(exportList, result.getScheduleDate());
         excelDataList.add(exportDataList);
 
-        // 节点5：硫化计划数据位于模板第 2 个 sheet（下标 1）的“硫化计划”页。
-        // 第 1 个 sheet 为模板辅助页，不能作为数据写入页。
+        // 节点5：硫化计划数据位于模板第 0 个 sheet（下标 0）的“硫化计划”页。
         byte[] exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(templateBytes), 0, tableMap, excelDataList);
 
         //1.获取导出数据
@@ -1105,6 +1106,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AjaxResult importScheduleTemplate(List<LhScheduleResultTemplateImportVO> list, LhScheduleResult result, boolean updateSupport, Long id) {
+        log.info(JSONUtil.toJsonStr(list));
         if (Objects.isNull(result) || StringUtils.isBlank(result.getFactoryCode()) || Objects.isNull(result.getScheduleDate())) {
             return AjaxResult.error("导入条件中的工厂和排程日期不能为空");
         }
@@ -1928,7 +1930,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return Collections.emptyMap();
         }
 
-        Date targetScheduleDate = Objects.nonNull(scheduleDate)
+        // 优先使用入参 scheduleDate，从班次日历取第一个班次的日期作为 T 日
+        // 硫化产量今天夜班 = 1号到T-1日的日完成量总和 + T-2日夜班班次完成量
+        Date baseScheduleDate = Objects.nonNull(scheduleDate)
                 ? DateUtil.beginOfDay(scheduleDate)
                 : list.stream()
                 .map(LhScheduleResult::getScheduleDate)
@@ -1936,21 +1940,43 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 .max(Date::compareTo)
                 .map(DateUtil::beginOfDay)
                 .orElse(DateUtil.beginOfDay(DateUtil.date()));
-        Date monthStart = DateUtil.beginOfMonth(targetScheduleDate);
+        List<LhScheduleShiftDateVO> shiftDateList = listScheduleShiftDates(baseScheduleDate);
+        String firstShiftDateStr = PubUtil.isNotEmpty(shiftDateList) ? shiftDateList.get(0).getShiftDate() : null;
+        Date targetScheduleDate = null;
+        if (StringUtils.isNotBlank(firstShiftDateStr)) {
+            // 先解析月日
+            Date parsed = DateUtil.parse(firstShiftDateStr, "MM/dd");
+            if (parsed != null) {
+                int baseYear = DateUtil.year(baseScheduleDate);
+                int baseMonth = DateUtil.month(baseScheduleDate) + 1;
+                int parsedMonth = DateUtil.month(parsed) + 1;
+                int parsedDay = DateUtil.dayOfMonth(parsed);
+                // 跨年判断：如果解析的月份小于基准日期的月份，说明是去年
+                if (parsedMonth < baseMonth) {
+                    targetScheduleDate = DateUtil.parse(baseYear - 1 + "-" + firstShiftDateStr.replace("/", "-"), "yyyy-MM-dd");
+                } else {
+                    targetScheduleDate = DateUtil.parse(baseYear + "-" + firstShiftDateStr.replace("/", "-"), "yyyy-MM-dd");
+                }
+            }
+        }
+        if (targetScheduleDate == null) {
+            targetScheduleDate = baseScheduleDate;
+        }
+        // 硫化产量今天夜班 = 1号到T-1日的日完成量总和 + T日class1FinishQty
         Date nextDayStart = DateUtil.offsetDay(targetScheduleDate, 1);
-        log.debug("buildTodayNightFinishQtyExportMap: 查询日期范围={} ~ {}，工厂数={}，物料数={}",
-                DateUtil.formatDate(monthStart), DateUtil.formatDate(nextDayStart),
+        Date monthStart = DateUtil.beginOfMonth(targetScheduleDate);
+        log.debug("buildTodayNightFinishQtyExportMap: T日={}, T+1日={}, 月初={}, 工厂数={}, 物料数={}",
+                DateUtil.formatDate(targetScheduleDate), DateUtil.formatDate(nextDayStart),
+                DateUtil.formatDate(monthStart),
                 factoryCodes.size(), materialCodes.size());
 
+        // 日完成量查询：1号到T-1日
         List<LhDayFinishQty> finishQtyList = lhDayFinishQtyMapper.selectList(
                 new LambdaQueryWrapper<LhDayFinishQty>()
                         .in(LhDayFinishQty::getFactoryCode, factoryCodes)
                         .in(LhDayFinishQty::getMaterialCode, materialCodes)
                         .ge(LhDayFinishQty::getFinishDate, monthStart)
-                        .lt(LhDayFinishQty::getFinishDate, nextDayStart)
-                        .and(wrapper -> wrapper.eq(LhDayFinishQty::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                                .or()
-                                .isNull(LhDayFinishQty::getIsDelete)));
+                        .lt(LhDayFinishQty::getFinishDate, targetScheduleDate));
         log.debug("buildTodayNightFinishQtyExportMap: T_LH_DAY_FINISH_QTY查询结果数量={}", finishQtyList.size());
         Map<String, BigDecimal> finishQtyMap = new HashMap<>(16);
         for (LhDayFinishQty finishQty : finishQtyList) {
@@ -1965,12 +1991,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                     BigDecimal::add);
         }
 
-        List<LhScheFinishQty> scheFinishQtyList = lhScheFinishQtyMapper.selectList(
-                new LambdaQueryWrapper<LhScheFinishQty>()
-                        .in(LhScheFinishQty::getFactoryCode, factoryCodes)
-                        .in(LhScheFinishQty::getMaterialCode, materialCodes)
-                        .ge(LhScheFinishQty::getScheduleDate, targetScheduleDate)
-                        .lt(LhScheFinishQty::getScheduleDate, nextDayStart));
+        // 排程完成量查询：T日class1FinishQty（夜班完成量）
+        LambdaQueryWrapper<LhScheFinishQty> query = new LambdaQueryWrapper<>();
+        query.in(LhScheFinishQty::getFactoryCode, factoryCodes)
+                .in(LhScheFinishQty::getMaterialCode, materialCodes)
+                .eq(LhScheFinishQty::getScheduleDate, targetScheduleDate);
+        List<LhScheFinishQty> scheFinishQtyList = lhScheFinishQtyMapper.selectList( query);
         log.debug("buildTodayNightFinishQtyExportMap: T_LH_SCHE_FINISH_QTY查询结果数量={}", scheFinishQtyList.size());
         for (LhScheFinishQty finishQty : scheFinishQtyList) {
             if (StringUtils.isBlank(finishQty.getFactoryCode()) || StringUtils.isBlank(finishQty.getMaterialCode())) {
