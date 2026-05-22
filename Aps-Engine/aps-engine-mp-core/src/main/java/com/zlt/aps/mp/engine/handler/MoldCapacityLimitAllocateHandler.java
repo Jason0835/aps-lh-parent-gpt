@@ -171,7 +171,7 @@ public class MoldCapacityLimitAllocateHandler {
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return null;
         }
-        List<MonthPlanProductionRequirePlanVo> singleMainPatternList = groupPlanData.stream().filter(singlePlan -> groupKey.equals(singlePlan.getGroupKey()) && null != singlePlan.getDayVulcanizationQty()).collect(Collectors.toList());
+        List<MonthPlanProductionRequirePlanVo> singleMainPatternList = groupPlanData.stream().filter(singlePlan -> groupKey.equals(singlePlan.getGroupKey()) && singlePlan.isEffectiveDayVulcanizationQty()).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(singleMainPatternList)) {
             return null;
         }

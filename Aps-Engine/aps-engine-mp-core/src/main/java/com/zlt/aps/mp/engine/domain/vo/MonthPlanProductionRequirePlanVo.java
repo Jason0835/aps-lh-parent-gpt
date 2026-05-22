@@ -177,6 +177,19 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
     }
 
     /**
+     * 判断日硫化量是否有效
+     * 日硫化量有值，且大于零
+     *
+     * @return
+     */
+    public boolean isEffectiveDayVulcanizationQty() {
+        if (null == getDayVulcanizationQty()) {
+            return false;
+        }
+        return getDayVulcanizationQty() > BigDecimal.ZERO.intValue();
+    }
+
+    /**
      * 是否一起排产
      *
      * @return
@@ -995,7 +1008,7 @@ public class MonthPlanProductionRequirePlanVo extends ProductionMonthPlanInit {
             return isProduction;
         }
         //全钢业务-没有日硫化量
-        if (null == getDayVulcanizationQty()) {
+        if (!isEffectiveDayVulcanizationQty()) {
             String noDayVulcanizationQtyReason = NoProductionReasonUtils.getNoProductionReason(MonthPlanNoProductionReasonEnum.NO_DAY_LH_CAPACITY);
             addNoProductionReason(noDayVulcanizationQtyReason);
             return YesOrNoEnum.NO.getCode();
