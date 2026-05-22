@@ -143,7 +143,7 @@ export default {
     columns() {
       return [
       {
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,

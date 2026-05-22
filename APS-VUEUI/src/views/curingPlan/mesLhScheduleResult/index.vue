@@ -112,7 +112,7 @@ export default {
           // sortable: "custom",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);

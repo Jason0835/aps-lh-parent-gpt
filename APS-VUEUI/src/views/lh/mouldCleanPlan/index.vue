@@ -32,7 +32,7 @@
           v-hasPermi="['lh:mouldCleanPlan:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
-        
+
         <el-button
           type="primary"
           plain
@@ -108,7 +108,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -152,7 +152,7 @@ export default {
         },
         {
           prop: "updateTime",
-          label: this.$t("ui.data.column.mouldCleanPlan.updateTime"),
+          label: this.$t("ui.data.column.updateTime"),
         },
 
         {
@@ -189,7 +189,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,

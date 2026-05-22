@@ -347,7 +347,7 @@
             @change="handleSyncBaseChange"
           />
         </el-form-item>
-        <el-form-item :label="$t('common.factory')" prop="factoryCode">
+        <el-form-item :label="$t('ui.data.column.factoryCode')" prop="factoryCode">
           <el-select
             v-model="syncDialog.form.factoryCode"
             :placeholder="$t('ui.frame.btn.choose')"
@@ -1199,7 +1199,7 @@ export default {
       let list = [
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,
@@ -2833,7 +2833,7 @@ export default {
         return;
       }
       this.loadText = this.$t("正在加载中，请稍候");
-      
+
       this.getList();
     },
     handlePageChange(current, pageSize) {

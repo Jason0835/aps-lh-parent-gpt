@@ -118,7 +118,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.confMinProd.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
         },
         {
           prop: "productCode",

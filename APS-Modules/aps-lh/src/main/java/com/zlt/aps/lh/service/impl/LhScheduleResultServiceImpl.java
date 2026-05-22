@@ -262,12 +262,15 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
         ShiftFieldUtil.syncDailyPlanQty(result);
 
+        fillShiftStartEndTimes(result, dto);
+
         return result;
     }
 
     /**
-     * 填充胎胚相关字段（胎胚代码、胎胚描述）
-     * <p>从月计划定稿表中根据工厂+物料编码查询胎胚代码和胎胚描述</p>
+     * 填充插单关联字段（胎胚代码/胎胚描述/需求计划版本号/排产版本号/规格/结构/模具号）
+     * <p>从月计划定稿表中根据工厂+物料编码查询关联字段</p>
+     * <p>班次开始/结束时间由 {@link #fillShiftStartEndTimes} 单独填充，需在班次计划量设置后调用</p>
      *
      * @param result 排程结果实体
      * @param dto    插单请求数据
@@ -290,7 +293,64 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             if (StringUtils.isNotBlank(monthPlan.getMainMaterialDesc())) {
                 result.setMainMaterialDesc(monthPlan.getMainMaterialDesc());
             }
+            if (StringUtils.isNotBlank(monthPlan.getMonthPlanVersion())) {
+                result.setMonthPlanVersion(monthPlan.getMonthPlanVersion());
+            }
+            if (StringUtils.isNotBlank(monthPlan.getProductionVersion())) {
+                result.setProductionVersion(monthPlan.getProductionVersion());
+            }
+            if (StringUtils.isNotBlank(monthPlan.getSpecifications())) {
+                result.setSpecCode(monthPlan.getSpecifications());
+            }
+            if (StringUtils.isNotBlank(monthPlan.getStructureName())) {
+                result.setStructureName(monthPlan.getStructureName());
+            }
         }
+
+        String mouldCode = resolveMouldCode(dto);
+        if (StringUtils.isNotBlank(mouldCode)) {
+            result.setMouldCode(mouldCode);
+        }
+    }
+
+    /**
+     * 填充有计划量班次的开始/结束时间
+     * <p>根据排程日期和班次配置计算各班次时间，仅对有计划量的班次填充</p>
+     *
+     * @param result 排程结果实体
+     * @param dto    插单请求数据
+     */
+    private void fillShiftStartEndTimes(LhScheduleResult result, LhOrderInsertDTO dto) {
+        if (dto.getScheduleDate() == null) {
+            return;
+        }
+        List<com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO> shifts =
+                LhScheduleTimeUtil.buildDefaultScheduleShifts(null, dto.getScheduleDate());
+        for (int i = 1; i <= com.zlt.aps.lh.api.constant.LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, i);
+            if (planQty != null && planQty > 0) {
+                com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO shift = findShiftByIndex(shifts, i);
+                if (shift != null) {
+                    ShiftFieldUtil.setShiftPlanQty(result, i, planQty,
+                            shift.getShiftStartDateTime(), shift.getShiftEndDateTime());
+                }
+            }
+        }
+    }
+
+    /**
+     * 根据班次索引从班次配置列表中查找对应班次
+     *
+     * @param shifts     班次配置列表
+     * @param shiftIndex 班次索引（1-8）
+     * @return 班次配置，未找到返回null
+     */
+    private com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO findShiftByIndex(
+            List<com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO> shifts, int shiftIndex) {
+        if (shifts == null || shiftIndex < 1 || shiftIndex > shifts.size()) {
+            return null;
+        }
+        return shifts.get(shiftIndex - 1);
     }
 
     /**

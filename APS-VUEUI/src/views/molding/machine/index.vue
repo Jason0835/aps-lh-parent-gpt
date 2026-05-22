@@ -133,7 +133,7 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          label: this.$t("ui.data.column.machine.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           formatter: (row) => {
             return this.selectDictLabel(

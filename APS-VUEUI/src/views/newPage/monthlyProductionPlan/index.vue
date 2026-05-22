@@ -187,7 +187,7 @@
             @change="handleSyncBaseChange"
           />
         </el-form-item>
-        <el-form-item :label="$t('common.factory')" prop="factoryCode">
+        <el-form-item :label="$t('ui.data.column.factoryCode')" prop="factoryCode">
           <el-select
             v-model="syncDialog.form.factoryCode"
             :placeholder="$t('ui.frame.btn.choose')"
@@ -385,7 +385,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,
@@ -448,7 +448,7 @@ export default {
         },
         // {
         //   prop: "factoryCode",
-        //   label: this.$t("common.factory"),
+        //   label: this.$t("ui.data.column.factoryCode"),
         //   width: 120,
         //   formatter: (row, column, value) => {
         //     return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -481,7 +481,7 @@ export default {
           width: 300,
           align: "left",
         },
-        { 
+        {
           prop: "constructionStage",
           label: this.$t("ui.data.column.monthplan.constructionStage"),
           minWidth: 100,

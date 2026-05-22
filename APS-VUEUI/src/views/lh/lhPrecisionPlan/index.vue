@@ -132,7 +132,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -188,7 +188,7 @@ export default {
         {
           prop: "updateTime",
           width: 180,
-          label: this.$t("ui.lh.precision.plan.updateTime"),
+          label: this.$t("ui.data.column.updateTime"),
         },
         {
           prop: "remark",
@@ -246,7 +246,7 @@ export default {
           value: new Date().getFullYear().toString(),
         },
         {
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,

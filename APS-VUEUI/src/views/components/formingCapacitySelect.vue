@@ -66,7 +66,7 @@ export default {
       // searchColumns: [
       //   {
       //     prop: "factoryCode",
-      //     label: this.$t("common.factory"),
+      //     label: this.$t("ui.data.column.factoryCode"),
       //     type: "select", //GLUE_TYPE
       //     dictData: this.parentDict.type.biz_factory_name,
       //   },
@@ -95,7 +95,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select", //GLUE_TYPE
           dictData: this.parentDict.type.biz_factory_name,
         },
@@ -109,7 +109,7 @@ export default {
       const list = [
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(
               this.parentDict.type.biz_factory_name,

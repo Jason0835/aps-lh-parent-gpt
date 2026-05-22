@@ -126,7 +126,7 @@ export default {
         },
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -146,7 +146,7 @@ export default {
         // },
         // {
         //   prop: "updateTime",
-        //   label: this.$t("common.updateTime"),
+        //   label: this.$t("ui.data.column.updateTime"),
         //   width: 180,
         // },
         {
@@ -181,7 +181,7 @@ export default {
           valueFormat: "yyyy-MM",
         },
         {
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,

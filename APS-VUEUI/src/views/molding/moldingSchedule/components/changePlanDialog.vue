@@ -41,7 +41,7 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('common.factory')"
+              :label="$t('ui.data.column.factoryCode')"
               prop="factoryCode"
             >
               <el-input v-model="form.factoryCode" disabled></el-input>
@@ -66,7 +66,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item
-              :label="$t('物料编码')"
+              :label="$t('ui.data.column.scheduleResult.materialCode')"
               prop="materialCode"
             >
               <el-input v-model="form.materialCode" disabled></el-input>
@@ -74,7 +74,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item
-              :label="$t('物料描述')"
+              :label="$t('ui.data.column.scheduleResult.materialDesc')"
               prop="materialDesc"
             >
               <el-input v-model="form.materialDesc" disabled></el-input>
@@ -92,7 +92,7 @@
 
           <el-col :span="12">
             <el-form-item
-              :label="$t('胎胚描述')"
+              :label="$t('ui.data.column.scheduleResult.embryoDesc')"
               prop="mainMaterialDesc"
             >
               <el-input v-model="form.mainMaterialDesc" disabled></el-input>
@@ -100,7 +100,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item
-              :label="$t('合计余量')"
+              :label="$t('ui.data.column.cxScheduleResult.totalSurplusQty')"
               prop="mouldSurplusQty"
             >
               <el-input :value="displayMouldSurplusQty" disabled></el-input>
@@ -108,7 +108,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item
-              :label="$t('胎胚库存')"
+              :label="$t('ui.data.column.scheduleResult.embryoStock')"
               prop="totalStock"
             >
               <el-input v-model="form.totalStock" disabled></el-input>
@@ -116,7 +116,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item
-              :label="$t('硫化班产')"
+              :label="$t('ui.data.column.cxScheduleResult.lhClassQty')"
               prop="lhClassQty"
             >
               <el-input v-model="form.lhClassQty" disabled></el-input>
@@ -134,7 +134,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ getShiftTitle($t("早班"), 0) }}
+              {{ getShiftTitle($t("ui.data.column.scheduleResult.morningShift"), 0) }}
             </h4>
           </el-col>
 
@@ -178,7 +178,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方编号')" prop="class1RecipeNo">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeNo')" prop="class1RecipeNo">
               <embryoNoSelect
                 :key="`class1RecipeNo-${form.class1RecipeNo || ''}`"
                 v-model="form.class1RecipeNo"
@@ -189,7 +189,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方类型')" prop="class1RecipeType">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeType')" prop="class1RecipeType">
               <dict-select
                 v-model="form.class1RecipeType"
                 :options="parentDict.type.trial_status"
@@ -199,7 +199,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ getShiftTitle($t("中班"), 1) }}
+              {{ getShiftTitle($t("ui.data.column.scheduleResult.middleShift"), 1) }}
             </h4>
           </el-col>
 
@@ -246,7 +246,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方编号')" prop="class2RecipeNo">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeNo')" prop="class2RecipeNo">
               <embryoNoSelect
                 :key="`class2RecipeNo-${form.class2RecipeNo || ''}`"
                 v-model="form.class2RecipeNo"
@@ -257,7 +257,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方类型')" prop="class2RecipeType">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeType')" prop="class2RecipeType">
               <dict-select
                 v-model="form.class2RecipeType"
                 :options="parentDict.type.trial_status"
@@ -267,7 +267,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ getShiftTitle($t("夜班"), 2) }}
+              {{ getShiftTitle($t("ui.data.column.scheduleResult.nightShift"), 2) }}
             </h4>
           </el-col>
 
@@ -314,7 +314,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方编号')" prop="class3RecipeNo">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeNo')" prop="class3RecipeNo">
               <embryoNoSelect
                 :key="`class3RecipeNo-${form.class3RecipeNo || ''}`"
                 v-model="form.class3RecipeNo"
@@ -325,7 +325,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方类型')" prop="class3RecipeType">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeType')" prop="class3RecipeType">
               <dict-select
                 v-model="form.class3RecipeType"
                 :options="parentDict.type.trial_status"
@@ -335,7 +335,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ getShiftTitle($t("早班"), 3) }}
+              {{ getShiftTitle($t("ui.data.column.scheduleResult.morningShift"), 3) }}
             </h4>
           </el-col>
 
@@ -382,7 +382,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方编号')" prop="class4RecipeNo">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeNo')" prop="class4RecipeNo">
               <embryoNoSelect
                 :key="`class4RecipeNo-${form.class4RecipeNo || ''}`"
                 v-model="form.class4RecipeNo"
@@ -393,7 +393,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方类型')" prop="class4RecipeType">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeType')" prop="class4RecipeType">
               <dict-select
                 v-model="form.class4RecipeType"
                 :options="parentDict.type.trial_status"
@@ -403,7 +403,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ getShiftTitle($t("中班"), 4) }}
+              {{ getShiftTitle($t("ui.data.column.scheduleResult.middleShift"), 4) }}
             </h4>
           </el-col>
 
@@ -450,7 +450,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方编号')" prop="class5RecipeNo">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeNo')" prop="class5RecipeNo">
               <embryoNoSelect
                 :key="`class5RecipeNo-${form.class5RecipeNo || ''}`"
                 v-model="form.class5RecipeNo"
@@ -461,7 +461,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方类型')" prop="class5RecipeType">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeType')" prop="class5RecipeType">
               <dict-select
                 v-model="form.class5RecipeType"
                 :options="parentDict.type.trial_status"
@@ -471,7 +471,7 @@
           </el-col>
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ getShiftTitle($t("夜班"), 5) }}
+              {{ getShiftTitle($t("ui.data.column.scheduleResult.nightShift"), 5) }}
             </h4>
           </el-col>
 
@@ -518,7 +518,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方编号')" prop="class6RecipeNo">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeNo')" prop="class6RecipeNo">
               <embryoNoSelect
                 :key="`class6RecipeNo-${form.class6RecipeNo || ''}`"
                 v-model="form.class6RecipeNo"
@@ -529,7 +529,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方类型')" prop="class6RecipeType">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeType')" prop="class6RecipeType">
               <dict-select
                 v-model="form.class6RecipeType"
                 :options="parentDict.type.trial_status"
@@ -541,7 +541,7 @@
 
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ getShiftTitle($t("早班"), 6) }}
+              {{ getShiftTitle($t("ui.data.column.scheduleResult.morningShift"), 6) }}
             </h4>
           </el-col>
 
@@ -588,7 +588,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方编号')" prop="class7RecipeNo">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeNo')" prop="class7RecipeNo">
               <embryoNoSelect
                 :key="`class7RecipeNo-${form.class7RecipeNo || ''}`"
                 v-model="form.class7RecipeNo"
@@ -599,7 +599,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方类型')" prop="class7RecipeType">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeType')" prop="class7RecipeType">
               <dict-select
                 v-model="form.class7RecipeType"
                 :options="parentDict.type.trial_status"
@@ -610,7 +610,7 @@
 
           <el-col :span="24">
             <h4 class="form-header h4">
-              {{ getShiftTitle($t("中班"), 7) }}
+              {{ getShiftTitle($t("ui.data.column.scheduleResult.middleShift"), 7) }}
             </h4>
           </el-col>
 
@@ -657,7 +657,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方编号')" prop="class8RecipeNo">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeNo')" prop="class8RecipeNo">
               <embryoNoSelect
                 :key="`class8RecipeNo-${form.class8RecipeNo || ''}`"
                 v-model="form.class8RecipeNo"
@@ -668,7 +668,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item :label="$t('示方类型')" prop="class8RecipeType">
+            <el-form-item :label="$t('ui.data.column.cxScheduleResult.recipeType')" prop="class8RecipeType">
               <dict-select
                 v-model="form.class8RecipeType"
                 :options="parentDict.type.trial_status"
@@ -770,7 +770,7 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("调量");
+      return this.$t("ui.data.column.scheduleResult.changePlan");
     },
     displayMouldSurplusQty() {
       if (this.form.mouldSurplusQty !== undefined && this.form.mouldSurplusQty !== null) {

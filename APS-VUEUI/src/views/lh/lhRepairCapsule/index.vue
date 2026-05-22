@@ -113,7 +113,7 @@ export default {
           prop: "updateTime",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.lhRepairCapsule.updateDate"),
+          label: this.$t("ui.data.column.updateTime"),
           minWidth: 180,
         },
         // {

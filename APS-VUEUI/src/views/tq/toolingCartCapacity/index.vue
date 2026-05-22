@@ -140,7 +140,7 @@ export default {
         {
           prop: "updateTime",
           halign: "center",
-          label: this.$t("ui.tq.toolingCartCapacity.column.updateTime"),
+          label: this.$t("ui.data.column.updateTime"),
           minWidth: 150,
         },
         {

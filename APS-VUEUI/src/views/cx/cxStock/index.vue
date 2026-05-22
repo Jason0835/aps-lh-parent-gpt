@@ -94,7 +94,7 @@ export default {
       return [
         {
           prop: 'factoryCode',
-          label: this.$t('ui.data.column.cxStock.factoryCode'),
+          label: this.$t('ui.data.column.factoryCode'),
           type: 'select',
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
@@ -142,7 +142,7 @@ export default {
           prop: 'factoryCode',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxStock.factoryCode'),
+          label: this.$t('ui.data.column.factoryCode'),
           minWidth: 140,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -190,7 +190,7 @@ export default {
           prop: 'updateTime',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.common.column.updateTime'),
+          label: this.$t('ui.data.column.updateTime'),
           minWidth: 160
         },
         {

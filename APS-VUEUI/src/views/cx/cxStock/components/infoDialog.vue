@@ -97,7 +97,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.cxStock.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           filterable: true,

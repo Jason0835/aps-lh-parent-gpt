@@ -163,7 +163,7 @@ export default {
       let columns = [
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           align: "center",
           width: 120,
           formatter: (row) => {

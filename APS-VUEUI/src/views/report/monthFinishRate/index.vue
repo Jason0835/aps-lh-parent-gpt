@@ -175,7 +175,7 @@ export default {
         },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.report.monthFinishRate.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
@@ -238,7 +238,7 @@ export default {
     // api
     async getList() {
       try {
-        this.loading = true;  
+        this.loading = true;
         const data = await listMonthFinishRate(this.formatParams());
         // console.log(data);
         const list = [];

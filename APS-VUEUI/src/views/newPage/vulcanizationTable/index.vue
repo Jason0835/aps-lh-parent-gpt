@@ -113,7 +113,7 @@ export default {
         {
           prop: "onboardDate",
           label: this.$t(
-            "financialManagement.averageAccountsReceivable.updateTime"
+            "ui.data.column.updateTime"
           ),
           width: 180,
           align: "center",
@@ -239,7 +239,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,

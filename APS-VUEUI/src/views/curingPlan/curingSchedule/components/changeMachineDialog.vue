@@ -448,7 +448,7 @@ export default {
         },
         {
           prop: "updateTime",
-          label: this.$t("ui.data.column.scheduleResult.updateTime"),
+          label: this.$t("ui.data.column.updateTime"),
           minWidth: 180,
         },
       ];

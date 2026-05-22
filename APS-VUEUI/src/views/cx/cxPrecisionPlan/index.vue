@@ -106,7 +106,7 @@ export default {
         { type: 'selection', fixed: 'left' },
         {
           prop: 'factoryCode',
-          label: this.$t('common.factory'),
+          label: this.$t('ui.data.column.factoryCode'),
           formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value)
         },
         { prop: 'machineCode', label: this.$t('ui.data.column.cxPrecisionPlan.machineCode') },
@@ -174,7 +174,7 @@ export default {
       return [
         {
           prop: 'factoryCode',
-          label: this.$t('common.factory'),
+          label: this.$t('ui.data.column.factoryCode'),
           type: 'select',
           dictData: this.dict.type.biz_factory_name,
           filterable: true

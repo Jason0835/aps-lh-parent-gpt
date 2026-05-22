@@ -155,7 +155,7 @@ export default {
         // { type: "index", fixed: "left" },
 
         {
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           formatter: (row) => {
             return this.selectDictLabel(
@@ -329,7 +329,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,

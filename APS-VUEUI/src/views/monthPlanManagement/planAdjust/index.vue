@@ -194,7 +194,7 @@ export default {
         //   sortable: "custom",
         // },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           minWidth: 100,
           formatter: (row, column, value) => {
@@ -458,7 +458,7 @@ export default {
           clearable: false,
         },
         {
-          label: this.$t("ui.data.column.mouldingDayResult.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
