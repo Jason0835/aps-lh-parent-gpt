@@ -48,7 +48,10 @@ public interface IFinalAndAdjustResultInterface {
         return 0;
     }
 
-    Integer getTypeBlockQty();
+    default Integer getTypeBlockQty(){
+        return 0;
+    }
+
 
     String getMaterialDesc();
 
