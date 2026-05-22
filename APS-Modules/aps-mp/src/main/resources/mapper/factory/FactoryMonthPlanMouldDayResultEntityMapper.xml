@@ -33,8 +33,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		                                              WHEN IFNULL(FP.PARAM_VALUE, FP.DEFAULE_VALUE) = 'A' THEN lc.APS_CAPACITY / 2
 		                                              ELSE lc.STANDARD_CAPACITY / 2 END)
 		    ) DAY_VULCANIZATION_QTY,
-		    sum( d.HEIGHT_QTY ) HEIGHT_QTY,
-		    sum( d.MID_QTY ) MID_QTY,
+		    sum( case when d.ORI_HEIGHT_QTY > 0 then d.ORI_HEIGHT_QTY else d.HEIGHT_QTY end ) HEIGHT_QTY,
+		    sum( case when d.ORI_MID_QTY > 0 then d.ORI_MID_QTY else d.MID_QTY end ) MID_QTY,
 		    sum( d.CYCLE_RESERVE_QTY ) CYCLE_RESERVE_QTY,
 		    sum( case when d.IS_SCHEDULE = '1' then d.CONVENTION_RESERVE_QTY else 0 end) CONVENTION_RESERVE_QTY,
 		    mc.NET_QTY UN_RESTRICTED_NET_QTY,

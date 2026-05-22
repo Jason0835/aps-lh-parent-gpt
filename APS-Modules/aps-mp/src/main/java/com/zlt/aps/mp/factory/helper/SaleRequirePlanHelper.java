@@ -293,6 +293,7 @@ public class SaleRequirePlanHelper {
         demandPlan.setIsUniformity(YesOrNoEnum.YES.getCode().equals(netDemand.getIsUniformity())?YesOrNoEnum.YES.getCode():YesOrNoEnum.NO.getCode());
         demandPlan.setNetQty(netDemand.getProduceQtyDue());
         demandPlan.setYearWeek(StringUtils.isBlank(netDemand.getWeekYear())?ZERO_YEAR_WEEK:netDemand.getWeekYear());
+        demandPlan.setOriScmPriority(netDemand.getScmPriority());
         return demandPlan;
     }
 
