@@ -756,7 +756,7 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
      *
      * @return
      */
-    public Integer isDisturb() {
+    public Integer getIsDisturb() {
         if (StringUtils.isBlank(mouldChangeInfo)) {
             return BigDecimal.ZERO.intValue();
         }

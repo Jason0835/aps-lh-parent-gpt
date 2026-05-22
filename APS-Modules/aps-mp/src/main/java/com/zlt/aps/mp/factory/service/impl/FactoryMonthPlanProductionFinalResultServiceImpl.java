@@ -40,6 +40,7 @@ import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
 import com.zlt.aps.mp.api.domain.dto.MonthPlanFinalizedEventDto;
 import com.zlt.aps.mp.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.common.utils.GroupedMapWithOrder;
@@ -60,6 +61,7 @@ import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntity
 import com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
+import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
 import com.zlt.aps.utils.BeanCopyUtils;
@@ -151,6 +153,10 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
     @Autowired
     private MdmCycleSchStruConfEntityMapper mdmCycleSchStruConfEntityMapper;
+
+    @Autowired
+    private IMpStructureAllocationService mpStructureAllocationService;
+
     @Autowired
     private DataManager dataManager;
 
@@ -1009,6 +1015,8 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
         // 加载结构转产表的结构清单
         Map<String, String> structureAllocationMap = this.loadStructureAllocationMap(condition);
+        addStructureAlloction(structureAllocationMap);
+
         // 补充试制量试计划SKU
         Map<String, FactoryMonthPlanFinalAdjustVo> trialResultMap = this.fillTrialPlanSku(matchVersion, condition, copyResultMap);
         // 补充有需求计划但是没有定稿、没有调整的SKU
@@ -1029,6 +1037,23 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         return resultList;
     }
 
+    /**
+     * 增加新增结构
+     * @param structureAllocationMap
+     */
+    private void addStructureAlloction(Map<String, String> structureAllocationMap){
+       /* if (PubUtil.isEmpty(structureAllocationMap)){
+            return;
+        }*/
+        //补充新增结构的机台信息
+        AdjustsCxMachineVo cxMachineVo = mpStructureAllocationService.getAdjustsCxMachineFromRedis();
+        if (cxMachineVo != null && structureAllocationMap.get(cxMachineVo.getStructureName()) == null){
+            MpStructureAllocation newStructureAlloction = new MpStructureAllocation();
+            newStructureAlloction.setStructureName(cxMachineVo.getStructureName());
+            newStructureAlloction.setCxMachineCode(cxMachineVo.getCxMachineCode());
+            structureAllocationMap.put(cxMachineVo.getStructureName(),cxMachineVo.getCxMachineCode());
+        }
+    }
     /**
      * 加载结构与成型机台的对应关系
      *

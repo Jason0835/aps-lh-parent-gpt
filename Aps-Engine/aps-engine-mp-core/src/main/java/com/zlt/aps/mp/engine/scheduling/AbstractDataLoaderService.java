@@ -459,6 +459,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.NO_CYCLE_PRODUCTION_MIN_LH_MACHINE_NUMBER.getCode());
         paramCodeList.add(MonthPlanEnums.OEM_BRAND_CONFIG.getCode());
         paramCodeList.add(MonthPlanEnums.OEM_BRAND_CAPACITY.getCode());
+        paramCodeList.add(MonthPlanEnums.ADD_CHANGE_MOLD_COUNT_BY_SAME_PATTERN.getCode());
         paramCodeList.add(MonthPlanEnums.RESERVE_PERCENT.getCode());
         paramCodeList.add(MonthPlanEnums.STRUCTURE_BILL_PRE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.OEM_JOIN_STRUCTURE_PRIORITY.getCode());
@@ -522,7 +523,9 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         //外销贴牌是否参与结构优先级的竞争
         String oemJoinStructurePriority = (String) paramConfigurationMap.get(MonthPlanEnums.OEM_JOIN_STRUCTURE_PRIORITY.getCode());
         configuration.setOemJoinStructurePriority(FactoryConstant.YES_VALUE.equals(oemJoinStructurePriority));
-
+        //20260522+ 同规格同花纹换活字块是否算换模次数
+        String isAddChangeMoldCount = (String) paramConfigurationMap.get(MonthPlanEnums.ADD_CHANGE_MOLD_COUNT_BY_SAME_PATTERN.getCode());
+        configuration.setAddChangeMoldCountBySameSpecificationsPattern(ProductionConstant.YES_VALUE.equals(isAddChangeMoldCount));
         configuration.setMaxBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MAX_BOOST_DAY.getCode()));
         configuration.setMatchingBoostDay((Integer) paramConfigurationMap.get(MonthPlanEnums.MATCHING_BOOST_DAY.getCode()));
         configuration.setSkuSecondProduction((Integer) paramConfigurationMap.get(MonthPlanEnums.SKU_SECOND_PRODUCTION.getCode()));

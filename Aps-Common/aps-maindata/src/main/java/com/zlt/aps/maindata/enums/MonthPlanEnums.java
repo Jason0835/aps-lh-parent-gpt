@@ -127,6 +127,11 @@ public enum MonthPlanEnums {
     OEM_JOIN_STRUCTURE_PRIORITY("SYS0203015", "外销贴牌是否参与结构优先级的竞争"),
 
     /**
+     * SYS0203016 前后两个SKU，同规格同花纹换活字块时是否算换模能力次数
+     */
+    ADD_CHANGE_MOLD_COUNT_BY_SAME_PATTERN("SYS0203016", "前后两个SKU，同规格同花纹换活字块时是否算换模能力次数"),
+
+    /**
      * SYS0204001 SKU总净需求量<=该值，SKU一次性排产
      */
     SUM_PRODUCTION_QTY("SYS0204001", "SKU总净需求量<=该值，SKU一次性排产"),
