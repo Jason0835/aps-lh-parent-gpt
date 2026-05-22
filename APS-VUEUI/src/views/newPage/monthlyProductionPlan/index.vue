@@ -406,11 +406,6 @@ export default {
           },
         },
         {
-          prop: "cxMachineCode",
-          label: this.$t("ui.data.column.monthPlanFinalAdjustQuery.cxMachine"),
-          filterable: true,
-        },
-        {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
           type: "select",
