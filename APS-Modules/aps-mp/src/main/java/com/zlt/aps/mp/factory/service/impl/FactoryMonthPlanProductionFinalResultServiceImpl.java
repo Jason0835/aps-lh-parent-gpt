@@ -1320,9 +1320,9 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             String materialCode = demandPlan.getMaterialCode();
             String constructionStage = ConstructionStageEnum.FORMAL.getCode();
             String matchKey = matchVersion + "|" + materialCode + "|" + constructionStage;
-            if (!structureAllocationMap.containsKey(demandPlan.getStructureName())) {
+            /*if (!structureAllocationMap.containsKey(demandPlan.getStructureName())) {
                 continue;
-            }
+            }*/
             if (finalResultMap.containsKey(matchKey)) {
                 continue;
             }
