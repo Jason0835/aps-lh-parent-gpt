@@ -53,6 +53,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
     /** 无排产目标量未排产提示 */
     private static final String NO_PLAN_QTY_REASON_TEMPLATE = "物料：%s 没有排产目标量，不进行排产";
+    /** 余量与胎胚库存均为0时的未排产提示 */
+    private static final String ZERO_SURPLUS_AND_EMBRYO_REASON_TEMPLATE =
+            "物料：%s 余量为0且胎胚库存为0，不需要排产";
     /** 无窗口计划量但存在余量/正向结转目标量提示 */
     private static final String TARGET_QTY_ONLY_WARN_TEMPLATE =
             "物料：%s 当前排程窗口没有计划量，但存在月计划余量/正向结转目标量[%d]，继续排产";
@@ -389,9 +392,16 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setTrialDemandQty(safeInt(plan.getTrialQty()));
         dto.setBeginDay(plan.getBeginDay());
         dto.setTrial(isTrialStage(plan.getConstructionStage()));
-        dto.setSmallBatchValidation(!dto.isTrial()
-                && dto.getTrialDemandQty() > 0
-                && dto.getTrialDemandQty() < resolveSmallBatchSkuThreshold(context));
+        // 正规SKU余量小于阈值时标记为小批量，保留单控机台优先权（试制 > 量试 > 小批量 > 正规）
+        int smallBatchThreshold = resolveSmallBatchSkuThreshold(context);
+        boolean isSmallBatch = !dto.isTrial()
+                && dto.getSurplusQty() < smallBatchThreshold;
+        dto.setSmallBatchValidation(isSmallBatch);
+        if (isSmallBatch) {
+            log.info("小批量SKU判定命中, 物料编码: {}, 施工阶段: {}, 余量: {}, 阈值: {}",
+                    dto.getMaterialCode(), dto.getConstructionStage(),
+                    dto.getSurplusQty(), smallBatchThreshold);
+        }
 
         // 示方书信息
         dto.setEmbryoNo(plan.getEmbryoNo());
@@ -628,10 +638,12 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
     /**
      * 解析常规待排需求量。
+     * <p>欠产传导量(carryForwardQty)暂不计入待排需求，避免余量为0的SKU因前次排程未完成而持续被排产。
+     * 该逻辑已在调整前序排程时通过 adjustPreviousSchedule 做了传导记录，但不应影响本次待排量的计算。</p>
      *
      * @param surplusQty 月计划余量
      * @param inheritedPlanQty 已继承量
-     * @param carryForwardQty 欠产传导量
+     * @param carryForwardQty 欠产传导量（当前暂不使用）
      * @param embryoStock 胎胚库存
      * @return 待排需求量
      */
@@ -639,7 +651,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                                       int inheritedPlanQty,
                                       int carryForwardQty,
                                       int embryoStock) {
-        int surplusDemandQty = Math.max(0, surplusQty - Math.max(0, inheritedPlanQty) + Math.max(0, carryForwardQty));
+        int surplusDemandQty = Math.max(0, surplusQty - Math.max(0, inheritedPlanQty));
         int effectiveEmbryoStock = Math.max(0, embryoStock);
         return Math.max(surplusDemandQty, effectiveEmbryoStock);
     }
@@ -724,13 +736,39 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
      * @param sku SKU排程DTO
      */
     private void addNoPlanUnscheduledResult(LhScheduleContext context, SkuScheduleDTO sku) {
-        String reason = String.format(NO_PLAN_QTY_REASON_TEMPLATE, sku.getMaterialCode());
+        String reason = resolveNoPlanUnscheduledReason(sku);
         log.warn(reason);
 
         LhUnscheduledResult unscheduled = buildBaseUnscheduledResult(context, sku);
         unscheduled.setUnscheduledQty(0);
         unscheduled.setUnscheduledReason(reason);
         context.getUnscheduledResultList().add(unscheduled);
+    }
+
+    /**
+     * 解析无目标量场景的未排原因。
+     *
+     * @param sku SKU排程DTO
+     * @return 未排原因
+     */
+    private String resolveNoPlanUnscheduledReason(SkuScheduleDTO sku) {
+        if (isZeroSurplusAndEmbryoStockSku(sku)) {
+            return String.format(ZERO_SURPLUS_AND_EMBRYO_REASON_TEMPLATE, sku.getMaterialCode());
+        }
+        return String.format(NO_PLAN_QTY_REASON_TEMPLATE, sku.getMaterialCode());
+    }
+
+    /**
+     * 判断是否命中“余量为0且胎胚库存为0”的免排场景。
+     *
+     * @param sku SKU排程DTO
+     * @return true-命中，false-未命中
+     */
+    private boolean isZeroSurplusAndEmbryoStockSku(SkuScheduleDTO sku) {
+        if (Objects.isNull(sku)) {
+            return false;
+        }
+        return sku.getSurplusQty() <= 0 && sku.getEmbryoStock() <= 0;
     }
 
     /**
