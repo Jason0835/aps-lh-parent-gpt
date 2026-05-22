@@ -195,8 +195,8 @@ public class CxContinueProductionHandler {
         if (productionQty <= BigDecimal.ZERO.intValue()) {
             excludeSkuSet.add(selectedMaterialDesc);
         } else {
-            //换模处理
-            if (ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType) {
+            //换模处理 20260522+ 同规格同花纹是否算换模次数，采用参数控制
+            if (isAddChangeMoldCountByChangeMold(context, continueType)) {
                 CxLhMouldProductionCalculator.addChangeMouldInfo(productionContext, addSkuInfo, startDay, beforeSkuInfo, selectedMouldList);
             }
             excludeDaySet = new HashSet<>();
@@ -332,6 +332,28 @@ public class CxContinueProductionHandler {
             }
         });
         return shareMouldMaterialDescSet;
+    }
+
+    /**
+     * 续作Sku接活字块是否加入换模次数
+     * 1、不是同规格同花纹算换模次数
+     * 2、同规格同花纹，看SYS0203016参数，Y则算
+     *
+     * @param context      排产上下文
+     * @param continueType 排产类型
+     * @return
+     */
+    private static boolean isAddChangeMoldCountByChangeMold(Context context, ContinueTypeEnum continueType) {
+        if (ContinueTypeEnum.SAME_EMBRYO_CODE_SHARE_MOULD == continueType) {
+            return true;
+        }
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        boolean isAddChangeMouldCount = productionContext.getBaseDataContainer().getParamConfiguration().isAddChangeMoldCountBySameSpecificationsPattern();
+        //同规格同花纹排产下，且参数配置：算换模次数
+        if (ContinueTypeEnum.SAME_SPECIFICATIONS_PATTERN == continueType && isAddChangeMouldCount) {
+            return true;
+        }
+        return false;
     }
 
     /**
