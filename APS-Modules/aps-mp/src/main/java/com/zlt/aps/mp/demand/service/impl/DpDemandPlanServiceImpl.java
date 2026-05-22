@@ -14,6 +14,7 @@ import com.zlt.aps.enums.ProductionPlanType;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.BizScheduleTypeEnum;
+import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
@@ -313,8 +314,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 3. 并行获取数据
         PredictionContext data = fetchRequiredDataInParallelByAdjust(createCondition);
         data.setPostponeOrders(null);
-        // 2. 生成版本号不能重复
-        String monthPlanVersion = requirementVersionService.generateVersion(PREFIX_ADJUST,true);
+        // 2. 生成版本号不能重复,优先获取调整订单的版本号
+        String monthPlanVersion = createCondition.getMonthPlanVersion();
+        if (StringUtils.isBlank(monthPlanVersion)){
+            monthPlanVersion = requirementVersionService.generateVersion(PREFIX_ADJUST,true);
+        }
         createCondition.setFactoryCode(StringUtils.isBlank(createCondition.getFactoryCode())?FactoryConstant.DEFAULT_FACTORY_CODE:createCondition.getFactoryCode());
         createCondition.setMonthPlanVersion(monthPlanVersion);
         createCondition.setPlanType(ProductionPlanType.ADJUST.getPlanType());

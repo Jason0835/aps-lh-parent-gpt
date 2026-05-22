@@ -14,6 +14,16 @@ public interface BusiConstant {
          * 版本号前缀
          */
         String VERSION_PREFIX = "ADJ";
+
+        /**
+         * 结构内版本号前缀
+         */
+        String STRUCTURE_IN_VERSION_PREFIX = "ADJ0";
+
+        /**
+         * 结构间版本号前缀
+         */
+        String STRUCTURE_OUT_VERSION_PREFIX = "ADJ1";
         /**
          * 锁定天数
          */
