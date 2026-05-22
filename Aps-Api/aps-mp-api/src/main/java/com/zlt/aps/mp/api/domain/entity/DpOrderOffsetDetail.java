@@ -273,6 +273,12 @@ public class DpOrderOffsetDetail extends BaseEntity {
     @ApiModelProperty(value = "是否替换料", name = "isAlternateMaterial")
     @TableField(exist = false)
     private String isAlternateMaterial;
+    /**
+     * 是否续作SKU
+     */
+    @ApiModelProperty(value = "是否续作SKU", name = "isContinueSKU")
+    @TableField(exist = false)
+    private Boolean isContinueSKU = false;
 
     @Excel(name = "ui.data.column.mdmMonCycleSchStruConf.updateDate", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ApiModelProperty("更新时间")

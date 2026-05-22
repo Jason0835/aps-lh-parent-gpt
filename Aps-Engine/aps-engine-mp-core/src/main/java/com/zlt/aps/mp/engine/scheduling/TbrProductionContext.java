@@ -9,6 +9,7 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.handler.MoldRatioDayDeductHelper;
+import com.zlt.aps.mp.engine.handler.SimulateResultHelper;
 import com.zlt.aps.mp.engine.handler.SkuProductionCounter;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -33,6 +34,10 @@ public class TbrProductionContext extends Context {
      * 基础数据容器对象
      */
     private BaseDataContainer baseDataContainer;
+    /**
+     * 模拟排产业务数据存储
+     */
+    private SimulateResultHelper simulateResult;
     /**
      * 排产计划信息-按Sku分组
      */

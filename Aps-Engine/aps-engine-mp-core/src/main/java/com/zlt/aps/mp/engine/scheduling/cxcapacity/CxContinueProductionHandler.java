@@ -221,7 +221,7 @@ public class CxContinueProductionHandler {
         if (null != planDemandQty) {
             //20260511+ 增加是否取高优先级量的处理
             Integer lhMachineCondition = ((TbrProductionContext) context).getBaseDataContainer().getParamConfiguration().getContinueSkuProductionHeightRequire();
-            planDemandQty = getContinueHeightQty(groupPlanInfo, lhMachineCondition, deductMould, cxContinueSkuInfo, planDemandQty);
+            planDemandQty = getContinueHeightQty(context, groupPlanInfo, lhMachineCondition, deductMould, cxContinueSkuInfo, planDemandQty);
             deductMould.setTotalQty(planDemandQty);
             deductMould.setRemainingQty(planDemandQty);
         }
@@ -390,6 +390,7 @@ public class CxContinueProductionHandler {
     /**
      * 增加续作是否先排产高优先级量
      *
+     * @param context            排产上下文
      * @param groupPlanInfo      分组计划
      * @param lhMachineCondition 硫化机台条件
      * @param deductMould        续作排产信息
@@ -397,7 +398,7 @@ public class CxContinueProductionHandler {
      * @param planDemandQty      排产量
      * @return
      */
-    private static Integer getContinueHeightQty(ProductionPlanGroupInfo groupPlanInfo, Integer lhMachineCondition, DeductMouldVo deductMould, CxContinueSkuInfoHelper cxContinueSkuInfo, Integer planDemandQty) {
+    private static Integer getContinueHeightQty(Context context, ProductionPlanGroupInfo groupPlanInfo, Integer lhMachineCondition, DeductMouldVo deductMould, CxContinueSkuInfoHelper cxContinueSkuInfo, Integer planDemandQty) {
         if (null == lhMachineCondition) {
             lhMachineCondition = Integer.MAX_VALUE;
         }
@@ -421,6 +422,11 @@ public class CxContinueProductionHandler {
         }
         //需按净需求一起排产
         if (YesOrNoEnum.YES.getValue().equals(skuPlan.getIsProductionBySum())) {
+            return planDemandQty;
+        }
+        //20260522+ 在没有高优级量，又能排产上的续作Sku名单中
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        if (productionContext.getSimulateResult().hasProductionFirstByContinueSku(materialDesc)) {
             return planDemandQty;
         }
         return allSkuPlanList.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightProductionQty).sum();

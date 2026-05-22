@@ -1127,7 +1127,7 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                         + ", " + PriorityTraceLogHelper.kv("SKU类型", resolveSkuTypeDesc(sku))
                         + ", " + PriorityTraceLogHelper.kv("规格", sku.getSpecCode())
                         + ", " + PriorityTraceLogHelper.kv("寸口", sku.getProSize())
-                        + ", " + PriorityTraceLogHelper.kv("特殊物料", PriorityTraceLogHelper.yesNo(matchResult.isSpecial()))
+                        + ", " + PriorityTraceLogHelper.kv("特殊物料", PriorityTraceLogHelper.oneZero(matchResult.isSpecial()))
                         + ", " + PriorityTraceLogHelper.kv("特殊分类", matchResult.getCategoryDisplayText()));
         // 过滤统计
         int filteredCount = trace.notAllowedMachineFilteredCount + trace.disabledCount
@@ -1170,14 +1170,14 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
             int embryoShareCount = resolveEmbryoShareCount(context, machine);
 
             List<String> sortKeyLevels = java.util.Arrays.asList(
-                    "L1_定点机台=" + specifyScore,
-                    "L2_单控拆分=" + singleCtrlScore,
-                    "L3_普通机台优先=" + normalMachineScore,
+                    "L1_定点机台=" + (specifyScore == 0 ? 1 : 0),
+                    "L2_单控拆分=" + (singleCtrlScore == 0 ? 1 : 0),
+                    "L3_普通机台优先=" + (normalMachineScore == 0 ? 1 : 0),
                     "L4_收尾时间=" + PriorityTraceLogHelper.formatDateTime(machine.getEstimatedEndTime()),
-                    "L5_同规格=" + specMatchScore,
-                    "L6_同英寸=" + proSizeMatchScore,
+                    "L5_同规格=" + (specMatchScore == 0 ? 1 : 0),
+                    "L6_同英寸=" + (proSizeMatchScore == 0 ? 1 : 0),
                     "L7_英寸接近度=" + formatInchDistance(inchDistance),
-                    "L8_胶囊共用=" + capsuleScore,
+                    "L8_胶囊共用=" + (capsuleScore == 0 ? 1 : 0),
                     "L9_胎胚共用=" + embryoShareCount);
             List<Integer> scores = java.util.Arrays.asList(
                     specifyScore,
@@ -1199,16 +1199,16 @@ public class DefaultMachineMatchStrategy implements IMachineMatchStrategy {
                             + ". " + PriorityTraceLogHelper.kv("机台", machine.getMachineCode())
                             + ", " + PriorityTraceLogHelper.kv("名称", machine.getMachineName())
                             + ", " + PriorityTraceLogHelper.kv("状态", machine.getStatus())
-                            + ", " + PriorityTraceLogHelper.kv("可用", PriorityTraceLogHelper.yesNo(MachineStatusUtil.isEnabled(machine.getStatus())))
-                            + ", " + PriorityTraceLogHelper.kv("单控", PriorityTraceLogHelper.yesNo(isSingleCtrl))
-                            + ", " + PriorityTraceLogHelper.kv("定点", PriorityTraceLogHelper.yesNo(specifyScore == 0))
-                            + ", " + PriorityTraceLogHelper.kv("支持SKU", PriorityTraceLogHelper.yesNo(true))
+                            + ", " + PriorityTraceLogHelper.kv("可用", PriorityTraceLogHelper.oneZero(MachineStatusUtil.isEnabled(machine.getStatus())))
+                            + ", " + PriorityTraceLogHelper.kv("单控", PriorityTraceLogHelper.oneZero(isSingleCtrl))
+                            + ", " + PriorityTraceLogHelper.kv("定点", PriorityTraceLogHelper.oneZero(specifyScore == 0))
+                            + ", " + PriorityTraceLogHelper.kv("支持SKU", PriorityTraceLogHelper.oneZero(true))
                             + ", " + PriorityTraceLogHelper.kv("当前在机", machine.getPreviousMaterialCode())
                             + ", " + PriorityTraceLogHelper.kv("收尾时间", PriorityTraceLogHelper.formatDateTime(machine.getEstimatedEndTime()))
-                            + ", " + PriorityTraceLogHelper.kv("同规格", PriorityTraceLogHelper.yesNo(specMatchScore == 0))
-                            + ", " + PriorityTraceLogHelper.kv("同英寸", PriorityTraceLogHelper.yesNo(proSizeMatchScore == 0))
+                            + ", " + PriorityTraceLogHelper.kv("同规格", PriorityTraceLogHelper.oneZero(specMatchScore == 0))
+                            + ", " + PriorityTraceLogHelper.kv("同英寸", PriorityTraceLogHelper.oneZero(proSizeMatchScore == 0))
                             + ", " + PriorityTraceLogHelper.kv("英寸差", formatInchDistance(inchDistance))
-                            + ", " + PriorityTraceLogHelper.kv("胶囊共用", PriorityTraceLogHelper.yesNo(capsuleScore == 0))
+                            + ", " + PriorityTraceLogHelper.kv("胶囊共用", PriorityTraceLogHelper.oneZero(capsuleScore == 0))
                             + ", " + PriorityTraceLogHelper.kv("胎胚共用数", embryoShareCount)
                             + ", " + PriorityTraceLogHelper.kv("机台顺序", machine.getMachineOrder())
                             + ", " + PriorityTraceLogHelper.kv("SortKey", sortKey)

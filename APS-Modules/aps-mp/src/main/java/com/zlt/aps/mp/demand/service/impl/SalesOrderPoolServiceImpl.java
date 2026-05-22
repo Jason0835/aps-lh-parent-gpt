@@ -503,6 +503,10 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
             productStock.setFactoryCode(factoryCode);
             productStock.setStockDate(DateUtils.parseDate(DateUtils.getDate(), DateUtils.YYYY_MM_DD));
             iMesItfService.syncProductStock(productStock);
+        } catch (Exception e) { // 同步失败也不影响订单同步
+            log.error(e.getMessage(), e);
+        }
+        try {
             // 触发调用itf接口同步出库未扫描订单
             MdmOutbountOrdersNotScan outbountOrdersNotScan = new MdmOutbountOrdersNotScan();
             outbountOrdersNotScan.setFactoryCode(factoryCode);

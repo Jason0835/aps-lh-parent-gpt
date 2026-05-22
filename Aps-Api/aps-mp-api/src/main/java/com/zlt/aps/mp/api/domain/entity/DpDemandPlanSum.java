@@ -227,12 +227,26 @@ public class DpDemandPlanSum extends BaseEntity {
     private Integer heightQty;
 
     /**
+     * 原高优先级
+     */
+    @ApiModelProperty(value = "原高优先级", name = "oriHeightQty")
+    @TableField(value = "ORI_HEIGHT_QTY")
+    private Integer oriHeightQty;
+
+    /**
      * 中优先级
      */
     @Excel(name = "ui.data.column.demandPlanSum.midQty", cellType = Excel.ColumnType.NUMERIC)
     @ApiModelProperty(value = "中优先级", name = "midQty")
     @TableField(value = "MID_QTY")
     private Integer midQty;
+
+    /**
+     * 原中优先级
+     */
+    @ApiModelProperty(value = "原中优先级", name = "oriMidQty")
+    @TableField(value = "ORI_MID_QTY")
+    private Integer oriMidQty;
 
     /**
      * 暂缓订单

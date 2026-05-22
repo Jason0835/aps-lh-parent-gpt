@@ -434,6 +434,28 @@ public class DpDemandPlan extends BaseEntity {
     @ApiModelProperty(value = "是否参与排产", name = "isSchedule")
     @TableField(value = "IS_SCHEDULE")
     private String isSchedule;
+    
+    /**
+     * 原物料优先级，记录区域产能限制修改前的物料优先字段
+     */
+    @ApiModelProperty(value = "原物料优先级", name = "oriScmPriority")
+    @TableField(value = "ORI_SCM_PRIORITY")
+    private String oriScmPriority;
+    
+    /**
+     * 原高优先级，记录区域产能限制修改前的值
+     */
+    @ApiModelProperty(value = "原高优先级", name = "heightQty")
+    @TableField(value = "ORI_HEIGHT_QTY")
+    private Integer oriHeightQty;
+
+    /**
+     * 原中优先级，记录区域产能限制修改前的值
+     */
+    @ApiModelProperty(value = "原中优先级", name = "midQty")
+    @TableField(value = "ORI_MID_QTY")
+    private Integer oriMidQty;
+    
     /**
      * 需求版本号前缀
      */
