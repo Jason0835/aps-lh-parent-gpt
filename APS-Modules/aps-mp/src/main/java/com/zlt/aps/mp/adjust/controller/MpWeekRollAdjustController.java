@@ -31,13 +31,15 @@ import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.dto.MpWeekRollAdjustDTO;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
 import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
 import com.zlt.aps.mp.common.utils.StringUtil;
+import com.zlt.aps.mp.demand.service.ISalesOrderPoolService;
 import com.zlt.aps.mp.engine.scheduling.matching.MatchingAdjuestProductionHandler;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
+import com.zlt.aps.utils.AppUtils;
 import com.zlt.common.utils.ExcelReadUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.msg.message.api.IMsgTemplateRemoteService;
@@ -98,6 +100,8 @@ public class MpWeekRollAdjustController extends BaseController {
     private MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
     @Autowired
     private IExportLogService iExportLogService;
+    @Autowired
+    private ISalesOrderPoolService iSalesOrderPoolService;
 
     @Autowired
     private IMpStructureAllocationService mpStructureAllocationService;
@@ -115,6 +119,15 @@ public class MpWeekRollAdjustController extends BaseController {
             args = {"#weekRollAdjustDTO.mpYear","#weekRollAdjustDTO.mpMonth"}
     )
     public TableDataInfo getAdjustDetailList(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
+        // 20260522+ 先触发销售订单池抓取
+        SalesOrderPool salesOrderPool = new SalesOrderPool();
+        salesOrderPool.setFactoryCode(weekRollAdjustDTO.getFactoryCode());
+        salesOrderPool.setYear(weekRollAdjustDTO.getMpYear());
+        salesOrderPool.setMonth(weekRollAdjustDTO.getMpMonth());
+        AjaxResult result = iSalesOrderPoolService.getSCMData(salesOrderPool);
+        if (!AppUtils.checkAjaxSuccess(result)) {
+            throw new BusinessException(String.valueOf(result.get(AjaxResult.MSG_TAG)));
+        }
         // 获取周程滚动调整策略
         IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
         if (weekAdjustStrategy == null) {
