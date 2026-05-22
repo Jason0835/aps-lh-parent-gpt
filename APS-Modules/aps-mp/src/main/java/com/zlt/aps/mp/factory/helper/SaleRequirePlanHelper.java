@@ -173,19 +173,25 @@ public class SaleRequirePlanHelper {
 
         @Override
         public int compare(DpOrderOffsetDetail o1, DpOrderOffsetDetail o2) {
-            // 1. 比较供应链优先级
+            // 1. 比较续作规格，续作规格应该最后扣减，但是后续是倒序扣减，因此排序需要放最前面
+            int continueSKUCompare = o2.getIsContinueSKU().compareTo(o1.getIsContinueSKU()); // ture比fals大，因此需要倒序处理
+            if (continueSKUCompare != 0) {
+                return continueSKUCompare;
+            }
+            
+            // 2. 比较供应链优先级
             int scmPriorityCompare = compareScmPriority(o1, o2);
             if (scmPriorityCompare != 0) {
                 return scmPriorityCompare;
             }
 
-            // 2. 比较提报日期
+            // 3. 比较提报日期
             int dateCompare = compareBillDate(o1, o2);
             if (dateCompare != 0) {
                 return dateCompare;
             }
 
-            // 3. 比较提报量
+            // 4. 比较提报量
             return compareOrdQty(o1, o2);
         }
 

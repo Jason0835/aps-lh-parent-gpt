@@ -57,7 +57,9 @@ public class SummaryDemandPlanService {
       entity.setPostponeNetQty(calculatePostponeNetQty(value));
       entity.setUnPostponeNetQty(calculateUnPostponeNetQty(value));
       entity.setHeightQty(calculateHeightQty(value));
+      entity.setOriHeightQty(calculateOriHeightQty(value));
       entity.setMidQty(calculateMidQty(value));
+      entity.setOriMidQty(calculateOriMidQty(value));
       entity.setPostponeQty(calculatePostponeQty(value));
       entity.setCycleReserveQty(calculateCycleReserveQty(value));
       entity.setConventionReserveQty(calculateConventionReserveQty(value));
@@ -146,12 +148,27 @@ public class SummaryDemandPlanService {
         .mapToInt(DpDemandPlan::getMidQty).sum();
   }
 
+  private int calculateOriMidQty(List<DpDemandPlan> dataList) {
+    return dataList.stream()
+        .filter(Objects::nonNull)
+        .filter(demandPlan ->  demandPlan.getOriMidQty() != null)
+        .mapToInt(DpDemandPlan::getOriMidQty).sum();
+  }
+
   private int calculateHeightQty(List<DpDemandPlan> dataList) {
     return dataList.stream()
         .filter(Objects::nonNull)
         .filter(demandPlan ->  demandPlan.getHeightQty() != null)
         .mapToInt(DpDemandPlan::getHeightQty).sum();
   }
+
+  private int calculateOriHeightQty(List<DpDemandPlan> dataList) {
+    return dataList.stream()
+        .filter(Objects::nonNull)
+        .filter(demandPlan ->  demandPlan.getOriHeightQty() != null)
+        .mapToInt(DpDemandPlan::getOriHeightQty).sum();
+  }
+
 
   private int calculateUnPostponeNetQty(List<DpDemandPlan> dataList) {
     return dataList.stream()

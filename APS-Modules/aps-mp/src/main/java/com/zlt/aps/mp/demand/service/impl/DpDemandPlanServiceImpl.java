@@ -19,6 +19,7 @@ import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmOutbountOrdersNotScanEntityMapper;
+import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IMdmAreaCapaAllocationService;
 import com.zlt.aps.maindata.service.IMdmCycleSchStruConfService;
@@ -31,6 +32,7 @@ import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.mp.api.domain.entity.DpOrderOffsetDetail;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 
 import com.zlt.aps.mp.api.domain.entity.MdmAreaCapaAllocation;
@@ -38,6 +40,7 @@ import com.zlt.aps.mp.api.domain.entity.MdmCycleSchStruConf;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmOutbountOrdersNotScan;
 import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
+import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor;
 import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
@@ -59,7 +62,7 @@ import com.zlt.aps.mp.demand.service.ISupplyOrderPoolService;
 import com.zlt.aps.mp.factory.helper.PredictionAllocationHelper;
 import com.zlt.aps.mp.factory.helper.SaleRequirePlanHelper;
 import com.zlt.aps.mp.factory.helper.StockAllocationHelper;
-
+import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
@@ -78,9 +81,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -156,12 +161,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     private final PrecedentStockUpService precedentStockUpService;
     // 批量插入处理器
     private final BatchInsertProcessor<DpDemandPlan> batchInsertProcessor;
-    // 结构转产表
-    private final IMpStructureAllocationService mpStructureAllocationService;
     // 未扫描订单
     private final MdmOutbountOrdersNotScanEntityMapper mdmOutbountOrdersNotScanEntityMapper;
     // 需求计划统计表
     private final DpDemandPlanSumEntityMapper dpDemandPlanSumEntityMapper;
+    // 月计划定稿
+    private final FactoryMonthPlanProductionFinalResultEntityMapper factoryMonthPlanProductionFinalResultEntityMapper;
+    // 工作日历
+    private final MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -226,7 +233,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 4. 处理销售订单分配
         PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
             monthPlanVersion, data.getSalesOrders(), data.getFinishedProductStockMap(),
-            data.getMonthSurplusMap(),data.getMaterialInfoMap());
+            data.getMonthSurplusMap(),data.getMaterialInfoMap(), data.getContinueSku());
 
         AlternateMaterialSelector.setAlternateMaterialFlag(allocationResult.getNetDemands(),data.getFinishedProductStockMap());
         // 6. 处理需求计划生成
@@ -326,7 +333,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 4. 处理销售订单分配
         PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
             monthPlanVersion, data.getSalesOrders(), data.getFinishedProductStockMap(),
-            data.getMonthSurplusMap(),data.getMaterialInfoMap());
+            data.getMonthSurplusMap(),data.getMaterialInfoMap(), data.getContinueSku());
         AlternateMaterialSelector.setAlternateMaterialFlag(allocationResult.getNetDemands(),data.getFinishedProductStockMap());
         // 6. 处理需求计划生成
         List<DpDemandPlan> rawPlans = generateDemandPlans(createCondition, allocationResult.getNetDemands(), data);
@@ -364,6 +371,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             CompletableFuture.supplyAsync(() -> this.fetchMaterialInfo(createCondition));
         CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
             CompletableFuture.supplyAsync(() ->  mdmCycleSchStruConfService.findAdjustCycleSchStruConf(createCondition, null));
+        CompletableFuture<Set<String>> continueSkuFuture =
+            CompletableFuture.supplyAsync(() -> this.fetchContinueSku(createCondition));
         // 等待所有任务完成
         CompletableFuture.allOf(
             salesOrdersFuture, stocksFuture, productionTypeFuture,
@@ -380,6 +389,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             int minProductionQty = minProductionQtyFuture.get();
             Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
             List<MdmCycleSchStruConf> cycleSchStruConf = cycleSchStruConfFuture.get();
+            // 20260522+ 加载续作SKU
+            Set<String> continueSku = continueSkuFuture.get();
             // 20260330 成品库存需要扣减掉未扫描订单量 禅道号:21197
             mdmProductStockService.reduceInventoryByNotScanOrder(finishedProductStocks, notScanOrderList);
             // 处理成品库存映射
@@ -411,7 +422,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 monthlySaleQty,
                 minProductionQty,
                 materialInfoMap,
-                cycleSchStruConf
+                cycleSchStruConf,
+                continueSku
             );
 
         } catch (Exception e) {
@@ -577,7 +589,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 monthlySaleQty,
                 minProductionQty,
                 materialInfoMap,
-                cycleSchStruConfs
+                cycleSchStruConfs,
+                null
             );
 
         } catch (Exception e) {
@@ -615,7 +628,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 3. 处理销售订单分配
         PredictionContext.OrderAllocationResult allocationResult = processSalesOrderAllocation(tMonth,
             predictionVersion, predictionContext.getSalesOrders(), predictionContext.getFinishedProductStockMap(),
-            predictionContext.getMonthSurplusMap(),predictionContext.getMaterialInfoMap());
+            predictionContext.getMonthSurplusMap(),predictionContext.getMaterialInfoMap(), predictionContext.getContinueSku());
         predictionContext.setPredictOffsetDetails(allocationResult.getAllocations());
         AlternateMaterialSelector.setAlternateMaterialFlag(allocationResult.getNetDemands(),predictionContext.getFinishedProductStockMap());
         List<SupplyOrderPool>   fetchSupplyOrders =  this.dpOrderPoolSnapshotService.fetchSupplyOrder(finalVersion);
@@ -878,6 +891,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         CompletableFuture<List<SupplyOrderPool>> supplyOrdersFuture =
             CompletableFuture.supplyAsync(() -> this.fetchSupplyOrderPool(createCondition));
 
+        CompletableFuture<Set<String>> continueSkuFuture =
+            CompletableFuture.supplyAsync(() -> this.fetchContinueSku(createCondition));
+
         CompletableFuture<Map<String, Integer>> monthlySaleQtyFuture =
             CompletableFuture.supplyAsync(() -> this.findCurrentMonthlySaleQty(createCondition.getFactoryCode()));
 
@@ -903,6 +919,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             int minProductionQty = minProductionQtyFuture.get();
             Map<String, MdmMaterialInfo> materialInfoMap = fetchMaterialInfoFuture.get();
             List<MdmCycleSchStruConf> cycleSchStruConf = cycleSchStruConfFuture.get();
+            // 20260522+ 加载续作SKU
+            Set<String> continueSku = continueSkuFuture.get();
             // 20260330 成品库存需要扣减掉未扫描订单量 禅道号:21197
             mdmProductStockService.reduceInventoryByNotScanOrder(finishedProductStocks, notScanOrderList);
             // 处理成品库存映射
@@ -929,7 +947,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
                 monthlySaleQty,
                 minProductionQty,
                 materialInfoMap,
-                cycleSchStruConf
+                cycleSchStruConf,
+                continueSku
             );
 
         } catch (Exception e) {
@@ -947,7 +966,8 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         List<SalesOrderPool> allocationOrders,
         Map<String, List<MdmProductStock>> finishedProductStockMap,
         Map<String, Integer> monthSurplusMap,
-        Map<String, MdmMaterialInfo> materialInfoMap) {
+        Map<String, MdmMaterialInfo> materialInfoMap,
+        Set<String> continueSku) {
 
         if (CollectionUtils.isEmpty(allocationOrders)) {
             return new PredictionContext.OrderAllocationResult(
@@ -963,6 +983,11 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         // 计算库存分配
         List<DpOrderOffsetDetail> allocations = StockAllocationHelper.calculateStockAllocation(
             monthPlanVersion,tMonth, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap,materialInfoMap,weekYearForEudr);
+        // 处理续作SKU标记
+        if (!CollectionUtils.isEmpty(continueSku)) {
+            allocations.stream().filter(o -> continueSku.contains(o.getMaterialDesc())).forEach(o -> o.setIsContinueSKU(true));
+        }
+        
         return new PredictionContext.OrderAllocationResult(allocations, allocations, finishedProductStockMap);
     }
 
@@ -1062,6 +1087,47 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         return  this.mpMonthlySaleQtyService.findCurrentMonthlySaleQty(factoryCode);
     }
 
+    /**
+     * 获取上个月的定稿记录
+     */
+    private Set<String> fetchContinueSku(DpDemandPlan createCondition) {
+        Set<String> continueSkuSet =new HashSet<>();
+        // 1、获取上月工作日历
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(createCondition.getYear(), createCondition.getMonth() - 1, 1); // 通过日历获取上本月一号的日历
+        calendar.add(Calendar.MONTH, -1); // 切换到上个月
+        Integer lastYear = calendar.get(Calendar.YEAR);
+        Integer lastMonth = calendar.get(Calendar.MONTH) + 1;
+        LambdaQueryWrapper<MdmWorkCalendar> calendarQueryWrapper = new LambdaQueryWrapper<>();
+        calendarQueryWrapper.eq(MdmWorkCalendar::getFactoryCode, createCondition.getFactoryCode());
+        calendarQueryWrapper.eq(MdmWorkCalendar::getYear, lastYear);
+        calendarQueryWrapper.eq(MdmWorkCalendar::getMonth, lastMonth);
+        calendarQueryWrapper.eq(MdmWorkCalendar::getProcCode, "01");
+        List<MdmWorkCalendar> calendarList = mdmWorkCalendarEntityMapper.selectList(calendarQueryWrapper);
+        if (CollectionUtils.isEmpty(calendarList)) {
+            return continueSkuSet;
+        }
+        // 1.2、取出最后一个工作日
+        MdmWorkCalendar lastMdmWorkCalendar = calendarList.stream()
+                .filter(c -> ApsConstant.APS_ZERO_1.equals(c.getProcCode())
+                        && YesOrNoEnum.YES.getCode().equals(c.getDayFlag())).max(Comparator.comparing(MdmWorkCalendar::getDay)).orElse(null);
+        if (lastMdmWorkCalendar == null) {
+            return continueSkuSet;
+        }
+        Integer lastDay = lastMdmWorkCalendar.getDay();
+        String fieldName = "day" + lastDay;
+        
+        // 2、获取上个月的定稿记录
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> finalQueryWrapper = new LambdaQueryWrapper<>();
+        finalQueryWrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, createCondition.getFactoryCode());
+        finalQueryWrapper.eq(FactoryMonthPlanProductionFinalResult::getYear, lastYear);
+        finalQueryWrapper.eq(FactoryMonthPlanProductionFinalResult::getMonth, lastMonth);
+        // 2.2取出最后一个工作日有排产的SKU
+        return factoryMonthPlanProductionFinalResultEntityMapper.selectList(finalQueryWrapper).stream()
+                .filter(r -> Convert.toInt(r.getFieldValueByFieldName(fieldName), 0) > 0)
+                .map(FactoryMonthPlanProductionFinalResult::getMaterialDesc).distinct().collect(Collectors.toSet());
+    }
+    
     /**
      * 按优先级分离销售订单
      */
@@ -1261,6 +1327,14 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setPostponeQty(statistics.postponeQty);
         demandPlan.setCycleReserveQty(statistics.cycleReserveQty);
         demandPlan.setConventionReserveQty(statistics.conventionReserveQty);
+        
+        // 使用统计对象收集所有数据，避免多次遍历
+        QuantityStatistics statisticsOri = groupPlans.stream()
+            .collect(QuantityStatistics::new, QuantityStatistics::accumulateOri, QuantityStatistics::combine);
+        // 设置优先级相关数量
+        // 设置基本数量
+        demandPlan.setOriHeightQty(statisticsOri.heightQty);
+        demandPlan.setOriMidQty(statisticsOri.midQty);
 
         // 计算派生数量
         calculateDerivedQuantities(demandPlan);
@@ -1299,6 +1373,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         demandPlan.setMonthPlanVersion(createCondition.getMonthPlanVersion());
         demandPlan.setOrderPriority(supplyOrder.getOrderType());
         demandPlan.setScmPriority(supplyOrder.getOrderType());
+        demandPlan.setOriScmPriority(supplyOrder.getOrderType());
         demandPlan.setOrderQty(supplyOrder.getQty()==null? BigDecimal.ZERO.intValue() : supplyOrder.getQty());
         demandPlan.setNetQty(demandPlan.getOrderQty());
         demandPlan.setIsSchedule(supplyOrder.getIsSchedule());
@@ -1343,6 +1418,23 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
             }
             // 根据订单优先级累加对应数量
             String priority = plan.getScmPriority();
+            this.accumulate(plan, priority);
+        }
+
+        /**
+         * 根据原始优先级合计需求量
+         * @param plan
+         */
+        void accumulateOri(DpDemandPlan plan) {
+            if (plan == null) {
+                return;
+            }
+            // 根据订单优先级累加对应数量
+            String priority = plan.getOriScmPriority();
+            this.accumulate(plan, priority);
+        }
+
+        private void accumulate(DpDemandPlan plan, String priority) {
             int netQty = plan.getNetQty()== null? BigDecimal.ZERO.intValue(): plan.getNetQty();
 
             if (ApsConstant.SAL_PRIORITY_HIGHT.equals(priority)) {

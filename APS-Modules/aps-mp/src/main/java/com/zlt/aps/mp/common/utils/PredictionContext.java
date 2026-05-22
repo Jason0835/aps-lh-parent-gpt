@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 预测上下文
@@ -34,6 +35,7 @@ public class PredictionContext {
   private  Integer  minProductionQty;
   private  Map<String, MdmMaterialInfo> materialInfoMap;
   private  List<MdmCycleSchStruConf> cycleSchStruConfs;
+  private  Set<String> continueSku;
   private  List<DpOrderOffsetDetail> predictOffsetDetails;
 
   public PredictionContext(
@@ -49,7 +51,8 @@ public class PredictionContext {
       Map<String, Integer>  monthlySaleQty,
       Integer  minProductionQty,
       Map<String, MdmMaterialInfo> materialInfoMap,
-      List<MdmCycleSchStruConf> cycleSchStruConfs) {
+      List<MdmCycleSchStruConf> cycleSchStruConfs,
+      Set<String> continueSku) {
     this.salesOrders = salesOrders != null ? salesOrders : Collections.emptyList();
     this.orderQtyMap = orderQtyMap != null ? orderQtyMap : Collections.emptyMap();
     this.finishedProductStocks = finishedProductStocks != null ? finishedProductStocks : Collections.emptyList();
@@ -64,6 +67,7 @@ public class PredictionContext {
     this.minProductionQty = minProductionQty != null ? minProductionQty : 0;
     this.materialInfoMap = materialInfoMap != null ? materialInfoMap : Collections.emptyMap();
     this.cycleSchStruConfs = cycleSchStruConfs != null ? cycleSchStruConfs : Collections.emptyList();
+    this.continueSku = continueSku != null? continueSku: Collections.emptySet();
     if(!CollectionUtils.isEmpty(initialData)) {
       // 深度拷贝：创建新的HashMap，确保与原始数据隔离
       this.originalMonthSurplusMap = Collections.unmodifiableMap(
