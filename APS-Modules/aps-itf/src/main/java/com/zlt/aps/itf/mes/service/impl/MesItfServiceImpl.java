@@ -28,6 +28,7 @@ import com.zlt.sync.handle.SyncDataHandle;
 import com.zlt.sync.povo.SyncParamsVO;
 import com.zlt.sync.service.SyncDataLogsService;
 import com.zlt.aps.lh.api.domain.entity.*;
+import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
@@ -1698,7 +1699,7 @@ public class MesItfServiceImpl implements MesItfService {
     private void updateChipStockFinishQty(String factoryCode, List<LhDayFinishQty> syncList) {
         FactoryParam chipCodeParam = new FactoryParam();
         chipCodeParam.setFactoryCode(factoryCode);
-        chipCodeParam.setParamCode("CHIP_CODE_STOCK_UPDATE");
+        chipCodeParam.setParamCode(LhScheduleParamConstant.CHIP_CODE_STOCK_UPDATE);
         FactoryParam paramResult;
         try {
             DynamicDataSourceContextHolder.push(DataSource.APS);

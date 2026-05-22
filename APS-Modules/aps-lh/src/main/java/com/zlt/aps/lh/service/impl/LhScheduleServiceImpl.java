@@ -1619,15 +1619,19 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Map<String, Object> todayNightFinishQtyMap = buildTodayNightFinishQtyExportMap(list, scheduleDate);
         Map<String, String> recipeTypeMap = loadLhTrialStatusDictMap();
 
-        // 模板要求第一条数据行不是具体机台明细，而是整张表的汇总行：
-        // 各班计划/实际取所有明细对应班次的合计，后面的每条才是原始排程明细。
-//        if(PubUtil.isNotEmpty(list)){
-//            dataList.add(buildSummaryRow(list));
-//        }
+        // 按硫化物料号排序，同一物料下按机台编码升序
+        List<LhScheduleResult> sortedList = list.stream()
+                .sorted(Comparator
+                        .comparing((LhScheduleResult r) -> StringUtils.defaultString(r.getMaterialCode()))
+                        .thenComparing(r -> StringUtils.defaultString(r.getLhMachineCode())))
+                .collect(Collectors.toList());
 
+        // 构建8班顺序值映射：同一物料按班次1~8遍历，每个班次内有计划量的记录按机台编码升序，顺序值从1~n连续编排
+        Map<String, Map<Integer, Integer>> shiftOrderMap = buildContinuousShiftOrderMap(sortedList);
 
-        for (LhScheduleResult result : list) {
+        for (LhScheduleResult result : sortedList) {
             Map<String, Object> row = new HashMap<>(112);
+            row.put("height", 17);
             row.put("lhMachineCode", result.getLhMachineCode());
             row.put("materialCode", result.getMaterialCode());
             row.put("embryoCode", result.getEmbryoCode());
@@ -1672,7 +1676,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             // 与模板中的 {.class1PlanQty}、{.class8Analysis} 等占位符一一对应。
             for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
                 row.put("class" + shift + "LeftRightMould", buildShiftLeftRightMould(result, shift));
-                row.put("class" + shift + "Order", buildShiftOrder(result, shift));
+                row.put("class" + shift + "Order", getContinuousShiftOrder(shiftOrderMap, result, shift));
                 row.put("class" + shift + "PlanQty", getClassPlanQty(result, shift));
                 row.put("class" + shift + "FinishQty", getClassFinishQty(result, shift));
                 row.put("class" + shift + "Type", buildShiftType(result, shift));
@@ -2117,12 +2121,97 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param result 排程结果
      * @param shift  班次序号
      * @return 班次顺序
+     * @deprecated 已被 {@link #buildContinuousShiftOrderMap} + {@link #getContinuousShiftOrder} 替代，
+     *             不再使用数据库字段 scheduleOrder，改为同一物料按班次连续编排
      */
+    @Deprecated
     private Object buildShiftOrder(LhScheduleResult result, int shift) {
         Integer planQty = getClassPlanQty(result, shift);
-        // 只有该班次有计划量时才展示排程顺序，空班次保持空白，
-        // 防止同一条明细的顺序号误显示到没有排产的班次下。
         return Objects.nonNull(planQty) && planQty > 0 ? result.getScheduleOrder() : "";
+    }
+
+    /**
+     * 构建同一物料下8班连续顺序值映射。
+     * <p>编排规则：按物料分组 → 按班次1~8顺序遍历 → 每个班次内有计划量的记录按机台编码升序 → 依次赋值1, 2, 3...
+     * 例如：4台机台ABCD排同一物料，班次1(早班)只有B有排产则B的班次1顺序=1，
+     * 班次2(中班)ABCD都有排产则按机台编码升序A=1,B=2,C=3,D=4，每个班次独立从1开始编号。</p>
+     *
+     * @param sortedList 已按物料编码+机台编码排序的排程结果列表
+     * @return key=物料编码|排程结果ID，value=该记录在各班次的顺序值Map（班次号→顺序值）
+     */
+    private Map<String, Map<Integer, Integer>> buildContinuousShiftOrderMap(List<LhScheduleResult> sortedList) {
+        Map<String, Map<Integer, Integer>> resultMap = new HashMap<>(sortedList.size());
+        if (PubUtil.isEmpty(sortedList)) {
+            return resultMap;
+        }
+
+        // 按物料编码分组，保持排序后的顺序
+        Map<String, List<LhScheduleResult>> materialGroupMap = new LinkedHashMap<>();
+        for (LhScheduleResult r : sortedList) {
+            String materialCode = StringUtils.defaultString(r.getMaterialCode());
+            materialGroupMap.computeIfAbsent(materialCode, k -> new ArrayList<>()).add(r);
+        }
+
+        // 对每个物料组，按班次1~8遍历，每个班次独立从1开始编号
+        // 班次内有计划量的记录按机台编码升序，依次赋值1,2,3...
+        for (Map.Entry<String, List<LhScheduleResult>> entry : materialGroupMap.entrySet()) {
+            List<LhScheduleResult> groupList = entry.getValue();
+
+            for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+                // 收集当前班次有计划量的记录，按机台编码升序
+                int finalShift = shift;
+                List<LhScheduleResult> shiftRecords = groupList.stream()
+                        .filter(r -> {
+                            Integer planQty = getClassPlanQty(r, finalShift);
+                            return Objects.nonNull(planQty) && planQty > 0;
+                        })
+                        .sorted(Comparator.comparing(r -> StringUtils.defaultString(r.getLhMachineCode())))
+                        .collect(Collectors.toList());
+
+                // 每个班次独立从1开始编号
+                int sequence = 1;
+                for (LhScheduleResult r : shiftRecords) {
+                    String key = buildShiftOrderMapKey(r);
+                    resultMap.computeIfAbsent(key, k -> new HashMap<>()).put(shift, sequence);
+                    sequence++;
+                }
+            }
+        }
+
+        return resultMap;
+    }
+
+    /**
+     * 构建顺序值映射的key。
+     *
+     * @param result 排程结果
+     * @return key = 物料编码|排程结果ID
+     */
+    private String buildShiftOrderMapKey(LhScheduleResult result) {
+        return StringUtils.defaultString(result.getMaterialCode()) + "|" + result.getId();
+    }
+
+    /**
+     * 从连续顺序值映射中获取指定记录指定班次的顺序值。
+     *
+     * @param shiftOrderMap 顺序值映射
+     * @param result        排程结果
+     * @param shift         班次序号
+     * @return 顺序值（有计划量时返回数字，无计划量时返回空字符串）
+     */
+    private Object getContinuousShiftOrder(Map<String, Map<Integer, Integer>> shiftOrderMap,
+                                           LhScheduleResult result, int shift) {
+        Integer planQty = getClassPlanQty(result, shift);
+        if (Objects.isNull(planQty) || planQty <= 0) {
+            return "";
+        }
+        String key = buildShiftOrderMapKey(result);
+        Map<Integer, Integer> orderMap = shiftOrderMap.get(key);
+        if (Objects.isNull(orderMap)) {
+            return "";
+        }
+        Integer order = orderMap.get(shift);
+        return Objects.nonNull(order) ? order : "";
     }
 
     /**

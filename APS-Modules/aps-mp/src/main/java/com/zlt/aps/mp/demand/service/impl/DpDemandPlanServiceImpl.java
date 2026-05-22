@@ -335,8 +335,9 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
     }
 
     private PredictionContext fetchRequiredDataInParallelByAdjust(DpDemandPlan createCondition) {
-        Set<String>  structureNames = mpStructureAllocationService.findStructureNames(createCondition);
-        List<MdmMaterialInfo> materialInfos = this.materialInfoService.findMaterialInfoByStructureNames(createCondition.getFactoryCode(), structureNames);
+        // 20260521+ 获取调整订单不需要根据结构转产表过滤
+//        Set<String>  structureNames = mpStructureAllocationService.findStructureNames(createCondition);
+        List<MdmMaterialInfo> materialInfos = this.materialInfoService.findMaterialInfoByStructureNames(createCondition.getFactoryCode(), null);
         Set<String> materialCodes = this.getMaterialCodes(materialInfos);
         CompletableFuture<List<SalesOrderPool>> salesOrdersFuture =
             CompletableFuture.supplyAsync(() ->  this.salesOrderPoolService.findCurrentSalesOrderPool(createCondition.getFactoryCode(), materialCodes));
@@ -358,7 +359,7 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         CompletableFuture<Map<String, MdmMaterialInfo>> fetchMaterialInfoFuture =
             CompletableFuture.supplyAsync(() -> this.fetchMaterialInfo(createCondition));
         CompletableFuture<List<MdmCycleSchStruConf>> cycleSchStruConfFuture =
-            CompletableFuture.supplyAsync(() ->  mdmCycleSchStruConfService.findAdjustCycleSchStruConf(createCondition,structureNames));
+            CompletableFuture.supplyAsync(() ->  mdmCycleSchStruConfService.findAdjustCycleSchStruConf(createCondition, null));
         // 等待所有任务完成
         CompletableFuture.allOf(
             salesOrdersFuture, stocksFuture, productionTypeFuture,

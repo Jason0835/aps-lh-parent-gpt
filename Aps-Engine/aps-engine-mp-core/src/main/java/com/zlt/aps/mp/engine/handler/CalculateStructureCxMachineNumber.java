@@ -429,6 +429,6 @@ public class CalculateStructureCxMachineNumber {
      */
     private int calculateMinLhDayCapacityQty(List<MonthPlanProductionRequirePlanVo> groupDatas) {
         //最小日硫化量
-        return groupDatas.stream().filter(item -> null != item.getDayVulcanizationQty()).mapToInt(MonthPlanProductionRequirePlanVo::getDayVulcanizationQty).min().orElse(0);
+        return groupDatas.stream().filter(item -> item.isEffectiveDayVulcanizationQty()).mapToInt(MonthPlanProductionRequirePlanVo::getDayVulcanizationQty).min().orElse(0);
     }
 }

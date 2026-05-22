@@ -241,11 +241,11 @@ public class MpWeekRollAdjustController extends BaseController {
                 // 同胎胚
                 .thenComparing(IFinalAndAdjustResultInterface::getEmbryoCode,Comparator.nullsLast(String::compareTo))
                 // 最大型腔数
-                .thenComparing(IFinalAndAdjustResultInterface::getMaxMouldCavityQty, Comparator.reverseOrder())
+                .thenComparing(IFinalAndAdjustResultInterface::getMaxMouldCavityQty, Comparator.nullsLast(Comparator.reverseOrder()))
                 // 主花纹
                 .thenComparing(IFinalAndAdjustResultInterface::getMainPattern, Comparator.nullsLast(String::compareTo))
                 // 活块数
-                .thenComparing(IFinalAndAdjustResultInterface::getTypeBlockQty, Comparator.reverseOrder())
+                .thenComparing(IFinalAndAdjustResultInterface::getTypeBlockQty, Comparator.nullsLast(Comparator.reverseOrder()))
                 // 物料描述
                 .thenComparing(IFinalAndAdjustResultInterface::getMaterialDesc, Comparator.nullsLast(String::compareTo));
     }

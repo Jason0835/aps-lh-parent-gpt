@@ -139,8 +139,8 @@ public class MonthPlanSyncService {
      */
     private AjaxResult validateAdjustedSyncParam(FactoryMonthPlanProductionFinalResult param) {
         if (param == null || param.getYear() == null || param.getMonth() == null
-                || StringUtils.isBlank(param.getFactoryCode()) || StringUtils.isBlank(param.getMonthPlanVersion())
-                || StringUtils.isBlank(param.getLastMonthPlanVersion()) || StringUtils.isBlank(param.getProductionVersion())) {
+                || StringUtils.isBlank(param.getFactoryCode()) || StringUtils.isBlank(param.getProductionVersion())
+                || StringUtils.isBlank(param.getLastMonthPlanVersion())) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.checkParam"));
         }
         if (StringUtils.equals(param.getMonthPlanVersion(), param.getLastMonthPlanVersion())) {
@@ -161,7 +161,7 @@ public class MonthPlanSyncService {
         queryWrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode())
                 .eq(FactoryMonthPlanProductionFinalResult::getYear, param.getYear())
                 .eq(FactoryMonthPlanProductionFinalResult::getMonth, param.getMonth())
-                .eq(FactoryMonthPlanProductionFinalResult::getMonthPlanVersion, param.getMonthPlanVersion())
+                .eq(FactoryMonthPlanProductionFinalResult::getLastMonthPlanVersion, param.getLastMonthPlanVersion())
                 .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, param.getProductionVersion())
                 .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, YesOrNoEnum.NO.getValue());
         return finalResultMapper.selectList(queryWrapper);
@@ -349,7 +349,7 @@ public class MonthPlanSyncService {
         for (FactoryMonthPlanProductionFinalResult result : finalList) {
             SyncOutFacScheduleVersionVo versionVo = new SyncOutFacScheduleVersionVo();
             versionVo.setFactory(result.getFactoryCode());
-            versionVo.setPlanVersion(Boolean.TRUE.equals(useAdjustVersion) ? result.getMonthPlanVersion() : result.getProductionVersion());
+            versionVo.setPlanVersion(Boolean.TRUE.equals(useAdjustVersion) ? result.getLastMonthPlanVersion() : result.getProductionVersion());
             versionVo.setProductPlanNo(result.getProductionNo());
             versionVo.setStatus(ApsConstant.APS_STRING_0);
             Integer year = result.getYear();

@@ -35,6 +35,7 @@ import com.zlt.aps.lh.api.domain.entity.LhSharedMouldPat;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
+import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
@@ -147,7 +148,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                 billVO.setOrderNo(origin.getOrderNo());
                 if (ApsConstant.IS_RELEASE.equals(origin.getIsRelease())) {
                     // 已发布单据编辑后需要重新进入待发布状态
-                    billVO.setIsRelease(ApsConstant.WAIT_RELEASING);
+                    billVO.setIsRelease(ReleaseStatusEnum.PENDING_RELEASE.getCode());
                     billVO.setMouldStatus(ApsConstant.FALSE);
                 } else {
                     billVO.setIsRelease(origin.getIsRelease());
@@ -600,7 +601,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
         QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, queryVO);
-        wrapper.in("IS_RELEASE", Arrays.asList(ApsConstant.NO_RELEASE, ApsConstant.WAIT_RELEASING));
+        wrapper.in("IS_RELEASE", Arrays.asList(ApsConstant.NO_RELEASE, ReleaseStatusEnum.PENDING_RELEASE.getCode()));
         wrapper.select("ID");
         List<LhMouldChangePlan> list = lhMouldChangePlanMapper.selectList(wrapper);
         if (CollectionUtils.isEmpty(list)) {
