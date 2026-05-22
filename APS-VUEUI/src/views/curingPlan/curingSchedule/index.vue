@@ -55,9 +55,9 @@
           >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button
         >
         <el-button
-          v-hasPermi="['lh:lhScheduleResult:changeMachine']"
+          v-hasPermi="['lh:lhScheduleResult:adjustQuantity']"
           type="primary"
-          @click="handleChangePlan"
+          @click="handleChangePlan()"
           :disabled="selection.length !== 1"
           >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button
         >
@@ -205,7 +205,6 @@ import moment from "moment";
 
 import {
   adjustTextNo,
-  changeQty,
   exportCombine,
   exportScheduleResult,
   generateTextMouldChangePlan,
@@ -247,7 +246,7 @@ export default {
     "IS_RELEASE_LH",
     "biz_factory_name",
     "biz_end_type",
-    "biz_construction_stage",
+    "lh_trial_status",
     "lh_schedule_type",
     "biz_mould_Type",
   ],
@@ -433,7 +432,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 1),
             }, // 第1班-左右模
             {
-              prop: "constructionStage",
+              prop: "trialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 1),
             }, // 第1班-施工阶段
@@ -468,7 +467,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 2),
             }, // 第2班-左右模
             {
-              prop: "constructionStage",
+              prop: "trialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 2),
             }, // 第2班-施工阶段
@@ -504,7 +503,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 3),
             }, // 第3班-左右模
             {
-              prop: "constructionStage",
+              prop: "trialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 3),
             }, // 第3班-施工阶段
@@ -540,7 +539,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 4),
             }, // 第4班-左右模
             {
-              prop: "constructionStage",
+              prop: "trialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 4),
             }, // 第4班-施工阶段
@@ -576,7 +575,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 5),
             }, // 第5班-左右模
             {
-              prop: "changedConstructionStage",
+              prop: "changedTrialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 5),
             }, // 第5班-施工阶段
@@ -612,7 +611,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 6),
             }, // 第6班-左右模
             {
-              prop: "changedConstructionStage",
+              prop: "changedTrialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 6),
             }, // 第6班-施工阶段
@@ -648,7 +647,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 7),
             }, // 第7班-左右模
             {
-              prop: "changedConstructionStage",
+              prop: "changedTrialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 7),
             }, // 第7班-施工阶段
@@ -684,7 +683,7 @@ export default {
               formatter: (row, column, value) => this.shiftLeftRightMouldFormatter(row, column, value, 8),
             }, // 第8班-左右模
             {
-              prop: "changedConstructionStage",
+              prop: "changedTrialStatus",
               label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftConstructionStageFormatter(row, column, value, 8),
             }, // 第8班-施工阶段
@@ -752,12 +751,12 @@ export default {
           render: ({ row }) => {
             return (
               <div>
-                {checkPermi(["lh:lhScheduleResult:save"]) ? (
+                {checkPermi(["lh:lhScheduleResult:adjustQuantity"]) ? (
                   <el-button
                     type="text"
                     size="mini"
                     icon="el-icon-edit"
-                    onClick={() => this.handleShowChangeQty(row)}
+                    onClick={() => this.handleChangePlan(row)}
                   >
                     {this.$t("ui.data.column.scheduleResult.changePlan")}
                   </el-button>
@@ -974,8 +973,8 @@ export default {
       if (this.isShiftAfterEnding(row, shiftIndex)) return '';
       const planQty = row['class' + shiftIndex + 'PlanQty'];
       if (planQty == null || planQty <= 0) return '';
-      const dictValue = value || "0";
-      return this.selectDictLabel(this.dict.type.biz_construction_stage, dictValue);
+      if (value == null || value === '') return '';
+      return this.selectDictLabel(this.dict.type.lh_trial_status, value);
     },
     shiftPlanQtyFormatter(row, column, value, shiftIndex) {
       if (this.isShiftAfterEnding(row, shiftIndex)) return '';
@@ -1031,10 +1030,15 @@ export default {
       }
     },
     // 调量
-    handleChangePlan() {
+    handleChangePlan(row) {
       if (this.$refs.changePlanRef) {
-        let row = this.selection[0];
-        this.$refs.changePlanRef.show(row);
+        const targetRow = row && row.id ? row : this.selection[0];
+        if (!targetRow) {
+          return;
+        }
+        // 深拷贝 row 数据，避免调量弹窗编辑时影响列表原始数据
+        const rowCopy = JSON.parse(JSON.stringify(targetRow));
+        this.$refs.changePlanRef.show(rowCopy);
       }
     },
     async getDate() {
@@ -1090,27 +1094,6 @@ export default {
     handleGotoSpecDescGant() {
       this.$router.push("/curingPlan/specDescGantChart");
     },
-    handleShowChangeQty(row) {
-      if (this.$refs.infoDialogRef) {
-        // 深拷贝 row 数据，避免编辑时影响列表原始数据
-        const rowCopy = JSON.parse(JSON.stringify(row));
-        this.$refs.infoDialogRef.show(rowCopy, true);
-      }
-    },
-    async handleChangeQty(row) {
-      try {
-        this.loading = true;
-        const data = await changeQty(row);
-        this.$modal.msgSuccess(data.msg);
-        // this.$set(this.page, "current", 1);
-        this.getList();
-      } catch (error) {
-        console.error(error);
-      } finally {
-        this.loading = false;
-      }
-    },
-
     handleDelete(row) {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",

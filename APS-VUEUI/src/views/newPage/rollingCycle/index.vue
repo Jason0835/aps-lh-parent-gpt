@@ -33,21 +33,20 @@
           v-if="isStructureInnerPage"
           class="mp-structure-inner-header"
         >
-          <div class="mp-structure-inner-toolbar">
-            <el-button
-              @click="adjustOrder"
-              :loading="getLoading"
-              v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
-              >{{ $t("获取调整订单") }}</el-button
-            >
-            <el-button
-              @click="handShowResult"
-              :loading="autoLoading"
-              :disabled="data.length == 0"
-              v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
-              >{{ $t("自动调整") }}</el-button
-            >
-          </div>
+          <el-button
+            @click="adjustOrder"
+            type="primary"
+            :loading="getLoading"
+            v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
+            >{{ $t("获取调整订单") }}</el-button
+          >
+          <el-button
+            @click="handShowResult"
+            :loading="autoLoading"
+            :disabled="data.length == 0"
+            v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
+            >{{ $t("自动调整") }}</el-button
+          >
         </div>
         <!-- 结构调整页：列表工具栏或单结构流程表单 -->
         <div
@@ -189,7 +188,7 @@
           </el-form>
         </div>
       </template>
-      <template slot="footer" v-if="isShowFoot">
+      <template slot="footer" v-if="showPageFooter">
         <div
           style="
             display: flex;
@@ -569,6 +568,8 @@ export default {
       actionDate: {},
       /** 从月计划调整查询「选择」进入，用于取消时清理路由参数 */
       monthPlanFromFinalSelect: false,
+      /** 月计划弹窗「选择」带入的调整日期快照，进入页即赋值且 bootstrap 后回写 */
+      _monthPlanAdjustDaySnapshot: null,
 
       syncLoading: false,
       /** 下发 SCM/MES 弹窗（与月计划调整查询页同源接口；弹窗年月独立按 backup-legacy 默认下月初始化） */
@@ -602,6 +603,30 @@ export default {
     /** 结构调整独立页 */
     isStructureAdjustPage() {
       return this.pageVariant === "structureAdjust";
+    },
+    /**
+     * 页脚确定/取消：结构调整单结构流程进入后即显示；
+     * 结构内自动调整等流程仍依赖 isShowFoot。
+     */
+    showPageFooter() {
+      if (this.isStructureAdjustPage && this.isShowResult) {
+        return true;
+      }
+      return this.isShowFoot;
+    },
+    /**
+     * 月计划结构内/结构调整独立页：版本号查询绑定 version（与 mpAdjustStructureIn/Out getVersionList 一致）；
+     * 周程原结构调整 Tab 仍为 productionVersion。
+     */
+    versionSearchProp() {
+      if (this.isStructureInnerPage || this.isStructureAdjustPage) {
+        return "version";
+      }
+      return this.activeName === "second" ? "productionVersion" : "version";
+    },
+    /** 结构内/结构调整独立页版本号不可清空，与结构内默认逻辑一致 */
+    versionSelectClearable() {
+      return !(this.isStructureInnerPage || this.isStructureAdjustPage);
     },
     columns() {
       if (!this.show) {
@@ -1077,7 +1102,6 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  {this.isEdit && (
                     <el-input
                       key={row.id}
                       v-model={row.confirmAdjustQty}
@@ -1094,8 +1118,6 @@ export default {
                       }}
                       size="mini"
                     ></el-input>
-                  )}
-                  {!this.isEdit && <span>{row.confirmAdjustQty}</span>}
                 </div>
               );
             },
@@ -1106,7 +1128,6 @@ export default {
             render: ({ row }) => {
               return (
                 <div>
-                  {this.isEdit && (
                     <el-input
                       key={row.id}
                       v-model={row.adjustPriority}
@@ -1128,8 +1149,6 @@ export default {
                       }}
                       size="mini"
                     ></el-input>
-                  )}
-                  {!this.isEdit && <span>{row.adjustPriority}</span>}
                 </div>
               );
             },
@@ -1214,21 +1233,27 @@ export default {
           filterable: true,
         })
       }
-      /** 月计划结构调整独立路由：不展示查询区「版本号」（定稿版本仍可由 getVersionList 写入 query 供列表接口使用） */
-      if (!this.isStructureAdjustPage) {
+      /** 结构调整页：查询区展示产品结构 */
+      if (this.isStructureAdjustPage) {
         list.push({
-          prop:
-            this.activeName == "second" ? "productionVersion" : "version",
-          label: this.$t("版本号"),
+          prop: "structureName",
+          label: this.$t("产品结构"),
           type: "select",
-          clearable: this.activeName == "first" ? false : true,
+          dictData: this.structureList,
           filterable: true,
-          dictData: this.versionList,
-          listeners: {
-            change: this.handleVersionChange,
-          },
         });
       }
+      list.push({
+        prop: this.versionSearchProp,
+        label: this.$t("版本号"),
+        type: "select",
+        clearable: this.versionSelectClearable,
+        filterable: true,
+        dictData: this.versionList,
+        listeners: {
+          change: this.handleVersionChange,
+        },
+      });
       list.push(
         {
           prop: "materialCode",
@@ -1743,13 +1768,23 @@ export default {
       try {
         let res = await editOutHistory(row);
         // this.$modal.msgSuccess(res.msg);
-        this.getSingleList({
+        const structureName = (
+          (this.formInline && this.formInline.structureName) ||
+          ""
+        )
+          .toString()
+          .trim();
+        const listParams = {
           factoryCode: row.factoryCode,
           year: row.year,
           month: row.month,
           version: row.version,
           productionVersion: row.productionVersion,
-        });
+        };
+        if (structureName) {
+          listParams.structureName = structureName;
+        }
+        this.getSingleList(listParams);
       } catch (err) {}
     },
 
@@ -1764,28 +1799,20 @@ export default {
       }
     },
     handleVersionChange(val) {
-      if (this.activeName == "second") {
-        this.search = {
-          ...this.search,
-          productionVersion: val,
-        };
-        this.query = {
-          ...this.search,
-          productionVersion: val,
-        };
-      } else {
-        this.search = {
-          ...this.search,
-          version: val,
-        };
-        this.query = {
-          ...this.search,
-          version: val,
-        };
-      }
+      const prop = this.versionSearchProp;
+      this.search = {
+        ...this.search,
+        [prop]: val,
+      };
+      this.query = {
+        ...this.search,
+      };
     },
 
     handleYearMonthChange(val) {
+      if (!val || val === this.query.yearMonth) {
+        return;
+      }
       this.search = {
         ...this.search,
         yearMonth: val,
@@ -1795,7 +1822,45 @@ export default {
         yearMonth: val,
       };
 
-      this.getVersionList(true);
+      this.scheduleYearMonthQueryRefresh();
+    },
+    /**
+     * 年月切换后合并刷新，避免同一接口在 200ms 内重复触发 request.js 防重复提交。
+     */
+    scheduleYearMonthQueryRefresh() {
+      if (this._yearMonthRefreshTimer) {
+        clearTimeout(this._yearMonthRefreshTimer);
+      }
+      this._yearMonthRefreshTimer = setTimeout(() => {
+        this._yearMonthRefreshTimer = null;
+        this.refreshAfterYearMonthChange();
+      }, 300);
+    },
+    async refreshAfterYearMonthChange() {
+      if (this._yearMonthRefreshing) {
+        this._yearMonthRefreshPending = true;
+        return;
+      }
+      this._yearMonthRefreshing = true;
+      try {
+        if (
+          this.isStructureAdjustPage &&
+          this.isShowResult &&
+          this.activeName === "singleResult"
+        ) {
+          await this.getOutVersionList(true);
+          return;
+        }
+        await this.getVersionList(true);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        this._yearMonthRefreshing = false;
+        if (this._yearMonthRefreshPending) {
+          this._yearMonthRefreshPending = false;
+          await this.refreshAfterYearMonthChange();
+        }
+      }
     },
     handleMaterialCodeChange(val) {
       this.search = {
@@ -1821,98 +1886,119 @@ export default {
 
       this.getVersionList();
     },
+    /**
+     * 结构内/结构调整版本号默认值：接口列表首项；isNewVersion 强制首项；
+     * 若 query.version 仍在列表中则保留（与结构内调整一致）。
+     */
+    applyAdjustVersionDefault(list, isNewVersion = false) {
+      if (!list || list.length === 0) {
+        return;
+      }
+      if (isNewVersion) {
+        this.$set(this.search, "version", list[0].value);
+        this.$set(this.query, "version", list[0].value);
+        return;
+      }
+      if (this.query.version) {
+        const hasVersion = list.some(
+          (item) => item.value == this.query.version
+        );
+        if (hasVersion) {
+          this.$set(this.search, "version", this.query.version);
+          this.$set(this.query, "version", this.query.version);
+          return;
+        }
+      }
+      this.$set(this.search, "version", list[0].value);
+      this.$set(this.query, "version", list[0].value);
+    },
+    clearVersionSearchFields() {
+      this.$set(this.search, "version", "");
+      this.$set(this.query, "version", "");
+      this.$set(this.search, "adjVersion", "");
+      this.$set(this.query, "adjVersion", "");
+      this.$set(this.search, "productionVersion", "");
+      this.$set(this.query, "productionVersion", "");
+    },
     //获取版本列表
     async getVersionList(isGet = false, isNewVersion = false) {
+      if (this._versionListPromise) {
+        return this._versionListPromise;
+      }
+      this._versionListPromise = this._loadVersionList(isGet, isNewVersion);
+      try {
+        return await this._versionListPromise;
+      } finally {
+        this._versionListPromise = null;
+      }
+    },
+    async _loadVersionList(isGet = false, isNewVersion = false) {
       this.loading = true;
       let res;
+      let shouldLoadList = false;
       try {
         if (this.activeName == "first") {
           res = await versionAdjust(this.formatParams());
+          shouldLoadList = isGet;
         } else if (this.activeName == "second") {
-          res = await versionStructure(this.formatParams());
-        } else if (this.activeName == "three") {
-          if (!this.isTabChange) return;
-          res = await resultVersion(this.formatParams());
-        } else {
-          if (isGet) {
-            this.getList();
+          if (this.isStructureAdjustPage) {
+            res = await versionOutHistory(this.formatParams());
           } else {
-            this.loading = false;
+            res = await versionStructure(this.formatParams());
           }
+          shouldLoadList = isGet;
+        } else if (this.activeName == "three") {
+          if (!this.isTabChange) {
+            return;
+          }
+          res = await resultVersion(this.formatParams());
+          shouldLoadList = isGet;
+        } else {
+          shouldLoadList = isGet;
           return;
         }
 
+        const useProductionVersionField =
+          this.activeName == "second" && !this.isStructureAdjustPage;
         let list = [];
         for (let i = 0; i < res.rows.length; i++) {
-          let obj = {
-            label:
-              this.activeName == "second"
-                ? res.rows[i].productionVersion
-                : res.rows[i].version,
-            value:
-              this.activeName == "second"
-                ? res.rows[i].productionVersion
-                : res.rows[i].version,
-          };
-          list.push(obj);
+          const raw = useProductionVersionField
+            ? res.rows[i].productionVersion
+            : res.rows[i].version;
+          if (raw == null || String(raw).trim() === "") {
+            continue;
+          }
+          list.push({
+            label: raw,
+            value: raw,
+          });
         }
 
         this.versionList = list;
 
         if (list.length > 0) {
-          if (this.activeName == "second") {
+          if (useProductionVersionField) {
             this.$set(this.search, "productionVersion", list[0].value);
             this.$set(this.query, "productionVersion", list[0].value);
           } else {
-            if (isNewVersion) {
-              this.$set(this.search, "version", list[0].value);
-              this.$set(this.query, "version", list[0].value);
-              return;
-            }
-            if (this.query.version) {
-              let hasVersion = list.some(
-                (item) => item.value == this.query.version
-              );
-              if (hasVersion) {
-                this.$set(this.search, "version", this.query.version);
-                this.$set(this.query, "version", this.query.version);
-                return;
-              }
-            }
-            this.$set(this.search, "version", list[0].value);
-            this.$set(this.query, "version", list[0].value);
+            this.applyAdjustVersionDefault(list, isNewVersion);
           }
         } else {
-          this.$set(this.search, "version", "");
-          this.$set(this.query, "version", "");
-          this.$set(this.search, "adjVersion", "");
-          this.$set(this.query, "adjVersion", "");
-          this.$set(this.search, "productionVersion", "");
-          this.$set(this.query, "productionVersion", "");
-          // if (this.activeName != "second") {
-          //   this.$set(this.search, "version", "");
-          //   this.$set(this.query, "version", "");
-          // } else if (this.activeName == "four") {
-          //   this.$set(this.search, "adjVersion", "");
-          //   this.$set(this.query, "adjVersion", "");
-          // } else {
-          //   this.$set(this.search, "productionVersion", "");
-          //   this.$set(this.query, "productionVersion", "");
-          // }
+          this.clearVersionSearchFields();
         }
       } catch (err) {
         console.log(err);
       } finally {
-        if (isGet) {
-          this.getList();
-        } else {
+        if (shouldLoadList) {
+          await this.getList();
+        } else if (!isGet) {
           this.loading = false;
         }
       }
     },
 
-    //获取单选历史列表的版本号
-    async getOutVersionList(isGet) {
+    //获取单选历史列表的版本号（mpAdjustStructureOut/getVersionList）
+    async getOutVersionList(isGet = false, isNewVersion = false) {
       try {
         const params = {
           ...this.query,
@@ -1934,20 +2020,14 @@ export default {
         }
 
         this.versionList = list;
-        // if (list.length > 0) {
-        //   this.$set(this.search, "version", list[0].value);
-        //   this.$set(this.query, "version", list[0].value);
-        // } else {
-        //   this.$set(this.search, "version", "");
-        //   this.$set(this.query, "version", "");
-        // }
-        if (isGet) {
-          this.$nextTick(() => {
-            this.getOutHistoryList();
-          });
+        if (list.length > 0) {
+          this.applyAdjustVersionDefault(list, isNewVersion);
         } else {
           this.$set(this.search, "version", "");
           this.$set(this.query, "version", "");
+        }
+        if (isGet) {
+          await this.getOutHistoryList();
         }
       } catch (err) {
         console.log(err);
@@ -2037,6 +2117,27 @@ export default {
         this.loading = false;
         this.show = true;
       }
+    },
+    /**
+     * 月计划弹窗「选择」进入结构调整页：拉版本号后默认查询单选结构历史列表
+     */
+    async bootstrapStructureAdjustSingleFlow() {
+      const productionVersion = (
+        this.formInline.productionVersion || ""
+      ).trim();
+      if (!productionVersion) {
+        this.page = null;
+        setTimeout(() => {
+          this.page = null;
+          this.data = [];
+          this.show = true;
+          this.loading = false;
+          this.isShowResult = true;
+          this.activeName = "singleResult";
+        }, 500);
+        return;
+      }
+      await this.getOutVersionList(true);
     },
     //获取调整订单
     async adjustOrder() {
@@ -2266,8 +2367,7 @@ export default {
           if (structureName) {
             queryExtra.structureName = structureName;
           }
-          const versionProp =
-            this.activeName === "second" ? "productionVersion" : "version";
+          const versionProp = this.versionSearchProp;
           const versionVal = this.search[versionProp] ?? this.query[versionProp];
           if (
             versionVal != null &&
@@ -2442,23 +2542,72 @@ export default {
         this.loading = false;
       }
     },
+    /** 单选结构调整 listOutHistory 入参：合并 query 与 formInline */
+    buildOutHistoryListParams() {
+      let params = {
+        ...this.query,
+        ...this.sort,
+      };
+      if (params.yearMonth) {
+        let arr = params.yearMonth.split("-");
+        params.year = arr[0];
+        params.month = arr[1];
+        params.yearMonth = "";
+      }
+      const form = this.formInline || {};
+      const sched =
+        params.scheduledMachines != null &&
+        String(params.scheduledMachines).trim() !== ""
+          ? String(params.scheduledMachines).trim()
+          : form.scheduledMachines != null &&
+              String(form.scheduledMachines).trim() !== ""
+            ? String(form.scheduledMachines).trim()
+            : form.cxMachineCode != null &&
+                String(form.cxMachineCode).trim() !== ""
+              ? String(form.cxMachineCode).trim()
+              : "";
+      if (sched) {
+        params.scheduledMachines = sched;
+      }
+      if (
+        (params.structureName == null ||
+          String(params.structureName).trim() === "") &&
+        form.structureName != null &&
+        String(form.structureName).trim() !== ""
+      ) {
+        params.structureName = String(form.structureName).trim();
+      }
+      const qPv =
+        params.productionVersion != null &&
+        String(params.productionVersion).trim() !== ""
+          ? String(params.productionVersion).trim()
+          : "";
+      const fPv =
+        form.productionVersion != null &&
+        String(form.productionVersion).trim() !== ""
+          ? String(form.productionVersion).trim()
+          : "";
+      if (!qPv && fPv) {
+        params.productionVersion = fPv;
+      }
+      const qpVer =
+        params.version != null && String(params.version).trim() !== ""
+          ? String(params.version).trim()
+          : "";
+      const fVer =
+        form.version != null && String(form.version).trim() !== ""
+          ? String(form.version).trim()
+          : "";
+      if (!qpVer && fVer) {
+        params.version = fVer;
+      }
+      params.adjustType = this.adjustType;
+      return params;
+    },
     //获取结构外调整历史列表
     async getOutHistoryList() {
       try {
-        let params = {
-          ...this.query,
-          ...this.sort,
-        };
-        if (params.yearMonth) {
-          let arr = params.yearMonth.split("-");
-          params.mpYear = arr[0];
-          params.mpMonth = arr[1];
-          params.yearMonth = "";
-        }
-        // params.scheduledMachines = this.actionDate.cxMachineCode;
-        // params.structureName = this.actionDate.structureName;
-
-        params.adjustType = this.adjustType;
+        let params = this.buildOutHistoryListParams();
         this.isEdit = false;
         let res = await listOutHistory(params);
         this.page = null;
@@ -2476,20 +2625,7 @@ export default {
     async resizeOutHistoryList() {
       this.loading = true;
       try {
-        let params = {
-          ...this.query,
-          ...this.sort,
-        };
-        if (params.yearMonth) {
-          let arr = params.yearMonth.split("-");
-          params.mpYear = arr[0];
-          params.mpMonth = arr[1];
-          params.yearMonth = "";
-        }
-        // params.scheduledMachines = this.actionDate.cxMachineCode;
-        // params.structureName = this.actionDate.structureName;
-
-        params.adjustType = this.adjustType;
+        let params = this.buildOutHistoryListParams();
         let res = await listOutHistory(params);
         this.page = null;
         this.data = res.rows;
@@ -2556,12 +2692,27 @@ export default {
         this.isEdit = true;
         let res = await getAdjustDetailList(params);
 
-        this.data = res.rows;
-        this.getOutResultList(
-          res.rows[0].productionVersion,
-          res.rows[0].version
-        );
-        this.isShowFoot = true;
+        const rows = res.rows || [];
+        if (rows.length > 0) {
+          const first = rows[0];
+          if (first.version != null && String(first.version).trim() !== "") {
+            const ver = String(first.version).trim();
+            this.$set(this.query, "version", ver);
+            this.$set(this.search, "version", ver);
+          }
+          if (
+            first.productionVersion != null &&
+            String(first.productionVersion).trim() !== ""
+          ) {
+            const pv = String(first.productionVersion).trim();
+            this.$set(this.query, "productionVersion", pv);
+            this.$set(this.search, "productionVersion", pv);
+          }
+          await this.getOutResultList(
+            first.productionVersion,
+            first.version
+          );
+        }
         this.showOutResult = true;
         if (!this.formInline.adjustStartDay) {
           this.formInline.adjustStartDay = this.formInline.beginDay;
@@ -2570,7 +2721,9 @@ export default {
           this.formInline.adjustEndDay = this.formInline.endDay;
         }
 
-        this.getOutVersionList();
+        /** 获取调整订单后：重新拉取版本号列表，再按最新版本查询 list */
+        await this.getOutVersionList(true, true);
+        this.isEdit = true;
       } catch (err) {
         console.log(err);
       } finally {
@@ -2651,12 +2804,18 @@ export default {
 
     handleSearch(data) {
       this.query = data;
+      this.search = { ...this.search, ...data };
       console.log('this.activeName', this.activeName)
       if (this.activeName == "second") {
         this.$set(this.page, "current", 1);
       }
       if (this.activeName == "singleResult") {
-        /** 与 index.backup-legacy 一致：单结构调整不重拉历史，避免 isEdit 被置 false 导致确认调整量/调整优先级不可编辑 */
+        /** 结构调整单结构流程：查询区调用 listOutHistory */
+        if (this.isStructureAdjustPage) {
+          this.loadText = this.$t("正在加载中，请稍候");
+          this.resizeOutHistoryList();
+          return;
+        }
         return;
       }
       this.loadText = this.$t("正在加载中，请稍候");
@@ -2897,6 +3056,9 @@ export default {
     },
     // api
     async getList() {
+      if (this.activeName == "singleResult" && this.isStructureAdjustPage) {
+        return this.resizeOutHistoryList();
+      }
       try {
         this.loading = true;
         console.log('this.activeName', this.activeName)
@@ -3066,6 +3228,35 @@ export default {
     },
 
     /**
+     * 月计划结构调整弹窗「选择」带入的调整日期（见 structureAdjustDialog.resolveAdjustDaysOnSelect）
+     */
+    applyMonthPlanSelectAdjustDays(formInline, adjustContext) {
+      if (!formInline || !adjustContext) {
+        return;
+      }
+      if (
+        adjustContext.adjustStartDay != null &&
+        adjustContext.adjustStartDay !== ""
+      ) {
+        this.$set(
+          formInline,
+          "adjustStartDay",
+          Number(adjustContext.adjustStartDay)
+        );
+      }
+      if (
+        adjustContext.adjustEndDay != null &&
+        adjustContext.adjustEndDay !== ""
+      ) {
+        this.$set(
+          formInline,
+          "adjustEndDay",
+          Number(adjustContext.adjustEndDay)
+        );
+      }
+    },
+
+    /**
      * 调用 getPreviousStructure（outGetStayDay）：与旧版一致，传 **listAdjusts 选中行全部字段**（id、monthPlanVersion、planType 等），
      * 仅合并 this.query 补缺并从 yearMonth 解析年月；去掉 UI 临时字段；beginDay/endDay/year/month 做数值化。
      */
@@ -3143,24 +3334,84 @@ export default {
     },
 
     /**
-     * 月计划调整查询弹窗中点击「选择」后携带参数进入：展示单结构调整表单并走与「单选结构调整」相同的数据加载逻辑
+     * 仅月计划结构调整弹窗「选择」跳转（路由 fromSelect=1）时执行：带入行数据 + 弹窗已算好的调整开始/结束日。
      */
-    applyMonthPlanFinalSelectPrefill() {
+    async applyMonthPlanFinalSelectPrefill() {
       const q = this.$route.query || {};
+      if (q.fromSelect !== "1") {
+        return;
+      }
       this.monthPlanFromFinalSelect = true;
 
       let storedRow = null;
+      let adjustContext = null;
       if (q.prefillStore === "1") {
         try {
           const raw = sessionStorage.getItem(
             MP_STRUCTURE_ADJUST_PREFILL_STORAGE_KEY
           );
           if (raw) {
-            storedRow = JSON.parse(raw);
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.row && typeof parsed.row === "object") {
+              storedRow = parsed.row;
+              adjustContext = parsed.adjustContext || null;
+            } else if (parsed && typeof parsed === "object") {
+              storedRow = parsed;
+            }
           }
         } catch (e) {
           console.warn("结构行缓存解析失败", e);
         }
+      }
+
+      /** 仅调整开始/结束日：进入页立即赋值（不等待 bootstrap） */
+      if (adjustContext) {
+        this._monthPlanAdjustDaySnapshot = {
+          adjustStartDay: adjustContext.adjustStartDay,
+          adjustEndDay: adjustContext.adjustEndDay,
+        };
+      } else {
+        const adjustStartDay =
+          q.adjustStartDay !== undefined && q.adjustStartDay !== ""
+            ? Number(q.adjustStartDay)
+            : null;
+        const adjustEndDay =
+          q.adjustEndDay !== undefined && q.adjustEndDay !== ""
+            ? Number(q.adjustEndDay)
+            : null;
+        this._monthPlanAdjustDaySnapshot = {
+          adjustStartDay:
+            adjustStartDay != null && !Number.isNaN(adjustStartDay)
+              ? adjustStartDay
+              : null,
+          adjustEndDay:
+            adjustEndDay != null && !Number.isNaN(adjustEndDay)
+              ? adjustEndDay
+              : null,
+        };
+      }
+      this.formInline = {
+        cxMachineCode: q.cxMachineCode || "",
+        scheduledMachines: q.scheduledMachines || "",
+        structureName: q.structureName || "",
+        beginDay:
+          q.beginDay !== undefined && q.beginDay !== ""
+            ? Number(q.beginDay)
+            : "",
+        endDay:
+          q.endDay !== undefined && q.endDay !== "" ? Number(q.endDay) : "",
+        factoryCode: q.factoryCode || this.search.factoryCode,
+      };
+      this.applyMonthPlanSelectAdjustDays(
+        this.formInline,
+        this._monthPlanAdjustDaySnapshot
+      );
+      this.isShowResult = true;
+      this.activeName = "singleResult";
+      this.show = false;
+      this.loading = true;
+
+      if (q.prefillStore === "1") {
         try {
           sessionStorage.removeItem(MP_STRUCTURE_ADJUST_PREFILL_STORAGE_KEY);
         } catch (e) {
@@ -3170,7 +3421,10 @@ export default {
 
       /** 与周程 handleAdd 一致：formInline = 完整 listAdjusts 行；路由仅覆盖首台机台等导航字段 */
       if (storedRow && typeof storedRow === "object") {
-        this.formInline = { ...storedRow };
+        const rowRest = { ...storedRow };
+        delete rowRest.adjustStartDay;
+        delete rowRest.adjustEndDay;
+        this.formInline = { ...this.formInline, ...rowRest };
         if (q.cxMachineCode) {
           this.formInline.cxMachineCode = q.cxMachineCode;
         }
@@ -3186,6 +3440,10 @@ export default {
         if (q.endDay !== undefined && q.endDay !== "") {
           this.formInline.endDay = Number(q.endDay);
         }
+        this.applyMonthPlanSelectAdjustDays(
+          this.formInline,
+          this._monthPlanAdjustDaySnapshot
+        );
         const qPv =
           q.productionVersion != null &&
           String(q.productionVersion).trim() !== ""
@@ -3217,6 +3475,11 @@ export default {
           yearMonth: q.yearMonth || this.search.yearMonth,
           scheduledMachines: sched,
           productionVersion: mergedPv,
+          structureName:
+            q.structureName ||
+            this.formInline.structureName ||
+            this.search.structureName ||
+            "",
         };
         const rowAdjVer =
           this.formInline.version != null &&
@@ -3233,20 +3496,12 @@ export default {
         this.isEdit = false;
         this.data = [];
         this.actionDate = { ...this.formInline };
-        this.getStartDay(this.formInline);
-        /** 与 handleAdd 一致：仅拉版本下拉，不 getOutHistoryList(true)，否则 isEdit=false 主表只读 */
-        if ((this.formInline.productionVersion || "").trim()) {
-          this.getOutVersionList();
-        } else {
-          this.page = null;
-          setTimeout(() => {
-            this.page = null;
-            this.data = [];
-            this.show = true;
-            this.loading = false;
-            this.isShowResult = true;
-            this.activeName = "singleResult";
-          }, 500);
+        await this.bootstrapStructureAdjustSingleFlow();
+        if (this._monthPlanAdjustDaySnapshot) {
+          this.applyMonthPlanSelectAdjustDays(
+            this.formInline,
+            this._monthPlanAdjustDaySnapshot
+          );
         }
         return;
       }
@@ -3261,7 +3516,8 @@ export default {
         factoryCode: q.factoryCode || this.search.factoryCode,
         yearMonth: q.yearMonth || this.search.yearMonth,
         scheduledMachines: q.scheduledMachines || q.cxMachineCode || "",
-        /** 与周程结构调整 Tab getVersionList 写入 query 一致，保证 getOutList 的 ...this.query 带定稿版本 */
+        structureName: q.structureName || "",
+        /** 月计划弹窗路由可能带 productionVersion；单结构流程仍用 formInline，列表查询版本由 getVersionList 写入 version */
         productionVersion: qPv,
       };
       this.query = { ...this.search };
@@ -3299,19 +3555,7 @@ export default {
       this.isEdit = false;
       this.data = [];
       this.getStartDay(row);
-      if (row.productionVersion) {
-        this.getOutVersionList();
-      } else {
-        this.page = null;
-        setTimeout(() => {
-          this.page = null;
-          this.data = [];
-          this.show = true;
-          this.loading = false;
-          this.isShowResult = true;
-          this.activeName = "singleResult";
-        }, 500);
-      }
+      await this.bootstrapStructureAdjustSingleFlow();
     },
 
   },
@@ -3363,6 +3607,12 @@ export default {
       this.applyMonthPlanFinalSelectPrefill();
     } else {
       this.getVersionList(true);
+    }
+  },
+  beforeDestroy() {
+    if (this._yearMonthRefreshTimer) {
+      clearTimeout(this._yearMonthRefreshTimer);
+      this._yearMonthRefreshTimer = null;
     }
   },
 };

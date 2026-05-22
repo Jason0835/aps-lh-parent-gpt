@@ -32,5 +32,5 @@ public interface IMpAdjustResultService  extends IDocService<MpAdjustResult>{
      * @param month 月份
      * @param version 调整版本
      */
-    void deleteAdjustResultByVersion(String factoryCode,String year,String month,String version);
+    void deleteAdjustResultByVersion(String factoryCode,String year,String month,String version,String structureName);
 }

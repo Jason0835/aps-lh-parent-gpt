@@ -188,4 +188,12 @@ public final class LhScheduleParamConstant {
     public static final String LOCAL_SEARCH_TIME_BUDGET_MS = "SYS0304013";
     /** 优先级跟踪日志开关（0-关闭，1-开启） */
     public static final String ENABLE_PRIORITY_TRACE_LOG = "SYS0304014";
+    /** 新增排产欠产追补判断天数 */
+    public static final String NEW_SPEC_SHORTAGE_LOOK_AHEAD_DAYS = "SYS0304015";
+    /** 硫化精排计划间隔年数 */
+    public static final String PRECISION_PLAN_INTERVAL_YEARS = "SYS0304016";
+    /** 芯片编码库存更新配置 */
+    public static final String CHIP_CODE_STOCK_UPDATE = "SYS0304017";
+    /** 模具清洗间隔天数 */
+    public static final String MOULD_CLEAN_DAYS = "SYS0308004";
 }

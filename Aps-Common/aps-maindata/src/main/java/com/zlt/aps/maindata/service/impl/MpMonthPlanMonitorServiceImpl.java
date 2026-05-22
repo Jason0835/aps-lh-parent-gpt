@@ -7,7 +7,6 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.maindata.mapper.MdmUnqualifiedStockEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthPlanMonitorEntityMapper;
 import com.zlt.aps.maindata.service.IMpMonthPlanMonitorService;
@@ -16,6 +15,7 @@ import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmUnqualifiedStock;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.RequiredArgsConstructor;
@@ -106,7 +106,7 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
         versionMap.put("year", param.getYear());
         versionMap.put("month", param.getMonth());
         versionMap.put("factory_code", param.getFactoryCode());
-        versionMap.put("month_plan_version", param.getMonthPlanVersion());
+//        versionMap.put("month_plan_version", param.getMonthPlanVersion());
         versionMap.put("production_version", param.getProductionVersion());
         List<MpFactoryProductionVersion> productionVersionList = baseDao.selectByMap(MpFactoryProductionVersion.class, versionMap);
         if (CollectionUtils.isEmpty(productionVersionList)) {
@@ -134,14 +134,14 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
                                     item.getMaterialCode()),
                             MdmUnqualifiedStock::getStockQty, Integer::sum));
         }
-        
+
         // 查询当前版本是否已经有生成监控记录
         LambdaQueryWrapper<MpMonthPlanMonitor> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(MpMonthPlanMonitor::getProductionVersion, param.getProductionVersion());
         Map<String, MpMonthPlanMonitor> oldMoniterMap = mpMonthPlanMonitorEntityMapper.selectList(queryWrapper).stream()
                 .collect(Collectors.toMap(MpMonthPlanMonitor::getProductionVersion, Function.identity(),
                         (m1, m2) -> m1));
-        
+
         for (FactoryMonthPlanProductionFinalResult finalResult : finalList) {
             MpMonthPlanMonitor monitor = oldMoniterMap.computeIfAbsent(finalResult.getMaterialCode(), k -> new MpMonthPlanMonitor());
             monitor.setFactoryCode(finalResult.getFactoryCode());

@@ -169,7 +169,7 @@
         ref="syncForm"
         :model="syncDialog.form"
         :rules="syncDialogRules"
-        label-width="120px"
+        label-width="140px"
       >
         <el-form-item
           :label="$t('ui.data.column.report.proSizeSummary.yearMonth')"
@@ -406,11 +406,6 @@ export default {
           },
         },
         {
-          prop: "cxMachineCode",
-          label: this.$t("ui.data.column.monthPlanFinalAdjustQuery.cxMachine"),
-          filterable: true,
-        },
-        {
           prop: "structureName",
           label: this.$t("ui.data.column.finishStock.structureName"),
           type: "select",
@@ -636,6 +631,16 @@ export default {
           ),
           width: 120,
           render: ({ row }) => {
+            if (this.isStatisticsRow(row)) {
+              return (
+                <span>
+                  {this.selectDictLabel(
+                    this.dict.type.biz_yes_no,
+                    row.isLockSchedule
+                  )}
+                </span>
+              );
+            }
             return (
               <el-select
                 v-model={row.isLockSchedule}
@@ -1769,15 +1774,10 @@ export default {
     },
     /** 打开下发弹窗，预填当前查询的年月、分厂，并加载可推送版本列表 */
     handleIssueScmMes() {
-      const now = new Date();
-      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      const year = nextMonth.getFullYear();
-      const month = nextMonth.getMonth() + 1; // 月份从0开始，需要+1
       this.syncDialog.visible = true;
-      this.syncDialog.form.yearMonth =`${year}-${month < 10 ? "0" + month : month}`;
-      // this.syncDialog.form.yearMonth = this.formatYearMonthForPicker(
-      //   this.query.yearMonth || this.search.yearMonth
-      // );
+      this.syncDialog.form.yearMonth = this.formatYearMonthForPicker(
+        this.query.yearMonth || this.search.yearMonth
+      );
       this.syncDialog.form.factoryCode =
         this.query.factoryCode || this.search.factoryCode || "";
       this.syncDialog.form.productionVersion =

@@ -813,7 +813,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String lastMonthPlanVersion = contextDTO.getAdjustMonthPlanVersion();
         //1、根据调整版本 先删除(物理)
         mpAdjustResultEntityMapper.deleteAdjustResultByVersion(contextDTO.getFactoryCode(),
-                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getVersion());
+                String.valueOf(contextDTO.getMpYear()),String.valueOf(contextDTO.getMpMonth()),contextDTO.getVersion(),contextDTO.getStructureName());
         //2、保存调整记录
         MpAdjustResult mpAdjustResult;
         List<MpAdjustResult> mpAdjustResultList = new ArrayList<>();
@@ -2763,6 +2763,42 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     public abstract void doAutoAdjust(MpRollAdjustContextDTO contextDTO);
 
     /**
+     * 筛选：|净需求 - 计划剩余排产量| > 0的数据
+     * @param adjustList
+     */
+    protected void filterAdjustList(List<MpAdjustDetailVo> adjustList) {
+        if (PubUtil.isEmpty(adjustList)) {
+            return;
+        }
+        adjustList.removeIf(adjust -> {
+            Integer currentNetQty = Convert.toInt(adjust.getCurrentNetQty(),0);
+            Integer monthUnScheduledQty = Convert.toInt(adjust.getMonthUnScheduledQty(),0);
+            Integer adjustQty = Math.abs(currentNetQty - monthUnScheduledQty);
+            boolean isOnlyConventionReserveHasValue = isOnlyConventionReserveHasValue(adjust);
+            //return (Math.abs(currentNetQty - monthUnScheduledQty) == 0) || isOnlyConventionReserveHasValue;
+            return (adjustQty == 0 && currentNetQty == 0 && monthUnScheduledQty == 0) || isOnlyConventionReserveHasValue;
+        });
+    }
+
+    /**
+     * 检查是否已执行自动调整
+     * @param contextDTO
+     */
+    protected void checkHasDoAutoAdjust(MpRollAdjustContextDTO contextDTO) {
+        LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MpAdjustResult::getFactoryCode, contextDTO.getFactoryCode());
+        queryWrapper.eq(MpAdjustResult::getVersion, contextDTO.getVersion());
+        if (!StringUtil.isEmptyWithTrim(contextDTO.getStructureName())){
+            queryWrapper.eq(MpAdjustResult::getStructureName, contextDTO.getStructureName());
+        }
+        List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
+        if (PubUtil.isNotEmpty(mpAdjustResultList)){
+            throw new BusinessException(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.findAutoAdjustRecord"),
+                    contextDTO.getVersion()));
+        }
+    }
+
+    /**
      * 检查偶数
      * @param number
      * @return
@@ -3904,9 +3940,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 queryVo.getStructureName());
         List<DpDemandPlan> dpDemandPlanList = dpDemandPlanService.createAdjustRequire(queryVo);
         // 净需求全量生成，显示按结构
-        if (!StringUtil.isEmptyWithTrim(contextDTO.getStructureName())){
+        /*if (!StringUtil.isEmptyWithTrim(contextDTO.getStructureName())){
             dpDemandPlanList = dpDemandPlanList.stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
-        }
+        }*/
         contextDTO.setDpDemandPlanList(dpDemandPlanList);
     }
 

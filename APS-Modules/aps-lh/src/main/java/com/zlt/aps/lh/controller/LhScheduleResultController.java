@@ -18,6 +18,7 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
@@ -25,6 +26,7 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
+import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
@@ -676,7 +678,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         List<LhScheduleResult> filteredList = list.stream()
                 .filter(item -> ApsConstant.NO_RELEASE.equals(item.getIsRelease())
                         || ApsConstant.FAILURE_RELEASE.equals(item.getIsRelease())
-                        || ApsConstant.WAIT_RELEASING.equals(item.getIsRelease()))
+                        || ReleaseStatusEnum.TIMEOUT_FAILED.getCode().equals(item.getIsRelease())
+                        || ReleaseStatusEnum.PENDING_RELEASE.getCode().equals(item.getIsRelease()))
                 .collect(Collectors.toList());
 
         if (CollectionUtils.isEmpty(filteredList)) {
@@ -850,7 +853,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         // 下发前补全MES物料编码和示方号（数据准备应在aps-lh模块完成，而非itf层）
         enrichMaterialAndExampleInfo(allIssueList);
 
-        return mesItfService.issueLhScheduleResult(allIssueList);
+        return FeignTokenHelper.callWithToken(() -> mesItfService.issueLhScheduleResult(allIssueList));
     }
 
 
@@ -1044,7 +1047,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setLhTime(source.getLhTime());
 
         target.setDataVersion(null);
-        target.setCompanyCode(FactoryConstant.DEFAULT_COMPANY_CODE);
+        target.setCompanyCode(source.getFactoryCode());
         target.setFactoryCode(source.getFactoryCode());
 
         return target;
@@ -1111,7 +1114,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setLhTime(source.getLhTime());
 
         target.setDataVersion(null);
-        target.setCompanyCode(FactoryConstant.DEFAULT_COMPANY_CODE);
+        target.setCompanyCode(source.getFactoryCode());
         target.setFactoryCode(source.getFactoryCode());
 
         return target;

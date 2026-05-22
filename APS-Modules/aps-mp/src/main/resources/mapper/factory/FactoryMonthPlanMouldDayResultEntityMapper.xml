@@ -87,6 +87,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             r.ADJUST_QTY2,
             r.ADJUST_QTY3,
             r.ADJUST_QTY4,
+            r.ORIGINAL_TOTAL_QTY,
+            ifnull(r.total_qty, 0) - ifnull(pm.PRODUCTION_QTY,0) PRODUCT_SURPLUS,
             </if>
 		    F.PRODUCTION_VERSION LAST_PRODUCTION_VERSION,
 		    '1' DATA_TYPE,
@@ -118,11 +120,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             LEFT JOIN T_MP_MOULDING_DAY_RESULT r ON m.MATERIAL_CODE = r.MATERIAL_CODE
             </otherwise>
         </choose>
-		    AND m.FACTORY_CODE = r.FACTORY_CODE 
-		    AND r.production_version = #{dayResult.productionVersion}
-		    AND r.IS_DELETE = 0 
-		    LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL f ON f.IS_DELETE = 0
-		    AND f.MATERIAL_CODE = m.MATERIAL_CODE
+            AND m.FACTORY_CODE = r.FACTORY_CODE 
+            AND r.production_version = #{dayResult.productionVersion}
+            AND r.IS_DELETE = 0 
+            <if test="isFinal">
+            LEFT JOIN T_MP_MONTH_PLAN_MONITOR pm ON m.MATERIAL_CODE = pm.MATERIAL_CODE
+            AND m.FACTORY_CODE = pm.FACTORY_CODE 
+            AND r.PRODUCTION_VERSION = pm.PRODUCTION_VERSION
+            AND pm.IS_DELETE = 0 
+            </if>
+            LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL f ON f.IS_DELETE = 0
+            AND f.MATERIAL_CODE = m.MATERIAL_CODE
             AND f.`YEAR_MONTH` = DATE_FORMAT(DATE_SUB(concat(#{dayResult.year},'-',#{dayResult.month},'-1'),INTERVAL 1 month), '%Y%m')
             LEFT JOIN T_DP_CYCLE_STRUCT_CONFIG C ON C.STRUCTURE_NAME = M.STRUCTURE_NAME
             AND C.IS_DELETE = 0
@@ -223,6 +231,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             r.ADJUST_QTY2,
             r.ADJUST_QTY3,
             r.ADJUST_QTY4,
+            r.ORIGINAL_TOTAL_QTY,
             </if>
 		    F.PRODUCTION_VERSION
 		ORDER BY

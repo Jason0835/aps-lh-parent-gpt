@@ -32,8 +32,8 @@
 import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
-import structureSelect from "../components/structureSelect.vue";
-import materialCodeSelect from "../components/materialCodeSelect.vue";
+import structureSelect from "@/views/components/structureSelect.vue";
+import materialCodeSelect from "./materialCodeSelect.vue";
 
 import { editMoldingParams, checkUniqueCxKeyProduct } from "@/api/cx/keyProduct";
 
@@ -64,7 +64,7 @@ export default {
         ],
       },
       columns: [
-      {
+        {
           prop: "structureName",
           align: "center",
           label: this.$t("结构"),
@@ -73,10 +73,13 @@ export default {
               <structureSelect
                 key={form.structureName}
                 v-model={form.structureName}
+                factoryCode={form.factoryCode || "116"}
+                machineType="CX"
+                clearable
+                onChange={this.handleStructureChange}
               />
             );
           }
-          // sortable: "custom",
         },
         {
           prop: "embryoCode",
@@ -119,6 +122,13 @@ export default {
     },
   },
   methods: {
+    handleStructureChange(val, row) {
+      if (val && row) {
+        this.$set(this.form, "structureName", row.structureName);
+      } else {
+        this.$set(this.form, "structureName", "");
+      }
+    },
     handleEmbryoCodeChange(val,row){
       if (val) {
         this.$set(this.form,'embryoDesc',row.embryoDesc);
@@ -156,6 +166,7 @@ export default {
         };
       }else{
         this.isEdit = false;
+        this.form = {};
       }
     },
     hide() {

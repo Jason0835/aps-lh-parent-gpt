@@ -736,6 +736,15 @@ public class MdmMaterialInfoServiceImpl extends AbstractDocService<MdmMaterialIn
 
     @Override
     public List<MdmMaterialInfo> findMaterialInfoByStructureNames(String factoryCode, Set<String> structureNames) {
+        // 20260521+ 允许不根据结构过滤物料
+        if (CollectionUtils.isEmpty(structureNames)) {
+            LambdaQueryWrapper<MdmMaterialInfo> wrapper =
+                Wrappers.lambdaQuery(MdmMaterialInfo.class)
+                    .eq(MdmMaterialInfo::getFactoryCode, factoryCode)
+                    .eq(MdmMaterialInfo::getQualityStateCode, QualityStateEnum.IN_PRODUCTION.getCode())
+                    .eq(MdmMaterialInfo::getIsDelete, ApsConstant.APS_YES_NO_0);
+            return mdmMaterialInfoEntityMapper.selectList(wrapper);
+        }
         List<MdmMaterialInfo> result = Lists.newArrayList();
         final int batchSize = 1000;
         List<String> structureNameList = new ArrayList<>(structureNames);

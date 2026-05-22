@@ -71,6 +71,11 @@ export default {
           clearable: true
         },
         {
+          prop: 'embryoSpec',
+          label: this.$t('ui.data.column.cxMachineOnlineInfo.embryoSpec'),
+          clearable: true
+        },
+        {
           prop: 'onlineDate',
           label: this.$t('ui.data.column.cxMachineOnlineInfo.onlineDate'),
           type: 'date',

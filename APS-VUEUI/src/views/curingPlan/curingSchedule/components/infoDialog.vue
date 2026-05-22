@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-dialog
     :title="title"
     :visible="visible"
@@ -205,15 +205,15 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-          prop: "constructionStage",
+          prop: "trialStatus",
           disabled: true,
           span: 12,
           render: (form) => {
             return (
               <dict-select
-                v-model={form.constructionStage}
+                v-model={form.trialStatus}
                 disabled
-                options={this.parentDict.type.biz_construction_stage}
+                options={this.parentDict.type.lh_trial_status}
               />
             );
           },
@@ -264,15 +264,15 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-          prop: "constructionStage",
+          prop: "trialStatus",
           disabled: true,
           span: 12,
           render: (form) => {
             return (
               <dict-select
-                v-model={form.constructionStage}
+                v-model={form.trialStatus}
                 disabled
-                options={this.parentDict.type.biz_construction_stage}
+                options={this.parentDict.type.lh_trial_status}
               />
             );
           },
@@ -323,15 +323,15 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-          prop: "constructionStage",
+          prop: "trialStatus",
           disabled: true,
           span: 12,
           render: (form) => {
             return (
               <dict-select
-                v-model={form.constructionStage}
+                v-model={form.trialStatus}
                 disabled
-                options={this.parentDict.type.biz_construction_stage}
+                options={this.parentDict.type.lh_trial_status}
               />
             );
           },
@@ -382,15 +382,15 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-          prop: "constructionStage",
+          prop: "trialStatus",
           disabled: true,
           span: 12,
           render: (form) => {
             return (
               <dict-select
-                v-model={form.constructionStage}
+                v-model={form.trialStatus}
                 disabled
-                options={this.parentDict.type.biz_construction_stage}
+                options={this.parentDict.type.lh_trial_status}
               />
             );
           },
@@ -441,15 +441,15 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-          prop: "constructionStage",
+          prop: "trialStatus",
           disabled: true,
           span: 12,
           render: (form) => {
             return (
               <dict-select
-                v-model={form.constructionStage}
+                v-model={form.trialStatus}
                 disabled
-                options={this.parentDict.type.biz_construction_stage}
+                options={this.parentDict.type.lh_trial_status}
               />
             );
           },
@@ -500,15 +500,15 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-          prop: "constructionStage",
+          prop: "trialStatus",
           disabled: true,
           span: 12,
           render: (form) => {
             return (
               <dict-select
-                v-model={form.constructionStage}
+                v-model={form.trialStatus}
                 disabled
-                options={this.parentDict.type.biz_construction_stage}
+                options={this.parentDict.type.lh_trial_status}
               />
             );
           },
@@ -559,15 +559,15 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-          prop: "constructionStage",
+          prop: "trialStatus",
           disabled: true,
           span: 12,
           render: (form) => {
             return (
               <dict-select
-                v-model={form.constructionStage}
+                v-model={form.trialStatus}
                 disabled
-                options={this.parentDict.type.biz_construction_stage}
+                options={this.parentDict.type.lh_trial_status}
               />
             );
           },
@@ -618,15 +618,15 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-          prop: "constructionStage",
+          prop: "trialStatus",
           disabled: true,
           span: 12,
           render: (form) => {
             return (
               <dict-select
-                v-model={form.constructionStage}
+                v-model={form.trialStatus}
                 disabled
-                options={this.parentDict.type.biz_construction_stage}
+                options={this.parentDict.type.lh_trial_status}
               />
             );
           },

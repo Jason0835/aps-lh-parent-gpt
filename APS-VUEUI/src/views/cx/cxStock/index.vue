@@ -18,18 +18,18 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button type="primary" plain v-hasPermi="['cx:cxStock:edit']" @click="handleAdd">
-          {{ $t('ui.frame.btn.add') }}
-        </el-button>
-        <el-button v-hasPermi="['cx:cxStock:edit']" :disabled="selection.length !== 1" @click="handleEdit(selection[0])">
-          {{ $t('ui.frame.btn.update') }}
-        </el-button>
-        <el-button type="danger" v-hasPermi="['cx:cxStock:remove']" :disabled="selection.length === 0" @click="handleDelete">
-          {{ $t('ui.frame.btn.delete') }}
-        </el-button>
-        <el-button v-hasPermi="['cx:cxStock:import']" @click="$refs.uploadRef.handleImport()">
-          {{ $t('ui.frame.btn.import') }}
-        </el-button>
+<!--        <el-button type="primary" plain v-hasPermi="['cx:cxStock:edit']" @click="handleAdd">-->
+<!--          {{ $t('ui.frame.btn.add') }}-->
+<!--        </el-button>-->
+<!--        <el-button v-hasPermi="['cx:cxStock:edit']" :disabled="selection.length !== 1" @click="handleEdit(selection[0])">-->
+<!--          {{ $t('ui.frame.btn.update') }}-->
+<!--        </el-button>-->
+<!--        <el-button type="danger" v-hasPermi="['cx:cxStock:remove']" :disabled="selection.length === 0" @click="handleDelete">-->
+<!--          {{ $t('ui.frame.btn.delete') }}-->
+<!--        </el-button>-->
+<!--        <el-button v-hasPermi="['cx:cxStock:import']" @click="$refs.uploadRef.handleImport()">-->
+<!--          {{ $t('ui.frame.btn.import') }}-->
+<!--        </el-button>-->
         <el-button v-hasPermi="['cx:cxStock:export']" @click="handleExport">
           {{ $t('ui.frame.btn.export') }}
         </el-button>
@@ -199,35 +199,35 @@ export default {
           label: this.$t('ui.common.column.remark'),
           minWidth: 160
         },
-        {
-          prop: 'option',
-          align: 'center',
-          halign: 'center',
-          label: this.$t('ui.data.btn.option'),
-          minWidth: 150,
-          render: ({ row }) => {
-            return (
-              <div>
-                <el-button
-                  v-hasPermi={['cx:cxStock:edit']}
-                  class="minus"
-                  type="success"
-                  onClick={() => this.handleEdit(row)}
-                >
-                  {this.$t('ui.frame.btn.update')}
-                </el-button>
-                <el-button
-                  v-hasPermi={['cx:cxStock:remove']}
-                  class="minus"
-                  type="danger"
-                  onClick={() => this.handleDelete(row)}
-                >
-                  {this.$t('ui.frame.btn.delete')}
-                </el-button>
-              </div>
-            )
-          }
-        }
+        // {
+        //   prop: 'option',
+        //   align: 'center',
+        //   halign: 'center',
+        //   label: this.$t('ui.data.btn.option'),
+        //   minWidth: 150,
+        //   render: ({ row }) => {
+        //     return (
+        //       <div>
+        //         <el-button
+        //           v-hasPermi={['cx:cxStock:edit']}
+        //           class="minus"
+        //           type="success"
+        //           onClick={() => this.handleEdit(row)}
+        //         >
+        //           {this.$t('ui.frame.btn.update')}
+        //         </el-button>
+        //         <el-button
+        //           v-hasPermi={['cx:cxStock:remove']}
+        //           class="minus"
+        //           type="danger"
+        //           onClick={() => this.handleDelete(row)}
+        //         >
+        //           {this.$t('ui.frame.btn.delete')}
+        //         </el-button>
+        //       </div>
+        //     )
+        //   }
+        // }
       ]
     }
   },

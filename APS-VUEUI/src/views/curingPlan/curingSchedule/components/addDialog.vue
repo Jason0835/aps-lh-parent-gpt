@@ -1,4 +1,4 @@
-<template>
+﻿﻿<template>
   <el-dialog
     :title="title"
     :visible="visible"
@@ -178,9 +178,9 @@ export default {
         },
         {
           label: this.$t("ui.data.column.scheduleResult.constructionStage"),
-          prop: "constructionStage",
+          prop: "trialStatus",
           type: "select",
-          dictData: this.parentDict.type.biz_construction_stage,
+          dictData: this.parentDict.type.lh_trial_status,
           disabled: true,
           span: 12,
         },
@@ -263,7 +263,7 @@ export default {
         this.$set(this.form, "mouldSurplusQty", null);
         this.$set(this.form, "embryoStock", null);
         this.$set(this.form, "machineShiftCapacity", null);
-        this.$set(this.form, "constructionStage", null);
+        this.$set(this.form, "trialStatus", null);
         this.$set(this.form, "leftRightMould", null);
       }
     },
@@ -276,24 +276,30 @@ export default {
           factoryCode: this.form.factoryCode,
           materialCode: materialCode,
           scheduleDate: this.form.scheduleDate,
+          lhMachineCode: this.form.lhMachineCode,
         };
         const res = await getSkuRelatedData(params);
-        if (res && res.data) {
-          const data = res.data;
-          if (data.mouldSurplusQty != null) {
-            this.$set(this.form, "mouldSurplusQty", data.mouldSurplusQty);
+        if (res) {
+          if (res.mouldSurplusQty != null) {
+            this.$set(this.form, "mouldSurplusQty", res.mouldSurplusQty);
           }
-          if (data.embryoStock != null) {
-            this.$set(this.form, "embryoStock", data.embryoStock);
+          if (res.embryoStock != null) {
+            this.$set(this.form, "embryoStock", res.embryoStock);
           }
-          if (data.machineShiftCapacity != null) {
-            this.$set(this.form, "machineShiftCapacity", data.machineShiftCapacity);
+          if (res.machineShiftCapacity != null) {
+            this.$set(this.form, "machineShiftCapacity", res.machineShiftCapacity);
           }
-          if (data.constructionStage != null) {
-            this.$set(this.form, "constructionStage", data.constructionStage);
+          if (res.trialStatus != null) {
+            this.$set(this.form, "trialStatus", res.trialStatus);
           }
-          if (data.leftRightMould != null) {
-            this.$set(this.form, "leftRightMould", data.leftRightMould);
+          if (res.leftRightMould != null) {
+            this.$set(this.form, "leftRightMould", res.leftRightMould);
+          }
+          if (res.errorMessages && res.errorMessages.length > 0) {
+            this.$modal.msgError(res.errorMessages.join('\n'));
+          }
+          if (res.warningMessages && res.warningMessages.length > 0) {
+            this.$modal.msgWarning(res.warningMessages.join('\n'));
           }
         }
       } catch (error) {
@@ -393,7 +399,7 @@ export default {
           "mouldSurplusQty",
           "embryoStock",
           "machineShiftCapacity",
-          "constructionStage",
+          "trialStatus",
           "leftRightMould",
         ];
         for (let i = 1; i <= 8; i++) {

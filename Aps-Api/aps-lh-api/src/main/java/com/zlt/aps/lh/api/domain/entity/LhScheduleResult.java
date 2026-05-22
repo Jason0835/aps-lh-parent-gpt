@@ -174,6 +174,54 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     private Date specEndTime;
 
     /**
+     * 保养开始时间
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.maintenanceStartTime")
+    @ApiModelProperty(value = "保养开始时间", name = "maintenanceStartTime")
+    @TableField(value = "MAINTENANCE_START_TIME")
+    private Date maintenanceStartTime;
+
+    /**
+     * 保养结束时间
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.maintenanceEndTime")
+    @ApiModelProperty(value = "保养结束时间", name = "maintenanceEndTime")
+    @TableField(value = "MAINTENANCE_END_TIME")
+    private Date maintenanceEndTime;
+
+    /**
+     * 设备停机开始时间
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.shutdownStartTime")
+    @ApiModelProperty(value = "设备停机开始时间", name = "shutdownStartTime")
+    @TableField(value = "SHUTDOWN_START_TIME")
+    private Date shutdownStartTime;
+
+    /**
+     * 设备停机结束时间
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.shutdownEndTime")
+    @ApiModelProperty(value = "设备停机结束时间", name = "shutdownEndTime")
+    @TableField(value = "SHUTDOWN_END_TIME")
+    private Date shutdownEndTime;
+
+    /**
+     * 清洗开始时间
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.cleaningStartTime")
+    @ApiModelProperty(value = "清洗开始时间", name = "cleaningStartTime")
+    @TableField(value = "CLEANING_START_TIME")
+    private Date cleaningStartTime;
+
+    /**
+     * 清洗结束时间
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.cleaningEndTime")
+    @ApiModelProperty(value = "清洗结束时间", name = "cleaningEndTime")
+    @TableField(value = "CLEANING_END_TIME")
+    private Date cleaningEndTime;
+
+    /**
      * 生产状态:0-未生产；1-生产中；2-生产完成
      */
     @Excel(name = "ui.data.column.lhScheduleResult.productionStatus")
@@ -526,10 +574,10 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     private String isDelivery;
 
     /**
-     * 是否发布，0-未发布，1-已发布 2-发布失败 3-超时发布 4-待发布
+     * 是否发布，0-未发布，1-已发布，2-发布失败，3-超时失败，4-待发布
      */
     @Excel(name = "ui.data.column.lhScheduleResult.isRelease")
-    @ApiModelProperty(value = "是否发布，0-未发布，1-已发布 2-发布失败 3-超时发布 4-待发布", name = "isRelease")
+    @ApiModelProperty(value = "是否发布，0-未发布，1-已发布，2-发布失败，3-超时失败，4-待发布", name = "isRelease")
     @TableField(value = "IS_RELEASE")
     private String isRelease;
 
@@ -602,9 +650,9 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
      * 产品状态
      */
 //    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", dictType = "biz_construction_stage")
-    @ApiModelProperty(value = "施工阶段 00 无工艺 01 试制 02 量试 03 正式", name = "changedConstructionStage")
-    @TableField(value = "CHANGED_CONSTRUCTION_STAGE")
-    private String changedConstructionStage;
+    @ApiModelProperty(value = "产品状态 X 试验示方 T 量试示方 S 正规示方", name = "changedTrialStatus")
+    @TableField(value = "CHANGED_TRIAL_STATUS")
+    private String changedTrialStatus;
 
     /**
      * 制造示方书号
@@ -771,10 +819,10 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
 
 
     /**
-     * 产品状态
+     * 示方类型（字典 lh_trial_status：S-正规示方，T-量试示方，X-试验示方）
      */
-    @Excel(name = "ui.data.column.lhScheduleResult.trialStatus", dictType = "trial_status")
-    @ApiModelProperty(value = "产品状态", name = "trialStatus")
+    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", dictType = "lh_trial_status")
+    @ApiModelProperty(value = "示方类型", name = "trialStatus")
     @TableField(value = "TRIAL_STATUS")
     private String trialStatus;
 

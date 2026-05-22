@@ -573,9 +573,8 @@ public class MesItfController {
     @PostMapping("/issueLhScheduleResult")
     @AutoLoginLog
     public AjaxResult issueLhScheduleResult(@RequestBody List<LhScheduleResultIssue> lhScheduleResultIssueList) {
-        // 从上下文中获取厂别和分公司编码
         String factoryCode = FactoryConstant.DEFAULT_FACTORY_CODE;
-        String companyCode = FactoryConstant.DEFAULT_COMPANY_CODE;
+        String companyCode = factoryCode;
         return lhScheduleResultIssueService.issueLhScheduleResult(lhScheduleResultIssueList, factoryCode, companyCode);
     }
 

@@ -588,16 +588,8 @@ import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import {
-  validateChangeQty,
-  cxScheduleResultEdit,
-  getInfoChangePlan,
-} from "@/api/cx/cxScheduleResult";
-import {
-  changeQty,
-  getScheduleDate,
-  validateAdjustQuantity,
-} from "@/api/lh/scheduleResult";
+import {getInfoChangePlan, validateChangeQty,} from "@/api/cx/cxScheduleResult";
+import {changeQty, getScheduleDate, validateAdjustQuantity,} from "@/api/lh/scheduleResult";
 
 
 export default {
@@ -1096,24 +1088,89 @@ export default {
   },
   methods: {
     async getDate(date) {
+      if (!date) {
+        this.dateList = this.buildEmptyDateList();
+        return this.dateList;
+      }
       try {
-        let res=await getScheduleDate({
+        const res = await getScheduleDate({
           scheduleDate: date,
         });
-        console.log(res);
-        this.dateList=res
-      } catch (error) {}
+        this.dateList = Array.isArray(res) && res.length ? res : this.buildEmptyDateList();
+      } catch (error) {
+        this.dateList = this.buildEmptyDateList();
+      }
+      return this.dateList;
     },
+    /**
+     * 构建空班次日期列表，接口异常或无返回时用于保持弹窗结构稳定。
+     * @returns {Array<Object>} 空班次日期列表
+     */
+    buildEmptyDateList() {
+      return Array.from({ length: 8 }, (_, index) => ({
+        shift: index + 1,
+        shiftDate: "",
+      }));
+    },
+    /**
+     * 根据排程日期补齐班次日期的年份，避免 MM/DD 跨年时解析到错误年份。
+     * @param {string} shiftDate 班次显示日期，格式 MM/DD
+     * @param {string|Date} scheduleDate 排程日期
+     * @returns {Object|null} 补齐年份后的 moment 对象，无法解析时返回 null
+     */
+    parseShiftDateWithScheduleYear(shiftDate, scheduleDate) {
+      if (!shiftDate || !scheduleDate) {
+        return null;
+      }
+      const baseDate = moment(scheduleDate);
+      const shiftMoment = moment(`${baseDate.year()}/${shiftDate}`, "YYYY/MM/DD", true);
+      if (!baseDate.isValid() || !shiftMoment.isValid()) {
+        return null;
+      }
+      if (shiftMoment.diff(baseDate, "months", true) > 6) {
+        return shiftMoment.subtract(1, "year");
+      }
+      if (baseDate.diff(shiftMoment, "months", true) > 6) {
+        return shiftMoment.add(1, "year");
+      }
+      return shiftMoment;
+    },
+    /**
+     * 当后端未返回班次结束时间时，按弹窗展示班次推导结束时间。
+     * @param {number} classIndex 班次序号
+     * @param {string|Date} scheduleDate 排程日期
+     * @returns {Object|null} 推导出的班次结束 moment 对象，无法推导时返回 null
+     */
+    resolveFallbackClassEndTime(classIndex, scheduleDate) {
+      const shiftDate = this.dateList[classIndex - 1] && this.dateList[classIndex - 1].shiftDate;
+      const shiftMoment = this.parseShiftDateWithScheduleYear(shiftDate, scheduleDate);
+      if (!shiftMoment) {
+        return null;
+      }
+      const shiftTypeIndex = (classIndex - 1) % 3;
+      if (shiftTypeIndex === 0) {
+        return shiftMoment.clone().hour(6).minute(0).second(0).add(8, "hours");
+      }
+      if (shiftTypeIndex === 1) {
+        return shiftMoment.clone().hour(14).minute(0).second(0).add(8, "hours");
+      }
+      return shiftMoment.clone().hour(22).minute(0).second(0).add(8, "hours");
+    },
+    /**
+     * 更新调量计划量是否禁用，优先使用后端班次结束时间，缺失时按班次日期兜底推导。
+     * @param {Object} data 当前调量行数据
+     * @returns {void}
+     */
     updatePlanTimeDisabledByClassTime(data) {
       const now = moment();
       for (let i = 1; i <= 8; i++) {
-        const endTime = data[`class${i}EndTime`];
+        const endTime = data[`class${i}EndTime`] || this.resolveFallbackClassEndTime(i, data.scheduleDate);
         if (!endTime) {
           this[`three${i}PlanTimeDisabled`] = true;
           continue;
         }
-        const formattedEndTime = moment(endTime).format("YYYY-MM-DD HH:mm:ss");
-        this[`three${i}PlanTimeDisabled`] = now.isAfter(formattedEndTime);
+        const classEndTime = moment(endTime);
+        this[`three${i}PlanTimeDisabled`] = !classEndTime.isValid() || now.isAfter(classEndTime);
       }
     },
     // api
@@ -1207,7 +1264,7 @@ export default {
     },
 
     //utils
-    show(data) {
+    async show(data) {
       this.visible = true;
       if (data) {
         this.isEdit = true;
@@ -1223,7 +1280,7 @@ export default {
           class7Analysis: this.decodeRemark(data.class7Analysis),
           class8Analysis: this.decodeRemark(data.class8Analysis),
         };
-        this.getDate(data.scheduleDate);
+        await this.getDate(data.scheduleDate);
         this.updatePlanTimeDisabledByClassTime(data);
         // this.getInfo(data.id);
 

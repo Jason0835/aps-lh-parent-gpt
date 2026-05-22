@@ -50,10 +50,10 @@ public class CxPrecisionPlanImportVo extends BaseEntity implements Serializable 
     private String precisionCycle;
 
     /** 计划日期 */
-    @Excel(name = "ui.data.column.cxPrecisionPlan.planDate", dateFormat = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "ui.data.column.cxPrecisionPlan.planDate", dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "计划日期")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     @TableField("PLAN_DATE")
     private Date planDate;
 

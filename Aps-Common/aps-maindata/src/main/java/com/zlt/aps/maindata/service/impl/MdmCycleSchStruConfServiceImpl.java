@@ -125,8 +125,13 @@ public class MdmCycleSchStruConfServiceImpl extends AbstractDocService<MdmCycleS
 
     @Override
     public List<MdmCycleSchStruConf> findAdjustCycleSchStruConf(DpDemandPlan createCondition, Set<String> structureNames) {
+        // 20260521+ 允许不根据结构列表过滤
         if(CollectionUtils.isEmpty(structureNames)) {
-            return Collections.emptyList();
+            LambdaQueryWrapper<MdmCycleSchStruConf> wrapper =
+                Wrappers.lambdaQuery(MdmCycleSchStruConf.class)
+                    .eq(MdmCycleSchStruConf::getFactoryCode, createCondition.getFactoryCode())
+                    .eq(MdmCycleSchStruConf::getIsDelete, ApsConstant.APS_YES_NO_0);
+            return this.mdmCycleSchStruConfEntityMapper.selectList(wrapper);
         }
         List<MdmCycleSchStruConf> list = Lists.newArrayList();
         final int batchSize = 1000;

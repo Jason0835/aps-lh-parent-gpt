@@ -35,6 +35,7 @@ import com.zlt.aps.lh.api.domain.entity.LhSharedMouldPat;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanVo;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.MouldChangeTypeEnum;
+import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.mapper.LhMachineOnlineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
@@ -147,7 +148,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
                 billVO.setOrderNo(origin.getOrderNo());
                 if (ApsConstant.IS_RELEASE.equals(origin.getIsRelease())) {
                     // 已发布单据编辑后需要重新进入待发布状态
-                    billVO.setIsRelease(ApsConstant.WAIT_RELEASING);
+                    billVO.setIsRelease(ReleaseStatusEnum.PENDING_RELEASE.getCode());
                     billVO.setMouldStatus(ApsConstant.FALSE);
                 } else {
                     billVO.setIsRelease(origin.getIsRelease());
@@ -291,10 +292,11 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     }
 
     public List<Map<String, Object>> buildExportDataList(List<LhMouldChangePlanVo> list, LhMouldChangePlan queryVO) {
-        // 按计划日期、班次、机台排序
-        list = list.stream().sorted(Comparator.comparing(LhMouldChangePlanVo::getPlanDate)
-                .thenComparing(LhMouldChangePlanVo::getClassIndex)
-                .thenComparing(LhMouldChangePlanVo::getLhMachineCode))
+        // 按计划日期、班次、机台排序，计划日期仅按年月日比较，避免时分秒影响导出顺序
+        list = list.stream().sorted(Comparator.comparing((LhMouldChangePlanVo item) ->
+                                DateUtil.beginOfDay(item.getPlanDate()))
+                .thenComparing(item -> StringUtils.defaultIfBlank(item.getClassIndex(), ""))
+                .thenComparing(item -> StringUtils.defaultIfBlank(item.getLhMachineCode(), "")))
                 .collect(Collectors.toList());
         // 查询字典用于转义
         List<SysDictData> classNumDictList = iSysDictDataCacheService.getType("class_num_two_mm");
@@ -312,32 +314,41 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         List<String> materialCodeList = new ArrayList<>();
         List<String> materialDescList = new ArrayList<>();
         for (LhMouldChangePlanVo mouldChangePlanVo : list) {
-            materialCodeList.add(mouldChangePlanVo.getAfterMaterialCode());
-            materialDescList.add(mouldChangePlanVo.getAfterMaterialDesc());
+            if (StringUtils.isNotBlank(mouldChangePlanVo.getAfterMaterialCode())) {
+                materialCodeList.add(mouldChangePlanVo.getAfterMaterialCode());
+            }
+            if (StringUtils.isNotBlank(mouldChangePlanVo.getAfterMaterialDesc())) {
+                materialDescList.add(mouldChangePlanVo.getAfterMaterialDesc());
+            }
         }
-        LambdaQueryWrapper<LhScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(LhScheduleResult::getFactoryCode, queryVO.getFactoryCode());
-        queryWrapper.eq(LhScheduleResult::getScheduleDate, queryVO.getScheduleDate());
-        queryWrapper.eq(LhScheduleResult::getIsDelete, YesOrNoEnum.NO.getCode());
-        queryWrapper.in(LhScheduleResult::getMaterialCode, materialCodeList);
-        List<LhScheduleResult> lhScheduleResultList = lhScheduleResultMapper.selectList(queryWrapper);
+        // 查询硫化排程结果，获取规格示方类型
         Map<String, String> lhScheduleResultMap = new HashMap<>();
-        if (CollectionUtils.isNotEmpty(lhScheduleResultList)) {
-            lhScheduleResultMap = lhScheduleResultList.stream()
-                    .sorted(Comparator.comparing(LhScheduleResult::getConstructionStage))
-                    .collect(Collectors.toMap(LhScheduleResult::getMaterialCode,
-                            LhScheduleResult::getConstructionStage,
-                    (s1, s2) -> s1));
+        if (CollUtil.isNotEmpty(materialCodeList)) {
+            LambdaQueryWrapper<LhScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(LhScheduleResult::getFactoryCode, queryVO.getFactoryCode());
+            queryWrapper.eq(LhScheduleResult::getScheduleDate, queryVO.getScheduleDate());
+            queryWrapper.eq(LhScheduleResult::getIsDelete, YesOrNoEnum.NO.getCode());
+            queryWrapper.in(LhScheduleResult::getMaterialCode, materialCodeList);
+            List<LhScheduleResult> lhScheduleResultList = lhScheduleResultMapper.selectList(queryWrapper);
+            if (CollectionUtils.isNotEmpty(lhScheduleResultList)) {
+                lhScheduleResultMap = lhScheduleResultList.stream()
+                        .sorted(Comparator.comparing(LhScheduleResult::getConstructionStage))
+                        .collect(Collectors.toMap(LhScheduleResult::getMaterialCode,
+                                LhScheduleResult::getConstructionStage,
+                        (s1, s2) -> s1));
+            }
         }
         // 查询共用模具
-        LambdaQueryWrapper<LhSharedMouldPat> sharedMouldPatQueryWrapper = new LambdaQueryWrapper<>();
-        sharedMouldPatQueryWrapper.eq(LhSharedMouldPat::getIsDelete, YesOrNoEnum.NO.getCode());
-        sharedMouldPatQueryWrapper.eq(LhSharedMouldPat::getFactoryCode, queryVO.getFactoryCode());
-        sharedMouldPatQueryWrapper.in(LhSharedMouldPat::getMaterialDesc, materialDescList);
-        List<LhSharedMouldPat> lhSharedMouldPatList = lhSharedMouldPatEntityMapper.selectList(sharedMouldPatQueryWrapper);
         Map<String, List<LhSharedMouldPat>> lhSharedMouldPatMap = new HashMap<>();
-        if (CollectionUtils.isNotEmpty(lhSharedMouldPatList)) {
-            lhSharedMouldPatMap = lhSharedMouldPatList.stream().collect(Collectors.groupingBy(LhSharedMouldPat::getMaterialDesc));
+        if (CollUtil.isNotEmpty(materialDescList)) {
+            LambdaQueryWrapper<LhSharedMouldPat> sharedMouldPatQueryWrapper = new LambdaQueryWrapper<>();
+            sharedMouldPatQueryWrapper.eq(LhSharedMouldPat::getIsDelete, YesOrNoEnum.NO.getCode());
+            sharedMouldPatQueryWrapper.eq(LhSharedMouldPat::getFactoryCode, queryVO.getFactoryCode());
+            sharedMouldPatQueryWrapper.in(LhSharedMouldPat::getMaterialDesc, materialDescList);
+            List<LhSharedMouldPat> lhSharedMouldPatList = lhSharedMouldPatEntityMapper.selectList(sharedMouldPatQueryWrapper);
+            if (CollectionUtils.isNotEmpty(lhSharedMouldPatList)) {
+                lhSharedMouldPatMap = lhSharedMouldPatList.stream().collect(Collectors.groupingBy(LhSharedMouldPat::getMaterialDesc));
+            }
         }
 
         List<Map<String, Object>> dataList = new ArrayList<>();
@@ -545,7 +556,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     @Override
     protected String getOrderBy() {
-        return " LH_MACHINE_CODE ASC";
+        return " DATE(PLAN_DATE), CLASS_INDEX, LH_MACHINE_CODE";
     }
 
     /**
@@ -590,7 +601,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
         QueryWrapper<LhMouldChangePlan> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, queryVO);
-        wrapper.in("IS_RELEASE", Arrays.asList(ApsConstant.NO_RELEASE, ApsConstant.WAIT_RELEASING));
+        wrapper.in("IS_RELEASE", Arrays.asList(ApsConstant.NO_RELEASE, ReleaseStatusEnum.PENDING_RELEASE.getCode()));
         wrapper.select("ID");
         List<LhMouldChangePlan> list = lhMouldChangePlanMapper.selectList(wrapper);
         if (CollectionUtils.isEmpty(list)) {

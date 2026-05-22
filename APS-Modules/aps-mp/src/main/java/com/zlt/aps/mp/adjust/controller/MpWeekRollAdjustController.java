@@ -31,6 +31,7 @@ import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
 import com.zlt.aps.mp.api.domain.dto.MpWeekRollAdjustDTO;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
 import com.zlt.aps.mp.common.utils.StringUtil;
@@ -240,11 +241,11 @@ public class MpWeekRollAdjustController extends BaseController {
                 // 同胎胚
                 .thenComparing(IFinalAndAdjustResultInterface::getEmbryoCode,Comparator.nullsLast(String::compareTo))
                 // 最大型腔数
-                .thenComparing(IFinalAndAdjustResultInterface::getMaxMouldCavityQty, Comparator.reverseOrder())
+                .thenComparing(IFinalAndAdjustResultInterface::getMaxMouldCavityQty, Comparator.nullsLast(Comparator.reverseOrder()))
                 // 主花纹
                 .thenComparing(IFinalAndAdjustResultInterface::getMainPattern, Comparator.nullsLast(String::compareTo))
                 // 活块数
-                .thenComparing(IFinalAndAdjustResultInterface::getTypeBlockQty, Comparator.reverseOrder())
+                .thenComparing(IFinalAndAdjustResultInterface::getTypeBlockQty, Comparator.nullsLast(Comparator.reverseOrder()))
                 // 物料描述
                 .thenComparing(IFinalAndAdjustResultInterface::getMaterialDesc, Comparator.nullsLast(String::compareTo));
     }
@@ -255,8 +256,8 @@ public class MpWeekRollAdjustController extends BaseController {
     @ApiOperation("确认调整结果")
     @PostMapping("/confirmAdjust")
     public AjaxResult confirmAdjust(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
-/*        AdjustsCxMachineVo cxMachineVo = mpStructureAllocationService.getAdjustsCxMachineFromRedis();
-        weekRollAdjustDTO.setAdjustType(cxMachineVo == null ? WeekAdjustTypeEnum.STRUCTURE_IN.getCode():WeekAdjustTypeEnum.STRUCTURE_OUT.getCode());*/
+        AdjustsCxMachineVo cxMachineVo = mpStructureAllocationService.getAdjustsCxMachineFromRedis();
+        weekRollAdjustDTO.setAdjustType(cxMachineVo == null ? WeekAdjustTypeEnum.STRUCTURE_IN.getCode():WeekAdjustTypeEnum.STRUCTURE_OUT.getCode());
         // 获取周程滚动调整策略
         IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
         if (weekAdjustStrategy == null) {
@@ -457,9 +458,9 @@ public class MpWeekRollAdjustController extends BaseController {
     @ApiOperation("重新计算")
     @PostMapping("/recalculate")
     public AjaxResult recalculate(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
-        /*AdjustsCxMachineVo adjustsCxMachineVo = mpStructureAllocationService.getAdjustsCxMachineFromRedis();
+        AdjustsCxMachineVo adjustsCxMachineVo = mpStructureAllocationService.getAdjustsCxMachineFromRedis();
         String adjustType = adjustsCxMachineVo == null ? WeekAdjustTypeEnum.STRUCTURE_IN.getCode() : WeekAdjustTypeEnum.STRUCTURE_OUT.getCode();
-        weekRollAdjustDTO.setAdjustType(adjustType);*/
+        weekRollAdjustDTO.setAdjustType(adjustType);
         // 获取周程滚动调整策略
         IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
         if (weekAdjustStrategy == null) {

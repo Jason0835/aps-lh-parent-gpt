@@ -7,6 +7,7 @@ import com.ruoyi.common.redis.service.RedisService;
 import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
 import com.zlt.aps.lh.api.domain.entity.LhMouldCleanWarn;
 import com.zlt.aps.lh.api.domain.entity.LhParams;
+import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.mapper.LhMouldCleanPlanMapper;
 import com.zlt.aps.lh.mapper.LhMouldCleanWarnMapper;
 import com.zlt.aps.lh.service.ILhMouldCleanPlanService;
@@ -419,7 +420,7 @@ public class LhMouldCleanPlanServiceImpl extends AbstractDocService<LhMouldClean
     }
 
     private int getCleanDays() {
-        LhParams params = lhParamsService.selectOneByParamCode("MOULD_CLEAN_DAYS", null);
+        LhParams params = lhParamsService.selectOneByParamCode(LhScheduleParamConstant.MOULD_CLEAN_DAYS, null);
         if (params != null && params.getParamValue() != null) {
             try {
                 return Integer.parseInt(params.getParamValue());

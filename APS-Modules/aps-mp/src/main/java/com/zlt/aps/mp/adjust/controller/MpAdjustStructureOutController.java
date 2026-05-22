@@ -156,7 +156,6 @@ public class MpAdjustStructureOutController extends AbstractDocBizController<MpA
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("version")), "VERSION", queryVO.getFieldValueByFieldName("version"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("scheduledMachines")), "SCHEDULED_MACHINES", queryVO.getFieldValueByFieldName("scheduledMachines"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("mesMaterialCode")), "MES_MATERIAL_CODE", queryVO.getFieldValueByFieldName("mesMaterialCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialCode")), "MATERIAL_CODE", queryVO.getFieldValueByFieldName("materialCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("materialDesc")), "MATERIAL_DESC", queryVO.getFieldValueByFieldName("materialDesc"));
@@ -170,7 +169,7 @@ public class MpAdjustStructureOutController extends AbstractDocBizController<MpA
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustPriority")), "ADJUST_PRIORITY", queryVO.getFieldValueByFieldName("adjustPriority"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("actualAdjustQty")), "ACTUAL_ADJUST_QTY", queryVO.getFieldValueByFieldName("actualAdjustQty"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustReason")), "ADJUST_REASON", queryVO.getFieldValueByFieldName("adjustReason"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionVersion")), "PRODUCTION_VERSION", queryVO.getFieldValueByFieldName("productionVersion"));
+        //queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionVersion")), "PRODUCTION_VERSION", queryVO.getFieldValueByFieldName("productionVersion"));
     }
 
 

@@ -13,11 +13,13 @@ import com.zlt.aps.lh.mapper.CxLhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
+import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +60,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
     @Resource
     private MdmSkuMouldRelMapper mdmSkuMouldRelMapper;
+
+    @Resource
+    private FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
 
     private static final AtomicInteger INSERT_ORDER_SEQ = new AtomicInteger(0);
 
@@ -150,10 +155,12 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         log.info("执行插单操作, 工厂: {}, 机台: {}, 物料: {}, 排程日期: {}",
                 dto.getFactoryCode(), dto.getLhMachineCode(), dto.getProductCode(), dto.getScheduleDate());
 
+        LhInsertOrderValidateResultDTO validateResult = insertOrderValidateHandler.validateInsertOrder(dto);
+
         String batchNo = generateNextBatchNo(dto.getScheduleDate(), dto.getFactoryCode());
         String orderNo = generateInsertOrderNo(dto.getScheduleDate());
 
-        LhScheduleResult result = buildInsertOrderResult(dto, batchNo, orderNo);
+        LhScheduleResult result = buildInsertOrderResult(dto, batchNo, orderNo, validateResult);
         mapper.insert(result);
 
         generateInsertMouldChangePlan(dto, batchNo);
@@ -165,12 +172,14 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     /**
      * 构建插单排程结果实体
      *
-     * @param dto     插单请求数据
-     * @param batchNo 批次号
-     * @param orderNo 工单号
+     * @param dto            插单请求数据
+     * @param batchNo        批次号
+     * @param orderNo        工单号
+     * @param validateResult 校验结果（用于回填硫化余量/胎胚库存/班产/示方类型等字段）
      * @return 排程结果实体
      */
-    private LhScheduleResult buildInsertOrderResult(LhOrderInsertDTO dto, String batchNo, String orderNo) {
+    private LhScheduleResult buildInsertOrderResult(LhOrderInsertDTO dto, String batchNo, String orderNo,
+                                                    LhInsertOrderValidateResultDTO validateResult) {
         LhScheduleResult result = new LhScheduleResult();
         result.setFactoryCode(dto.getFactoryCode());
         result.setBatchNo(batchNo);
@@ -189,6 +198,27 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         result.setIsDelete(DeleteFlagEnum.NORMAL.getCode());
         result.setScheduleType("02");
         result.setIsChangeMould("1");
+
+        if (validateResult != null) {
+            if (validateResult.getMouldSurplusQty() != null) {
+                result.setMouldSurplusQty(validateResult.getMouldSurplusQty());
+            }
+            if (validateResult.getEmbryoStock() != null) {
+                result.setEmbryoStock(validateResult.getEmbryoStock());
+            }
+            if (validateResult.getSingleMouldShiftQty() != null) {
+                result.setSingleMouldShiftQty(validateResult.getSingleMouldShiftQty());
+            }
+            if (StringUtils.isNotBlank(validateResult.getTrialStatus())) {
+                result.setTrialStatus(validateResult.getTrialStatus());
+                result.setChangedTrialStatus(validateResult.getTrialStatus());
+            }
+            if (StringUtils.isNotBlank(validateResult.getLeftRightMould())) {
+                result.setLeftRightMould(validateResult.getLeftRightMould());
+            }
+        }
+
+        fillEmbryoRelatedFields(result, dto);
 
         result.setClass1PlanQty(dto.getClass1PlanQty());
         result.setClass1StartTime(dto.getClass1StartTime());
@@ -233,6 +263,34 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         ShiftFieldUtil.syncDailyPlanQty(result);
 
         return result;
+    }
+
+    /**
+     * 填充胎胚相关字段（胎胚代码、胎胚描述）
+     * <p>从月计划定稿表中根据工厂+物料编码查询胎胚代码和胎胚描述</p>
+     *
+     * @param result 排程结果实体
+     * @param dto    插单请求数据
+     */
+    private void fillEmbryoRelatedFields(LhScheduleResult result, LhOrderInsertDTO dto) {
+        String materialCode = StringUtils.isNotBlank(dto.getProductCode()) ? dto.getProductCode() : dto.getMaterialCode();
+        if (StringUtils.isBlank(materialCode) || StringUtils.isBlank(dto.getFactoryCode())) {
+            return;
+        }
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, dto.getFactoryCode())
+                .eq(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCode)
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .last("LIMIT 1");
+        FactoryMonthPlanProductionFinalResult monthPlan = monthPlanMapper.selectOne(wrapper);
+        if (monthPlan != null) {
+            if (StringUtils.isNotBlank(monthPlan.getEmbryoCode())) {
+                result.setEmbryoCode(monthPlan.getEmbryoCode());
+            }
+            if (StringUtils.isNotBlank(monthPlan.getMainMaterialDesc())) {
+                result.setMainMaterialDesc(monthPlan.getMainMaterialDesc());
+            }
+        }
     }
 
     /**

@@ -591,26 +591,24 @@ public class MdmMaterialInfoController extends AbstractDocBizController<MdmMater
     @ApiOperation("查询胎胚编码列表（去重）")
     @PostMapping("/listEmbryoCode")
     public TableDataInfo listEmbryoCode(@RequestBody MdmMaterialInfo productInfo) {
-        startPage("embryo_code asc");
         LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(PubUtil.isNotEmpty(productInfo.getFactoryCode()), MdmMaterialInfo::getFactoryCode, productInfo.getFactoryCode());
         queryWrapper.isNotNull(MdmMaterialInfo::getEmbryoCode);
         queryWrapper.ne(MdmMaterialInfo::getEmbryoCode, "");
         queryWrapper.like(PubUtil.isNotEmpty(productInfo.getEmbryoCode()), MdmMaterialInfo::getEmbryoCode, productInfo.getEmbryoCode());
         queryWrapper.like(PubUtil.isNotEmpty(productInfo.getEmbryoDesc()), MdmMaterialInfo::getEmbryoDesc, productInfo.getEmbryoDesc());
+        queryWrapper.eq(PubUtil.isNotEmpty(productInfo.getStructureName()), MdmMaterialInfo::getStructureName, productInfo.getStructureName());
         queryWrapper.select(MdmMaterialInfo::getEmbryoCode, MdmMaterialInfo::getEmbryoDesc);
         queryWrapper.groupBy(MdmMaterialInfo::getEmbryoCode, MdmMaterialInfo::getEmbryoDesc);
+
+        // 开启分页
+        PageHelper.startPage(productInfo.getPageNum(), productInfo.getPageSize(), "embryo_code asc");
+
+        // 直接查询，不再转换
         List<MdmMaterialInfo> list = mdmMaterialInfoEntityMapper.selectList(queryWrapper);
-        // 将物料信息对象列表转换为只包含胎胚编码和胎胚描述的Map列表
-        List<Map<String, Object>> resultList = list.stream()
-                .map(item -> {
-                    // 创建Map，用于存储简化后的数据
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("embryoCode", item.getEmbryoCode());
-                    map.put("embryoDesc", item.getEmbryoDesc());
-                    return map;
-                })
-                .collect(Collectors.toList());
-        return getDataTable(resultList);
+
+        // 直接将 list 传给 getDataTable，此时 list 依然是 Page 对象，包含完整的分页信息
+        return getDataTable(list);
     }
+
 }

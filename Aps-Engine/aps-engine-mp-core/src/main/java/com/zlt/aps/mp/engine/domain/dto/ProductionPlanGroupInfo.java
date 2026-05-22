@@ -1283,10 +1283,8 @@ public class ProductionPlanGroupInfo {
             addSkuProductionDetailInfo(limitInfo, skuDayProductionInfo);
             return;
         }
-        //更新使用模具
-        planned.getUsedMouldSet().addAll(currentUsedMouldSet);
-        //更新数量
-        planned.addProductionDayQty(skuDayProductionInfo.getSumProductionQty(), skuDayProductionInfo.getLossQty());
+        //更新使用模具和排产数量
+        planned.addDayProductionInfo(skuDayProductionInfo);
         //加入Sku排产明细信息
         addSkuProductionDetailInfo(limitInfo, skuDayProductionInfo);
     }
