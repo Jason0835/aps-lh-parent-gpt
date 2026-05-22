@@ -78,6 +78,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
 
     private final DayProductionStatisticsHandler dayProductionStatisticsHandler;
 
+    private final SimulateProductionResultHandler simulateProductionResultHandler;
+
     private final CalculateStructureCxMachineNumber calculateStructureCxMachineNumber;
 
     private final ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler;
@@ -101,6 +103,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
                                           ClearProductionInfoHandler clearProductionInfoHandler,
                                           InitNoProductionRecordHandler initNoProductionRecordHandler,
                                           DayProductionStatisticsHandler dayProductionStatisticsHandler,
+                                          SimulateProductionResultHandler simulateProductionResultHandler,
                                           CalculateStructureCxMachineNumber calculateStructureCxMachineNumber,
                                           ProductionCxMachineCalculationHandler productionCxMachineCalculationHandler,
                                           AdjustContinueSkuProductionQtyHandler adjustContinueSkuProductionQtyHandler,
@@ -115,6 +118,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         this.clearProductionInfoHandler = clearProductionInfoHandler;
         this.initNoProductionRecordHandler = initNoProductionRecordHandler;
         this.dayProductionStatisticsHandler = dayProductionStatisticsHandler;
+        this.simulateProductionResultHandler = simulateProductionResultHandler;
         this.calculateStructureCxMachineNumber = calculateStructureCxMachineNumber;
         this.productionCxMachineCalculationHandler = productionCxMachineCalculationHandler;
         this.adjustContinueSkuProductionQtyHandler = adjustContinueSkuProductionQtyHandler;
@@ -200,6 +204,8 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //8、进行模拟模具排产
         log.info(TbrSimulateProductionLogRecorder.addStartMouldProductionLog(productionContext));
         simulateProductionHandler.productionGroupPlan(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
+        //20260522+ 对没有高优先级的续作Sku进行检查是否可在正式排产时排产
+        simulateProductionResultHandler.checkSimulateResultHandler(productionContext, cxContinueInfoMap);
         //9、保存结构成型排程结果
         List<MpStructureAllocation> allAllocationList = saveStructureInfo(productionContext);
         //10、第二轮排产
@@ -449,6 +455,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         BeanUtils.copyProperties(context, productionContext);
         //基础数据容器存储
         productionContext.setBaseDataContainer(new BaseDataContainer());
+        productionContext.setSimulateResult(new SimulateResultHelper());
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
         if (null == context.getLogBuilder()) {

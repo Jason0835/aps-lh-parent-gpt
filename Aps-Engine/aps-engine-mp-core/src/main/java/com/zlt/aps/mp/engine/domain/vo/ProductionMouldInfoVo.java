@@ -11,6 +11,7 @@ import org.springframework.util.CollectionUtils;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 排产模具信息对象
@@ -133,27 +134,6 @@ public class ProductionMouldInfoVo implements Serializable {
     }
 
     /**
-     * 增加模具排产信息
-     *
-     * @param day                   排产天
-     * @param mouldProductionHelper 排产信息对象
-     */
-    private void addDayProductionInfo(Integer day, CxMouldDayProductionHelper mouldProductionHelper) {
-        if (null == day || null == mouldProductionHelper) {
-            return;
-        }
-        if (null == dayProductionInfo) {
-            dayProductionInfo = new HashMap<>();
-        }
-        List<CxMouldDayProductionHelper> dayProductionList = dayProductionInfo.get(day);
-        if (null == dayProductionList) {
-            dayProductionList = new ArrayList<>();
-            dayProductionInfo.put(day, dayProductionList);
-        }
-        dayProductionList.add(mouldProductionHelper);
-    }
-
-    /**
      * 设置模具的可排产日信息
      * 首次可用日期 = 上机时间 + 1
      *
@@ -204,6 +184,34 @@ public class ProductionMouldInfoVo implements Serializable {
     }
 
     /**
+     * 判断模具是否排产了materialDesc
+     * 模具任何一天排产过，就算排产
+     *
+     * @param materialDesc
+     * @return
+     */
+    public boolean hasProductionSku(String materialDesc) {
+        if (StringUtils.isBlank(materialDesc)) {
+            return false;
+        }
+        if (CollectionUtils.isEmpty(dayProductionInfo)) {
+            return false;
+        }
+        for (Map.Entry<Integer, List<CxMouldDayProductionHelper>> entry : dayProductionInfo.entrySet()) {
+            List<CxMouldDayProductionHelper> allProductionSkuList = entry.getValue();
+            if (CollectionUtils.isEmpty(allProductionSkuList)) {
+                continue;
+            }
+            List<CxMouldDayProductionHelper> skuProductionList = allProductionSkuList.stream().filter(singleSku -> materialDesc.equals(singleSku.getMaterialDesc())).collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(skuProductionList)) {
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * 模具共用性
      * 数字越小，共用性越低
      *
@@ -237,5 +245,26 @@ public class ProductionMouldInfoVo implements Serializable {
             leftOverSet.add(needProductionDay);
         });
         return leftOverSet.size();
+    }
+
+    /**
+     * 增加模具排产信息
+     *
+     * @param day                   排产天
+     * @param mouldProductionHelper 排产信息对象
+     */
+    private void addDayProductionInfo(Integer day, CxMouldDayProductionHelper mouldProductionHelper) {
+        if (null == day || null == mouldProductionHelper) {
+            return;
+        }
+        if (null == dayProductionInfo) {
+            dayProductionInfo = new HashMap<>();
+        }
+        List<CxMouldDayProductionHelper> dayProductionList = dayProductionInfo.get(day);
+        if (null == dayProductionList) {
+            dayProductionList = new ArrayList<>();
+            dayProductionInfo.put(day, dayProductionList);
+        }
+        dayProductionList.add(mouldProductionHelper);
     }
 }
