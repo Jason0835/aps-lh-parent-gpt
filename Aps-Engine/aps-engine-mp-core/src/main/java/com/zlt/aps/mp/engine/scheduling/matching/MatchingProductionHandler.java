@@ -549,7 +549,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
                                             Map<String, List<MonthPlanProductionRequirePlanVo>> productionPlanMap,
                                             Map<String, ProductionMouldInfoVo> useMouldMap,
                                             Set<Integer> productDaySet) {
-        if (StringUtils.isEmpty(checkMaterialDesc)) { // 有指定SKU，说明有多新增模具并尝试补量，需要检查是否符合最低天数要求
+        if (StringUtils.isEmpty(checkMaterialDesc) || CollectionUtils.isEmpty(productDaySet)) { // 有指定SKU，说明有多新增模具并尝试补量，需要检查是否符合最低天数要求
             return;
         }
         // 取排产参数
