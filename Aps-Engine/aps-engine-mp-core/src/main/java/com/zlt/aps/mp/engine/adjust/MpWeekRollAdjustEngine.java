@@ -2180,6 +2180,7 @@ public class MpWeekRollAdjustEngine {
                 contextDTO.getLogDetail().append(String.format("结构:%s,【增模排产】,物料编码:%s,第:%s台硫化机,没有排产量,退出！",contextDTO.getStructureName(),mpFinalVo.getMaterialCode(),startMould/2)).append(ApsConstant.DIVISION);
                 return resetPlanQty(contextDTO,newOnLineDay,structureDeadLine,oriNewPlanQty,newPlanQty,incMouldContext.getHasProductionQty(),mpFinalVo,bakMpFinalVo);
             }
+
             //非首次上模，判断最短排产天数; 并且不是临近月底，则执行撤回
             //startMould/2 >= 2 ,第2台，开始撤回第1台；
             //已排产天数 < 最短排产天数 incMouldContext.getUsedProductionMap().size() < shortestProductionDays
