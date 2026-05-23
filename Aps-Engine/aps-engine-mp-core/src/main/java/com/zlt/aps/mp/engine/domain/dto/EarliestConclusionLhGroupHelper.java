@@ -112,11 +112,6 @@ public class EarliestConclusionLhGroupHelper implements Serializable {
         CxLhProductionHelper cxLhGroup = new CxLhProductionHelper();
         BeforeSkuProductionInfo beforeSku = getBeforeSkuInfo();
         cxLhGroup.setBeforeSku(beforeSku);
-//        cxLhGroup.setMaterialDesc(this.beforeMaterialDesc);
-//        cxLhGroup.setMaterialCode(this.beforeMaterialCode);
-//        cxLhGroup.setDayMaxProductionQty(this.beforeDayMaxQty);
-//        cxLhGroup.setProductionQty(this.beforeProductionQty);
-//        cxLhGroup.setProductionMouldSet(this.usedMouldSet);
         return cxLhGroup;
     }
 

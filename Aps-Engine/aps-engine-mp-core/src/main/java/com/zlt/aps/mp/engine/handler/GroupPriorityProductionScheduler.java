@@ -282,12 +282,15 @@ public class GroupPriorityProductionScheduler {
         }
         Set<String> needExcludeGroupMap = Optional.ofNullable(excludeGroupPlan).orElse(Collections.emptySet());
         Map<String, ProductionPlanGroupInfo> effectiveMap = Maps.newHashMap();
+        Set<String> preSelectedSet = Sets.newHashSet();
         allGroupPlanMap.forEach((groupName, groupInfo) -> {
             if (needExcludeGroupMap.contains(groupName)) {
                 return;
             }
+            preSelectedSet.add(groupName);
             effectiveMap.put(groupName, groupInfo);
         });
+        TbrSimulateProductionLogRecorder.addPreSelectedTopGroupLog(productionContext, preSelectedSet);
         if (CollectionUtils.isEmpty(effectiveMap)) {
             return Collections.emptyList();
         }
