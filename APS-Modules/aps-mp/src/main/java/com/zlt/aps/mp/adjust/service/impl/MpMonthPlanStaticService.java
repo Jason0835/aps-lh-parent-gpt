@@ -38,7 +38,7 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
      *
      * @param resultList
      */
-    public void handleMonthPlanStatistics(List<FactoryMonthPlanMouldDayResult> resultList) {
+    public void handleMonthPlanStatistics(List<FactoryMonthPlanMouldDayResult> resultList, boolean isAdjust) {
         FactoryMonthPlanMouldDayResult monthPlan = CollectionUtils.firstElement(resultList);
         String factoryCode = monthPlan.getFactoryCode();
         String productType = monthPlan.getProductTypeCode();
@@ -106,6 +106,7 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
                 MpMonthPlanStatistics monthPlanStatistics = this.buildMpMonthPlanStatistics(contextDTO, monthList,
                         YesOrNoEnum.NO.getCode());
                 if (Objects.nonNull(monthPlanStatistics)) {
+                    monthPlanStatistics.setTempFlag(isAdjust? YesOrNoEnum.YES.getCode(): YesOrNoEnum.NO.getCode());
                     monthPlanStatisticsList.add(monthPlanStatistics);
                 }
 

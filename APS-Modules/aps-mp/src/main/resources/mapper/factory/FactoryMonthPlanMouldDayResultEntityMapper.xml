@@ -233,6 +233,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             r.ADJUST_QTY3,
             r.ADJUST_QTY4,
             r.ORIGINAL_TOTAL_QTY,
+            pm.PRODUCTION_QTY,
             </if>
 		    F.PRODUCTION_VERSION
 		ORDER BY

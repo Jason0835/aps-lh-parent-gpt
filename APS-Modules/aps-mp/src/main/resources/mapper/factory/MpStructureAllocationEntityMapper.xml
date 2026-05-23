@@ -38,6 +38,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND t.YEAR = #{year}
 		    AND t.MONTH = #{month}
 		    AND t.IS_DELETE = 0
+		<if test="structureName != null and structureName != ''">
+            AND t.STRUCTURE_NAME = #{structureName}
+		</if>
         <if test="cxMachineCode != null and cxMachineCode != ''">
 		    AND t.CX_MACHINE_CODE LIKE concat('%', #{cxMachineCode}, '%')
         </if>

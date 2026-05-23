@@ -353,12 +353,12 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
                 return AjaxResult.error("导入模板标题格式不匹配");
             }
             String monthPlanVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.monthPlanVersion") + ": ";
-            Cell monthPlanVersionCell = sheet.getRow(0).getCell(26);
+            Cell monthPlanVersionCell = sheet.getRow(0).getCell(27);
             if (monthPlanVersionCell == null) {
                 return AjaxResult.error("导入模板不匹配");
             }
             monthPlanVersion = dataFormatter.formatCellValue(monthPlanVersionCell).replace(monthPlanVersionLabel, "");
-            Cell productVersionCell = sheet.getRow(0).getCell(34);
+            Cell productVersionCell = sheet.getRow(0).getCell(35);
             if (productVersionCell == null) {
                 return AjaxResult.error("导入模板不匹配");
             }
@@ -389,7 +389,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         AjaxResult ajaxResult = mpStructureAllocationService.importDataStructureAllocation(list, updateSupport, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap);
 
         // 月计划排产导入
-        AjaxResult ajaxResult4DayResult = mpStructureAllocationService.importDataDayResult(list4DayResult, updateSupport, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap);
+        AjaxResult ajaxResult4DayResult = mpStructureAllocationService.importDataDayResult(list4DayResult, updateSupport, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap, false);
 
         if (!Objects.equals(ajaxResult.get(AjaxResult.CODE_TAG), AjaxResult.Type.ERROR.value())
                 && !Objects.equals(ajaxResult4DayResult.get(AjaxResult.CODE_TAG), AjaxResult.Type.ERROR.value())) {

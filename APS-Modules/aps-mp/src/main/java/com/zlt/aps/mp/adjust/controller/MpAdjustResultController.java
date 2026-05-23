@@ -6,30 +6,38 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustResultService;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
 import com.zlt.aps.mp.common.utils.CommaFieldSortUtil;
 import com.zlt.aps.mp.common.utils.StringUtil;
+import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
+
 import lombok.extern.slf4j.Slf4j;
+
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.ruoyi.common.utils.StringUtils;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
+
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-
 
 import com.ruoyi.common.core.web.page.TableDataInfo;
 
@@ -57,6 +65,12 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
 
     @Autowired
     private IMpAdjustResultService mpAdjustResultService;
+
+    @Autowired
+    private IImportLogService iImportLogService;
+
+    @Autowired
+    private IImportErrorLogService iImportErrorLogService;
 
     @Autowired
     private MpAdjustResultEntityMapper entityMapper;
@@ -193,10 +207,40 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
     @ApiOperation("导入数据")
     @PostMapping("/importData")
     @Override
+    @SuppressWarnings("unchecked")
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
-        return super.importData(importContext,updateSupport);
-    }
+        if (importContext == null || importContext.getFileBytes() == null || importContext.getFileBytes().length == 0) {
+            return AjaxResult.error("导入文件不能为空");
+        }
+        Date beginTime = DateUtils.getNowDate();
+        byte[] fileBytes = importContext.getFileBytes();
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(fileBytes, importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
+        importLog = this.iImportLogService.add(importLog);
+        
+        AjaxResult ajaxResult = mpAdjustResultService.importData(fileBytes, importLog);
+        Map<String, Object> returnData = (Map<String, Object>)(ajaxResult.get(AjaxResult.DATA_TAG));
+        Integer rowCount = (Integer)returnData.getOrDefault("rowCount", 0);
+        Integer errorNum = (Integer)returnData.getOrDefault("errorNum", 0);
+        Integer successNum = (Integer)returnData.getOrDefault("successNum", 0);
+        List<Object> importErrorLogs = (List<Object>)returnData.get("importErrorLogs");
 
+        Date endTime = DateUtils.getNowDate();
+        importLog.setRowCount(rowCount);
+        importLog.setBeginTime(beginTime);
+        importLog.setEndTime(endTime);
+        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
+        ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
+        
+        if (errorNum > 0) {
+            return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.message.import.fail"), successNum, errorNum), importErrorLogs);
+        } else if (successNum > 0) {
+            return AjaxResult.success(StringUtils.format(I18nUtil.getMessage("ui.message.import.success"), successNum));
+        } else {
+            return ajaxResult;
+        }
+    }
+    
     /**
      * 导出列表
      */

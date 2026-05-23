@@ -2,27 +2,58 @@ package com.zlt.aps.mp.adjust.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+
+import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
+import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.domain.SysDictData;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.service.IMpAdjustResultService;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
+import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
+import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import static com.zlt.aps.common.core.utils.ApsNumberUtils.*;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -46,7 +77,13 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     protected MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
 
     @Autowired
+    private ISysDictDataCacheService sysDictDataCacheService;
+
+    @Autowired
     private MpWeekAdjustFactory mpWeekAdjustFactory;
+    
+    @Autowired
+    private IMpStructureAllocationService mpStructureAllocationService;
 
     @Override
     protected String getDocTypeCode() {
@@ -143,5 +180,196 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     @Override
     public void deleteAdjustResultByVersion(String factoryCode, String year, String month, String version,String structureName) {
         mpAdjustResultEntityMapper.deleteAdjustResultByVersion(factoryCode,year,month,version,structureName);
+    }
+
+    /**
+     * 数据导入
+     * @param fileBytes
+     * @param importLog
+     * @return
+     */
+    @Override
+    public AjaxResult importData(byte[] fileBytes, ImportLog importLog) {
+        ExcelUtil<MpStructureAllocationExportVo> util = new ExcelUtil<>(MpStructureAllocationExportVo.class);
+        DataFormatter dataFormatter = new DataFormatter();
+        // 工厂名称字典
+        List<SysDictData> factoryDatas = Optional.ofNullable(sysDictDataCacheService.getType("biz_factory_name")).orElse(Collections.emptyList());
+        Map<String, String> factoryMap = factoryDatas.stream()
+                .filter(Objects::nonNull)
+                .filter(v -> v.getDictLabel() != null && v.getDictValue() != null)
+                .collect(Collectors.toMap(SysDictData::getDictLabel, SysDictData::getDictValue, (a, b) -> a));
+
+        List<SysDictData> productTypeList = Optional.ofNullable(sysDictDataCacheService.getType("biz_product_type")).orElse(Collections.emptyList());
+        Map<String, String> productTypeMap = productTypeList.stream()
+                .filter(Objects::nonNull)
+                .filter(v -> v.getDictLabel() != null && v.getDictValue() != null)
+                .collect(Collectors.toMap(SysDictData::getDictLabel, SysDictData::getDictValue, (a, b) -> a));
+
+        String sheetName = "结构转产表";
+        String sheetName4DayResult = "月计划";
+        String[] params;
+        String[] params4DayResult;
+        String monthPlanVersion;
+        String productVersion;
+        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
+            Sheet sheet = wb.getSheet(sheetName);
+            if (sheet == null || sheet.getRow(0) == null) {
+                return AjaxResult.error("导入模板不匹配");
+            }
+            Cell titleCell = sheet.getRow(0).getCell(0);
+            if (titleCell == null) {
+                return AjaxResult.error("导入模板不匹配");
+            }
+            String titleFormat = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.exportTitle");
+            params = parseFormat(titleFormat, dataFormatter.formatCellValue(titleCell));
+            if (params == null || params.length < 4) {
+                return AjaxResult.error("导入模板标题格式不匹配");
+            }
+            String monthPlanVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.monthPlanVersion") + ": ";
+            Cell monthPlanVersionCell = sheet.getRow(0).getCell(27);
+            if (monthPlanVersionCell == null) {
+                return AjaxResult.error("导入模板不匹配");
+            }
+            monthPlanVersion = dataFormatter.formatCellValue(monthPlanVersionCell).replace(monthPlanVersionLabel, "");
+            Cell productVersionCell = sheet.getRow(0).getCell(35);
+            if (productVersionCell == null) {
+                return AjaxResult.error("导入模板不匹配");
+            }
+            String productionVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.productionVersion") + ": ";
+            productVersion = dataFormatter.formatCellValue(productVersionCell).replace(productionVersionLabel, "");
+
+            Sheet sheet4DayResult = wb.getSheet(sheetName4DayResult);
+            if (sheet4DayResult == null || sheet4DayResult.getRow(0) == null) {
+                return AjaxResult.error("导入模板不匹配");
+            }
+            Cell titleCell4DayResult = sheet4DayResult.getRow(0).getCell(0);
+            if (titleCell4DayResult == null) {
+                return AjaxResult.error("导入模板不匹配");
+            }
+            String titleFormat4DayResult = I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.exportTitle");
+            params4DayResult = parseFormat(titleFormat4DayResult, dataFormatter.formatCellValue(titleCell4DayResult));
+            if (params4DayResult == null || params4DayResult.length < 3) {
+                return AjaxResult.error("导入模板标题格式不匹配");
+            }
+        } catch (Exception e) {
+            log.warn("importDataStructureAllocation workbook parse failed", e);
+            return AjaxResult.error("导入文件格式不正确");
+        }
+        ExcelUtil<FactoryMonthPlanMouldDayResult> util4DayResult = new ExcelUtil<>(FactoryMonthPlanMouldDayResult.class);
+        
+        List<FactoryMonthPlanMouldDayResult> list4DayResult;
+        List<MpStructureAllocationExportVo> list;
+        try {
+            list4DayResult = util4DayResult.importExcel(sheetName4DayResult, new ByteArrayInputStream(fileBytes), 3, 1, -1);
+            list = util.importExcel(sheetName, new ByteArrayInputStream(fileBytes), 2, 2, 10);
+        } catch (Exception e) {
+            log.warn("importDataStructureAllocation workbook parse failed", e);
+            return AjaxResult.error("导入文件格式不正确");
+        }
+        
+        // 结构转产导入
+        AjaxResult ajaxResult = mpStructureAllocationService.importDataStructureAllocation(list, true, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap);
+
+        // 月计划调整排产导入
+        AjaxResult ajaxResult4DayResult = mpStructureAllocationService.importDataDayResult(list4DayResult, true, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap, true);
+
+        // 处理返回结果，统一
+        int errorNum = 0;
+        int successNum = 0;
+        List<Object> importErrorLogs = new ArrayList<>();
+        int[] resultParam = parseImportMsg(ajaxResult);
+        successNum += resultParam[0];
+        if (resultParam[2] > 0) {
+            errorNum += resultParam[1];
+
+            List<ImportErrorLog> importErrorLogList = StringUtils.cast(ajaxResult.get(AjaxResult.DATA_TAG));
+            if (CollectionUtils.isNotEmpty(importErrorLogList)) {
+                String listTxt = JSONArray.toJSONString(importErrorLogList);
+                importErrorLogs.addAll(JSONArray.parseArray(listTxt, ImportErrorLog.class));
+            }
+        }
+        int[] resultParam4DayResult = parseImportMsg(ajaxResult4DayResult);
+        successNum += resultParam4DayResult[0];
+        if (resultParam4DayResult[2] > 0) {
+            errorNum += resultParam4DayResult[1];
+
+            List<ImportErrorLog> importErrorLogList = StringUtils.cast(ajaxResult4DayResult.get(AjaxResult.DATA_TAG));
+            if (CollectionUtils.isNotEmpty(importErrorLogList)) {
+                String listTxt = JSONArray.toJSONString(importErrorLogList);
+                importErrorLogs.addAll(JSONArray.parseArray(listTxt, ImportErrorLog.class));
+            }
+        }
+        
+        // 构建返回数据
+        Integer rowCount = list4DayResult.size();
+        Map<String, Object> returnData = new HashMap<>();
+        returnData.put("rowCount", rowCount);
+        returnData.put("errorNum", errorNum);
+        returnData.put("successNum", successNum);
+        returnData.put("importErrorLogs", importErrorLogs);
+        return AjaxResult.success(returnData);
+    }
+    
+    private int[] parseImportMsg(AjaxResult ajaxResult) {
+        int[] result = new int[]{0, 0, 0};
+        if (ajaxResult == null) {
+            return result;
+        }
+        Object msgObj = ajaxResult.get(AjaxResult.MSG_TAG);
+        if (msgObj == null) {
+            log.warn("import result msg is null");
+            return result;
+        }
+        String[] msgArr = msgObj.toString().split(",");
+        if (msgArr.length < 2) {
+            log.warn("import result msg format invalid: {}", msgObj);
+            return result;
+        }
+        result[0] = intValue(msgArr[1]);
+        if (msgArr.length > 2) {
+            result[1] = intValue(msgArr[2]);
+            result[2] = 1;
+        }
+        return result;
+    }
+    
+    /**
+     * 从格式化后的字符串中，反向解析出原始参数
+     * @param format String.format 使用的模板（如 "年份:%d 月份:%d 工厂:%s 产品:%s"）
+     * @param formattedStr 格式化后的最终字符串
+     * @return 解析出的参数数组，null=解析失败
+     */
+    private String[] parseFormat(String format, String formattedStr) {
+        if (format == null || formattedStr == null) {
+            return null;
+        }
+
+        // 1. 把 format 模板 转成 正则表达式（核心步骤）
+        // 转义正则特殊字符 . * + ? | ( ) [ ] { } \ ^ $
+        String regex = format.replaceAll("([.*+?|()\\[\\]{}^$\\\\])", "\\\\$1");
+
+        // 2. 替换所有占位符为 正则捕获组
+        // 支持：%d %s %f %tY 等所有常用占位符
+        regex = regex.replaceAll("%(?:\\d+\\$)?[+-]?(?:\\d+)?(?:\\.\\d+)?[a-zA-Z]", "(.*?)");
+
+        // 3. 首尾加锚定，确保完全匹配整个字符串
+        regex = "^" + regex + "$";
+
+        // 4. 匹配
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(formattedStr);
+
+        if (!matcher.matches()) {
+            // 不匹配，解析失败
+            return null;
+        }
+
+        // 5. 提取所有捕获组（group 0 是整个字符串，从 1 开始）
+        String[] params = new String[matcher.groupCount()];
+        for (int i = 0; i < params.length; i++) {
+            params[i] = matcher.group(i + 1);
+        }
+
+        return params;
     }
 }

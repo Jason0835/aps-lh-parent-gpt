@@ -1,6 +1,8 @@
 package com.zlt.aps.mp.adjust.service;
 
 
+import com.ruoyi.api.gateway.system.domain.ImportLog;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.bill.common.service.IDocService;
 
@@ -33,4 +35,12 @@ public interface IMpAdjustResultService  extends IDocService<MpAdjustResult>{
      * @param version 调整版本
      */
     void deleteAdjustResultByVersion(String factoryCode,String year,String month,String version,String structureName);
+    
+    /**
+     * 数据导入
+     * @param fileBytes
+     * @param importLog
+     * @return
+     */
+    AjaxResult importData(byte[] fileBytes, ImportLog importLog);
 }
