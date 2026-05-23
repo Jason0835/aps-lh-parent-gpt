@@ -1902,6 +1902,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 failureNum++;
                 addImportErrorLog(importLogId, errorNum, noPlanStr, importErrorLogs);
                 continue;
+            } else {
+                item.setAllotDays(item.getEndDay() - item.getBeginDay() + 1);
             }
             // 赋值交替类型（仅对校验通过的有效记录）
             this.genAlternatingType(item, machineLastValidRecordMap);
@@ -1927,13 +1929,24 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                             .collect(Collectors.toMap(this::getStructureAllocationKey, Function.identity(),
                                     (p1, p2) -> p1));
                     
+                    // 取定稿版本对应的原始月计划需求核算版本
+                    LambdaQueryWrapper<MpFactoryProductionVersion> versionQueryWrapper = new LambdaQueryWrapper<>();
+                    versionQueryWrapper.eq(MpFactoryProductionVersion::getFactoryCode, importFactoryCode);
+                    versionQueryWrapper.eq(MpFactoryProductionVersion::getProductionVersion, productVersion);
+                    versionQueryWrapper.eq(MpFactoryProductionVersion::getYear, year);
+                    versionQueryWrapper.eq(MpFactoryProductionVersion::getMonth, month);
+                    MpFactoryProductionVersion version = mpFactoryProductionVersionMapper
+                            .selectOne(versionQueryWrapper);
+                    String oriMonthPlanVersion = version != null? version.getMonthPlanVersion(): monthPlanVersion;
+                    
                     for (MpStructureAllocation item: insertList) {
+                        item.setMonthPlanVersion(oriMonthPlanVersion);
                         MpStructureAllocation oldAllocation = oldAllocationMap.get(this.getStructureAllocationKey(item));
                         if (oldAllocation != null) {
-                            oldAllocation.setId(item.getId());
-                            oldAllocation.setCreateBy(item.getCreateBy());
-                            oldAllocation.setCreateTime(item.getCreateTime());
-                            oldAllocation.setBaseVale(oldAllocation.getId());
+                            item.setId(oldAllocation.getId());
+                            item.setCreateBy(oldAllocation.getCreateBy());
+                            item.setCreateTime(oldAllocation.getCreateTime());
+                            item.setBaseVale(item.getId());
                         }
                     }
                 }
