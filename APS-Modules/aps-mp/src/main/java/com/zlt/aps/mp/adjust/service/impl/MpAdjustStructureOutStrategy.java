@@ -65,7 +65,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
     @Override
     public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
         // 1、设置版本号
-        setVersion(contextDTO, BusiConstant.WeekRollAdjust.STRUCTURE_OUT_VERSION_PREFIX);
+        setVersion(contextDTO, BusiConstant.WeekRollAdjust.VERSION_PREFIX);
         // 2、构建结构外调整明细
         List<MpAdjustDetailVo> adjustDetailList = buildAdjustDetailList(contextDTO);
         // 3、构建结构内调整明细（月度计划有，无订单）
@@ -504,7 +504,12 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             return;
         }
         //结构内、结构间 调整订单列表，同时插入
-        baseDao.insertBatch(contextDTO.getAdjustDetailList());
+        //结构内调整，只要插入在结构转产表存在的
+        Set<String> structureNameSet = contextDTO.getStructureAllocationMap().keySet();
+        List<MpAdjustDetailVo> structureInList = contextDTO.getAdjustDetailList().stream().filter(x->structureNameSet.contains(x.getStructureName())).collect(Collectors.toList());
+        baseDao.insertBatch(structureInList);
+
+        //结构调整，仍全部插入，以应对新增结构
         contextDTO.getAdjustDetailList().forEach(x->{
             x.setId(null);
         });

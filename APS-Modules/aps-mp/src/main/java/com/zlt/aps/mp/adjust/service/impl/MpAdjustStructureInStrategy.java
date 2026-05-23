@@ -65,7 +65,7 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
     @Override
     public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
         // 1、设置版本号
-        setVersion(contextDTO, BusiConstant.WeekRollAdjust.STRUCTURE_IN_VERSION_PREFIX);
+        setVersion(contextDTO, BusiConstant.WeekRollAdjust.VERSION_PREFIX);
         // 2、构建结构内调整明细
         List<MpAdjustDetailVo> adjustDetailList = buildAdjustDetailList(contextDTO);
         // 3、构建结构内调整明细（试制量试计划）
@@ -446,10 +446,14 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
             return;
         }
         //结构内、结构间 调整订单列表，同时插入
+        //结构调整，仍保存所有，以应对有新增结构
         List<MpAdjustStructureOut> adjustStructureOutList = BeanUtil.copyToList(contextDTO.getAdjustDetailList(), MpAdjustStructureOut.class);
         baseDao.insertBatch(adjustStructureOutList);
 
-        List<MpAdjustDetailVo> resultList = baseDao.saveWithQuery(contextDTO.getAdjustDetailList());
+        //结构内调整，只要插入在结构转产表存在的
+        Set<String> structureNameSet = contextDTO.getStructureAllocationMap().keySet();
+        List<MpAdjustDetailVo> resultList = contextDTO.getAdjustDetailList().stream().filter(x->structureNameSet.contains(x.getStructureName())).collect(Collectors.toList());
+        resultList = baseDao.saveWithQuery(resultList);
         contextDTO.setAdjustDetailList(resultList);
     }
 
