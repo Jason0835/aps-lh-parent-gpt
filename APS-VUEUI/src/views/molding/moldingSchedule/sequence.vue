@@ -99,11 +99,11 @@ export default {
           align: "center",
           minWidth: 130,
         },
-        { label: this.$t("成型机台"), prop: "cxMachineCode", align: "center" },
-        { label: this.$t("硫化机台"), prop: "lhMachineCode", align: "center", minWidth: 180, },
-        { label: this.$t("物料编码"), prop: "materialCode", minWidth: 130, align: "center" },
-        { label: this.$t("物料描述"), prop: "materialDesc", minWidth: 300 },
-        { label: this.$t("胎胚描述"), prop: "mainMaterialDesc", minWidth: 320 },
+        { label: this.$t("ui.data.column.cxScheduleResult.cxMachineCode"), prop: "cxMachineCode", align: "center" },
+        { label: this.$t("ui.data.column.cxScheduleResult.lhMachineCode"), prop: "lhMachineCode", align: "center", minWidth: 180, },
+        { label: this.$t("ui.data.column.scheduleResult.materialCode"), prop: "materialCode", minWidth: 130, align: "center" },
+        { label: this.$t("ui.data.column.scheduleResult.materialDesc"), prop: "materialDesc", minWidth: 300 },
+        { label: this.$t("ui.data.column.scheduleResult.embryoDesc"), prop: "mainMaterialDesc", minWidth: 320 },
         {
           label: "车次号",
           prop: "tripNo",
@@ -135,8 +135,8 @@ export default {
       });
 
       const trailingColumns = [
-        { label: this.$t("工单号"), prop: "orderNo", align: "center", minWidth: 180 },
-        { label: this.$t("成型批次号"), prop: "cxBatchNo", align: "center", minWidth: 150 },
+        { label: this.$t("ui.data.column.scheduleResult.orderNo"), prop: "orderNo", align: "center", minWidth: 180 },
+        { label: this.$t("ui.data.column.cxScheduleResult.cxBatchNo"), prop: "cxBatchNo", align: "center", minWidth: 150 },
       ];
 
       return [...fixedColumns, ...shiftColumns, ...trailingColumns];
@@ -150,15 +150,15 @@ export default {
           valueFormat: "yyyy-MM-dd",
         },
         {
-          label: this.$t("物料编码"),
+          label: this.$t("ui.data.column.scheduleResult.materialCode"),
           prop: "materialCode",
         },
         {
-          label: this.$t("物料描述"),
+          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
           prop: "materialDesc",
         },
         {
-          label: this.$t("胎胚描述"),
+          label: this.$t("ui.data.column.scheduleResult.embryoDesc"),
           prop: "mainMaterialDesc",
         },
         {
@@ -353,7 +353,7 @@ export default {
         return item;
       });
       const res = await updateCxScheduleDetailPlanQty(payload);
-      this.$modal.msgSuccess(res.msg || this.$t("操作成功"));
+      this.$modal.msgSuccess(res.msg || this.$t("common.msg.success.operate"));
       this.getList();
     },
     rowStyle({ row }) {

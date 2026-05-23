@@ -192,7 +192,7 @@ export default {
         },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.monthPlanAdjustNotice.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           span: 6,
           disabled: true,
           type: "select",

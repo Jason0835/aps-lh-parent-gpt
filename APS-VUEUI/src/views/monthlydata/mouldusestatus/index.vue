@@ -148,7 +148,7 @@ export default {
 
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.mouldusestatus.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(
               this.dict.type.biz_factory_name,
@@ -193,7 +193,7 @@ export default {
         {
           prop: "remark",
           label: this.$t("ui.data.column.mouldusestatus.remark"),
-          minWidth: 100, 
+          minWidth: 100,
         },
       ];
 

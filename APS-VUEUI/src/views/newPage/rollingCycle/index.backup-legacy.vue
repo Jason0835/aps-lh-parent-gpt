@@ -341,19 +341,19 @@
           >
             {{ this.$t("common.button.confirm") }}</el-button
           >
-		  
+
 		  <el-button
             @click="handleExport"
             v-hasPermi="['monthplan:factoryMonthPlanFinalResult:export']"
             >{{ $t("ui.frame.btn.export") }}</el-button
           >
-		  
+
           <el-button
             v-hasPermi="['monthplan:factoryMonthPlanFinalResult:import']"
             @click="$refs.tltUpload.handleImport()"
             >{{ $t("ui.frame.btn.import") }}</el-button
           >
-		  
+
         </div>
       </template>
     </page-table>
@@ -1173,7 +1173,7 @@ export default {
           },
           {
             prop: "factoryCode",
-            label: this.$t("common.factory"),
+            label: this.$t("ui.data.column.factoryCode"),
             formatter: (row, column, value) => {
               return this.selectDictLabel(
                 this.dict.type.biz_factory_name,
@@ -1231,7 +1231,7 @@ export default {
       let list = [
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,
@@ -1526,8 +1526,8 @@ export default {
             row.version === item.version
         );
         if (sourceItem && sourceItem.productTypeCode) {
-          return { 
-            ...item, 
+          return {
+            ...item,
             productTypeCode: sourceItem.productTypeCode,
             dayVulcanizationQty: sourceItem.dayVulcanizationQty
           };

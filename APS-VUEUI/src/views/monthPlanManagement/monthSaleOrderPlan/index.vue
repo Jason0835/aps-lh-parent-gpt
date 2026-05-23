@@ -146,7 +146,7 @@ export default {
         },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.monthSaleOrderPlan.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           formatter: (row) => {
             return this.selectDictLabel(
               this.dict.type.biz_factory_name,
@@ -305,7 +305,7 @@ export default {
         },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.monthSaleOrderPlan.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,

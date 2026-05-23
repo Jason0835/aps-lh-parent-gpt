@@ -283,7 +283,7 @@ export default {
 
         // ui.data.column.scheduleResult.class1
         {
-          label: this.$t("夜班"),
+          label: this.$t("ui.data.column.scheduleResult.nightShift"),
           type: "title",
         },
         // {
@@ -322,7 +322,7 @@ export default {
 
         //  ui.data.column.scheduleResult.class2
         {
-          label: this.$t("早班"),
+          label: this.$t("ui.data.column.scheduleResult.morningShift"),
           type: "title",
         },
         // {
@@ -372,7 +372,7 @@ export default {
         },
 
         {
-          label: this.$t("中班"),
+          label: this.$t("ui.data.column.scheduleResult.middleShift"),
           type: "title",
         },
 
@@ -406,7 +406,7 @@ export default {
 
         // ui.data.column.scheduleResult.class4
         {
-          label: this.$t("夜班"),
+          label: this.$t("ui.data.column.scheduleResult.nightShift"),
           type: "title",
         },
 
@@ -439,7 +439,7 @@ export default {
 
         // ui.data.column.scheduleResult.class5
         {
-          label: this.$t("早班"),
+          label: this.$t("ui.data.column.scheduleResult.morningShift"),
           type: "title",
         },
 
@@ -471,7 +471,7 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("中班"),
+          label: this.$t("ui.data.column.scheduleResult.middleShift"),
           type: "title",
         },
 
@@ -503,7 +503,7 @@ export default {
           disabled: true,
         },
         {
-          label: this.$t("夜班"),
+          label: this.$t("ui.data.column.scheduleResult.nightShift"),
           type: "title",
         },
 
@@ -536,7 +536,7 @@ export default {
 
         // ui.data.column.scheduleResult.class5
         {
-          label: this.$t("早班"),
+          label: this.$t("ui.data.column.scheduleResult.morningShift"),
           type: "title",
         },
 

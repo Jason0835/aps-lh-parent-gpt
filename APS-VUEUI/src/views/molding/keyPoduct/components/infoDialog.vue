@@ -67,7 +67,7 @@ export default {
         {
           prop: "structureName",
           align: "center",
-          label: this.$t("结构"),
+          label: this.$t("ui.data.column.cxKeyProduct.structureName"),
           render: (form) => {
             return (
               <structureSelect
@@ -84,7 +84,7 @@ export default {
         {
           prop: "embryoCode",
           align: "center",
-          label: this.$t("胎胚代码"),
+          label: this.$t("ui.data.column.cxKeyProduct.embryoCode"),
           render: (form) => {
             return (
               <materialCodeSelect
@@ -99,13 +99,13 @@ export default {
         {
           prop: "embryoDesc",
           align: "center",
-          label: this.$t("胎胚描述"),
+          label: this.$t("ui.data.column.cxKeyProduct.embryoDesc"),
           disabled: true,
         },
         {
           prop: "isActive",
           align: "center",
-          label: this.$t("是否启用"),
+          label: this.$t("ui.data.column.cxKeyProduct.isActive"),
           type: "select",
           dictData: this.parentDict.type.biz_yes_no,
         },

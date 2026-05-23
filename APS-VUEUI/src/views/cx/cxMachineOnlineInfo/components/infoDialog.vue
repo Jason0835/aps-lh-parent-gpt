@@ -64,7 +64,7 @@ export default {
     columns() {
       return [
         {
-          label: this.$t('ui.data.column.cxMachineOnlineInfo.factoryCode'),
+          label: this.$t('ui.data.column.factoryCode'),
           prop: 'factoryCode',
           span: 24,
           type: 'select',

@@ -133,7 +133,7 @@ export default {
         {
           prop: "factoryCode",
           label: this.$t(
-            "ui.data.column.productionMouldConfiguration.factoryCode"
+            "ui.data.column.factoryCode"
           ),
           formatter: (row) => {
             return this.selectDictLabel(

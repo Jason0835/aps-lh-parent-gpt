@@ -173,7 +173,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         Map<Integer, String> classShiftTypeMap = buildClassShiftTypeMap(shiftConfigs);
 
         Map<String, Object> tableMap = buildTableMap(previousDate, scheduleDate, factoryCode, classShiftTypeMap);
-        List<List<Map<String, Object>>> dataList = buildDataList(scheduleDate, factoryCode);
+        // TD胶种列表也使用前一天的数据，与表头数据保持一致
+        List<List<Map<String, Object>>> dataList = buildDataList(previousDate, factoryCode);
 
         // 小胶种列表数据处理：无数据时隐藏第7行，有数据时合并B7到B列结束行
         List<Map<String, Object>> smallRubberList = dataList.isEmpty() ? Collections.emptyList() : dataList.get(0);
@@ -535,8 +536,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             return dataList;
         }
 
-        // 构建物料→示方类型映射（基于成型排程结果3/4/5班次的示方书类型，按物料级别映射）
-        Map<String, String> materialRecipeTypeMap = buildMaterialRecipeTypeMap(cxResults);
+        // 构建物料→示方类型集合映射（基于成型排程结果3/4/5班次的示方书类型，按物料级别映射）
+        // 同一物料可能同时属于多种示方类型（如正规和量试），保留所有类型以便分别展示
+        Map<String, Set<String>> materialRecipeTypeMap = buildMaterialRecipeTypeMap(cxResults);
         log.info("物料示方类型映射构建完成, 映射数量: {}", materialRecipeTypeMap.size());
 
         // 按胶种类型查询对应的胎胚，构建胶种→胎胚映射
@@ -611,10 +613,13 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
             }
 
             // 按示方类型对物料进行分组（物料级别，而非胎胚级别）
+            // 同一物料可能同时属于多种示方类型，需要分别加入对应的分组
             Map<String, List<MdmMaterialInfo>> recipeTypeMaterialGroupMap = new LinkedHashMap<>();
             for (MdmMaterialInfo materialInfo : rubberTypeMaterials) {
-                String recipeType = materialRecipeTypeMap.getOrDefault(materialInfo.getMaterialCode(), "S");
-                recipeTypeMaterialGroupMap.computeIfAbsent(recipeType, k -> new ArrayList<>()).add(materialInfo);
+                Set<String> recipeTypes = materialRecipeTypeMap.getOrDefault(materialInfo.getMaterialCode(), Collections.singleton("S"));
+                for (String recipeType : recipeTypes) {
+                    recipeTypeMaterialGroupMap.computeIfAbsent(recipeType, k -> new ArrayList<>()).add(materialInfo);
+                }
             }
 
             // 按示方类型顺序构建规格花纹字符串：正规 → 量试 → 试制
@@ -714,19 +719,19 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     }
 
     /**
-     * 构建物料→示方类型映射
+     * 构建物料→示方类型集合映射
      *
      * <p>根据成型排程结果的3/4/5班次示方书类型确定每个物料的示方类型。
      * 同一胎胚下不同物料可能有不同的示方类型（如正规和量试），因此按物料级别映射，
      * 确保每种物料都能正确归入对应的示方类型分组。</p>
-     * <p>优先级：X（试制）> T（量试）> S（正规），即如果同一物料在不同班次有不同示方类型，
-     * 取优先级最高的示方类型。</p>
+     * <p>同一物料在不同班次可能有不同的示方类型（如正规和量试同时存在），
+     * 需要保留所有示方类型，以便在展示时分别列出。</p>
      *
      * @param cxResults 成型排程结果列表
-     * @return 物料编码→示方类型编码映射（S-正规，T-量试，X-试制）
+     * @return 物料编码→示方类型编码集合映射（S-正规，T-量试，X-试制）
      */
-    private Map<String, String> buildMaterialRecipeTypeMap(List<CxScheduleResult> cxResults) {
-        Map<String, String> materialRecipeTypeMap = new HashMap<>();
+    private Map<String, Set<String>> buildMaterialRecipeTypeMap(List<CxScheduleResult> cxResults) {
+        Map<String, Set<String>> materialRecipeTypeMap = new HashMap<>();
         for (CxScheduleResult result : cxResults) {
             if (!hasAnyPlanQtyInShift345(result)) {
                 continue;
@@ -748,36 +753,16 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 recipeTypes.add(StringUtils.defaultString(result.getClass5RecipeType()));
             }
 
-            // 确定示方类型优先级：X（试制）> T（量试）> S（正规）
-            String determinedType = "S";
-            if (recipeTypes.contains("X")) {
-                determinedType = "X";
-            } else if (recipeTypes.contains("T")) {
-                determinedType = "T";
+            // 过滤掉空字符串，保留所有有效的示方类型
+            recipeTypes.removeIf(StringUtils::isBlank);
+            if (recipeTypes.isEmpty()) {
+                recipeTypes.add("S");
             }
 
-            // 同一物料可能有多条排程结果记录（不同机台），保留优先级最高的示方类型
-            String existingType = materialRecipeTypeMap.get(materialCode);
-            if (existingType == null || getRecipeTypePriority(determinedType) < getRecipeTypePriority(existingType)) {
-                materialRecipeTypeMap.put(materialCode, determinedType);
-            }
+            // 同一物料可能有多条排程结果记录（不同机台），合并所有示方类型
+            materialRecipeTypeMap.computeIfAbsent(materialCode, k -> new HashSet<>()).addAll(recipeTypes);
         }
         return materialRecipeTypeMap;
-    }
-
-    /**
-     * 获取示方类型优先级（数值越小优先级越高）
-     *
-     * @param recipeType 示方类型编码
-     * @return 优先级数值
-     */
-    private int getRecipeTypePriority(String recipeType) {
-        switch (StringUtils.defaultString(recipeType)) {
-            case "X": return 1;
-            case "T": return 2;
-            case "S": return 3;
-            default: return 4;
-        }
     }
 
     /**

@@ -103,7 +103,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.monthPlanAdjustNotice.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           listeners: {
@@ -191,7 +191,7 @@ export default {
       } else {
         this.form.stockQty = 0;
         return;
-      }      
+      }
     },
 
     //utils

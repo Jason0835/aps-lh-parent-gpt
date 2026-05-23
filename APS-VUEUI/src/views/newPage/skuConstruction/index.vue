@@ -160,7 +160,7 @@ export default {
       let columns = [
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           width: 120,
 
           formatter: (row, column, value) => {
@@ -318,7 +318,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,

@@ -11,7 +11,8 @@ import tltViLocale from "tlt-ui/src/locale/lang/vi"
 import zhLocale from "./zh";
 // import zhLocale from "./zh/web_zh_CN.json"
 // import zhUILocale from "./zh/ui_zh_CN.json"
-// import viLocale from "./vi";
+import viLocale from "./vi";
+import enLocale from "./en";
 import pako from "pako"
 import { pageJson } from "@/api/bd/i18nChange"
 
@@ -20,6 +21,7 @@ let messages = {
   en_US: {
     ...elementEnLocale,
     ...tltEnLocale,
+    ...enLocale,
   },
   zh_CN: {
     ...elementZhLocale,
@@ -29,6 +31,7 @@ let messages = {
   vi_VN: {
     ...elementViLocale,
     ...tltViLocale,
+    ...viLocale,
   }
 };
 

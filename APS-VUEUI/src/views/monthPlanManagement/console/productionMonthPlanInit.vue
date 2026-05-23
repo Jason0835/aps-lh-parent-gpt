@@ -117,7 +117,7 @@ export default {
       let columns = [
         // { type: "selection", fixed: "left" },
         {
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           width: 120,
           formatter: (row) => {

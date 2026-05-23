@@ -114,7 +114,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.mdmInterestRate.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           formatter: (row) => {
             return this.selectDictLabel(
               this.dict.type.biz_factory_name,
@@ -163,7 +163,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.mdmInterestRate.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },

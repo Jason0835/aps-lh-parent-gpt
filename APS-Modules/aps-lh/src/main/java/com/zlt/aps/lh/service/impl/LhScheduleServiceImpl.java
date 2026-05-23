@@ -2158,9 +2158,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     /**
      * 构建同一物料下8班连续顺序值映射。
-     * <p>编排规则：按物料分组 → 按班次1~8顺序遍历 → 每个班次内有计划量的记录按机台编码升序 → 依次赋值1, 2, 3...
-     * 例如：4台机台ABCD排同一物料，班次1(早班)只有B有排产则B的班次1顺序=1，
-     * 班次2(中班)ABCD都有排产则按机台编码升序A=1,B=2,C=3,D=4，每个班次独立从1开始编号。</p>
+     * <p>编排规则：按物料分组 → 按班次1~8顺序遍历 → 同一SKU+机台的顺序号一旦确定，后续班次沿用不变。
+     * 机台首次上机时按机台编码升序分配顺序号，后续班次新增机台从当前最大顺序号+1递增。</p>
+     * <p>例如：5台机台K111/K1113/K1206/K1313/K2024排同一物料，
+     * 班次1(早班)K1313和K2024有排产，按上机时间+机台编码升序 → K1313=1, K2024=2；
+     * 班次2(中班)5台都有排产，K1313和K2024沿用顺序1和2，新增K111=3, K1113=4, K1206=5；
+     * 后续班次中5台机台的顺序号始终保持不变。</p>
      *
      * @param sortedList 已按物料编码+机台编码排序的排程结果列表
      * @return key=物料编码|排程结果ID，value=该记录在各班次的顺序值Map（班次号→顺序值）
@@ -2178,10 +2181,15 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             materialGroupMap.computeIfAbsent(materialCode, k -> new ArrayList<>()).add(r);
         }
 
-        // 对每个物料组，按班次1~8遍历，每个班次独立从1开始编号
-        // 班次内有计划量的记录按机台编码升序，依次赋值1,2,3...
+        // 对每个物料组，按班次1~8遍历
+        // 机台首次上机时分配顺序号，后续班次沿用不变；新增机台从当前最大顺序号+1递增
         for (Map.Entry<String, List<LhScheduleResult>> entry : materialGroupMap.entrySet()) {
             List<LhScheduleResult> groupList = entry.getValue();
+
+            // 机台编码→已分配的顺序号，跨班次保持
+            Map<String, Integer> machineOrderMap = new LinkedHashMap<>();
+            // 当前已分配的最大顺序号
+            int maxOrder = 0;
 
             for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
                 // 收集当前班次有计划量的记录，按机台编码升序
@@ -2194,12 +2202,20 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                         .sorted(Comparator.comparing(r -> StringUtils.defaultString(r.getLhMachineCode())))
                         .collect(Collectors.toList());
 
-                // 每个班次独立从1开始编号
-                int sequence = 1;
                 for (LhScheduleResult r : shiftRecords) {
+                    String machineCode = StringUtils.defaultString(r.getLhMachineCode());
+                    int order;
+                    if (machineOrderMap.containsKey(machineCode)) {
+                        // 已排上机的机台，沿用已有顺序号
+                        order = machineOrderMap.get(machineCode);
+                    } else {
+                        // 新上机台，分配下一个顺序号
+                        maxOrder++;
+                        order = maxOrder;
+                        machineOrderMap.put(machineCode, order);
+                    }
                     String key = buildShiftOrderMapKey(r);
-                    resultMap.computeIfAbsent(key, k -> new HashMap<>()).put(shift, sequence);
-                    sequence++;
+                    resultMap.computeIfAbsent(key, k -> new HashMap<>()).put(shift, order);
                 }
             }
         }

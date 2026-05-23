@@ -107,7 +107,7 @@ export default {
           showOverflowTooltip: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.updateTime"),
+          label: this.$t("ui.data.column.updateTime"),
           prop: "processedTime",
           minWidth: 180,
           formatter: (row) => row.processedTime || row.updateTime,

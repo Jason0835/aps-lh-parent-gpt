@@ -69,7 +69,7 @@ export default {
       // searchColumns: [
       //   {
       //     prop: "factoryCode",
-      //     label: this.$t("common.factory"),
+      //     label: this.$t("ui.data.column.factoryCode"),
       //     type: "select", //GLUE_TYPE
       //     dictData: this.parentDict.type.biz_factory_name,
       //   },

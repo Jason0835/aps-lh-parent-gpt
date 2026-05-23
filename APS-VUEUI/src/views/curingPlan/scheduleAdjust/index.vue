@@ -131,7 +131,7 @@ export default {
         { type: "selection", fixed: "left" },
         // { type: "index", fixed: "left" },
         {
-          label: this.$t("ui.data.column.scheduleAdjust.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);

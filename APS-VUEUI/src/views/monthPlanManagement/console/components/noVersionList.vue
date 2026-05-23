@@ -87,7 +87,7 @@ export default {
 
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           align: "center",
 
           formatter: (row) => {
@@ -149,7 +149,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },

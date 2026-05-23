@@ -84,7 +84,7 @@ export default {
       return [
          {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.confMinProd.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           disabled: false,
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
@@ -159,7 +159,7 @@ export default {
           minQty: this.numberEmpty(data.minQty),
           upQty: this.numberEmpty(data.upQty),
         };
-      } 
+      }
     },
     hide() {
       this.form = {};

@@ -131,7 +131,7 @@ export default {
         // { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.monthPlanAdjustNotice.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           formatter: (row) => {
             return this.selectDictLabel(
               this.dict.type.biz_factory_name,
@@ -274,7 +274,7 @@ export default {
                   </text-button>
                 ) : null}
                 {row.status == "3" &&  row.planQty != 0 ? (
-                  <text-button 
+                  <text-button
                   v-hasPermi={['monthplan:adjustNotice:list']}
                    onClick={() => this.handleDetail(row)}>
                     {this.$t("查看明细")}
@@ -291,7 +291,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.monthPlanAdjustNotice.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,

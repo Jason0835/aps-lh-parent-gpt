@@ -107,24 +107,24 @@ export default {
         {
           prop: "structureName",
           align: "center",
-          label: this.$t("结构"),
+          label: this.$t("ui.data.column.cxKeyProduct.structureName"),
           minWidth: 180,
         },
         {
           prop: "embryoCode",
           align: "center",
-          label: this.$t("胎胚代码"),
+          label: this.$t("ui.data.column.cxKeyProduct.embryoCode"),
         },
         {
           prop: "embryoDesc",
           align: "left",
-          label: this.$t("胎胚描述"),
+          label: this.$t("ui.data.column.cxKeyProduct.embryoDesc"),
           minWidth: 350,
         },
         {
           prop: "isActive",
           align: "center",
-          label: this.$t("是否启用"),
+          label: this.$t("ui.data.column.cxKeyProduct.isActive"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -168,7 +168,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("结构"),
+          label: this.$t("ui.data.column.cxKeyProduct.structureName"),
           prop: "structureName",
           render: (form, item) => {
             return (
@@ -181,17 +181,17 @@ export default {
           },
         },
         {
-          label: this.$t("胎胚代码"),
+          label: this.$t("ui.data.column.cxKeyProduct.embryoCode"),
           prop: "embryoCode",
         },
         {
-          label: this.$t("胎胚描述"),
+          label: this.$t("ui.data.column.cxKeyProduct.embryoDesc"),
           minWidth: 350,
           align: "left",
           prop: "embryoDesc",
         },
         {
-          label: this.$t("是否启用"),
+          label: this.$t("ui.data.column.cxKeyProduct.isActive"),
           prop: "isActive",
           type: "select",
           dictData: this.dict.type.biz_yes_no,

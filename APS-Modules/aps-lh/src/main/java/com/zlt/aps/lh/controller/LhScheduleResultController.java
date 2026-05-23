@@ -63,6 +63,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 硫化排程控制器
@@ -907,14 +908,28 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
                 // 设置3个班的示方号（硫化示方书号），3个班的示方号都取同一个值
                 // 根据施工阶段对应的示方类型精确匹配：正规取正规、量试取量试、试制取试制
-                String exampleType = item.getClass1ExampleType();
+                // 注意：T-2日无夜班时class1ExampleType为空，需从class2/class3中取第一个非空值
+                String exampleType = Stream.of(
+                                item.getClass1ExampleType(),
+                                item.getClass2ExampleType(),
+                                item.getClass3ExampleType())
+                        .filter(StringUtils::isNotBlank)
+                        .findFirst()
+                        .orElse(null);
                 if (StringUtils.isNotBlank(exampleType)) {
                     String compositeKey = materialCode + "_" + exampleType;
                     String lhNo = materialCodeAndTypeToLhNoMap.get(compositeKey);
                     if (StringUtils.isNotBlank(lhNo)) {
-                        item.setClass1ExampleNo(lhNo);
-                        item.setClass2ExampleNo(lhNo);
-                        item.setClass3ExampleNo(lhNo);
+                        // 仅对有示方类型且有计划量的班次设置示方号
+                        if (StringUtils.isNotBlank(item.getClass1ExampleType())) {
+                            item.setClass1ExampleNo(lhNo);
+                        }
+                        if (StringUtils.isNotBlank(item.getClass2ExampleType())) {
+                            item.setClass2ExampleNo(lhNo);
+                        }
+                        if (StringUtils.isNotBlank(item.getClass3ExampleType())) {
+                            item.setClass3ExampleNo(lhNo);
+                        }
                     } else {
                         log.warn("物料{}未找到示方类型{}对应的硫化示方书号, 请检查SKU与示方书关系表数据", materialCode, exampleType);
                     }

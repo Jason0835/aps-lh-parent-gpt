@@ -120,7 +120,7 @@ export default {
           prop: "factoryCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.lhChipStock.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           minWidth: 120,
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
@@ -175,7 +175,7 @@ export default {
           prop: "updateTime",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.lhChipStock.updateTime"),
+          label: this.$t("ui.data.column.updateTime"),
           minWidth: 180,
         },
         {
@@ -220,7 +220,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.lhChipStock.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,

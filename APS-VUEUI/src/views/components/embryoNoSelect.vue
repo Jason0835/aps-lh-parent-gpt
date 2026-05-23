@@ -89,7 +89,7 @@ export default {
       return [
               {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
         },
@@ -105,7 +105,7 @@ export default {
       const list = [
       {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           width: 120,
 
           formatter: (row, column, value) => {

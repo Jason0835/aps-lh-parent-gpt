@@ -149,7 +149,7 @@ export default {
           clearable: false,
         },
         {
-          label: this.$t("ui.data.column.scheduleAdjust.factoryCode"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,

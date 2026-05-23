@@ -1,4 +1,4 @@
-﻿﻿<template>
+﻿﻿﻿﻿<template>
   <el-dialog
     :title="title"
     :visible="visible"
@@ -257,6 +257,11 @@ export default {
     handleMaterialCodeChange(val, row) {
       if (val) {
         this.$set(this.form, "materialDesc", row.materialDesc);
+        this.$set(this.form, "mouldSurplusQty", null);
+        this.$set(this.form, "embryoStock", null);
+        this.$set(this.form, "machineShiftCapacity", null);
+        this.$set(this.form, "trialStatus", null);
+        this.$set(this.form, "leftRightMould", null);
         this.loadSkuRelatedData(val);
       } else {
         this.$set(this.form, "materialDesc", "");
@@ -280,21 +285,11 @@ export default {
         };
         const res = await getSkuRelatedData(params);
         if (res) {
-          if (res.mouldSurplusQty != null) {
-            this.$set(this.form, "mouldSurplusQty", res.mouldSurplusQty);
-          }
-          if (res.embryoStock != null) {
-            this.$set(this.form, "embryoStock", res.embryoStock);
-          }
-          if (res.machineShiftCapacity != null) {
-            this.$set(this.form, "machineShiftCapacity", res.machineShiftCapacity);
-          }
-          if (res.trialStatus != null) {
-            this.$set(this.form, "trialStatus", res.trialStatus);
-          }
-          if (res.leftRightMould != null) {
-            this.$set(this.form, "leftRightMould", res.leftRightMould);
-          }
+          this.$set(this.form, "mouldSurplusQty", res.mouldSurplusQty ?? null);
+          this.$set(this.form, "embryoStock", res.embryoStock ?? null);
+          this.$set(this.form, "machineShiftCapacity", res.machineShiftCapacity ?? null);
+          this.$set(this.form, "trialStatus", res.trialStatus ?? null);
+          this.$set(this.form, "leftRightMould", res.leftRightMould ?? null);
           if (res.errorMessages && res.errorMessages.length > 0) {
             this.$modal.msgError(res.errorMessages.join('\n'));
           }
@@ -421,6 +416,9 @@ export default {
       await this.fetchScheduleShiftDates(this.form.scheduleDate);
       if (!data?.lhMachineCode) {
         this.$set(this.form, "lhMachineCode", "");
+      }
+      if (this.form.materialCode) {
+        await this.loadSkuRelatedData(this.form.materialCode);
       }
     },
     hide() {

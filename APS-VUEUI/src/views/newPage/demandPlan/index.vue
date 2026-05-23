@@ -250,7 +250,7 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
@@ -522,7 +522,7 @@ export default {
                       ))}
                     </el-select>
                   )}
-                {(!this.hasPermission("monthplan:demandPlan:edit") || 
+                {(!this.hasPermission("monthplan:demandPlan:edit") ||
 				  row.conventionReserveQty == null ||
 				  row.conventionReserveQty == 0) && (
                   <span>
@@ -618,7 +618,7 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           clearable: false,

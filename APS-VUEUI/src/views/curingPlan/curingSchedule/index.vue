@@ -728,7 +728,7 @@ export default {
         }, // 订单号
         {
           prop: "updateTime",
-          label: this.$t("ui.data.column.scheduleResult.updateTime"),
+          label: this.$t("ui.data.column.updateTime"),
           minWidth: 180,
         }, // 更新时间
         // {

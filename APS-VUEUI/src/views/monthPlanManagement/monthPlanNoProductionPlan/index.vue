@@ -120,7 +120,7 @@ export default {
     columns() {
       let columns = [
         {
-          label: this.$t("common.factory"),
+          label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           minWidth: 100,
           formatter: (row, column, value) => {

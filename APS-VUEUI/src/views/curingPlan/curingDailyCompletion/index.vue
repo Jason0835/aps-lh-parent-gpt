@@ -87,7 +87,7 @@ export default {
           showOverflowTooltip: true,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.updateTime"),
+          label: this.$t("ui.data.column.updateTime"),
           prop: "updateTime",
           minWidth: 160,
         },

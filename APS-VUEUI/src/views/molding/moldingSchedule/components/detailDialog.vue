@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    :title="$t('车次明细')"
+    :title="$t('ui.data.column.scheduleResult.trainDetail')"
     :visible.sync="visible"
     width="80%"
     append-to-body
@@ -83,7 +83,7 @@ export default {
   methods: {
     async show(mainId) {
       if (mainId === undefined || mainId === null || mainId === "") {
-        this.$modal.msgWarning(this.$t("主表id不能为空"));
+        this.$modal.msgWarning(this.$t("ui.data.column.scheduleResult.masterIdRequired"));
         return;
       }
       this.visible = true;

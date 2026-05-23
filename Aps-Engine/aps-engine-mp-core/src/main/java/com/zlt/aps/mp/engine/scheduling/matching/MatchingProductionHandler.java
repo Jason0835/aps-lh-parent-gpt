@@ -1474,11 +1474,13 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitMap = groupInfo.getDayProductionLimitInfo();
         if (dayProductionLimitMap != null) {
             GroupPlanCxLhCapacityLimitHelper limitHelper = dayProductionLimitMap.get(day);
-            Map<String, SkuDayProductionInfoHelper> productionSkuQtyMap = limitHelper.getProductionSkuQtyInfo();
-            if (!CollectionUtils.isEmpty(productionSkuQtyMap)) {
-                SkuDayProductionInfoHelper SkuDayProductionInfo = productionSkuQtyMap.get(materialDesc);
-                if (SkuDayProductionInfo != null) {
-                    currentDayProductionQty = SkuDayProductionInfo.getSumProductionQty();
+            if (limitHelper != null) {
+                Map<String, SkuDayProductionInfoHelper> productionSkuQtyMap = limitHelper.getProductionSkuQtyInfo();
+                if (!CollectionUtils.isEmpty(productionSkuQtyMap)) {
+                    SkuDayProductionInfoHelper SkuDayProductionInfo = productionSkuQtyMap.get(materialDesc);
+                    if (SkuDayProductionInfo != null) {
+                        currentDayProductionQty = SkuDayProductionInfo.getSumProductionQty();
+                    }
                 }
             }
         }

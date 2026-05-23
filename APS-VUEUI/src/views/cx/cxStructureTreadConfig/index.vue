@@ -167,7 +167,7 @@ export default {
       return [
         {
           prop: 'factoryCode',
-          label: this.$t('ui.data.column.cxStructureTreadConfig.factoryCode'),
+          label: this.$t('ui.data.column.factoryCode'),
           render: (form) => {
             return (
               <el-select
@@ -250,7 +250,7 @@ export default {
           prop: 'factoryCode',
           align: 'center',
           halign: 'center',
-          label: this.$t('ui.data.column.cxStructureTreadConfig.factoryCode'),
+          label: this.$t('ui.data.column.factoryCode'),
           minWidth: 140,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
