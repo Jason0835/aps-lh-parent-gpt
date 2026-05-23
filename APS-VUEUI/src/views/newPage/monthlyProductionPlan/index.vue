@@ -949,7 +949,29 @@ export default {
       }
     },
     /**
+     * 查询月份与当前月份比较：-1 过去月，0 当月，1 未来月；无法解析时返回 null。
+     */
+    getQueryMonthCompareToCurrent() {
+      const ym = this.normalizeYearMonth(
+        this.query.yearMonth || this.search.yearMonth
+      );
+      if (!ym) {
+        return null;
+      }
+      const queryYm = ym.year * 12 + ym.month;
+      const now = moment();
+      const currentYm = now.year() * 12 + (now.month() + 1);
+      if (queryYm < currentYm) {
+        return -1;
+      }
+      if (queryYm > currentYm) {
+        return 1;
+      }
+      return 0;
+    },
+    /**
      * 全表统一：根据 SYS0206001 计算锁定截止日（与行数据、机台号无关）。
+     * 仅当查询月份为「当前月」时生效。
      * lockedDays > 0：锁定 1 号至（今天 + lockedDays - 1）号；
      * lockedDays === 0：锁定当月今天之前的日期（如今天 18 号则锁定 1–17 号）。
      */
@@ -961,8 +983,20 @@ export default {
       const today = new Date().getDate();
       return lockDays === 0 ? today - 1 : today + lockDays - 1;
     },
-    /** 某日是否在锁定期内（全表同一规则） */
+    /**
+     * 某日是否在锁定期内（全表同一规则）：
+     * 查询月 < 当前月 → 1–31 号全部锁定；
+     * 查询月 = 当前月 → 按 SYS0206001 接口规则锁定；
+     * 查询月 > 当前月 → 不锁定。
+     */
     isDayLocked(day) {
+      const monthCompare = this.getQueryMonthCompareToCurrent();
+      if (monthCompare === 1) {
+        return false;
+      }
+      if (monthCompare === -1) {
+        return day >= 1 && day <= 31;
+      }
       const lockEndDay = this.getLockEndDay();
       if (lockEndDay < 1) {
         return false;
@@ -973,7 +1007,7 @@ export default {
     isStatisticsRow(row) {
       return !!(row && row.showBackground);
     },
-    /** 日排产是否显示编辑框：全表仅按锁定日期判断，与单元格有无值、机台号、row.id 无关 */
+    /** 日排产是否显示编辑框：按查询月份与锁定日期判断，与单元格有无值、机台号、row.id 无关 */
     canEditDayCell(row, day) {
       if (!row || this.isStatisticsRow(row)) {
         return false;
