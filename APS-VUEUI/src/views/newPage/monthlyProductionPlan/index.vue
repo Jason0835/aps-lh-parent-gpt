@@ -46,6 +46,11 @@
             >{{
             $t("ui.data.column.monthPlanFinalAdjustQuery.viewAdjustVersion")
           }}</el-button>
+          <el-button
+          v-hasPermi="['monthplan:mpAdjustResult:importData']"
+            @click="$refs.tltUpload.handleImport()"
+            >{{ $t("ui.frame.btn.import") }}</el-button
+          >
           <!-- 导出：与 console 排产明细 mouldingDayResult 页 factoryMonthPlanMouldDayResult/export 一致 -->
           <el-button
             @click="handleExport"
@@ -270,6 +275,12 @@
         >
       </span>
     </el-dialog>
+    <tlt-upload
+      ref="tltUpload"
+      downloadUrl=""
+      uploadUrl="/monthplan/mpAdjustResult/importData"
+      @uploadSuccess="getList"
+    />
   </basic-container>
 </template>
 
@@ -289,12 +300,14 @@ import {
 import { getByParamCode } from "@/api/monthplan/factoryParam";
 import structureAdjustDialog from "./components/structureAdjustDialog.vue";
 import adjustVersionDialog from "./components/adjustVersionDialog.vue";
+import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 export default {
   name: "MonthPlanFinalAdjustQuery",
   components: {
     structureAdjustDialog,
     adjustVersionDialog,
+    tltUpload
   },
   /** 含成型机台选择弹窗所需字典（与 formingCapacitySelect / 周程滚动页一致） */
   dicts: [
