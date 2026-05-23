@@ -311,6 +311,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
         factoryMonthPlanMouldDayResult.setMonth(queryVO.getMonth());
         factoryMonthPlanMouldDayResult.setProductionVersion(queryVO.getProductionVersion());
         factoryMonthPlanMouldDayResult.setMonthPlanVersion(queryVO.getMonthPlanVersion());
+        factoryMonthPlanMouldDayResult.setStructureName(queryVO.getStructureName());
         MpStructureAllocationExportStatisticsVo vo = mpStructureAllocationService.getExportVo(factoryMonthPlanMouldDayResult);
         byte[] excelBytes2 = mpStructureAllocationService.getMpStructureAllocationExportByte(vo);
         
