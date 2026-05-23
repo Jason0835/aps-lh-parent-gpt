@@ -36,6 +36,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    sum( case when d.ORI_HEIGHT_QTY > 0 then d.ORI_HEIGHT_QTY else d.HEIGHT_QTY end ) HEIGHT_QTY,
 		    sum( case when d.ORI_MID_QTY > 0 then d.ORI_MID_QTY else d.MID_QTY end ) MID_QTY,
 		    sum( d.CYCLE_RESERVE_QTY ) CYCLE_RESERVE_QTY,
+		    sum( d.POSTPONE_QTY ) POSTPONE_QTY,
 		    sum( case when d.IS_SCHEDULE = '1' then d.CONVENTION_RESERVE_QTY else 0 end) CONVENTION_RESERVE_QTY,
 		    mc.NET_QTY UN_RESTRICTED_NET_QTY,
 		    r.TOTAL_QTY,

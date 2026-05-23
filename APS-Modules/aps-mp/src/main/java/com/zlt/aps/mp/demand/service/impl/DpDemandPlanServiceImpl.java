@@ -984,9 +984,12 @@ public class DpDemandPlanServiceImpl extends AbstractDocService<DpDemandPlan>  i
         List<DpOrderOffsetDetail> allocations = StockAllocationHelper.calculateStockAllocation(
             monthPlanVersion,tMonth, saleOrderGroupMap, finishedProductStockMap, monthSurplusMap,materialInfoMap,weekYearForEudr);
         // 处理续作SKU标记
-        if (!CollectionUtils.isEmpty(continueSku)) {
-            allocations.stream().filter(o -> continueSku.contains(o.getMaterialDesc())).forEach(o -> o.setIsContinueSKU(true));
-        }
+        allocations.stream().forEach(o -> {
+            if (!CollectionUtils.isEmpty(continueSku)) {
+                o.setIsContinueSKU(continueSku.contains(o.getMaterialDesc()));
+            }
+            o.setOriScmPriority(o.getScmPriority());
+        });
         
         return new PredictionContext.OrderAllocationResult(allocations, allocations, finishedProductStockMap);
     }

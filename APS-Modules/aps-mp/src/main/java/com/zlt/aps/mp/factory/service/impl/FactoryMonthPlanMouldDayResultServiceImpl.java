@@ -244,9 +244,15 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 Integer differenceQty = prodReqPlan - intValue(result.getTotalQty());
                 result.setDifferenceQty(differenceQty >= 0? differenceQty: 0);
                 result.setProdReqPlan(prodReqPlan);
+                
                 // 2.1.2.3、实单未排产 = 高优先级 + 中优先级 - 高优先级实际 - 中优先级实际，如果为负数则设为0
-                Integer heightQty = Optional.ofNullable(result.getHeightQty()).orElse(0);
-                Integer midQty = Optional.ofNullable(result.getMidQty()).orElse(0);
+                Integer heightQty = intValue(result.getHeightQty());
+                Integer midQty = intValue(result.getMidQty());
+                // 重新分配高、中、周期、暂缓、储备的生产量
+                result.setHeightLossQty(heightQty);
+                result.setMidLossQty(midQty);
+                result.setCycleReserveLossQty(intValue(result.getCycleReserveQty()));
+                result.allocateProductionByPriority();
                 Integer heightProductionQty = Optional.ofNullable(result.getHeightProductionQty()).orElse(0);
                 Integer midProductionQty = Optional.ofNullable(result.getMidProductionQty()).orElse(0);
                 Integer actualOrderUnproduced = heightQty + midQty - heightProductionQty - midProductionQty;
@@ -298,6 +304,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMouldCavityQty, Comparator.reverseOrder())) // 型腔数倒序
                     .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMainPattern, Comparator.nullsLast(String::compareTo))) // 主花纹
                     .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getTypeBlockQty, Comparator.reverseOrder())) // 活块数倒序
+                    .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getPattern, Comparator.nullsLast(String::compareTo))) // 花纹
                     .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMaterialDesc, Comparator.nullsLast(String::compareTo))) // 物料描述
                     );// 排序
             totalRecordList.addAll(structureList);

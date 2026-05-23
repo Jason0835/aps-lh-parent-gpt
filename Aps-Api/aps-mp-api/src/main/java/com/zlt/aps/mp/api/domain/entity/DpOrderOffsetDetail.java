@@ -273,6 +273,14 @@ public class DpOrderOffsetDetail extends BaseEntity {
     @ApiModelProperty(value = "是否替换料", name = "isAlternateMaterial")
     @TableField(exist = false)
     private String isAlternateMaterial;
+    
+    /**
+     * 原物料优先级，记录区域产能限制修改前的物料优先字段
+     */
+    @ApiModelProperty(value = "原物料优先级", name = "oriScmPriority")
+    @TableField(exist = false)
+    private String oriScmPriority;
+    
     /**
      * 是否续作SKU
      */
