@@ -1,8 +1,11 @@
 package com.zlt.aps.mp.engine.handler;
 
+import cn.hutool.core.convert.Convert;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.zlt.aps.constant.StringConstant;
+import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.GroupPlanCxLhCapacityLimitHelper;
@@ -11,15 +14,10 @@ import com.zlt.aps.mp.engine.domain.dto.CxLhProductionHelper;
 import com.zlt.aps.mp.engine.domain.dto.CxMachineAllocationPlanHelper;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.dto.SkuDayProductionInfoHelper;
-import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
-import com.zlt.aps.mp.engine.domain.vo.CxMachineUsedLhInfo;
-import com.zlt.aps.mp.engine.domain.vo.GroupConclusionInfoVo;
-import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
-import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.logrecorder.GroupPlanConclusionLogRecorder;
+import com.zlt.aps.mp.engine.logrecorder.TbrSimulateProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
-
-import cn.hutool.core.convert.Convert;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -53,8 +51,8 @@ public class GroupPlanConclusionHandler {
      * 获取分组收尾信息
      * 场景：在机结构对在产机台的收尾处理
      *
-     * @param context
-     * @param groupPlanInfo
+     * @param context       排产上下文
+     * @param groupPlanInfo 分组计划
      * @return conclusionDay ：不再排产，即在此前一日为分组收尾日
      * deductionDaySet 需要清除的排产日信息
      */
@@ -158,12 +156,12 @@ public class GroupPlanConclusionHandler {
         //获取使用硫化机台数低于minLhMachineCount的数据
         List<CxMachineUsedLhInfo> realLowMinLhMachineDayList = getLowMinLhMachineDayInfo(context, groupPlanInfo, productionUsedLhInfoList, conclusionRange, minLhMachineCount);
 
-        //20260507+  获取单个成型机台高优先级占当日排产的硫化机台数<3的天数数据
-        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo = groupPlanInfo.getDayProductionLimitInfo();
+        //20260507+  获取单个成型机台高优先级占当日排产的硫化机台数<3的天数数据 20260523+ 排产信息取值错误，新增分配从cxMachineInfo对象中获取
+        Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo = cxMachineInfo.getDayProductionLimitInfo();
         if (!CollectionUtils.isEmpty(dayProductionLimitInfo)) {
             List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
-            List<GroupPlanCxLhCapacityLimitHelper> lowHeightPriorityLhMachineList = this.getLowHeightPriorityLhMachineList(
-                    groupPlanInfo, dayLimitList);
+            Map<String, Integer> heightQtyMap = getSkuHeightNeedProductionQty(groupPlanInfo, true);
+            List<GroupPlanCxLhCapacityLimitHelper> lowHeightPriorityLhMachineList = this.getLowHeightPriorityLhMachineList(context, groupPlanInfo, heightQtyMap, dayLimitList);
             Set<Integer> lowHeightPriorityDaySet = lowHeightPriorityLhMachineList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
             List<CxMachineUsedLhInfo> lowHeightPriorityUsedLhInfoList = productionUsedLhInfoList.stream().filter(single -> lowHeightPriorityDaySet.contains(single.getProductionDay())).collect(Collectors.toList());
             // 取并集，同一天的对象引用相同，因此可以直接用set去重
@@ -172,7 +170,7 @@ public class GroupPlanConclusionHandler {
             set1.addAll(set2);
             realLowMinLhMachineDayList = new ArrayList<>(set1);
         }
-        
+
         if (CollectionUtils.isEmpty(realLowMinLhMachineDayList)) {
             realLowMinLhMachineDayList = Lists.newArrayList();
         }
@@ -193,54 +191,6 @@ public class GroupPlanConclusionHandler {
         groupConclusionInfo.addSelectedConclusionCxMachine(cxMachineInfo);
         groupConclusionInfo.updateDeductionDaysByCxMachine(deductionDay);
         return groupConclusionInfo;
-    }
-
-    /**
-     * 从分组计划分配的成型机台中，获取提前收尾，配比大的机台
-     * 场景：在机机构在产机台的排产，故而此时机台都是只有一个结构分配
-     *
-     * @param context       排产上下文
-     * @param groupPlanInfo 分组
-     * @return
-     */
-    public CxMachineBaseInfoVo getConclusionCxMachine(Context context, ProductionPlanGroupInfo groupPlanInfo) {
-        if (null == groupPlanInfo) {
-            return null;
-        }
-        Set<String> allCxMachineCodeSet = groupPlanInfo.getAllocationCxMachineCodeSet();
-        if (CollectionUtils.isEmpty(allCxMachineCodeSet)) {
-            return null;
-        }
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        List<MonthPlanStructureLhRatioVo> effectiveRatioList = new ArrayList<>();
-        Map<MonthPlanStructureLhRatioVo, Set<String>> effectiveRationMap = new HashMap<>();
-        Map<String, CxMachineBaseInfoVo> allCxMachineInfo = productionContext.getBaseDataContainer().getCxMachineBaseInfo();
-        allCxMachineCodeSet.forEach(cxMachineCode -> {
-            CxMachineBaseInfoVo cxMachineInfo = allCxMachineInfo.get(cxMachineCode);
-            if (null == cxMachineInfo) {
-                return;
-            }
-            MonthPlanStructureLhRatioVo findLhRatio = groupPlanInfo.getLhRatio(cxMachineInfo);
-            if (null == findLhRatio) {
-                return;
-            }
-            Set<String> cxMachineCodeSet = effectiveRationMap.get(findLhRatio);
-            if (null == cxMachineCodeSet) {
-                cxMachineCodeSet = new HashSet<>();
-                effectiveRationMap.put(findLhRatio, cxMachineCodeSet);
-            }
-            cxMachineCodeSet.add(cxMachineCode);
-            effectiveRatioList.add(findLhRatio);
-        });
-        if (CollectionUtils.isEmpty(effectiveRatioList)) {
-            return null;
-        }
-        effectiveRatioList.sort(Comparator.comparing(MonthPlanStructureLhRatioVo::getLhMachineMaxQty));
-        MonthPlanStructureLhRatioVo selectedLhRatio = effectiveRatioList.get(BigDecimal.ZERO.intValue());
-        List<String> selectedCxMachineList = new ArrayList<>(effectiveRationMap.get(selectedLhRatio));
-        Collections.sort(selectedCxMachineList);
-        String selectedCxMachineCode = selectedCxMachineList.get(BigDecimal.ZERO.intValue());
-        return allCxMachineInfo.get(selectedCxMachineCode);
     }
 
     /**
@@ -277,35 +227,6 @@ public class GroupPlanConclusionHandler {
             return null;
         }
         return cxMachineInfo;
-    }
-
-    /**
-     * 根据分配信息，获取结构的收尾日信息
-     *
-     * @param context           排产上下文
-     * @param groupPlanInfo     分组
-     * @param allAllocationInfo 分组分配信息
-     * @return
-     */
-    private Set<Integer> getGroupConclusionDayInfo(Context context, ProductionPlanGroupInfo groupPlanInfo, List<CxMachineAllocationPlanHelper> allAllocationInfo) {
-        if (null == groupPlanInfo || CollectionUtils.isEmpty(allAllocationInfo)) {
-            return Collections.emptySet();
-        }
-        List<CxMachineAllocationPlanHelper> realAllocationList = allAllocationInfo.stream().filter(singleAllocation -> groupPlanInfo.equals(singleAllocation.getProductionPlanInfo())).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(realAllocationList)) {
-            return Collections.emptySet();
-        }
-        Set<Integer> groupConclusionDaySet = Sets.newHashSet();
-        realAllocationList.forEach(singleAllocation -> {
-            Integer realConclusionDay = singleAllocation.getRealConclusionDay(context);
-            if (null != realConclusionDay) {
-                groupConclusionDaySet.add(realConclusionDay);
-            }
-        });
-        if (CollectionUtils.isEmpty(groupConclusionDaySet)) {
-            return Collections.emptySet();
-        }
-        return groupConclusionDaySet;
     }
 
     /**
@@ -353,17 +274,17 @@ public class GroupPlanConclusionHandler {
         }
 
         List<GroupPlanCxLhCapacityLimitHelper> lowMinLhMachineDayList = getForcedConclusionDayInfo(groupPlanInfo, dayProductionLimitInfo);
-        
+
         //20260507+  获取单个成型机台高优先级占当日排产的硫化机台数<3的天数数据
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
-        List<GroupPlanCxLhCapacityLimitHelper> lowHeightPriorityLhMachineList = this.getLowHeightPriorityLhMachineList(
-                groupPlanInfo, dayLimitList);
+        Map<String, Integer> heightQtyMap = getSkuHeightNeedProductionQty(groupPlanInfo, false);
+        List<GroupPlanCxLhCapacityLimitHelper> lowHeightPriorityLhMachineList = this.getLowHeightPriorityLhMachineList(context, groupPlanInfo, heightQtyMap, dayLimitList);
         // 取并集，同一天的对象引用相同，因此可以直接用set去重
         Set<GroupPlanCxLhCapacityLimitHelper> set1 = new HashSet<>(lowMinLhMachineDayList);
         Set<GroupPlanCxLhCapacityLimitHelper> set2 = new HashSet<>(lowHeightPriorityLhMachineList);
         set1.addAll(set2);
         lowMinLhMachineDayList = new ArrayList<>(set1);
-        
+
         if (CollectionUtils.isEmpty(lowMinLhMachineDayList)) {
             //记录日志
             GroupPlanConclusionLogRecorder.addNoConclusionInfoLog(context, groupName, minLhMachineCount);
@@ -437,67 +358,131 @@ public class GroupPlanConclusionHandler {
         }
         return lowMinLhMachineList;
     }
-    
+
     /**
      * 获取单个成型机台高优先级占当日排产的硫化机台数<3的天数数据
-     * @param groupPlanInfo
-     * @param dayLimitList
+     *
+     * @param groupPlanInfo 分组计划对象
+     * @param heightQtyMap  分组下所有待排Sku及数量
+     * @param dayLimitList  日排产信息
      * @return
      */
-    private List<GroupPlanCxLhCapacityLimitHelper> getLowHeightPriorityLhMachineList(ProductionPlanGroupInfo groupPlanInfo,
+    private List<GroupPlanCxLhCapacityLimitHelper> getLowHeightPriorityLhMachineList(Context context,
+                                                                                     ProductionPlanGroupInfo groupPlanInfo,
+                                                                                     Map<String, Integer> heightQtyMap,
                                                                                      List<GroupPlanCxLhCapacityLimitHelper> dayLimitList) {
-        // 累计各sku的高优先级需求量
-        Map<String, Integer> heightQtyMap = groupPlanInfo.getGroupPlanData().stream()
-                .collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc,
-                        Collectors.collectingAndThen(Collectors.toList(),
-                                l -> l.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightQty).sum())));
-        // 高优先级台数低于阈值机台列表
+        //20260523+ 设置为结构优先，则跳过高优级量强制收尾业务-高优先级硫化机台数限制数
+        Integer minHeightLhMachineLimit = YesOrNoEnum.YES.getValue().equals(groupPlanInfo.isStructurePriority()) ? null : groupPlanInfo.getMinHeightPriorityLhMachineCount();
+        TbrSimulateProductionLogRecorder.addStartHeightPriorityLhMachineLog(context, groupPlanInfo.getGroupName(), heightQtyMap, minHeightLhMachineLimit);
+        if (null == minHeightLhMachineLimit) {
+            return Collections.emptyList();
+        }
+        //高优先级台数低于阈值机台列表
         List<GroupPlanCxLhCapacityLimitHelper> lowHeightPriorityLhMachineList = new ArrayList<>();
         TreeMap<Integer, List<GroupPlanCxLhCapacityLimitHelper>> dayLimitMap = dayLimitList.stream().collect(
                 Collectors.groupingBy(GroupPlanCxLhCapacityLimitHelper::getDay, TreeMap::new, Collectors.toList()));
         Integer latestDay = 0;
-        // 遍历各排产日，找出高优先级的SKU的机台占用超过阈值的最晚日期（默认2）
-        for (Entry<Integer, List<GroupPlanCxLhCapacityLimitHelper>> entry: dayLimitMap.entrySet()) {
+        //遍历各排产日，找出高优先级的SKU的机台占用超过阈值的最晚日期（默认2）
+        for (Entry<Integer, List<GroupPlanCxLhCapacityLimitHelper>> entry : dayLimitMap.entrySet()) {
             GroupPlanCxLhCapacityLimitHelper singleDay = CollectionUtils.firstElement(entry.getValue());
             Integer day = singleDay.getDay();
-            // 取出当天的排产量
+            //取出当天的排产量
             Map<String, SkuDayProductionInfoHelper> productionSkuQtyMap = singleDay.getProductionSkuQtyInfo();
-            // 高优先级排产机台数
+            //高优先级排产机台数
             int heightPriorityMachineCount = 0;
-            if (!CollectionUtils.isEmpty(productionSkuQtyMap)) { // 当天没排产，直接添加到列表中
-                // 内层循环，遍历当天每个SKU排产数据
-                for (Entry<String, SkuDayProductionInfoHelper> skuQtyEntry: productionSkuQtyMap.entrySet()) {
+            //当天没排产，直接添加到列表中
+            if (!CollectionUtils.isEmpty(productionSkuQtyMap)) {
+                //内层循环，遍历当天每个SKU排产数据
+                for (Entry<String, SkuDayProductionInfoHelper> skuQtyEntry : productionSkuQtyMap.entrySet()) {
                     String materialDesc = skuQtyEntry.getKey();
-                    // 取出SKU剩余未排的高优先级需求量
+                    //取出SKU剩余未排的高优先级需求量
                     Integer heightQty = heightQtyMap.getOrDefault(materialDesc, 0);
-                    if (heightQty == 0) { // 如果没有高优先级需求量，则看下一个SKU
+                    //如果没有高优先级需求量，则看下一个SKU
+                    if (heightQty == 0) {
                         continue;
                     }
-                    // 如果还有高优先级未排量，则高优先级机台数累加
+                    //如果还有高优先级未排量，则高优先级机台数累加
                     SkuDayProductionInfoHelper dayProductionInfo = skuQtyEntry.getValue();
                     Integer dayProductionQty = Convert.toInt(dayProductionInfo.getSumProductionQty(), 0);
                     heightPriorityMachineCount += dayProductionInfo.getUsedMouldSet().size() / ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-                    // 分配高优先级需求量
-                    Integer remainHeightQty = heightQty > dayProductionQty? heightQty - dayProductionQty: 0;// 计算分配后剩余的高优先级未排量
+                    //分配高优先级需求量-计算分配后剩余的高优先级未排量
+                    Integer remainHeightQty = heightQty > dayProductionQty ? heightQty - dayProductionQty : 0;
                     heightQtyMap.put(materialDesc, remainHeightQty);
                 }
             }
-            // 判断高优先级排产机台数是否达到阈值，达到了则更新最晚达标天数
-            if (heightPriorityMachineCount >= groupPlanInfo.getMinHeightPriorityLhMachineCount() && latestDay < day) {
+            //判断高优先级排产机台数是否达到阈值，达到了则更新最晚达标天数
+            if (heightPriorityMachineCount >= minHeightLhMachineLimit && latestDay < day) {
                 latestDay = day;
             }
         }
-        
+
         if (latestDay > 0) {
             // 检查最晚满足天数后是否还有其他日期，如果有则说明后续天数是不达标的，需要添加到收尾列表中
             Integer currentDay = dayLimitMap.higherKey(latestDay);
-            while(currentDay != null) {
+            while (currentDay != null) {
                 lowHeightPriorityLhMachineList.addAll(dayLimitMap.get(currentDay));
-                currentDay = dayLimitMap.higherKey(currentDay); // 取下一个天
-            } 
+                // 取下一个天
+                currentDay = dayLimitMap.higherKey(currentDay);
+            }
         }
-        
+
         return lowHeightPriorityLhMachineList;
+    }
+
+    /**
+     * 20260523+ 获取Sku-高优先级需求量
+     * 1、在【在机】分组对在产机台进行排产阶段(即续作阶段)，则为分组的原始高需求量
+     * 2、在进行分组新增机台阶段，则为新机台排产前待排高优先量
+     *
+     * @param groupPlanInfo  分组计划对象
+     * @param isAddCxMachine 是否新增机台分配
+     * @return
+     */
+    private Map<String, Integer> getSkuHeightNeedProductionQty(ProductionPlanGroupInfo groupPlanInfo, boolean isAddCxMachine) {
+        if (isAddCxMachine) {
+            Map<String, SkuProductionSnapshot> beforeProductionSnapshotMap = groupPlanInfo.getBeforeProductionSnapshotMap();
+            if (CollectionUtils.isEmpty(beforeProductionSnapshotMap)) {
+                return Collections.emptyMap();
+            }
+            Map<String, Integer> heightQtyMap = Maps.newHashMap();
+            beforeProductionSnapshotMap.forEach((materialDesc, snapshot) -> heightQtyMap.put(materialDesc, snapshot.getHeightProductionQty()));
+            return heightQtyMap;
+        }
+        //累计各sku的高优先级需求量
+        Map<String, Integer> heightQtyMap = groupPlanInfo.getGroupPlanData().stream()
+                .collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc,
+                        Collectors.collectingAndThen(Collectors.toList(),
+                                l -> l.stream().mapToInt(MonthPlanProductionRequirePlanVo::getHeightQty).sum())));
+        return heightQtyMap;
+    }
+
+    /**
+     * 根据分配信息，获取结构的收尾日信息
+     *
+     * @param context           排产上下文
+     * @param groupPlanInfo     分组
+     * @param allAllocationInfo 分组分配信息
+     * @return
+     */
+    private Set<Integer> getGroupConclusionDayInfo(Context context, ProductionPlanGroupInfo groupPlanInfo, List<CxMachineAllocationPlanHelper> allAllocationInfo) {
+        if (null == groupPlanInfo || CollectionUtils.isEmpty(allAllocationInfo)) {
+            return Collections.emptySet();
+        }
+        List<CxMachineAllocationPlanHelper> realAllocationList = allAllocationInfo.stream().filter(singleAllocation -> groupPlanInfo.equals(singleAllocation.getProductionPlanInfo())).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(realAllocationList)) {
+            return Collections.emptySet();
+        }
+        Set<Integer> groupConclusionDaySet = Sets.newHashSet();
+        realAllocationList.forEach(singleAllocation -> {
+            Integer realConclusionDay = singleAllocation.getRealConclusionDay(context);
+            if (null != realConclusionDay) {
+                groupConclusionDaySet.add(realConclusionDay);
+            }
+        });
+        if (CollectionUtils.isEmpty(groupConclusionDaySet)) {
+            return Collections.emptySet();
+        }
+        return groupConclusionDaySet;
     }
 
     /**
@@ -521,26 +506,6 @@ public class GroupPlanConclusionHandler {
             return Collections.emptyList();
         }
         return lowMinLhMachineList;
-    }
-
-    /**
-     * 获取需要强制收尾的日排产信息
-     * 实单排产硫化机台数低于要求的minLhMachineCount最低硫化机台数
-     *
-     * @param minLhMachineCount      最低硫化配比
-     * @param dayProductionLimitInfo 日排产信息集合
-     * @return
-     */
-    private List<GroupPlanCxLhCapacityLimitHelper> getForcedConclusionDayInfo(Integer minLhMachineCount, Map<Integer, GroupPlanCxLhCapacityLimitHelper> dayProductionLimitInfo) {
-        //转化成模具数
-        Integer minMouldNumber = minLhMachineCount * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
-        //获取使用模具数低于minMouldNumber的天数数据
-        List<GroupPlanCxLhCapacityLimitHelper> lowMinMouldNumberList = dayLimitList.stream().filter(singleDay -> singleDay.isLowMinMouldNumber(minMouldNumber)).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(lowMinMouldNumberList)) {
-            return Collections.emptyList();
-        }
-        return lowMinMouldNumberList;
     }
 
     /**
@@ -637,7 +602,7 @@ public class GroupPlanConclusionHandler {
         realLowMinLhMachineDayList.addAll(minLhMachineConclusionList);
         return;
     }
-    
+
     /**
      * 处理实单最低硫化机台数可持续的天数，超出需要在达到连续天数当天强制收尾
      *

@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -62,13 +63,14 @@ public class TbrSimulateProductionLogRecorder {
      * @param context 排程上下文
      * @return
      */
-    public static String addEndContinueSkuProductionLog(Context context){
+    public static String addEndContinueSkuProductionLog(Context context) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，分组计划模拟模具排产续作排产完毕====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
         return logContent;
     }
+
     /**
      * 增加 排产模式 效率优先或是交付优先 日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，采用%s模式进行排产====
@@ -149,7 +151,7 @@ public class TbrSimulateProductionLogRecorder {
      */
     public static String addPreSelectedTopGroupLog(Context context, Set<String> canSelectedGroupSet) {
         String groupInfo = "";
-        if(!CollectionUtils.isEmpty(canSelectedGroupSet)){
+        if (!CollectionUtils.isEmpty(canSelectedGroupSet)) {
             groupInfo = canSelectedGroupSet.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
         }
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，开始竞争Top列表可帅选分组：[%s]====",
@@ -179,6 +181,7 @@ public class TbrSimulateProductionLogRecorder {
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
         return logContent;
     }
+
     /**
      * 增加 分组匹配优先级最高机台 日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，订单高优先级交付优先：Top3最终选定 分组名 %s 选定机台 %s====
@@ -274,6 +277,27 @@ public class TbrSimulateProductionLogRecorder {
     public static String addDeliveryPriorityLeftOverGroupLog(Context context) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，交付优先排产：剩余分组需求排产====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion());
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 高优先级硫化机台数强制收尾业务 日志信息记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 高优先级硫化机台数 %s 计算：高优级Sku信息 %s====
+     *
+     * @param context 排程上下文
+     * @return
+     */
+    public static String addStartHeightPriorityLhMachineLog(Context context, String groupName, Map<String, Integer> heightQtyMap, Integer minHeightLhMachineLimit) {
+        StringBuilder skuInfo = new StringBuilder();
+        if (!CollectionUtils.isEmpty(heightQtyMap)) {
+            String singleSkuInfo = "物料描述：%s 高优先级待排产量: %s ";
+            heightQtyMap.forEach((materialDesc, heightQty) -> skuInfo.append(System.lineSeparator()).append(String.format(singleSkuInfo, materialDesc, heightQty)));
+        }
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 高优先级硫化机台数 %s 计算：高优级Sku信息 %s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, minHeightLhMachineLimit, skuInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.SIMULATE_MOULD_PRODUCTION, logContent);
         return logContent;

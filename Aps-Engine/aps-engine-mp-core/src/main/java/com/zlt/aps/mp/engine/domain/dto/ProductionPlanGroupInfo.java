@@ -19,6 +19,7 @@ import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.handler.ConclusionLhMachineHandler;
 import com.zlt.aps.mp.engine.handler.ContinuousProductionDayHandler;
+import com.zlt.aps.mp.engine.handler.SkuProductionSnapshot;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.utils.NoProductionReasonUtils;
@@ -187,7 +188,10 @@ public class ProductionPlanGroupInfo {
      * 高优先级需求量总值
      */
     private Integer sumHeightRequireQty;
-
+    /**
+     * 20260523+ 新成型机分配排产前Sku排产量备份
+     */
+    private Map<String, SkuProductionSnapshot> beforeProductionSnapshotMap;
     /**
      * 构建初始化分组信息对象
      * TBR 结构 PCR 英寸
@@ -940,13 +944,13 @@ public class ProductionPlanGroupInfo {
      */
     public Integer isStructurePriority() {
         if (CollectionUtils.isEmpty(groupPlanData)) {
-            return BigDecimal.ZERO.intValue();
+            return YesOrNoEnum.NO.getValue();
         }
         boolean isStructurePriority = groupPlanData.stream().anyMatch(singlePlan -> YesOrNoEnum.YES.getCode().equals(singlePlan.getStructurePriority()));
         if (isStructurePriority) {
-            return BigDecimal.ONE.intValue();
+            return YesOrNoEnum.YES.getValue();
         }
-        return BigDecimal.ZERO.intValue();
+        return YesOrNoEnum.NO.getValue();
     }
 
     /**

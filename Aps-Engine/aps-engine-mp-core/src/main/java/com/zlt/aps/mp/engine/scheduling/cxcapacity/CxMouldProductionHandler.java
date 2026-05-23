@@ -10,6 +10,7 @@ import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.CxMachineBaseInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanStructureLhRatioVo;
+import com.zlt.aps.mp.engine.handler.SimulateProductionSnapshotHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import lombok.RequiredArgsConstructor;
@@ -31,13 +32,21 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class CxMouldProductionHandler {
-
+    /**
+     * 数据备份处理器
+     */
+    private final SimulateProductionSnapshotHandler simulateProductionSnapshotHandler;
+    /**
+     * Sku排产处理器
+     */
     private final CxAddSkuProductionHandler cxAddSkuProductionHandler;
     /**
      * 结构分配延长处理器
      */
     private final GroupTimeExtensionHandler groupTimeExtensionHandler;
-
+    /**
+     * 结构提前收尾业务处理器
+     */
     private final GroupPlanBeforeConclusionHandler groupPlanBeforeConclusionHandler;
 
     /**
@@ -124,12 +133,14 @@ public class CxMouldProductionHandler {
      * @param ratio          配比信息
      * @param productionPlan 排产计划
      */
-    private static void buildNewLhConclusionInfo(Context context, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo ratio, CxMachineAllocationPlanHelper productionPlan) {
+    private void buildNewLhConclusionInfo(Context context, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo ratio, CxMachineAllocationPlanHelper productionPlan) {
         //构建硫化组信息--因为时间段更新
         Map<Integer, CxLhProductionHelper> cxLhRatioMap = buildCxLhGroupInfo(context, cxMachineInfo, ratio, productionPlan);
         cxMachineInfo.setCxLhRatioMap(cxLhRatioMap);
         //按日构建限制
         buildDayLimitInfo(context, cxMachineInfo, productionPlan);
+        //20260523+ 备份当前分组计划各自的当前待排产量
+        simulateProductionSnapshotHandler.saveProductionBeforeSnapshotData(context, productionPlan);
     }
 
     /**
@@ -140,7 +151,7 @@ public class CxMouldProductionHandler {
      * @param ratio          硫化配比信息
      * @param productionPlan 分配信息
      */
-    private static Map<Integer, CxLhProductionHelper> buildCxLhGroupInfo(Context context, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo ratio, CxMachineAllocationPlanHelper productionPlan) {
+    private Map<Integer, CxLhProductionHelper> buildCxLhGroupInfo(Context context, CxMachineBaseInfoVo cxMachineInfo, MonthPlanStructureLhRatioVo ratio, CxMachineAllocationPlanHelper productionPlan) {
         ProductionPlanGroupInfo productionPlanInfo = productionPlan.getProductionPlanInfo();
         //起始日
         Integer startDay = productionPlan.getStartDay();
@@ -173,7 +184,7 @@ public class CxMouldProductionHandler {
      * @param cxMachineInfo  成型机台
      * @param productionPlan 排产分配信息
      */
-    private static void buildDayLimitInfo(Context context, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper productionPlan) {
+    private void buildDayLimitInfo(Context context, CxMachineBaseInfoVo cxMachineInfo, CxMachineAllocationPlanHelper productionPlan) {
         Integer startDay = productionPlan.getStartDay();
         //按日构建限制
         Map<Integer, GroupPlanCxLhCapacityLimitHelper> newLimit = new HashMap<>();
@@ -197,7 +208,7 @@ public class CxMouldProductionHandler {
      * @param cxMachineCode
      * @param startDay
      */
-    private static void updateProductionInfo(Map<Integer, CxLhProductionHelper> cxLhRatioMap, Integer cxLhGroupNo, String groupName, String cxMachineCode, Integer startDay) {
+    private void updateProductionInfo(Map<Integer, CxLhProductionHelper> cxLhRatioMap, Integer cxLhGroupNo, String groupName, String cxMachineCode, Integer startDay) {
         if (cxLhRatioMap.containsKey(cxLhGroupNo)) {
             CxLhProductionHelper helper = cxLhRatioMap.get(cxLhGroupNo);
             helper.resetProductionInfoByNewGroupName(groupName, startDay);
