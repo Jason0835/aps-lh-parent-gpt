@@ -13,6 +13,7 @@ import com.google.common.collect.Maps;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
+import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.constant.BusiConstant;
@@ -34,16 +35,50 @@ import com.zlt.aps.maindata.utils.MessageServiceUtils;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustStructureOutEntityMapper;
-import com.zlt.aps.mp.adjust.service.*;
+import com.zlt.aps.mp.adjust.service.IBatchMpAdjustMaterialLogService;
+import com.zlt.aps.mp.adjust.service.IBatchMpAdjustResultService;
+import com.zlt.aps.mp.adjust.service.IBatchMpProductionFinalResultService;
+import com.zlt.aps.mp.adjust.service.IMpAdjustMaterialLogService;
+import com.zlt.aps.mp.adjust.service.IMpAdjustStructureInService;
+import com.zlt.aps.mp.adjust.service.IMpAdjustStructureLogService;
+import com.zlt.aps.mp.adjust.service.IMpWeekAdjustService;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.dto.MpRollAdjustContextDTO;
-import com.zlt.aps.mp.api.domain.entity.*;
-import com.zlt.aps.mp.api.domain.vo.*;
+import com.zlt.aps.mp.api.domain.dto.MpWeekRollAdjustDTO;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
+import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
+import com.zlt.aps.mp.api.domain.entity.MdmProductStock;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuLhCapacity;
+import com.zlt.aps.mp.api.domain.entity.MdmSkuStructureRef;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustMaterialLog;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureIn;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureLog;
+import com.zlt.aps.mp.api.domain.entity.MpAdjustStructureOut;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanMonitor;
+import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
+import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
+import com.zlt.aps.mp.api.domain.entity.MpTrialPlan;
+import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
+import com.zlt.aps.mp.api.domain.entity.SalesOrderPool;
+import com.zlt.aps.mp.api.domain.entity.SalesOrderPoolRecord;
+import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
+import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
+import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.aps.mp.api.domain.vo.MpAdjustDetailVo;
+import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.api.enums.AdjustItemSourceEnum;
 import com.zlt.aps.mp.common.utils.DistributedVersionGenerator;
 import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
+import com.zlt.aps.mp.demand.mapper.SalesOrderPoolRecordEntityMapper;
 import com.zlt.aps.mp.demand.service.IDpDemandPlanService;
+import com.zlt.aps.mp.demand.service.ISalesOrderPoolService;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
@@ -54,6 +89,7 @@ import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImpl;
 import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
+import com.zlt.aps.utils.AppUtils;
 import com.zlt.aps.utils.IncrementService;
 import com.zlt.aps.utils.ThreadPoolUtil;
 import com.zlt.common.utils.PubUtil;
@@ -73,7 +109,18 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -163,6 +210,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     @Autowired
     private IFactoryMonthPlanProductionFinalResultService finalResultService;
 
+    @Autowired
+    private ISalesOrderPoolService iSalesOrderPoolService;
+    @Autowired
+    private SalesOrderPoolRecordEntityMapper salesOrderPoolRecordEntityMapper;
+
     @Override
     public void generateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
         // 前置处理
@@ -181,6 +233,48 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         check(contextDTO);
         // 并行初始化
         initParallel(contextDTO);
+    }
+
+    /**
+     * 从供应链抓取最新的销售订单池数据<br/>
+     * 抓取年月判断最新抓取记录是否晚于本月，是则已最新抓取记录月份为准，否则已本月为准
+     *
+     * @param contextDTO
+     */
+    public void syncSalesOrderPool(MpRollAdjustContextDTO contextDTO) {
+        String isPreScmGrape = (String)contextDTO.getParamMap().get(MonthPlanEnums.ADJUST_GET_ORDER_PRE_SCM_GRAPE.getCode());
+        if (!FactoryConstant.YES_VALUE.equals(isPreScmGrape)){
+            return;
+        }
+        // 先查询最新的同步记录年月
+        // 年月默认当前时间年月
+        Date currentDate = DateUtils.getNowDate();
+        Integer year = DateUtils.getYear(currentDate);
+        Integer month = DateUtils.getMonth(currentDate);
+        LambdaQueryWrapper<SalesOrderPoolRecord> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.select(SalesOrderPoolRecord::getYear, SalesOrderPoolRecord::getMonth);
+        queryWrapper.groupBy(Arrays.asList(SalesOrderPoolRecord::getYear, SalesOrderPoolRecord::getMonth));
+        queryWrapper.ge(SalesOrderPoolRecord::getYear, year); // 今年之后的记录，支持跨年的场景
+        queryWrapper.isNotNull(SalesOrderPoolRecord::getMonth);
+        SalesOrderPoolRecord yearMonth = salesOrderPoolRecordEntityMapper.selectList(queryWrapper).stream()
+                .max((r1, r2) -> { // 取最新的同步年月
+                    Integer yearMonth1 = r1.getYear() * 100 + r1.getMonth();
+                    Integer yearMonth2 = r2.getYear() * 100 + r2.getMonth();
+                    return yearMonth1.compareTo(yearMonth2);
+                }).orElseGet(null);
+        if (yearMonth != null) { // 如果有更新的同步记录，则已同步记录的年月为准
+            year = yearMonth.getYear();
+            month = yearMonth.getMonth();
+        }
+        // 调用SCM接口同步数据
+        SalesOrderPool salesOrderPool = new SalesOrderPool();
+        salesOrderPool.setFactoryCode(contextDTO.getFactoryCode());
+        salesOrderPool.setYear(year);
+        salesOrderPool.setMonth(month);
+        AjaxResult result = iSalesOrderPoolService.getSCMData(salesOrderPool);
+        if (!AppUtils.checkAjaxSuccess(result)) {
+            throw new BusinessException(String.valueOf(result.get(AjaxResult.MSG_TAG)));
+        }
     }
 
     /**
@@ -2790,7 +2884,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @return
      */
     protected void setVersion(MpRollAdjustContextDTO contextDTO, String prefix) {
-        //prefix = "T"+prefix;
+        prefix = "T"+prefix;
         contextDTO.setVersion(generateVersion(prefix));
     }
 
@@ -3272,6 +3366,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         specialCheck(contextDTO);
         // 获取定稿的排产版本
         MpFactoryProductionVersion factoryProductionVersion = getIsFinalVersion(contextDTO);
+        // 设置周程滚动参数
+        contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), factoryProductionVersion.getProductTypeCode()));
         // 月度生产计划还未定稿，抛出异常
         Assert.isFalse(factoryProductionVersion == null, () -> {
             String msg = StrUtil.format(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.notFinalMonthPlan"),

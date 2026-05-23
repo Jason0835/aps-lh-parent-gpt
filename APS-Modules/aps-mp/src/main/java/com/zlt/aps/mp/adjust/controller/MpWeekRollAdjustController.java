@@ -105,10 +105,6 @@ public class MpWeekRollAdjustController extends BaseController {
     private MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
     @Autowired
     private IExportLogService iExportLogService;
-    @Autowired
-    private ISalesOrderPoolService iSalesOrderPoolService;
-    @Autowired
-    private SalesOrderPoolRecordEntityMapper salesOrderPoolRecordEntityMapper;
 
     @Autowired
     private IMpStructureAllocationService mpStructureAllocationService;
@@ -126,8 +122,7 @@ public class MpWeekRollAdjustController extends BaseController {
             args = {"#weekRollAdjustDTO.mpYear","#weekRollAdjustDTO.mpMonth"}
     )
     public TableDataInfo getAdjustDetailList(@RequestBody MpWeekRollAdjustDTO weekRollAdjustDTO) {
-        // 20260522+ 先触发销售订单池抓取
-        this.syncSalesOrderPool(weekRollAdjustDTO);
+
         // 获取周程滚动调整策略
         IMpWeekAdjustService weekAdjustStrategy = mpWeekAdjustFactory.getStrategy(weekRollAdjustDTO.getAdjustType());
         if (weekAdjustStrategy == null) {
@@ -142,44 +137,6 @@ public class MpWeekRollAdjustController extends BaseController {
         log.info("获取调整明细 ==> 完成执行策略:[{}] 年月:[{}]", WeekAdjustTypeEnum.getByCode(contextDTO.getAdjustType()).getName(),
                 String.format("%d%02d", contextDTO.getMpYear(), contextDTO.getMpMonth()));
         return getDataTable(contextDTO.getAdjustDetailList());
-    }
-    
-    /**
-     * 从供应链抓取最新的销售订单池数据<br/>
-     * 抓取年月判断最新抓取记录是否晚于本月，是则已最新抓取记录月份为准，否则已本月为准
-     * 
-     * @param weekRollAdjustDTO
-     */
-    private void syncSalesOrderPool(MpWeekRollAdjustDTO weekRollAdjustDTO) {
-        // 先查询最新的同步记录年月
-        // 年月默认当前时间年月
-        Date currentDate = DateUtils.getNowDate();
-        Integer year = DateUtils.getYear(currentDate);
-        Integer month = DateUtils.getMonth(currentDate);
-        LambdaQueryWrapper<SalesOrderPoolRecord> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.select(SalesOrderPoolRecord::getYear, SalesOrderPoolRecord::getMonth);
-        queryWrapper.groupBy(Arrays.asList(SalesOrderPoolRecord::getYear, SalesOrderPoolRecord::getMonth));
-        queryWrapper.ge(SalesOrderPoolRecord::getYear, year); // 今年之后的记录，支持跨年的场景
-        queryWrapper.isNotNull(SalesOrderPoolRecord::getMonth);
-        SalesOrderPoolRecord yearMonth = salesOrderPoolRecordEntityMapper.selectList(queryWrapper).stream()
-                .max((r1, r2) -> { // 取最新的同步年月
-                    Integer yearMonth1 = r1.getYear() * 100 + r1.getMonth();
-                    Integer yearMonth2 = r2.getYear() * 100 + r2.getMonth();
-                    return yearMonth1.compareTo(yearMonth2);
-                }).orElseGet(null);
-        if (yearMonth != null) { // 如果有更新的同步记录，则已同步记录的年月为准
-            year = yearMonth.getYear();
-            month = yearMonth.getMonth();
-        }
-        // 调用SCM接口同步数据
-        SalesOrderPool salesOrderPool = new SalesOrderPool();
-        salesOrderPool.setFactoryCode(weekRollAdjustDTO.getFactoryCode());
-        salesOrderPool.setYear(year);
-        salesOrderPool.setMonth(month);
-        AjaxResult result = iSalesOrderPoolService.getSCMData(salesOrderPool);
-        if (!AppUtils.checkAjaxSuccess(result)) {
-            throw new BusinessException(String.valueOf(result.get(AjaxResult.MSG_TAG)));
-        }
     }
 
     /**

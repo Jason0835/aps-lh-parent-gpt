@@ -64,6 +64,9 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
     @Override
     public void doGenerateAdjust(MpRollAdjustContextDTO contextDTO) throws BusinessException {
+        // 20260522+ 先触发销售订单池抓取
+        this.syncSalesOrderPool(contextDTO);
+
         // 1、设置版本号
         setVersion(contextDTO, BusiConstant.WeekRollAdjust.VERSION_PREFIX);
         // 2、构建结构外调整明细
