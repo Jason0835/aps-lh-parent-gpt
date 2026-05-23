@@ -114,8 +114,9 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
      * @param params 表头参数
      * @param monthPlanVersion 月计划版本
      * @param productVersion 生产版本
+     * @param isAdjust 是否调整
      * @return 结果
      */
     AjaxResult importDataDayResult(List<FactoryMonthPlanMouldDayResult> list, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
-                                   Map<String, String> factoryMap, Map<String, String> productTypeMap);
+                                   Map<String, String> factoryMap, Map<String, String> productTypeMap, boolean isAdjust);
 }
