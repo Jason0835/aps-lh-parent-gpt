@@ -43,6 +43,7 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
         String factoryCode = monthPlan.getFactoryCode();
         String productType = monthPlan.getProductTypeCode();
         String productionVersion = monthPlan.getProductionVersion();
+        String tempFlag = isAdjust? YesOrNoEnum.YES.getCode(): YesOrNoEnum.NO.getCode();
         Integer mpYear = monthPlan.getYear();
         Integer mpMonth = monthPlan.getMonth();
         MpRollAdjustContextDTO contextDTO = new MpRollAdjustContextDTO();
@@ -106,7 +107,7 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
                 MpMonthPlanStatistics monthPlanStatistics = this.buildMpMonthPlanStatistics(contextDTO, monthList,
                         YesOrNoEnum.NO.getCode());
                 if (Objects.nonNull(monthPlanStatistics)) {
-                    monthPlanStatistics.setTempFlag(isAdjust? YesOrNoEnum.YES.getCode(): YesOrNoEnum.NO.getCode());
+                    monthPlanStatistics.setTempFlag(tempFlag);
                     monthPlanStatisticsList.add(monthPlanStatistics);
                 }
 
@@ -117,7 +118,7 @@ public class MpMonthPlanStaticService extends AbstractBaseWeekAdjustServiceMonth
 
         contextDTO.setMonthPlanStatisticsList(monthPlanStatisticsList);
         // 保存月计划统计结果
-        saveMonthPlanStatisticsResult(contextDTO, null);
+        saveMonthPlanStatisticsResult(contextDTO, tempFlag);
     }
 
     /**

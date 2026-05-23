@@ -35,6 +35,7 @@ import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
 import com.zlt.aps.maindata.utils.FactoryParamUtils;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
@@ -46,17 +47,14 @@ import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.api.enums.AlternativeTypeEnum;
+import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
-import com.zlt.aps.mp.engine.basedata.assemble.construction.ConstructionSelector;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
-import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductConstructionInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.mp.engine.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.mp.engine.handler.GroupProductionConversionHandler;
 import com.zlt.aps.mp.engine.handler.LhMachineInfoCalculateHelper;
-import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductConstructionMapper;
-import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductLhCapacityMapper;
 import com.zlt.aps.mp.engine.mapper.FactoryMouldingDayResultMapper;
 import com.zlt.aps.mp.enums.StructureAllocationExportDataTypeEnum;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportChangeCountVo;
@@ -66,6 +64,8 @@ import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntity
 import com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
+import com.zlt.aps.mp.mdm.dto.DataDTO;
+import com.zlt.aps.mp.mdm.handler.DataManager;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -133,7 +133,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final DpDemandPlanEntityMapper dpDemandPlanEntityMapper;
     private final FactoryMonthPlanProductionFinalResultEntityMapper factoryMonthPlanProductionFinalResultEntityMapper;
     private final ISysDictDataCacheService sysDictDataCacheService;
-    private final FactoryMonthPlanProductConstructionMapper factoryMonthPlanProductConstructionMapper;
     private final MdmSkuLhCapacityEntityMapper mdmSkuLhCapacityEntityMapper;
     private final MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
     private final IFactoryParamService factoryParamService;
@@ -141,6 +140,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final MpTrialPlanEntityMapper mpTrialPlanEntityMapper;
     private final MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
     private final MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
+    private final DataManager dataManager;
+    private final IRawSpecialMaterialRecordService rawSpecialMaterialRecordService;
     private final Map<Long, Map<String, String>> importMachineMapCache = new ConcurrentHashMap<>();
     @Autowired
     @Lazy
@@ -2338,14 +2339,16 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             try {
                 successNum = insertList.size();
                 if(CollUtil.isNotEmpty(insertList)) {
+                    if (isAdjust) { // 调整要先删除原本的统计记录
+                        
+                    }
                     // 填充字段信息
                     this.fillMonthPlanMouldResult(insertList, isAdjust);
                     // 如果是调整，需要先删除原记录再插入
                     if (isAdjust) {
-                        Set<String> structureNameSet = insertList.stream()
+                        Set<String> structureNameSet = list.stream()
                                 .map(FactoryMonthPlanMouldDayResult::getStructureName).distinct()
                                 .collect(Collectors.toSet());
-                        // 前端传入 version 时表示调整版本号，对应调整结果表 VERSION 字段。
                         LambdaQueryWrapper<MpAdjustResult> queryWrapper = new LambdaQueryWrapper<>();
                         queryWrapper.eq(MpAdjustResult::getFactoryCode, factoryCode);
                         queryWrapper.eq(MpAdjustResult::getYear, importYear);
@@ -2353,11 +2356,30 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                         queryWrapper.eq(MpAdjustResult::getVersion, monthPlanVersion);
                         queryWrapper.in(MpAdjustResult::getStructureName, structureNameSet);
                         mpAdjustResultEntityMapper.delete(queryWrapper);
+                        // 取定稿版本对应的原始月计划需求核算版本
+                        LambdaQueryWrapper<MpFactoryProductionVersion> versionQueryWrapper = new LambdaQueryWrapper<>();
+                        versionQueryWrapper.eq(MpFactoryProductionVersion::getFactoryCode, factoryCode);
+                        versionQueryWrapper.eq(MpFactoryProductionVersion::getProductionVersion, productVersion);
+                        versionQueryWrapper.eq(MpFactoryProductionVersion::getYear, year);
+                        versionQueryWrapper.eq(MpFactoryProductionVersion::getMonth, month);
+                        MpFactoryProductionVersion version = mpFactoryProductionVersionMapper
+                                .selectOne(versionQueryWrapper);
+                        String oriMonthPlanVersion = version != null? version.getMonthPlanVersion(): monthPlanVersion;
+                                
+                        // 构建调整记录
                         List<MpAdjustResult> saveList = insertList.stream().map(r -> {
                             MpAdjustResult adjustResult = new MpAdjustResult();
                             BeanUtil.copyProperties(r, adjustResult);
+                            adjustResult.setVersion(monthPlanVersion);
+                            adjustResult.setMonthPlanVersion(oriMonthPlanVersion);
+                            adjustResult.setLastMonthPlanVersion(monthPlanVersion);
+                            adjustResult.setAdjustType(WeekAdjustTypeEnum.STRUCTURE_IN.getCode());
+                            adjustResult.setTotalPlanQty(adjustResult.getTotalQty());
                             return adjustResult;
                         }).collect(Collectors.toList());
+                        // 处理特殊材料标记
+                        this.setSpecialMaterial(factoryCode, saveList);
+                        
                         // 类型转成
                         baseDao.insertBatch(saveList);
                     } else {
@@ -2671,5 +2693,88 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 item.setEndDay(i);
             }
         }
+    }
+
+
+    /**
+     * 设置是否特殊材料
+     *
+     * @param factoryCode       分厂编号
+     * @param mpAdjustResultList 调整列表
+     */
+    private void setSpecialMaterial(String factoryCode, List<MpAdjustResult> mpAdjustResultList) {
+        if (com.zlt.aps.mp.common.utils.PubUtil.isEmpty(mpAdjustResultList)) {
+            return;
+        }
+
+        // 创建计时器
+        StopWatch watch = new StopWatch();
+        watch.start();
+
+        // 查询BOM物料消耗明细
+        CompletableFuture<List<MdmMaterialConsumeDetail>> materialConsumeDetailFuture = CompletableFuture.supplyAsync(
+                () -> queryMaterialConsumeDetailList(factoryCode)
+        );
+        // 查询特殊材料记录
+        CompletableFuture<List<RawSpecialMaterialRecord>> rawSpecialMaterialRecordFuture = CompletableFuture.supplyAsync(
+                () -> querySpecialMaterialRecordList(factoryCode)
+        );
+
+        try {
+            // 等待所有异步任务执行完成
+            CompletableFuture.allOf(
+                    materialConsumeDetailFuture,
+                    rawSpecialMaterialRecordFuture
+            ).join();
+
+            log.info("设置是否特殊材料 ==> 并行查询数据执行完成");
+
+        } catch (CompletionException e) {
+            // 异常处理
+            Throwable throwable = e.getCause();
+            log.error("查询数据失败! 失败原因:{}", throwable.getMessage(), throwable);
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.initDataFailure"), throwable);
+        } finally {
+            watch.stop();
+        }
+
+        List<MdmMaterialConsumeDetail> mdmMaterialConsumeDetailList = materialConsumeDetailFuture.join();
+        List<RawSpecialMaterialRecord> specialMaterialList = rawSpecialMaterialRecordFuture.join();
+
+        for (MpAdjustResult adjustResult : mpAdjustResultList) {
+            // 设置是否含有特殊材料
+            boolean isHasSpecialMaterial = rawSpecialMaterialRecordService.hasSpecialMaterial(adjustResult.getEmbryoCode(), mdmMaterialConsumeDetailList, specialMaterialList);
+            adjustResult.setHasSpecialMaterial(isHasSpecialMaterial ? ApsConstant.TRUE : ApsConstant.FALSE);
+        }
+    }
+
+    /**
+     * 查询BOM物料消耗明细
+     *
+     * @param factoryCode 分厂编号
+     */
+    @SuppressWarnings("unchecked")
+    private List<MdmMaterialConsumeDetail> queryMaterialConsumeDetailList(String factoryCode) {
+        MdmMaterialConsumeDetail queryVO = new MdmMaterialConsumeDetail();
+        queryVO.setFactoryCode(factoryCode);
+
+        String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
+        return dataManager.listMaterialConsumeDetails(dataDTO);
+    }
+
+    /**
+     * 查询特殊材料记录
+     *
+     * @param factoryCode 分厂编号
+     */
+    @SuppressWarnings("unchecked")
+    private List<RawSpecialMaterialRecord> querySpecialMaterialRecordList(String factoryCode) {
+        RawSpecialMaterialRecord queryVO = new RawSpecialMaterialRecord();
+        queryVO.setFactoryCode(factoryCode);
+
+        String cacheKey = dataManager.generateCacheKey(queryVO.getFactoryCode());
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO, cacheKey, Boolean.TRUE);
+        return dataManager.listSpecialMaterials(dataDTO);
     }
 }
