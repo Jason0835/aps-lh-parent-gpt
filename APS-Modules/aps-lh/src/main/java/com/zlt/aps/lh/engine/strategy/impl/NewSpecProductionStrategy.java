@@ -35,14 +35,11 @@ import com.zlt.aps.lh.engine.strategy.support.MachineScheduleRole;
 import com.zlt.aps.lh.engine.strategy.support.ProductionQuantityPolicy;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
-import com.zlt.aps.lh.util.LhMachineHardMatchUtil;
 import com.zlt.aps.lh.util.LhMultiMachineDistributionUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSingleControlMachineUtil;
 import com.zlt.aps.lh.util.LhSpecialMaterialUtil;
-import com.zlt.aps.lh.util.LhSpecifyMachineUtil;
 import com.zlt.aps.lh.util.MachineCleaningOverlapUtil;
-import com.zlt.aps.lh.util.MachineStatusUtil;
 import com.zlt.aps.lh.util.PriorityTraceLogHelper;
 import com.zlt.aps.lh.util.ResultDowntimeSummaryUtil;
 import com.zlt.aps.lh.util.ShiftCapacityResolverUtil;
@@ -86,6 +83,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private static final String AUTO_DATA_SOURCE = "0";
     private static final String ZERO_PLAN_UNSCHEDULED_REASON = "新增结果裁剪为0";
     private static final String NEW_SPEC_CLEANING_ANALYSIS = "模具清洗+换模";
+    private static final int SINGLE_CONTROL_COMPETITION_MAX_ROUNDS = 3;
     @Resource
     private OrderNoGenerator orderNoGenerator;
     @Resource
@@ -220,8 +218,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 执行一轮新增SKU排产。
-     * <p>新增SKU的单控资源竞争由当前排序顺序直接决定，不再依赖类型重试。</p>
+     * 执行新增SKU排产。
+     * <p>单控竞争按试制 -> 量试 -> 小批量最多重排3轮，避免更高类型未出队时直接把低类型落终态未排。</p>
      *
      * @param context 排程上下文
      * @param machineMatch 机台匹配策略
@@ -239,6 +237,34 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                         ICapacityCalculateStrategy capacityCalculate,
                                         List<LhShiftConfigVO> shifts,
                                         Map<String, Integer> unscheduledReasonCountMap) {
+        int scheduledCount = 0;
+        for (int round = 1; round <= SINGLE_CONTROL_COMPETITION_MAX_ROUNDS
+                && !CollectionUtils.isEmpty(context.getNewSpecSkuList()); round++) {
+            List<SkuScheduleDTO> deferredSkuList = new ArrayList<SkuScheduleDTO>(4);
+            scheduledCount += schedulePendingNewSpecsRound(context, machineMatch, mouldChangeBalance,
+                    inspectionBalance, capacityCalculate, shifts, unscheduledReasonCountMap, deferredSkuList, round);
+            if (CollectionUtils.isEmpty(deferredSkuList)) {
+                break;
+            }
+            context.getNewSpecSkuList().addAll(deferredSkuList);
+            log.info("新增SKU单控竞争延后重排, 轮次: {}, 延后SKU数量: {}, 延后SKU: {}",
+                    round, deferredSkuList.size(),
+                    deferredSkuList.stream()
+                            .map(SkuScheduleDTO::getMaterialCode)
+                            .collect(Collectors.joining(",")));
+        }
+        return scheduledCount;
+    }
+
+    private int schedulePendingNewSpecsRound(LhScheduleContext context,
+                                             IMachineMatchStrategy machineMatch,
+                                             IMouldChangeBalanceStrategy mouldChangeBalance,
+                                             IFirstInspectionBalanceStrategy inspectionBalance,
+                                             ICapacityCalculateStrategy capacityCalculate,
+                                             List<LhShiftConfigVO> shifts,
+                                             Map<String, Integer> unscheduledReasonCountMap,
+                                             List<SkuScheduleDTO> deferredSkuList,
+                                             int round) {
         int scheduledCount = 0;
         Iterator<SkuScheduleDTO> iterator = context.getNewSpecSkuList().iterator();
         while (iterator.hasNext()) {
@@ -270,6 +296,10 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             context.getNewSpecTypeRuleBlockedMap().remove(sku);
             List<MachineScheduleDTO> candidates = machineMatch.matchMachines(context, sku);
             if (candidates.isEmpty()) {
+                if (shouldDeferSingleControlCompetitionSku(context, sku, round)) {
+                    deferCurrentNewSpecSku(context, iterator, sku, deferredSkuList, round);
+                    continue;
+                }
                 String noCandidateReason = resolveNoCandidateMachineReason(context, sku);
                 log.warn("新增SKU无候选机台, materialCode: {}, 结构: {}, 规格: {}, 寸口: {}, 目标量: {}, 原因: {}",
                         sku.getMaterialCode(), sku.getStructureName(), sku.getSpecCode(),
@@ -303,6 +333,14 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             Integer finalTargetScheduleQty = baseTargetScheduleQty;
             // 初始化多机台拆量剩余量：需求目标保留月计划口径，实际拆机按日计划账本剩余额度收敛。
             int remainingQty = resolveSchedulableRemainingQty(sku);
+            // 非收尾可溢出场景下，dynamicTargetQty 至少为一个满班产能，
+            // 确保 shouldFillSingleMachineToWindowEnd 能按满班产能补足已开班次。
+            if (quantityPolicy != null && quantityPolicy.isAllowFillStartedShift() && !quantityPolicy.isEnding()) {
+                int shiftCapacity = sku.getShiftCapacity();
+                if (shiftCapacity > 0) {
+                    remainingQty = Math.max(remainingQty, shiftCapacity);
+                }
+            }
             int dynamicTargetQty = remainingQty;
             sku.setRemainingScheduleQty(remainingQty);
             MachineScheduleDTO finalMachine = null;
@@ -618,7 +656,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         int trialCount = 0;
         int massTrialCount = 0;
         int smallBatchCount = 0;
-        int specialMaterialCount = 0;
         for (SkuScheduleDTO pendingSku : context.getNewSpecSkuList()) {
             if (isTrialConstructionStage(pendingSku)) {
                 trialCount++;
@@ -634,32 +671,12 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             }
             formalCount++;
         }
-        // 统计特殊材料SKU数量
-        for (SkuScheduleDTO pendingSku : context.getNewSpecSkuList()) {
-            if (LhSpecialMaterialUtil.resolveMatchResult(context, pendingSku).isSpecial()) {
-                specialMaterialCount++;
-            }
-        }
         context.setPendingFormalNewSpecSkuCount(formalCount);
         context.setPendingTrialNewSpecSkuCount(trialCount);
         context.setPendingMassTrialNewSpecSkuCount(massTrialCount);
         context.setPendingSmallBatchNewSpecSkuCount(smallBatchCount);
-        context.setPendingSpecialMaterialNewSpecSkuCount(specialMaterialCount);
-
-        // 计算特殊机台保留集合：唯一候选特殊材料SKU所依赖的机台需要保护
-        Set<String> reservedCodes = new HashSet<>();
-        for (SkuScheduleDTO pendingSku : context.getNewSpecSkuList()) {
-            if (!LhSpecialMaterialUtil.resolveMatchResult(context, pendingSku).isSpecial()) {
-                continue;
-            }
-            String singleCandidate = resolveSingleCandidateMachineCode(context, pendingSku);
-            if (singleCandidate != null) {
-                reservedCodes.add(singleCandidate);
-            }
-        }
-        context.setSpecialMachineReservedCodes(reservedCodes);
-        log.info("新增待排SKU类型计数初始化, 试制SKU: {}, 量试SKU: {}, 小批量SKU: {}, 正规SKU: {}, 特殊材料SKU: {}, 保留特殊机台: {}",
-                trialCount, massTrialCount, smallBatchCount, formalCount, specialMaterialCount, reservedCodes.size());
+        log.info("新增待排SKU类型计数初始化, 试制SKU: {}, 量试SKU: {}, 小批量SKU: {}, 正规SKU: {}",
+                trialCount, massTrialCount, smallBatchCount, formalCount);
     }
 
     /**
@@ -675,6 +692,37 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 && Boolean.TRUE.equals(context.getNewSpecTypeRuleBlockedMap().get(sku));
     }
 
+    private boolean shouldDeferSingleControlCompetitionSku(LhScheduleContext context,
+                                                           SkuScheduleDTO sku,
+                                                           int round) {
+        if (round >= SINGLE_CONTROL_COMPETITION_MAX_ROUNDS || !isTypeRuleBlocked(context, sku) || sku == null) {
+            return false;
+        }
+        if (isMassTrialSku(sku)) {
+            return context.getPendingTrialNewSpecSkuCount() > 0;
+        }
+        if (isSmallBatchSku(sku)) {
+            return context.getPendingTrialNewSpecSkuCount() > 0
+                    || context.getPendingMassTrialNewSpecSkuCount() > 0;
+        }
+        return false;
+    }
+
+    private void deferCurrentNewSpecSku(LhScheduleContext context,
+                                        Iterator<SkuScheduleDTO> iterator,
+                                        SkuScheduleDTO sku,
+                                        List<SkuScheduleDTO> deferredSkuList,
+                                        int round) {
+        iterator.remove();
+        context.getNewSpecTypeRuleBlockedMap().remove(sku);
+        deferredSkuList.add(sku);
+        log.info("新增SKU单控竞争延后, 轮次: {}, materialCode: {}, SKU类型: {}, 待排试制SKU: {}, 待排量试SKU: {}, 待排小批量SKU: {}",
+                round, sku.getMaterialCode(), resolveNewSpecSkuType(sku),
+                context.getPendingTrialNewSpecSkuCount(),
+                context.getPendingMassTrialNewSpecSkuCount(),
+                context.getPendingSmallBatchNewSpecSkuCount());
+    }
+
     /**
      * 移除当前新增待排SKU，并同步更新类型计数。
      *
@@ -687,11 +735,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                          SkuScheduleDTO sku) {
         iterator.remove();
         context.getNewSpecTypeRuleBlockedMap().remove(sku);
-        // 特殊材料SKU计数递减
-        if (LhSpecialMaterialUtil.resolveMatchResult(context, sku).isSpecial()) {
-            context.setPendingSpecialMaterialNewSpecSkuCount(
-                    Math.max(0, context.getPendingSpecialMaterialNewSpecSkuCount() - 1));
-        }
         if (isTrialConstructionStage(sku)) {
             context.setPendingTrialNewSpecSkuCount(Math.max(0, context.getPendingTrialNewSpecSkuCount() - 1));
             return;
@@ -707,38 +750,6 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return;
         }
         context.setPendingFormalNewSpecSkuCount(Math.max(0, context.getPendingFormalNewSpecSkuCount() - 1));
-    }
-
-    /**
-     * 解析特殊材料SKU的唯一候选机台编码。
-     * <p>遍历所有机台，通过硬匹配+启用状态+不可作业机台过滤后，
-     * 若仅剩1台候选机台则返回其编码，否则返回null。</p>
-     *
-     * @param context 排程上下文
-     * @param sku 待排SKU
-     * @return 唯一候选机台编码，无唯一候选时返回null
-     */
-    private String resolveSingleCandidateMachineCode(LhScheduleContext context, SkuScheduleDTO sku) {
-        if (context == null || sku == null
-                || CollectionUtils.isEmpty(context.getMachineScheduleMap())) {
-            return null;
-        }
-        String singleMachineCode = null;
-        for (MachineScheduleDTO machine : context.getMachineScheduleMap().values()) {
-            if (machine == null
-                    || !MachineStatusUtil.isEnabled(machine.getStatus())
-                    || !LhMachineHardMatchUtil.isMachineHardMatched(context, sku, machine)
-                    || LhSpecifyMachineUtil.isNotAllowedMachine(
-                            context, machine.getMachineCode(), sku.getMaterialCode())) {
-                continue;
-            }
-            if (singleMachineCode != null) {
-                // 第二个候选机台出现，非唯一候选
-                return null;
-            }
-            singleMachineCode = machine.getMachineCode();
-        }
-        return singleMachineCode;
     }
 
     /**
