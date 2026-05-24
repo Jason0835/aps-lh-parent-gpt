@@ -339,6 +339,8 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         String[] params4DayResult;
         String monthPlanVersion;
         String productVersion = "I" + DateUtils.dateTimeNow();
+        int year;
+        int month;
         try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
             Sheet sheet = wb.getSheet(sheetName);
             if (sheet == null || sheet.getRow(0) == null) {
@@ -378,6 +380,15 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
             if (params4DayResult == null || params4DayResult.length < 3) {
                 return AjaxResult.error("导入模板标题格式不匹配");
             }
+            try {
+                year = Integer.parseInt(params[0]);
+                month = Integer.parseInt(params[1]);
+            } catch (NumberFormatException e) {
+                return AjaxResult.error("导入模板标题中的年月格式不正确");
+            }
+            if (month < 1 || month > 12) {
+                return AjaxResult.error("导入模板标题中的月份范围不正确");
+            }
         } catch (Exception e) {
             log.warn("importDataStructureAllocation workbook parse failed", e);
             return AjaxResult.error("导入文件格式不正确");
@@ -396,8 +407,8 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
             ajaxResult4DayResult = mpStructureAllocationService.importDataDayResult(list4DayResult, updateSupport, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap, false);
             isDayDataImport = AjaxResultUtils.checkAjaxSuccess(ajaxResult);
         }
-        
-        if (isStrcutreImport && isDayDataImport) {
+        // 月计划或者结构转产任意一个导入成功都要生成版本
+        if (isStrcutreImport || isDayDataImport) {
             // 版本关系存到版本表
             MpFactoryProductionVersion version = new MpFactoryProductionVersion();
             if (factoryMap.containsKey(params[2])) {
@@ -405,17 +416,6 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
             }
             if (productTypeMap.containsKey(params[3])) {
                 version.setProductTypeCode(productTypeMap.get(params[3]));
-            }
-            int year;
-            int month;
-            try {
-                year = Integer.parseInt(params[0]);
-                month = Integer.parseInt(params[1]);
-            } catch (NumberFormatException e) {
-                return AjaxResult.error("导入模板标题中的年月格式不正确");
-            }
-            if (month < 1 || month > 12) {
-                return AjaxResult.error("导入模板标题中的月份范围不正确");
             }
             version.setYear(year);
             version.setMonth(month);
