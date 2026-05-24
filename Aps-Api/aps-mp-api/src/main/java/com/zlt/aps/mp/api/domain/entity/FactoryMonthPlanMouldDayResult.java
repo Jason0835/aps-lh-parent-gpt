@@ -750,6 +750,13 @@ public class FactoryMonthPlanMouldDayResult extends BaseEntity {
     @ApiModelProperty(value = "非eudr数量", name = "nonEudrQty")
     @TableField(exist = false)
     private Integer nonEudrQty;
+    
+    /**
+     * 导入行号
+     */
+    @ApiModelProperty(value = "导入行号", name = "importRowNum")
+    @TableField(exist = false)
+    private Integer importRowNum;
 
     /**
      * 是否增模又降膜又增模

@@ -21,6 +21,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
@@ -387,12 +388,16 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         // 结构转产导入
         List<MpStructureAllocationExportVo> list = util.importExcel(sheetName, new ByteArrayInputStream(fileBytes), 2, 2, 10);
         AjaxResult ajaxResult = mpStructureAllocationService.importDataStructureAllocation(list, updateSupport, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap);
-
+        boolean isStrcutreImport = AjaxResultUtils.checkAjaxSuccess(ajaxResult);
+        AjaxResult ajaxResult4DayResult = ajaxResult;
         // 月计划排产导入
-        AjaxResult ajaxResult4DayResult = mpStructureAllocationService.importDataDayResult(list4DayResult, updateSupport, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap, false);
-
-        if (!Objects.equals(ajaxResult.get(AjaxResult.CODE_TAG), AjaxResult.Type.ERROR.value())
-                && !Objects.equals(ajaxResult4DayResult.get(AjaxResult.CODE_TAG), AjaxResult.Type.ERROR.value())) {
+        boolean isDayDataImport = isStrcutreImport;
+        if (isStrcutreImport) {
+            ajaxResult4DayResult = mpStructureAllocationService.importDataDayResult(list4DayResult, updateSupport, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap, false);
+            isDayDataImport = AjaxResultUtils.checkAjaxSuccess(ajaxResult);
+        }
+        
+        if (isStrcutreImport && isDayDataImport) {
             // 版本关系存到版本表
             MpFactoryProductionVersion version = new MpFactoryProductionVersion();
             if (factoryMap.containsKey(params[2])) {

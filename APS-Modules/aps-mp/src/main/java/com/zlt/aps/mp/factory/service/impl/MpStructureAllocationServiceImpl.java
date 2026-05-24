@@ -2275,7 +2275,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             String noFactoryStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noFactoryStr");
             String yearErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.yearErrorStr");
             String monthErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.monthErrorStr");
-            String notTotalQtyStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noTotalQty");
 
             // 过滤合计等数据
             list = list.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialCode())).collect(Collectors.toList());
@@ -2297,7 +2296,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 if (item.getTotalQty() <= 0) {
                     item.setId(-999L);
 //                    failureNum++; // 没有计划量的仅忽略不导入，不计入错误数中
-                    addImportErrorLog(importLogId, errorNum, notTotalQtyStr, importErrorLogs);
+//                    addImportErrorLog(importLogId, errorNum, notTotalQtyStr, importErrorLogs);
                     continue;
                 }
 
@@ -2343,20 +2342,21 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     importErrorLogs.addAll(validated);
                     continue;
                 }
+                item.setImportRowNum(errorNum);
                 insertList.add(item);
             }
+            
+            // 填充字段信息
+            List<FactoryMonthPlanMouldDayResult> finalImportList = this.fillMonthPlanMouldResult(insertList, isAdjust,
+                    importLogId, importErrorLogs);
+            failureNum += (insertList.size() - finalImportList.size());
 
             // 过滤id不等于空的数据
-            insertList = insertList.stream().filter(v -> v.getId() == null).collect(Collectors.toList());
+            finalImportList = finalImportList.stream().filter(v -> v.getId() == null).collect(Collectors.toList());
 
             try {
-                successNum = insertList.size();
-                if(CollUtil.isNotEmpty(insertList)) {
-                    if (isAdjust) { // 调整要先删除原本的统计记录
-                        
-                    }
-                    // 填充字段信息
-                    this.fillMonthPlanMouldResult(insertList, isAdjust);
+                successNum = finalImportList.size();
+                if(CollUtil.isNotEmpty(finalImportList)) {
                     // 如果是调整，需要先删除原记录再插入
                     if (isAdjust) {
                         Set<String> structureNameSet = list.stream()
@@ -2380,7 +2380,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                         String oriMonthPlanVersion = version != null? version.getMonthPlanVersion(): monthPlanVersion;
                                 
                         // 构建调整记录
-                        List<MpAdjustResult> saveList = insertList.stream().map(r -> {
+                        List<MpAdjustResult> saveList = finalImportList.stream().map(r -> {
                             MpAdjustResult adjustResult = new MpAdjustResult();
                             BeanUtil.copyProperties(r, adjustResult);
                             adjustResult.setVersion(monthPlanVersion);
@@ -2397,7 +2397,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                         baseDao.insertBatch(saveList);
                     } else {
                         // 插入新记录
-                        baseDao.insertBatch(insertList);
+                        baseDao.insertBatch(finalImportList);
                     }
                 }
             } catch (Exception e) {
@@ -2422,9 +2422,20 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     
     /**
      * 填充导入月计划数据的关联栏位
-     * @param insertList
+     * 
+     * @param isAdjust        是否导入调整版本
+     * @param insertList      导入数据
+     * @param importLogId
+     * @param importErrorLogs
+     * @return
      */
-    private void fillMonthPlanMouldResult(List<FactoryMonthPlanMouldDayResult> insertList, boolean isAdjust) {
+    private List<FactoryMonthPlanMouldDayResult> fillMonthPlanMouldResult(List<FactoryMonthPlanMouldDayResult> insertList,
+                                                                          boolean isAdjust,
+                                                                          Long importLogId,
+                                                                          List<ImportErrorLog> importErrorLogs) {
+        if (CollectionUtils.isEmpty(insertList)) {
+            return new ArrayList<>(0);
+        }
         // 计划类型、产品品类、MES物料编码、产品分类、排产分类、规格、花纹、品牌、SUM(高优先级数量)、月均销量、库销比、SUM(生产需求计划)、SUM(实际生产需求（含损耗）)、结构类型 --- 数据源：需求计划
         FactoryMonthPlanMouldDayResult firstResult = CollectionUtils.firstElement(insertList);
         String monthPlanVersion = firstResult.getMonthPlanVersion();
@@ -2434,6 +2445,9 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         Integer year = firstResult.getYear();
         Integer month = firstResult.getMonth();
         Integer yearMonth = Convert.toInt(String.format("%s%02d", year, month));
+        
+        // 错误提醒
+        String notDayVulcanizationQtyStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.dayVulcanizationQty");
         
         // 加载需求计划
         QueryWrapper<DpDemandPlan> dpDemandPlanQueryWrapper = new QueryWrapper<>();
@@ -2542,7 +2556,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             limitVo.setOpenProductionFirstDay(isOpenProductionFirstDay);
             dailyCapacityMap.put(day, limitVo);
         }
-        
+        List<FactoryMonthPlanMouldDayResult> finalImportList = new ArrayList<>();
         for (FactoryMonthPlanMouldDayResult insertItem: insertList) {
             String structureName = insertItem.getStructureName();
             String materialDesc = insertItem.getMaterialDesc();
@@ -2637,9 +2651,17 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 capacityVo.setStandardCapacity(mdmSkuLhCapacity.getStandardCapacity());
                 capacityVo.setApsCapacity(mdmSkuLhCapacity.getApsCapacity());
                 capacityVo.calculateDayVulcanizationQty(mode);
-                insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty() / 2);
+                if (capacityVo.getDayVulcanizationQty() != null) {
+                    insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty() / 2);
+                }
             }
-            
+            if (insertItem.getDayVulcanizationQty() == null) {
+                insertItem.setId(-999L);
+                String errorMsg = materialDesc + notDayVulcanizationQtyStr;
+                addImportErrorLog(importLogId, insertItem.getImportRowNum(), errorMsg, importErrorLogs);
+                continue;
+            }
+
             // 英寸---根据结构名称解析
             if (!StringUtil.isEmptyWithTrim(structureName)){
                 // 正则：R后面跟数字（可能带小数点）
@@ -2658,6 +2680,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             
             // 模具变化信息
             FactoryMonthPlanFinalAdjustVo mpFinalVo = new FactoryMonthPlanFinalAdjustVo();
+            mpFinalVo.setMaterialCode(materialCode);
+            mpFinalVo.setMaterialDesc(materialDesc);
             mpFinalVo.setDayVulcanizationQty(insertItem.getDayVulcanizationQty());
             int startDay = 0;
             for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
@@ -2672,9 +2696,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     dailyCapacityMap);
             insertItem.setMouldChangeInfo(mpFinalVo.getMouldChangeInfo());
             insertItem.setYearMonth(yearMonth);
+            finalImportList.add(insertItem);
         }
         // 生成统计信息（handleMonthPlanStatistics）
-        mpMonthPlanStaticService.handleMonthPlanStatistics(insertList, isAdjust);
+        mpMonthPlanStaticService.handleMonthPlanStatistics(finalImportList, isAdjust);
+        return finalImportList;
     }
     
     /**
