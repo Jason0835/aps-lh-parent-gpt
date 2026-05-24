@@ -10,6 +10,7 @@ import com.zlt.aps.mp.engine.basedata.assemble.cyclegroup.CycleGroupDataHandler;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.vo.*;
+import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
 import com.zlt.aps.mp.engine.logrecorder.TbrProductionInitLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.AbstractInitDataLoadService;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -78,6 +79,7 @@ public class TbrProductionInitService extends AbstractInitDataLoadService {
         }
         //创建排产上下文
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.INIT);
         //保存或是创建排产版本表记录
         saveProductionVersionRecord(productionContext);
         //开始初始化日志

@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.scheduling.mouldproduction;
 
+import com.google.common.collect.Lists;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.SecurityUtils;
@@ -12,8 +13,10 @@ import com.zlt.aps.mp.api.enums.ProductionProcessStage;
 import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.ProductionStageLogRecorder;
 import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.*;
+import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
 import com.zlt.aps.mp.engine.handler.*;
 import com.zlt.aps.mp.engine.logrecorder.KeyInformationLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
@@ -118,6 +121,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
         }
         //0、创建排产上下文
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.FIRST_ON_LINE);
         deleteOldData(productionContext);
         //1、获取排产计划信息
         List<MonthPlanProductionRequirePlanVo> requirePlanList = getMonthProductionDataService().getFactoryMonthPlanManufacturing(productionContext);
@@ -163,6 +167,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
         adjustContinueSkuProductionQtyHandler.adjustContinueSkuProductionQty(estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap, productionContext);
         //获取结构排产信息
         List<MpStructureAllocation> allAllocationList = getMonthProductionDataService().getStructureAllocationInfoByProductionVersion(productionContext);
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.FORMAL_PRODUCTION);
         log.info(TbrMouldFormalProductionLogRecorder.addStartMouldFormalLog(productionContext));
         //清除模拟排产信息、重新构建分组计划的硫化组限制信息
         clearProductionInfoHandler.resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, allAllocationList);
@@ -433,11 +438,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
         productionContext.setBaseDataContainer(new BaseDataContainer());
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        if (null == context.getLogBuilder()) {
-            StringBuilder logBuilder = new StringBuilder();
-            context.setLogBuilder(logBuilder);
-            productionContext.setLogBuilder(logBuilder);
-        }
+        resetTbrInitLogRecorderInfo(productionContext, context);
         setProductionCycleInfo(productionContext);
         return productionContext;
     }
@@ -458,11 +459,7 @@ public class TbrMouldProductionService extends AbstractDataLoaderService {
         BeanUtils.copyProperties(context, productionContext);
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        if (null == context.getLogBuilder()) {
-            StringBuilder logBuilder = new StringBuilder();
-            context.setLogBuilder(logBuilder);
-            productionContext.setLogBuilder(logBuilder);
-        }
+        resetInitLogRecorderInfo(productionContext, context);
         setProductionCycleInfo(productionContext);
         return productionContext;
     }

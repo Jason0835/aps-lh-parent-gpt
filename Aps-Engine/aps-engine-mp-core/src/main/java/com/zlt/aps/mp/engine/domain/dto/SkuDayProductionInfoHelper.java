@@ -110,6 +110,22 @@ public class SkuDayProductionInfoHelper implements Serializable {
     }
 
     /**
+     * 满产收尾-前Sku余量 null
+     *
+     * @param origin
+     * @return
+     */
+    public static SkuDayProductionInfoHelper createBeforeInfoByFullProduction(SkuDayProductionInfoHelper origin, Integer productionDay) {
+        SkuDayProductionInfoHelper result = createClone(origin);
+        if (null != result) {
+            result.productionDay = productionDay;
+            result.sumProductionQty = null;
+            result.lossQty = BigDecimal.ZERO.intValue();
+        }
+        return result;
+    }
+
+    /**
      * 复制
      *
      * @param origin
@@ -131,34 +147,6 @@ public class SkuDayProductionInfoHelper implements Serializable {
         result.sumProductionQty = origin.getSumProductionQty();
         result.dayVulcanizationQty = origin.getDayVulcanizationQty();
         result.lossQty = origin.getLossQty();
-        result.mainMaterialDesc = origin.getMainMaterialDesc();
-        result.mainPattern = origin.getMainPattern();
-        result.brand = origin.getBrand();
-        return result;
-    }
-
-    /**
-     * 复制
-     *
-     * @param origin
-     * @return
-     */
-    public static SkuDayProductionInfoHelper createCloneByOneProduction(SkuDayProductionInfoHelper origin, Integer productionDay) {
-        if (null == origin) {
-            return null;
-        }
-        SkuDayProductionInfoHelper result = new SkuDayProductionInfoHelper();
-        result.productionDay = productionDay;
-        result.materialDesc = origin.getMaterialDesc();
-        result.materialCode = origin.getMaterialCode();
-        result.embryoCode = origin.getEmbryoCode();
-        Set<String> newUsedMouldSet = new HashSet<>();
-        newUsedMouldSet.addAll(origin.getUsedMouldSet());
-        result.usedMouldSet = newUsedMouldSet;
-        result.groupName = origin.getGroupName();
-        result.sumProductionQty = ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        result.dayVulcanizationQty = origin.getDayVulcanizationQty();
-        result.lossQty = origin.getDayLhMachineQty() - result.sumProductionQty;
         result.mainMaterialDesc = origin.getMainMaterialDesc();
         result.mainPattern = origin.getMainPattern();
         result.brand = origin.getBrand();
@@ -248,23 +236,6 @@ public class SkuDayProductionInfoHelper implements Serializable {
     }
 
     /**
-     * 可否换活字块 当天或是隔天
-     *
-     * @param context
-     * @param productionDay
-     * @return
-     */
-    public boolean isChangeTypeBlock(Context context, Integer productionDay) {
-        if (this.productionDay.equals(productionDay)) {
-            return isChangeTypeBlock(context);
-        }
-        if (this.productionDay.equals(context.getPreviousDay(productionDay))) {
-            return isChangeTypeBlockByNext(context);
-        }
-        return false;
-    }
-
-    /**
      * 是否可换模，当天或是隔天
      *
      * @param context
@@ -283,10 +254,14 @@ public class SkuDayProductionInfoHelper implements Serializable {
 
     /**
      * 是否直接允许换模
+     * 空表示没有排产
      *
      * @return
      */
     public boolean isChangeMould() {
+        if (null == sumProductionQty) {
+            return true;
+        }
         return sumProductionQty < dayVulcanizationQty;
     }
 
@@ -307,7 +282,10 @@ public class SkuDayProductionInfoHelper implements Serializable {
      */
     public boolean isChangeTypeBlock(Context context) {
         Integer dayLhMachineQty = dayVulcanizationQty * ProductionConstant.DOUBLE_MOULD_PRODUCTION;
-        Integer diffValue = dayLhMachineQty - sumProductionQty;
+        Integer diffValue = dayLhMachineQty;
+        if (null != sumProductionQty) {
+            diffValue = diffValue - sumProductionQty;
+        }
         TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         Integer changeTypeBlockQtyDiff = paramConfiguration.getChangeTypeBlockQtyDiff();

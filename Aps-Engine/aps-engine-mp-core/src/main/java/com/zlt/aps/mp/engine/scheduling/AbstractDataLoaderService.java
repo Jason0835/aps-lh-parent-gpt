@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.scheduling;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -21,6 +22,7 @@ import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.daylimit.*;
 import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.ProductionStageLogRecorder;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.*;
 import com.zlt.aps.mp.engine.handler.LhMachineInfoCalculateHelper;
@@ -58,6 +60,46 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
     public AbstractDataLoaderService(ProductionMdmDataService dataService, DpRequireDataService dpRequireDataService, MonthProductionDataService monthProductionDataService, ProductionHistoryHandler productionHistoryHandler) {
         super(dataService, dpRequireDataService, monthProductionDataService);
         this.productionHistoryHandler = productionHistoryHandler;
+    }
+
+    /**
+     * 重新初始化日志记录器信息
+     * 为了保持：
+     * productionContext,context的日志记录器为同一个对象
+     *
+     * @param productionContext tbr排产上下文
+     * @param context           初始的通用排产上下文
+     */
+    protected void resetTbrInitLogRecorderInfo(TbrProductionContext productionContext, Context context) {
+        if (null == productionContext || null == context) {
+            return;
+        }
+        //没有值时，才初始化，productionContext,context的日志记录器为同一个对象
+        if (null == context.getLogBuilderList()) {
+            List<ProductionStageLogRecorder> logRecorderList = Lists.newArrayList();
+            context.setLogBuilderList(logRecorderList);
+            productionContext.setLogBuilderList(logRecorderList);
+        }
+    }
+
+    /**
+     * 重新初始化日志记录器信息
+     * 为了保持：
+     * productionContext,context的日志记录器为同一个对象
+     *
+     * @param productionContext tbr排产上下文
+     * @param context           初始的通用排产上下文
+     */
+    protected void resetInitLogRecorderInfo(ProductionContext productionContext, Context context) {
+        if (null == productionContext || null == context) {
+            return;
+        }
+        //没有值时，才初始化，productionContext,context的日志记录器为同一个对象
+        if (null == context.getLogBuilderList()) {
+            List<ProductionStageLogRecorder> logRecorderList = Lists.newArrayList();
+            context.setLogBuilderList(logRecorderList);
+            productionContext.setLogBuilderList(logRecorderList);
+        }
     }
 
     /**
@@ -143,13 +185,14 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
 
         //17. 初始硫化机台信息
         productionContext.getBaseDataContainer().setLhMachineInfoList(getDataService().listLhMachineInfo(productionContext));
-        
+
         //18. 硫化机台信息总台数（扣除单控机台数）
         productionContext.getBaseDataContainer().setLhMachineCount(this.getLhMachineCount(productionContext));
     }
 
     /**
      * 获取硫化机台信息总台数（扣除单控机台数）
+     *
      * @param productionContext
      * @return
      */
@@ -623,7 +666,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
             configuration.setContinueSkuProductionHeightRequire(continueSkuProductionHeightValue);
         }
         //20260512+ 最小起排量
-        Integer minProductionQty = (Integer)paramConfigurationMap.get(MonthPlanEnums.MIN_PRODUCTION_QTY.getCode());
+        Integer minProductionQty = (Integer) paramConfigurationMap.get(MonthPlanEnums.MIN_PRODUCTION_QTY.getCode());
         configuration.setMinProductionQty(minProductionQty);
 
         return configuration;

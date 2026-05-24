@@ -14,6 +14,7 @@ import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.*;
+import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
 import com.zlt.aps.mp.engine.handler.*;
 import com.zlt.aps.mp.engine.logrecorder.*;
 import com.zlt.aps.mp.engine.scheduling.AbstractDataLoaderService;
@@ -155,6 +156,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
     public void run(Context context, Object userObj) {
         //0、创建排产上下文
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.FIRST_ON_LINE);
         //开始进行成型产能分配-结构排产
         log.info(TbrBeforeProductionGroupLogRecorder.addStartGroupLog(productionContext));
         //1、获取排产计划信息
@@ -202,6 +204,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //                   如果不能包过来，就需要把中优先级中途下机，下机的时间点是，剩余的模具产能，正好能把高优先级产完。
         adjustContinueSkuProductionQtyHandler.adjustContinueSkuProductionQty(estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap, productionContext);
         //8、进行模拟模具排产
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_PRODUCTION);
         log.info(TbrSimulateProductionLogRecorder.addStartMouldProductionLog(productionContext));
         simulateProductionHandler.productionGroupPlan(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //20260522+ 对没有高优先级的续作Sku进行检查是否可在正式排产时排产
@@ -209,6 +212,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         //9、保存结构成型排程结果
         List<MpStructureAllocation> allAllocationList = saveStructureInfo(productionContext);
         //10、第二轮排产
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.FORMAL_PRODUCTION);
         log.info(TbrMouldFormalProductionLogRecorder.addStartMouldFormalLog(productionContext));
         //清除模拟排产信息、重新构建分组计划的硫化组限制信息
         clearProductionInfoHandler.resetBeforeFormalProduction(productionContext, estimateGroupCxAllocationMap, allAllocationList);
@@ -458,11 +462,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         productionContext.setSimulateResult(new SimulateResultHelper());
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        if (null == context.getLogBuilder()) {
-            StringBuilder logBuilder = new StringBuilder();
-            context.setLogBuilder(logBuilder);
-            productionContext.setLogBuilder(logBuilder);
-        }
+        resetTbrInitLogRecorderInfo(productionContext, context);
         setProductionCycleInfo(productionContext);
         return productionContext;
     }
@@ -483,11 +483,7 @@ public class TbrCxCapacityAllocationService extends AbstractDataLoaderService {
         BeanUtils.copyProperties(context, productionContext);
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        if (null == context.getLogBuilder()) {
-            StringBuilder logBuilder = new StringBuilder();
-            context.setLogBuilder(logBuilder);
-            productionContext.setLogBuilder(logBuilder);
-        }
+        resetInitLogRecorderInfo(productionContext, context);
         setProductionCycleInfo(productionContext);
         return productionContext;
     }
