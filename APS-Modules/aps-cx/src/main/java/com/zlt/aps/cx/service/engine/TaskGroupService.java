@@ -734,6 +734,9 @@ public class TaskGroupService {
             int deferredSkippedEnding = 0;
             int deferredSkippedWarehouse = 0;
 
+            // 跟踪每任务的累计分配：key=胎胚编码, value=[累计产量, 轮次]
+            Map<String, int[]> taskRoundTracker = new HashMap<>();
+
             // 按结构分组
             Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> structureDeferredMap = new LinkedHashMap<>();
             for (CoreScheduleAlgorithmService.DailyEmbryoTask dt : deferredTasks) {
@@ -878,10 +881,12 @@ public class TaskGroupService {
                                     List<MpCxCapacityConfiguration> machines = structureRecommendedMachinesCache.get(k);
                                     return machines != null ? calculateStructureAvgRatio(machines, k, context) : BigDecimal.ONE;
                                 });
+                        BigDecimal roundTimeSeconds = BigDecimal.ZERO;
                         if (dailyLhCapacity != null && dailyLhCapacity > 0 && avgRatio.compareTo(BigDecimal.ZERO) > 0) {
                             BigDecimal timePerTire = BigDecimal.valueOf(SECONDS_PER_DAY)
                                     .divide(avgRatio.multiply(BigDecimal.valueOf(dailyLhCapacity)), 2, java.math.RoundingMode.HALF_UP);
                             BigDecimal itemTimeSeconds = timePerTire.multiply(BigDecimal.valueOf(fallbackProduction));
+                            roundTimeSeconds = itemTimeSeconds;
                             BigDecimal deferredTime = structureDeferredTimeMap.getOrDefault(structName, BigDecimal.ZERO);
                             if (deferredTime.add(itemTimeSeconds).compareTo(remainingCapacity) > 0) {
                                 log.info("  [R2-产能不足] 结构={}, 已用={}s({}h) + 本项={}s({}h) > 剩余={}s({}h)，本轮跳过",
@@ -909,10 +914,17 @@ public class TaskGroupService {
                         dt.setDeferredRemainingDemand(newRemaining);
 
                         boolean dtIsSupplement = Boolean.TRUE.equals(dt.getIsSupplementTask());
-                        log.info("  [R2-分配] 结构={}, 胎胚={}, 原因={}, 一车={}, 剩余需求={}, 需车={}, 余量处理后产出={}",
-                                structName, dt.getEmbryoCode(),
-                                dtIsSupplement ? "补充计划" : "零净需求",
-                                fallbackProduction, newRemaining, dt.getRequiredCars(), dt.getEndingExtraInventory());
+
+                        String taskKey = dt.getEmbryoCode() != null ? dt.getEmbryoCode() : dt.getMaterialCode();
+                        int[] tracker = taskRoundTracker.computeIfAbsent(taskKey, k -> new int[]{0, 0});
+                        tracker[0] += fallbackProduction;
+                        tracker[1]++;
+                        String roundTimeDisplay = roundTimeSeconds.compareTo(BigDecimal.ZERO) > 0
+                                ? roundTimeSeconds.divide(BigDecimal.valueOf(3600), 2, BigDecimal.ROUND_HALF_UP) + "h"
+                                : "-";
+                        log.info("  [R2-第{}轮] 结构={}, 胎胚={}, 本轮={}条({}), 累计={}轮/{}条",
+                                tracker[1], structName, dt.getEmbryoCode(),
+                                fallbackProduction, roundTimeDisplay, tracker[1], tracker[0]);
 
                         // 收尾余量处理
                         handleEndingRemainder(dt, context);
@@ -955,8 +967,13 @@ public class TaskGroupService {
                             log.info("  [R2-收尾舍弃] 胎胚={}, plannedProduction={}", dt.getEmbryoCode(), dt.getPlannedProduction());
                         }
 
-                        // 剩余需求耗尽则移除，否则下轮继续补
+                        // 剩余需求耗尽则移除，打印本轮该任务的汇总
                         if (newRemaining <= 0) {
+                            int[] finishTracker = taskRoundTracker.getOrDefault(taskKey, new int[]{0, 0});
+                            log.info("  [R2-分配完成] 结构={}, 胎胚={}, 原因={}, 共补{}轮/{}条, 最终计划量={}",
+                                    structName, dt.getEmbryoCode(),
+                                    dtIsSupplement ? "补充计划" : "零净需求",
+                                    finishTracker[1], finishTracker[0], dt.getPlannedProduction());
                             iter.remove();
                         }
                         break;
@@ -966,7 +983,15 @@ public class TaskGroupService {
 
             int remainingDeferred = 0;
             for (List<CoreScheduleAlgorithmService.DailyEmbryoTask> remaining : structureDeferredMap.values()) {
-                remainingDeferred += remaining.size();
+                for (CoreScheduleAlgorithmService.DailyEmbryoTask rt : remaining) {
+                    remainingDeferred++;
+                    String rtKey = rt.getEmbryoCode() != null ? rt.getEmbryoCode() : rt.getMaterialCode();
+                    int[] tracker = taskRoundTracker.getOrDefault(rtKey, new int[]{0, 0});
+                    int rtRemaining = rt.getDeferredRemainingDemand() != null ? rt.getDeferredRemainingDemand() : 0;
+                    log.info("  [R2-未完成] 结构={}, 胎胚={}, 已补{}轮/{}条, 剩余需求={}, 最终计划量={}",
+                            rt.getStructureName(), rt.getEmbryoCode(),
+                            tracker[1], tracker[0], rtRemaining, rt.getPlannedProduction());
+                }
             }
             log.info("【第二轮分配结果】暂存:{}个 | 已分配:{}个 | 未分配:{}个 | 跳过:产能不足{}个/成型余量耗尽{}个/收尾余量<=0{}个/立库满{}个",
                     deferredTasks.size(), deferredAllocated, remainingDeferred,
