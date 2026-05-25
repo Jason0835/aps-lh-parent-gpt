@@ -737,6 +737,9 @@ public class TaskGroupService {
             // 跟踪每任务的累计分配：key=胎胚编码, value=[累计产量, 轮次]
             Map<String, int[]> taskRoundTracker = new HashMap<>();
 
+            // 跟踪R2中已加入结果列表的任务，避免重复添加
+            Set<CoreScheduleAlgorithmService.DailyEmbryoTask> r2AddedToResult = new HashSet<>();
+
             // 按结构分组
             Map<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> structureDeferredMap = new LinkedHashMap<>();
             for (CoreScheduleAlgorithmService.DailyEmbryoTask dt : deferredTasks) {
@@ -798,6 +801,28 @@ public class TaskGroupService {
                         if (dtFormingRemainder != null && (dtFormingRemainder - usedRemainderForMaterial) <= 0) {
                             log.info("  [R2-成型余量耗尽] 跳过：胎胚={}, 物料={}, 已用{}/总量{}",
                                     dt.getEmbryoCode(), dtMaterialCode, usedRemainderForMaterial, dtFormingRemainder);
+                            if (dt.getPlannedProduction() != null && dt.getPlannedProduction() > 0 && !r2AddedToResult.contains(dt)) {
+                                dt.setEndingExtraInventory(dt.getPlannedProduction());
+                                handleEndingRemainder(dt, context);
+                                String dtEmbryoCode2 = dt.getEmbryoCode();
+                                if (dtEmbryoCode2 != null && dt.getEndingExtraInventory() != null && dt.getEndingExtraInventory() > 0) {
+                                    int endingDiff = dt.getEndingExtraInventory() - dt.getPlannedProduction();
+                                    if (endingDiff != 0) {
+                                        shiftFormingOutputMap.merge(dtEmbryoCode2, endingDiff, Integer::sum);
+                                    }
+                                }
+                                boolean dtIsContinue2 = Boolean.TRUE.equals(dt.getIsContinueTask());
+                                boolean dtIsTrial2 = Boolean.TRUE.equals(dt.getIsTrialTask());
+                                if (dtIsContinue2) {
+                                    result.getContinueTasks().add(dt);
+                                } else if (dtIsTrial2) {
+                                    result.getTrialTasks().add(dt);
+                                } else {
+                                    result.getNewTasks().add(dt);
+                                }
+                                r2AddedToResult.add(dt);
+                                log.info("  [R2-余量耗尽但已分配] 胎胚={}, 最终计划量={}", dt.getEmbryoCode(), dt.getPlannedProduction());
+                            }
                             iter.remove();
                             deferredSkippedForming++;
                             continue;
@@ -861,6 +886,28 @@ public class TaskGroupService {
                                         dtEmbryoCode, dtCurrentStock, dtCumFormingOutput, dtCumVulcanizingConsumption,
                                         dtProjectedStock, dtSkipReason);
                                 deferredSkippedWarehouse++;
+                                // 被立库管控跳过，但之前已分配过产量的任务需要收尾处理并加入结果
+                                if (dt.getPlannedProduction() != null && dt.getPlannedProduction() > 0 && !r2AddedToResult.contains(dt)) {
+                                    dt.setEndingExtraInventory(dt.getPlannedProduction());
+                                    handleEndingRemainder(dt, context);
+                                    if (dtEmbryoCode != null && dt.getEndingExtraInventory() != null && dt.getEndingExtraInventory() > 0) {
+                                        int endingDiff = dt.getEndingExtraInventory() - dt.getPlannedProduction();
+                                        if (endingDiff != 0) {
+                                            shiftFormingOutputMap.merge(dtEmbryoCode, endingDiff, Integer::sum);
+                                        }
+                                    }
+                                    boolean dtIsContinue = Boolean.TRUE.equals(dt.getIsContinueTask());
+                                    boolean dtIsTrial = Boolean.TRUE.equals(dt.getIsTrialTask());
+                                    if (dtIsContinue) {
+                                        result.getContinueTasks().add(dt);
+                                    } else if (dtIsTrial) {
+                                        result.getTrialTasks().add(dt);
+                                    } else {
+                                        result.getNewTasks().add(dt);
+                                    }
+                                    r2AddedToResult.add(dt);
+                                    log.info("  [R2-立库跳过但已分配] 胎胚={}, 最终计划量={}", dt.getEmbryoCode(), dt.getPlannedProduction());
+                                }
                                 iter.remove();
                                 continue;
                             }
@@ -902,10 +949,10 @@ public class TaskGroupService {
                             structureDeferredTimeMap.put(structName, deferredTime.add(itemTimeSeconds));
                         }
 
-                        // 确认分配
-                        dt.setPlannedProduction(fallbackProduction);
-                        dt.setRequiredCars(calculateRequiredCars(fallbackProduction, tripCapacity));
-                        dt.setEndingExtraInventory(fallbackProduction);
+                        // 确认分配 - 累加产量，而非每轮覆盖
+                        int currentPP = dt.getPlannedProduction() != null ? dt.getPlannedProduction() : 0;
+                        dt.setPlannedProduction(currentPP + fallbackProduction);
+                        dt.setRequiredCars(calculateRequiredCars(dt.getPlannedProduction(), tripCapacity));
                         deferredAllocated++;
                         anyProgress = true;
 
@@ -922,53 +969,59 @@ public class TaskGroupService {
                         String roundTimeDisplay = roundTimeSeconds.compareTo(BigDecimal.ZERO) > 0
                                 ? roundTimeSeconds.divide(BigDecimal.valueOf(3600), 2, BigDecimal.ROUND_HALF_UP) + "h"
                                 : "-";
-                        log.info("  [R2-第{}轮] 结构={}, 胎胚={}, 本轮={}条({}), 累计={}轮/{}条",
+                        log.info("  [R2-第{}轮] 结构={}, 胎胚={}, 本轮={}条({}), 累计={}轮/{}条, 当前计划量={}",
                                 tracker[1], structName, dt.getEmbryoCode(),
-                                fallbackProduction, roundTimeDisplay, tracker[1], tracker[0]);
+                                fallbackProduction, roundTimeDisplay, tracker[1], tracker[0], dt.getPlannedProduction());
 
-                        // 收尾余量处理
-                        handleEndingRemainder(dt, context);
-
-                        // 累加本班次成型产出（收尾余量处理后的最终值，用于下轮立库库容检查）
-                        if (dtEmbryoCode != null && dt.getEndingExtraInventory() != null && dt.getEndingExtraInventory() > 0) {
-                            shiftFormingOutputMap.merge(dtEmbryoCode, dt.getEndingExtraInventory(), Integer::sum);
+                        // 累加本班次成型产出（用每轮产量直接累加，用于下轮立库库容检查）
+                        if (dtEmbryoCode != null && fallbackProduction > 0) {
+                            shiftFormingOutputMap.merge(dtEmbryoCode, fallbackProduction, Integer::sum);
                         }
 
-                        // 收尾余量处理后回溯更新 isLastEndingBatch
-                        if (Boolean.TRUE.equals(dt.getIsLastEndingBatch())) {
-                            List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
-                            if (allTasksForMaterial != null) {
-                                for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
-                                    if (prevTask != dt && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
-                                        prevTask.setIsLastEndingBatch(true);
-                                        log.info("  第二轮回溯更新 isLastEndingBatch: 物料={}, 胎胚={} → true", dtMaterialCode, prevTask.getEmbryoCode());
+                        // 更新已使用的成型余量（用每轮产量直接累加）
+                        if (fallbackProduction > 0) {
+                            materialUsedFormingRemainder.merge(dtMaterialCode, fallbackProduction, Integer::sum);
+                        }
+
+                        // 剩余需求耗尽或被立库管控跳过：收尾处理 + 加入结果列表（只加一次）
+                        if (newRemaining <= 0) {
+                            dt.setEndingExtraInventory(dt.getPlannedProduction());
+                            handleEndingRemainder(dt, context);
+
+                            if (dtEmbryoCode != null && dt.getEndingExtraInventory() != null && dt.getEndingExtraInventory() > 0) {
+                                int endingDiff = dt.getEndingExtraInventory() - dt.getPlannedProduction();
+                                if (endingDiff != 0) {
+                                    shiftFormingOutputMap.merge(dtEmbryoCode, endingDiff, Integer::sum);
+                                }
+                            }
+
+                            if (Boolean.TRUE.equals(dt.getIsLastEndingBatch())) {
+                                List<CoreScheduleAlgorithmService.DailyEmbryoTask> allTasksForMaterial = materialTasksMap.get(dtMaterialCode);
+                                if (allTasksForMaterial != null) {
+                                    for (CoreScheduleAlgorithmService.DailyEmbryoTask prevTask : allTasksForMaterial) {
+                                        if (prevTask != dt && !Boolean.TRUE.equals(prevTask.getIsLastEndingBatch())) {
+                                            prevTask.setIsLastEndingBatch(true);
+                                            log.info("  第二轮回溯更新 isLastEndingBatch: 物料={}, 胎胚={} → true", dtMaterialCode, prevTask.getEmbryoCode());
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        // 更新已使用的成型余量
-                        if (dt.getEndingExtraInventory() != null && dt.getEndingExtraInventory() > 0) {
-                            materialUsedFormingRemainder.merge(dtMaterialCode, dt.getEndingExtraInventory(), Integer::sum);
-                        }
-
-                        // 收尾舍弃的任务(plannedProduction=0)不加入分组
-                        if (dt.getPlannedProduction() != null && dt.getPlannedProduction() > 0) {
-                            boolean dtIsContinue = Boolean.TRUE.equals(dt.getIsContinueTask());
-                            boolean dtIsTrial = Boolean.TRUE.equals(dt.getIsTrialTask());
-                            if (dtIsContinue) {
-                                result.getContinueTasks().add(dt);
-                            } else if (dtIsTrial) {
-                                result.getTrialTasks().add(dt);
-                            } else {
-                                result.getNewTasks().add(dt);
+                            if (dt.getPlannedProduction() != null && dt.getPlannedProduction() > 0 && !r2AddedToResult.contains(dt)) {
+                                boolean dtIsContinue = Boolean.TRUE.equals(dt.getIsContinueTask());
+                                boolean dtIsTrial = Boolean.TRUE.equals(dt.getIsTrialTask());
+                                if (dtIsContinue) {
+                                    result.getContinueTasks().add(dt);
+                                } else if (dtIsTrial) {
+                                    result.getTrialTasks().add(dt);
+                                } else {
+                                    result.getNewTasks().add(dt);
+                                }
+                                r2AddedToResult.add(dt);
+                            } else if (dt.getPlannedProduction() == null || dt.getPlannedProduction() <= 0) {
+                                log.info("  [R2-收尾舍弃] 胎胚={}, plannedProduction={}", dt.getEmbryoCode(), dt.getPlannedProduction());
                             }
-                        } else {
-                            log.info("  [R2-收尾舍弃] 胎胚={}, plannedProduction={}", dt.getEmbryoCode(), dt.getPlannedProduction());
-                        }
 
-                        // 剩余需求耗尽则移除，打印本轮该任务的汇总
-                        if (newRemaining <= 0) {
                             int[] finishTracker = taskRoundTracker.getOrDefault(taskKey, new int[]{0, 0});
                             log.info("  [R2-分配完成] 结构={}, 胎胚={}, 原因={}, 共补{}轮/{}条, 最终计划量={}",
                                     structName, dt.getEmbryoCode(),
@@ -988,9 +1041,31 @@ public class TaskGroupService {
                     String rtKey = rt.getEmbryoCode() != null ? rt.getEmbryoCode() : rt.getMaterialCode();
                     int[] tracker = taskRoundTracker.getOrDefault(rtKey, new int[]{0, 0});
                     int rtRemaining = rt.getDeferredRemainingDemand() != null ? rt.getDeferredRemainingDemand() : 0;
-                    log.info("  [R2-未完成] 结构={}, 胎胚={}, 已补{}轮/{}条, 剩余需求={}, 最终计划量={}",
+                    log.info("  [R2-未完成] 结构={}, 胎胚={}, 已补{}轮/{}条, 剩余需求={}, 当前计划量={}",
                             rt.getStructureName(), rt.getEmbryoCode(),
                             tracker[1], tracker[0], rtRemaining, rt.getPlannedProduction());
+                    if (rt.getPlannedProduction() != null && rt.getPlannedProduction() > 0 && !r2AddedToResult.contains(rt)) {
+                        rt.setEndingExtraInventory(rt.getPlannedProduction());
+                        handleEndingRemainder(rt, context);
+                        String rtEmbryoCode = rt.getEmbryoCode();
+                        if (rtEmbryoCode != null && rt.getEndingExtraInventory() != null && rt.getEndingExtraInventory() > 0) {
+                            int endingDiff = rt.getEndingExtraInventory() - rt.getPlannedProduction();
+                            if (endingDiff != 0) {
+                                shiftFormingOutputMap.merge(rtEmbryoCode, endingDiff, Integer::sum);
+                            }
+                        }
+                        boolean rtIsContinue = Boolean.TRUE.equals(rt.getIsContinueTask());
+                        boolean rtIsTrial = Boolean.TRUE.equals(rt.getIsTrialTask());
+                        if (rtIsContinue) {
+                            result.getContinueTasks().add(rt);
+                        } else if (rtIsTrial) {
+                            result.getTrialTasks().add(rt);
+                        } else {
+                            result.getNewTasks().add(rt);
+                        }
+                        r2AddedToResult.add(rt);
+                        log.info("  [R2-未完成但已分配] 胎胚={}, 最终计划量={}", rt.getEmbryoCode(), rt.getPlannedProduction());
+                    }
                 }
             }
             log.info("【第二轮分配结果】暂存:{}个 | 已分配:{}个 | 未分配:{}个 | 跳过:产能不足{}个/成型余量耗尽{}个/收尾余量<=0{}个/立库满{}个",
