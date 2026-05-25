@@ -14,12 +14,14 @@ import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
 import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
+import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -63,6 +65,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
     @Resource
     private FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
+
+    @Resource
+    private MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
 
     private static final AtomicInteger INSERT_ORDER_SEQ = new AtomicInteger(0);
 
@@ -212,6 +217,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             if (StringUtils.isNotBlank(validateResult.getTrialStatus())) {
                 result.setTrialStatus(validateResult.getTrialStatus());
                 result.setChangedTrialStatus(validateResult.getTrialStatus());
+            } else if (StringUtils.isNotBlank(dto.getOriginalTrialStatus())) {
+                result.setTrialStatus(dto.getOriginalTrialStatus());
+                result.setChangedTrialStatus(dto.getOriginalTrialStatus());
             }
             if (StringUtils.isNotBlank(validateResult.getLeftRightMould())) {
                 result.setLeftRightMould(validateResult.getLeftRightMould());
@@ -269,7 +277,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
     /**
      * 填充插单关联字段（胎胚代码/胎胚描述/需求计划版本号/排产版本号/规格/结构/模具号）
-     * <p>从月计划定稿表中根据工厂+物料编码查询关联字段</p>
+     * <p>从月计划定稿表中根据工厂+年月+排产版本+物料编码查询关联字段</p>
      * <p>班次开始/结束时间由 {@link #fillShiftStartEndTimes} 单独填充，需在班次计划量设置后调用</p>
      *
      * @param result 排程结果实体
@@ -277,14 +285,26 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      */
     private void fillEmbryoRelatedFields(LhScheduleResult result, LhOrderInsertDTO dto) {
         String materialCode = StringUtils.isNotBlank(dto.getProductCode()) ? dto.getProductCode() : dto.getMaterialCode();
-        if (StringUtils.isBlank(materialCode) || StringUtils.isBlank(dto.getFactoryCode())) {
+        if (StringUtils.isBlank(materialCode) || StringUtils.isBlank(dto.getFactoryCode()) || dto.getScheduleDate() == null) {
             return;
         }
+
+        cn.hutool.core.date.DateTime scheduleDate = cn.hutool.core.date.DateUtil.date(dto.getScheduleDate());
+        int year = cn.hutool.core.date.DateUtil.year(scheduleDate);
+        int month = cn.hutool.core.date.DateUtil.month(scheduleDate) + 1;
+
+        MpFactoryProductionVersion finalVersion = getFinalProductionVersion(dto.getFactoryCode(), year, month);
+
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, dto.getFactoryCode())
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, year)
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, month)
                 .eq(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCode)
-                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                .last("LIMIT 1");
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        if (finalVersion != null && StringUtils.isNotBlank(finalVersion.getProductionVersion())) {
+            wrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, finalVersion.getProductionVersion());
+        }
+        wrapper.last("LIMIT 1");
         FactoryMonthPlanProductionFinalResult monthPlan = monthPlanMapper.selectOne(wrapper);
         if (monthPlan != null) {
             if (StringUtils.isNotBlank(monthPlan.getEmbryoCode())) {
@@ -457,5 +477,29 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .collect(Collectors.joining(","));
+    }
+
+    /**
+     * 获取定稿排产版本
+     *
+     * @param factoryCode 分厂编码
+     * @param year        年份
+     * @param month       月份
+     * @return 定稿排产版本，不存在返回null
+     */
+    private MpFactoryProductionVersion getFinalProductionVersion(String factoryCode, int year, int month) {
+        if (StringUtils.isBlank(factoryCode)) {
+            return null;
+        }
+        LambdaQueryWrapper<MpFactoryProductionVersion> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MpFactoryProductionVersion::getFactoryCode, factoryCode)
+                .eq(MpFactoryProductionVersion::getYear, year)
+                .eq(MpFactoryProductionVersion::getMonth, month)
+                .eq(MpFactoryProductionVersion::getIsFinal, "1")
+                .eq(MpFactoryProductionVersion::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .orderByDesc(MpFactoryProductionVersion::getUpdateTime)
+                .orderByDesc(MpFactoryProductionVersion::getId)
+                .last("LIMIT 1");
+        return mpFactoryProductionVersionMapper.selectOne(wrapper);
     }
 }

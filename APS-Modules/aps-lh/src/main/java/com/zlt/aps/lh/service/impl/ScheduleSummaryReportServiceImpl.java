@@ -173,8 +173,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         Map<Integer, String> classShiftTypeMap = buildClassShiftTypeMap(shiftConfigs);
 
         Map<String, Object> tableMap = buildTableMap(previousDate, scheduleDate, factoryCode, classShiftTypeMap);
-        // TD胶种列表也使用前一天的数据，与表头数据保持一致
-        List<List<Map<String, Object>>> dataList = buildDataList(previousDate, factoryCode);
+        // TD胶种列表使用排程日期查询成型日计划数据，过滤3/4/5班次有排计划量的胎胚，再取TD胶种
+        List<List<Map<String, Object>>> dataList = buildDataList(scheduleDate, factoryCode);
 
         // 小胶种列表数据处理：无数据时隐藏第7行，有数据时合并B7到B列结束行
         List<Map<String, Object>> smallRubberList = dataList.isEmpty() ? Collections.emptyList() : dataList.get(0);
