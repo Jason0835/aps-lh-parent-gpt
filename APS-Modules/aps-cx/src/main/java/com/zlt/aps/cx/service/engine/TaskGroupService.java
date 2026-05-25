@@ -745,13 +745,15 @@ public class TaskGroupService {
             Map<String, BigDecimal> structureRemainingCapacityMap = new HashMap<>();
             for (String structName : structureDeferredMap.keySet()) {
                 if (structName.isEmpty() || context.getStructureAllocationMap() == null) {
-                    structureRemainingCapacityMap.put(structName, BigDecimal.valueOf(Long.MAX_VALUE));
+                    structureRemainingCapacityMap.put(structName, BigDecimal.ZERO);
+                    log.info("  结构 {} 剩余产能: 无结构配置(产能=0)", structName.isEmpty() ? "(空)" : structName);
                     continue;
                 }
                 List<MpCxCapacityConfiguration> recommendedMachines = structureRecommendedMachinesCache
                         .computeIfAbsent(structName, k -> getRecommendedMachinesForStructure(k, scheduleDate, context));
                 if (recommendedMachines == null || recommendedMachines.isEmpty()) {
-                    structureRemainingCapacityMap.put(structName, BigDecimal.valueOf(Long.MAX_VALUE));
+                    structureRemainingCapacityMap.put(structName, BigDecimal.ZERO);
+                    log.info("  结构 {} 剩余产能: 无推荐机台(产能=0)", structName);
                     continue;
                 }
                 BigDecimal totalCapacitySeconds = BigDecimal.valueOf(recommendedMachines.size())
@@ -851,7 +853,8 @@ public class TaskGroupService {
                                 }
                             }
                             if (dtSkip) {
-                                log.info("  [R2-立库库容超限] 跳过：胎胚={}, 本胎胚: {}+{}-{}={}, {}",
+                                log.info("  [R2-{}] 跳过：胎胚={}, 本胎胚: {}+{}-{}={}, 原因: {}",
+                                        dtSkipReason.startsWith("[空间]") ? "空间(库容超限)" : "时间(硫化超6h)",
                                         dtEmbryoCode, dtCurrentStock, dtCumFormingOutput, dtCumVulcanizingConsumption,
                                         dtProjectedStock, dtSkipReason);
                                 deferredSkippedWarehouse++;

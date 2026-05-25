@@ -529,9 +529,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载精度计划失败，继续执行：{}", e.getMessage());
             }
 
-            // 16. 加载物料收尾信息并计算收尾日
+            // 16. 加载物料收尾信息并计算收尾日（使用排产起始日期，非前端传入的最后一天）
             try {
-                loadMaterialEndings(context, scheduleDate);
+                loadMaterialEndings(context, scheduleStartDate);
             } catch (Exception e) {
                 log.warn("加载物料收尾信息失败，继续执行：{}", e.getMessage());
             }
@@ -1805,6 +1805,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         int currentDay = scheduleDate.getDayOfMonth();
         int lastDayOfMonth = scheduleDate.withDayOfMonth(scheduleDate.lengthOfMonth()).getDayOfMonth();
         Integer yearMonth = year * 100 + month;
+
+        log.info("物料收尾计算：使用排产起始日期={}(第{}天), 月末={}日, 年月={}", scheduleDate, currentDay, lastDayOfMonth, yearMonth);
 
         // 1. 尝试从数据库加载已存在的收尾信息
         List<CxMaterialEnding> existingEndings = materialEndingMapper.selectByStatDate(scheduleDate);
