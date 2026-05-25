@@ -285,7 +285,7 @@ public class TaskGroupService {
         Map<String, Integer> shiftVulcanizingConsumptionMap = new HashMap<>();
 
         if (warehouseCapacity > 0) {
-            log.info("【立库库容管控】参数: 立库库容={}, 阈值比例={}%, 库容上限={}, 时间封顶阈值={}h, 管控胎胚种类数={}",
+            log.info("【立库库容管控】参数: 立库总库容={}条, 预警比例={}%, 预警线={}条, 单胎胚可供硫化>{}h即封顶, 立库中有库存的胎胚种类={}种",
                     warehouseCapacity, (int)(warehouseCapacityRatio * 100), warehouseThreshold,
                     STOCK_HOURS_CAP, embryoTotalStockMap.size());
         }
@@ -365,7 +365,7 @@ public class TaskGroupService {
                     return -score;
                 }
         ));
-        log.info("按三层优先级排序完成：补充计划 > 有计划量+3天内收尾 > ... > 无计划量+>10天收尾，层级内试制量试 > 续作 > 非续作 > 库存少优先");
+        log.info("按三层优先级排序完成：补充计划(10000) > 有计划量+紧急收尾(9000) > 有计划量+近期收尾(8000) > 有计划量+正常(7000) > 无计划量+紧急(6000) > 无计划量+近期(5000) > 无计划量+正常(4000)，层级内试制量试(+1500) > 续作(+800) > 非续作(+0) > 库存少优先(-库存)");
 
         for (LhScheduleResult lhResult : lhScheduleResults) {
             if (lhResult.getEmbryoCode() == null) {
