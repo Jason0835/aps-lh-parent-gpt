@@ -239,7 +239,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         ImportContext importContext = importDTO.getImportContext();
         LhScheduleResult result = importDTO.getScheduleResult();
         byte[] fileBytes = importContext.getFileBytes();
-        String sheetName = "硫化计划主表";
+        String sheetName = "硫化日计划";
         ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
         importLog = this.iImportLogService.add(importLog);
         ExcelUtil<LhScheduleResultTemplateImportVO> util = new ExcelUtil<>(LhScheduleResultTemplateImportVO.class);
