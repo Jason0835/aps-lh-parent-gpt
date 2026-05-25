@@ -164,9 +164,10 @@ public class LhChipStockController extends AbstractDocBizController<LhChipStock>
     }
 
     /**
-     * 更新完成量 - 供硫化排程回填调用
+     * 累加更新完成量 - 供硫化排程回填调用
+     * 在原有完成量的基础上叠加传入的完成量值，而非直接覆盖
      */
-    @ApiOperation("更新完成量")
+    @ApiOperation("累加更新完成量")
     @PostMapping("/updateFinishQty")
     @ResponseBody
     public AjaxResult updateFinishQty(@RequestParam("factoryCode") String factoryCode,

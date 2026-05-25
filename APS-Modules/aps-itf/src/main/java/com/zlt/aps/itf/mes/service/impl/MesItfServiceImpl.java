@@ -2399,7 +2399,7 @@ public class MesItfServiceImpl implements MesItfService {
             });
 
             DynamicDataSourceContextHolder.push(DataSource.MES);
-            List<LhRepairCapsuleVo> syncList = mesItfMapper.selectLhRepairCapsuleHistoryList(new AuxReqSyncDataLogs());
+            List<LhRepairCapsuleVo> syncList = mesItfMapper.selectLhRepairCapsuleList(new AuxReqSyncDataLogs());
             DynamicDataSourceContextHolder.poll();
 
             if (CollectionUtils.isEmpty(syncList)) {

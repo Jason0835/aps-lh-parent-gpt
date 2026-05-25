@@ -17,11 +17,12 @@ public interface ILhChipStockService extends IDocService<LhChipStock> {
     String[] getQueryFormulas();
 
     /**
-     * 更新完成量 - 供硫化排程回填
-     * @param factoryCode 分厂
+     * 累加更新完成量 - 供硫化排程回填调用
+     * 在原有完成量的基础上叠加传入的完成量值，而非直接覆盖
+     * @param factoryCode 分厂编号
      * @param chipCode 芯片编号
-     * @param finishQty 完成量
-     * @return 结果
+     * @param finishQty 待累加的完成量
+     * @return 更新的记录数
      */
     int updateFinishQty(String factoryCode, String chipCode, Integer finishQty);
 

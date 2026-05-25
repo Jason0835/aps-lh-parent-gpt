@@ -287,4 +287,10 @@ public class LhOrderInsertDTO implements Serializable {
     @ApiModelProperty(value = "是否交期")
     private String isDelivery;
 
+    /**
+     * 原始示方类型（从列表行带入，用于校验结果为空时的兜底）
+     */
+    @ApiModelProperty(value = "原始示方类型", name = "originalTrialStatus")
+    private String originalTrialStatus;
+
 }
