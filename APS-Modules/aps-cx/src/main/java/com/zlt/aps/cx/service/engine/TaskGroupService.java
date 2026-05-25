@@ -862,21 +862,26 @@ public class TaskGroupService {
                                     dtSkipReason = "[空间]全部预计=" + dtTotalProjected + ">=上限=" + warehouseThreshold;
                                 }
                             }
-                            // 维度二（时间）：本胎胚可供硫化时长 > 6h
+                            // 维度二（时间）：预估本轮排产后的可供硫化时长，如果>6h则跳过本轮（事前检查）
                             if (!dtSkip) {
                                 int dtTotalMoldQty = embryoTotalMoldMap.getOrDefault(dtEmbryoCode, 0);
                                 Integer dtDailyLhCap = getDailyLhCapacityForMaterial(dtMaterialCode, context);
                                 if (dtTotalMoldQty > 0 && dtDailyLhCap != null && dtDailyLhCap > 0) {
-                                    BigDecimal dtSingleTireMoldSeconds = BigDecimal.valueOf(SECONDS_PER_DAY)
-                                            .divide(BigDecimal.valueOf(dtDailyLhCap), 2, BigDecimal.ROUND_HALF_UP);
-                                    BigDecimal dtStockHours = BigDecimal.valueOf(dtProjectedStock)
-                                            .multiply(dtSingleTireMoldSeconds)
-                                            .divide(BigDecimal.valueOf(dtTotalMoldQty), 2, BigDecimal.ROUND_HALF_UP)
-                                            .divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 2, BigDecimal.ROUND_HALF_UP);
-                                    if (dtStockHours.compareTo(BigDecimal.valueOf(STOCK_HOURS_CAP)) > 0) {
-                                        dtSkip = true;
-                                        dtSkipReason = "[时间]本胎胚预计=" + dtProjectedStock + ",可供硫化="
-                                                + dtStockHours.setScale(2, BigDecimal.ROUND_HALF_UP) + "h>" + STOCK_HOURS_CAP + "h";
+                                    int dtTripCapacity = getTripCapacity(structName, dtEmbryoCode, context);
+                                    int dtFallbackProduction = Math.min(dtTripCapacity, remainingDemand);
+                                    if (dtFallbackProduction > 0) {
+                                        int dtProjectedAfter = dtCurrentStock + dtCumFormingOutput + dtFallbackProduction - dtCumVulcanizingConsumption;
+                                        BigDecimal dtSingleTireMoldSeconds = BigDecimal.valueOf(SECONDS_PER_DAY)
+                                                .divide(BigDecimal.valueOf(dtDailyLhCap), 2, BigDecimal.ROUND_HALF_UP);
+                                        BigDecimal dtStockHoursAfter = BigDecimal.valueOf(dtProjectedAfter)
+                                                .multiply(dtSingleTireMoldSeconds)
+                                                .divide(BigDecimal.valueOf(dtTotalMoldQty), 2, BigDecimal.ROUND_HALF_UP)
+                                                .divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 2, BigDecimal.ROUND_HALF_UP);
+                                        if (dtStockHoursAfter.compareTo(BigDecimal.valueOf(STOCK_HOURS_CAP)) > 0) {
+                                            dtSkip = true;
+                                            dtSkipReason = "[时间-事前]预估本轮排" + dtFallbackProduction + "条后=" + dtProjectedAfter
+                                                    + ",可供硫化=" + dtStockHoursAfter.setScale(2, BigDecimal.ROUND_HALF_UP) + "h>" + STOCK_HOURS_CAP + "h";
+                                        }
                                     }
                                 }
                             }
