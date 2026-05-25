@@ -70,9 +70,10 @@ public interface ILhChipStockRemoteService {
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
     /**
-     * 更新完成量 - 硫化排程回填接口
+     * 累加更新完成量 - 硫化排程回填接口
+     * 在原有完成量的基础上叠加传入的完成量值，而非直接覆盖
      */
-    @ApiOperation("更新完成量")
+    @ApiOperation("累加更新完成量")
     @PostMapping("/lhChipStock/updateFinishQty")
     AjaxResult updateFinishQty(@RequestParam("factoryCode") String factoryCode,
                                @RequestParam("chipCode") String chipCode,

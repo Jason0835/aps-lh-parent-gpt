@@ -529,9 +529,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载精度计划失败，继续执行：{}", e.getMessage());
             }
 
-            // 16. 加载物料收尾信息并计算收尾日
+            // 16. 加载物料收尾信息并计算收尾日（使用排产起始日期，非前端传入的最后一天）
             try {
-                loadMaterialEndings(context, scheduleDate);
+                loadMaterialEndings(context, scheduleStartDate);
             } catch (Exception e) {
                 log.warn("加载物料收尾信息失败，继续执行：{}", e.getMessage());
             }
@@ -1715,6 +1715,11 @@ public class ScheduleServiceImpl implements ScheduleService {
                     totalDemand += dayVulcanizationQty;
                 }
 
+                if (taskDemands.isEmpty()) {
+                    log.debug("胎胚 {} 对应多个硫化任务但全部被过滤（无有效日硫化量），跳过分配", embryoCode);
+                    continue;
+                }
+
                 if (totalDemand == 0) {
                     // 总需求为0，平均分配
                     int avgStock = totalStock / taskDemands.size();
@@ -1800,6 +1805,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         int currentDay = scheduleDate.getDayOfMonth();
         int lastDayOfMonth = scheduleDate.withDayOfMonth(scheduleDate.lengthOfMonth()).getDayOfMonth();
         Integer yearMonth = year * 100 + month;
+
+        log.info("物料收尾计算：使用排产起始日期={}(第{}天), 月末={}日, 年月={}", scheduleDate, currentDay, lastDayOfMonth, yearMonth);
 
         // 1. 尝试从数据库加载已存在的收尾信息
         List<CxMaterialEnding> existingEndings = materialEndingMapper.selectByStatDate(scheduleDate);
@@ -1893,13 +1900,17 @@ public class ScheduleServiceImpl implements ScheduleService {
 
                 // 计算延误量（如果成型余量 > 0 且接近收尾日）
                 if (formingRemainder != null && formingRemainder > 0 && daysToEnding >= 0 && daysToEnding <= NEAR_ENDING_DAYS) {
-                    // 从月计划中累加当前日到收尾日之间各天的计划排产量
                     int producibleQty = calculateProducibleQty(plans, currentDay, endingDay);
 
                     if (formingRemainder > producibleQty) {
                         int delayQty = formingRemainder - producibleQty;
                         ending.setDelayQuantity(delayQty);
                         ending.setDistributedQuantity(delayQty / CATCH_UP_DAYS);
+                        log.info("[延误量计算] 物料={}, 距收尾{}天, 成型余量={} > 月计划第{}~第{}天可生产量={}, "
+                                        + "延误量={}条(成型余量-可生产量), 未来{}天每天必须生产量={}条(才能消化完毕)",
+                                materialCode, daysToEnding, formingRemainder, currentDay, endingDay,
+                                producibleQty, delayQty,
+                                CATCH_UP_DAYS, delayQty / CATCH_UP_DAYS);
                     }
                 }
             } else {
@@ -2020,10 +2031,10 @@ public class ScheduleServiceImpl implements ScheduleService {
 
             lhScheduleResults.add(newRecord);
             supplemented++;
-            log.info("补充延误物料: 物料={}, 胎胚={}, 历史排程日期={}, 补充排产量={}, 来源延误量={}",
+            log.info("补充延误物料: 物料={}, 胎胚={}, 历史排程日期={}, 延误量={}条(成型余量-可生产量), 未来{}天每天必须生产量={}条(才能消化完毕)",
                     materialCode, historicalRecord.getEmbryoCode(),
                     historicalRecord.getScheduleDate(),
-                    ending.getDistributedQuantity(), ending.getDelayQuantity());
+                    ending.getDelayQuantity(), CATCH_UP_DAYS, ending.getDistributedQuantity());
         }
 
         log.info("延误物料补充完成：成功补充 {} 个，未找到历史记录 {} 个", supplemented, notFound);
