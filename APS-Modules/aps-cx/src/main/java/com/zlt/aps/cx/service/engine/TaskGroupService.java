@@ -759,8 +759,13 @@ public class TaskGroupService {
                 BigDecimal cumulativeTime = structureCumulativeTimeMap.getOrDefault(structName, BigDecimal.ZERO);
                 BigDecimal remaining = totalCapacitySeconds.subtract(cumulativeTime);
                 structureRemainingCapacityMap.put(structName, remaining.compareTo(BigDecimal.ZERO) > 0 ? remaining : BigDecimal.ZERO);
-                log.info("  结构 {} 剩余产能: 总={}s, 第一轮已用={}s, 剩余={}s",
-                        structName, totalCapacitySeconds.toBigInteger(), cumulativeTime.toBigInteger(), remaining.toBigInteger());
+                log.info("  结构 {} 剩余产能: 总={}s({}h), 第一轮已用={}s({}h), 剩余={}s({}h)",
+                        structName, totalCapacitySeconds.toBigInteger(),
+                        totalCapacitySeconds.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
+                        cumulativeTime.toBigInteger(),
+                        cumulativeTime.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
+                        remaining.toBigInteger(),
+                        remaining.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP));
             }
 
             // 轮询分配：每个结构下轮询安排一车，直到产能耗尽
@@ -876,9 +881,13 @@ public class TaskGroupService {
                             BigDecimal itemTimeSeconds = timePerTire.multiply(BigDecimal.valueOf(fallbackProduction));
                             BigDecimal deferredTime = structureDeferredTimeMap.getOrDefault(structName, BigDecimal.ZERO);
                             if (deferredTime.add(itemTimeSeconds).compareTo(remainingCapacity) > 0) {
-                                log.info("  [R2-产能不足] 结构={}, 已用={}s + 本项={}s > 剩余={}s，本轮跳过",
-                                        structName, deferredTime.toBigInteger(), itemTimeSeconds.toBigInteger(),
-                                        remainingCapacity.toBigInteger());
+                                log.info("  [R2-产能不足] 结构={}, 已用={}s({}h) + 本项={}s({}h) > 剩余={}s({}h)，本轮跳过",
+                                        structName, deferredTime.toBigInteger(),
+                                        deferredTime.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
+                                        itemTimeSeconds.toBigInteger(),
+                                        itemTimeSeconds.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
+                                        remainingCapacity.toBigInteger(),
+                                        remainingCapacity.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP));
                                 deferredSkippedCapacity++;
                                 break;
                             }

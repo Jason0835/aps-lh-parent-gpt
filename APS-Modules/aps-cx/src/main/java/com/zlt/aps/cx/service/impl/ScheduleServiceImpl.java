@@ -1905,10 +1905,10 @@ public class ScheduleServiceImpl implements ScheduleService {
                         ending.setDelayQuantity(delayQty);
                         ending.setDistributedQuantity(delayQty / CATCH_UP_DAYS);
                         log.info("[延误量计算] 物料={}, 距收尾{}天, 成型余量={} > 月计划第{}~第{}天可生产量={}, "
-                                        + "延误量={}条(成型余量-可生产量), 补排={}条/天(延误量/{}天={}/{})",
+                                        + "延误量={}条(成型余量-可生产量), 未来{}天每天必须生产量={}条(才能消化完毕)",
                                 materialCode, daysToEnding, formingRemainder, currentDay, endingDay,
                                 producibleQty, delayQty,
-                                delayQty / CATCH_UP_DAYS, CATCH_UP_DAYS, delayQty, CATCH_UP_DAYS);
+                                CATCH_UP_DAYS, delayQty / CATCH_UP_DAYS);
                     }
                 }
             } else {
@@ -2029,11 +2029,10 @@ public class ScheduleServiceImpl implements ScheduleService {
 
             lhScheduleResults.add(newRecord);
             supplemented++;
-            log.info("补充延误物料: 物料={}, 胎胚={}, 历史排程日期={}, 延误量={}条(成型余量-可生产量), 补充排产量={}条(延误量/{}天补产={}/{})",
+            log.info("补充延误物料: 物料={}, 胎胚={}, 历史排程日期={}, 延误量={}条(成型余量-可生产量), 未来{}天每天必须生产量={}条(才能消化完毕)",
                     materialCode, historicalRecord.getEmbryoCode(),
                     historicalRecord.getScheduleDate(),
-                    ending.getDelayQuantity(), ending.getDistributedQuantity(),
-                    CATCH_UP_DAYS, ending.getDelayQuantity(), CATCH_UP_DAYS);
+                    ending.getDelayQuantity(), CATCH_UP_DAYS, ending.getDistributedQuantity());
         }
 
         log.info("延误物料补充完成：成功补充 {} 个，未找到历史记录 {} 个", supplemented, notFound);
