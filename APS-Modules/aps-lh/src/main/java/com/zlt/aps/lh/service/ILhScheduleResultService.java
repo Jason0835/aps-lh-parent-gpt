@@ -69,6 +69,14 @@ public interface ILhScheduleResultService {
     String generateNextBatchNo(Date scheduleDate, String factoryCode);
 
     /**
+     * 生成插单工单号（LHGD+yyyyMMdd+3位流水号）
+     *
+     * @param scheduleDate 排程日期
+     * @return 工单号
+     */
+    String generateInsertOrderNo(Date scheduleDate);
+
+    /**
      * 更新排程结果发布状态
      *
      * @param item 排程结果（需包含id和isRelease）

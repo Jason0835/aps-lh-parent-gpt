@@ -359,7 +359,8 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      * @param scheduleDate 排程日期
      * @return 工单号
      */
-    private String generateInsertOrderNo(Date scheduleDate) {
+    @Override
+    public String generateInsertOrderNo(Date scheduleDate) {
         String dateStr = new SimpleDateFormat("yyyyMMdd").format(scheduleDate);
         int seq = INSERT_ORDER_SEQ.incrementAndGet() % 1000;
         return String.format("LHGD%s%03d", dateStr, seq);
