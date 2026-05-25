@@ -1259,7 +1259,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 source.getClass7MouldMethod(),
                 source.getClass8MouldMethod()
         ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
-        target.setScheduleType(scheduleType);
+        target.setTrialStatus(scheduleType);
 
         // 遍历class1LeftRightMould到class8LeftRightMould，取第一个非空值
         String leftRightMould = Stream.of(
