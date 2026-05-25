@@ -48,8 +48,3 @@ spring:
           group: ${nacos.cfg-group}
         refresh-enabled: true
 
-aps:
-  lh:
-    validation:
-      validators:
-        skuConstructionValidator: false

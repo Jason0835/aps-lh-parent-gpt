@@ -43,9 +43,3 @@ spring:
           data-id: sync-data-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
         #自动刷新配置文件
         refresh-enabled: true
-
-aps:
-  lh:
-    validation:
-      validators:
-        skuConstructionValidator: false
