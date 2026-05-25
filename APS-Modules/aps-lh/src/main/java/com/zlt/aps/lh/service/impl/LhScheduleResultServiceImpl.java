@@ -162,16 +162,44 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
         LhInsertOrderValidateResultDTO validateResult = insertOrderValidateHandler.validateInsertOrder(dto);
 
+        // 先查询前规格物料信息（必须在插入新排程结果之前查询，否则会查到刚插入的自身记录）
+        String beforeMaterialCode = null;
+        String beforeMaterialDesc = null;
+        LhScheduleResult prevResult = queryPrevScheduleResult(dto);
+        if (prevResult != null) {
+            beforeMaterialCode = prevResult.getMaterialCode();
+            beforeMaterialDesc = prevResult.getMaterialDesc();
+        }
+
         String batchNo = generateNextBatchNo(dto.getScheduleDate(), dto.getFactoryCode());
         String orderNo = generateInsertOrderNo(dto.getScheduleDate());
 
         LhScheduleResult result = buildInsertOrderResult(dto, batchNo, orderNo, validateResult);
         mapper.insert(result);
 
-        generateInsertMouldChangePlan(dto, batchNo);
+        generateInsertMouldChangePlan(dto, batchNo, beforeMaterialCode, beforeMaterialDesc);
 
         // TODO 同步触发成型机台均衡
         log.info("插单操作完成, 工单号: {}, 批次号: {}", orderNo, batchNo);
+    }
+
+    /**
+     * 查询插单机台在当前排程日期下最近一条排程结果（作为前规格参考）
+     *
+     * @param dto 插单请求数据
+     * @return 最近一条排程结果，不存在返回null
+     */
+    private LhScheduleResult queryPrevScheduleResult(LhOrderInsertDTO dto) {
+        LambdaQueryWrapper<LhScheduleResult> prevWrapper = new LambdaQueryWrapper<>();
+        prevWrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode())
+                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .eq(LhScheduleResult::getScheduleDate, dto.getScheduleDate());
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            prevWrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
+        }
+        prevWrapper.orderByDesc(LhScheduleResult::getCreateTime);
+        prevWrapper.last("LIMIT 1");
+        return mapper.selectOne(prevWrapper);
     }
 
     /**
@@ -388,32 +416,44 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
     /**
      * 生成插单对应的模具交替计划
+     * <p>若同机台+同排程日期+同后规格物料已存在交替计划，则覆盖更新；否则新增。</p>
      *
-     * @param dto     插单请求数据
-     * @param batchNo 批次号
+     * @param dto                 插单请求数据
+     * @param batchNo             批次号
+     * @param beforeMaterialCode  前规格物料编码（在插入排程结果之前查询获得）
+     * @param beforeMaterialDesc  前规格物料描述（在插入排程结果之前查询获得）
      */
-    private void generateInsertMouldChangePlan(LhOrderInsertDTO dto, String batchNo) {
-        LambdaQueryWrapper<LhScheduleResult> prevWrapper = new LambdaQueryWrapper<>();
-        prevWrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode())
-                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                .eq(LhScheduleResult::getScheduleDate, dto.getScheduleDate());
-        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
-            prevWrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
-        }
-        prevWrapper.orderByDesc(LhScheduleResult::getCreateTime);
-        prevWrapper.last("LIMIT 1");
-        LhScheduleResult prevResult = mapper.selectOne(prevWrapper);
-
-        String beforeMaterialCode = null;
-        String beforeMaterialDesc = null;
-        if (prevResult != null) {
-            beforeMaterialCode = prevResult.getMaterialCode();
-            beforeMaterialDesc = prevResult.getMaterialDesc();
-        }
-
+    private void generateInsertMouldChangePlan(LhOrderInsertDTO dto, String batchNo,
+                                               String beforeMaterialCode, String beforeMaterialDesc) {
         String mouldCode = resolveMouldCode(dto);
         String afterMaterialCode = StringUtils.isNotBlank(dto.getProductCode()) ? dto.getProductCode() : dto.getMaterialCode();
 
+        // 查询是否已存在同机台+同排程日期+同后规格物料的模具交替计划（避免删除插单后再次插单产生重复数据）
+        LhMouldChangePlan existingPlan = mouldChangePlanMapper.selectOne(
+                new LambdaQueryWrapper<LhMouldChangePlan>()
+                        .eq(LhMouldChangePlan::getFactoryCode, dto.getFactoryCode())
+                        .eq(LhMouldChangePlan::getScheduleDate, dto.getScheduleDate())
+                        .eq(LhMouldChangePlan::getLhMachineCode, dto.getLhMachineCode())
+                        .eq(LhMouldChangePlan::getAfterMaterialCode, afterMaterialCode)
+                        .last("LIMIT 1"));
+
+        if (existingPlan != null) {
+            // 覆盖更新已有记录，避免重复
+            existingPlan.setLhResultBatchNo(batchNo);
+            existingPlan.setBeforeMaterialCode(beforeMaterialCode);
+            existingPlan.setBeforeMaterialDesc(beforeMaterialDesc);
+            existingPlan.setMouldCode(mouldCode);
+            existingPlan.setLeftRightMould(LeftRightMouldUtil.resolveLeftRightMould(dto.getLeftRightMold(), dto.getLhMachineCode()));
+            existingPlan.setChangeMouldType("01");
+            existingPlan.setIsRelease(ReleaseStatusEnum.NOT_RELEASED.getCode());
+            existingPlan.setMouldStatus("0");
+            mouldChangePlanMapper.updateById(existingPlan);
+            log.info("插单覆盖更新模具交替计划, ID: {}, 机台: {}, 前规格: {}, 后规格: {}",
+                    existingPlan.getId(), dto.getLhMachineCode(), beforeMaterialCode, afterMaterialCode);
+            return;
+        }
+
+        // 新增模具交替计划
         LhMouldChangePlan plan = new LhMouldChangePlan();
         plan.setFactoryCode(dto.getFactoryCode());
         plan.setLhResultBatchNo(batchNo);

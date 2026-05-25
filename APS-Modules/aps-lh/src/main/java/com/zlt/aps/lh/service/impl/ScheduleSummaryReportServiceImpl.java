@@ -61,8 +61,8 @@ import java.util.stream.Collectors;
  * <ul>
  *   <li>{titleDate} - 标题日期（中文+越南语两行）</li>
  *   <li>{cxNightQty}/{cxMorningQty}/{cxMiddleQty}/{cxTotalQty} - 成型各班产量</li>
- *   <li>{cxSetupInfo} - 试制规格（成型原因分析字段匹配"试制" + 硫化施工阶段=01）</li>
- *   <li>{cxTrialInfo} - 量试规格（成型原因分析字段匹配"量试" + 硫化施工阶段=02）</li>
+ *   <li>{cxSetupInfo} - 试制规格（成型3/4/5班次有排计划量且示方书类型=X的物料描述）</li>
+ *   <li>{cxTrialInfo} - 量试规格（成型3/4/5班次有排计划量且示方书类型=T的物料描述）</li>
  *   <li>{cxSpecSwitch} - 成型规格切换</li>
  *   <li>{lhNightQty}/{lhMorningQty}/{lhMiddleQty}/{lhTotalQty} - 硫化各班产量</li>
  *   <li>{lhNightMachines}/{lhMorningMachines}/{lhMiddleMachines}/{lhTotalMachines} - 硫化各班开动机台数</li>
@@ -254,14 +254,39 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                         .eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         log.info("硫化排程结果查询完成, 日期: {}, 数量: {}", DateUtil.formatDate(actualScheduleDate), lhResults.size());
 
-        // 成型试制/量试信息：从成型原因分析字段和硫化施工阶段字段匹配，合并去重后按逗号隔开
-        String cxSetupSpecs = buildCxSetupOrTrialInfo(cxResults, "试制");
-        String lhSetupSpecs = buildLhSetupOrTrialInfo(lhResults, "试制");
-        map.put("cxSetupInfo", combineSpecInfo(cxSetupSpecs, lhSetupSpecs));
-
-        String cxTrialSpecs = buildCxSetupOrTrialInfo(cxResults, "量试");
-        String lhTrialSpecs = buildLhSetupOrTrialInfo(lhResults, "量试");
-        map.put("cxTrialInfo", combineSpecInfo(cxTrialSpecs, lhTrialSpecs));
+        // 试制/量试信息：根据成型排程结果3/4/5班次有排计划量的示方书类型归集（T=量试，X=试制）
+        Set<String> trialSpecs = new LinkedHashSet<>();
+        Set<String> setupSpecs = new LinkedHashSet<>();
+        for (CxScheduleResult result : cxResults) {
+            if (!hasAnyPlanQtyInShift345(result)) {
+                continue;
+            }
+            String specDesc = StringUtils.defaultString(result.getMaterialDesc()).trim();
+            if (StringUtils.isBlank(specDesc)) {
+                continue;
+            }
+            // 收集3/4/5班次中有计划量的班次对应的示方书类型
+            Set<String> recipeTypes = new HashSet<>();
+            if (nvl(result.getClass3PlanQty()).compareTo(BigDecimal.ZERO) > 0) {
+                recipeTypes.add(StringUtils.defaultString(result.getClass3RecipeType()));
+            }
+            if (nvl(result.getClass4PlanQty()).compareTo(BigDecimal.ZERO) > 0) {
+                recipeTypes.add(StringUtils.defaultString(result.getClass4RecipeType()));
+            }
+            if (nvl(result.getClass5PlanQty()).compareTo(BigDecimal.ZERO) > 0) {
+                recipeTypes.add(StringUtils.defaultString(result.getClass5RecipeType()));
+            }
+            recipeTypes.removeIf(StringUtils::isBlank);
+            // 按示方书类型归集：T=量试，X=试制
+            if (recipeTypes.contains("T")) {
+                trialSpecs.add(specDesc);
+            }
+            if (recipeTypes.contains("X")) {
+                setupSpecs.add(specDesc);
+            }
+        }
+        map.put("cxSetupInfo", setupSpecs.isEmpty() ? "无 Không" : String.join("，", setupSpecs));
+        map.put("cxTrialInfo", trialSpecs.isEmpty() ? "无 Không" : String.join("，", trialSpecs));
         // 成型规格切换：从T_MP_STRUCTURE_ALLOCATION取切换结构数据
         // 需同时传入reportDate和scheduleDate，支持非跨月和跨月两种场景
         map.put("cxSpecSwitch", buildCxSpecSwitch(reportDate, actualScheduleDate, factoryCode));
