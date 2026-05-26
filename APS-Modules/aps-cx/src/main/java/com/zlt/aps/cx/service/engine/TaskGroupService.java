@@ -602,12 +602,14 @@ public class TaskGroupService {
                 int totalProjectedStock = totalProjectedStockBefore + originalProduction - vulcanizingConsumption;
 
                 // 统一日志：每个任务都打印立库状态
+                //   入立库 = 成型产出 - 硫化消耗（净增量），当硫化消化全部成型产出时入立库=0
                 if (warehouseCapacity > 0) {
+                    int netStockChange = originalProduction - vulcanizingConsumption;
                     int warehouseRemainBefore = Math.max(0, warehouseThreshold - totalProjectedStockBefore);
                     int warehouseRemainAfter = Math.max(0, warehouseThreshold - totalProjectedStock);
-                    log.info("【立库库容管控】胎胚={}, 本任务入立库={}条, 立库预警线={}条(总容量={}×{}%), 加入前立库剩余={}条, 加入后立库剩余={}条",
-                            embryoCode, originalProduction, warehouseThreshold,
-                            warehouseCapacity, (int)(warehouseCapacityRatio * 100),
+                    log.info("【立库库容管控】胎胚={}, 成型产出={}条, 硫化消耗={}条, 净入立库={}条, 立库预警线={}条(总容量={}×{}%), 加入前立库剩余={}条, 加入后立库剩余={}条",
+                            embryoCode, originalProduction, vulcanizingConsumption, netStockChange,
+                            warehouseThreshold, warehouseCapacity, (int)(warehouseCapacityRatio * 100),
                             warehouseRemainBefore, warehouseRemainAfter);
                 }
 
@@ -710,9 +712,9 @@ public class TaskGroupService {
                     log.info("  排产计算[库存覆盖后收尾补产]: 当前硫化需求已被库存覆盖，收尾余量={}, 补产产量={}",
                             endingSurplus, task.getPlannedProduction());
                 } else if (isTrialProduction) {
-                    log.info("  排产计算[试制量试]: (硫化{} - 库存{}) = {}, 试制不补整车→待排={}, 需车={}, 实际={}",
+                    log.info("  排产计算[试制量试]: (硫化{} - 库存{}) = {}, 不补整车→计划量={}, 车数={}, 车容量={}",
                             vulcanizeDmd, stock, netDemand,
-                            tripCap, task.getPlannedProduction(), task.getRequiredCars(), task.getEndingExtraInventory());
+                            task.getPlannedProduction(), task.getRequiredCars(), tripCap);
                 } else {
                     int rawWithLoss = BigDecimal.valueOf(netDemand)
                             .multiply(BigDecimal.ONE.add(lossRate))
@@ -1006,6 +1008,7 @@ public class TaskGroupService {
                         // 累加本班次成型产出（用每轮产量直接累加，用于下轮立库库容检查）
                         if (dtEmbryoCode != null && fallbackProduction > 0) {
                             shiftFormingOutputMap.merge(dtEmbryoCode, fallbackProduction, Integer::sum);
+                            runningTotalProjectedStock += fallbackProduction;
                         }
 
                         // 更新已使用的成型余量（用每轮产量直接累加）
@@ -1083,6 +1086,7 @@ public class TaskGroupService {
                             int endingDiff = rt.getEndingExtraInventory() - rt.getPlannedProduction();
                             if (endingDiff != 0) {
                                 shiftFormingOutputMap.merge(rtEmbryoCode, endingDiff, Integer::sum);
+                                runningTotalProjectedStock += endingDiff;
                             }
                         }
                         boolean rtIsContinue = Boolean.TRUE.equals(rt.getIsContinueTask());
