@@ -73,6 +73,13 @@ public class ScheduleContextVo {
     private Set<String> dailyTrialAssignedMaterialCodes;
 
     /**
+     * 补充计划任务当日已排产量追踪（跨班次共享）
+     * Key: LhScheduleResult.id（补充任务的硫化记录ID）
+     * Value: 当日剩余应排量（班次间递减，每日重置为 dailyPlanQty）
+     */
+    private Map<Long, Integer> supplementDailyRemainingMap;
+
+    /**
      * 所有班次配置列表（按排程天数分组）
      * 用于核心算法按天获取班次配置
      */

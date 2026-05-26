@@ -999,6 +999,13 @@ public class TaskGroupService {
 
                         boolean dtIsSupplement = Boolean.TRUE.equals(dt.getIsSupplementTask());
 
+                        if (dtIsSupplement && dt.getLhId() != null) {
+                            Map<Long, Integer> suppMap = context.getSupplementDailyRemainingMap();
+                            if (suppMap != null) {
+                                suppMap.put(dt.getLhId(), newRemaining);
+                            }
+                        }
+
                         String taskKey = dt.getEmbryoCode() != null ? dt.getEmbryoCode() : dt.getMaterialCode();
                         int[] tracker = taskRoundTracker.computeIfAbsent(taskKey, k -> new int[]{0, 0});
                         tracker[0] += fallbackProduction;
@@ -1379,8 +1386,24 @@ public class TaskGroupService {
             return null;
         }
 
-        // 获取硫化需求量（根据当前班次配置获取对应的CLASS计划量）
         int vulcanizeDemand = getShiftPlanQty(lhResult, currentShiftConfigs);
+        if (vulcanizeDemand == 0 && "3".equals(lhResult.getDataSource())) {
+            Long lhId = lhResult.getId();
+            Map<Long, Integer> suppRemaining = context.getSupplementDailyRemainingMap();
+            if (suppRemaining == null) {
+                suppRemaining = new HashMap<>();
+                context.setSupplementDailyRemainingMap(suppRemaining);
+            }
+            if (suppRemaining.containsKey(lhId)) {
+                vulcanizeDemand = suppRemaining.get(lhId);
+            } else {
+                Integer dailyPlanQty = lhResult.getDailyPlanQty();
+                if (dailyPlanQty != null && dailyPlanQty > 0) {
+                    vulcanizeDemand = dailyPlanQty;
+                    suppRemaining.put(lhId, dailyPlanQty);
+                }
+            }
+        }
 
         // 获取分配给该硫化任务的库存（按硫化任务维度分配，共用胎胚库存已按比例分配）
         int currentStock = getCurrentStock(context, lhResult.getId());
