@@ -20,16 +20,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -319,72 +310,85 @@ public class TaskGroupService {
         }
 
         // 按三层优先级对 lhScheduleResults 排序（降序，高优先级先处理）
+        // 多级排序：L1基础分层 → L2类型加成 → L3库存（库存少优先）
         final int sortUrgentDays = getUrgentEndingDays(context);
         final int sortNearDays = getEndingDaysThreshold(context);
         final LocalDate sortScheduleDate = scheduleDate;
         final Map<String, Set<String>> sortMachineOnlineEmbryoMap = machineOnlineEmbryoMap;
         final Map<String, String> priorityDescMap = new HashMap<>();
-        lhScheduleResults.sort(Comparator.comparingInt(
-                (LhScheduleResult lh) -> {
-                    int score = 0;
-                    StringBuilder desc = new StringBuilder();
-                    boolean isSupplement = "3".equals(lh.getDataSource());
-                    boolean hasPlanQty = getShiftPlanQty(lh, dayShifts) > 0;
+        final List<CxShiftConfig> sortDayShifts = dayShifts;
 
-                    LocalDate endingDate = findEndingDate(lh.getMaterialCode(), context);
-                    int daysToEnding = (endingDate != null)
-                            ? (int) java.time.temporal.ChronoUnit.DAYS.between(sortScheduleDate, endingDate)
-                            : Integer.MAX_VALUE;
-                    boolean isUrgentEnding = daysToEnding >= 0 && daysToEnding <= sortUrgentDays;
-                    boolean isNearEnding = daysToEnding >= 0 && daysToEnding <= sortNearDays;
+        Map<LhScheduleResult, Integer> tier1Map = new IdentityHashMap<>();
+        Map<LhScheduleResult, Integer> tier2Map = new IdentityHashMap<>();
+        Map<LhScheduleResult, Integer> sortStockMap = new IdentityHashMap<>();
 
-                    if (isSupplement) {
-                        score += PRIORITY_SUPPLEMENT_BASE;
-                        desc.append("补充计划");
-                    } else if (hasPlanQty && isUrgentEnding) {
-                        score += PRIORITY_HAS_PLAN_URGENT;
-                        desc.append("有计划+紧急收尾");
-                    } else if (hasPlanQty && isNearEnding) {
-                        score += PRIORITY_HAS_PLAN_NEAR;
-                        desc.append("有计划+近期收尾");
-                    } else if (hasPlanQty) {
-                        score += PRIORITY_HAS_PLAN_NORMAL;
-                        desc.append("有计划+正常");
-                    } else if (isUrgentEnding) {
-                        score += PRIORITY_NO_PLAN_URGENT;
-                        desc.append("无计划+紧急");
-                    } else if (isNearEnding) {
-                        score += PRIORITY_NO_PLAN_NEAR;
-                        desc.append("无计划+近期");
-                    } else {
-                        score += PRIORITY_NO_PLAN_NORMAL;
-                        desc.append("无计划+正常");
-                    }
+        for (LhScheduleResult lh : lhScheduleResults) {
+            StringBuilder desc = new StringBuilder();
 
-                    String stage = lh.getConstructionStage();
-                    if (STAGE_TRIAL.equals(stage) || STAGE_PRODUCTION_TRIAL.equals(stage)) {
-                        score += PRIORITY_TRIAL;
-                        desc.append("+试制量试");
-                    }
+            boolean isSupplement = "3".equals(lh.getDataSource());
+            boolean hasPlanQty = getShiftPlanQty(lh, sortDayShifts) > 0;
 
-                    List<String> contMachines = findContinueMachines(
-                            lh.getMaterialCode(), lh.getEmbryoCode(), sortMachineOnlineEmbryoMap);
-                    if (!contMachines.isEmpty()) {
-                        score += PRIORITY_CONTINUE;
-                        desc.append("+续作");
-                    }
+            LocalDate endingDate = findEndingDate(lh.getMaterialCode(), context);
+            int daysToEnding = (endingDate != null)
+                    ? (int) java.time.temporal.ChronoUnit.DAYS.between(sortScheduleDate, endingDate)
+                    : Integer.MAX_VALUE;
+            boolean isUrgentEnding = daysToEnding >= 0 && daysToEnding <= sortUrgentDays;
+            boolean isNearEnding = daysToEnding >= 0 && daysToEnding <= sortNearDays;
 
-                    int stockQty = getCurrentStock(context, lh.getId());
-                    int stockDeduct = Math.min(stockQty, PRIORITY_STOCK_TIEBREAKER_MAX);
-                    score -= stockDeduct;
-                    desc.append("+库存扣").append(stockDeduct);
+            if (isSupplement) {
+                tier1Map.put(lh, PRIORITY_SUPPLEMENT_BASE);
+                desc.append("补充计划");
+            } else if (hasPlanQty && isUrgentEnding) {
+                tier1Map.put(lh, PRIORITY_HAS_PLAN_URGENT);
+                desc.append("有计划+紧急收尾");
+            } else if (hasPlanQty && isNearEnding) {
+                tier1Map.put(lh, PRIORITY_HAS_PLAN_NEAR);
+                desc.append("有计划+近期收尾");
+            } else if (hasPlanQty) {
+                tier1Map.put(lh, PRIORITY_HAS_PLAN_NORMAL);
+                desc.append("有计划+正常");
+            } else if (isUrgentEnding) {
+                tier1Map.put(lh, PRIORITY_NO_PLAN_URGENT);
+                desc.append("无计划+紧急");
+            } else if (isNearEnding) {
+                tier1Map.put(lh, PRIORITY_NO_PLAN_NEAR);
+                desc.append("无计划+近期");
+            } else {
+                tier1Map.put(lh, PRIORITY_NO_PLAN_NORMAL);
+                desc.append("无计划+正常");
+            }
 
-                    priorityDescMap.put(lh.getEmbryoCode() + "|" + lh.getMaterialCode(),
-                            score + "(" + desc + ")");
-                    return -score;
-                }
-        ));
-        log.info("按三层优先级排序完成：补充计划(10000) > 有计划量+紧急收尾(9000) > 有计划量+近期收尾(8000) > 有计划量+正常(7000) > 无计划量+紧急(6000) > 无计划量+近期(5000) > 无计划量+正常(4000)，层级内试制量试(+1500) > 续作(+800) > 非续作(+0) > 库存少优先(-库存)");
+            int tier2 = 0;
+            String stage = lh.getConstructionStage();
+            if (STAGE_TRIAL.equals(stage) || STAGE_PRODUCTION_TRIAL.equals(stage)) {
+                tier2 = PRIORITY_TRIAL;
+                desc.append("+试制量试");
+            }
+
+            List<String> contMachines = findContinueMachines(
+                    lh.getMaterialCode(), lh.getEmbryoCode(), sortMachineOnlineEmbryoMap);
+            if (!contMachines.isEmpty()) {
+                tier2 += PRIORITY_CONTINUE;
+                desc.append("+续作");
+            }
+            tier2Map.put(lh, tier2);
+
+            int stockQty = getCurrentStock(context, lh.getId());
+            int stockDeduct = Math.min(stockQty, PRIORITY_STOCK_TIEBREAKER_MAX);
+            sortStockMap.put(lh, stockQty);
+            desc.append("+库存扣").append(stockDeduct);
+
+            int score = tier1Map.get(lh) + tier2 - stockDeduct;
+            priorityDescMap.put(lh.getEmbryoCode() + "|" + lh.getMaterialCode(),
+                    score + "(" + desc + ")");
+        }
+
+        lhScheduleResults.sort(
+                Comparator.comparingInt((LhScheduleResult lh) -> -tier1Map.get(lh))
+                        .thenComparingInt(lh -> -tier2Map.get(lh))
+                        .thenComparingInt(lh -> sortStockMap.get(lh)));
+
+        log.info("按三层多级排序完成：L1(补充计划10000>有计划+紧急9000>有计划+近期8000>有计划+正常7000>无计划+紧急6000>无计划+近期5000>无计划+正常4000) → L2(试制量试1500>续作800>非续作0) → L3(库存少优先)");
 
         for (LhScheduleResult lhResult : lhScheduleResults) {
             if (lhResult.getEmbryoCode() == null) {
