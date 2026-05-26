@@ -1668,6 +1668,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             lastMonthPlanVersion = adjustDetailList.get(0).getLastMonthPlanVersion();
             monthPlanVersion = adjustDetailList.get(0).getMonthPlanVersion();
         }
+        if (StringUtil.isEmptyWithTrim(lastMonthPlanVersion) && PubUtil.isNotEmpty(adjustResultList)){
+            lastMonthPlanVersion = adjustResultList.get(0).getLastMonthPlanVersion();
+        }
         contextDTO.setAdjustMonthPlanVersion(lastMonthPlanVersion);
         // 获取需求计划Map（按照物料编码分组）
         Map<String, DpDemandPlan> demandPlanMap = getDemandPlanMap(contextDTO);
@@ -1984,11 +1987,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @return Map<String, MpAdjustResult>
      */
     public Map<String, MpAdjustResult> summaryAdjustResult(List<MpAdjustResult> adjustResultList, List<MpAdjustDetailVo> adjustDetailList) {
-        if (PubUtil.isEmpty(adjustResultList) || PubUtil.isEmpty(adjustDetailList)) {
+        if (PubUtil.isEmpty(adjustResultList)) {
             return Collections.emptyMap();
         }
         // 先按物料编码分组，再按主键ID映射
-        Map<String, Map<Long, MpAdjustDetailVo>> detailMap = adjustDetailList.stream()
+       /* Map<String, Map<Long, MpAdjustDetailVo>> detailMap = adjustDetailList.stream()
                 .collect(Collectors.groupingBy(
                         MpAdjustDetailVo::getMaterialCode,
                         Collectors.toMap(
@@ -1996,7 +1999,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                                 vo -> vo,
                                 (v1, v2) -> v1
                         )
-                ));
+                ));*/
 
         // 遍历调整结果，匹配明细并分组汇总
         Map<String, MpAdjustResult> summaryMap = new HashMap<>();
@@ -2005,18 +2008,14 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 continue;
             }
             // 匹配对应的调整明细VO
-            MpAdjustDetailVo detailVo = matchAdjustDetail(result, detailMap);
-            // 无匹配明细，跳过
-            if (detailVo == null) {
-                continue;
-            }
+            //MpAdjustDetailVo detailVo = matchAdjustDetail(result, detailMap);
             // 构建分组key
             String groupKey = buildGroupKey(result);
             // 获取或初始化汇总对象
             MpAdjustResult summaryResult = summaryMap.getOrDefault(groupKey, new MpAdjustResult());
             if (summaryResult.getMaterialCode() == null) {
                 BeanUtils.copyProperties(result, summaryResult);
-                summaryResult.setMaterialCode(detailVo.getMaterialCode());
+                //summaryResult.setMaterialCode(detailVo.getMaterialCode());
                 summaryResult.setAdjustDetailId(null);
                 summaryResult.setTotalPlanQty(0);
                 summaryResult.setTrialProductionQty(0);
@@ -2347,6 +2346,10 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String lastMonthPlanVersion = null;
         if (PubUtil.isNotEmpty(adjustDetailList)) {
             lastMonthPlanVersion = adjustDetailList.get(0).getLastMonthPlanVersion();
+            contextDTO.setAdjustMonthPlanVersion(lastMonthPlanVersion);
+        }
+        if (StringUtil.isEmptyWithTrim(lastMonthPlanVersion) && PubUtil.isNotEmpty(adjustResultList)){
+            lastMonthPlanVersion = adjustResultList.get(0).getLastMonthPlanVersion();
             contextDTO.setAdjustMonthPlanVersion(lastMonthPlanVersion);
         }
         // 通过结构过滤月计划列表
