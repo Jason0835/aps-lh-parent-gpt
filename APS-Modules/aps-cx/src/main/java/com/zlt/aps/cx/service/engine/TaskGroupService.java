@@ -286,6 +286,7 @@ public class TaskGroupService {
 
         Map<String, Integer> shiftFormingOutputMap = new HashMap<>();
         Map<String, Integer> shiftVulcanizingConsumptionMap = new HashMap<>();
+        int runningTotalProjectedStock = embryoTotalStockMap.values().stream().mapToInt(Integer::intValue).sum();
 
         if (warehouseCapacity > 0) {
             log.info("【立库库容管控】参数: 立库总库容={}条, 预警比例={}%, 预警线={}条, 单胎胚可供硫化>{}h即封顶, 立库中有库存的胎胚种类={}种",
@@ -582,17 +583,7 @@ public class TaskGroupService {
                 int vulcanizingConsumption = getShiftPlanQty(lhResult, dayShifts);
 
                 // 计算加入本任务前：全部胎胚的预计班后总库存
-                int totalProjectedStockBefore = 0;
-                if (warehouseCapacity > 0) {
-                    for (Map.Entry<String, Integer> stockEntry : embryoTotalStockMap.entrySet()) {
-                        String eCode = stockEntry.getKey();
-                        if (eCode == null) continue;
-                        int eStock = stockEntry.getValue();
-                        int eOutput = shiftFormingOutputMap.getOrDefault(eCode, 0);
-                        int eConsumption = shiftVulcanizingConsumptionMap.getOrDefault(eCode, 0);
-                        totalProjectedStockBefore += eStock + eOutput - eConsumption;
-                    }
-                }
+                int totalProjectedStockBefore = runningTotalProjectedStock;
 
                 // 加入本任务
                 if (originalProduction > 0) {
@@ -693,6 +684,9 @@ public class TaskGroupService {
                             (tripCapacity > 0 && maxAllowedProduction >= tripCapacity) ? "向下整车" : "不够一车→归零",
                             cappedProduction, capDetail.toString());
                 }
+
+                int actualProduction = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
+                runningTotalProjectedStock = totalProjectedStockBefore + actualProduction - vulcanizingConsumption;
             }
 
             // 打印收尾任务完整信息（封顶后的最终值）
@@ -841,6 +835,7 @@ public class TaskGroupService {
                                     int endingDiff = dt.getEndingExtraInventory() - dt.getPlannedProduction();
                                     if (endingDiff != 0) {
                                         shiftFormingOutputMap.merge(dtEmbryoCode2, endingDiff, Integer::sum);
+                                        runningTotalProjectedStock += endingDiff;
                                     }
                                 }
                                 boolean dtIsContinue2 = Boolean.TRUE.equals(dt.getIsContinueTask());
@@ -879,20 +874,10 @@ public class TaskGroupService {
 
                             boolean dtSkip = false;
                             String dtSkipReason = "";
-                            // 维度一（空间）：所有胎胚的预计班后库存总和 >= 库容上限
-                            int dtTotalProjected = 0;
-                            if (warehouseCapacity > 0) {
-                                for (Map.Entry<String, Integer> se : embryoTotalStockMap.entrySet()) {
-                                    String ec = se.getKey();
-                                    int es = se.getValue();
-                                    int eo = shiftFormingOutputMap.getOrDefault(ec, 0);
-                                    int ev = shiftVulcanizingConsumptionMap.getOrDefault(ec, 0);
-                                    dtTotalProjected += es + eo - ev;
-                                }
-                                if (dtTotalProjected >= warehouseThreshold) {
-                                    dtSkip = true;
-                                    dtSkipReason = "[空间]全部预计=" + dtTotalProjected + ">=上限=" + warehouseThreshold;
-                                }
+                            int dtTotalProjected = runningTotalProjectedStock;
+                            if (dtTotalProjected >= warehouseThreshold) {
+                                dtSkip = true;
+                                dtSkipReason = "[空间]全部预计=" + dtTotalProjected + ">=上限=" + warehouseThreshold;
                             }
                             // 维度二（时间）：预估本轮排产后的可供硫化时长，如果>6h则跳过本轮（事前检查）
                             if (!dtSkip) {
@@ -931,6 +916,7 @@ public class TaskGroupService {
                                         int endingDiff = dt.getEndingExtraInventory() - dt.getPlannedProduction();
                                         if (endingDiff != 0) {
                                             shiftFormingOutputMap.merge(dtEmbryoCode, endingDiff, Integer::sum);
+                                            runningTotalProjectedStock += endingDiff;
                                         }
                                     }
                                     boolean dtIsContinue = Boolean.TRUE.equals(dt.getIsContinueTask());
@@ -1036,6 +1022,7 @@ public class TaskGroupService {
                                 int endingDiff = dt.getEndingExtraInventory() - dt.getPlannedProduction();
                                 if (endingDiff != 0) {
                                     shiftFormingOutputMap.merge(dtEmbryoCode, endingDiff, Integer::sum);
+                                    runningTotalProjectedStock += endingDiff;
                                 }
                             }
 
