@@ -8,12 +8,16 @@ import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.LhInsertOrderValidateResultDTO;
 import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
+import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
+import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.mapper.CxStockMapper;
+import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
 import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
+import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
 import com.zlt.aps.lh.mapper.MdmModelInfoMapper;
 import com.zlt.aps.lh.mapper.MdmMonthSurplusMapper;
@@ -39,6 +43,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -99,6 +104,12 @@ public class LhInsertOrderValidateHandler {
     @Resource
     private MdmModelInfoMapper mdmModelInfoMapper;
 
+    @Resource
+    private LhDayFinishQtyMapper lhDayFinishQtyMapper;
+
+    @Resource
+    private LhScheFinishQtyMapper lhScheFinishQtyMapper;
+
     /** 排产版本已定稿 */
     private static final String PRODUCTION_VERSION_IS_FINAL = "1";
 
@@ -133,11 +144,11 @@ public class LhInsertOrderValidateHandler {
     }
 
     /**
-     * 获取SKU关联数据（硫化余量/胎胚库存/硫化班产/示方类型）
+     * 获取SKU关联数据（硫化余量/胎胚库存/硫化班产/示方类型/胎胚描述等）
      * <p>用于插单页面选择新物料时实时获取关联信息，不进行业务校验</p>
      *
      * @param dto 包含factoryCode、materialCode、scheduleDate的请求对象
-     * @return SKU关联数据（仅包含mouldSurplusQty、embryoStock、machineShiftCapacity、trialStatus、leftRightMould等字段）
+     * @return SKU关联数据（包含mouldSurplusQty、embryoStock、machineShiftCapacity、trialStatus、leftRightMould、embryoCode等字段）
      */
     public LhInsertOrderValidateResultDTO getSkuRelatedData(LhOrderInsertDTO dto) {
         LhInsertOrderValidateResultDTO result = new LhInsertOrderValidateResultDTO();
@@ -146,6 +157,18 @@ public class LhInsertOrderValidateHandler {
         checkMouldSurplus(dto, result);
         checkMouldAvailability(dto, result);
         fillSkuRelatedData(dto, result);
+        fillEmbryoRelatedFields(dto, result);
+        // 只有前端未传左右模值时，才保留checkMachineAvailability中通过机台信息解析的值
+        // 避免dto.getLeftRightMold()为空时覆盖掉已正确计算的左右模
+        if (StringUtils.isNotBlank(dto.getLeftRightMold())) {
+            result.setLeftRightMould(dto.getLeftRightMold());
+        } else if (StringUtils.isBlank(result.getLeftRightMould())) {
+            // 前端未传且checkMachineAvailability也未设置，则通过机台编码解析
+            String lrMould = resolveLeftRightMould(dto.getLhMachineCode());
+            if (StringUtils.isNotBlank(lrMould)) {
+                result.setLeftRightMould(lrMould);
+            }
+        }
         return result;
     }
 
@@ -383,7 +406,12 @@ public class LhInsertOrderValidateHandler {
         int currentShiftIndex = resolveCurrentShiftIndex(shifts, now);
 
         if (currentShiftIndex < 0) {
-            return;
+            // 当前时间不在任何班次范围内（班次间隙），取最近已结束的班次索引作为参考
+            // 最近已结束的班次 = 结束时间 <= 当前时间 且 结束时间最晚的班次
+            currentShiftIndex = resolveLastEndedShiftIndex(shifts, now);
+            if (currentShiftIndex < 0) {
+                return;
+            }
         }
 
         for (int i = 1; i < currentShiftIndex; i++) {
@@ -527,7 +555,9 @@ public class LhInsertOrderValidateHandler {
 
     /**
      * 检查硫化余量，进行超产提示
-     * <p>硫化余量 = 月计划量 - 已完成量（从月计划定稿表计算）</p>
+     * <p>硫化余量 = 生产实际排产量(totalQty) - 硫化产量今天夜班完成量</p>
+     * <p>硫化产量今天夜班完成量 = 本月1日至昨天的日完成量(LhDayFinishQty.DAY_FINISH_QTY) + 今天的夜班完成量(LhScheFinishQty.CLASS1_FINISH_QTY)</p>
+     * <p>注意：页面排程日期为T+2，"今天"指当前实际日期，而非排程日期</p>
      * <p>胎胚库存按共用胎胚分摊公式计算：SKU分配的胎胚库存量 = (SKU日硫化量 / 同胎胚的所有SKU日硫化量汇总) * 胎胚库存量</p>
      *
      * @param dto    插单数据
@@ -563,9 +593,9 @@ public class LhInsertOrderValidateHandler {
             return;
         }
 
-        int totalPlanQty = monthPlan.getTotalQty() != null ? monthPlan.getTotalQty() : 0;
-        int finishedQty = calculateFinishedQty(dto, materialCode, scheduleDate);
-        int surplusQty = Math.max(0, totalPlanQty - finishedQty);
+        int totalQty = monthPlan.getTotalQty() != null ? monthPlan.getTotalQty() : 0;
+        int todayNightFinishQty = calculateTodayNightFinishQty(dto.getFactoryCode(), materialCode, scheduleDate);
+        int surplusQty = Math.max(0, totalQty - todayNightFinishQty);
         result.setMouldSurplusQty(surplusQty);
 
         fillEmbryoStock(dto, result, monthPlan, year, month, finalVersion);
@@ -574,6 +604,56 @@ public class LhInsertOrderValidateHandler {
         if (totalInsertQty > surplusQty) {
             result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.mouldSurplusExceeded"), surplusQty, totalInsertQty, (totalInsertQty - surplusQty)));
         }
+    }
+
+    /**
+     * 计算硫化产量今天夜班完成量
+     * <p>计算逻辑：从本月1日到昨天(含)的日完成量(LhDayFinishQty.DAY_FINISH_QTY)汇总
+     * + 今天的夜班完成量(LhScheFinishQty.CLASS1_FINISH_QTY)汇总</p>
+     * <p>注意：页面排程日期为T+2，"今天"指当前实际日期，而非排程日期。
+     * 例如排程日期为5月27日，今天是5月25日，则"昨天"是5月24日，"今天"是5月25日。</p>
+     *
+     * @param factoryCode  工厂编码
+     * @param materialCode 物料编码
+     * @param scheduleDate 排程日期（用于确定所属月份，计算月初起点）
+     * @return 今天夜班完成量
+     */
+    private int calculateTodayNightFinishQty(String factoryCode, String materialCode, Date scheduleDate) {
+        Date today = DateUtil.beginOfDay(new Date());
+        Date yesterday = DateUtil.offsetDay(today, -1);
+        Date monthStart = DateUtil.beginOfMonth(scheduleDate);
+        Date nextDayOfToday = DateUtil.offsetDay(today, 1);
+
+        int dayFinishSum = 0;
+        if (!yesterday.before(monthStart)) {
+            LambdaQueryWrapper<LhDayFinishQty> dayWrapper = new LambdaQueryWrapper<>();
+            dayWrapper.eq(LhDayFinishQty::getFactoryCode, factoryCode)
+                    .eq(LhDayFinishQty::getMaterialCode, materialCode)
+                    .ge(LhDayFinishQty::getFinishDate, monthStart)
+                    .lt(LhDayFinishQty::getFinishDate, today);
+            List<LhDayFinishQty> dayFinishList = lhDayFinishQtyMapper.selectList(dayWrapper);
+            for (LhDayFinishQty item : dayFinishList) {
+                dayFinishSum += item.getDayFinishQty() != null ? item.getDayFinishQty().intValue() : 0;
+            }
+        }
+
+        int scheClass1Sum = 0;
+        LambdaQueryWrapper<LhScheFinishQty> scheWrapper = new LambdaQueryWrapper<>();
+        scheWrapper.eq(LhScheFinishQty::getFactoryCode, factoryCode)
+                .eq(LhScheFinishQty::getMaterialCode, materialCode)
+                .ge(LhScheFinishQty::getScheduleDate, today)
+                .lt(LhScheFinishQty::getScheduleDate, nextDayOfToday);
+        List<LhScheFinishQty> scheFinishList = lhScheFinishQtyMapper.selectList(scheWrapper);
+        for (LhScheFinishQty item : scheFinishList) {
+            scheClass1Sum += item.getClass1FinishQty() != null ? item.getClass1FinishQty().intValue() : 0;
+        }
+
+        int totalFinishQty = dayFinishSum + scheClass1Sum;
+        log.debug("计算硫化产量今天夜班完成量, factoryCode: {}, materialCode: {}, 今天: {}, "
+                        + "日完成量汇总(月初~昨天): {}, 今天夜班完成量: {}, 合计: {}",
+                factoryCode, materialCode, DateUtil.formatDate(today),
+                dayFinishSum, scheClass1Sum, totalFinishQty);
+        return totalFinishQty;
     }
 
     /**
@@ -610,9 +690,11 @@ public class LhInsertOrderValidateHandler {
     }
 
     /**
-     * 填充胎胚库存（按共用胎胚分摊公式计算）
+     * 填充胎胚库存（按共用胎胚分摊公式计算，使用最大余额法确保分配总和等于总量）
      * <p>SKU分配的胎胚库存量 = (SKU日硫化量 / 同胎胚的所有SKU日硫化量汇总) * 胎胚库存量</p>
-     * <p>分摊权重优先使用SKU标准产能（standardCapacity），缺失时回退到日硫化量（dayVulcanizationQty）</p>
+     * <p>分摊权重优先使用日硫化量（dayVulcanizationQty），缺失时回退到SKU标准产能（standardCapacity）</p>
+     * <p>最大余额法：先按比例取整数部分，再将未分配完的余量按余数从大到小依次补1，保证分配总和等于胎胚库存总量</p>
+     * <p>注意：页面排程日期为T+2，胎胚库存查询使用T日（当前实际日期），而非排程日期</p>
      *
      * @param dto          插单数据
      * @param result       校验结果
@@ -634,9 +716,10 @@ public class LhInsertOrderValidateHandler {
         if (StringUtils.isNotBlank(dto.getFactoryCode())) {
             stockWrapper.eq(CxStock::getFactoryCode, dto.getFactoryCode());
         }
-        if (dto.getScheduleDate() != null) {
-            stockWrapper.eq(CxStock::getStockDate, dto.getScheduleDate());
-        }
+        Date today = DateUtil.beginOfDay(new Date());
+        Date todayEnd = DateUtil.endOfDay(new Date());
+        stockWrapper.ge(CxStock::getStockDate, today)
+                    .le(CxStock::getStockDate, todayEnd);
         List<CxStock> stockList = cxStockMapper.selectList(stockWrapper);
         int embryoTotalStock = stockList.stream()
                 .mapToInt(s -> s.getStockNum() != null ? s.getStockNum() : 0)
@@ -657,28 +740,101 @@ public class LhInsertOrderValidateHandler {
         }
         List<FactoryMonthPlanProductionFinalResult> sameEmbryoPlans = monthPlanMapper.selectList(sameEmbryoWrapper);
 
-        int allocationWeight = resolveEmbryoAllocationWeight(dto.getFactoryCode(), monthPlan);
+        int currentWeight = resolveEmbryoAllocationWeight(dto.getFactoryCode(), monthPlan);
         int embryoWeightSum = 0;
         for (FactoryMonthPlanProductionFinalResult plan : sameEmbryoPlans) {
             embryoWeightSum += resolveEmbryoAllocationWeight(dto.getFactoryCode(), plan);
         }
 
-        if (allocationWeight <= 0 || embryoWeightSum <= 0) {
+        if (currentWeight <= 0 || embryoWeightSum <= 0) {
             result.setEmbryoStock(embryoTotalStock);
             return;
         }
 
-        int allocatedStock = (int) ((long) embryoTotalStock * allocationWeight / embryoWeightSum);
-        log.debug("同胎胚库存按分摊权重分摊, materialCode: {}, embryoCode: {}, allocationWeight: {}, "
+        int allocatedStock = allocateByLargestRemainderMethod(
+                embryoTotalStock, sameEmbryoPlans, monthPlan.getMaterialCode(), dto.getFactoryCode());
+        log.debug("同胎胚库存按最大余额法分摊, materialCode: {}, embryoCode: {}, currentWeight: {}, "
                         + "embryoWeightSum: {}, embryoTotalStock: {}, allocatedStock: {}",
-                monthPlan.getMaterialCode(), embryoCode, allocationWeight,
+                monthPlan.getMaterialCode(), embryoCode, currentWeight,
                 embryoWeightSum, embryoTotalStock, allocatedStock);
         result.setEmbryoStock(allocatedStock);
     }
 
     /**
+     * 最大余额法分配胎胚库存
+     * <p>步骤：</p>
+     * <ol>
+     *   <li>按权重比例计算每个SKU的整数分配量（截断）</li>
+     *   <li>计算每个SKU的余数（未分配的小数部分）</li>
+     *   <li>将未分配完的余量（总量 - 整数分配总和）按余数从大到小依次补1</li>
+     * </ol>
+     * <p>保证所有SKU分配量之和等于胎胚库存总量</p>
+     *
+     * @param embryoTotalStock 胎胚库存总量
+     * @param sameEmbryoPlans  同胎胚的所有月计划SKU列表
+     * @param targetMaterialCode 当前查询的物料编码
+     * @param factoryCode      工厂编码
+     * @return 当前SKU分配的胎胚库存量
+     */
+    private int allocateByLargestRemainderMethod(int embryoTotalStock,
+                                                  List<FactoryMonthPlanProductionFinalResult> sameEmbryoPlans,
+                                                  String targetMaterialCode,
+                                                  String factoryCode) {
+        int weightSum = 0;
+        List<AllocationItem> items = new ArrayList<>(sameEmbryoPlans.size());
+        for (FactoryMonthPlanProductionFinalResult plan : sameEmbryoPlans) {
+            int weight = resolveEmbryoAllocationWeight(factoryCode, plan);
+            weightSum += weight;
+            items.add(new AllocationItem(plan.getMaterialCode(), weight));
+        }
+
+        if (weightSum <= 0) {
+            return embryoTotalStock;
+        }
+
+        int allocatedSum = 0;
+        for (AllocationItem item : items) {
+            item.integerPart = (int) ((long) embryoTotalStock * item.weight / weightSum);
+            item.remainder = (long) embryoTotalStock * item.weight % weightSum;
+            allocatedSum += item.integerPart;
+        }
+
+        int remainder = embryoTotalStock - allocatedSum;
+        items.sort((a, b) -> Long.compare(b.remainder, a.remainder));
+        for (int i = 0; i < remainder && i < items.size(); i++) {
+            items.get(i).integerPart += 1;
+        }
+
+        int result = embryoTotalStock;
+        for (AllocationItem item : items) {
+            if (StringUtils.equals(item.materialCode, targetMaterialCode)) {
+                result = item.integerPart;
+                break;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 胎胚库存分配项（最大余额法内部使用）
+     */
+    private static class AllocationItem {
+        String materialCode;
+        int weight;
+        int integerPart;
+        long remainder;
+
+        AllocationItem(String materialCode, int weight) {
+            this.materialCode = materialCode;
+            this.weight = weight;
+            this.integerPart = 0;
+            this.remainder = 0;
+        }
+    }
+
+    /**
      * 解析胎胚库存分摊权重
-     * <p>优先使用SKU标准产能（standardCapacity），缺失时回退到日硫化量（dayVulcanizationQty）</p>
+     * <p>优先使用日硫化量（dayVulcanizationQty），缺失时回退到SKU标准产能（standardCapacity）</p>
      *
      * @param factoryCode 工厂编码
      * @param plan        月计划
@@ -687,6 +843,9 @@ public class LhInsertOrderValidateHandler {
     private int resolveEmbryoAllocationWeight(String factoryCode, FactoryMonthPlanProductionFinalResult plan) {
         if (plan == null || StringUtils.isBlank(plan.getMaterialCode())) {
             return 0;
+        }
+        if (plan.getDayVulcanizationQty() != null && plan.getDayVulcanizationQty() > 0) {
+            return plan.getDayVulcanizationQty();
         }
         LambdaQueryWrapper<MdmSkuLhCapacity> capacityWrapper = new LambdaQueryWrapper<>();
         capacityWrapper.eq(MdmSkuLhCapacity::getMaterialCode, plan.getMaterialCode());
@@ -698,7 +857,7 @@ public class LhInsertOrderValidateHandler {
         if (capacity != null && capacity.getStandardCapacity() != null && capacity.getStandardCapacity() > 0) {
             return capacity.getStandardCapacity();
         }
-        return plan.getDayVulcanizationQty() != null ? plan.getDayVulcanizationQty() : 0;
+        return 0;
     }
 
     /**
@@ -819,6 +978,31 @@ public class LhInsertOrderValidateHandler {
     }
 
     /**
+     * 解析最近已结束的班次索引（用于班次间隙场景）
+     * <p>当当前时间不在任何班次范围内时，找到结束时间 <= 当前时间且最晚的班次，
+     * 该班次之后（不含）的班次为历史班次，不允许插单</p>
+     *
+     * @param shifts 班次列表
+     * @param now    当前时间
+     * @return 最近已结束的班次索引，无匹配返回-1
+     */
+    private int resolveLastEndedShiftIndex(List<LhShiftConfigVO> shifts, Date now) {
+        int lastEndedIndex = -1;
+        Date latestEndTime = null;
+        for (LhShiftConfigVO shift : shifts) {
+            Date end = shift.getShiftEndDateTime();
+            if (end != null && !now.before(end)) {
+                if (latestEndTime == null || end.after(latestEndTime)) {
+                    latestEndTime = end;
+                    lastEndedIndex = shift.getShiftIndex();
+                }
+            }
+        }
+        // 返回下一个班次索引，因为最近已结束的班次本身也不应再插单
+        return lastEndedIndex >= 0 ? lastEndedIndex + 1 : -1;
+    }
+
+    /**
      * 根据班次索引查找班次配置
      *
      * @param shifts     班次列表
@@ -906,5 +1090,90 @@ public class LhInsertOrderValidateHandler {
         if (Objects.nonNull(skuConstructionRef) && StringUtils.isNotBlank(skuConstructionRef.getLhType())) {
             result.setTrialStatus(skuConstructionRef.getLhType());
         }
+    }
+
+    /**
+     * 填充胎胚关联字段（胎胚代码/胎胚描述/需求计划版本号/排产版本号/规格/结构/模具号）
+     * <p>从月计划定稿表中根据工厂+年月+排产版本+物料编码查询关联字段</p>
+     *
+     * @param dto    插单数据
+     * @param result 校验结果
+     */
+    private void fillEmbryoRelatedFields(LhOrderInsertDTO dto, LhInsertOrderValidateResultDTO result) {
+        String materialCode = resolveMaterialCode(dto);
+        if (StringUtils.isAnyBlank(dto.getFactoryCode(), materialCode) || dto.getScheduleDate() == null) {
+            return;
+        }
+
+        cn.hutool.core.date.DateTime scheduleDate = cn.hutool.core.date.DateUtil.date(dto.getScheduleDate());
+        int year = cn.hutool.core.date.DateUtil.year(scheduleDate);
+        int month = cn.hutool.core.date.DateUtil.month(scheduleDate) + 1;
+
+        MpFactoryProductionVersion finalVersion = getFinalProductionVersion(dto.getFactoryCode(), year, month);
+
+        LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, dto.getFactoryCode())
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, year)
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, month)
+                .eq(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCode)
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        if (finalVersion != null && StringUtils.isNotBlank(finalVersion.getProductionVersion())) {
+            wrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, finalVersion.getProductionVersion());
+        }
+        wrapper.last("LIMIT 1");
+        FactoryMonthPlanProductionFinalResult monthPlan = monthPlanMapper.selectOne(wrapper);
+
+        if (monthPlan != null) {
+            if (StringUtils.isNotBlank(monthPlan.getEmbryoCode())) {
+                result.setEmbryoCode(monthPlan.getEmbryoCode());
+            }
+            if (StringUtils.isNotBlank(monthPlan.getMainMaterialDesc())) {
+                result.setMainMaterialDesc(monthPlan.getMainMaterialDesc());
+            }
+            if (StringUtils.isNotBlank(monthPlan.getMonthPlanVersion())) {
+                result.setMonthPlanVersion(monthPlan.getMonthPlanVersion());
+            }
+            if (StringUtils.isNotBlank(monthPlan.getProductionVersion())) {
+                result.setProductionVersion(monthPlan.getProductionVersion());
+            }
+            if (StringUtils.isNotBlank(monthPlan.getSpecifications())) {
+                result.setSpecCode(monthPlan.getSpecifications());
+            }
+            if (StringUtils.isNotBlank(monthPlan.getStructureName())) {
+                result.setStructureName(monthPlan.getStructureName());
+            }
+        }
+
+        String mouldCode = resolveMouldCodeForRelatedData(dto);
+        if (StringUtils.isNotBlank(mouldCode)) {
+            result.setMouldCode(mouldCode);
+        }
+    }
+
+    /**
+     * 根据物料编码查询模具号（用于getSkuRelatedData场景）
+     *
+     * @param dto 插单数据
+     * @return 模具号，多个以逗号分隔
+     */
+    private String resolveMouldCodeForRelatedData(LhOrderInsertDTO dto) {
+        String materialCode = resolveMaterialCode(dto);
+        if (StringUtils.isBlank(materialCode)) {
+            return null;
+        }
+        LambdaQueryWrapper<MdmSkuMouldRel> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmSkuMouldRel::getMaterialCode, materialCode);
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            wrapper.eq(MdmSkuMouldRel::getFactoryCode, dto.getFactoryCode());
+        }
+        List<MdmSkuMouldRel> mouldRelList = mdmSkuMouldRelMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(mouldRelList)) {
+            return null;
+        }
+        return mouldRelList.stream()
+                .map(MdmSkuMouldRel::getMouldCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.joining(","));
     }
 }

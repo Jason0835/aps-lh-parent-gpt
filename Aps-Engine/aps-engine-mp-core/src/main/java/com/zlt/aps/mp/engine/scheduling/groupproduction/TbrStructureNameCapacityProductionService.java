@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.scheduling.groupproduction;
 
+import com.google.common.collect.Lists;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
@@ -12,8 +13,10 @@ import com.zlt.aps.mp.engine.basedata.assemble.continueinfo.ContinueGroupInfoHan
 import com.zlt.aps.mp.engine.basedata.assemble.fixed.GroupFixedInfoHandler;
 import com.zlt.aps.mp.engine.basedata.assemble.history.ProductionHistoryHandler;
 import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.ProductionStageLogRecorder;
 import com.zlt.aps.mp.engine.domain.dto.*;
 import com.zlt.aps.mp.engine.domain.vo.*;
+import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
 import com.zlt.aps.mp.engine.handler.CalculateStructureCxMachineNumber;
 import com.zlt.aps.mp.engine.handler.ContinueSkuCalculator;
 import com.zlt.aps.mp.engine.handler.GroupProductionConversionHandler;
@@ -95,6 +98,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         }
         //0、创建排产上下文
         TbrProductionContext productionContext = (TbrProductionContext) buildProductionContext(context);
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.FIRST_ON_LINE);
         deleteOldData(productionContext);
         //开始进行成型产能分配-结构排产
         log.info(TbrBeforeProductionGroupLogRecorder.addStartGroupLog(productionContext));
@@ -141,6 +145,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         //                   如果不能包过来，就需要把中优先级中途下机，下机的时间点是，剩余的模具产能，正好能把高优先级产完。
         adjustContinueSkuProductionQtyHandler.adjustContinueSkuProductionQty(estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap, productionContext);
         //8、进行模拟模具排产
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.SIMULATE_PRODUCTION);
         log.info(TbrSimulateProductionLogRecorder.addStartMouldProductionLog(productionContext));
         simulateProductionHandler.productionGroupPlan(productionContext, estimateGroupCxAllocationMap, continueAllocationList, cxContinueInfoMap);
         //9、保存结构成型排程结果
@@ -327,11 +332,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         productionContext.setBaseDataContainer(new BaseDataContainer());
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        if (null == context.getLogBuilder()) {
-            StringBuilder logBuilder = new StringBuilder();
-            context.setLogBuilder(logBuilder);
-            productionContext.setLogBuilder(logBuilder);
-        }
+        resetTbrInitLogRecorderInfo(productionContext, context);
         setProductionCycleInfo(productionContext);
         return productionContext;
     }
@@ -352,11 +353,7 @@ public class TbrStructureNameCapacityProductionService extends AbstractDataLoade
         BeanUtils.copyProperties(context, productionContext);
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        if (null == context.getLogBuilder()) {
-            StringBuilder logBuilder = new StringBuilder();
-            context.setLogBuilder(logBuilder);
-            productionContext.setLogBuilder(logBuilder);
-        }
+        resetInitLogRecorderInfo(productionContext, context);
         setProductionCycleInfo(productionContext);
         return productionContext;
     }

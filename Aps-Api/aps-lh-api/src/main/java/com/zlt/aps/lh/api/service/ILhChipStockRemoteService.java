@@ -70,9 +70,10 @@ public interface ILhChipStockRemoteService {
     AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
 
     /**
-     * 更新完成量 - 硫化排程回填接口
+     * 累加更新完成量 - 硫化排程回填接口
+     * 在原有完成量的基础上叠加传入的完成量值，而非直接覆盖
      */
-    @ApiOperation("更新完成量")
+    @ApiOperation("累加更新完成量")
     @PostMapping("/lhChipStock/updateFinishQty")
     AjaxResult updateFinishQty(@RequestParam("factoryCode") String factoryCode,
                                @RequestParam("chipCode") String chipCode,
@@ -109,6 +110,11 @@ public interface ILhChipStockRemoteService {
     @PostMapping("/lhChipStock/upsertFinishQty")
     AjaxResult upsertFinishQty(@RequestParam("factoryCode") String factoryCode,
                                @RequestBody List<LhChipStock> list);
+
+    @ApiOperation("覆盖更新芯片库存完成量（定时任务全量回填）")
+    @PostMapping("/lhChipStock/overwriteFinishQty")
+    AjaxResult overwriteFinishQty(@RequestParam("factoryCode") String factoryCode,
+                                  @RequestBody List<LhChipStock> list);
 
     /**
      * 合并保存 - 新增时检测到重复，将库存量和完成量累加到已有数据上

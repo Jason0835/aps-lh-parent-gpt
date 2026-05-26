@@ -6,10 +6,8 @@ import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.engine.strategy.IEndingJudgmentStrategy;
-import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 
@@ -42,7 +40,9 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
         // 满排模式下可选"按余量判定"开关，避免目标量封顶导致误判。
         int rule2CandidateQty = resolveRule2CandidateQty(sku, targetScheduleQty, fullCapacityMode,
                 endingBySurplusInFullModeEnabled);
-        if (rule2CandidateQty > 0) {
+        if (rule2CandidateQty > 0
+                && !shouldSkipRule2ByWindowRemainingPlanQty(sku, fullCapacityMode,
+                endingBySurplusInFullModeEnabled, rule2CandidateQty)) {
             int totalAvailableCapacity = getTargetScheduleQtyResolver()
                     .calcSkuTotalAvailableCapacityInWindow(context, sku);
             if (totalAvailableCapacity > 0 && rule2CandidateQty <= totalAvailableCapacity) {
@@ -92,18 +92,17 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
         return (int) Math.ceil((double) shifts / LhScheduleConstant.DEFAULT_SHIFTS_PER_DAY);
     }
 
-    /**
-     * 获取排程期总班次数
-     * <p>可配置，默认8班（T日2班 + T+1日3班 + T+2日3班）</p>
-     *
-     * @param context 排程上下文
-     * @return 排程窗口内总班次数
-     */
-    private int getTotalScheduleShifts(LhScheduleContext context) {
-        if (!CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
-            return context.getScheduleWindowShifts().size();
+    @Override
+    public int calculateEndingDaysForStructurePriority(LhScheduleContext context, SkuScheduleDTO sku) {
+        if (context == null || sku == null) {
+            return -1;
         }
-        return LhScheduleTimeUtil.getScheduleShifts(context, context.getScheduleDate()).size();
+        TargetScheduleQtyResolver.StructureEndingCapacitySnapshot snapshot =
+                getTargetScheduleQtyResolver().evaluateStructureEndingCapacity(context, sku);
+        if (snapshot != null) {
+            return snapshot.getEndingDaysWithinStructureWindow();
+        }
+        return calculateEndingDays(context, sku);
     }
 
     /**
@@ -151,6 +150,32 @@ public class DefaultEndingJudgmentStrategy implements IEndingJudgmentStrategy {
             return 0;
         }
         return resolveMaxDemandQty(sku.getSurplusQty(), sku.getEmbryoStock());
+    }
+
+    /**
+     * 判断规则2是否应被窗口剩余额度拦截。
+     * <p>仅在满排模式且启用"按余量判收尾"时生效，避免窗口 dayN 额度明显不足时提前命中收尾。</p>
+     *
+     * @param sku SKU
+     * @param fullCapacityMode 是否满排模式
+     * @param endingBySurplusInFullModeEnabled 满排按余量判收尾开关
+     * @param rule2CandidateQty 规则2比较量
+     * @return true-跳过规则2，false-保留原判定
+     */
+    private boolean shouldSkipRule2ByWindowRemainingPlanQty(SkuScheduleDTO sku,
+                                                            boolean fullCapacityMode,
+                                                            boolean endingBySurplusInFullModeEnabled,
+                                                            int rule2CandidateQty) {
+        if (sku == null || !fullCapacityMode || !endingBySurplusInFullModeEnabled || rule2CandidateQty <= 0) {
+            return false;
+        }
+        int windowRemainingPlanQty = Math.max(0, sku.getWindowRemainingPlanQty());
+        if (windowRemainingPlanQty <= 0 || rule2CandidateQty <= windowRemainingPlanQty) {
+            return false;
+        }
+        log.debug("SKU[{}]跳过收尾规则2: 比较量{} > 窗口剩余额度{}",
+                sku.getMaterialCode(), rule2CandidateQty, windowRemainingPlanQty);
+        return true;
     }
 
     /**

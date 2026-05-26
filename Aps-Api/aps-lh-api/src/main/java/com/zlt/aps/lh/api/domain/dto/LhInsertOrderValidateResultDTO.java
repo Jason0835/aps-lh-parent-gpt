@@ -79,6 +79,48 @@ public class LhInsertOrderValidateResultDTO implements Serializable {
     private Integer singleMouldShiftQty;
 
     /**
+     * 胎胚代码
+     */
+    @ApiModelProperty(value = "胎胚代码", name = "embryoCode")
+    private String embryoCode;
+
+    /**
+     * 胎胚描述（主物料描述）
+     */
+    @ApiModelProperty(value = "胎胚描述", name = "mainMaterialDesc")
+    private String mainMaterialDesc;
+
+    /**
+     * 需求计划版本号
+     */
+    @ApiModelProperty(value = "需求计划版本号", name = "monthPlanVersion")
+    private String monthPlanVersion;
+
+    /**
+     * 排产版本号
+     */
+    @ApiModelProperty(value = "排产版本号", name = "productionVersion")
+    private String productionVersion;
+
+    /**
+     * 规格
+     */
+    @ApiModelProperty(value = "规格", name = "specCode")
+    private String specCode;
+
+    /**
+     * 产品结构
+     */
+    @ApiModelProperty(value = "产品结构", name = "structureName")
+    private String structureName;
+
+    /**
+     * 模具号
+     */
+    @ApiModelProperty(value = "模具号", name = "mouldCode")
+    private String mouldCode;
+
+    /**
      * 班次产能信息
      */
     @Data

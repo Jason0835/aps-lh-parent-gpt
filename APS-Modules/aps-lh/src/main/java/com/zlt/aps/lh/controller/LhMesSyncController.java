@@ -19,9 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -62,6 +60,9 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
 
     @Autowired
     private ILhDayFinishQtyService lhDayFinishQtyService;
+
+    @Autowired
+    private ILhParamsService lhParamsService;
 
     @Autowired
     private LhMouldChangePlanEntityMapper lhMouldChangePlanEntityMapper;
@@ -371,5 +372,47 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
             log.error("基于全部预警数据全量生成清洗计划失败", e);
             return AjaxResult.error("操作失败：" + e.getMessage());
         }
+    }
+
+    @Override
+    @ApiOperation("查询每天最新版本的硫化排程日完成量数据")
+    @PostMapping("/queryLatestDayFinishQty")
+    public List<LhDayFinishQty> queryLatestDayFinishQty() {
+        LambdaQueryWrapper<LhDayFinishQty> wrapper = new LambdaQueryWrapper<>();
+        List<LhDayFinishQty> allList = lhDayFinishQtyMapper.selectList(wrapper);
+        if (allList == null || allList.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Map<String, Optional<LhDayFinishQty>> latestByVersion = allList.stream()
+                .collect(Collectors.groupingBy(
+                        item -> buildGroupKey(item.getFactoryCode(), item.getFinishDate()),
+                        Collectors.maxBy(Comparator.comparing(
+                                item -> item.getDataVersion() != null ? item.getDataVersion() : "",
+                                Comparator.nullsFirst(Comparator.naturalOrder())
+                        ))
+                ));
+        return latestByVersion.values().stream()
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toList());
+    }
+
+    private String buildGroupKey(String factoryCode, Date finishDate) {
+        String dateStr = finishDate != null ? DateUtil.formatDate(finishDate) : "null";
+        return factoryCode + "|" + dateStr;
+    }
+
+    @Override
+    @ApiOperation("根据参数编码和分厂编码查询硫化参数配置")
+    @PostMapping("/selectLhParamsByCode")
+    public LhParams selectLhParamsByCode(@RequestParam("paramCode") String paramCode, @RequestParam("factoryCode") String factoryCode) {
+        return lhParamsService.selectOneByParamCode(paramCode, factoryCode);
+    }
+
+    @Override
+    @ApiOperation("根据参数编码查询所有分厂的硫化参数配置")
+    @PostMapping("/selectLhParamsListByParamCode")
+    public List<LhParams> selectLhParamsListByParamCode(@RequestParam("paramCode") String paramCode) {
+        return lhParamsService.selectListByParamCode(paramCode);
     }
 }

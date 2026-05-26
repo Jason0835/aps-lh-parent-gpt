@@ -59,6 +59,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.text.ParseException;
 import cn.hutool.core.date.DateUtil;
 import java.util.*;
@@ -1697,33 +1698,59 @@ public class MesItfServiceImpl implements MesItfService {
      * @param syncList 硫化排程日完成量列表
      */
     private void updateChipStockFinishQty(String factoryCode, List<LhDayFinishQty> syncList) {
-        FactoryParam chipCodeParam = new FactoryParam();
-        chipCodeParam.setFactoryCode(factoryCode);
-        chipCodeParam.setParamCode(LhScheduleParamConstant.CHIP_CODE_STOCK_UPDATE);
-        FactoryParam paramResult;
+        log.info("【芯片库存回填排查】开始处理，factoryCode={}, syncList.size={}", factoryCode, syncList.size());
+
+        LhParams paramResult;
         try {
-            DynamicDataSourceContextHolder.push(DataSource.APS);
-            paramResult = iFactoryParamService.getFacParamSingle(chipCodeParam);
-        } finally {
-            DynamicDataSourceContextHolder.poll();
-        }
-        if (paramResult == null || StringUtils.isBlank(paramResult.getParamValue())) {
+            paramResult = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.selectLhParamsByCode(LhScheduleParamConstant.CHIP_CODE_STOCK_UPDATE, factoryCode));
+        } catch (Exception e) {
+            log.error("【芯片库存回填排查】查询硫化参数配置异常，factoryCode={}", factoryCode, e);
             return;
         }
+        if (paramResult == null || StringUtils.isBlank(paramResult.getParamValue())) {
+            log.warn("【芯片库存回填排查】硫化参数CHIP_CODE_STOCK_UPDATE未配置或值为空，factoryCode={}, paramResult={}", factoryCode, paramResult);
+            return;
+        }
+        log.info("【芯片库存回填排查】硫化参数CHIP_CODE_STOCK_UPDATE配置值：factoryCode={}, paramValue={}", factoryCode, paramResult.getParamValue());
+
         Set<String> chipCodeSet = Arrays.stream(paramResult.getParamValue().split(","))
                 .map(String::trim)
                 .filter(StringUtils::isNotBlank)
                 .collect(Collectors.toSet());
         if (CollectionUtils.isEmpty(chipCodeSet)) {
+            log.warn("【芯片库存回填排查】解析芯片编码集合为空，factoryCode={}", factoryCode);
             return;
         }
+        log.info("【芯片库存回填排查】芯片编码集合：{}", chipCodeSet);
+
+        List<String> syncMaterialCodes = syncList.stream()
+                .map(LhDayFinishQty::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        log.info("【芯片库存回填排查】syncList中物料编码列表：{}", syncMaterialCodes);
+
+        List<String> syncMesMaterialCodes = syncList.stream()
+                .map(LhDayFinishQty::getMesMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        log.info("【芯片库存回填排查】syncList中MES物料编码列表：{}", syncMesMaterialCodes);
+
+        List<String> matchedMaterialCodes = syncMaterialCodes.stream()
+                .filter(chipCodeSet::contains)
+                .collect(Collectors.toList());
+        log.info("【芯片库存回填排查】物料编码与芯片编码集合匹配结果：matched={}, unmatched={}", matchedMaterialCodes, syncMaterialCodes.stream().filter(code -> !chipCodeSet.contains(code)).collect(Collectors.toList()));
 
         List<LhDayFinishQty> chipDataList = syncList.stream()
                 .filter(item -> chipCodeSet.contains(item.getMaterialCode()))
                 .collect(Collectors.toList());
         if (CollectionUtils.isEmpty(chipDataList)) {
+            log.warn("【芯片库存回填排查】过滤后芯片数据为空，无匹配的物料编码！chipCodeSet={}, syncMaterialCodes={}", chipCodeSet, syncMaterialCodes);
             return;
         }
+        log.info("【芯片库存回填排查】过滤后芯片数据条数：{}", chipDataList.size());
 
         Map<String, Integer> chipFinishQtyMap = chipDataList.stream()
                 .filter(item -> item.getDayFinishQty() != null)
@@ -1731,12 +1758,24 @@ public class MesItfServiceImpl implements MesItfService {
                         LhDayFinishQty::getMaterialCode,
                         Collectors.summingInt(item -> item.getDayFinishQty().intValue())
                 ));
+        log.info("【芯片库存回填排查】芯片完成量汇总结果：{}", chipFinishQtyMap);
+
+        Map<String, String> chipVersionMap = chipDataList.stream()
+                .filter(item -> item.getDataVersion() != null && !item.getDataVersion().isEmpty())
+                .collect(Collectors.groupingBy(
+                        LhDayFinishQty::getMaterialCode,
+                        Collectors.collectingAndThen(
+                                Collectors.maxBy(Comparator.comparing(LhDayFinishQty::getDataVersion, Comparator.nullsFirst(Comparator.naturalOrder()))),
+                                opt -> opt.map(LhDayFinishQty::getDataVersion).orElse(null)
+                        )
+                ));
 
         List<LhChipStock> chipStockList = chipFinishQtyMap.entrySet().stream().map(entry -> {
             LhChipStock chipStock = new LhChipStock();
             chipStock.setFactoryCode(factoryCode);
             chipStock.setChipCode(entry.getKey());
             chipStock.setFinishQty(entry.getValue());
+            chipStock.setDataVersion(chipVersionMap.get(entry.getKey()));
             return chipStock;
         }).collect(Collectors.toList());
 
@@ -2399,7 +2438,7 @@ public class MesItfServiceImpl implements MesItfService {
             });
 
             DynamicDataSourceContextHolder.push(DataSource.MES);
-            List<LhRepairCapsuleVo> syncList = mesItfMapper.selectLhRepairCapsuleHistoryList(new AuxReqSyncDataLogs());
+            List<LhRepairCapsuleVo> syncList = mesItfMapper.selectLhRepairCapsuleList(new AuxReqSyncDataLogs());
             DynamicDataSourceContextHolder.poll();
 
             if (CollectionUtils.isEmpty(syncList)) {
@@ -2909,5 +2948,140 @@ public class MesItfServiceImpl implements MesItfService {
 
         log.info("临时任务-按版本迭代同步模具清洗预警数据并生成清洗计划完成");
         return AjaxResult.success("同步完成，共处理" + allVersions.size() + "个版本，总新增" + totalInsertCount.get() + "条，总更新" + totalUpdateCount.get() + "条");
+    }
+
+    @Override
+    public AjaxResult syncDayFinishQtyToChipStock() {
+        log.info("【硫化日完成量回填芯片库存】定时任务开始执行");
+
+        Map<String, Set<String>> factoryChipCodeMap = loadChipCodeConfig();
+        if (factoryChipCodeMap.isEmpty()) {
+            log.warn("【硫化日完成量回填芯片库存】未找到芯片编码配置（CHIP_CODE_STOCK_UPDATE），跳过执行");
+            return AjaxResult.error("未找到芯片编码配置（CHIP_CODE_STOCK_UPDATE）");
+        }
+
+        List<LhDayFinishQty> allDayFinishQtyList;
+        try {
+            allDayFinishQtyList = FeignTokenHelper.callWithToken(() -> lhMesSyncRemoteService.queryLatestDayFinishQty());
+        } catch (Exception e) {
+            log.error("【硫化日完成量回填芯片库存】查询日完成量数据异常", e);
+            return AjaxResult.error("查询日完成量数据异常：" + e.getMessage());
+        }
+
+        if (CollectionUtils.isEmpty(allDayFinishQtyList)) {
+            log.info("【硫化日完成量回填芯片库存】硫化日完成量回报数据为空，跳过执行");
+            return AjaxResult.success("日完成量数据为空");
+        }
+        log.info("【硫化日完成量回填芯片库存】查询到日完成量数据总条数：{}", allDayFinishQtyList.size());
+
+        int totalInsert = 0;
+        int totalUpdate = 0;
+        for (Map.Entry<String, Set<String>> entry : factoryChipCodeMap.entrySet()) {
+            String factoryCode = entry.getKey();
+            Set<String> chipCodeSet = entry.getValue();
+            log.info("【硫化日完成量回填芯片库存】分厂={}，芯片编码配置集合={}", factoryCode, chipCodeSet);
+
+            List<String> allMaterialCodes = allDayFinishQtyList.stream()
+                    .filter(item -> factoryCode.equals(item.getFactoryCode()))
+                    .map(LhDayFinishQty::getMaterialCode)
+                    .filter(StringUtils::isNotEmpty)
+                    .distinct()
+                    .collect(Collectors.toList());
+            log.info("【硫化日完成量回填芯片库存】分厂={}，日完成量中物料编码列表={}", factoryCode, allMaterialCodes);
+
+            List<String> allMesMaterialCodes = allDayFinishQtyList.stream()
+                    .filter(item -> factoryCode.equals(item.getFactoryCode()))
+                    .map(LhDayFinishQty::getMesMaterialCode)
+                    .filter(StringUtils::isNotEmpty)
+                    .distinct()
+                    .collect(Collectors.toList());
+            log.info("【硫化日完成量回填芯片库存】分厂={}，日完成量中MES物料编码列表={}", factoryCode, allMesMaterialCodes);
+
+            List<String> matchedCodes = allMaterialCodes.stream()
+                    .filter(chipCodeSet::contains)
+                    .collect(Collectors.toList());
+            log.info("【硫化日完成量回填芯片库存】分厂={}，物料编码与芯片编码集合匹配结果：matched={}, unmatched={}",
+                    factoryCode, matchedCodes, allMaterialCodes.stream().filter(code -> !chipCodeSet.contains(code)).collect(Collectors.toList()));
+
+            List<LhDayFinishQty> filteredList = allDayFinishQtyList.stream()
+                    .filter(item -> factoryCode.equals(item.getFactoryCode()))
+                    .filter(item -> chipCodeSet.contains(item.getMaterialCode()))
+                    .collect(Collectors.toList());
+
+            if (CollectionUtils.isEmpty(filteredList)) {
+                log.warn("【硫化日完成量回填芯片库存】分厂{}无匹配芯片编码的日完成量数据，跳过。chipCodeSet={}, allMaterialCodes={}", factoryCode, chipCodeSet, allMaterialCodes);
+                continue;
+            }
+
+            Map<String, BigDecimal> chipFinishQtyMap = filteredList.stream()
+                    .filter(item -> item.getDayFinishQty() != null)
+                    .collect(Collectors.groupingBy(
+                            LhDayFinishQty::getMaterialCode,
+                            Collectors.reducing(BigDecimal.ZERO, LhDayFinishQty::getDayFinishQty, BigDecimal::add)
+                    ));
+
+            Map<String, String> chipVersionMap = filteredList.stream()
+                    .filter(item -> item.getDataVersion() != null && !item.getDataVersion().isEmpty())
+                    .collect(Collectors.groupingBy(
+                            LhDayFinishQty::getMaterialCode,
+                            Collectors.collectingAndThen(
+                                    Collectors.maxBy(Comparator.comparing(LhDayFinishQty::getDataVersion, Comparator.nullsFirst(Comparator.naturalOrder()))),
+                                    opt -> opt.map(LhDayFinishQty::getDataVersion).orElse(null)
+                            )
+                    ));
+
+            log.info("【硫化日完成量回填芯片库存】分厂{}，匹配芯片编码数量={}，汇总后芯片数量={}，版本号映射={}",
+                    factoryCode, chipCodeSet.size(), chipFinishQtyMap.size(), chipVersionMap);
+
+            List<LhChipStock> chipStockList = chipFinishQtyMap.entrySet().stream().map(e -> {
+                LhChipStock chipStock = new LhChipStock();
+                chipStock.setFactoryCode(factoryCode);
+                chipStock.setChipCode(e.getKey());
+                chipStock.setFinishQty(e.getValue().intValue());
+                chipStock.setDataVersion(chipVersionMap.get(e.getKey()));
+                return chipStock;
+            }).collect(Collectors.toList());
+
+            try {
+                FeignTokenHelper.runWithToken(() -> {
+                    log.info("【硫化日完成量回填芯片库存】开始覆盖更新，factoryCode={}, 待处理数量={}", factoryCode, chipStockList.size());
+                    lhChipStockRemoteService.overwriteFinishQty(factoryCode, chipStockList);
+                    log.info("【硫化日完成量回填芯片库存】覆盖更新完成，factoryCode={}, 处理数量={}", factoryCode, chipStockList.size());
+                });
+            } catch (Exception e) {
+                log.error("【硫化日完成量回填芯片库存】覆盖更新异常, factoryCode={}", factoryCode, e);
+            }
+        }
+
+        log.info("【硫化日完成量回填芯片库存】定时任务执行完成");
+        return AjaxResult.success("执行完成");
+    }
+
+    private Map<String, Set<String>> loadChipCodeConfig() {
+        List<LhParams> paramList;
+        try {
+            paramList = FeignTokenHelper.callWithToken(() ->
+                    lhMesSyncRemoteService.selectLhParamsListByParamCode(LhScheduleParamConstant.CHIP_CODE_STOCK_UPDATE));
+        } catch (Exception e) {
+            log.error("【硫化日完成量回填芯片库存】查询硫化参数配置异常", e);
+            return Collections.emptyMap();
+        }
+        if (CollectionUtils.isEmpty(paramList)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Set<String>> result = new LinkedHashMap<>();
+        for (LhParams param : paramList) {
+            if (param.getParamValue() == null || param.getParamValue().trim().isEmpty()) {
+                continue;
+            }
+            Set<String> chipCodeSet = Arrays.stream(param.getParamValue().split(","))
+                    .map(String::trim)
+                    .filter(code -> !code.isEmpty())
+                    .collect(Collectors.toSet());
+            if (!chipCodeSet.isEmpty()) {
+                result.put(param.getFactoryCode(), chipCodeSet);
+            }
+        }
+        return result;
     }
 }

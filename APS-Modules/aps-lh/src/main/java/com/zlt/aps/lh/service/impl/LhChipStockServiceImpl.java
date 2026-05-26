@@ -2,7 +2,6 @@ package com.zlt.aps.lh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -84,13 +83,47 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
         }
     }
 
+    /**
+     * 累加更新完成量 - 供硫化排程回填调用（原子操作 + 版本号乐观锁）
+     * 在原有完成量的基础上叠加传入的完成量值，而非直接覆盖
+     * 通过原子SQL保证并发安全，利用版本号防止重复累加
+     *
+     * @param factoryCode 分厂编号
+     * @param chipCode    芯片编号
+     * @param finishQty   待累加的完成量
+     * @return 更新的记录数
+     */
     @Override
     public int updateFinishQty(String factoryCode, String chipCode, Integer finishQty) {
-        LambdaUpdateWrapper<LhChipStock> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper.eq(LhChipStock::getFactoryCode, factoryCode);
-        updateWrapper.eq(LhChipStock::getChipCode, chipCode);
-        updateWrapper.set(LhChipStock::getFinishQty, finishQty);
-        return lhChipStockMapper.update(null, updateWrapper);
+        LambdaQueryWrapper<LhChipStock> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(LhChipStock::getFactoryCode, factoryCode);
+        queryWrapper.eq(LhChipStock::getChipCode, chipCode);
+        LhChipStock existing = lhChipStockMapper.selectOne(queryWrapper);
+        if (existing == null) {
+            log.warn("芯片库存累加完成量：未找到匹配记录，factoryCode={}, chipCode={}", factoryCode, chipCode);
+            return 0;
+        }
+
+        String expectedVersion = existing.getDataVersion();
+        String newVersion = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        int delta = finishQty != null ? finishQty : 0;
+
+        int rows = lhChipStockMapper.atomicAddFinishQty(factoryCode, chipCode, delta, expectedVersion, newVersion, "MES");
+        if (rows > 0) {
+            log.info("芯片库存原子累加成功：factoryCode={}, chipCode={}, 累加值={}, 旧版本={}, 新版本={}",
+                    factoryCode, chipCode, delta, expectedVersion, newVersion);
+        } else {
+            log.warn("芯片库存原子累加失败（版本号冲突）：factoryCode={}, chipCode={}, 累加值={}, 期望版本={}, 尝试无版本校验重试",
+                    factoryCode, chipCode, delta, expectedVersion);
+            rows = lhChipStockMapper.atomicAddFinishQty(factoryCode, chipCode, delta, null, newVersion, "MES");
+            if (rows > 0) {
+                log.info("芯片库存原子累加重试成功（无版本校验）：factoryCode={}, chipCode={}, 累加值={}, 新版本={}",
+                        factoryCode, chipCode, delta, newVersion);
+            } else {
+                log.error("芯片库存原子累加重试仍失败：factoryCode={}, chipCode={}, 累加值={}", factoryCode, chipCode, delta);
+            }
+        }
+        return rows;
     }
 
     /**
@@ -275,14 +308,93 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
     }
 
     /**
-     * 增量更新芯片库存完成量
-     * 根据分厂编号+芯片编码匹配：已存在则累加完成量，不存在则新增记录
+     * 增量更新芯片库存完成量（原子操作 + 版本号乐观锁）
+     * 根据分厂编号+芯片编码匹配：
+     *   已存在：通过原子SQL累加完成量，利用数据库行锁+版本号防止并发重复累加
+     *   不存在：新增记录
      *
      * @param factoryCode 分厂编号
-     * @param list        待更新的芯片库存列表（需设置chipCode和finishQty）
+     * @param list        待更新的芯片库存列表（需设置chipCode、finishQty，可选dataVersion作为乐观锁期望值）
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void upsertFinishQty(String factoryCode, List<LhChipStock> list) {
+        if (CollectionUtils.isEmpty(list)) {
+            return;
+        }
+        List<String> chipCodes = list.stream()
+                .map(LhChipStock::getChipCode)
+                .filter(StringUtil::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(chipCodes)) {
+            return;
+        }
+
+        LambdaQueryWrapper<LhChipStock> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(LhChipStock::getFactoryCode, factoryCode);
+        queryWrapper.in(LhChipStock::getChipCode, chipCodes);
+        List<LhChipStock> existingList = lhChipStockMapper.selectList(queryWrapper);
+        Map<String, LhChipStock> existingMap = existingList.stream()
+                .collect(Collectors.toMap(LhChipStock::getChipCode, e -> e, (v1, v2) -> v1));
+
+        List<LhChipStock> insertList = new ArrayList<>();
+        for (LhChipStock item : list) {
+            if (StringUtil.isBlank(item.getChipCode())) {
+                continue;
+            }
+            LhChipStock existing = existingMap.get(item.getChipCode());
+            if (existing != null) {
+                String expectedVersion = existing.getDataVersion();
+                String newVersion = item.getDataVersion() != null ? item.getDataVersion() : UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+                int delta = item.getFinishQty() != null ? item.getFinishQty() : 0;
+                int rows = lhChipStockMapper.atomicAddFinishQty(factoryCode, item.getChipCode(), delta, expectedVersion, newVersion, "MES");
+                if (rows > 0) {
+                    log.info("芯片库存原子累加成功：分厂={}, 芯片编码={}, 累加量={}, 旧版本={}, 新版本={}",
+                            factoryCode, item.getChipCode(), delta, expectedVersion, newVersion);
+                } else {
+                    log.warn("芯片库存原子累加失败（版本号冲突或记录不存在）：分厂={}, 芯片编码={}, 累加量={}, 期望版本={}, 尝试无版本校验重试",
+                            factoryCode, item.getChipCode(), delta, expectedVersion);
+                    rows = lhChipStockMapper.atomicAddFinishQty(factoryCode, item.getChipCode(), delta, null, newVersion, "MES");
+                    if (rows > 0) {
+                        log.info("芯片库存原子累加重试成功（无版本校验）：分厂={}, 芯片编码={}, 累加量={}, 新版本={}",
+                                factoryCode, item.getChipCode(), delta, newVersion);
+                    } else {
+                        log.error("芯片库存原子累加重试仍失败：分厂={}, 芯片编码={}, 累加量={}", factoryCode, item.getChipCode(), delta);
+                    }
+                }
+            } else {
+                item.setFactoryCode(factoryCode);
+                item.setDataSource(ApsConstant.DATA_SOURCE_MES);
+                item.setCreateBy("MES");
+                item.setUpdateBy("MES");
+                item.setCreateTime(DateUtils.getNowDate());
+                item.setUpdateTime(DateUtils.getNowDate());
+                if (item.getDataVersion() == null || item.getDataVersion().isEmpty()) {
+                    item.setDataVersion(UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+                }
+                insertList.add(item);
+                log.info("芯片库存新增：分厂={}, 芯片编码={}, 完成量={}, 版本={}", factoryCode, item.getChipCode(), item.getFinishQty(), item.getDataVersion());
+            }
+        }
+        if (CollectionUtils.isNotEmpty(insertList)) {
+            baseDao.saveBatch(insertList);
+            log.info("芯片库存增量更新-批量插入完成：分厂={}, 新增数量={}", factoryCode, insertList.size());
+        }
+    }
+
+    /**
+     * 覆盖更新芯片库存完成量（原子操作 + 版本号乐观锁）
+     * 根据分厂编号+芯片编码匹配：
+     *   已存在：通过原子SQL覆盖完成量，利用数据库行锁+版本号防止并发覆盖
+     *   不存在：新增记录
+     *
+     * @param factoryCode 分厂编号
+     * @param list        待更新的芯片库存列表（需设置chipCode、finishQty，可选dataVersion作为乐观锁期望值）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void overwriteFinishQty(String factoryCode, List<LhChipStock> list) {
         if (CollectionUtils.isEmpty(list)) {
             return;
         }
@@ -308,26 +420,41 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
             }
             LhChipStock existing = existingMap.get(item.getChipCode());
             if (existing != null) {
-                int newFinishQty = (existing.getFinishQty() != null ? existing.getFinishQty() : 0)
-                        + (item.getFinishQty() != null ? item.getFinishQty() : 0);
-                existing.setFinishQty(newFinishQty);
-                lhChipStockMapper.updateById(existing);
-                log.info("芯片库存增量更新：分厂={}, 芯片编码={}, 累加完成量={}, 更新后完成量={}",
-                        factoryCode, item.getChipCode(), item.getFinishQty(), newFinishQty);
+                String expectedVersion = existing.getDataVersion();
+                String newVersion = item.getDataVersion() != null ? item.getDataVersion() : UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+                int finishQty = item.getFinishQty() != null ? item.getFinishQty() : 0;
+                int rows = lhChipStockMapper.atomicOverwriteFinishQty(factoryCode, item.getChipCode(), finishQty, expectedVersion, newVersion, "SYNC_TASK");
+                if (rows > 0) {
+                    log.info("芯片库存原子覆盖成功：分厂={}, 芯片编码={}, 完成量={}, 旧版本={}, 新版本={}",
+                            factoryCode, item.getChipCode(), finishQty, expectedVersion, newVersion);
+                } else {
+                    log.warn("芯片库存原子覆盖失败（版本号冲突或记录不存在）：分厂={}, 芯片编码={}, 完成量={}, 期望版本={}, 尝试无版本校验重试",
+                            factoryCode, item.getChipCode(), finishQty, expectedVersion);
+                    rows = lhChipStockMapper.atomicOverwriteFinishQty(factoryCode, item.getChipCode(), finishQty, null, newVersion, "SYNC_TASK");
+                    if (rows > 0) {
+                        log.info("芯片库存原子覆盖重试成功（无版本校验）：分厂={}, 芯片编码={}, 完成量={}, 新版本={}",
+                                factoryCode, item.getChipCode(), finishQty, newVersion);
+                    } else {
+                        log.error("芯片库存原子覆盖重试仍失败：分厂={}, 芯片编码={}, 完成量={}", factoryCode, item.getChipCode(), finishQty);
+                    }
+                }
             } else {
                 item.setFactoryCode(factoryCode);
-                item.setDataSource(ApsConstant.DATA_SOURCE_MES);
-                item.setCreateBy("MES");
-                item.setUpdateBy("MES");
+                item.setDataSource("DAY_FINISH_QTY_SYNC");
+                item.setCreateBy("SYNC_TASK");
+                item.setUpdateBy("SYNC_TASK");
                 item.setCreateTime(DateUtils.getNowDate());
                 item.setUpdateTime(DateUtils.getNowDate());
+                if (item.getDataVersion() == null || item.getDataVersion().isEmpty()) {
+                    item.setDataVersion(UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+                }
                 insertList.add(item);
-                log.info("芯片库存新增：分厂={}, 芯片编码={}, 完成量={}", factoryCode, item.getChipCode(), item.getFinishQty());
+                log.info("芯片库存新增：分厂={}, 芯片编码={}, 完成量={}, 版本={}", factoryCode, item.getChipCode(), item.getFinishQty(), item.getDataVersion());
             }
         }
         if (CollectionUtils.isNotEmpty(insertList)) {
             baseDao.saveBatch(insertList);
-            log.info("芯片库存增量更新-批量插入完成：分厂={}, 新增数量={}", factoryCode, insertList.size());
+            log.info("芯片库存覆盖更新-批量插入完成：分厂={}, 新增数量={}", factoryCode, insertList.size());
         }
     }
 }

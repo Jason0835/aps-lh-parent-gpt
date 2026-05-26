@@ -713,4 +713,11 @@ public class MesItfController {
         }
         return mesItfService.syncAllVersionsMouldCleanWarnAndGenPlan(syncDataLogs);
     }
+
+    @ApiOperation("硫化日完成量回填芯片库存")
+    @PostMapping("/syncDayFinishQtyToChipStock")
+    @AutoLoginLog
+    public AjaxResult syncDayFinishQtyToChipStock() {
+        return mesItfService.syncDayFinishQtyToChipStock();
+    }
 }

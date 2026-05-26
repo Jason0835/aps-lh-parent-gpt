@@ -1,18 +1,22 @@
 package com.zlt.aps.mp.engine.scheduling;
 
+import com.google.common.collect.Lists;
 import com.zlt.aps.enums.ProductTypeEnum;
-import com.zlt.aps.mp.engine.domain.Context;
-import com.zlt.aps.mp.engine.service.MonthProductionDataService;
-import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
 import com.zlt.aps.mp.api.domain.entity.MouldProductionLog;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
+import com.zlt.aps.mp.engine.domain.Context;
+import com.zlt.aps.mp.engine.domain.ProductionStageLogRecorder;
+import com.zlt.aps.mp.engine.service.MonthProductionDataService;
+import com.zlt.aps.mp.engine.service.ProductionMdmDataService;
 import com.zlt.aps.mp.engine.utils.DateUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
+import java.util.List;
 
 /**
  * 抽象的排产业务类
@@ -59,22 +63,14 @@ public abstract class AbstractBaseProductionService implements IProductionBusine
      * @param context
      */
     protected void saveProductionProcessLog(Context context, ProductionProcessStage processStage) {
-        StringBuilder logBuilder = context.getLogBuilder();
-        String logContent = logBuilder.toString();
-        if (StringUtils.isBlank(logContent)) {
+        List<ProductionStageLogRecorder> logRecorderList = context.getLogBuilderList();
+        if (CollectionUtils.isEmpty(logRecorderList)) {
             return;
         }
-        logContent = String.format("%s流程日志:%s%s", processStage.getDesc(), System.lineSeparator(), logContent);
-        MouldProductionLog log = new MouldProductionLog();
-        log.setFactoryCode(context.getFactoryCode());
-        log.setYear(context.getYear());
-        log.setMonth(context.getMonth());
-        log.setMonthPlanVersion(context.getMonthPlanVersion());
-        log.setProductionVersion(context.getProductionVersion());
-        log.setPlanType(context.getPlanType());
-        log.setWorkNo(context.getOperationWorkNo());
-        log.setLogContent(logContent);
-        monthProductionDataService.saveMouldProductionLog(log);
+        //可分多阶段
+        logRecorderList.forEach(stageLogRecorder -> {
+            saveSingleStageLog(context, processStage, stageLogRecorder);
+        });
     }
 
     /**
@@ -88,9 +84,9 @@ public abstract class AbstractBaseProductionService implements IProductionBusine
         BeanUtils.copyProperties(context, productionContext);
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        StringBuilder logBuilder = new StringBuilder();
-        context.setLogBuilder(logBuilder);
-        productionContext.setLogBuilder(logBuilder);
+        List<ProductionStageLogRecorder> logRecorderList = Lists.newArrayList();
+        context.setLogBuilderList(logRecorderList);
+        productionContext.setLogBuilderList(logRecorderList);
         setProductionCycleInfo(productionContext);
         return productionContext;
     }
@@ -107,9 +103,9 @@ public abstract class AbstractBaseProductionService implements IProductionBusine
         BeanUtils.copyProperties(context, productionContext);
         context.setProductionVersion(productionContext.createNewProductionVersion());
         context.setOperationWorkNo(productionContext.createNewOperationWorkNo());
-        StringBuilder logBuilder = new StringBuilder();
-        context.setLogBuilder(logBuilder);
-        productionContext.setLogBuilder(logBuilder);
+        List<ProductionStageLogRecorder> logRecorderList = Lists.newArrayList();
+        context.setLogBuilderList(logRecorderList);
+        productionContext.setLogBuilderList(logRecorderList);
         setProductionCycleInfo(productionContext);
         return productionContext;
     }
@@ -136,6 +132,32 @@ public abstract class AbstractBaseProductionService implements IProductionBusine
         LocalDate previousMonth = context.getPreviousMonth();
         context.setProductionStartDate(DateUtils.getDate(previousMonth.getYear(), previousMonth.getMonthValue(), cycleStartDay));
         context.setProductionEndDate(DateUtils.getDate(year, month, cycleStartDay - 1));
+    }
+
+    /**
+     * 单阶段日志保存
+     *
+     * @param context          排产上下文
+     * @param processStage     排产入口模式
+     * @param stageLogRecorder 排产阶段
+     */
+    private void saveSingleStageLog(Context context, ProductionProcessStage processStage, ProductionStageLogRecorder stageLogRecorder) {
+        StringBuilder logBuilder = stageLogRecorder.getLogBuilder();
+        String logContent = logBuilder.toString();
+        if (StringUtils.isBlank(logContent)) {
+            return;
+        }
+        logContent = String.format("%s-%s流程日志:%s%s", processStage.getDesc(), stageLogRecorder.getStage().getStageDesc(), System.lineSeparator(), logContent);
+        MouldProductionLog log = new MouldProductionLog();
+        log.setFactoryCode(context.getFactoryCode());
+        log.setYear(context.getYear());
+        log.setMonth(context.getMonth());
+        log.setMonthPlanVersion(context.getMonthPlanVersion());
+        log.setProductionVersion(context.getProductionVersion());
+        log.setPlanType(context.getPlanType());
+        log.setWorkNo(context.getOperationWorkNo());
+        log.setLogContent(logContent);
+        monthProductionDataService.saveMouldProductionLog(log);
     }
 
     public ProductionMdmDataService getDataService() {

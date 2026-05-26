@@ -38,6 +38,7 @@ import com.zlt.aps.lh.engine.observer.ScheduleEventPublisher;
 import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.mapper.*;
 import com.zlt.aps.lh.service.ILhScheduleService;
+import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
@@ -64,6 +65,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -122,6 +124,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     @Autowired
     private ISysDictDataCacheService sysDictDataCacheService;
+
+    @Resource
+    private ILhScheduleResultService lhScheduleResultService;
 
     @Override
     public LhScheduleResponseDTO executeSchedule(LhScheduleRequestDTO request) {
@@ -1180,6 +1185,11 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             copyImportRowToEntity(row, target);
             fillShiftTimes(target, shiftTimeMap);
 
+            String batchNo = lhScheduleResultService.generateNextBatchNo(scheduleDate, factoryCode);
+            String orderNo = lhScheduleResultService.generateInsertOrderNo(scheduleDate);
+            target.setBatchNo(batchNo);
+            target.setOrderNo(orderNo);
+
 //            scheduleResultMapper.insert(target);
             insertList.add(target);
             successNum++;
@@ -1238,7 +1248,32 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     private void copyImportRowToEntity(LhScheduleResultTemplateImportVO source, LhScheduleResult target) {
         target.setLhMachineName(source.getLhMachineName());
-        target.setLeftRightMould(source.getLeftRightMould());
+        // 遍历class1MouldMethod到class8MouldMethod，取第一个非空值
+        String scheduleType = Stream.of(
+                source.getClass1MouldMethod(),
+                source.getClass2MouldMethod(),
+                source.getClass3MouldMethod(),
+                source.getClass4MouldMethod(),
+                source.getClass5MouldMethod(),
+                source.getClass6MouldMethod(),
+                source.getClass7MouldMethod(),
+                source.getClass8MouldMethod()
+        ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
+        target.setTrialStatus(scheduleType);
+
+        // 遍历class1LeftRightMould到class8LeftRightMould，取第一个非空值
+        String leftRightMould = Stream.of(
+                source.getClass1LeftRightMould(),
+                source.getClass2LeftRightMould(),
+                source.getClass3LeftRightMould(),
+                source.getClass4LeftRightMould(),
+                source.getClass5LeftRightMould(),
+                source.getClass6LeftRightMould(),
+                source.getClass7LeftRightMould(),
+                source.getClass8LeftRightMould()
+        ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
+        target.setLeftRightMould(leftRightMould);
+
         target.setSpecCode(source.getSpecCode());
         target.setEmbryoCode(source.getEmbryoCode());
         target.setStructureName(source.getStructureName());
@@ -1249,7 +1284,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         target.setLhTime(source.getLhTime());
         target.setMouldSurplusQty(source.getMouldSurplusQty());
         target.setSingleMouldShiftQty(source.getSingleMouldShiftQty());
-        target.setMouldMethod(source.getMouldMethod());
         target.setDailyPlanQty(source.getDailyPlanQty());
         target.setTotalDailyPlanQty(source.getDailyPlanQty());
         target.setRemark(source.getRemark());

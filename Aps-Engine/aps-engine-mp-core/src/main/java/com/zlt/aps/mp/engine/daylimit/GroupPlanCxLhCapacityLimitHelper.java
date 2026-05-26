@@ -866,7 +866,8 @@ public class GroupPlanCxLhCapacityLimitHelper {
                 if (singleLh.isFullProduction(context)) {
                     return;
                 }
-                conclusionList.add(singleLh);
+                SkuDayProductionInfoHelper beforeSkuInfo = SkuDayProductionInfoHelper.createClone(singleLh);
+                conclusionList.add(beforeSkuInfo);
             });
         });
         if (CollectionUtils.isEmpty(conclusionList)) {
@@ -903,7 +904,8 @@ public class GroupPlanCxLhCapacityLimitHelper {
                 if (single.isFullProduction(context)) {
                     return;
                 }
-                conclusionList.add(single);
+                SkuDayProductionInfoHelper beforeSkuInfo = SkuDayProductionInfoHelper.createClone(single);
+                conclusionList.add(beforeSkuInfo);
             });
         });
         //减模：隔天换模、换活字块
@@ -915,7 +917,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
             if (CollectionUtils.isEmpty(currentSkuList)) {
                 skuList.forEach(single -> {
                     if (single.isChangeMouldByNext() || single.isChangeTypeBlockByNext(context)) {
-                        conclusionList.add(SkuDayProductionInfoHelper.createCloneByOneProduction(single, day));
+                        conclusionList.add(SkuDayProductionInfoHelper.createBeforeInfoByFullProduction(single, day));
                     }
                 });
                 return;
@@ -927,7 +929,9 @@ public class GroupPlanCxLhCapacityLimitHelper {
             }
             //满产收尾
             skuList.sort(Comparator.comparing(SkuDayProductionInfoHelper::getSumProductionQty, Comparator.reverseOrder()));
-            conclusionList.add(SkuDayProductionInfoHelper.createCloneByOneProduction(skuList.get(BigDecimal.ZERO.intValue()), day));
+            //20260524+ 前Sku满产收尾余量赋值-1
+            SkuDayProductionInfoHelper beforeSkuInfo = SkuDayProductionInfoHelper.createBeforeInfoByFullProduction(skuList.get(BigDecimal.ZERO.intValue()), day);
+            conclusionList.add(beforeSkuInfo);
         });
         return conclusionList;
     }

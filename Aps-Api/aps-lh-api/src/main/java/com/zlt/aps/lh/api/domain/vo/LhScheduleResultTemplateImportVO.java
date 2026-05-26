@@ -639,7 +639,7 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 示方类型（字典 lh_trial_status：S-正规示方，T-量试示方，X-试验示方）
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.constructionStage", dictType = "lh_trial_status")
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.constructionStage")
     @ApiModelProperty(value = "示方类型", name = "trialStatus")
     @TableField(value = "TRIAL_STATUS")
     private String trialStatus;
@@ -805,4 +805,308 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     @ApiModelProperty(value = "删除标识（0未删除；1已删除）", name = "isDelete")
     @TableField(value = "IS_DELETE")
     private Integer isDelete;
+
+    /**
+     * 替换胶囊数左右模
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.replaceCapsuleCountLeftRight")
+    @ApiModelProperty(value = "替换胶囊数左右模", name = "replaceCapsuleCountLeftRight")
+    @TableField(value = "REPLACE_CAPSULE_COUNT_LEFT_RIGHT")
+    private String replaceCapsuleCountLeftRight;
+
+    /**
+     * 1班顺序
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class1Order")
+    @ApiModelProperty(value = "1班顺序", name = "class1Order")
+    @TableField(value = "CLASS1_ORDER")
+    private Integer class1Order;
+
+    /**
+     * 1班左右模
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class1LeftRightMould")
+    @ApiModelProperty(value = "1班左右模", name = "class1LeftRightMould")
+    @TableField(value = "CLASS1_LEFT_RIGHT_MOULD")
+    private String class1LeftRightMould;
+
+    /**
+     * 1班类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class1Type")
+    @ApiModelProperty(value = "1班类型", name = "class1Type")
+    @TableField(value = "CLASS1_TYPE")
+    private String class1Type;
+
+    /**
+     * 1班点
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class1Dot")
+    @ApiModelProperty(value = "1班点", name = "class1Dot")
+    @TableField(value = "CLASS1_DOT")
+    private String class1Dot;
+
+    /**
+     * 2班顺序
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class2Order")
+    @ApiModelProperty(value = "2班顺序", name = "class2Order")
+    @TableField(value = "CLASS2_ORDER")
+    private Integer class2Order;
+
+    /**
+     * 2班左右模
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class2LeftRightMould")
+    @ApiModelProperty(value = "2班左右模", name = "class2LeftRightMould")
+    @TableField(value = "CLASS2_LEFT_RIGHT_MOULD")
+    private String class2LeftRightMould;
+
+    /**
+     * 2班类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class2Type")
+    @ApiModelProperty(value = "2班类型", name = "class2Type")
+    @TableField(value = "CLASS2_TYPE")
+    private String class2Type;
+
+    /**
+     * 2班点
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class2Dot")
+    @ApiModelProperty(value = "2班点", name = "class2Dot")
+    @TableField(value = "CLASS2_DOT")
+    private String class2Dot;
+
+    /**
+     * 3班顺序
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class3Order")
+    @ApiModelProperty(value = "3班顺序", name = "class3Order")
+    @TableField(value = "CLASS3_ORDER")
+    private Integer class3Order;
+
+    /**
+     * 3班左右模
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class3LeftRightMould")
+    @ApiModelProperty(value = "3班左右模", name = "class3LeftRightMould")
+    @TableField(value = "CLASS3_LEFT_RIGHT_MOULD")
+    private String class3LeftRightMould;
+
+    /**
+     * 3班类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class3Type")
+    @ApiModelProperty(value = "3班类型", name = "class3Type")
+    @TableField(value = "CLASS3_TYPE")
+    private String class3Type;
+
+    /**
+     * 3班点
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class3Dot")
+    @ApiModelProperty(value = "3班点", name = "class3Dot")
+    @TableField(value = "CLASS3_DOT")
+    private String class3Dot;
+
+    /**
+     * 4班顺序
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class4Order")
+    @ApiModelProperty(value = "4班顺序", name = "class4Order")
+    @TableField(value = "CLASS4_ORDER")
+    private Integer class4Order;
+
+    /**
+     * 4班左右模
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class4LeftRightMould")
+    @ApiModelProperty(value = "4班左右模", name = "class4LeftRightMould")
+    @TableField(value = "CLASS4_LEFT_RIGHT_MOULD")
+    private String class4LeftRightMould;
+
+    /**
+     * 4班类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class4Type")
+    @ApiModelProperty(value = "4班类型", name = "class4Type")
+    @TableField(value = "CLASS4_TYPE")
+    private String class4Type;
+
+    /**
+     * 4班点
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class4Dot")
+    @ApiModelProperty(value = "4班点", name = "class4Dot")
+    @TableField(value = "CLASS4_DOT")
+    private String class4Dot;
+
+    /**
+     * 5班顺序
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class5Order")
+    @ApiModelProperty(value = "5班顺序", name = "class5Order")
+    @TableField(value = "CLASS5_ORDER")
+    private Integer class5Order;
+
+    /**
+     * 5班左右模
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class5LeftRightMould")
+    @ApiModelProperty(value = "5班左右模", name = "class5LeftRightMould")
+    @TableField(value = "CLASS5_LEFT_RIGHT_MOULD")
+    private String class5LeftRightMould;
+
+    /**
+     * 5班类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class5Type")
+    @ApiModelProperty(value = "5班类型", name = "class5Type")
+    @TableField(value = "CLASS5_TYPE")
+    private String class5Type;
+
+    /**
+     * 5班点
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class5Dot")
+    @ApiModelProperty(value = "5班点", name = "class5Dot")
+    @TableField(value = "CLASS5_DOT")
+    private String class5Dot;
+
+    /**
+     * 6班顺序
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class6Order")
+    @ApiModelProperty(value = "6班顺序", name = "class6Order")
+    @TableField(value = "CLASS6_ORDER")
+    private Integer class6Order;
+
+    /**
+     * 6班左右模
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class6LeftRightMould")
+    @ApiModelProperty(value = "6班左右模", name = "class6LeftRightMould")
+    @TableField(value = "CLASS6_LEFT_RIGHT_MOULD")
+    private String class6LeftRightMould;
+
+    /**
+     * 6班类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class6Type")
+    @ApiModelProperty(value = "6班类型", name = "class6Type")
+    @TableField(value = "CLASS6_TYPE")
+    private String class6Type;
+
+    /**
+     * 6班点
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class6Dot")
+    @ApiModelProperty(value = "6班点", name = "class6Dot")
+    @TableField(value = "CLASS6_DOT")
+    private String class6Dot;
+
+    /**
+     * 7班顺序
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class7Order")
+    @ApiModelProperty(value = "7班顺序", name = "class7Order")
+    @TableField(value = "CLASS7_ORDER")
+    private Integer class7Order;
+
+    /**
+     * 7班左右模
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class7LeftRightMould")
+    @ApiModelProperty(value = "7班左右模", name = "class7LeftRightMould")
+    @TableField(value = "CLASS7_LEFT_RIGHT_MOULD")
+    private String class7LeftRightMould;
+
+    /**
+     * 7班类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class7Type")
+    @ApiModelProperty(value = "7班类型", name = "class7Type")
+    @TableField(value = "CLASS7_TYPE")
+    private String class7Type;
+
+    /**
+     * 7班点
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class7Dot")
+    @ApiModelProperty(value = "7班点", name = "class7Dot")
+    @TableField(value = "CLASS7_DOT")
+    private String class7Dot;
+
+    /**
+     * 8班顺序
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class8Order")
+    @ApiModelProperty(value = "8班顺序", name = "class8Order")
+    @TableField(value = "CLASS8_ORDER")
+    private Integer class8Order;
+
+    /**
+     * 8班左右模
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class8LeftRightMould")
+    @ApiModelProperty(value = "8班左右模", name = "class8LeftRightMould")
+    @TableField(value = "CLASS8_LEFT_RIGHT_MOULD")
+    private String class8LeftRightMould;
+
+    /**
+     * 8班类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class8Type")
+    @ApiModelProperty(value = "8班类型", name = "class8Type")
+    @TableField(value = "CLASS8_TYPE")
+    private String class8Type;
+
+    /**
+     * 8班点
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class8Dot")
+    @ApiModelProperty(value = "8班点", name = "class8Dot")
+    @TableField(value = "CLASS8_DOT")
+    private String class8Dot;
+
+    /**
+     * 夜班计划总量
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.nightPlanQtyTotal")
+    @ApiModelProperty(value = "夜班计划总量", name = "nightPlanQtyTotal")
+    @TableField(value = "NIGHT_PLAN_QTY_TOTAL")
+    private Integer nightPlanQtyTotal;
+
+    /**
+     * 夜班完成总量
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.nightFinishQtyTotal")
+    @ApiModelProperty(value = "夜班完成总量", name = "nightFinishQtyTotal")
+    @TableField(value = "NIGHT_FINISH_QTY_TOTAL")
+    private Integer nightFinishQtyTotal;
+
+    /**
+     * 总计划数量公式
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.totalPlanQtyFormula")
+    @ApiModelProperty(value = "总计划数量公式", name = "totalPlanQtyFormula")
+    @TableField(value = "TOTAL_PLAN_QTY_FORMULA")
+    private String totalPlanQtyFormula;
+
+    /**
+     * CX机台编号
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.cxMachineCode")
+    @ApiModelProperty(value = "CX机台编号", name = "cxMachineCode")
+    @TableField(value = "CX_MACHINE_CODE")
+    private String cxMachineCode;
+
+    /**
+     * 硫化产量今天夜班
+     */
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.todayNightFinishQty")
+    @ApiModelProperty(value = "硫化产量今天夜班", name = "todayNightFinishQty")
+    @TableField(value = "TODAY_NIGHT_FINISH_QTY")
+    private BigDecimal todayNightFinishQty;
 }

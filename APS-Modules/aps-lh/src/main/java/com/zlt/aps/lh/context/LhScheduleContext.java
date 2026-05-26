@@ -153,6 +153,8 @@ public class LhScheduleContext {
     private Map<String, Set<String>> specialMaterialCategoryByStructureName = new HashMap<>();
     /** SKU与示方书关系Map, key=materialCode */
     private Map<String, MdmSkuConstructionRef> skuConstructionRefMap = new HashMap<>();
+    /** SKU与示方书关系Map(复合key), key=materialCode + "::" + trialStatus */
+    private Map<String, MdmSkuConstructionRef> skuConstructionRefCompositeKeyMap = new HashMap<>();
 
     // ========== 中间计算结果(S4.3) ==========
 
@@ -184,12 +186,10 @@ public class LhScheduleContext {
     private int pendingMassTrialNewSpecSkuCount;
     /** S4.5当前待排小批量新增SKU数量，供单控机台内部资源竞争判断 */
     private int pendingSmallBatchNewSpecSkuCount;
-    /** S4.5当前待排特殊材料新增SKU数量，供特殊机台资源保护规则判断 */
-    private int pendingSpecialMaterialNewSpecSkuCount;
-    /** 特殊机台资源保护：被唯一候选特殊材料SKU依赖的机台编码集合 */
-    private Set<String> specialMachineReservedCodes = new HashSet<>();
     /** 新增SKU最近一次选机是否被单控/普通机台让位规则清空候选，使用对象身份避免同物料编码互相覆盖 */
     private Map<SkuScheduleDTO, Boolean> newSpecTypeRuleBlockedMap = new IdentityHashMap<>();
+    /** 新增SKU进入S4.5时是否命中结构五天内收尾层级快照，使用对象身份避免SKU出队后判定漂移 */
+    private Map<SkuScheduleDTO, Boolean> newSpecSingleControlStructureEndingLayerMap = new IdentityHashMap<>();
     /** 续作结果日额度账本是否已完成最终同步，防止同一上下文重复扣账 */
     private boolean continuousDailyQuotaSynced;
     /** 运行态结果来源SKU映射，使用对象身份避免结果行可变字段影响Map命中 */

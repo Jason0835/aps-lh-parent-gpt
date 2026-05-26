@@ -1,9 +1,11 @@
 package com.zlt.aps.mp.engine.domain;
 
+import com.google.common.collect.Lists;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.mp.api.enums.ProductionProcessStage;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -72,7 +74,7 @@ public class Context {
     /**
      * 日志存储器
      */
-    private StringBuilder logBuilder;
+    private List<ProductionStageLogRecorder> logBuilderList;
 
     /**
      * 操作批次号
@@ -121,6 +123,22 @@ public class Context {
         //设置年月值
         String yearAndMonth = String.format("%s%02d", year, month);
         return Integer.valueOf(yearAndMonth);
+    }
+
+    /**
+     * 增加日志存储器
+     *
+     * @param logRecorderStage 阶段日志存储器
+     */
+    public void addStageLogBuilder(LogRecorderStageEnum logRecorderStage) {
+        if (null == logBuilderList) {
+            logBuilderList = Lists.newArrayList();
+        }
+        if (null == logRecorderStage) {
+            return;
+        }
+        ProductionStageLogRecorder stageLogRecorder = new ProductionStageLogRecorder(logRecorderStage);
+        logBuilderList.add(stageLogRecorder);
     }
 
     /**

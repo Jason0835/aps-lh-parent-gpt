@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <el-dialog
     :title="title"
     :visible="visible"
@@ -22,12 +22,12 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item :label="$t('原机台')">
+            <el-form-item :label="$t('ui.data.column.scheduleResult.oldMachine')">
               <el-input v-model="form.oldMachineCode" disabled />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item :label="$t('新机台')" prop="lhMachineCode">
+            <el-form-item :label="$t('ui.data.column.scheduleResult.newMachine')" prop="lhMachineCode">
               <el-select
                 v-model="form.lhMachineCode"
                 class="w100"
@@ -92,26 +92,26 @@ export default {
   },
   computed: {
     title: function () {
-      return this.$t("转机台");
+      return this.$t("ui.data.column.scheduleResult.changeMachine");
     },
     tableColumns() {
       return [
         {
-          label: this.$t("硫化机台"),
+          label: this.$t("ui.data.column.scheduleResult.lhMachineCode"),
           prop: "lhMachineCode",
         },
         {
-          label: this.$t("物料编码"),
+          label: this.$t("ui.data.column.scheduleResult.materialCode"),
           prop: "materialCode",
           width: 320
         },
         {
-          label: this.$t("物料描述"),
+          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
           prop: "materialDesc",
           width: 320
         },
         {
-          label: this.$t("胎胚描述"),
+          label: this.$t("ui.data.column.scheduleResult.embryoDesc"),
           prop: "mainMaterialDesc",
         },
         {
@@ -126,27 +126,27 @@ export default {
           },
         },
         {
-          label: this.$t("合计余量"),
+          label: this.$t("ui.data.column.scheduleResult.totalSurplusQty"),
           prop: "mouldSurplusQty",
         },
         {
-          label: this.$t("完成量"),
+          label: this.$t("ui.data.column.scheduleResult.finishQty"),
           prop: "todayNightFinishQty",
         },
         {
-          label: this.$t("胎胚库存"),
+          label: this.$t("ui.data.column.scheduleResult.embryoStock"),
           prop: "embryoStock",
         },
         {
-          label: this.$t("硫化班产"),
+          label: this.$t("ui.data.column.scheduleResult.lhShiftQty"),
           prop: "singleMouldShiftQty",
         },
         {
-          label: this.$t("左右模"),
+          label: this.$t("ui.data.column.scheduleResult.leftRightMould"),
           prop: "leftRightMould",
         },
         {
-          label: this.$t("示方类型"),
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
           prop: "trialStatus",
           formatter: (row, column, value) => {
             return this.selectDictLabel(
@@ -156,14 +156,14 @@ export default {
           },
         },
         {
-          label: this.$t("类型"),
+          label: this.$t("ui.data.column.scheduleResult.type"),
           prop: "isEnd",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.parentDict.type.biz_end_type, value);
           },
         },
         {
-          label: this.$t("早班") + " " + this.dateList[0].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.morningShift") + " " + this.dateList[0].shiftDate,
           children: [
             {
               prop: "leftRightMould",
@@ -198,7 +198,7 @@ export default {
           ],
         },
         {
-          label: this.$t("中班") + " " + this.dateList[1].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.middleShift") + " " + this.dateList[1].shiftDate,
           children: [
             {
               prop: "leftRightMould",
@@ -233,7 +233,7 @@ export default {
           ],
         },
         {
-          label: this.$t("晚班") + " " + this.dateList[2].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.nightShift") + " " + this.dateList[2].shiftDate,
           children: [
             {
               prop: "leftRightMould",
@@ -268,7 +268,7 @@ export default {
           ],
         },
         {
-          label: this.$t("早班") + " " + this.dateList[3].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.morningShift") + " " + this.dateList[3].shiftDate,
           children: [
             {
               prop: "leftRightMould",
@@ -303,7 +303,7 @@ export default {
           ],
         },
         {
-          label: this.$t("中班") + " " + this.dateList[4].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.middleShift") + " " + this.dateList[4].shiftDate,
           children: [
             {
               prop: "leftRightMould",
@@ -338,7 +338,7 @@ export default {
           ],
         },
         {
-          label: this.$t("晚班") + " " + this.dateList[5].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.nightShift") + " " + this.dateList[5].shiftDate,
           children: [
             {
               prop: "leftRightMould",
@@ -373,7 +373,7 @@ export default {
           ],
         },
         {
-          label: this.$t("早班") + " " + this.dateList[6].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.morningShift") + " " + this.dateList[6].shiftDate,
           children: [
             {
               prop: "leftRightMould",
@@ -408,7 +408,7 @@ export default {
           ],
         },
         {
-          label: this.$t("中班") + " " + this.dateList[7].shiftDate,
+          label: this.$t("ui.data.column.scheduleResult.middleShift") + " " + this.dateList[7].shiftDate,
           children: [
             {
               prop: "leftRightMould",
@@ -444,7 +444,7 @@ export default {
         },
         {
           prop: "remark",
-          label: this.$t("备注"),
+          label: this.$t("ui.data.column.remark"),
         },
         {
           prop: "updateTime",
@@ -546,7 +546,7 @@ export default {
         const scheduleDate = this.form.scheduleDate;
         if (!scheduleDate) {
           this.machineOptions = [];
-          this.$modal.msgWarning(this.$t("排程日期缺失，无法查询可用机台"));
+          this.$modal.msgWarning(this.$t("ui.data.column.scheduleResult.scheduleDateRequired"));
           return;
         }
         const res = await listMachine({
@@ -630,7 +630,7 @@ export default {
         );
         if (!selectedMachine || !selectedMachine.machineName) {
           this.$modal.msgWarning(
-            this.$t("新机台名称获取失败，请重新选择新机台")
+            this.$t("ui.data.column.scheduleResult.newMachineNameNotFound")
           );
           return;
         }

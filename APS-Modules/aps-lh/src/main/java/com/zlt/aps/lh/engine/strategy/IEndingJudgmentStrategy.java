@@ -1,7 +1,7 @@
 package com.zlt.aps.lh.engine.strategy;
 
-import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.api.domain.dto.SkuScheduleDTO;
+import com.zlt.aps.lh.context.LhScheduleContext;
 
 /**
  * 收尾判定策略接口
@@ -45,4 +45,16 @@ public interface IEndingJudgmentStrategy {
      * @return 预计收尾天数
      */
     int calculateEndingDays(LhScheduleContext context, SkuScheduleDTO sku);
+
+    /**
+     * 计算结构排序使用的真实收尾天数。
+     * <p>默认复用通用收尾天数，具体实现可按候选机台真实窗口口径覆写。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU排程DTO
+     * @return 结构排序使用的预计收尾天数
+     */
+    default int calculateEndingDaysForStructurePriority(LhScheduleContext context, SkuScheduleDTO sku) {
+        return calculateEndingDays(context, sku);
+    }
 }

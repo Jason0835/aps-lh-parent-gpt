@@ -46,8 +46,3 @@ UIController extends BaseUIController<Entity>
 ### 后端：
 - 文件位置: `Aps-Common/aps-common-core/src/main/resources/i18n/apsui_zh_CN.properties`
 - 格式: `ui.data.column.cxEntityName.fieldName=中文名称`
-
-
-### 前端：
-- 文件位置: `APS-VUEUI/src/lang/zh/ui_zh_CN.json`
-- 格式: `"ui.data.column.cxEntityName.fieldName": "中文名称"`
