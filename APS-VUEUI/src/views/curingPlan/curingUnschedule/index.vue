@@ -292,7 +292,7 @@ export default {
         .catch(() => {});
     },
     handleExport() {
-      this.$confirm(this.$t(`确定导出？`), {
+      this.$confirm(this.$t("ui.data.column.scheduleResult.confirmExportLhScheduleResult"), {
         type: "warning",
       }).then(() => {
         try {
@@ -312,7 +312,7 @@ export default {
       });
     },
     handlePublish() {
-      this.$confirm(this.$t(`确认要发布排程吗？`), {
+      this.$confirm(this.$t("ui.data.column.scheduleResult.confirmPublish"), {
         type: "warning",
       }).then(async () => {
         try {
@@ -337,7 +337,7 @@ export default {
       });
     },
     handleConfirm(row) {
-      this.$confirm(this.$t(`是否确认？`), {
+      this.$confirm(this.$t("common.confirm.submit"), {
         type: "warning",
       }).then(async () => {
         try {

@@ -6,6 +6,7 @@ import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMoldAlterPlanFinish;
 import com.zlt.aps.lh.api.domain.entity.LhMouldCleanWarn;
+import com.zlt.aps.lh.api.domain.entity.LhParams;
 import com.zlt.aps.lh.api.domain.entity.LhRepairCapsule;
 import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
 import io.swagger.annotations.ApiOperation;
@@ -134,4 +135,16 @@ public interface ILhMesSyncRemoteService {
     @ApiOperation("基于全部预警数据全量生成清洗计划（不限制版本号）")
     @PostMapping("/mesSync/syncAllMouldCleanPlanFromWarn")
     AjaxResult syncAllMouldCleanPlanFromWarn();
+
+    @ApiOperation("查询每天最新版本的硫化排程日完成量数据")
+    @PostMapping("/mesSync/queryLatestDayFinishQty")
+    List<LhDayFinishQty> queryLatestDayFinishQty();
+
+    @ApiOperation("根据参数编码和分厂编码查询硫化参数配置")
+    @PostMapping("/mesSync/selectLhParamsByCode")
+    LhParams selectLhParamsByCode(@RequestParam("paramCode") String paramCode, @RequestParam("factoryCode") String factoryCode);
+
+    @ApiOperation("根据参数编码查询所有分厂的硫化参数配置")
+    @PostMapping("/mesSync/selectLhParamsListByParamCode")
+    List<LhParams> selectLhParamsListByParamCode(@RequestParam("paramCode") String paramCode);
 }

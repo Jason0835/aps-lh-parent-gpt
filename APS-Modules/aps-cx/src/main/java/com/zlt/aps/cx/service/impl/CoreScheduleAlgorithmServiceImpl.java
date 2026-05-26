@@ -196,6 +196,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             if (day != lastDay) {
                 context.setDailyTrialAssignedMaterialCodes(new HashSet<>());
                 context.setPrecisionPlanApplied(false);
+                context.setSupplementDailyRemainingMap(new HashMap<>());
             }
 
             // 执行该班次的排程

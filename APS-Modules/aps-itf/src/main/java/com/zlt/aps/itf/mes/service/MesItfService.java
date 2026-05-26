@@ -341,4 +341,6 @@ public interface MesItfService {
      * @return 执行结果
      */
     AjaxResult syncAllVersionsMouldCleanWarnAndGenPlan(AuxReqSyncDataLogs syncDataLogs);
+
+    AjaxResult syncDayFinishQtyToChipStock();
 }

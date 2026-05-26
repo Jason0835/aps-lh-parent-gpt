@@ -410,4 +410,8 @@ public interface IMesItfService {
     @ApiOperation("临时任务-按版本迭代同步模具清洗预警并生成清洗计划")
     @PostMapping("/mesItf/syncAllVersionsMouldCleanWarnAndGenPlan")
     AjaxResult syncAllVersionsMouldCleanWarnAndGenPlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    @ApiOperation("硫化日完成量回填芯片库存")
+    @PostMapping("/mesItf/syncDayFinishQtyToChipStock")
+    AjaxResult syncDayFinishQtyToChipStock();
 }

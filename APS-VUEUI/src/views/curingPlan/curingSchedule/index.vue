@@ -746,7 +746,7 @@ export default {
         {
           prop: "rowOperator",
           label: this.$t("common.option"),
-          width: 150,
+          width: 200,
           fixed: "right",
           render: ({ row }) => {
             return (
@@ -1080,7 +1080,7 @@ export default {
     handleChangeMachine() {
       // 转机台仅支持单选，未选或多选时直接提示并阻断弹窗打开。
       if (this.selection.length !== 1) {
-        this.$modal.msgWarning(this.$t("请选择一条需要转机台的数据"));
+        this.$modal.msgWarning(this.$t("ui.data.column.scheduleResult.noSelection"));
         return;
       }
       if (this.$refs.changeMachineDialogRef) {
