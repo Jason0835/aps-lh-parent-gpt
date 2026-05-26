@@ -19,6 +19,7 @@ import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import cn.hutool.core.date.DateUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
@@ -184,22 +185,78 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     }
 
     /**
-     * 查询插单机台在当前排程日期下最近一条排程结果（作为前规格参考）
+     * 查询插单机台在当前排程日期下的前规格物料信息（作为模具交替计划的前规格参考）
+     * <p>查询优先级：</p>
+     * <ol>
+     *   <li>同机台+同排程日期下，非插单来源（dataSource != '1'）的排程结果，取最新一条</li>
+     *   <li>若无非插单记录，则取同机台+同排程日期下所有排程结果中最新的一条</li>
+     *   <li>若当前排程日期无任何记录，则查询前一天该机台最后一条排程结果</li>
+     * </ol>
      *
      * @param dto 插单请求数据
-     * @return 最近一条排程结果，不存在返回null
+     * @return 前规格排程结果，不存在返回null
      */
     private LhScheduleResult queryPrevScheduleResult(LhOrderInsertDTO dto) {
-        LambdaQueryWrapper<LhScheduleResult> prevWrapper = new LambdaQueryWrapper<>();
-        prevWrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode())
+        // 优先查询非插单来源的排程结果，确保前规格是机台原始排程的规格
+        LhScheduleResult originalResult = queryLatestScheduleResult(dto, false);
+        if (originalResult != null) {
+            return originalResult;
+        }
+
+        // 当前排程日期无非插单记录，查询所有记录（含插单）中最新的一条
+        LhScheduleResult anyResult = queryLatestScheduleResult(dto, true);
+        if (anyResult != null) {
+            return anyResult;
+        }
+
+        // 当前排程日期无任何记录，查询前一天该机台最后一条排程结果
+        return queryPrevDayLastScheduleResult(dto);
+    }
+
+    /**
+     * 查询同机台+同排程日期下最新的排程结果
+     *
+     * @param dto          插单请求数据
+     * @param includeInsert 是否包含插单来源的记录
+     * @return 最新的排程结果，不存在返回null
+     */
+    private LhScheduleResult queryLatestScheduleResult(LhOrderInsertDTO dto, boolean includeInsert) {
+        LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode())
                 .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
                 .eq(LhScheduleResult::getScheduleDate, dto.getScheduleDate());
         if (StringUtils.isNotBlank(dto.getFactoryCode())) {
-            prevWrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
+            wrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
         }
-        prevWrapper.orderByDesc(LhScheduleResult::getCreateTime);
-        prevWrapper.last("LIMIT 1");
-        return mapper.selectOne(prevWrapper);
+        if (!includeInsert) {
+            wrapper.ne(LhScheduleResult::getDataSource, "1");
+        }
+        wrapper.orderByDesc(LhScheduleResult::getCreateTime);
+        wrapper.last("LIMIT 1");
+        return mapper.selectOne(wrapper);
+    }
+
+    /**
+     * 查询前一天该机台最后一条排程结果（作为前规格的兜底参考）
+     *
+     * @param dto 插单请求数据
+     * @return 前一天最后的排程结果，不存在返回null
+     */
+    private LhScheduleResult queryPrevDayLastScheduleResult(LhOrderInsertDTO dto) {
+        if (dto.getScheduleDate() == null) {
+            return null;
+        }
+        Date prevDay = DateUtil.offsetDay(dto.getScheduleDate(), -1);
+        LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode())
+                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .eq(LhScheduleResult::getScheduleDate, prevDay);
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            wrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
+        }
+        wrapper.orderByDesc(LhScheduleResult::getCreateTime);
+        wrapper.last("LIMIT 1");
+        return mapper.selectOne(wrapper);
     }
 
     /**

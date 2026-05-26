@@ -239,7 +239,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         ImportContext importContext = importDTO.getImportContext();
         LhScheduleResult result = importDTO.getScheduleResult();
         byte[] fileBytes = importContext.getFileBytes();
-        String sheetName = "硫化日计划";
+        String sheetName = I18nUtil.getMessage("ui.data.column.scheduleResult.exportSheetName");
         ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
         importLog = this.iImportLogService.add(importLog);
         ExcelUtil<LhScheduleResultTemplateImportVO> util = new ExcelUtil<>(LhScheduleResultTemplateImportVO.class);
@@ -780,7 +780,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         }
         String token = scheduleExecutionGuard.acquireIssueLock();
         if (token == null) {
-            return AjaxResult.error("排程下发操作正在进行中，请稍后再试");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.issueInProgress"));
         }
         try {
             return doIssueLhScheduleResultToMes(scheduleDate, null);
@@ -818,7 +818,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         }
 
         if (scheduleResultList.isEmpty()) {
-            return AjaxResult.error("没有需要下发的硫化排程结果数据");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.noIssueData"));
         }
 
         List<LhScheduleResultIssue> day1IssueList = new ArrayList<>();
@@ -843,7 +843,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         }
 
         if (day1IssueList.isEmpty() && day2IssueList.isEmpty() && day3IssueList.isEmpty()) {
-            return AjaxResult.error("没有需要下发的硫化排程结果数据");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.noIssueData"));
         }
 
         List<LhScheduleResultIssue> allIssueList = new ArrayList<>();
