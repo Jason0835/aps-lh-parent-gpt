@@ -412,7 +412,7 @@ public class FactoryMonthPlanProductionFinalResult extends BaseEntity implements
     @ApiModelProperty(value = "生产实际排产量", name = "totalQty")
     @TableField(value = "TOTAL_QTY")
     private Integer totalQty;
-    ;
+
 
     /**
      * 定稿生产实际排产量，后续调整不会变

@@ -2,7 +2,6 @@ package com.zlt.aps.lh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -84,13 +83,32 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
         }
     }
 
+    /**
+     * 累加更新完成量 - 供硫化排程回填调用
+     * 在原有完成量的基础上叠加传入的完成量值，而非直接覆盖
+     *
+     * @param factoryCode 分厂编号
+     * @param chipCode    芯片编号
+     * @param finishQty   待累加的完成量
+     * @return 更新的记录数
+     */
     @Override
     public int updateFinishQty(String factoryCode, String chipCode, Integer finishQty) {
-        LambdaUpdateWrapper<LhChipStock> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper.eq(LhChipStock::getFactoryCode, factoryCode);
-        updateWrapper.eq(LhChipStock::getChipCode, chipCode);
-        updateWrapper.set(LhChipStock::getFinishQty, finishQty);
-        return lhChipStockMapper.update(null, updateWrapper);
+        LambdaQueryWrapper<LhChipStock> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(LhChipStock::getFactoryCode, factoryCode);
+        queryWrapper.eq(LhChipStock::getChipCode, chipCode);
+        LhChipStock existing = lhChipStockMapper.selectOne(queryWrapper);
+        if (existing == null) {
+            log.warn("芯片库存累加完成量：未找到匹配记录，factoryCode={}, chipCode={}", factoryCode, chipCode);
+            return 0;
+        }
+        int oldFinishQty = existing.getFinishQty() != null ? existing.getFinishQty() : 0;
+        int newFinishQty = oldFinishQty + (finishQty != null ? finishQty : 0);
+        existing.setFinishQty(newFinishQty);
+        int result = lhChipStockMapper.updateById(existing);
+        log.info("芯片库存累加完成量：factoryCode={}, chipCode={}, 原完成量={}, 累加值={}, 更新后完成量={}",
+                factoryCode, chipCode, oldFinishQty, finishQty, newFinishQty);
+        return result;
     }
 
     /**

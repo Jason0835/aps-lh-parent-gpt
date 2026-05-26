@@ -14,12 +14,14 @@ import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
 import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
+import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -63,6 +65,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
     @Resource
     private FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
+
+    @Resource
+    private MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
 
     private static final AtomicInteger INSERT_ORDER_SEQ = new AtomicInteger(0);
 
@@ -157,16 +162,44 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
         LhInsertOrderValidateResultDTO validateResult = insertOrderValidateHandler.validateInsertOrder(dto);
 
+        // 先查询前规格物料信息（必须在插入新排程结果之前查询，否则会查到刚插入的自身记录）
+        String beforeMaterialCode = null;
+        String beforeMaterialDesc = null;
+        LhScheduleResult prevResult = queryPrevScheduleResult(dto);
+        if (prevResult != null) {
+            beforeMaterialCode = prevResult.getMaterialCode();
+            beforeMaterialDesc = prevResult.getMaterialDesc();
+        }
+
         String batchNo = generateNextBatchNo(dto.getScheduleDate(), dto.getFactoryCode());
         String orderNo = generateInsertOrderNo(dto.getScheduleDate());
 
         LhScheduleResult result = buildInsertOrderResult(dto, batchNo, orderNo, validateResult);
         mapper.insert(result);
 
-        generateInsertMouldChangePlan(dto, batchNo);
+        generateInsertMouldChangePlan(dto, batchNo, beforeMaterialCode, beforeMaterialDesc);
 
         // TODO 同步触发成型机台均衡
         log.info("插单操作完成, 工单号: {}, 批次号: {}", orderNo, batchNo);
+    }
+
+    /**
+     * 查询插单机台在当前排程日期下最近一条排程结果（作为前规格参考）
+     *
+     * @param dto 插单请求数据
+     * @return 最近一条排程结果，不存在返回null
+     */
+    private LhScheduleResult queryPrevScheduleResult(LhOrderInsertDTO dto) {
+        LambdaQueryWrapper<LhScheduleResult> prevWrapper = new LambdaQueryWrapper<>();
+        prevWrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode())
+                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .eq(LhScheduleResult::getScheduleDate, dto.getScheduleDate());
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            prevWrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
+        }
+        prevWrapper.orderByDesc(LhScheduleResult::getCreateTime);
+        prevWrapper.last("LIMIT 1");
+        return mapper.selectOne(prevWrapper);
     }
 
     /**
@@ -212,6 +245,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             if (StringUtils.isNotBlank(validateResult.getTrialStatus())) {
                 result.setTrialStatus(validateResult.getTrialStatus());
                 result.setChangedTrialStatus(validateResult.getTrialStatus());
+            } else if (StringUtils.isNotBlank(dto.getOriginalTrialStatus())) {
+                result.setTrialStatus(dto.getOriginalTrialStatus());
+                result.setChangedTrialStatus(dto.getOriginalTrialStatus());
             }
             if (StringUtils.isNotBlank(validateResult.getLeftRightMould())) {
                 result.setLeftRightMould(validateResult.getLeftRightMould());
@@ -269,7 +305,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
     /**
      * 填充插单关联字段（胎胚代码/胎胚描述/需求计划版本号/排产版本号/规格/结构/模具号）
-     * <p>从月计划定稿表中根据工厂+物料编码查询关联字段</p>
+     * <p>从月计划定稿表中根据工厂+年月+排产版本+物料编码查询关联字段</p>
      * <p>班次开始/结束时间由 {@link #fillShiftStartEndTimes} 单独填充，需在班次计划量设置后调用</p>
      *
      * @param result 排程结果实体
@@ -277,14 +313,26 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
      */
     private void fillEmbryoRelatedFields(LhScheduleResult result, LhOrderInsertDTO dto) {
         String materialCode = StringUtils.isNotBlank(dto.getProductCode()) ? dto.getProductCode() : dto.getMaterialCode();
-        if (StringUtils.isBlank(materialCode) || StringUtils.isBlank(dto.getFactoryCode())) {
+        if (StringUtils.isBlank(materialCode) || StringUtils.isBlank(dto.getFactoryCode()) || dto.getScheduleDate() == null) {
             return;
         }
+
+        cn.hutool.core.date.DateTime scheduleDate = cn.hutool.core.date.DateUtil.date(dto.getScheduleDate());
+        int year = cn.hutool.core.date.DateUtil.year(scheduleDate);
+        int month = cn.hutool.core.date.DateUtil.month(scheduleDate) + 1;
+
+        MpFactoryProductionVersion finalVersion = getFinalProductionVersion(dto.getFactoryCode(), year, month);
+
         LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, dto.getFactoryCode())
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, year)
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, month)
                 .eq(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCode)
-                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                .last("LIMIT 1");
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        if (finalVersion != null && StringUtils.isNotBlank(finalVersion.getProductionVersion())) {
+            wrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, finalVersion.getProductionVersion());
+        }
+        wrapper.last("LIMIT 1");
         FactoryMonthPlanProductionFinalResult monthPlan = monthPlanMapper.selectOne(wrapper);
         if (monthPlan != null) {
             if (StringUtils.isNotBlank(monthPlan.getEmbryoCode())) {
@@ -368,32 +416,44 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
     /**
      * 生成插单对应的模具交替计划
+     * <p>若同机台+同排程日期+同后规格物料已存在交替计划，则覆盖更新；否则新增。</p>
      *
-     * @param dto     插单请求数据
-     * @param batchNo 批次号
+     * @param dto                 插单请求数据
+     * @param batchNo             批次号
+     * @param beforeMaterialCode  前规格物料编码（在插入排程结果之前查询获得）
+     * @param beforeMaterialDesc  前规格物料描述（在插入排程结果之前查询获得）
      */
-    private void generateInsertMouldChangePlan(LhOrderInsertDTO dto, String batchNo) {
-        LambdaQueryWrapper<LhScheduleResult> prevWrapper = new LambdaQueryWrapper<>();
-        prevWrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode())
-                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
-                .eq(LhScheduleResult::getScheduleDate, dto.getScheduleDate());
-        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
-            prevWrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
-        }
-        prevWrapper.orderByDesc(LhScheduleResult::getCreateTime);
-        prevWrapper.last("LIMIT 1");
-        LhScheduleResult prevResult = mapper.selectOne(prevWrapper);
-
-        String beforeMaterialCode = null;
-        String beforeMaterialDesc = null;
-        if (prevResult != null) {
-            beforeMaterialCode = prevResult.getMaterialCode();
-            beforeMaterialDesc = prevResult.getMaterialDesc();
-        }
-
+    private void generateInsertMouldChangePlan(LhOrderInsertDTO dto, String batchNo,
+                                               String beforeMaterialCode, String beforeMaterialDesc) {
         String mouldCode = resolveMouldCode(dto);
         String afterMaterialCode = StringUtils.isNotBlank(dto.getProductCode()) ? dto.getProductCode() : dto.getMaterialCode();
 
+        // 查询是否已存在同机台+同排程日期+同后规格物料的模具交替计划（避免删除插单后再次插单产生重复数据）
+        LhMouldChangePlan existingPlan = mouldChangePlanMapper.selectOne(
+                new LambdaQueryWrapper<LhMouldChangePlan>()
+                        .eq(LhMouldChangePlan::getFactoryCode, dto.getFactoryCode())
+                        .eq(LhMouldChangePlan::getScheduleDate, dto.getScheduleDate())
+                        .eq(LhMouldChangePlan::getLhMachineCode, dto.getLhMachineCode())
+                        .eq(LhMouldChangePlan::getAfterMaterialCode, afterMaterialCode)
+                        .last("LIMIT 1"));
+
+        if (existingPlan != null) {
+            // 覆盖更新已有记录，避免重复
+            existingPlan.setLhResultBatchNo(batchNo);
+            existingPlan.setBeforeMaterialCode(beforeMaterialCode);
+            existingPlan.setBeforeMaterialDesc(beforeMaterialDesc);
+            existingPlan.setMouldCode(mouldCode);
+            existingPlan.setLeftRightMould(LeftRightMouldUtil.resolveLeftRightMould(dto.getLeftRightMold(), dto.getLhMachineCode()));
+            existingPlan.setChangeMouldType("01");
+            existingPlan.setIsRelease(ReleaseStatusEnum.NOT_RELEASED.getCode());
+            existingPlan.setMouldStatus("0");
+            mouldChangePlanMapper.updateById(existingPlan);
+            log.info("插单覆盖更新模具交替计划, ID: {}, 机台: {}, 前规格: {}, 后规格: {}",
+                    existingPlan.getId(), dto.getLhMachineCode(), beforeMaterialCode, afterMaterialCode);
+            return;
+        }
+
+        // 新增模具交替计划
         LhMouldChangePlan plan = new LhMouldChangePlan();
         plan.setFactoryCode(dto.getFactoryCode());
         plan.setLhResultBatchNo(batchNo);
@@ -457,5 +517,29 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .collect(Collectors.joining(","));
+    }
+
+    /**
+     * 获取定稿排产版本
+     *
+     * @param factoryCode 分厂编码
+     * @param year        年份
+     * @param month       月份
+     * @return 定稿排产版本，不存在返回null
+     */
+    private MpFactoryProductionVersion getFinalProductionVersion(String factoryCode, int year, int month) {
+        if (StringUtils.isBlank(factoryCode)) {
+            return null;
+        }
+        LambdaQueryWrapper<MpFactoryProductionVersion> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MpFactoryProductionVersion::getFactoryCode, factoryCode)
+                .eq(MpFactoryProductionVersion::getYear, year)
+                .eq(MpFactoryProductionVersion::getMonth, month)
+                .eq(MpFactoryProductionVersion::getIsFinal, "1")
+                .eq(MpFactoryProductionVersion::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .orderByDesc(MpFactoryProductionVersion::getUpdateTime)
+                .orderByDesc(MpFactoryProductionVersion::getId)
+                .last("LIMIT 1");
+        return mpFactoryProductionVersionMapper.selectOne(wrapper);
     }
 }

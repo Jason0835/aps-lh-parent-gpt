@@ -1,4 +1,4 @@
-﻿﻿﻿﻿<template>
+﻿﻿﻿<template>
   <el-dialog
     :title="title"
     :visible="visible"
@@ -285,11 +285,42 @@ export default {
         };
         const res = await getSkuRelatedData(params);
         if (res) {
-          this.$set(this.form, "mouldSurplusQty", res.mouldSurplusQty ?? null);
-          this.$set(this.form, "embryoStock", res.embryoStock ?? null);
-          this.$set(this.form, "machineShiftCapacity", res.machineShiftCapacity ?? null);
-          this.$set(this.form, "trialStatus", res.trialStatus ?? null);
-          this.$set(this.form, "leftRightMould", res.leftRightMould ?? null);
+          if (res.mouldSurplusQty != null) {
+            this.$set(this.form, "mouldSurplusQty", res.mouldSurplusQty);
+          }
+          if (res.embryoStock != null) {
+            this.$set(this.form, "embryoStock", res.embryoStock);
+          }
+          if (res.machineShiftCapacity != null) {
+            this.$set(this.form, "machineShiftCapacity", res.machineShiftCapacity);
+          }
+          if (res.trialStatus != null && res.trialStatus !== '') {
+            this.$set(this.form, "trialStatus", res.trialStatus);
+          }
+          if (res.leftRightMould != null && res.leftRightMould !== '') {
+            this.$set(this.form, "leftRightMould", res.leftRightMould);
+          }
+          if (res.embryoCode != null && res.embryoCode !== '') {
+            this.$set(this.form, "embryoCode", res.embryoCode);
+          }
+          if (res.mainMaterialDesc != null && res.mainMaterialDesc !== '') {
+            this.$set(this.form, "mainMaterialDesc", res.mainMaterialDesc);
+          }
+          if (res.monthPlanVersion != null && res.monthPlanVersion !== '') {
+            this.$set(this.form, "monthPlanVersion", res.monthPlanVersion);
+          }
+          if (res.productionVersion != null && res.productionVersion !== '') {
+            this.$set(this.form, "productionVersion", res.productionVersion);
+          }
+          if (res.specCode != null && res.specCode !== '') {
+            this.$set(this.form, "specCode", res.specCode);
+          }
+          if (res.structureName != null && res.structureName !== '') {
+            this.$set(this.form, "structureName", res.structureName);
+          }
+          if (res.mouldCode != null && res.mouldCode !== '') {
+            this.$set(this.form, "mouldCode", res.mouldCode);
+          }
           if (res.errorMessages && res.errorMessages.length > 0) {
             this.$modal.msgError(res.errorMessages.join('\n'));
           }
@@ -396,6 +427,13 @@ export default {
           "machineShiftCapacity",
           "trialStatus",
           "leftRightMould",
+          "embryoCode",
+          "mainMaterialDesc",
+          "monthPlanVersion",
+          "productionVersion",
+          "specCode",
+          "structureName",
+          "mouldCode",
         ];
         for (let i = 1; i <= 8; i++) {
           keys.push(`class${i}PlanQty`, `class${i}Analysis`);
@@ -410,15 +448,18 @@ export default {
           }
           form[k] = v;
         });
+        if (data.trialStatus) {
+          form.originalTrialStatus = data.trialStatus;
+        }
+        if (data.singleMouldShiftQty != null) {
+          form.machineShiftCapacity = data.singleMouldShiftQty;
+        }
       }
       this.form = form;
       await this.loadCuringMachinesDropdown();
       await this.fetchScheduleShiftDates(this.form.scheduleDate);
       if (!data?.lhMachineCode) {
         this.$set(this.form, "lhMachineCode", "");
-      }
-      if (this.form.materialCode) {
-        await this.loadSkuRelatedData(this.form.materialCode);
       }
     },
     hide() {
