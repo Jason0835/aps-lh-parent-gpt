@@ -438,77 +438,6 @@ public class TaskGroupService {
                 continue;
             }
 
-            // 检查4：月计划推荐的机台总产能管控（后置到buildSingleTask之后，使用实际计划量）
-            String structureName = lhResult.getStructureName();
-            if (structureName != null && context.getStructureAllocationMap() != null) {
-                List<MpCxCapacityConfiguration> recommendedMachines = structureRecommendedMachinesCache
-                        .computeIfAbsent(structureName, k -> getRecommendedMachinesForStructure(k, scheduleDate, context));
-
-                if (recommendedMachines == null || recommendedMachines.isEmpty()) {
-                    log.info("【机台产能管控】结构={}, 胎胚={}, 跳过：无推荐机台配置(结构未匹配到排产配置或生产版本)", structureName, lhResult.getEmbryoCode());
-                } else {
-                    int totalMaxLh = structureTotalMaxLhCache
-                            .computeIfAbsent(structureName, k -> calculateStructureTotalMaxLh(recommendedMachines, k, context));
-                    BigDecimal avgRatio = structureAvgRatioCache
-                            .computeIfAbsent(structureName, k -> calculateStructureAvgRatio(recommendedMachines, k, context));
-
-                    int currentCount = structureTaskCountMap.getOrDefault(structureName, 0);
-                    int plannedProduction = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
-
-                    if (plannedProduction == 0) {
-                        log.info("【机台产能管控】结构={}, 胎胚={}, 计划量=0条, 跳过累计(零需求任务，不占配额)",
-                                structureName, lhResult.getEmbryoCode());
-                    } else {
-                        if (currentCount >= totalMaxLh) {
-                            log.info("[检查4-硫化机数] 跳过：结构={}, 当前{}/上限{}", structureName, currentCount, totalMaxLh);
-                            skippedCapacityExceeded++;
-                            continue;
-                        }
-
-                        BigDecimal totalCapacitySeconds = BigDecimal.valueOf(recommendedMachines.size())
-                                .multiply(BigDecimal.valueOf(SECONDS_PER_SHIFT));
-                        Integer dailyLhCapacity = getDailyLhCapacityForMaterial(materialCode, context);
-
-                        BigDecimal itemTimeSeconds = BigDecimal.ZERO;
-                        String timePerTireStr = "-";
-                        if (dailyLhCapacity != null && dailyLhCapacity > 0
-                                && avgRatio.compareTo(BigDecimal.ZERO) > 0) {
-                            BigDecimal timePerTire = BigDecimal.valueOf(86400)
-                                    .divide(avgRatio.multiply(BigDecimal.valueOf(dailyLhCapacity)), 2, java.math.RoundingMode.HALF_UP);
-                            timePerTireStr = timePerTire.stripTrailingZeros().toPlainString();
-                            itemTimeSeconds = timePerTire.multiply(BigDecimal.valueOf(plannedProduction));
-                            BigDecimal cumulativeTime = structureCumulativeTimeMap.getOrDefault(structureName, BigDecimal.ZERO);
-
-                            if (cumulativeTime.add(itemTimeSeconds).compareTo(totalCapacitySeconds) > 0) {
-                                log.info("[检查4-累计耗时] 跳过：结构={}, 累计={}s > 总产能={}s",
-                                        structureName, cumulativeTime.add(itemTimeSeconds).toBigInteger(),
-                                        totalCapacitySeconds.toBigInteger());
-                                skippedCapacityExceeded++;
-                                continue;
-                            }
-                            structureCumulativeTimeMap.put(structureName, cumulativeTime.add(itemTimeSeconds));
-                        }
-                        structureTaskCountMap.merge(structureName, 1, Integer::sum);
-
-                        int newCount = structureTaskCountMap.getOrDefault(structureName, 0);
-                        BigDecimal newCumulative = structureCumulativeTimeMap.getOrDefault(structureName, BigDecimal.ZERO);
-                        BigDecimal remaining = totalCapacitySeconds.subtract(newCumulative);
-                        log.info("【机台产能管控】结构={}, 胎胚={}, 已排任务={}/{}, 配比={}, 单胎耗时={}s, 计划量={}条, 本项={}s({}h), 累计消耗={}s({}h), 总产能={}s({}h), 剩余={}s({}h)",
-                                structureName, lhResult.getEmbryoCode(), newCount, totalMaxLh,
-                                avgRatio.stripTrailingZeros().toPlainString(), timePerTireStr,
-                                plannedProduction,
-                                itemTimeSeconds.stripTrailingZeros().toPlainString(),
-                                itemTimeSeconds.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
-                                newCumulative.stripTrailingZeros().toPlainString(),
-                                newCumulative.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
-                                totalCapacitySeconds.stripTrailingZeros().toPlainString(),
-                                totalCapacitySeconds.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
-                                remaining.stripTrailingZeros().toPlainString(),
-                                remaining.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
-                    }
-                }
-            }
-
             String embryoCode = lhResult.getEmbryoCode();
 
             // 判断任务类型
@@ -585,6 +514,78 @@ public class TaskGroupService {
 
             // S5.2.5 计算待排产量
             calculatePlannedProduction(task, context, scheduleDate);
+
+            // 检查4：月计划推荐的机台总产能管控（后置到计算待排产量之后，使用实际计划量）
+            String structureName = lhResult.getStructureName();
+            if (structureName != null && context.getStructureAllocationMap() != null) {
+                List<MpCxCapacityConfiguration> recommendedMachines = structureRecommendedMachinesCache
+                        .computeIfAbsent(structureName, k -> getRecommendedMachinesForStructure(k, scheduleDate, context));
+
+                if (recommendedMachines == null || recommendedMachines.isEmpty()) {
+                    log.info("【机台产能管控】结构={}, 胎胚={}, 跳过：无推荐机台配置(结构未匹配到排产配置或生产版本)", structureName, lhResult.getEmbryoCode());
+                } else {
+                    int totalMaxLh = structureTotalMaxLhCache
+                            .computeIfAbsent(structureName, k -> calculateStructureTotalMaxLh(recommendedMachines, k, context));
+                    BigDecimal avgRatio = structureAvgRatioCache
+                            .computeIfAbsent(structureName, k -> calculateStructureAvgRatio(recommendedMachines, k, context));
+
+                    int currentCount = structureTaskCountMap.getOrDefault(structureName, 0);
+                    int plannedProduction = task.getPlannedProduction() != null ? task.getPlannedProduction() : 0;
+
+                    if (plannedProduction == 0) {
+                        log.info("【机台产能管控】结构={}, 胎胚={}, 计划量=0条, 跳过累计(零需求任务，不占配额)",
+                                structureName, lhResult.getEmbryoCode());
+                    } else {
+                        if (currentCount >= totalMaxLh) {
+                            log.info("[检查4-硫化机数] 跳过：结构={}, 当前{}/上限{}", structureName, currentCount, totalMaxLh);
+                            skippedCapacityExceeded++;
+                            continue;
+                        }
+
+                        BigDecimal totalCapacitySeconds = BigDecimal.valueOf(recommendedMachines.size())
+                                .multiply(BigDecimal.valueOf(SECONDS_PER_SHIFT));
+                        Integer dailyLhCapacity = getDailyLhCapacityForMaterial(materialCode, context);
+
+                        BigDecimal itemTimeSeconds = BigDecimal.ZERO;
+                        String timePerTireStr = "-";
+                        if (dailyLhCapacity != null && dailyLhCapacity > 0
+                                && avgRatio.compareTo(BigDecimal.ZERO) > 0) {
+                            BigDecimal timePerTire = BigDecimal.valueOf(86400)
+                                    .divide(avgRatio.multiply(BigDecimal.valueOf(dailyLhCapacity)), 2, java.math.RoundingMode.HALF_UP);
+                            timePerTireStr = timePerTire.stripTrailingZeros().toPlainString();
+                            itemTimeSeconds = timePerTire.multiply(BigDecimal.valueOf(plannedProduction));
+                            BigDecimal cumulativeTime = structureCumulativeTimeMap.getOrDefault(structureName, BigDecimal.ZERO);
+
+                            if (cumulativeTime.add(itemTimeSeconds).compareTo(totalCapacitySeconds) > 0) {
+                                log.info("[检查4-累计耗时] 跳过：结构={}, 累计={}s > 总产能={}s",
+                                        structureName, cumulativeTime.add(itemTimeSeconds).toBigInteger(),
+                                        totalCapacitySeconds.toBigInteger());
+                                skippedCapacityExceeded++;
+                                continue;
+                            }
+                            structureCumulativeTimeMap.put(structureName, cumulativeTime.add(itemTimeSeconds));
+                        }
+                        structureTaskCountMap.merge(structureName, 1, Integer::sum);
+
+                        int newCount = structureTaskCountMap.getOrDefault(structureName, 0);
+                        BigDecimal newCumulative = structureCumulativeTimeMap.getOrDefault(structureName, BigDecimal.ZERO);
+                        BigDecimal remaining = totalCapacitySeconds.subtract(newCumulative);
+                        log.info("【机台产能管控】结构={}, 胎胚={}, 已排任务={}/{}, 配比={}, 单胎耗时={}s, 计划量={}条, 本项={}s({}h), 累计消耗={}s({}h), 总产能={}s({}h), 剩余={}s({}h)",
+                                structureName, lhResult.getEmbryoCode(), newCount, totalMaxLh,
+                                avgRatio.stripTrailingZeros().toPlainString(), timePerTireStr,
+                                plannedProduction,
+                                itemTimeSeconds.stripTrailingZeros().toPlainString(),
+                                itemTimeSeconds.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                newCumulative.stripTrailingZeros().toPlainString(),
+                                newCumulative.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                totalCapacitySeconds.stripTrailingZeros().toPlainString(),
+                                totalCapacitySeconds.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                remaining.stripTrailingZeros().toPlainString(),
+                                remaining.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
+                    }
+                }
+            }
+
             // S5.2.6 收尾余量处理
             handleEndingRemainder(task, context);
 
@@ -990,28 +991,30 @@ public class TaskGroupService {
                             roundTimeSeconds = itemTimeSeconds;
                             BigDecimal deferredTime = structureDeferredTimeMap.getOrDefault(structName, BigDecimal.ZERO);
                             if (deferredTime.add(itemTimeSeconds).compareTo(remainingCapacity) > 0) {
+                                BigDecimal actualRemaining = remainingCapacity.subtract(deferredTime);
                                 log.info("  [R2-产能不足] 结构={}, 已用={}s({}h) + 本项={}s({}h) > 剩余={}s({}h)，本轮跳过",
                                         structName, deferredTime.toBigInteger(),
                                         deferredTime.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
                                         itemTimeSeconds.toBigInteger(),
                                         itemTimeSeconds.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
-                                        remainingCapacity.toBigInteger(),
-                                        remainingCapacity.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP));
+                                        actualRemaining.toBigInteger(),
+                                        actualRemaining.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP));
                                 deferredSkippedCapacity++;
                                 break;
                             }
                             structureDeferredTimeMap.put(structName, deferredTime.add(itemTimeSeconds));
                             BigDecimal newDeferredTime = structureDeferredTimeMap.get(structName);
+                            BigDecimal remainingBefore = remainingCapacity.subtract(deferredTime);
                             BigDecimal remainingAfter = remainingCapacity.subtract(newDeferredTime);
-                            log.info("  【R2机台产能管控】结构={}, 胎胚={}, 本轮={}条, 本项={}s({}h), R2累计={}s({}h), 剩余产能={}s({}h), 尚余={}s({}h)",
+                            log.info("  【R2机台产能管控】结构={}, 胎胚={}, 本轮={}条, 本项={}s({}h), R2累计={}s({}h), 剩余(前)={}s({}h), 剩余(后)={}s({}h)",
                                     structName, dt.getEmbryoCode(),
                                     fallbackProduction,
                                     roundTimeSeconds.stripTrailingZeros().toPlainString(),
                                     roundTimeSeconds.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                                     newDeferredTime.stripTrailingZeros().toPlainString(),
                                     newDeferredTime.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
-                                    remainingCapacity.stripTrailingZeros().toPlainString(),
-                                    remainingCapacity.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                    remainingBefore.stripTrailingZeros().toPlainString(),
+                                    remainingBefore.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                                     remainingAfter.stripTrailingZeros().toPlainString(),
                                     remainingAfter.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
                         }
