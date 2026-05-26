@@ -30,6 +30,10 @@ import com.zlt.aps.lh.engine.strategy.IMachineMatchStrategy;
 import com.zlt.aps.lh.engine.strategy.IMouldChangeBalanceStrategy;
 import com.zlt.aps.lh.engine.strategy.IProductionStrategy;
 import com.zlt.aps.lh.engine.strategy.ITrialProductionStrategy;
+import com.zlt.aps.lh.engine.strategy.support.DailyMachineCapacityDayDecision;
+import com.zlt.aps.lh.engine.strategy.support.DailyMachineCapacitySimulationRequest;
+import com.zlt.aps.lh.engine.strategy.support.DailyMachineCapacitySimulationResult;
+import com.zlt.aps.lh.engine.strategy.support.DailyMachineCapacitySimulationUtil;
 import com.zlt.aps.lh.engine.strategy.support.MachineProductionSegment;
 import com.zlt.aps.lh.engine.strategy.support.MachineScheduleRole;
 import com.zlt.aps.lh.engine.strategy.support.ProductionQuantityPolicy;
@@ -182,6 +186,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      */
     private boolean shouldKeepFormalNewSpecFullCapacity(SkuScheduleDTO sku, List<LhScheduleResult> skuResults) {
         if (sku == null || CollectionUtils.isEmpty(skuResults)) {
+            return false;
+        }
+        if (sku.getEmbryoStock() <= 0) {
             return false;
         }
         boolean endingResult = skuResults.stream().anyMatch(result -> result != null && "1".equals(result.getIsEnd()));
@@ -493,7 +500,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         maxQtyToWindowEnd, candidateTargetQty);
                 segment.setRole(role);
                 boolean singleMachineWindowFill = shouldFillSingleMachineToWindowEnd(
-                        sku, isEnding, totalScheduledQty, candidateTargetQty, maxQtyToWindowEnd);
+                        context, sku, isEnding, totalScheduledQty, candidateTargetQty, maxQtyToWindowEnd);
                 int machinePlanQty = singleMachineWindowFill
                         ? maxQtyToWindowEnd
                         : resolveMachinePlanQty(context, sku, quantityPolicy, role, segment,
@@ -501,7 +508,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 if (!singleMachineWindowFill) {
                     machinePlanQty = resolveDynamicMachinePlanQtyByDailyCapacity(
                             context, sku, candidates, excludedMachineCodes, quantityPolicy, segment,
-                            candidateTargetQty, totalScheduledQty, machinePlanQty);
+                            candidateMachine, shifts, capacityCalculate, candidateTargetQty,
+                            totalScheduledQty, machinePlanQty);
                 }
                 log.info("新增SKU候选机台动态分配, materialCode: {}, 机台: {}, 角色: {}, 最大可排量: {}, "
                                 + "累计已排: {}, 窗口目标量: {}, 本机台计划量: {}, 换模班次: {}, 开产班次: {}",
@@ -1259,7 +1267,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      * @param maxQtyToWindowEnd 当前机台最大可排量
      * @return true-按单机台补满窗口处理
      */
-    private boolean shouldFillSingleMachineToWindowEnd(SkuScheduleDTO sku,
+    private boolean shouldFillSingleMachineToWindowEnd(LhScheduleContext context,
+                                                       SkuScheduleDTO sku,
                                                        boolean isEnding,
                                                        int totalScheduledQty,
                                                        int candidateTargetQty,
@@ -1273,7 +1282,35 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         if (candidateTargetQty <= 0 || maxQtyToWindowEnd < candidateTargetQty) {
             return false;
         }
-        return true;
+        if (!CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())) {
+            return hasMultiDayQuotaWindow(sku) && isOnlyPendingNewSpecSku(context);
+        }
+        if (!isOnlyPendingNewSpecSku(context)) {
+            return false;
+        }
+        return candidateTargetQty > Math.max(0, sku.getPendingQty());
+    }
+
+    /**
+     * 判断当前SKU是否带有多日窗口账本。
+     *
+     * @param sku SKU
+     * @return true-多日窗口账本；false-仅单日或无账本
+     */
+    private boolean hasMultiDayQuotaWindow(SkuScheduleDTO sku) {
+        return sku != null && !CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())
+                && sku.getDailyPlanQuotaMap().size() > 1;
+    }
+
+    /**
+     * 判断当前新增待排队列是否只剩当前SKU。
+     *
+     * @param context 排程上下文
+     * @return true-只剩一个待排SKU；false-仍有后续SKU需要保留窗口产能
+     */
+    private boolean isOnlyPendingNewSpecSku(LhScheduleContext context) {
+        return context != null && !CollectionUtils.isEmpty(context.getNewSpecSkuList())
+                && context.getNewSpecSkuList().size() == 1;
     }
 
     /**
@@ -1338,6 +1375,9 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                                                             Set<String> excludedMachineCodes,
                                                             ProductionQuantityPolicy policy,
                                                             MachineProductionSegment segment,
+                                                            MachineScheduleDTO candidateMachine,
+                                                            List<LhShiftConfigVO> shifts,
+                                                            ICapacityCalculateStrategy capacityCalculate,
                                                             int targetQty,
                                                             int scheduledQty,
                                                             int defaultPlanQty) {
@@ -1354,16 +1394,17 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return defaultPlanQty;
         }
         boolean needAddMachineByTotal = scheduledQty + segment.getMaxQtyToWindowEnd() < targetQty;
+        int availableMachineCount = countAvailableCandidateMachines(candidates, excludedMachineCodes);
         int requiredMachineCountByDailyCapacity = resolveRequiredMachineCountByDailyCapacity(
-                context, sku, segment, remainingTargetQty);
+                context, sku, candidates, excludedMachineCodes, policy, segment, candidateMachine,
+                shifts, capacityCalculate, remainingTargetQty, availableMachineCount);
         boolean needAddMachineByDailyCapacity = requiredMachineCountByDailyCapacity > 1;
         if (!needAddMachineByTotal && !needAddMachineByDailyCapacity) {
             if (policy.isAllowFillStartedShift()) {
-                return defaultPlanQty;
+                return resolveSettledTailMachinePlanQty(segment, remainingTargetQty, defaultPlanQty);
             }
             return Math.min(remainingTargetQty, segment.getMaxQtyToWindowEnd());
         }
-        int availableMachineCount = countAvailableCandidateMachines(candidates, excludedMachineCodes);
         if (availableMachineCount <= 1) {
             return defaultPlanQty;
         }
@@ -1382,6 +1423,28 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 sku.getMaterialCode(), segment.getMachineCode(), scheduledQty, targetQty, defaultPlanQty,
                 balancedPlanQty, availableMachineCount, requiredMachineCount, requiredMachineCountByDailyCapacity);
         return balancedPlanQty;
+    }
+
+    /**
+     * 当前窗口 dayN 模拟已确认不需要继续扩机时，尾机台只保留满足剩余需求所需的满班量，
+     * 不再额外多吃一整班，避免尾量跨到下一业务日。
+     *
+     * @param segment 当前机台生产段
+     * @param remainingTargetQty 剩余目标量
+     * @param defaultPlanQty 原计划量
+     * @return 收敛后的计划量
+     */
+    private int resolveSettledTailMachinePlanQty(MachineProductionSegment segment,
+                                                 int remainingTargetQty,
+                                                 int defaultPlanQty) {
+        if (segment == null || segment.getRole() != MachineScheduleRole.TAIL_MACHINE || defaultPlanQty <= 0) {
+            return defaultPlanQty;
+        }
+        int roundedRemainingQty = roundUpToShiftCapacity(remainingTargetQty, segment.getShiftCapacity());
+        if (roundedRemainingQty <= 0 || roundedRemainingQty >= defaultPlanQty) {
+            return defaultPlanQty;
+        }
+        return Math.min(roundedRemainingQty, segment.getMaxQtyToWindowEnd());
     }
 
     /**
@@ -1454,40 +1517,369 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
      */
     private int resolveRequiredMachineCountByDailyCapacity(LhScheduleContext context,
                                                            SkuScheduleDTO sku,
+                                                           List<MachineScheduleDTO> candidates,
+                                                           Set<String> excludedMachineCodes,
+                                                           ProductionQuantityPolicy policy,
                                                            MachineProductionSegment segment,
-                                                           int remainingTargetQty) {
-        if (sku == null || segment == null || CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())) {
+                                                           MachineScheduleDTO candidateMachine,
+                                                           List<LhShiftConfigVO> shifts,
+                                                           ICapacityCalculateStrategy capacityCalculate,
+                                                           int remainingTargetQty,
+                                                           int availableMachineCount) {
+        if (sku == null || segment == null || CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())
+                || CollectionUtils.isEmpty(candidates) || CollectionUtils.isEmpty(shifts)
+                || candidateMachine == null || capacityCalculate == null) {
             return 0;
         }
-        int lookAheadDays = resolveNewSpecShortageLookAheadDays(context);
-        int checkedDays = 0;
-        int requiredQty = 0;
-        int machineCapacityQty = 0;
-        for (Map.Entry<LocalDate, SkuDailyPlanQuotaDTO> entry : sku.getDailyPlanQuotaMap().entrySet()) {
-            if (checkedDays > lookAheadDays) {
-                break;
-            }
-            LocalDate productionDate = entry.getKey();
-            SkuDailyPlanQuotaDTO quota = entry.getValue();
-            if (productionDate == null || quota == null) {
+        if (availableMachineCount <= 0) {
+            return 0;
+        }
+        DailyMachineCapacitySimulationRequest request = new DailyMachineCapacitySimulationRequest();
+        request.setMaterialCode(sku.getMaterialCode());
+        request.setDailyPlanQuotaMap(buildSimulationQuotaMap(sku.getDailyPlanQuotaMap(), remainingTargetQty));
+        List<Map<LocalDate, Integer>> existingMachineCapacityMaps = buildExistingSameMaterialCapacityMaps(
+                context, sku, candidateMachine, shifts, request.getDailyPlanQuotaMap());
+        request.setMachineDailyCapacityList(buildSimulationMachineCapacityList(
+                context, sku, candidates, excludedMachineCodes, policy, segment, candidateMachine,
+                shifts, capacityCalculate, request.getDailyPlanQuotaMap(), existingMachineCapacityMaps));
+        request.setInitialActiveMachines(Math.max(1, existingMachineCapacityMaps.size() + 1));
+        request.setShortageLookAheadDays(resolveNewSpecShortageLookAheadDays(context));
+        request.setWindowEndDate(resolveScheduleTargetLocalDate(context));
+        request.setSceneType("newSpec");
+        DailyMachineCapacitySimulationResult simulationResult =
+                DailyMachineCapacitySimulationUtil.simulateExpansion(request);
+        logDailyMachineCapacitySimulation(sku, segment, simulationResult);
+        return resolveRequiredNewSpecMachineCount(simulationResult.getFinalActiveMachines(),
+                existingMachineCapacityMaps.size());
+    }
+
+    /**
+     * 构建新增排产 dayN 模拟账本快照。
+     *
+     * @param quotaMap 原日计划账本
+     * @param remainingTargetQty 本轮剩余目标量
+     * @return 模拟账本
+     */
+    private Map<LocalDate, SkuDailyPlanQuotaDTO> buildSimulationQuotaMap(
+            Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap,
+            int remainingTargetQty) {
+        Map<LocalDate, SkuDailyPlanQuotaDTO> simulationQuotaMap =
+                new LinkedHashMap<LocalDate, SkuDailyPlanQuotaDTO>(Math.max(4, quotaMap.size() * 2));
+        int remainingLimitQty = Math.max(0, remainingTargetQty);
+        boolean hasTargetLimit = remainingTargetQty > 0;
+        for (Map.Entry<LocalDate, SkuDailyPlanQuotaDTO> entry : quotaMap.entrySet()) {
+            SkuDailyPlanQuotaDTO sourceQuota = entry.getValue();
+            if (sourceQuota == null) {
                 continue;
             }
-            requiredQty += Math.max(0, quota.getRemainingQty());
-            machineCapacityQty += sumSegmentCapacityByWorkDate(context, segment, productionDate);
-            checkedDays++;
+            SkuDailyPlanQuotaDTO quota = new SkuDailyPlanQuotaDTO();
+            quota.setMaterialCode(sourceQuota.getMaterialCode());
+            quota.setProductionDate(sourceQuota.getProductionDate());
+            int remainingQty = Math.max(0, sourceQuota.getRemainingQty());
+            int dayPlanQty = Math.max(0, sourceQuota.getDayPlanQty());
+            if (hasTargetLimit) {
+                remainingQty = Math.min(remainingQty, remainingLimitQty);
+                dayPlanQty = Math.min(dayPlanQty, remainingQty);
+                remainingLimitQty -= remainingQty;
+            }
+            quota.setDayPlanQty(dayPlanQty);
+            quota.setRemainingQty(remainingQty);
+            simulationQuotaMap.put(entry.getKey(), quota);
         }
-        if (requiredQty <= 0) {
-            return 0;
+        return simulationQuotaMap;
+    }
+
+    /**
+     * 构建候选机台日产能模拟列表。
+     *
+     * @param context 排程上下文
+     * @param segment 当前生产段
+     * @param quotaMap 模拟账本
+     * @param availableMachineCount 可用候选机台数
+     * @return 候选机台日产能列表
+     */
+    private List<Map<LocalDate, Integer>> buildSimulationMachineCapacityList(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            List<MachineScheduleDTO> candidates,
+            Set<String> excludedMachineCodes,
+            ProductionQuantityPolicy policy,
+            MachineProductionSegment currentSegment,
+            MachineScheduleDTO currentMachine,
+            List<LhShiftConfigVO> shifts,
+            ICapacityCalculateStrategy capacityCalculate,
+            Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap,
+            List<Map<LocalDate, Integer>> existingMachineCapacityMaps) {
+        List<Map<LocalDate, Integer>> machineCapacityList =
+                new ArrayList<Map<LocalDate, Integer>>(Math.max(1, candidates.size())
+                        + (CollectionUtils.isEmpty(existingMachineCapacityMaps) ? 0 : existingMachineCapacityMaps.size()));
+        if (!CollectionUtils.isEmpty(existingMachineCapacityMaps)) {
+            machineCapacityList.addAll(existingMachineCapacityMaps);
         }
-        if (remainingTargetQty > 0) {
-            // dayN账本可能大于本轮窗口目标量，扩机只应围绕当前窗口剩余目标做判断，
-            // 避免把窗口外滚动欠产一并折算成本轮机台数。
-            requiredQty = Math.min(requiredQty, remainingTargetQty);
+        for (MachineScheduleDTO candidate : candidates) {
+            if (candidate == null || StringUtils.isEmpty(candidate.getMachineCode())) {
+                continue;
+            }
+            if (!CollectionUtils.isEmpty(excludedMachineCodes)
+                    && excludedMachineCodes.contains(candidate.getMachineCode())) {
+                continue;
+            }
+            if (StringUtils.equals(candidate.getMachineCode(), currentMachine.getMachineCode())) {
+                machineCapacityList.add(buildSimulationCurrentMachineCapacityMap(context, currentSegment, quotaMap));
+                continue;
+            }
+            machineCapacityList.add(buildSimulationCandidateCapacityMap(
+                    context, sku, candidate, policy, shifts, capacityCalculate, quotaMap));
         }
-        if (machineCapacityQty <= 0) {
-            return Integer.MAX_VALUE;
+        return machineCapacityList;
+    }
+
+    /**
+     * 收集当前 SKU 在进入 S4.5 前已经落地的同 SKU 机台日产能图。
+     * <p>换活字块与本轮前面已排出的新增结果都视为已启用机台，需要参与 dayN 扩机判断。</p>
+     *
+     * @param context 排程上下文
+     * @param sku 当前 SKU
+     * @param currentMachine 当前候选机台
+     * @param shifts 排程窗口班次
+     * @param quotaMap 模拟账本
+     * @return 已启用机台日产能图列表
+     */
+    private List<Map<LocalDate, Integer>> buildExistingSameMaterialCapacityMaps(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO currentMachine,
+            List<LhShiftConfigVO> shifts,
+            Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap) {
+        List<Map<LocalDate, Integer>> existingMachineCapacityMaps = new ArrayList<Map<LocalDate, Integer>>(4);
+        if (context == null || sku == null || CollectionUtils.isEmpty(context.getScheduleResultList())
+                || CollectionUtils.isEmpty(shifts) || CollectionUtils.isEmpty(quotaMap)) {
+            return existingMachineCapacityMaps;
         }
-        return divideCeiling(requiredQty, machineCapacityQty);
+        Set<String> addedMachineCodes = new HashSet<String>(4);
+        String currentMachineCode = currentMachine == null ? null : currentMachine.getMachineCode();
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            if (!isExistingSameMaterialActiveResult(result, sku.getMaterialCode(), currentMachineCode)) {
+                continue;
+            }
+            if (!addedMachineCodes.add(result.getLhMachineCode())) {
+                continue;
+            }
+            Map<LocalDate, Integer> capacityMap = buildExistingResultDailyCapacityMap(result, shifts, quotaMap);
+            if (!hasPositiveDailyCapacity(capacityMap)) {
+                continue;
+            }
+            existingMachineCapacityMaps.add(capacityMap);
+        }
+        return existingMachineCapacityMaps;
+    }
+
+    /**
+     * 判断结果是否属于当前 SKU 已启用的同 SKU 机台。
+     *
+     * @param result 排程结果
+     * @param materialCode 当前物料编码
+     * @param currentMachineCode 当前候选机台编码
+     * @return true-属于已启用机台
+     */
+    private boolean isExistingSameMaterialActiveResult(LhScheduleResult result,
+                                                       String materialCode,
+                                                       String currentMachineCode) {
+        if (result == null
+                || StringUtils.isEmpty(materialCode)
+                || !StringUtils.equals(materialCode, result.getMaterialCode())
+                || StringUtils.equals(currentMachineCode, result.getLhMachineCode())
+                || StringUtils.isEmpty(result.getLhMachineCode())
+                || resolveResultScheduledQty(result) <= 0) {
+            return false;
+        }
+        return StringUtils.equals(NEW_SPEC_SCHEDULE_TYPE, result.getScheduleType())
+                || StringUtils.equals(ScheduleTypeEnum.TYPE_BLOCK.getCode(), result.getScheduleType());
+    }
+
+    /**
+     * 将既有结果按业务日折算为 dayN 模拟产能图。
+     *
+     * @param result 既有排程结果
+     * @param shifts 排程窗口班次
+     * @param quotaMap 模拟账本
+     * @return 该结果的业务日产能图
+     */
+    private Map<LocalDate, Integer> buildExistingResultDailyCapacityMap(
+            LhScheduleResult result,
+            List<LhShiftConfigVO> shifts,
+            Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap) {
+        Map<LocalDate, Integer> capacityMap =
+                new LinkedHashMap<LocalDate, Integer>(Math.max(4, quotaMap.size() * 2));
+        for (LocalDate productionDate : quotaMap.keySet()) {
+            capacityMap.put(productionDate, 0);
+        }
+        for (LhShiftConfigVO shift : shifts) {
+            if (shift == null || shift.getWorkDate() == null || shift.getShiftIndex() == null) {
+                continue;
+            }
+            LocalDate productionDate = shift.getWorkDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+            if (!capacityMap.containsKey(productionDate)) {
+                continue;
+            }
+            Integer shiftPlanQty = ShiftFieldUtil.getShiftPlanQty(result, shift.getShiftIndex());
+            if (shiftPlanQty == null || shiftPlanQty <= 0) {
+                continue;
+            }
+            capacityMap.merge(productionDate, shiftPlanQty, Integer::sum);
+        }
+        return capacityMap;
+    }
+
+    /**
+     * 判断日产能图是否存在有效产能。
+     *
+     * @param capacityMap 日产能图
+     * @return true-存在有效产能
+     */
+    private boolean hasPositiveDailyCapacity(Map<LocalDate, Integer> capacityMap) {
+        if (CollectionUtils.isEmpty(capacityMap)) {
+            return false;
+        }
+        for (Integer capacityQty : capacityMap.values()) {
+            if (capacityQty != null && capacityQty > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 将 dayN 模拟返回的总启用机台数回算为当前新增阶段仍需启用的机台数。
+     *
+     * @param finalActiveMachines 模拟最终总启用机台数
+     * @param existingMachineCount 已存在的同 SKU 机台数
+     * @return 当前新增阶段需要启用的机台数（含当前机台）
+     */
+    private int resolveRequiredNewSpecMachineCount(int finalActiveMachines, int existingMachineCount) {
+        return Math.max(1, Math.max(0, finalActiveMachines) - Math.max(0, existingMachineCount));
+    }
+
+    /**
+     * 构建当前候选机台的 dayN 模拟产能图。
+     *
+     * @param context 排程上下文
+     * @param currentSegment 当前机台生产段
+     * @param quotaMap 模拟账本
+     * @return 当前机台产能图
+     */
+    private Map<LocalDate, Integer> buildSimulationCurrentMachineCapacityMap(
+            LhScheduleContext context,
+            MachineProductionSegment currentSegment,
+            Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap) {
+        Map<LocalDate, Integer> currentMachineCapacityMap =
+                new LinkedHashMap<LocalDate, Integer>(Math.max(4, quotaMap.size() * 2));
+        for (LocalDate productionDate : quotaMap.keySet()) {
+            currentMachineCapacityMap.put(productionDate,
+                    sumSegmentCapacityByWorkDate(context, currentSegment, productionDate));
+        }
+        return currentMachineCapacityMap;
+    }
+
+    /**
+     * 构建其他候选机台的 dayN 模拟产能图。
+     *
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param candidate 候选机台
+     * @param policy 排产数量策略
+     * @param shifts 排程窗口班次
+     * @param capacityCalculate 机台起排策略
+     * @param quotaMap 模拟账本
+     * @return 候选机台产能图
+     */
+    private Map<LocalDate, Integer> buildSimulationCandidateCapacityMap(
+            LhScheduleContext context,
+            SkuScheduleDTO sku,
+            MachineScheduleDTO candidate,
+            ProductionQuantityPolicy policy,
+            List<LhShiftConfigVO> shifts,
+            ICapacityCalculateStrategy capacityCalculate,
+            Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap) {
+        Map<LocalDate, Integer> capacityMap =
+                new LinkedHashMap<LocalDate, Integer>(Math.max(4, quotaMap.size() * 2));
+        if (context == null || sku == null || candidate == null || CollectionUtils.isEmpty(shifts)
+                || capacityCalculate == null) {
+            return capacityMap;
+        }
+        Date endingTime = candidate.getEstimatedEndTime() != null
+                ? candidate.getEstimatedEndTime() : resolveDefaultMachineEndTime(context, shifts);
+        Date machineReadyTime = capacityCalculate.calculateStartTime(context, candidate.getMachineCode(), endingTime);
+        boolean maintenanceOverlapSwitch = getMaintenanceScheduleService()
+                .shouldApplyMaintenanceOverlapSwitchRule(context, candidate, endingTime);
+        Date switchReadyTime = maintenanceOverlapSwitch
+                ? getMaintenanceScheduleService().resolveMaintenanceEndTime(context, candidate)
+                : machineReadyTime;
+        switchReadyTime = resolveSpecifyReservedReadyTime(context, sku, candidate.getMachineCode(), switchReadyTime);
+        switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(context, switchReadyTime);
+        int switchDurationHours = maintenanceOverlapSwitch
+                ? LhScheduleTimeUtil.getMaintenanceOverlapSwitchHours(context)
+                : LhScheduleTimeUtil.getMouldChangeTotalHours(context);
+        Date mouldChangeStartTime = switchReadyTime;
+        Date mouldChangeCompleteTime = LhScheduleTimeUtil.addHours(mouldChangeStartTime, switchDurationHours);
+        Date productionStartTime = maintenanceOverlapSwitch
+                ? LhScheduleTimeUtil.addHours(
+                mouldChangeCompleteTime, LhScheduleTimeUtil.getFirstInspectionHours(context))
+                : mouldChangeCompleteTime;
+        int machineMouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(candidate);
+        int runtimeShiftCapacity = ShiftCapacityResolverUtil.resolveRuntimeShiftCapacity(
+                context, candidate, sku.getShiftCapacity());
+        Date firstProductionStartTime = ShiftProductionControlUtil.resolveFirstSchedulableStartIgnoringCleaning(
+                context,
+                candidate.getMachineCode(),
+                productionStartTime,
+                shifts,
+                runtimeShiftCapacity,
+                sku.getLhTimeSeconds(),
+                machineMouldQty);
+        if (firstProductionStartTime == null) {
+            return capacityMap;
+        }
+        Map<Integer, Integer> shiftCapacityMap = calculateShiftCapacityMap(
+                context, candidate, sku, firstProductionStartTime, mouldChangeStartTime,
+                shifts, machineMouldQty, runtimeShiftCapacity, policy != null && policy.isEnding());
+        MachineProductionSegment simulationSegment = buildMachineProductionSegment(
+                context, sku, candidate.getMachineCode(), mouldChangeStartTime,
+                firstProductionStartTime, sumShiftCapacity(shiftCapacityMap),
+                runtimeShiftCapacity, shiftCapacityMap);
+        for (LocalDate productionDate : quotaMap.keySet()) {
+            capacityMap.put(productionDate, sumSegmentCapacityByWorkDate(
+                    context, simulationSegment, productionDate));
+        }
+        return capacityMap;
+    }
+
+    /**
+     * 输出 dayN 机台模拟过程日志。
+     *
+     * @param sku SKU
+     * @param segment 当前生产段
+     * @param simulationResult 模拟结果
+     */
+    private void logDailyMachineCapacitySimulation(SkuScheduleDTO sku,
+                                                   MachineProductionSegment segment,
+                                                   DailyMachineCapacitySimulationResult simulationResult) {
+        if (sku == null || segment == null || simulationResult == null
+                || CollectionUtils.isEmpty(simulationResult.getDayDecisionList())) {
+            return;
+        }
+        for (DailyMachineCapacityDayDecision decision : simulationResult.getDayDecisionList()) {
+            log.info("新增SKU dayN机台模拟, materialCode: {}, 当前机台: {}, 日期: {}, 追补截止: {}, "
+                            + "dayN计划: {}, carryShortage: {}, 当日需求: {}, 当日产能: {}, "
+                            + "当日欠产: {}, 累计需求: {}, 累计产能: {}, 启用机台: {}, 新增机台: {}, "
+                            + "未满足: {}, 原因: {}",
+                    sku.getMaterialCode(), segment.getMachineCode(), decision.getProductionDate(),
+                    decision.getLookAheadEndDate(), decision.getTodayPlanQty(), decision.getCarryShortageQty(),
+                    decision.getTodayRequiredQty(), decision.getTodayCapacityQty(), decision.getDayShortageQty(),
+                    decision.getDemandQty(), decision.getCapacityQty(),
+                    decision.getActiveMachineCount(), decision.getAddedMachineCount(),
+                    decision.getUnmetQty(), decision.getReason());
+        }
     }
 
     /**
@@ -3854,14 +4246,16 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             if (quota == null) {
                 continue;
             }
-            // 按历史欠产、当日计划、未来预占顺序消费同一SKU的日计划账本
-            int consumed = SkuDailyPlanQuotaUtil.consumeRollingQuota(quotaMap, productionDate, planQty);
+            // 按历史欠产、当日计划、受限追补窗口消费同一SKU的日计划账本
+            int consumed = SkuDailyPlanQuotaUtil.consumeRollingQuota(
+                    quotaMap, productionDate, planQty, resolveLookAheadEndDate(context, quotaMap, productionDate));
             int overQty = planQty - consumed;
             if (overQty > 0) {
                 boolean endingResult = "1".equals(result.getIsEnd());
                 // 收尾结果必须严格截断，且不再记录满班补齐超排；
                 // 试制等严格目标量场景仍需回裁，但保留超排账本用于追踪被截掉的补满量。
-                if (endingResult || (sku != null && sku.isStrictTargetQty())) {
+                if (endingResult || (sku != null && sku.isStrictTargetQty())
+                        || shouldTrimUnavailableQuota(sku)) {
                     trimShiftPlanQty(result, shift.getShiftIndex(), consumed);
                     if (endingResult) {
                         continue;
@@ -3881,6 +4275,60 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         refreshResultSummary(context, result);
         return result.getDailyPlanQty() != null ? result.getDailyPlanQty() : 0;
+    }
+
+    /**
+     * 判断日计划额度耗尽后是否需要回裁结果行。
+     * <p>没有窗口目标量依据时，不允许把无法扣账的班次量继续留在结果行。</p>
+     *
+     * @param sku SKU排程DTO
+     * @return true-需要回裁；false-允许保留满班补齐量
+     */
+    private boolean shouldTrimUnavailableQuota(SkuScheduleDTO sku) {
+        if (sku == null) {
+            return true;
+        }
+        return sku.getWindowPlanQty() <= 0 && sku.getWindowRemainingPlanQty() <= 0;
+    }
+
+    /**
+     * 解析新增排产实际扣账允许追补的截止日期。
+     *
+     * @param context 排程上下文
+     * @param quotaMap 日计划账本
+     * @param productionDate 实际生产日期
+     * @return 追补截止日期
+     */
+    private LocalDate resolveLookAheadEndDate(LhScheduleContext context,
+                                              Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap,
+                                              LocalDate productionDate) {
+        return SkuDailyPlanQuotaUtil.resolveLookAheadEndDate(
+                quotaMap, productionDate, resolveNewSpecShortageLookAheadDays(context),
+                resolveScheduleTargetLocalDate(context));
+    }
+
+    /**
+     * 解析排程目标业务日期。
+     *
+     * @param context 排程上下文
+     * @return 排程目标业务日期
+     */
+    private LocalDate resolveScheduleTargetLocalDate(LhScheduleContext context) {
+        if (context == null) {
+            return null;
+        }
+        if (!CollectionUtils.isEmpty(context.getScheduleWindowShifts())) {
+            for (int index = context.getScheduleWindowShifts().size() - 1; index >= 0; index--) {
+                LhShiftConfigVO shift = context.getScheduleWindowShifts().get(index);
+                if (shift != null && shift.getWorkDate() != null) {
+                    return shift.getWorkDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                }
+            }
+        }
+        if (context.getScheduleTargetDate() == null) {
+            return null;
+        }
+        return context.getScheduleTargetDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
     }
 
     /**

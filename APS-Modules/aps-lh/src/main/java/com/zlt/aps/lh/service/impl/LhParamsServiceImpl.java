@@ -120,4 +120,17 @@ public class LhParamsServiceImpl extends AbstractDocService<LhParams> implements
         }
         return params;
     }
+
+    /**
+     * 根据参数编码查询所有分厂的硫化参数配置
+     *
+     * @param paramCode 参数编码
+     * @return 参数配置列表
+     */
+    @Override
+    public List<LhParams> selectListByParamCode(String paramCode) {
+        LambdaQueryWrapper<LhParams> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(LhParams::getParamCode, paramCode);
+        return lhParamsEntityMapper.selectList(wrapper);
+    }
 }

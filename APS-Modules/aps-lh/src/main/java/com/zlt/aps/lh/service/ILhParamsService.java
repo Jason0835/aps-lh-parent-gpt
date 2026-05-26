@@ -49,4 +49,12 @@ public interface ILhParamsService extends IDocService<LhParams> {
      * @return
      */
     Map<String,String> listLhParams(String factoryCode);
+
+    /**
+     * 根据参数编码查询所有分厂的硫化参数配置
+     *
+     * @param paramCode 参数编码
+     * @return 参数配置列表
+     */
+    List<LhParams> selectListByParamCode(String paramCode);
 }

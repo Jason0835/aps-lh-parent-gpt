@@ -15,7 +15,7 @@
             />
           </el-form-item>
         </el-form>
-        <el-button @click="handleSearch">{{ $t("搜索") }}</el-button>
+        <el-button @click="handleSearch">{{ $t("common.button.query") }}</el-button>
       </div>
     </el-card>
     <!-- <header-search

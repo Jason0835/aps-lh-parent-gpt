@@ -111,6 +111,11 @@ public interface ILhChipStockRemoteService {
     AjaxResult upsertFinishQty(@RequestParam("factoryCode") String factoryCode,
                                @RequestBody List<LhChipStock> list);
 
+    @ApiOperation("覆盖更新芯片库存完成量（定时任务全量回填）")
+    @PostMapping("/lhChipStock/overwriteFinishQty")
+    AjaxResult overwriteFinishQty(@RequestParam("factoryCode") String factoryCode,
+                                  @RequestBody List<LhChipStock> list);
+
     /**
      * 合并保存 - 新增时检测到重复，将库存量和完成量累加到已有数据上
      */

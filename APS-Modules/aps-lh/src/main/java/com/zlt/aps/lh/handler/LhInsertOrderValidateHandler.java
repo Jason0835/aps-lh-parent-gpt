@@ -158,7 +158,17 @@ public class LhInsertOrderValidateHandler {
         checkMouldAvailability(dto, result);
         fillSkuRelatedData(dto, result);
         fillEmbryoRelatedFields(dto, result);
-        result.setLeftRightMould(dto.getLeftRightMold());
+        // 只有前端未传左右模值时，才保留checkMachineAvailability中通过机台信息解析的值
+        // 避免dto.getLeftRightMold()为空时覆盖掉已正确计算的左右模
+        if (StringUtils.isNotBlank(dto.getLeftRightMold())) {
+            result.setLeftRightMould(dto.getLeftRightMold());
+        } else if (StringUtils.isBlank(result.getLeftRightMould())) {
+            // 前端未传且checkMachineAvailability也未设置，则通过机台编码解析
+            String lrMould = resolveLeftRightMould(dto.getLhMachineCode());
+            if (StringUtils.isNotBlank(lrMould)) {
+                result.setLeftRightMould(lrMould);
+            }
+        }
         return result;
     }
 
@@ -396,7 +406,12 @@ public class LhInsertOrderValidateHandler {
         int currentShiftIndex = resolveCurrentShiftIndex(shifts, now);
 
         if (currentShiftIndex < 0) {
-            return;
+            // 当前时间不在任何班次范围内（班次间隙），取最近已结束的班次索引作为参考
+            // 最近已结束的班次 = 结束时间 <= 当前时间 且 结束时间最晚的班次
+            currentShiftIndex = resolveLastEndedShiftIndex(shifts, now);
+            if (currentShiftIndex < 0) {
+                return;
+            }
         }
 
         for (int i = 1; i < currentShiftIndex; i++) {
@@ -960,6 +975,31 @@ public class LhInsertOrderValidateHandler {
             }
         }
         return -1;
+    }
+
+    /**
+     * 解析最近已结束的班次索引（用于班次间隙场景）
+     * <p>当当前时间不在任何班次范围内时，找到结束时间 <= 当前时间且最晚的班次，
+     * 该班次之后（不含）的班次为历史班次，不允许插单</p>
+     *
+     * @param shifts 班次列表
+     * @param now    当前时间
+     * @return 最近已结束的班次索引，无匹配返回-1
+     */
+    private int resolveLastEndedShiftIndex(List<LhShiftConfigVO> shifts, Date now) {
+        int lastEndedIndex = -1;
+        Date latestEndTime = null;
+        for (LhShiftConfigVO shift : shifts) {
+            Date end = shift.getShiftEndDateTime();
+            if (end != null && !now.before(end)) {
+                if (latestEndTime == null || end.after(latestEndTime)) {
+                    latestEndTime = end;
+                    lastEndedIndex = shift.getShiftIndex();
+                }
+            }
+        }
+        // 返回下一个班次索引，因为最近已结束的班次本身也不应再插单
+        return lastEndedIndex >= 0 ? lastEndedIndex + 1 : -1;
     }
 
     /**

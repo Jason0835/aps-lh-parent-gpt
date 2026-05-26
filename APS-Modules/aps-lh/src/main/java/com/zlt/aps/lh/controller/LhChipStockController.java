@@ -230,6 +230,15 @@ public class LhChipStockController extends AbstractDocBizController<LhChipStock>
         return AjaxResult.success();
     }
 
+    @ApiOperation("覆盖更新芯片库存完成量（定时任务全量回填）")
+    @PostMapping("/overwriteFinishQty")
+    @ResponseBody
+    public AjaxResult overwriteFinishQty(@RequestParam("factoryCode") String factoryCode,
+                                         @RequestBody List<LhChipStock> list) {
+        lhChipStockService.overwriteFinishQty(factoryCode, list);
+        return AjaxResult.success();
+    }
+
     @Override
     protected List<LhChipStock> listExportData(LhChipStock obj) {
         QueryWrapper<LhChipStock> wrapper = new QueryWrapper<>();

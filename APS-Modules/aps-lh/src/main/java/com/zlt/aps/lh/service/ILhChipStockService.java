@@ -51,4 +51,6 @@ public interface ILhChipStockService extends IDocService<LhChipStock> {
      * @param list        待更新的芯片库存列表（需设置chipCode和finishQty）
      */
     void upsertFinishQty(String factoryCode, List<LhChipStock> list);
+
+    void overwriteFinishQty(String factoryCode, List<LhChipStock> list);
 }

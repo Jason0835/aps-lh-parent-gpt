@@ -232,4 +232,18 @@ public class MesTask {
         }
         log.info("临时任务-按版本迭代同步模具清洗预警并生成清洗计划完成");
     }
+
+    @ApiOperation("硫化日完成量回填芯片库存")
+    public void syncDayFinishQtyToChipStock() {
+        log.info("硫化日完成量回填芯片库存-定时任务开始执行");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = iMesItfService.syncDayFinishQtyToChipStock();
+                log.info("硫化日完成量回填芯片库存-定时任务结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("硫化日完成量回填芯片库存-定时任务异常", e);
+        }
+        log.info("硫化日完成量回填芯片库存-定时任务执行完成");
+    }
 }
