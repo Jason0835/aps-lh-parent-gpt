@@ -77,6 +77,7 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         //没有值时，才初始化，productionContext,context的日志记录器为同一个对象
         if (null == context.getLogBuilderList()) {
             List<ProductionStageLogRecorder> logRecorderList = Lists.newArrayList();
+            //父类、子类保持同一个对象，否则在父类中取不到流程日志信息
             context.setLogBuilderList(logRecorderList);
             productionContext.setLogBuilderList(logRecorderList);
         }
