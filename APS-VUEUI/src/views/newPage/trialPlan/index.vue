@@ -37,7 +37,7 @@
           v-hasPermi="['monthplan:mpTrialPlan:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}
-          <el-tooltip content="导入按照下载的模板来导入" placement="top">
+          <el-tooltip :content="$t('ui.frame.tooltip.importTemplate')" placement="top">
             <i class="el-icon-info"></i>
           </el-tooltip>
         </el-button>

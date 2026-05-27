@@ -1,5 +1,7 @@
 package com.zlt.aps.mp.engine.logrecorder;
 
+import com.google.common.collect.Lists;
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.ProductionPlanLogDto;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
@@ -7,6 +9,13 @@ import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
 import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * TBR 模具正式排产日志记录器
@@ -93,6 +102,7 @@ public class TbrMouldFormalProductionLogRecorder {
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.FORMAL_MOULD_CONTINUE_GROUP_SINGLE_GROUP, logContent);
         return logContent;
     }
+
     /**
      * 增加 不同分组续作模具按分配比例调整后 日志信息记录
      * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，不同分组续作模具按分配比例调整完成====
@@ -196,6 +206,30 @@ public class TbrMouldFormalProductionLogRecorder {
                 groupName, type.getDesc());
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.FORMAL_MOULD_CONTINUE_GROUP_SINGLE_GROUP_NO_CONTINUE_SKU, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 sku已经降膜排产的日期范围
+     *
+     * @param context       排产上下文
+     * @param groupName     分组名
+     * @param materialDesc  排产Sku
+     * @param reducedDaySet 降膜排产日
+     * @return
+     */
+    public static String addSkuReducedDayInfoLog(Context context, String groupName, String materialDesc, Set<Integer> reducedDaySet) {
+        if (CollectionUtils.isEmpty(reducedDaySet)) {
+            return StringUtils.EMPTY;
+        }
+        List<Integer> sortDayList = Lists.newArrayList(reducedDaySet);
+        sortDayList.sort(Comparator.comparing(Integer::intValue));
+        String daysInfo = sortDayList.stream().map(String::valueOf).collect(Collectors.joining(StringConstant.COMMA));
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构 %s Sku %s 在[%s]降模排产====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, materialDesc, daysInfo);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.FORMAL_MOULD_PRODUCTION, logContent);
         return logContent;
     }
 

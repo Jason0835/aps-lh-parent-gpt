@@ -410,10 +410,18 @@
    "ui.data.messageTemplate.userName":"关联用户",
    "ui.data.messageTemplate.msgType":"任务类型",
    "ui.data.messageTemplate.msgStatus":"任务来源",
-   "ui.data.messageTemplate.msgContent":"消息内容"
-
-
-
-
-
+   "ui.data.messageTemplate.msgContent":"消息内容",
+   "ui.data.DemandPlan.structurePriority":"结构优先",
+   "ui.data.DemandPlan.materialPriority":"物料优先",
+   "ui.data.DemandPlan.submitConfirm":"提交确认",
+   "ui.data.DemandPlan.revokeSubmit":"撤销提交",
+   "ui.data.DemandPlan.inheritConfig":"继承人工配置",
+   "ui.data.DemandPlan.priorityAdjust":"优先级调整",
+   "ui.data.DemandPlan.isSchedule":"常规储备是否排产",
+   "ui.data.DemandPlan.showAllNetQty":"显示所有净需求",
+   "ui.data.DemandPlan.confirmRevoke":"该需求版本已做月计划，确认撤销？",
+   "ui.data.DemandPlan.confirmInherit":"继承人工配置会用上个版本的配置覆盖当前版本的【结构优先、物料优先、是否排产、常规储备是否排产】，确认继承？",
+   "ui.data.DemandPlan.yearMinus2Dot":"Y-2+(DOT)",
+   "ui.data.DemandPlan.yearMinus1Dot":"Y-1+(DOT)",
+   "ui.data.DemandPlan.year0Dot":"Y-0+(DOT)"
 }

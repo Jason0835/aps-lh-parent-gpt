@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.engine.scheduling.cxcapacity;
 
+import com.google.common.collect.Lists;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
@@ -16,11 +17,9 @@ import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
-import com.zlt.aps.mp.engine.handler.CxLhMouldProductionCalculator;
-import com.zlt.aps.mp.engine.handler.SkuMouldSelector;
-import com.zlt.aps.mp.engine.handler.SkuPrioritySelector;
-import com.zlt.aps.mp.engine.handler.SkuProductionQtySelector;
+import com.zlt.aps.mp.engine.handler.*;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
+import com.zlt.aps.mp.engine.logrecorder.TbrMouldFormalProductionLogRecorder;
 import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.common.utils.PubUtil;
@@ -44,10 +43,15 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class CxAddSkuProductionHandler {
+
     /**
      * 结构分配延长处理器
      */
     private final GroupTimeExtensionHandler groupTimeExtensionHandler;
+    /**
+     * Sku日排产范围业务处理器
+     */
+    private final SkuProductionDateRangeHandler skuProductionDateRangeHandler;
     /**
      * 结构提前收尾处理器
      */
@@ -152,6 +156,10 @@ public class CxAddSkuProductionHandler {
             //todo 记录日志
             return;
         }
+        //20260526+ 若是已经降膜，则从降膜日开始衔接
+        handBeforeReduced(context, productionStage, formalRound, groupPlanInfo, needProductionInfo, lhGroup);
+        startDay = lhGroup.getClosingDay();
+        endDay = lhGroup.getEndDay();
         //是否最后一个Sku
         boolean isLastSkuPlan = isLastSkuPlan(leftOverHasProductionList, materialDesc);
         TbrMouldProductionLogRecorder.addIsLastFindSkuLog(context, groupName, isLastSkuPlan, materialDesc);
@@ -290,24 +298,39 @@ public class CxAddSkuProductionHandler {
     }
 
     /**
-     * @param context                     排产上下文
-     * @param continueCxMachineAllocation 在机结构分配情况
+     * 设置剩余的每日硫化机台数
+     *
+     * @param context
+     * @param allGroupPlanInfo
+     * @param currentStructName
      */
-    private void markTimeExtensionCxMachine(Context context, List<CxMachineAllocationPlanHelper> continueCxMachineAllocation) {
-        if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
-            return;
+    public void setRemainLhMachineCount(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, String currentStructName) {
+        TbrProductionContext productionContext = (TbrProductionContext) context;
+        Integer endDay = productionContext.getMonthDays();
+        GroupPlanCxLhCapacityLimitHelper capacityLimitHelper;
+        ProductionPlanGroupInfo groupPlan;
+        int accUsedLhMachines;
+        // 1. 获取总的硫化机台数
+        Integer totalLhMachines = productionContext.getBaseDataContainer().getLhMachineCount();
+        // 2. 按日更新 结构下每日剩余可用的硫化机台数
+        for (int i = ProductionConstant.MONTH_START_DAY; i <= endDay; i++) {
+            // 更新当前结构的 剩余可使用的硫化机台
+            groupPlan = allGroupPlanInfo.get(currentStructName);
+            if (groupPlan == null) {
+                continue;
+            }
+            // 获取其他结构已使用的硫化机台数
+            accUsedLhMachines = getOtherStructUsedLhMachines(allGroupPlanInfo, currentStructName, i);
+            // 是更新每日剩余可用的硫化机台数
+            if (PubUtil.isEmpty(groupPlan.getDayProductionLimitInfo())) {
+                continue;
+            }
+            capacityLimitHelper = groupPlan.getDayProductionLimitInfo().get(i);
+            if (capacityLimitHelper == null) {
+                continue;
+            }
+            capacityLimitHelper.updateRemainMaxLhMachines(totalLhMachines - accUsedLhMachines);
         }
-        if (CollectionUtils.isEmpty(continueCxMachineAllocation)) {
-            return;
-        }
-        List<CxMachineAllocationPlanHelper> markList = continueCxMachineAllocation.stream().filter(single -> single.isTimeExtensionFlag()).collect(Collectors.toList());
-        if (!CollectionUtils.isEmpty(markList)) {
-            return;
-        }
-        //延长优先级最低的，因为其最先释放
-        continueCxMachineAllocation.sort(Comparator.comparing(CxMachineAllocationPlanHelper::getReleasePriority, Comparator.nullsLast(Comparator.reverseOrder())));
-        continueCxMachineAllocation.get(BigDecimal.ZERO.intValue()).markTimeExtension();
-        return;
     }
 
     /**
@@ -367,61 +390,6 @@ public class CxAddSkuProductionHandler {
             return null;
         }
         return lhGroup;
-    }
-
-    /**
-     * 从排产计划中挑选出在startDay~endDay能进行排产的sku计划
-     * 1、挑选在startDay~endDay还可进行双模排产的sku
-     * 2、有供应链优先字样的计划最优先
-     * 3、其次考虑先高优先级再排产其它净需求
-     * 4、库销比低的优先
-     * 5、小于50条的优先
-     * 6、净需求量大的优先
-     * 7、如果挑选的sku与其它sku是共用模具，且是存在其它sku最后两副模具(即模具受限)
-     * 则，需排产量小的优先
-     *
-     * @param productionContext  排产上下文
-     * @param startDay           排产开始日
-     * @param endDay             排产结束日
-     * @param productionPlanList 排产计划
-     * @return
-     */
-    private String getSelectedAddSku(TbrProductionContext productionContext, Integer startDay, Integer endDay, List<MonthPlanProductionRequirePlanVo> productionPlanList) {
-        if (CollectionUtils.isEmpty(productionPlanList)) {
-            return StringUtils.EMPTY;
-        }
-        List<MonthPlanProductionRequirePlanVo> hasProductionList = productionPlanList.stream().filter(singlePlan -> singlePlan.hasProductionThisRound()).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(hasProductionList)) {
-            return StringUtils.EMPTY;
-        }
-        //提取所有sku的物料描述
-        Set<String> allMaterialDescSet = hasProductionList.stream().map(MonthPlanProductionRequirePlanVo::getMaterialDesc).collect(Collectors.toSet());
-        Set<String> enableMaterialDescSet = productionContext.getHasMouldCapacity(ProductionConstant.DOUBLE_MOULD_PRODUCTION, allMaterialDescSet, startDay, endDay);
-        if (CollectionUtils.isEmpty(enableMaterialDescSet)) {
-            return StringUtils.EMPTY;
-        }
-        List<MonthPlanProductionRequirePlanVo> enablePlanList = hasProductionList.stream().filter(plan -> enableMaterialDescSet.contains(plan.getMaterialDesc())).collect(Collectors.toList());
-        if (CollectionUtils.isEmpty(enablePlanList)) {
-            return StringUtils.EMPTY;
-        }
-        Map<String, List<MonthPlanProductionRequirePlanVo>> skuPlanMap = enablePlanList.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialDesc())).collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
-        /**
-         * 供应链标注"优先字样"最先排产
-         * 先排产高优先级，在排产其它净需求
-         * 模具产能约束 --> 库销比低优先 -> 小于50条 -> 净需求大
-         * 模具产能约束，则取排产量小的
-         *
-         */
-        // 3. 选择最高优先级SKU
-        Optional<String> highestPrioritySku = SkuPrioritySelector.selectHighestPrioritySku(skuPlanMap, productionContext, startDay, endDay);
-        if (highestPrioritySku.isPresent()) {
-            String highestPriorityMaterialDesc = highestPrioritySku.get();
-            log.info("最高优先级SKU:{} ", highestPriorityMaterialDesc);
-            return highestPriorityMaterialDesc;
-        } else {
-            log.info("没有找到符合条件的SKU");
-            return StringUtils.EMPTY;
-        }
     }
 
     /**
@@ -537,7 +505,7 @@ public class CxAddSkuProductionHandler {
         if (CollectionUtils.isEmpty(materialDescSet) || materialDescSet.size() > BigDecimal.ONE.intValue()) {
             //20260522+ 不同模具时，则不能算
             String beforeSkuInfo = Optional.ofNullable(lhGroup.getBeforeSkuInfo().getMaterialDesc()).orElse("");
-            if(beforeSkuInfo.equals(preMaterialDesc)){
+            if (beforeSkuInfo.equals(preMaterialDesc)) {
 
             }
 
@@ -559,43 +527,6 @@ public class CxAddSkuProductionHandler {
             productionQty = productionQtyList.stream().mapToInt(Integer::intValue).sum();
         }
         lhGroup.updateBeforeSkuInfo(materialDesc, planInfo.getMaterialCode(), productionQty, dayLhQty);
-    }
-
-    /**
-     * 设置剩余的每日硫化机台数
-     *
-     * @param context
-     * @param allGroupPlanInfo
-     * @param currentStructName
-     */
-    public void setRemainLhMachineCount(Context context, Map<String, ProductionPlanGroupInfo> allGroupPlanInfo, String currentStructName) {
-        TbrProductionContext productionContext = (TbrProductionContext) context;
-        Integer endDay = productionContext.getMonthDays();
-        GroupPlanCxLhCapacityLimitHelper capacityLimitHelper;
-        ProductionPlanGroupInfo groupPlan;
-        int accUsedLhMachines;
-        // 1. 获取总的硫化机台数
-        Integer totalLhMachines = productionContext.getBaseDataContainer().getLhMachineCount();
-        // 2. 按日更新 结构下每日剩余可用的硫化机台数
-        for (int i = ProductionConstant.MONTH_START_DAY; i <= endDay; i++) {
-            // 更新当前结构的 剩余可使用的硫化机台
-            groupPlan = allGroupPlanInfo.get(currentStructName);
-            if (groupPlan == null) {
-                continue;
-            }
-
-            // 获取其他结构已使用的硫化机台数
-            accUsedLhMachines = getOtherStructUsedLhMachines(allGroupPlanInfo, currentStructName, i);
-            // 是更新每日剩余可用的硫化机台数
-            if (PubUtil.isEmpty(groupPlan.getDayProductionLimitInfo())) {
-                continue;
-            }
-            capacityLimitHelper = groupPlan.getDayProductionLimitInfo().get(i);
-            if (capacityLimitHelper == null) {
-                continue;
-            }
-            capacityLimitHelper.updateRemainMaxLhMachines(totalLhMachines - accUsedLhMachines);
-        }
     }
 
     /**
@@ -627,5 +558,41 @@ public class CxAddSkuProductionHandler {
             accUsedLhMachines += dailyCapacityLimitVo.getUsedLhMachines();
         }
         return accUsedLhMachines;
+    }
+
+    /**
+     * 20260526+ 若是已经降膜，则从降膜日开始衔接
+     * 否则正常处理
+     *
+     * @param context            排产上下文
+     * @param productionStage    排产阶段
+     * @param formalRound        排产轮次
+     * @param groupPlanInfo      分组对象
+     * @param needProductionInfo 排产Sku信息对象
+     * @param lhGroup            硫化组信息对象
+     */
+    private void handBeforeReduced(Context context, ProductionStageEnum productionStage, FormalRoundEnum formalRound, ProductionPlanGroupInfo groupPlanInfo, SkuNeedProductionInfo needProductionInfo, EarliestConclusionLhGroupHelper lhGroup) {
+        //非正式排产且续作阶段，不处理
+        if (ProductionStageEnum.FORMAL_STAGE != productionStage || !formalRound.isNoContinue()) {
+            return;
+        }
+        if (null == groupPlanInfo || null == needProductionInfo || StringUtils.isBlank(needProductionInfo.getMaterialDesc())) {
+            return;
+        }
+        Integer startDay = lhGroup.getClosingDay();
+        Integer endDay = lhGroup.getEndDay();
+        String groupName = groupPlanInfo.getGroupName();
+        String materialDesc = needProductionInfo.getMaterialDesc();
+        Set<Integer> newRangeSet = skuProductionDateRangeHandler.getSelectedSkuNextProductionDateRange(context, groupPlanInfo, needProductionInfo, groupPlanInfo.getDayProductionLimitInfo(), startDay, endDay);
+        TbrMouldFormalProductionLogRecorder.addSkuReducedDayInfoLog(context, groupName, materialDesc, newRangeSet);
+        if (CollectionUtils.isEmpty(newRangeSet)) {
+            return;
+        }
+        List<Integer> newRangeList = Lists.newArrayList(newRangeSet);
+        newRangeList.sort(Comparator.comparing(Integer::intValue));
+        int endIndex = newRangeList.size() - BigDecimal.ONE.intValue();
+        Integer newStartDay = newRangeList.get(BigDecimal.ZERO.intValue());
+        Integer newEndDay = newRangeList.get(endIndex);
+        lhGroup.updateProductionDateRange(newStartDay, newEndDay);
     }
 }

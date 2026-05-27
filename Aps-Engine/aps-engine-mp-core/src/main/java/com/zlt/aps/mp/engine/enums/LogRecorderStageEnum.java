@@ -28,9 +28,25 @@ public enum LogRecorderStageEnum {
      */
     SIMULATE_PRODUCTION("03", "模拟排产阶段"),
     /**
-     * 04 正式排产阶段
+     * 04 正式排产阶段-续作
      */
     FORMAL_PRODUCTION("04", "正式排产阶段"),
+    /**
+     * 0401 正式排产阶段-续作
+     */
+    FORMAL_PRODUCTION_CONTINUE("0401", "正式排产阶段-续作"),
+    /**
+     * 0402 正式排产阶段-最低实单
+     */
+    FORMAL_PRODUCTION_MIN_LH_MACHINE("0402", "正式排产阶段-最低实单"),
+    /**
+     * 0403 正式排产阶段-前半段机台
+     */
+    FORMAL_PRODUCTION_BEFORE_LH_MACHINE("0403", "正式排产阶段-前半段机台"),
+    /**
+     * 0404 正式排产阶段-后半段机台
+     */
+    FORMAL_PRODUCTION_FINAL_LH_MACHINE("0404", "正式排产阶段-后半段机台"),
     /**
      * 05 搭配排产阶段
      */

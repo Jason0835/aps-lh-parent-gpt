@@ -24,7 +24,7 @@
           type="primary"
              v-hasPermi="['monthplan:demandPlan:edit']"
           @click="handleEdit(selection[0])"
-          >{{ $t("结构优先") }}
+          >{{ $t("ui.data.DemandPlan.structurePriority") }}
         </el-button>
         <el-button
           type="primary"
@@ -40,7 +40,7 @@
           plain
            v-hasPermi="['monthplan:demandPlan:confirmSubmit']"
           @click="handleSubmit"
-          >{{ $t("提交确认") }}
+          >{{ $t("ui.data.DemandPlan.submitConfirm") }}
         </el-button>
         <el-button
           type="primary"
@@ -48,7 +48,7 @@
           :loading="btnLoading"
            v-hasPermi="['monthplan:demandPlan:cancelSubmit']"
           @click="handleRevoke"
-          >{{ $t("撤销提交") }}
+          >{{ $t("ui.data.DemandPlan.revokeSubmit") }}
         </el-button>
         <el-button
           type="primary"
@@ -56,14 +56,14 @@
           :loading="btnLoading"
            v-hasPermi="['monthplan:demandPlan:extendsConfiguration']"
           @click="handleExtends"
-          >{{ $t("继承人工配置") }}
+          >{{ $t("ui.data.DemandPlan.inheritConfig") }}
         </el-button>
         <!-- <el-button
           type="success"
           plain
           v-hasPermi="['monthplan:productionMouldConfiguration:add']"
           @click="handleChanged"
-          >{{ $t("优先级调整") }}
+          >{{ $t("ui.data.DemandPlan.priorityAdjust") }}
         </el-button> -->
         <!-- <el-button
           type="primary"
@@ -95,15 +95,15 @@
       <template slot="headerRight">
         <span class="stat-info">
           <span
-            >{{ $t("库存总量") }}:
+            >{{ $t("ui.data.total.stockQty") }}:
             <span class="stat-value"> {{ stat.stockQty }} </span></span
           >
           <span
-            >{{ $t("订单总量") }}:
+            >{{ $t("ui.data.total.orderQty") }}:
             <span class="stat-value"> {{ stat.orderQty }} </span></span
           >
           <span
-            >{{ $t("排产净需求总量") }}:
+            >{{ $t("ui.data.total.netQty") }}:
             <span class="stat-value"> {{ stat.netQty }} </span></span
           >
         </span>
@@ -192,7 +192,7 @@ export default {
   data() {
     return {
       btnLoading:false,
-      title: "优先级调整",
+      title: this.$t("ui.data.DemandPlan.priorityAdjust"),
       versionList: [],
       createLoading: false,
       loading: false,
@@ -293,7 +293,7 @@ export default {
         },
         {
           prop: "scmPriority",
-          label: this.$t("物料优先"),
+          label: this.$t("ui.data.DemandPlan.materialPriority"),
           // width:120,
           // formatter: (row, column, value) => {
           //   return this.selectDictLabel(this.dict.type.biz_order_type, value);
@@ -331,7 +331,7 @@ export default {
         },
         {
           prop: "structurePriority",
-          label: this.$t("结构优先"),
+          label: this.$t("ui.data.DemandPlan.structurePriority"),
           width:120,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
@@ -378,17 +378,17 @@ export default {
         },
         {
           prop: "sub2YearStockQty",
-          label: this.$t("Y-2+(DOT)"),
+          label: this.$t("ui.data.DemandPlan.yearMinus2Dot"),
           width: 120,
         },
         {
           prop: "sub1YearStockQty",
-          label: this.$t("Y-1+(DOT)"),
+          label: this.$t("ui.data.DemandPlan.yearMinus1Dot"),
           width: 120,
         },
         {
           prop: "currentYearStockQty",
-          label: this.$t("Y-0+(DOT)"),
+          label: this.$t("ui.data.DemandPlan.year0Dot"),
           width: 120,
         },
         // {
@@ -429,7 +429,7 @@ export default {
               <span>
                 {this.$t("ui.data.DemandPlan.netQty")}
                 <el-tooltip
-                  content={this.$t("排产净需求=实单高优先级+实单中优先级+周期排产储备")}
+                  content={this.$t("ui.data.tooltip.netQty")}
                   placement="top"
                 >
                   <i class="el-icon-info"></i>
@@ -497,7 +497,7 @@ export default {
         },
         {
           prop: "isSchedule",
-          label: "常规储备是否排产",
+          label: this.$t("ui.data.DemandPlan.isSchedule"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -544,7 +544,7 @@ export default {
               <span>
                 {this.$t("ui.data.DemandPlan.postponeNetQty")}
                 <el-tooltip
-                  content={this.$t("净需求（含暂缓）=（实单高优先级+实单中优先级）净需求 +暂缓")}
+                  content={this.$t("ui.data.tooltip.postponeNetQty")}
                   placement="top"
                 >
                   <i class="el-icon-info"></i>
@@ -561,7 +561,7 @@ export default {
               <span>
                 {this.$t("ui.data.DemandPlan.unPostponeNetQty")}
                 <el-tooltip
-                  content={this.$t("净需求（不含暂缓）=（实单高优先级+实单中优先级）净需求")}
+                  content={this.$t("ui.data.tooltip.unPostponeNetQty")}
                   placement="top"
                 >
                   <i class="el-icon-info"></i>
@@ -689,13 +689,13 @@ export default {
         },
         {
           prop: "scmPriority",
-          label: this.$t("物料优先"),
+          label: this.$t("ui.data.DemandPlan.materialPriority"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
         {
           prop: "structurePriority",
-          label: this.$t("结构优先"),
+          label: this.$t("ui.data.DemandPlan.structurePriority"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
@@ -707,7 +707,7 @@ export default {
         },
         {
           prop: "viewFlag",
-          label: this.$t("显示所有净需求"),
+          label: this.$t("ui.data.DemandPlan.showAllNetQty"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
@@ -759,7 +759,7 @@ export default {
       }
     },
     async handleRevoke(){
-      this.$confirm(this.$t("该需求版本已做月计划，确认撤销？"), {
+      this.$confirm(this.$t("ui.data.DemandPlan.confirmRevoke"), {
         type: "warning",
       }).then(() => {
         this.btnLoading=true
@@ -786,7 +786,7 @@ export default {
       });
     },
     async handleExtends(){
-      this.$confirm(this.$t("继承人工配置会用上个版本的配置覆盖当前版本的【结构优先、物料优先、是否排产、常规储备是否排产】，确认继承？"), {
+      this.$confirm(this.$t("ui.data.DemandPlan.confirmInherit"), {
         type: "warning",
       }).then(() => {
         this.btnLoading=true
@@ -899,7 +899,7 @@ export default {
           type: "select",
         },
       ]),
-        (this.title = "优先级调整");
+        (this.title = this.$t("ui.data.DemandPlan.priorityAdjust"));
       this.visible = true;
     },
     handleRow() {
@@ -910,7 +910,7 @@ export default {
           type: "select",
         },
       ]),
-        (this.title = "ui.data.DemandPlan.isProduction");
+        (this.title = this.$t("ui.data.DemandPlan.isProduction"));
       this.visible = true;
     },
     handleAdd() {

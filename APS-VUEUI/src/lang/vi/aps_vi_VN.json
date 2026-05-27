@@ -408,5 +408,18 @@
   "ui.data.messageTemplate.userName": "Người dùng liên quan",
   "ui.data.messageTemplate.msgType": "Loại nhiệm vụ",
   "ui.data.messageTemplate.msgStatus": "Nguồn nhiệm vụ",
-  "ui.data.messageTemplate.msgContent": "Nội dung tin nhắn"
+  "ui.data.messageTemplate.msgContent": "Nội dung tin nhắn",
+  "ui.data.DemandPlan.structurePriority": "Ưu tiên cấu trúc",
+  "ui.data.DemandPlan.materialPriority": "Ưu tiên vật liệu",
+  "ui.data.DemandPlan.submitConfirm": "Xác nhận nộp",
+  "ui.data.DemandPlan.revokeSubmit": "Thu hồi nộp",
+  "ui.data.DemandPlan.inheritConfig": "Kế thừa cấu hình thủ công",
+  "ui.data.DemandPlan.priorityAdjust": "Điều chỉnh ưu tiên",
+  "ui.data.DemandPlan.isSchedule": "Dự trữ thông thường có LKHSX hay không",
+  "ui.data.DemandPlan.showAllNetQty": "Hiển thị tất cả nhu cầu thực",
+  "ui.data.DemandPlan.confirmRevoke": "Phiên bản nhu cầu này đã lập kế hoạch tháng, xác nhận thu hồi?",
+  "ui.data.DemandPlan.confirmInherit": "Kế thừa cấu hình thủ công sẽ sử dụng cấu hình phiên bản trước để ghi đè [Ưu tiên cấu trúc, Ưu tiên vật liệu, Có LKHSX hay không, Dự trữ thông thường có LKHSX hay không], xác nhận kế thừa?",
+  "ui.data.DemandPlan.yearMinus2Dot": "Y-2+(DOT)",
+  "ui.data.DemandPlan.yearMinus1Dot": "Y-1+(DOT)",
+  "ui.data.DemandPlan.year0Dot": "Y-0+(DOT)"
 }

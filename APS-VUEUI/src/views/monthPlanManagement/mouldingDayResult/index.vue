@@ -47,7 +47,7 @@
         <el-button
           @click="handleExportMaterial"
           v-hasPermi="['monthplan:mouldingDayResult:exportAllMaterial']"
-          >{{ $t("全物料导出") }}</el-button
+          >{{ $t("ui.data.column.monthPlanFinalAdjustQuery.exportAllMaterial") }}</el-button
         >
       </template>
       <!-- <template slot="headerRight">
@@ -236,7 +236,7 @@ export default {
           width: 120,
         },
         {
-          label: this.$t("排产类型"),
+          label: this.$t("ui.data.column.scheduleResult.scheduleType"),
           prop: "constructionStage",
           formatter: (row, column, value) => {
             return this.selectDictLabel(
@@ -295,7 +295,7 @@ export default {
         },
         {
           prop: "differenceQty",
-          label: this.$t("未排产数量"),
+          label: this.$t("ui.data.column.mouldingDayResult.unproducedQty"),
           width: 120,
         },
         {
@@ -691,9 +691,9 @@ export default {
                 structureName: current.structureName,
                 showBackground: "light-blue",
               };
-              embryoCount.factoryCode = "胎胚种类数";
-              lhMachines.factoryCode = "硫化机台数";
-              changeMould.factoryCode = "换模次数";
+              embryoCount.factoryCode = this.$t("ui.data.column.mouldingDayResult.embryoCount");
+              lhMachines.factoryCode = this.$t("ui.data.column.mouldingDayResult.lhMachineCount");
+              changeMould.factoryCode = this.$t("ui.data.column.mouldingDayResult.changeMouldCount");
               for (let j = 1; j <= 31; j++) {
                 const key = `day${j}`;
 

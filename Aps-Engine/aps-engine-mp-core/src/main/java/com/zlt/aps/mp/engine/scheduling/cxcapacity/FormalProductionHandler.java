@@ -12,6 +12,7 @@ import com.zlt.aps.mp.engine.domain.dto.ProductionPlanGroupInfo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.enums.ContinueTypeEnum;
 import com.zlt.aps.mp.engine.enums.FormalRoundEnum;
+import com.zlt.aps.mp.engine.enums.LogRecorderStageEnum;
 import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.handler.GroupPlanPrioritySelector;
 import com.zlt.aps.mp.engine.handler.SkuMouldSelector;
@@ -79,24 +80,27 @@ public class FormalProductionHandler extends OnLineGroupOnLineMachineHandler {
         //初始化排产计数器
         productionContext.setProductionCounter(SkuProductionCounter.buildInit());
         allGroupPlanInfo.forEach((structureName, groupPlanInfo) -> groupPlanInfo.setThisRoundCanProduction());
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.FORMAL_PRODUCTION_CONTINUE);
         log.info(TbrMouldFormalProductionLogRecorder.addProductionContinueGroupLog(productionContext));
         //续作部分排产 1、续作Sku 2、续作Sku同规格同花纹高优先级量 3、续作Sku同生胎共模具高优先级量
         productionContinue(cxAddSkuProductionHandler, ProductionStageEnum.FORMAL_STAGE, productionContext, allContinueInfo, Collections.emptyList(), allGroupPlanInfo, allAllocationList);
 
 //        //4、一次性排产完毕
 //        reachGroupLhMachines(productionContext, FormalRoundEnum.DISPOSABLE_LH_MACHINE, allGroupPlanInfo, allContinueInfo);
-
+        productionContext.addStageLogBuilder(LogRecorderStageEnum.FORMAL_PRODUCTION_MIN_LH_MACHINE);
         //4、满足实单最低硫化机台数排产
         reachGroupLhMachines(productionContext, FormalRoundEnum.ACTUAL_MIN_LH_MACHINE, allGroupPlanInfo, allContinueInfo);
 
         //5、按结构优先级，前段排产
         List<ProductionPlanGroupInfo> groupSortList = groupPlanPrioritySelector.sortGroupByFormalProduction(allGroupPlanInfo);
         if (!CollectionUtils.isEmpty(groupSortList)) {
+            productionContext.addStageLogBuilder(LogRecorderStageEnum.FORMAL_PRODUCTION_BEFORE_LH_MACHINE);
             groupSortList.forEach(groupPlan -> productionGroupAddSku(productionContext, allGroupPlanInfo, groupPlan, FormalRoundEnum.FIRST_HALF_PRIORITY, ""));
         }
         //6、按结构优先级、后段排产--新的排序
         List<ProductionPlanGroupInfo> newGroupSortList = groupPlanPrioritySelector.sortGroupByFormalProduction(allGroupPlanInfo);
         if (!CollectionUtils.isEmpty(newGroupSortList)) {
+            productionContext.addStageLogBuilder(LogRecorderStageEnum.FORMAL_PRODUCTION_FINAL_LH_MACHINE);
             newGroupSortList.forEach(groupPlan -> productionGroupAddSku(productionContext, allGroupPlanInfo, groupPlan, FormalRoundEnum.LATTER_HALF_PRIORITY, ""));
         }
     }

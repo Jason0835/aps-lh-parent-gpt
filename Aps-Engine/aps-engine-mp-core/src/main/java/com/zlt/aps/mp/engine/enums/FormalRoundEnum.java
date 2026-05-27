@@ -1,6 +1,10 @@
 package com.zlt.aps.mp.engine.enums;
 
+import com.google.common.collect.Lists;
 import lombok.Getter;
+import org.springframework.util.CollectionUtils;
+
+import java.util.List;
 
 /**
  * 排产轮次枚举定义类
@@ -62,5 +66,45 @@ public enum FormalRoundEnum {
     FormalRoundEnum(String roundCode, String roundDesc) {
         this.roundCode = roundCode;
         this.roundDesc = roundDesc;
+    }
+
+    /**
+     * 是否匹配
+     *
+     * @param round
+     * @return
+     */
+    public boolean isMatch(FormalRoundEnum round) {
+        if (null == round) {
+            return false;
+        }
+        return this == round;
+    }
+
+    /**
+     * 当前轮次非续作轮次
+     *
+     * @return
+     */
+    public boolean isNoContinue() {
+        List<FormalRoundEnum> noContinueRoundList = noContinueRoundInfo();
+        if (CollectionUtils.isEmpty(noContinueRoundList)) {
+            return false;
+        }
+        return noContinueRoundList.stream().anyMatch(singleRound -> singleRound.isMatch(this));
+    }
+
+    /**
+     * 非续作轮次信息
+     *
+     * @return
+     */
+    private static List<FormalRoundEnum> noContinueRoundInfo() {
+        List<FormalRoundEnum> noContinueRoundList = Lists.newArrayList();
+        noContinueRoundList.add(ACTUAL_MIN_LH_MACHINE);
+        noContinueRoundList.add(FIRST_HALF_PRIORITY);
+        noContinueRoundList.add(LATTER_HALF_PRIORITY);
+        noContinueRoundList.add(DISPOSABLE_LH_MACHINE);
+        return noContinueRoundList;
     }
 }

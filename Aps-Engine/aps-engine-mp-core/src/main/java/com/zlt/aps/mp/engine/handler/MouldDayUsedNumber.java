@@ -41,6 +41,22 @@ public class MouldDayUsedNumber implements Serializable {
     }
 
     /**
+     * 是否在排产范围内
+     *
+     * @param startDay 开始日
+     * @param endDay   结束日
+     * @return
+     */
+    public boolean isRange(Integer startDay, Integer endDay) {
+        if (null == startDay || null == endDay) {
+            return false;
+        }
+        Integer minDay = Math.min(startDay, endDay);
+        Integer maxDay = Math.max(startDay, endDay);
+        return productionDay >= minDay && productionDay <= maxDay;
+    }
+
+    /**
      * 构建空排产模具数对象
      *
      * @param productionDay
