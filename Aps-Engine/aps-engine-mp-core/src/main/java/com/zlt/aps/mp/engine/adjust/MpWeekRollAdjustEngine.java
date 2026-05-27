@@ -45,6 +45,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -75,6 +76,9 @@ public class MpWeekRollAdjustEngine {
         if (PubUtil.isEmpty(mpProdFinalList)) {
             mpProdFinalList = new ArrayList<>();
         }
+
+        //结构内同步需求量
+        syncRequestQtyForStructureIn(mpAdjustStructureInList,mpProdFinalList);
 
         List<String> onMaterialCodeList = mpProdFinalList.stream().map(x -> x.getMaterialCode()).collect(Collectors.toList());
         Date startTime,endTime;
@@ -177,6 +181,84 @@ public class MpWeekRollAdjustEngine {
         endTime = new Date();
         contextDTO.getLogDetail().append(String.format("结构:%s,【试制排产】,结束时间:%s,总耗时:%s毫秒",contextDTO.getStructureName(), DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS,endTime),DateUtils.getDiffMillTime(startTime,endTime))).append(ApsConstant.DIVISION);
 
+    }
+
+    /**
+     * 结构内，同步需求量
+     * @param sourceList 结构内需求列表
+     * @param targetList 排产结果列表
+     */
+    private void syncRequestQtyForStructureIn(
+            List<MpAdjustStructureIn> sourceList,
+            List<FactoryMonthPlanFinalAdjustVo> targetList) {
+
+        if (PubUtil.isEmpty(sourceList) || PubUtil.isEmpty(targetList)) {
+            return;
+        }
+
+        // 构建源数据映射：key = materialCode + "|" + constructionStage
+        Map<String, MpAdjustStructureIn> sourceMap = sourceList.stream()
+                .filter(s -> s != null && s.getMaterialCode() != null && s.getConstructionStage() != null)
+                .collect(Collectors.toMap(
+                        s -> s.getMaterialCode() + "|" + s.getConstructionStage(),
+                        Function.identity(),
+                        (existing, replacement) -> replacement
+                ));
+
+        // 遍历目标列表，匹配并更新
+        for (FactoryMonthPlanFinalAdjustVo vo : targetList) {
+            if (vo == null || vo.getMaterialCode() == null || vo.getConstructionStage() == null) {
+                continue;
+            }
+            String key = vo.getMaterialCode() + "|" + vo.getConstructionStage();
+            MpAdjustStructureIn source = sourceMap.get(key);
+            if (source != null) {
+                vo.setHeightQty(source.getHeightQty());
+                vo.setMidQty(source.getMidQty());
+                vo.setPostponeQty(source.getPostponeQty());
+                vo.setCycleReserveQty(source.getCycleReserveQty());
+                vo.setConventionReserveQty(source.getConventionReserveQty());
+            }
+        }
+    }
+
+    /**
+     * 结构，同步需求量
+     * @param sourceList 结构内需求列表
+     * @param targetList 排产结果列表
+     */
+    private void syncRequestQtyForStructureOut(
+            List<MpAdjustStructureOut> sourceList,
+            List<FactoryMonthPlanFinalAdjustVo> targetList) {
+
+        if (PubUtil.isEmpty(sourceList) || PubUtil.isEmpty(targetList)) {
+            return;
+        }
+
+        // 构建源数据映射：key = materialCode + "|" + constructionStage
+        Map<String, MpAdjustStructureOut> sourceMap = sourceList.stream()
+                .filter(s -> s != null && s.getMaterialCode() != null && s.getConstructionStage() != null)
+                .collect(Collectors.toMap(
+                        s -> s.getMaterialCode() + "|" + s.getConstructionStage(),
+                        Function.identity(),
+                        (existing, replacement) -> replacement
+                ));
+
+        // 遍历目标列表，匹配并更新
+        for (FactoryMonthPlanFinalAdjustVo vo : targetList) {
+            if (vo == null || vo.getMaterialCode() == null || vo.getConstructionStage() == null) {
+                continue;
+            }
+            String key = vo.getMaterialCode() + "|" + vo.getConstructionStage();
+            MpAdjustStructureOut source = sourceMap.get(key);
+            if (source != null) {
+                vo.setHeightQty(source.getHeightQty());
+                vo.setMidQty(source.getMidQty());
+                vo.setPostponeQty(source.getPostponeQty());
+                vo.setCycleReserveQty(source.getCycleReserveQty());
+                vo.setConventionReserveQty(source.getConventionReserveQty());
+            }
+        }
     }
 
     /**
@@ -524,6 +606,9 @@ public class MpWeekRollAdjustEngine {
         if (PubUtil.isNotEmpty(mpProdFinalList)){
             onMaterialCodeList = mpProdFinalList.stream().map(x->x.getMaterialCode()).collect(Collectors.toList());
         }
+
+        //结构内同步需求量
+        syncRequestQtyForStructureOut(mpAdjustStructureOutList,mpProdFinalList);
 
         Date startTime,endTime;
         StringBuffer sbError = new StringBuffer();

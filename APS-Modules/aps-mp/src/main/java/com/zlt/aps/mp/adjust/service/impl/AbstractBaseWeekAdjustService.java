@@ -1274,7 +1274,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (finalAdjustVo.getBeginDay() == null || finalAdjustVo.getEndDay() == null){
                 continue;
             }
-            if (finalAdjustVo.getBeginDay() == 0 && finalAdjustVo.getEndDay() == 0){
+            if (finalAdjustVo.getBeginDay() == 0 || finalAdjustVo.getEndDay() == 0){
                 continue;
             }
             if (finalAdjustVo.getBeginDay() < contextDTO.getStructureStartDay() || finalAdjustVo.getEndDay() > contextDTO.getStructureDeadLine() ){

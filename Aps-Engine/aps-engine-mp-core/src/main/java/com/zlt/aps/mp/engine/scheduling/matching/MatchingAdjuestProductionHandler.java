@@ -442,6 +442,9 @@ public class MatchingAdjuestProductionHandler {
                     if (unAllocationQty <= 0) {
                         break out;
                     }
+                    if (day == 0){
+                        continue;
+                    }
                     // 5.2.1、检查生产日历，停产日不处理
                     if (!this.checkDayCanProduct(contextDTO, day)) {
                         continue;
@@ -740,6 +743,9 @@ public class MatchingAdjuestProductionHandler {
         if (!isCheckContinue) {
             Integer lastDayPlanQty = null;
             for (int day = beginDay; day < realEndDay; day++) {
+                if (day == 0){
+                    continue;
+                }
                 if (!this.checkDayCanProduct(contextDTO, day)) {
                     continue;
                 }
