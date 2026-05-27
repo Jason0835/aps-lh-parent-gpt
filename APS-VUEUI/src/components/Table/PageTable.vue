@@ -62,7 +62,12 @@ export default {
     isReset:{
       type: Boolean,
       default: false,
-    }
+    },
+    /** 是否开启 t-table 框选区域（默认关闭，不影响现有页面） */
+    selectArea: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
@@ -422,7 +427,7 @@ export default {
           filter={this.filter ? this.filterForm : undefined}
           header-sum={this.headerSum ? this.headerSumForm : undefined}
           columns={this.columns}
-          selectArea={false}
+          selectArea={this.selectArea}
           hiddenContextMenu
         >
           {this.renderColumns(this.columns)}

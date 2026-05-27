@@ -16,7 +16,7 @@
       @sort-change="handleSortChange"
       @selection-change="handleStructureAdjustSelectionChange"
       :showSummary="false"
-      :selectArea="false"
+      :selectArea="true"
       :row-class-name="tableRowClassName"
     >
       <template slot="header">
@@ -370,6 +370,12 @@ export default {
       lockedDays: 0,
       /** 结构调整：表格多选勾选行（统计行不可选）；超过 1 条时禁用「结构调整」按钮 */
       structureAdjustSelection: [],
+      /** 日排产单元格单击选中（用于高亮与填充柄） */
+      dayCellActive: null,
+      /** 拖动填充预览范围（Vue 渲染，避免 DOM class 被表格重渲染冲掉） */
+      dayFillDragPreview: null,
+      /** 拖拽填充结束后短暂抑制双击，避免误触发 */
+      dayFillDragSuppressDblclickUntil: 0,
     };
   },
   computed: {
@@ -448,6 +454,9 @@ export default {
       ];
     },
     columns() {
+      /** 拖动预览变化时触发列配置更新，保证日列高亮重新渲染 */
+      const dayFillDragPreview = this.dayFillDragPreview;
+      void dayFillDragPreview;
       const structureTypeLabel = (v) => {
         const m = { "01": "周期结构", "02": "常规结构" };
         return m[v] != null ? m[v] : v || "";
@@ -701,17 +710,62 @@ export default {
               const isOver = row._overDays && row._overDays[prop];
               return <span style={isOver ? { color: "red" } : {}}>{text}</span>;
             }
+            const fillVisual = this.getDayFillDragVisual(row, i);
+            const isActive = this.isDayCellActive(row, i) && !fillVisual;
+            const showFillHandle = this.canShowDayFillHandle(row, i);
             return (
-              <el-input
-                size="mini"
-                value={text}
-                onInput={(value) => {
-                  const n = String(value).replace(/[^\d]/g, "");
-                  row[prop] = n === "" ? null : Number(n);
+              <div
+                class={[
+                  "day-cell-wrap",
+                  isActive ? "day-cell-wrap--active" : "",
+                  fillVisual ? "day-cell-wrap--fill-preview" : "",
+                  fillVisual && fillVisual.isSource
+                    ? "day-cell-wrap--fill-source"
+                    : "",
+                  fillVisual && fillVisual.isTarget
+                    ? "day-cell-wrap--fill-target"
+                    : "",
+                ]}
+                attrs={{
+                  "data-day-cell-row-key": this.getDayCellRowKey(row),
+                  "data-day-cell-day": String(i),
                 }}
-                onFocus={() => this.onDayEditFocus(row, prop)}
-                onBlur={() => this.handleResultDayEdit(row, prop)}
-              />
+                onClick={(e) => this.handleDayCellClick(row, i, e)}
+              >
+                <el-input
+                  size="mini"
+                  value={text}
+                  nativeOnMousedown={(e) => e.stopPropagation()}
+                  onInput={(value) => {
+                    const n = String(value).replace(/[^\d]/g, "");
+                    row[prop] = n === "" ? null : Number(n);
+                  }}
+                  onFocus={() => {
+                    this.setDayCellActive(row, i);
+                    this.onDayEditFocus(row, prop);
+                  }}
+                  onBlur={() => this.handleResultDayEdit(row, prop)}
+                />
+                {showFillHandle ? (
+                  <span
+                    class="day-cell-fill-handle"
+                    title={this.getDayFillHandleTitle(row, i)}
+                    on={{
+                      mousedown: (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        this.startDayFillDrag(row, i, e);
+                      },
+                      click: (e) => e.stopPropagation(),
+                      dblclick: (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        this.handleDayFillDown(row, i);
+                      },
+                    }}
+                  />
+                ) : null}
+              </div>
             );
           },
         });
@@ -781,6 +835,15 @@ export default {
         ],
       };
     },
+  },
+  mounted() {
+    document.addEventListener("click", this.handleDocumentClickClearDayCell);
+    this._boundDayFillDragMove = this.handleDayFillDragMove.bind(this);
+    this._boundDayFillDragEnd = this.handleDayFillDragEnd.bind(this);
+  },
+  beforeDestroy() {
+    document.removeEventListener("click", this.handleDocumentClickClearDayCell);
+    this.cleanupDayFillDrag(true);
   },
   async created() {
     /** 与月度生产计划旧页 index.backup-legacy.vue 一致：默认查询「下个月」 */
@@ -1114,9 +1177,351 @@ export default {
       }
       return String(val);
     },
-    /** 是否为「可视为空」的单元格（未填） */
+    /** 是否为「可视为空」的单元格（未填）；0 不算空 */
     isDayCellEmptyish(val) {
       return val == null || val === "";
+    },
+    /** 日排产单元格是否有值（含 0） */
+    hasDayCellValue(val) {
+      return !this.isDayCellEmptyish(val);
+    },
+    /** 日排产行唯一标识（用于单元格选中态） */
+    getDayCellRowKey(row) {
+      if (!row) {
+        return "";
+      }
+      if (row.id != null && row.id !== "") {
+        return String(row.id);
+      }
+      return [
+        row.structureName || "",
+        row.materialCode || "",
+        row.cxMachineCode || "",
+        row.embryoCode || "",
+      ].join("_");
+    },
+    setDayCellActive(row, day) {
+      this.dayCellActive = {
+        rowKey: this.getDayCellRowKey(row),
+        day,
+      };
+    },
+    isDayCellActive(row, day) {
+      if (!this.dayCellActive) {
+        return false;
+      }
+      return (
+        this.dayCellActive.rowKey === this.getDayCellRowKey(row) &&
+        this.dayCellActive.day === day
+      );
+    },
+    /** 当前格之后是否存在可编辑日期（用于显示填充柄，含拖动覆盖场景） */
+    hasEditableDayAfter(row, day) {
+      for (let d = day + 1; d <= 31; d++) {
+        if (this.canEditDayCell(row, d)) {
+          return true;
+        }
+      }
+      return false;
+    },
+    /** 当前格之后是否存在可编辑且为空的日期格（连续空段，遇锁定日或有值则停止） */
+    hasEditableEmptyDayAfter(row, day) {
+      for (let d = day + 1; d <= 31; d++) {
+        if (!this.canEditDayCell(row, d)) {
+          break;
+        }
+        if (this.isDayCellEmptyish(row[`day${d}`])) {
+          return true;
+        }
+        break;
+      }
+      return false;
+    },
+    /** 是否显示右下角填充柄 */
+    canShowDayFillHandle(row, day) {
+      if (!this.isDayCellActive(row, day)) {
+        return false;
+      }
+      if (!this.canEditDayCell(row, day)) {
+        return false;
+      }
+      if (!this.hasDayCellValue(row[`day${day}`])) {
+        return false;
+      }
+      return this.hasEditableDayAfter(row, day);
+    },
+    /** 填充柄 hover 提示：无连续空格时不展示双击说明 */
+    getDayFillHandleTitle(row, day) {
+      if (this.hasEditableEmptyDayAfter(row, day)) {
+        return "双击向下填充空格；拖动可覆盖后续日期";
+      }
+      return "拖动可覆盖后续日期";
+    },
+    /** 拖动填充预览视觉（由 Vue 渲染，表格 hover 重绘时仍保留） */
+    getDayFillDragVisual(row, day) {
+      const preview = this.dayFillDragPreview;
+      if (!preview || preview.endDay <= preview.startDay) {
+        return null;
+      }
+      if (preview.rowKey !== this.getDayCellRowKey(row)) {
+        return null;
+      }
+      if (day < preview.startDay || day > preview.endDay) {
+        return null;
+      }
+      return {
+        isSource: day === preview.startDay,
+        isTarget: day > preview.startDay,
+      };
+    },
+    /** 从拖拽事件解析日排产单元格 */
+    resolveDayCellFromDragEvent(event) {
+      if (!event) {
+        return null;
+      }
+      const target = document.elementFromPoint(event.clientX, event.clientY);
+      const wrap =
+        target && target.closest
+          ? target.closest(".day-cell-wrap[data-day-cell-day]")
+          : null;
+      if (!wrap) {
+        return null;
+      }
+      const day = Number(wrap.getAttribute("data-day-cell-day"));
+      const rowKey = wrap.getAttribute("data-day-cell-row-key") || "";
+      if (!day || Number.isNaN(day)) {
+        return null;
+      }
+      return { day, rowKey };
+    },
+    startDayFillDrag(row, startDay, event) {
+      if (
+        !this.canEditDayCell(row, startDay) ||
+        !this.hasDayCellValue(row[`day${startDay}`]) ||
+        !this.hasEditableDayAfter(row, startDay)
+      ) {
+        return;
+      }
+      this.cleanupDayFillDrag(true);
+      this._dayFillDragSession = {
+        row,
+        rowKey: this.getDayCellRowKey(row),
+        startDay,
+        endDay: startDay,
+        fillValue: row[`day${startDay}`],
+        moved: false,
+        startX: event.clientX,
+        startY: event.clientY,
+        rafId: null,
+      };
+      document.addEventListener("mousemove", this._boundDayFillDragMove, {
+        passive: true,
+      });
+      document.addEventListener("mouseup", this._boundDayFillDragEnd);
+      document.body.classList.add("day-fill-dragging");
+    },
+    handleDayFillDragMove(event) {
+      const session = this._dayFillDragSession;
+      if (!session) {
+        return;
+      }
+      session.pendingEvent = event;
+      if (session.rafId != null) {
+        return;
+      }
+      session.rafId = window.requestAnimationFrame(() => {
+        session.rafId = null;
+        this.syncDayFillDragPreview(session.pendingEvent);
+      });
+    },
+    /** rAF 内同步拖动预览（仅 endDay 变化时更新 Vue 状态） */
+    syncDayFillDragPreview(event) {
+      const session = this._dayFillDragSession;
+      if (!session || !event) {
+        return;
+      }
+      const dx = Math.abs(event.clientX - session.startX);
+      const dy = Math.abs(event.clientY - session.startY);
+      session.moved = session.moved || dx > 2 || dy > 2;
+      let endDay = session.startDay;
+      const hit = this.resolveDayCellFromDragEvent(event);
+      if (hit && hit.rowKey === session.rowKey && hit.day >= session.startDay) {
+        endDay = hit.day;
+      }
+      session.endDay = endDay;
+      if (!session.moved || endDay <= session.startDay) {
+        if (this.dayFillDragPreview) {
+          this.dayFillDragPreview = null;
+        }
+        return;
+      }
+      const preview = this.dayFillDragPreview;
+      if (
+        preview &&
+        preview.rowKey === session.rowKey &&
+        preview.startDay === session.startDay &&
+        preview.endDay === endDay
+      ) {
+        return;
+      }
+      this.dayFillDragPreview = {
+        rowKey: session.rowKey,
+        startDay: session.startDay,
+        endDay,
+      };
+    },
+    async handleDayFillDragEnd() {
+      const session = this._dayFillDragSession;
+      if (!session) {
+        this.cleanupDayFillDrag(true);
+        return;
+      }
+      if (session.rafId != null) {
+        window.cancelAnimationFrame(session.rafId);
+        session.rafId = null;
+        if (session.pendingEvent) {
+          this.syncDayFillDragPreview(session.pendingEvent);
+        }
+      }
+      const { row, startDay, endDay, moved } = session;
+      this.cleanupDayFillDrag(true);
+      if (!moved || endDay <= startDay) {
+        return;
+      }
+      this.dayFillDragSuppressDblclickUntil = Date.now() + 400;
+      await this.applyDayFillRangeOverwrite(row, startDay, endDay);
+    },
+    cleanupDayFillDrag(silent) {
+      const session = this._dayFillDragSession;
+      if (session && session.rafId != null) {
+        window.cancelAnimationFrame(session.rafId);
+      }
+      if (this._boundDayFillDragMove) {
+        document.removeEventListener("mousemove", this._boundDayFillDragMove);
+      }
+      if (this._boundDayFillDragEnd) {
+        document.removeEventListener("mouseup", this._boundDayFillDragEnd);
+      }
+      document.body.classList.remove("day-fill-dragging");
+      this.dayFillDragPreview = null;
+      this._dayFillDragSession = null;
+      if (!silent) {
+        this.$forceUpdate();
+      }
+    },
+    /** 填充结果提示（双击 / 拖动共用） */
+    showDayFillResultMessage(row, startDay, endDay) {
+      const total = this.sumDayRange(row, startDay, endDay);
+      const rangeLabel =
+        startDay === endDay ? `${startDay}号` : `${startDay}号-${endDay}号`;
+      const filledLabel =
+        startDay === endDay
+          ? `${startDay}号`
+          : `${startDay + 1}号-${endDay}号`;
+      this.$message.success(
+        `已填充 ${filledLabel}，${rangeLabel}合计：${total}`
+      );
+    },
+    /**
+     * 拖动填充：覆盖 startDay+1 至 endDay 内所有可编辑日（不论原有无值）
+     */
+    async applyDayFillRangeOverwrite(row, startDay, endDay) {
+      const fillValue = row[`day${startDay}`];
+      let changed = false;
+      for (let d = startDay + 1; d <= endDay; d++) {
+        if (!this.canEditDayCell(row, d)) {
+          continue;
+        }
+        row[`day${d}`] = fillValue;
+        changed = true;
+      }
+      if (!changed) {
+        return;
+      }
+      try {
+        await this.saveDayRowAdjust(row);
+        this.showDayFillResultMessage(row, startDay, endDay);
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    handleDayCellClick(row, day, event) {
+      if (event) {
+        event.stopPropagation();
+      }
+      this.setDayCellActive(row, day);
+    },
+    handleDocumentClickClearDayCell(event) {
+      if (!this.dayCellActive) {
+        return;
+      }
+      const target = event && event.target;
+      if (target && target.closest && target.closest(".day-cell-wrap")) {
+        return;
+      }
+      this.dayCellActive = null;
+    },
+    /** 计算日排产区间内数值之和 */
+    sumDayRange(row, startDay, endDay) {
+      let sum = 0;
+      for (let d = startDay; d <= endDay; d++) {
+        const val = row[`day${d}`];
+        if (this.hasDayCellValue(val)) {
+          sum += Number(val);
+        }
+      }
+      return sum;
+    },
+    /** 日排产整行保存（单格失焦与批量填充共用） */
+    async saveDayRowAdjust(row) {
+      this.recalculateBeginEndDay(row);
+      const versionFromSearch = this.resolveSearchColumnsVersion();
+      await saveAdjustResult({
+        ...row,
+        version:
+          versionFromSearch ||
+          (row.version != null ? String(row.version).trim() : ""),
+        adjustType: this.pickAdjustTypeOnlyMonthPlanConfirmRecalculate(),
+      });
+      this.allocateProductionByPriority(row);
+    },
+    /**
+     * 双击填充柄：以当前格数值填充同行后续连续空段（遇有值或不可编辑日停止）
+     */
+    async handleDayFillDown(row, startDay) {
+      if (
+        this.dayFillDragSuppressDblclickUntil &&
+        Date.now() < this.dayFillDragSuppressDblclickUntil
+      ) {
+        return;
+      }
+      if (!this.canShowDayFillHandle(row, startDay)) {
+        return;
+      }
+      if (!this.hasEditableEmptyDayAfter(row, startDay)) {
+        return;
+      }
+      const fillValue = row[`day${startDay}`];
+      let endDay = startDay;
+      for (let d = startDay + 1; d <= 31; d++) {
+        if (!this.canEditDayCell(row, d)) {
+          break;
+        }
+        if (!this.isDayCellEmptyish(row[`day${d}`])) {
+          break;
+        }
+        row[`day${d}`] = fillValue;
+        endDay = d;
+      }
+      if (endDay === startDay) {
+        return;
+      }
+      try {
+        await this.saveDayRowAdjust(row);
+        this.showDayFillResultMessage(row, startDay, endDay);
+      } catch (err) {
+        console.error(err);
+      }
     },
     /** 是否为数值 0（展示为 0） */
     isDayCellZeroish(val) {
@@ -1292,16 +1697,7 @@ export default {
         return;
       }
       try {
-        this.recalculateBeginEndDay(row);
-        const versionFromSearch = this.resolveSearchColumnsVersion();
-        await saveAdjustResult({
-          ...row,
-          version:
-            versionFromSearch ||
-            (row.version != null ? String(row.version).trim() : ""),
-          adjustType: this.pickAdjustTypeOnlyMonthPlanConfirmRecalculate(),
-        });
-        this.allocateProductionByPriority(row);
+        await this.saveDayRowAdjust(row);
       } catch (err) {
         console.error(err);
       }
@@ -1513,6 +1909,8 @@ export default {
         this.data = [];
       } finally {
         this.loading = false;
+        this.dayCellActive = null;
+        this.cleanupDayFillDrag(true);
         this.$nextTick(() => {
           this.clearStructureAdjustSelection();
         });
@@ -2258,5 +2656,98 @@ export default {
 }
 ::v-deep .warning-row {
   background-color: #ffcccc !important;
+}
+
+/* 日排产单元格：单击选中与 Excel 式填充柄 */
+::v-deep .day-cell-wrap {
+  position: relative;
+  width: 100%;
+  min-height: 28px;
+  box-sizing: border-box;
+}
+::v-deep .day-cell-wrap--active {
+  outline: 2px solid #409eff;
+  outline-offset: -2px;
+  background-color: #ecf5ff;
+}
+
+/* 拖动填充：整体范围极淡底色（可选） */
+::v-deep .day-cell-wrap--fill-preview {
+  z-index: 4;
+  background-color: #f7fbff !important;
+  transition: background-color 0.08s ease;
+}
+
+/* 拖动源格：与单击选中一致，不加深色 */
+::v-deep .day-cell-wrap--fill-source {
+  z-index: 5;
+  outline: 2px solid #409eff;
+  outline-offset: -2px;
+  background-color: #ecf5ff !important;
+  transition: background-color 0.08s ease, outline-color 0.08s ease;
+}
+::v-deep .day-cell-wrap--fill-source .el-input__inner {
+  background: transparent !important;
+}
+
+/* 拖动目标格：亮蓝虚线框，极淡底 */
+::v-deep .day-cell-wrap--fill-target {
+  z-index: 5;
+  background-color: #f0f7ff !important;
+  transition: background-color 0.08s ease;
+}
+::v-deep .day-cell-wrap--fill-target::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 2px dashed #409eff;
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 1;
+  transition: opacity 0.08s ease;
+}
+::v-deep .day-cell-wrap--fill-target .el-input__inner {
+  background: transparent !important;
+}
+
+::v-deep .day-cell-fill-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  background-color: #409eff;
+  border: 1px solid #fff;
+  cursor: crosshair;
+  z-index: 8;
+  box-sizing: border-box;
+}
+::v-deep .day-cell-fill-handle::before {
+  content: "";
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 16px;
+  height: 16px;
+}
+::v-deep .day-cell-fill-handle:hover {
+  background-color: #337ecc;
+}
+</style>
+
+<style lang="scss">
+/* 日排产拖动填充：全局光标，仅拖拽时生效 */
+body.day-fill-dragging {
+  cursor: crosshair !important;
+  user-select: none;
+
+  .el-table .cell {
+    overflow: visible;
+  }
+
+  .day-cell-wrap {
+    transition: none;
+  }
 }
 </style>
