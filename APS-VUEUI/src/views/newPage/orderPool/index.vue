@@ -69,7 +69,7 @@
           plain
           v-hasPermi="['monthplan:SalesOrderPool:unlock']"
           @click="unLockBtn"
-          >{{ $t("取消锁定") }}
+          >{{ $t("ui.data.orderPool.unLockBtn") }}
         </el-button>
       </template>
       <template slot="headerRight">
@@ -396,7 +396,7 @@ export default {
         },
         {
           prop: "orderPriorityNullFlag",
-          label: this.$t("订单优先级为空"),
+          label: this.$t("ui.data.orderPool.orderPriorityNullFlag"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },

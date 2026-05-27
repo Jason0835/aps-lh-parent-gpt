@@ -67,12 +67,12 @@ export default {
         },
         {
           prop: "saleBillNo",
-          label: "DN号",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.saleBillNo"),
           minWidth: 120,
         },
         {
           prop: "saleOrderNo",
-          label: "出运单号",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.saleOrderNo"),
           minWidth: 120,
         },
         // {
@@ -82,17 +82,17 @@ export default {
         // },
         {
           prop: "saleOrgName",
-          label: "销售组织名称",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.saleOrgName"),
           minWidth: 150,
         },
         {
           prop: "sellTo",
-          label: "客户编码",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.sellTo"),
           minWidth: 100,
         },
         {
           prop: "billId",
-          label: "出库单号",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.billId"),
           minWidth: 120,
         },
         // {
@@ -102,47 +102,47 @@ export default {
         // },
         {
           prop: "sapCode",
-          label: "物料编码",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.sapCode"),
           minWidth: 150,
         },
         {
           prop: "materialName",
-          label: "物料描述",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.materialName"),
           minWidth: 200,
         },
         {
           prop: "dot",
-          label: "年周号",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.dot"),
           minWidth: 120,
         },
         {
           prop: "stockDate",
-          label: "库存日期",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.stockDate"),
           minWidth: 120,
         },
         {
           prop: "scanAmount",
-          label: "扫描数量",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.scanAmount"),
           minWidth: 100,
         },
         {
           prop: "outAmount",
-          label: "计划数量",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.outAmount"),
           minWidth: 100,
         },
         {
           prop: "noscanAmount",
-          label: "未扫描数量",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.noscanAmount"),
           minWidth: 100,
         },
         {
           prop: "saleItemNo",
-          label: "SCM行内码",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.saleItemNo"),
           minWidth: 100,
         },
         {
           prop: "updateTime",
-          label: "更新日期",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.updateTime"),
           minWidth: 150,
         },
       ];
@@ -159,19 +159,19 @@ export default {
         },
         {
           prop: "saleBillNo",
-          label: "DN号",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.saleBillNo"),
         },
         {
           prop: "saleOrderNo",
-          label: "出运单号",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.saleOrderNo"),
         },
         {
           prop: "sellTo",
-          label: "客户编码",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.sellTo"),
         },
         {
           prop: "billId",
-          label: "出库单号",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.billId"),
         },
         // {
         //   prop: "materialCode",
@@ -179,15 +179,15 @@ export default {
         // },
         {
           prop: "sapCode",
-          label: "物料编码",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.sapCode"),
         },
         {
           prop: "materialName",
-          label: "物料描述",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.materialName"),
         },
         {
           prop: "stockDate",
-          label: "库存日期",
+          label: this.$t("ui.data.column.mdmOutbountOrdersNotScan.stockDate"),
           type: "date",
           dateType: "daterange",
           valueFormat: "yyyy-MM-dd",
