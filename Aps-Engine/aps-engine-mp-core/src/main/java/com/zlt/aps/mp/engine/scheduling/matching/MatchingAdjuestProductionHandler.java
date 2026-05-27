@@ -912,11 +912,12 @@ public class MatchingAdjuestProductionHandler {
      */
     private int getNewCavityQty(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo mpFinalVo, int iDay) {
         DailyMouldAvailabilityResult cavity2BlockVo = contextDTO.getCavity2BlockMap().get(iDay);
+        int oriMouldCavityQty = mpFinalVo.getMouldCavityQty() == null ? 0 : mpFinalVo.getMouldCavityQty();
         if (cavity2BlockVo != null && cavity2BlockVo.getCavityResults() != null) {
             Integer cavityQty = cavity2BlockVo.getCavityResults().get(mpFinalVo.getStructureName() + mpFinalVo.getMainPattern());
-            return cavityQty != null ? cavityQty : mpFinalVo.getMouldCavityQty();
+            return cavityQty != null ? cavityQty : oriMouldCavityQty;
         }
-        return mpFinalVo.getMouldCavityQty();
+        return oriMouldCavityQty;
     }
 
     /**
