@@ -1097,32 +1097,35 @@ export default {
       }
       this.lastRouteLoadKey = routeKey;
       if (routeQuery.yearMonth) {
-        const defaultParams = {
+        this.search = {
+          ...this.search,
           ...routeQuery,
         };
-        this.search = {
-          ...defaultParams,
-        };
         this.query = {
-          ...defaultParams,
+          ...this.query,
+          ...routeQuery,
         };
         this.getVersionList(true, false);
       } else {
-        const now = new Date();
-        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        const year = nextMonth.getFullYear();
-        const month = nextMonth.getMonth() + 1;
-        const defaultParams = {
-          factoryCode: "116",
-          yearMonth: `${year}-${month}`,
-        };
-        this.search = {
-          ...defaultParams,
-        };
-        this.query = {
-          ...defaultParams,
-        };
-        this.getVersionList(true);
+        if (!this.search.factoryCode && !this.search.yearMonth) {
+          const now = new Date();
+          const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+          const year = nextMonth.getFullYear();
+          const month = nextMonth.getMonth() + 1;
+          const defaultParams = {
+            factoryCode: "116",
+            yearMonth: `${year}-${month}`,
+          };
+          this.search = {
+            ...defaultParams,
+          };
+          this.query = {
+            ...defaultParams,
+          };
+          this.getVersionList(true);
+        } else {
+          this.getVersionList(true, false);
+        }
       }
     },
   },
