@@ -3677,7 +3677,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 试制量制关联字段设置
             if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
                 // 施工阶段
-                adjustDetailVo.setConstructionStage(trialPlan.getTrialStatus());
+                if (ConstructionStageEnum.MEASUREMENT_FLAG.equals(trialPlan.getTrialStatus())) {
+                    adjustDetailVo.setConstructionStage(ConstructionStageEnum.MEASUREMENT.getStage());
+                }else if (ConstructionStageEnum.TRIAL_FLAG.equals(trialPlan.getTrialStatus())) {
+                    adjustDetailVo.setConstructionStage(ConstructionStageEnum.TRIAL_PRODUCTION.getStage());
+                }
+
                 // 产品状态
                 adjustDetailVo.setProductStatus(productStatus);
                 // 紧急程度
@@ -3721,7 +3726,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 紧急程度
             adjustDetailVo.setUrgencyType(trialPlan.getUrgencyType());
             // 施工阶段
-            adjustDetailVo.setConstructionStage(trialPlan.getTrialStatus());
+            if (ConstructionStageEnum.MEASUREMENT_FLAG.equals(trialPlan.getTrialStatus())) {
+                adjustDetailVo.setConstructionStage(ConstructionStageEnum.MEASUREMENT.getStage());
+            }else if (ConstructionStageEnum.TRIAL_FLAG.equals(trialPlan.getTrialStatus())) {
+                adjustDetailVo.setConstructionStage(ConstructionStageEnum.TRIAL_PRODUCTION.getStage());
+            }
             // 试制量试ID
             adjustDetailVo.setTrialPlanId(Convert.toStr(trialPlan.getId(), null));
         }
