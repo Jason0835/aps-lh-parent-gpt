@@ -619,6 +619,9 @@ public class MatchingAdjuestProductionHandler {
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap = contextDTO.getDailyCapacityLimitVoMap(); // 每日产能统计
         this.reCalcAdjustDailyCapacityLimit(contextDTO, safeList, plan, day); // 先重算产能占用
         MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
+        if (dailyCapacityLimitVo == null){
+            return false;
+        }
         // 1、检查胎胚数是否满足条件
         if (dailyCapacityLimitVo.getMaxEmbryoTypes() <= dailyCapacityLimitVo.getUsedEmbryoTypes()) { // 胎胚数已达上限，则不能继续添加新胎胚
             Set<String> embryoCodes = dailyCapacityLimitVo.getEmbryoCodes();
