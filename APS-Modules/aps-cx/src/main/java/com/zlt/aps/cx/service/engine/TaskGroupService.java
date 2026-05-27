@@ -838,20 +838,25 @@ public class TaskGroupService {
                         remaining.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
             }
 
-            // 轮询分配：每个结构下轮询安排一车，直到产能耗尽
-            Map<String, BigDecimal> structureDeferredTimeMap = new HashMap<>();
-            boolean anyProgress = true;
-            while (anyProgress) {
-                anyProgress = false;
-                for (Map.Entry<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> entry : structureDeferredMap.entrySet()) {
-                    String structName = entry.getKey();
-                    List<CoreScheduleAlgorithmService.DailyEmbryoTask> taskList = entry.getValue();
-                    BigDecimal remainingCapacity = structureRemainingCapacityMap.getOrDefault(structName, BigDecimal.ZERO);
+            // 按结构独立处理：每个结构内任务轮询分配一车，直到该结构产能耗尽
+            for (Map.Entry<String, List<CoreScheduleAlgorithmService.DailyEmbryoTask>> entry : structureDeferredMap.entrySet()) {
+                String structName = entry.getKey();
+                List<CoreScheduleAlgorithmService.DailyEmbryoTask> taskList = entry.getValue();
+                BigDecimal remainingCapacity = structureRemainingCapacityMap.getOrDefault(structName, BigDecimal.ZERO);
 
-                    if (remainingCapacity.compareTo(BigDecimal.ZERO) <= 0) {
-                        continue;
-                    }
+                log.info("==================== 结构={}, 剩余产能={}s({}h) ====================",
+                        structName, remainingCapacity.stripTrailingZeros().toPlainString(),
+                        remainingCapacity.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
 
+                if (remainingCapacity.compareTo(BigDecimal.ZERO) <= 0) {
+                    log.info("  结构 {} 剩余产能为0，跳过", structName);
+                    continue;
+                }
+
+                BigDecimal structDeferredTime = BigDecimal.ZERO;
+                boolean anyProgress = true;
+                while (anyProgress) {
+                    anyProgress = false;
                     Iterator<CoreScheduleAlgorithmService.DailyEmbryoTask> iter = taskList.iterator();
                     while (iter.hasNext()) {
                         CoreScheduleAlgorithmService.DailyEmbryoTask dt = iter.next();
@@ -993,12 +998,12 @@ public class TaskGroupService {
                                     .divide(avgRatio.multiply(BigDecimal.valueOf(dailyLhCapacity)), 2, java.math.RoundingMode.HALF_UP);
                             BigDecimal itemTimeSeconds = timePerTire.multiply(BigDecimal.valueOf(fallbackProduction));
                             roundTimeSeconds = itemTimeSeconds;
-                            BigDecimal deferredTime = structureDeferredTimeMap.getOrDefault(structName, BigDecimal.ZERO);
-                            if (deferredTime.add(itemTimeSeconds).compareTo(remainingCapacity) > 0) {
-                                BigDecimal actualRemaining = remainingCapacity.subtract(deferredTime);
+                            BigDecimal afterAdd = structDeferredTime.add(itemTimeSeconds);
+                            if (afterAdd.compareTo(remainingCapacity) > 0) {
+                                BigDecimal actualRemaining = remainingCapacity.subtract(structDeferredTime);
                                 log.info("  [R2-产能不足] 结构={}, 已用={}s({}h) + 本项={}s({}h) > 剩余={}s({}h)，本轮跳过",
-                                        structName, deferredTime.toBigInteger(),
-                                        deferredTime.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
+                                        structName, structDeferredTime.toBigInteger(),
+                                        structDeferredTime.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
                                         itemTimeSeconds.toBigInteger(),
                                         itemTimeSeconds.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP),
                                         actualRemaining.toBigInteger(),
@@ -1006,19 +1011,23 @@ public class TaskGroupService {
                                 deferredSkippedCapacity++;
                                 break;
                             }
-                            structureDeferredTimeMap.put(structName, deferredTime.add(itemTimeSeconds));
-                            BigDecimal newDeferredTime = structureDeferredTimeMap.get(structName);
-                            BigDecimal remainingBefore = remainingCapacity.subtract(deferredTime);
-                            BigDecimal remainingAfter = remainingCapacity.subtract(newDeferredTime);
-                            log.info("  【R2机台产能管控】结构={}, 胎胚={}, 本轮={}条, 本项={}s({}h), R2累计={}s({}h), 剩余(前)={}s({}h), 剩余(后)={}s({}h)",
+                            structDeferredTime = afterAdd;
+                            BigDecimal remainingAfter = remainingCapacity.subtract(structDeferredTime);
+                            int totalRecommendedMachines = structureRecommendedMachinesCache.get(structName) != null
+                                    ? structureRecommendedMachinesCache.get(structName).size() : 0;
+                            BigDecimal totalCapacitySeconds = BigDecimal.valueOf(totalRecommendedMachines)
+                                    .multiply(BigDecimal.valueOf(SECONDS_PER_SHIFT));
+                            log.info("  【机台产能管控】结构={}, 胎胚={}, 配比={}, 单胎耗时={}s, 本轮={}条, 本项={}s({}h), R2累计={}s({}h), 总产能={}s({}h), 剩余={}s({}h)",
                                     structName, dt.getEmbryoCode(),
+                                    avgRatio.stripTrailingZeros().toPlainString(),
+                                    timePerTire.stripTrailingZeros().toPlainString(),
                                     fallbackProduction,
                                     roundTimeSeconds.stripTrailingZeros().toPlainString(),
                                     roundTimeSeconds.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
-                                    newDeferredTime.stripTrailingZeros().toPlainString(),
-                                    newDeferredTime.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
-                                    remainingBefore.stripTrailingZeros().toPlainString(),
-                                    remainingBefore.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                    structDeferredTime.stripTrailingZeros().toPlainString(),
+                                    structDeferredTime.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
+                                    totalCapacitySeconds.stripTrailingZeros().toPlainString(),
+                                    totalCapacitySeconds.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP),
                                     remainingAfter.stripTrailingZeros().toPlainString(),
                                     remainingAfter.divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 1, BigDecimal.ROUND_HALF_UP));
                         }
@@ -1056,8 +1065,20 @@ public class TaskGroupService {
 
                         // 累加本班次成型产出（用每轮产量直接累加，用于下轮立库库容检查）
                         if (dtEmbryoCode != null && fallbackProduction > 0) {
+                            int prevRunning = runningTotalProjectedStock;
                             shiftFormingOutputMap.merge(dtEmbryoCode, fallbackProduction, Integer::sum);
                             runningTotalProjectedStock += fallbackProduction;
+
+                            if (warehouseCapacity > 0) {
+                                int dtVulcCons = dt.getVulcanizeDemand() != null ? dt.getVulcanizeDemand() : 0;
+                                int netStockChange = fallbackProduction - dtVulcCons;
+                                int warehouseRemainBefore = Math.max(0, warehouseThreshold - prevRunning);
+                                int warehouseRemainAfter = Math.max(0, warehouseThreshold - runningTotalProjectedStock);
+                                log.info("  【立库库容管控】胎胚={}, 成型产出={}条, 硫化消耗={}条, 净入立库={}条, 立库预警线={}条(总容量={}×{}%), 加入前立库剩余={}条, 加入后立库剩余={}条",
+                                        dtEmbryoCode, fallbackProduction, dtVulcCons, netStockChange,
+                                        warehouseThreshold, warehouseCapacity, (int)(warehouseCapacityRatio * 100),
+                                        warehouseRemainBefore, warehouseRemainAfter);
+                            }
                         }
 
                         // 更新已使用的成型余量（用每轮产量直接累加）
@@ -1112,7 +1133,6 @@ public class TaskGroupService {
                                     finishTracker[1], finishTracker[0], dt.getPlannedProduction());
                             iter.remove();
                         }
-                        break;
                     }
                 }
             }
