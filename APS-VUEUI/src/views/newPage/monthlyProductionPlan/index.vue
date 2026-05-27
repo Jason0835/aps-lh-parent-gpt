@@ -756,15 +756,17 @@ export default {
                       mousedown: (e) => {
                         e.stopPropagation();
                         e.preventDefault();
+                        if (e.detail >= 2) {
+                          this.cleanupDayFillDrag(true);
+                          this.suppressDayEditBlurSave = false;
+                          this.setDayCellActive(row, i);
+                          this.handleDayFillDown(row, i);
+                          return;
+                        }
                         this.suppressDayEditBlurSave = true;
-                        this.startDayFillDrag(row, i, e);
+                        this.armDayFillPointer(row, i, e);
                       },
                       click: (e) => e.stopPropagation(),
-                      dblclick: (e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        this.handleDayFillDown(row, i);
-                      },
                     }}
                   />
                 ) : null}
@@ -1280,6 +1282,17 @@ export default {
         activeEl.blur();
       }
     },
+    /** 重新聚焦指定日排产格输入框（填充柄单击后保持可双击） */
+    refocusDayCellInput(row, day) {
+      this.$nextTick(() => {
+        const rowKey = this.getDayCellRowKey(row);
+        const selector = `.day-cell-wrap[data-day-cell-row-key="${rowKey}"][data-day-cell-day="${day}"] input`;
+        const input = document.querySelector(selector);
+        if (input && typeof input.focus === "function") {
+          input.focus();
+        }
+      });
+    },
     /** 将编辑基准值同步为当前聚焦日排产格的实际值，避免 blur 误判变更 */
     syncDayEditOriginalFromFocusedCell() {
       const activeEl = document.activeElement;
@@ -1449,32 +1462,26 @@ export default {
       }
       return { day, rowKey };
     },
-    startDayFillDrag(row, startDay, event) {
+    /** 填充柄按下：仅记录指针，移动超过阈值后才开始拖动（保证双击第一下不失焦） */
+    armDayFillPointer(row, startDay, event) {
       if (
         !this.canEditDayCell(row, startDay) ||
         !this.hasDayCellValue(row[`day${startDay}`]) ||
         !this.hasEditableDayAfter(row, startDay)
       ) {
-        this.suppressDayEditBlurSave = false;
         return;
       }
       this.cleanupDayFillDrag(true);
-      const pendingSaveOnDragEnd = this.dayCellValueChangedForSave(
-        this.dayEditOriginalValue,
-        row[`day${startDay}`]
-      );
-      this.suppressDayEditBlurSave = true;
-      this.syncDayEditOriginalFromFocusedCell();
-      this.blurActiveDayCellInput();
       this._dayFillDragSession = {
         row,
         rowKey: this.getDayCellRowKey(row),
         startDay,
         endDay: startDay,
         fillValue: row[`day${startDay}`],
+        armed: false,
         moved: false,
         deletedDuringDrag: false,
-        pendingSaveOnDragEnd,
+        pendingSaveOnDragEnd: false,
         startX: event.clientX,
         startY: event.clientY,
         rafId: null,
@@ -1483,12 +1490,33 @@ export default {
         passive: true,
       });
       document.addEventListener("mouseup", this._boundDayFillDragEnd);
+      this.refocusDayCellInput(row, startDay);
+    },
+    /** 指针移动超过阈值后，正式进入拖动填充 */
+    activateDayFillDrag(session) {
+      if (!session || session.armed) {
+        return;
+      }
+      session.armed = true;
+      session.pendingSaveOnDragEnd = this.dayCellValueChangedForSave(
+        this.dayEditOriginalValue,
+        session.row[`day${session.startDay}`]
+      );
+      this.suppressDayEditBlurSave = true;
       document.body.classList.add("day-fill-dragging");
     },
     handleDayFillDragMove(event) {
       const session = this._dayFillDragSession;
       if (!session) {
         return;
+      }
+      if (!session.armed) {
+        const dx = Math.abs(event.clientX - session.startX);
+        const dy = Math.abs(event.clientY - session.startY);
+        if (dx <= 2 && dy <= 2) {
+          return;
+        }
+        this.activateDayFillDrag(session);
       }
       session.pendingEvent = event;
       if (session.rafId != null) {
@@ -1502,7 +1530,7 @@ export default {
     /** rAF 内同步拖动预览（仅 endDay 变化时更新 Vue 状态） */
     syncDayFillDragPreview(event) {
       const session = this._dayFillDragSession;
-      if (!session || !event) {
+      if (!session || !event || !session.armed) {
         return;
       }
       const dx = Math.abs(event.clientX - session.startX);
@@ -1550,14 +1578,28 @@ export default {
       }
       const { row, startDay, endDay, moved, deletedDuringDrag, pendingSaveOnDragEnd } =
         session;
+      if (!session.armed) {
+        try {
+          if (deletedDuringDrag) {
+            await this.saveDayRowAdjust(row);
+            this.dayEditOriginalValue = row[`day${startDay}`];
+          }
+        } catch (err) {
+          console.error(err);
+        }
+        this.cleanupDayFillDrag(true);
+        this.suppressDayEditBlurSave = false;
+        this.refocusDayCellInput(row, startDay);
+        return;
+      }
+      const didFill = moved && endDay > startDay;
       this.cleanupDayFillDrag(true);
-      this.dayFillDragSuppressDblclickUntil = Date.now() + 400;
       try {
         if (deletedDuringDrag) {
           await this.saveDayRowAdjust(row);
+          this.dayEditOriginalValue = row[`day${startDay}`];
           return;
         }
-        const didFill = moved && endDay > startDay;
         let fillChanged = false;
         if (didFill) {
           fillChanged = this.applyDayFillRangeChanges(row, startDay, endDay);
@@ -1567,11 +1609,13 @@ export default {
           if (fillChanged) {
             this.showDayFillResultMessage(row, startDay, endDay);
           }
+          this.dayEditOriginalValue = row[`day${startDay}`];
         }
       } catch (err) {
         console.error(err);
-      } finally {
-        this.finishDayCellDragEditState();
+      }
+      if (didFill) {
+        this.dayFillDragSuppressDblclickUntil = Date.now() + 400;
       }
     },
     cleanupDayFillDrag(silent) {
@@ -1686,10 +1730,11 @@ export default {
       ) {
         return;
       }
-      if (!this.canShowDayFillHandle(row, startDay)) {
-        return;
-      }
-      if (!this.hasEditableEmptyDayAfter(row, startDay)) {
+      if (
+        !this.canEditDayCell(row, startDay) ||
+        !this.hasDayCellValue(row[`day${startDay}`]) ||
+        !this.hasEditableEmptyDayAfter(row, startDay)
+      ) {
         return;
       }
       const fillValue = row[`day${startDay}`];
@@ -1709,6 +1754,7 @@ export default {
       }
       try {
         await this.saveDayRowAdjust(row);
+        this.dayEditOriginalValue = row[`day${startDay}`];
         this.showDayFillResultMessage(row, startDay, endDay);
       } catch (err) {
         console.error(err);
