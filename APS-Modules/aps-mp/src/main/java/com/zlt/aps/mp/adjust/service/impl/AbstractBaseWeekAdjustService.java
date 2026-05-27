@@ -1570,24 +1570,26 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
             insertMonthPlanList.add(monthPlan);
         }
+        if (PubUtil.isNotEmpty(insertMonthPlanList)){
+            // 将日期字段中值为0的字段设为null
+            for (FactoryMonthPlanProductionFinalResult monthPlan : insertMonthPlanList) {
+                handleZeroToNull(monthPlan);
+            }
+            // 添加到月计划上下文
+            contextDTO.getFactoryMonthPlanProdFinalList().addAll(BeanUtil.copyToList(insertMonthPlanList, FactoryMonthPlanFinalAdjustVo.class));
+        }
 
         // 构建搭配排产新增月度计划
         List<FactoryMonthPlanProductionFinalResult> matchingProductionMonthPlanList = buildMatchingProductionMonthPlan(adjustDetailList, adjustResultList, contextDTO);
-        insertMonthPlanList.addAll(matchingProductionMonthPlanList);
-        // 获取调整结果计划总量为0的月度计划列表
-        //List<FactoryMonthPlanProductionFinalResult> adjustResultMonthPlanList = buildAdjustResultMonthPlan(adjustResultList);
-        // 需要删除月度生产计划列表
-        /*List<FactoryMonthPlanProductionFinalResult> deleteMonthPlanList = new ArrayList<>();
-        deleteMonthPlanList.addAll(insertMonthPlanList);
-        deleteMonthPlanList.addAll(adjustResultMonthPlanList);*/
-
-        // 将日期字段中值为0的字段设为null
-        for (FactoryMonthPlanProductionFinalResult monthPlan : insertMonthPlanList) {
-            handleZeroToNull(monthPlan);
+        if (PubUtil.isNotEmpty(matchingProductionMonthPlanList)){
+            // 将日期字段中值为0的字段设为null
+            for (FactoryMonthPlanProductionFinalResult monthPlan : matchingProductionMonthPlanList) {
+                handleZeroToNull(monthPlan);
+            }
+            // 添加到月计划上下文
+            contextDTO.getFactoryMonthPlanProdFinalList().addAll(BeanUtil.copyToList(matchingProductionMonthPlanList, FactoryMonthPlanFinalAdjustVo.class));
         }
 
-        // 添加到月计划上下文
-        contextDTO.getFactoryMonthPlanProdFinalList().addAll(BeanUtil.copyToList(insertMonthPlanList, FactoryMonthPlanFinalAdjustVo.class));
 
         /*try {
             // 删除月度生产计划
