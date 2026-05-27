@@ -376,6 +376,8 @@ export default {
       dayFillDragPreview: null,
       /** 拖拽填充结束后短暂抑制双击，避免误触发 */
       dayFillDragSuppressDblclickUntil: 0,
+      /** 拖动填充开始时抑制 blur save，待松手后统一 save */
+      suppressDayEditBlurSave: false,
     };
   },
   computed: {
@@ -754,6 +756,7 @@ export default {
                       mousedown: (e) => {
                         e.stopPropagation();
                         e.preventDefault();
+                        this.suppressDayEditBlurSave = true;
                         this.startDayFillDrag(row, i, e);
                       },
                       click: (e) => e.stopPropagation(),
@@ -840,9 +843,12 @@ export default {
     document.addEventListener("click", this.handleDocumentClickClearDayCell);
     this._boundDayFillDragMove = this.handleDayFillDragMove.bind(this);
     this._boundDayFillDragEnd = this.handleDayFillDragEnd.bind(this);
+    this._boundDayCellKeydown = this.handleDayCellDeleteKey.bind(this);
+    document.addEventListener("keydown", this._boundDayCellKeydown, true);
   },
   beforeDestroy() {
     document.removeEventListener("click", this.handleDocumentClickClearDayCell);
+    document.removeEventListener("keydown", this._boundDayCellKeydown, true);
     this.cleanupDayFillDrag(true);
   },
   async created() {
@@ -1215,6 +1221,155 @@ export default {
         this.dayCellActive.day === day
       );
     },
+    /** 根据日排产行 key 在列表中定位行 */
+    findRowByDayCellKey(rowKey) {
+      if (!rowKey) {
+        return null;
+      }
+      return (this.data || []).find(
+        (row) => this.getDayCellRowKey(row) === rowKey
+      );
+    },
+    /** 是否应忽略 Delete（日排产格与其它表单控件分开处理） */
+    shouldIgnoreDayCellDeleteKey(target) {
+      if (!target || !target.closest) {
+        return false;
+      }
+      if (target.closest(".day-cell-wrap")) {
+        return false;
+      }
+      const tag = target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+        return true;
+      }
+      return !!target.isContentEditable;
+    },
+    /** 清空指定日排产格（可编辑且有值时返回 true） */
+    clearDayCellValue(row, day) {
+      if (!row || !this.canEditDayCell(row, day)) {
+        return false;
+      }
+      const prop = `day${day}`;
+      if (!this.hasDayCellValue(row[prop])) {
+        return false;
+      }
+      row[prop] = null;
+      return true;
+    },
+    /** 清空拖动范围内所有可编辑日排产格（含源格与目标格） */
+    clearDayCellsInDragRange(row, startDay, endDay) {
+      let changed = false;
+      const from = Math.min(startDay, endDay);
+      const to = Math.max(startDay, endDay);
+      for (let d = from; d <= to; d++) {
+        if (this.clearDayCellValue(row, d)) {
+          changed = true;
+        }
+      }
+      return changed;
+    },
+    /** 失焦当前日排产输入框，避免 Delete 后仍停留在逐字编辑态 */
+    blurActiveDayCellInput() {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        activeEl.closest &&
+        activeEl.closest(".day-cell-wrap") &&
+        activeEl.tagName === "INPUT"
+      ) {
+        activeEl.blur();
+      }
+    },
+    /** 将编辑基准值同步为当前聚焦日排产格的实际值，避免 blur 误判变更 */
+    syncDayEditOriginalFromFocusedCell() {
+      const activeEl = document.activeElement;
+      if (activeEl && activeEl.closest) {
+        const wrap = activeEl.closest(".day-cell-wrap[data-day-cell-day]");
+        if (wrap) {
+          const day = Number(wrap.getAttribute("data-day-cell-day"));
+          const rowKey = wrap.getAttribute("data-day-cell-row-key") || "";
+          const row = this.findRowByDayCellKey(rowKey);
+          if (row && day) {
+            this.dayEditOriginalValue = row[`day${day}`];
+            return;
+          }
+        }
+      }
+      if (this.dayCellActive) {
+        const row = this.findRowByDayCellKey(this.dayCellActive.rowKey);
+        const day = this.dayCellActive.day;
+        if (row) {
+          this.dayEditOriginalValue = row[`day${day}`];
+          return;
+        }
+      }
+      this.dayEditOriginalValue = null;
+    },
+    /** 拖动结束并已 save 后，清除编辑态，避免 blur 再次触发 save */
+    finishDayCellDragEditState() {
+      this.syncDayEditOriginalFromFocusedCell();
+      this.blurActiveDayCellInput();
+      this.dayCellActive = null;
+    },
+    /**
+     * Delete：选中格整格清空并保存；
+     * 拖动填充未松手时清空源格与当前拖动范围内目标格，松手后统一 save
+     */
+    async handleDayCellDeleteKey(event) {
+      if (!event || event.key !== "Delete") {
+        return;
+      }
+      const session = this._dayFillDragSession;
+      if (session) {
+        event.preventDefault();
+        event.stopPropagation();
+        const { row, startDay, endDay } = session;
+        if (this.clearDayCellsInDragRange(row, startDay, endDay)) {
+          session.deletedDuringDrag = true;
+          if (
+            this.dayCellActive &&
+            this.dayCellActive.rowKey === session.rowKey
+          ) {
+            const activeDay = this.dayCellActive.day;
+            const from = Math.min(startDay, endDay);
+            const to = Math.max(startDay, endDay);
+            if (activeDay >= from && activeDay <= to) {
+              this.dayEditOriginalValue = row[`day${activeDay}`];
+            }
+          }
+        }
+        return;
+      }
+      if (!this.dayCellActive) {
+        if (this.shouldIgnoreDayCellDeleteKey(event.target)) {
+          return;
+        }
+        return;
+      }
+      if (this.shouldIgnoreDayCellDeleteKey(event.target)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const row = this.findRowByDayCellKey(this.dayCellActive.rowKey);
+      const day = this.dayCellActive.day;
+      if (!row || !this.canEditDayCell(row, day)) {
+        return;
+      }
+      const prop = `day${day}`;
+      const hadValue = this.hasDayCellValue(row[prop]);
+      row[prop] = null;
+      this.dayEditOriginalValue = null;
+      this.blurActiveDayCellInput();
+      if (!hadValue) {
+        return;
+      }
+      try {
+        await this.saveDayRowAdjust(row);
+      } catch (err) {
+        console.error(err);
+      }
+    },
     /** 当前格之后是否存在可编辑日期（用于显示填充柄，含拖动覆盖场景） */
     hasEditableDayAfter(row, day) {
       for (let d = day + 1; d <= 31; d++) {
@@ -1300,9 +1455,17 @@ export default {
         !this.hasDayCellValue(row[`day${startDay}`]) ||
         !this.hasEditableDayAfter(row, startDay)
       ) {
+        this.suppressDayEditBlurSave = false;
         return;
       }
       this.cleanupDayFillDrag(true);
+      const pendingSaveOnDragEnd = this.dayCellValueChangedForSave(
+        this.dayEditOriginalValue,
+        row[`day${startDay}`]
+      );
+      this.suppressDayEditBlurSave = true;
+      this.syncDayEditOriginalFromFocusedCell();
+      this.blurActiveDayCellInput();
       this._dayFillDragSession = {
         row,
         rowKey: this.getDayCellRowKey(row),
@@ -1310,6 +1473,8 @@ export default {
         endDay: startDay,
         fillValue: row[`day${startDay}`],
         moved: false,
+        deletedDuringDrag: false,
+        pendingSaveOnDragEnd,
         startX: event.clientX,
         startY: event.clientY,
         rafId: null,
@@ -1383,13 +1548,31 @@ export default {
           this.syncDayFillDragPreview(session.pendingEvent);
         }
       }
-      const { row, startDay, endDay, moved } = session;
+      const { row, startDay, endDay, moved, deletedDuringDrag, pendingSaveOnDragEnd } =
+        session;
       this.cleanupDayFillDrag(true);
-      if (!moved || endDay <= startDay) {
-        return;
-      }
       this.dayFillDragSuppressDblclickUntil = Date.now() + 400;
-      await this.applyDayFillRangeOverwrite(row, startDay, endDay);
+      try {
+        if (deletedDuringDrag) {
+          await this.saveDayRowAdjust(row);
+          return;
+        }
+        const didFill = moved && endDay > startDay;
+        let fillChanged = false;
+        if (didFill) {
+          fillChanged = this.applyDayFillRangeChanges(row, startDay, endDay);
+        }
+        if (fillChanged || pendingSaveOnDragEnd) {
+          await this.saveDayRowAdjust(row);
+          if (fillChanged) {
+            this.showDayFillResultMessage(row, startDay, endDay);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        this.finishDayCellDragEditState();
+      }
     },
     cleanupDayFillDrag(silent) {
       const session = this._dayFillDragSession;
@@ -1405,6 +1588,7 @@ export default {
       document.body.classList.remove("day-fill-dragging");
       this.dayFillDragPreview = null;
       this._dayFillDragSession = null;
+      this.suppressDayEditBlurSave = false;
       if (!silent) {
         this.$forceUpdate();
       }
@@ -1424,8 +1608,9 @@ export default {
     },
     /**
      * 拖动填充：覆盖 startDay+1 至 endDay 内所有可编辑日（不论原有无值）
+     * @returns {boolean} 是否有单元格被改动
      */
-    async applyDayFillRangeOverwrite(row, startDay, endDay) {
+    applyDayFillRangeChanges(row, startDay, endDay) {
       const fillValue = row[`day${startDay}`];
       let changed = false;
       for (let d = startDay + 1; d <= endDay; d++) {
@@ -1435,7 +1620,13 @@ export default {
         row[`day${d}`] = fillValue;
         changed = true;
       }
-      if (!changed) {
+      return changed;
+    },
+    /**
+     * 拖动填充并保存（双击向下填充等场景复用）
+     */
+    async applyDayFillRangeOverwrite(row, startDay, endDay) {
+      if (!this.applyDayFillRangeChanges(row, startDay, endDay)) {
         return;
       }
       try {
@@ -1687,6 +1878,9 @@ export default {
      * 修改 1–31 号日排产后实时保存，与 rollingCycle handleResultDayEdit 一致
      */
     async handleResultDayEdit(row, prop) {
+      if (this.suppressDayEditBlurSave || this._dayFillDragSession) {
+        return;
+      }
       const dayNum = Number(String(prop).replace(/^day/, ""));
       if (!this.canSaveDayCell(row) || this.isDayLocked(dayNum)) {
         return;
