@@ -24,7 +24,7 @@ import com.zlt.aps.cx.mapper.MpCxCapacityConfigurationMapper;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.mapper.CxMaterialEndingMapper;
-import com.zlt.aps.cx.mapper.FactoryParamMapper;
+import com.zlt.aps.maindata.mapper.FactoryParamMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.cx.service.ScheduleAdjustService;
 import com.zlt.aps.cx.vo.ScheduleAdjustResultVo;
