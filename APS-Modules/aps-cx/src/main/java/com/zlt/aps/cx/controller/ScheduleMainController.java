@@ -345,7 +345,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         return cxScheduleResultService.exportStructureChange(queryVO, fileName);
     }
 
-    @ApiOperation(value = "生成排程", notes = "根据日期和天数生成排程")
+    @ApiOperation(value = "生成排程", notes = "根据排程日期（最后一天）和排产天数生成排程，默认排产3天，排产窗口为（最后一天-天数+1）~ 最后一天")
     @PostMapping("/generate")
     public AjaxResult generateSchedule(@RequestBody ScheduleGenerateVo dto) {
         if (dto.getScheduleDate() == null) {
@@ -355,9 +355,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             // 默认排产3天
             dto.setDays(3);
         }
-        // 只需要调用一次executeSchedule，days参数表示排产天数
+        // 构建排程请求，scheduleDate为排产窗口最后一天
         ScheduleRequestVo request = new ScheduleRequestVo();
-        // 最后一天日期
+        // 最后一天日期，后端按 scheduleDate - days + 1 反推起始日期
         request.setScheduleDate(dto.getScheduleDate());
         request.setOverwrite(dto.getOverwrite() != null ? dto.getOverwrite() : false);
         request.setFactoryCode(dto.getFactoryCode());
@@ -388,17 +388,31 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
-     * 发布选中的排程结果到MES
-     * 发布流程：1.更新发布状态为"待发布" → 2.调用issueToMes下发MES → 3.根据MES反馈更新发布状态
-     * 参考硫化排程发布逻辑，支持按勾选ID发布
-     * 业务规则：
-     * 每条成型排程结果自带8班数据，覆盖排程日期前2天到排程日期当天：
-     * - T-2日（窗口首日）：更新夜早中3班
-     * - T-1日（窗口次日）：更新夜早中3班
-     * - T日（排程日期）：下发早中2班（夜班尚未排产）
+     * 发布选中的排程结果到MES中间表
+     * 
+     * 发布流程：
+     *   1. 按排程日期+工厂编码查询排程结果，若传入ids则按勾选ID过滤；
+     *   2. 过滤可发布状态的记录：仅处理"未发布(0)"、"发布失败(2)"、"待发布(5)"三种状态；
+     *   3. 校验每条记录必须已分配唯一成型机台（cxMachineCode不能为空或含逗号分隔的多机台）；
+     *   4. 获取分布式锁后调用doIssueCxScheduleResultToMes构建3天下发实体并下发MES；
+     *   5. 根据MES反馈结果更新发布状态：成功→"已发布(1)"，失败→"发布失败(2)"；
+     * 
+     * 日期推导与班次映射（doIssueCxScheduleResultToMes内部）：
+     *   每条成型排程结果自带8班数据（排程日期=T，排产窗口=T-2 ~ T）：
+     *   8班结构：CLASS1=早(T-2), CLASS2=中(T-2), CLASS3=夜(T-1), CLASS4=早(T-1),
+     *            CLASS5=中(T-1), CLASS6=夜(T), CLASS7=早(T), CLASS8=中(T)
+     *   下发到MES中间表时拆分为3天的3班数据（中间表1班=夜班, 2班=早班, 3班=中班）：
+     *   - T-2日（窗口首日）：下发早中2班（CLASS1→2班, CLASS2→3班；1班=夜班置空，因T-2夜班已生产）
+     *   - T-1日（窗口次日）：下发夜早中3班（CLASS3→1班, CLASS4→2班, CLASS5→3班）
+     *   - T 日（排程日期）：下发夜早中3班（CLASS6→1班, CLASS7→2班, CLASS8→3班）
+     * 
+     * 下发前数据补全（enrichMaterialAndExampleInfo）：
+     *   - MES物料编码：通过物料编码关联MdmMaterialInfo获取mesMaterialCode
+     *   - 成型示方号：通过物料编码关联MdmSkuConstructionRef获取embryoNo作为示方号，
+     *     同一个示方号回填到3个班
      *
-     * @param dto 排程结果对象（含scheduleDate、factoryCode）
-     * @param ids 选中的记录ID，多个用逗号分隔
+     * @param dto 排程结果查询条件（含scheduleDate、factoryCode）
+     * @param ids 选中的记录ID，多个以逗号分隔，为空时全量发布该日期下所有可发布记录
      * @return 操作结果
      */
     @Log(title = "ui.data.column.cxScheduleResult.modelName", businessType = BusinessType.PUBLISH)

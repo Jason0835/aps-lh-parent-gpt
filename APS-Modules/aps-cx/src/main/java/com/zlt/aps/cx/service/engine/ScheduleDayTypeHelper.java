@@ -110,27 +110,6 @@ public class ScheduleDayTypeHelper {
         }
     }
 
-    /**
-     * 班次标识信息
-     */
-    public static class ShiftFlagInfo {
-        /** 日期 */
-        public final LocalDate date;
-        /** 班次序号 */
-        public final int shiftOrder;
-        /** 班次名称 */
-        public final String shiftName;
-        /** 开停产标志：0=停，1=开 */
-        public final String flag;
-
-        public ShiftFlagInfo(LocalDate date, int shiftOrder, String shiftName, String flag) {
-            this.date = date;
-            this.shiftOrder = shiftOrder;
-            this.shiftName = shiftName;
-            this.flag = flag;
-        }
-    }
-
     // ==================== 缓存管理 ====================
 
     /**
@@ -575,29 +554,8 @@ public class ScheduleDayTypeHelper {
     /**
      * 判断是否为停产班（本班次=0），带工厂编号
      */
-    public boolean isClosedShift(LocalDate date, int shiftOrder, String factoryCode) {
-        return determineShiftType(date, shiftOrder, factoryCode) == ShiftType.CLOSED;
-    }
-
-    /**
-     * 判断是否为开产首个班次（本班次=1 且 上班次=0），带工厂编号
-     */
-    public boolean isOpenStartShift(LocalDate date, int shiftOrder, String factoryCode) {
-        return determineShiftType(date, shiftOrder, factoryCode) == ShiftType.OPEN_START;
-    }
-
-    /**
-     * 判断是否为停产班（本班次=0），带工厂编号
-     */
     public boolean isClosingShift(LocalDate date, int shiftOrder, String factoryCode) {
         return determineShiftType(date, shiftOrder, factoryCode) == ShiftType.CLOSED;
-    }
-
-    /**
-     * 判断是否为停产前一个班次（本班次=1 且 下班次=0），带工厂编号
-     */
-    public boolean isBeforeCloseShift(LocalDate date, int shiftOrder, String factoryCode) {
-        return determineShiftType(date, shiftOrder, factoryCode) == ShiftType.BEFORE_CLOSE;
     }
 
     // ==================== 班次停产判断（用于排程主循环跳过停产班次） ====================

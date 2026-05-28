@@ -322,7 +322,7 @@ public class ProductionCalculator {
                     shiftTrips[left]++;
                     remainder--;
                     if (remainder > 0) {
-                        shiftTrips[right]--;
+                        shiftTrips[right]++;
                         remainder--;
                     }
                     left++;
