@@ -171,20 +171,20 @@ mvn spring-boot:run -q
 成型排程不再独立维护其他模块已有参数，参数加载遵循以下优先级：
 
 1. **源头参数表（优先）**
-    - 硫化停锅/开模时间 → `T_LH_PARAMS`（硫化参数表）
-        - `SYS0310007` = 硫化停锅时间
-        - `SYS0310006` = 硫化开模时间
-    - 日硫化量计算模式 → `T_MP_FACTORY_PARAM`（工厂月计划参数表）
-        - `SYS0202002` = 日硫化量计算模式（MES/标准/APS）
-    - 试制量试SKU上限、周日是否允许排产 → `T_MP_FACTORY_PARAM`
-        - `SYS0206003` = 试制量试SKU上限
-        - `SYS0206005` = 试制量试周日允许排产标志
+   - 硫化停锅/开模时间 → `T_LH_PARAMS`（硫化参数表）
+     - `SYS0310007` = 硫化停锅时间
+     - `SYS0310006` = 硫化开模时间
+   - 日硫化量计算模式 → `T_MP_FACTORY_PARAM`（工厂月计划参数表）
+     - `SYS0202002` = 日硫化量计算模式（MES/标准/APS）
+   - 试制量试SKU上限、周日是否允许排产 → `T_MP_FACTORY_PARAM`
+     - `SYS0206003` = 试制量试SKU上限
+     - `SYS0206005` = 试制量试周日允许排产标志
 
 2. **成型参数表（兜底）**
-    - `T_CX_PARAM_CONFIG` 中对应 `SYS04` 编码的参数
+   - `T_CX_PARAM_CONFIG` 中对应 `SYS04` 编码的参数
 
 3. **代码硬编码（最后兜底）**
-    - 当上述来源均无值时采用代码默认值
+   - 当上述来源均无值时采用代码默认值
 
 ### 机台最大胎胚种类数参数格式
 参数值格式：`H15,3;H14,5`（分号分隔，逗号分隔前缀和数值）
@@ -197,32 +197,32 @@ mvn spring-boot:run -q
 ### 排程执行流程
 
 1. **构建排程上下文** (`ScheduleServiceImpl.buildScheduleContext`)
-    - 加载机台信息、物料信息、库存数据
-    - 加载硫化需求任务、在机信息
-    - 加载配置参数和约束条件（按参数治理体系优先级加载）
-    - 构建物料日硫化产能映射（按参数模式计算）
-    - 加载试制计划数据
-    - 初始化 `machineMaxEmbryoTypes` Map、`maxTrialSkuPerDay`、`trialAllowedOnSunday`
+   - 加载机台信息、物料信息、库存数据
+   - 加载硫化需求任务、在机信息
+   - 加载配置参数和约束条件（按参数治理体系优先级加载）
+   - 构建物料日硫化产能映射（按参数模式计算）
+   - 加载试制计划数据
+   - 初始化 `machineMaxEmbryoTypes` Map、`maxTrialSkuPerDay`、`trialAllowedOnSunday`
 
 2. **数据完整性校验** (`ScheduleDataValidator.validate`)
-    - 校验班次配置、成型机台、物料信息、硫化排程结果
-    - 校验物料日硫化产能（按参数模式校验对应字段是否有值）
-    - 校验参数配置完整性
-    - 校验失败阻断排程
+   - 校验班次配置、成型机台、物料信息、硫化排程结果
+   - 校验物料日硫化产能（按参数模式校验对应字段是否有值）
+   - 校验参数配置完整性
+   - 校验失败阻断排程
 
 3. **执行核心算法** (`CoreScheduleAlgorithmService.executeSchedule`)
-    - 按天循环（共8个班次，约3天）
-    - 每天流程：
-        - **任务分组** (`TaskGroupService`): 收尾/紧急/续作/试制/新增分类，三层优先级排序
-        - **续作处理** (`ContinueTaskProcessor`): 保底预留+均衡
-        - **新增处理** (`NewTaskProcessor`): 均衡分配+结构分配
-        - **试制处理** (`TrialTaskProcessor`): 约束验证+排产
-        - **班次均衡** (`ShiftScheduleService`): 按试制/停产/开产/收尾/普通类型排产
-    - 精度计划联动硫化扣量（`applyPrecisionHourDeduction`）
+   - 按天循环（共8个班次，约3天）
+   - 每天流程：
+     - **任务分组** (`TaskGroupService`): 收尾/紧急/续作/试制/新增分类，三层优先级排序
+     - **续作处理** (`ContinueTaskProcessor`): 保底预留+均衡
+     - **新增处理** (`NewTaskProcessor`): 均衡分配+结构分配
+     - **试制处理** (`TrialTaskProcessor`): 约束验证+排产
+     - **班次均衡** (`ShiftScheduleService`): 按试制/停产/开产/收尾/普通类型排产
+   - 精度计划联动硫化扣量（`applyPrecisionHourDeduction`）
 
 4. **保存排程结果**
-    - 保存到 `T_CX_SCHEDULE_RESULT` 主表
-    - 保存到 `T_CX_SCHEDULE_DETAIL` 子表
+   - 保存到 `T_CX_SCHEDULE_RESULT` 主表
+   - 保存到 `T_CX_SCHEDULE_DETAIL` 子表
 
 ### 任务分组与属性计算 (TaskGroupService)
 
@@ -257,9 +257,9 @@ mvn spring-boot:run -q
 - **零净需求判定**：库存已覆盖需求 或 补充计划任务，净需求量 <= 0
 - **暂存处理**：零净需求任务不立即分配，进入 `zeroNetDemandTasks` 暂存列表
 - **第二轮轮询分配**：第一轮正常任务分配完成后，按结构轮询方式逐车分配暂存任务
-    - 每次从暂存列表中按优先级取任务，分配1车（当前班次产能允许前提下）
-    - 一车一车补充，而非一次性全部分配
-    - 补充计划任务按"缺多少补多少"逻辑下量
+  - 每次从暂存列表中按优先级取任务，分配1车（当前班次产能允许前提下）
+  - 一车一车补充，而非一次性全部分配
+  - 补充计划任务按"缺多少补多少"逻辑下量
 
 #### 结构推荐机台总产能管控
 
@@ -416,7 +416,7 @@ mvn spring-boot:run -q
 #### 机台选择策略
 1. **空机台优先**：优先选择当前无任务的空机台
 2. **负载不均衡度**：无空机台时，选择当前负载最不均衡的机台（负载差异最大者）
-    - 计算各机台当前任务总量，选择加入该任务后能使整体负载最均衡的机台
+   - 计算各机台当前任务总量，选择加入该任务后能使整体负载最均衡的机台
 3. **不补整车**：试制任务不执行补整车逻辑，按计算量直接排产
 4. **无库存分配**：试制任务不占用库存逻辑
 5. **无收尾处理**：试制任务不走收尾余量处理逻辑
@@ -482,10 +482,10 @@ hourlyCapacity = 3600 / singleTireMoldSeconds × moldCount
 逻辑流程：
 1. 计算成型产量 = 库存 + 新排产量
 2. 与硫化计划量比较：
-    - 若 成型可用量 < 硫化计划量：
-        - 生成精度影响备注：`成型精度影响: 库存X+产量Y=Z<硫化计划W, 缺口V条`
-        - **同步更新硫化计划量**：将 `LhScheduleResult` 的对应 `class*PlanQty` 设置为 `totalAvailable`
-        - 将修改后的硫化结果加入待更新列表
+   - 若 成型可用量 < 硫化计划量：
+     - 生成精度影响备注：`成型精度影响: 库存X+产量Y=Z<硫化计划W, 缺口V条`
+     - **同步更新硫化计划量**：将 `LhScheduleResult` 的对应 `class*PlanQty` 设置为 `totalAvailable`
+     - 将修改后的硫化结果加入待更新列表
 
 ### 日硫化量计算模式
 
@@ -544,41 +544,41 @@ dayVulcanizationQty → 按模式选值 → ÷2（双模转单模）→ stockHou
 ## 注意事项
 
 1. **不要删除或修改以下文件**:
-    - `ApsFormingScheduleApplication.java` - 应用启动类
-    - `MybatisPlusConfig.java` - MyBatis Plus 配置
-    - `AGENTS.md` - 本项目规范文件
+   - `ApsFormingScheduleApplication.java` - 应用启动类
+   - `MybatisPlusConfig.java` - MyBatis Plus 配置
+   - `AGENTS.md` - 本项目规范文件
 
 2. **实体类修改注意事项**:
-    - 修改实体类时需同步更新对应的 Mapper XML 文件
-    - 新增字段需添加到数据库建表语句中
+   - 修改实体类时需同步更新对应的 Mapper XML 文件
+   - 新增字段需添加到数据库建表语句中
 
 3. **算法修改注意事项**:
-    - 核心算法位于 `service/engine` 目录
-    - 修改前需充分理解现有逻辑
-    - 建议添加单元测试验证修改
-    - 新增校验策略：创建类继承 BaseValidationStrategy + @Component
+   - 核心算法位于 `service/engine` 目录
+   - 修改前需充分理解现有逻辑
+   - 建议添加单元测试验证修改
+   - 新增校验策略：创建类继承 BaseValidationStrategy + @Component
 
 4. **跨天班次注意事项**:
-    - NIGHT_D2/NIGHT_D3 等夜班（22:00~05:59）必须设置 `IS_CROSS_DAY=1`
-    - `calculateStartTime` 和 `calculateShiftEndTime` 均依赖此字段
+   - NIGHT_D2/NIGHT_D3 等夜班（22:00~05:59）必须设置 `IS_CROSS_DAY=1`
+   - `calculateStartTime` 和 `calculateShiftEndTime` 均依赖此字段
 
 5. **开产判定注意事项**:
-    - 仅 `OPEN_START`（本班次=1 且 上班次=0）触发现开产逻辑
-    - `isOpeningDay`（DAY_FLAG=1）已废弃，不再用于开产判断
+   - 仅 `OPEN_START`（本班次=1 且 上班次=0）触发现开产逻辑
+   - `isOpeningDay`（DAY_FLAG=1）已废弃，不再用于开产判断
 
 6. **库存分配注意事项**:
-    - 当前班次计划量=0 的任务跳过库存分配
-    - `dayVulcanizationQty=0` 的物料跳过库存分配（数据完整性由 validation 保障）
-    - 共用胎胚按日硫化量比例分配，最后一条倒扣
+   - 当前班次计划量=0 的任务跳过库存分配
+   - `dayVulcanizationQty=0` 的物料跳过库存分配（数据完整性由 validation 保障）
+   - 共用胎胚按日硫化量比例分配，最后一条倒扣
 
 7. **Mapper包扫描注意事项**:
-    - MyBatis扫描包为 `com.zlt.aps.cx.mapper`
-    - 其他包下的 `@Mapper` 需要移到该包下或配置额外扫描路径
+   - MyBatis扫描包为 `com.zlt.aps.cx.mapper`
+   - 其他包下的 `@Mapper` 需要移到该包下或配置额外扫描路径
 
 8. **参数加载注意事项**:
-    - 参数加载遵循"源头表 > T_CX_PARAM_CONFIG > 硬编码"优先级
-    - 修改参数来源时需同时更新 `loadLhParamValue()` 和 `loadFactoryParamValue()` 方法
-    - 日硫化量模式原始值（M/S/A）需通过 `convertDayVulcanizationMode()` 转换为数字编码（1/2/3）
+   - 参数加载遵循"源头表 > T_CX_PARAM_CONFIG > 硬编码"优先级
+   - 修改参数来源时需同时更新 `loadLhParamValue()` 和 `loadFactoryParamValue()` 方法
+   - 日硫化量模式原始值（M/S/A）需通过 `convertDayVulcanizationMode()` 转换为数字编码（1/2/3）
 
 ## 最近清理记录
 
@@ -590,3 +590,35 @@ dayVulcanizationQty → 按模式选值 → ÷2（双模转单模）→ stockHou
 - `ConstraintCheckService.checkKeyProductConstraint()` 接口与实现
 - `HolidayScheduleServiceImpl.context.setIsOpeningDay(true)` 调用
 - `calculateStockHours` 中的 lhResult 后备计算逻辑
+- **`applyStockHoursCap()` 方法**：已移除，6小时封顶逻辑已合并到 S5.2.6.2 立库库容双维度管控中
+- **`getStockHoursCap()` 方法**：已移除，不再需要读取 `SYS04050005` 参数
+- **`calculateProductionStockHours()` 方法**：已移除，仅用于收尾补产日志的辅助方法
+- **`STOCK_HOURS_CAP_THRESHOLD` 常量（值=6）**：已移除，改为类常量 `STOCK_HOURS_CAP`
+- **`PARAM_STOCK_HOURS_CAP` 常量（编码=SYS04050005）**：已移除，参数不再使用
+- **`embryoTotalMoldMap` 预构建**：重新添加，供维度二（时间）封顶使用
+
+### 立库库容管控改造记录
+
+**改造前**（旧逻辑）：
+- 循环开始前预计算 `totalExcessStock = Σ(库存 - 月需求量)`，全局布尔值 `warehouseCapacityExceeded`
+- 超限后所有任务跳过，无法区分单个胎胚
+- 独立的 `applyStockHoursCap()` 方法做6小时封顶，库存基准为静态快照，共用胎胚时 excessStock 重复扣减
+
+**改造后**（当前逻辑）：
+- S5.2.6.2 统一双维度封顶：空间（所有胎胚合计 vs 库容上限）+ 时间（单胎胚可供硫化时长 vs 6h）
+- 动态累计 `shiftFormingOutputMap` / `shiftVulcanizingConsumptionMap`，每个任务看到最新的预计库存
+- 两维度取较小允许产量，封顶后向下取整车，不够一车归零
+- 放在收尾日志打印和成型余量累加之前执行，确保日志和累加使用的是封顶后的最终值
+- 第二轮跳过检查同步使用双维度判定
+
+### R2轮次计数器改造记录
+
+**改造前**（旧逻辑）：
+- 轮次按每个**胎胚**独立追踪，胎胚A从1到N轮后，换到胎胚B时又从1开始
+- 日志显示：`[R2-第1轮] 胎胚=215103130` → `[R2-第4轮] 胎胚=215102626` → `[R2-第1轮] 胎胚=215101726`
+
+**改造后**（当前逻辑）：
+- 轮次改为**结构级别全局追踪**，同一结构内的所有任务共享同一个轮次计数器
+- 每轮表示"所有任务各分配一车"，第1轮完成后进入第2轮
+- 新增 `structGlobalRound` 变量，在 while 循环开始时递增
+- 日志显示：`[R2-第1轮] 胎胚=215103130` → `[R2-第1轮] 胎胚=215102626` → `[R2-第2轮] 胎胚=215102626` → `[R2-第2轮] 胎胚=215101726`

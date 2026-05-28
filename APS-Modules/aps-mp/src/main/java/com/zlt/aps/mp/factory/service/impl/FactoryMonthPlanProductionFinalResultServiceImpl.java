@@ -37,6 +37,7 @@ import com.zlt.aps.maindata.mapper.MpTrialPlanEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
+import com.zlt.aps.mp.adjust.mapper.MpAdjustStructureInEntityMapper;
 import com.zlt.aps.mp.api.IFinalAndAdjustResultInterface;
 import com.zlt.aps.mp.api.domain.dto.MonthPlanFinalizedEventDto;
 import com.zlt.aps.mp.api.domain.entity.*;
@@ -153,9 +154,10 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     private MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
     @Autowired
     private MdmCycleSchStruConfEntityMapper mdmCycleSchStruConfEntityMapper;
-
     @Autowired
     private IMpStructureAllocationService mpStructureAllocationService;
+    @Autowired
+    private MpAdjustStructureInEntityMapper mpAdjustStructureInEntityMapper;
 
     @Autowired
     private DataManager dataManager;
@@ -984,7 +986,23 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         queryWrapper.eq(MpAdjustResult::getIsDelete, YesOrNoEnum.NO.getCode());
         List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
 
-        Map<String, DpDemandPlanSum> demandPlanSumMap = this.buildDemandPlanSumMap(condition);
+        // 加载月计划版本
+        Map<String, DpDemandPlanSum> demandPlanSumMap = this.buildDemandPlanSumMap(condition, matchVersion);
+        // 尝试额外加载结构内的最新版本对应的需求计划，如果版本不一样，需要关联出新物料并且并入需求计划列表中
+        LambdaQueryWrapper<MpAdjustStructureIn> adjustStructureInQueryWrapper = new LambdaQueryWrapper<>();
+        adjustStructureInQueryWrapper.select(MpAdjustStructureIn::getVersion);
+        adjustStructureInQueryWrapper.groupBy(Arrays.asList(MpAdjustStructureIn::getVersion));
+        adjustStructureInQueryWrapper.eq(MpAdjustStructureIn::getFactoryCode, condition.getFactoryCode());
+        adjustStructureInQueryWrapper.eq(MpAdjustStructureIn::getYear, condition.getYear());
+        adjustStructureInQueryWrapper.eq(MpAdjustStructureIn::getMonth, condition.getMonth());
+        String newVersion = mpAdjustStructureInEntityMapper.selectList(adjustStructureInQueryWrapper).stream().map(MpAdjustStructureIn::getVersion).max(String::compareTo).orElse(null);
+        if (StringUtils.isNotEmpty(newVersion) && !Objects.equals(newVersion, matchVersion)) {
+            // 两个版本的数据统一合并至demandPlanSumMap
+            this.buildDemandPlanSumMap(condition, newVersion).values().stream().forEach(plan -> {
+                demandPlanSumMap.putIfAbsent(this.buildDemandPlanSumMapKey(matchVersion, plan.getMaterialCode()), plan);
+            });
+        }
+        
         Map<String, MpAdjustResult> mpAdjustResultMap = new LinkedHashMap<>();
         if (CollectionUtils.isNotEmpty(mpAdjustResultList)) {
             for (MpAdjustResult mpAdjustResult : mpAdjustResultList) {
@@ -1008,7 +1026,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             /*int dayVulcanizationQty = adjustVo.getDayVulcanizationQty() == null ? 0 : adjustVo.getDayVulcanizationQty();
             adjustVo.setDayVulcanizationQty(dayVulcanizationQty * 2);*/
         }
-
+        
         // 尝试把试制量试、以及有订单的SKU补充到列表中
         Map<String, FactoryMonthPlanFinalAdjustVo> copyResultMap = finalResultMap.entrySet().stream()
                 .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
@@ -1459,8 +1477,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
      * @param condition 调整列表查询条件
      * @return 需求计划版本号和物料编码组成的需求计划汇总映射
      */
-    private Map<String, DpDemandPlanSum> buildDemandPlanSumMap(FactoryMonthPlanProductionFinalResult condition) {
-        String matchVersion = StringUtils.defaultIfBlank(condition.getVersion(), condition.getMonthPlanVersion());
+    private Map<String, DpDemandPlanSum> buildDemandPlanSumMap(FactoryMonthPlanProductionFinalResult condition, String matchVersion) {
         if (StringUtil.isEmptyWithTrim(matchVersion)) {
             return Collections.emptyMap();
         }

@@ -43,7 +43,7 @@ public class NewTaskProcessor {
      * @param context           排程上下文
      * @param scheduleDate      排程日期
      * @param dayShifts         当天班次配置
-     * @param dayShifts         当天班次配置
+     * @param continueTasks     续作任务列表（剩余需求>0的重新均衡）
      * @param existAllocations  续作任务分配结果
      * @param trialAllocations 试制任务分配结果（用于量试约束）
      * @return 均衡分配结果
