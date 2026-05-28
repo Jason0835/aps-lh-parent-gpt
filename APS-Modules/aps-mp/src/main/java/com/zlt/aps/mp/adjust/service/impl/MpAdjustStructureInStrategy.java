@@ -429,15 +429,20 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
         }
         // 生产计划列表按照物料编码进行分组
         Map<String, List<FactoryMonthPlanFinalAdjustVo>> monthPlanMap = monthPlanProdList.stream()
-                .collect(Collectors.groupingBy(FactoryMonthPlanFinalAdjustVo::getMaterialCode));
+                .collect(Collectors.groupingBy(e->e.getMaterialCode() + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY+e.getConstructionStage()));
         // 遍历试制量试计划列表，匹配生产计划
+        String constructionStage = ConstructionStageEnum.TRIAL_PRODUCTION.getStage();
         for (MpTrialPlan trialPlan : trialPlanList) {
             String materialCode = trialPlan.getMaterialCode();
             // 物料编码为空则跳过
             if (StringUtils.isEmpty(materialCode)) {
                 continue;
             }
-            matchMonthPlanList(contextDTO,resultList,materialCode,monthPlanMap,
+
+            if (ConstructionStageEnum.MEASUREMENT_FLAG.equals(trialPlan.getTrialStatus())){
+                constructionStage = ConstructionStageEnum.MEASUREMENT.getStage();
+            }
+            matchMonthPlanList(contextDTO,resultList,materialCode,constructionStage,monthPlanMap,
                     Convert.toInt(trialPlan.getTrialQty(),0), ApsConstant.TRUE, trialPlan.getId());
         }
         return resultList;
