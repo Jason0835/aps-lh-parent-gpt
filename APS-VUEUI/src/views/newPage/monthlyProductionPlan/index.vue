@@ -2481,8 +2481,8 @@ export default {
       );
       this.syncDialog.form.factoryCode =
         this.query.factoryCode || this.search.factoryCode || "";
-      this.syncDialog.form.productionVersion =
-        (this.query.version || this.search.version || "").trim();
+      /** 月度计划版本由 loadSyncVersionList 加载后取 options 第一项，不用查询区调整版本号 */
+      this.syncDialog.form.productionVersion = "";
       this.syncDialog.form.lastMonthPlanVersion = "";
       this.syncDialog.form.monthPlanVersion = "";
       this.syncDialog.versionList = [];
@@ -2522,6 +2522,28 @@ export default {
       };
       this.syncDialog.versionList = [];
     },
+    /**
+     * 可推送版本列表加载后：月度计划版本默认取 options 第一项，并联动第一项需求计划版本。
+     */
+    applySyncDialogDefaultVersions() {
+      const productionOptions = this.syncProductionVersionOptions;
+      if (!productionOptions.length) {
+        this.syncDialog.form.productionVersion = "";
+        this.syncDialog.form.lastMonthPlanVersion = "";
+        this.syncDialog.form.monthPlanVersion = "";
+        return;
+      }
+      this.syncDialog.form.productionVersion = productionOptions[0];
+      const demandOptions = this.syncDemandVersionOptions;
+      if (demandOptions.length) {
+        this.syncDialog.form.lastMonthPlanVersion = demandOptions[0].optionKey;
+        this.syncDialog.form.monthPlanVersion =
+          demandOptions[0].monthPlanVersion || "";
+      } else {
+        this.syncDialog.form.lastMonthPlanVersion = "";
+        this.syncDialog.form.monthPlanVersion = "";
+      }
+    },
     async loadSyncVersionList(showWarning) {
       const { yearMonth, factoryCode } = this.syncDialog.form;
       if (!yearMonth || !factoryCode) {
@@ -2553,6 +2575,13 @@ export default {
               optionKey: `${item.productionVersion}__${item.monthPlanVersion}__${item.lastMonthPlanVersion}`,
             };
           });
+        if (this.syncDialog.versionList.length > 0) {
+          this.applySyncDialogDefaultVersions();
+        } else {
+          this.syncDialog.form.productionVersion = "";
+          this.syncDialog.form.lastMonthPlanVersion = "";
+          this.syncDialog.form.monthPlanVersion = "";
+        }
         if (showWarning && this.syncDialog.versionList.length === 0) {
           this.$modal.msgWarning(
             this.$t(
