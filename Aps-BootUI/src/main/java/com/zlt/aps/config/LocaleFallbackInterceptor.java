@@ -33,8 +33,6 @@ public class LocaleFallbackInterceptor implements HandlerInterceptor {
     @Autowired
     private RedisService redisService;
 
-    private static final String DEFAULT_LANG = "zh_CN";
-
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         try {
@@ -44,8 +42,7 @@ public class LocaleFallbackInterceptor implements HandlerInterceptor {
             String lang = resolveLang(request);
 
             if (StringUtils.isEmpty(lang)) {
-                lang = DEFAULT_LANG;
-                log.debug("所有语言来源均为空，使用默认语言: {}", lang);
+                return true;
             }
 
             writeAllLocaleKeys(sessionId, authToken, lang);
@@ -168,7 +165,7 @@ public class LocaleFallbackInterceptor implements HandlerInterceptor {
     private HttpServletRequest getCurrentRequest() {
         try {
             org.springframework.web.context.request.RequestAttributes requestAttributes =
-                org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+                    org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
             if (requestAttributes instanceof org.springframework.web.context.request.ServletRequestAttributes) {
                 return ((org.springframework.web.context.request.ServletRequestAttributes) requestAttributes).getRequest();
             }
@@ -183,7 +180,6 @@ public class LocaleFallbackInterceptor implements HandlerInterceptor {
             String acceptLang = request.getHeader("Accept-Language");
             if (StringUtils.isNotEmpty(acceptLang)) {
                 acceptLang = acceptLang.split(",")[0].trim();
-                acceptLang = acceptLang.replace("-", "_");
                 if (acceptLang.matches("[a-z]{2}_[A-Z]{2}")) {
                     return acceptLang;
                 }
