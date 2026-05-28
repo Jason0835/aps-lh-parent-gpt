@@ -936,7 +936,7 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
     /**
      * 填充制造示方书号、文字示方号、硫化示方号
-     * <p>优先根据物料编码+月计划产品状态匹配示方书关系；若月计划缺失则仅按物料编码匹配。</p>
+     * <p>优先根据物料编码+月计划产品状态匹配示方书关系；若未取到，则获取月计划中的示方书号。</p>
      *
      * @param result             排程结果
      * @param monthPlan          月计划对象（可能为null）
@@ -951,18 +951,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         }
 
         MdmSkuConstructionRef ref = null;
-        // 优先按物料编码+产品状态匹配
+        // 按物料编码+产品状态匹配示方书关系
         if (Objects.nonNull(monthPlan) && StringUtils.isNotEmpty(monthPlan.getProductStatus())) {
             String key = matCode + "|" + monthPlan.getProductStatus();
             ref = constructionRefMap.get(key);
-        }
-        // 兜底：仅按物料编码匹配（取第一条）
-        if (ref == null) {
-            String keyPrefix = matCode + "|";
-            ref = constructionRefMap.entrySet().stream()
-                    .filter(e -> e.getKey().startsWith(keyPrefix))
-                    .map(Map.Entry::getValue)
-                    .findFirst().orElse(null);
         }
 
         if (ref != null) {
@@ -975,9 +967,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             if (StringUtils.isNotEmpty(ref.getLhNo())) {
                 result.setLhNo(ref.getLhNo());
             }
+            return;
         }
 
-        // 如果月计划中有更准确的示方书号，优先覆盖
+        // 未匹配到示方书关系，取月计划中的示方书号
         if (Objects.nonNull(monthPlan)) {
             if (StringUtils.isNotEmpty(monthPlan.getEmbryoNo())) {
                 result.setEmbryoNo(monthPlan.getEmbryoNo());
