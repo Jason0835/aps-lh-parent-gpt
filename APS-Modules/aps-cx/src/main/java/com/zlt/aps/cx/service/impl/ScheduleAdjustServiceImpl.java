@@ -24,6 +24,8 @@ import com.zlt.aps.cx.mapper.MpCxCapacityConfigurationMapper;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.mapper.CxMaterialEndingMapper;
+import com.zlt.aps.cx.mapper.FactoryParamMapper;
+import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.cx.service.ScheduleAdjustService;
 import com.zlt.aps.cx.vo.ScheduleAdjustResultVo;
 import com.zlt.aps.cx.vo.MonthPlanProductLhCapacityVo;
@@ -65,18 +67,6 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
     private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int DEFAULT_ENDING_DISCARD_THRESHOLD = 2;
 
-    @Value("${aps.schedule.adjust.stock-hours-threshold:6}")
-    private int stockHoursThreshold;
-
-    @Value("${aps.schedule.adjust.before-handover-minutes:60}")
-    private int beforeHandoverMinutes;
-
-    @Value("${aps.schedule.adjust.tread-parking-warning-minutes:10}")
-    private int treadParkingWarningMinutes;
-
-    @Value("${aps.schedule.adjust.tread-parking-hours:4}")
-    private int treadParkingHours;
-
     @Autowired
     private CxScheduleResultMapper scheduleResultMapper;
 
@@ -91,6 +81,9 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
 
     @Autowired
     private CxParamConfigMapper paramConfigMapper;
+
+    @Autowired
+    private FactoryParamMapper factoryParamMapper;
 
     @Autowired
     private LhScheduleResultMapper lhScheduleResultMapper;
@@ -133,7 +126,7 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
 
         LocalDate scheduleDate = LocalDate.parse(scheduleDateStr, DATE_FMT);
 
-        int threshold = getIntParamValue("ADJUST_STOCK_HOURS_THRESHOLD", stockHoursThreshold);
+        int threshold = getIntParamValue("SYS04080001", 6);
 
         log.info("交班库存时长调整开始：factory={}, date={}, shift={}, threshold={}h",
                 factoryCode, scheduleDateStr, shiftClass, threshold);
@@ -497,8 +490,8 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
 
         LocalDate scheduleDate = LocalDate.parse(scheduleDateStr, DATE_FMT);
 
-        int warningMinutes = getIntParamValue("ADJUST_TREAD_PARKING_WARNING_MINUTES", treadParkingWarningMinutes);
-        int parkHours = getIntParamValue("ADJUST_TREAD_PARKING_HOURS", treadParkingHours);
+        int warningMinutes = getIntParamValue("SYS04080003", 10);
+        int parkHours = getIntParamValue("SYS04080004", 4);
 
         log.info("计划滚动调整开始：factory={}, date={}, shift={}, warningMinutes={}, parkHours={}",
                 factoryCode, scheduleDateStr, shiftClass, warningMinutes, parkHours);
@@ -973,6 +966,35 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
         return null;
     }
 
+    private String loadFactoryParamValue(String factoryCode, String productTypeCode, String paramCode) {
+        try {
+            LambdaQueryWrapper<FactoryParam> wrapper = new LambdaQueryWrapper<FactoryParam>()
+                    .eq(FactoryParam::getFactoryCode, factoryCode)
+                    .eq(FactoryParam::getParamCode, paramCode)
+                    .eq(FactoryParam::getIsDelete, "0");
+            if (productTypeCode != null) {
+                wrapper.eq(FactoryParam::getProductTypeCode, productTypeCode);
+            }
+            FactoryParam param = factoryParamMapper.selectOne(wrapper);
+            if (param != null && StringUtils.hasText(param.getParamValue())) {
+                return param.getParamValue().trim();
+            }
+        } catch (Exception e) {
+            log.warn("从T_MP_FACTORY_PARAM加载参数失败: factoryCode={}, paramCode={}, error={}", factoryCode, paramCode, e.getMessage());
+        }
+        return null;
+    }
+
+    private String convertDayVulcanizationMode(String mpValue) {
+        if (mpValue == null) return null;
+        switch (mpValue.toUpperCase().trim()) {
+            case "M": return "1";
+            case "S": return "2";
+            case "A": return "3";
+            default: return mpValue;
+        }
+    }
+
     /**
      * 从班次字段名解析索引
      */
@@ -1111,6 +1133,11 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
 
         BigDecimal lossRate;
         String dayVulcanizationMode;
+        int endingDiscardThreshold;
+        int stockHoursThreshold;
+        int beforeHandoverMinutes;
+        int treadParkingWarningMinutes;
+        int treadParkingHours;
 
         Map<String, MdmMaterialInfo> materialInfoMap;
         Map<String, MdmWorkCalendar> calendarMap;
@@ -1130,6 +1157,11 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
 
         Map<String, Integer> structureLhMachineCount;
         Map<String, Integer> structureMoldCount;
+
+        int warehouseCapacity;
+        double warehouseCapacityRatio;
+        Map<String, Integer> embryoTotalStockMap;
+        Map<String, Integer> embryoTotalMoldMap;
 
         List<String> onlineEmbryos;
 
@@ -1154,6 +1186,7 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
         loadEndingDates(ctx);
         loadStructureLhConfig(ctx);
         buildMaterialEmbryoMapping(ctx);
+        buildWarehouseMaps(ctx);
     }
 
     private void loadShiftConfigs(RescheduleContext ctx) {
@@ -1203,12 +1236,14 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
     }
 
     private void loadLhScheduleResults(RescheduleContext ctx) {
+        LocalDate startDate = ctx.scheduleDate.minusDays(2);
+        LocalDate endDate = ctx.scheduleDate;
         ctx.lhScheduleResults = lhScheduleResultMapper.selectList(
                 new LambdaQueryWrapper<LhScheduleResult>()
                         .eq(LhScheduleResult::getFactoryCode, ctx.factoryCode)
-                        .eq(LhScheduleResult::getScheduleDate,
-                                java.sql.Date.valueOf(ctx.scheduleDate)));
-        log.info("[数据加载] 硫化任务: {} 条", ctx.lhScheduleResults.size());
+                        .ge(LhScheduleResult::getScheduleDate, java.sql.Date.valueOf(startDate))
+                        .le(LhScheduleResult::getScheduleDate, java.sql.Date.valueOf(endDate)));
+        log.info("[数据加载] 硫化任务: {} 条 ({}~{})", ctx.lhScheduleResults.size(), startDate, endDate);
     }
 
     private void loadParams(RescheduleContext ctx) {
@@ -1216,11 +1251,30 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
         ctx.lossRate = StringUtils.hasText(lossRateStr)
                 ? new BigDecimal(lossRateStr) : BigDecimal.ZERO;
 
-        ctx.dayVulcanizationMode = getParamValue("SYS04010001");
-        if (!StringUtils.hasText(ctx.dayVulcanizationMode)) {
-            ctx.dayVulcanizationMode = "2";
+        String mpValue = loadFactoryParamValue(ctx.factoryCode, "TBR", "SYS0202002");
+        if (mpValue != null) {
+            String converted = convertDayVulcanizationMode(mpValue);
+            log.info("[数据加载] 日硫化量模式（来自T_MP_FACTORY_PARAM SYS0202002）: {} -> {}", mpValue, converted);
+            ctx.dayVulcanizationMode = converted;
+        } else {
+            ctx.dayVulcanizationMode = getParamValue("SYS04010001");
+            if (!StringUtils.hasText(ctx.dayVulcanizationMode)) {
+                ctx.dayVulcanizationMode = "2";
+            }
         }
-        log.info("[数据加载] 损耗率: {}, 日硫化量模式: {}", ctx.lossRate, ctx.dayVulcanizationMode);
+        ctx.endingDiscardThreshold = getIntParamValue("SYS04050001", DEFAULT_ENDING_DISCARD_THRESHOLD);
+        ctx.stockHoursThreshold = getIntParamValue("SYS04080001", 6);
+        ctx.beforeHandoverMinutes = getIntParamValue("SYS04080002", 60);
+        ctx.treadParkingWarningMinutes = getIntParamValue("SYS04080003", 10);
+        ctx.treadParkingHours = getIntParamValue("SYS04080004", 4);
+        ctx.warehouseCapacity = getIntParamValue("SYS04060001", 0);
+        String warehouseRatioStr = getParamValue("SYS04060002");
+        ctx.warehouseCapacityRatio = StringUtils.hasText(warehouseRatioStr)
+                ? Double.parseDouble(warehouseRatioStr) : 0.9;
+        log.info("[数据加载] 损耗率: {}, 日硫化量模式: {}, 收尾舍弃阈值: {}, 库存时长阈值: {}h, 交班前分钟: {}, 胎面停放预警: {}min, 胎面停放时长: {}h, 立库库容: {}条/比例: {}",
+                ctx.lossRate, ctx.dayVulcanizationMode, ctx.endingDiscardThreshold,
+                ctx.stockHoursThreshold, ctx.beforeHandoverMinutes, ctx.treadParkingWarningMinutes, ctx.treadParkingHours,
+                ctx.warehouseCapacity, ctx.warehouseCapacityRatio);
     }
 
     private void loadWorkCalendar(RescheduleContext ctx) {
@@ -1399,6 +1453,32 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
         }
     }
 
+    private void buildWarehouseMaps(RescheduleContext ctx) {
+        ctx.embryoTotalStockMap = new HashMap<>();
+        ctx.embryoTotalMoldMap = new HashMap<>();
+        if (ctx.currentStockMap != null) {
+            for (Map.Entry<String, Integer> entry : ctx.currentStockMap.entrySet()) {
+                String mat = entry.getKey();
+                int stock = entry.getValue();
+                if (stock > 0) {
+                    List<String> embryos = ctx.materialEmbryosMap.getOrDefault(mat, Collections.emptyList());
+                    for (String emb : embryos) {
+                        ctx.embryoTotalStockMap.merge(emb, stock, Integer::sum);
+                    }
+                }
+            }
+        }
+        if (ctx.lhScheduleResults != null) {
+            for (LhScheduleResult lh : ctx.lhScheduleResults) {
+                if (lh.getEmbryoCode() != null && lh.getMouldQty() != null && lh.getMouldQty() > 0) {
+                    ctx.embryoTotalMoldMap.merge(lh.getEmbryoCode(), lh.getMouldQty(), Integer::sum);
+                }
+            }
+        }
+        log.info("[数据加载] 立库: 胎胚库存={}种, 胎胚模数={}种",
+                ctx.embryoTotalStockMap.size(), ctx.embryoTotalMoldMap.size());
+    }
+
     // ==================== Phase A: 应用已完成班次 FINISH_QTY ====================
 
     private void applyFinishedShiftsToContext(RescheduleContext ctx) {
@@ -1486,7 +1566,7 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
         EmbryoStockItem needSubtract = null;
 
         for (EmbryoStockItem item : items) {
-            if (item.stockHours < stockHoursThreshold) {
+            if (item.stockHours < ctx.stockHoursThreshold) {
                 needAdd = item;
                 break;
             }
@@ -1504,7 +1584,7 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
         }
 
         if (needAdd == null) {
-            log.info("[Phase B] 所有胎胚库存时长均 >= {} 小时，无需补车", stockHoursThreshold);
+            log.info("[Phase B] 所有胎胚库存时长均 >= {} 小时，无需补车", ctx.stockHoursThreshold);
             return;
         }
         if (needSubtract == null) {
@@ -1517,8 +1597,21 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
         doAddVehicle(ctx, adjustClassIdx, needAdd, tripCap, result);
         doSubtractVehicle(ctx, adjustClassIdx, needSubtract, tripCap, result);
 
+        // Phase B 补车/减车后同步更新上下文库存和成型余量，供 Phase C 使用
+        int addStock = ctx.currentStockMap.getOrDefault(needAdd.materialCode, 0);
+        ctx.currentStockMap.put(needAdd.materialCode, addStock + tripCap);
+        BigDecimal addRemainder = ctx.formingRemainderMap.getOrDefault(needAdd.materialCode, BigDecimal.ZERO);
+        BigDecimal addNewRemainder = addRemainder.subtract(BigDecimal.valueOf(tripCap));
+        ctx.formingRemainderMap.put(needAdd.materialCode,
+                addNewRemainder.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : addNewRemainder);
+
+        int subStock = ctx.currentStockMap.getOrDefault(needSubtract.materialCode, 0);
+        ctx.currentStockMap.put(needSubtract.materialCode, Math.max(0, subStock - tripCap));
+        BigDecimal subRemainder = ctx.formingRemainderMap.getOrDefault(needSubtract.materialCode, BigDecimal.ZERO);
+        ctx.formingRemainderMap.put(needSubtract.materialCode, subRemainder.add(BigDecimal.valueOf(tripCap)));
+
         recalculateMainTableFromDetails(ctx);
-        log.info("[Phase B] 调整完成: add={}(+{}), sub={}(-{})",
+        log.info("[Phase B] 调整完成: add={}(+{}), sub={}(-{}), 库存/余量已同步更新",
                 needAdd.embryoCode, tripCap, needSubtract.embryoCode, tripCap);
     }
 
@@ -1684,6 +1777,44 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
         return false;
     }
 
+    private boolean isBeforeCloseShift(RescheduleContext ctx, int classIdx) {
+        CxShiftConfig sc = getShiftConfigByClassOrder(ctx, classIdx);
+        if (sc == null || ctx.calendarMap == null) {
+            return false;
+        }
+        Integer scheduleDay = sc.getScheduleDay();
+        Integer dayShiftOrder = sc.getDayShiftOrder();
+        if (scheduleDay == null || dayShiftOrder == null) {
+            return false;
+        }
+        String dateStr = getDateForScheduleDay(ctx.scheduleDate, scheduleDay);
+        MdmWorkCalendar calendar = ctx.calendarMap.get(dateStr);
+        if (calendar == null) {
+            return false;
+        }
+        String currentFlag = getCalendarDayShiftFlag(calendar, dayShiftOrder);
+        if (!"1".equals(currentFlag)) {
+            return false;
+        }
+        int nextOrder = getShiftConfigOrder(ctx, sc) + 1;
+        for (CxShiftConfig next : ctx.sortedShiftConfigs) {
+            if (getShiftConfigOrder(ctx, next) == nextOrder) {
+                Integer nextDay = next.getScheduleDay();
+                Integer nextOrder2 = next.getDayShiftOrder();
+                if (nextDay == null || nextOrder2 == null) {
+                    return false;
+                }
+                String nextDateStr = getDateForScheduleDay(ctx.scheduleDate, nextDay);
+                MdmWorkCalendar nextCalendar = ctx.calendarMap.get(nextDateStr);
+                if (nextCalendar == null) {
+                    return false;
+                }
+                return "0".equals(getCalendarDayShiftFlag(nextCalendar, nextOrder2));
+            }
+        }
+        return false;
+    }
+
     private double calculateStockHoursValue(int currentStock, int lhMachineCount,
                                             int moldCount, int dailyLhCapacity) {
         if (dailyLhCapacity <= 0 || lhMachineCount <= 0 || moldCount <= 0) {
@@ -1777,8 +1908,9 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
     private void rescheduleRemainingShifts(RescheduleContext ctx, ScheduleAdjustResultVo result,
                                            int adjustClassIdx) {
         int startShift = adjustClassIdx + 1;
-        if (startShift > 8) {
-            log.info("[Phase C] 无剩余班次需要重排 (start={})", startShift);
+        int maxAvailableShift = getMaxAvailableShiftIndex(ctx);
+        if (startShift > maxAvailableShift) {
+            log.info("[Phase C] 无剩余班次需要重排 (start={}, maxAvailable={})", startShift, maxAvailableShift);
             return;
         }
 
@@ -1786,7 +1918,7 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
 
         Map<String, BigDecimal> materialUsedFormingRemainder = new HashMap<>();
 
-        for (int classIdx = startShift; classIdx <= 8; classIdx++) {
+        for (int classIdx = startShift; classIdx <= maxAvailableShift; classIdx++) {
             log.info("[Phase C] 重排班次: CLASS{}", classIdx);
             rescheduleSingleShift(ctx, classIdx, embryoPlans, materialUsedFormingRemainder);
             materialUsedFormingRemainder.clear();
@@ -1795,7 +1927,18 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
         clearUnusedShiftPlans(ctx, startShift);
 
         recalculateMainTableFromDetails(ctx);
-        log.info("[Phase C] 重排完成: shifts={}~8", startShift);
+        log.info("[Phase C] 重排完成: shifts={}~{}", startShift, maxAvailableShift);
+    }
+
+    private int getMaxAvailableShiftIndex(RescheduleContext ctx) {
+        int max = 0;
+        for (CxShiftConfig sc : ctx.sortedShiftConfigs) {
+            Integer order = getShiftClassOrder(sc);
+            if (order != null && order > max) {
+                max = order;
+            }
+        }
+        return max;
     }
 
     private Map<String, EmbryoReschedulePlan> buildEmbryoReschedulePlans(RescheduleContext ctx) {
@@ -1852,7 +1995,7 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
                                       int actualRemaining) {
         plan.isLastEndingBatch = true;
 
-        if (!plan.isMainProduct && actualRemaining <= DEFAULT_ENDING_DISCARD_THRESHOLD) {
+        if (!plan.isMainProduct && actualRemaining <= ctx.endingDiscardThreshold) {
             plan.endingAbandoned = true;
             plan.endingAbandonedQty = actualRemaining;
             log.info("[Phase C 收尾] 非主销舍弃 material={}, qty={}", plan.materialCode, actualRemaining);
@@ -1877,12 +2020,10 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
         if (lossRate.compareTo(BigDecimal.ZERO) <= 0) {
             return quantity;
         }
-        BigDecimal divisor = BigDecimal.ONE.subtract(
+        BigDecimal multiplier = BigDecimal.ONE.add(
                 lossRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
-        if (divisor.compareTo(BigDecimal.ZERO) <= 0) {
-            return quantity;
-        }
-        return BigDecimal.valueOf(quantity).divide(divisor, 0, RoundingMode.UP).intValue();
+        return BigDecimal.valueOf(quantity).multiply(multiplier)
+                .setScale(0, RoundingMode.UP).intValue();
     }
 
     private boolean canEmbryoRunOnMachine(RescheduleContext ctx, String structureName) {
@@ -1903,10 +2044,19 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
             return;
         }
 
-        int shiftCapacity = getShiftMaxCapacity(shiftConfig);
+        int shiftCapacity = calculateShiftCapacity(ctx, shiftConfig, embryoPlans);
         if (shiftCapacity <= 0) {
             log.info("[Phase C] 班次 {} 产能为0，跳过", classIdx);
             return;
+        }
+
+        boolean isOpenStart = isOpenStartShift(ctx, classIdx);
+        boolean isBeforeClose = isBeforeCloseShift(ctx, classIdx);
+
+        if (isOpenStart) {
+            int sixHourCapacity = shiftCapacity * 6 / (shiftConfig.getShiftHours() != null ? shiftConfig.getShiftHours() : 8);
+            shiftCapacity = sixHourCapacity;
+            log.info("[Phase C] 班次 {} 为开产首班，产能封顶6h: {}条", classIdx, shiftCapacity);
         }
 
         List<ShiftAllocationItem> allocations = new ArrayList<>();
@@ -1962,6 +2112,36 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
             int remaining = shiftCapacity - usedForming.intValue();
             int allocated = Math.min(plannedProd, remaining);
 
+            // 停产前一班次：反推封顶（产量不超过停锅前硫化能消化的量）
+            if (isBeforeClose && allocated > 0 && plan.dailyLhCapacity > 0) {
+                int currentStock = ctx.currentStockMap.getOrDefault(plan.materialCode, 0);
+                int ratio = plan.lhMachineCount > 0 ? plan.lhMachineCount : 1;
+                double singleTireSeconds = 86400.0 / (ratio * plan.dailyLhCapacity);
+                int shiftHrs = shiftConfig.getShiftHours() != null ? shiftConfig.getShiftHours() : 8;
+                int closingRequired = (int) (shiftHrs * 3600 / singleTireSeconds);
+                int cappedByClosing = Math.max(0, closingRequired - currentStock);
+                if (cappedByClosing < allocated) {
+                    allocated = cappedByClosing;
+                    log.info("[Phase C] 停产前封顶: embryo={}, closingRequired={}, stock={}, capped={}",
+                            plan.embryoCode, closingRequired, currentStock, allocated);
+                }
+            }
+
+            // 开产首班：关键产品不排（除非全结构均为关键产品）
+            if (isOpenStart && ctx.keyProductEmbryos.contains(plan.embryoCode)) {
+                boolean allKeyInStructure = true;
+                for (EmbryoReschedulePlan p : sortedPlans) {
+                    if (plan.structureName.equals(p.structureName) && !ctx.keyProductEmbryos.contains(p.embryoCode)) {
+                        allKeyInStructure = false;
+                        break;
+                    }
+                }
+                if (!allKeyInStructure) {
+                    allocated = 0;
+                    log.info("[Phase C] 开产首班跳过关键产品: embryo={}", plan.embryoCode);
+                }
+            }
+
             if (!skipVehicleRounding) {
                 if (allocated < plan.tripCapacity && allocated > 0) {
                     allocated = 0;
@@ -1969,6 +2149,76 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
                 if (allocated > 0) {
                     int vehicles = allocated / plan.tripCapacity;
                     allocated = vehicles * plan.tripCapacity;
+                }
+            }
+
+            // 立库库容双维度管控
+            if (ctx.warehouseCapacity > 0 && allocated > 0 && plan.embryoCode != null) {
+                int warehouseThreshold = (int) Math.floor(ctx.warehouseCapacity * ctx.warehouseCapacityRatio);
+
+                // 维度一（空间）：所有胎胚预计班后库存总和
+                int totalProjectedStock = 0;
+                for (ShiftAllocationItem prevAlloc : allocations) {
+                    totalProjectedStock += prevAlloc.allocatedQty;
+                }
+                totalProjectedStock += allocated;
+                for (Map.Entry<String, Integer> e : ctx.embryoTotalStockMap.entrySet()) {
+                    totalProjectedStock += e.getValue();
+                }
+                int totalVulcConsumption = 0;
+                for (LhScheduleResult lh : ctx.lhScheduleResults) {
+                    Integer planQty = getLhClassPlanQty(lh, classIdx);
+                    if (planQty != null && planQty > 0) {
+                        totalVulcConsumption += planQty;
+                    }
+                }
+                totalProjectedStock -= totalVulcConsumption;
+
+                if (totalProjectedStock >= warehouseThreshold) {
+                    int overAmount = totalProjectedStock - warehouseThreshold;
+                    int spaceLimit = Math.max(0, allocated - overAmount);
+                    if (spaceLimit < allocated) {
+                        allocated = spaceLimit;
+                        if (allocated < plan.tripCapacity) {
+                            allocated = 0;
+                        }
+                    }
+                }
+
+                // 维度二（时间）：单胎胚预计班后库存可供硫化时长 > 6h
+                if (allocated > 0 && plan.dailyLhCapacity > 0) {
+                    int embryoStock = ctx.embryoTotalStockMap.getOrDefault(plan.embryoCode, 0);
+                    int embryoForming = 0;
+                    for (ShiftAllocationItem prevAlloc : allocations) {
+                        if (plan.embryoCode.equals(prevAlloc.embryoCode)) {
+                            embryoForming += prevAlloc.allocatedQty;
+                        }
+                    }
+                    embryoForming += allocated;
+                    int embryoVulc = 0;
+                    for (LhScheduleResult lh : ctx.lhScheduleResults) {
+                        if (plan.embryoCode.equals(lh.getEmbryoCode())) {
+                            Integer planQty = getLhClassPlanQty(lh, classIdx);
+                            if (planQty != null && planQty > 0) {
+                                embryoVulc += planQty;
+                            }
+                        }
+                    }
+                    int projectedStock = embryoStock + embryoForming - embryoVulc;
+                    int totalMoldQty = ctx.embryoTotalMoldMap.getOrDefault(plan.embryoCode, 1);
+                    double singleTireSeconds = 86400.0 / plan.dailyLhCapacity;
+                    double projectedStockHours = (double) projectedStock * singleTireSeconds / totalMoldQty / 3600;
+                    if (projectedStockHours > 6.0) {
+                        int maxStockFor6h = (int) Math.ceil(6.0 * 3600 * totalMoldQty / singleTireSeconds);
+                        int excessStock = projectedStock - maxStockFor6h;
+                        int timeLimit = Math.max(0, allocated - excessStock);
+                        if (timeLimit < allocated) {
+                            allocated = timeLimit;
+                            if (allocated < plan.tripCapacity) {
+                                allocated = 0;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -2010,19 +2260,50 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
     }
 
     private Integer getShiftClassOrder(CxShiftConfig sc) {
-        int scheduleDay = sc.getScheduleDay();
-        int dayShiftOrder = sc.getDayShiftOrder();
-        switch (scheduleDay) {
-            case 1: return dayShiftOrder == 1 ? 1 : (dayShiftOrder == 2 ? 2 : (dayShiftOrder == 3 ? 3 : null));
-            case 2: return dayShiftOrder == 1 ? 4 : (dayShiftOrder == 2 ? 5 : (dayShiftOrder == 3 ? 6 : null));
-            case 3: return dayShiftOrder == 1 ? 7 : (dayShiftOrder == 2 ? 8 : null);
-            default: return null;
+        if (sc == null) {
+            return null;
+        }
+        try {
+            Integer scheduleDayObj = sc.getScheduleDay();
+            Integer dayShiftOrderObj = sc.getDayShiftOrder();
+            if (scheduleDayObj == null || dayShiftOrderObj == null) {
+                return null;
+            }
+            int scheduleDay = scheduleDayObj;
+            int dayShiftOrder = dayShiftOrderObj;
+            switch (scheduleDay) {
+                case 1: return dayShiftOrder == 1 ? 1 : (dayShiftOrder == 2 ? 2 : (dayShiftOrder == 3 ? 3 : null));
+                case 2: return dayShiftOrder == 1 ? 4 : (dayShiftOrder == 2 ? 5 : (dayShiftOrder == 3 ? 6 : null));
+                case 3: return dayShiftOrder == 1 ? 7 : (dayShiftOrder == 2 ? 8 : null);
+                default: return null;
+            }
+        } catch (NullPointerException e) {
+            log.error("[getShiftClassOrder] NPE occurred, will return null", e);
+            return null;
         }
     }
 
-    private int getShiftMaxCapacity(CxShiftConfig shiftConfig) {
+    private int calculateShiftCapacity(RescheduleContext ctx, CxShiftConfig shiftConfig,
+                                       Map<String, EmbryoReschedulePlan> embryoPlans) {
         Integer shiftHours = shiftConfig.getShiftHours();
-        return shiftHours != null ? shiftHours : 0;
+        if (shiftHours == null || shiftHours <= 0) {
+            return 0;
+        }
+        int maxHourlyCapacity = 0;
+        for (EmbryoReschedulePlan plan : embryoPlans.values()) {
+            int ratio = plan.lhMachineCount > 0 ? plan.lhMachineCount : 1;
+            int dailyCap = plan.dailyLhCapacity > 0 ? plan.dailyLhCapacity : 0;
+            if (dailyCap > 0) {
+                int hourly = ratio * dailyCap / 24;
+                if (hourly > maxHourlyCapacity) {
+                    maxHourlyCapacity = hourly;
+                }
+            }
+        }
+        if (maxHourlyCapacity <= 0) {
+            maxHourlyCapacity = 16;
+        }
+        return shiftHours * maxHourlyCapacity;
     }
 
     private List<EmbryoReschedulePlan> sortPlansByPriority(
@@ -2068,14 +2349,16 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
 
     private int calculatePlannedProduction(int netDemand, BigDecimal lossRate, int tripCapacity) {
         if (lossRate.compareTo(BigDecimal.ZERO) <= 0) {
+            if (tripCapacity > 0) {
+                int vehicles = (int) Math.ceil((double) netDemand / tripCapacity);
+                return vehicles * tripCapacity;
+            }
             return netDemand;
         }
-        BigDecimal divisor = BigDecimal.ONE.subtract(
+        BigDecimal multiplier = BigDecimal.ONE.add(
                 lossRate.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
-        if (divisor.compareTo(BigDecimal.ZERO) <= 0) {
-            return netDemand;
-        }
-        BigDecimal production = BigDecimal.valueOf(netDemand).divide(divisor, 0, RoundingMode.UP);
+        BigDecimal production = BigDecimal.valueOf(netDemand).multiply(multiplier)
+                .setScale(0, RoundingMode.UP);
         int prodInt = production.intValue();
         if (tripCapacity > 0) {
             int vehicles = (int) Math.ceil((double) prodInt / tripCapacity);
@@ -2111,17 +2394,41 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
                                                List<ShiftAllocationItem> allocations,
                                                int classIdx,
                                                Map<String, EmbryoReschedulePlan> embryoPlans) {
-        for (ShiftAllocationItem alloc : allocations) {
-            int oldStock = ctx.currentStockMap.getOrDefault(alloc.materialCode, 0);
-            int newStock = oldStock + alloc.allocatedQty;
-            ctx.currentStockMap.put(alloc.materialCode, newStock);
+        // 1. 计算本班次全厂硫化消耗（按物料编码汇总）
+        Map<String, Integer> vulcanizeByMaterial = new HashMap<>();
+        for (LhScheduleResult lh : ctx.lhScheduleResults) {
+            Integer planQty = getLhClassPlanQty(lh, classIdx);
+            if (planQty != null && planQty > 0 && lh.getMaterialCode() != null) {
+                vulcanizeByMaterial.merge(lh.getMaterialCode(), planQty, Integer::sum);
+            }
+        }
 
-            BigDecimal oldRemainder = ctx.formingRemainderMap.getOrDefault(
-                    alloc.materialCode, BigDecimal.ZERO);
-            BigDecimal newRemainder = oldRemainder.subtract(
-                    BigDecimal.valueOf(alloc.allocatedQty));
-            ctx.formingRemainderMap.put(alloc.materialCode,
-                    newRemainder.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newRemainder);
+        // 2. 更新库存：+成型产出 - 硫化消耗；更新成型余量：-成型产出
+        Set<String> affectedMaterials = new HashSet<>();
+        for (ShiftAllocationItem alloc : allocations) {
+            affectedMaterials.add(alloc.materialCode);
+        }
+        affectedMaterials.addAll(vulcanizeByMaterial.keySet());
+
+        for (String mat : affectedMaterials) {
+            int formingOutput = 0;
+            for (ShiftAllocationItem alloc : allocations) {
+                if (mat.equals(alloc.materialCode)) {
+                    formingOutput += alloc.allocatedQty;
+                }
+            }
+            int vulcanizeConsume = vulcanizeByMaterial.getOrDefault(mat, 0);
+
+            int oldStock = ctx.currentStockMap.getOrDefault(mat, 0);
+            int newStock = oldStock + formingOutput - vulcanizeConsume;
+            ctx.currentStockMap.put(mat, Math.max(0, newStock));
+
+            if (formingOutput > 0) {
+                BigDecimal oldRemainder = ctx.formingRemainderMap.getOrDefault(mat, BigDecimal.ZERO);
+                BigDecimal newRemainder = oldRemainder.subtract(BigDecimal.valueOf(formingOutput));
+                ctx.formingRemainderMap.put(mat,
+                        newRemainder.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newRemainder);
+            }
         }
 
         for (EmbryoReschedulePlan plan : embryoPlans.values()) {

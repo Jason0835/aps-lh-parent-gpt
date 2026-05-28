@@ -109,4 +109,36 @@ public class ScheduleAdjustController {
             return AjaxResult.error("获取调整班次范围失败：" + e.getMessage());
         }
     }
+
+    @ApiOperation(value = "机台滚动重排", notes = "以机台维度滚动重排程：阶段A应用完工量→阶段B库存时长补减车→阶段C后续班次重排")
+    @PostMapping("/reschedule")
+    public AjaxResult rescheduleByMachine(
+            @ApiParam(value = "工厂编码") @RequestParam(required = false) String factoryCode,
+            @ApiParam(value = "排程日期（yyyy-MM-dd）") @RequestParam String scheduleDate,
+            @ApiParam(value = "触发班次（CLASS1~CLASS7）") @RequestParam String triggerShiftClass,
+            @ApiParam(value = "成型机台编码") @RequestParam String machineCode) {
+
+        if (scheduleDate == null || scheduleDate.isEmpty()) {
+            return AjaxResult.error("排程日期不能为空");
+        }
+        if (triggerShiftClass == null || triggerShiftClass.isEmpty()) {
+            return AjaxResult.error("触发班次不能为空");
+        }
+        if (machineCode == null || machineCode.isEmpty()) {
+            return AjaxResult.error("机台编码不能为空");
+        }
+
+        try {
+            ScheduleAdjustResultVo result = scheduleAdjustService.rescheduleByMachine(
+                    factoryCode, scheduleDate, triggerShiftClass, machineCode);
+            if (result.isSuccess()) {
+                return AjaxResult.success(result);
+            } else {
+                return AjaxResult.error(result.getMessage(), result);
+            }
+        } catch (Exception e) {
+            log.error("机台滚动重排失败：{}", e.getMessage(), e);
+            return AjaxResult.error("机台滚动重排失败：" + e.getMessage());
+        }
+    }
 }

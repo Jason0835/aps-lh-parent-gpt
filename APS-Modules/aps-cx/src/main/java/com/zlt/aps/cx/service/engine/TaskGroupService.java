@@ -804,6 +804,10 @@ public class TaskGroupService {
             int deferredSkippedForming = 0;
             int deferredSkippedEnding = 0;
             int deferredSkippedWarehouse = 0;
+            List<String> skippedFormingList = new ArrayList<>();
+            List<String> skippedEndingList = new ArrayList<>();
+            List<String> skippedWarehouseList = new ArrayList<>();
+            List<String> skippedCapacityList = new ArrayList<>();
 
             // 跟踪每任务的累计分配：key=胎胚编码, value=[累计产量, 轮次]
             Map<String, int[]> taskRoundTracker = new HashMap<>();
@@ -905,6 +909,7 @@ public class TaskGroupService {
                             }
                             iter.remove();
                             deferredSkippedForming++;
+                            skippedFormingList.add(dt.getEmbryoCode() + "/" + dtMaterialCode);
                             continue;
                         }
 
@@ -914,6 +919,7 @@ public class TaskGroupService {
                             log.info("  [R2-剩余需求<=0] 跳过：胎胚={}", dt.getEmbryoCode());
                             iter.remove();
                             deferredSkippedEnding++;
+                            skippedEndingList.add(dt.getEmbryoCode() + "/" + dtMaterialCode);
                             continue;
                         }
 
@@ -963,6 +969,7 @@ public class TaskGroupService {
                                         dtEmbryoCode, dtCurrentStock, dtCumFormingOutput, dtCumVulcanizingConsumption,
                                         dtProjectedStock, dtSkipReason);
                                 deferredSkippedWarehouse++;
+                                skippedWarehouseList.add(dtEmbryoCode + "/" + dtMaterialCode);
                                 // 被立库管控跳过，但之前已分配过产量的任务需要收尾处理并加入结果
                                 if (dt.getPlannedProduction() != null && dt.getPlannedProduction() > 0 && !r2AddedToResult.contains(dt)) {
                                     dt.setEndingExtraInventory(dt.getPlannedProduction());
@@ -1031,6 +1038,7 @@ public class TaskGroupService {
                                         actualRemaining.toBigInteger(),
                                         actualRemaining.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP));
                                 deferredSkippedCapacity++;
+                                skippedCapacityList.add(dt.getEmbryoCode() + "/" + dtMaterialCode);
                                 break;
                             }
                             structDeferredTime = afterAdd;
@@ -1197,6 +1205,18 @@ public class TaskGroupService {
             log.info("【第二轮分配结果】总数:{}个 | 已分配:{}个 | 未完成:{}个 | 跳过:产能不足{}个/成型余量耗尽{}个/收尾余量<=0{}个/立库满{}个",
                     deferredTotal, deferredAllocated, remainingDeferred,
                     deferredSkippedCapacity, deferredSkippedForming, deferredSkippedEnding, deferredSkippedWarehouse);
+            if (!skippedCapacityList.isEmpty()) {
+                log.info("  [R2-产能不足明细] {}", String.join(", ", skippedCapacityList));
+            }
+            if (!skippedFormingList.isEmpty()) {
+                log.info("  [R2-成型余量耗尽明细] {}", String.join(", ", skippedFormingList));
+            }
+            if (!skippedEndingList.isEmpty()) {
+                log.info("  [R2-收尾余量<=0明细] {}", String.join(", ", skippedEndingList));
+            }
+            if (!skippedWarehouseList.isEmpty()) {
+                log.info("  [R2-立库满明细] {}", String.join(", ", skippedWarehouseList));
+            }
         }
 
         log.info("【任务分组结果】续作:{}个 | 试制:{}个 | 新增:{}个 | 跳过:空胎胚{}个/空任务{}个/硫化余量{}个/成型余量{}个/产能超限{}个/立库满{}个",
