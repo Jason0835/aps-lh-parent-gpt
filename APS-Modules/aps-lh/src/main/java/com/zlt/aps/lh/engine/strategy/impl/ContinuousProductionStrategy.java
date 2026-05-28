@@ -17,7 +17,6 @@ import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
-import com.zlt.aps.lh.api.enums.ShiftEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -44,6 +43,7 @@ import com.zlt.aps.lh.util.SingleMouldShiftQtyUtil;
 import com.zlt.aps.lh.util.SkuDailyPlanQuotaUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -1546,7 +1546,7 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 续作同SKU多机台收尾错峰。
+     * 续作同SKU多机台同班次尾量归集。
      *
      * @param context 排程上下文
      * @param shifts 班次列表
@@ -1590,72 +1590,69 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                 if (shiftEntry.getValue().size() < 2) {
                     continue;
                 }
-                tryStaggerContinuousSameShiftEnding(context, sourceSku, shifts,
-                        shiftEntry.getKey(), results, shiftEntry.getValue());
+                tryAggregateContinuousSameShiftEnding(context, sourceSku, shifts,
+                        shiftEntry.getKey(), shiftEntry.getValue());
             }
         }
     }
 
     /**
-     * 尝试错开续作同SKU同班次收尾。
+     * 尝试归集续作同SKU同班次尾量。
      *
      * @param context 排程上下文
      * @param sourceSku 来源SKU
      * @param shifts 班次列表
      * @param endingShiftIndex 收尾班次索引
-     * @param groupResults 同SKU同账本组续作结果
      * @param results 同班次收尾结果
-     * @return true-已错开
+     * @return true-已归集
      */
-    private boolean tryStaggerContinuousSameShiftEnding(LhScheduleContext context,
-                                                       SkuScheduleDTO sourceSku,
-                                                       List<LhShiftConfigVO> shifts,
-                                                       int endingShiftIndex,
-                                                       List<LhScheduleResult> groupResults,
-                                                       List<LhScheduleResult> results) {
+    private boolean tryAggregateContinuousSameShiftEnding(LhScheduleContext context,
+                                                          SkuScheduleDTO sourceSku,
+                                                          List<LhShiftConfigVO> shifts,
+                                                          int endingShiftIndex,
+                                                          List<LhScheduleResult> results) {
         LhShiftConfigVO endingShift = findShiftByIndex(shifts, endingShiftIndex);
-        LhShiftConfigVO nextShift = findShiftByIndex(shifts, endingShiftIndex + 1);
-        if (endingShift == null || nextShift == null) {
+        if (endingShift == null) {
             return false;
         }
-        boolean nightShift = StringUtils.equals(ShiftEnum.NIGHT_SHIFT.getCode(), endingShift.getShiftType());
-        log.info("续作同SKU多机台收尾错峰判断, materialCode: {}, 收尾班次: {}, 是否晚班: {}, 是否同SKU多机台收尾: 1",
-                sourceSku != null ? sourceSku.getMaterialCode() : null, endingShiftIndex, nightShift);
-        if (nightShift) {
+        List<LhScheduleResult> sortedResults = new ArrayList<LhScheduleResult>(results);
+        sortedResults.sort(buildContinuationKeepComparator(context));
+        int totalShiftQty = sumScheduledQtyByShifts(results, Collections.singletonList(endingShift));
+        if (totalShiftQty <= 0) {
             return false;
         }
-        if (!isSameWorkDate(endingShift.getWorkDate(), nextShift.getWorkDate())) {
-            return false;
-        }
-        LhScheduleResult donor = resolveTailDonorResult(results, endingShiftIndex);
-        LhScheduleResult receiver = resolveTailReceiverResult(context, sourceSku, groupResults, donor, nextShift);
-        if (donor == null || receiver == null) {
-            return false;
-        }
-        Integer donorQty = ShiftFieldUtil.getShiftPlanQty(donor, endingShiftIndex);
-        if (donorQty == null || donorQty <= 0) {
-            return false;
-        }
-        int availableQty = resolveAvailableShiftQtyForEndingStagger(context, sourceSku, receiver, nextShift);
-        if (donorQty > availableQty) {
-            log.info("续作同SKU多机台收尾错峰跳过, materialCode: {}, 承接机台: {}, 需转移: {}, 可用: {}",
-                    sourceSku != null ? sourceSku.getMaterialCode() : null,
-                    receiver.getLhMachineCode(), donorQty, availableQty);
-            return false;
-        }
-        setShiftPlanQty(donor, endingShiftIndex, 0, null, null);
-        Integer receiverExistingQty = ShiftFieldUtil.getShiftPlanQty(receiver, nextShift.getShiftIndex());
-        int receiverNextQty = (receiverExistingQty != null ? receiverExistingQty : 0) + donorQty;
-        setShiftPlanQty(receiver, nextShift.getShiftIndex(), receiverNextQty,
-                nextShift.getShiftStartDateTime(), null);
-        refreshResultSummary(context, donor, shifts);
-        refreshResultSummary(context, receiver, shifts);
-        log.info("续作同SKU多机台收尾尾量错开完成, materialCode: {}, 释放机台: {}, 承接机台: {}, "
-                        + "原收尾班次: {}, 承接班次: {}, 转移数量: {}, 换模均衡检查: 交由现有换模均衡与S4.6校验",
+        log.info("续作同SKU同班次尾量归集判断, materialCode: {}, 收尾班次: {}, 归集排序: {}, 同班次总量: {}",
                 sourceSku != null ? sourceSku.getMaterialCode() : null,
-                donor.getLhMachineCode(), receiver.getLhMachineCode(),
-                endingShiftIndex, nextShift.getShiftIndex(), donorQty);
-        return true;
+                endingShiftIndex, joinMachineCodes(sortedResults), totalShiftQty);
+
+        int remainingQty = totalShiftQty;
+        boolean changed = false;
+        for (int index = 0; index < sortedResults.size(); index++) {
+            LhScheduleResult result = sortedResults.get(index);
+            int existingQty = resolveShiftPlanQty(result, endingShiftIndex);
+            int allocatableQty = resolveSameShiftEndingAllocatableQty(context, result, endingShift);
+            int targetQty;
+            if (index == sortedResults.size() - 1) {
+                targetQty = remainingQty;
+            } else {
+                targetQty = Math.min(remainingQty, allocatableQty);
+            }
+            if (targetQty != existingQty) {
+                changed = true;
+            }
+            if (targetQty > 0) {
+                setShiftPlanQty(result, endingShiftIndex, targetQty,
+                        endingShift.getShiftStartDateTime(), endingShift.getShiftEndDateTime());
+            } else {
+                setShiftPlanQty(result, endingShiftIndex, 0, null, null);
+            }
+            refreshResultSummary(context, result, shifts);
+            remainingQty -= targetQty;
+        }
+        log.info("续作同SKU同班次尾量归集完成, materialCode: {}, 收尾班次: {}, 归集结果: {}, 同班次总量: {}",
+                sourceSku != null ? sourceSku.getMaterialCode() : null,
+                endingShiftIndex, joinMachineCodes(sortedResults), totalShiftQty);
+        return changed;
     }
 
     /**
@@ -1697,136 +1694,31 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
     }
 
     /**
-     * 判断两个日期是否属于同一业务日。
+     * 解析结果在指定班次的当前计划量。
      *
-     * @param firstDate 第一个日期
-     * @param secondDate 第二个日期
-     * @return true-同一业务日
+     * @param result 排程结果
+     * @param shiftIndex 班次序号
+     * @return 当前计划量
      */
-    private boolean isSameWorkDate(Date firstDate, Date secondDate) {
-        if (firstDate == null || secondDate == null) {
-            return false;
-        }
-        return LhScheduleTimeUtil.clearTime(firstDate).equals(LhScheduleTimeUtil.clearTime(secondDate));
+    private int resolveShiftPlanQty(LhScheduleResult result, int shiftIndex) {
+        Integer shiftQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+        return shiftQty != null ? shiftQty : 0;
     }
 
     /**
-     * 选择需要释放尾量的续作结果。
-     *
-     * @param results 同班次收尾结果
-     * @param endingShiftIndex 收尾班次序号
-     * @return 尾量转出结果
-     */
-    private LhScheduleResult resolveTailDonorResult(List<LhScheduleResult> results, int endingShiftIndex) {
-        LhScheduleResult donor = null;
-        int minEndingQty = Integer.MAX_VALUE;
-        for (LhScheduleResult result : results) {
-            Integer qty = ShiftFieldUtil.getShiftPlanQty(result, endingShiftIndex);
-            if (qty == null || qty <= 0) {
-                continue;
-            }
-            if (qty < minEndingQty) {
-                donor = result;
-                minEndingQty = qty;
-            }
-        }
-        return donor;
-    }
-
-    /**
-     * 选择承接尾量的续作结果。
+     * 解析同班次尾量归集时单台机台可承接的最大计划量。
      *
      * @param context 排程上下文
-     * @param sourceSku 来源SKU
-     * @param results 同SKU同账本组续作结果
-     * @param donor 转出结果
-     * @param nextShift 承接班次
-     * @return 尾量承接结果
+     * @param result 续作结果
+     * @param shift 收尾班次
+     * @return 可承接计划量
      */
-    private LhScheduleResult resolveTailReceiverResult(LhScheduleContext context,
-                                                       SkuScheduleDTO sourceSku,
-                                                       List<LhScheduleResult> results,
-                                                       LhScheduleResult donor,
-                                                       LhShiftConfigVO nextShift) {
-        LhScheduleResult emptyReceiver = null;
-        int maxAvailableQty = 0;
-        for (LhScheduleResult result : results) {
-            if (result == null || result == donor) {
-                continue;
-            }
-            int availableQty = resolveAvailableShiftQtyForEndingStagger(context, sourceSku, result, nextShift);
-            if (availableQty <= 0) {
-                continue;
-            }
-            Integer existingQty = ShiftFieldUtil.getShiftPlanQty(result, nextShift.getShiftIndex());
-            if (existingQty != null && existingQty > 0) {
-                return result;
-            }
-            if (availableQty > maxAvailableQty) {
-                emptyReceiver = result;
-                maxAvailableQty = availableQty;
-            }
-        }
-        return emptyReceiver;
-    }
-
-    /**
-     * 解析收尾错峰承接班次的剩余可用量。
-     *
-     * @param context 排程上下文
-     * @param sourceSku 来源SKU
-     * @param result 承接结果
-     * @param nextShift 承接班次
-     * @return 剩余可用量
-     */
-    private int resolveAvailableShiftQtyForEndingStagger(LhScheduleContext context,
-                                                         SkuScheduleDTO sourceSku,
-                                                         LhScheduleResult result,
-                                                         LhShiftConfigVO nextShift) {
-        if (isMachineShiftOccupiedByOtherSku(context, sourceSku, result, nextShift)) {
-            return 0;
-        }
-        int shiftCapacity = calculateResultShiftCapacity(context, result, nextShift);
-        Integer existingQty = ShiftFieldUtil.getShiftPlanQty(result, nextShift.getShiftIndex());
-        return Math.max(0, shiftCapacity - (existingQty != null ? existingQty : 0));
-    }
-
-    /**
-     * 判断承接机台下一班次是否已被其他SKU占用。
-     *
-     * @param context 排程上下文
-     * @param sourceSku 来源SKU
-     * @param receiver 承接结果
-     * @param nextShift 承接班次
-     * @return true-存在其他SKU占用
-     */
-    private boolean isMachineShiftOccupiedByOtherSku(LhScheduleContext context,
-                                                     SkuScheduleDTO sourceSku,
-                                                     LhScheduleResult receiver,
-                                                     LhShiftConfigVO nextShift) {
-        if (context == null || sourceSku == null || receiver == null || nextShift == null) {
-            return false;
-        }
-        List<LhScheduleResult> machineResults = context.getMachineAssignmentMap().get(receiver.getLhMachineCode());
-        if (CollectionUtils.isEmpty(machineResults)) {
-            machineResults = context.getScheduleResultList();
-        }
-        String sourceGroupKey = buildContinuationGroupKey(sourceSku);
-        for (LhScheduleResult result : machineResults) {
-            if (result == null) {
-                continue;
-            }
-            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, nextShift.getShiftIndex());
-            if (planQty == null || planQty <= 0) {
-                continue;
-            }
-            SkuScheduleDTO resultSourceSku = resolveResultSourceSku(context, result);
-            if (StringUtils.equals(sourceGroupKey, buildContinuationGroupKey(resultSourceSku))) {
-                continue;
-            }
-            return true;
-        }
-        return false;
+    private int resolveSameShiftEndingAllocatableQty(LhScheduleContext context,
+                                                     LhScheduleResult result,
+                                                     LhShiftConfigVO shift) {
+        int existingQty = resolveShiftPlanQty(result, shift.getShiftIndex());
+        int shiftCapacity = calculateResultShiftCapacity(context, result, shift);
+        return Math.max(existingQty, shiftCapacity);
     }
 
     /**
@@ -2373,12 +2265,42 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         result.setScheduleType(sku.getScheduleType() != null ? sku.getScheduleType() : "01");
         result.setIsTypeBlock("0");
         result.setConstructionStage(sku.getConstructionStage());
-        // 设置产品状态（取自月计划productStatus）
-        result.setTrialStatus(sku.getProductStatus());
-        result.setChangedTrialStatus(sku.getProductStatus());
+        // 产品状态从月计划获取
+        result.setProductStatus(sku.getProductStatus());
+
+        // 通过物料编码+产品状态查询SKU与示方书关系获取硫化示方类型和硫化示方书号
+        String lhNo = null;
+        String lhType = null;
+        if (StringUtils.isNotEmpty(sku.getProductStatus())) {
+            MdmSkuConstructionRef constructionRef = context.getSkuConstructionRefCompositeKeyMap()
+                    .get(sku.getMaterialCode() + "::" + sku.getProductStatus());
+            if (constructionRef != null) {
+                lhNo = constructionRef.getLhNo();
+                lhType = constructionRef.getLhType();
+            }
+        }
+        // 设置1-8班硫化示方书号和硫化示方书类型
+        result.setClass1LhNo(lhNo);
+        result.setClass1LhType(lhType);
+        result.setClass2LhNo(lhNo);
+        result.setClass2LhType(lhType);
+        result.setClass3LhNo(lhNo);
+        result.setClass3LhType(lhType);
+        result.setClass4LhNo(lhNo);
+        result.setClass4LhType(lhType);
+        result.setClass5LhNo(lhNo);
+        result.setClass5LhType(lhType);
+        result.setClass6LhNo(lhNo);
+        result.setClass6LhType(lhType);
+        result.setClass7LhNo(lhNo);
+        result.setClass7LhType(lhType);
+        result.setClass8LhNo(lhNo);
+        result.setClass8LhType(lhType);
+        // 硫化示方书号回写
+        result.setLhNo(lhNo != null ? lhNo : sku.getLhNo());
+        result.setChangedTrialStatus(lhType);
         result.setEmbryoNo(sku.getEmbryoNo());
         result.setTextNo(sku.getTextNo());
-        result.setLhNo(sku.getLhNo());
         result.setMonthPlanVersion(sku.getMonthPlanVersion());
         result.setProductionVersion(sku.getProductionVersion());
         result.setIsTrial(sku.isTrial() ? "1" : "0");

@@ -300,10 +300,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 result.setSingleMouldShiftQty(validateResult.getSingleMouldShiftQty());
             }
             if (StringUtils.isNotBlank(validateResult.getTrialStatus())) {
-                result.setTrialStatus(validateResult.getTrialStatus());
+                result.setProductStatus(validateResult.getTrialStatus());
                 result.setChangedTrialStatus(validateResult.getTrialStatus());
             } else if (StringUtils.isNotBlank(dto.getOriginalTrialStatus())) {
-                result.setTrialStatus(dto.getOriginalTrialStatus());
+                result.setProductStatus(dto.getOriginalTrialStatus());
                 result.setChangedTrialStatus(dto.getOriginalTrialStatus());
             }
             if (StringUtils.isNotBlank(validateResult.getLeftRightMould())) {
