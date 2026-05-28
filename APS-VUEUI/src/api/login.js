@@ -22,7 +22,7 @@ export function login(username, password, code, uuid) {
       username,
       password: encryptedPassword,
       rememberMe: false,
-      lang: localStorage.getItem("lang") || "zh_CN" ,
+      lang: localStorage.getItem("language") || "zh_CN" ,
     },
   });
 }

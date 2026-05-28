@@ -28,6 +28,9 @@ const service = axios.create({
 // request拦截器
 service.interceptors.request.use(
   function (config) {
+    const currentLang = store.getters.language || localStorage.getItem('language') || 'zh_CN'
+    config.headers['Accept-Language'] = currentLang
+    config.headers['lang'] = currentLang
     if (
       config.headers?.['Content-Type'] ===
       'application/x-www-form-urlencoded;charset=UTF-8' &&

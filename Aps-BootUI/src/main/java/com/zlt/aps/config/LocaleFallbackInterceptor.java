@@ -33,6 +33,8 @@ public class LocaleFallbackInterceptor implements HandlerInterceptor {
     @Autowired
     private RedisService redisService;
 
+    private static final String DEFAULT_LANG = "zh_CN";
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         try {
@@ -42,7 +44,8 @@ public class LocaleFallbackInterceptor implements HandlerInterceptor {
             String lang = resolveLang(request);
 
             if (StringUtils.isEmpty(lang)) {
-                return true;
+                lang = DEFAULT_LANG;
+                log.debug("所有语言来源均为空，使用默认语言: {}", lang);
             }
 
             writeAllLocaleKeys(sessionId, authToken, lang);
@@ -180,6 +183,7 @@ public class LocaleFallbackInterceptor implements HandlerInterceptor {
             String acceptLang = request.getHeader("Accept-Language");
             if (StringUtils.isNotEmpty(acceptLang)) {
                 acceptLang = acceptLang.split(",")[0].trim();
+                acceptLang = acceptLang.replace("-", "_");
                 if (acceptLang.matches("[a-z]{2}_[A-Z]{2}")) {
                     return acceptLang;
                 }
