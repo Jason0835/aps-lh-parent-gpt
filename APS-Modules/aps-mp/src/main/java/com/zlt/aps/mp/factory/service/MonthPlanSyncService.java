@@ -148,9 +148,9 @@ public class MonthPlanSyncService {
                 || StringUtils.isBlank(param.getLastMonthPlanVersion())) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.finalized.checkParam"));
         }
-        if (StringUtils.equals(param.getMonthPlanVersion(), param.getLastMonthPlanVersion())) {
+        /*if (StringUtils.equals(param.getMonthPlanVersion(), param.getLastMonthPlanVersion())) {
             return AjaxResult.error("未找到调整后的最新需求计划版本，无法推送");
-        }
+        }*/
         return null;
     }
 
