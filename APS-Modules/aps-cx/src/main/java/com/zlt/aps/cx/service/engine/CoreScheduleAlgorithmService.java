@@ -260,15 +260,4 @@ public interface CoreScheduleAlgorithmService {
         /** 是否临近收尾（10天内收尾） */
         private Boolean isNearEnding;
     }
-
-    /**
-     * 班次分配结果
-     */
-    @lombok.Data
-    class ShiftAllocationResult {
-        private String machineCode;
-        private String machineName;
-        private Map<String, Integer> shiftPlanQty;
-        private List<TaskAllocation> tasks;
-    }
 }

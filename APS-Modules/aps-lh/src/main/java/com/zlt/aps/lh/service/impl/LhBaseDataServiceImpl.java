@@ -1253,14 +1253,15 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                 if (StringUtils.isNotEmpty(ref.getMaterialCode())) {
                     // 按物料编码（后者覆盖前者），供策略类使用
                     refMap.put(ref.getMaterialCode(), ref);
-                    // 按物料编码 + 产品状态（复合key，完整保留所有记录），供校验器精确查找
+                    // 按物料编码 + 产品状态（复合key，完整保留所有记录），供校验器和策略类精确查找
                     compositeKeyMap.put(ref.getMaterialCode() + "::" + ref.getTrialStatus(), ref);
                 }
             }
         }
         context.setSkuConstructionRefMap(refMap);
         context.setSkuConstructionRefCompositeKeyMap(compositeKeyMap);
-        log.debug("SKU与示方书关系加载完成, 数量: {}, 复合Key数量: {}", refMap.size(), compositeKeyMap.size());
+        log.debug("SKU与示方书关系加载完成, 数量: {}, 复合Key数量: {}",
+                refMap.size(), compositeKeyMap.size());
     }
 
     /**

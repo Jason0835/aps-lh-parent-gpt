@@ -12,14 +12,28 @@ import com.zlt.aps.lh.handler.LhInsertOrderValidateHandler;
 import com.zlt.aps.lh.mapper.CxLhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
+import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
+import com.zlt.aps.lh.mapper.LhScheFinishQtyMapper;
+import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
+import com.zlt.aps.lh.mapper.MdmSkuConstructionRefMapper;
+import com.zlt.aps.lh.mapper.MdmSkuLhCapacityMapper;
 import com.zlt.aps.lh.mapper.MdmSkuMouldRelMapper;
+import com.zlt.aps.lh.mapper.LhMachineInfoMapper;
 import com.zlt.aps.lh.mapper.FactoryMonthPlanProductionFinalResultMapper;
 import com.zlt.aps.lh.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
+import com.zlt.aps.lh.api.constant.LhScheduleConstant;
+import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
+import com.zlt.aps.lh.api.domain.entity.LhScheFinishQty;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.mdm.api.domain.entity.MdmSkuLhCapacity;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
@@ -30,10 +44,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -69,6 +89,24 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
 
     @Resource
     private MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
+
+    @Resource
+    private MdmSkuConstructionRefMapper mdmSkuConstructionRefMapper;
+
+    @Resource
+    private LhMachineInfoMapper lhMachineInfoMapper;
+
+    @Resource
+    private MdmMaterialInfoMapper mdmMaterialInfoMapper;
+
+    @Resource
+    private MdmSkuLhCapacityMapper mdmSkuLhCapacityMapper;
+
+    @Resource
+    private LhDayFinishQtyMapper lhDayFinishQtyMapper;
+
+    @Resource
+    private LhScheFinishQtyMapper lhScheFinishQtyMapper;
 
     private static final AtomicInteger INSERT_ORDER_SEQ = new AtomicInteger(0);
 
@@ -300,10 +338,10 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 result.setSingleMouldShiftQty(validateResult.getSingleMouldShiftQty());
             }
             if (StringUtils.isNotBlank(validateResult.getTrialStatus())) {
-                result.setTrialStatus(validateResult.getTrialStatus());
+                result.setProductStatus(validateResult.getTrialStatus());
                 result.setChangedTrialStatus(validateResult.getTrialStatus());
             } else if (StringUtils.isNotBlank(dto.getOriginalTrialStatus())) {
-                result.setTrialStatus(dto.getOriginalTrialStatus());
+                result.setProductStatus(dto.getOriginalTrialStatus());
                 result.setChangedTrialStatus(dto.getOriginalTrialStatus());
             }
             if (StringUtils.isNotBlank(validateResult.getLeftRightMould())) {
@@ -598,5 +636,359 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
                 .orderByDesc(MpFactoryProductionVersion::getId)
                 .last("LIMIT 1");
         return mpFactoryProductionVersionMapper.selectOne(wrapper);
+    }
+
+    @Override
+    public void fillScheduleResultFields(List<LhScheduleResult> lhScheduleResultList, Date scheduleDate) {
+        if (CollectionUtils.isEmpty(lhScheduleResultList) || Objects.isNull(scheduleDate)) {
+            log.warn("fillScheduleResultFields: 传入参数为空, listSize={}, scheduleDate={}", 
+                    lhScheduleResultList == null ? 0 : lhScheduleResultList.size(), scheduleDate);
+            return;
+        }
+
+        // 提取排程日期年月
+        cn.hutool.core.date.DateTime dateTime = DateUtil.date(scheduleDate);
+        int year = DateUtil.year(dateTime);
+        int month = DateUtil.month(dateTime) + 1;
+
+        log.info("fillScheduleResultFields: 开始填充排程结果字段, 排程日期={}, 结果数量={}, year={}, month={}",
+                DateUtil.formatDate(scheduleDate), lhScheduleResultList.size(), year, month);
+
+        // scheduleDate 业务上为 T+2，计算 T 日用于完成量相关查询
+        Date tDay = DateUtil.offsetDay(scheduleDate, -2);
+        log.info("fillScheduleResultFields: scheduleDate={}, T日={}",
+                DateUtil.formatDate(scheduleDate), DateUtil.formatDate(tDay));
+
+        // 收集所有去重key
+        Set<String> factoryCodes = new HashSet<>();
+        Set<String> materialCodes = new HashSet<>();
+        Set<String> machineCodes = new HashSet<>();
+        for (LhScheduleResult r : lhScheduleResultList) {
+            if (StringUtils.isNotEmpty(r.getFactoryCode())) {
+                factoryCodes.add(r.getFactoryCode());
+            }
+            if (StringUtils.isNotEmpty(r.getMaterialCode())) {
+                materialCodes.add(r.getMaterialCode());
+            }
+            if (StringUtils.isNotEmpty(r.getLhMachineCode())) {
+                machineCodes.add(r.getLhMachineCode());
+            }
+        }
+
+        // ======== 1. 加载定稿排产版本 ========
+        // key: factoryCode, value: MpFactoryProductionVersion
+        Map<String, MpFactoryProductionVersion> productionVersionMap = new HashMap<>(factoryCodes.size());
+        for (String fc : factoryCodes) {
+            MpFactoryProductionVersion version = getFinalProductionVersion(fc, year, month);
+            if (Objects.nonNull(version)) {
+                productionVersionMap.put(fc, version);
+            }
+        }
+        log.info("fillScheduleResultFields: 排产版本加载完成, 工厂数={}, 匹配数={}", factoryCodes.size(), productionVersionMap.size());
+
+        // ======== 2. 加载月计划定稿数据 ========
+        // key: factoryCode + "|" + materialCode, value: FactoryMonthPlanProductionFinalResult
+        Map<String, FactoryMonthPlanProductionFinalResult> monthPlanMap = new HashMap<>(lhScheduleResultList.size());
+        for (String fc : factoryCodes) {
+            MpFactoryProductionVersion version = productionVersionMap.get(fc);
+            String productionVersion = Objects.nonNull(version) ? version.getProductionVersion() : null;
+            if (StringUtils.isBlank(productionVersion)) {
+                continue;
+            }
+            // 按物料编码分批查询
+            LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, fc)
+                    .eq(FactoryMonthPlanProductionFinalResult::getYear, year)
+                    .eq(FactoryMonthPlanProductionFinalResult::getMonth, month)
+                    .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, productionVersion)
+                    .in(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCodes)
+                    .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+            List<FactoryMonthPlanProductionFinalResult> monthPlanList = monthPlanMapper.selectList(wrapper);
+            for (FactoryMonthPlanProductionFinalResult mp : monthPlanList) {
+                if (StringUtils.isNotEmpty(mp.getMaterialCode())) {
+                    monthPlanMap.put(fc + "|" + mp.getMaterialCode(), mp);
+                }
+            }
+        }
+        log.info("fillScheduleResultFields: 月计划定稿加载完成, 月计划匹配数={}", monthPlanMap.size());
+
+        // ======== 3. 加载机台信息（使用模数） ========
+        // key: machineCode, value: LhMachineInfo
+        Map<String, LhMachineInfo> machineInfoMap = new HashMap<>(machineCodes.size());
+        if (!machineCodes.isEmpty()) {
+            LambdaQueryWrapper<LhMachineInfo> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(LhMachineInfo::getMachineCode, machineCodes);
+            List<LhMachineInfo> machineList = lhMachineInfoMapper.selectList(wrapper);
+            for (LhMachineInfo m : machineList) {
+                if (StringUtils.isNotEmpty(m.getMachineCode())) {
+                    machineInfoMap.put(m.getMachineCode(), m);
+                }
+            }
+        }
+        log.info("fillScheduleResultFields: 机台信息加载完成, 机台数={}, 匹配数={}", machineCodes.size(), machineInfoMap.size());
+
+        // ======== 4. 加载物料信息（规格编码、规格描述） ========
+        // key: materialCode, value: MdmMaterialInfo
+        Map<String, MdmMaterialInfo> materialInfoMap = new HashMap<>(materialCodes.size());
+        if (!materialCodes.isEmpty()) {
+            LambdaQueryWrapper<MdmMaterialInfo> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(MdmMaterialInfo::getMaterialCode, materialCodes);
+            List<MdmMaterialInfo> materialList = mdmMaterialInfoMapper.selectList(wrapper);
+            for (MdmMaterialInfo m : materialList) {
+                if (StringUtils.isNotEmpty(m.getMaterialCode())) {
+                    materialInfoMap.put(m.getMaterialCode(), m);
+                }
+            }
+        }
+        log.info("fillScheduleResultFields: 物料信息加载完成, 物料数={}, 匹配数={}", materialCodes.size(), materialInfoMap.size());
+
+        // ======== 5. 加载SKU硫化产能（硫化时间） ========
+        // key: materialCode, value: MdmSkuLhCapacity
+        Map<String, MdmSkuLhCapacity> skuLhCapacityMap = new HashMap<>(materialCodes.size());
+        if (!materialCodes.isEmpty()) {
+            LambdaQueryWrapper<MdmSkuLhCapacity> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(MdmSkuLhCapacity::getMaterialCode, materialCodes);
+            List<MdmSkuLhCapacity> capacityList = mdmSkuLhCapacityMapper.selectList(wrapper);
+            for (MdmSkuLhCapacity c : capacityList) {
+                if (StringUtils.isNotEmpty(c.getMaterialCode())) {
+                    skuLhCapacityMap.put(c.getMaterialCode(), c);
+                }
+            }
+        }
+        log.info("fillScheduleResultFields: SKU硫化产能加载完成, 物料数={}, 匹配数={}", materialCodes.size(), skuLhCapacityMap.size());
+
+        // ======== 6. 加载SKU示方书关系 ========
+        // key: materialCode + "|" + trialStatus, value: MdmSkuConstructionRef
+        Map<String, MdmSkuConstructionRef> constructionRefMap = new HashMap<>(materialCodes.size());
+        if (!materialCodes.isEmpty()) {
+            LambdaQueryWrapper<MdmSkuConstructionRef> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodes);
+            List<MdmSkuConstructionRef> refList = mdmSkuConstructionRefMapper.selectList(wrapper);
+            for (MdmSkuConstructionRef ref : refList) {
+                if (StringUtils.isNotEmpty(ref.getMaterialCode())) {
+                    String key = ref.getMaterialCode() + "|" + StringUtils.defaultString(ref.getTrialStatus());
+                    // 同物料同产品状态只保留一条
+                    constructionRefMap.putIfAbsent(key, ref);
+                }
+            }
+        }
+        log.info("fillScheduleResultFields: 示方书关系加载完成, 物料数={}, 匹配数={}", materialCodes.size(), constructionRefMap.size());
+
+        // ======== 7. 加载日完成量（本月1日至T-1日累计） ========
+        // T-1 日 = tDay - 1天
+        // key: factoryCode + "|" + materialCode, value: 累计完成量
+        Map<String, BigDecimal> dayFinishSumMap = new HashMap<>(materialCodes.size());
+        Date monthStart = DateUtil.beginOfMonth(scheduleDate);
+        Date dayBeforeTDay = DateUtil.offsetDay(tDay, -1);
+        if (!factoryCodes.isEmpty() && !materialCodes.isEmpty()) {
+            LambdaQueryWrapper<LhDayFinishQty> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(LhDayFinishQty::getFactoryCode, factoryCodes)
+                    .in(LhDayFinishQty::getMaterialCode, materialCodes)
+                    .ge(LhDayFinishQty::getFinishDate, monthStart)
+                    .le(LhDayFinishQty::getFinishDate, dayBeforeTDay);
+            List<LhDayFinishQty> dayFinishList = lhDayFinishQtyMapper.selectList(wrapper);
+            for (LhDayFinishQty qty : dayFinishList) {
+                if (StringUtils.isNotEmpty(qty.getFactoryCode()) && StringUtils.isNotEmpty(qty.getMaterialCode())
+                        && Objects.nonNull(qty.getDayFinishQty())) {
+                    String key = qty.getFactoryCode() + "|" + qty.getMaterialCode();
+                    dayFinishSumMap.merge(key, qty.getDayFinishQty(), BigDecimal::add);
+                }
+            }
+        }
+        log.info("fillScheduleResultFields: 日完成量加载完成, 匹配数={}", dayFinishSumMap.size());
+
+        // ======== 8. 加载班完成量（T日夜班完成量） ========
+        // key: factoryCode + "|" + materialCode, value: class1FinishQty
+        Map<String, BigDecimal> scheNightFinishMap = new HashMap<>(materialCodes.size());
+        if (!factoryCodes.isEmpty() && !materialCodes.isEmpty()) {
+            LambdaQueryWrapper<LhScheFinishQty> wrapper = new LambdaQueryWrapper<>();
+            wrapper.in(LhScheFinishQty::getFactoryCode, factoryCodes)
+                    .in(LhScheFinishQty::getMaterialCode, materialCodes)
+                    .eq(LhScheFinishQty::getScheduleDate, tDay);
+            List<LhScheFinishQty> scheFinishList = lhScheFinishQtyMapper.selectList(wrapper);
+            for (LhScheFinishQty qty : scheFinishList) {
+                if (StringUtils.isNotEmpty(qty.getFactoryCode()) && StringUtils.isNotEmpty(qty.getMaterialCode())
+                        && Objects.nonNull(qty.getClass1FinishQty())) {
+                    String key = qty.getFactoryCode() + "|" + qty.getMaterialCode();
+                    scheNightFinishMap.merge(key, qty.getClass1FinishQty(), BigDecimal::add);
+                }
+            }
+        }
+        log.info("fillScheduleResultFields: 班完成量加载完成, 匹配数={}", scheNightFinishMap.size());
+
+        // ======== 9. 填充每条排程结果 ========
+        for (LhScheduleResult result : lhScheduleResultList) {
+            String fc = result.getFactoryCode();
+            String matCode = result.getMaterialCode();
+            String machineCode = result.getLhMachineCode();
+            String fcMatKey = fc + "|" + matCode;
+
+            // 月计划对象（用于获取 productStatus、totalQty、constructionStage、monthPlanVersion）
+            FactoryMonthPlanProductionFinalResult monthPlan = monthPlanMap.get(fcMatKey);
+
+            // ---------- TOTAL_DAILY_PLAN_QTY：月计划总量 ----------
+            if (Objects.nonNull(monthPlan) && Objects.nonNull(monthPlan.getTotalQty())) {
+                result.setTotalDailyPlanQty(monthPlan.getTotalQty());
+            }
+
+            // ---------- PRODUCTION_VERSION：排产版本 ----------
+            MpFactoryProductionVersion finalVersion = productionVersionMap.get(fc);
+            if (Objects.nonNull(finalVersion) && StringUtils.isNotEmpty(finalVersion.getProductionVersion())) {
+                result.setProductionVersion(finalVersion.getProductionVersion());
+            }
+
+            // ---------- MONTH_PLAN_VERSION：需求计划版本 ----------
+            if (Objects.nonNull(finalVersion) && StringUtils.isNotEmpty(finalVersion.getMonthPlanVersion())) {
+                result.setMonthPlanVersion(finalVersion.getMonthPlanVersion());
+            }
+            // 如果排产版本表没有，再尝试从月计划定稿取
+            if (StringUtils.isEmpty(result.getMonthPlanVersion()) && Objects.nonNull(monthPlan)
+                    && StringUtils.isNotEmpty(monthPlan.getMonthPlanVersion())) {
+                result.setMonthPlanVersion(monthPlan.getMonthPlanVersion());
+            }
+
+            // ---------- CONSTRUCTION_STAGE：施工阶段 ----------
+            if (Objects.nonNull(monthPlan) && StringUtils.isNotEmpty(monthPlan.getConstructionStage())) {
+                result.setConstructionStage(monthPlan.getConstructionStage());
+            }
+
+            // ---------- MOULD_QTY：使用模数 ----------
+            LhMachineInfo machineInfo = machineInfoMap.get(machineCode);
+            if (Objects.nonNull(machineInfo) && Objects.nonNull(machineInfo.getMaxMoldNum())) {
+                result.setMouldQty(machineInfo.getMaxMoldNum());
+            }
+
+            // ---------- LH_TIME：硫化时间 ----------
+            Integer lhTime = null;
+            MdmSkuLhCapacity capacity = skuLhCapacityMap.get(matCode);
+            if (Objects.nonNull(capacity) && Objects.nonNull(capacity.getVulcanizationTime())
+                    && capacity.getVulcanizationTime() > 0) {
+                lhTime = capacity.getVulcanizationTime();
+            }
+            // 兜底：根据单班硫化量和使用模数反推
+            if (lhTime == null || lhTime <= 0) {
+                Integer singleMouldShiftQty = result.getSingleMouldShiftQty();
+                Integer mouldQty = result.getMouldQty();
+                // 如果result的singleMouldShiftQty为空，尝试从产能主数据取班产
+                if (singleMouldShiftQty == null || singleMouldShiftQty <= 0) {
+                    if (Objects.nonNull(capacity) && Objects.nonNull(capacity.getClassCapacity())
+                            && capacity.getClassCapacity() > 0) {
+                        singleMouldShiftQty = capacity.getClassCapacity();
+                    }
+                }
+                if (singleMouldShiftQty != null && singleMouldShiftQty > 0
+                        && mouldQty != null && mouldQty > 0) {
+                    // 单班硫化量 = floor(28800 / 硫化时间) * 使用模数
+                    // 反推：硫化时间 ≈ 28800 * 使用模数 / 单班硫化量
+                    lhTime = (int) (28800.0 * mouldQty / singleMouldShiftQty);
+                }
+            }
+            if (lhTime != null && lhTime > 0) {
+                result.setLhTime(lhTime);
+            }
+
+            // ---------- DAILY_PLAN_QTY：日计划量 ----------
+            int dailyPlanQty = 0;
+            for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+                Integer shiftQty = ShiftFieldUtil.getShiftPlanQty(result, shift);
+                if (shiftQty != null) {
+                    dailyPlanQty += shiftQty;
+                }
+            }
+            result.setDailyPlanQty(dailyPlanQty);
+
+            // ---------- MOULD_SURPLUS_QTY：硫化余量 ----------
+            if (Objects.nonNull(monthPlan) && Objects.nonNull(monthPlan.getTotalQty())) {
+                int finishedQty = 0;
+                // 本月1日至T-1日累计完成量
+                BigDecimal dayFinishSum = dayFinishSumMap.get(fcMatKey);
+                if (dayFinishSum != null) {
+                    finishedQty += dayFinishSum.intValue();
+                }
+                // T日夜班完成量（class1代表夜班）
+                BigDecimal nightFinish = scheNightFinishMap.get(fcMatKey);
+                if (nightFinish != null) {
+                    finishedQty += nightFinish.intValue();
+                }
+                int surplus = monthPlan.getTotalQty() - finishedQty;
+                result.setMouldSurplusQty(Math.max(surplus, 0));
+            }
+
+            // ---------- SPEC_CODE：规格编码 ----------
+            MdmMaterialInfo materialInfo = materialInfoMap.get(matCode);
+            if (Objects.nonNull(materialInfo) && StringUtils.isNotEmpty(materialInfo.getSpecifications())) {
+                result.setSpecCode(materialInfo.getSpecifications());
+            }
+
+            // ---------- SPEC_DESC：规格描述 ----------
+            if (Objects.nonNull(materialInfo) && StringUtils.isNotEmpty(materialInfo.getMaterialDesc())) {
+                result.setSpecDesc(materialInfo.getMaterialDesc());
+            }
+
+            // ---------- DATA_SOURCE：数据来源（固定值2-导入） ----------
+            result.setDataSource("2");
+
+            // ---------- EMBRYO_NO / TEXT_NO / LH_NO：示方书号 ----------
+            fillConstructionRefFields(result, monthPlan, constructionRefMap);
+        }
+
+        log.info("fillScheduleResultFields: 排程结果字段填充完成, 共处理{}条记录", lhScheduleResultList.size());
+    }
+
+    /**
+     * 填充制造示方书号、文字示方号、硫化示方号
+     * <p>优先根据物料编码+月计划产品状态匹配示方书关系；若未取到，则获取月计划中的示方书号。</p>
+     *
+     * @param result             排程结果
+     * @param monthPlan          月计划对象（可能为null）
+     * @param constructionRefMap 示方书关系Map，key为 materialCode + "|" + trialStatus
+     */
+    private void fillConstructionRefFields(LhScheduleResult result,
+                                           FactoryMonthPlanProductionFinalResult monthPlan,
+                                           Map<String, MdmSkuConstructionRef> constructionRefMap) {
+        String matCode = result.getMaterialCode();
+        if (StringUtils.isBlank(matCode)) {
+            return;
+        }
+
+        MdmSkuConstructionRef ref = null;
+        // 按物料编码+产品状态匹配示方书关系
+        if (Objects.nonNull(monthPlan) && StringUtils.isNotEmpty(monthPlan.getProductStatus())) {
+            String key = matCode + "|" + monthPlan.getProductStatus();
+            ref = constructionRefMap.get(key);
+        }
+
+        if (ref != null) {
+            if (StringUtils.isNotEmpty(ref.getEmbryoNo())) {
+                result.setEmbryoNo(ref.getEmbryoNo());
+            }
+            if (StringUtils.isNotEmpty(ref.getTextNo())) {
+                result.setTextNo(ref.getTextNo());
+            }
+            if (StringUtils.isNotEmpty(ref.getLhNo())) {
+                result.setLhNo(ref.getLhNo());
+            }
+            return;
+        }
+
+        // 未匹配到示方书关系，取月计划中的示方书号
+        if (Objects.nonNull(monthPlan)) {
+            if (StringUtils.isNotEmpty(monthPlan.getEmbryoNo())) {
+                result.setEmbryoNo(monthPlan.getEmbryoNo());
+            }
+            if (StringUtils.isNotEmpty(monthPlan.getTextNo())) {
+                result.setTextNo(monthPlan.getTextNo());
+            }
+            if (StringUtils.isNotEmpty(monthPlan.getLhNo())) {
+                result.setLhNo(monthPlan.getLhNo());
+            }
+        }
+
+        // 设置1-8班次的硫化示方号，取值同lhNo
+        if (StringUtils.isNotEmpty(result.getLhNo())) {
+            for (int i = 1; i <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
+                BeanUtil.setProperty(result, "class" + i + "LhNo", result.getLhNo());
+            }
+        }
     }
 }

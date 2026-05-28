@@ -280,9 +280,10 @@ public class TaskGroupService {
         int runningTotalProjectedStock = embryoTotalStockMap.values().stream().mapToInt(Integer::intValue).sum();
 
         if (warehouseCapacity > 0) {
-            log.info("【立库库容管控】参数: 立库总库容={}条, 预警比例={}%, 预警线={}条, 单胎胚可供硫化>{}h即封顶, 立库中有库存的胎胚种类={}种",
+            log.info("【立库库容管控】参数: 立库总库容={}条, 预警比例={}%, 预警线={}条, 单胎胚可供硫化>{}h即封顶, 立库中有库存的胎胚种类={}种, 当前立库总库存={}条, 剩余可用={}条",
                     warehouseCapacity, (int)(warehouseCapacityRatio * 100), warehouseThreshold,
-                    STOCK_HOURS_CAP, embryoTotalStockMap.size());
+                    STOCK_HOURS_CAP, embryoTotalStockMap.size(),
+                    runningTotalProjectedStock, Math.max(0, warehouseThreshold - runningTotalProjectedStock));
         }
 
         // 预计算：哪些结构的全部胎胚都是关键产品（开产班次时不进行过滤，否则整个结构无任务可排）
@@ -700,6 +701,14 @@ public class TaskGroupService {
                     }
                 }
 
+                // 可供硫化时长管控结果
+                if (projectedStockHours != null) {
+                    log.info("【可供硫化管控】胎胚={}, 预计班后库存={}, 可供硫化={}h, 6h上限, {}",
+                            embryoCode, projectedStock,
+                            projectedStockHours.setScale(2, BigDecimal.ROUND_HALF_UP),
+                            projectedStockHours.compareTo(BigDecimal.valueOf(STOCK_HOURS_CAP)) > 0 ? "超限→封顶" : "未超限→通过");
+                }
+
                 if (capped && maxAllowedProduction < originalProduction) {
                     int cappedProduction;
                     if (tripCapacity > 0 && maxAllowedProduction >= tripCapacity) {
@@ -795,6 +804,10 @@ public class TaskGroupService {
             int deferredSkippedForming = 0;
             int deferredSkippedEnding = 0;
             int deferredSkippedWarehouse = 0;
+            List<String> skippedFormingList = new ArrayList<>();
+            List<String> skippedEndingList = new ArrayList<>();
+            List<String> skippedWarehouseList = new ArrayList<>();
+            List<String> skippedCapacityList = new ArrayList<>();
 
             // 跟踪每任务的累计分配：key=胎胚编码, value=[累计产量, 轮次]
             Map<String, int[]> taskRoundTracker = new HashMap<>();
@@ -854,9 +867,12 @@ public class TaskGroupService {
                 }
 
                 BigDecimal structDeferredTime = BigDecimal.ZERO;
+                int structGlobalRound = 0;
                 boolean anyProgress = true;
                 while (anyProgress) {
                     anyProgress = false;
+                    structGlobalRound++;
+                    int currentRound = structGlobalRound;
                     Iterator<CoreScheduleAlgorithmService.DailyEmbryoTask> iter = taskList.iterator();
                     while (iter.hasNext()) {
                         CoreScheduleAlgorithmService.DailyEmbryoTask dt = iter.next();
@@ -893,6 +909,7 @@ public class TaskGroupService {
                             }
                             iter.remove();
                             deferredSkippedForming++;
+                            skippedFormingList.add(dt.getEmbryoCode() + "/" + dtMaterialCode);
                             continue;
                         }
 
@@ -902,6 +919,7 @@ public class TaskGroupService {
                             log.info("  [R2-剩余需求<=0] 跳过：胎胚={}", dt.getEmbryoCode());
                             iter.remove();
                             deferredSkippedEnding++;
+                            skippedEndingList.add(dt.getEmbryoCode() + "/" + dtMaterialCode);
                             continue;
                         }
 
@@ -916,6 +934,7 @@ public class TaskGroupService {
                             boolean dtSkip = false;
                             String dtSkipReason = "";
                             int dtTotalProjected = runningTotalProjectedStock;
+                            BigDecimal dtStockHoursAfterResult = null;
                             if (dtTotalProjected >= warehouseThreshold) {
                                 dtSkip = true;
                                 dtSkipReason = "[空间]全部预计=" + dtTotalProjected + ">=上限=" + warehouseThreshold;
@@ -935,6 +954,7 @@ public class TaskGroupService {
                                                 .multiply(dtSingleTireMoldSeconds)
                                                 .divide(BigDecimal.valueOf(dtTotalMoldQty), 2, BigDecimal.ROUND_HALF_UP)
                                                 .divide(BigDecimal.valueOf(SECONDS_PER_HOUR), 2, BigDecimal.ROUND_HALF_UP);
+                                        dtStockHoursAfterResult = dtStockHoursAfter;
                                         if (dtStockHoursAfter.compareTo(BigDecimal.valueOf(STOCK_HOURS_CAP)) > 0) {
                                             dtSkip = true;
                                             dtSkipReason = "[时间-事前]预估本轮排" + dtFallbackProduction + "条后=" + dtProjectedAfter
@@ -949,6 +969,7 @@ public class TaskGroupService {
                                         dtEmbryoCode, dtCurrentStock, dtCumFormingOutput, dtCumVulcanizingConsumption,
                                         dtProjectedStock, dtSkipReason);
                                 deferredSkippedWarehouse++;
+                                skippedWarehouseList.add(dtEmbryoCode + "/" + dtMaterialCode);
                                 // 被立库管控跳过，但之前已分配过产量的任务需要收尾处理并加入结果
                                 if (dt.getPlannedProduction() != null && dt.getPlannedProduction() > 0 && !r2AddedToResult.contains(dt)) {
                                     dt.setEndingExtraInventory(dt.getPlannedProduction());
@@ -974,6 +995,14 @@ public class TaskGroupService {
                                 }
                                 iter.remove();
                                 continue;
+                            }
+                            // 可供硫化时长管控结果（事前预估通过）
+                            if (dtStockHoursAfterResult != null) {
+                                int dtEstFallback = Math.min(getTripCapacity(structName, dtEmbryoCode, context), remainingDemand);
+                                log.info("  【可供硫化管控】胎胚={}, 预估排{}条后库存={}, 可供硫化={}h, 6h上限, 未超限→通过",
+                                        dtEmbryoCode, dtEstFallback,
+                                        dtCurrentStock + dtCumFormingOutput + dtEstFallback - dtCumVulcanizingConsumption,
+                                        dtStockHoursAfterResult.setScale(2, BigDecimal.ROUND_HALF_UP));
                             }
                         }
 
@@ -1009,6 +1038,7 @@ public class TaskGroupService {
                                         actualRemaining.toBigInteger(),
                                         actualRemaining.divide(BigDecimal.valueOf(3600), 1, BigDecimal.ROUND_HALF_UP));
                                 deferredSkippedCapacity++;
+                                skippedCapacityList.add(dt.getEmbryoCode() + "/" + dtMaterialCode);
                                 break;
                             }
                             structDeferredTime = afterAdd;
@@ -1059,9 +1089,9 @@ public class TaskGroupService {
                         String roundTimeDisplay = roundTimeSeconds.compareTo(BigDecimal.ZERO) > 0
                                 ? roundTimeSeconds.divide(BigDecimal.valueOf(3600), 2, BigDecimal.ROUND_HALF_UP) + "h"
                                 : "-";
-                        log.info("  [R2-第{}轮] 结构={}, 胎胚={}, 本轮={}条({}), 累计={}轮/{}条, 当前计划量={}",
-                                tracker[1], structName, dt.getEmbryoCode(),
-                                fallbackProduction, roundTimeDisplay, tracker[1], tracker[0], dt.getPlannedProduction());
+                        log.info("  [R2-第{}轮] 结构={}, 胎胚={}, 本轮={}条({}), 累计轮/{}条, 当前计划量={}",
+                                currentRound, structName, dt.getEmbryoCode(),
+                                fallbackProduction, roundTimeDisplay, tracker[0], dt.getPlannedProduction());
 
                         // 累加本班次成型产出（用每轮产量直接累加，用于下轮立库库容检查）
                         if (dtEmbryoCode != null && fallbackProduction > 0) {
@@ -1175,6 +1205,18 @@ public class TaskGroupService {
             log.info("【第二轮分配结果】总数:{}个 | 已分配:{}个 | 未完成:{}个 | 跳过:产能不足{}个/成型余量耗尽{}个/收尾余量<=0{}个/立库满{}个",
                     deferredTotal, deferredAllocated, remainingDeferred,
                     deferredSkippedCapacity, deferredSkippedForming, deferredSkippedEnding, deferredSkippedWarehouse);
+            if (!skippedCapacityList.isEmpty()) {
+                log.info("  [R2-产能不足明细] {}", String.join(", ", skippedCapacityList));
+            }
+            if (!skippedFormingList.isEmpty()) {
+                log.info("  [R2-成型余量耗尽明细] {}", String.join(", ", skippedFormingList));
+            }
+            if (!skippedEndingList.isEmpty()) {
+                log.info("  [R2-收尾余量<=0明细] {}", String.join(", ", skippedEndingList));
+            }
+            if (!skippedWarehouseList.isEmpty()) {
+                log.info("  [R2-立库满明细] {}", String.join(", ", skippedWarehouseList));
+            }
         }
 
         log.info("【任务分组结果】续作:{}个 | 试制:{}个 | 新增:{}个 | 跳过:空胎胚{}个/空任务{}个/硫化余量{}个/成型余量{}个/产能超限{}个/立库满{}个",

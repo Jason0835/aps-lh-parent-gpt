@@ -362,6 +362,7 @@
   "ui.data.rollingCycle.structuralSingle": "Điều chỉnh cấu trúc đơn",
   "ui.data.rollingCycle.result": "Kết quả điều chỉnh",
   "ui.data.rollingCycle.adjustOrder": "Lấy đơn hàng điều chỉnh",
+  "ui.data.rollingCycle.directConfirm": "Xác nhận trực tiếp",
   "ui.data.rollingCycle.adjustAuto": "Tự động điều chỉnh",
   "ui.data.rollingCycle.adjustCheck": "Điều chỉnh cấu trúc đơn lẻ",
   "ui.data.rollingCycle.adjustAdd": "Thêm cấu trúc mới",

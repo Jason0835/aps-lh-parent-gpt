@@ -1194,6 +1194,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             insertList.add(target);
             successNum++;
         }
+
+        // 填充排程结果字段
+        lhScheduleResultService.fillScheduleResultFields(insertList, scheduleDate);
+
         this.baseDao.insertBatch(insertList);
         if (failureNum > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
@@ -1259,7 +1263,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 source.getClass7MouldMethod(),
                 source.getClass8MouldMethod()
         ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
-        target.setTrialStatus(scheduleType);
+        target.setProductStatus(scheduleType);
 
         // 遍历class1LeftRightMould到class8LeftRightMould，取第一个非空值
         String leftRightMould = Stream.of(
