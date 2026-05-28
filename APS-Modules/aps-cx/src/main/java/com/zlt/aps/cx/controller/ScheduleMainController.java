@@ -380,23 +380,23 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             summary.setErrors(result.getValidationErrors());
             summary.setWarnings(result.getValidationWarnings());
             return AjaxResult.error(
-                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.scheduleFailed") + "[" + dto.getScheduleDate() + "]: "
-                            + I18nUtil.getMessage("ui.data.column.cxScheduleResult.validationFailedSummary",
-                            new Object[]{summary.getErrorCount(), summary.getWarningCount()}),
+                    "排程失败[" + dto.getScheduleDate() + "]: 数据完整性校验不通过，共 "
+                            + summary.getErrorCount() + " 项错误，"
+                            + summary.getWarningCount() + " 项警告",
                     summary);
         }
     }
 
     /**
      * 发布选中的排程结果到MES中间表
-     * 
+     *
      * 发布流程：
      *   1. 按排程日期+工厂编码查询排程结果，若传入ids则按勾选ID过滤；
      *   2. 过滤可发布状态的记录：仅处理"未发布(0)"、"发布失败(2)"、"待发布(5)"三种状态；
      *   3. 校验每条记录必须已分配唯一成型机台（cxMachineCode不能为空或含逗号分隔的多机台）；
      *   4. 获取分布式锁后调用doIssueCxScheduleResultToMes构建3天下发实体并下发MES；
      *   5. 根据MES反馈结果更新发布状态：成功→"已发布(1)"，失败→"发布失败(2)"；
-     * 
+     *
      * 日期推导与班次映射（doIssueCxScheduleResultToMes内部）：
      *   每条成型排程结果自带8班数据（排程日期=T，排产窗口=T-2 ~ T）：
      *   8班结构：CLASS1=早(T-2), CLASS2=中(T-2), CLASS3=夜(T-1), CLASS4=早(T-1),
@@ -405,7 +405,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      *   - T-2日（窗口首日）：下发早中2班（CLASS1→2班, CLASS2→3班；1班=夜班置空，因T-2夜班已生产）
      *   - T-1日（窗口次日）：下发夜早中3班（CLASS3→1班, CLASS4→2班, CLASS5→3班）
      *   - T 日（排程日期）：下发夜早中3班（CLASS6→1班, CLASS7→2班, CLASS8→3班）
-     * 
+     *
      * 下发前数据补全（enrichMaterialAndExampleInfo）：
      *   - MES物料编码：通过物料编码关联MdmMaterialInfo获取mesMaterialCode
      *   - 成型示方号：通过物料编码关联MdmSkuConstructionRef获取embryoNo作为示方号，
@@ -924,24 +924,24 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         return cxScheduleResultService;
     }
 
-	@Override
-	protected void builderCondition(QueryWrapper<CxScheduleResult> queryWrapper, CxScheduleResult queryVO) {
-		// 排程日期查询
+    @Override
+    protected void builderCondition(QueryWrapper<CxScheduleResult> queryWrapper, CxScheduleResult queryVO) {
+        // 排程日期查询
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getScheduleDate()), "SCHEDULE_DATE", queryVO.getScheduleDate());
-		// 机台代码模糊查询
-		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getCxMachineCode()), "CX_MACHINE_CODE", queryVO.getCxMachineCode());
-		// 物料代码模糊查询
-		queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
+        // 机台代码模糊查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getCxMachineCode()), "CX_MACHINE_CODE", queryVO.getCxMachineCode());
+        // 物料代码模糊查询
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialCode()), "MATERIAL_CODE", queryVO.getMaterialCode());
         // 物料代码模糊查询
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMaterialDesc()), "MATERIAL_DESC", queryVO.getMaterialDesc());
         // 物料代码模糊查询
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getMainMaterialDesc()), "MAIN_MATERIAL_DESC", queryVO.getMainMaterialDesc());
-		// 订单号精确查询
-		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getOrderNo()), "ORDER_NO", queryVO.getOrderNo());
-		// 生产状态精确查询
-		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getProductionStatus()), "PRODUCTION_STATUS", queryVO.getProductionStatus());
-		// 发布状态精确查询
-		queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getIsRelease()), "IS_RELEASE", queryVO.getIsRelease());
+        // 订单号精确查询
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getOrderNo()), "ORDER_NO", queryVO.getOrderNo());
+        // 生产状态精确查询
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getProductionStatus()), "PRODUCTION_STATUS", queryVO.getProductionStatus());
+        // 发布状态精确查询
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getIsRelease()), "IS_RELEASE", queryVO.getIsRelease());
     }
 
     /**
@@ -1129,8 +1129,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      * - 修改后的计划量不能低于已完成量
      */
     private AjaxResult validateAdjustQtyShifts(ScheduleAdjustVo vo, CxScheduleResult record,
-                                                LocalDate scheduleLocalDate, LocalDateTime now,
-                                                 Map<String, CxShiftConfig> configMap) {
+                                               LocalDate scheduleLocalDate, LocalDateTime now,
+                                               Map<String, CxShiftConfig> configMap) {
         String[] shiftNames = buildShiftNames(scheduleLocalDate);
 
         BigDecimal[] planQtys = {null, vo.getClass1PlanQty(), vo.getClass2PlanQty(), vo.getClass3PlanQty(),
@@ -1244,7 +1244,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      * 2. T日夜班(CLASS3)即使未到结束时间也不转移（业务规则）
      */
     private boolean isShiftTransferable(int classIndex, LocalDate scheduleDate, LocalDateTime now,
-                                         Map<String, CxShiftConfig> configMap) {
+                                        Map<String, CxShiftConfig> configMap) {
         if (isShiftPast(classIndex, scheduleDate, now, configMap)) {
             return false;
         }
@@ -1698,7 +1698,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      * 校验新机台是否有足够产能承接转移的计划量（按单条胎时间计算）
      */
     private String checkNewMachineCapacityTimeBased(List<CxScheduleResult> transferRecords, String newMachineCode,
-                                                     MdmMoldingMachine newMachine, Map<String, CxShiftConfig> configMap) {
+                                                    MdmMoldingMachine newMachine, Map<String, CxShiftConfig> configMap) {
         // 按排程日期分组转移记录
         Map<Date, List<CxScheduleResult>> recordsByDate = new HashMap<>();
         for (CxScheduleResult record : transferRecords) {
@@ -1848,7 +1848,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      * 2. 单条胎耗时(s) = 86400 / (配比 × 日硫化量)
      */
     private BigDecimal calcSingleTireTime(MdmMoldingMachine machine, String structureName,
-                                           int dailyLhCapacity) {
+                                          int dailyLhCapacity) {
         if (machine == null || structureName == null) {
             return BigDecimal.valueOf(86400L); // 无法获取配比时默认24h一条
         }
@@ -1944,7 +1944,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      * 从产能列表中获取指定物料的日硫化量（按模式计算）
      */
     private int getDailyLhCapacity(List<MonthPlanProductLhCapacityVo> capacityList,
-                                    DayVulcanizationModeEnum mode, String materialCode, int fallbackValue) {
+                                   DayVulcanizationModeEnum mode, String materialCode, int fallbackValue) {
         if (capacityList != null && materialCode != null) {
             for (MonthPlanProductLhCapacityVo capVo : capacityList) {
                 if (materialCode.equals(capVo.getMaterialCode())) {
@@ -1962,9 +1962,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      * 每个物料按自身的单条胎耗时独立计算
      */
     private BigDecimal[] calcShiftTimeConsumed(MdmMoldingMachine machine, Date scheduleDate,
-                                                List<CxScheduleResult> records,
-                                                List<MonthPlanProductLhCapacityVo> capacityList,
-                                                DayVulcanizationModeEnum mode, int fallbackDailyLh) {
+                                               List<CxScheduleResult> records,
+                                               List<MonthPlanProductLhCapacityVo> capacityList,
+                                               DayVulcanizationModeEnum mode, int fallbackDailyLh) {
         BigDecimal[] shiftTime = new BigDecimal[9];
         for (int i = 1; i <= 8; i++) shiftTime[i] = BigDecimal.ZERO;
         for (CxScheduleResult record : records) {
@@ -1999,7 +1999,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      * @return 产能不足时返回错误信息，充足时返回 null
      */
     private String checkPerShiftCapacity(BigDecimal[] planQtys, BigDecimal[] existingTimeSeconds,
-                                          BigDecimal insertSingleTireTime, String[] shiftNames) {
+                                         BigDecimal insertSingleTireTime, String[] shiftNames) {
         BigDecimal shiftTotalSeconds = BigDecimal.valueOf(28800L);
         for (int i = 1; i <= 8; i++) {
             if (planQtys[i] == null) continue;
