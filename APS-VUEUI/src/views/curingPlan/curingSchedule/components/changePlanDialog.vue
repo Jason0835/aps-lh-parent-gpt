@@ -1320,9 +1320,12 @@ export default {
     },
     validatePlanQtyByFinishQty() {
       for (let i = 1; i <= 8; i++) {
+        if (this[`three${i}PlanTimeDisabled`]) {
+          continue;
+        }
         const planQty = Number(this.form[`class${i}PlanQty`] || 0);
         const finishQty = Number(this.form[`class${i}FinishQty`] || 0);
-        if (finishQty > 0 && planQty <= finishQty) {
+        if (finishQty > 0 && planQty < finishQty) {
           this.$modal.msgError(
             this.$t(
               "ui.data.column.scheduleResult.planGreaterThanFinishWhenFinishPositive",

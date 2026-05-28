@@ -153,7 +153,7 @@ export default {
         },
         {
           prop: "boardingDate",
-          label: this.$t("模具可用日期"),
+          label: this.$t("ui.data.column.mpMouldDeliveryPlan.boardingDate"),
           type: "date",
           valueFormat: "yyyy-MM-dd",
           disabled: true,

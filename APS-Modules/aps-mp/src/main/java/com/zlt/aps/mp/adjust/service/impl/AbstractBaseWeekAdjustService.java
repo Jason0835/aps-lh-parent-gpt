@@ -1274,7 +1274,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             if (finalAdjustVo.getBeginDay() == null || finalAdjustVo.getEndDay() == null){
                 continue;
             }
-            if (finalAdjustVo.getBeginDay() == 0 && finalAdjustVo.getEndDay() == 0){
+            if (finalAdjustVo.getBeginDay() == 0 || finalAdjustVo.getEndDay() == 0){
                 continue;
             }
             if (finalAdjustVo.getBeginDay() < contextDTO.getStructureStartDay() || finalAdjustVo.getEndDay() > contextDTO.getStructureDeadLine() ){
@@ -1570,24 +1570,26 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
             insertMonthPlanList.add(monthPlan);
         }
+        if (PubUtil.isNotEmpty(insertMonthPlanList)){
+            // 将日期字段中值为0的字段设为null
+            for (FactoryMonthPlanProductionFinalResult monthPlan : insertMonthPlanList) {
+                handleZeroToNull(monthPlan);
+            }
+            // 添加到月计划上下文
+            contextDTO.getFactoryMonthPlanProdFinalList().addAll(BeanUtil.copyToList(insertMonthPlanList, FactoryMonthPlanFinalAdjustVo.class));
+        }
 
         // 构建搭配排产新增月度计划
         List<FactoryMonthPlanProductionFinalResult> matchingProductionMonthPlanList = buildMatchingProductionMonthPlan(adjustDetailList, adjustResultList, contextDTO);
-        insertMonthPlanList.addAll(matchingProductionMonthPlanList);
-        // 获取调整结果计划总量为0的月度计划列表
-        //List<FactoryMonthPlanProductionFinalResult> adjustResultMonthPlanList = buildAdjustResultMonthPlan(adjustResultList);
-        // 需要删除月度生产计划列表
-        /*List<FactoryMonthPlanProductionFinalResult> deleteMonthPlanList = new ArrayList<>();
-        deleteMonthPlanList.addAll(insertMonthPlanList);
-        deleteMonthPlanList.addAll(adjustResultMonthPlanList);*/
-
-        // 将日期字段中值为0的字段设为null
-        for (FactoryMonthPlanProductionFinalResult monthPlan : insertMonthPlanList) {
-            handleZeroToNull(monthPlan);
+        if (PubUtil.isNotEmpty(matchingProductionMonthPlanList)){
+            // 将日期字段中值为0的字段设为null
+            for (FactoryMonthPlanProductionFinalResult monthPlan : matchingProductionMonthPlanList) {
+                handleZeroToNull(monthPlan);
+            }
+            // 添加到月计划上下文
+            contextDTO.getFactoryMonthPlanProdFinalList().addAll(BeanUtil.copyToList(matchingProductionMonthPlanList, FactoryMonthPlanFinalAdjustVo.class));
         }
 
-        // 添加到月计划上下文
-        contextDTO.getFactoryMonthPlanProdFinalList().addAll(BeanUtil.copyToList(insertMonthPlanList, FactoryMonthPlanFinalAdjustVo.class));
 
         /*try {
             // 删除月度生产计划
@@ -3677,7 +3679,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 试制量制关联字段设置
             if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
                 // 施工阶段
-                adjustDetailVo.setConstructionStage(trialPlan.getTrialStatus());
+                if (ConstructionStageEnum.MEASUREMENT_FLAG.equals(trialPlan.getTrialStatus())) {
+                    adjustDetailVo.setConstructionStage(ConstructionStageEnum.MEASUREMENT.getStage());
+                }else if (ConstructionStageEnum.TRIAL_FLAG.equals(trialPlan.getTrialStatus())) {
+                    adjustDetailVo.setConstructionStage(ConstructionStageEnum.TRIAL_PRODUCTION.getStage());
+                }
+
                 // 产品状态
                 adjustDetailVo.setProductStatus(productStatus);
                 // 紧急程度
@@ -3721,7 +3728,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 紧急程度
             adjustDetailVo.setUrgencyType(trialPlan.getUrgencyType());
             // 施工阶段
-            adjustDetailVo.setConstructionStage(trialPlan.getTrialStatus());
+            if (ConstructionStageEnum.MEASUREMENT_FLAG.equals(trialPlan.getTrialStatus())) {
+                adjustDetailVo.setConstructionStage(ConstructionStageEnum.MEASUREMENT.getStage());
+            }else if (ConstructionStageEnum.TRIAL_FLAG.equals(trialPlan.getTrialStatus())) {
+                adjustDetailVo.setConstructionStage(ConstructionStageEnum.TRIAL_PRODUCTION.getStage());
+            }
             // 试制量试ID
             adjustDetailVo.setTrialPlanId(Convert.toStr(trialPlan.getId(), null));
         }

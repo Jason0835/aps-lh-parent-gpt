@@ -442,6 +442,9 @@ public class MatchingAdjuestProductionHandler {
                     if (unAllocationQty <= 0) {
                         break out;
                     }
+                    if (day == 0){
+                        continue;
+                    }
                     // 5.2.1、检查生产日历，停产日不处理
                     if (!this.checkDayCanProduct(contextDTO, day)) {
                         continue;
@@ -616,6 +619,9 @@ public class MatchingAdjuestProductionHandler {
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityLimitMap = contextDTO.getDailyCapacityLimitVoMap(); // 每日产能统计
         this.reCalcAdjustDailyCapacityLimit(contextDTO, safeList, plan, day); // 先重算产能占用
         MpDailyCapacityLimitVo dailyCapacityLimitVo = dailyCapacityLimitMap.get(day);
+        if (dailyCapacityLimitVo == null){
+            return false;
+        }
         // 1、检查胎胚数是否满足条件
         if (dailyCapacityLimitVo.getMaxEmbryoTypes() <= dailyCapacityLimitVo.getUsedEmbryoTypes()) { // 胎胚数已达上限，则不能继续添加新胎胚
             Set<String> embryoCodes = dailyCapacityLimitVo.getEmbryoCodes();
@@ -740,6 +746,9 @@ public class MatchingAdjuestProductionHandler {
         if (!isCheckContinue) {
             Integer lastDayPlanQty = null;
             for (int day = beginDay; day < realEndDay; day++) {
+                if (day == 0){
+                    continue;
+                }
                 if (!this.checkDayCanProduct(contextDTO, day)) {
                     continue;
                 }
@@ -903,11 +912,12 @@ public class MatchingAdjuestProductionHandler {
      */
     private int getNewCavityQty(MpRollAdjustContextDTO contextDTO, FactoryMonthPlanFinalAdjustVo mpFinalVo, int iDay) {
         DailyMouldAvailabilityResult cavity2BlockVo = contextDTO.getCavity2BlockMap().get(iDay);
+        int oriMouldCavityQty = mpFinalVo.getMouldCavityQty() == null ? 0 : mpFinalVo.getMouldCavityQty();
         if (cavity2BlockVo != null && cavity2BlockVo.getCavityResults() != null) {
             Integer cavityQty = cavity2BlockVo.getCavityResults().get(mpFinalVo.getStructureName() + mpFinalVo.getMainPattern());
-            return cavityQty != null ? cavityQty : mpFinalVo.getMouldCavityQty();
+            return cavityQty != null ? cavityQty : oriMouldCavityQty;
         }
-        return mpFinalVo.getMouldCavityQty();
+        return oriMouldCavityQty;
     }
 
     /**

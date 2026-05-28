@@ -20,12 +20,19 @@
 </template>
 
 <script>
-import { listResult } from "@/api/lh/curingDailyCompletion";
+import {listResult} from "@/api/lh/curingDailyCompletion";
 
 export default {
   name: "CuringDailyCompletion",
   dicts: ["biz_factory_name"],
   data() {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const y = yesterday.getFullYear();
+    const m = String(yesterday.getMonth() + 1).padStart(2, "0");
+    const d = String(yesterday.getDate()).padStart(2, "0");
+    const defaultDate = `${y}-${m}-${d}`;
     return {
       loading: false,
       data: [],
@@ -39,11 +46,13 @@ export default {
         factoryCode: "116",
         materialCode: "",
         materialDesc: "",
+        finishDate: defaultDate,
       },
       query: {
         factoryCode: "116",
         materialCode: "",
         materialDesc: "",
+        finishDate: defaultDate,
       },
     };
   },
@@ -101,6 +110,12 @@ export default {
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.completeDate"),
+          prop: "finishDate",
+          type: "date",
+          valueFormat: "yyyy-MM-dd",
         },
         {
           label: this.$t("ui.data.column.scheduleResult.materialCode"),

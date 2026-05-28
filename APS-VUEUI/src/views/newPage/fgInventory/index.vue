@@ -50,7 +50,7 @@
           plain
           v-hasPermi="['monthplan:mdmFinishStock:genOverDueSkuByStock']"
           @click="handleAdd"
-          >{{ $t("生成超期SKU") }}
+          >{{ $t("ui.btn.fgInventory.genOverDueSku") }}
         </el-button>
       </template>
     </page-table>
@@ -133,7 +133,7 @@ export default {
         },
         {
           prop: "finalGrade",
-          label: this.$t("品级"),
+          label: this.$t("ui.data.column.finishStock.finalGrade"),
           width:120
         },
         {
