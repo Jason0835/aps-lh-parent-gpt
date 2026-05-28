@@ -88,12 +88,12 @@
             />
           </div>
           <div class="current-machine-wrap">
-            <span class="current-machine-label">当前调整结构</span>
+            <span class="current-machine-label">{{ $t('ui.data.column.monthlyProductionPlan.currentAdjustStructure') }}</span>
             <el-input
               class="current-machine-input"
               :value="currentAdjustStructure"
               disabled
-              placeholder="当前调整结构"
+              :placeholder="$t('ui.data.column.monthlyProductionPlan.currentAdjustStructure')"
             />
           </div>
           <div class="current-machine-wrap">
@@ -460,7 +460,7 @@ export default {
       const dayFillDragPreview = this.dayFillDragPreview;
       void dayFillDragPreview;
       const structureTypeLabel = (v) => {
-        const m = { "01": "周期结构", "02": "常规结构" };
+        const m = { "01": this.$t("ui.data.column.monthlyProductionPlan.structureType.cycle"), "02": this.$t("ui.data.column.monthlyProductionPlan.structureType.normal") };
         return m[v] != null ? m[v] : v || "";
       };
       const cols = [
@@ -516,13 +516,13 @@ export default {
         }, // 排产类型
         {
           prop: "embryoCode",
-          label: "胎胚号",
+          label: this.$t("ui.data.column.monthlyProductionPlan.embryoCode"),
           width: 100,
           align: "left",
         },
         {
           prop: "mainMaterialDesc",
-          label: "胎胚描述",
+          label: this.$t("ui.data.column.monthlyProductionPlan.embryoDesc"),
           width: 310,
           align: "left",
         },
@@ -546,7 +546,7 @@ export default {
         },
         {
           prop: "proSize",
-          label: "英寸",
+          label: this.$t("ui.data.column.monthlyProductionPlan.inch"),
           width: 80,
         },
         {
@@ -566,22 +566,22 @@ export default {
         },
         {
           prop: "adjustQty1",
-          label: "调整1",
+          label: this.$t("ui.data.column.monthlyProductionPlan.adjustQty1"),
           width: 80,
         },
         {
           prop: "adjustQty2",
-          label: "调整2",
+          label: this.$t("ui.data.column.monthlyProductionPlan.adjustQty2"),
           width: 80,
         },
         {
           prop: "adjustQty3",
-          label: "调整3",
+          label: this.$t("ui.data.column.monthlyProductionPlan.adjustQty3"),
           width: 80,
         },
         {
           prop: "adjustQty4",
-          label: "调整4",
+          label: this.$t("ui.data.column.monthlyProductionPlan.adjustQty4"),
           width: 80,
         },
         {
@@ -700,7 +700,7 @@ export default {
       for (let i = 1; i <= 31; i++) {
         const prop = `day${i}`;
         cols.push({
-          label: `${i}号`,
+          label: `${i}${this.$t("ui.data.column.monthlyProductionPlan.day")}`,
           prop,
           minWidth: "72px",
           render: ({ row }) => {
@@ -1421,9 +1421,9 @@ export default {
     /** 填充柄 hover 提示：无连续空格时不展示双击说明 */
     getDayFillHandleTitle(row, day) {
       if (this.hasEditableEmptyDayAfter(row, day)) {
-        return "双击向下填充空格；拖动可覆盖后续日期";
+        return this.$t("ui.data.column.monthlyProductionPlan.fillHandleTitle.doubleClick");
       }
-      return "拖动可覆盖后续日期";
+      return this.$t("ui.data.column.monthlyProductionPlan.fillHandleTitle.drag");
     },
     /** 拖动填充预览视觉（由 Vue 渲染，表格 hover 重绘时仍保留） */
     getDayFillDragVisual(row, day) {
@@ -1640,14 +1640,17 @@ export default {
     /** 填充结果提示（双击 / 拖动共用） */
     showDayFillResultMessage(row, startDay, endDay) {
       const total = this.sumDayRange(row, startDay, endDay);
+      const dayLabel = this.$t("ui.data.column.monthlyProductionPlan.day");
       const rangeLabel =
-        startDay === endDay ? `${startDay}号` : `${startDay}号-${endDay}号`;
+        startDay === endDay ? `${startDay}${dayLabel}` : `${startDay}${dayLabel}-${endDay}${dayLabel}`;
       const filledLabel =
         startDay === endDay
-          ? `${startDay}号`
-          : `${startDay + 1}号-${endDay}号`;
+          ? `${startDay}${dayLabel}`
+          : `${startDay + 1}${dayLabel}-${endDay}${dayLabel}`;
+      const filled = this.$t("ui.data.column.monthlyProductionPlan.filled");
+      const totalLabel = this.$t("ui.data.column.monthlyProductionPlan.total");
       this.$message.success(
-        `已填充 ${filledLabel}，${rangeLabel}合计：${total}`
+        `${filled} ${filledLabel}，${rangeLabel}${totalLabel}：${total}`
       );
     },
     /**
@@ -2276,12 +2279,12 @@ export default {
               const embryoCount = {
                 structureName: current.structureName,
                 showBackground: "light-green",
-                materialCode: "胎胚种类数",
+                materialCode: this.$t("ui.data.column.mouldingDayResult.embryoCount"),
               };
               const lhMachines = {
                 structureName: current.structureName,
                 showBackground: "light-blue",
-                materialCode: "硫化机台数",
+                materialCode: this.$t("ui.data.column.mouldingDayResult.lhMachineCount"),
                 _overDays: {},
               };
               for (let j = 1; j <= 31; j++) {

@@ -80,7 +80,7 @@ public class MpWeekRollAdjustEngine {
         //结构内同步需求量
         syncRequestQtyForStructureIn(mpAdjustStructureInList,mpProdFinalList);
 
-        List<String> onMaterialCodeList = mpProdFinalList.stream().map(x -> x.getMaterialCode()).collect(Collectors.toList());
+        List<String> onMaterialCodeStageList = mpProdFinalList.stream().map(x -> x.getMaterialCode()+ BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY + x.getConstructionStage()).collect(Collectors.toList());
         Date startTime,endTime;
         //StringBuffer sbError = new StringBuffer();
         for (MpAdjustStructureIn adjustStructureIn:mpAdjustStructureInList){
@@ -108,7 +108,7 @@ public class MpWeekRollAdjustEngine {
             }
             if (adjustStructureIn.getConfirmAdjustQty() > 0){
                 //1.2 增量
-                if (onMaterialCodeList.indexOf(adjustStructureIn.getMaterialCode())>=0){
+                if (onMaterialCodeStageList.indexOf(adjustStructureIn.getMaterialCode()+ BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY + adjustStructureIn.getConstructionStage())>=0){
                     //在机SKU增量
                     onIncrementAdjustList.add(adjustStructureIn);
                 }else{

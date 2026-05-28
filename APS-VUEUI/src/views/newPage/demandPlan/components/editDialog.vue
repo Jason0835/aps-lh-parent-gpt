@@ -127,7 +127,7 @@ export default {
         },
         {
           prop: "structurePriority",
-          label: this.$t("结构优先"),
+          label: this.$t("ui.data.DemandPlan.structurePriority"),
           type: "select",
           dictData: this.parentDict.type.biz_yes_no,
         },

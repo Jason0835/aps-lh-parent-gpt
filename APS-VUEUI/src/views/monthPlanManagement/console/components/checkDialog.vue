@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    title="检查配置项"
+    :title="$t('ui.data.checkDialog.title')"
     :visible="visible"
     width="800px"
     @close="hide"
@@ -188,19 +188,19 @@ export default {
 
     // 进度文本
     progressText() {
-      if (this.checking) return "正在检查中...";
+      if (this.checking) return this.$t("ui.data.checkDialog.checking");
       if (this.allPassed)
-        return `全部检查通过 (${this.passedCount}/${this.checkItems.length})`;
-      return `已检查 ${this.checkedCount}/${this.checkItems.length}`;
+        return this.$t("ui.data.checkDialog.allCheck") + ` (${this.passedCount}/${this.checkItems.length})`;
+      return this.$t("ui.data.checkDialog.check") + ` ${this.checkedCount}/${this.checkItems.length}`;
     },
 
     // 确认按钮文本
     confirmText() {
-      if (this.confirming) return "确认中...";
-      if (this.checking) return "检查中...";
+      if (this.confirming) return this.$t("ui.data.checkDialog.checking");
+      if (this.checking) return this.$t("ui.data.checkDialog.checking");
       if (this.allPassed)
-        return `确认 (${this.passedCount}/${this.checkItems.length})`;
-      return `确认 (${this.passedCount}/${this.checkItems.length})`;
+        return this.$t("common.button.confirm") + ` (${this.passedCount}/${this.checkItems.length})`;
+      return this.$t("common.button.confirm") + ` (${this.passedCount}/${this.checkItems.length})`;
     },
   },
   methods: {
