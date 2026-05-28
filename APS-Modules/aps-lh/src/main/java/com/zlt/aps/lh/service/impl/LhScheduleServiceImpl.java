@@ -1194,6 +1194,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             insertList.add(target);
             successNum++;
         }
+
+        // 填充排程结果字段
+        lhScheduleResultService.fillScheduleResultFields(insertList, scheduleDate);
+
         this.baseDao.insertBatch(insertList);
         if (failureNum > 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);

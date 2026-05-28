@@ -117,4 +117,15 @@ public interface ILhScheduleResultService {
      * @param dto 插单请求数据
      */
     void insertOrder(LhOrderInsertDTO dto);
+
+    /**
+     * 填充排程结果字段：月计划总量、制造示方书号、使用模数、排产版本、施工阶段、硫化时间、
+     * 日计划量、硫化余量、需求计划版本、规格编码、规格描述、数据来源、文字示方号、硫化示方号
+     * <p>批量预加载月计划、排产版本、机台信息、示方书关系、物料信息、SKU硫化产能等数据，
+     * 避免在循环中反复查库。</p>
+     *
+     * @param lhScheduleResultList 排程结果列表
+     * @param scheduleDate         排程目标日期
+     */
+    void fillScheduleResultFields(List<LhScheduleResult> lhScheduleResultList, Date scheduleDate);
 }
