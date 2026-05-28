@@ -268,7 +268,7 @@ public class CxContinueProductionHandler {
      * @return
      */
     private static ContinueSkuNextSkuInfo getNextSku(TbrProductionContext productionContext, EarliestConclusionLhGroupHelper lhGroup, ProductionPlanGroupInfo productionPlanInfo, ProductionStageEnum productionStage, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> matchList, Set<String> excludeSkuSet) {
-        //改用Top3列表，不再单个优先级：ContinueSkuPrioritySelector.getHeightPrioritySku(productionStage, matchList, excludeSkuSet);
+        //改用Top3列表，不再单个优先级
         Integer startDay = lhGroup.getClosingDay();
         Integer endDay = lhGroup.getEndDay();
         String selectedMaterialDesc = SkuPrioritySelector.getHighestPrioritySku(productionContext, productionStage, null, productionPlanInfo, lhGroup, continueType, matchList, excludeSkuSet, null);

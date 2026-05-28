@@ -268,7 +268,7 @@ public class TbrMouldProductionLogRecorder {
 
     /**
      * 增加 在排产日最后找到的一个Sku日志记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 硫化组找到是否[%s]最后一个排产Sku：%s====
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 硫化组找到 %s 是否最后一个排产Sku：[%s]====
      *
      * @param context      排程上下文
      * @param groupName    分组名-结构
@@ -277,8 +277,9 @@ public class TbrMouldProductionLogRecorder {
      * @return
      */
     public static String addIsLastFindSkuLog(Context context, String groupName, boolean isLast, String materialDesc) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 硫化组找到是否[%s]最后一个排产Sku：%s====";
-        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, isLast, materialDesc);
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 硫化组找到 %s 是否最后一个排产Sku：[%s]====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, materialDesc, isLast);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_MOULD_FIND_SKU_LH_GROUP, logContent);
         return logContent;

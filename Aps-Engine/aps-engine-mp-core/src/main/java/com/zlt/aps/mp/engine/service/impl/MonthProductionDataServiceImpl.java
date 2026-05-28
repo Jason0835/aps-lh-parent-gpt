@@ -172,6 +172,15 @@ public class MonthProductionDataServiceImpl extends AbstractDataService implemen
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public void saveProductionLog(List<MouldProductionLog> productionLogList) {
+        if (CollectionUtils.isEmpty(productionLogList)) {
+            return;
+        }
+        baseDao.insertBatch(productionLogList);
+    }
+
+    @Override
     public List<MonthPlanProductionRequirePlanVo> getFactoryMonthPlanManufacturing(Context context) {
         if (isEmptyFactoryAndProductionVersion(context)) {
             return Collections.emptyList();
