@@ -472,7 +472,7 @@ public class GroupPlanCxLhCapacityLimitHelper {
         }
         //结构首日?
         if (null == previousLimit) {
-            return getConclusionInfoByFirstOrEnd(context);
+            return Collections.emptyList();
         }
         //todo 先忽略如果没有排产
         return getConclusionInfoByMid(context, previousLimit);

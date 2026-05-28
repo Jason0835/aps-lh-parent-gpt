@@ -50,9 +50,6 @@ public class SkuPrioritySelector {
      * @return
      */
     public static String getHighestPrioritySku(Context context, ProductionStageEnum productionStage, FormalRoundEnum formalRound, ProductionPlanGroupInfo groupPlanInfo, EarliestConclusionLhGroupHelper lhGroup, ContinueTypeEnum continueType, List<MonthPlanProductionRequirePlanVo> allSkuList, Set<String> excludeSkuSet, EarliestConclusionLhGroupHelper allLhMachineLhGroup) {
-        /*if (groupPlanInfo != null && groupPlanInfo.getGroupName().equals("215/75R17.5")){
-            System.out.println("215/75R17.5");
-        }*/
         List<MonthPlanProductionRequirePlanVo> effectiveSkuList = getEffectiveSkuList(allSkuList, excludeSkuSet);
         if (CollectionUtils.isEmpty(effectiveSkuList)) {
             return StringUtils.EMPTY;
