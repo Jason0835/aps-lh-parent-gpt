@@ -25,6 +25,7 @@ import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
@@ -980,6 +981,13 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             }
             if (StringUtils.isNotEmpty(monthPlan.getLhNo())) {
                 result.setLhNo(monthPlan.getLhNo());
+            }
+        }
+
+        // 设置1-8班次的硫化示方号，取值同lhNo
+        if (StringUtils.isNotEmpty(result.getLhNo())) {
+            for (int i = 1; i <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
+                BeanUtil.setProperty(result, "class" + i + "LhNo", result.getLhNo());
             }
         }
     }
