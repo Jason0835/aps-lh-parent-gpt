@@ -20,7 +20,6 @@
         AND PRODUCTION_VERSION != ''
         AND MONTH_PLAN_VERSION != ''
         AND LAST_MONTH_PLAN_VERSION != ''
-        AND LAST_MONTH_PLAN_VERSION != MONTH_PLAN_VERSION
         <if test="factoryCode != null and factoryCode != ''">AND FACTORY_CODE = #{factoryCode}</if>
         <if test="year != null and year != ''">AND YEAR = #{year}</if>
         <if test="month != null and month != ''">AND MONTH = #{month}</if>
