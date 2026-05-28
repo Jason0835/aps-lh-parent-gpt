@@ -54,13 +54,13 @@
           :disabled="selection.length !== 1"
           >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button
         >
-        <el-button
-          v-hasPermi="['lh:lhScheduleResult:adjustQuantity']"
-          type="primary"
-          @click="handleChangePlan()"
-          :disabled="selection.length !== 1"
-          >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button
-        >
+<!--        <el-button-->
+<!--          v-hasPermi="['lh:lhScheduleResult:adjustQuantity']"-->
+<!--          type="primary"-->
+<!--          @click="handleChangePlan()"-->
+<!--          :disabled="selection.length !== 1"-->
+<!--          >{{ $t("ui.data.column.scheduleResult.changePlan") }}</el-button-->
+<!--        >-->
 
         <el-button
           type="primary"
