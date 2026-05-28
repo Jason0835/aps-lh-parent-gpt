@@ -41,6 +41,7 @@
     "big.js": "^6.2.1",
     "clipboard": "2.0.8",
     "core-js": "3.25.3",
+    "crypto-js": "^4.2.0",
     "echarts": "5.4.0",
     "element-ui": "2.15.14",
     "file-saver": "2.0.5",

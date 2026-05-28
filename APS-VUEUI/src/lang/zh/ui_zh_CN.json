@@ -985,6 +985,11 @@
   "ui.cx.machine.export.sheetName": "成型机台信息",
   "ui.cx.specifyMachine.export.fileName": "成型定点机台信息",
   "ui.cx.stock.export.fileName": "成型库存信息",
+  "ui.cx.cxStock.export.fileName": "成型库存同步",
+  "ui.cx.cxDayFinishQty.export.fileName": "成型日完成量",
+  "ui.cx.cxMachineOnlineInfo.export.fileName": "成型在机同步",
+  "ui.cx.cxKeyProduct.export.fileName": "关键产品配置",
+  "ui.cx.cxStructureTreadConfig.export.fileName": "胎面整车配置",
   "ui.cd15.stock.export.fileName": "钢丝斜裁库存信息",
   "ui.cd15.lineside.stock.export.fileName": "钢丝斜裁线边库库存信息",
   "ui.cd15.machine.export.fileName": "钢丝斜裁机台信息",
@@ -2850,5 +2855,22 @@
   "ui.data.column.monthlyProductionPlan.filled": "已填充",
   "ui.data.column.monthlyProductionPlan.total": "合计",
   "ui.data.column.monthlyProductionPlan.fillHandleTitle.doubleClick": "双击向下填充空格；拖动可覆盖后续日期",
-  "ui.data.column.monthlyProductionPlan.fillHandleTitle.drag": "拖动可覆盖后续日期"
+  "ui.data.column.monthlyProductionPlan.fillHandleTitle.drag": "拖动可覆盖后续日期",
+
+  "ui.data.column.cxScheduleResult.tripNo": "车次号",
+  "ui.data.column.cxScheduleResult.tripNoPrefix": "车",
+  "ui.data.column.cxScheduleResult.tripCapacity": "整车条数",
+  "ui.data.column.cxScheduleResult.stockHoursForLh": "库存可供硫化时长",
+  "ui.data.column.cxScheduleResult.sequence": "顺位",
+  "ui.data.column.cxScheduleResult.scheduleRunning": "排程正在执行中，请稍后刷新页面查看结果",
+  "ui.data.column.cxScheduleResult.scheduleValidating": "排程正在进行中，数据校验已通过，请稍后刷新页面查看结果",
+  "ui.data.column.cxScheduleResult.scheduleFailed": "排程失败",
+  "ui.data.column.cxScheduleResult.scheduleDateLabel": "排程日期：",
+  "ui.data.column.cxScheduleResult.errorLabel": "错误",
+  "ui.data.column.cxScheduleResult.warningLabel": "警告",
+  "ui.data.column.cxScheduleResult.itemsLabel": "项",
+  "ui.data.column.cxScheduleResult.gotIt": "知道了",
+  "ui.data.column.cxScheduleResult.scheduleTimeout": "排程请求超时或服务异常，如排程正在执行中，请稍后刷新页面查看结果",
+
+  "ui.cx.cxScheduleResult.exportCxDayPlanFileName": "成型日计划"
 }

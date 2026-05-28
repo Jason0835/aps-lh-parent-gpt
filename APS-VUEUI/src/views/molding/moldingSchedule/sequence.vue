@@ -105,17 +105,17 @@ export default {
         { label: this.$t("ui.data.column.scheduleResult.materialDesc"), prop: "materialDesc", minWidth: 300 },
         { label: this.$t("ui.data.column.scheduleResult.embryoDesc"), prop: "mainMaterialDesc", minWidth: 320 },
         {
-          label: "车次号",
+          label: this.$t("ui.data.column.cxScheduleResult.tripNo"),
           prop: "tripNo",
           minWidth: 100,
           align: "center",
           formatter: (row, column, value) => {
             if (!value) return "";
-            return  "车"+ value;
+            return this.$t("ui.data.column.cxScheduleResult.tripNoPrefix") + value;
           },
         },
         {
-          label: "整车条数",
+          label: this.$t("ui.data.column.cxScheduleResult.tripCapacity"),
           prop: "tripCapacity",
           minWidth: 140,
           align: "center",
@@ -128,8 +128,8 @@ export default {
           label: `${this.$t(this.getShiftLabel(shift))} ${this.dateList[idx].shiftDate}`,
           children: [
             this.createEditableColumn(`class${shift}PlanQty`, this.$t("ui.data.column.scheduleResult.plan"), "number"),
-            this.createEditableColumn(`class${shift}StockHours`, "库存可供硫化时长", "number"),
-            this.createEditableColumn(`class${shift}Sequence`, "顺位", "number"),
+            this.createEditableColumn(`class${shift}StockHours`, this.$t("ui.data.column.cxScheduleResult.stockHoursForLh"), "number"),
+            this.createEditableColumn(`class${shift}Sequence`, this.$t("ui.data.column.cxScheduleResult.sequence"), "number"),
           ],
         };
       });
@@ -210,7 +210,16 @@ export default {
     },
     getShiftLabel(shift) {
       // 表头班次顺序：早班、中班、晚班、早班、中班、晚班、早班、中班
-      const labels = ["早班", "中班", "晚班", "早班", "中班", "晚班", "早班", "中班"];
+      const labels = [
+        this.$t("ui.data.column.scheduleResult.morningShift"),
+        this.$t("ui.data.column.scheduleResult.middleShift"),
+        this.$t("ui.data.column.scheduleResult.nightShift"),
+        this.$t("ui.data.column.scheduleResult.morningShift"),
+        this.$t("ui.data.column.scheduleResult.middleShift"),
+        this.$t("ui.data.column.scheduleResult.nightShift"),
+        this.$t("ui.data.column.scheduleResult.morningShift"),
+        this.$t("ui.data.column.scheduleResult.middleShift"),
+      ];
       return labels[shift - 1] || "";
     },
     createEditableColumn(prop, label, type) {
