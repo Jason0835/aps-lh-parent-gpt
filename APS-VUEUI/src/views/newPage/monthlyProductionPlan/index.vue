@@ -295,6 +295,7 @@ import {
   recalculateWeekRollAdjust,
   resultVersion,
   saveAdjustResult,
+  setAdjustsCxMachineFromRedis,
   statisticsResult
 } from "@/api/monthplan/adjustStructure";
 import { getByParamCode } from "@/api/monthplan/factoryParam";
@@ -2338,8 +2339,20 @@ export default {
       this.fetchCurrentAdjustMachineFromRedis();
       this.getList();
     },
-    onPlanDowntimeApplied() {
-      this.fetchCurrentAdjustMachineFromRedis();
+    /** 计划停机：清空 Redis 调整上下文后刷新主页面展示（仅在此处调用 set，避免与弹窗重复） */
+    async onPlanDowntimeApplied() {
+      try {
+        await setAdjustsCxMachineFromRedis({
+          cxMachineCode: "",
+          structureName: "",
+          beginDay: null,
+          endDay: null,
+          version: "",
+        });
+        await this.fetchCurrentAdjustMachineFromRedis();
+      } catch (e) {
+        console.error(e);
+      }
     },
     /**
      * 与周程滚动「结构调整」listAdjusts 入参对齐：productionVersion + version + adjVersion（列表首行 version 一般为调整版本 ADJ…）
