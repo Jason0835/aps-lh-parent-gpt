@@ -380,9 +380,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             summary.setErrors(result.getValidationErrors());
             summary.setWarnings(result.getValidationWarnings());
             return AjaxResult.error(
-                    "排程失败[" + dto.getScheduleDate() + "]: 数据完整性校验不通过，共 "
-                            + summary.getErrorCount() + " 项错误，"
-                            + summary.getWarningCount() + " 项警告",
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.scheduleFailed") + "[" + dto.getScheduleDate() + "]: "
+                            + I18nUtil.getMessage("ui.data.column.cxScheduleResult.validationFailedSummary",
+                            new Object[]{summary.getErrorCount(), summary.getWarningCount()}),
                     summary);
         }
     }

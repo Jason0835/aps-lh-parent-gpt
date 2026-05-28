@@ -1,4 +1,5 @@
 import request from "@/utils/request";
+import { encrypt as aesEncrypt } from "@/utils/aes";
 
 // 登录方法
 export function login(username, password, code, uuid) {
@@ -7,6 +8,10 @@ export function login(username, password, code, uuid) {
   // form.set("password", password);
   // form.set("rememberMe", false);
   // form.set("lang", "zh_CN");
+
+  // 对密码进行AES加密
+  const encryptedPassword = aesEncrypt(password);
+
   return request({
     url: "/login",
     headers: {
@@ -15,7 +20,7 @@ export function login(username, password, code, uuid) {
     method: "post",
     data: {
       username,
-      password,
+      password: encryptedPassword,
       rememberMe: false,
       lang: localStorage.getItem("lang") || "zh_CN" ,
     },

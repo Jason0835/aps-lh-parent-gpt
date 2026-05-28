@@ -12,8 +12,8 @@
           AND IS_DELETE = 0
     </update>
 
-    <!-- 原子累加完成量（含版本号乐观锁）-->
-    <update id="atomicAddFinishQty">
+    <!-- 原子累加完成量（版本号相同时跳过，防止重复累加）-->
+    <update id="atomicAddFinishQtyIfVersionDiff">
         UPDATE T_LH_CHIP_STOCK
         SET FINISH_QTY = FINISH_QTY + #{delta},
             DATA_VERSION = #{newVersion},
@@ -22,12 +22,10 @@
         WHERE FACTORY_CODE = #{factoryCode}
           AND CHIP_CODE = #{chipCode}
           AND IS_DELETE = 0
-          <if test="expectedVersion != null and expectedVersion != ''">
-              AND DATA_VERSION = #{expectedVersion}
-          </if>
+          AND (DATA_VERSION IS NULL OR DATA_VERSION != #{newVersion})
     </update>
 
-    <!-- 原子覆盖完成量（含版本号乐观锁）-->
+    <!-- 原子覆盖完成量（覆盖写入不需要版本校验，直接赋值）-->
     <update id="atomicOverwriteFinishQty">
         UPDATE T_LH_CHIP_STOCK
         SET FINISH_QTY = #{finishQty},
@@ -37,9 +35,6 @@
         WHERE FACTORY_CODE = #{factoryCode}
           AND CHIP_CODE = #{chipCode}
           AND IS_DELETE = 0
-          <if test="expectedVersion != null and expectedVersion != ''">
-              AND DATA_VERSION = #{expectedVersion}
-          </if>
     </update>
 
 </mapper>
