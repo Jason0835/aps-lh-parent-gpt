@@ -26,11 +26,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -52,6 +54,9 @@ public class MonthPlanSyncService {
 
     @Autowired
     private IncrementService incrementService;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     @Autowired
     private MdmMaterialInfoEntityMapper materialInfoEntityMapper;
@@ -345,11 +350,13 @@ public class MonthPlanSyncService {
                             Function.identity(), (s1, s2) -> s1));
         }
 
+        // 计算去重后的计划版本号，避免重复推送时版本号冲突
+        String planVersion = computeSuffixedPlanVersion(eventDto, useAdjustVersion);
         List<SyncOutFacScheduleVersionVo> syncOutFacScheduleVersionVoList = new ArrayList<>();
         for (FactoryMonthPlanProductionFinalResult result : finalList) {
             SyncOutFacScheduleVersionVo versionVo = new SyncOutFacScheduleVersionVo();
             versionVo.setFactory(result.getFactoryCode());
-            versionVo.setPlanVersion(Boolean.TRUE.equals(useAdjustVersion) ? result.getLastMonthPlanVersion() : result.getProductionVersion());
+            versionVo.setPlanVersion(planVersion);
             versionVo.setProductPlanNo(result.getProductionNo());
             versionVo.setStatus(ApsConstant.APS_STRING_0);
             Integer year = result.getYear();
@@ -388,5 +395,35 @@ public class MonthPlanSyncService {
         }
         log.info("处理月计划下发SCM数据结束，数据行数：{}", syncOutFacScheduleVersionVoList.size());
         return syncOutFacScheduleVersionVoList;
+    }
+
+    /**
+     * 计算下发SCM的计划版本号，通过 Redis 原子自增检测重复，避免同一版本号重复下发。
+     *
+     * @param eventDto         月计划事件参数
+     * @param useAdjustVersion 是否使用调整版本作为SCM计划版本号
+     * @return 去重后的计划版本号，无数据或版本号为空时返回null或原值
+     */
+    private String computeSuffixedPlanVersion(MonthPlanFinalizedEventDto eventDto, Boolean useAdjustVersion) {
+        List<FactoryMonthPlanProductionFinalResult> finalList = eventDto.getFinalList();
+        if (CollectionUtils.isEmpty(finalList)) {
+            return null;
+        }
+        String originalVersion = Boolean.TRUE.equals(useAdjustVersion)
+                ? finalList.get(0).getLastMonthPlanVersion()
+                : eventDto.getProductionVersion();
+        if (StringUtils.isBlank(originalVersion)) {
+            return originalVersion;
+        }
+        String redisKey = String.format("mp:sync:version:%s:%d:%d:%s",
+                eventDto.getFactoryCode(), eventDto.getYear(), eventDto.getMonth(), originalVersion);
+        Long seq = stringRedisTemplate.opsForValue().increment(redisKey);
+        if (seq != null && seq == 1) {
+            stringRedisTemplate.expire(redisKey, 30, TimeUnit.DAYS);
+        }
+        if (seq != null && seq > 1) {
+            return originalVersion + "-" + (seq - 1);
+        }
+        return originalVersion;
     }
 }
