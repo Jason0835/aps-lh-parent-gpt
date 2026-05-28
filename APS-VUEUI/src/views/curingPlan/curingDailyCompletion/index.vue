@@ -105,17 +105,17 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.scheduleResult.completeDate"),
-          prop: "finishDate",
-          type: "date",
-          valueFormat: "yyyy-MM-dd",
-        },
-        {
           label: this.$t("ui.data.column.factoryCode"),
           prop: "factoryCode",
           type: "select",
           dictData: this.dict.type.biz_factory_name,
           filterable: true,
+        },
+        {
+          label: this.$t("ui.data.column.scheduleResult.completeDate"),
+          prop: "finishDate",
+          type: "date",
+          valueFormat: "yyyy-MM-dd",
         },
         {
           label: this.$t("ui.data.column.scheduleResult.materialCode"),
