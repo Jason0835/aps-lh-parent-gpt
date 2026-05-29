@@ -127,13 +127,13 @@ public class CxAddSkuProductionHandler {
         String groupName = groupPlanInfo.getGroupName();
         String onLineMachineInfo = String.join(StringConstant.COMMA, groupPlanInfo.getAllocationCxMachineCodeSet());
         //成型分配的排产范围起始日~分组收尾日
+        BeforeSkuProductionInfo beforeSkuInfo = lhGroup.getBeforeSkuInfo();
         Integer startDay = lhGroup.getClosingDay();
         Integer endDay = lhGroup.getEndDay();
-        TbrMouldProductionLogRecorder.addGroupFindLhMachineRangeLog(context, groupName, onLineMachineInfo, startDay, endDay);
+        TbrMouldProductionLogRecorder.addGroupFindLhMachineRangeLog(context, groupName, onLineMachineInfo, startDay, endDay, beforeSkuInfo);
         //提取结构内可排产的Sku信息
         List<MonthPlanProductionRequirePlanVo> groupPlanData = groupPlanInfo.getGroupPlanData();
         List<MonthPlanProductionRequirePlanVo> leftOverHasProductionList = groupPlanData.stream().filter(groupPlan -> groupPlan.hasProductionThisRound()).collect(Collectors.toList());
-        BeforeSkuProductionInfo beforeSkuInfo = lhGroup.getBeforeSkuInfo();
         //获取优先级最高的Sku信息 getSelectedAddSku(productionContext, startDay, endDay, leftOverHasProductionList)
         EarliestConclusionLhGroupHelper allLhMachine = null;
         if (FormalRoundEnum.ACTUAL_MIN_LH_MACHINE == formalRound) {
@@ -172,18 +172,17 @@ public class CxAddSkuProductionHandler {
             retrieveNextSku(context, productionStage, formalRound, groupPlanInfo, needProductionInfo, excludeDays, isLastSkuPlan, startDay);
             return;
         }
-        //重新确认排产时间范围-再次修正排产范围
+        //重新确认排产时间范围-再次修正排产范围及衔接Sku
         MonthPlanProductionRequirePlanVo addSkuInfo = needProductionInfo.getNeedProductionList().get(BigDecimal.ZERO.intValue());
         groupPlanInfo.correctProductionDateRange(context, addSkuInfo, lhGroup, doubleMouldList, onLineMachineInfo);
+        beforeSkuInfo = lhGroup.getBeforeSkuInfo();
         Integer newStartDay = lhGroup.getClosingDay();
         endDay = lhGroup.getEndDay();
-        TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(context, groupName, onLineMachineInfo, newStartDay, endDay);
+        TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(context, groupName, onLineMachineInfo, newStartDay, endDay, beforeSkuInfo);
         if (null == newStartDay || null == endDay || !startDay.equals(newStartDay)) {
             retrieveNextSku(context, productionStage, formalRound, groupPlanInfo, needProductionInfo, excludeDays, isLastSkuPlan, startDay);
             return;
         }
-        //20260129 修正前排产Sku信息，可能因为模具排产日
-        correctBeforeSku(context, lhGroup, doubleMouldList, groupName, startDay);
         Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
         Integer dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
         //实际排产量

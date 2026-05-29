@@ -60,19 +60,12 @@ public class SkuDayLhMachineProductionCalculator {
         }
         //上模首日(即换模日：新增换模或是换活字块)
         TbrProductionContext productionContext = (TbrProductionContext) context;
-        ProductionPlanGroupInfo productionPlanInfo = lhProductionQtyHelper.getProductionPlanInfo();
         //首日排产量参数
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
-        Integer firstQty = paramConfiguration.getChangeMouldFirstQty();
         //首日非前Sku收尾日
         if (!firstDay.equals(conclusionDay)) {
             //20260425+ 前日胎胚有排产，首日32
-            boolean isProductionEmbryo = productionPlanInfo.hasProductionEmbryo(productionDay - BigDecimal.ONE.intValue(), productionSkuInfo);
-            if (isProductionEmbryo) {
-                firstQty = paramConfiguration.getChangeTypeBlockQty();
-            }
-            Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - firstQty;
-            return new DayProductionQtyHelper(productionDay, false, firstQty, lossQty, BigDecimal.ZERO.intValue(), true);
+            return buildByFirstNoConclusion(productionDay, lhProductionQtyHelper, paramConfiguration, productionSkuInfo);
         }
         CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
         String beforeSku = cxLhGroup.getBeforeSku().getMaterialDesc();
@@ -80,10 +73,9 @@ public class SkuDayLhMachineProductionCalculator {
         Integer beforeSkuDayMaxQty = cxLhGroup.getBeforeSku().getDayMaxQty();
         //前Sku的排产量
         Integer beforeSkuProductionQty = cxLhGroup.getBeforeSku().getProductionQty();
-        //同Sku，则是不同优先级的衔接(余量不为零)
-        if (needProductionSku.equals(beforeSku) && null != beforeSkuProductionQty) {
-            Integer needProductionQty = beforeSkuDayMaxQty - beforeSkuProductionQty;
-            return new DayProductionQtyHelper(productionDay, false, needProductionQty, BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue(), false);
+        //同Sku，则是不同优先级的衔接(余量可为零)
+        if (needProductionSku.equals(beforeSku)) {
+            return buildByContinue(productionDay, lhProductionQtyHelper, beforeSkuDayMaxQty, beforeSkuProductionQty);
         }
         boolean isChangeMould = !productionContext.getBaseDataContainer().isShareMouldSameGroup(beforeSku, needProductionSku);
         if (isChangeMould) {
@@ -123,6 +115,49 @@ public class SkuDayLhMachineProductionCalculator {
     }
 
     /**
+     * 构建首日排产量，非收尾日
+     *
+     * @param productionDay         排产日
+     * @param lhProductionQtyHelper 排产辅助信息
+     * @param paramConfiguration    全局参数对象
+     * @param productionSkuInfo     排产Sku计划信息
+     * @return
+     */
+    private static DayProductionQtyHelper buildByFirstNoConclusion(Integer productionDay, LhProductionQtyHelper lhProductionQtyHelper, ProductionCapacityParamConfiguration paramConfiguration, MonthPlanProductionRequirePlanVo productionSkuInfo) {
+        ProductionPlanGroupInfo productionPlanInfo = lhProductionQtyHelper.getProductionPlanInfo();
+        Integer firstQty = paramConfiguration.getChangeMouldFirstQty();
+        //20260425+ 前日胎胚有排产，首日32
+        boolean isProductionEmbryo = productionPlanInfo.hasProductionEmbryo(productionDay - BigDecimal.ONE.intValue(), productionSkuInfo);
+        if (isProductionEmbryo) {
+            firstQty = paramConfiguration.getChangeTypeBlockQty();
+        }
+        Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - firstQty;
+        return new DayProductionQtyHelper(productionDay, false, firstQty, lossQty, BigDecimal.ZERO.intValue(), true);
+    }
+
+    /**
+     * 构建日排产量，同Sku不同优先级衔接
+     *
+     * @param productionDay          排产日
+     * @param lhProductionQtyHelper  排产信息
+     * @param beforeSkuDayMaxQty     双模日硫化量
+     * @param beforeSkuProductionQty 余量
+     * @return
+     */
+    private static DayProductionQtyHelper buildByContinue(Integer productionDay, LhProductionQtyHelper lhProductionQtyHelper, Integer beforeSkuDayMaxQty, Integer beforeSkuProductionQty) {
+        Integer surplusQty = beforeSkuProductionQty;
+        if (null == surplusQty) {
+            surplusQty = BigDecimal.ZERO.intValue();
+        }
+        Integer needProductionQty = beforeSkuDayMaxQty - surplusQty;
+        boolean isFinish = false;
+        if (needProductionQty <= lhProductionQtyHelper.getSumProductionQty()) {
+            isFinish = true;
+        }
+        return new DayProductionQtyHelper(productionDay, false, needProductionQty, BigDecimal.ZERO.intValue(), BigDecimal.ZERO.intValue(), isFinish);
+    }
+
+    /**
      * 构建日排产信息-换模场景
      * 1、结构上机首日
      * 2、衔接前后规格-换模
@@ -152,18 +187,12 @@ public class SkuDayLhMachineProductionCalculator {
     private static DayProductionQtyHelper buildByChangeMould(Integer productionDay, LhProductionQtyHelper lhProductionQtyHelper, ProductionCapacityParamConfiguration paramConfiguration, MonthPlanProductionRequirePlanVo productionSkuInfo) {
         CxLhProductionHelper cxLhGroup = lhProductionQtyHelper.getCxLhGroup();
         String beforeSku = cxLhGroup.getBeforeSku().getMaterialDesc();
-        Integer firstQty = paramConfiguration.getChangeMouldFirstQty();
-        ProductionPlanGroupInfo productionPlanInfo = lhProductionQtyHelper.getProductionPlanInfo();
         //没有前规格，通常为结构上机首日
         if (StringUtils.isBlank(beforeSku)) {
-            //20260425+ 前日胎胚有排产，首日32
-            boolean isProductionEmbryo = productionPlanInfo.hasProductionEmbryo(productionDay - BigDecimal.ONE.intValue(), productionSkuInfo);
-            if (isProductionEmbryo) {
-                firstQty = paramConfiguration.getChangeTypeBlockQty();
-            }
-            Integer lossQty = lhProductionQtyHelper.getDayMaxProductionQty() - firstQty;
-            return new DayProductionQtyHelper(productionDay, false, firstQty, lossQty, BigDecimal.ZERO.intValue(), true);
+            return buildByFirstNoConclusion(productionDay, lhProductionQtyHelper, paramConfiguration, productionSkuInfo);
         }
+        Integer firstQty = paramConfiguration.getChangeMouldFirstQty();
+        ProductionPlanGroupInfo productionPlanInfo = lhProductionQtyHelper.getProductionPlanInfo();
         //衔接
         Integer beforeSkuProductionQty = cxLhGroup.getBeforeSku().getProductionQty();
         if (null == beforeSkuProductionQty) {
