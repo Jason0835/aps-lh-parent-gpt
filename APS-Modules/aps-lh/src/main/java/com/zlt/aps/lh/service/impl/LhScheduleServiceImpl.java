@@ -732,15 +732,16 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 节点6：排产小结数据位于模板第 3 个 sheet（下标 2），
         // 复用 ScheduleSummaryReportService 的数据构建逻辑，将排产小结作为第三个sheet写入。
-        String factoryCode = StringUtils.defaultString(result.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
-        Map<String, Object> summaryExportData = scheduleSummaryReportService.buildScheduleSummaryExportData(result.getScheduleDate(), factoryCode);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> summaryTableMap = (Map<String, Object>) summaryExportData.get("tableMap");
-        @SuppressWarnings("unchecked")
-        List<List<Map<String, Object>>> summaryDataList = (List<List<Map<String, Object>>>) summaryExportData.get("dataList");
-
-        inputStream = new ByteArrayInputStream(exportBytes);
-        exportBytes = ExcelUtils.writeMultiList(inputStream, 2, summaryTableMap, summaryDataList);
+        //todo 森财这个需要修改下引用类问题
+//        String factoryCode = StringUtils.defaultString(result.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
+//        Map<String, Object> summaryExportData = scheduleSummaryReportService.buildScheduleSummaryExportData(result.getScheduleDate(), factoryCode);
+//        @SuppressWarnings("unchecked")
+//        Map<String, Object> summaryTableMap = (Map<String, Object>) summaryExportData.get("tableMap");
+//        @SuppressWarnings("unchecked")
+//        List<List<Map<String, Object>>> summaryDataList = (List<List<Map<String, Object>>>) summaryExportData.get("dataList");
+//
+//        inputStream = new ByteArrayInputStream(exportBytes);
+//        exportBytes = ExcelUtils.writeMultiList(inputStream, 2, summaryTableMap, summaryDataList);
 
         return fillExportSummaryFormulas(exportBytes, exportDataList.size(), placeholderMap);
     }
@@ -1753,9 +1754,18 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     private void copyImportRowToEntity(LhScheduleResultTemplateImportVO source, LhScheduleResult target) {
         target.setLhMachineName(source.getLhMachineName());
-        // 遍历class1MouldMethod到class8MouldMethod，取第一个非空值
-        // 模板首行用于反向导入，示方类型不再按 8 个班次分别维护，统一取 trialStatus。
-        String scheduleType = source.getTrialStatus();
+        // 模板按 8 个班次分别维护示方类型，导入时取第一个非空的 classXLhType 作为主业务口径。
+        String scheduleType = Stream.of(
+                source.getClass1LhType(),
+                source.getClass2LhType(),
+                source.getClass3LhType(),
+                source.getClass4LhType(),
+                source.getClass5LhType(),
+                source.getClass6LhType(),
+                source.getClass7LhType(),
+                source.getClass8LhType(),
+                source.getTrialStatus()
+        ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
         target.setProductStatus(scheduleType);
 
         // 遍历class1LeftRightMould到class8LeftRightMould，取第一个非空值
@@ -1788,27 +1798,43 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         target.setClass1PlanQty(source.getClass1PlanQty());
         target.setClass1FinishQty(source.getClass1FinishQty());
         target.setClass1Analysis(source.getClass1Analysis());
+        target.setClass1IsEnd(source.getClass1IsEnd());
+        target.setClass1LhType(source.getClass1LhType());
         target.setClass2PlanQty(source.getClass2PlanQty());
         target.setClass2FinishQty(source.getClass2FinishQty());
         target.setClass2Analysis(source.getClass2Analysis());
+        target.setClass2IsEnd(source.getClass2IsEnd());
+        target.setClass2LhType(source.getClass2LhType());
         target.setClass3PlanQty(source.getClass3PlanQty());
         target.setClass3FinishQty(source.getClass3FinishQty());
         target.setClass3Analysis(source.getClass3Analysis());
+        target.setClass3IsEnd(source.getClass3IsEnd());
+        target.setClass3LhType(source.getClass3LhType());
         target.setClass4PlanQty(source.getClass4PlanQty());
         target.setClass4FinishQty(source.getClass4FinishQty());
         target.setClass4Analysis(source.getClass4Analysis());
+        target.setClass4IsEnd(source.getClass4IsEnd());
+        target.setClass4LhType(source.getClass4LhType());
         target.setClass5PlanQty(source.getClass5PlanQty());
         target.setClass5FinishQty(source.getClass5FinishQty());
         target.setClass5Analysis(source.getClass5Analysis());
+        target.setClass5IsEnd(source.getClass5IsEnd());
+        target.setClass5LhType(source.getClass5LhType());
         target.setClass6PlanQty(source.getClass6PlanQty());
         target.setClass6FinishQty(source.getClass6FinishQty());
         target.setClass6Analysis(source.getClass6Analysis());
+        target.setClass6IsEnd(source.getClass6IsEnd());
+        target.setClass6LhType(source.getClass6LhType());
         target.setClass7PlanQty(source.getClass7PlanQty());
         target.setClass7FinishQty(source.getClass7FinishQty());
         target.setClass7Analysis(source.getClass7Analysis());
+        target.setClass7IsEnd(source.getClass7IsEnd());
+        target.setClass7LhType(source.getClass7LhType());
         target.setClass8PlanQty(source.getClass8PlanQty());
         target.setClass8FinishQty(source.getClass8FinishQty());
         target.setClass8Analysis(source.getClass8Analysis());
+        target.setClass8IsEnd(source.getClass8IsEnd());
+        target.setClass8LhType(source.getClass8LhType());
 
         target.setScheduleType(normalizeScheduleTypeCode(source.getScheduleType()));
         if (StringUtils.isNotBlank(source.getIsFirst())) {
