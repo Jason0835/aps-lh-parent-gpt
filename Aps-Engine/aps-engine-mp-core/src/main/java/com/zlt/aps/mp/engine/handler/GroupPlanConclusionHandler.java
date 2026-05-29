@@ -161,7 +161,7 @@ public class GroupPlanConclusionHandler {
         if (!CollectionUtils.isEmpty(dayProductionLimitInfo)) {
             List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
             Map<String, Integer> heightQtyMap = getSkuHeightNeedProductionQty(groupPlanInfo, true);
-            List<GroupPlanCxLhCapacityLimitHelper> lowHeightPriorityLhMachineList = this.getLowHeightPriorityLhMachineList(context, groupPlanInfo, heightQtyMap, dayLimitList);
+            List<GroupPlanCxLhCapacityLimitHelper> lowHeightPriorityLhMachineList = this.getLowHeightPriorityLhMachineList(context, groupPlanInfo, heightQtyMap, dayLimitList, false);
             Set<Integer> lowHeightPriorityDaySet = lowHeightPriorityLhMachineList.stream().map(GroupPlanCxLhCapacityLimitHelper::getDay).collect(Collectors.toSet());
             List<CxMachineUsedLhInfo> lowHeightPriorityUsedLhInfoList = productionUsedLhInfoList.stream().filter(single -> lowHeightPriorityDaySet.contains(single.getProductionDay())).collect(Collectors.toList());
             // 取并集，同一天的对象引用相同，因此可以直接用set去重
@@ -278,7 +278,7 @@ public class GroupPlanConclusionHandler {
         //20260507+  获取单个成型机台高优先级占当日排产的硫化机台数<3的天数数据
         List<GroupPlanCxLhCapacityLimitHelper> dayLimitList = dayProductionLimitInfo.values().stream().collect(Collectors.toList());
         Map<String, Integer> heightQtyMap = getSkuHeightNeedProductionQty(groupPlanInfo, false);
-        List<GroupPlanCxLhCapacityLimitHelper> lowHeightPriorityLhMachineList = this.getLowHeightPriorityLhMachineList(context, groupPlanInfo, heightQtyMap, dayLimitList);
+        List<GroupPlanCxLhCapacityLimitHelper> lowHeightPriorityLhMachineList = this.getLowHeightPriorityLhMachineList(context, groupPlanInfo, heightQtyMap, dayLimitList, true);
         // 取并集，同一天的对象引用相同，因此可以直接用set去重
         Set<GroupPlanCxLhCapacityLimitHelper> set1 = new HashSet<>(lowMinLhMachineDayList);
         Set<GroupPlanCxLhCapacityLimitHelper> set2 = new HashSet<>(lowHeightPriorityLhMachineList);
@@ -362,17 +362,28 @@ public class GroupPlanConclusionHandler {
     /**
      * 获取单个成型机台高优先级占当日排产的硫化机台数<3的天数数据
      *
-     * @param groupPlanInfo 分组计划对象
-     * @param heightQtyMap  分组下所有待排Sku及数量
-     * @param dayLimitList  日排产信息
+     * @param groupPlanInfo       分组计划对象
+     * @param heightQtyMap        分组下所有待排Sku及数量
+     * @param dayLimitList        日排产信息
+     * @param isContinueCxMachine 是否在产机台阶段
      * @return
      */
     private List<GroupPlanCxLhCapacityLimitHelper> getLowHeightPriorityLhMachineList(Context context,
                                                                                      ProductionPlanGroupInfo groupPlanInfo,
                                                                                      Map<String, Integer> heightQtyMap,
-                                                                                     List<GroupPlanCxLhCapacityLimitHelper> dayLimitList) {
-        //20260523+ 设置为结构优先，则跳过高优级量强制收尾业务-高优先级硫化机台数限制数
-        Integer minHeightLhMachineLimit = YesOrNoEnum.YES.getValue().equals(groupPlanInfo.isStructurePriority()) ? null : groupPlanInfo.getMinHeightPriorityLhMachineCount();
+                                                                                     List<GroupPlanCxLhCapacityLimitHelper> dayLimitList,
+                                                                                     boolean isContinueCxMachine) {
+        /**
+         * 20260523+ 设置为结构优先，则跳过高优级量强制收尾业务-高优先级硫化机台数限制数
+         * 20260529+ 增加在机结构在产机台不是按高优先级排产的结构，不进行高强制收尾
+         */
+        Integer minHeightLhMachineLimit;
+        if (isContinueCxMachine) {
+            //在机结构在产机台
+            minHeightLhMachineLimit = YesOrNoEnum.YES.getValue().equals(groupPlanInfo.isHeightPriorityLhMachineConclusion()) ? groupPlanInfo.getMinHeightPriorityLhMachineCount() : null;
+        } else {
+            minHeightLhMachineLimit = YesOrNoEnum.YES.getValue().equals(groupPlanInfo.isStructurePriority()) ? null : groupPlanInfo.getMinHeightPriorityLhMachineCount();
+        }
         TbrSimulateProductionLogRecorder.addStartHeightPriorityLhMachineLog(context, groupPlanInfo.getGroupName(), heightQtyMap, minHeightLhMachineLimit);
         if (null == minHeightLhMachineLimit) {
             return Collections.emptyList();

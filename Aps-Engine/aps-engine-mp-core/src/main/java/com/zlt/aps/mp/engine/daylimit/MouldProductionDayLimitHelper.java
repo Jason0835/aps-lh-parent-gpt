@@ -3,6 +3,7 @@ package com.zlt.aps.mp.engine.daylimit;
 import lombok.Getter;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.Set;
 
 /**
@@ -25,5 +26,12 @@ public class MouldProductionDayLimitHelper implements Serializable {
     public MouldProductionDayLimitHelper(Set<Integer> productionDaySet, MouldProductionLimitTypeEnum limitType) {
         this.productionDaySet = productionDaySet;
         this.limitType = limitType;
+    }
+
+    /**
+     * 清空排产日集合
+     */
+    public void clearProductionDayInfo() {
+        productionDaySet = Collections.emptySet();
     }
 }

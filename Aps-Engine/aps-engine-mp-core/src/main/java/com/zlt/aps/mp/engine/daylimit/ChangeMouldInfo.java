@@ -5,6 +5,7 @@ import com.zlt.aps.mp.engine.domain.Context;
 import com.zlt.aps.mp.engine.domain.dto.CxMouldDayProductionHelper;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductionRequirePlanVo;
 import com.zlt.aps.mp.engine.domain.vo.ProductionMouldInfoVo;
+import com.zlt.aps.mp.engine.logrecorder.TbrMouldProductionLogRecorder;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
 import com.zlt.aps.mp.engine.scheduling.cxcapacity.ProductionCapacityParamConfiguration;
@@ -110,6 +111,7 @@ public class ChangeMouldInfo implements Serializable {
      */
     public static ChangeMouldInfo buildChangeMouldInfo(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, BeforeSkuProductionInfo beforeSkuInfo, BeforeSkuProductionInfo mouldSkuInfo) {
         BeforeSkuProductionInfo real = getBeforeSkuProductionInfo(beforeSkuInfo, mouldSkuInfo);
+        TbrMouldProductionLogRecorder.addChangeMoldJudgeInfo(context, addSkuInfo.getStructureName(), addSkuInfo.getMaterialDesc(), real);
         String materialDesc = real.getMaterialDesc();
         Integer productionQty = real.getProductionQty();
         Integer dayMaxProductionQty = real.getDayMaxQty();

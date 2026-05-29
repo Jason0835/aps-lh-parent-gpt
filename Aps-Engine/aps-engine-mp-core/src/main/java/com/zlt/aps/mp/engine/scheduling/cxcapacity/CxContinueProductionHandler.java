@@ -136,7 +136,7 @@ public class CxContinueProductionHandler {
         String groupName = productionPlanInfo.getGroupName();
         Set<String> cxMachineCodeInfo = continueSkuMap.values().stream().collect(Collectors.toList()).get(BigDecimal.ZERO.intValue()).getOnLineCxMachineSet();
         String onLineMachineInfo = String.join(StringConstant.COMMA, cxMachineCodeInfo);
-        //取得最早收尾的续作硫化组 getEarliestConclusionLhInfoByContinueSku
+        //取得最早收尾的续作硫化组
         EarliestConclusionLhGroupHelper earliestConclusionLhGroup = productionPlanInfo.getEarliestConclusionLhInfo(context, null, excludeDaySet);
         if (null == earliestConclusionLhGroup) {
             //记录日志
@@ -297,9 +297,10 @@ public class CxContinueProductionHandler {
         Set<String> cxMachineCodeInfo = Optional.ofNullable(productionPlanInfo.getAllocationCxMachineCodeSet()).orElse(Collections.emptySet());
         String onLineMachineInfo = String.join(StringConstant.COMMA, cxMachineCodeInfo);
         productionPlanInfo.correctProductionDateRange(productionContext, addSkuInfo, lhGroup, selectedMouldList, onLineMachineInfo);
+        BeforeSkuProductionInfo beforeSku = lhGroup.getBeforeSkuInfo();
         Integer newStartDay = lhGroup.getClosingDay();
         endDay = lhGroup.getEndDay();
-        TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(productionContext, groupName, onLineMachineInfo, newStartDay, endDay);
+        TbrMouldProductionLogRecorder.addContinueGroupContinueMachineCorrectLhGroupRangeLog(productionContext, groupName, onLineMachineInfo, newStartDay, endDay, beforeSku);
         if (null == newStartDay || null == endDay || !startDay.equals(newStartDay)) {
             excludeSkuSet.add(selectedMaterialDesc);
             return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet);
@@ -311,27 +312,6 @@ public class CxContinueProductionHandler {
             return getNextSku(productionContext, lhGroup, productionPlanInfo, productionStage, continueType, matchList, excludeSkuSet);
         }
         return new ContinueSkuNextSkuInfo(selectedMaterialDesc, selectedMouldList, lhBeforeSkuInfo);
-    }
-
-    /**
-     * 从模具关系中和硫化组排产模具，挑选共用模具的物料集合
-     *
-     * @param mouldInfoMap              sku与模具关系
-     * @param earliestConclusionLhGroup 收尾信息
-     */
-    private static Set<String> getShareMouldSkuByLhGroup(Map<String, List<MonthPlanProductMouldInfoVo>> mouldInfoMap, EarliestConclusionLhGroupHelper earliestConclusionLhGroup) {
-        Set<String> shareMouldMaterialDescSet = new HashSet<>();
-        mouldInfoMap.forEach((shareMouldMaterialDesc, mouldRelationList) -> {
-            Set<String> mouldCodeSet = mouldRelationList.stream().map(MonthPlanProductMouldInfoVo::getMouldCode).collect(Collectors.toSet());
-            if (CollectionUtils.isEmpty(mouldCodeSet)) {
-                return;
-            }
-            //模具关系中全包含
-            if (mouldCodeSet.containsAll(earliestConclusionLhGroup.getUsedMouldSet())) {
-                shareMouldMaterialDescSet.add(shareMouldMaterialDesc);
-            }
-        });
-        return shareMouldMaterialDescSet;
     }
 
     /**
@@ -354,37 +334,6 @@ public class CxContinueProductionHandler {
             return true;
         }
         return false;
-    }
-
-    /**
-     * 获取续作sku合适的同规格同花纹/共生胎同模具的下多个sku
-     * 优先选择高优级数量多的，其次是净需求量多的
-     *
-     * @param productionStage     排产阶段
-     * @param sameMultipleSkuList 同规格同花纹/共生胎同模具的下多个sku
-     * @return
-     */
-    private static String getSelectedSuitableSku(ProductionStageEnum productionStage, List<MonthPlanProductionRequirePlanVo> sameMultipleSkuList) {
-        //挑选可排产计划
-        if (CollectionUtils.isEmpty(sameMultipleSkuList)) {
-            //todo 记录日志
-            return "";
-        }
-        //先取得高优先级量最大的
-        Map<String, List<MonthPlanProductionRequirePlanVo>> skuGroupMap = sameMultipleSkuList.stream().collect(Collectors.groupingBy(MonthPlanProductionRequirePlanVo::getMaterialDesc));
-        Map<String, Integer> productionSkuMap = new HashMap<>();
-        skuGroupMap.forEach((skuMaterialDesc, groupPlanList) -> {
-            Integer sumProductionQty = ContinueSkuCalculator.getContinueSkuSummaryQty(productionStage, groupPlanList);
-            if (sumProductionQty > BigDecimal.ZERO.intValue()) {
-                productionSkuMap.put(skuMaterialDesc, sumProductionQty);
-            }
-        });
-        if (CollectionUtils.isEmpty(productionSkuMap)) {
-            //todo 记录日志
-            return "";
-        }
-        Optional<Map.Entry<String, Integer>> maxEntry = productionSkuMap.entrySet().stream().max(Map.Entry.comparingByValue());
-        return maxEntry.get().getKey();
     }
 
     /**

@@ -132,9 +132,10 @@
                   v-model="formInline.adjustStartDay"
                   style="width: 100px"
                   filterable
+                  @change="handleAdjustStartDayChange"
                 >
                   <el-option
-                    v-for="item in dayList"
+                    v-for="item in adjustStartDayOptions"
                     :key="item"
                     :label="item"
                     :value="item"
@@ -147,9 +148,10 @@
                   v-model="formInline.adjustEndDay"
                   style="width: 100px"
                   filterable
+                  @change="handleAdjustEndDayChange"
                 >
                   <el-option
-                    v-for="item in dayList"
+                    v-for="item in adjustEndDayOptions"
                     :key="item"
                     :label="item"
                     :value="item"
@@ -598,6 +600,9 @@ export default {
       },
 
       dayList: 31,
+      /** 调整开始/结束日上一次合法值，用于修改越界时回退 */
+      lastValidAdjustStartDay: null,
+      lastValidAdjustEndDay: null,
       // 调整结果页日计划量是否可编辑：仅自动调整后可编辑
       resultDayEditable: false,
     };
@@ -614,6 +619,38 @@ export default {
     /** 结构调整独立页 */
     isStructureAdjustPage() {
       return this.pageVariant === "structureAdjust";
+    },
+    /** 月内日序号 1～dayList */
+    monthDayOptions() {
+      const n = Number(this.dayList);
+      if (!Number.isNaN(n) && n > 0) {
+        return Array.from({ length: n }, (_, i) => i + 1);
+      }
+      return Array.isArray(this.dayList) ? this.dayList : [];
+    },
+    /** 调整开始日可选范围：不能大于已选结束日 */
+    adjustStartDayOptions() {
+      const end = Number(this.formInline.adjustEndDay);
+      if (
+        this.formInline.adjustEndDay == null ||
+        this.formInline.adjustEndDay === "" ||
+        Number.isNaN(end)
+      ) {
+        return this.monthDayOptions;
+      }
+      return this.monthDayOptions.filter((d) => d <= end);
+    },
+    /** 调整结束日可选范围：不能小于已选开始日 */
+    adjustEndDayOptions() {
+      const start = Number(this.formInline.adjustStartDay);
+      if (
+        this.formInline.adjustStartDay == null ||
+        this.formInline.adjustStartDay === "" ||
+        Number.isNaN(start)
+      ) {
+        return this.monthDayOptions;
+      }
+      return this.monthDayOptions.filter((d) => d >= start);
     },
     /**
      * 页脚确定/取消：结构调整单结构流程进入后即显示；
@@ -1615,6 +1652,89 @@ export default {
         this.getMonthPlanFinalAdjustQueryRoute(queryExtra)
       );
     },
+    /**
+     * 校验调整开始/结束日期。
+     * @param {{ requireBoth?: boolean }} options requireBoth 为 false 时，仅在校验双方均有值时比较大小
+     */
+    validateAdjustDayRange(options = {}) {
+      const { requireBoth = true } = options;
+      const startRaw = this.formInline.adjustStartDay;
+      const endRaw = this.formInline.adjustEndDay;
+      const startEmpty = startRaw == null || startRaw === "";
+      const endEmpty = endRaw == null || endRaw === "";
+      if (requireBoth && startEmpty) {
+        this.$modal.msgWarning("请选择调整开始日期");
+        return false;
+      }
+      if (requireBoth && endEmpty) {
+        this.$modal.msgWarning("请选择调整结束日期");
+        return false;
+      }
+      if (startEmpty || endEmpty) {
+        return true;
+      }
+      const adjustStart = Number(startRaw);
+      const adjustEnd = Number(endRaw);
+      if (
+        !Number.isNaN(adjustStart) &&
+        !Number.isNaN(adjustEnd) &&
+        adjustStart > adjustEnd
+      ) {
+        this.$modal.msgWarning("调整开始日期不能大于调整结束日期");
+        return false;
+      }
+      return true;
+    },
+    /** 修改调整开始日期：超出结束日时回退并提示 */
+    handleAdjustStartDayChange(val) {
+      const end = Number(this.formInline.adjustEndDay);
+      const start = Number(val);
+      if (
+        val != null &&
+        val !== "" &&
+        !Number.isNaN(start) &&
+        !Number.isNaN(end) &&
+        start > end
+      ) {
+        this.$modal.msgWarning("调整开始日期不能大于调整结束日期");
+        this.$nextTick(() => {
+          this.$set(
+            this.formInline,
+            "adjustStartDay",
+            this.lastValidAdjustStartDay != null
+              ? this.lastValidAdjustStartDay
+              : end
+          );
+        });
+        return;
+      }
+      this.lastValidAdjustStartDay = val;
+    },
+    /** 修改调整结束日期：小于开始日时回退并提示 */
+    handleAdjustEndDayChange(val) {
+      const start = Number(this.formInline.adjustStartDay);
+      const end = Number(val);
+      if (
+        val != null &&
+        val !== "" &&
+        !Number.isNaN(start) &&
+        !Number.isNaN(end) &&
+        start > end
+      ) {
+        this.$modal.msgWarning("调整开始日期不能大于调整结束日期");
+        this.$nextTick(() => {
+          this.$set(
+            this.formInline,
+            "adjustEndDay",
+            this.lastValidAdjustEndDay != null
+              ? this.lastValidAdjustEndDay
+              : start
+          );
+        });
+        return;
+      }
+      this.lastValidAdjustEndDay = val;
+    },
     /** 直接确认时写入 Redis，入参仅取自 formInline */
     buildAdjustsCxMachineRedisPayload() {
       const fi =
@@ -1635,6 +1755,9 @@ export default {
      * 结构调整页「直接确认」：写入 Redis 后将当前页列表数据带回月计划调整查询页。
      */
     async handleDirectConfirm() {
+      if (!this.validateAdjustDayRange()) {
+        return;
+      }
       try {
         await setAdjustsCxMachineFromRedis(
           this.buildAdjustsCxMachineRedisPayload()
@@ -2120,6 +2243,9 @@ export default {
     },
     //确认调整结果
     async confirmResult() {
+      if (!this.validateAdjustDayRange({ requireBoth: false })) {
+        return;
+      }
       this.loadText = this.$t("正在加载中，请稍候");
       try {
         this.show = false;
@@ -2481,26 +2607,8 @@ export default {
           );
         }
       }
-      if (
-        this.formInline.adjustStartDay == null ||
-        this.formInline.adjustStartDay === ""
-      ) {
-        return this.$modal.msgWarning("请选择调整开始日期");
-      }
-      if (
-        this.formInline.adjustEndDay == null ||
-        this.formInline.adjustEndDay == ""
-      ) {
-        return this.$modal.msgWarning("请选择调整结束日期");
-      }
-      const adjustStart = Number(this.formInline.adjustStartDay);
-      const adjustEnd = Number(this.formInline.adjustEndDay);
-      if (
-        !Number.isNaN(adjustStart) &&
-        !Number.isNaN(adjustEnd) &&
-        adjustStart > adjustEnd
-      ) {
-        return this.$modal.msgWarning("调整开始日期不能大于调整结束日期");
+      if (!this.validateAdjustDayRange()) {
+        return;
       }
       this.loading = true;
       try {
@@ -2700,6 +2808,9 @@ export default {
 
     //结构外获取调整订单
     async getOutList() {
+      if (!this.validateAdjustDayRange({ requireBoth: false })) {
+        return;
+      }
       this.loading = true;
       this.loadText = this.$t("正在获取调整订单，请稍候");
       try {
@@ -2778,6 +2889,7 @@ export default {
         if (!this.formInline.adjustEndDay) {
           this.formInline.adjustEndDay = this.formInline.endDay;
         }
+        this.syncLastValidAdjustDays();
 
         /** 获取调整订单后：重新拉取版本号列表，再按最新版本查询 list */
         await this.getOutVersionList(true, true);
@@ -3312,6 +3424,12 @@ export default {
           Number(adjustContext.adjustEndDay)
         );
       }
+      this.syncLastValidAdjustDays();
+    },
+    /** 同步调整日开始/结束日的合法快照，供修改越界时回退 */
+    syncLastValidAdjustDays() {
+      this.lastValidAdjustStartDay = this.formInline.adjustStartDay;
+      this.lastValidAdjustEndDay = this.formInline.adjustEndDay;
     },
 
     /**
@@ -3385,6 +3503,7 @@ export default {
         const res = await outGetStayDay(payload);
         if (res && res.adjustStartDay != null) {
           this.$set(this.formInline, "adjustStartDay", res.adjustStartDay);
+          this.syncLastValidAdjustDays();
         }
       } catch (err) {
         console.log(err);
