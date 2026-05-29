@@ -2358,13 +2358,16 @@ export default {
     /** 计划停机：清空 Redis 调整上下文后刷新主页面展示（仅在此处调用 set，避免与弹窗重复） */
     async onPlanDowntimeApplied() {
       try {
-        await setAdjustsCxMachineFromRedis({
+        const res = await setAdjustsCxMachineFromRedis({
           cxMachineCode: "",
           structureName: "",
           beginDay: null,
           endDay: null,
           version: "",
         });
+        if (res && res.msg) {
+          this.$modal.msgSuccess(res.msg);
+        }
         await this.fetchCurrentAdjustMachineFromRedis();
       } catch (e) {
         console.error(e);
