@@ -192,6 +192,7 @@ public class ProductionPlanGroupInfo {
      * 20260523+ 新成型机分配排产前Sku排产量备份
      */
     private Map<String, SkuProductionSnapshot> beforeProductionSnapshotMap;
+
     /**
      * 构建初始化分组信息对象
      * TBR 结构 PCR 英寸
@@ -688,7 +689,7 @@ public class ProductionPlanGroupInfo {
             return;
         }
         String mouldSetCode = selectedMould.get(BigDecimal.ZERO.intValue()).getMouldSetCode();
-        //得到有效排产范围：考虑模壳、胶囊卡盘、模具分配比例等
+        //得到有效排产范围：考虑模壳、胶囊卡盘、模具分配比例、换模次数等
         MouldProductionDayLimitHelper limitHelper = getProductionDayLimitInfo(context, addSkuInfo, preSelected, selectedMould);
         Set<Integer> effectiveRangeSet = limitHelper.getProductionDaySet();
         if (CollectionUtils.isEmpty(effectiveRangeSet)) {
@@ -954,12 +955,33 @@ public class ProductionPlanGroupInfo {
     }
 
     /**
+     * 是否需要高优先级Sku占比强制收尾
+     * 1、结构优先结构，无需判断
+     * 2、非高优先级先排产的无需判断
+     * 0 表示不要判断 1 表示要判断
+     *
+     * @return
+     */
+    public Integer isHeightPriorityLhMachineConclusion() {
+        if (YesOrNoEnum.YES.getValue().equals(isStructurePriority())) {
+            return YesOrNoEnum.NO.getValue();
+        }
+        if (CollectionUtils.isEmpty(groupPlanData)) {
+            return YesOrNoEnum.NO.getValue();
+        }
+        MonthPlanProductionRequirePlanVo isPriorityHeight = groupPlanData.stream().filter(single -> YesOrNoEnum.YES.getValue().equals(single.getIsPriorityHeight())).findAny().orElse(null);
+        if (null != isPriorityHeight) {
+            return YesOrNoEnum.YES.getValue();
+        }
+        return YesOrNoEnum.NO.getValue();
+    }
+
+    /**
      * 获取剩余排产中高优先级的SKU个数
      *
      * @return
      */
     public Integer getHeightPriorityCount() {
-        List<MonthPlanProductionRequirePlanVo> groupPlanData = getGroupPlanData();
         if (CollectionUtils.isEmpty(groupPlanData)) {
             return BigDecimal.ZERO.intValue();
         }
@@ -2064,6 +2086,7 @@ public class ProductionPlanGroupInfo {
     /**
      * 获取排产限制信息
      * 得到有效排产日范围集合
+     * 并设置对应的前Sku信息
      *
      * @param context       排产上下文
      * @param addSkuInfo    排产的Sku信息
@@ -2082,13 +2105,21 @@ public class ProductionPlanGroupInfo {
         TbrMouldProductionLogRecorder.addFindBeforeSkuInfo(context, groupName, addSkuInfo.getMaterialDesc(), lhBeforeSkuInfo);
         preSelected.updateBeforeSkuInfo(lhBeforeSkuInfo);
         BeforeSkuProductionInfo mouldSkuInfo = ChangeMouldInfo.buildBeforeSkuProductionInfoByMould(productionContext, preClosingDay, selectedMould);
-        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, preSelected.getBeforeSkuInfo(), mouldSkuInfo);
+        TbrMouldProductionLogRecorder.addMouldLastProductionSkuInfo(context, groupName, mouldSkuInfo);
+        ChangeMouldInfo changeMouldInfo = ChangeMouldInfo.buildChangeMouldInfo(context, addSkuInfo, lhBeforeSkuInfo, mouldSkuInfo);
         boolean isChangeMould = changeMouldInfo.isChangeMould();
         //隔天换模
         if (isChangeMould && changeMouldInfo.isProductionNextDay()) {
             preClosingDay = context.getNextHasProductionDay(preClosingDay, stopDayInfo);
         }
-        return LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
+        //20260529+ 二次增模排产最短上机天数控制
+        MouldProductionDayLimitHelper moldLimit = LhGroupProductionRangeCalculator.confirmProductionRange(productionContext, addSkuInfo, preClosingDay, preEndDay, selectedMould, dayLimitList, stopDayInfo, isChangeMould);
+        Set<Integer> effectiveRangeSet = moldLimit.getProductionDaySet();
+        if (isReachAgainProduction(productionContext, addSkuInfo, effectiveRangeSet, isChangeMould)) {
+            return moldLimit;
+        }
+        moldLimit.clearProductionDayInfo();
+        return moldLimit;
     }
 
     /**
@@ -2125,11 +2156,11 @@ public class ProductionPlanGroupInfo {
      *
      * @param context             排产上下文
      * @param addSkuInfo          排产计划
-     * @param canProductionDaySet 排产天数
-     * @param maxNeedDays         需求量最少排产天数
+     * @param canProductionDaySet 可排产天数集合
+     * @param isChangeMold        是否需要换模
      * @return
      */
-    private boolean isReachAgainProduction(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, Set<Integer> canProductionDaySet, Integer maxNeedDays) {
+    private boolean isReachAgainProduction(Context context, MonthPlanProductionRequirePlanVo addSkuInfo, Set<Integer> canProductionDaySet, boolean isChangeMold) {
         if (null == addSkuInfo || CollectionUtils.isEmpty(canProductionDaySet)) {
             return false;
         }
@@ -2141,14 +2172,19 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(effectiveList)) {
             return false;
         }
+        //是否已经排产
         boolean hasProduction = effectiveList.stream().anyMatch(MonthPlanProductionRequirePlanVo::hasPlannedProduction);
         if (!hasProduction) {
             return true;
         }
-        Integer daySize = Math.min(canProductionDaySet.size(), maxNeedDays);
+        //无需换模
+        if (!isChangeMold) {
+            return true;
+        }
         // 非首次上模最短在机天数
+        Integer maxDaySize = canProductionDaySet.size();
         TbrProductionContext productionContext = (TbrProductionContext) context;
         Integer skuShortestProductionDays = productionContext.getBaseDataContainer().getParamConfiguration().getSkuShortestProductionDays();
-        return daySize >= skuShortestProductionDays;
+        return maxDaySize >= skuShortestProductionDays;
     }
 }
