@@ -2277,6 +2277,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             String noFactoryStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noFactoryStr");
             String yearErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.yearErrorStr");
             String monthErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.monthErrorStr");
+            String noStructureNameStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noStructureNameStr");
+            
+            // 查询结构转产表
+            QueryWrapper<MpStructureAllocation> structureAllocationQueryWrapper = new QueryWrapper<>();
+            structureAllocationQueryWrapper.eq("FACTORY_CODE", factoryCode);
+            structureAllocationQueryWrapper.eq("PRODUCTION_VERSION", productVersion);
+            Set<String> allStructureNameSet = entityMapper.selectList(structureAllocationQueryWrapper).stream()
+                    .map(MpStructureAllocation::getStructureName).distinct().collect(Collectors.toSet());
 
             // 过滤合计等数据
             list = list.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialCode())).collect(Collectors.toList());
@@ -2344,6 +2352,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     importErrorLogs.addAll(validated);
                     continue;
                 }
+                // 结构转产表校验
+                if (!allStructureNameSet.contains(item.getStructureName())) {
+                    item.setId(-999L);
+                    failureNum++;
+                    addImportErrorLog(importLogId, errorNum, String.format(noStructureNameStr, item.getStructureName()), importErrorLogs);
+                    continue;
+                }
+                
                 item.setImportRowNum(errorNum);
                 insertList.add(item);
             }
