@@ -1626,9 +1626,9 @@ export default {
           fi.cxMachineCode != null ? String(fi.cxMachineCode).trim() : "",
         structureName:
           fi.structureName != null ? String(fi.structureName).trim() : "",
-        beginDay: fi.beginDay,
-        endDay: fi.endDay,
-        version: fi.version != null ? String(fi.version).trim() : "",
+        beginDay: fi.adjustStartDay,
+        endDay: fi.adjustEndDay,
+        version: fi.productionVersion != null ? String(fi.productionVersion).trim() : "",
       };
     },
     /**

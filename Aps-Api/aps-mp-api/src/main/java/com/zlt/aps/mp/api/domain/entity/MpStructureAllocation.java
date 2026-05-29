@@ -113,6 +113,7 @@ public class MpStructureAllocation extends BaseEntity {
     /**
      * 成型机编码
      */
+    @ImportExcelValidated(required = true)
     @Excel(name = "ui.data.column.mpStructureAllocation.cxMachineCode")
     @ApiModelProperty(value = "成型机编码", name = "cxMachineCode")
     @TableField(value = "CX_MACHINE_CODE")
