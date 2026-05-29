@@ -355,7 +355,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             // 默认排产3天
             dto.setDays(3);
         }
-        // 构建排程请求，scheduleDate为排产窗口最后一天
+
         ScheduleRequestVo request = new ScheduleRequestVo();
         // 最后一天日期，后端按 scheduleDate - days + 1 反推起始日期
         request.setScheduleDate(dto.getScheduleDate());
@@ -371,6 +371,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         } else {
             // 排程锁冲突：已有排程执行中
             if (result.getMessage() != null && result.getMessage().contains("排程执行中")) {
+                //todo 错误码-使用枚举类
                 return AjaxResult.error(423, result.getMessage());
             }
             // 校验不通过时，构建校验摘要返回前端

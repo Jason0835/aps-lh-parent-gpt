@@ -192,11 +192,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             context.setCurrentScheduleDate(currentScheduleDate);
             context.setCurrentShiftConfigs(singleShiftList);
 
-            // 跨天时重置试制/量试单日SKU上限计数（单日最多2个试制+量试SKU）
+            // 跨天时重置单日状态（按天管控的计数器/标记在进入新一天时清空）
             if (day != lastDay) {
-                context.setDailyTrialAssignedMaterialCodes(new HashSet<>());
-                context.setPrecisionPlanApplied(false);
-                context.setSupplementDailyRemainingMap(new HashMap<>());
+                context.setDailyTrialAssignedMaterialCodes(new HashSet<>());   // 试制/量试单日SKU上限计数（每天最多2个）
+                context.setPrecisionPlanApplied(false);                        // 精度计划已执行标记（每天首次班次挑选）
+                context.setSupplementDailyRemainingMap(new HashMap<>());      // 补充计划每日剩余需求跟踪（按lhId→剩余量，用于立库库容管控+R2轮补产）
             }
 
             // 执行该班次的排程
@@ -223,8 +223,6 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // ==================== 合并多班次结果：每个机台一条记录，8个班次映射到CLASS1~8 ====================
         List<CxScheduleResult> allResults = buildFinalScheduleResultsFromShifts(context, shiftResults, allShiftConfigs);
-
-        // ==================== 精度计划扣量已移至每日首次班次排产前执行 ====================
 
         // ==================== 班次量均衡：按结构班产标准，最大硫化机数胎胚调整班次均衡 ====================
         balanceShiftQuantities(context, shiftResults, allShiftConfigs);

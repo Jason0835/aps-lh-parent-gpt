@@ -478,7 +478,13 @@ public class TaskGroupService {
             boolean isSupplement = Boolean.TRUE.equals(task.getIsSupplementTask());
             boolean shouldDefer = (taskNetDemand == 0 && !isTrialLikeTask) || isSupplement;
             if (shouldDefer) {
-                int deferredQty = isSupplement ? taskNetDemand : (task.getEndingSurplusQty() != null ? task.getEndingSurplusQty() : 0);
+                int deferredQty;
+                if (isSupplement) {
+                    int tripCapacity = getTripCapacity(task.getStructureName(), embryoCode, context);
+                    deferredQty = tripCapacity > 0 ? ((taskNetDemand + tripCapacity - 1) / tripCapacity) * tripCapacity : taskNetDemand;
+                } else {
+                    deferredQty = task.getEndingSurplusQty() != null ? task.getEndingSurplusQty() : 0;
+                }
                 task.setDeferredRemainingDemand(deferredQty);
                 task.setPlannedProduction(0);
                 task.setRequiredCars(0);
@@ -669,6 +675,8 @@ public class TaskGroupService {
                 // 维度二（时间）：本胎胚预计库存可供硫化时长超过6小时
                 int totalMoldQty = embryoTotalMoldMap.getOrDefault(embryoCode, 0);
                 Integer materialDailyLhCapacity = getDailyLhCapacityForMaterial(materialCode, context);
+                // 日硫化量为双模值，需÷2得到单模产量（与S5.2.3一致）
+                materialDailyLhCapacity = materialDailyLhCapacity != null && materialDailyLhCapacity > 0 ? materialDailyLhCapacity / 2 : null;
                 BigDecimal projectedStockHours = null;
                 int capMaxStock = 0;
                 if (totalMoldQty > 0 && materialDailyLhCapacity != null && materialDailyLhCapacity > 0) {
@@ -699,12 +707,9 @@ public class TaskGroupService {
                                     .append(")=").append(timeLimit);
                         }
                     }
-                }
-
-                // 可供硫化时长管控结果
-                if (projectedStockHours != null) {
-                    log.info("【可供硫化管控】胎胚={}, 预计班后库存={}, 可供硫化={}h, 6h上限, {}",
+                    log.info("【可供硫化管控】胎胚={}, 预计班后库存={}, 可供硫化= {} × {} / {} / 3600 = {}h, 6h上限, {}",
                             embryoCode, projectedStock,
+                            projectedStock, singleTireMoldSeconds.setScale(2, BigDecimal.ROUND_HALF_UP), totalMoldQty,
                             projectedStockHours.setScale(2, BigDecimal.ROUND_HALF_UP),
                             projectedStockHours.compareTo(BigDecimal.valueOf(STOCK_HOURS_CAP)) > 0 ? "超限→封顶" : "未超限→通过");
                 }
@@ -940,15 +945,22 @@ public class TaskGroupService {
                                 dtSkipReason = "[空间]全部预计=" + dtTotalProjected + ">=上限=" + warehouseThreshold;
                             }
                             // 维度二（时间）：预估本轮排产后的可供硫化时长，如果>6h则跳过本轮（事前检查）
+                            int dtTotalMoldQty = 0;
+                            Integer dtDailyLhCap = null;
+                            BigDecimal dtSingleTireMoldSeconds = null;
+                            int dtProjectedAfter = 0;
+                            int dtFallbackProduction = 0;
                             if (!dtSkip) {
-                                int dtTotalMoldQty = embryoTotalMoldMap.getOrDefault(dtEmbryoCode, 0);
-                                Integer dtDailyLhCap = getDailyLhCapacityForMaterial(dtMaterialCode, context);
+                                dtTotalMoldQty = embryoTotalMoldMap.getOrDefault(dtEmbryoCode, 0);
+                                dtDailyLhCap = getDailyLhCapacityForMaterial(dtMaterialCode, context);
+                                // 日硫化量为双模值，需÷2得到单模产量（与S5.2.3一致）
+                                dtDailyLhCap = dtDailyLhCap != null && dtDailyLhCap > 0 ? dtDailyLhCap / 2 : null;
                                 if (dtTotalMoldQty > 0 && dtDailyLhCap != null && dtDailyLhCap > 0) {
                                     int dtTripCapacity = getTripCapacity(structName, dtEmbryoCode, context);
-                                    int dtFallbackProduction = Math.min(dtTripCapacity, remainingDemand);
+                                    dtFallbackProduction = Math.min(dtTripCapacity, remainingDemand);
                                     if (dtFallbackProduction > 0) {
-                                        int dtProjectedAfter = dtCurrentStock + dtCumFormingOutput + dtFallbackProduction - dtCumVulcanizingConsumption;
-                                        BigDecimal dtSingleTireMoldSeconds = BigDecimal.valueOf(SECONDS_PER_DAY)
+                                        dtProjectedAfter = dtCurrentStock + dtCumFormingOutput + dtFallbackProduction - dtCumVulcanizingConsumption;
+                                        dtSingleTireMoldSeconds = BigDecimal.valueOf(SECONDS_PER_DAY)
                                                 .divide(BigDecimal.valueOf(dtDailyLhCap), 2, BigDecimal.ROUND_HALF_UP);
                                         BigDecimal dtStockHoursAfter = BigDecimal.valueOf(dtProjectedAfter)
                                                 .multiply(dtSingleTireMoldSeconds)
@@ -998,10 +1010,10 @@ public class TaskGroupService {
                             }
                             // 可供硫化时长管控结果（事前预估通过）
                             if (dtStockHoursAfterResult != null) {
-                                int dtEstFallback = Math.min(getTripCapacity(structName, dtEmbryoCode, context), remainingDemand);
-                                log.info("  【可供硫化管控】胎胚={}, 预估排{}条后库存={}, 可供硫化={}h, 6h上限, 未超限→通过",
-                                        dtEmbryoCode, dtEstFallback,
-                                        dtCurrentStock + dtCumFormingOutput + dtEstFallback - dtCumVulcanizingConsumption,
+                                log.info("  【可供硫化管控】胎胚={}, 预估排{}条后库存={}, 可供硫化= {} × {} / {} / 3600 = {}h, 6h上限, 未超限→通过",
+                                        dtEmbryoCode, dtFallbackProduction,
+                                        dtProjectedAfter,
+                                        dtProjectedAfter, dtSingleTireMoldSeconds.setScale(2, BigDecimal.ROUND_HALF_UP), dtTotalMoldQty,
                                         dtStockHoursAfterResult.setScale(2, BigDecimal.ROUND_HALF_UP));
                             }
                         }
