@@ -734,6 +734,7 @@ export default {
                   "data-day-cell-day": String(i),
                 }}
                 onClick={(e) => this.handleDayCellClick(row, i, e)}
+                onMousedown={(e) => this.handleDayCellMouseDown(e)}
               >
                 <el-input
                   size="mini"
@@ -1209,11 +1210,26 @@ export default {
         row.embryoCode || "",
       ].join("_");
     },
+    /** 清除 t-table 框选区域，避免与日排产单元格选中态冲突 */
+    clearTableSelectArea() {
+      const table = this.getMonthPlanTableInnerRef();
+      const body = table && table.$refs && table.$refs.tableBody;
+      if (body && typeof body.removeSelectArea === "function") {
+        body.removeSelectArea();
+      }
+    },
     setDayCellActive(row, day) {
+      this.clearTableSelectArea();
       this.dayCellActive = {
         rowKey: this.getDayCellRowKey(row),
         day,
       };
+    },
+    /** 阻止 selectArea 在 td 上拦截日排产格的按下/选中 */
+    handleDayCellMouseDown(event) {
+      if (event) {
+        event.stopPropagation();
+      }
     },
     isDayCellActive(row, day) {
       if (!this.dayCellActive) {
