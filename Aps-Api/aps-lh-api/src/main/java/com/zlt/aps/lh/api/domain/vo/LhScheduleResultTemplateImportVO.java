@@ -223,7 +223,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 1班示方类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class1MouldMethod", dictType = "lh_trial_status")
     @ApiModelProperty(value = "1班示方类型", name = "class1MouldMethod")
     @TableField(value = "CLASS1_MOULD_METHOD")
     private String class1MouldMethod;
@@ -271,7 +270,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 2班示方类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class2MouldMethod", dictType = "lh_trial_status")
     @ApiModelProperty(value = "2班示方类型", name = "class2MouldMethod")
     @TableField(value = "CLASS2_MOULD_METHOD")
     private String class2MouldMethod;
@@ -319,7 +317,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 3班示方类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class3MouldMethod", dictType = "lh_trial_status")
     @ApiModelProperty(value = "3班示方类型", name = "class3MouldMethod")
     @TableField(value = "CLASS3_MOULD_METHOD")
     private String class3MouldMethod;
@@ -367,7 +364,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 4班示方类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class4MouldMethod", dictType = "lh_trial_status")
     @ApiModelProperty(value = "4班示方类型", name = "class4MouldMethod")
     @TableField(value = "CLASS4_MOULD_METHOD")
     private String class4MouldMethod;
@@ -415,7 +411,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 5班示方类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class5MouldMethod", dictType = "lh_trial_status")
     @ApiModelProperty(value = "5班示方类型", name = "class5MouldMethod")
     @TableField(value = "CLASS5_MOULD_METHOD")
     private String class5MouldMethod;
@@ -463,7 +458,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 6班示方类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class6MouldMethod", dictType = "lh_trial_status")
     @ApiModelProperty(value = "6班示方类型", name = "class6MouldMethod")
     @TableField(value = "CLASS6_MOULD_METHOD")
     private String class6MouldMethod;
@@ -511,7 +505,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 7班示方类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class7MouldMethod", dictType = "lh_trial_status")
     @ApiModelProperty(value = "7班示方类型", name = "class7MouldMethod")
     @TableField(value = "CLASS7_MOULD_METHOD")
     private String class7MouldMethod;
@@ -559,7 +552,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 8班示方类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class8MouldMethod", dictType = "lh_trial_status")
     @ApiModelProperty(value = "8班示方类型", name = "class8MouldMethod")
     @TableField(value = "CLASS8_MOULD_METHOD")
     private String class8MouldMethod;
@@ -639,7 +631,7 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 示方类型（字典 lh_trial_status：S-正规示方，T-量试示方，X-试验示方）
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.constructionStage")
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.constructionStage", dictType = "lh_trial_status")
     @ApiModelProperty(value = "示方类型", name = "trialStatus")
     @TableField(value = "TRIAL_STATUS")
     private String trialStatus;
@@ -833,7 +825,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 1班类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class1Type")
     @ApiModelProperty(value = "1班类型", name = "class1Type")
     @TableField(value = "CLASS1_TYPE")
     private String class1Type;
@@ -865,7 +856,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 2班类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class2Type")
     @ApiModelProperty(value = "2班类型", name = "class2Type")
     @TableField(value = "CLASS2_TYPE")
     private String class2Type;
@@ -897,7 +887,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 3班类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class3Type")
     @ApiModelProperty(value = "3班类型", name = "class3Type")
     @TableField(value = "CLASS3_TYPE")
     private String class3Type;
@@ -929,7 +918,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 4班类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class4Type")
     @ApiModelProperty(value = "4班类型", name = "class4Type")
     @TableField(value = "CLASS4_TYPE")
     private String class4Type;
@@ -961,7 +949,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 5班类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class5Type")
     @ApiModelProperty(value = "5班类型", name = "class5Type")
     @TableField(value = "CLASS5_TYPE")
     private String class5Type;
@@ -993,7 +980,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 6班类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class6Type")
     @ApiModelProperty(value = "6班类型", name = "class6Type")
     @TableField(value = "CLASS6_TYPE")
     private String class6Type;
@@ -1025,7 +1011,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 7班类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class7Type")
     @ApiModelProperty(value = "7班类型", name = "class7Type")
     @TableField(value = "CLASS7_TYPE")
     private String class7Type;
@@ -1057,7 +1042,6 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     /**
      * 8班类型
      */
-    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.class8Type")
     @ApiModelProperty(value = "8班类型", name = "class8Type")
     @TableField(value = "CLASS8_TYPE")
     private String class8Type;
