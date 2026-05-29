@@ -468,6 +468,7 @@ import {
   getAdjustDetailList,
   listOutsideStructure,
   confirmAdjust,
+  setAdjustsCxMachineFromRedis,
   autoAdjust,
   saveAdjust,
   removeAdjust,
@@ -1614,11 +1615,34 @@ export default {
         this.getMonthPlanFinalAdjustQueryRoute(queryExtra)
       );
     },
+    /** 直接确认时写入 Redis，入参仅取自 formInline */
+    buildAdjustsCxMachineRedisPayload() {
+      const fi =
+        this.formInline && typeof this.formInline === "object"
+          ? this.formInline
+          : {};
+      return {
+        cxMachineCode:
+          fi.cxMachineCode != null ? String(fi.cxMachineCode).trim() : "",
+        structureName:
+          fi.structureName != null ? String(fi.structureName).trim() : "",
+        beginDay: fi.beginDay,
+        endDay: fi.endDay,
+        version: fi.version != null ? String(fi.version).trim() : "",
+      };
+    },
     /**
-     * 结构调整页「直接确认」：不调用 autoAdjust，将当前页列表数据带回月计划调整查询页。
+     * 结构调整页「直接确认」：写入 Redis 后将当前页列表数据带回月计划调整查询页。
      */
-    handleDirectConfirm() {
-      this.navigateToMonthPlanAfterStructureAdjust(this.data);
+    async handleDirectConfirm() {
+      try {
+        await setAdjustsCxMachineFromRedis(
+          this.buildAdjustsCxMachineRedisPayload()
+        );
+        this.navigateToMonthPlanAfterStructureAdjust(this.data);
+      } catch (err) {
+        console.error(err);
+      }
     },
     //修改锁定上机日期
     handleLockScheduleChange(row, val) {
