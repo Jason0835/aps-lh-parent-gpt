@@ -99,6 +99,13 @@ public interface MonthProductionDataService {
     void saveMouldProductionLog(MouldProductionLog productionLog);
 
     /**
+     * 保存月计划排程排产流程日志
+     *
+     * @param productionLogList 阶段流程日志集合
+     */
+    void saveProductionLog(List<MouldProductionLog> productionLogList);
+
+    /**
      * 根据查询条件，获取工厂的排产计划信息
      * 从初始化中获取
      *

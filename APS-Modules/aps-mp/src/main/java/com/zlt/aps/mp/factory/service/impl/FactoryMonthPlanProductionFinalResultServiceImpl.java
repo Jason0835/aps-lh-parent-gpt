@@ -987,7 +987,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         List<MpAdjustResult> mpAdjustResultList = mpAdjustResultEntityMapper.selectList(queryWrapper);
 
         // 加载月计划版本
-        Map<String, DpDemandPlanSum> demandPlanSumMap = this.buildDemandPlanSumMap(condition, matchVersion);
+        Map<String, DpDemandPlanSum> demandPlanSumMap = new HashMap<>(this.buildDemandPlanSumMap(condition, matchVersion));
         // 尝试额外加载结构内的最新版本对应的需求计划，如果版本不一样，需要关联出新物料并且并入需求计划列表中
         LambdaQueryWrapper<MpAdjustStructureIn> adjustStructureInQueryWrapper = new LambdaQueryWrapper<>();
         adjustStructureInQueryWrapper.select(MpAdjustStructureIn::getVersion);
@@ -998,9 +998,12 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         String newVersion = mpAdjustStructureInEntityMapper.selectList(adjustStructureInQueryWrapper).stream().map(MpAdjustStructureIn::getVersion).max(String::compareTo).orElse(null);
         if (StringUtils.isNotEmpty(newVersion) && !Objects.equals(newVersion, matchVersion)) {
             // 两个版本的数据统一合并至demandPlanSumMap
-            this.buildDemandPlanSumMap(condition, newVersion).values().stream().forEach(plan -> {
-                demandPlanSumMap.putIfAbsent(this.buildDemandPlanSumMapKey(matchVersion, plan.getMaterialCode()), plan);
-            });
+            Map<String, DpDemandPlanSum> dpDemandPlanSumMap = this.buildDemandPlanSumMap(condition, newVersion);
+            if (PubUtil.isNotEmpty(dpDemandPlanSumMap)){
+                dpDemandPlanSumMap.values().stream().forEach(plan -> {
+                    demandPlanSumMap.putIfAbsent(this.buildDemandPlanSumMapKey(matchVersion, plan.getMaterialCode()), plan);
+                });
+            }
         }
         
         Map<String, MpAdjustResult> mpAdjustResultMap = new LinkedHashMap<>();

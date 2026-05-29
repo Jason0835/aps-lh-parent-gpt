@@ -173,7 +173,7 @@ public class CxScheduleResultUIController extends BaseUIController<CxScheduleRes
     @ResponseBody
     public void exportCxRemainQty(HttpServletResponse response, CxScheduleResult entity) throws IOException {
         Date scheduleDate = entity.getScheduleDate() != null ? entity.getScheduleDate() : new Date();
-        String fileName = "成型日计划" + cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyyMMdd");
+        String fileName = I18nUtil.getMessage("ui.cx.cxScheduleResult.exportCxDayPlanFileName") + cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyyMMdd");
         byte[] excelBytes = iCxScheduleResultService.exportCxRemainQty(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");

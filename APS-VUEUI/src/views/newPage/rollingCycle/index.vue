@@ -38,7 +38,7 @@
             type="primary"
             :loading="getLoading"
             v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
-            >{{ $t("获取调整订单") }}</el-button
+            >{{ $t("ui.data.rollingCycle.adjustOrder") }}</el-button
           >
           <el-button
             @click="handShowResult"
@@ -165,8 +165,11 @@
                   v-hasPermi="[
                     'monthplan:mpWeekRollAdjust:getAdjustDetailList',
                   ]"
-                  >获取调整订单</el-button
+                  >{{ $t("ui.data.rollingCycle.adjustOrder") }}</el-button
                 >
+                <el-button @click="handleDirectConfirm">{{
+                  $t("ui.data.rollingCycle.directConfirm")
+                }}</el-button>
               </el-form-item>
               <!-- <el-button
                 @click="handShowResult"
@@ -206,7 +209,11 @@
             :loading="loading"
             :disabled="data.length == 0"
           >
-            {{ this.$t("common.button.confirm") }}</el-button
+            {{
+              isStructureAdjustPage
+                ? $t("ui.data.rollingCycle.adjustAuto")
+                : $t("common.button.confirm")
+            }}</el-button
           >
           <el-button
             type="primary"
@@ -216,7 +223,11 @@
             :disabled="data.length == 0"
             v-hasPermi="['monthplan:mpWeekRollAdjust:autoAdjust']"
           >
-            {{ this.$t("common.button.confirm") }}</el-button
+            {{
+              isStructureAdjustPage
+                ? $t("ui.data.rollingCycle.adjustAuto")
+                : $t("common.button.confirm")
+            }}</el-button
           >
 
 		  <!-- <el-button
@@ -457,6 +468,7 @@ import {
   getAdjustDetailList,
   listOutsideStructure,
   confirmAdjust,
+  setAdjustsCxMachineFromRedis,
   autoAdjust,
   saveAdjust,
   removeAdjust,
@@ -1592,6 +1604,46 @@ export default {
       }
       return queryExtra;
     },
+    /**
+     * 月计划结构调整独立页：关闭当前页并回到月计划调整查询，携带工厂/年月/版本/结构等。
+     * @param {Array} resultList 用于反查 query 的行列表（autoAdjust 结果或当前页 data）
+     */
+    navigateToMonthPlanAfterStructureAdjust(resultList) {
+      const queryExtra =
+        this.buildMonthPlanQueryAfterStructureAutoAdjust(resultList);
+      this.$tab.closeOpenPage(
+        this.getMonthPlanFinalAdjustQueryRoute(queryExtra)
+      );
+    },
+    /** 直接确认时写入 Redis，入参仅取自 formInline */
+    buildAdjustsCxMachineRedisPayload() {
+      const fi =
+        this.formInline && typeof this.formInline === "object"
+          ? this.formInline
+          : {};
+      return {
+        cxMachineCode:
+          fi.cxMachineCode != null ? String(fi.cxMachineCode).trim() : "",
+        structureName:
+          fi.structureName != null ? String(fi.structureName).trim() : "",
+        beginDay: fi.adjustStartDay,
+        endDay: fi.adjustEndDay,
+        version: fi.productionVersion != null ? String(fi.productionVersion).trim() : "",
+      };
+    },
+    /**
+     * 结构调整页「直接确认」：写入 Redis 后将当前页列表数据带回月计划调整查询页。
+     */
+    async handleDirectConfirm() {
+      try {
+        await setAdjustsCxMachineFromRedis(
+          this.buildAdjustsCxMachineRedisPayload()
+        );
+        this.navigateToMonthPlanAfterStructureAdjust(this.data);
+      } catch (err) {
+        console.error(err);
+      }
+    },
     //修改锁定上机日期
     handleLockScheduleChange(row, val) {
       saveAdjustResult({
@@ -2387,11 +2439,7 @@ export default {
         this.autoLoading = false;
         /** 月计划结构调整独立路由：自动调整成功后关当前页并回到月计划调整查询，携带工厂/年月/版本/结构等 */
         if (this.pageVariant === "structureAdjust") {
-          const queryExtra =
-            this.buildMonthPlanQueryAfterStructureAutoAdjust(list);
-          this.$tab.closeOpenPage(
-            this.getMonthPlanFinalAdjustQueryRoute(queryExtra)
-          );
+          this.navigateToMonthPlanAfterStructureAdjust(list);
           return;
         }
         if (list.length != 0) {
@@ -2462,11 +2510,7 @@ export default {
         const list = this.normalizeAutoAdjustResponse(raw);
         this.outResultData = this.enrichProductTypeCode(list);
         if (this.pageVariant === "structureAdjust") {
-          const queryExtra =
-            this.buildMonthPlanQueryAfterStructureAutoAdjust(list);
-          this.$tab.closeOpenPage(
-            this.getMonthPlanFinalAdjustQueryRoute(queryExtra)
-          );
+          this.navigateToMonthPlanAfterStructureAdjust(list);
           return;
         }
         if (list.length !== 0) {

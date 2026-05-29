@@ -364,6 +364,7 @@
   "ui.data.rollingCycle.structuralSingle":"单结构调整",
   "ui.data.rollingCycle.result":"调整结果",
   "ui.data.rollingCycle.adjustOrder":"获取调整订单",
+  "ui.data.rollingCycle.directConfirm":"直接确认",
   "ui.data.rollingCycle.adjustAuto":"自动调整",
   "ui.data.rollingCycle.adjustCheck":"单选结构调整",
   "ui.data.rollingCycle.adjustAdd":"新增结构",

@@ -84,6 +84,11 @@ export default {
         this.resize();
       });
     },
+    data() {
+      if (this.selectArea) {
+        this.$nextTick(() => this.bindSelectAreaHandler());
+      }
+    },
   },
 
   created() {
@@ -99,11 +104,23 @@ export default {
   mounted() {
     this.$nextTick(() => {
       this.resize();
+      this.bindSelectAreaHandler();
     });
+  },
+  updated() {
+    this.bindSelectAreaHandler();
   },
   beforeDestroy() {
     if (this.calcHeight) {
       window.removeEventListener("resize", this._resizeHandler, false);
+    }
+    const table = this.getTableRef();
+    if (table && table.__pageTableSelectAreaDocListener) {
+      document.removeEventListener(
+        "mouseup",
+        table.__pageTableSelectAreaDocListener
+      );
+      table.__pageTableSelectAreaDocListener = null;
     }
   },
 
@@ -150,6 +167,292 @@ export default {
         rowHeight += this.$refs.pageRef.clientHeight;
       }
       return rowHeight;
+    },
+    /** 从表格 DOM 读取框选单元格文本（支持 el-input 日列等） */
+    readSelectAreaCellTextFromDom(table, rowColKey) {
+      const root = table.$el;
+      if (!root) {
+        return "";
+      }
+      const parts = String(rowColKey).split("_");
+      if (parts.length !== 2) {
+        return "";
+      }
+      const r = Number(parts[0]);
+      const c = Number(parts[1]);
+      const tbodies = [
+        root.querySelector(".el-table__body-wrapper tbody"),
+        root.querySelector(".el-table__fixed-body-wrapper tbody"),
+        root.querySelector(
+          ".el-table__fixed-right .el-table__fixed-body-wrapper tbody"
+        ),
+      ].filter(Boolean);
+      for (let i = 0; i < tbodies.length; i++) {
+        const td = tbodies[i].rows[r] && tbodies[i].rows[r].cells[c];
+        if (!td) {
+          continue;
+        }
+        const input = td.querySelector("input.el-input__inner, input");
+        if (input) {
+          return (input.value != null ? String(input.value) : "").trim();
+        }
+        const text = (td.innerText || td.textContent || "").trim();
+        if (text !== "" || i === tbodies.length - 1) {
+          return text;
+        }
+      }
+      return "";
+    },
+    /**
+     * 解析框选单元格：空/0 视为数值 0；含中文、英文或符号视为非数值。
+     */
+    parseSelectAreaCellValue(text) {
+      const t = (text != null ? String(text) : "").trim();
+      if (t === "") {
+        return { isNumeric: true, value: 0 };
+      }
+      if (/[\u4e00-\u9fff]/.test(t) || /[a-zA-Z]/.test(t)) {
+        return { isNumeric: false, value: null };
+      }
+      if (/^-?\d+(\.\d+)?$/.test(t)) {
+        const num = Number(t);
+        return {
+          isNumeric: !Number.isNaN(num) && Number.isFinite(num),
+          value: num,
+        };
+      }
+      return { isNumeric: false, value: null };
+    },
+    formatSelectAreaNumber(value) {
+      if (!Number.isFinite(value)) {
+        return value;
+      }
+      return value % 1 ? Number(value.toFixed(2)) : value;
+    },
+    buildSelectAreaInfo(table, areaData) {
+      if (!areaData || Object.keys(areaData).length === 0) {
+        return null;
+      }
+      let count = 0;
+      let summation = 0;
+      let hasNonNumeric = false;
+      for (const k in areaData) {
+        if (!areaData[k]) {
+          continue;
+        }
+        count += 1;
+        const text = this.readSelectAreaCellTextFromDom(table, k);
+        const parsed = this.parseSelectAreaCellValue(text);
+        if (!parsed.isNumeric) {
+          hasNonNumeric = true;
+        } else {
+          summation += parsed.value;
+        }
+      }
+      if (count === 0) {
+        return null;
+      }
+      if (hasNonNumeric) {
+        return { count, countOnly: true };
+      }
+      return {
+        count,
+        summation: this.formatSelectAreaNumber(summation),
+        average: this.formatSelectAreaNumber(summation / count),
+        countOnly: false,
+      };
+    },
+    /** 含非数值时 t-table 模板仍渲染三项，此处只保留计数文案 */
+    applySelectAreaInfoBar(table) {
+      const info = table.selectAreaInfo;
+      const el =
+        table.$el && table.$el.querySelector(".t-table-select-area-info");
+      if (!el || !info) {
+        return;
+      }
+      if (info.__countOnly) {
+        el.innerHTML = `<span>计数：${info.count}</span>`;
+      }
+    },
+    /** 交互控件内按下时不启动框选，保留单元格内文本选中/编辑 */
+    shouldSkipSelectAreaForTarget(target) {
+      if (!target || !target.closest) {
+        return false;
+      }
+      return !!target.closest(
+        "input, textarea, select, .el-select, .el-input, .day-cell-wrap"
+      );
+    },
+    /** 清除延迟框选状态 */
+    clearSelectAreaPending(tableBody) {
+      if (tableBody) {
+        tableBody._selectAreaPending = null;
+      }
+    },
+    /**
+     * 适配 selectArea 与单元格文本选中：
+     * 1. 去掉 td 上的 user-select:none，允许拖选普通文本；
+     * 2. 仅在跨格拖动（或 Shift 追加）时启动框选，同格内按下可正常选中文本。
+     */
+    patchSelectAreaTableBody(tableBody, vm) {
+      if (!tableBody || tableBody.__pageTableSelectAreaBodyPatched) {
+        return;
+      }
+      const originalGetCellStyle = tableBody.getCellStyle.bind(tableBody);
+      tableBody.getCellStyle = function (...args) {
+        const style = originalGetCellStyle(...args) || {};
+        if (style.userSelect === "none") {
+          delete style.userSelect;
+        }
+        return style;
+      };
+
+      const originalMouseDown = tableBody.handelCellMouseDown.bind(tableBody);
+      const originalMouseMove = tableBody.handelCellMouseMove.bind(tableBody);
+      const originalMouseUp = tableBody.handelCellMouseUp.bind(tableBody);
+      const originalTableMouseLeave =
+        tableBody.handleTableMouseLeave.bind(tableBody);
+
+      tableBody.handelCellMouseDown = function (
+        event,
+        rowIndex,
+        colIndex,
+        rowspan,
+        colspan
+      ) {
+        if (event.button !== 0) {
+          return;
+        }
+        if (event.shiftKey) {
+          tableBody._selectAreaPending = null;
+          return originalMouseDown(
+            event,
+            rowIndex,
+            colIndex,
+            rowspan,
+            colspan
+          );
+        }
+        if (vm.shouldSkipSelectAreaForTarget(event.target)) {
+          tableBody._selectAreaPending = null;
+          return;
+        }
+        tableBody._selectAreaPending = {
+          rowIndex,
+          colIndex,
+          rowspan,
+          colspan,
+          activated: false,
+        };
+      };
+
+      tableBody.handelCellMouseMove = function (
+        event,
+        rowIndex,
+        colIndex,
+        rowspan,
+        colspan
+      ) {
+        const pending = tableBody._selectAreaPending;
+        if (
+          pending &&
+          !pending.activated &&
+          (tableBody.selectAreaIndex == null ||
+            tableBody.selectAreaIndex === undefined)
+        ) {
+          if (
+            rowIndex !== pending.rowIndex ||
+            colIndex !== pending.colIndex
+          ) {
+            pending.activated = true;
+            originalMouseDown(
+              event,
+              pending.rowIndex,
+              pending.colIndex,
+              pending.rowspan,
+              pending.colspan
+            );
+          }
+        }
+        return originalMouseMove(
+          event,
+          rowIndex,
+          colIndex,
+          rowspan,
+          colspan
+        );
+      };
+
+      tableBody.handelCellMouseUp = function (...args) {
+        tableBody._selectAreaPending = null;
+        return originalMouseUp(...args);
+      };
+
+      tableBody.handleTableMouseLeave = function (...args) {
+        tableBody._selectAreaPending = null;
+        return originalTableMouseLeave(...args);
+      };
+
+      tableBody.__pageTableSelectAreaBodyPatched = true;
+    },
+    bindSelectAreaDocumentMouseUp(table) {
+      if (!table || table.__pageTableSelectAreaDocListener) {
+        return;
+      }
+      const onDocMouseUp = () => {
+        const body = table.$refs && table.$refs.tableBody;
+        this.clearSelectAreaPending(body);
+      };
+      document.addEventListener("mouseup", onDocMouseUp);
+      table.__pageTableSelectAreaDocListener = onDocMouseUp;
+    },
+    /** t-table 的 updateSelectArea 不向外冒泡，需在 mounted 时 patch handleUpdateSelectArea */
+    bindSelectAreaHandler() {
+      if (!this.selectArea) {
+        return;
+      }
+      const table = this.getTableRef();
+      if (!table) {
+        return;
+      }
+      const tableBody = table.$refs && table.$refs.tableBody;
+      if (tableBody) {
+        this.patchSelectAreaTableBody(tableBody, this);
+      }
+      this.bindSelectAreaDocumentMouseUp(table);
+      if (table.__pageTableSelectAreaPatched) {
+        return;
+      }
+      const vm = this;
+      table.handleUpdateSelectArea = function (areaData) {
+        if (!areaData || Object.keys(areaData).length === 0) {
+          table.selectAreaInfo = null;
+          return;
+        }
+        const stats = vm.buildSelectAreaInfo(table, areaData);
+        if (!stats) {
+          table.selectAreaInfo = null;
+          return;
+        }
+        if (stats.countOnly) {
+          table.selectAreaInfo = {
+            count: stats.count,
+            average: 0,
+            summation: 0,
+            __countOnly: true,
+          };
+        } else {
+          table.selectAreaInfo = {
+            count: stats.count,
+            average: stats.average,
+            summation: stats.summation,
+            __countOnly: false,
+          };
+        }
+        table.$forceUpdate();
+        vm.$nextTick(() => vm.applySelectAreaInfoBar(table));
+      };
+      table.__pageTableSelectAreaPatched = true;
     },
     resize() {
       console.log('resize');
@@ -380,7 +683,12 @@ export default {
 
   render() {
     return (
-      <div class={this.calcHeight ? "page-table flex" : "page-table"}>
+      <div
+        class={[
+          this.calcHeight ? "page-table flex" : "page-table",
+          this.selectArea ? "page-table--select-area" : "",
+        ]}
+      >
         {this.searchColumns.length || this.batchSearchColumns ? (
           <HeaderSearch
             ref="searchRef"
@@ -565,6 +873,16 @@ export default {
 ::v-deep .white-space-pre {
   .cell {
     white-space: pre;
+  }
+}
+
+/* selectArea 开启时恢复单元格文本可选（t-table 默认 user-select:none） */
+.page-table--select-area {
+  ::v-deep .el-table__body-wrapper .cell,
+  ::v-deep .el-table__fixed-body-wrapper .cell,
+  ::v-deep .el-table__fixed-right .el-table__fixed-body-wrapper .cell {
+    user-select: text;
+    -webkit-user-select: text;
   }
 }
 </style>

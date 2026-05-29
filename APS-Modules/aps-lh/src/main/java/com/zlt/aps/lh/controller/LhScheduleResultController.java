@@ -66,7 +66,17 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * 硫化排程控制器
+ * 硫化排程对外接口控制器。
+ *
+ * <p>业务定位：</p>
+ * <ul>
+ *   <li>作为硫化排程接口入口，接收排程执行和排程发布请求；</li>
+ *   <li>不承载排程算法，仅做请求日志记录并委托 {@link ILhScheduleService}；</li>
+ *   <li>排程执行请求最终进入服务层构建 {@code LhScheduleContext}，再由模板链路执行 S4.1～S4.6；</li>
+ *   <li>发布请求只按批次号发布已生成的硫化排程结果。</li>
+ * </ul>
+ *
+ * <p>注意：该类不应加入 SKU 排序、机台选择、换模或班次分配等业务规则。</p>
  *
  * @author APS
  */
@@ -124,6 +134,16 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         return lhScheduleService.listScheduleShiftDates(query.getScheduleDate());
     }
 
+
+    /**
+     * 执行自动排程。
+     *
+     * <p>入口只记录工厂和排程日期，实际业务由 {@link ILhScheduleService#executeSchedule(LhScheduleRequestDTO)}
+     * 负责，包括排程锁、参数快照、基础数据初始化、续作、新增排产和结果保存。</p>
+     *
+     * @param request 排程请求参数
+     * @return 排程响应结果
+     */
     @PostMapping("/execute")
     @ApiOperation("执行自动排程")
     public LhScheduleResponseDTO executeSchedule(@RequestBody LhScheduleRequestDTO request) {
@@ -245,7 +265,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         ExcelUtil<LhScheduleResultTemplateImportVO> util = new ExcelUtil<>(LhScheduleResultTemplateImportVO.class);
         // 模板第1行为key表头，第9行开始是明细数据，因此表头行数传9，并关闭二级表头。
         List<LhScheduleResultTemplateImportVO> list = util.importExcel(
-                sheetName, new ByteArrayInputStream(fileBytes), 0, 6, -1);
+                sheetName, new ByteArrayInputStream(fileBytes), 0, 5, -1);
         AjaxResult ajaxResult = lhScheduleService.importScheduleTemplate(list, result, updateSupport, importLog.getId());
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(list.size());

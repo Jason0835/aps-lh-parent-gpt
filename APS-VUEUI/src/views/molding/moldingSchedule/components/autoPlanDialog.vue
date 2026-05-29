@@ -137,7 +137,7 @@ export default {
           this.hide();
         } else if (result.code === 423) {
           // 排程执行中（锁冲突），提示用户稍后查看
-          this.$modal.msgWarning(result.msg || "排程正在执行中，请稍后刷新页面查看结果");
+          this.$modal.msgWarning(result.msg || this.$t("ui.data.column.cxScheduleResult.scheduleRunning"));
           this.hide();
         } else if (result.code === 500) {
           const errorData = result.data || {};
@@ -146,7 +146,7 @@ export default {
 
           // 校验已通过但超时：排程实际正在执行中，友好提示用户稍后刷新
           if (errorCount === 0 && warningCount === 0) {
-            this.$modal.msgWarning("排程正在进行中，数据校验已通过，请稍后刷新页面查看结果");
+            this.$modal.msgWarning(this.$t("ui.data.column.cxScheduleResult.scheduleValidating"));
             this.hide();
             return;
           }
@@ -155,17 +155,18 @@ export default {
           const warnings = errorData.warnings || [];
 
           // 构建标题，包含日期
-          const titleMatch = result.msg.match(/排程失败\[(\d{4}-\d{2}-\d{2})\]:/);
+          const scheduleFailedText = this.$t("ui.data.column.cxScheduleResult.scheduleFailed");
+          const titleMatch = result.msg.match(new RegExp(scheduleFailedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\[(\\d{4}-\\d{2}-\\d{2})\\]:'));
           const scheduleDate = titleMatch ? titleMatch[1] : '';
-          const summaryMsg = result.msg.replace(/排程失败\[\d{4}-\d{2}-\d{2}\]:/, '').trim();
+          const summaryMsg = result.msg.replace(new RegExp(scheduleFailedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\[\\d{4}-\\d{2}-\\d{2}\\]:'), '').trim();
 
           let html = '';
 
           // 摘要信息
           html += '<div style="margin-bottom:16px;padding:10px;background:#fef0f0;border:1px solid #fde2e2;border-radius:4px;">';
-          html += '<div style="color:#F56C6C;font-size:14px;font-weight:bold;">⚠️ 排程失败</div>';
+          html += '<div style="color:#F56C6C;font-size:14px;font-weight:bold;">⚠️ ' + this.$t("ui.data.column.cxScheduleResult.scheduleFailed") + '</div>';
           if (scheduleDate) {
-            html += '<div style="color:#606266;font-size:13px;margin-top:4px;">排程日期：' + scheduleDate + '</div>';
+            html += '<div style="color:#606266;font-size:13px;margin-top:4px;">' + this.$t("ui.data.column.cxScheduleResult.scheduleDateLabel") + scheduleDate + '</div>';
           }
           html += '<div style="color:#909399;font-size:13px;margin-top:4px;">' + summaryMsg + '</div>';
           html += '</div>';
@@ -175,7 +176,7 @@ export default {
             html += '<div style="margin-bottom:12px;">';
             html += '<div style="color:#F56C6C;font-size:13px;font-weight:bold;margin-bottom:8px;display:flex;align-items:center;">';
             html += '<span style="display:inline-block;width:4px;height:14px;background:#F56C6C;margin-right:6px;border-radius:2px;"></span>';
-            html += '错误 (' + errorData.errorCount + ' 项)</div>';
+            html += this.$t("ui.data.column.cxScheduleResult.errorLabel") + ' (' + errorData.errorCount + ' ' + this.$t("ui.data.column.cxScheduleResult.itemsLabel") + ')</div>';
 
             errors.forEach((item, idx) => {
               html += '<div style="margin-bottom:12px;padding:10px;background:#fef0f0;border-left:3px solid #F56C6C;border-radius:3px;">';
@@ -195,7 +196,7 @@ export default {
             html += '<div>';
             html += '<div style="color:#E6A23C;font-size:13px;font-weight:bold;margin-bottom:8px;display:flex;align-items:center;">';
             html += '<span style="display:inline-block;width:4px;height:14px;background:#E6A23C;margin-right:6px;border-radius:2px;"></span>';
-            html += '警告 (' + errorData.warningCount + ' 项)</div>';
+            html += this.$t("ui.data.column.cxScheduleResult.warningLabel") + ' (' + errorData.warningCount + ' ' + this.$t("ui.data.column.cxScheduleResult.itemsLabel") + ')</div>';
 
             warnings.forEach((item, idx) => {
               html += '<div style="margin-bottom:12px;padding:10px;background:#fdf6ec;border-left:3px solid #E6A23C;border-radius:3px;">';
@@ -209,17 +210,17 @@ export default {
             html += '</div>';
           }
 
-          this.$alert(html, '排程失败', {
+          this.$alert(html, this.$t("ui.data.column.cxScheduleResult.scheduleFailed"), {
             dangerouslyUseHTMLString: true,
             type: 'error',
             customClass: 'molding-auto-plan-error',
-            confirmButtonText: '知道了',
+            confirmButtonText: this.$t("ui.data.column.cxScheduleResult.gotIt"),
           });
         }
       } catch (error) {
         console.error(error);
         this.loading = false;
-        this.$modal.msgWarning("排程请求超时或服务异常，如排程正在执行中，请稍后刷新页面查看结果");
+        this.$modal.msgWarning(this.$t("ui.data.column.cxScheduleResult.scheduleTimeout"));
       }
     },
     async autoPlan(params) {

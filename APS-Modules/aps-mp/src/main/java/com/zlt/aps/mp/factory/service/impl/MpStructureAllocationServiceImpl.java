@@ -1245,13 +1245,12 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 1.5、加载需求计划
         QueryWrapper<DpDemandPlan> dpDemandPlanQueryWrapper = new QueryWrapper<>();
         dpDemandPlanQueryWrapper.select("STRUCTURE_NAME", "SUM(UN_POSTPONE_NET_QTY) UN_POSTPONE_NET_QTY",
-                "SUM(HEIGHT_QTY) HEIGHT_QTY");
+                "SUM(HEIGHT_QTY) HEIGHT_QTY", "SUM(ORI_HEIGHT_QTY) ORI_HEIGHT_QTY");
         dpDemandPlanQueryWrapper.groupBy("STRUCTURE_NAME");
         dpDemandPlanQueryWrapper.eq("FACTORY_CODE", param.getFactoryCode());
         dpDemandPlanQueryWrapper.eq("MONTH_PLAN_VERSION", param.getMonthPlanVersion());
         List<DpDemandPlan> dpDemandPlanList = dpDemandPlanEntityMapper.selectList(dpDemandPlanQueryWrapper);
         Map<String, DpDemandPlan> dpDemandPlanMap = dpDemandPlanList.stream()
-                .filter(p -> p.getUnPostponeNetQty() != null)
                 .collect(Collectors.toMap(DpDemandPlan::getStructureName, Function.identity()));
 
         // 2、构建报表头
@@ -1334,8 +1333,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 machineRecord.setChangeRank(changeRank ++); // 设置序号
                 machineRecord.setBeginDay(beginDay);
                 machineRecord.setEndDay(endDay);
-                machineRecord.setUnPostponeNetQty(Optional.ofNullable(dpDemandPlanMap.get(structureName)).map(DpDemandPlan::getUnPostponeNetQty).orElse(0));
-                machineRecord.setHeightQty(Optional.ofNullable(dpDemandPlanMap.get(structureName)).map(DpDemandPlan::getHeightQty).orElse(0));
+                DpDemandPlan dpDemandPlan = Optional.ofNullable(dpDemandPlanMap.get(structureName)).orElse(null);
+                if (dpDemandPlan != null) {
+                    machineRecord.setUnPostponeNetQty(Convert.toInt(dpDemandPlan.getUnPostponeNetQty(), 0));
+                    machineRecord.setHeightQty(Convert.toInt(dpDemandPlan.getOriHeightQty(), Convert.toInt(dpDemandPlan.getHeightQty(), 0)));
+                }
                 if (beginDay != null && endDay != null) {
                     machineRecord.setAllotDays(endDay - beginDay + 1);
                 }
@@ -2275,6 +2277,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             String noFactoryStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noFactoryStr");
             String yearErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.yearErrorStr");
             String monthErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.monthErrorStr");
+            String noStructureNameStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noStructureNameStr");
+            
+            // 查询结构转产表
+            QueryWrapper<MpStructureAllocation> structureAllocationQueryWrapper = new QueryWrapper<>();
+            structureAllocationQueryWrapper.eq("FACTORY_CODE", factoryCode);
+            structureAllocationQueryWrapper.eq("PRODUCTION_VERSION", productVersion);
+            Set<String> allStructureNameSet = entityMapper.selectList(structureAllocationQueryWrapper).stream()
+                    .map(MpStructureAllocation::getStructureName).distinct().collect(Collectors.toSet());
 
             // 过滤合计等数据
             list = list.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialCode())).collect(Collectors.toList());
@@ -2342,6 +2352,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     importErrorLogs.addAll(validated);
                     continue;
                 }
+                // 结构转产表校验
+                if (!allStructureNameSet.contains(item.getStructureName())) {
+                    item.setId(-999L);
+                    failureNum++;
+                    addImportErrorLog(importLogId, errorNum, String.format(noStructureNameStr, item.getStructureName()), importErrorLogs);
+                    continue;
+                }
+                
                 item.setImportRowNum(errorNum);
                 insertList.add(item);
             }

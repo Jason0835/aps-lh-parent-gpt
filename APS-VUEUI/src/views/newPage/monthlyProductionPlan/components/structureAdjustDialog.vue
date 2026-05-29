@@ -34,6 +34,8 @@
           <el-button
             type="warning"
             plain
+            :loading="planDowntimeSubmitting"
+            :disabled="planDowntimeSubmitting"
             @click="handlePlanDowntime"
           >
             {{ $t("ui.data.column.monthPlanFinalAdjustQuery.planDowntime") }}
@@ -138,11 +140,7 @@
 import { mapGetters } from "vuex";
 import formingCapacitySelect from "@/views/components/formingCapacitySelect.vue";
 /** listOutsideStructure → POST /monthplan/mpStructureAllocation/listAdjusts */
-import {
-  listOutsideStructure,
-  setAdjustsCxMachineFromRedis,
-  getAdjustsCxMachineFromRedis,
-} from "@/api/monthplan/adjustStructure";
+import { listOutsideStructure } from "@/api/monthplan/adjustStructure";
 
 const MONTH_STANDARD_MAX = 31;
 
@@ -211,6 +209,8 @@ export default {
       adjustMachineLocked: false,
       serverRows: [],
       newRows: [],
+      /** 计划停机提交中，防止重复点击触发多次清空 Redis */
+      planDowntimeSubmitting: false,
     };
   },
   computed: {
@@ -317,6 +317,7 @@ export default {
       this.adjustMachineLocked = false;
       this.serverRows = [];
       this.newRows = [];
+      this.planDowntimeSubmitting = false;
     },
     /**
      * 成型机台弹窗点「确定」后触发：此处同时写入机台号并请求 listAdjusts（不用 v-model，避免与 change 时序问题）。
@@ -422,24 +423,17 @@ export default {
         endDay: null,
       });
     },
-    async handlePlanDowntime() {
-      try {
-        this.loading = true;
-        await setAdjustsCxMachineFromRedis({
-          cxMachineCode: "",
-          structureName: "",
-          beginDay: null,
-          endDay: null,
-          version: "",
-        });
-        this.dialogVisible = false;
-        await getAdjustsCxMachineFromRedis();
-        this.$emit("plan-downtime-applied");
-      } catch (e) {
-        console.error(e);
-      } finally {
-        this.loading = false;
+    /**
+     * 计划停机：仅关闭弹窗并通知父页清空 Redis（写入接口由父页统一调用，避免重复请求）。
+     */
+    handlePlanDowntime() {
+      if (this.planDowntimeSubmitting) {
+        return;
       }
+      this.planDowntimeSubmitting = true;
+      this.dialogVisible = false;
+      this.$emit("plan-downtime-applied");
+      this.planDowntimeSubmitting = false;
     },
     getDaysInMonth(year, month) {
       return new Date(year, month, 0).getDate();

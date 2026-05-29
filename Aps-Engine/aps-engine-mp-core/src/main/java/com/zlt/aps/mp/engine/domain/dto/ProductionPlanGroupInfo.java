@@ -1526,6 +1526,7 @@ public class ProductionPlanGroupInfo {
         if (CollectionUtils.isEmpty(previousDayList)) {
             return null;
         }
+        //日期从大到小排序
         previousDayList.sort(Comparator.comparing(Integer::intValue, Comparator.reverseOrder()));
         return previousDayList.get(BigDecimal.ZERO.intValue());
     }

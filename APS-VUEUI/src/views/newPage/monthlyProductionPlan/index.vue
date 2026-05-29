@@ -295,6 +295,7 @@ import {
   recalculateWeekRollAdjust,
   resultVersion,
   saveAdjustResult,
+  setAdjustsCxMachineFromRedis,
   statisticsResult
 } from "@/api/monthplan/adjustStructure";
 import { getByParamCode } from "@/api/monthplan/factoryParam";
@@ -733,6 +734,7 @@ export default {
                   "data-day-cell-day": String(i),
                 }}
                 onClick={(e) => this.handleDayCellClick(row, i, e)}
+                onMousedown={(e) => this.handleDayCellMouseDown(e)}
               >
                 <el-input
                   size="mini"
@@ -1208,11 +1210,26 @@ export default {
         row.embryoCode || "",
       ].join("_");
     },
+    /** 清除 t-table 框选区域，避免与日排产单元格选中态冲突 */
+    clearTableSelectArea() {
+      const table = this.getMonthPlanTableInnerRef();
+      const body = table && table.$refs && table.$refs.tableBody;
+      if (body && typeof body.removeSelectArea === "function") {
+        body.removeSelectArea();
+      }
+    },
     setDayCellActive(row, day) {
+      this.clearTableSelectArea();
       this.dayCellActive = {
         rowKey: this.getDayCellRowKey(row),
         day,
       };
+    },
+    /** 阻止 selectArea 在 td 上拦截日排产格的按下/选中 */
+    handleDayCellMouseDown(event) {
+      if (event) {
+        event.stopPropagation();
+      }
     },
     isDayCellActive(row, day) {
       if (!this.dayCellActive) {
@@ -2338,8 +2355,23 @@ export default {
       this.fetchCurrentAdjustMachineFromRedis();
       this.getList();
     },
-    onPlanDowntimeApplied() {
-      this.fetchCurrentAdjustMachineFromRedis();
+    /** 计划停机：清空 Redis 调整上下文后刷新主页面展示（仅在此处调用 set，避免与弹窗重复） */
+    async onPlanDowntimeApplied() {
+      try {
+        const res = await setAdjustsCxMachineFromRedis({
+          cxMachineCode: "",
+          structureName: "",
+          beginDay: null,
+          endDay: null,
+          version: "",
+        });
+        if (res && res.msg) {
+          this.$modal.msgSuccess(res.msg);
+        }
+        await this.fetchCurrentAdjustMachineFromRedis();
+      } catch (e) {
+        console.error(e);
+      }
     },
     /**
      * 与周程滚动「结构调整」listAdjusts 入参对齐：productionVersion + version + adjVersion（列表首行 version 一般为调整版本 ADJ…）
@@ -2468,8 +2500,8 @@ export default {
       );
       this.syncDialog.form.factoryCode =
         this.query.factoryCode || this.search.factoryCode || "";
-      this.syncDialog.form.productionVersion =
-        (this.query.version || this.search.version || "").trim();
+      /** 月度计划版本由 loadSyncVersionList 加载后取 options 第一项，不用查询区调整版本号 */
+      this.syncDialog.form.productionVersion = "";
       this.syncDialog.form.lastMonthPlanVersion = "";
       this.syncDialog.form.monthPlanVersion = "";
       this.syncDialog.versionList = [];
@@ -2509,6 +2541,28 @@ export default {
       };
       this.syncDialog.versionList = [];
     },
+    /**
+     * 可推送版本列表加载后：月度计划版本默认取 options 第一项，并联动第一项需求计划版本。
+     */
+    applySyncDialogDefaultVersions() {
+      const productionOptions = this.syncProductionVersionOptions;
+      if (!productionOptions.length) {
+        this.syncDialog.form.productionVersion = "";
+        this.syncDialog.form.lastMonthPlanVersion = "";
+        this.syncDialog.form.monthPlanVersion = "";
+        return;
+      }
+      this.syncDialog.form.productionVersion = productionOptions[0];
+      const demandOptions = this.syncDemandVersionOptions;
+      if (demandOptions.length) {
+        this.syncDialog.form.lastMonthPlanVersion = demandOptions[0].optionKey;
+        this.syncDialog.form.monthPlanVersion =
+          demandOptions[0].monthPlanVersion || "";
+      } else {
+        this.syncDialog.form.lastMonthPlanVersion = "";
+        this.syncDialog.form.monthPlanVersion = "";
+      }
+    },
     async loadSyncVersionList(showWarning) {
       const { yearMonth, factoryCode } = this.syncDialog.form;
       if (!yearMonth || !factoryCode) {
@@ -2540,6 +2594,13 @@ export default {
               optionKey: `${item.productionVersion}__${item.monthPlanVersion}__${item.lastMonthPlanVersion}`,
             };
           });
+        if (this.syncDialog.versionList.length > 0) {
+          this.applySyncDialogDefaultVersions();
+        } else {
+          this.syncDialog.form.productionVersion = "";
+          this.syncDialog.form.lastMonthPlanVersion = "";
+          this.syncDialog.form.monthPlanVersion = "";
+        }
         if (showWarning && this.syncDialog.versionList.length === 0) {
           this.$modal.msgWarning(
             this.$t(
