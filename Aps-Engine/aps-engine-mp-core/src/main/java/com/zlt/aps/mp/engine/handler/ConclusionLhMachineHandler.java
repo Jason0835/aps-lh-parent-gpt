@@ -58,7 +58,7 @@ public class ConclusionLhMachineHandler {
         if (CollectionUtils.isEmpty(conclusionSkuInfo)) {
             return BeforeSkuProductionInfo.buildEmpty(productionDay);
         }
-        Integer firstQty = getProductionDayQty(context, groupInfo, productionDay, mainPattern,embryoCode);
+        Integer firstQty = getProductionDayQty(context, groupInfo, productionDay, mainPattern, embryoCode);
         TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         Integer changMouldFirstQty = paramConfiguration.getChangeMouldFirstQty();
@@ -90,7 +90,7 @@ public class ConclusionLhMachineHandler {
         if (StringUtils.isBlank(materialDesc) || StringUtils.isBlank(mainPattern)) {
             return null;
         }
-        Integer firstQty = getProductionDayQty(context, groupInfo, productionDay, mainPattern,embryoCode);
+        Integer firstQty = getProductionDayQty(context, groupInfo, productionDay, mainPattern, embryoCode);
         TbrProductionContext productionContext = (TbrProductionContext) context;
         ProductionCapacityParamConfiguration paramConfiguration = productionContext.getBaseDataContainer().getParamConfiguration();
         Integer changMouldFirstQty = paramConfiguration.getChangeMouldFirstQty();
@@ -105,7 +105,7 @@ public class ConclusionLhMachineHandler {
         }
         //20260521+ 续作换活字块，一定要有前Sku
         BeforeSkuProductionInfo beforeSku = findBeforeSkuProductionInfoByChangeTypeBlock(context, conclusionSkuInfo, productionDay, materialDesc);
-        if(null == beforeSku || StringUtils.isBlank(beforeSku.getMaterialDesc())){
+        if (null == beforeSku || StringUtils.isBlank(beforeSku.getMaterialDesc())) {
             return null;
         }
         return beforeSku;
@@ -129,7 +129,7 @@ public class ConclusionLhMachineHandler {
         //2. 组装参数Map
         Map<String, Object> paramMap = groupInfo.composeDailyCapacityParamMap(productionContext);
         //3. 计算日产能
-        Integer firstQty = dailyCapacityLimitObj.getFirstDayQty(mouldDayResultList, iDay, dailyCapacityLimitVoMap.get(iDay), paramMap, mainPattern,embryoCode);
+        Integer firstQty = dailyCapacityLimitObj.getFirstDayQty(mouldDayResultList, iDay, dailyCapacityLimitVoMap.get(iDay), paramMap, mainPattern, embryoCode);
         return firstQty;
     }
 
@@ -217,9 +217,13 @@ public class ConclusionLhMachineHandler {
         if (null == currentLimit) {
             return Collections.emptyList();
         }
+        //获取前日排产信息
+        GroupPlanCxLhCapacityLimitHelper previousDayLimit = null;
         Integer previousDay = groupInfo.getPreviousDay(productionDay);
+        if (null != previousDay) {
+            previousDayLimit = dayProductionLimitInfo.get(previousDay);
+        }
         GroupPlanCxLhCapacityLimitHelper nextDayLimit = groupInfo.getNextDayInfo(currentLimit);
-        GroupPlanCxLhCapacityLimitHelper previousDayLimit = dayProductionLimitInfo.get(previousDay);
         return currentLimit.getConclusionSkuInfo(context, productionDay, previousDayLimit, nextDayLimit);
     }
 

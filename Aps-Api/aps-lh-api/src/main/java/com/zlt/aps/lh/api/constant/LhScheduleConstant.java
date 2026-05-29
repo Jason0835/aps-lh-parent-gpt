@@ -3,7 +3,13 @@ package com.zlt.aps.lh.api.constant;
 import java.math.BigDecimal;
 
 /**
- * 硫化排程常量类
+ * 硫化排程常量类。
+ *
+ * <p>集中维护硫化排程默认参数值。运行时优先读取 {@code T_LH_PARAMS} 中的参数，
+ * 未配置或解析失败时由配置解析器回退到本类默认值。</p>
+ *
+ * <p>注意：新增参数时需要同步检查 {@code LhScheduleParamConstant}、参数解析器、
+ * 初始化 SQL 和实际策略消费点，避免只有常量没有生效链路。</p>
  *
  * @author zlt
  */
@@ -323,6 +329,9 @@ public final class LhScheduleConstant {
 
     /** 新增排产欠产追补判断天数默认值（当前天发生欠产后，额外向后观察2天） */
     public static final int NEW_SPEC_SHORTAGE_LOOK_AHEAD_DAYS = 2;
+
+    /** 硫化示方历史保护开关默认值（0-关闭，1-开启） */
+    public static final int ENABLE_CURE_FORMULA_HISTORY_PROTECT = 0;
 
     // ======================== 排序跟踪日志输出控制 ========================
 

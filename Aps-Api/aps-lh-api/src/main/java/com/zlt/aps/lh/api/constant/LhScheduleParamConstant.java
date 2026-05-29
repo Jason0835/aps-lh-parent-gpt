@@ -196,4 +196,6 @@ public final class LhScheduleParamConstant {
     public static final String CHIP_CODE_STOCK_UPDATE = "SYS0304017";
     /** 模具清洗间隔天数 */
     public static final String MOULD_CLEAN_DAYS = "SYS0308004";
+    /** 硫化示方历史保护开关（0-关闭，1-开启） */
+    public static final String ENABLE_CURE_FORMULA_HISTORY_PROTECT = "SYS0304018";
 }

@@ -183,7 +183,7 @@ public class CxAddSkuProductionHandler {
             return;
         }
         //20260129 修正前排产Sku信息，可能因为模具排产日
-        correctBeforeSku(context, materialDesc, lhGroup, doubleMouldList, groupName, startDay);
+        correctBeforeSku(context, lhGroup, doubleMouldList, groupName, startDay);
         Integer sumProductionQty = needProductionInfo.getSumNeedProductionQty();
         Integer dayMaxProductionQty = needProductionInfo.getDayMaxProductionQty();
         //实际排产量
@@ -461,13 +461,12 @@ public class CxAddSkuProductionHandler {
      * 修正当前排产的Sku信息
      *
      * @param context         排产上下文
-     * @param preMaterialDesc 需要排产的Sku
      * @param lhGroup         收尾硫化组
      * @param doubleMouldList 排产模具
      * @param groupName       分组名-TBR 结构
      * @param startDay        起始排产日
      */
-    private void correctBeforeSku(Context context, String preMaterialDesc, EarliestConclusionLhGroupHelper lhGroup, List<ProductionMouldInfoVo> doubleMouldList, String groupName, Integer startDay) {
+    private void correctBeforeSku(Context context, EarliestConclusionLhGroupHelper lhGroup, List<ProductionMouldInfoVo> doubleMouldList, String groupName, Integer startDay) {
         if (null == lhGroup || CollectionUtils.isEmpty(doubleMouldList) || StringUtils.isBlank(groupName) || null == startDay) {
             return;
         }
@@ -503,12 +502,6 @@ public class CxAddSkuProductionHandler {
             }
         });
         if (CollectionUtils.isEmpty(materialDescSet) || materialDescSet.size() > BigDecimal.ONE.intValue()) {
-            //20260522+ 不同模具时，则不能算
-            String beforeSkuInfo = Optional.ofNullable(lhGroup.getBeforeSkuInfo().getMaterialDesc()).orElse("");
-            if (beforeSkuInfo.equals(preMaterialDesc)) {
-
-            }
-
             return;
         }
         String materialDesc = materialDescSet.stream().findFirst().orElse(null);

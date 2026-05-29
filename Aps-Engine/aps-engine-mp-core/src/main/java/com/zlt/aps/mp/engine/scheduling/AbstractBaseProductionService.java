@@ -68,9 +68,18 @@ public abstract class AbstractBaseProductionService implements IProductionBusine
             return;
         }
         //可分多阶段
+        List<MouldProductionLog> stageLogList = Lists.newArrayList();
         logRecorderList.forEach(stageLogRecorder -> {
-            saveSingleStageLog(context, processStage, stageLogRecorder);
+            MouldProductionLog stageLog = buildSingleStageLog(context, processStage, stageLogRecorder);
+            if (null == stageLog) {
+                return;
+            }
+            stageLogList.add(stageLog);
         });
+        if (CollectionUtils.isEmpty(stageLogList)) {
+            return;
+        }
+        monthProductionDataService.saveProductionLog(stageLogList);
     }
 
     /**
@@ -142,10 +151,26 @@ public abstract class AbstractBaseProductionService implements IProductionBusine
      * @param stageLogRecorder 排产阶段
      */
     private void saveSingleStageLog(Context context, ProductionProcessStage processStage, ProductionStageLogRecorder stageLogRecorder) {
+        MouldProductionLog singleStageLog = buildSingleStageLog(context, processStage, stageLogRecorder);
+        if (null == singleStageLog) {
+            return;
+        }
+        monthProductionDataService.saveMouldProductionLog(singleStageLog);
+    }
+
+    /**
+     * 构建排产阶段流程日志对象
+     *
+     * @param context          排产上下文
+     * @param processStage     阶段
+     * @param stageLogRecorder 日志记录器对象
+     * @return
+     */
+    private MouldProductionLog buildSingleStageLog(Context context, ProductionProcessStage processStage, ProductionStageLogRecorder stageLogRecorder) {
         StringBuilder logBuilder = stageLogRecorder.getLogBuilder();
         String logContent = logBuilder.toString();
         if (StringUtils.isBlank(logContent)) {
-            return;
+            return null;
         }
         logContent = String.format("%s-%s流程日志:%s%s", processStage.getDesc(), stageLogRecorder.getStage().getStageDesc(), System.lineSeparator(), logContent);
         MouldProductionLog log = new MouldProductionLog();
@@ -157,7 +182,7 @@ public abstract class AbstractBaseProductionService implements IProductionBusine
         log.setPlanType(context.getPlanType());
         log.setWorkNo(context.getOperationWorkNo());
         log.setLogContent(logContent);
-        monthProductionDataService.saveMouldProductionLog(log);
+        return log;
     }
 
     public ProductionMdmDataService getDataService() {

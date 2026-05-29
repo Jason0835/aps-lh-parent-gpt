@@ -204,6 +204,7 @@ public class MonthPlanIssueServiceImpl implements IMonthPlanIssueService {
                 monthPlanIssue.setDataVersion(dataVersion);
                 monthPlanIssue.setCompanyCode(finalResult.getFactoryCode());
                 monthPlanIssue.setFactoryCode(finalResult.getFactoryCode());
+                monthPlanIssue.setConstructionStage(finalResult.getConstructionStage());
                 monthPlanIssues.add(monthPlanIssue);
             }
         }

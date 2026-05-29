@@ -31,40 +31,35 @@ public interface LhChipStockMapper extends BaseMapper<LhChipStock> {
                                               @Param("updateTime") Date updateTime);
 
     /**
-     * 原子累加完成量（含版本号乐观锁）
-     * 利用数据库行锁保证原子性，通过DATA_VERSION做乐观锁防止并发重复累加
+     * 原子累加完成量（版本号相同时跳过，防止重复累加）
+     * 利用数据库行锁保证原子性，通过DATA_VERSION判断：版本号相同说明已同步过，跳过累加
      *
-     * @param factoryCode     分厂编号
-     * @param chipCode        芯片编号
-     * @param delta           待累加的完成量增量
-     * @param expectedVersion 期望的版本号（乐观锁），为null或空时不做版本校验
-     * @param newVersion      更新后的新版本号
-     * @param updateBy        更新者
-     * @return 影响的行数，0表示版本号不匹配或记录不存在
+     * @param factoryCode 分厂编号
+     * @param chipCode    芯片编号
+     * @param delta       待累加的完成量增量
+     * @param newVersion  MES日完成量的版本号，同时作为防重复标识
+     * @param updateBy    更新者
+     * @return 影响的行数，0表示版本号相同（已同步过）或记录不存在
      */
-    int atomicAddFinishQty(@Param("factoryCode") String factoryCode,
-                           @Param("chipCode") String chipCode,
-                           @Param("delta") Integer delta,
-                           @Param("expectedVersion") String expectedVersion,
-                           @Param("newVersion") String newVersion,
-                           @Param("updateBy") String updateBy);
+    int atomicAddFinishQtyIfVersionDiff(@Param("factoryCode") String factoryCode,
+                                        @Param("chipCode") String chipCode,
+                                        @Param("delta") Integer delta,
+                                        @Param("newVersion") String newVersion,
+                                        @Param("updateBy") String updateBy);
 
     /**
-     * 原子覆盖完成量（含版本号乐观锁）
-     * 利用数据库行锁保证原子性，通过DATA_VERSION做乐观锁防止并发覆盖
+     * 原子覆盖完成量（覆盖写入不需要版本校验，直接赋值）
      *
-     * @param factoryCode     分厂编号
-     * @param chipCode        芯片编号
-     * @param finishQty       新的完成量值
-     * @param expectedVersion 期望的版本号（乐观锁），为null或空时不做版本校验
-     * @param newVersion      更新后的新版本号
-     * @param updateBy        更新者
-     * @return 影响的行数，0表示版本号不匹配或记录不存在
+     * @param factoryCode 分厂编号
+     * @param chipCode    芯片编号
+     * @param finishQty   新的完成量值
+     * @param newVersion  MES最新版本号
+     * @param updateBy    更新者
+     * @return 影响的行数，0表示记录不存在
      */
     int atomicOverwriteFinishQty(@Param("factoryCode") String factoryCode,
                                  @Param("chipCode") String chipCode,
                                  @Param("finishQty") Integer finishQty,
-                                 @Param("expectedVersion") String expectedVersion,
                                  @Param("newVersion") String newVersion,
                                  @Param("updateBy") String updateBy);
 }

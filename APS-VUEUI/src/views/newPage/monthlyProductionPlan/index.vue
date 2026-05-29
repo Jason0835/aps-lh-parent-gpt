@@ -734,6 +734,7 @@ export default {
                   "data-day-cell-day": String(i),
                 }}
                 onClick={(e) => this.handleDayCellClick(row, i, e)}
+                onMousedown={(e) => this.handleDayCellMouseDown(e)}
               >
                 <el-input
                   size="mini"
@@ -1209,11 +1210,26 @@ export default {
         row.embryoCode || "",
       ].join("_");
     },
+    /** 清除 t-table 框选区域，避免与日排产单元格选中态冲突 */
+    clearTableSelectArea() {
+      const table = this.getMonthPlanTableInnerRef();
+      const body = table && table.$refs && table.$refs.tableBody;
+      if (body && typeof body.removeSelectArea === "function") {
+        body.removeSelectArea();
+      }
+    },
     setDayCellActive(row, day) {
+      this.clearTableSelectArea();
       this.dayCellActive = {
         rowKey: this.getDayCellRowKey(row),
         day,
       };
+    },
+    /** 阻止 selectArea 在 td 上拦截日排产格的按下/选中 */
+    handleDayCellMouseDown(event) {
+      if (event) {
+        event.stopPropagation();
+      }
     },
     isDayCellActive(row, day) {
       if (!this.dayCellActive) {
@@ -2342,13 +2358,16 @@ export default {
     /** 计划停机：清空 Redis 调整上下文后刷新主页面展示（仅在此处调用 set，避免与弹窗重复） */
     async onPlanDowntimeApplied() {
       try {
-        await setAdjustsCxMachineFromRedis({
+        const res = await setAdjustsCxMachineFromRedis({
           cxMachineCode: "",
           structureName: "",
           beginDay: null,
           endDay: null,
           version: "",
         });
+        if (res && res.msg) {
+          this.$modal.msgSuccess(res.msg);
+        }
         await this.fetchCurrentAdjustMachineFromRedis();
       } catch (e) {
         console.error(e);

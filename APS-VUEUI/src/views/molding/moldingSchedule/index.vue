@@ -113,7 +113,7 @@
       @uploadSuccess="getList"
       :columns="[
         {
-          label: '排程日期',
+          label: $t('ui.data.column.scheduleResult.scheduleDate'),
           prop: 'scheduleDate',
           type: 'date',
           dateType: 'date',
@@ -129,7 +129,7 @@
       @uploadSuccess="getList"
       :columns="[
         {
-          label: '排程日期',
+          label: $t('ui.data.column.scheduleResult.scheduleDate'),
           prop: 'scheduleDate',
           type: 'date',
           dateType: 'date',

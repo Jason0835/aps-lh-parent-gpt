@@ -36,6 +36,7 @@ import org.springframework.util.CollectionUtils;
 import javax.annotation.Resource;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -51,8 +52,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
- * S4.6 结果校验与发布保存处理器
- * <p>最终校验排程结果，生成模具交替计划，保存数据</p>
+ * S4.6 结果校验与发布保存处理器。
+ *
+ * <p>主要职责：</p>
+ * <ul>
+ *   <li>对 S4.4/S4.5 生成的排程结果做必填字段、数量口径和换模约束校验；</li>
+ *   <li>根据换模结果、滚动继承状态和清洗计划生成模具交替计划；</li>
+ *   <li>补全工单号、排程顺序、汇总日志和日计划滚动账本日志；</li>
+ *   <li>执行硫化示方历史班次保护，防止已执行班次被重排结果覆盖；</li>
+ *   <li>委托持久化服务以事务方式替换目标日结果，并发布排程完成事件。</li>
+ * </ul>
+ *
+ * <p>注意：该 Handler 处于保存前最后一道业务防线。新增结果字段时需同时确认后置校验、
+ * 换模计划生成、历史保护和 Mapper 落库口径。</p>
  *
  * @author APS
  */
@@ -75,10 +87,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     protected void doHandle(LhScheduleContext context) {
         String scheduleOrderBusinessKey = buildScheduleOrderBusinessKey(context);
         try {
-            // S4.6.1 排程后置校验
+            // S4.6.1 排程后置校验：保存前校验结果必填字段和关键数量约束。
             postValidation(context);
 
-            // S4.6.2 生成模具交替计划
+            // S4.6.2 生成模具交替计划：基于结果真实换模开始时间和机台滚动状态生成前后规格。
             generateMouldChangePlan(context);
             validateMouldChangePlanQuota(context);
             validateManualSundaySandBlastThreshold(context);
@@ -95,7 +107,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             // S4.6.5.1 按SKU+日期汇总校验日计划完成情况
             addDailyPlanSummaryLog(context);
 
-            // S4.6.6 保存排程结果到数据库
+            // S4.6.5.2 硫化示方历史保护：逐班次判断是否保留历史值，避免运行中班次被覆盖。
+            applyCureFormulaHistoryProtection(context);
+
+            // S4.6.6 保存排程结果到数据库：由持久化服务统一做目标日原子替换。
             schedulePersistenceService.replaceScheduleAtomically(context);
 
             // S4.6.7 发布排程完成事件（观察者模式）
@@ -106,7 +121,12 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 排程后置校验：检查结果完整性
+     * 排程后置校验：检查结果完整性。
+     *
+     * <p>该方法会补齐部分保存所需的默认字段，例如批次号、工厂、目标日和发布状态；
+     * 但不会改变机台、班次计划量、排序结果、换模判断和收尾判断。</p>
+     *
+     * @param context 排程上下文
      */
     private void postValidation(LhScheduleContext context) {
         log.info("执行排程后置校验, 排程结果数: {}, 未排产数: {}",
@@ -124,7 +144,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     "批次号或工厂编码为空，无法执行结果保存");
         }
 
-        // 校验2：检查每个排程结果必填字段
+        // 校验2：检查每个排程结果必填字段，字段缺失直接阻断保存，避免脏结果落库。
         for (LhScheduleResult result : context.getScheduleResultList()) {
             if (result.getBatchNo() == null) {
                 result.setBatchNo(context.getBatchNo());
@@ -153,6 +173,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             }
         }
 
+//        TODO 这两个校验当前保持历史关闭状态。后续如需打开，应先用真实批次验证同胎胚换模和多机台补满结果。
 //        validateGreenTireChangeoverShift(context);
 //        validateProductionQuantityPolicy(context);
 
@@ -540,11 +561,13 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 生成模具交替计划
+     * 生成模具交替计划。
      * <p>
      * 收集排程结果中换模的机台，生成对应的模具交替计划记录。<br/>
-     * 计划天数为2天（T日和T+1日），均衡早中班换模次数。
+     * 计划顺序按机台和真实换模开始时间稳定排序，滚动继承结果不重复生成换模计划。
      * </p>
+     *
+     * @param context 排程上下文
      */
     private void generateMouldChangePlan(LhScheduleContext context) {
         List<LhScheduleResult> changeResults = context.getScheduleResultList().stream()
@@ -560,7 +583,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         log.info("生成模具交替计划, 换模排程结果数: {}", changeResults.size());
 
         List<LhMouldChangePlan> plans = context.getMouldChangePlanList();
-        // 不清空列表，保留滚动衔接中已继承的换模计划，新计划从尾部追加
+        // 不清空列表，保留滚动衔接中已继承的换模计划，新计划从尾部追加。
+        // rollingStateMap 用于在同一机台连续换模时逐条推进前规格。
         Map<String, RollingMachineState> rollingStateMap = new HashMap<>();
         int planOrder = plans.size() + 1;
 
@@ -593,7 +617,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             plan.setEndType("1".equals(result.getIsEnd()) ? "1" : "0");
             plan.setChangeTime(resolvePlanChangeTime(result, state));
 
-            // 判断交替类型
+            // 判断交替类型：普通换模、换活字块、干冰清洗、喷砂清洗在这里统一落数据字典值。
             plan.setChangeMouldType(determineChangeMouldType(result));
             plans.add(plan);
 
@@ -881,6 +905,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      */
     private void assignOrderNumbers(LhScheduleContext context) {
         log.info("补全工单号, 排程结果数: {}", context.getScheduleResultList().size());
+        // TODO 后续可统一替换为 Hutool 或 java.time 格式化，当前保持历史工单号格式不变。
         String dateStr = new SimpleDateFormat("yyyyMMdd").format(context.getScheduleTargetDate());
 
         for (LhScheduleResult result : context.getScheduleResultList()) {
@@ -1164,6 +1189,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
      * 生成模具交替计划工单号：CHG+yyyyMMdd+3位流水号
      */
     private String generateChangePlanOrderNo(LhScheduleContext context) {
+        // TODO 后续可统一替换为 Hutool 或 java.time 格式化，当前保持历史换模工单号格式不变。
         String dateStr = new SimpleDateFormat("yyyyMMdd").format(context.getScheduleTargetDate());
         int seq = CHG_SEQ.incrementAndGet() % 1000;
         return String.format("%s%s%03d", LhScheduleConstant.MOULD_CHANGE_ORDER_PREFIX, dateStr, seq);
@@ -1344,5 +1370,195 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         public void setEstimatedEndTime(Date estimatedEndTime) {
             this.estimatedEndTime = estimatedEndTime;
         }
+    }
+
+    /**
+     * 硫化示方历史保护：对 1-8 班硫化示方号、硫化示方类型共 16 个字段，
+     * 按班次逐班判断是否属于历史班次，属于历史班次则保留历史排程结果的值。
+     * <p>核心逻辑：</p>
+     * <ol>
+     *   <li>检查 ENABLE_CURE_FORMULA_HISTORY_PROTECT 开关</li>
+     *   <li>从 context 读取 S4.2 已加载的上一轮排程结果</li>
+     *   <li>反推窗口开始日期 T = scheduleTargetDate - 2 天</li>
+     *   <li>获取当前精确时间 LocalDateTime.now()，判断当前所属班次 currentWindowShiftNo</li>
+     *   <li>逐机台逐班次判断是否历史班次：班次日期 &lt; 当前日期，或等于当前日期且班次编号 &lt; 当前班次</li>
+     *   <li>历史班次从历史结果复制 16 个字段，非历史班次保留本次排程值</li>
+     * </ol>
+     *
+     * @param context 排程上下文
+     */
+    private void applyCureFormulaHistoryProtection(LhScheduleContext context) {
+        // ===== 1. 检查开关：ENABLE_CURE_FORMULA_HISTORY_PROTECT = 1 时才启用 =====
+        if (!context.getScheduleConfig().isCureFormulaHistoryProtectEnabled()) {
+            return;
+        }
+
+        // ===== 2. 获取历史结果：S4.2 阶段已按 factoryCode + scheduleTargetDate 查询并放入 context =====
+        List<LhScheduleResult> historyList = context.getPreviousCureFormulaResultList();
+        if (CollectionUtils.isEmpty(historyList)) {
+            log.info("硫化示方历史保护: 不存在历史排程结果, 全部使用本次值");
+            return;
+        }
+
+        // ===== 3. 按机台编码建立历史结果 Map，用于后续快速匹配 =====
+        // key = lhMachineCode，同一目标日期下每个机台最多一条记录
+        Map<String, LhScheduleResult> historyMap = new HashMap<>();
+        for (LhScheduleResult hr : historyList) {
+            historyMap.put(hr.getLhMachineCode(), hr);
+        }
+
+        // ===== 4. 反推窗口开始日期 T = scheduleTargetDate - 2 天 =====
+        // 排程日期 scheduleDate 是 T+2（当前传入的排程目标日）
+        // 窗口开始日期 T = scheduleDate - 2 天
+        // 1-8 班次与日期映射：1-2班 -> T，3-5班 -> T+1，6-8班 -> T+2
+        Date targetDate = context.getScheduleTargetDate();
+        LocalDate scheduleLocalDate = targetDate.toInstant()
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate windowStartDate = scheduleLocalDate.minusDays(2);
+
+        // ===== 5. 获取当前精确时间，精确到年月日时分秒 =====
+        // 必须使用 LocalDateTime.now()，不能只取 LocalDate，否则无法判断当前落班次
+        LocalDateTime currentDateTime = LocalDateTime.now();
+        LocalDate currentDate = currentDateTime.toLocalDate();
+        Date currentTimeDate = Date.from(currentDateTime.atZone(ZoneId.systemDefault()).toInstant());
+
+        // ===== 6. 基于 T 日构建 1-8 班次列表 =====
+        // 通过 LhScheduleTimeUtil.getScheduleShifts 获取班次信息，每个班次包含 workDate（业务日）
+        Date windowStartDateTime = Date.from(
+                windowStartDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        List<LhShiftConfigVO> shifts = LhScheduleTimeUtil.getScheduleShifts(context, windowStartDateTime);
+
+        // ===== 7. 判断当前时间所属的窗口班次编号（1-8） =====
+        // 用于后续"班次日期 = 当前日期"时比较班次大小
+        // 返回值 = -1 表示当前时间不在任意班次内
+        int currentWindowShiftNo = LhScheduleTimeUtil.getShiftIndex(
+                context, windowStartDateTime, currentTimeDate);
+
+        // ===== 8. 日志记录关键参数用于排查 =====
+        log.info("硫化示方历史保护: scheduleDate={}, windowStartDate={}, currentDateTime={}, "
+                        + "currentWindowShiftNo={}, historyResultCount={}",
+                scheduleLocalDate, windowStartDate, currentDateTime,
+                currentWindowShiftNo, historyList.size());
+
+        // 记录哪些班次命中了历史保护
+        List<Integer> protectedShifts = new ArrayList<>();
+
+        // ===== 9. 逐排程结果逐班次判断是否属于历史班次 =====
+        for (LhScheduleResult currentResult : context.getScheduleResultList()) {
+            String machineCode = currentResult.getLhMachineCode();
+            LhScheduleResult historyResult = historyMap.get(machineCode);
+            // 当前机台在历史结果中不存在，跳过保护
+            if (historyResult == null) {
+                continue;
+            }
+
+            // 逐班次处理 1-8 班
+            for (int shift = 1; shift <= 8; shift++) {
+                // 获取班次配置（含 workDate 等）
+                LhShiftConfigVO shiftConfig = findShiftByIndex(shifts, shift);
+                if (shiftConfig == null) {
+                    continue;
+                }
+
+                // 获取班次对应的实际生产日期
+                Date workDate = shiftConfig.getWorkDate();
+                if (workDate == null) {
+                    continue;
+                }
+
+                // 将班次日期转为 LocalDate 用于比较
+                LocalDate shiftDate = workDate.toInstant()
+                        .atZone(ZoneId.systemDefault()).toLocalDate();
+
+                // ===== 历史班次判断规则 =====
+                // 规则 1：shiftDate < currentDate → 历史班次
+                // 规则 2：shiftDate = currentDate 且 shift < currentWindowShiftNo → 历史班次
+                // 规则 3：shiftDate = currentDate 且 shift >= currentWindowShiftNo → 非历史（当前班次本身用本次值）
+                // 规则 4：shiftDate > currentDate → 非历史
+                boolean historyShift;
+                if (shiftDate.isBefore(currentDate)) {
+                    historyShift = true;
+                } else if (shiftDate.isEqual(currentDate)) {
+                    historyShift = currentWindowShiftNo > 0 && shift < currentWindowShiftNo;
+                } else {
+                    historyShift = false;
+                }
+
+                // ===== 10. 属于历史班次则复制硫化示方号 + 硫化示方类型 =====
+                if (historyShift) {
+                    protectedShifts.add(shift);
+                    copyCureFormulaFields(currentResult, historyResult, shift);
+                }
+                // 非历史班次保留本次排程值（不做任何修改）
+            }
+        }
+
+        // ===== 11. 日志输出保护结果 =====
+        log.info("硫化示方历史保护完成, 保留历史值班次: {}, 使用本次值班次: 除去保留班次的其余班次",
+                protectedShifts);
+    }
+
+    /**
+     * 将指定班次的硫化示方号、硫化示方类型从历史结果复制到当前结果。
+     *
+     * <p>历史值为空时也保留为空，因为这里的目标是“保持历史班次原样”，不是重新补示方。</p>
+     *
+     * @param target 当前排程结果
+     * @param source 历史排程结果
+     * @param shift  班次索引（1-8）
+     */
+    private void copyCureFormulaFields(LhScheduleResult target, LhScheduleResult source, int shift) {
+        switch (shift) {
+            case 1:
+                target.setClass1LhNo(source.getClass1LhNo());
+                target.setClass1LhType(source.getClass1LhType());
+                break;
+            case 2:
+                target.setClass2LhNo(source.getClass2LhNo());
+                target.setClass2LhType(source.getClass2LhType());
+                break;
+            case 3:
+                target.setClass3LhNo(source.getClass3LhNo());
+                target.setClass3LhType(source.getClass3LhType());
+                break;
+            case 4:
+                target.setClass4LhNo(source.getClass4LhNo());
+                target.setClass4LhType(source.getClass4LhType());
+                break;
+            case 5:
+                target.setClass5LhNo(source.getClass5LhNo());
+                target.setClass5LhType(source.getClass5LhType());
+                break;
+            case 6:
+                target.setClass6LhNo(source.getClass6LhNo());
+                target.setClass6LhType(source.getClass6LhType());
+                break;
+            case 7:
+                target.setClass7LhNo(source.getClass7LhNo());
+                target.setClass7LhType(source.getClass7LhType());
+                break;
+            case 8:
+                target.setClass8LhNo(source.getClass8LhNo());
+                target.setClass8LhType(source.getClass8LhType());
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * 按班次索引从班次列表中查找对应班次。
+     *
+     * @param shifts     班次列表
+     * @param shiftIndex 班次索引（1-8）
+     * @return 班次视图，未找到返回 null
+     */
+    private LhShiftConfigVO findShiftByIndex(List<LhShiftConfigVO> shifts, int shiftIndex) {
+        for (LhShiftConfigVO shift : shifts) {
+            if (shift.getShiftIndex() != null && shift.getShiftIndex() == shiftIndex) {
+                return shift;
+            }
+        }
+        return null;
     }
 }
