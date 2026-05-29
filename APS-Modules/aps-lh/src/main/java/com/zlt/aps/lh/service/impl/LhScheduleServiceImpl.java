@@ -71,8 +71,19 @@ import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 /**
- * 硫化排程主服务实现
- * <p>排程入口，负责构建上下文并委托给排程执行器</p>
+ * 硫化排程主服务实现。
+ *
+ * <p>主要职责：</p>
+ * <ul>
+ *   <li>接收控制器传入的排程请求，构建本次排程上下文；</li>
+ *   <li>解析并固化本次排程参数快照，保证一次排程内规则口径稳定；</li>
+ *   <li>通过 {@link ScheduleExecutionGuard} 控制同工厂同目标日的并发排程；</li>
+ *   <li>委托 {@link IScheduleExecutor} 进入模板链路，执行基础数据初始化、SKU归集、续作、新增和结果校验保存；</li>
+ *   <li>按批次号发布已保存的排程结果并触发发布事件。</li>
+ * </ul>
+ *
+ * <p>该类位于整体流程的服务入口层，只做流程编排和边界控制，不直接实现 SKU 排序、机台匹配、
+ * 班次排量、换模或换活字块算法。</p>
  *
  * @author APS
  */
@@ -201,8 +212,17 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
-     * 构建排程上下文
-     * <p>先解析本次排程配置快照，再按 scheduleDays 计算窗口起点 T 日</p>
+     * 构建排程上下文。
+     *
+     * <p>处理流程：</p>
+     * <ol>
+     *   <li>写入工厂、操作人、月计划版本等请求参数；</li>
+     *   <li>将请求日期标准化为排程目标日；</li>
+     *   <li>解析硫化参数形成 {@code LhScheduleConfig} 快照；</li>
+     *   <li>根据 {@code SCHEDULE_DAYS} 反推出窗口起点 T 日，供班次、日计划 dayN 和基础数据加载使用。</li>
+     * </ol>
+     *
+     * <p>该方法会修改并返回新建的 {@link LhScheduleContext}，不访问排程结果表，也不触发算法计算。</p>
      *
      * @param request 排程请求
      * @return 排程上下文
