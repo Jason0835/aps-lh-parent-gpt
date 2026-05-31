@@ -44,6 +44,7 @@ import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
+import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.ImportExcelUtils;
@@ -146,6 +147,12 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      */
     @PostMapping("/execute")
     @ApiOperation("执行自动排程")
+    @DistributedLock(
+            key = "'APS:LH:SCHEDULE:LOCK:' + #request.factoryCode + ':' + T(com.zlt.aps.lh.util.LhScheduleTimeUtil).getDateStr(T(com.zlt.aps.lh.util.LhScheduleTimeUtil).clearTime(#request.scheduleDate))",
+            waitTime = 0,
+            leaseTime = -1,
+            failMsg = "ui.data.alert.distributed.lock.fail"
+    )
     public LhScheduleResponseDTO executeSchedule(@RequestBody LhScheduleRequestDTO request) {
         log.info("收到排程请求, 工厂: {}, 日期: {}", request.getFactoryCode(), LhScheduleTimeUtil.formatDate(request.getScheduleDate()));
         return lhScheduleService.executeSchedule(request);
