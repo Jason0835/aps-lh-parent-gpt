@@ -178,7 +178,7 @@ export default {
             {
               prop: "class1IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 1),
+              formatter: (row, column, value) => this.selectDictLabel(this.parentDict.type.biz_end_type, value),
             },
             {
               prop: "class1PlanQty",
@@ -213,7 +213,7 @@ export default {
             {
               prop: "class2IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 2),
+              formatter: (row, column, value) => this.selectDictLabel(this.parentDict.type.biz_end_type, value),
             },
             {
               prop: "class2PlanQty",
@@ -248,7 +248,7 @@ export default {
             {
               prop: "class3IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 3),
+              formatter: (row, column, value) => this.selectDictLabel(this.parentDict.type.biz_end_type, value),
             },
             {
               prop: "class3PlanQty",
@@ -283,7 +283,7 @@ export default {
             {
               prop: "class4IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 4),
+              formatter: (row, column, value) => this.selectDictLabel(this.parentDict.type.biz_end_type, value),
             },
             {
               prop: "class4PlanQty",
@@ -318,7 +318,7 @@ export default {
             {
               prop: "class5IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 5),
+              formatter: (row, column, value) => this.selectDictLabel(this.parentDict.type.biz_end_type, value),
             },
             {
               prop: "class5PlanQty",
@@ -353,7 +353,7 @@ export default {
             {
               prop: "class6IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 6),
+              formatter: (row, column, value) => this.selectDictLabel(this.parentDict.type.biz_end_type, value),
             },
             {
               prop: "class6PlanQty",
@@ -388,7 +388,7 @@ export default {
             {
               prop: "class7IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 7),
+              formatter: (row, column, value) => this.selectDictLabel(this.parentDict.type.biz_end_type, value),
             },
             {
               prop: "class7PlanQty",
@@ -423,7 +423,7 @@ export default {
             {
               prop: "class8IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 8),
+              formatter: (row, column, value) => this.selectDictLabel(this.parentDict.type.biz_end_type, value),
             },
             {
               prop: "class8PlanQty",
@@ -455,37 +455,6 @@ export default {
     },
   },
   methods: {
-    calcShiftIsEnd(row, shiftIndex) {
-      if (this.isShiftAfterEnding(row, shiftIndex)) {
-        return "";
-      }
-      const planQty = row["class" + shiftIndex + "PlanQty"];
-      if (planQty == null || planQty <= 0) {
-        return "";
-      }
-      const referenceQty = Math.max(row.mouldSurplusQty || 0, row.embryoStock || 0);
-      if (referenceQty <= 0) {
-        return this.selectDictLabel(this.parentDict.type.biz_end_type, "0");
-      }
-      let totalPlanQty = 0;
-      for (let i = 1; i <= 8; i++) {
-        totalPlanQty += row["class" + i + "PlanQty"] || 0;
-      }
-      if (totalPlanQty < referenceQty) {
-        return this.selectDictLabel(this.parentDict.type.biz_end_type, "0");
-      }
-      let remaining = referenceQty;
-      for (let i = 1; i <= 8; i++) {
-        remaining -= row["class" + i + "PlanQty"] || 0;
-        if (remaining <= 0) {
-          if (i === shiftIndex) {
-            return this.selectDictLabel(this.parentDict.type.biz_end_type, "1");
-          }
-          break;
-        }
-      }
-      return this.selectDictLabel(this.parentDict.type.biz_end_type, "0");
-    },
     isShiftAfterEnding(row, shiftIndex) {
       const referenceQty = Math.max(row.mouldSurplusQty || 0, row.embryoStock || 0);
       if (referenceQty <= 0) {

@@ -5,11 +5,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.exception.ServiceException;
 import com.zlt.aps.common.core.domain.ExcelCellRangeAddress;
 import com.zlt.aps.common.core.utils.ExcelUtils;
-import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
+import com.zlt.aps.cx.entity.schedule.CxPrecisionPlan;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.CxScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhPrecisionPlan;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.entity.LhShiftConfig;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
 import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
@@ -247,11 +248,11 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 cxNightTotal.add(cxMorningTotal).add(cxMiddleTotal));
 
         // 硫化排程结果：查询排程日期（actualScheduleDate）的数据
-        List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> lhResults = cxLhScheduleResultMapper.selectList(
-                new LambdaQueryWrapper<com.zlt.aps.cx.entity.schedule.LhScheduleResult>()
-                        .eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getScheduleDate, actualScheduleDate)
-                        .eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getFactoryCode, factoryCode)
-                        .eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        List<LhScheduleResult> lhResults = cxLhScheduleResultMapper.selectList(
+                new LambdaQueryWrapper<LhScheduleResult>()
+                        .eq(LhScheduleResult::getScheduleDate, actualScheduleDate)
+                        .eq(LhScheduleResult::getFactoryCode, factoryCode)
+                        .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
         log.info("硫化排程结果查询完成, 日期: {}, 数量: {}", DateUtil.formatDate(actualScheduleDate), lhResults.size());
 
         // 试制/量试信息：根据成型排程结果3/4/5班次有排计划量的示方书类型归集（T=量试，X=试制）
@@ -295,7 +296,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         BigDecimal lhMorningTotal = BigDecimal.ZERO;
         BigDecimal lhMiddleTotal = BigDecimal.ZERO;
 
-        for (com.zlt.aps.cx.entity.schedule.LhScheduleResult result : lhResults) {
+        for (LhScheduleResult result : lhResults) {
             lhNightTotal = lhNightTotal.add(sumLhQtyByShiftType(result, classShiftTypeMap, "01"));
             lhMorningTotal = lhMorningTotal.add(sumLhQtyByShiftType(result, classShiftTypeMap, "02"));
             lhMiddleTotal = lhMiddleTotal.add(sumLhQtyByShiftType(result, classShiftTypeMap, "03"));
@@ -382,7 +383,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * @param keyword   关键字（"试制"或"量试"）
      * @return 匹配到的规格描述，多个用"，"隔开；无匹配返回空字符串
      */
-    private String buildLhSetupOrTrialInfo(List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> lhResults, String keyword) {
+    private String buildLhSetupOrTrialInfo(List<LhScheduleResult> lhResults, String keyword) {
         String targetCode;
         if ("试制".equals(keyword)) {
             targetCode = ConstructionStageEnum.MEASUREMENT.getStage();
@@ -391,7 +392,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         }
 
         Set<String> matchedSpecs = new LinkedHashSet<>();
-        for (com.zlt.aps.cx.entity.schedule.LhScheduleResult result : lhResults) {
+        for (LhScheduleResult result : lhResults) {
             if (targetCode.equals(result.getConstructionStage())) {
                 String specDesc = StringUtils.defaultString(result.getSpecDesc()).trim();
                 if (StringUtils.isNotBlank(specDesc)) {
@@ -856,7 +857,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 按班次类型汇总硫化产量
      */
-    private BigDecimal sumLhQtyByShiftType(com.zlt.aps.cx.entity.schedule.LhScheduleResult result,
+    private BigDecimal sumLhQtyByShiftType(LhScheduleResult result,
                                            Map<Integer, String> classShiftTypeMap, String shiftType) {
         BigDecimal total = BigDecimal.ZERO;
         for (Map.Entry<Integer, String> entry : classShiftTypeMap.entrySet()) {
@@ -898,7 +899,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 统计某班次类型下的硫化开动机台数
      */
-    private long countLhMachinesByShiftType(List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> results,
+    private long countLhMachinesByShiftType(List<LhScheduleResult> results,
                                             Map<Integer, String> classShiftTypeMap, String shiftType) {
         return results.stream()
                 .filter(r -> hasNonZeroQtyForShiftType(r, classShiftTypeMap, shiftType))
@@ -908,7 +909,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 判断某台机器在指定班次类型下是否有计划产量
      */
-    private boolean hasNonZeroQtyForShiftType(com.zlt.aps.cx.entity.schedule.LhScheduleResult result,
+    private boolean hasNonZeroQtyForShiftType(LhScheduleResult result,
                                               Map<Integer, String> classShiftTypeMap, String shiftType) {
         for (Map.Entry<Integer, String> entry : classShiftTypeMap.entrySet()) {
             if (shiftType.equals(entry.getValue())) {

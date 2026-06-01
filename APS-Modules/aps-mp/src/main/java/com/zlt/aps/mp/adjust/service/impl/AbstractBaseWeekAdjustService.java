@@ -1000,6 +1000,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 contextDTO.getMpMonth(), contextDTO.getVersion(), contextDTO.getProductionVersion(),
                 contextDTO.getStructureName(), contextDTO.getScheduledMachines(), contextDTO.getStartDay(),
                 contextDTO.getEndDay(), contextDTO.getAdjustStartDay(), contextDTO.getAdjustEndDay());
+        if (StringUtil.isEmptyWithTrim(contextDTO.getVersion())){
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.versionEmpty"));
+        }
         // 1、查询周程调整结果
         queryAdjustResult(contextDTO);
         // 2、查询调整明细
@@ -1065,6 +1068,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 contextDTO.getMpMonth(), contextDTO.getVersion(), contextDTO.getProductionVersion(),
                 contextDTO.getStructureName(), contextDTO.getScheduledMachines(), contextDTO.getStartDay(),
                 contextDTO.getEndDay(), contextDTO.getAdjustStartDay(), contextDTO.getAdjustEndDay());
+        if (StringUtil.isEmptyWithTrim(contextDTO.getVersion())){
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.versionEmpty"));
+        }
         FactoryMonthPlanProductionFinalResult params = new FactoryMonthPlanProductionFinalResult();
         params.setFactoryCode(contextDTO.getFactoryCode());
         params.setYear(contextDTO.getMpYear());

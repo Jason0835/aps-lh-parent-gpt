@@ -83,15 +83,21 @@ public interface ILhScheduleResultService {
      */
     void updateReleaseStatus(LhScheduleResult item);
 
-    List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> getCxLhScheduleResultList(Date scheduleDate);
+    /**
+     * 根据排程日期查询硫化排程结果（aps-lh-api实体，包含8班数据）
+     *
+     * @param scheduleDate 排程日期
+     * @return 排程结果列表
+     */
+    List<LhScheduleResult> getCxLhScheduleResultList(Date scheduleDate);
 
     /**
-     * 根据ID列表查询硫化排程结果（cx-lh-api实体）
+     * 根据ID列表查询硫化排程结果（aps-lh-api实体，包含8班数据）
      *
      * @param ids 主键ID列表
      * @return 排程结果列表
      */
-    List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> getCxLhScheduleResultListByIds(List<Long> ids);
+    List<LhScheduleResult> getCxLhScheduleResultListByIds(List<Long> ids);
 
     /**
      * 插单校验

@@ -3,7 +3,7 @@ package com.zlt.aps.lh.handler;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.cx.api.domain.entity.CxStock;
+import com.zlt.aps.cx.entity.CxStock;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.LhInsertOrderValidateResultDTO;
 import com.zlt.aps.lh.api.domain.dto.LhOrderInsertDTO;

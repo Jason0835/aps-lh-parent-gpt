@@ -163,6 +163,9 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
     @PostMapping("/save")
     @Override
     public AjaxResult save(@RequestBody MpAdjustResult billVO){
+        if (StringUtil.isEmptyWithTrim(billVO.getVersion())){
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.versionEmpty"));
+        }
         if (StringUtil.isEmptyWithTrim(billVO.getStructureName())){
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.structureNameEmpty"));
         }

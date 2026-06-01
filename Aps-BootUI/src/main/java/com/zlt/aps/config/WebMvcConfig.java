@@ -15,6 +15,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(localeFallbackInterceptor)
                 .addPathPatterns("/**")
-                .excludePathPatterns("/static/**", "/css/**", "/js/**", "/images/**", "/lib/**", "/favicon.ico");
+                .excludePathPatterns("/static/**", "/css/**", "/js/**", "/images/**", "/lib/**", "/favicon.ico",
+                        "/login", "/unauth", "/captchaImage", "/logout");
     }
 }

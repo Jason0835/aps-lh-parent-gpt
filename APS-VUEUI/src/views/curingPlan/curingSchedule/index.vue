@@ -439,8 +439,8 @@ export default {
         {
           prop: "class1IsEnd",
           label: this.$t("ui.data.column.scheduleResult.type"),
-          formatter: (row, column, value) => this.calcShiftIsEnd(row, 1),
-        }, // 第1班-类型
+          formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_end_type, value),
+        }, // 第1班-类型(收尾标识)
             {
               prop: "class1PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
@@ -474,8 +474,8 @@ export default {
            {
               prop: "class2IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 2),
-            }, // 第2班-类型
+              formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_end_type, value),
+            }, // 第2班-类型(收尾标识)
             {
               prop: "class2PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
@@ -510,8 +510,8 @@ export default {
            {
               prop: "class3IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 3),
-            }, // 第3班-类型
+              formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_end_type, value),
+            }, // 第3班-类型(收尾标识)
             {
               prop: "class3PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
@@ -546,8 +546,8 @@ export default {
            {
               prop: "class4IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 4),
-            }, // 第4班-类型
+              formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_end_type, value),
+            }, // 第4班-类型(收尾标识)
             {
               prop: "class4PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
@@ -582,8 +582,8 @@ export default {
             {
               prop: "class5IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 5),
-            }, // 第5班-类型
+              formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_end_type, value),
+            }, // 第5班-类型(收尾标识)
             {
               prop: "class5PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
@@ -618,8 +618,8 @@ export default {
             {
               prop: "class6IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 6),
-            }, // 第6班-类型
+              formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_end_type, value),
+            }, // 第6班-类型(收尾标识)
             {
               prop: "class6PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
@@ -654,8 +654,8 @@ export default {
             {
               prop: "class7IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 7),
-            }, // 第7班-类型
+              formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_end_type, value),
+            }, // 第7班-类型(收尾标识)
             {
               prop: "class7PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
@@ -690,8 +690,8 @@ export default {
             {
               prop: "class8IsEnd",
               label: this.$t("ui.data.column.scheduleResult.type"),
-              formatter: (row, column, value) => this.calcShiftIsEnd(row, 8),
-            }, // 第8班-类型
+              formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_end_type, value),
+            }, // 第8班-类型(收尾标识)
             {
               prop: "class8PlanQty",
               label: this.$t("ui.data.column.scheduleResult.plan"),
@@ -881,37 +881,6 @@ export default {
       } finally {
         this.loading = false;
       }
-    },
-    calcShiftIsEnd(row, shiftIndex) {
-      if (this.isShiftAfterEnding(row, shiftIndex)) {
-        return '';
-      }
-      const planQty = row['class' + shiftIndex + 'PlanQty'];
-      if (planQty == null || planQty <= 0) {
-        return '';
-      }
-      const referenceQty = Math.max(row.mouldSurplusQty || 0, row.embryoStock || 0);
-      if (referenceQty <= 0) {
-        return this.selectDictLabel(this.dict.type.biz_end_type, "0");
-      }
-      let totalPlanQty = 0;
-      for (let i = 1; i <= 8; i++) {
-        totalPlanQty += (row['class' + i + 'PlanQty'] || 0);
-      }
-      if (totalPlanQty < referenceQty) {
-        return this.selectDictLabel(this.dict.type.biz_end_type, "0");
-      }
-      let remaining = referenceQty;
-      for (let i = 1; i <= 8; i++) {
-        remaining -= (row['class' + i + 'PlanQty'] || 0);
-        if (remaining <= 0) {
-          if (i === shiftIndex) {
-            return this.selectDictLabel(this.dict.type.biz_end_type, "1");
-          }
-          break;
-        }
-      }
-      return this.selectDictLabel(this.dict.type.biz_end_type, "0");
     },
     async handleGenerateTextMouldChangePlan() {
       try {
