@@ -387,12 +387,12 @@ export default {
         }, // 胚料描述
         {
           prop: "scheduleType",
-          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
+          label: this.$t("ui.data.column.scheduleResult.scheduleType"),
           minWidth: 100,
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.lh_schedule_type, value);
           },
-        }, // 示方类型
+        }, // 排产类型
 
         {
           label: this.$t("ui.data.column.scheduleResult.finishQty"),
