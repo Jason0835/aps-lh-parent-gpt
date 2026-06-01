@@ -834,7 +834,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         LocalDate day2 = scheduleLocalDate.minusDays(LhScheduleConstant.SCHEDULE_DAYS - 2);
         LocalDate day3 = scheduleLocalDate;
 
-        List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> scheduleResultList;
+        List<LhScheduleResult> scheduleResultList;
         if (CollectionUtils.isNotEmpty(selectedIds)) {
             scheduleResultList = lhScheduleResultService.getCxLhScheduleResultListByIds(selectedIds);
         } else {
@@ -852,7 +852,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         List<LhScheduleResultIssue> day2IssueList = new ArrayList<>();
         List<LhScheduleResultIssue> day3IssueList = new ArrayList<>();
 
-        for (com.zlt.aps.cx.entity.schedule.LhScheduleResult source : scheduleResultList) {
+        for (LhScheduleResult source : scheduleResultList) {
             LhScheduleResultIssue day1Issue = convertToDay1IssueEntity(source, day1);
             if (day1Issue != null) {
                 day1IssueList.add(day1Issue);
@@ -1038,9 +1038,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * 转换为T-2日（窗口首日）的下发实体
      * 8班数据（2+3+3映射）：1班(早)、2班(中) -> 中间表：2班(早)=1班, 3班(中)=2班
      * 业务规则：T-2日无夜班，只下发早中2班数据
-     * 使用aps-cx-lh-api实体（有8班数据）
+     * 使用aps-lh-api实体（有8班数据）
      */
-    private LhScheduleResultIssue convertToDay1IssueEntity(com.zlt.aps.cx.entity.schedule.LhScheduleResult source, LocalDate scheduleDate) {
+    private LhScheduleResultIssue convertToDay1IssueEntity(LhScheduleResult source, LocalDate scheduleDate) {
         if (source == null) {
             return null;
         }
@@ -1099,9 +1099,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * 转换为T-1日（窗口次日）的下发实体
      * 8班数据（2+3+3映射）：3班(夜)、4班(早)、5班(中) -> 中间表：1班(夜)=3班, 2班(早)=4班, 3班(中)=5班
      * 业务规则：更新夜早中3班数据（存在则更新，不存在则插入）
-     * 使用aps-cx-lh-api实体（有8班数据）
+     * 使用aps-lh-api实体（有8班数据）
      */
-    private LhScheduleResultIssue convertToDay2IssueEntity(com.zlt.aps.cx.entity.schedule.LhScheduleResult source, LocalDate scheduleDate) {
+    private LhScheduleResultIssue convertToDay2IssueEntity(LhScheduleResult source, LocalDate scheduleDate) {
         if (source == null) {
             return null;
         }
@@ -1166,9 +1166,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * 转换为T日（排程日期当天）的下发实体
      * 8班数据（2+3+3映射）：6班(夜)、7班(早)、8班(中) -> 中间表：1班(夜)=6班, 2班(早)=7班, 3班(中)=8班
      * 业务规则：更新夜早中3班数据（存在则更新，不存在则插入）
-     * 使用aps-cx-lh-api实体（有8班数据）
+     * 使用aps-lh-api实体（有8班数据）
      */
-    private LhScheduleResultIssue convertToDay3IssueEntity(com.zlt.aps.cx.entity.schedule.LhScheduleResult source, LocalDate scheduleDate) {
+    private LhScheduleResultIssue convertToDay3IssueEntity(LhScheduleResult source, LocalDate scheduleDate) {
         if (source == null) {
             return null;
         }

@@ -453,6 +453,7 @@ export default {
           type: "select",
           dictData: this.versionOptions,
           filterable: true,
+          clearable: false,
           listeners: {
             change: this.handleProductionVersionChange,
           },

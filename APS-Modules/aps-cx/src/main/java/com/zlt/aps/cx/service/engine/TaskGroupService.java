@@ -673,7 +673,7 @@ public class TaskGroupService {
                 }
 
                 // 维度二（时间）：本胎胚预计库存可供硫化时长超过6小时
-                int taskMoldQty = task.getVulcanizeMoldCount() != null ? task.getVulcanizeMoldCount() : 1;
+                int taskMoldQty = task.getVulcanizeMoldCount();
                 Integer materialDailyLhCapacity = getDailyLhCapacityForMaterial(materialCode, context);
                 // 日硫化量为双模值，需÷2得到单模产量（与S5.2.3一致）
                 materialDailyLhCapacity = materialDailyLhCapacity != null && materialDailyLhCapacity > 0 ? materialDailyLhCapacity / 2 : null;
@@ -727,10 +727,46 @@ public class TaskGroupService {
                     task.setEndingExtraInventory(cappedProduction);
                     shiftFormingOutputMap.put(embryoCode,
                             cumFormingOutput - originalProduction + cappedProduction);
-                    log.info("【立库封顶详情】胎胚={}, 取两维度较小允许产量={}, 原产量={}, {}整车→封顶后={}, 详情: {}",
+
+                    if (cappedProduction < originalProduction) {
+                        String structName = task.getStructureName();
+                        if (structName != null) {
+                            int timeDiff = originalProduction - cappedProduction;
+                            BigDecimal oldCumulative = structureCumulativeTimeMap.getOrDefault(structName, BigDecimal.ZERO);
+                            Integer oldDailyLhCap = getDailyLhCapacityForMaterial(materialCode, context);
+                            if (oldDailyLhCap != null && oldDailyLhCap > 0) {
+                                BigDecimal avgRatio = structureAvgRatioCache.get(structName);
+                                if (avgRatio == null || avgRatio.compareTo(BigDecimal.ZERO) == 0) {
+                                    avgRatio = BigDecimal.ONE;
+                                }
+                                BigDecimal timePerTire = BigDecimal.valueOf(86400)
+                                        .divide(avgRatio.multiply(BigDecimal.valueOf(oldDailyLhCap)), 2, java.math.RoundingMode.HALF_UP);
+                                BigDecimal reduceSeconds = timePerTire.multiply(BigDecimal.valueOf(timeDiff));
+                                BigDecimal newCumulative = oldCumulative.subtract(reduceSeconds);
+                                structureCumulativeTimeMap.put(structName, newCumulative);
+                                log.info("立库封顶回滚机台产能: 结构={}, 胎胚={}, 原产量={}, 封顶后={}, 回滚耗时={}s({}h), 更新后累计={}s",
+                                        structName, embryoCode, originalProduction, cappedProduction,
+                                        reduceSeconds.stripTrailingZeros().toPlainString(),
+                                        reduceSeconds.divide(BigDecimal.valueOf(3600), 2, BigDecimal.ROUND_HALF_UP),
+                                        newCumulative.stripTrailingZeros().toPlainString());
+                            }
+                        }
+                    }
+
+                    String capReason;
+                    if (capDetail.toString().contains("[空间]") && capDetail.toString().contains("[时间]")) {
+                        capReason = "空间+时间双重限制";
+                    } else if (capDetail.toString().contains("[空间]")) {
+                        capReason = "立库空间不足";
+                    } else {
+                        capReason = "可供硫化超6h";
+                    }
+                    log.info("【立库封顶详情】胎胚={}, 原产量={}条, 因{}只能生产{}条, 整车容量={}条, {}→最终计划量={}条, 详情: {}",
                             embryoCode,
-                            maxAllowedProduction, originalProduction,
-                            (tripCapacity > 0 && maxAllowedProduction >= tripCapacity) ? "向下整车" : "不够一车→归零",
+                            originalProduction, capReason, maxAllowedProduction, tripCapacity,
+                            (tripCapacity > 0 && maxAllowedProduction >= tripCapacity)
+                                    ? "向下取整车(" + maxAllowedProduction + "/" + tripCapacity + "=" + (maxAllowedProduction / tripCapacity) + "车)"
+                                    : "不够一车→归零",
                             cappedProduction, capDetail.toString());
                 }
 
@@ -945,7 +981,7 @@ public class TaskGroupService {
                                 dtSkipReason = "[空间]全部预计=" + dtTotalProjected + ">=上限=" + warehouseThreshold;
                             }
                             // 维度二（时间）：预估本轮排产后的可供硫化时长，如果>6h则跳过本轮（事前检查）
-                            int dtTaskMoldQty = dt.getVulcanizeMoldCount() != null ? dt.getVulcanizeMoldCount() : 1;
+                            int dtTaskMoldQty = dt.getVulcanizeMoldCount();
                             Integer dtDailyLhCap = null;
                             BigDecimal dtSingleTireMoldSeconds = null;
                             int dtProjectedAfter = 0;
@@ -2231,7 +2267,7 @@ public class TaskGroupService {
 
         // 计算单胎单模硫化时长(秒)
         int dailyLhCapacity = getDailyLhCapacity(lhResult, context);
-        int moldQty = task.getVulcanizeMoldCount() != null ? task.getVulcanizeMoldCount() : 1;
+        int moldQty = task.getVulcanizeMoldCount();
         int ratio = getStructureLhRatio(task, context);
         if (dailyLhCapacity <= 0 || ratio <= 0) {
             return 0;
@@ -2574,7 +2610,7 @@ public class TaskGroupService {
                                               ScheduleContextVo context,
                                               BigDecimal maxHours) {
         int dailyLhCapacity = getDailyLhCapacityByTask(task, context);
-        int moldQty = task.getVulcanizeMoldCount() != null && task.getVulcanizeMoldCount() > 0
+        int moldQty = task.getVulcanizeMoldCount() > 0
                 ? task.getVulcanizeMoldCount() : 1;
         if (dailyLhCapacity <= 0 || moldQty <= 0 || maxHours == null
                 || maxHours.compareTo(BigDecimal.ZERO) <= 0) {
