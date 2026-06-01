@@ -563,6 +563,8 @@
   "ui.data.column.scheduleResult.specNotExist": "Quy cách không tồn tại, vui lòng nhập mã quy cách đầy đủ",
   "ui.data.column.scheduleResult.unschedule": "Chưa sắp xếp",
   "ui.data.column.scheduleResult.onlyUnreleasedEditable": "Chỉ dữ liệu chưa xuất bản mới được phép sửa",
+  "ui.data.column.scheduleResult.lhScheduleExecuting": "Lịch sắp xếp lưu hóa đã gửi, đang tính toán ở hậu trường, vui lòng làm mới trang sau để xem kết quả",
+  "ui.data.column.scheduleResult.lhScheduleCompleted": "Lịch sắp xếp lưu hóa đã hoàn tất, vui lòng làm mới trang để xem kết quả mới nhất",
   "ui.data.column.scheduleResult.validationError": "Chi tiết lỗi kiểm tra",
   "ui.data.column.scheduleResult.validationErrors": "Danh sách lỗi kiểm tra",
   "ui.data.column.scheduleResult.mouldValidationErrorDetails": "Chi tiết lỗi kiểm tra khuôn",
