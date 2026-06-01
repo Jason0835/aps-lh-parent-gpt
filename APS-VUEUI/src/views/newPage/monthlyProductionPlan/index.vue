@@ -5,6 +5,7 @@
       tableRef="MonthPlanFinalAdjustQueryTable"
       :calcHeight="88"
       v-loading="loading"
+      :element-loading-text="loadText"
       :columns="columns"
       :searchColumns="searchColumns"
       :data="data"
@@ -21,6 +22,13 @@
     >
       <template slot="header">
         <div class="toolbar-row">
+          <el-button
+            type="primary"
+            :loading="getAdjustOrderLoading"
+            v-hasPermi="['monthplan:mpWeekRollAdjust:getAdjustDetailList']"
+            @click="handleGetAdjustOrder"
+            >{{ $t("ui.data.rollingCycle.adjustOrder") }}</el-button
+          >
           <el-button
             type="primary"
             plain
@@ -291,12 +299,13 @@ import {downloadLink} from "@/utils/request";
 import {getFinalResultVersionList, listMonthPlanFinal4Adjust, syncAdjustedMonthPlanToScmAndMes,} from "@/api/monthplan/monthlyProductionPlan";
 import {
   confirmAdjust,
+  getAdjustDetailList,
   getAdjustsCxMachineFromRedis,
   recalculateWeekRollAdjust,
-  resultVersion,
   saveAdjustResult,
   setAdjustsCxMachineFromRedis,
-  statisticsResult
+  statisticsResult,
+  versionAdjust,
 } from "@/api/monthplan/adjustStructure";
 import { getByParamCode } from "@/api/monthplan/factoryParam";
 import structureAdjustDialog from "./components/structureAdjustDialog.vue";
@@ -327,6 +336,7 @@ export default {
   data() {
     return {
       loading: false,
+      loadText: "正在加载中...",
       data: [],
       page: {
         current: 1,
@@ -351,6 +361,7 @@ export default {
       currentAdjustMonthPlanVersion: "",
       confirmAdjustLoading: false,
       recalculateLoading: false,
+      getAdjustOrderLoading: false,
       syncLoading: false,
       /** 下发 SCM/MES 弹窗（与月度生产计划页「推送SCM/MES」同源接口与交互） */
       syncDialog: {
@@ -442,6 +453,7 @@ export default {
           type: "select",
           dictData: this.versionOptions,
           filterable: true,
+          clearable: false,
           listeners: {
             change: this.handleProductionVersionChange,
           },
@@ -1963,12 +1975,43 @@ export default {
       }
     },
     /**
-     * 版本号下拉：与 rollingCycle/index.backup-legacy.vue 结构调整 Tab 的 getVersionList 一致，
-     * 调用 resultVersion（版本列表接口）；选项来自接口行的 version 字段；
-     * 前端 query/search 统一使用字段 version（与 HeaderSearch prop 一致），默认取列表首项；
-     * 若当前 version 仍在列表中则保留。
+     * 结构内/结构调整版本号默认值：与 structureInnerAdjust（rollingCycle structureInner）一致；
+     * 列表首项为默认；isNewVersion 为 true 时强制首项；query.version 仍在列表中则保留。
      */
-    async loadVersionOptions() {
+    applyAdjustVersionDefault(list, isNewVersion = false) {
+      if (!list || list.length === 0) {
+        this.search = { ...this.search, version: "" };
+        this.query = { ...this.query, version: "" };
+        return;
+      }
+      if (isNewVersion) {
+        const v = list[0].value;
+        this.search = { ...this.search, version: v };
+        this.query = { ...this.query, version: v };
+        return;
+      }
+      const currentPv = String(
+        this.query.version || this.search.version || ""
+      ).trim();
+      if (currentPv) {
+        const hasVersion = list.some(
+          (item) => String(item.value) === currentPv
+        );
+        if (hasVersion) {
+          this.search = { ...this.search, version: currentPv };
+          this.query = { ...this.query, version: currentPv };
+          return;
+        }
+      }
+      const defaultPv = list[0].value;
+      this.search = { ...this.search, version: defaultPv };
+      this.query = { ...this.query, version: defaultPv };
+    },
+    /**
+     * 版本号下拉：与 structureInnerAdjust 一致，调用 mpAdjustStructureIn/getVersionList（versionAdjust）；
+     * 选项来自接口行的 version 字段；默认逻辑见 applyAdjustVersionDefault。
+     */
+    async loadVersionOptions(isNewVersion = false) {
       const factoryCode = this.query.factoryCode || this.search.factoryCode;
       const yearMonth = this.query.yearMonth || this.search.yearMonth;
       if (!factoryCode || !yearMonth) {
@@ -1979,7 +2022,9 @@ export default {
         return;
       }
       try {
-        const res = await resultVersion(this.formatParamsForStructureVersionList());
+        const res = await versionAdjust(
+          this.formatParamsForStructureVersionList()
+        );
         const rows = res.rows || [];
         this.monthPlanMpAdjustVersionRawRows = rows;
         const list = [];
@@ -1999,25 +2044,8 @@ export default {
           });
         }
         this.versionOptions = list;
-
         if (list.length > 0) {
-          const currentPv = String(
-            this.query.version || this.search.version || ""
-          ).trim();
-
-          if (currentPv) {
-            const hasVersion = list.some(
-              (item) => String(item.value) === currentPv
-            );
-            if (hasVersion) {
-              this.search = { ...this.search, version: currentPv };
-              this.query = { ...this.query, version: currentPv };
-              return;
-            }
-          }
-          const defaultPv = list[0].value;
-          this.search = { ...this.search, version: defaultPv };
-          this.query = { ...this.query, version: defaultPv };
+          this.applyAdjustVersionDefault(list, isNewVersion);
         } else {
           this.search = { ...this.search, version: "" };
           this.query = { ...this.query, version: "" };
@@ -2101,26 +2129,49 @@ export default {
       return params;
     },
     /**
-     * 版本号下拉数据请求入参：与 rollingCycle/index.backup-legacy.vue 结构调整 Tab 下
-     * getVersionList 请求方式一致（含分页与 year/month 拆分）。
-     * 仍携带 query.version，由后端 MpAdjustResult/getVersionList 按年月厂过滤（不按版本号过滤列表）。
+     * 版本号下拉数据请求入参：与 structureInnerAdjust（rollingCycle 结构内）getVersionList 一致，
+     * 调用 /monthplan/mpAdjustStructureIn/getVersionList，year/month 拆分后清空 yearMonth。
      */
     formatParamsForStructureVersionList() {
       const params = {
         ...this.query,
         ...this.sort,
       };
-      if (this.page) {
-        params.pageSize = this.page.pageSize;
-        params.pageNum = this.page.current;
-      }
       if (params.yearMonth) {
         const arr = String(params.yearMonth).split("-");
         params.year = arr[0];
         params.month = arr[1];
-        delete params.yearMonth;
+        params.yearMonth = "";
       }
       return params;
+    },
+    /** 获取调整订单：与 structureInnerAdjust 页 adjustOrder 一致 */
+    async handleGetAdjustOrder() {
+      this.loadText = this.$t("正在获取订单中");
+      this.getAdjustOrderLoading = true;
+      this.loading = true;
+      try {
+        const params = {
+          ...this.query,
+          ...this.sort,
+        };
+        if (params.yearMonth) {
+          const arr = params.yearMonth.split("-");
+          params.mpYear = arr[0];
+          params.mpMonth = arr[1];
+          params.yearMonth = "";
+        }
+        params.adjustType = "01";
+        await getAdjustDetailList(params);
+        await this.loadVersionOptions(true);
+        await this.getList();
+      } catch (e) {
+        console.error(e);
+      } finally {
+        this.getAdjustOrderLoading = false;
+        this.loading = false;
+        this.loadText = "正在加载中...";
+      }
     },
     /**
      * 排产明细导出入参：与 monthPlanManagement/mouldingDayResult 一致（不含分页），
@@ -2358,13 +2409,16 @@ export default {
     /** 计划停机：清空 Redis 调整上下文后刷新主页面展示（仅在此处调用 set，避免与弹窗重复） */
     async onPlanDowntimeApplied() {
       try {
-        await setAdjustsCxMachineFromRedis({
+        const res = await setAdjustsCxMachineFromRedis({
           cxMachineCode: "",
           structureName: "",
           beginDay: null,
           endDay: null,
           version: "",
         });
+        if (res && res.msg) {
+          this.$modal.msgSuccess(res.msg);
+        }
         await this.fetchCurrentAdjustMachineFromRedis();
       } catch (e) {
         console.error(e);

@@ -30,6 +30,7 @@ import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.maindata.mapper.MdmMonthSurplusEntityMapper;
 import com.zlt.aps.maindata.service.IBatchMpMonthPlanStatisticsService;
+import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
 import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.maindata.utils.MessageServiceUtils;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
@@ -206,6 +207,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     @Autowired
     protected DpDemandPlanEntityMapper demandPlanEntityMapper;
+
+    @Autowired
+    protected IMdmSkuScheduleCategoryService mdmSkuScheduleCategoryService;
 
     @Autowired
     private IFactoryMonthPlanProductionFinalResultService finalResultService;
@@ -996,6 +1000,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 contextDTO.getMpMonth(), contextDTO.getVersion(), contextDTO.getProductionVersion(),
                 contextDTO.getStructureName(), contextDTO.getScheduledMachines(), contextDTO.getStartDay(),
                 contextDTO.getEndDay(), contextDTO.getAdjustStartDay(), contextDTO.getAdjustEndDay());
+        if (StringUtil.isEmptyWithTrim(contextDTO.getVersion())){
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.versionEmpty"));
+        }
         // 1、查询周程调整结果
         queryAdjustResult(contextDTO);
         // 2、查询调整明细
@@ -1061,6 +1068,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 contextDTO.getMpMonth(), contextDTO.getVersion(), contextDTO.getProductionVersion(),
                 contextDTO.getStructureName(), contextDTO.getScheduledMachines(), contextDTO.getStartDay(),
                 contextDTO.getEndDay(), contextDTO.getAdjustStartDay(), contextDTO.getAdjustEndDay());
+        if (StringUtil.isEmptyWithTrim(contextDTO.getVersion())){
+            throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.versionEmpty"));
+        }
         FactoryMonthPlanProductionFinalResult params = new FactoryMonthPlanProductionFinalResult();
         params.setFactoryCode(contextDTO.getFactoryCode());
         params.setYear(contextDTO.getMpYear());
@@ -1492,6 +1502,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String batchNo = String.format("%02d", incrementService.getIncrementNumber(prefixKey));
         // 初始化SKU与施工（示方书）关系
         initSkuConstructionRef(contextDTO);
+        // 初始化SKU排产分类
+        initSkuProductionType(contextDTO);
         // 汇总调整明细
         List<MpAdjustDetailVo> summaryAdjustDetailList = sumByStructureAndMaterial(adjustDetailList, Boolean.TRUE);
         Map<String, MpAdjustDetailVo> adjustDetailVoMap = summaryAdjustDetailList.stream()
@@ -1521,6 +1533,19 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             BeanUtils.copyProperties(adjustResult, monthPlan);
             if (!StringUtil.isEmptyWithTrim(adjustDetailVo.getMaterialCode())){
                 BeanUtils.copyProperties(adjustDetailVo, monthPlan);
+            }
+
+            if (StringUtil.isEmptyWithTrim(monthPlan.getProductStatus())){
+                //补充产品状态
+                monthPlan.setProductStatus(transferStageToProductStatus(monthPlan.getConstructionStage()));
+            }
+            if (StringUtil.isEmptyWithTrim(monthPlan.getProductTypeCode())){
+                //补充产品品类
+                monthPlan.setProductTypeCode(contextDTO.getProductType());
+            }
+            if (StringUtil.isEmptyWithTrim(monthPlan.getProductionType())){
+                //补充排产分类
+                monthPlan.setProductionType(contextDTO.getMdmSkuProductionTypeMap().get(monthPlan.getMaterialCode()));
             }
             monthPlan.setTotalQty(adjustResult.getTotalQty());
             if (adjustDetailVo.getYear() != null && adjustDetailVo.getMonth() != null) {
@@ -1606,6 +1631,24 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
 
     }
 
+    /**
+     * 施工阶段转换产品状态
+     * @param constructionStage
+     * @return
+     */
+    protected String transferStageToProductStatus(String constructionStage) {
+        String productStatus;
+        if (ConstructionStageEnum.FORMAL_PRODUCTION.getStage().equals(constructionStage)) {
+            productStatus = ConstructionStageEnum.FORMAL_FLAG;
+        } else if (ConstructionStageEnum.TRIAL_PRODUCTION.getStage().equals(constructionStage)) {
+            productStatus = ConstructionStageEnum.TRIAL_FLAG;
+        } else if (ConstructionStageEnum.MEASUREMENT.getStage().equals(constructionStage)) {
+            productStatus = ConstructionStageEnum.MEASUREMENT_FLAG;
+        } else {
+            productStatus = ConstructionStageEnum.FORMAL_FLAG;
+        }
+        return productStatus;
+    }
 
     /**
      * 构建调整结果总计划量为0的月度计划
@@ -2742,6 +2785,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             List<FactoryMonthPlanProductionFinalResult> factoryMonthPlanProdFinalList = factoryMonthPlanProdFinalMapper.selectList(queryWrapper);
             List<FactoryMonthPlanFinalAdjustVo> resultList = BeanUtil.copyToList(factoryMonthPlanProdFinalList, FactoryMonthPlanFinalAdjustVo.class);
             contextDTO.setFactoryMonthPlanProdFinalList(resultList);
+            if (PubUtil.isNotEmpty(resultList)){
+                contextDTO.setProductType(resultList.get(0).getProductionType());
+            }
         } catch (Exception e) {
             log.error("查询月度生产计划异常，年份：{}，月份：{}", year, month, e);
             throw new RuntimeException("查询月度生产计划失败", e);
@@ -3112,6 +3158,17 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         contextDTO.setMdmSkuConstructionRefMap(mdmSkuConstructionRefMap);
     }
 
+    /**
+     * 初始化SKU排产分类
+     * @param contextDTO
+     */
+    private void initSkuProductionType(MpRollAdjustContextDTO contextDTO){
+        Map<String,String> productionTypeMap = mdmSkuScheduleCategoryService.skuToProductionType(contextDTO.getFactoryCode());
+        if (PubUtil.isEmpty(productionTypeMap)){
+            productionTypeMap = new HashMap<>();
+        }
+        contextDTO.setMdmSkuProductionTypeMap(productionTypeMap);
+    }
 
     /**
      * 初始化sku与结构关系

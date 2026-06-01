@@ -49,8 +49,6 @@ public class LocaleFallbackInterceptor implements HandlerInterceptor {
             setShiroSessionLang(lang);
             setLocaleContextHolder(lang);
             request.setAttribute(LOCALE_ATTRIBUTE_NAME, lang);
-            log.info("设置attribute时的request: {}", System.identityHashCode(request));
-
             log.debug("语言缓存已写入：lang={}, sessionId={}", lang, sessionId);
         } catch (Exception e) {
             log.warn("LocaleFallbackInterceptor preHandle异常: {}", e.getMessage());
@@ -224,7 +222,10 @@ public class LocaleFallbackInterceptor implements HandlerInterceptor {
 
     private String resolveSessionId(HttpServletRequest request) {
         try {
-            return request.getSession().getId();
+            HttpSession session = request.getSession(false);
+            if (session != null) {
+                return session.getId();
+            }
         } catch (Exception e) {
             log.debug("获取SessionId异常: {}", e.getMessage());
         }
@@ -244,14 +245,12 @@ public class LocaleFallbackInterceptor implements HandlerInterceptor {
     }
 
     private void setLocaleContextHolder(String lang) {
-        log.info("【设置前】LocaleContextHolder: {}", LocaleContextHolder.getLocale());
         try {
             if (StringUtils.isNotEmpty(lang) && lang.contains("_")) {
                 String[] parts = lang.split("_");
                 Locale locale = new Locale(parts[0], parts[1]);
                 LocaleContextHolder.setLocale(locale);
-                log.info("【设置后】LocaleContextHolder: {}", LocaleContextHolder.getLocale());
-                log.info("【当前线程】{}", Thread.currentThread().getName());
+                log.debug("LocaleContextHolder已设置: lang={}, thread={}", locale, Thread.currentThread().getName());
             }
         } catch (Exception e) {
             log.debug("setLocaleContextHolder异常: {}", e.getMessage());

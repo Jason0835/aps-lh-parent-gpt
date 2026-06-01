@@ -179,6 +179,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         LocalDate scheduleDate = request.getScheduleDate();
 
         // 获取排程执行锁（工厂+日期维度）
+        // todo 可以使用注解，代码简洁
         String lockToken = scheduleExecutionGuard.acquire(factoryCode, scheduleDate);
         if (lockToken == null) {
             result.setSuccess(false);
@@ -405,6 +406,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     /**
      * 构建排程上下文
      */
+    //todo 多线程差表，减少查询时间
     private ScheduleContextVo buildScheduleContext(ScheduleRequestVo request) {
         try {
             ScheduleContextVo context = new ScheduleContextVo();
@@ -415,12 +417,15 @@ public class ScheduleServiceImpl implements ScheduleService {
                     scheduleStartDate, scheduleDate, request.getFactoryCode());
 
             // 1. 加载班次配置
+            // 工厂编码优先用请求中传入的 factoryCode，没传则用默认值 DEFAULT_FACTORY_CODE
+            // 按工厂编码查询启用的班次数据（isActive=1），结果存入 shiftConfigList，同时推算排程天数
             String factoryCode = request.getFactoryCode() != null ? request.getFactoryCode() : DEFAULT_FACTORY_CODE;
             context.setFactoryCode(factoryCode);
             loadShiftConfigs(context, factoryCode);
             log.info("班次配置加载完成，班次数：{}", context.getShiftConfigList() != null ? context.getShiftConfigList().size() : 0);
 
             // 2. 获取设备计划停机信息
+            // 按 scheduleDate（排程日期）查询设备计划停机安排（停机类型限定为成型），结果存入 devicePlanShutMap
             try {
                 loadDevicePlanShuts(context, scheduleDate);
                 log.info("设备计划停机信息加载完成");
@@ -428,11 +433,14 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载设备计划停机信息失败，继续执行：{}", e.getMessage());
             }
 
-            // 3. 获取所有机台
+            // 3. 获取所有成型机台
+            // isActive=1（只查启用状态）、isDelete=0（过滤已删除），结果存入 availableMachines
             loadMoldingMachines(context);
             log.info("机台信息加载完成，机台数：{}", context.getAvailableMachines() != null ? context.getAvailableMachines().size() : 0);
 
-            // 4. 获取硫化排程结果（后续会根据成型余量过滤）
+            // 4. 获取硫化排程结果 + 提取排产版本
+            // 按 scheduleDate 查询硫化排程结果 → 存入 lhScheduleResults
+            // 从结果中提取排产版本号 → 存入 productionVersion，供后续结构排产配置过滤
             try {
                 loadLhScheduleResults(context, scheduleDate);
                 log.info("硫化排程结果加载完成");
@@ -442,7 +450,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载硫化排程结果失败，继续执行：{}", e.getMessage());
             }
 
-            // 5. 获取成型在机信息（需要在获取物料信息之前，以便补充物料来源）
+            // 5. 获取成型在机信息
+            // 按 scheduleStartDate（排产起始日期 = scheduleDate - 2天）查询当前在机的成型信息
+            // 必须在步骤6前执行，以便 loadMaterials 能汇总硫化+在机的物料编码
             try {
                 loadOnlineInfos(context, scheduleStartDate);
                 log.info("成型在机信息加载完成");
@@ -451,6 +461,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             // 6. 根据硫化排程结果和成型在机信息获取物料信息
+            // 汇总步骤4（硫化排程结果）+ 步骤5（成型在机信息）中的物料编码 → 批量查 T_MDM_MATERIAL_INFO → 存入 materials
             try {
                 loadMaterials(context);
                 log.info("物料信息加载完成");
@@ -458,7 +469,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载物料信息失败，继续执行：{}", e.getMessage());
             }
 
-            // 7. 获取胎胚库存信息（根据排产起始日期获取早上6点的库存）
+            // 7. 获取胎胚库存信息
+            // 按 scheduleStartDate（排产起始日期）查询胎胚库存，取的是该日期早上6点的库存快照
+            // stockNum > 0 才参与查询，结果存入 stocks
             try {
                 loadStocks(context, scheduleStartDate);
                 log.info("胎胚库存信息加载完成");
@@ -466,7 +479,9 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("加载胎胚库存信息失败，继续执行：{}", e.getMessage());
             }
 
-            // 8. 构建机台在机胎胚映射（后续会根据成型余量过滤）
+            // 8. 构建机台在机胎胚映射
+            // 基于步骤5（在机信息）+ 步骤7（库存）构建映射关系：机台编码 → 该机台当前在产的胎胚集合
+            // 结果存入 machineOnlineEmbryoMap，供续作任务判断使用（后续会根据成型余量过滤）
             try {
                 buildMachineOnlineEmbryoMap(context);
             } catch (Exception e) {
@@ -474,13 +489,16 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             // 9. 获取参数配置
+            // 查询编码前缀 SYS04 的排程参数（损耗率、机台种类上限、硫化机数上限等），直接读配置表
+            // 结果存入 paramConfigMap + 各类具体字段（如 lossRate、maxTypesPerMachine 等）
             try {
                 loadParamConfigs(context);
             } catch (Exception e) {
                 log.warn("加载参数配置失败，继续执行：{}", e.getMessage());
             }
 
-            // 10. 获取结构整车配置
+            // 10. 获取结构整车配置（结构班次产能）
+            // 查询每个结构按整车生产的班次产能配置，直接读配置表，结果存入 structureShiftCapacityMap
             try {
                 loadStructureShiftCapacities(context);
             } catch (Exception e) {
@@ -488,6 +506,7 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             // 11. 获取关键产品配置
+            // 查询哪些胎胚是关键产品（开产首班不排关键产品），直接读配置表，结果存入 keyProductSet
             try {
                 loadKeyProducts(context);
             } catch (Exception e) {
@@ -495,6 +514,8 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             // 12. 构建物料日产能映射/成型硫化配比
+            // 基于已加载的物料和产能数据计算：materialLhCapacityMap（物料日硫化产能映射）、structureLhRatioMap（结构硫化配比）
+            // 日硫化量计算模式由参数 SYS04010001 控制（MES实际/标准配置/APS计算），结果存入 context
             try {
                 buildCapacityMaps(context);
             } catch (Exception e) {
@@ -502,34 +523,40 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             // 13. 获取月度计划余量并计算成型余量（考虑共用胎胚）
+            // 先查询月度计划剩余量（按 year+month），再按日硫化量比例分配库存到各物料
+            // 成型余量 = 硫化余量 – 库存分配量，结果存入 formingRemainderMap
             try {
                 loadMonthSurplusAndCalculateFormingRemainder(context, scheduleDate);
             } catch (Exception e) {
                 log.warn("加载月度计划余量失败，继续执行：{}", e.getMessage());
             }
 
-            // 14. 获取SKU排产分类
+            // 14. 获取SKU排产分类（主销/非主销），存入 skuCategoryMap
             try {
                 loadSkuCategories(context);
             } catch (Exception e) {
                 log.warn("加载SKU排产分类失败，继续执行：{}", e.getMessage());
             }
 
-            // 15. 设置节假日相关标记
+            // 15. 设置节假日相关标记（已废弃，实际使用 CoreScheduleAlgorithmServiceImpl 中的 scheduleDayTypeHelper 按班次级别判定）
             try {
                 setHolidayFlags(context, scheduleDate);
             } catch (Exception e) {
                 log.warn("设置节假日标记失败，继续执行：{}", e.getMessage());
             }
 
-            // 15.5 加载精度计划（planDate < 当前班次日期 - 3天 且 actualDate 为空）
+            // 15.5 加载精度计划
+            // 查询条件：actualDate 为空（未实际执行） + isDelete=0（未删除）
+            //   - 批次1：scheduleDate 也为空（从未被排程安排过）
+            //   - 批次2：scheduleDate 已回填但 planDate > 排程日期（上轮被提前安排，本轮重新纳入）
+            // 精度提前天数默认3天（参数 SYS04030004），存入 precisionAdvanceDays
             try {
                 loadPrecisionPlans(context, scheduleDate);
             } catch (Exception e) {
                 log.warn("加载精度计划失败，继续执行：{}", e.getMessage());
             }
 
-            // 16. 加载物料收尾信息并计算收尾日（使用排产起始日期，非前端传入的最后一天）
+            // 16. 加载物料收尾信息并计算收尾日（使用排产起始日期 scheduleStartDate，非前端传入的最后一天 scheduleDate）
             try {
                 loadMaterialEndings(context, scheduleStartDate);
             } catch (Exception e) {
@@ -537,6 +564,9 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             // 16.5 补充延误物料到硫化任务
+            // 步骤16中 delayQuantity > 0（成型余量 > 收尾日前可生产量）且不在当前 lhScheduleResults 中
+            // → 查历史硫化排程中最近一条记录 → 复制并加入 lhScheduleResults
+            // dataSource="3"（补充计划，TaskGroupService 中拿10000分最高优先级），dailyPlanQty = 追赶量
             try {
                 supplementDelayMaterialTasks(context, scheduleDate);
             } catch (Exception e) {
@@ -544,8 +574,8 @@ public class ScheduleServiceImpl implements ScheduleService {
             }
 
             // 16.6 补充加载延误物料的物料信息
-            // 补充延误物料后，lhScheduleResults中可能新增了materialCode，
-            // 但loadMaterials已经在步骤4执行完毕，context.getMaterials()中不包含这些延误物料的信息
+            // 补充延误物料后，lhScheduleResults 中可能新增了 materialCode，
+            // 但 loadMaterials 已经在步骤4执行完毕，context.getMaterials() 中不包含这些延误物料的信息
             // 需要补充加载，否则校验会报"物料在T_MDM_MATERIAL_INFO中没有配置"
             try {
                 supplementDelayMaterialInfo(context);
@@ -553,21 +583,22 @@ public class ScheduleServiceImpl implements ScheduleService {
                 log.warn("补充延误物料信息失败，继续执行：{}", e.getMessage());
             }
 
-            // 17. 过滤已收尾物料（成型余量<=0的物料不参与排程）
+            // 17. 过滤已收尾物料（成型余量 <= 0 的物料不参与排程）
+            // 从 lhScheduleResults、onlineInfos、machineOnlineEmbryoMap 中移除已收尾物料
             try {
                 filterCompletedMaterials(context);
             } catch (Exception e) {
                 log.warn("过滤已收尾物料失败，继续执行：{}", e.getMessage());
             }
 
-            // 18. 加载结构排产配置（用于均衡分配）
+            // 18. 加载结构排产配置（结构 → 可用机台列表，按 PRODUCTION_VERSION 过滤），供均衡分配使用
             try {
                 loadStructureAllocations(context, scheduleDate);
             } catch (Exception e) {
                 log.warn("加载结构排产配置失败，继续执行：{}", e.getMessage());
             }
 
-            // 19. 加载结构整车配置（用于按车分配计算）
+            // 19. 加载结构整车配置（结构+胎胚 → 整车条数），供按车分配计算使用
             try {
                 loadStructureTreadConfigs(context);
             } catch (Exception e) {
@@ -662,19 +693,6 @@ public class ScheduleServiceImpl implements ScheduleService {
         log.info("查询硫化排程结果，日期: {}", scheduleDate);
         List<LhScheduleResult> lhScheduleResults = lhScheduleResultMapper.selectByDate(scheduleDate);
         log.info("硫化排程查询结果: {} 条", lhScheduleResults != null ? lhScheduleResults.size() : 0);
-
-        if (lhScheduleResults == null || lhScheduleResults.isEmpty()) {
-            // 尝试不带条件查询，看看是否有数据
-            List<LhScheduleResult> allResults = lhScheduleResultMapper.selectAll();
-            log.info("全表查询硫化排程结果: {} 条", allResults != null ? allResults.size() : 0);
-            if (allResults != null && !allResults.isEmpty()) {
-                log.info("硫化数据示例 - 日期: {}, 物料: {}, 胚号: {}",
-                        allResults.get(0).getScheduleDate(),
-                        allResults.get(0).getMaterialCode(),
-                        allResults.get(0).getEmbryoCode());
-            }
-        }
-
         context.setLhScheduleResults(lhScheduleResults);
     }
 

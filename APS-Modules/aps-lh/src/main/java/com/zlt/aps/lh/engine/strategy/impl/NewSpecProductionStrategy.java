@@ -385,6 +385,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                         : machineReadyTime;
                 switchReadyTime = resolveSpecifyReservedReadyTime(context, sku, machineCode, switchReadyTime);
                 switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(context, switchReadyTime);
+                switchReadyTime = alignNewSpecSwitchReadyTimeToWindowStart(context, shifts, switchReadyTime);
 
                 // 4. 分配换模窗口；模具清洗即便重叠，也不再顺延换模起点。
                 Date mouldChangeStartTime = null;
@@ -1846,6 +1847,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
                 : machineReadyTime;
         switchReadyTime = resolveSpecifyReservedReadyTime(context, sku, candidate.getMachineCode(), switchReadyTime);
         switchReadyTime = ShiftProductionControlUtil.resolveEarliestSwitchStartTime(context, switchReadyTime);
+        switchReadyTime = alignNewSpecSwitchReadyTimeToWindowStart(context, shifts, switchReadyTime);
         int switchDurationHours = maintenanceOverlapSwitch
                 ? LhScheduleTimeUtil.getMaintenanceOverlapSwitchHours(context)
                 : LhScheduleTimeUtil.getMouldChangeTotalHours(context);
@@ -2936,16 +2938,18 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         // 产品状态从月计划获取
         result.setProductStatus(sku.getProductStatus());
 
-        // 通过物料编码+产品状态查询SKU与示方书关系获取硫化示方类型和硫化示方书号
+        // 通过物料编码+产品状态查询SKU与示方书关系获取文字/硫化/制造示方书号
+        String embryoNo = null;
+        String textNo = null;
         String lhNo = null;
         String lhType = null;
-        if (StringUtils.isNotEmpty(sku.getProductStatus())) {
-            MdmSkuConstructionRef constructionRef = context.getSkuConstructionRefCompositeKeyMap()
-                    .get(sku.getMaterialCode() + "::" + sku.getProductStatus());
-            if (constructionRef != null) {
-                lhNo = constructionRef.getLhNo();
-                lhType = constructionRef.getLhType();
-            }
+        MdmSkuConstructionRef constructionRef = context.findSkuConstructionRef(
+                sku.getMaterialCode(), sku.getProductStatus());
+        if (constructionRef != null) {
+            embryoNo = constructionRef.getEmbryoNo();
+            textNo = constructionRef.getTextNo();
+            lhNo = constructionRef.getLhNo();
+            lhType = constructionRef.getLhType();
         }
         // 设置1-8班硫化示方书号和硫化示方书类型
         result.setClass1LhNo(lhNo);
@@ -2964,11 +2968,11 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         result.setClass7LhType(lhType);
         result.setClass8LhNo(lhNo);
         result.setClass8LhType(lhType);
-        // 硫化示方书号回写
-        result.setLhNo(sku.getLhNo());
+        // 文字/硫化/制造示方书号回写：关系查不到时置空，以关系值为准
+        result.setLhNo(lhNo);
         result.setChangedTrialStatus(lhType);
-        result.setEmbryoNo(sku.getEmbryoNo());
-        result.setTextNo(sku.getTextNo());
+        result.setEmbryoNo(embryoNo);
+        result.setTextNo(textNo);
         result.setMonthPlanVersion(sku.getMonthPlanVersion());
         result.setProductionVersion(sku.getProductionVersion());
         result.setIsTrial(sku.isTrial() ? "1" : "0");
@@ -4271,6 +4275,44 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return context.getScheduleDate();
         }
         return new Date();
+    }
+
+    /**
+     * 新增换模只能从当前排程窗口首班开始发起，不能借用窗口外的空闲时段提前换模。
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @param switchReadyTime 当前候选机台的可切换时间
+     * @return 与排程窗口首班对齐后的可切换时间
+     */
+    private Date alignNewSpecSwitchReadyTimeToWindowStart(LhScheduleContext context,
+                                                          List<LhShiftConfigVO> shifts,
+                                                          Date switchReadyTime) {
+        if (switchReadyTime == null) {
+            return null;
+        }
+        Date windowStartTime = resolveScheduleWindowStartTime(context, shifts);
+        if (windowStartTime != null && switchReadyTime.before(windowStartTime)) {
+            return windowStartTime;
+        }
+        return switchReadyTime;
+    }
+
+    /**
+     * 解析当前排程窗口首班开始时间。
+     *
+     * @param context 排程上下文
+     * @param shifts 排程窗口班次
+     * @return 窗口首班开始时间
+     */
+    private Date resolveScheduleWindowStartTime(LhScheduleContext context, List<LhShiftConfigVO> shifts) {
+        if (!CollectionUtils.isEmpty(shifts) && shifts.get(0).getShiftStartDateTime() != null) {
+            return shifts.get(0).getShiftStartDateTime();
+        }
+        if (context != null && context.getScheduleDate() != null) {
+            return context.getScheduleDate();
+        }
+        return null;
     }
 
     private List<MachineCleaningWindowDTO> resolveMachineCleaningWindowList(LhScheduleContext context, String machineCode) {

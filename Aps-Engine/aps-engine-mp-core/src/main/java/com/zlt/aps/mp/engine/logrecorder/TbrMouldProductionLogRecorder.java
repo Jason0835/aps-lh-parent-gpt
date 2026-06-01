@@ -1,6 +1,7 @@
 package com.zlt.aps.mp.engine.logrecorder;
 
 import com.alibaba.fastjson.JSON;
+import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.mp.engine.daylimit.BeforeSkuProductionInfo;
 import com.zlt.aps.mp.engine.daylimit.MouldProductionLimitTypeEnum;
 import com.zlt.aps.mp.engine.domain.Context;
@@ -12,6 +13,10 @@ import com.zlt.aps.mp.engine.enums.ProductionStageEnum;
 import com.zlt.aps.mp.engine.enums.TbrMouldProductionLogType;
 import com.zlt.aps.mp.engine.utils.TbrProductionLogUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
+
+import java.util.Set;
 
 /**
  * TBR 模具排产日志记录器
@@ -190,18 +195,24 @@ public class TbrMouldProductionLogRecorder {
 
     /**
      * 增加获取结构排产硫化组排产日范围日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 获取到排产日范围：%s~%s====
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 获取到排产日范围：%s~%s 前Sku信息：%s====
      *
      * @param context           排程上下文
      * @param groupName         分组名-结构
      * @param onLineMachineInfo 在产机台信息
      * @param startDay          开始日
      * @param endDay            结束日
+     * @param beforeSkuContent  前Sku信息
      * @return
      */
-    public static String addGroupFindLhMachineRangeLog(Context context, String groupName, String onLineMachineInfo, Integer startDay, Integer endDay) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 获取到排产日范围：%s~%s====";
-        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo, startDay, endDay);
+    public static String addGroupFindLhMachineRangeLog(Context context, String groupName, String onLineMachineInfo, Integer startDay, Integer endDay, BeforeSkuProductionInfo beforeSkuContent) {
+        String beforeSkuInfo = "un know";
+        if (null != beforeSkuContent) {
+            beforeSkuInfo = JSON.toJSONString(beforeSkuContent);
+        }
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 获取到排产日范围：%s~%s 前Sku信息：%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, startDay, endDay, beforeSkuInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.GROUP_FIND_LH_MACHINE_RANGE, logContent);
         return logContent;
@@ -231,18 +242,24 @@ public class TbrMouldProductionLogRecorder {
 
     /**
      * 增加在机结构对在产机台可排产硫化组日期范围修正日志信息记录
-     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 排产硫化组修正后排产日范围：%s~%s====
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 排产硫化组修正后排产日范围：%s~%s 前Sku信息：%s====
      *
      * @param context           排程上下文
      * @param groupName         分组名-结构
      * @param onLineMachineInfo 在产机台信息
      * @param startDay          开始日
      * @param endDay            结束日
+     * @param beforeSkuContent  前Sku信息
      * @return
      */
-    public static String addContinueGroupContinueMachineCorrectLhGroupRangeLog(Context context, String groupName, String onLineMachineInfo, Integer startDay, Integer endDay) {
-        String logContentFormat = "=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 排产硫化组修正后排产日范围：%s~%s====";
-        String logContent = String.format(logContentFormat, context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(), groupName, onLineMachineInfo, startDay, endDay);
+    public static String addContinueGroupContinueMachineCorrectLhGroupRangeLog(Context context, String groupName, String onLineMachineInfo, Integer startDay, Integer endDay, BeforeSkuProductionInfo beforeSkuContent) {
+        String beforeSkuInfo = "un know";
+        if (null != beforeSkuContent) {
+            beforeSkuInfo = JSON.toJSONString(beforeSkuContent);
+        }
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 排产机台：%s 排产硫化组修正后排产日范围：%s~%s 前Sku信息：%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, onLineMachineInfo, startDay, endDay, beforeSkuInfo);
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
         TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.CONTINUE_GROUP_ON_LINE_MACHINE_LH_GROUP_RANGE, logContent);
         return logContent;
@@ -700,6 +717,53 @@ public class TbrMouldProductionLogRecorder {
      */
     public static String addFindBeforeSkuInfo(Context context, String groupName, String materialDesc, BeforeSkuProductionInfo beforeSkuContent) {
         String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s Sku：%s 前Sku信息：%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, materialDesc, JSON.toJSONString(beforeSkuContent));
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_PRODUCTION_PLAN, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 模具在productionDay最后排产的Sku 信息日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 模具：%s 在[%s]日 最后排产Sku：%s====
+     *
+     * @param context      排程上下文
+     * @param groupName    分组名-结构
+     * @param mouldSkuInfo 模具排产信息
+     * @return
+     */
+    public static String addMouldLastProductionSkuInfo(Context context, String groupName, BeforeSkuProductionInfo mouldSkuInfo) {
+        if (null == mouldSkuInfo || StringUtils.isBlank(groupName)) {
+            return StringUtils.EMPTY;
+        }
+        String materialDesc = mouldSkuInfo.getMaterialDesc();
+        String moldInfo = "";
+        Set<String> productionMoldSet = mouldSkuInfo.getProductionMouldSet();
+        if (!CollectionUtils.isEmpty(mouldSkuInfo.getProductionMouldSet())) {
+            moldInfo = String.join(StringConstant.COMMA, productionMoldSet);
+        }
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s 模具：%s 在[%s]日 最后排产Sku：%s====",
+                context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
+                groupName, moldInfo, mouldSkuInfo.getClosingDay(),
+                materialDesc);
+        ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();
+        TbrProductionLogUtils.addProductionLog(context, productionPlanInfo, TbrMouldProductionLogType.MOULD_PRODUCTION_PLAN, logContent);
+        return logContent;
+    }
+
+    /**
+     * 增加 换模判断信息日志记录
+     * =====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s Sku：%s 判断换模-前Sku信息：%s====
+     *
+     * @param context          排程上下文
+     * @param groupName        分组名-结构
+     * @param materialDesc     Sku信息
+     * @param beforeSkuContent 前Sku信息
+     * @return
+     */
+    public static String addChangeMoldJudgeInfo(Context context, String groupName, String materialDesc, BeforeSkuProductionInfo beforeSkuContent) {
+        String logContent = String.format("=====工厂%s, 计划年月：%d-%d, 需求计划版本：%s, 排产版本：%s，结构：%s Sku：%s 判断换模-前Sku信息：%s====",
                 context.getFactoryCode(), context.getYear(), context.getMonth(), context.getMonthPlanVersion(), context.getProductionVersion(),
                 groupName, materialDesc, JSON.toJSONString(beforeSkuContent));
         ProductionPlanLogDto productionPlanInfo = ProductionPlanLogDto.getEmpty();

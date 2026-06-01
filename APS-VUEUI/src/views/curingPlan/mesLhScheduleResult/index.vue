@@ -73,7 +73,7 @@ export default {
     // tltUpload,
     // infoDialog,
   },
-  dicts: ["biz_factory_name", "IS_RELEASE"],
+  dicts: ["biz_factory_name", "IS_RELEASE", "biz_end_type"],
   provide() {
     return {
       parentDict: this.dict,
@@ -220,23 +220,6 @@ export default {
             this.$t("ui.data.column.scheduleResult.plan"),
           prop: "class1PlanQty",
           minWidth: 100,
-          // sortable: "custom",
-          // render: ({ row }) => {
-          //   return (
-          //     <TPopover
-          //       title={this.$t("ui.data.column.scheduleResult.plan")}
-          //       v-model={row.class1PlanQty}
-          //       showClose={false}
-          //       min={0}
-          //       onConfirm={(val) => {
-          //         this.handleChangeQty({
-          //           ...row,
-          //           class1PlanQty: val,
-          //         });
-          //       }}
-          //     />
-          //   );
-          // },
         },
         {
           label:
@@ -244,7 +227,6 @@ export default {
             this.$t("ui.data.column.scheduleResult.finish"),
           prop: "class1FinishQty",
           minWidth: 100,
-          // sortable: "custom",
         },
         {
           label:
@@ -252,7 +234,16 @@ export default {
             this.$t("ui.data.column.scheduleResult.analysis"),
           prop: "class1Analysis",
           minWidth: 100,
-          // sortable: "custom",
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class11") +
+            this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class1IsEnd",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_end_type, value);
+          },
         },
         {
           label:
@@ -260,23 +251,6 @@ export default {
             this.$t("ui.data.column.scheduleResult.plan"),
           prop: "class2PlanQty",
           minWidth: 100,
-          // sortable: "custom",
-          // render: ({ row }) => {
-          //   return (
-          //     <TPopover
-          //       title={this.$t("ui.data.column.scheduleResult.plan")}
-          //       v-model={row.class2PlanQty}
-          //       showClose={false}
-          //       min={0}
-          //       onConfirm={(val) => {
-          //         this.handleChangeQty({
-          //           ...row,
-          //           class2PlanQty: val,
-          //         });
-          //       }}
-          //     />
-          //   );
-          // },
         },
         {
           label:
@@ -284,7 +258,6 @@ export default {
             this.$t("ui.data.column.scheduleResult.finish"),
           prop: "class2FinishQty",
           minWidth: 100,
-          // sortable: "custom",
         },
         {
           label:
@@ -292,7 +265,16 @@ export default {
             this.$t("ui.data.column.scheduleResult.analysis"),
           prop: "class2Analysis",
           minWidth: 100,
-          // sortable: "custom",
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class22") +
+            this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class2IsEnd",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_end_type, value);
+          },
         },
         {
           label:
@@ -300,23 +282,6 @@ export default {
             this.$t("ui.data.column.scheduleResult.plan"),
           prop: "class3PlanQty",
           minWidth: 100,
-          // sortable: "custom",
-          // render: ({ row }) => {
-          //   return (
-          //     <TPopover
-          //       title={this.$t("ui.data.column.scheduleResult.plan")}
-          //       v-model={row.class3PlanQty}
-          //       showClose={false}
-          //       min={0}
-          //       onConfirm={(val) => {
-          //         this.handleChangeQty({
-          //           ...row,
-          //           class3PlanQty: val,
-          //         });
-          //       }}
-          //     />
-          //   );
-          // },
         },
         {
           label:
@@ -324,7 +289,6 @@ export default {
             this.$t("ui.data.column.scheduleResult.finish"),
           prop: "class3FinishQty",
           minWidth: 100,
-          // sortable: "custom",
         },
         {
           label:
@@ -332,7 +296,171 @@ export default {
             this.$t("ui.data.column.scheduleResult.analysis"),
           prop: "class3Analysis",
           minWidth: 100,
-          // sortable: "custom",
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class33") +
+            this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class3IsEnd",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_end_type, value);
+          },
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class44") +
+            this.$t("ui.data.column.scheduleResult.plan"),
+          prop: "class4PlanQty",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class44") +
+            this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class4FinishQty",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class44") +
+            this.$t("ui.data.column.scheduleResult.analysis"),
+          prop: "class4Analysis",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class44") +
+            this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class4IsEnd",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_end_type, value);
+          },
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class55") +
+            this.$t("ui.data.column.scheduleResult.plan"),
+          prop: "class5PlanQty",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class55") +
+            this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class5FinishQty",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class55") +
+            this.$t("ui.data.column.scheduleResult.analysis"),
+          prop: "class5Analysis",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class55") +
+            this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class5IsEnd",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_end_type, value);
+          },
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class66") +
+            this.$t("ui.data.column.scheduleResult.plan"),
+          prop: "class6PlanQty",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class66") +
+            this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class6FinishQty",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class66") +
+            this.$t("ui.data.column.scheduleResult.analysis"),
+          prop: "class6Analysis",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class66") +
+            this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class6IsEnd",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_end_type, value);
+          },
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class77") +
+            this.$t("ui.data.column.scheduleResult.plan"),
+          prop: "class7PlanQty",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class77") +
+            this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class7FinishQty",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class77") +
+            this.$t("ui.data.column.scheduleResult.analysis"),
+          prop: "class7Analysis",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class77") +
+            this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class7IsEnd",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_end_type, value);
+          },
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class88") +
+            this.$t("ui.data.column.scheduleResult.plan"),
+          prop: "class8PlanQty",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class88") +
+            this.$t("ui.data.column.scheduleResult.finish"),
+          prop: "class8FinishQty",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class88") +
+            this.$t("ui.data.column.scheduleResult.analysis"),
+          prop: "class8Analysis",
+          minWidth: 100,
+        },
+        {
+          label:
+            this.$t("ui.data.column.scheduleResult.class88") +
+            this.$t("ui.data.column.scheduleResult.type"),
+          prop: "class8IsEnd",
+          minWidth: 100,
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_end_type, value);
+          },
         },
       ];
 

@@ -15,6 +15,7 @@ import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.text.Convert;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
@@ -149,10 +150,10 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         int oriTotalQty = entity.getTotalQty()== null ? 0:entity.getTotalQty();
         entity.setAdjustFlag(oriTotalQty != accTotalQty ? YesOrNoEnum.YES.getCode() : YesOrNoEnum.NO.getCode());
         entity.setTotalQty(accTotalQty);
-        // 如果版本号没有值，更新调整类型=人工调整
-        if (StrUtil.isBlank(entity.getVersion())) {
-            entity.setAdjustType(ApsConstant.APS_ZERO_3);
+
+        if (StrUtil.isNotBlank(entity.getVersion())) {
             entity.setVersion(adjVersion);
+            entity.setLastMonthPlanVersion(adjVersion);
         }
         if (StrUtil.isBlank(entity.getAdjustType())){
             LambdaQueryWrapper<MpAdjustResult> queryWrapper2 = new LambdaQueryWrapper<>();
@@ -161,6 +162,8 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
             List<MpAdjustResult> mpAdjustResultList2 = mpAdjustResultEntityMapper.selectList(queryWrapper2);
             if (PubUtil.isNotEmpty(mpAdjustResultList2)){
                 entity.setAdjustType(mpAdjustResultList2.get(0).getAdjustType());
+            }else{
+                entity.setAdjustType(ApsConstant.APS_ZERO_3);
             }
         }
         // 计算各排产量
@@ -325,9 +328,9 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
             log.warn("import result msg format invalid: {}", msgObj);
             return result;
         }
-        result[0] = intValue(msgArr[1]);
+        result[0] = Convert.toInt(msgArr[1], 0);
         if (msgArr.length > 2) {
-            result[1] = intValue(msgArr[2]);
+            result[1] = Convert.toInt(msgArr[2], 0);
             result[2] = 1;
         }
         return result;

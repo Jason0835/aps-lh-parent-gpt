@@ -189,6 +189,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "SKU与结构关系Map")
     private Map<String, MdmSkuStructureRef> mdmSkuStructureRefMap;
 
+    @ApiModelProperty(value = "SKU排产分类")
+    private Map<String, String> mdmSkuProductionTypeMap;
+
     @ApiModelProperty(value = "SKU与施工（示方书）关系列表")
     private List<MdmSkuConstructionRef> mdmSkuConstructionRefList;
 

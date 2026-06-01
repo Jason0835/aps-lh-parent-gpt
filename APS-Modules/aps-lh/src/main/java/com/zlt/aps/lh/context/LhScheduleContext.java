@@ -135,7 +135,7 @@ public class LhScheduleContext {
     private Map<String, Integer> embryoRealtimeStockMap = new HashMap<>();
     /** 日完成量Map（按物料+完成日期聚合）, key=materialCode_finishDate(yyyy-MM-dd) */
     private Map<String, Integer> materialDayFinishedQtyMap = new HashMap<>();
-    /** 月累计完成量Map（截至目标排产日期含当天）, key=materialCode */
+    /** 月累计完成量Map（按月计划所属月份统计，截至排程窗口T日前一日）, key=materialCode */
     private Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>();
     /** T日排程班次完成量Map, key=materialCode, value=T日class1FinishQty按物料汇总值 */
     private Map<String, Integer> materialScheDayFinishQtyMap = new HashMap<>();
@@ -453,5 +453,21 @@ public class LhScheduleContext {
         return factoryCode;
     }
 
-}
+    /**
+     * 按物料编码 + 产品状态从SKU与示方书关系中精确查找。
+     * <p>用于排产结果写入前回写文字/硫化/制造示方书号，未命中时返回 null，
+     * 由调用方决定是否回退到其他来源或置空。</p>
+     *
+     * @param materialCode 物料编码
+     * @param productStatus 产品状态
+     * @return SKU与示方书关系，未命中返回 null
+     */
+    public MdmSkuConstructionRef findSkuConstructionRef(String materialCode, String productStatus) {
+        if (StringUtils.isEmpty(materialCode) || StringUtils.isEmpty(productStatus)
+                || CollectionUtils.isEmpty(skuConstructionRefCompositeKeyMap)) {
+            return null;
+        }
+        return skuConstructionRefCompositeKeyMap.get(materialCode + "::" + productStatus);
+    }
 
+}

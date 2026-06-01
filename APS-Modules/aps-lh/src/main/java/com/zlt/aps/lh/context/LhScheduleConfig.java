@@ -469,6 +469,21 @@ public class LhScheduleConfig {
                 LhScheduleConstant.NEW_SPEC_SHORTAGE_LOOK_AHEAD_DAYS));
     }
 
+    public int getContinuousShortageLookAheadDays() {
+        return Math.max(0, getParamIntValue(LhScheduleParamConstant.CONTINUOUS_SHORTAGE_LOOK_AHEAD_DAYS,
+                LhScheduleConstant.CONTINUOUS_SHORTAGE_LOOK_AHEAD_DAYS));
+    }
+
+    /**
+     * 判断是否将T-1欠产/超产净值追加到当前排程窗口。
+     *
+     * @return true-追加；false-不追加
+     */
+    public boolean isCarryForwardQtyEnabled() {
+        return getParamIntValue(LhScheduleParamConstant.ENABLE_CARRY_FORWARD_QTY,
+                LhScheduleConstant.ENABLE_CARRY_FORWARD_QTY) == 1;
+    }
+
     /**
      * 判断是否启用硫化示方历史保护。
      *

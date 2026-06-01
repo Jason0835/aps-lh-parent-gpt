@@ -29,7 +29,6 @@ import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
 import com.zlt.aps.lh.api.enums.FactoryCodeEnum;
 import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.LhScheduleConfigResolver;
-import com.zlt.aps.lh.component.ScheduleExecutionGuard;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.controller.LhMouldChangePlanController;
 import com.zlt.aps.lh.engine.decorator.IScheduleExecutor;
@@ -41,7 +40,12 @@ import com.zlt.aps.lh.service.ILhScheduleService;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.service.IScheduleSummaryReportService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.MachineStatusUtil;
+import com.zlt.aps.lh.util.MouldStatusUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.zlt.aps.mdm.api.domain.entity.*;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.utils.ImportExcelValidatedUtils;
@@ -77,7 +81,7 @@ import java.util.zip.ZipOutputStream;
  * <ul>
  *   <li>接收控制器传入的排程请求，构建本次排程上下文；</li>
  *   <li>解析并固化本次排程参数快照，保证一次排程内规则口径稳定；</li>
- *   <li>通过 {@link ScheduleExecutionGuard} 控制同工厂同目标日的并发排程；</li>
+ *   <li>同工厂同目标日的并发排程由 Controller 层 {@link com.zlt.aps.redissonLock.annotation.DistributedLock} 注解控制；</li>
  *   <li>委托 {@link IScheduleExecutor} 进入模板链路，执行基础数据初始化、SKU归集、续作、新增和结果校验保存；</li>
  *   <li>按批次号发布已保存的排程结果并触发发布事件。</li>
  * </ul>
@@ -119,9 +123,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     private ScheduleEventPublisher scheduleEventPublisher;
 
     @Resource
-    private ScheduleExecutionGuard scheduleExecutionGuard;
-
-    @Resource
     private LhTextMouldChangePlanGenerator textMouldChangePlanGenerator;
 
     @Resource
@@ -139,20 +140,37 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     @Resource
     private ILhScheduleResultService lhScheduleResultService;
 
+    @Resource
+    private MdmSkuMouldRelMapper mdmSkuMouldRelMapper;
+
+    @Resource
+    private MdmModelInfoMapper mdmModelInfoMapper;
+
+    @Resource
+    private LhMachineInfoMapper lhMachineInfoMapper;
+
+    @Resource
+    private MpFactoryProductionVersionMapper mpFactoryProductionVersionMapper;
+
+    @Resource
+    private FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
+
+    @Resource
+    private MdmSkuConstructionRefMapper mdmSkuConstructionRefMapper;
+
+    @Resource
+    private MdmSkuLhCapacityMapper mdmSkuLhCapacityMapper;
+
+    @Resource
+    private MdmWorkCalendarMapper mdmWorkCalendarMapper;
+
     @Override
     public LhScheduleResponseDTO executeSchedule(LhScheduleRequestDTO request) {
         log.info("接收排程请求, 工厂: {}, 日期: {}, 月计划版本: {}, 生产版本: {}",
                 request.getFactoryCode(), LhScheduleTimeUtil.formatDate(request.getScheduleDate()),
                 request.getMonthPlanVersion(), request.getProductionVersion());
         LhScheduleContext context = buildContext(request);
-        String lockToken = null;
         try {
-            log.info("准备获取排程执行锁, 工厂: {}, 目标日: {}, T日: {}, 排程天数: {}",
-                    context.getFactoryCode(),
-                    LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
-                    LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
-                    context.getScheduleConfig().getScheduleDays());
-            lockToken = scheduleExecutionGuard.acquire(context.getFactoryCode(), context.getScheduleTargetDate());
             LhScheduleResponseDTO response = scheduleExecutor.execute(context);
             log.info("排程服务执行完成, 工厂: {}, 批次号: {}, 成功: {}, 排程结果数: {}, 未排产数: {}, 模具计划数: {}",
                     context.getFactoryCode(), response.getBatchNo(), response.isSuccess(),
@@ -166,11 +184,6 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             log.error("排程服务入口异常, 工厂: {}, 日期: {}",
                     context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()), e);
             return LhScheduleResponseDTO.fail(context.getBatchNo(), "排程执行异常: " + e.getMessage());
-        } finally {
-            scheduleExecutionGuard.release(context.getFactoryCode(), context.getScheduleTargetDate(), lockToken);
-            log.debug("排程执行锁释放完成, 工厂: {}, 目标日: {}, 锁令牌是否存在: {}",
-                    context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()),
-                    StringUtils.isNotEmpty(lockToken));
         }
     }
 
@@ -1169,15 +1182,26 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Map<Integer, Date[]> shiftTimeMap = buildShiftTimeMap(scheduleDate);
         Set<String> importUniqueKeys = new HashSet<>();
 
-        boolean hasValidRow = list.stream()
+        boolean hasValidBaseRow = list.stream()
                 .filter(Objects::nonNull)
                 .anyMatch(item -> !Objects.equals(item.getId(), -999L));
-        if (hasValidRow) {
-            // 模板导入以指定排程日期为整体覆盖范围，先逻辑删除旧排程，再插入本次导入的新排程。
-            scheduleResultMapper.update(null, new LambdaUpdateWrapper<LhScheduleResult>()
-                    .eq(LhScheduleResult::getFactoryCode, factoryCode)
-                    .eq(LhScheduleResult::getScheduleDate, scheduleDate)
-                    .set(LhScheduleResult::getIsDelete, DeleteFlagEnum.DELETED.getCode()));
+        ImportScheduleValidationContext validationContext = new ImportScheduleValidationContext();
+        if (hasValidBaseRow) {
+            // 业务主数据校验必须在删除旧排程之前执行。
+            // 原因：模板导入是按“工厂+排程日期”整体覆盖，如果先删除旧排程，再发现月计划、
+            // 工作日历等全局前置条件不满足，会导致原有排程被误清空。
+            // 这里先批量加载后续逐行校验所需的主数据上下文；只有全局前置条件通过，并且最终
+            // 生成了至少一条可导入记录时，才会在下方执行旧排程逻辑删除。
+            validationContext = buildImportScheduleValidationContext(list, factoryCode, scheduleDate);
+            if (CollUtil.isNotEmpty(validationContext.globalErrors)) {
+                failureNum += (int) list.stream()
+                        .filter(Objects::nonNull)
+                        .filter(item -> !Objects.equals(item.getId(), -999L))
+                        .count();
+                ImportExcelValidatedUtils.addImportErrorLog(id, 0,
+                        String.join(";", validationContext.globalErrors), importErrorLogs);
+                return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+            }
         }
 
         List<LhScheduleResult> insertList = new ArrayList<>();
@@ -1191,6 +1215,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             if (!rowErrors.isEmpty()) {
                 failureNum++;
                 importErrorLogs.add(new ImportErrorLog(id, rowNum, String.join(";", rowErrors)));
+                continue;
+            }
+            List<String> businessErrors = validateImportBusinessRow(row, validationContext);
+            if (!businessErrors.isEmpty()) {
+                failureNum++;
+                importErrorLogs.add(new ImportErrorLog(id, rowNum, String.join(";", businessErrors)));
                 continue;
             }
 
@@ -1215,7 +1245,21 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             successNum++;
         }
 
-        // 填充排程结果字段
+        if (CollUtil.isEmpty(insertList)) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+        }
+
+        // 模板导入以指定排程日期为整体覆盖范围；存在可导入记录时，再逻辑删除旧排程并写入本次有效数据。
+        // 这样可以满足“只导入存在硫化示方号/班产的 SKU”的要求：失败 SKU 写入错误日志，
+        // 成功 SKU 进入 insertList，并作为本次日期的新排程结果。
+        scheduleResultMapper.update(null, new LambdaUpdateWrapper<LhScheduleResult>()
+                .eq(LhScheduleResult::getFactoryCode, factoryCode)
+                .eq(LhScheduleResult::getScheduleDate, scheduleDate)
+                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .set(LhScheduleResult::getIsDelete, DeleteFlagEnum.DELETED.getCode()));
+
+        // 复用排程结果服务中的字段补全逻辑，统一填充月计划版本、生产版本、规格、
+        // 硫化时间、日计划量、硫化余量、示方号等导入模板没有直接提供的字段。
         lhScheduleResultService.fillScheduleResultFields(insertList, scheduleDate);
 
         this.baseDao.insertBatch(insertList);
@@ -1223,6 +1267,447 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
         }
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
+    }
+
+    /**
+     * 构建导入模板业务校验上下文。
+     * <p>
+     * 该方法只做批量数据加载和全局前置条件校验，不直接决定某一行是否可导入。
+     * 这样可以避免在逐行校验时反复访问数据库，也可以把“月计划是否定稿”“工作日历是否生成”
+     * 这类整批导入共用的失败原因提前返回。
+     * </p>
+     * <p>
+     * 当前导入业务要求所有 SKU、物料编码相关匹配都必须叠加 factoryCode。
+     * 因此上下文中的 Map/Set key 均使用 factoryCode + 业务编码拼接，避免不同工厂同编码数据串用。
+     * </p>
+     *
+     * @param list         Excel 模板解析后的导入行，包含前一轮注解必填校验结果
+     * @param factoryCode  本次导入选择的工厂编码
+     * @param scheduleDate 本次导入选择的排程日期
+     * @return 导入业务校验上下文，包含全局错误和逐行校验所需的主数据缓存
+     */
+    private ImportScheduleValidationContext buildImportScheduleValidationContext(List<LhScheduleResultTemplateImportVO> list,
+                                                                                 String factoryCode,
+                                                                                 Date scheduleDate) {
+        ImportScheduleValidationContext context = new ImportScheduleValidationContext();
+        // 月计划业务月不是自然月：每月 26 号开始计入下一个月计划周期。
+        // 例如 2026-05-25 匹配 2026 年 5 月，2026-05-26 匹配 2026 年 6 月。
+        int[] yearMonth = resolveImportPlanYearMonth(scheduleDate);
+        context.year = yearMonth[0];
+        context.month = yearMonth[1];
+
+        // 仅基于第一轮基础校验通过的行提取批量查询条件；
+        // 必填缺失、Excel 内重复等基础错误行已经标记为 -999，不参与业务主数据校验。
+        List<LhScheduleResultTemplateImportVO> validRows = list.stream()
+                .filter(Objects::nonNull)
+                .filter(row -> !Objects.equals(row.getId(), -999L))
+                .collect(Collectors.toList());
+        Set<String> materialCodes = validRows.stream()
+                .map(LhScheduleResultTemplateImportVO::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .map(StringUtils::trim)
+                .collect(Collectors.toSet());
+        Set<String> machineCodes = validRows.stream()
+                .map(LhScheduleResultTemplateImportVO::getLhMachineCode)
+                .filter(StringUtils::isNotBlank)
+                .map(StringUtils::trim)
+                .collect(Collectors.toSet());
+
+        // 全局校验 1：排程日期对应业务月必须存在定稿生产版本。
+        // 后续月计划明细和字段补全均依赖这个 productionVersion。
+        context.finalVersion = getImportFinalProductionVersion(factoryCode, context.year, context.month);
+        if (Objects.isNull(context.finalVersion) || StringUtils.isBlank(context.finalVersion.getProductionVersion())) {
+            context.globalErrors.add(String.format("工厂%s，%s年%s月月计划未定稿", factoryCode, context.year, context.month));
+            return context;
+        }
+
+        // 全局校验 2：工作日历中必须已经生成硫化工序日历。
+        // 硫化工序编码固定为 02，与 MdmWorkCalendar.procCode 字典保持一致。
+        if (!hasLhWorkCalendar(factoryCode, context.year, context.month)) {
+            context.globalErrors.add(String.format("工厂%s，%s年%s月工作日历中硫化工序未生成", factoryCode, context.year, context.month));
+            return context;
+        }
+
+        // 批量加载逐行校验所需数据：
+        // 1. 月计划定稿明细：用于确认 SKU 是否在月计划中，并取得产品状态 productStatus；
+        // 2. 机台台账：用于确认机台存在且状态启用；
+        // 3. 模具台账可用集合：用于确认 SKU 关联的模具号可用；
+        // 4. SKU-模具关系：用于从物料编码找到应校验的模具号；
+        // 5. SKU-示方关系：用于按物料编码+产品状态确认硫化示方号；
+        // 6. SKU 双模日硫化能力：用于确认班产 classCapacity 有值。
+        context.monthPlanMap = loadImportMonthPlanMap(factoryCode, context.year, context.month,
+                context.finalVersion.getProductionVersion(), materialCodes);
+        context.machineInfoMap = loadImportMachineInfoMap(factoryCode, machineCodes);
+        context.availableMouldCodeSet = loadImportAvailableMouldCodeSet(factoryCode, materialCodes);
+        context.materialMouldRelMap = loadImportMaterialMouldRelMap(factoryCode, materialCodes);
+        context.constructionRefKeySet = loadImportConstructionRefKeySet(factoryCode, materialCodes);
+        context.classCapacityMaterialSet = loadImportClassCapacityMaterialSet(factoryCode, materialCodes);
+        return context;
+    }
+
+    /**
+     * 校验单行导入数据是否满足硫化排程导入业务前置条件。
+     * <p>
+     * 该方法只读取 {@link ImportScheduleValidationContext} 中已经批量加载好的缓存，
+     * 不再直接访问数据库，避免导入行数较多时产生 N+1 查询。
+     * </p>
+     * <p>
+     * 返回错误时，该行不会进入 insertList；返回空集合时，该行才会被转换为 LhScheduleResult。
+     * 这对应需求中的“只导入存在硫化示方号的 SKU”“只导入存在班产的 SKU”。
+     * </p>
+     *
+     * @param row     当前导入行
+     * @param context 批量导入校验上下文
+     * @return 当前行业务错误列表，空集合表示可以导入
+     */
+    private List<String> validateImportBusinessRow(LhScheduleResultTemplateImportVO row,
+                                                   ImportScheduleValidationContext context) {
+        List<String> errors = new ArrayList<>();
+        String factoryCode = StringUtils.trim(row.getFactoryCode());
+        String materialCode = StringUtils.trim(row.getMaterialCode());
+        String machineCode = StringUtils.trim(row.getLhMachineCode());
+        String materialKey = buildMaterialFactoryKey(factoryCode, materialCode);
+
+        // 校验机台是否可用：
+        // 先按 factoryCode + machineCode 找硫化机台台账，再按 sys_enable_disable 字典判断启用状态。
+        LhMachineInfo machineInfo = context.machineInfoMap.get(buildMachineFactoryKey(factoryCode, machineCode));
+        if (Objects.isNull(machineInfo)) {
+            errors.add(String.format("机台%s不存在", machineCode));
+        } else if (!MachineStatusUtil.isEnabled(machineInfo.getStatus())) {
+            errors.add(String.format("机台%s状态不可用", machineCode));
+        }
+
+        // 校验模具号是否可用：
+        // 先通过 SKU-模具关系表按 factoryCode + materialCode 找到所有模具号，
+        // 再到模具台账可用集合中确认这些模具号是否存在且 mouldStatus=1。
+        List<String> mouldCodes = context.materialMouldRelMap.getOrDefault(materialKey, Collections.emptyList());
+        if (CollUtil.isEmpty(mouldCodes)) {
+            errors.add(String.format("SKU%s未维护模具关系", materialCode));
+        } else {
+            List<String> unavailableMouldCodes = mouldCodes.stream()
+                    .filter(mouldCode -> !context.availableMouldCodeSet.contains(buildMouldFactoryKey(factoryCode, mouldCode)))
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (CollUtil.isNotEmpty(unavailableMouldCodes)) {
+                errors.add(String.format("SKU%s模具号不可用：%s", materialCode, String.join(",", unavailableMouldCodes)));
+            }
+        }
+
+        // 校验硫化示方号是否存在：
+        // 需求要求“通过月计划中物料编码+产品状态到 SKU 与示方关系校验硫化示方号”。
+        // 因此这里先从月计划明细拿 productStatus，再用 factoryCode + materialCode + productStatus
+        // 匹配 MdmSkuConstructionRef，并且要求 lhNo 不为空。
+        FactoryMonthPlanProductionFinalResult monthPlan = context.monthPlanMap.get(materialKey);
+        if (Objects.isNull(monthPlan)) {
+            errors.add(String.format("月计划中不存在SKU%s", materialCode));
+        } else {
+            String constructionKey = buildConstructionRefKey(factoryCode, materialCode, monthPlan.getProductStatus());
+            if (!context.constructionRefKeySet.contains(constructionKey)) {
+                errors.add(String.format("SKU%s不存在硫化示方号", materialCode));
+            }
+        }
+
+        // 校验班产是否有值：
+        // MdmSkuLhCapacity.classCapacity 必须存在且大于 0，否则该 SKU 不导入，仅输出错误提示。
+        if (!context.classCapacityMaterialSet.contains(materialKey)) {
+            errors.add(String.format("SKU%s未维护班产", materialCode));
+        }
+        return errors;
+    }
+
+    /**
+     * 根据排程日期解析月计划业务年月。
+     * <p>
+     * 月计划周期按每月 26 号切换：1-25 号属于当前自然月，26 号及之后属于下一个月计划月。
+     * </p>
+     *
+     * @param scheduleDate 排程日期
+     * @return int[0]=业务年份，int[1]=业务月份
+     */
+    private int[] resolveImportPlanYearMonth(Date scheduleDate) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(scheduleDate);
+        if (calendar.get(Calendar.DAY_OF_MONTH) >= 26) {
+            calendar.add(Calendar.MONTH, 1);
+        }
+        return new int[]{calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1};
+    }
+
+    /**
+     * 查询导入排程日期对应业务月的定稿生产版本。
+     * <p>
+     * 月计划明细表按 productionVersion 匹配；如果这里没有定稿版本，则整批导入无法继续。
+     * 多条定稿数据异常存在时，取更新时间和 ID 最新的一条，与字段补全服务中的查询策略保持一致。
+     * </p>
+     *
+     * @param factoryCode 工厂编码
+     * @param year        业务年份
+     * @param month       业务月份
+     * @return 定稿生产版本，未找到返回 null
+     */
+    private MpFactoryProductionVersion getImportFinalProductionVersion(String factoryCode, int year, int month) {
+        return mpFactoryProductionVersionMapper.selectOne(new LambdaQueryWrapper<MpFactoryProductionVersion>()
+                .eq(MpFactoryProductionVersion::getFactoryCode, factoryCode)
+                .eq(MpFactoryProductionVersion::getYear, year)
+                .eq(MpFactoryProductionVersion::getMonth, month)
+                .eq(MpFactoryProductionVersion::getIsFinal, "1")
+                .eq(MpFactoryProductionVersion::getIsDelete, DeleteFlagEnum.NORMAL.getCode())
+                .orderByDesc(MpFactoryProductionVersion::getUpdateTime)
+                .orderByDesc(MpFactoryProductionVersion::getId)
+                .last("LIMIT 1"));
+    }
+
+    /**
+     * 判断指定工厂、业务年月是否已经生成硫化工作日历。
+     * <p>
+     * MdmWorkCalendar.procCode=02 表示硫化工序。这里只校验是否存在有效记录，
+     * 不逐日校验开停产标识；导入前置条件关注的是该月该工序日历是否已生成。
+     * </p>
+     *
+     * @param factoryCode 工厂编码
+     * @param year        业务年份
+     * @param month       业务月份
+     * @return true 表示已生成硫化工序日历
+     */
+    private boolean hasLhWorkCalendar(String factoryCode, int year, int month) {
+        return mdmWorkCalendarMapper.selectCount(new LambdaQueryWrapper<MdmWorkCalendar>()
+                .eq(MdmWorkCalendar::getFactoryCode, factoryCode)
+                .eq(MdmWorkCalendar::getYear, year)
+                .eq(MdmWorkCalendar::getMonth, month)
+                .eq(MdmWorkCalendar::getProcCode, "02")
+                .eq(MdmWorkCalendar::getIsDelete, DeleteFlagEnum.NORMAL.getCode())) > 0;
+    }
+
+    /**
+     * 加载本次导入 SKU 在定稿月计划中的明细。
+     * <p>
+     * 返回结果按 factoryCode + materialCode 组织，逐行校验时用于确认 SKU 是否属于定稿月计划，
+     * 同时提供 productStatus 给“SKU 与示方关系”校验使用。
+     * </p>
+     *
+     * @param factoryCode       工厂编码
+     * @param year              业务年份
+     * @param month             业务月份
+     * @param productionVersion 定稿生产版本
+     * @param materialCodes     本次导入涉及的物料编码集合
+     * @return key=factoryCode|materialCode，value=月计划定稿明细
+     */
+    private Map<String, FactoryMonthPlanProductionFinalResult> loadImportMonthPlanMap(String factoryCode,
+                                                                                      int year,
+                                                                                      int month,
+                                                                                      String productionVersion,
+                                                                                      Set<String> materialCodes) {
+        if (CollUtil.isEmpty(materialCodes)) {
+            return Collections.emptyMap();
+        }
+        List<FactoryMonthPlanProductionFinalResult> monthPlanList = monthPlanMapper.selectList(new LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult>()
+                .eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, factoryCode)
+                .eq(FactoryMonthPlanProductionFinalResult::getYear, year)
+                .eq(FactoryMonthPlanProductionFinalResult::getMonth, month)
+                .eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, productionVersion)
+                .in(FactoryMonthPlanProductionFinalResult::getMaterialCode, materialCodes)
+                .eq(FactoryMonthPlanProductionFinalResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        return monthPlanList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
+                .collect(Collectors.toMap(item -> buildMaterialFactoryKey(item.getFactoryCode(), item.getMaterialCode()),
+                        item -> item, (a, b) -> a));
+    }
+
+    /**
+     * 加载本次导入涉及的硫化机台台账。
+     * <p>
+     * 这里只加载存在的机台记录，是否启用在逐行校验中通过 MachineStatusUtil 判断。
+     * </p>
+     *
+     * @param factoryCode  工厂编码
+     * @param machineCodes 本次导入涉及的机台编码集合
+     * @return key=factoryCode|machineCode，value=机台台账
+     */
+    private Map<String, LhMachineInfo> loadImportMachineInfoMap(String factoryCode, Set<String> machineCodes) {
+        if (CollUtil.isEmpty(machineCodes)) {
+            return Collections.emptyMap();
+        }
+        List<LhMachineInfo> machineInfoList = lhMachineInfoMapper.selectList(new LambdaQueryWrapper<LhMachineInfo>()
+                .eq(LhMachineInfo::getFactoryCode, factoryCode)
+                .in(LhMachineInfo::getMachineCode, machineCodes)
+                .eq(LhMachineInfo::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        return machineInfoList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getMachineCode()))
+                .collect(Collectors.toMap(item -> buildMachineFactoryKey(item.getFactoryCode(), item.getMachineCode()),
+                        item -> item, (a, b) -> a));
+    }
+
+    /**
+     * 加载 SKU 与模具号关系。
+     * <p>
+     * 一个 SKU 可能关联多个模具号，所以返回值是 List。逐行校验时会检查该 SKU 的所有关联模具号
+     * 是否均存在于“可用模具集合”中。
+     * </p>
+     *
+     * @param factoryCode   工厂编码
+     * @param materialCodes 本次导入涉及的物料编码集合
+     * @return key=factoryCode|materialCode，value=该 SKU 关联的模具号列表
+     */
+    private Map<String, List<String>> loadImportMaterialMouldRelMap(String factoryCode, Set<String> materialCodes) {
+        if (CollUtil.isEmpty(materialCodes)) {
+            return Collections.emptyMap();
+        }
+        List<MdmSkuMouldRel> mouldRelList = mdmSkuMouldRelMapper.selectList(new LambdaQueryWrapper<MdmSkuMouldRel>()
+                .eq(MdmSkuMouldRel::getFactoryCode, factoryCode)
+                .in(MdmSkuMouldRel::getMaterialCode, materialCodes)
+                .eq(MdmSkuMouldRel::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        return mouldRelList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
+                .filter(item -> StringUtils.isNotBlank(item.getMouldCode()))
+                .collect(Collectors.groupingBy(item -> buildMaterialFactoryKey(item.getFactoryCode(), item.getMaterialCode()),
+                        Collectors.mapping(item -> StringUtils.trim(item.getMouldCode()), Collectors.toList())));
+    }
+
+    /**
+     * 加载本次导入 SKU 关联的可用模具号集合。
+     * <p>
+     * 查询步骤：
+     * 1. 通过 MdmSkuMouldRel 找出本次导入物料编码关联的所有模具号；
+     * 2. 通过 MdmModelInfo 按 factoryCode + mouldCode 查询模具台账；
+     * 3. 只保留 mouldStatus=1 的可用模具。
+     * </p>
+     *
+     * @param factoryCode   工厂编码
+     * @param materialCodes 本次导入涉及的物料编码集合
+     * @return key=factoryCode|mouldCode 的可用模具集合
+     */
+    private Set<String> loadImportAvailableMouldCodeSet(String factoryCode, Set<String> materialCodes) {
+        Map<String, List<String>> materialMouldRelMap = loadImportMaterialMouldRelMap(factoryCode, materialCodes);
+        Set<String> mouldCodes = materialMouldRelMap.values().stream()
+                .flatMap(Collection::stream)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+        if (CollUtil.isEmpty(mouldCodes)) {
+            return Collections.emptySet();
+        }
+        List<MdmModelInfo> mouldInfoList = mdmModelInfoMapper.selectList(new LambdaQueryWrapper<MdmModelInfo>()
+                .eq(MdmModelInfo::getFactoryCode, factoryCode)
+                .in(MdmModelInfo::getMouldCode, mouldCodes)
+                .eq(MdmModelInfo::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        return mouldInfoList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getMouldCode()))
+                .filter(item -> MouldStatusUtil.isEnabled(item.getMouldStatus()))
+                .map(item -> buildMouldFactoryKey(item.getFactoryCode(), item.getMouldCode()))
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 加载存在有效硫化示方号的 SKU+产品状态集合。
+     * <p>
+     * 只有 MdmSkuConstructionRef.lhNo 不为空的记录才视为“硫化示方号存在”。
+     * key 中加入 trialStatus，是为了和月计划 productStatus 一一匹配。
+     * </p>
+     *
+     * @param factoryCode   工厂编码
+     * @param materialCodes 本次导入涉及的物料编码集合
+     * @return key=factoryCode|materialCode|trialStatus 的示方关系集合
+     */
+    private Set<String> loadImportConstructionRefKeySet(String factoryCode, Set<String> materialCodes) {
+        if (CollUtil.isEmpty(materialCodes)) {
+            return Collections.emptySet();
+        }
+        List<MdmSkuConstructionRef> refList = mdmSkuConstructionRefMapper.selectList(new LambdaQueryWrapper<MdmSkuConstructionRef>()
+                .eq(MdmSkuConstructionRef::getFactoryCode, factoryCode)
+                .in(MdmSkuConstructionRef::getMaterialCode, materialCodes)
+                .eq(MdmSkuConstructionRef::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        return refList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
+                .filter(item -> StringUtils.isNotBlank(item.getLhNo()))
+                .map(item -> buildConstructionRefKey(item.getFactoryCode(), item.getMaterialCode(), item.getTrialStatus()))
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 加载已维护有效班产的 SKU 集合。
+     * <p>
+     * MdmSkuLhCapacity.classCapacity 为空或小于等于 0 都视为未维护有效班产。
+     * 这类 SKU 会写入导入失败日志，不进入本次排程结果。
+     * </p>
+     *
+     * @param factoryCode   工厂编码
+     * @param materialCodes 本次导入涉及的物料编码集合
+     * @return key=factoryCode|materialCode 的有效班产 SKU 集合
+     */
+    private Set<String> loadImportClassCapacityMaterialSet(String factoryCode, Set<String> materialCodes) {
+        if (CollUtil.isEmpty(materialCodes)) {
+            return Collections.emptySet();
+        }
+        List<MdmSkuLhCapacity> capacityList = mdmSkuLhCapacityMapper.selectList(new LambdaQueryWrapper<MdmSkuLhCapacity>()
+                .eq(MdmSkuLhCapacity::getFactoryCode, factoryCode)
+                .in(MdmSkuLhCapacity::getMaterialCode, materialCodes)
+                .eq(MdmSkuLhCapacity::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
+        return capacityList.stream()
+                .filter(item -> StringUtils.isNotBlank(item.getMaterialCode()))
+                .filter(item -> Objects.nonNull(item.getClassCapacity()) && item.getClassCapacity() > 0)
+                .map(item -> buildMaterialFactoryKey(item.getFactoryCode(), item.getMaterialCode()))
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 构建物料维度缓存 key。
+     * <p>所有 SKU/物料编码匹配均叠加 factoryCode，避免跨工厂同物料编码误匹配。</p>
+     */
+    private String buildMaterialFactoryKey(String factoryCode, String materialCode) {
+        return StringUtils.trimToEmpty(factoryCode) + "|" + StringUtils.trimToEmpty(materialCode);
+    }
+
+    /**
+     * 构建机台维度缓存 key。
+     * <p>机台编码按工厂隔离，避免不同工厂同机台编码误匹配。</p>
+     */
+    private String buildMachineFactoryKey(String factoryCode, String machineCode) {
+        return StringUtils.trimToEmpty(factoryCode) + "|" + StringUtils.trimToEmpty(machineCode);
+    }
+
+    /**
+     * 构建模具维度缓存 key。
+     * <p>模具号可用性校验必须叠加 factoryCode。</p>
+     */
+    private String buildMouldFactoryKey(String factoryCode, String mouldCode) {
+        return StringUtils.trimToEmpty(factoryCode) + "|" + StringUtils.trimToEmpty(mouldCode);
+    }
+
+    /**
+     * 构建 SKU 与示方关系缓存 key。
+     * <p>匹配口径为 factoryCode + materialCode + trialStatus，其中 trialStatus 来源于月计划 productStatus。</p>
+     */
+    private String buildConstructionRefKey(String factoryCode, String materialCode, String trialStatus) {
+        return buildMaterialFactoryKey(factoryCode, materialCode) + "|" + StringUtils.trimToEmpty(trialStatus);
+    }
+
+    /**
+     * 导入模板业务校验上下文。
+     * <p>
+     * 该对象只在一次 importScheduleTemplate 调用内使用，用于保存整批导入共用的校验结果和主数据缓存。
+     * globalErrors 表示整批导入无法继续的错误；其余 Map/Set 供逐行校验使用。
+     * </p>
+     */
+    private static class ImportScheduleValidationContext {
+        /** 按 26 号切月规则解析得到的月计划业务年份。 */
+        private int year;
+        /** 按 26 号切月规则解析得到的月计划业务月份。 */
+        private int month;
+        /** 当前工厂、业务年月对应的定稿生产版本。 */
+        private MpFactoryProductionVersion finalVersion;
+        /** 整批导入级错误，例如月计划未定稿、硫化工作日历未生成。 */
+        private List<String> globalErrors = new ArrayList<>();
+        /** 定稿月计划明细缓存，key=factoryCode|materialCode。 */
+        private Map<String, FactoryMonthPlanProductionFinalResult> monthPlanMap = new HashMap<>();
+        /** 硫化机台台账缓存，key=factoryCode|machineCode。 */
+        private Map<String, LhMachineInfo> machineInfoMap = new HashMap<>();
+        /** SKU 与模具关系缓存，key=factoryCode|materialCode，value=模具号列表。 */
+        private Map<String, List<String>> materialMouldRelMap = new HashMap<>();
+        /** 可用模具号集合，key=factoryCode|mouldCode。 */
+        private Set<String> availableMouldCodeSet = new HashSet<>();
+        /** 有效硫化示方关系集合，key=factoryCode|materialCode|trialStatus。 */
+        private Set<String> constructionRefKeySet = new HashSet<>();
+        /** 已维护有效班产的 SKU 集合，key=factoryCode|materialCode。 */
+        private Set<String> classCapacityMaterialSet = new HashSet<>();
     }
 
     private List<String> validateImportRow(LhScheduleResultTemplateImportVO row,
@@ -1272,16 +1757,17 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
     private void copyImportRowToEntity(LhScheduleResultTemplateImportVO source, LhScheduleResult target) {
         target.setLhMachineName(source.getLhMachineName());
-        // 遍历class1MouldMethod到class8MouldMethod，取第一个非空值
+        // 模板按 8 个班次分别维护示方类型，导入时取第一个非空的 classXLhType 作为主业务口径。
         String scheduleType = Stream.of(
-                source.getClass1MouldMethod(),
-                source.getClass2MouldMethod(),
-                source.getClass3MouldMethod(),
-                source.getClass4MouldMethod(),
-                source.getClass5MouldMethod(),
-                source.getClass6MouldMethod(),
-                source.getClass7MouldMethod(),
-                source.getClass8MouldMethod()
+                source.getClass1LhType(),
+                source.getClass2LhType(),
+                source.getClass3LhType(),
+                source.getClass4LhType(),
+                source.getClass5LhType(),
+                source.getClass6LhType(),
+                source.getClass7LhType(),
+                source.getClass8LhType(),
+                source.getTrialStatus()
         ).filter(StringUtils::isNotBlank).findFirst().orElse(null);
         target.setProductStatus(scheduleType);
 
@@ -1315,27 +1801,43 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         target.setClass1PlanQty(source.getClass1PlanQty());
         target.setClass1FinishQty(source.getClass1FinishQty());
         target.setClass1Analysis(source.getClass1Analysis());
+        target.setClass1IsEnd(source.getClass1IsEnd());
+        target.setClass1LhType(source.getClass1LhType());
         target.setClass2PlanQty(source.getClass2PlanQty());
         target.setClass2FinishQty(source.getClass2FinishQty());
         target.setClass2Analysis(source.getClass2Analysis());
+        target.setClass2IsEnd(source.getClass2IsEnd());
+        target.setClass2LhType(source.getClass2LhType());
         target.setClass3PlanQty(source.getClass3PlanQty());
         target.setClass3FinishQty(source.getClass3FinishQty());
         target.setClass3Analysis(source.getClass3Analysis());
+        target.setClass3IsEnd(source.getClass3IsEnd());
+        target.setClass3LhType(source.getClass3LhType());
         target.setClass4PlanQty(source.getClass4PlanQty());
         target.setClass4FinishQty(source.getClass4FinishQty());
         target.setClass4Analysis(source.getClass4Analysis());
+        target.setClass4IsEnd(source.getClass4IsEnd());
+        target.setClass4LhType(source.getClass4LhType());
         target.setClass5PlanQty(source.getClass5PlanQty());
         target.setClass5FinishQty(source.getClass5FinishQty());
         target.setClass5Analysis(source.getClass5Analysis());
+        target.setClass5IsEnd(source.getClass5IsEnd());
+        target.setClass5LhType(source.getClass5LhType());
         target.setClass6PlanQty(source.getClass6PlanQty());
         target.setClass6FinishQty(source.getClass6FinishQty());
         target.setClass6Analysis(source.getClass6Analysis());
+        target.setClass6IsEnd(source.getClass6IsEnd());
+        target.setClass6LhType(source.getClass6LhType());
         target.setClass7PlanQty(source.getClass7PlanQty());
         target.setClass7FinishQty(source.getClass7FinishQty());
         target.setClass7Analysis(source.getClass7Analysis());
+        target.setClass7IsEnd(source.getClass7IsEnd());
+        target.setClass7LhType(source.getClass7LhType());
         target.setClass8PlanQty(source.getClass8PlanQty());
         target.setClass8FinishQty(source.getClass8FinishQty());
         target.setClass8Analysis(source.getClass8Analysis());
+        target.setClass8IsEnd(source.getClass8IsEnd());
+        target.setClass8LhType(source.getClass8LhType());
 
         target.setScheduleType(normalizeScheduleTypeCode(source.getScheduleType()));
         if (StringUtils.isNotBlank(source.getIsFirst())) {
@@ -1678,6 +2180,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Map<Long, String> cxMachineCodeMap = buildCxMachineCodeExportMap(list);
         Map<String, Object> todayNightFinishQtyMap = buildTodayNightFinishQtyExportMap(list, scheduleDate);
         Map<String, String> recipeTypeMap = loadLhTrialStatusDictMap();
+        Map<String, String> endTypeMap = loadBizEndTypeDictMap();
 
         // 按硫化物料号排序，同一物料下按机台编码升序
         List<LhScheduleResult> sortedList = list.stream()
@@ -1716,6 +2219,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             row.put("mouldMethod", result.getMouldMethod());
             row.put("structureName", result.getStructureName());
             row.put("totalFinishQty", sumFinishQty(result));
+            row.put("isEnd", buildUnifiedShiftType(result, endTypeMap));
+            row.put("trialStatus", buildUnifiedLhType(result, recipeTypeMap));
 
             // 明细行的 dailyPlanQty 已按需求从 totalDailyPlanQty 改为 dailyPlanQty。
             // totalPlanQty 只是模板“总计”占位符，为了明细行保持同一日计划量展示，
@@ -1739,8 +2244,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                 row.put("class" + shift + "Order", getContinuousShiftOrder(shiftOrderMap, result, shift));
                 row.put("class" + shift + "PlanQty", getClassPlanQty(result, shift));
                 row.put("class" + shift + "FinishQty", getClassFinishQty(result, shift));
-                row.put("class" + shift + "Type", buildShiftType(result, shift));
-                row.put("class" + shift + "MouldMethod", buildShiftMouldMethod(result, shift, recipeTypeMap));
+                Object shiftType = buildShiftType(result, shift, endTypeMap);
+                Object shiftLhType = buildShiftMouldMethod(result, shift, recipeTypeMap);
+                row.put("class" + shift + "IsEnd", shiftType);
+                row.put("class" + shift + "Type", shiftType);
+                row.put("class" + shift + "LhType", shiftLhType);
+                row.put("class" + shift + "MouldMethod", shiftLhType);
                 row.put("class" + shift + "Analysis", getClassAnalysis(result, shift));
                 row.put("class" + shift + "Dot", "");
             }
@@ -2388,7 +2897,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param shift  班次序号
      * @return 班次类型
      */
-    private String buildShiftType(LhScheduleResult result, int shift) {
+    private String buildShiftType(LhScheduleResult result, int shift, Map<String, String> endTypeMap) {
         if (isShiftAfterEnding(result, shift)) {
             return "";
         }
@@ -2399,25 +2908,9 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 对齐前端 curingSchedule/index.vue 的 calcShiftIsEnd：
         // 该列展示 biz_end_type 字典含义，0=正常、1=收尾；空班次和收尾后的班次不展示。
-        int referenceQty = Math.max(defaultZero(result.getMouldSurplusQty()), defaultZero(result.getEmbryoStock()));
-        if (referenceQty <= 0) {
-            return "正常";
-        }
-        int totalPlanQty = 0;
-        for (int index = 1; index <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; index++) {
-            totalPlanQty += defaultZero(getClassPlanQty(result, index));
-        }
-        if (totalPlanQty < referenceQty) {
-            return "正常";
-        }
-        int remaining = referenceQty;
-        for (int index = 1; index <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; index++) {
-            remaining -= defaultZero(getClassPlanQty(result, index));
-            if (remaining <= 0) {
-                return index == shift ? "收尾" : "正常";
-            }
-        }
-        return "正常";
+        // 直接使用排程结果中已落库的 classXIsEnd，避免导出时重新推算导致与页面/导入数据不一致。
+        String isEnd = StringUtils.defaultIfBlank(ShiftFieldUtil.getShiftIsEnd(result, shift), "0");
+        return endTypeMap.getOrDefault(isEnd, isEnd);
     }
 
     /**
@@ -2432,6 +2925,33 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param recipeTypeMap lh_trial_status 字典映射，key=标记值(S/X/T)，value=字典标签
      * @return 当前班次示方类型展示值
      */
+    /**
+     * 构建模板导入行使用的统一收尾类型。
+     * <p>模板首行用于反向导入，收尾类型不再按 8 个班次分别导入，因此导出时也提供统一字段。
+     * 优先取主字段 isEnd；旧数据未写主字段时，回退取第一个有计划量班次的 classXIsEnd。</p>
+     *
+     * @param result 排程结果
+     * @param endTypeMap biz_end_type 字典映射
+     * @return 收尾类型显示值
+     */
+    private String buildUnifiedShiftType(LhScheduleResult result, Map<String, String> endTypeMap) {
+        if (Objects.isNull(result)) {
+            return "";
+        }
+        String isEnd = StringUtils.trimToEmpty(result.getIsEnd());
+        if (StringUtils.isBlank(isEnd)) {
+            for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+                if (defaultZero(getClassPlanQty(result, shift)) <= 0) {
+                    continue;
+                }
+                isEnd = ShiftFieldUtil.getShiftIsEnd(result, shift);
+                break;
+            }
+        }
+        isEnd = StringUtils.defaultIfBlank(isEnd, "0");
+        return endTypeMap.getOrDefault(isEnd, isEnd);
+    }
+
     private Object buildShiftMouldMethod(LhScheduleResult result, int shift, Map<String, String> recipeTypeMap) {
         if (Objects.isNull(result) || isShiftAfterEnding(result, shift)) {
             return "";
@@ -2440,7 +2960,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         if (Objects.isNull(planQty) || planQty <= 0) {
             return "";
         }
-        return buildLhTrialStatusName(result.getConstructionStage(), recipeTypeMap);
+        // 直接使用班次维度的硫化示方类型 classXLhType，避免所有班次共用 constructionStage。
+        String lhType = getClassLhType(result, shift);
+        if (StringUtils.isBlank(lhType)) {
+            return "";
+        }
+        return recipeTypeMap.getOrDefault(lhType, lhType);
     }
 
     /**
@@ -2456,6 +2981,35 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      * @param recipeTypeMap lh_trial_status 字典映射
      * @return 示方类型展示文本
      */
+    /**
+     * 构建模板导入行使用的统一示方类型。
+     * <p>模板首行用于反向导入，示方类型不再按 8 个班次分别导入，因此导出时也提供统一字段。
+     * 优先取第一个有计划量班次的 classXLhType；没有班次值时回退使用 constructionStage。</p>
+     *
+     * @param result 排程结果
+     * @param recipeTypeMap lh_trial_status 字典映射
+     * @return 示方类型显示值
+     */
+    private String buildUnifiedLhType(LhScheduleResult result, Map<String, String> recipeTypeMap) {
+        if (Objects.isNull(result)) {
+            return "";
+        }
+        String lhType = "";
+        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+            if (defaultZero(getClassPlanQty(result, shift)) <= 0) {
+                continue;
+            }
+            lhType = getClassLhType(result, shift);
+            if (StringUtils.isNotBlank(lhType)) {
+                break;
+            }
+        }
+        if (StringUtils.isBlank(lhType)) {
+            return buildLhTrialStatusName(result.getConstructionStage(), recipeTypeMap);
+        }
+        return recipeTypeMap.getOrDefault(lhType, lhType);
+    }
+
     private String buildLhTrialStatusName(String constructionStage, Map<String, String> recipeTypeMap) {
         String dictValue = StringUtils.defaultIfBlank(constructionStage, "00");
         String markFlag = convertConstructionStageToMarkFlag(dictValue);
@@ -2494,6 +3048,58 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
      *
      * @return 标记值→标签映射
      */
+    /**
+     * 获取指定班次的硫化示方类型。
+     *
+     * @param result 排程结果
+     * @param shift 班次序号
+     * @return class1LhType~class8LhType 的字段值
+     */
+    private String getClassLhType(LhScheduleResult result, int shift) {
+        if (Objects.isNull(result)) {
+            return "";
+        }
+        switch (shift) {
+            case 1:
+                return result.getClass1LhType();
+            case 2:
+                return result.getClass2LhType();
+            case 3:
+                return result.getClass3LhType();
+            case 4:
+                return result.getClass4LhType();
+            case 5:
+                return result.getClass5LhType();
+            case 6:
+                return result.getClass6LhType();
+            case 7:
+                return result.getClass7LhType();
+            case 8:
+                return result.getClass8LhType();
+            default:
+                return "";
+        }
+    }
+
+    /**
+     * 加载收尾类型字典（biz_end_type），构建字典值→标签的映射。
+     *
+     * @return 字典值→标签映射
+     */
+    private Map<String, String> loadBizEndTypeDictMap() {
+        List<SysDictData> dictList = sysDictDataCacheService.getType("biz_end_type");
+        if (dictList == null || dictList.isEmpty()) {
+            Map<String, String> defaultMap = new HashMap<>(4);
+            defaultMap.put("0", "正常");
+            defaultMap.put("1", "收尾");
+            return defaultMap;
+        }
+        return dictList.stream()
+                .filter(d -> StringUtils.isNotEmpty(d.getDictValue()))
+                .collect(Collectors.toMap(SysDictData::getDictValue, SysDictData::getDictLabel,
+                        (a, b) -> a, LinkedHashMap::new));
+    }
+
     private Map<String, String> loadLhTrialStatusDictMap() {
         List<SysDictData> dictList = sysDictDataCacheService.getType("lh_trial_status");
         if (dictList == null || dictList.isEmpty()) {
