@@ -80,7 +80,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="getAdjustVersionList" resultType="com.zlt.aps.mp.api.domain.entity.MpAdjustResult">
         SELECT
         r.FACTORY_CODE,
-        r.MONTH_PLAN_VERSION,
         r.PRODUCTION_VERSION,
         r.VERSION,
         r.ADJUST_TYPE,
@@ -101,7 +100,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="updateBy != null and updateBy != ''">AND r.UPDATE_BY = #{updateBy}</if>
         GROUP BY
         r.FACTORY_CODE,
-        r.MONTH_PLAN_VERSION,
         r.PRODUCTION_VERSION,
         r.VERSION,
         r.ADJUST_TYPE,
