@@ -113,6 +113,13 @@ export async function loadLanguageAsync(lang) {
 
 
     // }
+     if (process.env.NODE_ENV === "development") {
+      i18n.setLocaleMessage(langKey[lang], {
+        ...messages[lang]
+      })
+      setI18nLanguage(langKey[lang])
+
+    }else{
       let data = getLanguage(lang);
       console.log(data)
       if (data == false) {
@@ -137,6 +144,7 @@ export async function loadLanguageAsync(lang) {
       setI18nLanguage(langKey[lang])
 
       return true
+    }
 
 
   }
