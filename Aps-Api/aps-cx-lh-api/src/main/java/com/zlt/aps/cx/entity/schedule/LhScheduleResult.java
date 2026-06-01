@@ -174,6 +174,54 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     private Date specEndTime;
 
     /**
+     * 保养开始时间
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.maintenanceStartTime")
+    @ApiModelProperty(value = "保养开始时间", name = "maintenanceStartTime")
+    @TableField(value = "MAINTENANCE_START_TIME")
+    private Date maintenanceStartTime;
+
+    /**
+     * 保养结束时间
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.maintenanceEndTime")
+    @ApiModelProperty(value = "保养结束时间", name = "maintenanceEndTime")
+    @TableField(value = "MAINTENANCE_END_TIME")
+    private Date maintenanceEndTime;
+
+    /**
+     * 设备停机开始时间
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.shutdownStartTime")
+    @ApiModelProperty(value = "设备停机开始时间", name = "shutdownStartTime")
+    @TableField(value = "SHUTDOWN_START_TIME")
+    private Date shutdownStartTime;
+
+    /**
+     * 设备停机结束时间
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.shutdownEndTime")
+    @ApiModelProperty(value = "设备停机结束时间", name = "shutdownEndTime")
+    @TableField(value = "SHUTDOWN_END_TIME")
+    private Date shutdownEndTime;
+
+    /**
+     * 清洗开始时间
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.cleaningStartTime")
+    @ApiModelProperty(value = "清洗开始时间", name = "cleaningStartTime")
+    @TableField(value = "CLEANING_START_TIME")
+    private Date cleaningStartTime;
+
+    /**
+     * 清洗结束时间
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.cleaningEndTime")
+    @ApiModelProperty(value = "清洗结束时间", name = "cleaningEndTime")
+    @TableField(value = "CLEANING_END_TIME")
+    private Date cleaningEndTime;
+
+    /**
      * 生产状态:0-未生产；1-生产中；2-生产完成
      */
     @Excel(name = "ui.data.column.lhScheduleResult.productionStatus")
@@ -517,6 +565,72 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     @TableField(value = "CLASS8_FINISH_QTY")
     private Integer class8FinishQty;
 
+
+    /**
+     * 1班是否收尾 0-正常 1-收尾。S4.6 按同 SKU 多机台、SKU 收尾和机台收尾规则统一回填。
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.class1IsEnd")
+    @ApiModelProperty(value = "1班是否收尾 0-正常 1-收尾", name = "class1IsEnd")
+    @TableField(value = "CLASS1_IS_END")
+    private String class1IsEnd;
+
+    /**
+     * 2班是否收尾 0-正常 1-收尾
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.class2IsEnd")
+    @ApiModelProperty(value = "2班是否收尾 0-正常 1-收尾", name = "class2IsEnd")
+    @TableField(value = "CLASS2_IS_END")
+    private String class2IsEnd;
+
+    /**
+     * 3班是否收尾 0-正常 1-收尾
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.class3IsEnd")
+    @ApiModelProperty(value = "3班是否收尾 0-正常 1-收尾", name = "class3IsEnd")
+    @TableField(value = "CLASS3_IS_END")
+    private String class3IsEnd;
+
+    /**
+     * 4班是否收尾 0-正常 1-收尾
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.class4IsEnd")
+    @ApiModelProperty(value = "4班是否收尾 0-正常 1-收尾", name = "class4IsEnd")
+    @TableField(value = "CLASS4_IS_END")
+    private String class4IsEnd;
+
+    /**
+     * 5班是否收尾 0-正常 1-收尾
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.class5IsEnd")
+    @ApiModelProperty(value = "5班是否收尾 0-正常 1-收尾", name = "class5IsEnd")
+    @TableField(value = "CLASS5_IS_END")
+    private String class5IsEnd;
+
+    /**
+     * 6班是否收尾 0-正常 1-收尾
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.class6IsEnd")
+    @ApiModelProperty(value = "6班是否收尾 0-正常 1-收尾", name = "class6IsEnd")
+    @TableField(value = "CLASS6_IS_END")
+    private String class6IsEnd;
+
+    /**
+     * 7班是否收尾 0-正常 1-收尾
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.class7IsEnd")
+    @ApiModelProperty(value = "7班是否收尾 0-正常 1-收尾", name = "class7IsEnd")
+    @TableField(value = "CLASS7_IS_END")
+    private String class7IsEnd;
+
+    /**
+     * 8班是否收尾 0-正常 1-收尾
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.class8IsEnd")
+    @ApiModelProperty(value = "8班是否收尾 0-正常 1-收尾", name = "class8IsEnd")
+    @TableField(value = "CLASS8_IS_END")
+    private String class8IsEnd;
+
+
     /**
      * 是否交期，0--否，1--是
      */
@@ -591,20 +705,20 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     private String mouldMethod;
 
     /**
-     * 示方类型（字典 lh_trial_status：S-正规示方，T-量试示方，X-试验示方）
+     * 施工阶段 00 无工艺 01 试制 02 量试 03 正式
      */
-    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", dictType = "lh_trial_status")
-    @ApiModelProperty(value = "施工阶段 S-正规示方 T-量试示方 X-试验示方", name = "constructionStage")
+    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "施工阶段 00 无工艺 01 试制 02 量试 03 正式", name = "constructionStage")
     @TableField(value = "CONSTRUCTION_STAGE")
     private String constructionStage;
 
     /**
-     * 示方类型（字典 lh_trial_status：S-正规示方，T-量试示方，X-试验示方）
+     * 产品状态
      */
-    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", dictType = "lh_trial_status")
-    @ApiModelProperty(value = "示方类型", name = "trialStatus")
-    @TableField(value = "TRIAL_STATUS")
-    private String trialStatus;
+//    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage", dictType = "biz_construction_stage")
+    @ApiModelProperty(value = "产品状态 X 试验示方 T 量试示方 S 正规示方", name = "changedTrialStatus")
+    @TableField(value = "CHANGED_TRIAL_STATUS")
+    private String changedTrialStatus;
 
     /**
      * 制造示方书号
@@ -769,6 +883,127 @@ public class LhScheduleResult extends BaseEntity implements Serializable {
     @TableField(value = "IS_TYPE_BLOCK")
     private String isTypeBlock;
 
+
+    /**
+     * 产品状态（来自月计划）
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.productStatus", dictType = "lh_trial_status")
+    @ApiModelProperty(value = "产品状态", name = "productStatus")
+    @TableField(value = "PRODUCT_STATUS")
+    private String productStatus;
+
+
+    /**
+     * 1班硫化示方书号
+     */
+    @ApiModelProperty(value = "1班硫化示方书号", name = "class1LhNo")
+    @TableField(value = "CLASS1_LH_NO")
+    private String class1LhNo;
+
+    /**
+     * 1班硫化示方书类型
+     */
+    @ApiModelProperty(value = "1班硫化示方书类型", name = "class1LhType")
+    @TableField(value = "CLASS1_LH_TYPE")
+    private String class1LhType;
+
+    /**
+     * 2班硫化示方书号
+     */
+    @ApiModelProperty(value = "2班硫化示方书号", name = "class2LhNo")
+    @TableField(value = "CLASS2_LH_NO")
+    private String class2LhNo;
+
+    /**
+     * 2班硫化示方书类型
+     */
+    @ApiModelProperty(value = "2班硫化示方书类型", name = "class2LhType")
+    @TableField(value = "CLASS2_LH_TYPE")
+    private String class2LhType;
+
+    /**
+     * 3班硫化示方书号
+     */
+    @ApiModelProperty(value = "3班硫化示方书号", name = "class3LhNo")
+    @TableField(value = "CLASS3_LH_NO")
+    private String class3LhNo;
+
+    /**
+     * 3班硫化示方书类型
+     */
+    @ApiModelProperty(value = "3班硫化示方书类型", name = "class3LhType")
+    @TableField(value = "CLASS3_LH_TYPE")
+    private String class3LhType;
+
+    /**
+     * 4班硫化示方书号
+     */
+    @ApiModelProperty(value = "4班硫化示方书号", name = "class4LhNo")
+    @TableField(value = "CLASS4_LH_NO")
+    private String class4LhNo;
+
+    /**
+     * 4班硫化示方书类型
+     */
+    @ApiModelProperty(value = "4班硫化示方书类型", name = "class4LhType")
+    @TableField(value = "CLASS4_LH_TYPE")
+    private String class4LhType;
+
+    /**
+     * 5班硫化示方书号
+     */
+    @ApiModelProperty(value = "5班硫化示方书号", name = "class5LhNo")
+    @TableField(value = "CLASS5_LH_NO")
+    private String class5LhNo;
+
+    /**
+     * 5班硫化示方书类型
+     */
+    @ApiModelProperty(value = "5班硫化示方书类型", name = "class5LhType")
+    @TableField(value = "CLASS5_LH_TYPE")
+    private String class5LhType;
+
+    /**
+     * 6班硫化示方书号
+     */
+    @ApiModelProperty(value = "6班硫化示方书号", name = "class6LhNo")
+    @TableField(value = "CLASS6_LH_NO")
+    private String class6LhNo;
+
+    /**
+     * 6班硫化示方书类型
+     */
+    @ApiModelProperty(value = "6班硫化示方书类型", name = "class6LhType")
+    @TableField(value = "CLASS6_LH_TYPE")
+    private String class6LhType;
+
+    /**
+     * 7班硫化示方书号
+     */
+    @ApiModelProperty(value = "7班硫化示方书号", name = "class7LhNo")
+    @TableField(value = "CLASS7_LH_NO")
+    private String class7LhNo;
+
+    /**
+     * 7班硫化示方书类型
+     */
+    @ApiModelProperty(value = "7班硫化示方书类型", name = "class7LhType")
+    @TableField(value = "CLASS7_LH_TYPE")
+    private String class7LhType;
+
+    /**
+     * 8班硫化示方书号
+     */
+    @ApiModelProperty(value = "8班硫化示方书号", name = "class8LhNo")
+    @TableField(value = "CLASS8_LH_NO")
+    private String class8LhNo;
+
+    /**
+     * 8班硫化示方书类型
+     */
+    @ApiModelProperty(value = "8班硫化示方书类型", name = "class8LhType")
+    @TableField(value = "CLASS8_LH_TYPE")
+    private String class8LhType;
 
     /**
      * 删除标识（0未删除；1已删除）
