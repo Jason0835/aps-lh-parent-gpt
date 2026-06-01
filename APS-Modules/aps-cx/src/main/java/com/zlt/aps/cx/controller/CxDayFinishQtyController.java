@@ -6,6 +6,9 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cx.api.domain.entity.CxDayFinishQty;
+import com.zlt.aps.cx.entity.config.CxKeyProduct;
+import com.zlt.aps.cx.mapper.CxDayFinishQtyMapper;
+import com.zlt.aps.cx.mapper.CxKeyProductMapper;
 import com.zlt.aps.cx.service.ICxDayFinishQtyService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -16,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
@@ -34,6 +38,9 @@ public class CxDayFinishQtyController extends AbstractDocBizController<CxDayFini
 
     @Autowired
     private ICxDayFinishQtyService cxDayFinishQtyService;
+
+    @Resource
+    private CxDayFinishQtyMapper cxDayFinishQtyMapper;
 
     /**
      * 查询成型排程日完成量列表
@@ -79,6 +86,13 @@ public class CxDayFinishQtyController extends AbstractDocBizController<CxDayFini
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("exampleType")), "EXAMPLE_TYPE", queryVO.getFieldValueByFieldName("exampleType"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("bomDataVersion")), "BOM_DATA_VERSION", queryVO.getFieldValueByFieldName("bomDataVersion"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("dataVersion")), "DATA_VERSION", queryVO.getFieldValueByFieldName("dataVersion"));
+    }
+
+    @Override
+    protected List<CxDayFinishQty> listExportData(CxDayFinishQty obj) {
+        QueryWrapper<CxDayFinishQty> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return cxDayFinishQtyMapper.selectList(wrapper);
     }
 
     @Override
