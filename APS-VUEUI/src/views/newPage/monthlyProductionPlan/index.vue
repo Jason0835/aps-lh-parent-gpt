@@ -5,6 +5,7 @@
       tableRef="MonthPlanFinalAdjustQueryTable"
       :calcHeight="88"
       v-loading="loading"
+      :element-loading-text="loadText"
       :columns="columns"
       :searchColumns="searchColumns"
       :data="data"
@@ -335,6 +336,7 @@ export default {
   data() {
     return {
       loading: false,
+      loadText: "正在加载中...",
       data: [],
       page: {
         current: 1,
@@ -2144,6 +2146,7 @@ export default {
     },
     /** 获取调整订单：与 structureInnerAdjust 页 adjustOrder 一致 */
     async handleGetAdjustOrder() {
+      this.loadText = this.$t("正在获取订单中");
       this.getAdjustOrderLoading = true;
       this.loading = true;
       try {
@@ -2166,6 +2169,7 @@ export default {
       } finally {
         this.getAdjustOrderLoading = false;
         this.loading = false;
+        this.loadText = "正在加载中...";
       }
     },
     /**
