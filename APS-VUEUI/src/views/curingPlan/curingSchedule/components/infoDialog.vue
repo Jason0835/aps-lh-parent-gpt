@@ -710,36 +710,6 @@ export default {
         this.dateList = empty;
       }
     },
-    calcShiftIsEndFields(data) {
-      const referenceQty = Math.max(data.mouldSurplusQty || 0, data.embryoStock || 0);
-      for (let i = 1; i <= 8; i++) {
-        const planQty = data['class' + i + 'PlanQty'];
-        if (planQty == null || planQty <= 0 || referenceQty <= 0) {
-          this.$set(this.form, 'class' + i + 'IsEnd', '0');
-          continue;
-        }
-        let totalPlanQty = 0;
-        for (let j = 1; j <= 8; j++) {
-          totalPlanQty += (data['class' + j + 'PlanQty'] || 0);
-        }
-        if (totalPlanQty < referenceQty) {
-          this.$set(this.form, 'class' + i + 'IsEnd', '0');
-          continue;
-        }
-        let remaining = referenceQty;
-        let isEndShift = false;
-        for (let j = 1; j <= 8; j++) {
-          remaining -= (data['class' + j + 'PlanQty'] || 0);
-          if (remaining <= 0) {
-            if (j === i) {
-              isEndShift = true;
-            }
-            break;
-          }
-        }
-        this.$set(this.form, 'class' + i + 'IsEnd', isEndShift ? '1' : '0');
-      }
-    },
     encodeRemark(remark) {
       if (!remark) return remark;
       return remark
@@ -828,7 +798,6 @@ export default {
           class7FinishQty: data.class7FinishQty == null ? 0 : data.class7FinishQty,
           class8FinishQty: data.class8FinishQty == null ? 0 : data.class8FinishQty,
         };
-        this.calcShiftIsEndFields(data);
         this.fetchScheduleShiftDates(data.scheduleDate);
 
         if (data.scheduleDate) {

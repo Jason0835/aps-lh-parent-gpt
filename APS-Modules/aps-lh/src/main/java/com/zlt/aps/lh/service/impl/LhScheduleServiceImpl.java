@@ -736,16 +736,15 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
 
         // 节点6：排产小结数据位于模板第 3 个 sheet（下标 2），
         // 复用 ScheduleSummaryReportService 的数据构建逻辑，将排产小结作为第三个sheet写入。
-        //todo 森财这个需要修改下引用类问题
-//        String factoryCode = StringUtils.defaultString(result.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
-//        Map<String, Object> summaryExportData = scheduleSummaryReportService.buildScheduleSummaryExportData(result.getScheduleDate(), factoryCode);
-//        @SuppressWarnings("unchecked")
-//        Map<String, Object> summaryTableMap = (Map<String, Object>) summaryExportData.get("tableMap");
-//        @SuppressWarnings("unchecked")
-//        List<List<Map<String, Object>>> summaryDataList = (List<List<Map<String, Object>>>) summaryExportData.get("dataList");
-//
-//        inputStream = new ByteArrayInputStream(exportBytes);
-//        exportBytes = ExcelUtils.writeMultiList(inputStream, 2, summaryTableMap, summaryDataList);
+        String factoryCode = StringUtils.defaultString(result.getFactoryCode(), FactoryConstant.DEFAULT_FACTORY_CODE);
+        Map<String, Object> summaryExportData = scheduleSummaryReportService.buildScheduleSummaryExportData(result.getScheduleDate(), factoryCode);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> summaryTableMap = (Map<String, Object>) summaryExportData.get("tableMap");
+        @SuppressWarnings("unchecked")
+        List<List<Map<String, Object>>> summaryDataList = (List<List<Map<String, Object>>>) summaryExportData.get("dataList");
+
+        inputStream = new ByteArrayInputStream(exportBytes);
+        exportBytes = ExcelUtils.writeMultiList(inputStream, 2, summaryTableMap, summaryDataList);
 
         return fillExportSummaryFormulas(exportBytes, exportDataList.size(), placeholderMap);
     }

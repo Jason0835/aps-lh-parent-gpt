@@ -31,6 +31,10 @@ public class CxScheduleResult extends BaseEntity {
     @TableId(value = "ID", type = IdType.AUTO)
     private Long id;
 
+    @ApiModelProperty(value = "分厂编码")
+    @TableField("FACTORY_CODE")
+    private String factoryCode;
+
     @ApiModelProperty(value = "成型批次号")
     @TableField("CX_BATCH_NO")
     private String cxBatchNo;
@@ -79,6 +83,14 @@ public class CxScheduleResult extends BaseEntity {
     @ApiModelProperty(value = "硫化机使用总模数")
     @TableField("LH_MACHINE_QTY")
     private BigDecimal lhMachineQty;
+
+    @ApiModelProperty(value = "物料编号")
+    @TableField("MATERIAL_CODE")
+    private String materialCode;
+
+    @ApiModelProperty(value = "物料描述")
+    @TableField("MATERIAL_DESC")
+    private String materialDesc;
 
     @ApiModelProperty(value = "外胎代码")
     @TableField("SAP_CODE")

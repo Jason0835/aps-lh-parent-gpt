@@ -47,6 +47,7 @@ import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -167,19 +168,19 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     }
 
     @Override
-    public List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> getCxLhScheduleResultList(Date scheduleDate) {
-        LambdaQueryWrapper<com.zlt.aps.cx.entity.schedule.LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getScheduleDate, scheduleDate);
+    public List<LhScheduleResult> getCxLhScheduleResultList(Date scheduleDate) {
+        LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhScheduleResult::getScheduleDate, scheduleDate);
         return cxLhScheduleResultMapper.selectList(wrapper);
     }
 
     @Override
-    public List<com.zlt.aps.cx.entity.schedule.LhScheduleResult> getCxLhScheduleResultListByIds(List<Long> ids) {
+    public List<LhScheduleResult> getCxLhScheduleResultListByIds(List<Long> ids) {
         if (CollectionUtils.isEmpty(ids)) {
             return new ArrayList<>();
         }
-        LambdaQueryWrapper<com.zlt.aps.cx.entity.schedule.LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(com.zlt.aps.cx.entity.schedule.LhScheduleResult::getId, ids);
+        LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(LhScheduleResult::getId, ids);
         return cxLhScheduleResultMapper.selectList(wrapper);
     }
 
@@ -214,6 +215,14 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         String orderNo = generateInsertOrderNo(dto.getScheduleDate());
 
         LhScheduleResult result = buildInsertOrderResult(dto, batchNo, orderNo, validateResult);
+
+        // 调用fillScheduleResultFields补全月计划总量、施工阶段、使用模数、
+        // 硫化时间、精确硫化余量、规格描述、示方书号等字段
+        fillScheduleResultFields(Collections.singletonList(result), dto.getScheduleDate());
+
+        // fillScheduleResultFields会将dataSource设为"2"（导入），插单场景需修正为"1"
+        result.setDataSource("1");
+
         mapper.insert(result);
 
         generateInsertMouldChangePlan(dto, batchNo, beforeMaterialCode, beforeMaterialDesc);
