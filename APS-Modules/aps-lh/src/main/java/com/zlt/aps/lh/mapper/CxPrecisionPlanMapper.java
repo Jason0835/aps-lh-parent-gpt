@@ -1,7 +1,7 @@
 package com.zlt.aps.lh.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
+import com.zlt.aps.cx.entity.schedule.CxPrecisionPlan;
 import org.apache.ibatis.annotations.Mapper;
 
 /**

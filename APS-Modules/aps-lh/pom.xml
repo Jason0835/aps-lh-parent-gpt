@@ -56,7 +56,7 @@
             <artifactId>aps-lh-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>
         </dependency>
-        <!-- 成型硫化API模块（包含8班数据的LhScheduleResult实体） -->
+        <!-- 成型硫化API模块（包含8班数据的LhScheduleResult实体，以及CxScheduleResult/CxPrecisionPlan/CxStock/CxParamConfig等成型实体） -->
         <dependency>
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-cx-lh-api</artifactId>
