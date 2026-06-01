@@ -176,7 +176,7 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
 
     /**
      * 更新或插入数据（存在则更新，不存在则插入）
-     * 中间表MES_LH_SCHEDULE_RESULT建在jy_aps_mid主库，Mapper已通过@DS(DataSource.MASTER)指定数据源
+     * 中间表MES_LH_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
      */
     private void upsertLhScheduleResult(List<MesLhScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
@@ -196,7 +196,7 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
      * T-2日（窗口首日）更新或插入数据
      * 仅更新早中班（class2、class3），不覆盖夜班（class1）数据
      * T-2日无夜班排产数据，避免将MES已有的夜班数据覆盖为空
-     * 中间表MES_LH_SCHEDULE_RESULT建在jy_aps_mid主库，Mapper已通过@DS(DataSource.MASTER)指定数据源
+     * 中间表MES_LH_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
      */
     private void upsertDay1LhScheduleResult(List<MesLhScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
@@ -214,7 +214,7 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
 
     /**
      * 插入数据（先删除指定日期的旧数据，再插入新数据）
-     * 中间表MES_LH_SCHEDULE_RESULT建在jy_aps_mid主库，Mapper已通过@DS(DataSource.MASTER)指定数据源
+     * 中间表MES_LH_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
      */
     private void insertLhScheduleResult(List<MesLhScheduleResult> mesList, LocalDate scheduleDate, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {

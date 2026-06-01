@@ -14,12 +14,12 @@ import java.util.List;
  * @author APS Team
  * @since 2.0.0
  */
-@DS(DataSource.MASTER)
+@DS(DataSource.MES)
 @Mapper
 public interface CxScheduleResultIssueMapper {
 
     /**
-     * 批量新增成型排程结果到中间表
+     * 批量新增成型排程结果到MES中间表
      *
      * @param list 数据列表
      * @return 影响行数

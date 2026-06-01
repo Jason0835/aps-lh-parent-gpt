@@ -114,7 +114,7 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
 
     /**
      * 更新或插入数据（存在则更新，不存在则插入）
-     * 中间表MES_CX_SCHEDULE_RESULT建在jy_aps_mid主库，Mapper已通过@DS(DataSource.MASTER)指定数据源
+     * 中间表MES_CX_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
      */
     private void upsertCxScheduleResult(List<MesCxScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
@@ -130,7 +130,7 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
 
     /**
      * 插入数据（先删除指定日期的旧数据，再插入新数据）
-     * 中间表MES_CX_SCHEDULE_RESULT建在jy_aps_mid主库，Mapper已通过@DS(DataSource.MASTER)指定数据源
+     * 中间表MES_CX_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
      */
     private void insertCxScheduleResult(List<MesCxScheduleResult> mesList, LocalDate scheduleDate, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {

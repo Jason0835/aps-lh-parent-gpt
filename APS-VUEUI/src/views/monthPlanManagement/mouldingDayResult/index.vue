@@ -236,7 +236,7 @@ export default {
           width: 120,
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
           prop: "constructionStage",
           formatter: (row, column, value) => {
             return this.selectDictLabel(

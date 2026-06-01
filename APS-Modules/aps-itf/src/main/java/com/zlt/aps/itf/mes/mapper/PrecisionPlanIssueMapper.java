@@ -10,12 +10,12 @@ import java.util.List;
 
 /**
  * 精度计划下发Mapper接口
- * 写入APS中间表MES_PRECISION_PLAN，通知MES来获取精度计划排程数据
+ * 写入MES中间表MES_PRECISION_PLAN（建在MES分库），通知MES来获取精度计划排程数据
  * 成型精度和硫化精度统一使用此表，通过PRECISION_TYPE区分
  *
  * @author APS Team
  */
-@DS(DataSource.MASTER)
+@DS(DataSource.MES)
 @Mapper
 public interface PrecisionPlanIssueMapper {
 

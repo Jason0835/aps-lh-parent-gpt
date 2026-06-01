@@ -115,7 +115,7 @@ export default {
           prop: "mainMaterialDesc",
         },
         {
-          label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
           prop: "scheduleType",
           minWidth: 100,
           formatter: (row, column, value) => {
