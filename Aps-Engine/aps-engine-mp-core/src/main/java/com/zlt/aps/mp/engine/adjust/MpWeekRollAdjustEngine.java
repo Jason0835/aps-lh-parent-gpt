@@ -904,6 +904,7 @@ public class MpWeekRollAdjustEngine {
             deductScheduleQtyByDay(contextDTO, mpFinalVo);
             //4.重置开始日\结束日\汇总值
             resetBegin2EndDay2TotalQty(contextDTO.getStructureStartDay(),contextDTO.getStructureDeadLine(),mpFinalVo);
+            mpFinalVo.setAdjustDetailId(String.valueOf(deductAdjust.getId()));
         }
     }
 
@@ -1518,7 +1519,7 @@ public class MpWeekRollAdjustEngine {
         }
 
         mpFinalVo.setHasSpecialMaterial(adjustStructInVo.getHasSpecialMaterial());
-
+        mpFinalVo.setAdjustDetailId(String.valueOf(adjustStructInVo.getId()));
         contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,新上机日:%s,原开始日:%s", contextDTO.getStructureName(), mpFinalVo.getMaterialCode(),newOnLineDay,mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
         if(mpFinalVo.getBeginDay() < lockNextDay && !hasPlanByDay(mpFinalVo, lockNextDay -1)){
             // 开始日 < 锁定日 且 锁定前日没有值,则退出
@@ -1786,6 +1787,7 @@ public class MpWeekRollAdjustEngine {
             return;
         }
         mpFinalVo.setHasSpecialMaterial(adjustStructOutVo.getHasSpecialMaterial());
+        mpFinalVo.setAdjustDetailId(String.valueOf(adjustStructOutVo.getId()));
         contextDTO.getLogDetail().append(String.format("结构:%s,【在机SKU增量】,物料编码:%s,新上机日:%s,原开始日:%s", contextDTO.getStructureName(), mpFinalVo.getMaterialCode(),newOnLineDay,mpFinalVo.getBeginDay())).append(ApsConstant.DIVISION);
         if(mpFinalVo.getBeginDay() < lockNextDay && !hasPlanByDay(mpFinalVo,lockNextDay -1)){
             // 开始日 < 锁定日 且 锁定前日没有值,继续
