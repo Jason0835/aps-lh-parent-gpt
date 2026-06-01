@@ -12,7 +12,6 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
@@ -476,8 +475,12 @@ public class SalesOrderPoolServiceImpl extends AbstractDocService<SalesOrderPool
                 SalesOrderPool oldPool = CollectionUtils.firstElement(scmDetailMap.get(pool.getScmDetailId()));
                 if (oldPool != null) {
                     // 如果(SCM行ID)存在，则订单类型 = 旧订单类型，供应链优先级 = 旧供应链优先级；同时，更新订单其他字段数据；
-                    pool.setOrderPriority(oldPool.getOrderPriority());
-                    pool.setScmPriority(oldPool.getScmPriority());
+                    if (StringUtils.isNotBlank(oldPool.getOrderPriority())) {
+                        pool.setOrderPriority(oldPool.getOrderPriority());
+                    }
+                    if (StringUtils.isNotBlank(oldPool.getScmPriority())) {
+                        pool.setScmPriority(oldPool.getScmPriority());
+                    }
                 } else {
                     // 如果(SCM行ID)不存在，则订单类型=抓取数据的订单类型；供应链优先级 = 中优先级；
                     pool.setScmPriority(ApsConstant.SAL_PRIORITY_MID);
