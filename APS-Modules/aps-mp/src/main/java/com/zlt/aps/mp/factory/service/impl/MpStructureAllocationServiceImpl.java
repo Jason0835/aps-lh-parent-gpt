@@ -45,17 +45,21 @@ import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.AdjustsCxMachineVo;
 import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanFinalAdjustVo;
+import com.zlt.aps.mp.api.domain.vo.MoldCavityInsertMaxValueCalculatorVo;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.api.enums.AlternativeTypeEnum;
 import com.zlt.aps.mp.api.enums.WeekAdjustTypeEnum;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanEntityMapper;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.engine.capacity.MpAdjustDailyCapacityLimit;
+import com.zlt.aps.mp.engine.constant.ProductionConstant;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.mp.engine.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.mp.engine.handler.GroupProductionConversionHandler;
 import com.zlt.aps.mp.engine.handler.LhMachineInfoCalculateHelper;
+import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductMouldMapper;
 import com.zlt.aps.mp.engine.mapper.FactoryMouldingDayResultMapper;
+import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.mp.enums.StructureAllocationExportDataTypeEnum;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportChangeCountVo;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportStatisticsVo;
@@ -84,6 +88,8 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StopWatch;
 
 import java.io.InputStream;
+import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
@@ -140,6 +146,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     private final MpTrialPlanEntityMapper mpTrialPlanEntityMapper;
     private final MdmMaterialInfoEntityMapper mdmMaterialInfoEntityMapper;
     private final MpAdjustResultEntityMapper mpAdjustResultEntityMapper;
+    private final FactoryMonthPlanProductMouldMapper factoryMonthPlanProductMouldMapper;
     private final DataManager dataManager;
     private final IRawSpecialMaterialRecordService rawSpecialMaterialRecordService;
     private final Map<Long, Map<String, String>> importMachineMapCache = new ConcurrentHashMap<>();
@@ -2472,9 +2479,13 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         Integer year = firstResult.getYear();
         Integer month = firstResult.getMonth();
         Integer yearMonth = Convert.toInt(String.format("%s%02d", year, month));
+        MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
+        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
         
         // 错误提醒
-        String notDayVulcanizationQtyStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.dayVulcanizationQty");
+        String notDayVulcanizationQtyStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.dayVulcanizationQty"); // 没有维护日硫化量
+        String notMaterialStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.notMaterial"); // 物料不存在
+        String notSkuMoldRelStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.notSkuMoldRel"); // SKU与模具关系不存在
         
         // 加载需求计划
         QueryWrapper<DpDemandPlan> dpDemandPlanQueryWrapper = new QueryWrapper<>();
@@ -2491,7 +2502,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         Map<String, DpDemandPlan> dpDemandPlanMap = dpDemandPlanEntityMapper.selectList(dpDemandPlanQueryWrapper)
                 .stream().collect(Collectors.toMap(DpDemandPlan::getMaterialCode, Function.identity()));
         
-        // 加载sku与施工关系
+        // 1、加载必要的基础数据
+        // 1.1、加载sku与施工关系
         LambdaQueryWrapper<MdmSkuConstructionRef> skuConstructionRefQueryWrapper = new LambdaQueryWrapper<>();
         skuConstructionRefQueryWrapper.eq(MdmSkuConstructionRef::getFactoryCode, factoryCode);
         Map<String, Map<String, List<MdmSkuConstructionRef>>> constructionInfoMap = mdmSkuConstructionRefEntityMapper
@@ -2499,8 +2511,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 .collect(Collectors.groupingBy(MdmSkuConstructionRef::getMaterialCode,
                         Collectors.collectingAndThen(Collectors.toList(), list -> list.stream().collect(
                                 Collectors.groupingBy(i -> this.transferTrialStatusToStage(i.getTrialStatus()))))));
-
-        // 日硫化量获取
+        // 1.2、日硫化量获取
         DayVulcanizationModeEnum mode = null;
         FactoryParam dayVulcanizationParam = CollectionUtils.firstElement(factoryParamService.getFactoryParamByCondition(factoryCode, productTypeCode, Collections.singletonList(MonthPlanEnums.DAY_VULCANIZATION_MODE.getCode())));
         if (dayVulcanizationParam != null) {
@@ -2514,8 +2525,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         Map<String, MdmSkuLhCapacity> productLhCapacityMap = mdmSkuLhCapacityEntityMapper
                 .selectList(skuLhCapacityQueryWrapper).stream().collect(Collectors
                         .toMap(MdmSkuLhCapacity::getMaterialCode, Function.identity(), (m1, m2) -> m1));
-        
-        // 加载型腔活块数
+        // 1.3、加载型腔活块数
         Map<String, Integer> cavityResults = new HashMap<>(0); // 型腔可用量（按结构+主花纹分组）
         Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
         List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
@@ -2525,8 +2535,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             cavityResults = moldResult.get(0).getCavityResults();
             insertResults = moldResult.get(0).getInsertResults();
         }
-        
-        // 加载试产试制规格
+        // 1.4、加载试产试制规格
         LambdaQueryWrapper<MpTrialPlan> mpTrialPlanQueryWrapper = new LambdaQueryWrapper<>();
         mpTrialPlanQueryWrapper.eq(MpTrialPlan::getFactoryCode, factoryCode);
         mpTrialPlanQueryWrapper.eq(MpTrialPlan::getYear, year);
@@ -2534,37 +2543,29 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         mpTrialPlanQueryWrapper.isNull(MpTrialPlan::getProductionDate);
         Map<String, MpTrialPlan> trialPlanMap = mpTrialPlanEntityMapper.selectList(mpTrialPlanQueryWrapper).stream()
                 .collect(Collectors.toMap(MpTrialPlan::getMaterialCode, Function.identity(), (p1, p2) -> p2));
-        
-        // 加载周期结构
+        // 1.5、加载周期结构
         LambdaQueryWrapper<MdmCycleSchStruConf> mdmCycleSchStruConfQueryWrapper = new LambdaQueryWrapper<>();
         mdmCycleSchStruConfQueryWrapper.eq(MdmCycleSchStruConf::getFactoryCode, factoryCode);
         Set<String> cycleSchStruSet = mdmCycleSchStruConfEntityMapper.selectList(mdmCycleSchStruConfQueryWrapper).stream().map(MdmCycleSchStruConf::getStructureName).distinct().collect(Collectors.toSet());
-        
-        MpWeekRollAdjustEngine weekRollAdjustEngine = new MpWeekRollAdjustEngine();
-        MpAdjustDailyCapacityLimit adjustDailyCapacityLimitObj = new MpAdjustDailyCapacityLimit();
-
-        // 加载排产参数
+        // 1.6、加载排产参数
         LambdaQueryWrapper<FactoryParam> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(FactoryParam::getFactoryCode, factoryCode);
         queryWrapper.eq(FactoryParam::getIsDelete, YesOrNoEnum.NO.getValue());
         queryWrapper.in(FactoryParam::getParamCode, MonthPlanEnums.CHANGE_MOULD_FIRST_QTY.getCode(), MonthPlanEnums.CHANGE_TYPE_BLOCK_QTY.getCode());
         Map<String, Object> paramMap = factoryParamMapper.selectList(queryWrapper).stream()
                 .collect(Collectors.toMap(FactoryParam::getParamCode, FactoryParamUtils::getParamValue));
-        
-        // 加载物料表
+        // 1.7、加载物料表
         LambdaQueryWrapper<MdmMaterialInfo> mdmMaterialInfoQueryWrapper = new LambdaQueryWrapper<>();
         mdmMaterialInfoQueryWrapper.eq(MdmMaterialInfo::getFactoryCode, factoryCode);
         Map<String, MdmMaterialInfo> materialInfoMap = mdmMaterialInfoEntityMapper
                 .selectList(mdmMaterialInfoQueryWrapper).stream()
                 .collect(Collectors.toMap(MdmMaterialInfo::getMaterialCode, Function.identity(), (m1, m2) -> m1));
-
-        // 加载日历
+        // 1.8、加载日历
         MpStructureAllocation mpStructureAllocation = new MpStructureAllocation();
         mpStructureAllocation.setFactoryCode(factoryCode);
         mpStructureAllocation.setYear(year);
         mpStructureAllocation.setMonth(month);
         List<MdmWorkCalendar> calendarList = this.queryMdmWorkCalendar(mpStructureAllocation);
-        
         Map<Integer, MpDailyCapacityLimitVo> dailyCapacityMap = new HashMap<>();
         Set<Integer> stopDaySet = new HashSet<>();
         for (MdmWorkCalendar workCalendar: calendarList) {
@@ -2583,12 +2584,42 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             limitVo.setOpenProductionFirstDay(isOpenProductionFirstDay);
             dailyCapacityMap.put(day, limitVo);
         }
+        // 1.9、加载SKU与模具关系
+        List<MoldCavityInsertMaxValueCalculatorVo> moldList = factoryMonthPlanProductMouldMapper
+                .getEnableProductionMouldInfoByNetDemand(factoryCode, year, yearMonth, monthPlanVersion, true);
+        // 1.9.1、加载模具到货计划
+        LocalDate monthStart = LocalDate.of(year, month, ProductionConstant.MONTH_START_DAY);
+        Date productionStartDate = DateUtils.getDate(LocalDate.of(year, month, ProductionConstant.MONTH_START_DAY));
+        Date productionEndDate = DateUtils.getDate(monthStart.with(TemporalAdjusters.lastDayOfMonth()));
+        List<MoldCavityInsertMaxValueCalculatorVo> mouldDeliveryList = factoryMonthPlanProductMouldMapper
+                .getEnableMouldDeliveryInfoByNetDemand(factoryCode, year, month, monthPlanVersion, productionStartDate,
+                        productionEndDate);
+        Set<String> materialHasMoldSet = moldList.stream().map(MoldCavityInsertMaxValueCalculatorVo::getMaterialDesc).distinct().collect(Collectors.toSet()); // 有模具的sku列表
+        materialHasMoldSet.addAll(mouldDeliveryList.stream().map(MoldCavityInsertMaxValueCalculatorVo::getMaterialDesc).distinct().collect(Collectors.toSet())); // 模具到货计划合并到sku列表中
+        
+        // 2、遍历导入数据，填充各必要栏位数值
         List<FactoryMonthPlanMouldDayResult> finalImportList = new ArrayList<>();
         for (FactoryMonthPlanMouldDayResult insertItem: insertList) {
             String structureName = insertItem.getStructureName();
             String materialDesc = insertItem.getMaterialDesc();
             String materialCode = insertItem.getMaterialCode();
             DpDemandPlan demandPlan = dpDemandPlanMap.get(materialCode);
+            // 2.1、物料校验
+            MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
+            if (materialInfo == null) {
+                insertItem.setId(-999L);
+                String errorMsg = materialDesc + notMaterialStr;
+                addImportErrorLog(importLogId, insertItem.getImportRowNum(), errorMsg, importErrorLogs);
+                continue;
+            }
+            // 2.2、模具校验
+            if (!materialHasMoldSet.contains(materialDesc)) {
+                insertItem.setId(-999L);
+                String errorMsg = materialDesc + notSkuMoldRelStr;
+                addImportErrorLog(importLogId, insertItem.getImportRowNum(), errorMsg, importErrorLogs);
+                continue;
+            }
+            
             if (demandPlan != null) {
                 structureName = demandPlan.getStructureName();
                 insertItem.setStructureName(structureName);
@@ -2611,10 +2642,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 // 计算库销比
                 insertItem.setInventorySalesRatio(BigDecimalUtils.div(demandPlan.getStockQty(), demandPlan.getAverageSaleQty(), 1));
             } else { // 试产试制规格从物料信息表加载信息
-                MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
-                if (materialInfo == null) {
-                    continue;
-                }
                 structureName = materialInfo.getStructureName();
                 insertItem.setStructureName(structureName);
                 insertItem.setMesMaterialCode(materialInfo.getMesMaterialCode());
