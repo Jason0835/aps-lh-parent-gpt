@@ -2769,6 +2769,7 @@
   "ui.data.column.lhScheduleResult.insertOrder.skuNotInMonthPlan": "SKU[{}]不在当前月度计划中，无法插单",
   "ui.data.column.lhScheduleResult.insertOrder.skuAlreadyInProduction": "SKU[{}]在当前月已正在生产，无法重复插单",
   "ui.data.column.lhScheduleResult.insertOrder.monthPlanVersionNotFound": "当前排程月[{}]未找到定稿排产版本，无法校验月度计划",
+  "ui.data.column.lhScheduleResult.insertOrder.currentShiftOverCapacity": "当前班次【{}】剩余产能不足，剩余产能={}，插单量={}，不允许超产插单",
   "ui.data.column.lhPrecisionPlan.factoryCode": "分厂",
   "ui.data.column.lhPrecisionPlan.machineCode": "机台编号",
   "ui.data.column.lhPrecisionPlan.precisionType": "精度类型",
