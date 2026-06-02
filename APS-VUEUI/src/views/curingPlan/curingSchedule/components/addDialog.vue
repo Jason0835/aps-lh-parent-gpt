@@ -1,4 +1,4 @@
-﻿﻿﻿<template>
+﻿﻿<template>
   <el-dialog
     :title="title"
     :visible="visible"
@@ -260,8 +260,6 @@ export default {
         this.$set(this.form, "mouldSurplusQty", null);
         this.$set(this.form, "embryoStock", null);
         this.$set(this.form, "machineShiftCapacity", null);
-        this.$set(this.form, "trialStatus", null);
-        this.$set(this.form, "leftRightMould", null);
         this.loadSkuRelatedData(val);
       } else {
         this.$set(this.form, "materialDesc", "");
@@ -282,6 +280,7 @@ export default {
           materialCode: materialCode,
           scheduleDate: this.form.scheduleDate,
           lhMachineCode: this.form.lhMachineCode,
+          leftRightMold: this.form.leftRightMould,
         };
         const res = await getSkuRelatedData(params);
         if (res) {
@@ -294,12 +293,8 @@ export default {
           if (res.machineShiftCapacity != null) {
             this.$set(this.form, "machineShiftCapacity", res.machineShiftCapacity);
           }
-          if (res.trialStatus != null && res.trialStatus !== '') {
-            this.$set(this.form, "trialStatus", res.trialStatus);
-          }
-          if (res.leftRightMould != null && res.leftRightMould !== '') {
-            this.$set(this.form, "leftRightMould", res.leftRightMould);
-          }
+          this.$set(this.form, "trialStatus", res.trialStatus || null);
+          this.$set(this.form, "leftRightMould", res.leftRightMould || null);
           if (res.embryoCode != null && res.embryoCode !== '') {
             this.$set(this.form, "embryoCode", res.embryoCode);
           }
