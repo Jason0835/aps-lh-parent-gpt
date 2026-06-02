@@ -103,6 +103,7 @@ public class CxScheFinishQtyServiceImpl extends AbstractDocService<CxScheFinishQ
             queryWrapper.eq(CxScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
             queryWrapper.eq(CxScheduleResult::getFactoryCode, summary.getFactoryCode());
             queryWrapper.eq(CxScheduleResult::getCxMachineCode, summary.getCxMachineCode());
+            queryWrapper.eq(CxScheduleResult::getEmbryoCode, summary.getEmbryoCode());
             queryWrapper.eq(CxScheduleResult::getMaterialCode, summary.getMaterialCode());
             queryWrapper.in(CxScheduleResult::getScheduleDate, Arrays.asList(dateD, dateD1, dateD2));
             List<CxScheduleResult> resultList = cxScheduleResultMapper.selectList(queryWrapper);

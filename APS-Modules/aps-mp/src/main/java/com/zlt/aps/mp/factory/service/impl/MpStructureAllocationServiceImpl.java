@@ -2284,8 +2284,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             QueryWrapper<MpStructureAllocation> structureAllocationQueryWrapper = new QueryWrapper<>();
             structureAllocationQueryWrapper.eq("FACTORY_CODE", factoryCode);
             structureAllocationQueryWrapper.eq("PRODUCTION_VERSION", productVersion);
-            Set<String> allStructureNameSet = entityMapper.selectList(structureAllocationQueryWrapper).stream()
-                    .map(MpStructureAllocation::getStructureName).distinct().collect(Collectors.toSet());
+            Map<String, List<MpStructureAllocation>> allStructureNameMap = entityMapper.selectList(structureAllocationQueryWrapper).stream()
+                    .collect(Collectors.groupingBy(MpStructureAllocation::getStructureName));
 
             // 过滤合计等数据
             list = list.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialCode())).collect(Collectors.toList());
@@ -2354,7 +2354,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     continue;
                 }
                 // 结构转产表校验
-                if (!allStructureNameSet.contains(item.getStructureName())) {
+                if (!allStructureNameMap.containsKey(item.getStructureName())) {
                     item.setId(-999L);
                     failureNum++;
                     addImportErrorLog(importLogId, errorNum, String.format(noStructureNameStr, item.getStructureName()), importErrorLogs);
@@ -2378,6 +2378,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 if(CollUtil.isNotEmpty(finalImportList)) {
                     // 如果是调整，需要先删除原记录再插入
                     if (isAdjust) {
+                        // 删除本次导入结构的调整记录
                         Set<String> structureNameSet = list.stream()
                                 .map(FactoryMonthPlanMouldDayResult::getStructureName).distinct()
                                 .collect(Collectors.toSet());
@@ -2407,6 +2408,13 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                             adjustResult.setLastMonthPlanVersion(monthPlanVersion);
                             adjustResult.setAdjustType(WeekAdjustTypeEnum.STRUCTURE_IN.getCode());
                             adjustResult.setTotalPlanQty(adjustResult.getTotalQty());
+                            // 从结构转产表获取成型机并添加到调整记录表中
+                            List<MpStructureAllocation> allStructureNameList = allStructureNameMap.get(adjustResult.getStructureName());
+                            if (allStructureNameList != null) {
+                                adjustResult.setCxMachineCode(allStructureNameList.stream()
+                                        .map(MpStructureAllocation::getCxMachineCode).filter(StringUtils::isNotEmpty)
+                                        .sorted().collect(Collectors.joining(",")));
+                            }
                             return adjustResult;
                         }).collect(Collectors.toList());
                         // 处理特殊材料标记

@@ -158,15 +158,22 @@ public class LhInsertOrderValidateHandler {
         checkMouldAvailability(dto, result);
         fillSkuRelatedData(dto, result);
         fillEmbryoRelatedFields(dto, result);
-        // 只有前端未传左右模值时，才保留checkMachineAvailability中通过机台信息解析的值
-        // 避免dto.getLeftRightMold()为空时覆盖掉已正确计算的左右模
+        // 左右模处理逻辑：
+        // 1. 前端传了leftRightMold且非空，优先使用前端值（用户手动选择或原值带入）
+        // 2. checkMachineAvailability已设置（单模机台场景），保留该值
+        // 3. 前端未传且checkMachineAvailability未设置，从机台编码解析
+        // 4. 机台编码也无法解析时，查询机台信息判断是否双模机台，双模默认"LR"
         if (StringUtils.isNotBlank(dto.getLeftRightMold())) {
             result.setLeftRightMould(dto.getLeftRightMold());
         } else if (StringUtils.isBlank(result.getLeftRightMould())) {
-            // 前端未传且checkMachineAvailability也未设置，则通过机台编码解析
             String lrMould = resolveLeftRightMould(dto.getLhMachineCode());
             if (StringUtils.isNotBlank(lrMould)) {
                 result.setLeftRightMould(lrMould);
+            } else {
+                LhMachineInfo machineInfo = getMachineInfoByCode(dto.getLhMachineCode(), dto.getFactoryCode());
+                if (machineInfo != null && machineInfo.getMaxMoldNum() != null && machineInfo.getMaxMoldNum() > 1) {
+                    result.setLeftRightMould("LR");
+                }
             }
         }
         return result;
@@ -420,6 +427,19 @@ public class LhInsertOrderValidateHandler {
                 LhShiftConfigVO shift = findShiftByIndex(shifts, i);
                 String shiftName = shift != null ? shift.getShiftName() : String.format("第%d班", i);
                 result.addError(String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.historicalShift"), shiftName));
+            }
+        }
+
+        // 当前班次允许插单，但需校验插单量是否超过剩余产能
+        Integer currentPlanQty = getPlanQtyByShiftIndex(dto, currentShiftIndex);
+        if (currentPlanQty != null && currentPlanQty > 0 && StringUtils.isNotBlank(dto.getLhMachineCode())) {
+            int remainingCapacity = calculateShiftRemainingCapacity(dto, currentShiftIndex);
+            if (remainingCapacity < currentPlanQty) {
+                LhShiftConfigVO shift = findShiftByIndex(shifts, currentShiftIndex);
+                String shiftName = shift != null ? shift.getShiftName() : String.format("第%d班", currentShiftIndex);
+                result.addError(String.format(
+                        I18nUtil.getMessage("ui.data.column.lhScheduleResult.insertOrder.currentShiftOverCapacity"),
+                        shiftName, remainingCapacity, currentPlanQty));
             }
         }
     }
@@ -978,6 +998,81 @@ public class LhInsertOrderValidateHandler {
     }
 
     /**
+     * 计算指定班次在当前机台上的剩余产能
+     * <p>剩余产能 = 机台班产 - 该班次已排计划量</p>
+     *
+     * @param dto        插单数据
+     * @param shiftIndex 班次索引（1-8）
+     * @return 剩余产能
+     */
+    private int calculateShiftRemainingCapacity(LhOrderInsertDTO dto, int shiftIndex) {
+        Integer shiftCapacity = getMachineShiftCapacity(dto);
+        if (shiftCapacity == null || shiftCapacity <= 0) {
+            return 0;
+        }
+
+        LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhScheduleResult::getLhMachineCode, dto.getLhMachineCode())
+                .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode());
+        if (dto.getScheduleDate() != null) {
+            wrapper.eq(LhScheduleResult::getScheduleDate, dto.getScheduleDate());
+        }
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            wrapper.eq(LhScheduleResult::getFactoryCode, dto.getFactoryCode());
+        }
+        List<LhScheduleResult> existingResults = lhScheduleResultMapper.selectList(wrapper);
+
+        int scheduledQty = 0;
+        for (LhScheduleResult existing : existingResults) {
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(existing, shiftIndex);
+            scheduledQty += (planQty != null ? planQty : 0);
+        }
+
+        return Math.max(0, shiftCapacity - scheduledQty);
+    }
+
+    /**
+     * 获取机台班产
+     * <p>优先从机台主数据获取quota，若为空则从SKU硫化产能主数据获取classCapacity</p>
+     *
+     * @param dto 插单数据
+     * @return 机台班产
+     */
+    private Integer getMachineShiftCapacity(LhOrderInsertDTO dto) {
+        if (StringUtils.isBlank(dto.getLhMachineCode())) {
+            return null;
+        }
+
+        LambdaQueryWrapper<LhMachineInfo> machineWrapper = new LambdaQueryWrapper<>();
+        machineWrapper.eq(LhMachineInfo::getMachineCode, dto.getLhMachineCode());
+        if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+            machineWrapper.eq(LhMachineInfo::getFactoryCode, dto.getFactoryCode());
+        }
+        machineWrapper.last("LIMIT 1");
+        LhMachineInfo machineInfo = lhMachineInfoMapper.selectOne(machineWrapper);
+
+        if (machineInfo != null && machineInfo.getQuota() != null && machineInfo.getQuota() > 0) {
+            return machineInfo.getQuota();
+        }
+
+        String materialCode = resolveMaterialCode(dto);
+        if (StringUtils.isNotBlank(materialCode)) {
+            LambdaQueryWrapper<MdmSkuLhCapacity> capacityWrapper = new LambdaQueryWrapper<>();
+            capacityWrapper.eq(MdmSkuLhCapacity::getMaterialCode, materialCode);
+            if (StringUtils.isNotBlank(dto.getFactoryCode())) {
+                capacityWrapper.eq(MdmSkuLhCapacity::getFactoryCode, dto.getFactoryCode());
+            }
+            capacityWrapper.last("LIMIT 1");
+            MdmSkuLhCapacity skuCapacity = mdmSkuLhCapacityMapper.selectOne(capacityWrapper);
+            if (skuCapacity != null && skuCapacity.getClassCapacity() != null) {
+                return skuCapacity.getClassCapacity();
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * 解析最近已结束的班次索引（用于班次间隙场景）
      * <p>当当前时间不在任何班次范围内时，找到结束时间 <= 当前时间且最晚的班次，
      * 该班次之后（不含）的班次为历史班次，不允许插单</p>
@@ -1055,6 +1150,26 @@ public class LhInsertOrderValidateHandler {
     }
 
     /**
+     * 根据机台编码查询机台信息
+     *
+     * @param machineCode 机台编码
+     * @param factoryCode 工厂编码
+     * @return 机台信息
+     */
+    private LhMachineInfo getMachineInfoByCode(String machineCode, String factoryCode) {
+        if (StringUtils.isBlank(machineCode)) {
+            return null;
+        }
+        LambdaQueryWrapper<LhMachineInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhMachineInfo::getMachineCode, machineCode);
+        if (StringUtils.isNotBlank(factoryCode)) {
+            wrapper.eq(LhMachineInfo::getFactoryCode, factoryCode);
+        }
+        wrapper.last("LIMIT 1");
+        return lhMachineInfoMapper.selectOne(wrapper);
+    }
+
+    /**
      * 填充SKU关联数据（示方类型等）
      * <p>在所有校验完成后统一填充，避免校验中断导致数据缺失</p>
      *
@@ -1089,6 +1204,9 @@ public class LhInsertOrderValidateHandler {
                 .orElse(null);
         if (Objects.nonNull(skuConstructionRef) && StringUtils.isNotBlank(skuConstructionRef.getLhType())) {
             result.setTrialStatus(skuConstructionRef.getLhType());
+        } else {
+            // 新SKU没有示方类型时，显式设置为空字符串，确保前端能区分"后端未返回"和"新SKU无示方类型"
+            result.setTrialStatus("");
         }
     }
 
