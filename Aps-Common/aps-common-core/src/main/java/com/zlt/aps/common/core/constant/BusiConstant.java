@@ -24,6 +24,11 @@ public interface BusiConstant {
          * 结构间版本号前缀
          */
         String STRUCTURE_OUT_VERSION_PREFIX = "ADJ1";
+
+        /**
+         * 最大的周数
+         */
+        int MAX_WEEK_OF_MONTH = 4;
         /**
          * 锁定天数
          */

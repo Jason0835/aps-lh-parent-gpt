@@ -69,6 +69,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
 
         // 1、设置版本号
         setVersion(contextDTO, BusiConstant.WeekRollAdjust.VERSION_PREFIX);
+        // 设置调整日
+        setAdjustDate(contextDTO);
         // 2、构建结构外调整明细
         List<MpAdjustDetailVo> adjustDetailList = buildAdjustDetailList(contextDTO);
         // 3、构建结构内调整明细（月度计划有，无订单）
