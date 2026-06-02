@@ -125,7 +125,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             AND r.production_version = #{dayResult.productionVersion}
             AND r.IS_DELETE = 0 
             <if test="isFinal">
-            LEFT JOIN T_MP_MONTH_PLAN_MONITOR pm ON m.MATERIAL_CODE = pm.MATERIAL_CODE
+            LEFT JOIN T_MP_MONTH_PLAN_MONITOR pm ON r.id = pm.final_result_id
             AND m.FACTORY_CODE = pm.FACTORY_CODE 
             AND r.PRODUCTION_VERSION = pm.PRODUCTION_VERSION
             AND pm.IS_DELETE = 0 
