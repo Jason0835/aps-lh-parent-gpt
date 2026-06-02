@@ -1,5 +1,7 @@
 package com.zlt.aps.cx.service.impl.validation;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import lombok.extern.slf4j.Slf4j;
@@ -10,11 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * 班次配置校验策略
- *
- * @author APS Team
- */
 @Slf4j
 @Component
 public class ShiftConfigValidationStrategy extends BaseValidationStrategy {
@@ -33,20 +30,18 @@ public class ShiftConfigValidationStrategy extends BaseValidationStrategy {
 
         if (isEmpty(shiftConfigs)) {
             addError(result,
-                    "班次配置为空，无法确定排程班次",
-                    "请在班次配置表(T_CX_SHIFT_CONFIG)中配置工厂【" + factoryCode + "】的班次信息");
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.empty"),
+                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.empty.suggestion"), factoryCode));
             return;
         }
 
-        // 检查排程天数
         if (scheduleDays == null || scheduleDays < 1) {
             addError(result,
-                    "排程天数配置异常：" + scheduleDays,
-                    "请检查班次配置表中的SCHEDULE_DAY字段");
+                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.scheduleDaysInvalid"), scheduleDays),
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.scheduleDaysInvalid.suggestion"));
             return;
         }
 
-        // 检查每一天的班次配置
         Map<Integer, Long> dayShiftCount = shiftConfigs.stream()
                 .filter(c -> c.getScheduleDay() != null)
                 .collect(Collectors.groupingBy(CxShiftConfig::getScheduleDay, Collectors.counting()));
@@ -55,17 +50,17 @@ public class ShiftConfigValidationStrategy extends BaseValidationStrategy {
             Long count = dayShiftCount.get(day);
             if (count == null || count == 0) {
                 addWarn(result,
-                        "第" + day + "天缺少班次配置",
-                        "请为第" + day + "天配置班次信息（早班、中班、夜班）");
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.dayMissing"), day),
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.dayMissing.suggestion"), day));
             } else if (count < 2) {
                 addInfo(result,
-                        "第" + day + "天班次配置数量较少：" + count + "个",
-                        "建议至少配置2个班次");
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.dayShiftFew"), day, count),
+                        I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.dayShiftFew.suggestion"));
             }
         }
 
         addInfo(result,
-                "班次配置完整，共" + shiftConfigs.size() + "条记录，覆盖" + scheduleDays + "天",
+                StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.summary"), shiftConfigs.size(), scheduleDays),
                 null);
     }
 }

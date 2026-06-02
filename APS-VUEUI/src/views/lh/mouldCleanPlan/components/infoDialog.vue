@@ -79,7 +79,7 @@ export default {
   computed: {
     title: function () {
       return this.isEdit
-        ? "编辑"
+        ? this.$t("common.button.edit")
         : this.$t("common.button.add");
     },
     columns() {
@@ -118,6 +118,12 @@ export default {
           type: "select",
           dictData: this.parentDict.type.MOULD_CLEAN_TYPE,
           disabled: this.isEdit,
+        },
+        {
+          prop: "finishStatus",
+          label: this.$t("ui.data.column.mouldCleanPlan.finishStatus"),
+          type: "select",
+          dictData: this.parentDict.type.MOULD_CLEAN_FINISH_STATUS,
         },
         {
           prop: "remark",

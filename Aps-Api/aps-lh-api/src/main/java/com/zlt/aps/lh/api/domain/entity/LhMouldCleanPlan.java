@@ -86,7 +86,7 @@ public class LhMouldCleanPlan extends BaseEntity implements Serializable {
     private String leftRightMould;
 
     @ApiModelProperty(value = "完成状态: 0-未完成 1-已完成")
-    @Excel(name = "ui.data.column.mouldCleanPlan.finishStatus")
+    @Excel(name = "ui.data.column.mouldCleanPlan.finishStatus", dictType = "mould_clean_finish_status")
     @TableField(value = "FINISH_STATUS")
     private String finishStatus;
 

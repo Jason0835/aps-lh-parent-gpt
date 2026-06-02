@@ -38,3 +38,6 @@ src/lang/
 ### 新增/修改多语言
 - 在对应语言目录的 json 文件中添加 key-value
 - 确保各语言文件 key 一致，value 翻译为对应语言
+- 新增多语言时，后端也需同步更新以下文件：
+  - `Aps-Common/aps-common-core/src/main/resources/i18n/web_vi_VN.properties`（越南语）
+  - `Aps-Common/aps-common-core/src/main/resources/i18n/web_zh_CN.properties`（中文）

@@ -392,7 +392,7 @@ export default {
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.lh_schedule_type, value);
           },
-        }, // 排程类型
+        }, // 排产类型
 
         {
           label: this.$t("ui.data.column.scheduleResult.finishQty"),
@@ -433,7 +433,7 @@ export default {
             }, // 第1班-左右模
             {
           prop: "class1LhType",
-          label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+          label: this.$t("ui.data.column.scheduleResult.constructionStage"),
           formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 1),
         }, // 第1班-示方类型
         {
@@ -468,7 +468,7 @@ export default {
             }, // 第2班-左右模
             {
               prop: "class2LhType",
-              label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 2),
             }, // 第2班-示方类型
            {
@@ -504,7 +504,7 @@ export default {
             }, // 第3班-左右模
             {
               prop: "class3LhType",
-              label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 3),
             }, // 第3班-示方类型
            {
@@ -540,7 +540,7 @@ export default {
             }, // 第4班-左右模
             {
               prop: "class4LhType",
-              label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 4),
             }, // 第4班-示方类型
            {
@@ -576,7 +576,7 @@ export default {
             }, // 第5班-左右模
             {
               prop: "class5LhType",
-              label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 5),
             }, // 第5班-示方类型
             {
@@ -612,7 +612,7 @@ export default {
             }, // 第6班-左右模
             {
               prop: "class6LhType",
-              label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 6),
             }, // 第6班-示方类型
             {
@@ -648,7 +648,7 @@ export default {
             }, // 第7班-左右模
             {
               prop: "class7LhType",
-              label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 7),
             }, // 第7班-示方类型
             {
@@ -684,7 +684,7 @@ export default {
             }, // 第8班-左右模
             {
               prop: "class8LhType",
-              label: this.$t("ui.data.column.scheduleResult.scheduleType"),
+              label: this.$t("ui.data.column.scheduleResult.constructionStage"),
               formatter: (row, column, value) => this.shiftLhTypeFormatter(row, column, value, 8),
             }, // 第8班-示方类型
             {

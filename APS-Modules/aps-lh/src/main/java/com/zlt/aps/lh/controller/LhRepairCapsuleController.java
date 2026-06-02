@@ -52,7 +52,7 @@ public class LhRepairCapsuleController extends AbstractDocBizController<LhRepair
     /**
      * 导出列表
      */
-    @Log(title = "APS胶囊已使用次数", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.lhRepairCapsule.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override

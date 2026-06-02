@@ -45,4 +45,7 @@ UIController extends BaseUIController<Entity>
 
 ### 后端：
 - 文件位置: `Aps-Common/aps-common-core/src/main/resources/i18n/apsui_zh_CN.properties`
+- Web业务多语言（越南语）: `Aps-Common/aps-common-core/src/main/resources/i18n/web_vi_VN.properties`
+- Web业务多语言（中文）: `Aps-Common/aps-common-core/src/main/resources/i18n/web_zh_CN.properties`
 - 格式: `ui.data.column.cxEntityName.fieldName=中文名称`
+- 新增多语言时，需同步更新以上所有语言文件

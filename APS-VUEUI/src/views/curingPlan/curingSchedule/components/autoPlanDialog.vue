@@ -31,7 +31,7 @@
 import moment from "moment";
 
 import infoForm from "@/views/components/infoForm.vue";
-import { lhValidateAutoPlan, autoPlan } from "@/api/lh/scheduleResult";
+import { autoPlan } from "@/api/lh/scheduleResult";
 
 export default {
   components: { infoForm },
@@ -84,66 +84,58 @@ export default {
     },
   },
   methods: {
-    // api
-    async handleAutoPlan(params) {
-      // console.log(params);
-      try {
-        this.loading = true;
-        // const result = await lhValidateAutoPlan(params);
-        // if (result.msg == "1") {
-        //   //已经生成，提示是否重新生成
-        //   this.$confirm(this.$t("ui.biz.alter.makeSureRecreate"))
-        //     .then(async () => {
-        //       try {
-        //         const data = await autoPlan(params);
-        //         this.$modal.msgSuccess(data.msg);
-        //         this.$emit("success", params);
-        //       } catch (error) {
-        //         console.error(error);
-        //       }
-        //     })
-        //     .catch(() => {
-        //       this.loading = false;
-        //     });
-        // } else if (result.msg == "2") {
-        //   //未生成，直接生成
-        //   const data = await autoPlan(params);
-        //   this.$modal.msgSuccess(data.msg);
-        //   this.$emit("success", params);
-        // } else if (result.msg == "3") {
-        //   //已发布，提示不能重新生成
-        //   this.$modal.msgError(this.$t("ui.biz.alter.CanNotRecreate"));
-        // }
-        const data = await autoPlan(params);
-        // 接口返回：{ success, message, batchNo, validationErrors }；兼容旧版 { msg }
-        const tip = data.message || data.msg || "";
-        if (data.success === false) {
-          const hasValidationDetails =
-            (data.validationErrors &&
-              Array.isArray(data.validationErrors) &&
-              data.validationErrors.length > 0) ||
-            (data.validationErrorDetails &&
-              Array.isArray(data.validationErrorDetails) &&
-              data.validationErrorDetails.length > 0);
-          if (hasValidationDetails) {
-            this.$emit("validationError", data);
-          } else {
-            this.$modal.msgError(
-              tip || this.$t("ui.data.btn.ajax.code.msg")
-            );
-          }
-          return;
+    /**
+     * 判断排程响应是否包含可展示的校验明细
+     * @param {Object} data 接口响应
+     * @returns {boolean}
+     */
+    hasScheduleValidationDetails(data) {
+      return (
+        (data.validationErrors &&
+          Array.isArray(data.validationErrors) &&
+          data.validationErrors.length > 0) ||
+        (data.validationErrorDetails &&
+          Array.isArray(data.validationErrorDetails) &&
+          data.validationErrorDetails.length > 0)
+      );
+    },
+    /**
+     * 处理硫化自动排程接口响应（后台异步回调）
+     * @param {Object} data 接口响应
+     * @param {Object} params 排程参数
+     */
+    handleAutoPlanResponse(data, params) {
+      const tip = data.message || data.msg || "";
+      if (data.success === false) {
+        if (this.hasScheduleValidationDetails(data)) {
+          this.$emit("validationError", data);
+        } else {
+          this.$modal.msgError(tip || this.$t("ui.data.btn.ajax.code.msg"));
         }
-        this.$modal.msgSuccess(
-          tip || this.$t("common.msg.ajax.operation.success")
-        );
-        this.$emit("success", { ...params, batchNo: data.batchNo });
-        this.hide();
-      } catch (error) {
-        console.log(error);
-      } finally {
-        this.loading = false;
+        return;
       }
+      this.$modal.msgSuccess(
+        tip || this.$t("ui.data.column.scheduleResult.lhScheduleCompleted")
+      );
+      this.$emit("success", { ...params, batchNo: data.batchNo });
+    },
+    /**
+     * 提交硫化自动排程：先提示用户后台执行中，再异步调用后端接口
+     * @param {Object} params 排程参数
+     */
+    handleAutoPlan(params) {
+      this.$modal.msgSuccess(
+        this.$t("ui.data.column.scheduleResult.lhScheduleExecuting")
+      );
+      this.hide();
+      autoPlan(params)
+        .then((data) => this.handleAutoPlanResponse(data, params))
+        .catch((error) => {
+          console.error(error);
+          this.$modal.msgWarning(
+            this.$t("ui.data.column.cxScheduleResult.scheduleTimeout")
+          );
+        });
     },
 
     //utils

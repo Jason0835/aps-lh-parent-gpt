@@ -76,7 +76,7 @@ export default {
   components: {
     infoDialog
   },
-  dicts: ["biz_factory_name", "MOULD_CLEAN_TYPE"],
+  dicts: ["biz_factory_name", "MOULD_CLEAN_TYPE", "MOULD_CLEAN_FINISH_STATUS"],
   provide() {
     return {
       parentDict: this.dict,
@@ -133,6 +133,13 @@ export default {
           prop: "leftRightMould",
           label: this.$t("ui.data.column.mouldCleanPlan.leftRightMould"),
           width: 100
+        },
+        {
+          prop: "finishStatus",
+          label: this.$t("ui.data.column.mouldCleanPlan.finishStatus"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.MOULD_CLEAN_FINISH_STATUS, value);
+          },
         },
         {
           prop: "remark",

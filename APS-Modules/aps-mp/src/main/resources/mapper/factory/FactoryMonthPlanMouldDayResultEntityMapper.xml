@@ -38,7 +38,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    sum( d.CYCLE_RESERVE_QTY ) CYCLE_RESERVE_QTY,
 		    sum( d.POSTPONE_QTY ) POSTPONE_QTY,
 		    sum( case when d.IS_SCHEDULE = '1' then d.CONVENTION_RESERVE_QTY else 0 end) CONVENTION_RESERVE_QTY,
-		    mc.NET_QTY UN_RESTRICTED_NET_QTY,
 		    r.TOTAL_QTY,
 		    r.HEIGHT_PRODUCTION_QTY,
 		    r.MID_PRODUCTION_QTY,
@@ -83,14 +82,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    F.DAY_29 LAST_29,
 		    F.DAY_30 LAST_30,
 		    F.DAY_31 LAST_31,
-            <if test="isFinal">
+        <choose>
+            <when test="isFinal">
             r.ADJUST_QTY1,
             r.ADJUST_QTY2,
             r.ADJUST_QTY3,
             r.ADJUST_QTY4,
             r.ORIGINAL_TOTAL_QTY,
-            ifnull(r.total_qty, 0) - ifnull(pm.PRODUCTION_QTY,0) PRODUCT_SURPLUS,
-            </if>
+            ifnull(f.total_qty, 0) - ifnull(pm.PRODUCTION_QTY,0) PRODUCT_SURPLUS,
+            </when>
+            <otherwise>
+            mc.NET_QTY UN_RESTRICTED_NET_QTY,
+            </otherwise>
+        </choose>
 		    F.PRODUCTION_VERSION LAST_PRODUCTION_VERSION,
 		    '1' DATA_TYPE,
 		    '2' LOCATION_TYPE /*内外销，目前没有地方取，暂时固定外销*/
@@ -105,10 +109,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    AND d.FACTORY_CODE = m.FACTORY_CODE 
 		    AND d.MATERIAL_CODE = m.MATERIAL_CODE 
 		    AND d.is_delete = 0
-            LEFT JOIN T_MP_MOLD_CAPACITY_LOG mc ON mc.IS_DELETE = 0
-            AND mc.FACTORY_CODE = m.FACTORY_CODE 
-            AND mc.production_version = #{dayResult.productionVersion}
-            AND mc.MATERIAL_CODE = m.MATERIAL_CODE
 		    LEFT JOIN T_MP_PROC_MONTH_PLAN_INIT i on i.MONTH_PLAN_ID = d.id
             AND m.FACTORY_CODE = i.FACTORY_CODE 
 		    AND i.PRODUCTION_VERSION = #{dayResult.productionVersion}
@@ -124,17 +124,25 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             AND m.FACTORY_CODE = r.FACTORY_CODE 
             AND r.production_version = #{dayResult.productionVersion}
             AND r.IS_DELETE = 0 
-            <if test="isFinal">
-            LEFT JOIN T_MP_MONTH_PLAN_MONITOR pm ON m.MATERIAL_CODE = pm.MATERIAL_CODE
-            AND m.FACTORY_CODE = pm.FACTORY_CODE 
-            AND r.PRODUCTION_VERSION = pm.PRODUCTION_VERSION
-            AND pm.IS_DELETE = 0 
-            </if>
             LEFT JOIN T_MP_MONTH_PLAN_PROD_FINAL f ON f.IS_DELETE = 0
             AND f.MATERIAL_CODE = m.MATERIAL_CODE
             AND f.`YEAR_MONTH` = DATE_FORMAT(DATE_SUB(concat(#{dayResult.year},'-',#{dayResult.month},'-1'),INTERVAL 1 month), '%Y%m')
             LEFT JOIN T_DP_CYCLE_STRUCT_CONFIG C ON C.STRUCTURE_NAME = M.STRUCTURE_NAME
             AND C.IS_DELETE = 0
+        <choose>
+            <when test="isFinal">
+            LEFT JOIN T_MP_MONTH_PLAN_MONITOR pm ON f.id = pm.final_result_id
+            AND m.FACTORY_CODE = pm.FACTORY_CODE 
+            AND r.PRODUCTION_VERSION = pm.PRODUCTION_VERSION
+            AND pm.IS_DELETE = 0 
+            </when>
+            <otherwise>
+            LEFT JOIN T_MP_MOLD_CAPACITY_LOG mc ON mc.IS_DELETE = 0
+            AND mc.FACTORY_CODE = m.FACTORY_CODE 
+            AND mc.production_version = #{dayResult.productionVersion}
+            AND mc.MATERIAL_CODE = m.MATERIAL_CODE
+            </otherwise>
+        </choose>
             LEFT JOIN T_MDM_SKU_LH_CAPACITY lc ON lc.IS_DELETE = 0
             AND lc.MATERIAL_CODE = m.MATERIAL_CODE
             LEFT JOIN T_MP_FACTORY_PARAM FP ON FP.IS_DELETE = 0
@@ -177,7 +185,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    m.SINGLE_TIRE_WEIGHT,
 		    m.PRODUCT_CATEGORY,
             m.SECTION_WIDTH,
-            mc.NET_QTY,
 		    r.MOULD_CAVITY_QTY,
 		    r.TYPE_BLOCK_QTY,
 		    r.TOTAL_QTY,
@@ -227,14 +234,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    F.DAY_29 ,
 		    F.DAY_30 ,
 		    F.DAY_31 ,
-            <if test="isFinal">
+            F.total_qty,
+        <choose>
+            <when test="isFinal">
             r.ADJUST_QTY1,
             r.ADJUST_QTY2,
             r.ADJUST_QTY3,
             r.ADJUST_QTY4,
             r.ORIGINAL_TOTAL_QTY,
             pm.PRODUCTION_QTY,
-            </if>
+            </when>
+            <otherwise>
+            mc.NET_QTY,
+            </otherwise>
+        </choose>
 		    F.PRODUCTION_VERSION
 		ORDER BY
             MM.MIN_PRO_SIZE,

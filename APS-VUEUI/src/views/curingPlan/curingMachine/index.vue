@@ -261,8 +261,7 @@ export default {
                 disabled={this.loading}
                 value={row.status}
                 onChange={(val) => {
-                  let text = val == "0" ? "禁用" : "启用";
-                  this.$confirm(`确认${text}吗？`, { type: "warning" }).then(
+                  this.$confirm(val == "0" ? this.$t("ui.lhMachineInfo.confirm.disable") : this.$t("ui.lhMachineInfo.confirm.enable"), { type: "warning" }).then(
                     async () => {
                       try {
                         this.loading = true;
@@ -419,7 +418,7 @@ export default {
         .catch(() => {});
     },
     handleExport() {
-      this.$confirm(this.$t(`确定导出所有机台信息？`), {
+      this.$confirm(this.$t("ui.lhMachineInfo.confirm.export"), {
         type: "warning",
       }).then(() => {
         try {

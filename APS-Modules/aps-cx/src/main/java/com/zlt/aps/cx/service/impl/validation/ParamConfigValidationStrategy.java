@@ -1,5 +1,7 @@
 package com.zlt.aps.cx.service.impl.validation;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import lombok.extern.slf4j.Slf4j;
@@ -9,29 +11,20 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
 
-/**
- * 参数配置校验策略
- *
- * @author APS Team
- */
 @Slf4j
 @Component
 public class ParamConfigValidationStrategy extends BaseValidationStrategy {
 
-    /** 关键参数编码列表（必须存在） */
     private static final Set<String> REQUIRED_PARAM_CODES = new HashSet<>(Arrays.asList(
-            "LOSS_RATE"             // 损耗率
+            "LOSS_RATE"
     ));
 
-    /** 关键参数默认值映射 */
     private static final Map<String, String> PARAM_DEFAULTS = new HashMap<>();
 
-    /** 关键参数说明 */
     private static final Map<String, String> PARAM_DESCRIPTIONS = new HashMap<>();
 
     static {
         PARAM_DEFAULTS.put("LOSS_RATE", "0.02");
-
         PARAM_DESCRIPTIONS.put("LOSS_RATE", "损耗率，用于计算实际产能");
     }
 
@@ -48,12 +41,11 @@ public class ParamConfigValidationStrategy extends BaseValidationStrategy {
 
         if (paramConfigMap == null || paramConfigMap.isEmpty()) {
             addWarn(result,
-                    "参数配置为空，将使用默认值继续排程",
-                    "建议在参数配置表(T_CX_PARAM_CONFIG)中配置排程参数以确保准确性");
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.empty"),
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.empty.suggestion"));
             return;
         }
 
-        // 检查关键参数
         for (String paramCode : REQUIRED_PARAM_CODES) {
             CxParamConfig config = paramConfigMap.get(paramCode);
             String description = PARAM_DESCRIPTIONS.get(paramCode);
@@ -61,29 +53,28 @@ public class ParamConfigValidationStrategy extends BaseValidationStrategy {
 
             if (config == null) {
                 addWarn(result,
-                        "缺少关键参数【" + paramCode + "】",
-                        "将使用默认值【" + defaultValue + "】，" + description);
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramMissing"), paramCode),
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramMissing.suggestion"), defaultValue, description));
             } else if (config.getParamValue() == null || config.getParamValue().trim().isEmpty()) {
                 addWarn(result,
-                        "参数【" + paramCode + "】的值为空",
-                        "将使用默认值【" + defaultValue + "】，请检查参数配置");
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramValueEmpty"), paramCode),
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramValueEmpty.suggestion"), defaultValue));
             } else {
-                // 校验数值格式
                 try {
                     new BigDecimal(config.getParamValue());
                     addInfo(result,
-                            "参数【" + paramCode + "】已配置，值：" + config.getParamValue(),
+                            StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramConfigured"), paramCode, config.getParamValue()),
                             null);
                 } catch (NumberFormatException e) {
                     addWarn(result,
-                            "参数【" + paramCode + "】的值格式错误：" + config.getParamValue(),
-                            "请确保参数为数数值，当前将使用默认值【" + defaultValue + "】");
+                            StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramValueInvalid"), paramCode, config.getParamValue()),
+                            StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramValueInvalid.suggestion"), defaultValue));
                 }
             }
         }
 
         addInfo(result,
-                "参数配置总数：" + paramConfigMap.size() + "项",
+                StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.summary"), paramConfigMap.size()),
                 null);
     }
 }
