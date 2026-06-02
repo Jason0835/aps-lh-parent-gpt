@@ -163,6 +163,8 @@
   "common.upload.clickUpload": "Nhấp để tải lên",
   "common.upload.onlyXlsXlsx": "Chỉ cho phép nhập tệp định dạng xls, xlsx.",
   "common.upload.downloadTemplate": "Tải mẫu",
+  "common.loading.downloading": "Đang tải dữ liệu, vui lòng đợi",
+  "common.loading.downloadError": "Lỗi tải tệp, vui lòng liên hệ quản trị viên!",
   "common.upload.importResult": "Kết quả nhập",
   "common.messageTask.msgTitle": "Tiêu đề tin nhắn",
   "common.messageTask.msgSource": "Nguồn tin nhắn",

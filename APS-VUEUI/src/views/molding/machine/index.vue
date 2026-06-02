@@ -301,24 +301,24 @@ export default {
         //   sortable: "custom",
         // },
         {
-          prop: "机型",
-          label: "机型",
+          prop: "cxMachineTypeCode",
+          label: this.$t("ui.data.column.mdmMoldingMachine.cxMachineTypeCode"),
         },
         {
-          prop: "反包方式",
-          label: "反包方式",
+          prop: "rollOverType",
+          label: this.$t("ui.data.column.mdmMoldingMachine.rollOverType"),
         },
         {
-          prop: "是否有零度供料架",
-          label: "是否有零",
+          prop: "isZeroRack",
+          label: this.$t("ui.data.column.mdmMoldingMachine.isZeroRack"),
         },
         {
-          prop: "对应硫化机上限",
-          label: "对应硫化机上限",
+          prop: "lhMachineMaxQty",
+          label: this.$t("ui.data.column.mdmMoldingMachine.lhMachineMaxQty"),
         },
         {
-          prop: "设备最大日产",
-          label: "设备最大日产",
+          prop: "maxDayCapacity",
+          label: this.$t("ui.data.column.mdmMoldingMachine.maxDayCapacity"),
         },
         {
           prop: "remark",
@@ -418,11 +418,15 @@ export default {
       }).then(async () => {
         try {
           this.loading = true;
-          const res = await editMdmMoldingMachine({
+          await editMdmMoldingMachine({
             ...row,
             machineStatus,
           });
-          this.$modal.msgSuccess(res.msg);
+          this.$modal.msgSuccess(
+            machineStatus === "0"
+              ? this.$t("ui.mdmMoldingMachine.confirm.enableSuccess")
+              : this.$t("ui.mdmMoldingMachine.confirm.disableSuccess")
+          );
           this.getList();
         } catch (error) {
           this.loading = false;
@@ -457,10 +461,14 @@ export default {
     },
 
     handleExport() {
-      downloadLink(
-        "/maindata/mdmMoldingMachine/export",
-        this.formatParams(false)
-      );
+      this.$confirm(this.$t("ui.mdmMoldingMachine.confirm.export"), {
+        type: "warning",
+      }).then(() => {
+        downloadLink(
+          "/maindata/mdmMoldingMachine/export",
+          this.formatParams(false)
+        );
+      });
     },
 
     handleSelectionChange(rows) {

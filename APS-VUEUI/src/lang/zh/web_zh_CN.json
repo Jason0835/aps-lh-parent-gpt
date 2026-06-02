@@ -163,6 +163,8 @@
   "common.upload.clickUpload": "点击上传",
   "common.upload.onlyXlsXlsx": "仅允许导入xls、xlsx格式文件。",
   "common.upload.downloadTemplate": "下载模板",
+  "common.loading.downloading": "正在下载数据，请稍候",
+  "common.loading.downloadError": "下载文件出现错误，请联系管理员！",
   "common.upload.importResult": "导入结果",
   "common.messageTask.msgTitle": "消息标题",
   "common.messageTask.msgSource": "消息来源",

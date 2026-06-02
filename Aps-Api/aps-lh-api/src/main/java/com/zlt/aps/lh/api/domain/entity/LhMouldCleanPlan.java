@@ -54,7 +54,7 @@ public class LhMouldCleanPlan extends BaseEntity implements Serializable {
 
     @ApiModelProperty(value = "清洗时间")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.mouldCleanPlan.cleanTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ImportExcelValidated(required = true)
     @TableField(value = "CLEAN_TIME")
@@ -70,13 +70,13 @@ public class LhMouldCleanPlan extends BaseEntity implements Serializable {
 
     @ApiModelProperty(value = "清洗时间开始")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField(exist = false)
     private Date cleanTimeBegin;
 
     @ApiModelProperty(value = "清洗时间结束")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField(exist = false)
     private Date cleanTimeEnd;
 
@@ -97,7 +97,7 @@ public class LhMouldCleanPlan extends BaseEntity implements Serializable {
 
     @ApiModelProperty(value = "更新时间")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.mouldCleanPlan.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE)
     private Date updateTime;

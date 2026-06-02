@@ -148,7 +148,7 @@ public class CxStock extends BaseEntity {
     private Date updateDay;
 
     @ImportValidated(maxLength = 300)
-    @Excel(name = "ui.data.column.stock.remark")
+    @Excel(name = "ui.data.column.cxStock.remark")
     private String remark;
 
     /**

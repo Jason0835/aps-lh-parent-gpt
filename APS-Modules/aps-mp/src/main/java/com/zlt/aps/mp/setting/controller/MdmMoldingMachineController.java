@@ -129,7 +129,7 @@ public class MdmMoldingMachineController extends AbstractDocBizController<MdmMol
     /**
      * 导出列表
      */
-    @Log(title = "基础数据-成型机档案", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.mdmMoldingMachine.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override

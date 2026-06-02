@@ -48,7 +48,7 @@ public class LhMouldCleanWarn extends BaseEntity implements Serializable {
 
     @ApiModelProperty(value = "上机时间")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.mouldCleanWarn.operTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ImportExcelValidated(required = true)
     @TableField(value = "OPER_TIME")
@@ -56,14 +56,14 @@ public class LhMouldCleanWarn extends BaseEntity implements Serializable {
 
     @ApiModelProperty(value = "首次清洗时间")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.mouldCleanWarn.firstWashTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @TableField(value = "FIRST_WASH_TIME")
     private Date firstWashTime;
 
     @ApiModelProperty(value = "二次清洗时间")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.mouldCleanWarn.secondWashTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @ImportExcelValidated(required = true)
     @TableField(value = "SECOND_WASH_TIME")
@@ -76,7 +76,7 @@ public class LhMouldCleanWarn extends BaseEntity implements Serializable {
 
     @ApiModelProperty(value = "更新时间")
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "ui.data.column.mouldCleanWarn.updateTime", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     @TableField(value = "UPDATE_TIME", fill = FieldFill.INSERT_UPDATE)
     private Date updateTime;

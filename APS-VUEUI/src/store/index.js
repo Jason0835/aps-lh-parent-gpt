@@ -10,6 +10,7 @@ import createPersistedState from 'vuex-persistedstate'
 
 import molding from './modules/molding'
 import curing from './modules/curing'
+import tqBead from './modules/tqBead'
 import mix from './modules/mix'
 
 import tread from './modules/semifinished/tread'
@@ -42,6 +43,8 @@ const store = new Vuex.Store({
     molding,
     //硫化
     curing,
+    //胎圈
+    tqBead,
     // 半部件
     tread,
     bead,
