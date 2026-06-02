@@ -227,6 +227,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		    F.DAY_29 ,
 		    F.DAY_30 ,
 		    F.DAY_31 ,
+            F.total_qty,
             <if test="isFinal">
             r.ADJUST_QTY1,
             r.ADJUST_QTY2,
