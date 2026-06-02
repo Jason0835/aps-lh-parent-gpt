@@ -154,7 +154,7 @@ public class LhChipStockController extends AbstractDocBizController<LhChipStock>
     /**
      * 导出列表
      */
-    @Log(title = "芯片库存", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.lhChipStock.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override

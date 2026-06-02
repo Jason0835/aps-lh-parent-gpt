@@ -133,7 +133,7 @@ public class LhMachineInfoController extends AbstractDocBizController<LhMachineI
     /**
      * 导出列表
      */
-    @Log(title = "硫化机台信息", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.lh.LhMachineInfo.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导入数据")
     @PostMapping("/exportData/{fileName}")
     @Override

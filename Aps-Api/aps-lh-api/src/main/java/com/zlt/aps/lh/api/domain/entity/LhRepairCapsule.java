@@ -66,7 +66,7 @@ public class LhRepairCapsule extends BaseEntity implements Serializable {
 
     @ApiModelProperty(value = "品牌")
     @TableField(value = "BRAND")
-//    @Excel(name = "ui.data.column.lhRepairCapsule.brand", dictType = "biz_brand_type")
+    @Excel(name = "ui.data.column.lhRepairCapsule.brand", dictType = "biz_brand_type")
     private String brand;
 
     @ApiModelProperty(value = "版本号")

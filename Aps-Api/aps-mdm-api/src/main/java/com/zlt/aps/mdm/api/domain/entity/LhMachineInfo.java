@@ -49,8 +49,7 @@ public class LhMachineInfo extends BaseEntity implements Serializable {
     private String machineCode;
 
     /** 机台名称 */
-//    @ImportExcelValidated(required = true)
-//    @Excel(name = "ui.data.column.info.machineName",sort = 30)
+    @Excel(name = "ui.data.column.info.machineName",sort = 30)
     @ApiModelProperty(value = "机台名称", name = "machineName")
     @TableField(value = "MACHINE_NAME")
     private String machineName;

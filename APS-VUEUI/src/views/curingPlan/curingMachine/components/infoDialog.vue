@@ -80,10 +80,10 @@ export default {
       }
 
       if (chineseCount > 10) {
-        return callback(new Error("中文不能超过10个字符"));
+        return callback(new Error(this.$t("ui.lhMachineInfo.validate.chineseMax")));
       }
       if (asciiCount > 30) {
-        return callback(new Error("字母/数字不能超过30个字符"));
+        return callback(new Error(this.$t("ui.lhMachineInfo.validate.asciiMax")));
       }
       callback();
     };
@@ -462,7 +462,7 @@ export default {
           })
           .catch((error) => {
             console.error(error);
-            reject(new Error("验证失败，请稍后再试"));
+            reject(new Error(this.$t("ui.lhMachineInfo.validate.retry")));
           });
       });
     },
@@ -484,7 +484,7 @@ export default {
             })
             .catch((error) => {
               console.error(error);
-              reject(new Error("验证失败，请稍后再试"));
+              reject(new Error(this.$t("ui.lhMachineInfo.validate.retry")));
             });
         }, 201);
       });
