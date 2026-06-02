@@ -1318,7 +1318,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     .in(MdmMaterialConsumeDetail::getChildMaterialName, codes));
 
             if(CollectionUtils.isNotEmpty(mdmMaterialConsumeDetailList)) {
-                smallGlueMap = mdmMaterialConsumeDetailList.stream().collect(Collectors.toMap(MdmMaterialConsumeDetail::getEmbryoCode, MdmMaterialConsumeDetail::getChildMaterialName));
+                smallGlueMap = mdmMaterialConsumeDetailList.stream()
+                        .collect(Collectors.toMap(MdmMaterialConsumeDetail::getEmbryoCode,
+                                MdmMaterialConsumeDetail::getChildMaterialName, (a, b) -> a));
             }
         }
 
