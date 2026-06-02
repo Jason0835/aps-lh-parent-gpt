@@ -397,7 +397,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         List<FactoryMonthPlanMouldDayResult> list4DayResult = util4DayResult.importExcel(sheetName4DayResult, new ByteArrayInputStream(fileBytes), 3, 1, -1);
 
         // 结构转产导入
-        List<MpStructureAllocationExportVo> list = util.importExcel(sheetName, new ByteArrayInputStream(fileBytes), 2, 2, 10);
+        List<MpStructureAllocationExportVo> list = util.importExcel(sheetName, new ByteArrayInputStream(fileBytes), 2, 2, 13);
         AjaxResult ajaxResult = mpStructureAllocationService.importDataStructureAllocation(list, updateSupport, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap);
         boolean isStrcutreImport = AjaxResultUtils.checkAjaxSuccess(ajaxResult);
         AjaxResult ajaxResult4DayResult = ajaxResult;

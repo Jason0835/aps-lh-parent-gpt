@@ -264,7 +264,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         List<MpStructureAllocationExportVo> list;
         try {
             list4DayResult = util4DayResult.importExcel(sheetName4DayResult, new ByteArrayInputStream(fileBytes), 3, 1, -1);
-            list = util.importExcel(sheetName, new ByteArrayInputStream(fileBytes), 2, 2, 10);
+            list = util.importExcel(sheetName, new ByteArrayInputStream(fileBytes), 2, 2, 13);
         } catch (Exception e) {
             log.warn("importDataStructureAllocation workbook parse failed", e);
             return AjaxResult.error("导入文件格式不正确");
