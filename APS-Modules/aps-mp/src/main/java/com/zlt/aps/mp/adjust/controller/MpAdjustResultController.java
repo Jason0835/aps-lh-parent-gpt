@@ -227,21 +227,25 @@ public class MpAdjustResultController extends AbstractDocBizController<MpAdjustR
         Integer successNum = (Integer)returnData.getOrDefault("successNum", 0);
         List<Object> importErrorLogs = (List<Object>)returnData.get("importErrorLogs");
 
+        AjaxResult logResult; // 日志消息，用于更新日志
         AjaxResult finalResult;
         if (errorNum > 0) {
             finalResult = AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.message.import.fail"), successNum, errorNum), importErrorLogs);
+            logResult = AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + errorNum, importErrorLogs);
         } else if (successNum > 0) {
             finalResult = AjaxResult.success(StringUtils.format(I18nUtil.getMessage("ui.message.import.success"), successNum));
+            logResult = finalResult;
         } else {
             finalResult = ajaxResult;
+            logResult = finalResult;
         }
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(rowCount);
         importLog.setBeginTime(beginTime);
         importLog.setEndTime(endTime);
         importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
-        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, finalResult, this.iImportLogService);
-        ImportExcelUtils.saveImportErrorLogs(finalResult, this.iImportErrorLogService);
+        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, logResult, this.iImportLogService);
+        ImportExcelUtils.saveImportErrorLogs(logResult, this.iImportErrorLogService);
         return finalResult;
     }
     
