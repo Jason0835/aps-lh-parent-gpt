@@ -73,6 +73,15 @@ public class ProductionCapacityParamConfiguration {
      * 每日最小产能
      */
     private Integer dayMinCapacity;
+
+    /**
+     * 月计划日产上限预警阀值
+     */
+    private Integer dayMaxAlarmLimit;
+    /**
+     * 月计划日产下限预警阀值
+     */
+    private Integer dayMinAlarmLimit;
     /**
      * 每日单台成型最大胎胚种类数
      */
