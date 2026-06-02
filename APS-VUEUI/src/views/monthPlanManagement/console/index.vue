@@ -319,7 +319,7 @@ export default {
           label: this.$t("ui.data.column.console.productionVersion"),
           prop: "productionVersion",
           align: "center",
-          minWidth: 180,
+          minWidth: 500,
           render: ({ row }) => {
             if (!row.productionVersion) {
               return "";
