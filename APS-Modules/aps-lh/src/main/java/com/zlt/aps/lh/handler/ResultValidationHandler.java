@@ -593,7 +593,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                         && !r.isRollingInherited()
                         && r.getDailyPlanQty() != null
                         && r.getDailyPlanQty() > 0)
-                .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode, Comparator.nullsLast(String::compareTo))
+                .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
                         .thenComparing(this::resolvePlannedMouldChangeStartTime, Comparator.nullsLast(Date::compareTo))
                         .thenComparing(LhScheduleResult::getSpecEndTime, Comparator.nullsLast(Date::compareTo)))
                 .collect(Collectors.toList());

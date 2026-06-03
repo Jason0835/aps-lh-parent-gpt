@@ -1296,7 +1296,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
      */
     private List<Map<String, Object>> buildCxRemainQtyExportDataList(List<CxScheduleResult> list) {
         List<CxScheduleResult> exportList = Objects.isNull(list) ? Collections.emptyList() :
-                list.stream().sorted(Comparator.comparing(CxScheduleResult::getCxMachineCode)
+                list.stream().sorted(Comparator.comparing(CxScheduleResult::getCxMachineCode, String.CASE_INSENSITIVE_ORDER)
                                 .thenComparing(CxScheduleResult::getMaterialCode))
                         .collect(Collectors.toList());
         if (CollectionUtils.isEmpty(list)) {

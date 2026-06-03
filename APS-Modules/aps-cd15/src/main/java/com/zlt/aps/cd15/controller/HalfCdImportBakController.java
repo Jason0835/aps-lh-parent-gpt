@@ -45,7 +45,7 @@ import com.zlt.aps.nc.service.NcCurlRollService;
 import com.zlt.aps.nc.service.NcParamsService;
 import com.zlt.aps.nc.service.NcScheduleResultService;
 import com.zlt.aps.tq.api.domain.dto.TqScheduleResultDto;
-import com.zlt.aps.tq.service.TqScheduleResultService;
+import com.zlt.aps.tq.api.service.ITqScheduleResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.ExcelReadUtils;
@@ -901,7 +901,7 @@ public class HalfCdImportBakController extends AbstractDocBizController<HalfCdIm
     private NcScheduleResultService ncScheduleResultService;
 
     @Autowired
-    private TqScheduleResultService tqScheduleResultService;
+    private ITqScheduleResultService iTqScheduleResultService;
 
     @Autowired
     private GsqScheduleResultService gsqScheduleResultService;
@@ -1544,7 +1544,7 @@ public class HalfCdImportBakController extends AbstractDocBizController<HalfCdIm
                     }
                 }
             }
-            AjaxResult ajaxResult3 = tqScheduleResultService.importData(tqScheduleResultList, importLog.getId(), scheduleDate);
+            AjaxResult ajaxResult3 = iTqScheduleResultService.importData(tqScheduleResultList, importLog.getId(), scheduleDateStr);
             if (ajaxResult3.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
                 List<ImportErrorLog> tmImportErrorLog = (List<ImportErrorLog>) ajaxResult3.get(AjaxResult.DATA_TAG);
                 importErrorLogs.addAll(tmImportErrorLog);
@@ -1578,7 +1578,7 @@ public class HalfCdImportBakController extends AbstractDocBizController<HalfCdIm
                     }
                 }
             }
-            AjaxResult ajaxResult4 = tqScheduleResultService.importData(tqScheduleResultList, importLog.getId(), scheduleDate);
+            AjaxResult ajaxResult4 = iTqScheduleResultService.importData(tqScheduleResultList, importLog.getId(), scheduleDateStr);
             if (ajaxResult4.get(AjaxResult.CODE_TAG).equals(AjaxResult.Type.ERROR.value())) {
                 List<ImportErrorLog> importErrorLogs1 = (List<ImportErrorLog>) ajaxResult4.get(AjaxResult.DATA_TAG);
                 importErrorLogs.addAll(importErrorLogs1);
