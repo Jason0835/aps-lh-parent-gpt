@@ -48,7 +48,7 @@
     </page-table>
     <tlt-upload-form
       ref="tltUploadForm"
-      :title="$t('common.import.title')"
+      title="导入机台信息数据"
       downloadUrl="/setting/decompose/importTemplate"
       uploadUrl="/setting/decompose/importData"
       @uploadSuccess="getList"
@@ -95,12 +95,12 @@ export default {
             console.log(form);
             return (
               <el-checkbox
-                :label="$t('common.import.updateSupport')"
+                label="是否更新已经存在的用户数据"
                 true-label={true}
                 false-label={false}
                 v-model={form.updateSupport}
               >
-                {this.$t('common.import.updateSupport')}
+                是否更新已经存在的用户数据
               </el-checkbox>
             );
           },
@@ -325,7 +325,7 @@ export default {
       });
     },
     handleExport() {
-      this.$confirm(this.$t("common.confirm.export"), {
+      this.$confirm(this.$t(`确定导出？`), {
         type: "warning",
       }).then(() => {
         try {

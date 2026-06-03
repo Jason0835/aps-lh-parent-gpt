@@ -134,7 +134,7 @@
 
     <tlt-upload-form
       ref="tltUploadForm"
-      :title="$t('common.import.title')"
+      title="导入排程结果数据"
       downloadUrl="/schedule/glueScheduleResult/importTemplate"
       uploadUrl="/schedule/glueScheduleResult/importData"
       @uploadSuccess="getList"
@@ -461,7 +461,7 @@ export default {
               valign: "middle",
               halign: "center",
               align: "center",
-              label: this.$t("schedule.common.expectedStartTime"),
+              label: this.$t("预计开始时间"),
               width: 150,
             },
             {
@@ -469,7 +469,7 @@ export default {
               valign: "middle",
               halign: "center",
               align: "center",
-              label: this.$t("schedule.common.expectedEndTime"),
+              label: this.$t("预计完成时间"),
               width: 150,
             },
             {
@@ -614,7 +614,7 @@ export default {
               valign: "middle",
               halign: "center",
               align: "center",
-              label: this.$t("schedule.common.expectedStartTime"),
+              label: this.$t("预计开始时间"),
               width: 150,
             },
             {
@@ -622,7 +622,7 @@ export default {
               valign: "middle",
               halign: "center",
               align: "center",
-              label: this.$t("schedule.common.expectedEndTime"),
+              label: this.$t("预计完成时间"),
               width: 150,
             },
             {
@@ -726,7 +726,7 @@ export default {
         },
 
         {
-          label: this.$t("schedule.common.midClassWithTime"),
+          label: this.$t("中班（14:00-22:00)"),
           children: [
             {
               prop: "midProduceOrder",
@@ -766,7 +766,7 @@ export default {
               valign: "middle",
               halign: "center",
               align: "center",
-              label: this.$t("schedule.common.expectedStartTime"),
+              label: this.$t("预计开始时间"),
               width: 150,
             },
             {
@@ -774,7 +774,7 @@ export default {
               valign: "middle",
               halign: "center",
               align: "center",
-              label: this.$t("schedule.common.expectedEndTime"),
+              label: this.$t("预计完成时间"),
               width: 150,
             },
             {
@@ -865,7 +865,7 @@ export default {
               halign: "center",
               valign: "middle",
               align: "center",
-              label: this.$t("schedule.common.midRemark"),
+              label: this.$t("中班备注"),
               // editable: {
               //   type: "text",
               //   label: this.$t("schedule.glueScheduleResult.midRemark"),
@@ -926,12 +926,12 @@ export default {
     importColumn() {
       return [
         {
-          label: this.$t("schedule.glueScheduleResult.scheduleDate"),
+          label: "排程日期",
           prop: "scheduleDate",
           type: "date",
         },
         {
-          label: this.$t("schedule.glueScheduleResult.mixArea"),
+          label: "密炼区",
           prop: "mixArea",
           type: "select",
           type: "select",
