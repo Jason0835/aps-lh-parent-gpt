@@ -2928,6 +2928,7 @@
   "ui.data.column.monthlyProductionPlan.embryoCode": "胎胚号",
   "ui.data.column.monthlyProductionPlan.embryoDesc": "胎胚描述",
   "ui.data.column.monthlyProductionPlan.inch": "英寸",
+  "ui.data.column.monthlyProductionPlan.originalTotalQty": "定稿排产量",
   "ui.data.column.monthlyProductionPlan.adjustQty1": "调整1",
   "ui.data.column.monthlyProductionPlan.adjustQty2": "调整2",
   "ui.data.column.monthlyProductionPlan.adjustQty3": "调整3",
