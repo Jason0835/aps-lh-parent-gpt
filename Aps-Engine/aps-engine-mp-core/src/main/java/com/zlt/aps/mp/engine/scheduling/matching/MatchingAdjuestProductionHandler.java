@@ -1730,6 +1730,8 @@ public class MatchingAdjuestProductionHandler {
         configuration.setSingleCxEmbryoCodeCount((Integer) paramConfigurationMap.get(MonthPlanEnums.SINGLE_CX_EMBRYO_CODE_COUNT.getCode()));
         configuration.setDayMaxCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MAX_CAPACITY.getCode()));
         configuration.setDayMinCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MIN_CAPACITY.getCode()));
+        configuration.setDayMaxAlarmLimit((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MAX_ALARM_LIMIT.getCode()));
+        configuration.setDayMinAlarmLimit((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MIN_ALARM_LIMIT.getCode()));
         configuration.setDeductionLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.CHANGE_STRUCT_DEC_LH_MACHINES.getCode()));
         //降膜排产相关
         configuration.setDeductMouldMinLhMachineCount((Integer) paramConfigurationMap.get(MonthPlanEnums.DEDUCT_MOULD_MIN_LH_MACHINE_COUNT.getCode()));

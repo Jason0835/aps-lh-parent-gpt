@@ -349,7 +349,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     @PostMapping("/generate")
     public AjaxResult generateSchedule(@RequestBody ScheduleGenerateVo dto) {
         if (dto.getScheduleDate() == null) {
-            return AjaxResult.error("排程日期不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.scheduleDateRequired"));
         }
         if (dto.getDays() == null || dto.getDays() < 1) {
             // 默认排产3天
@@ -381,9 +381,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             summary.setErrors(result.getValidationErrors());
             summary.setWarnings(result.getValidationWarnings());
             return AjaxResult.error(
-                    "排程失败[" + dto.getScheduleDate() + "]: 数据完整性校验不通过，共 "
-                            + summary.getErrorCount() + " 项错误，"
-                            + summary.getWarningCount() + " 项警告",
+                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.scheduleFailedSummary"),
+                            dto.getScheduleDate(), summary.getErrorCount(), summary.getWarningCount()),
                     summary);
         }
     }
@@ -461,7 +460,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         try {
             String token = scheduleExecutionGuard.acquire(dto.getFactoryCode(), scheduleLocalDate);
             if (token == null) {
-                return AjaxResult.error("排程下发操作正在进行中，请稍后再试");
+                return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.publishInProgress"));
             }
             try {
                 AjaxResult issueResult = doIssueCxScheduleResultToMes(dto.getScheduleDate(), selectedIds);
@@ -519,7 +518,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         }
 
         if (scheduleResultList.isEmpty()) {
-            return AjaxResult.error("没有需要下发的成型排程结果数据");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.noDataToIssue"));
         }
 
         List<CxScheduleResultIssue> day1IssueList = new ArrayList<>();
@@ -544,7 +543,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         }
 
         if (day1IssueList.isEmpty() && day2IssueList.isEmpty() && day3IssueList.isEmpty()) {
-            return AjaxResult.error("没有需要下发的成型排程结果数据");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.noDataToIssue"));
         }
 
         List<CxScheduleResultIssue> allIssueList = new ArrayList<>();
@@ -691,7 +690,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         List<CxScheduleResult> scheduleResultList = cxScheduleResultService.listByScheduleDate(today);
 
         if (scheduleResultList.isEmpty()) {
-            return AjaxResult.error("没有需要下发的成型排程结果数据");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.noDataToIssue"));
         }
 
         // 转换为3天的下发数据
@@ -720,7 +719,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         }
 
         if (day1IssueList.isEmpty() && day2IssueList.isEmpty() && day3IssueList.isEmpty()) {
-            return AjaxResult.error("没有需要下发的成型排程结果数据");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.noDataToIssue"));
         }
 
         // 合并所有数据并调用下发接口
@@ -1006,12 +1005,12 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     @PostMapping("/adjustQty")
     public AjaxResult adjustQty(@RequestBody ScheduleAdjustVo vo) {
         if (vo.getId() == null) {
-            return AjaxResult.error("排程记录ID不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.recordIdRequired"));
         }
 
         CxScheduleResult record = cxScheduleResultMapper.selectById(vo.getId());
         if (record == null) {
-            return AjaxResult.error("排程记录不存在");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.recordNotFound"));
         }
 
         LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
@@ -1064,8 +1063,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                 BigDecimal newTime = newPlanQtys[i].multiply(singleTireTime);
                 BigDecimal adjustedTotal = existingTime[i].subtract(oldTime).add(newTime);
                 if (adjustedTotal.compareTo(shiftTotalSeconds) > 0) {
-                    return AjaxResult.error("调量失败：" + shiftNames[i] + "调整后总耗时(" + formatSeconds(adjustedTotal)
-                            + ")超过每班8h");
+                    return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.failed.timeExceeded"),
+                            shiftNames[i], formatSeconds(adjustedTotal), formatSeconds(shiftTotalSeconds)));
                 }
             }
         }
@@ -1116,9 +1115,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         int rows = cxScheduleResultMapper.updateById(record);
         if (rows > 0) {
             log.info("调量成功，记录ID：{}", vo.getId());
-            return AjaxResult.success("调量成功");
+            return AjaxResult.success(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.success"));
         } else {
-            return AjaxResult.error("调量失败");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.failed"));
         }
     }
 
@@ -1154,11 +1153,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             }
 
             if (isShiftPast(i, scheduleLocalDate, now, configMap)) {
-                return AjaxResult.error(shiftNames[i] + "计划量不可调整：该班次已过");
+                return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.shiftNotAdjustable"), shiftNames[i]));
             }
 
             if (finishQtys[i] != null && planQtys[i].compareTo(finishQtys[i]) < 0) {
-                return AjaxResult.error(shiftNames[i] + "计划量不能低于已完成量：" + finishQtys[i]);
+                return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.belowFinishQty"), shiftNames[i], finishQtys[i]));
             }
         }
 
@@ -1268,7 +1267,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     @PostMapping("/insertOrder")
     public AjaxResult insertOrder(@RequestBody ScheduleInsertVo vo) {
         if (vo.getScheduleDate() == null || vo.getCxMachineCode() == null || vo.getEmbryoCode() == null) {
-            return AjaxResult.error("排程日期、机台编码、胎胚编码不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.requiredFields"));
         }
 
         Date scheduleDate = DateUtil.parse(vo.getScheduleDate());
@@ -1287,7 +1286,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
         Long count = cxScheduleResultMapper.selectCount(queryWrapper);
         if (count > 0) {
-            return AjaxResult.error("插单失败：该日已存在相同机台、胎胚、物料的排程记录");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.duplicateRecord"));
         }
 
         // 校验该机台是否配置了不可作业规格/物料
@@ -1298,12 +1297,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             // 检查不可作业结构
             if (vo.getStructureName() != null
                     && machineFixed.getSplitDisableStructure().contains(vo.getStructureName())) {
-                return AjaxResult.error("当前插单规格不可在" + vo.getCxMachineCode() + "机台生产");
+                return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.specNotMatchMachine"), vo.getCxMachineCode()));
             }
-            // 检查不可作业SKU（物料编码）
             if (vo.getMaterialCode() != null
                     && machineFixed.getSplitDisableMaterialCode().contains(vo.getMaterialCode())) {
-                return AjaxResult.error("当前插单规格不可在" + vo.getCxMachineCode() + "机台生产");
+                return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.specNotMatchMachine"), vo.getCxMachineCode()));
             }
         }
 
@@ -1380,7 +1378,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                         msg.append("  ").append(line).append("<br/>");
                     }
                 }
-                msg.append("<br/>💡 提示：请减少插单计划量或清理该机台已有记录");
+                msg.append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.reducePlanHint"));
                 return AjaxResult.error(msg.toString());
             }
         }
@@ -1519,9 +1517,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         int rows = cxScheduleResultMapper.insert(newRecord);
         if (rows > 0) {
             log.info("插单成功，记录ID：{}", newRecord.getId());
-            return AjaxResult.success("插单成功");
+            return AjaxResult.success(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.success"));
         } else {
-            return AjaxResult.error("插单失败");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.failed"));
         }
     }
 
@@ -1536,17 +1534,16 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     @PostMapping("/updateRemark")
     public AjaxResult updateRemark(@RequestBody ScheduleUpdateRemarkVo vo) {
         if (vo.getId() == null) {
-            return AjaxResult.error("排程记录ID不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.updateRecord.recordIdRequired"));
         }
 
         CxScheduleResult record = cxScheduleResultMapper.selectById(vo.getId());
         if (record == null) {
-            return AjaxResult.error("排程记录不存在");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.updateRecord.recordNotFound"));
         }
 
-        // 若已发布，不允许修改
         if ("1".equals(record.getIsRelease())) {
-            return AjaxResult.error("已发布的排程记录不允许修改");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.updateRecord.publishedNotEditable"));
         }
 
         // 更新备注和原因分析
@@ -1563,9 +1560,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         int rows = cxScheduleResultMapper.updateById(record);
         if (rows > 0) {
             log.info("修改成功，记录ID：{}", vo.getId());
-            return AjaxResult.success("数据修改成功");
+            return AjaxResult.success(I18nUtil.getMessage("ui.data.column.cxScheduleResult.updateRecord.success"));
         } else {
-            return AjaxResult.error("修改失败");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.updateRecord.failed"));
         }
     }
 
@@ -1583,15 +1580,15 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     @PostMapping("/transferMachine")
     public AjaxResult transferMachine(@RequestBody ScheduleTransferMachineVo vo) {
         if (vo.getIds() == null || vo.getIds().isEmpty()) {
-            return AjaxResult.error("请选择需要转机台的记录");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.selectRecord"));
         }
         if (vo.getNewMachineCode() == null) {
-            return AjaxResult.error("新机台编码不能为空");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.newMachineCodeRequired"));
         }
 
         List<CxScheduleResult> records = cxScheduleResultMapper.selectBatchIds(vo.getIds());
         if (records.isEmpty()) {
-            return AjaxResult.error("未找到排程记录");
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.recordNotFound"));
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -1605,9 +1602,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             LocalDate scheduleLocalDate = DateUtil.toLocalDateTime(record.getScheduleDate()).toLocalDate();
 
             if (scheduleLocalDate.isBefore(now.toLocalDate())) {
-                return AjaxResult.error("<b>转机台失败</b><br/>胎胚：" + record.getEmbryoCode()
-                        + "<br/>物料：" + (record.getMaterialCode() != null ? record.getMaterialCode() : "")
-                        + "<br/>排程日期(" + DateUtil.formatDate(record.getScheduleDate()) + ")为历史日期，不可转机台");
+                return AjaxResult.error("<b>" + I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.failed") + "</b><br/>"
+                        + record.getEmbryoCode() + " / " + (record.getMaterialCode() != null ? record.getMaterialCode() : "")
+                        + " - " + StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.failed.historyDate"), DateUtil.formatDate(record.getScheduleDate())));
             }
 
             boolean hasTransferableShift = false;
@@ -1618,9 +1615,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                 }
             }
             if (!hasTransferableShift) {
-                return AjaxResult.error("<b>转机台失败</b><br/>胎胚：" + record.getEmbryoCode()
-                        + "<br/>物料：" + (record.getMaterialCode() != null ? record.getMaterialCode() : "")
-                        + "<br/>排程日期(" + DateUtil.formatDate(record.getScheduleDate()) + ")没有可转移的班次计划");
+                return AjaxResult.error("<b>" + I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.failed") + "</b><br/>"
+                        + record.getEmbryoCode() + " / " + (record.getMaterialCode() != null ? record.getMaterialCode() : "")
+                        + " - " + StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.failed.noTransferableShift"), DateUtil.formatDate(record.getScheduleDate())));
             }
 
             // 校验新机台唯一性（排程日期 + 新机台 + 胎胚 + 物料）
@@ -1635,12 +1632,10 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             }
             Long duplicateCount = cxScheduleResultMapper.selectCount(uniqueCheck);
             if (duplicateCount > 0) {
-                return AjaxResult.error("<b>转机台失败</b><br/>"
-                        + "新机台(" + vo.getNewMachineCode() + ")<br/>"
-                        + "排程日期：" + DateUtil.formatDate(record.getScheduleDate()) + "<br/>"
-                        + "胎胚：" + record.getEmbryoCode() + "<br/>"
-                        + "物料：" + record.getMaterialCode() + "<br/>"
-                        + "<br/>该机台当天已存在相同胎胚、物料的排程记录");
+                return AjaxResult.error("<b>" + I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.failed") + "</b><br/>"
+                        + vo.getNewMachineCode() + " / " + DateUtil.formatDate(record.getScheduleDate())
+                        + " / " + record.getEmbryoCode() + " / " + record.getMaterialCode()
+                        + "<br/>" + I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.failed.duplicateRecord"));
             }
 
             transferRecords.add(record);
@@ -1652,7 +1647,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                         .eq("CX_MACHINE_CODE", vo.getNewMachineCode())
                         .eq("IS_ACTIVE", 1));
         if (newMachine == null) {
-            return AjaxResult.error("新机台(" + vo.getNewMachineCode() + ")不存在或未启用");
+            return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.newMachineNotFound"), vo.getNewMachineCode()));
         }
 
         // 产能校验（未确认时返回提示不强制拦截，已确认时跳过直接执行）
@@ -1692,7 +1687,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         }
 
         log.info("转机台成功，记录数：{}", transferRecords.size());
-        return AjaxResult.success("转机台成功");
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.success"));
     }
 
     /**

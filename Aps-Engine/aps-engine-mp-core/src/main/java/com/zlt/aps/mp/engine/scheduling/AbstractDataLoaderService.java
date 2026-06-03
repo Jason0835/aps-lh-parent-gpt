@@ -488,6 +488,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         paramCodeList.add(MonthPlanEnums.SINGLE_CX_EMBRYO_CODE_COUNT.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_MAX_CAPACITY.getCode());
         paramCodeList.add(MonthPlanEnums.DAY_MIN_CAPACITY.getCode());
+        paramCodeList.add(MonthPlanEnums.DAY_MAX_ALARM_LIMIT.getCode());
+        paramCodeList.add(MonthPlanEnums.DAY_MIN_ALARM_LIMIT.getCode());
         paramCodeList.add(MonthPlanEnums.PRODUCTION_MODE.getCode());
         paramCodeList.add(MonthPlanEnums.SINGLE_CX_MACHINE_CHANGE_PRO_SIZE_REPEAT_COUNT.getCode());
         //排产控制相关
@@ -586,6 +588,8 @@ public abstract class AbstractDataLoaderService extends AbstractInitDataLoadServ
         configuration.setSingleCxEmbryoCodeCount((Integer) paramConfigurationMap.get(MonthPlanEnums.SINGLE_CX_EMBRYO_CODE_COUNT.getCode()));
         configuration.setDayMaxCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MAX_CAPACITY.getCode()));
         configuration.setDayMinCapacity((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MIN_CAPACITY.getCode()));
+        configuration.setDayMaxAlarmLimit((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MAX_ALARM_LIMIT.getCode()));
+        configuration.setDayMinAlarmLimit((Integer) paramConfigurationMap.get(MonthPlanEnums.DAY_MIN_ALARM_LIMIT.getCode()));
         //20260511+ 单机台允许重复切换英寸的最大次数
         Object changeProSizeRepeatMaxCountValue = paramConfigurationMap.get(MonthPlanEnums.SINGLE_CX_MACHINE_CHANGE_PRO_SIZE_REPEAT_COUNT.getCode());
         if (null == changeProSizeRepeatMaxCountValue) {

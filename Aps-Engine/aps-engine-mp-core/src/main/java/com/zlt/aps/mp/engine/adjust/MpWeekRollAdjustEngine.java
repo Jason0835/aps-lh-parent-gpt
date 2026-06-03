@@ -2626,7 +2626,7 @@ public class MpWeekRollAdjustEngine {
         int preDayMouldValue = 0;
         StringBuilder sb = new StringBuilder();
         for (int i=startDay;i<=FactoryConstant.MONTH_MAX_DAY;i++){
-            if (!hasPlanByDay(mpFinalVo,i)){
+            if (preDayMouldValue ==0 && !hasPlanByDay(mpFinalVo,i)){
                 continue;
             }
             if (dailyCapacityMap.get(i) == null){

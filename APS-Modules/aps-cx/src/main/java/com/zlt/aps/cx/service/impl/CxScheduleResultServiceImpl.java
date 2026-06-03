@@ -16,6 +16,7 @@ import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.domain.CellStyle;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.config.CxKeyProduct;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
@@ -31,6 +32,7 @@ import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialConsumeDetail;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
+import com.zlt.aps.mp.api.domain.entity.MdmMonthSurplus;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.service.IFactoryMonthPlanProductionFinalResultRemoteService;
 import com.zlt.aps.mp.api.service.IMpStructureAllocationRemoteService;
@@ -100,6 +102,12 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
     @Autowired
     private FactoryMonthPlanProductionFinalResultMapper monthPlanMapper;
+
+    @Autowired
+    private MdmMonthSurplusMapper monthSurplusMapper;
+
+    @Autowired
+    private CxStockMapper stockMapper;
 
     @Override
     public List<CxScheduleResult> listByScheduleDate(LocalDate scheduleDate) {
@@ -1318,7 +1326,9 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                     .in(MdmMaterialConsumeDetail::getChildMaterialName, codes));
 
             if(CollectionUtils.isNotEmpty(mdmMaterialConsumeDetailList)) {
-                smallGlueMap = mdmMaterialConsumeDetailList.stream().collect(Collectors.toMap(MdmMaterialConsumeDetail::getEmbryoCode, MdmMaterialConsumeDetail::getChildMaterialName));
+                smallGlueMap = mdmMaterialConsumeDetailList.stream()
+                        .collect(Collectors.toMap(MdmMaterialConsumeDetail::getEmbryoCode,
+                                MdmMaterialConsumeDetail::getChildMaterialName, (a, b) -> a));
             }
         }
 
@@ -1699,8 +1709,8 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             log.debug("结构切换: machineStructureGroup keys={}", machineStructureGroup.keySet());
         }
 
-        // 计算机台+前结构的成型余量（按物料去重后汇总）
-        BigDecimal remainQtyVal = calculateStructureRemainQty(prevGroupList);
+        // 计算机台+前结构的成型余量（按排程算法：硫化余量-库存）
+        BigDecimal remainQtyVal = calculateStructureRemainQty(prevGroupList, year, month);
         String remainQty = remainQtyVal.compareTo(BigDecimal.ZERO) > 0 ? remainQtyVal.toString() : "";
 
         // 预计收尾时间：前结构分组中最后一个有值班次对应的日期
@@ -1826,6 +1836,79 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
                         .max(Comparator.naturalOrder())
                         .orElse(BigDecimal.ZERO))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * 计算结构切换的成型余量（按排程算法：硫化余量-库存）。
+     *
+     * @param groupList 机台+结构分组记录
+     * @param year 年份
+     * @param month 月份
+     * @return 成型余量总和
+     */
+    private BigDecimal calculateStructureRemainQty(List<CxScheduleResult> groupList, int year, int month) {
+        if (CollectionUtils.isEmpty(groupList)) {
+            return BigDecimal.ZERO;
+        }
+
+        String factoryCode = groupList.stream()
+                .map(CxScheduleResult::getFactoryCode)
+                .filter(StringUtils::isNotBlank)
+                .findFirst()
+                .orElse(null);
+
+        if (factoryCode == null) {
+            return BigDecimal.ZERO;
+        }
+
+        Set<String> materialCodes = groupList.stream()
+                .map(CxScheduleResult::getMaterialCode)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
+
+        if (materialCodes.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        // embryoCode → materialCode 映射（同一embryoCode可能对应多个materialCode）
+        Map<String, Set<String>> embryoToMaterials = groupList.stream()
+                .filter(r -> StringUtils.isNotBlank(r.getEmbryoCode()) && StringUtils.isNotBlank(r.getMaterialCode()))
+                .collect(Collectors.groupingBy(
+                        r -> r.getEmbryoCode().trim(),
+                        Collectors.mapping(r -> r.getMaterialCode().trim(), Collectors.toSet())));
+
+        List<MdmMonthSurplus> monthSurplusList = monthSurplusMapper.selectByYearMonth(year, month);
+        Map<String, MdmMonthSurplus> monthSurplusMap = monthSurplusList.stream()
+                .filter(s -> s.getMaterialCode() != null)
+                .collect(Collectors.toMap(MdmMonthSurplus::getMaterialCode, s -> s, (a, b) -> a));
+
+        // 按胎胚编码查询库存，然后汇总到物料维度
+        Set<String> embryoCodes = embryoToMaterials.keySet();
+        List<CxStock> stockList = stockMapper.selectList(
+                new LambdaQueryWrapper<CxStock>()
+                        .eq(CxStock::getFactoryCode, factoryCode)
+                        .in(CxStock::getEmbryoCode, embryoCodes));
+        Map<String, Integer> materialStockMap = new HashMap<>();
+        for (CxStock stock : stockList) {
+            String embryoCode = stock.getEmbryoCode() != null ? stock.getEmbryoCode().trim() : "";
+            int stockNum = stock.getEffectiveStock() != null ? stock.getEffectiveStock() : 0;
+            Set<String> mcSet = embryoToMaterials.getOrDefault(embryoCode, Collections.emptySet());
+            for (String mc : mcSet) {
+                materialStockMap.merge(mc, stockNum, Integer::sum);
+            }
+        }
+
+        BigDecimal totalRemainder = BigDecimal.ZERO;
+        for (String materialCode : materialCodes) {
+            MdmMonthSurplus surplus = monthSurplusMap.get(materialCode);
+            int vulcanizingRemainder = surplus != null && surplus.getPlanSurplusQty() != null
+                    ? surplus.getPlanSurplusQty().intValue() : 0;
+            int stockVal = materialStockMap.getOrDefault(materialCode, 0);
+            int formingRemainder = Math.max(0, vulcanizingRemainder - stockVal);
+            totalRemainder = totalRemainder.add(BigDecimal.valueOf(formingRemainder));
+        }
+
+        return totalRemainder;
     }
 
     /**

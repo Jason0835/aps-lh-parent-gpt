@@ -192,11 +192,11 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             context.setCurrentScheduleDate(currentScheduleDate);
             context.setCurrentShiftConfigs(singleShiftList);
 
-            // 跨天时重置单日状态（按天管控的计数器/标记在进入新一天时清空）
+            // 跨天时重置试制/量试单日SKU上限计数（单日最多2个试制+量试SKU）
             if (day != lastDay) {
-                context.setDailyTrialAssignedMaterialCodes(new HashSet<>());   // 试制/量试单日SKU上限计数（每天最多2个）
-                context.setPrecisionPlanApplied(false);                        // 精度计划已执行标记（每天首次班次挑选）
-                context.setSupplementDailyRemainingMap(new HashMap<>());      // 补充计划每日剩余需求跟踪（按lhId→剩余量，用于立库库容管控+R2轮补产）
+                context.setDailyTrialAssignedMaterialCodes(new HashSet<>());
+                context.setPrecisionPlanApplied(false);
+                context.setSupplementDailyRemainingMap(new HashMap<>());
             }
 
             // 执行该班次的排程
@@ -223,6 +223,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
         // ==================== 合并多班次结果：每个机台一条记录，8个班次映射到CLASS1~8 ====================
         List<CxScheduleResult> allResults = buildFinalScheduleResultsFromShifts(context, shiftResults, allShiftConfigs);
+
+        // ==================== 精度计划扣量已移至每日首次班次排产前执行 ====================
 
         // ==================== 班次量均衡：按结构班产标准，最大硫化机数胎胚调整班次均衡 ====================
         balanceShiftQuantities(context, shiftResults, allShiftConfigs);
@@ -1706,6 +1708,21 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     if (existing.getShiftCode() == null && spr.getShiftCode() != null) {
                         existing.setShiftCode(spr.getShiftCode());
                     }
+                    // 累加 sourceTask 的 vulcanizeMachineCount 和 vulcanizeMoldCount
+                    CoreScheduleAlgorithmService.DailyEmbryoTask existingTask = existing.getSourceTask();
+                    CoreScheduleAlgorithmService.DailyEmbryoTask sprTask = spr.getSourceTask();
+                    if (existingTask != null && sprTask != null) {
+                        Integer existingVmc = existingTask.getVulcanizeMachineCount();
+                        Integer sprVmc = sprTask.getVulcanizeMachineCount();
+                        if (existingVmc != null && sprVmc != null) {
+                            existingTask.setVulcanizeMachineCount(existingVmc + sprVmc);
+                        }
+                        Integer existingVmd = existingTask.getVulcanizeMoldCount();
+                        Integer sprVmd = sprTask.getVulcanizeMoldCount();
+                        if (existingVmd != null && sprVmd != null) {
+                            existingTask.setVulcanizeMoldCount(existingVmd + sprVmd);
+                        }
+                    }
                 }
             }
 
@@ -1720,12 +1737,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
                 CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
                 if (task != null) {
-                    if (task.getVulcanizeMachineCount() != null) {
-                        tracker.setVulcanizeMachineCount(task.getVulcanizeMachineCount());
-                    }
-                    if (task.getVulcanizeMoldCount() != null) {
-                        tracker.setVulcanizeMoldCount(task.getVulcanizeMoldCount());
-                    }
+                    // 每个班次都从当班合并后的task中获取，覆盖之前的值
+                    tracker.setVulcanizeMachineCount(task.getVulcanizeMachineCount());
+                    tracker.setVulcanizeMoldCount(task.getVulcanizeMoldCount());
                     // 每个班次开始时，更新beginStock为上一班次结束时的库存（currentStock），
                     // 并重置累计值，使stockHours反映当前班次的实时库存水位
                     if (tracker.getBeginStock() != null) {
@@ -1792,9 +1806,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     // 计算当前车次后的库存可供硫化时长（= 期初 + 包含本车次在内的累计成型 - 硫化累计）
                     int currentStock = tracker.getCurrentStock();
                     double stockHours = calculateStockHours(
-                            currentStock, tracker.getCumulativeForming(),
-                            tracker.getCumulativeVulcanize(),
-                            tracker.getVulcanizeMachineCount(), tracker.getVulcanizeMoldCount(),
+                            currentStock, tracker.getVulcanizeMoldCount(),
                             tracker.getDailyLhCapacity());
 
                     // 计算车次时间
@@ -1946,27 +1958,19 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
      * <p>其中当前库存 = 期初库存 + 成型累计 - 硫化累计
      *
      * @param currentStock      当前库存（期初库存 + 成型累计 - 硫化累计）
-     * @param cumulativeForming 成型累计生产量
-     * @param vulcanizeConsumed 硫化累计消耗量
-     * @param vulcanizeMachineCount 硫化机台数
      * @param vulcanizeMoldCount   单台模数
      * @param dailyLhCapacity   日硫化量（单模）
      * @return 库存可供硫化时长（小时）
      */
-    private double calculateStockHours(int currentStock, int cumulativeForming,
-                                       int vulcanizeConsumed,
-                                       int vulcanizeMachineCount, int vulcanizeMoldCount,
+    private double calculateStockHours(int currentStock, int vulcanizeMoldCount,
                                        Integer dailyLhCapacity) {
-        if (vulcanizeMachineCount <= 0 || vulcanizeMoldCount <= 0 || dailyLhCapacity == null || dailyLhCapacity <= 0) {
+        if (vulcanizeMoldCount <= 0 || dailyLhCapacity == null || dailyLhCapacity <= 0) {
             return 0;
         }
-        // 1. 单胎单模硫化时长(秒) = 86400 / 日硫化量
         double singleTireMoldSeconds = (double) SECONDS_PER_DAY / dailyLhCapacity;
 
-        // 2. 库存可供硫化时长(小时) = 当前库存 × 单胎单模硫化时长 / 3600 / 硫化机数 / 单台模数
-        // 注意: currentStock = 期初库存 + 成型累计 - 硫化累计，已经包含了成型累计，不需要再加cumulativeForming
         return (double) currentStock * singleTireMoldSeconds
-                / SECONDS_PER_HOUR / vulcanizeMachineCount / vulcanizeMoldCount;
+                / SECONDS_PER_HOUR / vulcanizeMoldCount;
     }
 
     /**
@@ -3067,7 +3071,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         if (lhCapacityMap != null && materialCode != null) {
             MonthPlanProductLhCapacityVo capacityVo = lhCapacityMap.get(materialCode);
             if (capacityVo != null) {
-                dailyLhCapacity = capacityVo.getDefaultDayVulcanizationQty();
+                dailyLhCapacity = capacityVo.getDayVulcanizationQty();
             }
         }
 

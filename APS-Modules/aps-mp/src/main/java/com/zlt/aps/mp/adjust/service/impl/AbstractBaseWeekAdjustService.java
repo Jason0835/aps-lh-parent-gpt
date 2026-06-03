@@ -1003,6 +1003,12 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (StringUtil.isEmptyWithTrim(contextDTO.getVersion())){
             throw new BusinessException(I18nUtil.getMessage("ui.data.alert.mpWeekRollAdjust.versionEmpty"));
         }
+        // 设置周程滚动参数
+        contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), ProductTypeEnum.WHOLE_STEEL.getValue()));
+
+        // 设置调整日（依赖 paramMap）
+        setAdjustDate(contextDTO);
+
         // 1、查询周程调整结果
         queryAdjustResult(contextDTO);
         // 2、查询调整明细
@@ -1081,6 +1087,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         contextDTO.setFactoryMonthPlanProdFinalList(adjustVos);
         // 2、处理月计划统计结果
         if (isHandleMonthPlanStatistics) {
+            // 设置周程滚动参数
+            contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), ProductTypeEnum.WHOLE_STEEL.getValue()));
             handleMonthPlanStatistics(contextDTO,YesOrNoEnum.YES.getCode());
         }
         log.info("周程调整确认流程执行完成");
@@ -1101,19 +1109,17 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         // 结构名称
         String structureNameParam = contextDTO.getStructureName();
 
-        // 获取产品品类
-        String productType = ProductTypeEnum.WHOLE_STEEL.getValue();
         FactoryMonthPlanFinalAdjustVo monthPlan = monthPLanList.get(0);
+        // 获取产品品类
+        /*String productType = ProductTypeEnum.WHOLE_STEEL.getValue();
         if (StringUtils.isNotEmpty(monthPlan.getProductTypeCode())) {
             productType = monthPlan.getProductTypeCode();
-        }
+        }*/
         if (StringUtils.isEmpty(contextDTO.getProductionVersion())){
             contextDTO.setProductionVersion(monthPlan.getProductionVersion());
         }
 
         contextDTO.setLogDetail(new StringBuilder());
-        // 设置周程滚动参数
-        contextDTO.setParamMap(mpAdjustStructureInService.getMpWeekAdjustParam(contextDTO.getFactoryCode(), productType));
         // 设置工作日历
         contextDTO.setWorkCalendarMap(mpAdjustStructureInService.getWorkCalendarMap(contextDTO));
 
@@ -1258,7 +1264,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * 设置调整日
      * @param contextDTO 周程滚动上下文
      */
-    private void setAdjustDate(MpRollAdjustContextDTO contextDTO) {
+    protected void setAdjustDate(MpRollAdjustContextDTO contextDTO) {
         String weekRollAdjustDate = (String) contextDTO.getParamMap().get(MonthPlanEnums.WEEK_ROLL_ADJUST_DATE.getCode());
         Date adjustDate = StringUtil.isEmptyWithTrim(weekRollAdjustDate) ? DateUtils.getNowDate() : DateUtils.parseDate(weekRollAdjustDate);
         if (contextDTO.getMpMonth() != DateUtils.getMonth(adjustDate)){
@@ -1580,14 +1586,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setDifferenceQty(differenceQty);
             // 模具变化信息
             monthPlan.setMouldChangeInfo(adjustResult.getMouldChangeInfo());
-            // 获取周数
-            int week = getWeekNumber(new Date());
-            // 调整量
-            Integer actualAdjustQty = adjustDetailVo.getActualAdjustQty();
-            if (Convert.toInt(actualAdjustQty, 0) == 0) {
-                actualAdjustQty = null;
-            }
-            monthPlan.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, actualAdjustQty);
+            // 设置周调整量
+            int week = getWeekNumber(contextDTO.getAdjustDay());
+            setWeekAdjustQty(monthPlan,week);
             // 设置最新需求计划版本
             monthPlan.setLastMonthPlanVersion(adjustResult.getLastMonthPlanVersion());
             // 设置月度计划开始日期、结束日期
@@ -2471,14 +2472,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             monthPlan.setDifferenceQty(differenceQty);
             // 模具变化信息
             monthPlan.setMouldChangeInfo(adjustResult.getMouldChangeInfo());
-            // 获取周数
-            int week = getWeekNumber(new Date());
-            // 调整量
-            Integer actualAdjustQty = adjustDetail.getActualAdjustQty();
-            if (Convert.toInt(actualAdjustQty, 0) == 0) {
-                actualAdjustQty = null;
-            }
-            monthPlan.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, actualAdjustQty);
+            // 设置周调整量
+            int week = getWeekNumber(contextDTO.getAdjustDay());
+            setWeekAdjustQty(monthPlan, week);
             // 将日期字段中值为0的字段设为null
             handleZeroToNull(monthPlan);
             //monthPlanResultList.add(monthPlan);
@@ -2499,6 +2495,27 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             throw new RuntimeException("更新月度生产计划失败", e);
         }*/
 
+    }
+
+    /**
+     * 设置周调整量
+     * @param monthPlan
+     */
+    private void setWeekAdjustQty(FactoryMonthPlanProductionFinalResult monthPlan,int week) {
+        // 调整量
+        int oriAdjustQty = monthPlan.getOriginalTotalQty();
+        if (week > 1){
+            for (int i = 1; i < week; i++){
+                oriAdjustQty += Convert.toInt(monthPlan.getFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + i), 0);
+            }
+        }
+
+        //Integer actualAdjustQty = adjustDetail.getActualAdjustQty();
+        Integer actualAdjustQty = monthPlan.getTotalQty() - oriAdjustQty;
+        if (Convert.toInt(actualAdjustQty, 0) == 0) {
+            actualAdjustQty = null;
+        }
+        monthPlan.setFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + week, actualAdjustQty);
     }
 
     /**
@@ -2620,12 +2637,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     /**
      * 根据时间获取周次
      * 范围：第1周1-7，第2周8-14，第3周15-21，第4周22-31
-     * @param date
      * @return
      */
-    protected int getWeekNumber(Date date) {
-        int dayOfMonth = DateUtil.dayOfMonth(date);
-        int baseWeek = (dayOfMonth - 1) / 7 + 1;
+    protected int getWeekNumber(int adjustDay) {
+        //int dayOfMonth = DateUtil.dayOfMonth(date);
+        int baseWeek = (adjustDay - 1) / 7 + 1;
         return Math.min(baseWeek, 4);
     }
 
@@ -3512,6 +3528,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (PubUtil.isEmpty(salesOrderPoolList)) {
             return resultList;
         }
+
         // 按物料编码分组，合并同分组下的成型机编码（逗号分隔）
         List<FactoryMonthPlanFinalAdjustVo> mergeMonthPlanProdList = mergeMonthPlanProdList(monthPlanProdList);
         // 生产计划列表按照物料编码进行分组
@@ -3548,6 +3565,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         if (PubUtil.isEmpty(monthPlanProdList)) {
             return resultList;
         }
+
         // 销售订单池列表
         Set<String> salesOrderSet = salesOrderPoolList.stream()
                 .map(SalesOrderPool::getOriMaterialCode)
@@ -3572,7 +3590,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 设置月度生产计划关联的字段
             setPlanRelatedFields(contextDTO, adjustDetailVo, monthPlan, monthPlan.getId());
             // 调整前净需求量
-            setPreviousNetQty(adjustDetailVo, monthPlan);
+            setPreviousNetQty(adjustDetailVo, monthPlan, contextDTO.getAdjustDay());
             // 调整明细来源
             adjustDetailVo.setAdjustItemSource(AdjustItemSourceEnum.MONTH_PLAN.getCode());
             // 添加到结果集
@@ -3592,7 +3610,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 设置月度生产计划关联的字段
             setPlanRelatedFields(contextDTO, emptyAdjustVo, null, busiId);
             // 调整前净需求量
-            setPreviousNetQty(emptyAdjustVo, null);
+            setPreviousNetQty(emptyAdjustVo, null, contextDTO.getAdjustDay());
             // 设置调整明细来源
             setAdjustItemSource(emptyAdjustVo);
             // 添加到结果集
@@ -3606,7 +3624,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 设置月度生产计划关联的字段
             setPlanRelatedFields(contextDTO, adjustDetailVo, monthPlan, busiId);
             // 调整前净需求量
-            setPreviousNetQty(adjustDetailVo, monthPlan);
+            setPreviousNetQty(adjustDetailVo, monthPlan, contextDTO.getAdjustDay());
             // 设置调整明细来源
             setAdjustItemSource(adjustDetailVo);
             // 添加到结果集
@@ -3982,7 +4000,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      * @param adjustDetailVo
      * @param monthPlan
      */
-    protected void setPreviousNetQty(MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan) {
+    protected void setPreviousNetQty(MpAdjustDetailVo adjustDetailVo, FactoryMonthPlanFinalAdjustVo monthPlan, int adjustDay) {
         if (ApsConstant.TRUE.equals(adjustDetailVo.getIsTrial())) {
             // 当为试制量试时，设置为空
             adjustDetailVo.setPreviousNetQty(null);
@@ -3992,7 +4010,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             return;
         }
         // 获取上周的周数
-        int week = getWeekNumber(new Date());
+        int week = getWeekNumber(adjustDay);
         if (week > 1) {
             week = week - 1;
         }

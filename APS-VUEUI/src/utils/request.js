@@ -306,7 +306,7 @@ service.interceptors.response.use(
 // 通用下载方法
 export function download(url, params, filename, config) {
   downloadLoadingInstance = Loading.service({
-    text: '正在下载数据，请稍候',
+    text: i18n.t("common.loading.downloading"),
     spinner: 'el-icon-loading',
     background: 'rgba(0, 0, 0, 0.7)'
   })
@@ -337,14 +337,14 @@ export function download(url, params, filename, config) {
     })
     .catch((r) => {
       console.error(r)
-      Message.error('下载文件出现错误，请联系管理员！')
+      Message.error(i18n.t("common.loading.downloadError"))
       downloadLoadingInstance.close()
     })
 }
 
 export function downloadGet(url, params, filename, config) {
   downloadLoadingInstance = Loading.service({
-    text: "正在下载数据，请稍候",
+    text: i18n.t("common.loading.downloading"),
     spinner: "el-icon-loading",
     background: "rgba(0, 0, 0, 0.7)",
   });
@@ -385,14 +385,14 @@ export function downloadGet(url, params, filename, config) {
     })
     .catch((r) => {
       console.error(r);
-      Message.error("下载文件出现错误，请联系管理员！");
+      Message.error(i18n.t("common.loading.downloadError"));
       downloadLoadingInstance.close();
     });
 }
 
 export function downloadLink(url, params = null, filename = null) {
   downloadLoadingInstance = Loading.service({
-    text: "正在下载数据，请稍候",
+    text: i18n.t("common.loading.downloading"),
     spinner: "el-icon-loading",
     background: "rgba(0, 0, 0, 0.7)",
   });
@@ -441,7 +441,7 @@ export function downloadLink(url, params = null, filename = null) {
         downloadLoadingInstance.close()
       } else {
         console.log(blob);
-        Message.error(blob.msg || "下载文件出现错误，请联系管理员！");
+        Message.error(blob.msg || i18n.t("common.loading.downloadError"));
         downloadLoadingInstance.close()
       }
     })

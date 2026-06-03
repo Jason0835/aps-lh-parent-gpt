@@ -1,5 +1,7 @@
 package com.zlt.aps.cx.service.impl.validation;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
@@ -9,11 +11,6 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * 成型机台校验策略
- *
- * @author APS Team
- */
 @Slf4j
 @Component
 public class MoldingMachineValidationStrategy extends BaseValidationStrategy {
@@ -31,39 +28,37 @@ public class MoldingMachineValidationStrategy extends BaseValidationStrategy {
 
         if (isEmpty(machines)) {
             addError(result,
-                    "成型机台数据为空，无可用机台进行排程",
-                    "请检查成型机台基础数据(T_MDM_MOLDING_MACHINE)是否正确配置");
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.empty"),
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.empty.suggestion"));
             return;
         }
 
-        // 检查机台状态（IS_ACTIVE是整数，1表示启用）
         long activeCount = machines.stream()
                 .filter(m -> m.getIsActive() != null && ApsConstant.APS_STRING_1.equals(m.getIsActive()))
                 .count();
 
         if (activeCount == 0) {
             addError(result,
-                    "没有启用状态的成型机台，无法进行排程",
-                    "请检查机台IS_ACTIVE字段，至少需要1台启用状态的机台");
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.noActive"),
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.noActive.suggestion"));
         } else if (activeCount < machines.size()) {
             addWarn(result,
-                    "部分机台未启用，启用：" + activeCount + "，总计：" + machines.size(),
-                    "如需启用请修改机台IS_ACTIVE字段为'1'");
+                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.partialInactive"), activeCount, machines.size()),
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.partialInactive.suggestion"));
         }
 
-        // 检查关键字段
         long validCount = machines.stream()
                 .filter(m -> m.getCxMachineCode() != null)
                 .count();
 
         if (validCount < machines.size()) {
             addWarn(result,
-                    "部分机台缺少机台编码，有效：" + validCount + "，总计：" + machines.size(),
-                    "请检查机台CX_MACHINE_CODE字段");
+                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.missingCode"), validCount, machines.size()),
+                    I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.missingCode.suggestion"));
         }
 
         addInfo(result,
-                "成型机台数量：" + machines.size() + "，启用：" + activeCount,
+                StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.summary"), machines.size(), activeCount),
                 null);
     }
 }

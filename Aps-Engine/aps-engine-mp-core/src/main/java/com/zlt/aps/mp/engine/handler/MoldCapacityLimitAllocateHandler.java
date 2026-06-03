@@ -185,7 +185,7 @@ public class MoldCapacityLimitAllocateHandler {
      *
      * @param skuList
      */
-    private List<SkuMoldCapacityInfoVo> moldCapacityAllocateHandler(List<SkuMoldCapacityInfoVo> skuList) {
+    public List<SkuMoldCapacityInfoVo> moldCapacityAllocateHandler(List<SkuMoldCapacityInfoVo> skuList) {
         if (CollectionUtils.isEmpty(skuList)) {
             return Collections.emptyList();
         }

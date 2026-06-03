@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -30,6 +31,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONValidator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.google.common.collect.Lists;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.SysDictData;
@@ -43,6 +45,7 @@ import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
+import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
 import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialStockEntityMapper;
@@ -51,8 +54,10 @@ import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
+import com.zlt.aps.mp.api.domain.entity.MdmWorkCalendar;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
+import com.zlt.aps.mp.api.domain.entity.MpSkuMoldCapacityAllocateLog;
 import com.zlt.aps.mp.api.domain.entity.MpStructureAllocation;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialRecord;
 import com.zlt.aps.mp.api.domain.entity.RawSpecialMaterialStock;
@@ -61,6 +66,10 @@ import com.zlt.aps.mp.api.domain.vo.DailyMouldAvailabilityResult;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.common.utils.PubUtil;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.engine.daylimit.MouldAllocationInfoVo;
+import com.zlt.aps.mp.engine.domain.vo.SkuMoldCapacityInfoVo;
+import com.zlt.aps.mp.engine.handler.MoldCapacityLimitAllocateHandler;
+import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductMouldMapper;
 import com.zlt.aps.mp.engine.mapper.MpStructureAllocationMapper;
 import com.zlt.aps.mp.enums.MonthPlanExportDataTypeEnum;
 import com.zlt.aps.mp.factory.dto.FactoryMonthPlanMouldDayResultExportVo;
@@ -106,11 +115,17 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     protected RawSpecialMaterialRecordEntityMapper rawSpecialMaterialRecordMapper;
     @Autowired
     private RawSpecialMaterialStockEntityMapper rawSpecialMaterialStockEntityMapper;
+    @Autowired
+    private MdmWorkCalendarEntityMapper mdmWorkCalendarEntityMapper;
+    @Autowired
+    private FactoryMonthPlanProductMouldMapper factoryMonthPlanProductMouldMapper;
 
     @Autowired
     private ISysDictDataCacheService sysDictDataCacheService;
     @Autowired
     private IFactoryParamService factoryParamService;
+    @Autowired
+    private MoldCapacityLimitAllocateHandler moldCapacityLimitAllocateHandler;
     
     /**
      * 日计划字段名称
@@ -189,8 +204,6 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                 .selectList(structureQueryWrapper).stream().collect(
                         Collectors.toMap(MpStructureAllocation::getStructureName, Function.identity(), (s1, s2) -> s1));
         // 1.6、加载型腔数活块数
-//        LocalDate monthStart = LocalDate.of(params.getYear(), params.getMonth(), ProductionConstant.MONTH_START_DAY);
-//        DateUtils.getDate(monthStart.with(TemporalAdjusters.lastDayOfMonth()))
         Map<String, Integer> cavityResults = new HashMap<>(0); // 型腔可用量（按结构+主花纹分组）
         Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
         List<DailyMouldAvailabilityResult> moldResult = moldCavityInsertMaxValueCalculator
@@ -200,6 +213,20 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             cavityResults = moldResult.get(0).getCavityResults();
             insertResults = moldResult.get(0).getInsertResults();
         }
+        // 1.7、加载本月工作日历
+        LambdaQueryWrapper<MdmWorkCalendar> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MdmWorkCalendar::getFactoryCode, params.getFactoryCode());
+        queryWrapper.eq(MdmWorkCalendar::getYear, params.getYear());
+        queryWrapper.eq(MdmWorkCalendar::getMonth, params.getMonth());
+        queryWrapper.eq(MdmWorkCalendar::getIsDelete, YesOrNoEnum.NO.getValue());
+        queryWrapper.eq(MdmWorkCalendar::getProcCode, "01");
+        Set<Integer> workDaySet = mdmWorkCalendarEntityMapper.selectList(queryWrapper).stream()
+                .filter(calendar -> ApsConstant.TRUE.equals(calendar.getDayFlag())).map(MdmWorkCalendar::getDay)
+                .distinct().collect(Collectors.toSet());
+        
+        // 1.8、加载结构模具分配比例
+        List<MouldAllocationInfoVo> mouldAllocationInfoList = factoryMonthPlanProductMouldMapper
+                .getMouldAllocationInfo(params.getFactoryCode(), params.getYear(), params.getMonth());
 
         // 2、构建导出总表
         List<FactoryMonthPlanMouldDayResultExportVo> totalRecordList = new LinkedList<>(); // 导出数据总表
@@ -308,6 +335,11 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     .thenComparing(Comparator.comparing(FactoryMonthPlanMouldDayResultExportVo::getMaterialDesc, Comparator.nullsLast(String::compareTo))) // 物料描述
                     );// 排序
             totalRecordList.addAll(structureList);
+            
+            // 2.1.2.7、如果是导出定稿版本，需要计算模具产能受限情况
+            if (isFinal) {
+                this.moldCapacityAllocate(structureName, structureList, workDaySet, mouldAllocationInfoList);
+            }
 
             // 2.1.3、添加结构排产信息汇总行（胎胚种类数、硫化机台数）
             FactoryMonthPlanMouldDayResultExportVo embryoCountStatisticsRecord = new FactoryMonthPlanMouldDayResultExportVo();
@@ -365,6 +397,77 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         return totalRecordList;
     }
 
+    /**
+     * 计算模具产能受限情况
+     * @param structureName
+     * @param structureList
+     * @param workDaySet
+     */
+    private void moldCapacityAllocate(String structureName, List<FactoryMonthPlanMouldDayResultExportVo> structureList,
+            Set<Integer> workDaySet, List<MouldAllocationInfoVo> mouldAllocationInfoList) {
+        //获取对应的模具产能
+        Integer dayCapacityQty = structureList.stream()
+                .map(FactoryMonthPlanMouldDayResultExportVo::getDayVulcanizationQty).filter(Objects::nonNull)
+                .max(Integer::compareTo).orElse(null);
+        Integer maxProductionDays = workDaySet.size();
+        Map<String, Integer> mouldAllocationMap = mouldAllocationInfoList.stream().collect(Collectors.toMap(
+                MouldAllocationInfoVo::getDuplicateKey, MouldAllocationInfoVo::getAllocationQty, (q1, q2) -> q1));
+        // 计算最大可用模具产能
+        Map<String, Integer> maxEnableMouldCapacityMap = structureList.stream()
+                .collect(Collectors.toMap(FactoryMonthPlanMouldDayResultExportVo::getGroupAndMainPattern, r -> {
+                    // 计算可用模具数，取型腔数、活块数的最小值
+                    Integer mouldCavityQty = r.getMouldCavityQty();
+                    Integer typeBlockQty = r.getTypeBlockQty();
+                    Integer mouldNumber = Math.min(typeBlockQty, mouldCavityQty);
+                    // 如果有配置模具分配，则同时要比较模具分配数的最小值
+                    if (mouldAllocationMap.containsKey(r.getGroupAndMainPattern())) {
+                        Integer mouldAllocation = mouldAllocationMap.getOrDefault(r.getGroupAndMainPattern(), 0);
+                        mouldNumber = Math.min(mouldNumber, mouldAllocation);
+                    }
+                    // 最大产能 = 日产 * 模具数 * 本月生产天数
+                    return dayCapacityQty * mouldNumber * maxProductionDays;
+                }, (q1, q2) -> q1));
+        
+        // 统计需求量
+        Integer sumNetQty = structureList.stream()
+                .mapToInt(FactoryMonthPlanMouldDayResultExportVo::getProdReqPlan).sum();
+        Integer sumHeightQty = structureList.stream().filter(result -> result.getHeightQty() != null)
+                .mapToInt(FactoryMonthPlanMouldDayResultExportVo::getHeightQty).sum();
+        // 计算产能受限
+        List<SkuMoldCapacityInfoVo> skuList = structureList.stream().map(result -> {
+            SkuMoldCapacityInfoVo skuCapacityInfo = new SkuMoldCapacityInfoVo();
+            skuCapacityInfo.setGroupName(structureName);
+            skuCapacityInfo.setMaterialCode(result.getMaterialCode());
+            skuCapacityInfo.setMaterialDesc(result.getMaterialDesc());
+            skuCapacityInfo.setMainPattern(result.getMainPattern());
+            skuCapacityInfo.setDayVulcanizationQty(result.getDayVulcanizationQty());
+            skuCapacityInfo.setMaxMoldCapacity(maxEnableMouldCapacityMap.getOrDefault(result.getGroupAndMainPattern(), 0));
+            skuCapacityInfo.setSumProductionQty(sumNetQty);
+            skuCapacityInfo.setSumHeightProductionQty(sumHeightQty);
+            skuCapacityInfo.setProductionQty(result.getProdReqPlan());
+            skuCapacityInfo.setHeightProductionQty(result.getHeightQty());
+            return skuCapacityInfo;
+        }).collect(Collectors.toList());
+        List<SkuMoldCapacityInfoVo> groupResultList = moldCapacityLimitAllocateHandler.moldCapacityAllocateHandler(skuList);
+        Map<String, Integer> moldCapacityAllocateMap = groupResultList.stream()
+                .map(skuCapacityInfo -> skuCapacityInfo.buildLog()).collect(Collectors.toMap(
+                        MpSkuMoldCapacityAllocateLog::getMaterialDesc, MpSkuMoldCapacityAllocateLog::getNetQty, (s1, s2) -> s1));
+        // 重算根据模具产能受限重算净计算相关栏位
+        structureList.forEach(result -> {
+            Integer unRestrictedNetQty = moldCapacityAllocateMap.getOrDefault(result.getMaterialDesc(), 0);
+            Integer prodReqPlan = intValue(result.getProdReqPlan());
+            if (!Objects.equals(prodReqPlan, unRestrictedNetQty)) { // 不含模具受限
+                Integer restrictedNetQty = prodReqPlan - unRestrictedNetQty;
+                restrictedNetQty = restrictedNetQty < 0 ? 0 : restrictedNetQty;
+                result.setRestrictedNetQty(restrictedNetQty);
+                result.setUnRestrictedNetQty(unRestrictedNetQty);
+            } else {
+                result.setRestrictedNetQty(null);
+                result.setUnRestrictedNetQty(null);
+            }
+        });
+    }
+    
     /**
      * 加载月计划表头信息
      * @param params

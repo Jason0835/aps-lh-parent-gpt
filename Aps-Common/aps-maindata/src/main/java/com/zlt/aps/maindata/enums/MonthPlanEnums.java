@@ -132,6 +132,16 @@ public enum MonthPlanEnums {
     ADD_CHANGE_MOLD_COUNT_BY_SAME_PATTERN("SYS0203016", "前后两个SKU，同规格同花纹换活字块时是否算换模能力次数"),
 
     /**
+     * SYS0203021 月计划日产上限预警阀值
+     */
+    DAY_MAX_ALARM_LIMIT("SYS0203021", "月计划日产上限预警阀值"),
+
+    /**
+     * SYS0203022 月计划日产下限预警阀值
+     */
+    DAY_MIN_ALARM_LIMIT("SYS0203022", "月计划日产下限预警阀值"),
+
+    /**
      * SYS0204001 SKU总净需求量<=该值，SKU一次性排产
      */
     SUM_PRODUCTION_QTY("SYS0204001", "SKU总净需求量<=该值，SKU一次性排产"),
