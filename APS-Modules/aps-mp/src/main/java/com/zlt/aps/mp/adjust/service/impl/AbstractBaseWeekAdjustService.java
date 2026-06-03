@@ -2503,7 +2503,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     private void setWeekAdjustQty(FactoryMonthPlanProductionFinalResult monthPlan,int week) {
         // 调整量
-        int oriAdjustQty = monthPlan.getOriginalTotalQty();
+        int oriAdjustQty = Convert.toInt(monthPlan.getOriginalTotalQty(), 0);
         if (week > 1){
             for (int i = 1; i < week; i++){
                 oriAdjustQty += Convert.toInt(monthPlan.getFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + i), 0);
