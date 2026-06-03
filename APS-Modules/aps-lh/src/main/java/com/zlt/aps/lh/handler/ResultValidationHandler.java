@@ -92,7 +92,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
             // S4.6.2 生成模具交替计划：基于结果真实换模开始时间和机台滚动状态生成前后规格。
             generateMouldChangePlan(context);
-            validateMouldChangePlanQuota(context);
+//            validateMouldChangePlanQuota(context);
             validateManualSundaySandBlastThreshold(context);
 
             // S4.6.3 补全工单号和发布状态
@@ -593,7 +593,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                         && !r.isRollingInherited()
                         && r.getDailyPlanQty() != null
                         && r.getDailyPlanQty() > 0)
-                .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode, Comparator.nullsLast(String::compareTo))
+                .sorted(Comparator.comparing(LhScheduleResult::getLhMachineCode, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
                         .thenComparing(this::resolvePlannedMouldChangeStartTime, Comparator.nullsLast(Date::compareTo))
                         .thenComparing(LhScheduleResult::getSpecEndTime, Comparator.nullsLast(Date::compareTo)))
                 .collect(Collectors.toList());

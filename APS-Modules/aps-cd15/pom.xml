@@ -64,10 +64,10 @@
             <artifactId>aps-cd90</artifactId>
             <version>1.0.3-SNAPSHOT</version>
         </dependency>
-        <!-- 胎圈 -->
+        <!-- 胎圈API -->
         <dependency>
             <groupId>com.zlt.aps.tq</groupId>
-            <artifactId>aps-tq</artifactId>
+            <artifactId>aps-tq-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>
         </dependency>
         <!-- 钢丝圈 -->

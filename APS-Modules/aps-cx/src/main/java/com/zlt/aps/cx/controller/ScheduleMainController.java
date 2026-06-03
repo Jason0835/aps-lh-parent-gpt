@@ -989,7 +989,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
     @Override
     protected String getOrderBy() {
-        return "schedule_date desc, cx_machine_code asc";
+        return "schedule_date desc, UPPER(cx_machine_code) asc";
     }
 
     /**

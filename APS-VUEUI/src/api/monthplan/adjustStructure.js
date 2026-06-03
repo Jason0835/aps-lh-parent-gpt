@@ -49,13 +49,21 @@ export function setAdjustsCxMachineFromRedis(query) {
   })
 }
 
-//确认调整结果
-export function confirmAdjust(query) {
-  return request({
+/**
+ * 确认调整结果
+ * @param {Object} query 请求体
+ * @param {{ passError?: boolean }} [options] passError 为 true 时 500 不弹全局 Message，由调用方处理 res
+ */
+export function confirmAdjust(query, options = {}) {
+  const config = {
     url: '/monthplan/mpWeekRollAdjust/confirmAdjust',
     method: 'post',
-    data: query
-  })
+    data: query,
+  }
+  if (options.passError) {
+    config._passError = true
+  }
+  return request(config)
 }
 
 /**
