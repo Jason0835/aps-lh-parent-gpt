@@ -283,6 +283,38 @@
         >
       </span>
     </el-dialog>
+    <el-dialog
+      :title="
+        $t(
+          'ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustAlarmTitle'
+        )
+      "
+      :visible.sync="confirmAdjustAlarmDialog.visible"
+      width="640px"
+      append-to-body
+      custom-class="month-plan-confirm-adjust-alarm-dialog"
+      @close="resetConfirmAdjustAlarmDialog"
+    >
+      <div
+        class="confirm-adjust-alarm-message"
+        v-html="confirmAdjustAlarmDialog.messageHtml"
+      />
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="confirmAdjustAlarmDialog.visible = false">{{
+          $t("common.button.cancel")
+        }}</el-button>
+        <el-button
+          type="primary"
+          :loading="confirmAdjustLoading"
+          @click="handleConfirmAdjustAlarmForce"
+          >{{
+            $t(
+              "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustForceExec"
+            )
+          }}</el-button
+        >
+      </span>
+    </el-dialog>
     <tlt-upload
       ref="tltUpload"
       downloadUrl=""
@@ -360,6 +392,12 @@ export default {
       /** 调整版本号（来自 Redis） */
       currentAdjustMonthPlanVersion: "",
       confirmAdjustLoading: false,
+      /** 确认调整校验异常：展示 msg，确认后带 frontForceExecFlag=1 重试 */
+      confirmAdjustAlarmDialog: {
+        visible: false,
+        messageHtml: "",
+        basePayload: null,
+      },
       recalculateLoading: false,
       getAdjustOrderLoading: false,
       syncLoading: false,
@@ -380,6 +418,8 @@ export default {
       dayEditOriginalValue: null,
       /** 锁定天数（SYS0206001）：>0 含今天起向后；0 表示仅锁定今天之前的日期 */
       lockedDays: 0,
+      /** 周程滚动调整日（SYS0206006），与后端 setAdjustDate 一致 */
+      weekRollAdjustDate: "",
       /** 结构调整：表格多选勾选行（统计行不可选）；超过 1 条时禁用「结构调整」按钮 */
       structureAdjustSelection: [],
       /** 日排产单元格单击选中（用于高亮与填充柄） */
@@ -899,7 +939,7 @@ export default {
     this.query = { ...defaults };
     await this.loadVersionOptions();
     await this.fetchCurrentAdjustMachineFromRedis();
-    this.fetchLockedDays();
+    await this.fetchLockedDays();
     this.getList();
   },
   methods: {
@@ -913,7 +953,7 @@ export default {
       }
       await this.loadVersionOptions();
       this.fetchCurrentAdjustMachineFromRedis();
-      this.fetchLockedDays();
+      await this.fetchLockedDays();
     },
     handleProductionVersionChange() {
       this.fetchCurrentAdjustMachineFromRedis();
@@ -1032,6 +1072,7 @@ export default {
       const factoryCode = this.query.factoryCode || this.search.factoryCode;
       if (!factoryCode) {
         this.lockedDays = 0;
+        this.weekRollAdjustDate = "";
         return;
       }
       const baseParams = {
@@ -1039,12 +1080,95 @@ export default {
         productTypeCode: "TBR",
       };
       try {
-        const res = await getByParamCode({ ...baseParams, paramCode: "SYS0206001" });
-        this.lockedDays = Number(res?.paramValue) || 0;
+        /** 同 URL 的 POST 需间隔 ≥300ms，避免 request 防重复提交拦截 */
+        const lockRes = await getByParamCode({
+          ...baseParams,
+          paramCode: "SYS0206001",
+        });
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const adjustDateRes = await getByParamCode({
+          ...baseParams,
+          paramCode: "SYS0206006",
+        });
+        this.lockedDays = Number(lockRes?.paramValue) || 0;
+        this.weekRollAdjustDate =
+          adjustDateRes?.paramValue != null
+            ? String(adjustDateRes.paramValue).trim()
+            : "";
       } catch (e) {
-        console.error("获取锁定天数失败:", e);
+        console.error("获取锁定天数/调整日失败:", e);
         this.lockedDays = 0;
+        this.weekRollAdjustDate = "";
       }
+    },
+    /**
+     * 解析用于周次计算的调整日：与后端 setAdjustDate 一致。
+     * 调整日取自 SYS0206006，为空则用当天；若调整月不等于查询月，则视为 1 号。
+     */
+    resolveAdjustDayForWeekCalc() {
+      const ym = this.normalizeYearMonth(
+        this.query.yearMonth || this.search.yearMonth
+      );
+      if (!ym) {
+        return 1;
+      }
+      let adjustDate = moment();
+      if (this.weekRollAdjustDate) {
+        const parsed = moment(this.weekRollAdjustDate, [
+          "YYYY-MM-DD",
+          "YYYY-M-D",
+          "YYYY/MM/DD",
+        ], true);
+        if (parsed.isValid()) {
+          adjustDate = parsed;
+        }
+      }
+      if (
+        adjustDate.year() !== ym.year ||
+        adjustDate.month() + 1 !== ym.month
+      ) {
+        return 1;
+      }
+      return adjustDate.date();
+    },
+    /**
+     * 根据调整日计算当前周次（第1周1-7，第2周8-14，第3周15-21，第4周22-31）
+     */
+    getAdjustWeekNumber(adjustDay) {
+      const day = Number(adjustDay);
+      const safeDay = Number.isFinite(day) && day > 0 ? day : 1;
+      const baseWeek = Math.floor((safeDay - 1) / 7) + 1;
+      return Math.min(baseWeek, 4);
+    },
+    /**
+     * 按当前周次计算 adjustQty1~4：
+     * 当前周调整量 = totalQty -（originalTotalQty + 前若干周 adjustQty 累计）
+     * 当前周之后置 0；当前周之前保留后端原值。
+     */
+    calcRowAdjustQtyFields(row) {
+      if (!row || this.isStatisticsRow(row)) {
+        return;
+      }
+      const currentWeek = this.getAdjustWeekNumber(
+        this.resolveAdjustDayForWeekCalc()
+      );
+      const originalTotalQty = Number(row.originalTotalQty) || 0;
+      const totalQty = Number(row.totalQty) || 0;
+      let cumulativePrevious = originalTotalQty;
+      for (let week = 1; week <= 4; week++) {
+        const prop = `adjustQty${week}`;
+        if (week < currentWeek) {
+          cumulativePrevious += Number(row[prop]) || 0;
+        } else if (week === currentWeek) {
+          row[prop] = totalQty - cumulativePrevious;
+        } else {
+          row[prop] = 0;
+        }
+      }
+    },
+    /** 批量重算列表行的 adjustQty1~4 */
+    applyAdjustQtyFieldsToRows(rows) {
+      (rows || []).forEach((row) => this.calcRowAdjustQtyFields(row));
     },
     /**
      * 查询月份与当前月份比较：-1 过去月，0 当月，1 未来月；无法解析时返回 null。
@@ -1845,6 +1969,7 @@ export default {
         totalQty += val;
       }
       row.totalQty = totalQty;
+      this.calcRowAdjustQtyFields(row);
 
       const stageLabel = this.selectDictLabel(
         this.dict.type.biz_construction_stage,
@@ -2075,7 +2200,7 @@ export default {
       this.$set(this.page, "current", 1);
       await this.loadVersionOptions();
       await this.fetchCurrentAdjustMachineFromRedis();
-      this.fetchLockedDays();
+      await this.fetchLockedDays();
       this.getList();
     },
     handleSortChange({ column, prop, order }) {
@@ -2296,6 +2421,7 @@ export default {
         this.data = [];
         return;
       }
+      this.applyAdjustQtyFieldsToRows(resultList);
       const first = resultList[0];
       const ym = this.normalizeYearMonth(this.query.yearMonth);
       const productionVersion = this.resolveProductionVersionForStatistics(first);
@@ -2843,13 +2969,76 @@ export default {
       const payload = this.buildWeekRollConfirmPayload();
       return payload;
     },
-    async handleConfirmAdjust() {
-      if (!this.data || !this.data.length) {
-        this.$modal.msgWarning(
-          this.$t("ui.data.column.monthPlanFinalAdjustQuery.confirmNeedListData")
-        );
-        return;
+    /**
+     * 将确认调整接口返回的 msg 转为弹窗可展示的 HTML（后端分隔符为 </br>）
+     */
+    formatConfirmAdjustAlarmMessageHtml(msg) {
+      const raw = msg == null ? "" : String(msg);
+      if (!raw.trim()) {
+        return "";
       }
+      if (/<\/?[a-z][\s\S]*>/i.test(raw)) {
+        return raw;
+      }
+      return raw
+        .split(/\r?\n|<br\s*\/?>/gi)
+        .filter((line) => line.trim() !== "")
+        .map((line) => `<div>${line}</div>`)
+        .join("");
+    },
+    resetConfirmAdjustAlarmDialog() {
+      this.confirmAdjustAlarmDialog.messageHtml = "";
+      this.confirmAdjustAlarmDialog.basePayload = null;
+    },
+    openConfirmAdjustAlarmDialog(message, basePayload) {
+      this.confirmAdjustAlarmDialog.messageHtml =
+        this.formatConfirmAdjustAlarmMessageHtml(message);
+      this.confirmAdjustAlarmDialog.basePayload = basePayload
+        ? { ...basePayload }
+        : null;
+      this.confirmAdjustAlarmDialog.visible = true;
+    },
+    resolveConfirmAdjustResponseCode(res) {
+      if (res == null) {
+        return 200;
+      }
+      if (typeof res === "object" && res.code !== undefined) {
+        return res.code;
+      }
+      return 200;
+    },
+    /** 确认调整成功后的列表刷新与结构调整弹窗逻辑 */
+    async afterConfirmAdjustSuccess(res) {
+      this.$modal.msgSuccess(
+        (res && res.msg) || this.$t("common.msg.ajax.operation.success")
+      );
+      /** 成功后不主动清空 Redis 中的当前调整机台，便于继续结构调整 */
+      if (this.$refs.structureAdjustDialogRef) {
+        this.$refs.structureAdjustDialogRef.dialogVisible = false;
+      }
+      await this.getList();
+      await this.fetchCurrentAdjustMachineFromRedis();
+      const machineTrim = (this.currentAdjustMachine || "").trim();
+      if (machineTrim && this.$refs.structureAdjustDialogRef) {
+        const ym = this.query.yearMonth || this.search.yearMonth;
+        const fc = this.query.factoryCode || this.search.factoryCode || "116";
+        if (ym) {
+          this.$refs.structureAdjustDialogRef.show({
+            factoryCode: fc,
+            yearMonth: ym,
+            ...this.buildStructureDialogListVersionParams(),
+            prefillCxMachineCode: this.extractFirstCxMachineCode(
+              this.currentAdjustMachine
+            ),
+          });
+        }
+      }
+    },
+    /**
+     * 提交确认调整
+     * @param {"0"|"1"} frontForceExecFlag 手动确认调整为 0；异常弹窗确认继续为 1
+     */
+    async submitConfirmAdjust(frontForceExecFlag) {
       const payload = this.buildMonthPlanConfirmAdjustPayload();
       if (!payload) {
         this.$modal.msgWarning(
@@ -2859,38 +3048,69 @@ export default {
         );
         return;
       }
+      const requestPayload = {
+        ...payload,
+        frontForceExecFlag: String(frontForceExecFlag),
+      };
       this.confirmAdjustLoading = true;
       try {
-        const res = await confirmAdjust(payload);
-        this.$modal.msgSuccess(
-          (res && res.msg) ||
-            this.$t("common.msg.ajax.operation.success")
-        );
-        /** 成功后不主动清空 Redis 中的当前调整机台，便于继续结构调整 */
-        if (this.$refs.structureAdjustDialogRef) {
-          this.$refs.structureAdjustDialogRef.dialogVisible = false;
+        const res = await confirmAdjust(requestPayload, { passError: true });
+        const code = this.resolveConfirmAdjustResponseCode(res);
+        if (code === 200) {
+          this.confirmAdjustAlarmDialog.visible = false;
+          this.resetConfirmAdjustAlarmDialog();
+          await this.afterConfirmAdjustSuccess(res);
+          return;
         }
-        await this.getList();
-        await this.fetchCurrentAdjustMachineFromRedis();
-        const machineTrim = (this.currentAdjustMachine || "").trim();
-        if (
-          machineTrim &&
-          this.$refs.structureAdjustDialogRef
-        ) {
-          const ym = this.query.yearMonth || this.search.yearMonth;
-          const fc = this.query.factoryCode || this.search.factoryCode || "116";
-          if (ym) {
-            this.$refs.structureAdjustDialogRef.show({
-              factoryCode: fc,
-              yearMonth: ym,
-              ...this.buildStructureDialogListVersionParams(),
-              prefillCxMachineCode: this.extractFirstCxMachineCode(
-                this.currentAdjustMachine
-              ),
-            });
-          }
+        if (code === 500) {
+          const { frontForceExecFlag: _omit, ...basePayload } = requestPayload;
+          this.openConfirmAdjustAlarmDialog(
+            (res && res.msg) || "",
+            basePayload
+          );
+          return;
+        }
+        if (res && res.msg) {
+          this.$modal.msgError(res.msg);
         }
       } catch (e) {
+        console.error(e);
+      } finally {
+        this.confirmAdjustLoading = false;
+      }
+    },
+    async handleConfirmAdjust() {
+      if (!this.data || !this.data.length) {
+        this.$modal.msgWarning(
+          this.$t("ui.data.column.monthPlanFinalAdjustQuery.confirmNeedListData")
+        );
+        return;
+      }
+      await this.submitConfirmAdjust("0");
+    },
+    /**
+     * 确认调整校验异常弹窗：继续执行（frontForceExecFlag=1）。
+     * 仍失败时关闭弹窗，走 request 默认 500 全局错误提示，不再二次打开校验弹窗。
+     */
+    async handleConfirmAdjustAlarmForce() {
+      const basePayload = this.confirmAdjustAlarmDialog.basePayload;
+      if (!basePayload) {
+        this.confirmAdjustAlarmDialog.visible = false;
+        return;
+      }
+      const requestPayload = {
+        ...basePayload,
+        frontForceExecFlag: "1",
+      };
+      this.confirmAdjustLoading = true;
+      try {
+        const res = await confirmAdjust(requestPayload);
+        this.confirmAdjustAlarmDialog.visible = false;
+        this.resetConfirmAdjustAlarmDialog();
+        await this.afterConfirmAdjustSuccess(res);
+      } catch (e) {
+        this.confirmAdjustAlarmDialog.visible = false;
+        this.resetConfirmAdjustAlarmDialog();
         console.error(e);
       } finally {
         this.confirmAdjustLoading = false;
@@ -2984,6 +3204,14 @@ export default {
   align-items: center;
   gap: 12px;
   padding: 8px 0 4px;
+}
+.confirm-adjust-alarm-message {
+  max-height: 420px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #606266;
+  word-break: break-word;
 }
 
 /* 与 rollingCycle/index.vue「调整结果」表格行颜色一致（含固定列） */

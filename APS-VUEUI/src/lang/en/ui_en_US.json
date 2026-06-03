@@ -9,6 +9,8 @@
   "ui.data.column.monthPlanFinalAdjustQuery.cycleReserveProductionQty": "Cycle Reserve Production Qty",
   "ui.data.column.monthPlanFinalAdjustQuery.isLockSchedule": "Priority On Machine",
   "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjust": "Confirm Adjust",
+  "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustAlarmTitle": "Confirm Adjust Validation",
+  "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustForceExec": "Force Execute",
   "ui.data.column.monthPlanFinalAdjustQuery.continueAdjust": "Continue Adjust",
   "ui.data.column.monthPlanFinalAdjustQuery.recalculate": "Recalculate",
   "ui.data.column.monthPlanFinalAdjustQuery.structureType": "Structure Type",
@@ -317,7 +319,7 @@
   "ui.data.column.cxDayFinishQty.embryoCode": "Embryo Material Code",
   "ui.data.column.cxDayFinishQty.exampleType": "Recipe Type",
   "ui.data.column.cxDayFinishQty.bomDataVersion": "BOM Version",
-  "ui.data.column.cxDayFinishQty.dataVersion": "Data Version"
+  "ui.data.column.cxDayFinishQty.dataVersion": "Data Version",
   "ui.cx.cxScheduleResult.exportCxDayPlanFileName": "Molding Day Plan",
 
   "ui.construction.carcassRawMaterialList": "Carcass Raw Material List",

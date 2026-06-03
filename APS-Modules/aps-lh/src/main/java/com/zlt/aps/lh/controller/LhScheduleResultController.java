@@ -1281,7 +1281,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     @Override
     protected String getOrderBy() {
-        return "schedule_date desc, lh_machine_code asc";
+        return "schedule_date desc, UPPER(lh_machine_code) asc";
     }
 
     /**

@@ -187,4 +187,14 @@ public interface ITqScheduleResultService {
     @PostMapping("/tq/scheduleResult/getSummaryVo")
     @ApiOperation("获取排程日期的排程结果合计")
     public AjaxResult getSummaryVo(@RequestBody TqScheduleResultDto scheduleResult);
+
+    /**
+     * 批量更新批次号和工单号
+     *
+     * @param scheduleDate 排程日期，格式：yyyy-MM-dd
+     * @return 结果
+     */
+    @PostMapping("/tq/scheduleResult/batchUpdateBatchNoAndOrderNo")
+    @ApiOperation("批量更新批次号和工单号")
+    AjaxResult batchUpdateBatchNoAndOrderNo(@RequestParam("scheduleDate") String scheduleDate);
 }

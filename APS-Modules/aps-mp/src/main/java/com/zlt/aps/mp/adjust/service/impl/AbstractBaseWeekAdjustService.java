@@ -7,6 +7,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.JSONValidator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.google.common.collect.Maps;
@@ -1034,7 +1035,11 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         String bakStructureName = contextDTO.getStructureName();
         handleMonthPlanStatistics(contextDTO,null);
         contextDTO.setStructureName(bakStructureName);
-        // 10、合并至定稿月度生产计划并更新最新版本号
+        // 10、检查日产预警限制
+        if (!YesOrNoEnum.YES.getCode().equals(contextDTO.getFrontForceExecFlag())){
+            checkDayAlarmLimit(contextDTO);
+        }
+        // 11、合并至定稿月度生产计划并更新最新版本号
         // 根据优先级顺序分配生产数量
         allocateProductionByPriority(contextDTO);
         saveMpProductionFinalResult(contextDTO);
@@ -1042,6 +1047,48 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         log.info("周程调整确认流程执行完成");
     }
 
+    /**
+     * 检查日产预警限制
+     * @param contextDTO 滚动上下文
+     */
+    private void checkDayAlarmLimit(MpRollAdjustContextDTO contextDTO) {
+        Map<String, MpMonthPlanStatistics> structureStatisticMap = contextDTO.getStructureStatisticMap();
+        if (PubUtil.isEmpty(structureStatisticMap)){
+            return;
+        }
+        String dayFieldName;
+        String dayStatisticsStr;
+        MpMonthPlanStatistics statistics;
+        MpDayProductionStatisticsDetailVo dayStatistics;
+        int dayTotalQty;
+        int maxAlarmLimit = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.DAY_MAX_ALARM_LIMIT.getCode());
+        int minAlarmLimit = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.DAY_MIN_ALARM_LIMIT.getCode());
+        StringBuilder sbError = new StringBuilder();
+        for (int iDay = FactoryConstant.MONTH_START_DAY; iDay <= FactoryConstant.MONTH_MAX_DAY; iDay++){
+            dayTotalQty = 0;
+            for (Map.Entry<String, MpMonthPlanStatistics> entry1 : structureStatisticMap.entrySet()){
+                dayFieldName = FactoryConstant.DAY_FIELD + iDay;
+                statistics = entry1.getValue();
+                if (statistics == null){
+                    continue;
+                }
+                dayStatisticsStr = (String) statistics.getFieldValueByFieldName(dayFieldName);
+                if (StringUtils.isNotEmpty(dayStatisticsStr) && JSONValidator.from(dayStatisticsStr).validate()) {
+                    dayStatistics = JSONObject.parseObject(dayStatisticsStr,MpDayProductionStatisticsDetailVo.class);
+                    if (dayStatistics == null){
+                        continue;
+                    }
+                    dayTotalQty += Optional.ofNullable(dayStatistics.getTotalQty()).orElse(0);
+                }
+            }
+            if (dayTotalQty > maxAlarmLimit || dayTotalQty < minAlarmLimit){
+                sbError.append(String.format(I18nUtil.getMessage("alg.data.mp.weekRollAdjust.confirm.checkDayAlarmLimit"),iDay,dayTotalQty,minAlarmLimit,maxAlarmLimit)).append(BusiConstant.WeekRollAdjust.SPLIT_FRONT_NEW_LINE);
+            }
+        }
+        if (!StringUtil.isEmptyWithTrim(sbError.toString())){
+            throw new BusinessException(sbError.toString());
+        }
+    }
     /**
      * 合并至定稿月度生产计划,同时过滤掉总排产量为0的数据
      * @param contextDTO
@@ -2503,7 +2550,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
      */
     private void setWeekAdjustQty(FactoryMonthPlanProductionFinalResult monthPlan,int week) {
         // 调整量
-        int oriAdjustQty = monthPlan.getOriginalTotalQty();
+        int oriAdjustQty = Convert.toInt(monthPlan.getOriginalTotalQty(), 0);
         if (week > 1){
             for (int i = 1; i < week; i++){
                 oriAdjustQty += Convert.toInt(monthPlan.getFieldValueByFieldName(BusiConstant.WeekRollAdjust.FIELD_PREFIX_ADJUST_QTY + i), 0);

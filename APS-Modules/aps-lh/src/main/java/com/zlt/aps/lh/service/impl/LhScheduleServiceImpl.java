@@ -2182,10 +2182,10 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Map<String, String> recipeTypeMap = loadLhTrialStatusDictMap();
         Map<String, String> endTypeMap = loadBizEndTypeDictMap();
 
-        // 先按硫化机台升序，再按同机台不同物料的收尾班次序号升序排（先收尾下机的物料排前面）
+        // 先按硫化机台升序（忽略大小写），再按同机台不同物料的收尾班次序号升序排（先收尾下机的物料排前面）
         List<LhScheduleResult> sortedList = list.stream()
                 .sorted(Comparator
-                        .comparing((LhScheduleResult r) -> StringUtils.defaultString(r.getLhMachineCode()))
+                        .comparing((LhScheduleResult r) -> StringUtils.defaultString(r.getLhMachineCode()), String.CASE_INSENSITIVE_ORDER)
                         .thenComparingInt(r -> findLastPlannedShift(r))
                         .thenComparing(r -> StringUtils.defaultString(r.getMaterialCode())))
                 .collect(Collectors.toList());
@@ -2767,7 +2767,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                             Integer planQty = getClassPlanQty(r, finalShift);
                             return Objects.nonNull(planQty) && planQty > 0;
                         })
-                        .sorted(Comparator.comparing(r -> StringUtils.defaultString(r.getLhMachineCode())))
+                        .sorted(Comparator.comparing(r -> StringUtils.defaultString(r.getLhMachineCode()), String.CASE_INSENSITIVE_ORDER))
                         .collect(Collectors.toList());
 
                 for (LhScheduleResult r : shiftRecords) {

@@ -196,9 +196,13 @@ public final class LhScheduleParamConstant {
     public static final String CHIP_CODE_STOCK_UPDATE = "SYS0304017";
     /** 模具清洗间隔天数 */
     public static final String MOULD_CLEAN_DAYS = "SYS0308004";
+    /** 新增排产欠产增机台阈值 */
+    public static final String NEW_SPEC_SHORTAGE_ADD_MACHINE_THRESHOLD = "SYS0304022";
+    /** 是否开启换模均衡（0-关闭，1-开启） */
+    public static final String ENABLE_CHANGEOVER_BALANCE = "SYS0304021";
     /** 续作欠产追补判断天数 */
     public static final String CONTINUOUS_SHORTAGE_LOOK_AHEAD_DAYS = "SYS0304019";
-    /** 是否追加T-1欠产/超产量（0-关闭，1-开启） */
+    /** 是否追加本月历史欠产量（0-关闭，1-开启） */
     public static final String ENABLE_CARRY_FORWARD_QTY = "SYS0304020";
     /** 硫化示方历史保护开关（0-关闭，1-开启） */
     public static final String ENABLE_CURE_FORMULA_HISTORY_PROTECT = "SYS0304018";

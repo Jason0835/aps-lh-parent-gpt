@@ -50,7 +50,7 @@ public class CxDayFinishQty extends BaseEntity implements Serializable {
     private String embryoCode;
 
     /** 示方类型 */
-    @Excel(name = "ui.data.column.cxDayFinishQty.exampleType")
+    @Excel(name = "ui.data.column.cxDayFinishQty.exampleType", dictType = "trial_status")
     @ApiModelProperty(value = "示方类型")
     @TableField(value = "EXAMPLE_TYPE")
     private String exampleType;

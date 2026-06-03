@@ -2841,6 +2841,8 @@
   "ui.data.column.monthPlanFinalAdjustQuery.cycleReserveProductionQty": "周期储备排产量",
   "ui.data.column.monthPlanFinalAdjustQuery.isLockSchedule": "优先上机",
   "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjust": "确认调整",
+  "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustAlarmTitle": "确认调整校验提示",
+  "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustForceExec": "强制执行",
   "ui.data.column.monthPlanFinalAdjustQuery.continueAdjust": "继续调整",
   "ui.data.column.monthPlanFinalAdjustQuery.recalculate": "重新计算",
   "ui.data.column.demandPlanSum.netQty": "净需求",

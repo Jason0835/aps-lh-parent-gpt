@@ -51,6 +51,9 @@ public class MpWeekRollAdjustDTO implements Serializable {
     @ApiModelProperty(value = "排产机台")
     private String scheduledMachines;
 
+    @ApiModelProperty(value = "前端是否传入强制执行标志")
+    private String frontForceExecFlag;
+
     /**
      * 调整类型 01-结构内，02-结构外
      */
