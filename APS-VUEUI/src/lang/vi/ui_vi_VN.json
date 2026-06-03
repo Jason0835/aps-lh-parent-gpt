@@ -23,6 +23,7 @@
   "ui.data.column.monthPlanFinalAdjustQuery.isLockSchedule": "Ưu tiên lên máy",
   "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjust": "Xác nhận điều chỉnh",
   "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustAlarmTitle": "Thông báo xác nhận điều chỉnh",
+  "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustForceExec": "Thực thi cưỡng bức",
   "ui.data.column.monthPlanFinalAdjustQuery.continueAdjust": "Tiếp tục điều chỉnh",
   "ui.data.column.monthPlanFinalAdjustQuery.recalculate": "Tính lại",
   "ui.data.column.monthPlanFinalAdjustQuery.structureType": "Loại cấu trúc",

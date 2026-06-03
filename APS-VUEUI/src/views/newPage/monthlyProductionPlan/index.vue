@@ -307,7 +307,11 @@
           type="primary"
           :loading="confirmAdjustLoading"
           @click="handleConfirmAdjustAlarmForce"
-          >{{ $t("common.button.confirm") }}</el-button
+          >{{
+            $t(
+              "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustForceExec"
+            )
+          }}</el-button
         >
       </span>
     </el-dialog>

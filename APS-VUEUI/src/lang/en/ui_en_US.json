@@ -10,6 +10,7 @@
   "ui.data.column.monthPlanFinalAdjustQuery.isLockSchedule": "Priority On Machine",
   "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjust": "Confirm Adjust",
   "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustAlarmTitle": "Confirm Adjust Validation",
+  "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustForceExec": "Force Execute",
   "ui.data.column.monthPlanFinalAdjustQuery.continueAdjust": "Continue Adjust",
   "ui.data.column.monthPlanFinalAdjustQuery.recalculate": "Recalculate",
   "ui.data.column.monthPlanFinalAdjustQuery.structureType": "Structure Type",
