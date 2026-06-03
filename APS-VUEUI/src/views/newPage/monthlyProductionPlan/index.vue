@@ -380,6 +380,8 @@ export default {
       dayEditOriginalValue: null,
       /** 锁定天数（SYS0206001）：>0 含今天起向后；0 表示仅锁定今天之前的日期 */
       lockedDays: 0,
+      /** 周程滚动调整日（SYS0206006），与后端 setAdjustDate 一致 */
+      weekRollAdjustDate: "",
       /** 结构调整：表格多选勾选行（统计行不可选）；超过 1 条时禁用「结构调整」按钮 */
       structureAdjustSelection: [],
       /** 日排产单元格单击选中（用于高亮与填充柄） */
@@ -899,7 +901,7 @@ export default {
     this.query = { ...defaults };
     await this.loadVersionOptions();
     await this.fetchCurrentAdjustMachineFromRedis();
-    this.fetchLockedDays();
+    await this.fetchLockedDays();
     this.getList();
   },
   methods: {
@@ -913,7 +915,7 @@ export default {
       }
       await this.loadVersionOptions();
       this.fetchCurrentAdjustMachineFromRedis();
-      this.fetchLockedDays();
+      await this.fetchLockedDays();
     },
     handleProductionVersionChange() {
       this.fetchCurrentAdjustMachineFromRedis();
@@ -1032,6 +1034,7 @@ export default {
       const factoryCode = this.query.factoryCode || this.search.factoryCode;
       if (!factoryCode) {
         this.lockedDays = 0;
+        this.weekRollAdjustDate = "";
         return;
       }
       const baseParams = {
@@ -1039,12 +1042,95 @@ export default {
         productTypeCode: "TBR",
       };
       try {
-        const res = await getByParamCode({ ...baseParams, paramCode: "SYS0206001" });
-        this.lockedDays = Number(res?.paramValue) || 0;
+        /** 同 URL 的 POST 需间隔 ≥300ms，避免 request 防重复提交拦截 */
+        const lockRes = await getByParamCode({
+          ...baseParams,
+          paramCode: "SYS0206001",
+        });
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const adjustDateRes = await getByParamCode({
+          ...baseParams,
+          paramCode: "SYS0206006",
+        });
+        this.lockedDays = Number(lockRes?.paramValue) || 0;
+        this.weekRollAdjustDate =
+          adjustDateRes?.paramValue != null
+            ? String(adjustDateRes.paramValue).trim()
+            : "";
       } catch (e) {
-        console.error("获取锁定天数失败:", e);
+        console.error("获取锁定天数/调整日失败:", e);
         this.lockedDays = 0;
+        this.weekRollAdjustDate = "";
       }
+    },
+    /**
+     * 解析用于周次计算的调整日：与后端 setAdjustDate 一致。
+     * 调整日取自 SYS0206006，为空则用当天；若调整月不等于查询月，则视为 1 号。
+     */
+    resolveAdjustDayForWeekCalc() {
+      const ym = this.normalizeYearMonth(
+        this.query.yearMonth || this.search.yearMonth
+      );
+      if (!ym) {
+        return 1;
+      }
+      let adjustDate = moment();
+      if (this.weekRollAdjustDate) {
+        const parsed = moment(this.weekRollAdjustDate, [
+          "YYYY-MM-DD",
+          "YYYY-M-D",
+          "YYYY/MM/DD",
+        ], true);
+        if (parsed.isValid()) {
+          adjustDate = parsed;
+        }
+      }
+      if (
+        adjustDate.year() !== ym.year ||
+        adjustDate.month() + 1 !== ym.month
+      ) {
+        return 1;
+      }
+      return adjustDate.date();
+    },
+    /**
+     * 根据调整日计算当前周次（第1周1-7，第2周8-14，第3周15-21，第4周22-31）
+     */
+    getAdjustWeekNumber(adjustDay) {
+      const day = Number(adjustDay);
+      const safeDay = Number.isFinite(day) && day > 0 ? day : 1;
+      const baseWeek = Math.floor((safeDay - 1) / 7) + 1;
+      return Math.min(baseWeek, 4);
+    },
+    /**
+     * 按当前周次计算 adjustQty1~4：
+     * 当前周调整量 = totalQty -（originalTotalQty + 前若干周 adjustQty 累计）
+     * 当前周之后置 0；当前周之前保留后端原值。
+     */
+    calcRowAdjustQtyFields(row) {
+      if (!row || this.isStatisticsRow(row)) {
+        return;
+      }
+      const currentWeek = this.getAdjustWeekNumber(
+        this.resolveAdjustDayForWeekCalc()
+      );
+      const originalTotalQty = Number(row.originalTotalQty) || 0;
+      const totalQty = Number(row.totalQty) || 0;
+      let cumulativePrevious = originalTotalQty;
+      for (let week = 1; week <= 4; week++) {
+        const prop = `adjustQty${week}`;
+        if (week < currentWeek) {
+          cumulativePrevious += Number(row[prop]) || 0;
+        } else if (week === currentWeek) {
+          row[prop] = totalQty - cumulativePrevious;
+        } else {
+          row[prop] = 0;
+        }
+      }
+    },
+    /** 批量重算列表行的 adjustQty1~4 */
+    applyAdjustQtyFieldsToRows(rows) {
+      (rows || []).forEach((row) => this.calcRowAdjustQtyFields(row));
     },
     /**
      * 查询月份与当前月份比较：-1 过去月，0 当月，1 未来月；无法解析时返回 null。
@@ -1845,6 +1931,7 @@ export default {
         totalQty += val;
       }
       row.totalQty = totalQty;
+      this.calcRowAdjustQtyFields(row);
 
       const stageLabel = this.selectDictLabel(
         this.dict.type.biz_construction_stage,
@@ -2075,7 +2162,7 @@ export default {
       this.$set(this.page, "current", 1);
       await this.loadVersionOptions();
       await this.fetchCurrentAdjustMachineFromRedis();
-      this.fetchLockedDays();
+      await this.fetchLockedDays();
       this.getList();
     },
     handleSortChange({ column, prop, order }) {
@@ -2296,6 +2383,7 @@ export default {
         this.data = [];
         return;
       }
+      this.applyAdjustQtyFieldsToRows(resultList);
       const first = resultList[0];
       const ym = this.normalizeYearMonth(this.query.yearMonth);
       const productionVersion = this.resolveProductionVersionForStatistics(first);
