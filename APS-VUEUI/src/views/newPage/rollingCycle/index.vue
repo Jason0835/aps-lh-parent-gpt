@@ -127,7 +127,7 @@
             </el-form-item>
             <!-- 调整日期与操作按钮单独一行 -->
             <div class="mp-roll-adjust-toolbar-line">
-              <el-form-item label="调整开始日期">
+              <el-form-item :label="$t('ui.form.label.adjustStartDate')">
                 <el-select
                   v-model="formInline.adjustStartDay"
                   style="width: 100px"
@@ -143,7 +143,7 @@
                   </el-option>
                 </el-select>
               </el-form-item>
-              <el-form-item label="调整结束日期">
+              <el-form-item :label="$t('ui.form.label.adjustEndDate')">
                 <el-select
                   v-model="formInline.adjustEndDay"
                   style="width: 100px"
@@ -185,7 +185,7 @@
                   type="primary"
                   @click="nextStructure"
                   :loading="nextLoading"
-                  >下一个</el-button
+                  >{{ $t('ui.button.next') }}</el-button
                 >
               </el-form-item> -->
             </div>

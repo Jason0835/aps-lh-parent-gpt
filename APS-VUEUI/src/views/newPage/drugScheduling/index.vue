@@ -134,7 +134,7 @@
 
     <tlt-upload-form
       ref="tltUploadForm"
-      title="导入排程结果数据"
+      :title="$t('ui.title.importScheduleResult')"
       downloadUrl="/schedule/glueScheduleResult/importTemplate"
       uploadUrl="/schedule/glueScheduleResult/importData"
       @uploadSuccess="getList"
@@ -222,7 +222,7 @@ export default {
               halign: "center",
               valign: "middle",
               align: "center",
-              label: this.$t("称重工位"),
+              label: this.$t("ui.data.column.drugScheduling.weighingStation"),
               // formatter: (row, column, value, index) => {
               //   if ($.common.isEmpty(value)) {
               //     return this.$t(
@@ -264,7 +264,7 @@ export default {
               halign: "center",
               valign: "middle",
               align: "left",
-              label: this.$t("药品名称"),
+              label: this.$t("ui.data.column.drugInventory.glueName"),
               cellStyle: function (value, row, index) {
                 if (row.dataSource == "4") {
                   return { css: { background: "#f4cf01" } };
@@ -457,19 +457,19 @@ export default {
               // },
             },
             {
-              prop: "预计开始时间",
+              prop: "estimatedStartTime",
               valign: "middle",
               halign: "center",
               align: "center",
-              label: this.$t("预计开始时间"),
+              label: this.$t("ui.data.column.drugScheduling.estimatedStartTime"),
               width: 150,
             },
             {
-              prop: "预计完成时间",
+              prop: "estimatedEndTime",
               valign: "middle",
               halign: "center",
               align: "center",
-              label: this.$t("预计完成时间"),
+              label: this.$t("ui.data.column.drugScheduling.estimatedEndTime"),
               width: 150,
             },
             {
@@ -610,19 +610,19 @@ export default {
               // },
             },
             {
-              prop: "预计开始时间",
+              prop: "estimatedStartTime",
               valign: "middle",
               halign: "center",
               align: "center",
-              label: this.$t("预计开始时间"),
+              label: this.$t("ui.data.column.drugScheduling.estimatedStartTime"),
               width: 150,
             },
             {
-              prop: "预计完成时间",
+              prop: "estimatedEndTime",
               valign: "middle",
               halign: "center",
               align: "center",
-              label: this.$t("预计完成时间"),
+              label: this.$t("ui.data.column.drugScheduling.estimatedEndTime"),
               width: 150,
             },
             {
@@ -762,19 +762,19 @@ export default {
               // },
             },
             {
-              prop: "预计开始时间",
+              prop: "estimatedStartTime",
               valign: "middle",
               halign: "center",
               align: "center",
-              label: this.$t("预计开始时间"),
+              label: this.$t("ui.data.column.drugScheduling.estimatedStartTime"),
               width: 150,
             },
             {
-              prop: "预计完成时间",
+              prop: "estimatedEndTime",
               valign: "middle",
               halign: "center",
               align: "center",
-              label: this.$t("预计完成时间"),
+              label: this.$t("ui.data.column.drugScheduling.estimatedEndTime"),
               width: 150,
             },
             {

@@ -249,5 +249,115 @@
 
   "ui.cx.cxScheduleResult.export.fileName": "Molding scheduling results",
   "ui.cx.cxScheduleResult.export.fileName4FinishedList": "Closing list of molding schedule",
-  "ui.cx.cxScheduleResult.exportCxDayPlanFileName": "Molding Day Plan"
+  "ui.cx.cxScheduleResult.exportCxDayPlanFileName": "Molding Day Plan",
+
+  "ui.construction.carcassRawMaterialList": "Carcass Raw Material List",
+
+  "common.yes": "Yes",
+  "common.no": "No",
+  "common.show": "Show",
+  "common.hide": "Hide",
+  "common.day": "Day",
+  "common.search": "Search",
+  "common.dailyData": "Daily Data",
+
+  "ui.data.column.mdmMonthProdPlan.importTitle": "Import Monthly Production Plan Data",
+  "ui.data.column.mdmMonthProdPlan.dailyProduction": "Production Qty",
+  "ui.data.column.mdmMonthProdPlan.dailyOutput": "Daily Output",
+  "ui.data.column.mdmMonthProdPlan.moldQuantity": "Mold Quantity",
+  "ui.data.column.mdmMonthProdPlan.confirmExport": "Confirm to export all monthly production plans?",
+  "ui.data.column.mdmMonthProdPlan.confirmExpectedExport": "Confirm to export all monthly production plans - Expected Excess/Arrears?",
+  "ui.data.column.mdmMonthProdPlan.confirmOverExport": "Confirm to export all monthly production plans - Excess/Arrears?",
+  "ui.data.column.mdmMonthProdPlan.confirmIssuePlan": "Confirm to issue",
+  "ui.data.column.mdmMonthProdPlan.finalizedPlan": "finalized plan?",
+  "ui.data.column.mdmMonthProdPlan.month": "Month",
+  "ui.data.column.mdmMonthProdPlan.isFinalized": "Is Finalized",
+  "ui.data.column.mdmMonthProdPlan.constructionCode": "Construction Code",
+  "ui.data.column.mdmMonthProdPlan.stage": "Stage",
+
+  "ui.data.column.planAdjust.adjustNumber": "Adjust Number",
+  "ui.data.column.planAdjust.reduceNumber": "Reduce Number",
+  "ui.data.column.planAdjust.leftOverQty": "Left Over Qty",
+  "ui.data.column.planAdjust.stillNeedQty": "Still Need Qty",
+  "ui.data.column.planAdjust.stillNeedSubtractQty": "Still Need Subtract Qty",
+  "ui.data.column.specCode": "Spec Code",
+  "ui.data.column.materialDesc": "Material Desc",
+  "ui.data.column.id": "ID",
+
+  "ui.title.needSubtractPlan": "Need Subtract Plan",
+  "ui.title.failureReason": "Failure Reason",
+  "ui.title.adjust": "Adjust",
+  "ui.title.subtract": "Subtract",
+
+  "ui.button.checkConstruction": "Check Construction",
+  "ui.button.adjustSuggestion": "Adjust Suggestion",
+
+  "ui.placeholder.selectTableRow": "Please select table row",
+
+  "ui.message.confirmCheckConstruction": "Confirm to check construction for {month}?",
+
+  "common.button.apply": "Apply",
+  "common.button.confirm": "Confirm",
+  "common.button.cancel": "Cancel",
+  "common.message.operationSuccess": "Operation Success",
+  "common.message.needContinueAdjust": "Adjustment quantity is insufficient, need to continue adjusting",
+
+  "ui.upload.dataNotice": "Data Notice",
+  "ui.upload.insertNewSpec": "When you need to insert a new specification",
+  "ui.upload.leaveEmptyProductionNo": "Please leave the 'Production Order No.' field empty",
+  "ui.upload.systemWillAutoAssign": "The system will automatically assign resources for the new specification",
+  "ui.upload.adjustExistingSpec": "When you need to adjust an existing specification",
+  "ui.upload.keepProductionNoUnchanged": "Please keep the original 'Production Order No.' unchanged",
+  "ui.upload.systemWillRecognizeAsAdjust": "The system will recognize it as an adjustment rather than a new addition",
+
+  "ui.title.importInfoData": "Import Information Data",
+  "ui.title.importScheduleResult": "Import Schedule Result",
+  "ui.title.relatedUser": "Related User",
+
+  "ui.checkbox.updateExistingData": "Whether to update existing user data",
+
+  "ui.data.column.drugInventory.glueName": "Drug Name",
+  "ui.data.column.drugInventory.stockNum": "Stock Qty (Pack)",
+  "ui.data.column.drugScheduling.weighingStation": "Weighing Station",
+  "ui.data.column.drugScheduling.estimatedStartTime": "Estimated Start Time",
+  "ui.data.column.drugScheduling.estimatedEndTime": "Estimated End Time",
+
+  "ui.tab.netDemandPlan": "Net Demand Plan",
+  "ui.tab.supplyChainOrder": "Supply Chain Order",
+  "ui.tab.productionPlan": "Production Plan",
+  "ui.tab.unscheduledPlan": "Unscheduled Plan",
+
+  "ui.placeholder.pleaseSelect": "Please select",
+
+  "ui.form.label.adjustStartDate": "Adjust Start Date",
+  "ui.form.label.adjustEndDate": "Adjust End Date",
+  "ui.button.next": "Next",
+
+  "ui.title.structureAdjust": "Structure Adjust",
+  "ui.title.specialMaterialProduction": "Special Material Production",
+  "ui.title.adjustResult": "Adjust Result",
+  "ui.title.addStructure": "Add Structure",
+
+  "ui.data.column.productStructure": "Product Structure",
+  "ui.data.column.schedulingMachine": "Scheduling Machine",
+  "ui.data.column.ncMaterialCode": "NC Material Code",
+  "ui.data.column.materialDescription": "Material Description",
+  "ui.data.column.isContainMaterials": "Is Contain Materials",
+  "ui.data.column.lastWeekNetDemand": "Last Week Net Demand",
+  "ui.data.column.currentNetDemand": "Current Net Demand",
+  "ui.data.column.netDemandChange": "Net Demand Change",
+  "ui.data.column.monthlyPlanProduction": "Monthly Plan Production",
+  "ui.data.column.pendingAdjustmentAmount": "Pending Adjustment Amount",
+  "ui.data.column.confirmAdjustmentAmount": "Confirm Adjustment Amount",
+  "ui.data.column.adjustPriorities": "Adjust Priorities",
+  "ui.data.column.actualAdjustment": "Actual Adjustment",
+  "ui.data.column.adjustmentReason": "Adjustment Reason",
+  "ui.data.column.process": "Process",
+  "ui.data.column.specialMaterial": "Special Material",
+  "ui.data.column.todayStockAndPlan": "Today Stock And Plan",
+  "ui.data.column.equivalentTireCount": "Equivalent Tire Count",
+  "ui.data.column.originalStructure": "Original Structure",
+  "ui.data.column.originalSpecification": "Original Specification",
+  "ui.data.column.adjustedTireCount": "Adjusted Tire Count",
+  "ui.data.column.formingMachine": "Forming Machine"
 }

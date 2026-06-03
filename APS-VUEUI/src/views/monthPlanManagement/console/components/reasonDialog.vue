@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    title="失败原因"
+    :title="$t('ui.title.failureReason')"
     :visible="visible"
     width="1000px"
     @close="hide"
@@ -10,7 +10,7 @@
   >
     <div style="height: 400px;overflow: auto;">
       <el-table :data="tableData" style="width: 100%" max-height="400"  v-loading="loading" border >
-        <el-table-column prop="materialDesc" :label="this.$t('物料描述')" show-overflow-tooltip width="320">
+        <el-table-column prop="materialDesc" :label="$t('ui.data.column.materialDesc')" show-overflow-tooltip width="320">
 
         </el-table-column>
         <el-table-column prop="checkContent" :label="this.$t('ui.data.checkDialog.reason')" show-overflow-tooltip >
