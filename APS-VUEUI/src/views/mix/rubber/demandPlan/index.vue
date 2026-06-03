@@ -74,7 +74,7 @@
     <grabDialog ref="grabRef" @success="getList" />
     <tlt-upload-form
       ref="tltUploadForm"
-      title="导入分厂胶料需求计划数据"
+      :title="$t('schedule.glueDemandPlan.importTitle')"
       downloadUrl="/schedule/glueDemandPlan/importTemplate"
       uploadUrl="/schedule/glueDemandPlan/importData"
       @uploadSuccess="getList"
@@ -352,7 +352,7 @@ export default {
     },
     importColumns() {return [
       {
-        label: "排程日期",
+        label: this.$t("schedule.glueDecomposePlan.planDate"),
         prop: "planDate",
         type: "date",
         valueFormat: "yyyy-MM-dd",

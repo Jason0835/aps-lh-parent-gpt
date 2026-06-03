@@ -48,7 +48,7 @@
            :loading="updateLoading"
             type="primary"
           v-hasPermi="['lean:productinfo:updateQualityStateCodeName']"
-          >{{ $t("质控状态更新") }}
+          >{{ $t("btn.qualityControlUpdate") }}
         </el-button>
         <!--<el-button-->
         <!--  v-hasPermi="['setting:material:export']"-->
@@ -221,7 +221,7 @@ export default {
         {
           prop: "qualityStateCode",
           type: "select", //GLUE_TYPE
-          label: this.$t("质控状态"),
+          label: this.$t("qualityControl.status"),
           dictData: this.dict.type.quality_state,
 
         },
@@ -289,7 +289,7 @@ export default {
         {
           prop: "qualityStateCode",
           width: 120,
-          label: this.$t("质控状态"),
+          label: this.$t("qualityControl.status"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.quality_state, value);
           },

@@ -48,7 +48,7 @@
     </page-table>
     <tlt-upload-form
       ref="tltUploadForm"
-      title="导入信息数据"
+      :title="$t('common.import.title')"
       downloadUrl="/setting/mlstock/importTemplate"
       uploadUrl="/setting/mlstock/importData"
       @uploadSuccess="getList"
@@ -98,12 +98,12 @@ export default {
             console.log(form);
             return (
               <el-checkbox
-                label="是否更新已经存在的用户数据"
+                :label="$t('common.import.updateSupport')"
                 true-label={true}
                 false-label={false}
                 v-model={form.updateSupport}
               >
-                是否更新已经存在的用户数据
+                {this.$t('common.import.updateSupport')}
               </el-checkbox>
             );
           },
@@ -311,7 +311,7 @@ export default {
       });
     },
     handleExport() {
-      this.$confirm(this.$t(`确定导出所有信息？`), {
+      this.$confirm(this.$t("common.confirm.export"), {
         type: "warning",
       }).then(() => {
         try {
