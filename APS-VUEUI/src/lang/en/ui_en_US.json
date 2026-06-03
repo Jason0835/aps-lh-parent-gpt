@@ -317,7 +317,7 @@
   "ui.data.column.cxDayFinishQty.embryoCode": "Embryo Material Code",
   "ui.data.column.cxDayFinishQty.exampleType": "Recipe Type",
   "ui.data.column.cxDayFinishQty.bomDataVersion": "BOM Version",
-  "ui.data.column.cxDayFinishQty.dataVersion": "Data Version"
+  "ui.data.column.cxDayFinishQty.dataVersion": "Data Version",
   "ui.cx.cxScheduleResult.exportCxDayPlanFileName": "Molding Day Plan",
 
   "ui.construction.carcassRawMaterialList": "Carcass Raw Material List",
