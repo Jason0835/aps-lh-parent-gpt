@@ -136,6 +136,8 @@ public class LhScheduleContext {
     private Map<String, Integer> embryoRealtimeStockMap = new HashMap<>();
     /** 日完成量Map（按物料+完成日期聚合）, key=materialCode_finishDate(yyyy-MM-dd) */
     private Map<String, Integer> materialDayFinishedQtyMap = new HashMap<>();
+    /** 本月日完成量Map（按物料+完成日期聚合）, key=materialCode_finishDate(yyyy-MM-dd)，仅覆盖当前排程月份截至T-1 */
+    private Map<String, Integer> materialMonthDailyFinishedQtyMap = new HashMap<>();
     /** 月累计完成量Map（按月计划所属月份统计，截至排程窗口T日前一日）, key=materialCode */
     private Map<String, Integer> materialMonthFinishedQtyMap = new HashMap<>();
     /** T日排程班次完成量Map, key=materialCode, value=T日class1FinishQty按物料汇总值 */
@@ -187,7 +189,7 @@ public class LhScheduleContext {
     private List<SkuScheduleDTO> continuousSkuList = new ArrayList<>();
     /** 新增SKU列表，续作和换活字块未消费完的 SKU 会继续保留到 S4.5 新增链路 */
     private List<SkuScheduleDTO> newSpecSkuList = new ArrayList<>();
-    /** 前一日欠产/超产向当日传导的净值，key=materialCode */
+    /** 本月历史欠产向当前排程窗口传导的数量，key=materialCode */
     private Map<String, Integer> carryForwardQtyMap = new HashMap<>();
     /** 满班补齐超排量累加器，key=materialCode，供最终汇总日志使用（不受SKU从待排列表中移除影响） */
     private Map<String, Integer> skuShiftFillOverQtyMap = new LinkedHashMap<>();
