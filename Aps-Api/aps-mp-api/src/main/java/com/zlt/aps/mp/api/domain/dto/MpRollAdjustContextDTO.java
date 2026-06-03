@@ -108,6 +108,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "前端是否传入排产机台")
     private Boolean frontScheduledMachinesFlag;
 
+    @ApiModelProperty(value = "前端是否传入强制执行标志")
+    private String frontForceExecFlag;
+
     @ApiModelProperty(value = "结构起产日")
     private Integer structureStartDay;
 
