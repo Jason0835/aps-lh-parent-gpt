@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    title="关联用户"
+    :title="$t('ui.title.relatedUser')"
     :visible="visible"
     width="900px"
     @close="hide"

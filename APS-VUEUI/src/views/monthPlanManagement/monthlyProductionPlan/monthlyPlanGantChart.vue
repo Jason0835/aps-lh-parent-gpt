@@ -4,7 +4,7 @@
     <el-card class="top-el-card" shadow="never">
       <div style="height: 30px">
         <el-form :inline="true" style="display: contents">
-          <el-form-item label="月度">
+          <el-form-item :label="$t('ui.data.column.mdmMonthProdPlan.mainPlanMonth')">
             <el-date-picker
               v-model="scheduleDate"
               type="month"
@@ -13,7 +13,7 @@
             />
           </el-form-item>
         </el-form>
-        <el-button @click="handleSearch">{{ $t("搜索") }}</el-button>
+        <el-button @click="handleSearch">{{ $t("common.search") }}</el-button>
         <el-button
           @click="handleGotoCurve"
           style="position: absolute; right: 20px"
@@ -170,17 +170,17 @@ export default {
             // dimensions:["startDay","endDay","diffDay","machineCode","index","cpdh","specdh","ydl","jd","storageLocation","qualityGrade"],
             if (params[0]) {
               let htmlStr = `
-              <div>规格：${params[0].value.codeId}</div>
+              <div>${this.$t("ui.data.column.mdmMonthProdPlan.specDesc")}：${params[0].value.codeId}</div>
               <div style="display:flex;border-top: 1px solid #DDD;margin-top: 10px;padding-top: 10px;">
                   <div style="padding-right:20px">
-                    <div>物料编码：${params[0].value.cpdh}</div>
-                    <div>实际安排：${params[0].value.ydl}</div>
-                    <div>库存地点：${params[0].value.storageLocation}</div>
+                    <div>${this.$t("ui.data.column.mdmMonthProdPlan.materialCode")}：${params[0].value.cpdh}</div>
+                    <div>${this.$t("ui.data.column.mdmMonthProdPlan.actualArrangement")}：${params[0].value.ydl}</div>
+                    <div>${this.$t("ui.data.column.mdmMonthProdPlan.storageLocation")}：${params[0].value.storageLocation}</div>
                   </div>
                   <div>
-                    <div>施工代码：${params[0].value.specdh}</div>
-                    <div>阶段：${params[0].value.jd}</div>
-                    <div>质量等级：${params[0].value.qualityGrade}</div>
+                    <div>${this.$t("ui.data.column.mdmMonthProdPlan.constructionCode")}：${params[0].value.specdh}</div>
+                    <div>${this.$t("ui.data.column.mdmMonthProdPlan.stage")}：${params[0].value.jd}</div>
+                    <div>${this.$t("ui.data.column.mdmMonthProdPlan.qualityGrade")}：${params[0].value.qualityGrade}</div>
                   </div>
                   </div>
               </div>`;
@@ -206,7 +206,7 @@ export default {
               if (val == this.days + 1) {
                 return "";
               }
-              return parseInt(val) + "日";
+              return parseInt(val) + this.$t("common.day");
             },
           },
         },
@@ -304,7 +304,7 @@ export default {
             label: {
               show: true,
               formatter: (params) => {
-                return "实际安排：" + params.value.ydl;
+                return this.$t("ui.data.column.mdmMonthProdPlan.actualArrangement") + "：" + params.value.ydl;
               },
             },
             // dataGroupId: "Other",

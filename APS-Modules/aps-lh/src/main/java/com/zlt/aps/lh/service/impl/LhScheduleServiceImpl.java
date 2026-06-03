@@ -2182,11 +2182,12 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         Map<String, String> recipeTypeMap = loadLhTrialStatusDictMap();
         Map<String, String> endTypeMap = loadBizEndTypeDictMap();
 
-        // 按硫化物料号排序，同一物料下按机台编码升序
+        // 先按硫化机台升序，再按同机台不同物料的收尾班次序号升序排（先收尾下机的物料排前面）
         List<LhScheduleResult> sortedList = list.stream()
                 .sorted(Comparator
-                        .comparing((LhScheduleResult r) -> StringUtils.defaultString(r.getMaterialCode()))
-                        .thenComparing(r -> StringUtils.defaultString(r.getLhMachineCode())))
+                        .comparing((LhScheduleResult r) -> StringUtils.defaultString(r.getLhMachineCode()))
+                        .thenComparingInt(r -> findLastPlannedShift(r))
+                        .thenComparing(r -> StringUtils.defaultString(r.getMaterialCode())))
                 .collect(Collectors.toList());
 
         // 构建8班顺序值映射：同一物料按班次1~8遍历，每个班次内有计划量的记录按机台编码升序，顺序值从1~n连续编排
@@ -2788,6 +2789,25 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         }
 
         return resultMap;
+    }
+
+    /**
+     * 查找排程结果中最后一个有计划量的班次序号。
+     * 遍历班次1~8，返回最后一个有计划量（planQty > 0）的班次序号。
+     * 用于同机台不同物料的收尾排序：班次序号越小表示越早收尾下机。
+     *
+     * @param result 排程结果
+     * @return 最后一个有计划量的班次序号（1~8），所有班次均无计划量时返回0
+     */
+    private int findLastPlannedShift(LhScheduleResult result) {
+        int lastShift = 0;
+        for (int shift = 1; shift <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shift++) {
+            Integer planQty = getClassPlanQty(result, shift);
+            if (Objects.nonNull(planQty) && planQty > 0) {
+                lastShift = shift;
+            }
+        }
+        return lastShift;
     }
 
     /**

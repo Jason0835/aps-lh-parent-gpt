@@ -35,7 +35,7 @@
         <el-button
           @click="handleGoDetail"
           v-hasPermi="['mdm:mdmMaterialConsumeDetail:list']"
-          >{{ $t("胎胚原材料清单") }}</el-button
+          >{{ $t("ui.construction.carcassRawMaterialList") }}</el-button
         >
         <!-- <el-button
           type="primary"

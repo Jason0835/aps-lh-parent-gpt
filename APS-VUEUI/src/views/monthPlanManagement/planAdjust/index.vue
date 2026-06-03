@@ -93,17 +93,17 @@
     >
       <template slot="tip">
         <div class="upload-tip">
-          <div class="tip-row text-center title">数据注意事项</div>
+          <div class="tip-row text-center title">{{ $t('ui.upload.dataNotice') }}</div>
 
           <div class="tip-row">
-            1.当您需要插入新规格时：<span class="text-red"
-              >请将"排产制造单号"字段留空</span
-            >，系统将自动为新规格分配资源。
+            1.{{ $t('ui.upload.insertNewSpec') }}：<span class="text-red"
+              >{{ $t('ui.upload.leaveEmptyProductionNo') }}</span
+            >，{{ $t('ui.upload.systemWillAutoAssign') }}
           </div>
           <div class="tip-row">
-            2.当您需要对现有规格进行调整时：<span class="text-red"
-              >请保持原有"排产制造单号"不变</span
-            >，系统将识别为规格调整而非新增。
+            2.{{ $t('ui.upload.adjustExistingSpec') }}：<span class="text-red"
+              >{{ $t('ui.upload.keepProductionNoUnchanged') }}</span
+            >，{{ $t('ui.upload.systemWillRecognizeAsAdjust') }}
           </div>
         </div>
       </template>

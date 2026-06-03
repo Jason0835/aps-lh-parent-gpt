@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    title="特殊材料生产情况"
+    :title="$t('ui.title.specialMaterialProduction')"
     :visible="visible"
     width="800px"
     @close="hide"
@@ -9,32 +9,32 @@
     :append-to-body="true"
   >
   <el-table :data="tableData1" border style="width: 100%">
-      <el-table-column prop="process" label="工序" width="120">
+      <el-table-column prop="process" :label="$t('ui.data.column.process')" width="120">
       </el-table-column>
-      <el-table-column prop="specialMaterial" label="特殊材料" width="120">
+      <el-table-column prop="specialMaterial" :label="$t('ui.data.column.specialMaterial')" width="120">
       </el-table-column>
-      <el-table-column prop="todayStockAndPlan" label="特殊材料今日库存+今日计划" width="120">
+      <el-table-column prop="todayStockAndPlan" :label="$t('ui.data.column.todayStockAndPlan')" width="120">
       </el-table-column>
-      <el-table-column prop="equivalentTireCount" label="折合轮胎条数" width="120">
+      <el-table-column prop="equivalentTireCount" :label="$t('ui.data.column.equivalentTireCount')" width="120">
       </el-table-column>
-      <el-table-column prop="originalStructure" label="原结构" width="120">
+      <el-table-column prop="originalStructure" :label="$t('ui.data.column.originalStructure')" width="120">
       </el-table-column>
-      <el-table-column prop="adjustedTireCount" label="调整的轮胎条数" width="120">
+      <el-table-column prop="adjustedTireCount" :label="$t('ui.data.column.adjustedTireCount')" width="120">
       </el-table-column>
     </el-table>
 
     <el-table :data="tableData2" border style="width: 100%;margin-top: 20px">
-      <el-table-column prop="process" label="工序" width="120">
+      <el-table-column prop="process" :label="$t('ui.data.column.process')" width="120">
       </el-table-column>
-      <el-table-column prop="specialMaterial" label="特殊材料" width="120">
+      <el-table-column prop="specialMaterial" :label="$t('ui.data.column.specialMaterial')" width="120">
       </el-table-column>
-      <el-table-column prop="todayStockAndPlan" label="特殊材料今日库存+今日计划" width="120">
+      <el-table-column prop="todayStockAndPlan" :label="$t('ui.data.column.todayStockAndPlan')" width="120">
       </el-table-column>
-      <el-table-column prop="equivalentTireCount" label="折合轮胎条数" width="120">
+      <el-table-column prop="equivalentTireCount" :label="$t('ui.data.column.equivalentTireCount')" width="120">
       </el-table-column>
-      <el-table-column prop="originalSpecification" label="原规格" width="120">
+      <el-table-column prop="originalSpecification" :label="$t('ui.data.column.originalSpecification')" width="120">
       </el-table-column>
-      <el-table-column prop="adjustedTireCount" label="调整的轮胎条数" width="120">
+      <el-table-column prop="adjustedTireCount" :label="$t('ui.data.column.adjustedTireCount')" width="120">
       </el-table-column>
     </el-table>
 

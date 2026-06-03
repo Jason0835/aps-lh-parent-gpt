@@ -1,7 +1,7 @@
 <template>
     <basic-container>
   <!-- <el-dialog
-    title="调整结果"
+    :title="$t('ui.title.adjustResult')"
     :visible="visible"
     width="800px"
     @close="hide"
@@ -11,25 +11,25 @@
   > -->
 
     <el-table :data="tableData" border >
-      <el-table-column prop="formingMachine" label="成型机台" >
+      <el-table-column prop="formingMachine" :label="$t('ui.data.column.formingMachine')" >
       </el-table-column>
-      <el-table-column prop="productStructure" label="产品结构" width="180">
+      <el-table-column prop="productStructure" :label="$t('ui.data.column.productStructure')" width="180">
       </el-table-column>
-      <el-table-column prop="ncMaterialCode" label="NC物料编码"  width="120">
+      <el-table-column prop="ncMaterialCode" :label="$t('ui.data.column.ncMaterialCode')"  width="120">
       </el-table-column>
-      <el-table-column prop="materialDescription" label="物料描述"  width="200">
+      <el-table-column prop="materialDescription" :label="$t('ui.data.column.materialDescription')"  width="200">
       </el-table-column>
-      <el-table-column prop="isContainMaterials" label="是否含材料"  width="120">
+      <el-table-column prop="isContainMaterials" :label="$t('ui.data.column.isContainMaterials')"  width="120">
       </el-table-column>
-      <el-table-column prop="planQuantity" label="计划量">
+      <el-table-column prop="planQuantity" :label="$t('ui.data.column.planQuantity')">
       </el-table-column>
-      <el-table-column prop="startDate" label="开始日期" >
+      <el-table-column prop="startDate" :label="$t('ui.data.column.startDate')" >
       </el-table-column>
-      <el-table-column prop="endDate" label="结束日期">
+      <el-table-column prop="endDate" :label="$t('ui.data.column.endDate')">
       </el-table-column>
       <el-table-column v-for="item in daysList" :key="item.label"  :label="item.label" >
       </el-table-column>
-      <el-table-column v-if="isLock" prop="lockDate" label="锁定上机日期" width="180" >
+      <el-table-column v-if="isLock" prop="lockDate" :label="$t('ui.data.column.lockDate')" width="180" >
       </el-table-column>
     </el-table>
     <!-- <template slot="footer">
