@@ -2553,7 +2553,7 @@ public class MpWeekRollAdjustEngine {
             //若开产首日，将日硫化量等比例减，奇数+1
             dailyLhQty = adjustDailyCapacityLimitObj.getProportionalDeductQty(dailyCapacityLimitVo,dailyLhQty);
         }
-        int dayPlanQty = (Integer) mpFinalVo.getFieldValueByFieldName(dayField);
+        Integer dayPlanQty = Convert.toInt(mpFinalVo.getFieldValueByFieldName(dayField),0);
         int fullMachines = dayPlanQty / dailyLhQty;
         int otherMachines;
         if (adjustDailyCapacityLimitObj.isDecMould(mpFinalVo,dayField,day1Field,day2Field,iDay)){
@@ -2633,7 +2633,12 @@ public class MpWeekRollAdjustEngine {
                 continue;
             }
             //按日获取模具信息
-            dayMouldValue = getMouldByDay(adjustDailyCapacityLimitObj,paramMap,i,mpFinalVo,dailyCapacityMap.get(i));
+            if(hasPlanByDay(mpFinalVo,i)){
+                dayMouldValue = getMouldByDay(adjustDailyCapacityLimitObj,paramMap,i,mpFinalVo,dailyCapacityMap.get(i));
+            }else{
+                dayMouldValue = 0;
+            }
+
             if (dayMouldValue != preDayMouldValue){
                 if (preDayMouldValue != 0){
                     //若不是第1笔
