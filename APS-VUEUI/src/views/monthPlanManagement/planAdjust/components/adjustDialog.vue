@@ -12,16 +12,16 @@
     <div class="adjust" v-loading="loading">
       <div class="header">
         <el-form inline>
-          <el-form-item label="模具">
+          <el-form-item :label="$t('ui.data.column.mouldingDayResult.mouldNo')">
             <el-input disabled :value="info.mouldNo" />
           </el-form-item>
-          <el-form-item label="SAP代码">
+          <el-form-item :label="$t('ui.data.column.mouldingDayResult.productCode')">
             <el-input disabled :value="info.productCode" />
           </el-form-item>
-          <el-form-item label="开始日期">
+          <el-form-item :label="$t('ui.data.column.mouldingDayResult.beginDate')">
             <el-input disabled :value="info.startDate" />
           </el-form-item>
-          <el-form-item label="调整量">
+          <el-form-item :label="$t('ui.data.column.planAdjust.adjustNumber')">
             <el-input disabled :value="info.adjustNumber" />
           </el-form-item>
         </el-form>
@@ -39,15 +39,15 @@
           <template slot="headerRight">
             <div class="heard-content">
               <div class="item">
-                <label class="label">SAP代码</label>
+                <label class="label">{{ $t('ui.data.column.mouldingDayResult.productCode') }}</label>
                 <el-input
                   readonly
-                  placeholder="请选择表格行数据"
+                  :placeholder="$t('ui.placeholder.selectTableRow')"
                   :value="currentRow ? currentRow.productCode : ''"
                 />
               </div>
               <div class="item">
-                <label class="label">开始日期</label>
+                <label class="label">{{ $t('ui.data.column.mouldingDayResult.beginDate') }}</label>
                 <el-date-picker
                   value-format="yyyy-MM-dd"
                   v-model="form.startDate"
@@ -55,7 +55,7 @@
                 />
               </div>
               <div class="item">
-                <label class="label">调减量</label>
+                <label class="label">{{ $t('ui.data.column.planAdjust.reduceNumber') }}</label>
                 <el-input-number
                   v-model="form.adjustNumber"
                   :controls="false"
@@ -69,7 +69,7 @@
                 plain
                 :disabled="currentRow === null"
                 @click="handleReduce"
-                >应用</el-button
+                >{{ $t('common.button.apply') }}</el-button
               >
             </div>
           </template>
@@ -113,7 +113,7 @@ export default {
   },
   computed: {
     title: function () {
-      return "需要调减计划";
+      return this.$t("ui.title.needSubtractPlan");
     },
     columns() {
       let columns = [
@@ -438,10 +438,10 @@ export default {
 
           if (status == 1) {
             this.hide();
-            this.$modal.msgSuccess("操作成功");
+            this.$modal.msgSuccess(this.$t("common.message.operationSuccess"));
           } else {
             this.update(data);
-            this.$modal.msgError("调整数量不满足， 需要继续调整");
+            this.$modal.msgError(this.$t("common.message.needContinueAdjust"));
           }
         }
       );

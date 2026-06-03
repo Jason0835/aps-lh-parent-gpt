@@ -20,10 +20,10 @@
     >
       <template slot="header">
         <el-tabs v-model="activeName" @tab-click="handleClick" type="card">
-          <el-tab-pane label="净需求计划" name="first"> </el-tab-pane>
-          <el-tab-pane label="供应链订单" name="second"> </el-tab-pane>
-          <el-tab-pane label="排产计划" name="three"> </el-tab-pane>
-          <el-tab-pane label="未排产计划" name="four"> </el-tab-pane>
+          <el-tab-pane :label="$t('ui.tab.netDemandPlan')" name="first"> </el-tab-pane>
+          <el-tab-pane :label="$t('ui.tab.supplyChainOrder')" name="second"> </el-tab-pane>
+          <el-tab-pane :label="$t('ui.tab.productionPlan')" name="three"> </el-tab-pane>
+          <el-tab-pane :label="$t('ui.tab.unscheduledPlan')" name="four"> </el-tab-pane>
         </el-tabs>
       </template>
     </page-table>

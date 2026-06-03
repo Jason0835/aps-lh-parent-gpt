@@ -41,8 +41,8 @@
               dailyVisible = !dailyVisible;
             }
           "
-          >{{ dailyVisible ? "隐藏" : "显示"
-          }}{{ $t("每日数据") }}</el-button
+          >{{ dailyVisible ? $t("common.hide") : $t("common.show")
+          }}{{ $t("common.dailyData") }}</el-button
         >
         <el-button @click="handleGotoGant">{{
           $t("ui.data.column.scheduleResult.monthPlan.gantt")
@@ -51,7 +51,7 @@
     </page-table>
     <tlt-upload-form
       ref="tltUploadForm"
-      title="导入月度生产计划数据"
+      title="$t("ui.data.column.mdmMonthProdPlan.importTitle")"
       downloadUrl="/cx/mdmMonthProdPlan/importTemplate/{mainPlanMonth}"
       :downloadUrlFormatter="handleDownloadUrl"
       uploadUrl="/cx/mdmMonthProdPlan/importData"
@@ -88,7 +88,7 @@ export default {
       },
       importColumns: [
         {
-          label: this.$t("月度"),
+          label: this.$t("ui.data.column.mdmMonthProdPlan.month"),
           prop: "mainPlanMonth",
           type: "date",
           dateType: "month",
@@ -96,15 +96,15 @@ export default {
           clearable: false,
         },
         {
-          label: this.$t("是否定稿"),
+          label: this.$t("ui.data.column.mdmMonthProdPlan.isFinalized"),
           prop: "isFinamized",
           render: (form) => {
             return (
               <dict-select
                 v-model={form.isFinamized}
                 options={[
-                  { label: "是", value: 0 },
-                  { label: "否", value: 1 },
+                  { label: this.$t("common.yes"), value: 0 },
+                  { label: this.$t("common.no"), value: 1 },
                 ]}
                 disabled
               />
@@ -384,7 +384,7 @@ export default {
 
         for (let i = 0; i < days; i++) {
           columns.push({
-            label: `${i + 1}号生产数量`,
+            label: `${i + 1}` + this.$t("ui.data.column.mdmMonthProdPlan.dailyProduction"),
             prop: `productQty${i + 1}`,
             minWidth: "160px",
             type: "number",
@@ -411,8 +411,8 @@ export default {
               <dict-select
                 v-model={form.hasVersion}
                 options={[
-                  { label: "是", value: 0 },
-                  { label: "否", value: 1 },
+                  { label: this.$t("common.yes"), value: 0 },
+                  { label: this.$t("common.no"), value: 1 },
                 ]}
               />
             );
@@ -468,7 +468,7 @@ export default {
       });
     },
     handleExport() {
-      this.$confirm(this.$t(`确定导出所有月度生产计划？`), {
+      this.$confirm(this.$t(`ui.data.column.mdmMonthProdPlan.confirmExport`), {
         type: "warning",
       }).then(() => {
         try {
@@ -488,7 +488,7 @@ export default {
       });
     },
     handleExportExpectedExcessArrears() {
-      this.$confirm(this.$t(`确定导出所有月度生产计划-预计超欠产？`), {
+      this.$confirm(this.$t(`ui.data.column.mdmMonthProdPlan.confirmExpectedExport`), {
         type: "warning",
       }).then(() => {
         try {
@@ -508,7 +508,7 @@ export default {
       });
     },
     handleExportExcessArrears() {
-      this.$confirm(this.$t(`确定导出所有月度生产计划-超欠产？`), {
+      this.$confirm(this.$t(`ui.data.column.mdmMonthProdPlan.confirmOverExport`), {
         type: "warning",
       }).then(() => {
         try {
@@ -529,7 +529,7 @@ export default {
     },
     handleIssuePlan() {
       this.$confirm(
-        this.$t(`确认要下发 ${this.search.mainPlanMonth} 定稿计划？`),
+        this.$t(`ui.data.column.mdmMonthProdPlan.confirmIssuePlan`) + this.search.mainPlanMonth + this.$t("ui.data.column.mdmMonthProdPlan.finalizedPlan"),
         {
           type: "warning",
         }

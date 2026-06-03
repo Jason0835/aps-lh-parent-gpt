@@ -18,7 +18,7 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button type="primary" @click="handleCheckConstruction">检测施工</el-button>
+        <el-button type="primary" @click="handleCheckConstruction">{{ $t('ui.button.checkConstruction') }}</el-button>
       </template>
     </page-table>
     <el-button style="display: none" ref="hidePopoverBtnRef"></el-button>
@@ -59,7 +59,7 @@ export default {
         //   },
         // },
         {
-          label: this.$t("主键ID"),
+          label: this.$t("ui.data.column.id"),
           prop: "id",
           minWidth: 100,
           // sortable: "custom",
@@ -81,8 +81,8 @@ export default {
               <dict-tag
                 value={row.isComplete}
                 options={[
-                  { label: "是", value: "0",raw:{} },
-                  { label: "否", value: "1",raw:{} },
+                  { label: this.$t("common.yes"), value: "0",raw:{} },
+                  { label: this.$t("common.no"), value: "1",raw:{} },
                 ]}
               />
             );
@@ -177,7 +177,7 @@ export default {
       }
     },
     handleCheckConstruction() {
-      this.$confirm(this.$t(`确认要检测 ${this.query.planMonth} 的施工？`), {
+      this.$confirm(this.$t('ui.message.confirmCheckConstruction', { month: this.query.planMonth }), {
         type: "warning",
       }).then(async () => {
         try {

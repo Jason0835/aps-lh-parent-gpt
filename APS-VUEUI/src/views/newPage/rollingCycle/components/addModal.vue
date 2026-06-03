@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    title="新增结构"
+    :title="$t('ui.title.addStructure')"
     :visible="visible"
     width="800px"
     @close="hide"

@@ -69,7 +69,7 @@ export default {
           },
         },
         legend: {
-          data: ["日产量", "模具数量"],
+          data: [this.$t("ui.data.column.mdmMonthProdPlan.dailyOutput"), this.$t("ui.data.column.mdmMonthProdPlan.moldQuantity")],
           textStyle: {
             color: "#ccc",
           },
@@ -91,7 +91,7 @@ export default {
         yAxis: [
           {
             type: "value",
-            name: "日产量",
+            name: this.$t("ui.data.column.mdmMonthProdPlan.dailyOutput"),
             position: "left",
             alignTicks: true,
             splitLine: { show: false },
@@ -103,7 +103,7 @@ export default {
           },
           {
             type: "value",
-            name: "模具数量",
+            name: this.$t("ui.data.column.mdmMonthProdPlan.moldQuantity"),
             position: "right",
             alignTicks: true,
             splitLine: { show: false },
@@ -116,7 +116,7 @@ export default {
         ],
         series: [
           {
-            name: "日产量",
+            name: this.$t("ui.data.column.mdmMonthProdPlan.dailyOutput"),
             type: "line",
             smooth: true,
             showAllSymbol: true,
@@ -125,7 +125,7 @@ export default {
             data: lineData,
           },
           {
-            name: "模具数量",
+            name: this.$t("ui.data.column.mdmMonthProdPlan.moldQuantity"),
             type: "bar",
             yAxisIndex: 1,
             barWidth: 10,
@@ -141,7 +141,7 @@ export default {
             data: barData,
           },
           {
-            name: "日产量",
+            name: this.$t("ui.data.column.mdmMonthProdPlan.dailyOutput"),
             type: "bar",
             barGap: "-100%",
             barWidth: 10,
@@ -161,7 +161,7 @@ export default {
             },
           },
           {
-            name: "日产量",
+            name: this.$t("ui.data.column.mdmMonthProdPlan.dailyOutput"),
             type: "pictorialBar",
             symbol: "rect",
             itemStyle: {

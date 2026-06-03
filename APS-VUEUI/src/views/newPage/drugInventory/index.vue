@@ -48,7 +48,7 @@
     </page-table>
     <tlt-upload-form
       ref="tltUploadForm"
-      title="导入信息数据"
+      :title="$t('ui.title.importInfoData')"
       downloadUrl="/setting/stock/importTemplate"
       uploadUrl="/setting/stock/importData"
       @uploadSuccess="getList"
@@ -94,12 +94,12 @@ export default {
             console.log(form);
             return (
               <el-checkbox
-                label="是否更新已经存在的用户数据"
+                label={this.$t("ui.checkbox.updateExistingData")}
                 true-label={true}
                 false-label={false}
                 v-model={form.updateSupport}
               >
-                是否更新已经存在的用户数据
+                {this.$t("ui.checkbox.updateExistingData")}
               </el-checkbox>
             );
           },
@@ -130,7 +130,7 @@ export default {
           }
         },
         {
-          label: this.$t("药品名称"),
+          label: this.$t("ui.data.column.drugInventory.glueName"),
           prop: "glue",
         },
       ],
@@ -174,14 +174,14 @@ export default {
           // sortable: "custom",
           halign: "center",
           align: "center",
-          label: this.$t("药品名称"),
+          label: this.$t("ui.data.column.drugInventory.glueName"),
         },
         {
           prop: "stockNum",
           // sortable: "custom",
           halign: "center",
           align: "right",
-          label: this.$t("库存量(包)"),
+          label: this.$t("ui.data.column.drugInventory.stockNum"),
         },
         // {
         //   prop: "stockWeight",

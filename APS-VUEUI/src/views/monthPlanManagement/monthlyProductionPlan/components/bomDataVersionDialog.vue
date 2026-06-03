@@ -49,13 +49,13 @@ export default {
       },
       columns: [
         {
-          label: this.$t("胎胚代码"),
+          label: this.$t("ui.data.column.mdmMonthProdPlan.embryoCode"),
           prop: "embryoCode",
           span: 24,
           disabled:true
         },
         {
-          label: this.$t("施工版本"),
+          label: this.$t("ui.data.column.productStatus.bomDataVersion"),
           prop: "bomDataVersion",
           span: 24,
         },

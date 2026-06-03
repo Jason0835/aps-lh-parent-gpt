@@ -2943,6 +2943,5 @@
   "financialManagement.averageAccountsReceivable.updateTime": "Ngày",
   "ui.data.column.scheduleResult.totalSurplusQty": "Lượng dư lưu hóa",
   "ui.data.column.scheduleResult.nightShift": "Ca đêm",
-  "ui.data.column.scheduleResult.finishQty": "Lượng hoàn thành",
-  "ui.data.column.monthplan.productType": "Loại sản phẩm"
+  "ui.data.column.scheduleResult.finishQty": "Lượng hoàn thành"
 }

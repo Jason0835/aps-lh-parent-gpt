@@ -21,7 +21,7 @@
       <div class="itemForm">
         <el-select
           v-model="search.year"
-          placeholder="请选择"
+          :placeholder="$t('ui.placeholder.pleaseSelect')"
           @change="changeYear"
         >
           <el-option

@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    title="结构调整"
+    :title="$t('ui.title.structureAdjust')"
     :visible="visible"
     width="800px"
     @close="hide"
@@ -20,63 +20,63 @@
     >
     </info-form>
     <el-table :data="tableData" border style="width: 100%">
-      <el-table-column prop="productStructure" label="产品结构" width="120">
+      <el-table-column prop="productStructure" :label="$t('ui.data.column.productStructure')" width="120">
       </el-table-column>
-      <el-table-column prop="schedulingMachine" label="排产机台" width="120">
+      <el-table-column prop="schedulingMachine" :label="$t('ui.data.column.schedulingMachine')" width="120">
       </el-table-column>
-      <el-table-column prop="ncMaterialCode" label="NC物料编码" width="120">
+      <el-table-column prop="ncMaterialCode" :label="$t('ui.data.column.ncMaterialCode')" width="120">
       </el-table-column>
-      <el-table-column prop="materialDescription" label="物料描述" width="120">
+      <el-table-column prop="materialDescription" :label="$t('ui.data.column.materialDescription')" width="120">
       </el-table-column>
-      <el-table-column prop="isContainMaterials" label="是否含材料" width="120">
+      <el-table-column prop="isContainMaterials" :label="$t('ui.data.column.isContainMaterials')" width="120">
       </el-table-column>
       <el-table-column
         prop="lastWeekNetDemand"
-        label="调整前净需求量（上周）"
+        :label="$t('ui.data.column.lastWeekNetDemand')"
         width="120"
       >
       </el-table-column>
-      <el-table-column prop="currentNetDemand" label="当前净需求量" width="120">
+      <el-table-column prop="currentNetDemand" :label="$t('ui.data.column.currentNetDemand')" width="120">
       </el-table-column>
-      <el-table-column prop="netDemandChange" label="净需求变动" width="120">
+      <el-table-column prop="netDemandChange" :label="$t('ui.data.column.netDemandChange')" width="120">
       </el-table-column>
       <el-table-column
         prop="monthlyPlanProduction"
-        label="月计划已排产量（第1轮结构内调整后）"
+        :label="$t('ui.data.column.monthlyPlanProduction')"
         width="120"
       >
       </el-table-column>
       <el-table-column
         prop="pendingAdjustmentAmount"
-        label="待调整量（降序）"
+        :label="$t('ui.data.column.pendingAdjustmentAmount')"
         width="120"
       >
       </el-table-column>
-      <el-table-column label="确认调整量" width="120">
+      <el-table-column :label="$t('ui.data.column.confirmAdjustmentAmount')" width="120">
         <template slot-scope="scope">
           <el-input
             v-model="scope.row.confirmAdjustmentAmount"
-            placeholder="请输入内容"
+            :placeholder="$t('common.placeholder.input')"
             size="mini"
           ></el-input>
         </template>
       </el-table-column>
-      <el-table-column prop="adjustPriorities" label="调整优先级" width="120">
+      <el-table-column prop="adjustPriorities" :label="$t('ui.data.column.adjustPriorities')" width="120">
         <template slot-scope="scope">
           <el-input
             v-model="scope.row.adjustPriorities"
-            placeholder="请输入内容"
+            :placeholder="$t('common.placeholder.input')"
             size="mini"
           ></el-input>
         </template>
       </el-table-column>
-      <el-table-column prop="actualAdjustment" label="实际调整" width="120">
+      <el-table-column prop="actualAdjustment" :label="$t('ui.data.column.actualAdjustment')" width="120">
       </el-table-column>
-      <el-table-column prop="adjustmentReason" label="调整原因" width="120">
+      <el-table-column prop="adjustmentReason" :label="$t('ui.data.column.adjustmentReason')" width="120">
       </el-table-column>
-      <el-table-column fixed="right" label="操作" width="100">
+      <el-table-column fixed="right" :label="$t('ui.data.column.operation')" width="100">
         <template slot-scope="scope">
-          <el-button type="text" size="small" @click="handleDelete(scope.$index)">删除</el-button>
+          <el-button type="text" size="small" @click="handleDelete(scope.$index)">{{ $t('ui.button.delete') }}</el-button>
         </template>
       </el-table-column>
     </el-table>

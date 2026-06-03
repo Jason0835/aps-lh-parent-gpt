@@ -36,16 +36,16 @@
           <template slot="headerRight">
             <div class="heard-content">
               <div class="item">
-                <label class="label">SAP代码</label>
+                <label class="label">{{ $t('ui.data.column.mouldingDayResult.productCode') }}</label>
                 <el-input
                   readonly
                   disabled
-                  placeholder="请选择表格行数据"
+                  :placeholder="$t('ui.placeholder.selectTableRow')"
                   :value="currentRow ? currentRow.productCode : ''"
                 />
               </div>
               <div class="item">
-                <label class="label">开始日期</label>
+                <label class="label">{{ $t('ui.data.column.mouldingDayResult.beginDate') }}</label>
                 <el-date-picker
                   value-format="yyyy-MM-dd"
                   v-model="adjustForm.startDate"
@@ -56,7 +56,7 @@
                 />
               </div>
               <div class="item">
-                <label class="label">调减量</label>
+                <label class="label">{{ $t('ui.data.column.planAdjust.reduceNumber') }}</label>
                 <el-input-number
                   v-model="adjustForm.adjustNumber"
                   :controls="false"
@@ -76,7 +76,7 @@
                   adjustForm.adjustNumber === 0
                 "
                 @click="handleCalculateAddQty"
-                >应用</el-button
+                >{{ $t('common.button.apply') }}</el-button
               >
             </div>
           </template>
@@ -175,7 +175,7 @@ export default {
   computed: {
     title: function () {
       if (this.form) {
-        return this.form.planQty > 0 ? "调整" : "调减";
+        return this.form.planQty > 0 ? this.$t("ui.title.adjust") : this.$t("ui.title.subtract");
       }
 
       return this.isEdit
@@ -266,7 +266,7 @@ export default {
       if (this.form.planQty > 0) {
         columns.push(
           {
-            label: "规格代码",
+            label: this.$t("ui.data.column.specCode"),
             prop: "specCode",
             span: 6,
             type: "select",
@@ -276,13 +276,13 @@ export default {
             },
           },
           {
-            label: "模具",
+            label: this.$t("ui.data.column.mouldingDayResult.mouldNo"),
             prop: "mouldNo",
             span: 6,
             disabled: true,
           },
           {
-            label: "调整量",
+            label: this.$t("ui.data.column.planAdjust.adjustNumber"),
             prop: "adjustNumber",
             span: 6,
             type: "number",
@@ -297,14 +297,14 @@ export default {
             // disabled: true,
           },
           {
-            label: "空余产能量",
+            label: this.$t("ui.data.column.planAdjust.leftOverQty"),
             prop: "leftOverQty",
             span: 6,
             disabled: true,
             placeholder: " ",
           },
           {
-            label: "还需增量",
+            label: this.$t("ui.data.column.planAdjust.stillNeedQty"),
             prop: "stillNeedQty",
             span: 6,
             disabled: true,
@@ -313,7 +313,7 @@ export default {
       } else {
         columns.push(
           {
-            label: "调整量",
+            label: this.$t("ui.data.column.planAdjust.adjustNumber"),
             prop: "adjustNumber",
             span: 6,
             type: "number",
@@ -328,7 +328,7 @@ export default {
             },
           },
           {
-            label: "还需调减量",
+            label: this.$t("ui.data.column.planAdjust.stillNeedSubtractQty"),
             prop: "stillNeedQty",
             span: 6,
             disabled: true,
@@ -340,7 +340,7 @@ export default {
         render: () => {
           return (
             <el-button type="primary" onClick={this.handleOperatePlan}>
-              调整建议
+              {this.$t("ui.button.adjustSuggestion")}
             </el-button>
           );
         },
