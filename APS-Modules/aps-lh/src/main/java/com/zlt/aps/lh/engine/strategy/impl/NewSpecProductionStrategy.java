@@ -3750,7 +3750,7 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
         }
         List<String> machineSummaryList = new ArrayList<String>(results.size());
         List<LhScheduleResult> sortedResults = new ArrayList<LhScheduleResult>(results);
-        sortedResults.sort(Comparator.comparing(result -> StringUtils.defaultString(result.getLhMachineCode())));
+        sortedResults.sort(Comparator.comparing(result -> StringUtils.defaultString(result.getLhMachineCode()), String.CASE_INSENSITIVE_ORDER));
         for (LhScheduleResult result : sortedResults) {
             machineSummaryList.add(buildMachineShiftSummary(result));
         }

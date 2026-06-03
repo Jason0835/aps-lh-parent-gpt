@@ -414,4 +414,17 @@ public class TqScheduleResultController extends BaseController {
         BeanUtils.copyProperties(scheduleResult, result);
         return tqScheduleResultService.getSummaryVo(result);
     }
+
+    /**
+     * 批量更新批次号和工单号
+     *
+     * @param scheduleDate 排程日期，格式：yyyy-MM-dd
+     * @return 结果
+     */
+    @PostMapping("/batchUpdateBatchNoAndOrderNo")
+    @ApiOperation("批量更新批次号和工单号")
+    public AjaxResult batchUpdateBatchNoAndOrderNo(@RequestParam("scheduleDate") String scheduleDate) {
+        tqEngineService.batchUpdateBatchNoAndOrderNo(scheduleDate);
+        return AjaxResult.success();
+    }
 }

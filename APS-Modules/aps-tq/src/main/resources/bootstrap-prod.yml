@@ -1,6 +1,6 @@
 # Tomcat
 server:
-  port: 9005
+  port: 9007
 
 nacos:
   server-addr: 10.135.55.216:8848

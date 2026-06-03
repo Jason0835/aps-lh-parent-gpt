@@ -25,7 +25,6 @@ public class ApsCdDiscoveryConfig implements SmartInitializingSingleton, Applica
 
 //	NacosRegistration cd15Registration;
 	NacosRegistration cd90Registration;
-	NacosRegistration tqRegistration;
 	NacosRegistration gsqRegistration;
 	NacosRegistration ncRegistration;
 
@@ -37,9 +36,6 @@ public class ApsCdDiscoveryConfig implements SmartInitializingSingleton, Applica
 		// 注册90度裁断服务
 		cd90Registration = this.registService("aps-cd90");
 		registry.register(cd90Registration);
-		// 注册胎圈服务
-		tqRegistration = this.registService("aps-tq");
-		registry.register(tqRegistration);
 		// 注册钢丝圈服务
 		gsqRegistration = this.registService("aps-gsq");
 		registry.register(gsqRegistration);
@@ -70,7 +66,6 @@ public class ApsCdDiscoveryConfig implements SmartInitializingSingleton, Applica
 	public void onApplicationEvent(ContextClosedEvent event) {
 //		registry.deregister(cd15Registration);
 		registry.deregister(cd90Registration);
-		registry.deregister(tqRegistration);
 		registry.deregister(gsqRegistration);
 		registry.deregister(ncRegistration);
 	}
