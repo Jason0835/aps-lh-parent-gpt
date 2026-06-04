@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.engine.chain.validators;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.constant.LhDataValidationGroupConstant;
 import com.zlt.aps.lh.api.enums.ConstructionStageEnum;
 import com.zlt.aps.lh.api.enums.ValidationPolicyEnum;
@@ -42,8 +43,9 @@ public class TrialFormulaValidator implements IDataValidator {
             String missingFieldText = String.join("、", missingFieldList);
             log.warn("试制量试物料示方缺失, materialCode: {}, missingFields: {}",
                     plan.getMaterialCode(), missingFieldText);
-            context.addValidationError("[" + getValidatorName() + "] 试制/量试物料 "
-                    + plan.getMaterialCode() + " 缺少" + missingFieldText);
+            context.addValidationError("[" + getValidatorName() + "] "
+                    + String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.trialFormulaMissing"),
+                    plan.getMaterialCode(), missingFieldText));
         }
         return passed;
     }
@@ -71,20 +73,20 @@ public class TrialFormulaValidator implements IDataValidator {
     private List<String> resolveMissingFormulaFields(FactoryMonthPlanProductionFinalResult plan) {
         List<String> missingFieldList = new ArrayList<>(3);
         if (StringUtils.isEmpty(plan.getEmbryoNo())) {
-            missingFieldList.add("制造示方");
+            missingFieldList.add(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.manufacturingFormula"));
         }
         if (StringUtils.isEmpty(plan.getTextNo())) {
-            missingFieldList.add("文字示方");
+            missingFieldList.add(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.textFormula"));
         }
         if (StringUtils.isEmpty(plan.getLhNo())) {
-            missingFieldList.add("硫化示方");
+            missingFieldList.add(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.vulcanizationFormula"));
         }
         return missingFieldList;
     }
 
     @Override
     public String getValidatorName() {
-        return "试制量试示方校验";
+        return I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.trialFormulaName");
     }
 
     @Override

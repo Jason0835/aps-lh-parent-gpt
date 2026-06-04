@@ -63,4 +63,32 @@ public interface ITqNewScheduleResultService {
     @PostMapping("/tqNewScheduleResult/listScheduleShiftDates")
     @ApiOperation("获取胎圈排程班次日期列表")
     List<TqScheduleShiftDateVO> listScheduleShiftDates(@RequestBody TqNewScheduleResult queryVO);
+
+    @PostMapping("/tqNewScheduleResult/autoPlan")
+    @ApiOperation("自动排程")
+    AjaxResult autoPlan(@RequestBody TqNewScheduleResult entity);
+
+    @PostMapping("/tqNewScheduleResult/insertOrder")
+    @ApiOperation("插单")
+    AjaxResult insertOrder(@RequestBody TqNewScheduleResult entity);
+
+    @PostMapping("/tqNewScheduleResult/changeMachine")
+    @ApiOperation("转机台")
+    AjaxResult changeMachine(@RequestBody TqNewScheduleResult entity);
+
+    @PostMapping("/tqNewScheduleResult/changeQty")
+    @ApiOperation("调量")
+    AjaxResult changeQty(@RequestBody TqNewScheduleResult entity);
+
+    @PostMapping("/tqNewScheduleResult/publish")
+    @ApiOperation("发布排程")
+    AjaxResult publish(@RequestBody TqNewScheduleResult entity);
+
+    @PostMapping("/tqNewScheduleResult/isPublish")
+    @ApiOperation("查询排程日期是否已发布")
+    Boolean isPublish(@RequestBody TqNewScheduleResult entity);
+
+    @PostMapping("/tqNewScheduleResult/checkUnique")
+    @ApiOperation("唯一性校验")
+    Boolean checkUnique(@RequestBody TqNewScheduleResult entity);
 }

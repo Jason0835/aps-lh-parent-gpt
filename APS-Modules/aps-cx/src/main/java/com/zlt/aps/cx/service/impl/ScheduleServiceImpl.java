@@ -3,6 +3,7 @@ package com.zlt.aps.cx.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.component.ScheduleExecutionGuard;
 import com.zlt.aps.cx.entity.CxMaterialEnding;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
@@ -183,7 +184,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         String lockToken = scheduleExecutionGuard.acquire(factoryCode, scheduleDate);
         if (lockToken == null) {
             result.setSuccess(false);
-            result.setMessage("排程执行中，请稍后重试：当前工厂[" + factoryCode + "]日期[" + scheduleDate + "]已有排程正在执行");
+            result.setErrorCode(ScheduleService.ERROR_CODE_LOCK_CONFLICT);
+            result.setMessage(I18nUtil.getMessage("ui.data.column.cxScheduleResult.scheduleRunning"));
             log.warn("排程锁已被占用，拒绝重复执行。工厂: {}, 日期: {}", factoryCode, scheduleDate);
             return result;
         }

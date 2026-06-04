@@ -20,23 +20,23 @@
     <div class="error-table-container" v-if="errorList.length > 0">
       <div class="table-header">
         <span class="count-info">
-          共 <strong>{{ filteredList.length }}</strong> 条记录
+          {{ $t('ui.data.column.lhScheduleResult.validation.total') }} <strong>{{ filteredList.length }}</strong> {{ $t('ui.data.column.lhScheduleResult.validation.records') }}
           <el-tag
             v-if="disabledCount > 0"
             type="danger"
             size="mini"
             style="margin-left: 8px"
-          >禁用 {{ disabledCount }}</el-tag>
+          >{{ $t('ui.data.column.lhScheduleResult.validation.disabled') }} {{ disabledCount }}</el-tag>
           <el-tag
             v-if="missingCount > 0"
             type="warning"
             size="mini"
             style="margin-left: 4px"
-          >缺失 {{ missingCount }}</el-tag>
+          >{{ $t('ui.data.column.lhScheduleResult.validation.missing') }} {{ missingCount }}</el-tag>
         </span>
         <el-input
           v-model="searchText"
-          placeholder="搜索模具编号/原因"
+          :placeholder="$t('ui.data.column.lhScheduleResult.validation.searchPlaceholder')"
           prefix-icon="el-icon-search"
           clearable
           size="small"
@@ -55,19 +55,19 @@
       >
         <el-table-column
           type="index"
-          label="序号"
+          :label="$t('ui.data.column.lhScheduleResult.validation.index')"
           width="60"
           align="center"
         />
         <el-table-column
           prop="mouldCode"
-          label="模具编号"
+          :label="$t('ui.data.column.lhScheduleResult.validation.mouldCode')"
           min-width="160"
           show-overflow-tooltip
         />
         <el-table-column
           prop="mouldType"
-          label="模具类型"
+          :label="$t('ui.data.column.lhScheduleResult.validation.mouldType')"
           min-width="100"
           align="center"
         >
@@ -77,19 +77,19 @@
         </el-table-column>
         <el-table-column
           prop="reason"
-          label="禁用原因"
+          :label="$t('ui.data.column.lhScheduleResult.validation.disabledReason')"
           min-width="200"
           show-overflow-tooltip
         />
         <el-table-column
           prop="status"
-          label="状态"
+          :label="$t('ui.data.column.lhScheduleResult.validation.status')"
           width="80"
           align="center"
         >
           <template slot-scope="{ row }">
-            <el-tag :type="row.status === '禁用' ? 'danger' : 'warning'" size="mini">
-              {{ row.status || '禁用' }}
+            <el-tag :type="row.status === $t('ui.data.column.lhScheduleResult.validation.disabled') ? 'danger' : 'warning'" size="mini">
+              {{ row.status || $t('ui.data.column.lhScheduleResult.validation.disabled') }}
             </el-tag>
           </template>
         </el-table-column>
@@ -109,10 +109,10 @@
     </div>
 
     <div v-if="validationErrors.length > 0 && errorList.length === 0" class="error-section">
-      <h4 class="section-title">校验错误信息</h4>
+      <h4 class="section-title">{{ $t('ui.data.column.lhScheduleResult.validation.errorInfo') }}</h4>
       <el-table :data="validationErrors" border size="small" max-height="300">
-        <el-table-column type="index" label="序号" width="60" align="center" />
-        <el-table-column label="错误信息" min-width="300">
+        <el-table-column type="index" :label="$t('ui.data.column.lhScheduleResult.validation.index')" width="60" align="center" />
+        <el-table-column :label="$t('ui.data.column.lhScheduleResult.validation.errorMessage')" min-width="300">
           <template slot-scope="{ row }">
             <span>{{ row }}</span>
           </template>
@@ -122,13 +122,13 @@
 
     <div v-if="errorList.length === 0 && validationErrors.length === 0" class="no-data-tip">
       <i class="el-icon-warning-outline"></i>
-      <span>暂无详细错误信息</span>
+      <span>{{ $t('ui.data.column.lhScheduleResult.validation.noErrorDetail') }}</span>
     </div>
 
     <template slot="footer">
-      <el-button @click="hide">关闭</el-button>
+      <el-button @click="hide">{{ $t('common.button.cancel') }}</el-button>
       <el-button type="primary" @click="handleExport" v-if="errorList.length > 0">
-        导出列表
+        {{ $t('ui.data.column.lhScheduleResult.validation.exportList') }}
       </el-button>
     </template>
   </el-dialog>
@@ -172,7 +172,7 @@ export default {
 
       const message = data.message || data.msg || '';
       this.validationErrors = data.validationErrors || [];
-      this.summaryMessage = message || '校验未通过';
+      this.summaryMessage = message || this.$t('ui.data.column.lhScheduleResult.validation.validationFailed');
 
       const details = data.validationErrorDetails || [];
 
@@ -181,16 +181,16 @@ export default {
           id: index + 1,
           mouldCode: item.mouldCode || '',
           mouldType: item.mouldType || '',
-          reason: item.reason || item.message || '状态为禁用',
-          status: item.status || '禁用',
+          reason: item.reason || item.message || this.$t('ui.data.column.lhScheduleResult.validation.statusDisabled'),
+          status: item.status || this.$t('ui.data.column.lhScheduleResult.validation.disabled'),
         }));
       } else if (this.validationErrors.length > 0 && typeof this.validationErrors[0] === 'object') {
         this.errorList = this.validationErrors.map((item, index) => ({
           id: index + 1,
           mouldCode: item.mouldCode || '',
           mouldType: item.mouldType || '',
-          reason: item.reason || item.message || '状态为禁用',
-          status: item.status || '禁用',
+          reason: item.reason || item.message || this.$t('ui.data.column.lhScheduleResult.validation.statusDisabled'),
+          status: item.status || this.$t('ui.data.column.lhScheduleResult.validation.disabled'),
         }));
         this.validationErrors = [];
       } else if (message && !details.length) {
@@ -206,10 +206,10 @@ export default {
       }
 
       this.disabledCount = this.errorList.filter(
-        (item) => item.status === '禁用' || item.reason.includes('禁用')
+        (item) => item.status === this.$t('ui.data.column.lhScheduleResult.validation.disabled') || item.reason.includes(this.$t('ui.data.column.lhScheduleResult.validation.disabled'))
       ).length;
       this.missingCount = this.errorList.filter(
-        (item) => item.reason.includes('缺失') || item.reason.includes('不存在')
+        (item) => item.reason.includes(this.$t('ui.data.column.lhScheduleResult.validation.missing')) || item.reason.includes(this.$t('ui.data.column.lhScheduleResult.validation.notExist'))
       ).length;
 
       this.filteredList = [...this.errorList];
@@ -224,9 +224,9 @@ export default {
       const matches = message.match(hmRegex) || [];
       if (matches.length === 0) return [];
 
-      const reasonMatch = message.match(/模具状态为禁用|不存在|缺失|未启用/gi);
-      const reason = reasonMatch ? reasonMatch[0] : '模具状态为禁用';
-      const status = reason.includes('禁用') ? '禁用' : '异常';
+      const reasonMatch = message.match(new RegExp(this.$t('ui.data.column.lhScheduleResult.validation.mouldStatusDisabled') + '|' + this.$t('ui.data.column.lhScheduleResult.validation.notExist') + '|' + this.$t('ui.data.column.lhScheduleResult.validation.missing') + '|' + this.$t('ui.data.column.lhScheduleResult.validation.notEnabled'), 'gi'));
+      const reason = reasonMatch ? reasonMatch[0] : this.$t('ui.data.column.lhScheduleResult.validation.mouldStatusDisabled');
+      const status = reason.includes(this.$t('ui.data.column.lhScheduleResult.validation.disabled')) ? this.$t('ui.data.column.lhScheduleResult.validation.disabled') : this.$t('ui.data.column.lhScheduleResult.validation.abnormal');
 
       return [...new Set(matches)].map((code, index) => ({
         id: index + 1,

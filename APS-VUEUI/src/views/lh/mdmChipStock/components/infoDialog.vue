@@ -159,10 +159,6 @@ export default {
       try {
         this.loading = true;
 
-        if (this.isEdit) {
-          params.finishQty = null;
-        }
-
         const res = await editLhChipStock(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");

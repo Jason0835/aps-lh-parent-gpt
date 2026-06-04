@@ -7,6 +7,7 @@ import com.zlt.aps.lh.exception.ScheduleException;
 import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -53,8 +54,7 @@ public class PreValidationHandler extends AbsScheduleStepHandler {
             log.warn("排程被拒绝: 日期[{}]已有已发布排程, 数量: {}", LhScheduleTimeUtil.formatDate(targetDate), releasedCount);
             throw new ScheduleException(ScheduleStepEnum.S4_1_PRE_VALIDATION, ScheduleErrorCode.MES_RELEASED,
                     factoryCode, context.getBatchNo(),
-                    "该日期排程已下发MES，请先撤销发布后再重新排程。排程日期: "
-                            + LhScheduleTimeUtil.getDateStr(targetDate));
+                    String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.mesReleasedReschedule"), LhScheduleTimeUtil.getDateStr(targetDate)));
         }
     }
 
@@ -75,7 +75,7 @@ public class PreValidationHandler extends AbsScheduleStepHandler {
                 ScheduleErrorCode.CROSS_MONTH_SCHEDULE_UNSUPPORTED,
                 context.getFactoryCode(),
                 context.getBatchNo(),
-                MonthPlanDayQtyUtil.CROSS_MONTH_UNSUPPORTED_MESSAGE);
+                I18nUtil.getMessage("ui.data.column.lhScheduleResult.crossMonthUnsupported"));
     }
 
     /**

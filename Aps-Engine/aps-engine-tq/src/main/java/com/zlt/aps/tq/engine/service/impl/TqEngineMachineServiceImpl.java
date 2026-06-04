@@ -3,6 +3,7 @@ package com.zlt.aps.tq.engine.service.impl;
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
 import com.zlt.aps.tq.engine.mapper.TqEngineMachineMapper;
 import com.zlt.aps.tq.engine.service.TqEngineMachineService;
+import com.zlt.aps.tq.engine.vo.TqMachineChuckVo;
 import com.zlt.aps.tq.engine.vo.TqMouthPlateMachineVo;
 import com.zlt.aps.tq.engine.vo.TqSpecifyMachineVo;
 import lombok.extern.slf4j.Slf4j;
@@ -13,10 +14,8 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.math.BigDecimal;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -25,7 +24,7 @@ public class TqEngineMachineServiceImpl implements TqEngineMachineService {
 
     @Resource
     private TqEngineMachineMapper tqEngineMachineMapper;
-    
+
     /**
      * 查询胎圈机台
      * @return
@@ -46,7 +45,6 @@ public class TqEngineMachineServiceImpl implements TqEngineMachineService {
         for(TqSpecifyMachineVo specifyMachineVo : list) {
             specifyMachineMap.put(specifyMachineVo.getBeadCode(), specifyMachineVo.getMachineIds());
         }
-//        Map<String, String> specifyMachineMap = list.stream().collect(Collectors.toMap(TqSpecifyMachineVo::getBeadCode, TqSpecifyMachineVo::getMachineIds));
         return specifyMachineMap;
     }
 
@@ -60,14 +58,25 @@ public class TqEngineMachineServiceImpl implements TqEngineMachineService {
         for(TqMouthPlateMachineVo mouthPlateMachineVo : list) {
             mouthPlateMachineMap.put(mouthPlateMachineVo.getMouthPlateCode(), mouthPlateMachineVo.getMachineIds());
         }
-//        Map<String, String> specifyMachineMap = list.stream().collect(Collectors.toMap(TqMouthPlateMachineVo::getMouthPlateCode, TqMouthPlateMachineVo::getMachineIds));
         return mouthPlateMachineMap;
     }
-    
+
+    /**
+     * 获得机台寸口映射，key=机台ID，value=该机台可做的寸口值列表
+     * @return
+     */
+    @Override
+    public Map<Long, List<BigDecimal>> getMachineChuckMap() {
+        List<TqMachineChuckVo> list = tqEngineMachineMapper.listMachineChuck();
+        return list.stream().collect(Collectors.groupingBy(
+                TqMachineChuckVo::getMachineId,
+                Collectors.mapping(TqMachineChuckVo::getInchSize, Collectors.toList())
+        ));
+    }
 
     /**
      * 获取上一天规格已排产机台列表
-     * 
+     *
      * @param scheduleDate
      * @return
      */

@@ -111,14 +111,6 @@ export default {
             trigger: "change",
           },
         ],
-        machineName: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "change",
-
-          },
-        ],
         manufacturer: [
           {
             validator: validateManufacturer,
@@ -466,30 +458,6 @@ export default {
           });
       });
     },
-    checkMachineName() {
-      return new Promise((resolve, reject) => {
-        setTimeout(() => {
-          checkMachineCodeUnique({
-            id: this.form.id,
-            machineName: this.form.machineName,
-          })
-            .then((res) => {
-              if (res === 0) {
-                resolve();
-              } else {
-                reject(
-                  new Error(this.$t("ui.data.column.cx.machineName.message"))
-                );
-              }
-            })
-            .catch((error) => {
-              console.error(error);
-              reject(new Error(this.$t("ui.lhMachineInfo.validate.retry")));
-            });
-        }, 201);
-      });
-    },
-
     handleConfirm() {
       this.$refs.form.triggerConfirm(async (params) => {
         if (params.openMachineClass) {

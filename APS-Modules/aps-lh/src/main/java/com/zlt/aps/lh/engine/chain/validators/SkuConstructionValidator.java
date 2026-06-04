@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.engine.chain.validators;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.constant.LhDataValidationGroupConstant;
 import com.zlt.aps.lh.api.enums.ValidationPolicyEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -38,8 +39,8 @@ public class SkuConstructionValidator implements IDataValidator {
         Map<String, MdmSkuConstructionRef> compositeKeyMap = context.getSkuConstructionRefCompositeKeyMap();
         if (CollectionUtils.isEmpty(compositeKeyMap)) {
             log.warn("SKU与示方书关系数据为空, 工厂: {}", context.getFactoryCode());
-            context.addValidationError("[" + getValidatorName() + "] SKU与示方书关系数据为空, 工厂: "
-                    + context.getFactoryDisplayName());
+            context.addValidationError("[" + getValidatorName() + "] "
+                    + String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.skuConstructionEmpty"), context.getFactoryDisplayName()));
             return false;
         }
         // 遍历月计划物料，按物料编码+产品状态精确查找并校验 lhNo/lhType
@@ -52,23 +53,24 @@ public class SkuConstructionValidator implements IDataValidator {
             String compositeKey = materialCode + "::" + plan.getProductStatus();
             MdmSkuConstructionRef ref = compositeKeyMap.get(compositeKey);
             if (Objects.isNull(ref)) {
-                missingFieldMap.put(materialCode, "未找到匹配物料编码和产品状态的示方书关系数据");
+                missingFieldMap.put(materialCode, I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.constructionNotFound"));
                 continue;
             }
             // 校验 lhNo / lhType 是否为空
             if (StringUtils.isEmpty(ref.getLhNo()) && StringUtils.isEmpty(ref.getLhType())) {
-                missingFieldMap.put(materialCode, "硫化示方书号和硫化示方书类型均为空");
+                missingFieldMap.put(materialCode, I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.lhNoAndTypeEmpty"));
             } else if (StringUtils.isEmpty(ref.getLhNo())) {
-                missingFieldMap.put(materialCode, "硫化示方书号为空");
+                missingFieldMap.put(materialCode, I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.lhNoEmpty"));
             } else if (StringUtils.isEmpty(ref.getLhType())) {
-                missingFieldMap.put(materialCode, "硫化示方书类型为空");
+                missingFieldMap.put(materialCode, I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.lhTypeEmpty"));
             }
         }
         if (!missingFieldMap.isEmpty()) {
             StringBuilder errorMsg = new StringBuilder("[").append(getValidatorName()).append("] ");
-            errorMsg.append("硫化示方书数据不完整: ");
+            errorMsg.append(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.skuConstructionIncomplete")).append(" ");
             for (Map.Entry<String, String> missingEntry : missingFieldMap.entrySet()) {
-                errorMsg.append("[物料编码:").append(missingEntry.getKey())
+                errorMsg.append("[").append(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.materialCode"))
+                        .append(":").append(missingEntry.getKey())
                         .append(", ").append(missingEntry.getValue()).append("]; ");
             }
             String errorText = errorMsg.toString();
@@ -83,7 +85,7 @@ public class SkuConstructionValidator implements IDataValidator {
 
     @Override
     public String getValidatorName() {
-        return "SKU与示方书关系校验";
+        return I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.skuConstructionName");
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.zlt.aps.tq.engine.mapper;
 
 
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
+import com.zlt.aps.tq.engine.vo.TqMachineChuckVo;
 import com.zlt.aps.tq.engine.vo.TqMouthPlateMachineVo;
 import com.zlt.aps.tq.engine.vo.TqSpecifyMachineVo;
 import org.apache.ibatis.annotations.Param;
@@ -15,7 +16,7 @@ public interface TqEngineMachineMapper {
      * @return
      */
     List<TqMachineInfo> listTqMachine();
-    
+
     /**
      * 查询胎圈定点机台信息
      * @param jobType 作业类型，0-限制作业，1-不可作业
@@ -29,7 +30,12 @@ public interface TqEngineMachineMapper {
      */
     List<TqMouthPlateMachineVo> listTqMouthPlateMachine();
 
-    
+    /**
+     * 查询机台寸口对应关系（用于寸口过滤）
+     * @return 机台寸口列表
+     */
+    List<TqMachineChuckVo> listMachineChuck();
+
     /**
      * 获取上一天规格已排产机台列表
      * @param scheduleDate
