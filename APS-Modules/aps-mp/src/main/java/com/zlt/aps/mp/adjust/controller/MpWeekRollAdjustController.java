@@ -291,6 +291,9 @@ public class MpWeekRollAdjustController extends BaseController {
     private MpRollAdjustContextDTO buildAdjustContext(MpWeekRollAdjustDTO weekRollAdjustDTO) {
         MpRollAdjustContextDTO contextDTO = BeanUtil.copyProperties(weekRollAdjustDTO, MpRollAdjustContextDTO.class);
         contextDTO.setFrontScheduledMachinesFlag(!StringUtil.isEmptyWithTrim(weekRollAdjustDTO.getScheduledMachines()));
+        Date now = DateUtils.getNowDate();
+        contextDTO.setCurrentYear(DateUtils.getYear(now));
+        contextDTO.setCurrentMonth(DateUtils.getMonth(now));
         return contextDTO;
     }
 

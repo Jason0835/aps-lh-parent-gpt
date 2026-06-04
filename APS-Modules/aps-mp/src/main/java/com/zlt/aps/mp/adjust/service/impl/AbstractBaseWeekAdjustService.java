@@ -3148,8 +3148,30 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         DataDTO dataDTO = dataManager.buildDataDTO(queryVO);
         List<MpMonthPlanMonitor> planMonitorList = dataManager.listPlanMonitors(dataDTO);
         contextDTO.setMpMonthPlanMonitorList(planMonitorList);
+
+        //检查是否跨月，初始上月监控
+        if (checkCrossMonth(contextDTO)){
+            initLastPlanMonitor(contextDTO);
+        }
     }
 
+    /**
+     * 初始化上月月度硫化监控
+     *
+     * @param contextDTO
+     */
+    private void initLastPlanMonitor(MpRollAdjustContextDTO contextDTO) {
+        MpMonthPlanMonitor queryVO = MpMonthPlanMonitor.builder()
+                .factoryCode(contextDTO.getFactoryCode())
+                .year(contextDTO.getCurrentYear())
+                .month(contextDTO.getCurrentMonth())
+                .productionVersion(contextDTO.getLastProductionVersion())
+                .build();
+
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO);
+        List<MpMonthPlanMonitor> planMonitorList = dataManager.listPlanMonitors(dataDTO);
+        contextDTO.setLastMonthPlanMonitorList(planMonitorList);
+    }
 
     /**
      * 初始化成品实时库存
@@ -3386,8 +3408,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         contextDTO.setFactoryProductionVersionList(versionList);
     }
 
-
-
     /**
      * 初始化月度生产计划
      *
@@ -3417,8 +3437,49 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             // 月度计划排产版本
             contextDTO.setProductionVersion(resultList.get(0).getProductionVersion());
         }
+
+
+        //检查是否跨月,初始上月月度计划
+        if (checkCrossMonth(contextDTO)) {
+            initLastMonthPlan(contextDTO);
+        }
     }
 
+    /**
+     * 检查是否跨月
+     * @param contextDTO
+     * @return
+     */
+    protected boolean checkCrossMonth(MpRollAdjustContextDTO contextDTO){
+        Date nextMonthDate = DateUtils.addMonths(DateUtils.getNowDate(), 1);
+        return contextDTO.getMpMonth() == DateUtils.getMonth(nextMonthDate);
+    }
+
+    /**
+     * 初始化上月月度生产计划
+     *
+     * @param contextDTO
+     */
+    private void initLastMonthPlan(MpRollAdjustContextDTO contextDTO) {
+        if (PubUtil.isNotEmpty(contextDTO.getLastFactoryMonthPlanProdFinalList())) {
+            return;
+        }
+        // 查询上月月度生产计划
+        FactoryMonthPlanProductionFinalResult queryVO = new FactoryMonthPlanProductionFinalResult();
+        queryVO.setFactoryCode(contextDTO.getFactoryCode());
+        queryVO.setYear(contextDTO.getCurrentYear());
+        queryVO.setMonth(contextDTO.getCurrentMonth());
+
+        DataDTO dataDTO = dataManager.buildDataDTO(queryVO);
+        List<FactoryMonthPlanProductionFinalResult> lastFactoryMonthPlanProdFinalList = dataManager.listMonthPlans(dataDTO);
+
+        List<FactoryMonthPlanFinalAdjustVo> resultList = BeanUtil.copyToList(lastFactoryMonthPlanProdFinalList, FactoryMonthPlanFinalAdjustVo.class);
+        contextDTO.setLastFactoryMonthPlanProdFinalList(resultList);
+        if (PubUtil.isNotEmpty(resultList) && StringUtils.isEmpty(contextDTO.getLastProductionVersion())) {
+            // 上月月度计划排产版本
+            contextDTO.setLastProductionVersion(resultList.get(0).getProductionVersion());
+        }
+    }
 
     /**
      * 构建月度生产计划条件
@@ -3556,7 +3617,6 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 .orElse(null);
         return factoryProductionVersion;
     }
-
 
     /**
      * 构建调整明细
@@ -4487,6 +4547,52 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     }
 
     /**
+     * 设置上月计划剩余排产量
+     * 上月计划剩余排产量 =【 1日 至 月底】.计划量 - 已生产量，出现负数，默认等于0
+     *
+     * @param contextDTO
+     */
+    protected void setLastMonthRemainQty(MpRollAdjustContextDTO contextDTO) {
+        // 上月月度硫化监控列表
+        List<MpMonthPlanMonitor> lastMonitorList = contextDTO.getLastMonthPlanMonitorList();
+        // 上月月度生产计划列表
+        List<FactoryMonthPlanFinalAdjustVo> lastPlanList = contextDTO.getLastFactoryMonthPlanProdFinalList();
+        // 结构内调整记录
+        List<MpAdjustDetailVo> adjustList = contextDTO.getAdjustDetailList();
+        // 转分组Map
+        Map<String, List<FactoryMonthPlanFinalAdjustVo>> lastPlanGroupMap = convertToPlanGroupMap(lastPlanList);
+        Map<String, List<MpMonthPlanMonitor>> lastMonitorGroupMap = convertToMonitorGroupMap(lastMonitorList);
+        // 遍历目标列表，计算赋值
+        for (MpAdjustDetailVo adjust : adjustList) {
+            if (StringUtils.isEmpty(adjust.getMaterialCode())) {
+                continue;
+            }
+            String materialCode = adjust.getMaterialCode();
+            Integer totalScheduledQty = 0;
+            if (ApsConstant.FALSE.equals(adjust.getIsTrial())) {
+                if (PubUtil.isNotEmpty(lastPlanGroupMap.get(materialCode))){
+                    totalScheduledQty = lastPlanGroupMap.get(materialCode).get(0).getTotalQty();
+                }
+            }
+            // 获取已生产量（空值按0处理）
+            List<MpMonthPlanMonitor> monthPlanMonitorList = MapUtils.getObject(lastMonitorGroupMap, materialCode, new ArrayList<>());
+            Integer productionQty = Convert.toInt(monthPlanMonitorList.stream()
+                    .filter(e -> e.getProductionQty() != null)
+                    .mapToInt(MpMonthPlanMonitor::getProductionQty)
+                    .sum(), 0);
+            // 计划剩余排产量 = 累计已排产量 - 已生产量
+            Integer monthUnScheduledQty = totalScheduledQty - productionQty;
+            // 计划剩余排产量为负数时，默认为0
+            if (monthUnScheduledQty < 0) {
+                monthUnScheduledQty = 0;
+            }
+            adjust.setLastMonthRemainQty(monthUnScheduledQty == 0 ? null : monthUnScheduledQty);
+        }
+
+    }
+
+
+    /**
      * 设置计划剩余排产量
      * 计划剩余排产量 =【 1日 至 月底】.计划量 - 已生产量，出现负数，默认等于0
      *
@@ -4578,8 +4684,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         List<MpAdjustDetailVo> adjustList = contextDTO.getAdjustDetailList();
         // 循环设置
         adjustList.stream().forEach(vo -> {
-            // 计算: 调整量 = 净需求 - 计划剩余排产量
-            Integer pendingQty = Convert.toInt(vo.getCurrentNetQty(),0) - Convert.toInt(vo.getMonthUnScheduledQty(),0);
+            // 计算: 调整量 = 净需求 - 计划剩余排产量 -上月计划余量
+            Integer pendingQty = Convert.toInt(vo.getCurrentNetQty(),0) - Convert.toInt(vo.getMonthUnScheduledQty(),0) - Convert.toInt(vo.getLastMonthRemainQty(),0);
             vo.setPendingQty(pendingQty);
             // 确认调整量默认等于待调整量
             vo.setConfirmAdjustQty(pendingQty);
