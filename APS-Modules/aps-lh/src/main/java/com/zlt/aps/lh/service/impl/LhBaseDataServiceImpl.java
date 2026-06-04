@@ -70,6 +70,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.stream.Collectors;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -995,6 +996,9 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
      */
     private void loadCleaningPlan(LhScheduleContext context, String factoryCode, Date startDate, Date endDate) {
         List<String> machineCodes = new ArrayList<>(context.getMachineInfoMap().keySet());
+        log.info("[清洗加载调试] 查询条件: factoryCode={}, startDate={}, endDate={}, 机台数={}, 机台列表={}",
+                factoryCode, LhScheduleTimeUtil.formatDateTime(startDate),
+                LhScheduleTimeUtil.formatDateTime(endDate), machineCodes.size(), machineCodes);
         List<LhMouldCleanPlan> cleaningPlanList;
         if (machineCodes.isEmpty()) {
             cleaningPlanList = Collections.emptyList();
@@ -1011,7 +1015,10 @@ public class LhBaseDataServiceImpl implements ILhBaseDataService {
                             .orderByAsc(LhMouldCleanPlan::getCleanTime));
         }
         context.setCleaningPlanList(cleaningPlanList != null ? cleaningPlanList : context.getCleaningPlanList());
-        log.debug("模具清洗计划加载完成, 数量: {}", context.getCleaningPlanList().size());
+        log.info("[清洗加载调试] 查询结果数量: {}, 明细: {}", context.getCleaningPlanList().size(),
+                context.getCleaningPlanList().stream()
+                        .map(p -> p.getLhCode() + "|" + p.getCleanType() + "|" + LhScheduleTimeUtil.formatDateTime(p.getCleanTime()))
+                        .collect(java.util.stream.Collectors.joining("; ")));
     }
 
     /**

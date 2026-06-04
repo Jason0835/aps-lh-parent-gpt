@@ -113,6 +113,9 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             // S4.6.5.3 无计划量班次不展示硫化示方号和类型，避免空班次携带示方信息。
             clearUnplannedShiftCureFormulaFields(context);
 
+            // S4.6.5.4 清洗分析标识：被清洗窗口覆盖的班次在analysis中标识原因
+            applyCleaningAnalysis(context);
+
             // S4.6.6 保存排程结果到数据库：由持久化服务统一做目标日原子替换。
             schedulePersistenceService.replaceScheduleAtomically(context);
 
@@ -1577,5 +1580,82 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             }
         }
         return null;
+    }
+
+    /**
+     * 为被清洗窗口覆盖的班次设置分析标识。
+     * <p>遍历每个排程结果，检查其每个班次是否被清洗窗口覆盖，
+     * 如果被覆盖则在 classNAnalysis 中标识清洗原因（干冰清洗/喷砂清洗）。</p>
+     *
+     * @param context 排程上下文
+     */
+    private void applyCleaningAnalysis(LhScheduleContext context) {
+        if (CollectionUtils.isEmpty(context.getScheduleResultList())) {
+            return;
+        }
+        for (LhScheduleResult result : context.getScheduleResultList()) {
+            String machineCode = result.getLhMachineCode();
+            MachineScheduleDTO machine = context.getMachineScheduleMap().get(machineCode);
+            if (machine == null || CollectionUtils.isEmpty(machine.getCleaningWindowList())) {
+                continue;
+            }
+            List<MachineCleaningWindowDTO> cleaningWindowList = machine.getCleaningWindowList();
+            List<LhShiftConfigVO> shifts = context.getScheduleWindowShifts();
+            if (CollectionUtils.isEmpty(shifts)) {
+                continue;
+            }
+            // 检查每个班次（1-8）是否被清洗窗口覆盖
+            for (int shiftIndex = 1; shiftIndex <= 8; shiftIndex++) {
+                LhShiftConfigVO shift = findShiftByIndex(shifts, shiftIndex);
+                if (shift == null || shift.getShiftStartDateTime() == null || shift.getShiftEndDateTime() == null) {
+                    continue;
+                }
+                // 检查该班次时段是否与清洗窗口重叠
+                for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
+                    if (cleaningWindow == null || cleaningWindow.getCleanStartTime() == null
+                            || cleaningWindow.getCleanEndTime() == null) {
+                        continue;
+                    }
+                    // 判断班次与清洗窗口是否有重叠
+                    if (hasTimeOverlap(shift.getShiftStartDateTime(), shift.getShiftEndDateTime(),
+                            cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime())) {
+                        // 根据清洗类型设置分析标识
+                        String cleanType = cleaningWindow.getCleanType();
+                        String analysis;
+                        if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)) {
+                            analysis = "喷砂清洗";
+                        } else if (CleaningTypeEnum.DRY_ICE.getCode().equals(cleanType)) {
+                            analysis = "干冰清洗";
+                        } else {
+                            continue;
+                        }
+                        // 设置分析标识
+                        ShiftFieldUtil.setShiftAnalysis(result, shiftIndex, analysis);
+                        log.info("[清洗分析标识] 机台: {}, 班次: {}, 原因: {}, 清洗窗��: {}~{}",
+                                machineCode, shiftIndex, analysis,
+                                LhScheduleTimeUtil.formatDateTime(cleaningWindow.getCleanStartTime()),
+                                LhScheduleTimeUtil.formatDateTime(cleaningWindow.getCleanEndTime()));
+                        // 一个班次只处理一个清洗窗口
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 判断两个时间段是否有重叠。
+     *
+     * @param start1 时间段1开始
+     * @param end1   时间段1结束
+     * @param start2 时间段2开始
+     * @param end2   时间段2结束
+     * @return true-有重叠，false-无重叠
+     */
+    private boolean hasTimeOverlap(Date start1, Date end1, Date start2, Date end2) {
+        if (start1 == null || end1 == null || start2 == null || end2 == null) {
+            return false;
+        }
+        return start1.before(end2) && end1.after(start2);
     }
 }

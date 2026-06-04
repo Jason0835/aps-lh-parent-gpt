@@ -101,6 +101,9 @@ public class LhCleaningScheduleService {
                                                             Map<String, Integer> dryIceAfternoonCountMap,
                                                             Map<String, Integer> sandBlastDailyCountMap) {
         if (!isValidCleaningPlan(cleaningPlan, cleaningPlan != null ? cleaningPlan.getCleanType() : null)) {
+            log.info("[清洗调试] 清洗计划无效跳过, 机台: {}, 类型: {}", 
+                    cleaningPlan != null ? cleaningPlan.getLhCode() : "null",
+                    cleaningPlan != null ? cleaningPlan.getCleanType() : "null");
             return null;
         }
         // 机台当前在机物料近收尾（剩余天数 <= 阈值），跳过清洗避免无效停机
@@ -117,7 +120,13 @@ public class LhCleaningScheduleService {
         Date candidateStartTime = resolvePreferredCleaningStartTime(context, cleaningPlan);
         int cleanDurationHours = resolveCleanDurationHours(context, cleanType);
         int readyDurationHours = resolveReadyDurationHours(context, cleanType, cleanDurationHours);
+        log.info("[清洗调试] 开始调度清洗, 机台: {}, 类型: {}, cleanTime: {}, 候选开始时间: {}, 时长: {}h",
+                cleaningPlan.getLhCode(), cleanType,
+                LhScheduleTimeUtil.formatDateTime(cleaningPlan.getCleanTime()),
+                candidateStartTime != null ? LhScheduleTimeUtil.formatDateTime(candidateStartTime) : "null",
+                cleanDurationHours);
         if (Objects.isNull(candidateStartTime) || cleanDurationHours <= 0) {
+            log.info("[清洗调试] 候选开始时间为空或时长为0, 机台: {}, 跳过", cleaningPlan.getLhCode());
             return null;
         }
         for (int attempt = 0; attempt < CLEANING_SEARCH_MAX_DAYS; attempt++) {
@@ -126,6 +135,8 @@ public class LhCleaningScheduleService {
                     context, cleaningPlan.getLhCode(), candidateStartTime, cleanDurationHours);
             if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)
                     && isSandBlastForbiddenDate(context, adjustedStartTime)) {
+                log.info("[清洗调试] 喷砂禁止日命中, 机台: {}, 调整后时间: {}, 尝试向前搜索",
+                        cleaningPlan.getLhCode(), LhScheduleTimeUtil.formatDateTime(adjustedStartTime));
                 candidateStartTime = resolvePreviousSandBlastCandidate(context, candidateStartTime);
                 continue;
             }
@@ -138,10 +149,14 @@ public class LhCleaningScheduleService {
                             LhScheduleTimeUtil.formatDateTime(adjustedStartTime));
                     return null;
                 }
+                log.info("[清洗调试] 清洗窗口排入成功, 机台: {}, 类型: {}, 最终开始时间: {}",
+                        cleaningPlan.getLhCode(), cleanType, LhScheduleTimeUtil.formatDateTime(adjustedStartTime));
                 increaseCleaningCapacityUsage(context, totalDailyCountMap, dryIceDailyCountMap, dryIceMorningCountMap,
                         dryIceAfternoonCountMap, sandBlastDailyCountMap, cleanType, adjustedStartTime);
                 return buildCleaningWindow(context, cleaningPlan, adjustedStartTime, cleanDurationHours, readyDurationHours);
             }
+            log.info("[清洗调试] 额度不足, 机台: {}, 类型: {}, 时间: {}, 尝试下一候选",
+                    cleaningPlan.getLhCode(), cleanType, LhScheduleTimeUtil.formatDateTime(adjustedStartTime));
             candidateStartTime = resolveNextCleaningCandidateTime(context, cleanType, adjustedStartTime);
         }
         log.warn("清洗窗口在搜索范围内未找到可用时段，本次不计入清洗占用, 机台: {}, 类型: {}, 原时间: {}",
@@ -197,6 +212,25 @@ public class LhCleaningScheduleService {
         cleaningWindow.setCleanStartTime(adjustedCleanStartTime);
         cleaningWindow.setCleanEndTime(LhScheduleTimeUtil.addHours(adjustedCleanStartTime, cleanDurationHours));
         cleaningWindow.setReadyTime(LhScheduleTimeUtil.addHours(adjustedCleanStartTime, readyDurationHours));
+
+        // 喷砂清洗不能跨越夜班：如果结束时间在夜班时段，则整体顺延到次日早班
+        if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleaningPlan.getCleanType())) {
+            Date cleanEndTime = cleaningWindow.getCleanEndTime();
+            if (cleanEndTime != null && LhScheduleTimeUtil.isNoMouldChangeTime(context, cleanEndTime)) {
+                Date morningStart = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(
+                        context, adjustedCleanStartTime);
+                log.info("喷砂清洗窗口跨越夜班，顺延到早班, 机台: {}, 原开始: {}, 原结束: {}, 调整后开始: {}",
+                        cleaningPlan.getLhCode(),
+                        LhScheduleTimeUtil.formatDateTime(adjustedCleanStartTime),
+                        LhScheduleTimeUtil.formatDateTime(cleanEndTime),
+                        LhScheduleTimeUtil.formatDateTime(morningStart));
+                // 重新计算结束时间和ready时间
+                cleaningWindow.setCleanStartTime(morningStart);
+                cleaningWindow.setCleanEndTime(LhScheduleTimeUtil.addHours(morningStart, cleanDurationHours));
+                cleaningWindow.setReadyTime(LhScheduleTimeUtil.addHours(morningStart, readyDurationHours));
+            }
+        }
+
         cleaningWindow.setDataSource(cleaningPlan.getDataSource());
         cleaningWindow.setRemark(cleaningPlan.getRemark());
         return cleaningWindow;
@@ -234,6 +268,16 @@ public class LhCleaningScheduleService {
     private Date normalizeCleaningStartTime(LhScheduleContext context, String cleanType, Date candidateStartTime) {
         if (CleaningTypeEnum.DRY_ICE.getCode().equals(cleanType)) {
             return resolveDryIceWindowStartTime(context, candidateStartTime);
+        }
+        // 喷砂清洗不能在夜班触发，需要顺延到早班开始
+        if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)) {
+            if (LhScheduleTimeUtil.isNoMouldChangeTime(context, candidateStartTime)) {
+                Date morningStart = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(context, candidateStartTime);
+                log.info("喷砂清洗落在夜班，顺延到早班, 原时间: {}, 调整后: {}",
+                        LhScheduleTimeUtil.formatDateTime(candidateStartTime),
+                        LhScheduleTimeUtil.formatDateTime(morningStart));
+                return morningStart;
+            }
         }
         return candidateStartTime;
     }
@@ -384,6 +428,10 @@ public class LhCleaningScheduleService {
         Date cursorTime = candidateStartTime;
         for (int attempt = 0; attempt < CLEANING_SEARCH_MAX_DAYS && Objects.nonNull(cursorTime); attempt++) {
             if (!isSandBlastForbiddenDate(context, cursorTime)) {
+                // 喷砂清洗不能在夜班触发，对齐到早班开始
+                if (LhScheduleTimeUtil.isNoMouldChangeTime(context, cursorTime)) {
+                    cursorTime = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(context, cursorTime);
+                }
                 return cursorTime;
             }
             cursorTime = LhScheduleTimeUtil.addDays(cursorTime, -1);
@@ -395,6 +443,10 @@ public class LhCleaningScheduleService {
         Date cursorTime = candidateStartTime;
         for (int attempt = 0; attempt < CLEANING_SEARCH_MAX_DAYS && Objects.nonNull(cursorTime); attempt++) {
             if (!isSandBlastForbiddenDate(context, cursorTime)) {
+                // 喷砂清洗不能在夜班触发，对齐到早班开始
+                if (LhScheduleTimeUtil.isNoMouldChangeTime(context, cursorTime)) {
+                    cursorTime = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(context, cursorTime);
+                }
                 return cursorTime;
             }
             cursorTime = LhScheduleTimeUtil.addDays(cursorTime, 1);
