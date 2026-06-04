@@ -53,4 +53,15 @@
           AND NIGHT_PLAN_QTY > 0
         GROUP BY BEAD_CODE
     </select>
+
+    <select id="listMachineChuck" resultType="com.zlt.aps.tq.engine.vo.TqMachineChuckVo">
+        select mc.MACHINE_ID as machineId,
+               mc.INCH_SIZE  as inchSize
+        from T_TQ_MACHINE_CHUCK mc
+        inner join T_TQ_MACHINE_INFO m on mc.MACHINE_ID = m.id
+        where mc.DEL_FLAG = '0'
+          and m.STATUS = '0'
+          and m.DEL_FLAG = '0'
+          and mc.INCH_SIZE is not null
+    </select>
 </mapper>

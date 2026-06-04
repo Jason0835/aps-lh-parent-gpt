@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.engine.chain.validators;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.constant.LhDataValidationGroupConstant;
 import com.zlt.aps.lh.api.enums.ValidationPolicyEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -24,15 +25,14 @@ import java.util.stream.Collectors;
 @Component
 public class SkuCapacityValidator implements IDataValidator {
     private static final String VALIDATOR_KEY = "skuCapacityValidator";
-    private static final String SKU_DELIMITER = "、";
-    private static final String INVALID_TIME_ERROR_TEMPLATE = "[%s] 物料编码 %s 对应的标准产能无效";
+    private static final String SKU_DELIMITER = "\u3001";
 
     @Override
     public boolean validate(LhScheduleContext context) {
         if (context.getSkuLhCapacityMap() == null || context.getSkuLhCapacityMap().isEmpty()) {
             log.warn("SKU日硫化产能数据为空, 工厂: {}", context.getFactoryCode());
-            context.addValidationError("[" + getValidatorName() + "] SKU日硫化产能数据为空, 工厂: "
-                    + context.getFactoryDisplayName());
+            context.addValidationError("[" + getValidatorName() + "] "
+                    + String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.skuCapacityEmpty"), context.getFactoryDisplayName()));
             return false;
         }
         long missingCapacityCount = context.getMonthPlanList().stream()
@@ -41,10 +41,10 @@ public class SkuCapacityValidator implements IDataValidator {
                 .count();
         if (missingCapacityCount > 0) {
             log.warn("有{}个月计划SKU缺少硫化产能数据", missingCapacityCount);
-            context.addValidationError("[" + getValidatorName() + "] 有 " + missingCapacityCount + " 个月计划SKU缺少硫化产能数据");
+            context.addValidationError("[" + getValidatorName() + "] "
+                    + String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.skuCapacityMissing"), missingCapacityCount));
             return false;
         }
-        // 仅校验月计划中出现的SKU，保持首现顺序用于稳定错误展示
         Set<String> monthPlanSkuSet = context.getMonthPlanList().stream()
                 .map(p -> p.getMaterialCode())
                 .filter(StringUtils::isNotEmpty)
@@ -62,7 +62,8 @@ public class SkuCapacityValidator implements IDataValidator {
         if (!invalidSkuList.isEmpty()) {
             String invalidSkuText = String.join(SKU_DELIMITER, invalidSkuList);
             log.warn("月计划SKU标准产能无效, 工厂: {}, 物料编码: {}", context.getFactoryCode(), invalidSkuText);
-            context.addValidationError(String.format(INVALID_TIME_ERROR_TEMPLATE, getValidatorName(), invalidSkuText));
+            context.addValidationError("[" + getValidatorName() + "] "
+                    + String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.invalidStandardCapacity"), invalidSkuText));
             return false;
         }
         return true;
@@ -70,7 +71,7 @@ public class SkuCapacityValidator implements IDataValidator {
 
     @Override
     public String getValidatorName() {
-        return "SKU日硫化产能校验";
+        return I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.skuCapacityName");
     }
 
     /**

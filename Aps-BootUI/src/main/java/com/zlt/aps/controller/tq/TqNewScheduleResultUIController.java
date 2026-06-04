@@ -86,4 +86,79 @@ public class TqNewScheduleResultUIController extends BaseUIController<TqNewSched
         List<TqScheduleShiftDateVO> list = iTqNewScheduleResultService.listScheduleShiftDates(queryVO);
         return AjaxResult.success(list);
     }
+
+    /**
+     * 自动排程
+     */
+    @RequiresPermissions("tq:newScheduleResult:autoPlan")
+    @PostMapping("/autoPlan")
+    @ResponseBody
+    @ApiOperation("自动排程")
+    public AjaxResult autoPlan(TqNewScheduleResult entity) {
+        return iTqNewScheduleResultService.autoPlan(entity);
+    }
+
+    /**
+     * 插单
+     */
+    @RequiresPermissions("tq:newScheduleResult:insertOrder")
+    @PostMapping("/insertOrder")
+    @ResponseBody
+    @ApiOperation("插单")
+    public AjaxResult insertOrder(TqNewScheduleResult entity) {
+        return iTqNewScheduleResultService.insertOrder(entity);
+    }
+
+    /**
+     * 转机台
+     */
+    @RequiresPermissions("tq:newScheduleResult:changeMachine")
+    @PostMapping("/changeMachine")
+    @ResponseBody
+    @ApiOperation("转机台")
+    public AjaxResult changeMachine(TqNewScheduleResult entity) {
+        return iTqNewScheduleResultService.changeMachine(entity);
+    }
+
+    /**
+     * 调量
+     */
+    @RequiresPermissions("tq:newScheduleResult:adjustQty")
+    @PostMapping("/changeQty")
+    @ResponseBody
+    @ApiOperation("调量")
+    public AjaxResult changeQty(TqNewScheduleResult entity) {
+        return iTqNewScheduleResultService.changeQty(entity);
+    }
+
+    /**
+     * 发布排程
+     */
+    @RequiresPermissions("tq:newScheduleResult:release")
+    @PostMapping("/publish")
+    @ResponseBody
+    @ApiOperation("发布排程")
+    public AjaxResult publish(TqNewScheduleResult entity) {
+        return iTqNewScheduleResultService.publish(entity);
+    }
+
+    /**
+     * 查询排程日期是否已发布
+     */
+    @PostMapping("/isPublish")
+    @ResponseBody
+    @ApiOperation("查询排程日期是否已发布")
+    public AjaxResult isPublish(TqNewScheduleResult entity) {
+        return AjaxResult.success(iTqNewScheduleResultService.isPublish(entity));
+    }
+
+    /**
+     * 唯一性校验
+     */
+    @PostMapping("/checkUnique")
+    @ResponseBody
+    @ApiOperation("唯一性校验")
+    public AjaxResult checkUnique(TqNewScheduleResult entity) {
+        return AjaxResult.success(iTqNewScheduleResultService.checkUnique(entity));
+    }
 }

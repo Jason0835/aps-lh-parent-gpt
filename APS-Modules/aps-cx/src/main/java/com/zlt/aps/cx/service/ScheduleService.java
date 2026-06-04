@@ -48,9 +48,13 @@ public interface ScheduleService {
     /**
      * 排程执行结果
      */
+    /** 排程锁冲突错误码 */
+    String ERROR_CODE_LOCK_CONFLICT = "LOCK_CONFLICT";
+
     class ScheduleResult {
         private boolean success;
         private String message;
+        private String errorCode;
         private LocalDate scheduleDate;
         private List<CxScheduleResult> results;
         private List<ValidationDetail> validationErrors;
@@ -72,6 +76,14 @@ public interface ScheduleService {
 
         public void setMessage(String message) {
             this.message = message;
+        }
+
+        public String getErrorCode() {
+            return errorCode;
+        }
+
+        public void setErrorCode(String errorCode) {
+            this.errorCode = errorCode;
         }
 
         public LocalDate getScheduleDate() {

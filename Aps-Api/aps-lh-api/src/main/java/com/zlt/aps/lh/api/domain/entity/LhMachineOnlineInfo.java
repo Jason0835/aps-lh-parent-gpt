@@ -91,7 +91,6 @@ public class LhMachineOnlineInfo extends BaseEntity implements Serializable {
      * <p>用于数据同步的版本控制，防止数据冲突</p>
      */
     @ApiModelProperty(value = "版本号", name = "dataVersion")
-    @Excel(name = "ui.data.column.lhMachineOnlineInfo.dataVersion")
     @TableField(value = "DATA_VERSION")
     private String dataVersion;
 

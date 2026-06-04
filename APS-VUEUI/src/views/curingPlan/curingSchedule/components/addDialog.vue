@@ -1,4 +1,4 @@
-﻿﻿<template>
+﻿<template>
   <el-dialog
     :title="title"
     :visible="visible"
@@ -443,8 +443,12 @@ export default {
           }
           form[k] = v;
         });
-        if (data.trialStatus) {
-          form.originalTrialStatus = data.trialStatus;
+        // 列表行数据中示方类型字段名为 changedTrialStatus，映射到表单的 trialStatus
+        if (data.changedTrialStatus && !data.trialStatus) {
+          form.trialStatus = data.changedTrialStatus;
+        }
+        if (data.trialStatus || data.changedTrialStatus) {
+          form.originalTrialStatus = data.trialStatus || data.changedTrialStatus;
         }
         if (data.singleMouldShiftQty != null) {
           form.machineShiftCapacity = data.singleMouldShiftQty;
@@ -455,6 +459,10 @@ export default {
       await this.fetchScheduleShiftDates(this.form.scheduleDate);
       if (!data?.lhMachineCode) {
         this.$set(this.form, "lhMachineCode", "");
+      }
+      // 有物料编码时主动加载SKU关联数据，确保示方类型等信息从后端获取最新值
+      if (this.form.materialCode) {
+        await this.loadSkuRelatedData(this.form.materialCode);
       }
     },
     hide() {

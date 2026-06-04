@@ -43,3 +43,66 @@ export function listScheduleShiftDates(query) {
     data: query
   })
 }
+
+/** 自动排程 */
+export function autoPlan(data) {
+  return request({
+    url: '/tq/newScheduleResult/autoPlan',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 插单 */
+export function insertOrder(data) {
+  return request({
+    url: '/tq/newScheduleResult/insertOrder',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 转机台 */
+export function changeMachine(data) {
+  return request({
+    url: '/tq/newScheduleResult/changeMachine',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 调量 */
+export function changeQty(data) {
+  return request({
+    url: '/tq/newScheduleResult/changeQty',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 发布排程 */
+export function publishSchedule(data) {
+  return request({
+    url: '/tq/newScheduleResult/publish',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 查询排程日期是否已发布 */
+export function isPublish(data) {
+  return request({
+    url: '/tq/newScheduleResult/isPublish',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 唯一性校验 */
+export function checkUnique(data) {
+  return request({
+    url: '/tq/newScheduleResult/checkUnique',
+    method: 'post',
+    data: data
+  })
+}

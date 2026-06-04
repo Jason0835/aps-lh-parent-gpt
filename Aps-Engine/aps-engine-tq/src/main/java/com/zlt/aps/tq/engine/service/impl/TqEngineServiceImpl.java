@@ -19,9 +19,11 @@ import com.zlt.aps.common.engine.service.impl.IncrementService;
 import com.zlt.aps.common.engine.utils.CollectionUtil;
 import com.zlt.aps.tq.api.domain.dto.TqScheduleResultDto;
 import com.zlt.aps.tq.api.domain.entity.TqMachineInfo;
+import com.zlt.aps.tq.engine.context.TqScheduleContext;
 import com.zlt.aps.tq.engine.mapper.TqEngineMapper;
 import com.zlt.aps.tq.engine.mapper.TqEngineStockMapper;
 import com.zlt.aps.tq.engine.service.*;
+import com.zlt.aps.tq.engine.template.TqScheduleTemplateImpl;
 import com.zlt.aps.tq.engine.vo.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
@@ -62,6 +64,10 @@ public class TqEngineServiceImpl implements TqEngineService {
     private TqEngineStockMapper tqEngineStockMapper;
     @Resource
     private AutoScheduleLogService autoScheduleLogService;
+
+    @Resource
+    private TqScheduleTemplateImpl tqScheduleTemplate;
+
     private String division = "\r\n---------------------------------------------------\r\n";  //日志分割符
 
     private final static BigDecimal HOUR24 = new BigDecimal("24"); // 24小时
@@ -75,79 +81,23 @@ public class TqEngineServiceImpl implements TqEngineService {
     private final static String DEFAULT_ONE_ROLL_NUM = "220"; // 最低排产量默认值
 
     /**
-     * 胎圈胶自动排程
+     * 胎圈胶自动排程（重构后：构造Context → 调用Template → 检查中断）
      *
      * @param scheduleDate 排程日期，格式：yyyy-MM-dd
      */
     @Transactional(rollbackFor=Exception.class)
     public void autoTqSchedule(String scheduleDate) {
-        String username = SecurityUtils.getUsername(); //用户账号
-        String cxBatchNo = "";  //成型批次号
-        String batchNo = this.createBatchNo(scheduleDate);  //胎圈排程批次号
-        TqScheduleParams params = this.loadParams();  // 获取工序参数map
-        Map<String, String> mapAssistSpec = this.mapAssistSpec(); //获得外协规格Map
-        String productionStage = params.getProductionStage();  //仅投产阶段规格排产标识
-        List<TqScheduleResultVo> scheduleList = tqEngineMapper.statTqScheduleBase(scheduleDate, productionStage);  //根据成型排程记录 统计出 胎圈胶排程记录基础数据
-        if (scheduleList == null || scheduleList.isEmpty()) {
-            log.info("根据成型排程记录 统计出 胎圈胶排程记录基础数据 为空");
-            autoScheduleLogService.insertTqScheduleLog(batchNo, "", "自动排程失败", "自动排程失败，原因：成型排程数据为空，或没有在施工信息中找到对应的物料"); //添加日志
-            throw new RuntimeException(I18nUtil.getMessage("engine.auto.scheule.tip1"));
-        }
-        //过滤掉成型5个班的计划量都为0的数据
-        scheduleList = scheduleList.stream().filter(s -> (s.getCxClass2Plan()+s.getCxClass3Plan()+s.getCxClass4Plan()+s.getCxClass5Plan())>0).collect(Collectors.toList());
-        autoScheduleLogService.insertTqScheduleLog(batchNo, "", "根据成'型排程记录'统计出胎圈胶排程记录基础数据",  toJSONString(scheduleList));
-        this.ValidatedConstruction(scheduleDate, batchNo, productionStage, mapAssistSpec);   //证成型排程记录的胎胚code在施工表中是否都能找到对应记录，如果不能则提示
-        Map<String, String> mouthPlateMachineMap = tqEngineMachineService.getMouthPlateMachineMap(); //获得口型板代码map
-        Map<String, String> specifyCanMachineMap = tqEngineMachineService.getSpecifyMachineMap(EngineConstants.JOB_TYPE_CAN); //获得胎圈代码和定点机台的限制作业map
-        Map<String, String> specifyNotMachineMap = tqEngineMachineService.getSpecifyMachineMap(EngineConstants.JOB_TYPE_NOT); //获得胎圈代码和定点机台的不可作业map
-        Map<String, Double> planStockMap = tqEngineStockService.getPlanStockMap(batchNo, scheduleDate, params.getStockLossRate());  //计算胎圈隔天7点预计库存
-        Map<String, Double> stockMap = this.loadTqStock(scheduleDate); // 加载库存
-        Map<String, Double> lastDayMidPlanMap = this.loadLastDayMidPlan(scheduleDate); // 加载昨日早班计划
-        Map<String, Double> lossRateMap = tqEngineLossService.getLossRateMap();   //损耗率map
-        Map<String, TqMonthSurplusVo> monthSurplus = tqEngineMonthSurplusService.getMonthSurplus(scheduleDate);  // 获得月度计划剩余量、完成量
-        List<TqMachineInfo> allMachineList = tqEngineMachineService.listTqMachine();
-        this.baseDataLog(batchNo, mouthPlateMachineMap, specifyCanMachineMap, specifyNotMachineMap, planStockMap, lossRateMap, monthSurplus, params); //把基础数据假如到日志中
-        TqTotalPlanQtyVo totalPlanQtyVo = new TqTotalPlanQtyVo();  //胎圈中班和夜班总计划量Vo
-        for (TqScheduleResultVo scheduleVo : scheduleList) {
-            cxBatchNo = scheduleVo.getCxBatchNo();
-            scheduleVo.setBatchNo(batchNo);    //批次号
-            String orderNo = this.createOrderNo(batchNo);   //创建工单号
-            scheduleVo.setOrderNo(orderNo);
-            scheduleVo.setStockQty(stockMap.getOrDefault(scheduleVo.getBeadCode(), 0D));  // 库存
-            scheduleVo.setSurplusQty(Optional.ofNullable(monthSurplus.get(scheduleVo.getBeadCode())).map(TqMonthSurplusVo::getMonthRemainQty).orElse(0D)); // 剩余量
-//            scheduleVo.setPlanStockQty(planStockMap.getOrDefault(scheduleVo.getBeadCode(), 0D));
-            scheduleVo.setLastMidPlanQty(lastDayMidPlanMap.getOrDefault(scheduleVo.getBeadCode(), 0D)); // 上一天早班库存
-            scheduleVo.setPlanStockQty(BigDecimalUtils.qtySub(BigDecimalUtil.add(scheduleVo.getStockQty(), scheduleVo.getLastMidPlanQty()), scheduleVo.getCxClass1Plan())); // 计算19点预计库存
-            scheduleVo.getParams().put(EngineConstants.BIG_SIZE_SPEC, params.getBigSizeSpec());
-            autoScheduleLogService.insertTqScheduleLog(batchNo, orderNo, "根据'16点预计库存集合'设置库存",
-                    logSplit("16点预计库存集合：" + toJSONString(planStockMap), "数据结果：" + toJSONString(scheduleVo))); //添加日志
+        // 1. 构造上下文
+        TqScheduleContext context = new TqScheduleContext();
+        context.setScheduleDate(scheduleDate);
+        context.setOperator(SecurityUtils.getUsername());
 
-            this.newComputeSupplyTime(scheduleVo, scheduleVo.getPlanStockQty());  //库存供应时长，用预计库存计算
-            this.computeTqPlanQty(scheduleVo, totalPlanQtyVo, lossRateMap, params);  //计算胎圈中班和夜班计划量
-            this.setStatusAndCloseTip(scheduleVo, monthSurplus.get(scheduleVo.getBeadCode()), params.getCloseOutNum());  //设置收尾提示标识 和 生产状态字段
-            scheduleVo.setIsRelease(ApsConstant.NO_RELEASE);
-            scheduleVo.setDelFlag(ApsConstant.DEL_FLAG_NORMAL);
-            scheduleVo.setCreateTime(new Date());
-            scheduleVo.setCreateBy(username);
-        }
-        this.equilibriumDay1(scheduleList, totalPlanQtyVo, params);  // 均衡第一天计划
-        this.equilibriumDay2(scheduleList, totalPlanQtyVo, params); // 均衡第二天计划
-//        this.equilibrium(batchNo, scheduleList, paramsMap, totalPlanQtyVo, toolCapacity.doubleValue());  //中班和夜班计排程计划量均衡处理（非特殊规格）
-        this.chooseMachine(scheduleList, allMachineList, specifyCanMachineMap, specifyNotMachineMap, mouthPlateMachineMap);  //选择生产线
-        this.setProduceOrder(scheduleList);  //设置白班和夜班的生产顺序
+        // 2. 执行模板方法（S1→S2→S3→S4）
+        tqScheduleTemplate.execute(context);
 
-        List<TqScheduleResultVo> existScheduleList = this.tqEngineMapper.listTqEnginSchedule(scheduleDate);  //查询当天已经存在的排产记录
-        this.syncTqScheduleToLog(scheduleDate);  //把排程数据同步到log表，删除历史外协排程数据
-        this.createScheduleRecord(scheduleDate, cxBatchNo, batchNo);  //创建自动排程记录
-        List<TqScheduleResultVo> assistScheduleList = scheduleList.stream().filter(r -> mapAssistSpec.containsKey(r.getBeadCode())).collect(Collectors.toList()); //过滤出外协排程数据
-        scheduleList = scheduleList.stream().filter(r -> !mapAssistSpec.containsKey(r.getBeadCode())).collect(Collectors.toList());  //过滤出非外协的排产数据
-        if(StringUtils.isNotEmpty(assistScheduleList)) {
-            tqEngineMapper.batchCreateAssistScheduleResult(assistScheduleList);   //批量新增外协排程结果数据
-        }
-
-        scheduleList = this.mergeExistSchedule(batchNo, scheduleList, existScheduleList);  //如果当天排程已经存在，则把当天的排程合并到 自动排程的列表中
-        if(StringUtils.isNotEmpty(scheduleList)) {
-            tqEngineMapper.batchCreateScheduleResult(scheduleList);   //批量新增非外协排程结果数据
+        // 3. 检查中断
+        if (context.isInterrupted()) {
+            throw new RuntimeException(context.getInterruptReason());
         }
     }
 

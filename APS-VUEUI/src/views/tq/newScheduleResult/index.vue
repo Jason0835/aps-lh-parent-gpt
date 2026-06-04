@@ -80,7 +80,7 @@
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listNewScheduleResult, removeNewScheduleResult, listScheduleShiftDates } from "@/api/tq/tqNewScheduleResult";
+import { listNewScheduleResult, removeNewScheduleResult, listScheduleShiftDates, autoPlan, insertOrder, changeMachine, changeQty, publishSchedule } from "@/api/tq/tqNewScheduleResult";
 import { mapState } from "vuex";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
@@ -458,19 +458,48 @@ export default {
       }
     },
     handleAutoPlan() {
-      this.$message.info("自动排程功能待实现");
+      this.$confirm(this.$t("ui.data.btn.tqNewScheduleResult.autoPlan") + "?", {
+        type: "warning",
+      }).then(() => {
+        autoPlan({ scheduleDateQuery: this.query.scheduleDateQuery || this.search.scheduleDateQuery }).then((res) => {
+          this.$modal.msgSuccess(res.msg);
+          this.getList();
+        });
+      }).catch(() => {});
     },
     handleInsertOrder() {
-      this.$message.info("插单功能待实现");
+      // TODO 插单弹窗待实现，目前先调用接口
+      this.$message.info("插单弹窗待实现");
     },
     handleChangeMachine() {
-      this.$message.info("转机台功能待实现");
+      if (this.selection.length !== 1) {
+        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        return;
+      }
+      // TODO 转机台弹窗待实现，目前先调用接口
+      this.$message.info("转机台弹窗待实现");
     },
     handleAdjustQty() {
-      this.$message.info("调量功能待实现");
+      if (this.selection.length !== 1) {
+        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        return;
+      }
+      // TODO 调量弹窗待实现，目前先调用接口
+      this.$message.info("调量弹窗待实现");
     },
     handleRelease() {
-      this.$message.info("发布功能待实现");
+      if (!this.selection || this.selection.length === 0) {
+        this.$modal.msgWarning(this.$t("common.tip.selectOne"));
+        return;
+      }
+      this.$confirm(this.$t("ui.data.btn.tqNewScheduleResult.release") + "?", {
+        type: "warning",
+      }).then(() => {
+        publishSchedule({ scheduleDateQuery: this.query.scheduleDateQuery || this.search.scheduleDateQuery }).then((res) => {
+          this.$modal.msgSuccess(res.msg);
+          this.getList();
+        });
+      }).catch(() => {});
     },
     handleBatchDelete() {
       if (!this.selection || this.selection.length === 0) {

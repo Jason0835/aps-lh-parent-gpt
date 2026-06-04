@@ -1,4 +1,4 @@
-package com.zlt.aps.config;
+package com.zlt.aps.interceptor;
 
 import com.ruoyi.common.core.utils.SecurityUtils;
 import com.ruoyi.common.redis.service.RedisService;

@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.engine.chain.validators;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.constant.LhDataValidationGroupConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.enums.ValidationPolicyEnum;
@@ -23,19 +24,19 @@ public class WorkCalendarValidator implements IDataValidator {
     public boolean validate(LhScheduleContext context) {
         if (context.getWorkCalendarList() == null || context.getWorkCalendarList().isEmpty()) {
             log.warn("工作日历数据为空, 工厂: {}", context.getFactoryCode());
-            context.addValidationError("[" + getValidatorName() + "] 工作日历数据为空, 工厂: "
-                    + context.getFactoryDisplayName());
+            context.addValidationError("[" + getValidatorName() + "] "
+                    + String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.workCalendarEmpty"), context.getFactoryDisplayName()));
             return false;
         }
         long lhCalendarCount = context.getWorkCalendarList().stream()
-                // 必须存在硫化工序工作日历，否则后续班次管控无法可靠判断开停产。
                 .filter(wc -> StringUtils.equals(LhScheduleConstant.PROC_CODE_LH, wc.getProcCode()))
                 .count();
         if (lhCalendarCount == 0) {
             log.warn("工作日历中无硫化工序({})数据, 工厂: {}",
                     LhScheduleConstant.PROC_CODE_LH, context.getFactoryCode());
-            context.addValidationError("[" + getValidatorName() + "] 工作日历中无硫化工序("
-                    + LhScheduleConstant.PROC_CODE_LH + ")数据, 工厂: " + context.getFactoryDisplayName());
+            context.addValidationError("[" + getValidatorName() + "] "
+                    + String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.noLhProcessCalendar"),
+                    LhScheduleConstant.PROC_CODE_LH, context.getFactoryDisplayName()));
             return false;
         }
         log.info("工作日历校验通过, 硫化日历记录数: {}", lhCalendarCount);
@@ -44,7 +45,7 @@ public class WorkCalendarValidator implements IDataValidator {
 
     @Override
     public String getValidatorName() {
-        return "工作日历校验";
+        return I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.workCalendarName");
     }
 
     /**

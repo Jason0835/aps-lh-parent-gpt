@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.engine.chain.validators;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.constant.LhDataValidationGroupConstant;
 import com.zlt.aps.lh.api.domain.entity.LhSpecialMaterialBom;
 import com.zlt.aps.lh.api.enums.LhSpecialMaterialCategoryEnum;
@@ -78,18 +79,18 @@ public class SpecialMaterialBomValidator implements IDataValidator {
         }
         if (!CollectionUtils.isEmpty(emptyKeyErrorList)) {
             context.addValidationError("[" + getValidatorName()
-                    + "] 特殊物料清单结构名称和物料编码至少填写一个: "
-                    + String.join("；", emptyKeyErrorList));
+                    + "] " + I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.specialBomKeyEmpty")
+                    + String.join("\uFF1B", emptyKeyErrorList));
         }
         if (!CollectionUtils.isEmpty(invalidCategoryErrorList)) {
             context.addValidationError("[" + getValidatorName()
-                    + "] 特殊物料清单分类只能为01/02/03: "
-                    + String.join("；", invalidCategoryErrorList));
+                    + "] " + I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.specialBomCategoryInvalid")
+                    + String.join("\uFF1B", invalidCategoryErrorList));
         }
         if (!CollectionUtils.isEmpty(categoryConflictErrorList)) {
             context.addValidationError("[" + getValidatorName()
-                    + "] 同一物料/结构下19.5寸宽基和22.5寸宽基互斥，芯片胎可与它们组合: "
-                    + String.join("；", categoryConflictErrorList));
+                    + "] " + I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.specialBomCategoryConflict")
+                    + String.join("\uFF1B", categoryConflictErrorList));
         }
         boolean passed = CollectionUtils.isEmpty(emptyKeyErrorList)
                 && CollectionUtils.isEmpty(invalidCategoryErrorList)
@@ -106,7 +107,7 @@ public class SpecialMaterialBomValidator implements IDataValidator {
 
     @Override
     public String getValidatorName() {
-        return "特殊物料清单校验";
+        return I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.specialBomName");
     }
 
     /**

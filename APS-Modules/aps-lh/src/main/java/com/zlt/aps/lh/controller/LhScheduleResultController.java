@@ -348,7 +348,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     /**
      * 导出列表
      */
-    @Log(title = "硫化排程导出", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.lhScheduleResult.exportLogTitle", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override
@@ -850,7 +850,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * @return 下发结果
      */
     @ApiOperation(value = "硫化排程结果下发到MES", notes = "将硫化排程结果下发到MES中间表，8班数据对应3天班次")
-    @Log(title = "硫化排程结果下发", businessType = BusinessType.PUBLISH)
+    @Log(title = "ui.data.column.lhScheduleResult.issueToMesLogTitle", businessType = BusinessType.PUBLISH)
     @PostMapping("/issueToMes")
     public AjaxResult issueLhScheduleResultToMes(@RequestParam(value = "scheduleDate", required = false) Date scheduleDate) {
         if (scheduleDate == null) {
@@ -1342,7 +1342,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
      * @param fileName 导出文件名
      * @return Excel文件字节数组
      */
-    @Log(title = "排产小结导出", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.lhScheduleResult.exportSummaryLogTitle", businessType = BusinessType.EXPORT)
     @ApiOperation("排产小结报表导出")
     @PostMapping("/exportScheduleSummaryReport/{fileName}")
     public byte[] exportScheduleSummaryReport(@RequestBody ScheduleSummaryReportVO queryVO,

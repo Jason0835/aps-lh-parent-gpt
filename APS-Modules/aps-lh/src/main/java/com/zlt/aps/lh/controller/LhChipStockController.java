@@ -6,6 +6,7 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.lh.api.domain.entity.LhChipStock;
 import com.zlt.aps.lh.mapper.LhChipStockMapper;
@@ -85,6 +86,14 @@ public class LhChipStockController extends AbstractDocBizController<LhChipStock>
             return AjaxResult.error(com.ruoyi.common.i18n.utils.I18nUtil.getMessage("ui.data.alert.lhChipStock.stockLessThanEditFinish"));
         }
         int result = lhChipStockService.save(billVO);
+        if (result > 0) {
+            // 保存成功后，自动从日完成量回填完成量
+            try {
+                lhChipStockService.autoFillFinishQtyFromDayFinish(billVO.getFactoryCode(), billVO.getChipCode());
+            } catch (Exception e) {
+                log.error("自动回填完成量失败：factoryCode={}, chipCode={}", billVO.getFactoryCode(), billVO.getChipCode(), e);
+            }
+        }
         return result > 0 ? AjaxResult.success() : AjaxResult.error();
     }
 
@@ -99,7 +108,16 @@ public class LhChipStockController extends AbstractDocBizController<LhChipStock>
         if (PubUtil.isEmpty(billVO.getFactoryCode())) {
             billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        return lhChipStockService.mergeSave(billVO);
+        AjaxResult mergeResult = lhChipStockService.mergeSave(billVO);
+        if (AjaxResultUtils.checkAjaxSuccess(mergeResult)) {
+            // 合并保存成功后，自动从日完成量回填完成量
+            try {
+                lhChipStockService.autoFillFinishQtyFromDayFinish(billVO.getFactoryCode(), billVO.getChipCode());
+            } catch (Exception e) {
+                log.error("自动回填完成量失败：factoryCode={}, chipCode={}", billVO.getFactoryCode(), billVO.getChipCode(), e);
+            }
+        }
+        return mergeResult;
     }
 
     /**
