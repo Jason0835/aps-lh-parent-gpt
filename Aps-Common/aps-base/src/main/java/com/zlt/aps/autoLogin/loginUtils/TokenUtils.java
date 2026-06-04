@@ -13,10 +13,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import javax.crypto.Cipher;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -47,33 +43,7 @@ public class TokenUtils {
     @Value("${sync.user.password:STzF8C#p8kyrAQy@6XzQ}")
     private String syncPassword;
 
-    @Value("${sync.aes.key:zlt_aps_pwd_key!}")
-    private String aesKey;
-
     private static final String SYNC_TOKEN_KEY = "syncToken";
-
-    /**
-     * AES加密（与前端aes.js保持一致）
-     * 密钥直接转UTF-8字节，ECB模式，PKCS5Padding填充
-     *
-     * @param content 待加密的明文
-     * @return Base64编码的密文
-     */
-    private String aesEncrypt(String content) {
-        try {
-            byte[] keyBytes = aesKey.getBytes(StandardCharsets.UTF_8);
-            byte[] key128 = new byte[16];
-            System.arraycopy(keyBytes, 0, key128, 0, Math.min(keyBytes.length, 16));
-            SecretKeySpec keySpec = new SecretKeySpec(key128, "AES");
-            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, keySpec);
-            byte[] encrypted = cipher.doFinal(content.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(encrypted);
-        } catch (Exception e) {
-            log.error("AES加密失败", e);
-            return null;
-        }
-    }
 
     /**
      * 登录并返回token
@@ -88,12 +58,7 @@ public class TokenUtils {
         log.info("开始执行同步用户登录: {}", syncUsername);
         LoginBody loginBody = new LoginBody();
         loginBody.setUsername(syncUsername);
-        String encryptedPassword = aesEncrypt(syncPassword);
-        if (encryptedPassword == null) {
-            log.error("同步用户密码AES加密失败，无法登录");
-            return null;
-        }
-        loginBody.setPassword(encryptedPassword);
+        loginBody.setPassword(syncPassword);
         try {
             R<?> jsonObject = iSysLoginService.login(loginBody);
             if (jsonObject != null && jsonObject.getCode() == 200) {
