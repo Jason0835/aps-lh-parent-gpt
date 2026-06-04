@@ -3,12 +3,14 @@ package com.zlt.aps.tq.controller;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult;
 import com.zlt.aps.tq.api.domain.vo.TqScheduleShiftDateVO;
+import com.zlt.aps.tq.engine.service.TqEngineService;
 import com.zlt.aps.tq.mapper.TqNewScheduleResultMapper;
 import com.zlt.aps.tq.service.ITqNewScheduleResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
@@ -43,6 +45,9 @@ public class TqNewScheduleResultController extends AbstractDocBizController<TqNe
 
     @Resource
     private TqNewScheduleResultMapper tqNewScheduleResultMapper;
+
+    @Autowired
+    private TqEngineService tqEngineService;
 
     @ApiOperation("查询胎圈排程结果列表")
     @PostMapping("/list")
@@ -127,11 +132,88 @@ public class TqNewScheduleResultController extends AbstractDocBizController<TqNe
     }
 
     /**
+     * 自动排程
+     */
+    @Log(title = "胎圈排程结果(新)", businessType = BusinessType.AUTOPLAN)
+    @ApiOperation("自动排程")
+    @PostMapping("/autoPlan")
+    public AjaxResult autoPlan(@RequestBody TqNewScheduleResult queryVO) {
+        Date scheduleDate = queryVO.getScheduleDateQuery();
+        if (scheduleDate == null) {
+            return AjaxResult.error("排程日期不能为空");
+        }
+        tqEngineService.autoTqSchedule(DateUtils.parseDateToStr("yyyy-MM-dd", scheduleDate));
+        return AjaxResult.success();
+    }
+
+    /**
+     * 插单（id为空则新增排程记录）
+     */
+    @Log(title = "胎圈排程结果(新)", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("插单")
+    @PostMapping("/insertOrder")
+    public AjaxResult insertOrder(@RequestBody TqNewScheduleResult entity) {
+        // TODO 插单业务逻辑待实现：规格校验、唯一性校验等
+        return tqNewScheduleResultService.insertOrder(entity);
+    }
+
+    /**
+     * 转机台
+     */
+    @Log(title = "胎圈排程结果(新)", businessType = BusinessType.CHANGE_MACHINE)
+    @ApiOperation("转机台")
+    @PostMapping("/changeMachine")
+    public AjaxResult changeMachine(@RequestBody TqNewScheduleResult entity) {
+        // TODO 转机台业务逻辑待实现：发布状态校验、唯一性校验、调度日志等
+        return tqNewScheduleResultService.changeMachine(entity);
+    }
+
+    /**
+     * 调量
+     */
+    @Log(title = "胎圈排程结果(新)", businessType = BusinessType.CHANGE_QTY)
+    @ApiOperation("调量")
+    @PostMapping("/changeQty")
+    public AjaxResult changeQty(@RequestBody TqNewScheduleResult entity) {
+        // TODO 调量业务逻辑待实现：发布状态校验、调度日志等
+        return tqNewScheduleResultService.changeQty(entity);
+    }
+
+    /**
+     * 发布排程到MES
+     */
+    @Log(title = "胎圈排程结果(新)", businessType = BusinessType.PUBLISH)
+    @ApiOperation("发布排程")
+    @PostMapping("/publish")
+    public AjaxResult publish(@RequestBody TqNewScheduleResult queryVO) {
+        // TODO 发布业务逻辑待实现：同步锁、状态校验、MES数据同步等
+        return tqNewScheduleResultService.publish(queryVO);
+    }
+
+    /**
+     * 查询排程日期是否已发布
+     */
+    @ApiOperation("查询排程日期是否已发布")
+    @PostMapping("/isPublish")
+    public Boolean isPublish(@RequestBody TqNewScheduleResult queryVO) {
+        return tqNewScheduleResultService.isPublish(queryVO.getScheduleDateQuery());
+    }
+
+    /**
+     * 根据排程日期、胎圈代码、机台编号校验唯一性
+     */
+//    @ApiOperation("唯一性校验")
+//    @PostMapping("/checkUnique")
+//    public String checkUnique(@RequestBody TqNewScheduleResult entity) {
+//        return tqNewScheduleResultService.checkUnique(entity);
+//    }
+
+    /**
      * 根据排程日期构建6个班次的日期展示列表
      * 胎圈排程6个班次覆盖排程日期的前一天和当天：
      * 班次1~3属于T-1日（夜班→早班→中班），班次4~6属于T日（夜班→早班→中班）
      *
-     * @param scheduleDate 排程日期（T日）
+     * @param queryVO
      * @return 班次日期列表
      */
     @ApiOperation("获取胎圈排程班次日期列表")

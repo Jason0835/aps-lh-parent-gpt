@@ -21,6 +21,7 @@ import com.zlt.aps.lh.service.ILhScheduleResultService;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -109,7 +110,7 @@ public class SchedulePersistenceService {
             throw new ScheduleException(ScheduleStepEnum.S4_6_RESULT_VALIDATION,
                     ScheduleErrorCode.MES_RELEASED,
                     factoryCode, context.getBatchNo(),
-                    "目标日已有已发布排程，禁止覆盖。排程日期: " + LhScheduleTimeUtil.getDateStr(targetDate));
+                    String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.publishedScheduleCannotOverwrite"), LhScheduleTimeUtil.getDateStr(targetDate)));
         }
 
         List<LhScheduleResult> oldResults = scheduleResultMapper.selectList(

@@ -113,20 +113,16 @@ export async function loadLanguageAsync(lang) {
 
 
     // }
-     if (process.env.NODE_ENV === "development") {
       i18n.setLocaleMessage(langKey[lang], {
         ...messages[lang]
       })
       setI18nLanguage(langKey[lang])
 
-    }else{
       let data = getLanguage(lang);
-      console.log(data)
       if (data == false) {
         const response = await pageJson({
           locale: langKey[lang]
         });
-
 
         data = response;
         saveLanguage(data, lang);
@@ -135,7 +131,6 @@ export async function loadLanguageAsync(lang) {
       Object.keys(data).map(key => {
         data[key] = unzipDataBase64(data[key])
       });
-      console.log(data)
 
       i18n.setLocaleMessage(langKey[lang], {
         ...messages[lang],
@@ -144,7 +139,6 @@ export async function loadLanguageAsync(lang) {
       setI18nLanguage(langKey[lang])
 
       return true
-    }
 
 
   }

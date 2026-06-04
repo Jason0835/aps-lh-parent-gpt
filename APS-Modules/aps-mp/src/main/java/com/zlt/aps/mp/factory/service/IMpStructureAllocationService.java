@@ -76,9 +76,10 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
     /**
      * 获取结构转产表导出数据
      * @param param
+     * @param isFinal
      * @return
      */
-    MpStructureAllocationExportStatisticsVo getExportVo(MpStructureAllocation param);
+    MpStructureAllocationExportStatisticsVo getExportVo(MpStructureAllocation param, boolean isFinal);
 
 
     /**

@@ -263,7 +263,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
                              HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
         setProductionVersion(queryVO);
-        MpStructureAllocationExportStatisticsVo statisticsVo = mpStructureAllocationService.getExportVo(queryVO);
+        MpStructureAllocationExportStatisticsVo statisticsVo = mpStructureAllocationService.getExportVo(queryVO, false);
         List<MpStructureAllocationExportVo> list = statisticsVo.getRecordList();
         byte[] resultBytes = mpStructureAllocationService.getMpStructureAllocationExportByte(statisticsVo);
         Date endTime = DateUtils.getNowDate();

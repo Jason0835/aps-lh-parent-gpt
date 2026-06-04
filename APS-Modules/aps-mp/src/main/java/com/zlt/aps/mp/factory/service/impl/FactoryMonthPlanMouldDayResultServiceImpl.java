@@ -503,7 +503,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         if (!CollectionUtils.isEmpty(headList)) {
             FactoryMonthPlanProductionFinalResult head = headList.get(0);
             params.setProductTypeCode(head.getProductTypeCode());
-            params.setMonthPlanVersion(head.getLastMonthPlanVersion());
+            params.setMonthPlanVersion(params.getProductionVersion());
             params.setProductionVersion(head.getProductionVersion());
         }
     }

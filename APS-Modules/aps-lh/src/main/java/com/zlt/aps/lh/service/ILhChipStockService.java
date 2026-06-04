@@ -53,4 +53,13 @@ public interface ILhChipStockService extends IDocService<LhChipStock> {
     void upsertFinishQty(String factoryCode, List<LhChipStock> list);
 
     void overwriteFinishQty(String factoryCode, List<LhChipStock> list);
+
+    /**
+     * 自动从硫化日完成量回填芯片库存完成量
+     * 查询T_LH_DAY_FINISH_QTY中匹配芯片编码的物料编码数据，汇总日完成量后更新芯片库存的完成量
+     *
+     * @param factoryCode 分厂编号
+     * @param chipCode    芯片编号
+     */
+    void autoFillFinishQtyFromDayFinish(String factoryCode, String chipCode);
 }

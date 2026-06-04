@@ -1,5 +1,6 @@
 package com.zlt.aps.tq.engine.service;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +25,13 @@ public interface TqEngineMachineService {
      * @return
      */
     Map<String, String> getMouthPlateMachineMap();
-    
+
+    /**
+     * 获得机台寸口映射，key=机台ID，value=该机台可做的寸口值列表
+     * @return
+     */
+    Map<Long, List<BigDecimal>> getMachineChuckMap();
+
     /**
      * 获取上一天规格已排产机台列表
      * @param scheduleDate

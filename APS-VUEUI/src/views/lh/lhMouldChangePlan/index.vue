@@ -55,20 +55,22 @@
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
+      :title="$t('ui.data.column.scheduleResult.importLhScheduleResultData')"
       downloadUrl="/lh/lhMouldChangePlan/importTemplate"
-      uploadUrl="/lh/lhMouldChangePlan/importData"
+      uploadUrl="/lh/lhMouldChangePlan/importDataCust"
       @uploadSuccess="getList"
-      labelWidth="0"
       :columns="importColumns"
-    ></tlt-upload-form>
+      :rules="importRules"
+    />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 <script>
-import { downloadLink } from "@/utils/request";
-import { listLhMouldChangePlan, removeLhMouldChangePlan, issueSchedule } from "@/api/lh/lhMouldChangePlan";
+import {downloadLink} from "@/utils/request";
+import {issueSchedule, listLhMouldChangePlan, removeLhMouldChangePlan} from "@/api/lh/lhMouldChangePlan";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
+import moment from "moment/moment";
 
 const formatDate = (date) => {
   const year = date.getFullYear();
@@ -96,7 +98,11 @@ export default {
     };
   },
   data() {
+    let defaultDate = moment().add(1, "days").format("YYYY-MM-DD"); //明天
     return {
+      importDefaultValue: {
+        scheduleDate: defaultDate,
+      },
       importColumns: [
         {
           label: "",
@@ -112,7 +118,24 @@ export default {
             );
           },
         },
+        {
+          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
+          prop: "scheduleDate",
+          type: "date",
+          dateType: "date",
+          valueFormat: "yyyy-MM-dd",
+          clearable: false,
+        },
       ],
+      importRules: {
+        scheduleDate: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "blur",
+          },
+        ],
+      },
       loading: false,
       data: [],
       selection: [],

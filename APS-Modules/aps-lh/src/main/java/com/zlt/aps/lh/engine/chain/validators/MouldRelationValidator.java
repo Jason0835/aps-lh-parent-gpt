@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.engine.chain.validators;
 
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.lh.api.constant.LhDataValidationGroupConstant;
 import com.zlt.aps.lh.api.domain.dto.MouldValidationErrorDetail;
 import com.zlt.aps.lh.api.enums.ValidationPolicyEnum;
@@ -30,19 +31,15 @@ import java.util.stream.Collectors;
 @Component
 public class MouldRelationValidator implements IDataValidator {
     private static final String VALIDATOR_KEY = "mouldRelationValidator";
-    private static final String MOULD_CODE_DELIMITER = "、";
+    private static final String MOULD_CODE_DELIMITER = "\u3001";
     private static final int SUMMARY_DISPLAY_LIMIT = 3;
-    private static final String MISSING_MODEL_INFO_ERROR_TEMPLATE = "[%s] 模具台账缺失，模具号: %s";
-    private static final String MISSING_MODEL_INFO_ERROR_TEMPLATE_MANY = "[%s] 模具台账缺失，共 %d 个，如: %s 等";
-    private static final String DISABLED_MODEL_ERROR_TEMPLATE = "[%s] 模具状态为禁用，模具号: %s";
-    private static final String DISABLED_MODEL_ERROR_TEMPLATE_MANY = "[%s] 模具状态为禁用，共 %d 个，如: %s 等";
 
     @Override
     public boolean validate(LhScheduleContext context) {
         if (CollectionUtils.isEmpty(context.getSkuMouldRelMap())) {
             log.warn("SKU与模具关系数据为空, 工厂: {}", context.getFactoryCode());
-            context.addValidationError("[" + getValidatorName() + "] SKU与模具关系数据为空, 工厂: "
-                    + context.getFactoryDisplayName());
+            context.addValidationError("[" + getValidatorName() + "] "
+                    + String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldRelEmpty"), context.getFactoryDisplayName()));
             return false;
         }
         long missingMouldCount = context.getMonthPlanList().stream()
@@ -51,8 +48,8 @@ public class MouldRelationValidator implements IDataValidator {
                 .count();
         if (missingMouldCount > 0) {
             log.warn("有{}个月计划SKU缺少模具关系数据（可能正常，如续作时已有模具）", missingMouldCount);
-            context.addValidationError("[" + getValidatorName() + "] 月计划SKU缺少模具关系数据, 工厂: "
-                    + context.getFactoryDisplayName());
+            context.addValidationError("[" + getValidatorName() + "] "
+                    + String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.monthPlanMouldRelMissing"), context.getFactoryDisplayName()));
             return false;
         }
         Set<String> monthPlanSkuSet = context.getMonthPlanList().stream()
@@ -84,8 +81,8 @@ public class MouldRelationValidator implements IDataValidator {
         }
         if (!missingModelInfoMouldCodeSet.isEmpty()) {
             String summaryMsg = buildSummaryMessage(
-                    MISSING_MODEL_INFO_ERROR_TEMPLATE,
-                    MISSING_MODEL_INFO_ERROR_TEMPLATE_MANY,
+                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldMissingSimple"),
+                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldMissingMany"),
                     getValidatorName(), missingModelInfoMouldCodeSet);
             log.warn("检测到模具台账缺失, 工厂: {}, 模具号: {}", context.getFactoryCode(),
                     String.join(MOULD_CODE_DELIMITER, missingModelInfoMouldCodeSet));
@@ -95,8 +92,8 @@ public class MouldRelationValidator implements IDataValidator {
         }
         if (!disabledMouldCodeSet.isEmpty()) {
             String summaryMsg = buildSummaryMessage(
-                    DISABLED_MODEL_ERROR_TEMPLATE,
-                    DISABLED_MODEL_ERROR_TEMPLATE_MANY,
+                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldDisabledSimple"),
+                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldDisabledMany"),
                     getValidatorName(), disabledMouldCodeSet);
             log.warn("检测到禁用模具, 工厂: {}, 模具号: {}", context.getFactoryCode(),
                     String.join(MOULD_CODE_DELIMITER, disabledMouldCodeSet));
@@ -142,7 +139,7 @@ public class MouldRelationValidator implements IDataValidator {
         for (String mouldCode : missingMouldCodeSet) {
             details.add(new MouldValidationErrorDetail(
                     mouldCode, "", "", "",
-                    "模具台账缺失", "缺失"));
+                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldMissingStatus"), I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldMissingStatusShort")));
         }
         return details;
     }
@@ -160,14 +157,14 @@ public class MouldRelationValidator implements IDataValidator {
             String mouldType = modelInfo != null ? StringUtils.defaultString(modelInfo.getMouldType(), "") : "";
             details.add(new MouldValidationErrorDetail(
                     mouldCode, mouldNo, specifications, mouldType,
-                    "模具状态为禁用", "禁用"));
+                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldDisabledStatus"), I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldDisabledStatusShort")));
         }
         return details;
     }
 
     @Override
     public String getValidatorName() {
-        return "SKU与模具关系校验";
+        return I18nUtil.getMessage("ui.data.column.lhScheduleResult.validator.mouldRelName");
     }
 
     @Override

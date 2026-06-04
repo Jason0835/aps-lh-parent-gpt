@@ -539,7 +539,7 @@ export default {
     return {
       subDayNum: 0,
       dayEditOriginalValue: null,
-      loadText: "正在加载中...",
+      loadText: this.$t("newPage.message.loadingShort"),
       //结构外调整结果列表
       outResultData: [],
       outResultVersion: "",
@@ -619,6 +619,17 @@ export default {
     /** 结构调整独立页 */
     isStructureAdjustPage() {
       return this.pageVariant === "structureAdjust";
+    },
+    /** 上月计划余量列（结构内/结构调整列表共用） */
+    lastMonthRemainQtyColumn() {
+      const i18nKey = this.isStructureInnerPage
+        ? "ui.data.column.mpAdjustStructureIn.lastMonthRemainQty"
+        : "ui.data.column.mpAdjustStructureOut.lastMonthRemainQty";
+      return {
+        prop: "lastMonthRemainQty",
+        label: this.$t(i18nKey),
+        width: 120,
+      };
     },
     /** 月内日序号 1～dayList */
     monthDayOptions() {
@@ -720,6 +731,7 @@ export default {
               return this.selectDictLabel(this.dict.type.biz_yes_no, value);
             },
           },
+          this.lastMonthRemainQtyColumn,
           {
             prop: "previousNetQty",
             label: this.$t("调整前净需求量（上周）"),
@@ -760,7 +772,7 @@ export default {
                   <el-input
                     key={row.id}
                     v-model={row.confirmAdjustQty}
-                    placeholder="请输入内容"
+                    placeholder={this.$t("newPage.common.placeholderInputContent")}
                     onInput={(value) => {
                       // 移除小数点和小数部分
                       const matched = value.match(/^-?\d*/);
@@ -797,7 +809,7 @@ export default {
                         row.adjustPriority = 99999;
                       }
                     }}
-                    placeholder="请输入"
+                    placeholder={this.$t("newPage.common.placeholderInput")}
                     min={0}
                     onBlur={(e) => {
                       e.preventDefault(); // 如果需要阻止默认行为
@@ -974,6 +986,7 @@ export default {
               return this.selectDictLabel(this.dict.type.biz_yes_no, value);
             },
           },
+          this.lastMonthRemainQtyColumn,
           {
             prop: "totalPlanQty",
             label: this.$t("计划量"),
@@ -1114,6 +1127,7 @@ export default {
             },
             width: 120,
           },
+          this.lastMonthRemainQtyColumn,
           {
             prop: "previousNetQty",
             label: this.$t("调整前净需求量（上周）"),
@@ -1153,7 +1167,7 @@ export default {
                     <el-input
                       key={row.id}
                       v-model={row.confirmAdjustQty}
-                      placeholder="请输入内容"
+                      placeholder={this.$t("newPage.common.placeholderInputContent")}
                       onInput={(value) => {
                         // 移除小数点和小数部分
                         const matched = value.match(/^-?\d*/);
@@ -1180,7 +1194,7 @@ export default {
                       key={row.id}
                       v-model={row.adjustPriority}
                       disabled={row.isSkuAdd != "1"}
-                      placeholder="请输入"
+                      placeholder={this.$t("newPage.common.placeholderInput")}
                       min={0}
                       onInput={(value) => {
                         // 移除小数点、负号和其他非数字字符
@@ -1663,11 +1677,11 @@ export default {
       const startEmpty = startRaw == null || startRaw === "";
       const endEmpty = endRaw == null || endRaw === "";
       if (requireBoth && startEmpty) {
-        this.$modal.msgWarning("请选择调整开始日期");
+        this.$modal.msgWarning(this.$t("newPage.message.selectAdjustStartDate"));
         return false;
       }
       if (requireBoth && endEmpty) {
-        this.$modal.msgWarning("请选择调整结束日期");
+        this.$modal.msgWarning(this.$t("newPage.message.selectAdjustEndDate"));
         return false;
       }
       if (startEmpty || endEmpty) {
@@ -1680,7 +1694,7 @@ export default {
         !Number.isNaN(adjustEnd) &&
         adjustStart > adjustEnd
       ) {
-        this.$modal.msgWarning("调整开始日期不能大于调整结束日期");
+        this.$modal.msgWarning(this.$t("newPage.message.adjustStartGreaterThanEnd"));
         return false;
       }
       return true;
@@ -1696,7 +1710,7 @@ export default {
         !Number.isNaN(end) &&
         start > end
       ) {
-        this.$modal.msgWarning("调整开始日期不能大于调整结束日期");
+        this.$modal.msgWarning(this.$t("newPage.message.adjustStartGreaterThanEnd"));
         this.$nextTick(() => {
           this.$set(
             this.formInline,
@@ -1721,7 +1735,7 @@ export default {
         !Number.isNaN(end) &&
         start > end
       ) {
-        this.$modal.msgWarning("调整开始日期不能大于调整结束日期");
+        this.$modal.msgWarning(this.$t("newPage.message.adjustStartGreaterThanEnd"));
         this.$nextTick(() => {
           this.$set(
             this.formInline,
@@ -3290,7 +3304,7 @@ export default {
           this.data = [];
           this.outResultData = [];
         } else {
-          this.$modal.msgWarning("已经是最后一个结构");
+          this.$modal.msgWarning(this.$t("newPage.message.alreadyLastStructure"));
         }
       } catch (err) {
         console.log(err);

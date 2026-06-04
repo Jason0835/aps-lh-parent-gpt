@@ -179,7 +179,7 @@ export default {
 
         const result = await changeMachine(params);
         if (result.code == 200) {
-          this.$modal.msgSuccess("操作成功");
+          this.$modal.msgSuccess(this.$t("newPage.message.operationSuccess"));
           this.$emit("success");
           this.hide();
         }

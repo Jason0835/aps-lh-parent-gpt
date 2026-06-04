@@ -223,6 +223,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         // fillScheduleResultFields会将dataSource设为"2"（导入），插单场景需修正为"1"
         result.setDataSource("1");
 
+        // 根据班次计划量设置班次收尾标识（与自动排程逻辑对齐）
+        ShiftFieldUtil.applyLastPlannedShiftEndMark(result, true);
+
         mapper.insert(result);
 
         generateInsertMouldChangePlan(dto, batchNo, beforeMaterialCode, beforeMaterialDesc);
@@ -967,6 +970,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             ref = constructionRefMap.get(key);
         }
 
+        // 硫化示方类型：优先取示方书关系的lhType
+        String lhType = null;
+
         if (ref != null) {
             if (StringUtils.isNotEmpty(ref.getEmbryoNo())) {
                 result.setEmbryoNo(ref.getEmbryoNo());
@@ -977,11 +983,9 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
             if (StringUtils.isNotEmpty(ref.getLhNo())) {
                 result.setLhNo(ref.getLhNo());
             }
-            return;
-        }
-
-        // 未匹配到示方书关系，取月计划中的示方书号
-        if (Objects.nonNull(monthPlan)) {
+            lhType = ref.getLhType();
+        } else if (Objects.nonNull(monthPlan)) {
+            // 未匹配到示方书关系，取月计划中的示方书号
             if (StringUtils.isNotEmpty(monthPlan.getEmbryoNo())) {
                 result.setEmbryoNo(monthPlan.getEmbryoNo());
             }
@@ -997,6 +1001,16 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
         if (StringUtils.isNotEmpty(result.getLhNo())) {
             for (int i = 1; i <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
                 BeanUtil.setProperty(result, "class" + i + "LhNo", result.getLhNo());
+            }
+        }
+
+        // 设置1-8班次的硫化示方类型，优先取示方书关系的lhType，其次取changedTrialStatus
+        if (StringUtils.isBlank(lhType)) {
+            lhType = result.getChangedTrialStatus();
+        }
+        if (StringUtils.isNotEmpty(lhType)) {
+            for (int i = 1; i <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; i++) {
+                BeanUtil.setProperty(result, "class" + i + "LhType", lhType);
             }
         }
     }

@@ -1,5 +1,6 @@
 import request, {downloadLink} from '@/utils/request'
 import moment from 'moment'
+import i18n from '@/lang'
 
 /**
  * 根据条件查询硫化排程结果列表
@@ -295,7 +296,8 @@ export function selectListMdmProductConstruction(query) {
  */
 export function exportScheduleResult(params) {
   const scheduleDate = params && params.scheduleDate ? moment(params.scheduleDate).format('YYYYMMDD') : moment().format('YYYYMMDD')
-  const filename = `硫化日计划${scheduleDate}.xlsx`
+  const filenamePrefix = i18n.t('ui.data.column.lhScheduleResult.exportFileName')
+  const filename = `${filenamePrefix}${scheduleDate}.xlsx`
   return downloadLink("/lh/lhScheduleResult/export", params, filename);
 }
 /**

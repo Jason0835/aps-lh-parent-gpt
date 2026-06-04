@@ -370,8 +370,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             return AjaxResult.success();
         } else {
             // 排程锁冲突：已有排程执行中
-            if (result.getMessage() != null && result.getMessage().contains("排程执行中")) {
-                //todo 错误码-使用枚举类
+            if (ScheduleService.ERROR_CODE_LOCK_CONFLICT.equals(result.getErrorCode())) {
                 return AjaxResult.error(423, result.getMessage());
             }
             // 校验不通过时，构建校验摘要返回前端
@@ -954,15 +953,18 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         LocalDate d2 = scheduleDate.minusDays(1);
         LocalDate d3 = scheduleDate;
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("MM-dd");
+        String morning = I18nUtil.getMessage("ui.data.column.cxScheduleResult.shift.morning");
+        String middle = I18nUtil.getMessage("ui.data.column.cxScheduleResult.shift.middle");
+        String night = I18nUtil.getMessage("ui.data.column.cxScheduleResult.shift.night");
         return new String[]{"",
-                "早班(" + d1.format(fmt) + ")",
-                "中班(" + d1.format(fmt) + ")",
-                "夜班(" + d2.format(fmt) + ")",
-                "早班(" + d2.format(fmt) + ")",
-                "中班(" + d2.format(fmt) + ")",
-                "夜班(" + d3.format(fmt) + ")",
-                "早班(" + d3.format(fmt) + ")",
-                "中班(" + d3.format(fmt) + ")"};
+                morning + "(" + d1.format(fmt) + ")",
+                middle + "(" + d1.format(fmt) + ")",
+                night + "(" + d2.format(fmt) + ")",
+                morning + "(" + d2.format(fmt) + ")",
+                middle + "(" + d2.format(fmt) + ")",
+                night + "(" + d3.format(fmt) + ")",
+                morning + "(" + d3.format(fmt) + ")",
+                middle + "(" + d3.format(fmt) + ")"};
     }
 
     /**
@@ -1342,9 +1344,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                     }
                 }
                 detailSb.append("  ").append(er.getMaterialCode()).append("(").append(er.getMaterialDesc()).append(")")
-                        .append(" 结构:").append(er.getStructureName())
-                        .append(" 单条:").append(formatSeconds(erSingleTireTime))
-                        .append(" 总耗时:").append(formatSeconds(recordTotal)).append("\n");
+                        .append(" ").append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.structureLabel")).append(er.getStructureName())
+                        .append(" ").append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.singleTimeLabel")).append(formatSeconds(erSingleTireTime))
+                        .append(" ").append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.totalTimeLabel")).append(formatSeconds(recordTotal)).append("\n");
             }
             log.info("机台{} 已有记录明细:\n{}", vo.getCxMachineCode(), detailSb.toString());
 
@@ -1359,20 +1361,16 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             String capErr = checkPerShiftCapacity(planQtys, existingTimeSeconds, insertSingleTireTime, shiftNames);
             if (capErr != null) {
                 StringBuilder msg = new StringBuilder();
-                msg.append("<b>⚠ 插单产能校验不通过</b><br/>");
-                msg.append("排程日期：").append(DateUtil.format(scheduleDate, "yyyy-MM-dd")).append("<br/>");
-                msg.append("机台：").append(vo.getCxMachineCode()).append("<br/>");
-                msg.append("插单物料：").append(vo.getMaterialCode()).append("(").append(vo.getSpecDesc()).append(")<br/>");
-                msg.append("插单结构：").append(vo.getStructureName()).append("<br/>");
-                msg.append("单条耗时：").append(formatSeconds(insertSingleTireTime)).append("<br/>");
-                msg.append("单班产能：").append(formatSeconds(BigDecimal.valueOf(28800L))).append("<br/><br/>");
-                msg.append("<b>错误：</b><br/>");
-                String capErrText = capErr.replace("已有耗时", "<br/>已有耗时")
-                        .replace("剩余时间", "<br/>剩余时间")
-                        .replace("最多可生产", "<br/>最多可生产")
-                        .replace("计划量", "<br/>计划量");
-                msg.append("  ").append(capErrText).append("<br/><br/>");
-                msg.append("<b>该机台当天已有记录耗时明细：</b><br/>");
+                msg.append("<b>⚠ ").append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.capacityCheckFailed")).append("</b><br/>");
+                msg.append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.scheduleDate")).append(DateUtil.format(scheduleDate, "yyyy-MM-dd")).append("<br/>");
+                msg.append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.machine")).append(vo.getCxMachineCode()).append("<br/>");
+                msg.append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.material")).append(vo.getMaterialCode()).append("(").append(vo.getSpecDesc()).append(")<br/>");
+                msg.append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.structure")).append(vo.getStructureName()).append("<br/>");
+                msg.append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.singleTime")).append(formatSeconds(insertSingleTireTime)).append("<br/>");
+                msg.append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.shiftCapacity")).append(formatSeconds(BigDecimal.valueOf(28800L))).append("<br/><br/>");
+                msg.append("<b>").append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.error")).append("</b><br/>");
+                msg.append("  ").append(capErr).append("<br/><br/>");
+                msg.append("<b>").append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.existingDetail")).append("</b><br/>");
                 for (String line : detailSb.toString().split("\n")) {
                     if (!line.trim().isEmpty()) {
                         msg.append("  ").append(line).append("<br/>");
@@ -1747,12 +1745,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             for (int i = 1; i <= 8; i++) {
                 BigDecimal totalTime = existingTime[i].add(transferTime[i]);
                 if (totalTime.compareTo(shiftTotalSeconds) > 0) {
-                    return "新机台(" + newMachineCode + ")排程日期"
-                            + DateUtil.formatDate(scheduleDate) + shiftNames[i] + "产能不足，"
-                            + "已有耗时(" + formatSeconds(existingTime[i])
-                            + ")+转入耗时(" + formatSeconds(transferTime[i])
-                            + ")=" + formatSeconds(totalTime)
-                            + "，超过每班8h，是否确认转机台？";
+                    return StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.capacityWarning"),
+                            newMachineCode, DateUtil.formatDate(scheduleDate) + shiftNames[i], "",
+                            formatSeconds(existingTime[i]), formatSeconds(transferTime[i]), formatSeconds(totalTime));
                 }
             }
         }
@@ -2006,9 +2001,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                 maxInsertQty = remainingSeconds.divide(insertSingleTireTime, 0, RoundingMode.FLOOR);
             }
             if (planQtys[i].compareTo(maxInsertQty) > 0) {
-                return shiftNames[i] + "已有耗时(" + formatSeconds(existingTimeSeconds[i])
-                        + ")，剩余时间(" + formatSeconds(remainingSeconds)
-                        + ")，最多可生产(" + maxInsertQty + ")条，计划量(" + planQtys[i] + ")超出产能";
+                return StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.capacityExceeded"),
+                        shiftNames[i], formatSeconds(existingTimeSeconds[i]),
+                        formatSeconds(remainingSeconds), maxInsertQty, planQtys[i]);
             }
         }
         return null;

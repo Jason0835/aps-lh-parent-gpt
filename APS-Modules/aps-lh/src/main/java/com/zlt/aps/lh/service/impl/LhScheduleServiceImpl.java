@@ -183,7 +183,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         } catch (Exception e) {
             log.error("排程服务入口异常, 工厂: {}, 日期: {}",
                     context.getFactoryCode(), LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()), e);
-            return LhScheduleResponseDTO.fail(context.getBatchNo(), "排程执行异常: " + e.getMessage());
+            return LhScheduleResponseDTO.fail(context.getBatchNo(),
+                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.scheduleExecuteError") + e.getMessage());
         }
     }
 
@@ -197,7 +198,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
                     .eq(LhScheduleResult::getIsDelete, DeleteFlagEnum.NORMAL.getCode()));
             if (results == null || results.isEmpty()) {
                 log.warn("发布排程结果失败, 未查询到有效排程结果, 批次号: {}", batchNo);
-                return LhScheduleResponseDTO.fail(batchNo, "批次号[" + batchNo + "]对应的排程结果不存在");
+                return LhScheduleResponseDTO.fail(batchNo,
+                        String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.batchNoResultNotFound"), batchNo));
             }
 
             // 2. 更新发布状态为"已发布"（1）
@@ -216,11 +218,13 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             scheduleEventPublisher.publish(ScheduleEvent.published(publishContext));
 
             log.info("排程结果发布成功, 批次号: {}, 发布记录数: {}", batchNo, results.size());
-            return LhScheduleResponseDTO.success(batchNo, "发布成功，共发布" + results.size() + "条记录");
+            return LhScheduleResponseDTO.success(batchNo,
+                    String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.publishSuccess"), results.size()));
 
         } catch (Exception e) {
             log.error("发布排程结果异常, 批次号: {}", batchNo, e);
-            return LhScheduleResponseDTO.fail(batchNo, "发布失败: " + e.getMessage());
+            return LhScheduleResponseDTO.fail(batchNo,
+                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.publishFailed") + e.getMessage());
         }
     }
 
@@ -681,7 +685,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
         // 表头、合并单元格、下拉框、公式位置都由 lhjhtemplate.xlsx 统一维护。
         InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("excelModel/lhjhtemplate.xlsx");
         if (Objects.isNull(inputStream)) {
-            throw new ServiceException("硫化计划导出模板不存在");
+            throw new ServiceException(I18nUtil.getMessage("ui.data.column.lhScheduleResult.exportTemplateNotFound"));
         }
 
         // 节点1.5：在 writeMultiList 处理模板之前，先扫描模板占位符行，
@@ -697,7 +701,7 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             }
             templateBytes = baos.toByteArray();
         } catch (IOException e) {
-            throw new ServiceException("读取硫化计划导出模板失败");
+            throw new ServiceException(I18nUtil.getMessage("ui.data.column.lhScheduleResult.exportTemplateReadFailed"));
         }
         Map<String, Integer> placeholderMap = ExcelUtils.scanTemplateRowPlaceholders(
                 new ByteArrayInputStream(templateBytes), 0);
@@ -752,14 +756,95 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     /**
      * 下载导入模板（不含物料描述列）
      * <p>物料描述通过物料编码自动带出，导入时用户无需填写物料描述</p>
+     * <p>模板下载只填充表头占位符（日期、班次等），不查询数据库中的业务数据，
+     * 确保3个Sheet（硫化计划、硫化换模计划、排产小结）均为空模板。</p>
      *
      * @param result 查询条件（工厂、排程日期等）
      * @return 导入模板Excel字节数组
      */
     @Override
     public byte[] downloadImportTemplate(LhScheduleResult result) {
-        byte[] templateBytes = exportData(Collections.emptyList(), result);
-        return removeMaterialDescColumn(templateBytes);
+        // 读取固定导出模板
+        InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("excelModel/lhjhtemplate.xlsx");
+        if (Objects.isNull(inputStream)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.column.lhScheduleResult.exportTemplateNotFound"));
+        }
+        byte[] templateBytes;
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int len;
+            while ((len = inputStream.read(buffer)) != -1) {
+                baos.write(buffer, 0, len);
+            }
+            templateBytes = baos.toByteArray();
+        } catch (IOException e) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.column.lhScheduleResult.exportTemplateReadFailed"));
+        }
+
+        // Sheet 0 - 硫化计划：只填充表头占位符，明细数据传空列表
+        Map<String, Object> scheduleTableMap = buildExportTableMap(Collections.emptyList(), result.getScheduleDate());
+        List<List<Map<String, Object>>> scheduleDataList = new ArrayList<>();
+        scheduleDataList.add(new ArrayList<>());
+        byte[] exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(templateBytes), 0, scheduleTableMap, scheduleDataList);
+
+        // Sheet 1 - 硫化换模计划：只填充表头占位符，不查询数据库，明细数据传空列表
+        Map<String, Object> mouldChangePlanTableMap = lhMouldChangePlanController.buildExportTableMap(Collections.emptyList(), result.getScheduleDate());
+        List<List<Map<String, Object>>> mouldChangePlanDataList = new ArrayList<>();
+        mouldChangePlanDataList.add(new ArrayList<>());
+        exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(exportBytes), 1, mouldChangePlanTableMap, mouldChangePlanDataList);
+
+        // Sheet 2 - 排产小结：只填充表头占位符，不查询数据库，明细数据传空列表
+        // 排产小结的 buildTableMap 内部会查询数据库获取成型/硫化汇总数据，
+        // 模板下载时不需要这些数据，因此只构建最小化的表头占位符映射
+        Map<String, Object> summaryTableMap = buildEmptySummaryTableMap(result.getScheduleDate());
+        List<List<Map<String, Object>>> summaryDataList = new ArrayList<>();
+        summaryDataList.add(new ArrayList<>());
+        exportBytes = ExcelUtils.writeMultiList(new ByteArrayInputStream(exportBytes), 2, summaryTableMap, summaryDataList);
+
+        // 移除物料描述列
+        return removeMaterialDescColumn(exportBytes);
+    }
+
+    /**
+     * 构建排产小结的空模板表头映射
+     * <p>仅填充标题日期等必要占位符，其余汇总数据字段置为空字符串，
+     * 避免模板下载时查询数据库产生不必要的业务数据。</p>
+     *
+     * @param scheduleDate 排程日期
+     * @return 排产小结模板表头映射
+     */
+    private Map<String, Object> buildEmptySummaryTableMap(Date scheduleDate) {
+        Map<String, Object> map = new HashMap<>(32);
+        Date reportDate = LhScheduleTimeUtil.addDays(scheduleDate, -1);
+        // 标题日期
+        map.put("titleDate", DateUtil.format(reportDate, "MM月dd日") + "计划排产\n"
+                + "Ke hoach san xuat ngay " + DateUtil.format(reportDate, "dd/MM"));
+        // 成型汇总数据置空
+        map.put("cxNightQty", "");
+        map.put("cxMorningQty", "");
+        map.put("cxMiddleQty", "");
+        map.put("cxTotalQty", "");
+        map.put("cxSetupInfo", "");
+        map.put("cxTrialInfo", "");
+        map.put("cxSpecSwitch", "");
+        // 硫化汇总数据置空
+        map.put("lhNightQty", "");
+        map.put("lhMorningQty", "");
+        map.put("lhMiddleQty", "");
+        map.put("lhTotalQty", "");
+        map.put("lhNightMachines", "");
+        map.put("lhMorningMachines", "");
+        map.put("lhMiddleMachines", "");
+        map.put("lhTotalMachines", "");
+        // 模具交替/清洗信息置空
+        map.put("mouldChangeInfo", "");
+        map.put("mouldCleanDate", DateUtil.format(reportDate, "MM月dd日"));
+        map.put("mouldCleanInfo", "");
+        // 备注置空
+        map.put("cxRemark", "");
+        map.put("lhRemark", "");
+        return map;
     }
 
     /**

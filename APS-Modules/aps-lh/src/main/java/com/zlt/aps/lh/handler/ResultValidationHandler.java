@@ -27,6 +27,7 @@ import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MonthPlanDayQtyUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -161,7 +162,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             throw new ScheduleException(ScheduleStepEnum.S4_6_RESULT_VALIDATION,
                     ScheduleErrorCode.RESULT_VALIDATION_FAILED,
                     context.getFactoryCode(), context.getBatchNo(),
-                    "批次号或工厂编码为空，无法执行结果保存");
+                    I18nUtil.getMessage("ui.data.column.lhScheduleResult.batchNoOrFactoryCodeEmpty"));
         }
 
         // 校验2：检查每个排程结果必填字段，字段缺失直接阻断保存，避免脏结果落库。
@@ -186,10 +187,10 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             requireField(result.getMaterialCode(), "materialCode", context, result);
             requireField(result.getScheduleType(), "scheduleType", context, result);
             if (result.getSpecEndTime() == null) {
-                throwValidationFailure(context, result, "specEndTime 缺失");
+                throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.specEndTimeMissing"));
             }
             if ("1".equals(result.getIsChangeMould()) && StringUtils.isBlank(result.getMouldCode())) {
-                throwValidationFailure(context, result, "换模结果 mouldCode 缺失");
+                throwValidationFailure(context, result, I18nUtil.getMessage("ui.data.column.lhScheduleResult.mouldCodeMissingInChangeMould"));
             }
         }
 
@@ -259,7 +260,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         if (scheduledQty <= targetQty) {
             return;
         }
-        String message = String.format("严格目标量SKU超排：物料[%s] 目标量[%d] 实际排产[%d]",
+        String message = String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.strictUpperLimitExceeded"),
                 sku.getMaterialCode(), targetQty, scheduledQty);
         log.error("排程结果校验失败, {}", message);
         throw new ScheduleException(ScheduleStepEnum.S4_6_RESULT_VALIDATION,
@@ -286,7 +287,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         int allowedOverQty = Math.max(validationShiftCapacity,
                 sku != null ? Math.max(0, sku.getShiftFillOverQty()) : 0);
         if (allowedOverQty > 0 && overQty > allowedOverQty) {
-            String message = String.format("正式/量试SKU超排超过最后已开班补满范围：物料[%s] 目标量[%d] 实际排产[%d] 超排[%d] 班产[%d]",
+            String message = String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.formalOverShiftCapacity"),
                     sku.getMaterialCode(), targetQty, scheduledQty, overQty, validationShiftCapacity);
             log.error("排程结果校验失败, {}", message);
             throw new ScheduleException(ScheduleStepEnum.S4_6_RESULT_VALIDATION,
@@ -294,7 +295,7 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     context.getFactoryCode(), context.getBatchNo(), message);
         }
         if (scheduledQty < targetQty && !hasUnscheduledResult(context, sku)) {
-            String message = String.format("正式/量试SKU未满足窗口目标量且无未排记录：物料[%s] 目标量[%d] 实际排产[%d]",
+            String message = String.format(I18nUtil.getMessage("ui.data.column.lhScheduleResult.formalTargetNotMet"),
                     sku.getMaterialCode(), targetQty, scheduledQty);
             log.error("排程结果校验失败, {}", message);
             throw new ScheduleException(ScheduleStepEnum.S4_6_RESULT_VALIDATION,

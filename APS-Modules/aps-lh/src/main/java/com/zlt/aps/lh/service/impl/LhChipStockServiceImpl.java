@@ -2,6 +2,7 @@ package com.zlt.aps.lh.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.utils.DateUtils;
@@ -11,7 +12,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.lh.api.domain.entity.LhChipStock;
+import com.zlt.aps.lh.api.domain.entity.LhDayFinishQty;
 import com.zlt.aps.lh.mapper.LhChipStockMapper;
+import com.zlt.aps.lh.mapper.LhDayFinishQtyMapper;
 import com.zlt.aps.lh.service.ILhChipStockService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
@@ -40,6 +43,9 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
 
     @Resource
     private LhChipStockMapper lhChipStockMapper;
+
+    @Resource
+    private LhDayFinishQtyMapper lhDayFinishQtyMapper;
 
     @Override
     public String[] getQueryFormulas() {
@@ -399,5 +405,57 @@ public class LhChipStockServiceImpl extends AbstractDocService<LhChipStock> impl
             baseDao.saveBatch(insertList);
             log.info("芯片库存覆盖更新-批量插入完成：分厂={}, 新增数量={}", factoryCode, insertList.size());
         }
+    }
+
+    /**
+     * 自动从硫化日完成量回填芯片库存完成量
+     * 查询T_LH_DAY_FINISH_QTY中匹配芯片编码的物料编码数据（同时匹配materialCode和mesMaterialCode），
+     * 汇总日完成量后更新芯片库存的完成量
+     *
+     * @param factoryCode 分厂编号
+     * @param chipCode    芯片编号
+     */
+    @Override
+    public void autoFillFinishQtyFromDayFinish(String factoryCode, String chipCode) {
+        if (StringUtil.isBlank(factoryCode) || StringUtil.isBlank(chipCode)) {
+            return;
+        }
+        // 查询日完成量数据，同时匹配materialCode和mesMaterialCode
+        LambdaQueryWrapper<LhDayFinishQty> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LhDayFinishQty::getFactoryCode, factoryCode);
+        wrapper.and(w -> w.eq(LhDayFinishQty::getMaterialCode, chipCode)
+                .or().eq(LhDayFinishQty::getMesMaterialCode, chipCode));
+        List<LhDayFinishQty> dayFinishList = lhDayFinishQtyMapper.selectList(wrapper);
+
+        if (CollectionUtils.isEmpty(dayFinishList)) {
+            log.info("自动回填完成量：未找到芯片编码{}对应的日完成量数据，factoryCode={}", chipCode, factoryCode);
+            return;
+        }
+
+        // 汇总日完成量
+        int totalFinishQty = dayFinishList.stream()
+                .filter(item -> item.getDayFinishQty() != null)
+                .mapToInt(item -> item.getDayFinishQty().intValue())
+                .sum();
+
+        // 获取最新版本号
+        String latestVersion = dayFinishList.stream()
+                .map(LhDayFinishQty::getDataVersion)
+                .filter(v -> v != null && !v.isEmpty())
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+
+        // 更新芯片库存完成量
+        LambdaUpdateWrapper<LhChipStock> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(LhChipStock::getFactoryCode, factoryCode);
+        updateWrapper.eq(LhChipStock::getChipCode, chipCode);
+        updateWrapper.set(LhChipStock::getFinishQty, totalFinishQty);
+        if (latestVersion != null) {
+            updateWrapper.set(LhChipStock::getDataVersion, latestVersion);
+        }
+        updateWrapper.set(LhChipStock::getDataSource, "MES");
+        int rows = lhChipStockMapper.update(null, updateWrapper);
+        log.info("自动回填完成量：factoryCode={}, chipCode={}, finishQty={}, 版本={}, 更新行数={}",
+                factoryCode, chipCode, totalFinishQty, latestVersion, rows);
     }
 }
