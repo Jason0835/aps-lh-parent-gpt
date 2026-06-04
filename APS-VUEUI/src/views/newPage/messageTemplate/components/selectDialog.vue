@@ -180,7 +180,7 @@ export default {
     },
     async handleConfirm() {
       if (this.selection.length == 0) {
-        return this.$modal.msgWarning("请先选择用户");
+        return this.$modal.msgWarning(this.$t("newPage.message.selectUserFirst"));
       }
       let params = {
         ...this.actionData,

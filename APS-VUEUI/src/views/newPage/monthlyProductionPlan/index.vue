@@ -368,7 +368,7 @@ export default {
   data() {
     return {
       loading: false,
-      loadText: "正在加载中...",
+      loadText: this.$t("newPage.message.loadingShort"),
       data: [],
       page: {
         current: 1,
@@ -2302,7 +2302,7 @@ export default {
       } finally {
         this.getAdjustOrderLoading = false;
         this.loading = false;
-        this.loadText = "正在加载中...";
+        this.loadText = this.$t("newPage.message.loadingShort");
       }
     },
     /**

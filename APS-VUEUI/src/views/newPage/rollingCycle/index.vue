@@ -539,7 +539,7 @@ export default {
     return {
       subDayNum: 0,
       dayEditOriginalValue: null,
-      loadText: "正在加载中...",
+      loadText: this.$t("newPage.message.loadingShort"),
       //结构外调整结果列表
       outResultData: [],
       outResultVersion: "",
@@ -760,7 +760,7 @@ export default {
                   <el-input
                     key={row.id}
                     v-model={row.confirmAdjustQty}
-                    placeholder="请输入内容"
+                    placeholder={this.$t("newPage.common.placeholderInputContent")}
                     onInput={(value) => {
                       // 移除小数点和小数部分
                       const matched = value.match(/^-?\d*/);
@@ -797,7 +797,7 @@ export default {
                         row.adjustPriority = 99999;
                       }
                     }}
-                    placeholder="请输入"
+                    placeholder={this.$t("newPage.common.placeholderInput")}
                     min={0}
                     onBlur={(e) => {
                       e.preventDefault(); // 如果需要阻止默认行为
@@ -1153,7 +1153,7 @@ export default {
                     <el-input
                       key={row.id}
                       v-model={row.confirmAdjustQty}
-                      placeholder="请输入内容"
+                      placeholder={this.$t("newPage.common.placeholderInputContent")}
                       onInput={(value) => {
                         // 移除小数点和小数部分
                         const matched = value.match(/^-?\d*/);
@@ -1180,7 +1180,7 @@ export default {
                       key={row.id}
                       v-model={row.adjustPriority}
                       disabled={row.isSkuAdd != "1"}
-                      placeholder="请输入"
+                      placeholder={this.$t("newPage.common.placeholderInput")}
                       min={0}
                       onInput={(value) => {
                         // 移除小数点、负号和其他非数字字符
@@ -1663,11 +1663,11 @@ export default {
       const startEmpty = startRaw == null || startRaw === "";
       const endEmpty = endRaw == null || endRaw === "";
       if (requireBoth && startEmpty) {
-        this.$modal.msgWarning("请选择调整开始日期");
+        this.$modal.msgWarning(this.$t("newPage.message.selectAdjustStartDate"));
         return false;
       }
       if (requireBoth && endEmpty) {
-        this.$modal.msgWarning("请选择调整结束日期");
+        this.$modal.msgWarning(this.$t("newPage.message.selectAdjustEndDate"));
         return false;
       }
       if (startEmpty || endEmpty) {
@@ -1680,7 +1680,7 @@ export default {
         !Number.isNaN(adjustEnd) &&
         adjustStart > adjustEnd
       ) {
-        this.$modal.msgWarning("调整开始日期不能大于调整结束日期");
+        this.$modal.msgWarning(this.$t("newPage.message.adjustStartGreaterThanEnd"));
         return false;
       }
       return true;
@@ -1696,7 +1696,7 @@ export default {
         !Number.isNaN(end) &&
         start > end
       ) {
-        this.$modal.msgWarning("调整开始日期不能大于调整结束日期");
+        this.$modal.msgWarning(this.$t("newPage.message.adjustStartGreaterThanEnd"));
         this.$nextTick(() => {
           this.$set(
             this.formInline,
@@ -1721,7 +1721,7 @@ export default {
         !Number.isNaN(end) &&
         start > end
       ) {
-        this.$modal.msgWarning("调整开始日期不能大于调整结束日期");
+        this.$modal.msgWarning(this.$t("newPage.message.adjustStartGreaterThanEnd"));
         this.$nextTick(() => {
           this.$set(
             this.formInline,
@@ -3290,7 +3290,7 @@ export default {
           this.data = [];
           this.outResultData = [];
         } else {
-          this.$modal.msgWarning("已经是最后一个结构");
+          this.$modal.msgWarning(this.$t("newPage.message.alreadyLastStructure"));
         }
       } catch (err) {
         console.log(err);

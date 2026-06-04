@@ -14,10 +14,12 @@ public class ApsNumberUtils {
      * @param val2
      * @return
      */
-    public static Integer safeAdd(Integer val1, Integer val2) {
-        Integer newVal1 = intValue(val1);
-        Integer newVal2 = intValue(val2);
-        return newVal1 + newVal2;
+    public static Integer safeAdd(Integer... val) {
+        Integer result = 0;
+        for (Integer valItem: val) {
+            result += intValue(valItem);
+        }
+        return result;
     }
     
     /**
@@ -38,10 +40,12 @@ public class ApsNumberUtils {
      * @param val2
      * @return
      */
-    public static Long safeAdd(Long val1, Long val2) {
-        Long newVal1 = longValue(val1);
-        Long newVal2 = longValue(val2);
-        return newVal1 + newVal2;
+    public static Long safeAdd(Long... val) {
+        Long result = 0L;
+        for (Long valItem: val) {
+            result += longValue(valItem);
+        }
+        return result;
     }
     
     /**

@@ -306,6 +306,12 @@ public class MpAdjustStructureOut extends BaseEntity {
     @TableField(value = "NET_QTY_CHANGE")
     private Integer netQtyChange;
 
+    /** 上月计划余量 */
+    @Excel(name = "ui.data.column.mpAdjustStructureIn.lastMonthRemainQty")
+    @ApiModelProperty(value = "上月计划余量", name = "lastMonthRemainQty")
+    @TableField(value = "LAST_MONTH_REMAIN_QTY")
+    private Integer lastMonthRemainQty;
+
     /** 月计划已排产量 */
     @Excel(name = "ui.data.column.mpAdjustStructureOut.monthScheduledQty")
     @ApiModelProperty(value = "月计划已排产量", name = "monthScheduledQty")

@@ -305,24 +305,24 @@ export default {
     handleGenerate() {
       const params = this.formatParams(false);
       if (!params.factoryCode) {
-        this.$modal.msgWarning("请选择工厂");
+        this.$modal.msgWarning(this.$t("newPage.message.selectFactory"));
         return;
       }
       if (!params.year || !params.month) {
-        this.$modal.msgWarning("请选择年月");
+        this.$modal.msgWarning(this.$t("newPage.message.selectYearMonth"));
         return;
       }
       if (!params.requireVersion) {
-        this.$modal.msgWarning("请选择需求版本号");
+        this.$modal.msgWarning(this.$t("newPage.message.selectDemandVersion"));
         return;
       }
-      this.$confirm("确认生成已出库未扫描版本?", "提示", {
+      this.$confirm(this.$t("newPage.confirm.generateShippedNotScanVersion"), this.$t("newPage.common.tips"), {
         type: "warning",
       }).then(() => {
         this.loading = true;
         generateVersion(params)
           .then((res) => {
-            this.$modal.msgSuccess("生成成功");
+            this.$modal.msgSuccess(this.$t("newPage.message.generateSuccess"));
             this.getVersionList(true);
           })
           .finally(() => {

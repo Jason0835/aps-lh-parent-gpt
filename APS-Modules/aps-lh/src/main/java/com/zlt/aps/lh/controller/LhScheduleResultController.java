@@ -3,6 +3,7 @@ package com.zlt.aps.lh.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
@@ -21,15 +22,16 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.autoLogin.feign.FeignTokenHelper;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.domain.dto.*;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
-import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
-import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleResultTemplateImportVO;
 import com.zlt.aps.lh.api.domain.vo.LhScheduleShiftDateVO;
 import com.zlt.aps.lh.api.domain.vo.ScheduleSummaryReportVO;
+import com.zlt.aps.lh.api.enums.DeleteFlagEnum;
+import com.zlt.aps.lh.api.enums.ReleaseStatusEnum;
 import com.zlt.aps.lh.component.ScheduleExecutionGuard;
 import com.zlt.aps.lh.mapper.LhScheduleResultMapper;
 import com.zlt.aps.lh.mapper.MdmMaterialInfoMapper;
@@ -40,7 +42,6 @@ import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.ShiftFieldUtil;
 import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
-import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.LhScheduleResultIssue;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
@@ -54,6 +55,7 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -119,6 +121,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     @Autowired
     private IImportLogService iImportLogService;
+
+    @Autowired
+    private LhMouldChangePlanController lhMouldChangePlanController;
 
     /**
      * 获取排程日期对象列表
@@ -274,6 +279,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         List<LhScheduleResultTemplateImportVO> list = util.importExcel(
                 sheetName, new ByteArrayInputStream(fileBytes), 0, 5, -1);
         AjaxResult ajaxResult = lhScheduleService.importScheduleTemplate(list, result, updateSupport, importLog.getId());
+        // 硫化换模计划导入
+        AjaxResult lhMouldChangePlanAjaxResult = lhMouldChangePlanController.importData(importDTO, updateSupport);
+
         Date endTime = DateUtils.getNowDate();
         importLog.setRowCount(list.size());
         importLog.setBeginTime(beginTime);
@@ -281,7 +289,50 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
         ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
         ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
+
+        LhChangePlanImportResult changePlanResult = getLhChangePlanImportResult(ajaxResult, lhMouldChangePlanAjaxResult, importLog);
+
+        ajaxResult.put(AjaxResult.DATA_TAG, changePlanResult.importErrorLogs);
+        ajaxResult.put(AjaxResult.MSG_TAG, changePlanResult.message);
         return ajaxResult;
+    }
+
+    @NotNull
+    private static LhChangePlanImportResult getLhChangePlanImportResult(AjaxResult ajaxResult, AjaxResult lhMouldChangePlanAjaxResult, ImportLog importLog) {
+        List<ImportErrorLog> importErrorLogs = (List<ImportErrorLog>) ajaxResult.get(AjaxResult.DATA_TAG);
+        importErrorLogs = importErrorLogs == null ? new ArrayList<>() : importErrorLogs;
+        List<ImportErrorLog> lhMouldChangePlanImportErrorLogs = (List<ImportErrorLog>) lhMouldChangePlanAjaxResult.get(AjaxResult.DATA_TAG);
+        lhMouldChangePlanImportErrorLogs = lhMouldChangePlanImportErrorLogs == null ? new ArrayList<>() : lhMouldChangePlanImportErrorLogs;
+        importErrorLogs.addAll(lhMouldChangePlanImportErrorLogs);
+        String msg = (String) lhMouldChangePlanAjaxResult.get(AjaxResult.MSG_TAG);
+        String lhMouldChangePlanMsg = (String) lhMouldChangePlanAjaxResult.get(AjaxResult.MSG_TAG);
+        String[] lhMouldChangePlanMessage = lhMouldChangePlanAjaxResult.get(AjaxResult.MSG_TAG).toString().split(",");
+        switch (lhMouldChangePlanMessage.length) {
+            case 2:
+                importLog.setSuccessNum(importLog.getSuccessNum() + Long.parseLong(lhMouldChangePlanMessage[1]));
+                importLog.setFailNum(importLog.getFailNum());
+                lhMouldChangePlanAjaxResult.put("msg", com.ruoyi.common.utils.StringUtils.format(lhMouldChangePlanMessage[0], new Object[]{lhMouldChangePlanMessage[1]}));
+                break;
+            case 3:
+                importLog.setSuccessNum(importLog.getSuccessNum() + Long.parseLong(lhMouldChangePlanMessage[1]));
+                importLog.setFailNum(importLog.getFailNum() + Long.parseLong(lhMouldChangePlanMessage[2]));
+                lhMouldChangePlanAjaxResult.put("msg", com.ruoyi.common.utils.StringUtils.format(lhMouldChangePlanMessage[0], new Object[]{lhMouldChangePlanMessage[1], lhMouldChangePlanMessage[2]}));
+        }
+        msg = StringUtils.defaultIfBlank(msg, "");
+        String lhMouldChangePlanTitle = I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.import.modelName");
+        String message = msg + "<br>" + lhMouldChangePlanTitle + ":" + lhMouldChangePlanMsg;
+        LhChangePlanImportResult changePlanResult = new LhChangePlanImportResult(importErrorLogs, message);
+        return changePlanResult;
+    }
+
+    private static class LhChangePlanImportResult {
+        public final List<ImportErrorLog> importErrorLogs;
+        public final String message;
+
+        public LhChangePlanImportResult(List<ImportErrorLog> importErrorLogs, String message) {
+            this.importErrorLogs = importErrorLogs;
+            this.message = message;
+        }
     }
 
 
