@@ -53,3 +53,6 @@ gateway:
   url: http://192.168.2.94:9512/
   casUrl: http://192.168.2.93:8899/cas
 
+aes:
+  password:
+    key: zlt_aps_pwd_key!
