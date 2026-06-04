@@ -120,9 +120,13 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         setCurrentNetQty(contextDTO);
         // 8、设置型腔、活块数量
         setMoldCavityInsert(contextDTO);
-        // 9、设置计划剩余排产量、计划已排产量、已生产量
+        // 9、设置上月剩余量
+        if (checkCrossMonth(contextDTO)){
+            setLastMonthRemainQty(contextDTO);
+        }
+        // 10`、设置计划剩余排产量、计划已排产量、已生产量
         setMonthUnScheduledQty(contextDTO);
-        // 10、筛选：|净需求 - 计划已排产量| > 0的数据
+        // 11、筛选：|净需求 - 计划已排产量| > 0的数据
         filterAdjustList(contextDTO.getAdjustDetailList());
         // 筛选后数据为空，抛出异常
         Assert.isFalse(PubUtil.isEmpty(contextDTO.getAdjustDetailList()), () -> {

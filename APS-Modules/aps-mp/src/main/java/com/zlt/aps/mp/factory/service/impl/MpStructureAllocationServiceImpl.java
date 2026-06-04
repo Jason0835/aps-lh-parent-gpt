@@ -1961,7 +1961,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         // 结构转产导入
         AjaxResult ajaxResult = this.importDataStructureAllocation(list, list4DayResult, false, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap);
         boolean isStrcutreImport = AjaxResultUtils.checkAjaxSuccess(ajaxResult);
-        AjaxResult ajaxResult4DayResult = ajaxResult;
+        AjaxResult ajaxResult4DayResult = null;
         // 月计划排产导入
         boolean isDayDataImport = isStrcutreImport;
         if (isStrcutreImport) {
@@ -2007,26 +2007,27 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         int successNum = 0;
         List<Object> importErrorLogs = new ArrayList<>();
         int[] resultParam = parseImportMsg(ajaxResult);
-        successNum += resultParam[0];
         if (resultParam[2] > 0) {
-            errorNum += resultParam[1];
-
             List<ImportErrorLog> importErrorLogList = com.ruoyi.common.utils.StringUtils.cast(ajaxResult.get(AjaxResult.DATA_TAG));
             if (!CollectionUtils.isEmpty(importErrorLogList)) {
                 String listTxt = JSONArray.toJSONString(importErrorLogList);
                 importErrorLogs.addAll(JSONArray.parseArray(listTxt, ImportErrorLog.class));
             }
         }
-        int[] resultParam4DayResult = parseImportMsg(ajaxResult4DayResult);
-        successNum += resultParam4DayResult[0];
-        if (resultParam4DayResult[2] > 0) {
-            errorNum += resultParam4DayResult[1];
-
-            List<ImportErrorLog> importErrorLogList = com.ruoyi.common.utils.StringUtils.cast(ajaxResult4DayResult.get(AjaxResult.DATA_TAG));
-            if (!CollectionUtils.isEmpty(importErrorLogList)) {
-                String listTxt = JSONArray.toJSONString(importErrorLogList);
-                importErrorLogs.addAll(JSONArray.parseArray(listTxt, ImportErrorLog.class));
+        if (ajaxResult4DayResult != null) {
+            int[] resultParam4DayResult = parseImportMsg(ajaxResult4DayResult);
+            successNum += resultParam4DayResult[0];
+            if (resultParam4DayResult[2] > 0) {
+                errorNum += resultParam4DayResult[1];
+                
+                List<ImportErrorLog> importErrorLogList = com.ruoyi.common.utils.StringUtils.cast(ajaxResult4DayResult.get(AjaxResult.DATA_TAG));
+                if (!CollectionUtils.isEmpty(importErrorLogList)) {
+                    String listTxt = JSONArray.toJSONString(importErrorLogList);
+                    importErrorLogs.addAll(JSONArray.parseArray(listTxt, ImportErrorLog.class));
+                }
             }
+        } else {
+            errorNum = list.size();
         }
 
         // 构建返回数据
@@ -2133,48 +2134,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         String yearErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.yearErrorStr");
         String monthErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.monthErrorStr");
         String noPlanStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noPlanStr");
-        String outOfRangeStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.outOfRange");
 
         // 过滤合计等数据
         list = list.stream().filter(item -> StringUtils.isNotBlank(item.getCxMachineCode())).collect(Collectors.toList());
         
-        // 处理结构转产表、月计划的开始、结束日期
-        // 按结构分组月计划数据
-        Map<String, List<FactoryMonthPlanMouldDayResult>> dayResultMap = new HashMap<>();
-        for (int i = 0, size = list4DayResult.size(); i < size; i ++) {
-            FactoryMonthPlanMouldDayResult item = list4DayResult.get(i);
-            this.setBeginDayAndEndDay(item); // 给开始日期、结束日期赋值
-            item.setImportRowNum(i + 2); // 记录导入行号
-            dayResultMap.computeIfAbsent(item.getStructureName(), k -> new ArrayList<>()).add(item);
-        }
-        // 按结构分组汇总结构转产表的最早上机日期和最晚下机日期
-        Map<String, MpStructureAllocationExportVo> structureDayMap = new HashMap<>();
-        for (MpStructureAllocationExportVo item: list) {
-            this.setBeginDayAndEndDay(item); // 给开始日期、结束日期赋值
-            Integer itemBegingDay = item.getBeginDay();
-            Integer itemEndDay = item.getEndDay();
-            if (itemBegingDay == null || itemEndDay == null) {
-                continue;
-            }
-            MpStructureAllocationExportVo structureDayItem = structureDayMap.get(item.getStructureName());
-            if (structureDayItem == null) {
-                MpStructureAllocationExportVo newVo = new MpStructureAllocationExportVo();
-                newVo.setBeginDay(itemBegingDay);
-                newVo.setEndDay(itemEndDay);
-                structureDayMap.put(item.getStructureName(), newVo);
-                continue;
-            }
-            // 比较两者的开始结束日期，取两个范围的并集
-            Integer beginDay = structureDayItem.getBeginDay();
-            Integer endDay = structureDayItem.getEndDay();
-            if (itemBegingDay < beginDay) {
-                structureDayItem.setBeginDay(itemBegingDay);
-            }
-            if (itemEndDay > endDay) {
-                structureDayItem.setEndDay(itemEndDay);
-            }
-        }
-
         // 构建每个成型机的当前排产结构
         Map<String, MpStructureAllocation> machineLastValidRecordMap = new HashMap<>(); 
         Integer importYear = Convert.toInt(year, null);
@@ -2188,7 +2151,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
         //3.公共校验（非空校验、长度校验等）
         for (int i = 0; i < list.size(); i++) {
-            int errorNum = i + 4;
+            int errorNum = i + 5;
             MpStructureAllocation item = list.get(i);
 
             item.setDataSource(DataSourceEnum.IMPORT.getCode());
@@ -2233,43 +2196,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             if (item.getBeginDay() == null || item.getEndDay() == null) { // 没有排产的结构过滤掉
                 item.setId(-999L);
                 failureNum++;
-                addImportErrorLog(importLogId, errorNum, item.getStructureName() + noPlanStr, importErrorLogs);
+                String errorMsg = String.format(noPlanStr, item.getStructureName());
+                addImportErrorLog(importLogId, errorNum, errorMsg, importErrorLogs);
                 continue;
             } else {
                 item.setAllotDays(item.getEndDay() - item.getBeginDay() + 1);
-            }
-            
-            // 校验月计划的排产日期是否在结构转产表的范围内
-            List<FactoryMonthPlanMouldDayResult> dayResultList = dayResultMap.get(item.getStructureName());
-            if (dayResultList != null) {
-                MpStructureAllocationExportVo structureDay = structureDayMap.get(item.getStructureName());
-                boolean isError = false;
-                if (structureDay != null) {
-                    for (FactoryMonthPlanMouldDayResult dayResult: dayResultList) {
-                        if (StringUtils.isEmpty(dayResult.getMaterialDesc())) {
-                            continue;
-                        }
-                        Integer resultBegingDay = dayResult.getBeginDay();
-                        Integer resultEndDay = dayResult.getEndDay();
-                        Integer structureBegingDay = structureDay.getBeginDay();
-                        Integer structureEndDay = structureDay.getEndDay();
-                        if (resultBegingDay == null || resultEndDay == null) {
-                            continue;
-                        }
-                        if (resultBegingDay < structureBegingDay || resultEndDay > structureEndDay) { // 超范围则记录错误信息
-                            item.setId(-999L);
-                            String errorMsg = String.format(outOfRangeStr, dayResult.getMaterialDesc(), structureBegingDay, structureEndDay);
-                            addImportErrorLog(importLogId, dayResult.getImportRowNum(), errorMsg, importErrorLogs);
-                            isError = true;
-                        }
-                    }
-                } else {
-                    isError = true;
-                }
-                if (isError) {
-                    failureNum++;
-                    continue;
-                }
             }
             
             // 赋值交替类型（仅对校验通过的有效记录）
@@ -2628,6 +2559,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             String yearErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.yearErrorStr");
             String monthErrorStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.monthErrorStr");
             String noStructureNameStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.noStructureNameStr");
+            String outOfRangeStr = I18nUtil.getMessage("ui.data.alert.MpStructureAllocation.outOfRange");
             
             // 查询结构转产表
             QueryWrapper<MpStructureAllocation> structureAllocationQueryWrapper = new QueryWrapper<>();
@@ -2635,13 +2567,16 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             structureAllocationQueryWrapper.eq("PRODUCTION_VERSION", productVersion);
             Map<String, List<MpStructureAllocation>> allStructureNameMap = entityMapper.selectList(structureAllocationQueryWrapper).stream()
                     .collect(Collectors.groupingBy(MpStructureAllocation::getStructureName));
-
+            
+            // 按结构分组汇总结构转产表的最早上机日期和最晚下机日期
+            Map<String, MpStructureAllocation> structureDayMap = this.getStructureDayMap(allStructureNameMap);
+            
             // 过滤合计等数据
             list = list.stream().filter(item -> StringUtils.isNotBlank(item.getMaterialCode())).collect(Collectors.toList());
 
             //3.公共校验（非空校验、长度校验等）
             for (int i = 0; i < list.size(); i++) {
-                int errorNum = i + 2;
+                int errorNum = i + 5;
                 FactoryMonthPlanMouldDayResult item = list.get(i);
 
                 item.setIsImport(YesOrNoEnum.YES.getCode());
@@ -2653,8 +2588,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 item.statisticsTotalQty(); // 统计总排产量
                 if (item.getTotalQty() <= 0) {
                     item.setId(-999L);
-//                    failureNum++; // 没有计划量的仅忽略不导入，不计入错误数中
-//                    addImportErrorLog(importLogId, errorNum, notTotalQtyStr, importErrorLogs);
                     continue;
                 }
 
@@ -2706,6 +2639,26 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     failureNum++;
                     addImportErrorLog(importLogId, errorNum, String.format(noStructureNameStr, item.getStructureName()), importErrorLogs);
                     continue;
+                }
+                // 给开始日期、结束日期赋值
+                this.setBeginDayAndEndDay(item);
+                Integer resultBegingDay = item.getBeginDay();
+                Integer resultEndDay = item.getEndDay();
+                if (resultBegingDay == null || resultEndDay == 0) { // 没有排产日的记录忽略，无需记录错误记录
+                    continue;
+                }
+                // 校验月计划的排产日期是否在结构转产表的范围内
+                MpStructureAllocation mpStructureAllocation = structureDayMap.get(item.getStructureName());
+                if (mpStructureAllocation != null) {
+                    Integer structureBegingDay = mpStructureAllocation.getBeginDay();
+                    Integer structureEndDay = mpStructureAllocation.getEndDay();
+                    if (resultBegingDay < structureBegingDay || resultEndDay > structureEndDay) { // 超范围则记录错误信息
+                        item.setId(-999L);
+                        failureNum++;
+                        String errorMsg = String.format(outOfRangeStr, item.getMaterialDesc(), structureBegingDay, structureEndDay);
+                        addImportErrorLog(importLogId, errorNum, errorMsg, importErrorLogs);
+                        continue;
+                    }
                 }
                 
                 insertList.add(item);
@@ -2791,6 +2744,33 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         } finally {
             clearImportMachineMap(importLogId);
         }
+    }
+    
+    /**
+     * 按结构分组汇总结构转产表的最早上机日期和最晚下机日期
+     * @param allStructureNameMap
+     * @return
+     */
+    private Map<String, MpStructureAllocation> getStructureDayMap(
+            Map<String, List<MpStructureAllocation>> allStructureNameMap) {
+        Map<String, MpStructureAllocation> structureDayMap = new HashMap<>();
+        for (Entry<String, List<MpStructureAllocation>> entry : allStructureNameMap.entrySet()) {
+            String structureName = entry.getKey();
+            List<MpStructureAllocation> structureNameList = entry.getValue();
+            // 取结构结构的上机时间和下机时间
+            Integer itemBegingDay = structureNameList.stream().map(MpStructureAllocation::getBeginDay)
+                    .filter(Objects::nonNull).min(Integer::compareTo).orElse(null);
+            Integer itemEndDay = structureNameList.stream().map(MpStructureAllocation::getEndDay)
+                    .filter(Objects::nonNull).max(Integer::compareTo).orElse(null);
+            if (itemBegingDay == null || itemEndDay == null) {
+                continue;
+            }
+            MpStructureAllocation newVo = new MpStructureAllocation();
+            newVo.setBeginDay(itemBegingDay);
+            newVo.setEndDay(itemEndDay);
+            structureDayMap.put(structureName, newVo);
+        }
+        return structureDayMap;
     }
     
     /**
@@ -2946,14 +2926,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
             if (materialInfo == null) {
                 insertItem.setId(-999L);
-                String errorMsg = materialDesc + notMaterialStr;
+                String errorMsg = String.format(notMaterialStr, materialDesc);
                 addImportErrorLog(importLogId, insertItem.getImportRowNum(), errorMsg, importErrorLogs);
                 continue;
             }
             // 2.2、模具校验
             if (!materialHasMoldSet.contains(materialDesc)) {
                 insertItem.setId(-999L);
-                String errorMsg = materialDesc + notSkuMoldRelStr;
+                String errorMsg = String.format(notSkuMoldRelStr, materialDesc);
                 addImportErrorLog(importLogId, insertItem.getImportRowNum(), errorMsg, importErrorLogs);
                 continue;
             }
@@ -3049,7 +3029,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             }
             if (insertItem.getDayVulcanizationQty() == null) {
                 insertItem.setId(-999L);
-                String errorMsg = materialDesc + notDayVulcanizationQtyStr;
+                String errorMsg = String.format(notDayVulcanizationQtyStr, materialDesc);
                 addImportErrorLog(importLogId, insertItem.getImportRowNum(), errorMsg, importErrorLogs);
                 continue;
             }

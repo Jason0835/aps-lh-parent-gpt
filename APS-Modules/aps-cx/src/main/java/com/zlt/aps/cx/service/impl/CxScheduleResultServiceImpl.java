@@ -260,7 +260,7 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     @Override
     public byte[] exportData(List<CxScheduleResult> list, Date scheduleDate) {
         java.io.InputStream inputStream = this.getClass().getClassLoader()
-                .getResourceAsStream("excelModel/cxjhtemplate.xls");
+                .getResourceAsStream("excelModel/cxjhtemplate.xlsx");
         if (Objects.isNull(inputStream)) {
             throw new ServiceException("成型计划导入模板不存在");
         }

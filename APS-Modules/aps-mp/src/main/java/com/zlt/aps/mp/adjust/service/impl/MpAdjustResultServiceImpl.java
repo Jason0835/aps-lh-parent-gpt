@@ -283,10 +283,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         int successNum = 0;
         List<Object> importErrorLogs = new ArrayList<>();
         int[] resultParam = parseImportMsg(ajaxResult);
-        successNum += resultParam[0];
         if (resultParam[2] > 0) {
-            errorNum += resultParam[1];
-
             List<ImportErrorLog> importErrorLogList = StringUtils.cast(ajaxResult.get(AjaxResult.DATA_TAG));
             if (CollectionUtils.isNotEmpty(importErrorLogList)) {
                 String listTxt = JSONArray.toJSONString(importErrorLogList);

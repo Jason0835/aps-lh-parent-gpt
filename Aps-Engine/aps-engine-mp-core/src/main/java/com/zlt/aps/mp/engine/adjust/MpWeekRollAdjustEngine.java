@@ -2649,7 +2649,11 @@ public class MpWeekRollAdjustEngine {
                 preDayMouldValue = dayMouldValue;
             }
         }
-        mpFinalVo.setMouldChangeInfo(sb.toString());
+        String mouldChangeInfo = sb.toString();
+        if (mouldChangeInfo.endsWith("-0")) {
+            mouldChangeInfo = mouldChangeInfo.substring(0, mouldChangeInfo.length() - 2);
+        }
+        mpFinalVo.setMouldChangeInfo(mouldChangeInfo);
     }
     /**
      * 检查模具满足情况
