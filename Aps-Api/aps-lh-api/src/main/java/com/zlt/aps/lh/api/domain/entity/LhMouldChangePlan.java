@@ -65,7 +65,7 @@ public class LhMouldChangePlan extends BaseEntity implements Serializable {
 
     @ApiModelProperty(value = "排程日期")
     @Excel(name = "ui.data.column.lhMouldChangePlan.scheduleDate", dateFormat = "yyyy-MM-dd")
-    @ImportExcelValidated(required = true)
+//    @ImportExcelValidated(required = true)
     @TableField(value = "SCHEDULE_DATE")
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")

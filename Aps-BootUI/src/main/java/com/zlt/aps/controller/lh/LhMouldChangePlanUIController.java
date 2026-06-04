@@ -8,7 +8,9 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.lh.api.domain.dto.LhScheduleImportDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
+import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
 import com.zlt.aps.lh.api.domain.vo.LhMouldChangePlanImportVo;
 import com.zlt.aps.lh.api.service.ILhMachineInfoRemoteService;
 import com.zlt.aps.lh.api.service.ILhMouldChangePlanRemoteService;
@@ -32,6 +34,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Date;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -200,11 +203,12 @@ public class LhMouldChangePlanUIController extends BaseUIController<LhMouldChang
         response.flushBuffer();
     }
 
-    @PostMapping({"/importData"})
+    @PostMapping({"/importDataCust"})
     @ResponseBody
     @ApiOperation("数据导入")
-    @Override
-    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
+    public AjaxResult importDataCust(@RequestPart("file") MultipartFile file,
+                                 Date scheduleDate,
+                                 boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
 
         ImportContext context = new ImportContext();
@@ -213,7 +217,12 @@ public class LhMouldChangePlanUIController extends BaseUIController<LhMouldChang
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        return iLhMouldChangePlanService.importData(context,updateSupport);
+        LhScheduleImportDTO importDTO = new LhScheduleImportDTO();
+        importDTO.setImportContext(context);
+        LhScheduleResult lhScheduleResult = new LhScheduleResult();
+        lhScheduleResult.setScheduleDate(scheduleDate);
+        importDTO.setScheduleResult(lhScheduleResult);
+        return iLhMouldChangePlanService.importData(importDTO, updateSupport);
     }
 
     @ApiOperation("获取机台下拉列表 - 支持搜索筛选")
