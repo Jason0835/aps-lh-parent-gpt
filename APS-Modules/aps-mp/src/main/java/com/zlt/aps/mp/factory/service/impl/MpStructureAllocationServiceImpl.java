@@ -29,7 +29,6 @@ import com.zlt.aps.baseVo.excelVo.CellStyle;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.enums.DataSourceEnum;
 import com.zlt.aps.common.core.utils.AjaxResultUtils;
-import com.zlt.aps.common.core.utils.ApsNumberUtils;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
@@ -113,6 +112,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.zlt.common.utils.ImportExcelValidatedUtils.addImportErrorLog;
+import static com.zlt.aps.common.core.utils.ApsNumberUtils.*;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -1188,10 +1188,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
     /**
      * 获取结构转产表导出数据
      * @param param
+     * @param isFinal
      * @return
      */
     @Override
-    public MpStructureAllocationExportStatisticsVo getExportVo(MpStructureAllocation param) {
+    public MpStructureAllocationExportStatisticsVo getExportVo(MpStructureAllocation param, boolean isFinal) {
         // 1、加载构建导出列表的各项数据
         // 1.1、加载硫化机总数
         LambdaQueryWrapper<LhMachineInfo> lhMachineQueryWrapper = new LambdaQueryWrapper<>();
@@ -1227,13 +1228,26 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             }
             lhMachineStatisticsMap.put(entry.getKey(), dayLhMachinesMap);
         }
-        // 1.4、加载月计划排产明细
-        LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> resultQueryWrapper = new LambdaQueryWrapper<>();
-        resultQueryWrapper.eq(FactoryMonthPlanMouldDayResult::getFactoryCode, param.getFactoryCode());
-        resultQueryWrapper.eq(FactoryMonthPlanMouldDayResult::getProductionVersion, param.getProductionVersion());
-        Map<String, List<FactoryMonthPlanMouldDayResult>> mouldingDayResultMap = factoryMouldingDayResultMapper
-                .selectList(resultQueryWrapper).stream()
-                .collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getStructureName)); // 按结构对排产结果分组
+        // 1.4、加载月计划排产明细，根据参数决定加载月计划还是定稿版本
+        Map<String, List<FactoryMonthPlanMouldDayResult>> mouldingDayResultMap;
+        if (isFinal) { // 定稿
+            LambdaQueryWrapper<FactoryMonthPlanProductionFinalResult> resultQueryWrapper = new LambdaQueryWrapper<>();
+            resultQueryWrapper.eq(FactoryMonthPlanProductionFinalResult::getFactoryCode, param.getFactoryCode());
+            resultQueryWrapper.eq(FactoryMonthPlanProductionFinalResult::getProductionVersion, param.getProductionVersion());
+            List<FactoryMonthPlanProductionFinalResult> finalResultList = factoryMonthPlanProductionFinalResultEntityMapper.selectList(resultQueryWrapper);
+            mouldingDayResultMap = finalResultList.stream().map(finalResult -> {
+                FactoryMonthPlanMouldDayResult result = new FactoryMonthPlanMouldDayResult();
+                BeanUtil.copyProperties(finalResult, result);
+                return result;
+            }).collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getStructureName));
+        } else {
+            LambdaQueryWrapper<FactoryMonthPlanMouldDayResult> resultQueryWrapper = new LambdaQueryWrapper<>();
+            resultQueryWrapper.eq(FactoryMonthPlanMouldDayResult::getFactoryCode, param.getFactoryCode());
+            resultQueryWrapper.eq(FactoryMonthPlanMouldDayResult::getProductionVersion, param.getProductionVersion());
+            mouldingDayResultMap = factoryMouldingDayResultMapper
+                    .selectList(resultQueryWrapper).stream()
+                    .collect(Collectors.groupingBy(FactoryMonthPlanMouldDayResult::getStructureName)); // 按结构对排产结果分组
+        }
         // 1.4.1、根据结构将月计划明细汇总
         String productTypeCode = null;
         Map<String, FactoryMonthPlanMouldDayResult> structureDayResultMap = new HashMap<>();
@@ -1264,14 +1278,26 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
         // 1.5、加载需求计划
         QueryWrapper<DpDemandPlan> dpDemandPlanQueryWrapper = new QueryWrapper<>();
-        dpDemandPlanQueryWrapper.select("STRUCTURE_NAME", "SUM(UN_POSTPONE_NET_QTY) UN_POSTPONE_NET_QTY",
-                "SUM(HEIGHT_QTY) HEIGHT_QTY", "SUM(ORI_HEIGHT_QTY) ORI_HEIGHT_QTY");
-        dpDemandPlanQueryWrapper.groupBy("STRUCTURE_NAME");
         dpDemandPlanQueryWrapper.eq("FACTORY_CODE", param.getFactoryCode());
         dpDemandPlanQueryWrapper.eq("MONTH_PLAN_VERSION", param.getMonthPlanVersion());
         List<DpDemandPlan> dpDemandPlanList = dpDemandPlanEntityMapper.selectList(dpDemandPlanQueryWrapper);
-        Map<String, DpDemandPlan> dpDemandPlanMap = dpDemandPlanList.stream()
-                .collect(Collectors.toMap(DpDemandPlan::getStructureName, Function.identity()));
+        // 按结构累计需求量
+        Map<String, DpDemandPlan> dpDemandPlanMap = dpDemandPlanList.stream().map(dpDemandPlan -> {
+            if (!Objects.equals(YesOrNoEnum.YES.getCode(), dpDemandPlan.getIsSchedule())) {
+                dpDemandPlan.setConventionReserveQty(0); // 不参与排产，搭配需要清0
+            }
+            return dpDemandPlan;
+        }).collect(Collectors.groupingBy(DpDemandPlan::getStructureName,
+                Collectors.collectingAndThen(Collectors.toList(), list -> list.stream().reduce((p1, p2) -> {
+                    p1.setHeightQty(safeAdd(p1.getHeightQty(), p2.getHeightQty())); // 高优先级数量
+                    p1.setOriHeightQty(safeAdd(p1.getOriHeightQty(), p2.getOriHeightQty())); // 高优先级数量原始值
+                    p1.setMidQty(safeAdd(p1.getHeightQty(), p2.getMidQty())); // 中优先级数量
+                    p1.setOriMidQty(safeAdd(p1.getOriMidQty(), p2.getOriMidQty())); // 中优先级数量原始值
+                    p1.setCycleReserveQty(safeAdd(p1.getCycleReserveQty(), p2.getCycleReserveQty())); // 周期储备量
+                    p1.setConventionReserveQty(safeAdd(p1.getConventionReserveQty(), p2.getConventionReserveQty())); // 常规储备量
+                    p1.setPostponeQty(safeAdd(p1.getPostponeQty(), p2.getPostponeQty())); // 展缓订单量
+                    return p1;
+                }).orElse(null))));
 
         // 2、构建报表头
         MpStructureAllocationExportStatisticsVo exportVo = new MpStructureAllocationExportStatisticsVo();
@@ -1355,8 +1381,13 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 machineRecord.setEndDay(endDay);
                 DpDemandPlan dpDemandPlan = Optional.ofNullable(dpDemandPlanMap.get(structureName)).orElse(null);
                 if (dpDemandPlan != null) {
-                    machineRecord.setUnPostponeNetQty(Convert.toInt(dpDemandPlan.getUnPostponeNetQty(), 0));
-                    machineRecord.setHeightQty(Convert.toInt(dpDemandPlan.getOriHeightQty(), Convert.toInt(dpDemandPlan.getHeightQty(), 0)));
+                    Integer heightQty = Convert.toInt(dpDemandPlan.getOriHeightQty(), Convert.toInt(dpDemandPlan.getHeightQty(), 0));// 高优先级需求量
+                    Integer midQty = Convert.toInt(dpDemandPlan.getOriMidQty(), Convert.toInt(dpDemandPlan.getMidQty(), 0));// 中优先级需求量
+                    Integer unPostponeNetQty = safeAdd(heightQty, midQty, dpDemandPlan.getCycleReserveQty(), dpDemandPlan.getConventionReserveQty());// 净需求不含暂缓 = 高优先级需求量 + 中优先级需求量 + 周期 + 常规储备
+                    Integer lossQty = safeAdd(unPostponeNetQty, dpDemandPlan.getPostponeQty());// 净需求含暂缓 = 净需求不含暂缓 + 暂缓订单数量
+                    machineRecord.setLossQty(lossQty);
+                    machineRecord.setUnPostponeNetQty(unPostponeNetQty);
+                    machineRecord.setHeightQty(heightQty);
                 }
                 if (beginDay != null && endDay != null) {
                     machineRecord.setAllotDays(endDay - beginDay + 1);
@@ -3047,7 +3078,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             int startDay = 0;
             for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
                 String dayField = FactoryConstant.DAY_FIELD + day;
-                int planQty = ApsNumberUtils.intValue(insertItem.getFieldValueByFieldName(dayField));
+                int planQty = intValue(insertItem.getFieldValueByFieldName(dayField));
                 mpFinalVo.setFieldValueByFieldName(dayField, planQty);
                 if (planQty > 0 && startDay == 0) {
                     startDay = day;

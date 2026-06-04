@@ -201,11 +201,12 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
                              HttpServletResponse response) throws IOException {
         // 组装月计划导出excel
         Date beginTime = DateUtils.getNowDate();
-        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, false, false);
-        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, false);
+        boolean isFinal = false;
+        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, false, isFinal);
+        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, isFinal);
         
         // 合并月计划、结构转产表的导出数据
-        byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1);
+        byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1, isFinal);
         // 保存导出日志
         this.saveExportLog(queryVO, fileName, beginTime, list);
         return resultBytes;
@@ -221,11 +222,12 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
                              HttpServletResponse response) throws IOException {
         // 组装月计划导出excel
         Date beginTime = DateUtils.getNowDate();
-        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, false, true);
-        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, true);
+        boolean isFinal = true;
+        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, false, isFinal);
+        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, isFinal);
 
         // 合并月计划、结构转产表的导出数据
-        byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1);
+        byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1, isFinal);
         // 保存导出日志
         this.saveExportLog(queryVO, fileName, beginTime, list);
         return resultBytes;
@@ -240,11 +242,12 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     public byte[] exportAllMaterial(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
-        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, true, false);
-        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, false);
+        boolean isFinal = false;
+        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, true, isFinal);
+        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, isFinal);
 
         // 合并月计划、结构转产表的导出数据
-        byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1);
+        byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1, isFinal);
         // 保存导出日志
         this.saveExportLog(queryVO, fileName, beginTime, list);
         return resultBytes;
@@ -259,11 +262,12 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
     public byte[] exportFinalAllMaterial(@RequestBody FactoryMonthPlanMouldDayResult queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         Date beginTime = DateUtils.getNowDate();
-        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, true, true);
-        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, true);
+        boolean isFinal = true;
+        List<FactoryMonthPlanMouldDayResultExportVo> list = factoryMonthPlanMouldDayResultService.getExportList(queryVO, true, isFinal);
+        byte[] excelBytes1 = factoryMonthPlanMouldDayResultService.getFactoryMonthPlanMouldDayResultExportByte(queryVO, list, isFinal);
 
         // 合并月计划、结构转产表的导出数据
-        byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1);
+        byte[] resultBytes = this.mergeStructureAllocationSheet(queryVO, excelBytes1, isFinal);
         // 保存导出日志
         this.saveExportLog(queryVO, fileName, beginTime, list);
         return resultBytes;
@@ -299,10 +303,11 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
      * 
      * @param queryVO     查询条件
      * @param excelBytes1 第一个页签的excel数据
+     * @param isFinal     是否导出定稿版本
      * @return
      * @throws IOException
      */
-    private byte[] mergeStructureAllocationSheet(FactoryMonthPlanMouldDayResult queryVO, byte[] excelBytes1)
+    private byte[] mergeStructureAllocationSheet(FactoryMonthPlanMouldDayResult queryVO, byte[] excelBytes1, boolean isFinal)
             throws IOException {
         // 同时组装结构转产表导出excel
         MpStructureAllocation factoryMonthPlanMouldDayResult = new MpStructureAllocation();
@@ -312,7 +317,7 @@ public class FactoryMonthPlanMouldDayResultController extends AbstractDocBizCont
         factoryMonthPlanMouldDayResult.setProductionVersion(queryVO.getProductionVersion());
         factoryMonthPlanMouldDayResult.setMonthPlanVersion(queryVO.getMonthPlanVersion());
         factoryMonthPlanMouldDayResult.setStructureName(queryVO.getStructureName());
-        MpStructureAllocationExportStatisticsVo vo = mpStructureAllocationService.getExportVo(factoryMonthPlanMouldDayResult);
+        MpStructureAllocationExportStatisticsVo vo = mpStructureAllocationService.getExportVo(factoryMonthPlanMouldDayResult, isFinal);
         byte[] excelBytes2 = mpStructureAllocationService.getMpStructureAllocationExportByte(vo);
         
         // 合并月计划、结构转产表的导出数据
