@@ -140,8 +140,10 @@
     />
     <tlt-upload
       ref="tltUpload"
-      downloadUrl=""
-      uploadUrl="/cx/cxScheduleResult/importData"
+      downloadUrl="/cx/cxScheduleResult/importTemplateDown"
+      :download-params="importTemplateDownloadParams"
+      :upload-params="importByCustUploadParams"
+      uploadUrl="/cx/cxScheduleResult/importDataByCust"
       @uploadSuccess="getList"
     />
     <productStatusEditDialog ref="psEditRef" @success="handelSuccess" />
@@ -260,6 +262,17 @@ export default {
       moldingMachines: (state) => state.molding.machines,
       curingMachines: (state) => state.curing.machines,
     }),
+    importTemplateDownloadParams() {
+      return {
+        scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+      };
+    },
+    importByCustUploadParams() {
+      return {
+        factoryCode: this.query.factoryCode || this.search.factoryCode,
+        scheduleDate: this.query.scheduleDate || this.search.scheduleDate,
+      };
+    },
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
