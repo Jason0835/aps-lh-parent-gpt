@@ -1787,14 +1787,14 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
-     * 下载导入模板
+     * 下载导入模板（使用CxExport.xlsx，填充yearmonthday和version）
      */
     @ApiOperation(value = "导入模板下载")
     @PostMapping("/downloadTemplate/{fileName}")
     public byte[] downloadTemplate(@RequestBody CxScheduleResult queryVO, @PathVariable("fileName") String fileName,
                                    HttpServletResponse response) throws IOException {
         queryVO = queryVO == null ? new CxScheduleResult() : queryVO;
-        return cxScheduleResultService.exportData(Collections.emptyList(), queryVO.getScheduleDate());
+        return cxScheduleResultService.exportCxRemainQty(queryVO, fileName);
     }
 
     /**
