@@ -28,7 +28,7 @@ import com.zlt.aps.cd15.enums.CdMachineExportEnums;
 import com.zlt.aps.cd15.mapper.Cd15ParamsMapper;
 import com.zlt.aps.cd15.mapper.HalfCdImportBakEntityMapper;
 import com.zlt.aps.cd15.service.Cd15ScheduleResultService;
-import com.zlt.aps.cd15.service.IHalfCdImportBakService;
+//import com.zlt.aps.cd15.service.IHalfCdImportBakService;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
 import com.zlt.aps.cd90.service.Cd90ScheduleResultService;
 import com.zlt.aps.common.core.utils.BigDecimalUtil;
@@ -94,8 +94,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/halfCdImportBak")
 public class HalfCdImportBakController extends AbstractDocBizController<HalfCdImportBak> {
 
-    @Autowired
-    private IHalfCdImportBakService halfCdImportBakService;
+//    @Autowired
+//    private IHalfCdImportBakService halfCdImportBakService;
 
     @Autowired
     private HalfCdImportBakEntityMapper entityMapper;
@@ -389,21 +389,22 @@ public class HalfCdImportBakController extends AbstractDocBizController<HalfCdIm
     @PostMapping("/importData")
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
-        Date beginTime = DateUtils.getNowDate();
-        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
-        importLog = this.iImportLogService.add(importLog);
-        InputStream is = new ByteArrayInputStream(importContext.getFileBytes());
-        List<HalfCdImportBak> list = this.importExcel("", is);
-        AjaxResult ajaxResult = halfCdImportBakService.importData(list);
-//        AjaxResult ajaxResult = AjaxResult.success();
-        Date endTime = DateUtils.getNowDate();
-        importLog.setRowCount(list.size());
-        importLog.setBeginTime(beginTime);
-        importLog.setEndTime(endTime);
-        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
-        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
-        ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
-        return ajaxResult;
+//        Date beginTime = DateUtils.getNowDate();
+//        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
+//        importLog = this.iImportLogService.add(importLog);
+//        InputStream is = new ByteArrayInputStream(importContext.getFileBytes());
+//        List<HalfCdImportBak> list = this.importExcel("", is);
+//        AjaxResult ajaxResult = halfCdImportBakService.importData(list);
+////        AjaxResult ajaxResult = AjaxResult.success();
+//        Date endTime = DateUtils.getNowDate();
+//        importLog.setRowCount(list.size());
+//        importLog.setBeginTime(beginTime);
+//        importLog.setEndTime(endTime);
+//        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+//        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
+//        ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
+//        return ajaxResult;
+        return AjaxResult.error();
     }
 
     public List<HalfCdImportBak> importExcel(String sheetName, InputStream is) throws Exception {
@@ -827,7 +828,7 @@ public class HalfCdImportBakController extends AbstractDocBizController<HalfCdIm
             if (CollectionUtils.isNotEmpty(nextDayList)) {
                 scheduleDate = nextDayList.get(0).getScheduleDate();
             }
-            halfCdImportBakService.exportDataToList(list, nextDayList, scheduleDate);
+//            halfCdImportBakService.exportDataToList(list, nextDayList, scheduleDate);
 //            nextDayList = HalfCdImportBakService.exportDataToList(nextDayList, scheduleDate, OpenMachineClassEnums.CLASS_THREE.getClassIndex());
 
             for (int i = 0; i < list.size(); i++) {

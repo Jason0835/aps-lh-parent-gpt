@@ -307,7 +307,11 @@
           type="primary"
           :loading="confirmAdjustLoading"
           @click="handleConfirmAdjustAlarmForce"
-          >{{ $t("common.button.confirm") }}</el-button
+          >{{
+            $t(
+              "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustForceExec"
+            )
+          }}</el-button
         >
       </span>
     </el-dialog>
@@ -611,6 +615,13 @@ export default {
         {
           prop: "dayLhQty",
           label: this.$t("ui.data.monthlyProductionPlan.dayVulcanizationQty"),
+          width: 100,
+        },
+        {
+          prop: "originalTotalQty",
+          label: this.$t(
+            "ui.data.column.monthlyProductionPlan.originalTotalQty"
+          ),
           width: 100,
         },
         {

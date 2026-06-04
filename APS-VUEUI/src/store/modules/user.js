@@ -136,7 +136,7 @@ const user = {
         login(username, password, code, uuid)
           .then((res) => {
             if (res.code === 200) {
-              // changeLang(rootState.app.language);
+              changeLang(rootState.app.language);
               Cookies.set("dept", "" )
               resolve();
             }

@@ -81,6 +81,7 @@
             fin.POSTPONE_PRODUCTION_QTY,
             fin.TRIAL_PRODUCTION_QTY,
             fin.DIFFERENCE_QTY,
+            fin.ORIGINAL_TOTAL_QTY,
             fin.REASON,
             fin.BEGIN_DAY,
             fin.END_DAY,
