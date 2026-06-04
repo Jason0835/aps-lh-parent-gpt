@@ -215,3 +215,6 @@ fileEncrypt:
   ll:
     enabled: false
 
+aes:
+  password:
+    key: zlt_aps_pwd_key!
