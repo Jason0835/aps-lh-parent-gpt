@@ -87,8 +87,6 @@ system-tag: aps
 # Spring
 # Spring配置
 spring:
-  profiles:
-    active: prod
   autoconfigure:
     exclude:
       - com.ruoyi.common.i18n.configure.LocaleConfig

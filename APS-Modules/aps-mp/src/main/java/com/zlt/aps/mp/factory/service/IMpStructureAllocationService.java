@@ -1,5 +1,6 @@
 package com.zlt.aps.mp.factory.service;
 
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.mp.api.domain.entity.DpDemandPlan;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
@@ -75,9 +76,10 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
     /**
      * 获取结构转产表导出数据
      * @param param
+     * @param isFinal
      * @return
      */
-    MpStructureAllocationExportStatisticsVo getExportVo(MpStructureAllocation param);
+    MpStructureAllocationExportStatisticsVo getExportVo(MpStructureAllocation param, boolean isFinal);
 
 
     /**
@@ -93,9 +95,19 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
      * @return
      */
     List<MdmStructureLhRatio> queryMdmStructureLhRatio(MpStructureAllocation mpStructureAllocation);
+    
+    /**
+     * 数据导入
+     * @param fileBytes
+     * @param importLog
+     * @return
+     */
+    AjaxResult importData(byte[] fileBytes, ImportLog importLog);
+    
     /**
      * 导入
      * @param list 列表数据
+     * @param list4DayResult 月计划列表数据
      * @param updateSupport 覆盖
      * @param importLogId 导入日志ID
      * @param params 表头参数
@@ -103,7 +115,7 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
      * @param productVersion 生产版本
      * @return 结果
      */
-    AjaxResult importDataStructureAllocation(List<MpStructureAllocationExportVo> list, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
+    AjaxResult importDataStructureAllocation(List<MpStructureAllocationExportVo> list, List<FactoryMonthPlanMouldDayResult> list4DayResult, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
                                              Map<String, String> factoryMap, Map<String, String> productTypeMap);
 
     /**

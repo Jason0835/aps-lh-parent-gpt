@@ -29,6 +29,12 @@ public class CxDayFinishQty extends BaseEntity implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    /** 厂别 */
+    @Excel(name = "ui.data.column.cxDayFinishQty.factoryCode", dictType = "biz_factory_name")
+    @ApiModelProperty(value = "厂别")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
+
     /** 完成日期 */
     @Excel(name = "ui.data.column.cxDayFinishQty.finishDate", dateFormat = "yyyy-MM-dd")
     @ApiModelProperty(value = "完成日期")
@@ -36,12 +42,6 @@ public class CxDayFinishQty extends BaseEntity implements Serializable {
     @DateTimeFormat(pattern = "yyyy-MM-dd")
     @TableField(value = "FINISH_DATE")
     private Date finishDate;
-
-    /** 胚胎日完成量 */
-    @Excel(name = "ui.data.column.cxDayFinishQty.dayFinishQty")
-    @ApiModelProperty(value = "胚胎日完成量")
-    @TableField(value = "DAY_FINISH_QTY")
-    private BigDecimal dayFinishQty;
 
     /** 成型胚胎物料编码 */
     @Excel(name = "ui.data.column.cxDayFinishQty.embryoCode")
@@ -54,6 +54,12 @@ public class CxDayFinishQty extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "示方类型")
     @TableField(value = "EXAMPLE_TYPE")
     private String exampleType;
+
+    /** 胚胎日完成量 */
+    @Excel(name = "ui.data.column.cxDayFinishQty.dayFinishQty")
+    @ApiModelProperty(value = "胚胎日完成量")
+    @TableField(value = "DAY_FINISH_QTY")
+    private BigDecimal dayFinishQty;
 
     /** 胚胎施工版本号 */
     @Excel(name = "ui.data.column.cxDayFinishQty.bomDataVersion")
@@ -72,12 +78,6 @@ public class CxDayFinishQty extends BaseEntity implements Serializable {
     @TableField(value = "COMPANY_CODE")
     private String companyCode;
 
-    /** 厂别 */
-    @Excel(name = "ui.data.column.cxDayFinishQty.factoryCode", dictType = "biz_factory_name")
-    @ApiModelProperty(value = "厂别")
-    @TableField(value = "FACTORY_CODE")
-    private String factoryCode;
-
     /** 完成日期开始（搜索用，非数据库列） */
     @ApiModelProperty(value = "完成日期开始（搜索用）")
     @TableField(exist = false)
@@ -91,4 +91,9 @@ public class CxDayFinishQty extends BaseEntity implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
     private Date finishDateEnd;
+
+    @Excel(name = "ui.data.column.mdmMaterialInfo.remark")
+    @ApiModelProperty("备注")
+    @TableField("REMARK")
+    private String remark;
 }
