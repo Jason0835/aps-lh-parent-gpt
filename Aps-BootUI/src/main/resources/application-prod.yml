@@ -164,6 +164,13 @@ spring:
     port: ${redis-port}
     password: ${redis-password}
     database: ${redis-database}
+  # Spring Session 相关配置
+  session:
+    store-type: redis       # 关键配置：指定会话存储类型为redis
+    timeout: 30m            # 会话超时时间（可选，默认为30分钟）
+    redis:
+      flush-mode: on_save   # 每次请求结束保存会话时，再写入Redis
+      namespace: "bootui:session" # 存储在Redis中的key前缀，便于区分
 shiro:
   #使用单点登录时，sso = true
   sso:
