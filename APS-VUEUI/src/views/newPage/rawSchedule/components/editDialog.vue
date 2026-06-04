@@ -348,7 +348,7 @@ export default {
       try {
         this.loading = true;
         let res = await editGlueScheduleResult(params);
-        this.$modal.msgSuccess("操作成功")
+        this.$modal.msgSuccess(this.$t("newPage.message.operationSuccess"))
         this.$emit("success");
         this.hide();
         this.loading = false;
