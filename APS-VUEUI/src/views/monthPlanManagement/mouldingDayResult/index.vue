@@ -362,10 +362,9 @@ export default {
           for (let i = 0; i < list.length; i++) {
             let dayNumStr = list[i];
             columns.push({
-              label: `${Number(dayNumStr)}号`,
-              // label: this.$t("ui.data.column.mouldingDayResult.day", {
-              //   day: Number(dayNumStr),
-              // }),
+              label: this.$t("ui.data.column.mouldingDayResult.day", {
+                day: Number(dayNumStr),
+              }),
               prop: `day${i + 1}`,
               minWidth: "80px",
               type: "number",
@@ -380,10 +379,9 @@ export default {
 
           for (let i = 0; i < days; i++) {
             columns.push({
-              label: `${i + 1}号`,
-              // label: this.$t("ui.data.column.mouldingDayResult.day", {
-              //   day: i + 1,
-              // }),
+              label: this.$t("ui.data.column.mouldingDayResult.day", {
+                day: i + 1,
+              }),
               prop: `day${i + 1}`,
               minWidth: "80px",
               type: "number",

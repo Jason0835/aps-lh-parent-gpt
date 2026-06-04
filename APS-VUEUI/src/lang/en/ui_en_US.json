@@ -152,6 +152,7 @@
   "ui.data.column.mouldingDayResult.embryoCount": "Embryo Types Count",
   "ui.data.column.mouldingDayResult.lhMachineCount": "Curing Machines Count",
   "ui.data.column.mouldingDayResult.changeMouldCount": "Mold Changes Count",
+  "ui.data.column.mouldingDayResult.day": "Day {day}",
   "ui.data.column.monthPlanFinalAdjustQuery.exportAllMaterial": "Export All Materials",
   "ui.data.column.monthlyProductionPlan.currentAdjustStructure": "Current Adjust Structure",
   "ui.data.column.monthlyProductionPlan.structureType.cycle": "Cycle Structure",

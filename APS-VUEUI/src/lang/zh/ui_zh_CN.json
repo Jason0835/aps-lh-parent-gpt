@@ -2922,6 +2922,7 @@
   "ui.data.column.mouldingDayResult.embryoCount": "胎胚种类数",
   "ui.data.column.mouldingDayResult.lhMachineCount": "硫化机台数",
   "ui.data.column.mouldingDayResult.changeMouldCount": "换模次数",
+  "ui.data.column.mouldingDayResult.day": "{day}号",
   "ui.data.column.monthlyProductionPlan.currentAdjustStructure": "当前调整结构",
   "ui.data.column.monthlyProductionPlan.structureType.cycle": "周期结构",
   "ui.data.column.monthlyProductionPlan.structureType.normal": "常规结构",

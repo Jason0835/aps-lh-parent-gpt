@@ -1300,6 +1300,7 @@
   "ui.data.column.mouldingDayResult.embryoCount": "Số loại phôi",
   "ui.data.column.mouldingDayResult.lhMachineCount": "Số máy lưu hóa",
   "ui.data.column.mouldingDayResult.changeMouldCount": "Số lần thay khuôn",
+  "ui.data.column.mouldingDayResult.day": "Ngày {day}",
   "ui.data.column.monthPlanFinalAdjustQuery.exportAllMaterial": "Xuất tất cả vật liệu",
   "ui.data.column.monthlyProductionPlan.currentAdjustStructure": "Cấu trúc điều chỉnh hiện tại",
   "ui.data.column.monthlyProductionPlan.structureType.cycle": "Cấu trúc chu kỳ",
