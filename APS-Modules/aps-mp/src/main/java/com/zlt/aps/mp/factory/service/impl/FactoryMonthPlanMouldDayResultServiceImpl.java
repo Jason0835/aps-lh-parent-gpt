@@ -122,7 +122,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     /**
      * 月计划日统计量预警起始列下标
      */
-    private final static int ADJUST_HEADER_DAY_TOTAL_WARNING_START_COLUMN_INDEX = 18;
+    private final static int ADJUST_HEADER_DAY_TOTAL_WARNING_START_COLUMN_INDEX = 39;
     /**
      * 月底计划字段名称
      */
