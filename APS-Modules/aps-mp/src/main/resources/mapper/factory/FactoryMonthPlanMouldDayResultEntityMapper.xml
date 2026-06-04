@@ -133,7 +133,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <when test="isFinal">
             LEFT JOIN T_MP_MONTH_PLAN_MONITOR pm ON f.id = pm.final_result_id
             AND m.FACTORY_CODE = pm.FACTORY_CODE 
-            AND r.PRODUCTION_VERSION = pm.PRODUCTION_VERSION
+            AND f.PRODUCTION_VERSION = pm.PRODUCTION_VERSION
             AND pm.IS_DELETE = 0 
             </when>
             <otherwise>
