@@ -1,9 +1,9 @@
 package com.zlt.aps.lh.api.service;
 
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.lh.api.domain.dto.LhScheduleImportDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -74,7 +74,7 @@ public interface ILhMouldChangePlanRemoteService {
      */
     @ApiOperation("导入数据")
     @PostMapping("/lhMouldChangePlan/importData")
-    AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport);
+    AjaxResult importData(@RequestBody LhScheduleImportDTO importContext, @RequestParam("updateSupport") boolean updateSupport);
 
     /**
      * 排程发布

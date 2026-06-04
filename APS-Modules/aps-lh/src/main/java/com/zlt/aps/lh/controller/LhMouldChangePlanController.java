@@ -6,11 +6,13 @@ import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ExportLog;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.api.gateway.system.service.IExportLogService;
 import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
 import com.ruoyi.api.gateway.system.service.IImportLogService;
 import com.ruoyi.api.gateway.system.service.ISysDictDataCacheService;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.domain.SysDictData;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.ServletUtils;
@@ -28,6 +30,7 @@ import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.lh.api.domain.dto.LhScheduleImportDTO;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.api.domain.entity.LhScheduleResult;
@@ -46,6 +49,7 @@ import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -57,8 +61,10 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -198,16 +204,63 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
 
     /**
      * 根据集合导入模具交替计划数据
-     * @param importContext 导入上下文
+     * @param lhImportContext 导入上下文
      * @param updateSupport 已存在记录是否更新
      * @return 结果
      */
     @Log(title = "ui.data.column.lhMouldChangePlan.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData")
-    @Override
-    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
-        return super.importData(importContext,updateSupport);
+    public AjaxResult importData(@RequestBody LhScheduleImportDTO lhImportContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
+        ImportContext importContext = lhImportContext.getImportContext();
+        Date scheduleDate = lhImportContext.getScheduleResult().getScheduleDate();
+        Date beginTime = DateUtils.getNowDate();
+        ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
+        importLog = this.iImportLogService.add(importLog);
+        byte[] fileBytes = importContext.getFileBytes();
+        ExcelUtil<LhMouldChangePlanVo> util = new ExcelUtil<>(LhMouldChangePlanVo.class);
+        String sheetName = I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.import.modelName");
+        List<LhMouldChangePlanVo> list = util.importExcel(
+                sheetName, new ByteArrayInputStream(fileBytes), 0, 4, -1);
+        List<LhMouldChangePlan> mouldChangePlanList = buildLhMouldChangePlanList(list, scheduleDate);
+        AjaxResult ajaxResult = this.doImportData(mouldChangePlanList, updateSupport, importLog.getId());
+        Date endTime = DateUtils.getNowDate();
+        importLog.setRowCount(list.size());
+        importLog.setBeginTime(beginTime);
+        importLog.setEndTime(endTime);
+        importLog.setSpendTime(DateUtils.getDiffTime(endTime, beginTime));
+        ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
+        ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
+        return ajaxResult;
+    }
+
+    public List<LhMouldChangePlan> buildLhMouldChangePlanList(List<LhMouldChangePlanVo> list, Date scheduleDate) {
+        List<LhMouldChangePlan> resultList = new ArrayList<>();
+        for (LhMouldChangePlanVo lhMouldChangePlanVo : list) {
+            LhMouldChangePlan lhMouldChangePlan = new LhMouldChangePlan();
+            BeanUtil.copyProperties(lhMouldChangePlanVo, lhMouldChangePlan);
+
+            lhMouldChangePlan.setScheduleDate(scheduleDate);
+
+            if (StringUtil.isBlank(lhMouldChangePlan.getFactoryCode())) {
+                lhMouldChangePlan.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+            }
+            if (YesOrNoEnum.YES.getValue().equals(lhMouldChangePlanVo.getIsReplaceBlock())) {
+                lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.TYPE_BLOCK.getCode());
+            } else if (YesOrNoEnum.YES.getValue().equals(lhMouldChangePlanVo.getIsSandblastingClean())) {
+                lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.SAND_BLAST.getCode());
+            } else if (YesOrNoEnum.YES.getValue().equals(lhMouldChangePlanVo.getIsDryIceClean())) {
+                lhMouldChangePlan.setChangeMouldType(MouldChangeTypeEnum.DRY_ICE.getCode());
+            }
+            String endType = lhMouldChangePlanVo.getEndType();
+            if ("是Có".equals(endType)) {
+                lhMouldChangePlan.setEndType(YesOrNoEnum.NO.getCode());
+            } else {
+                lhMouldChangePlan.setEndType(YesOrNoEnum.YES.getCode());
+            }
+            resultList.add(lhMouldChangePlan);
+        }
+        return resultList;
     }
 
     /**
@@ -288,6 +341,22 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
         tableMap.put("title", titleFormat + "                                                                       "
                 + version);
         tableMap.put("version", version);
+
+        ExcelUtil<LhMouldChangePlanVo> util = new ExcelUtil<>(LhMouldChangePlanVo.class);
+        List<Field> allFields = util.getClassField(LhMouldChangePlanVo.class);
+        for (Field field : allFields) {
+            Excel attr = field.getAnnotation(Excel.class);
+            if (attr != null && (attr.type() == Excel.Type.ALL || attr.type() == Excel.Type.IMPORT)) {
+                // 设置类的私有字段属性可访问.
+                field.setAccessible(true);
+                String attrName = "".equals(attr.importName()) ? attr.name() : attr.importName();
+                if (StringUtils.isNotEmpty(attrName)) {
+                    attrName = attrName.replaceAll("\\{", "").replaceAll("}", "");
+                    attrName = I18nUtil.getMessage(attrName);
+                }
+                tableMap.put(field.getName(), attrName);
+            }
+        }
         return tableMap;
     }
 

@@ -90,8 +90,16 @@ public class LhMouldChangePlanVo extends BaseEntity implements Serializable {
     @TableField(value = "AFTER_MATERIAL_DESC")
     private String afterMaterialDesc;
 
+    /**
+     * 示方类型
+     */
+    @Excel(name = "ui.data.column.lhScheduleResult.constructionStage")
+    @ApiModelProperty(value = "示方类型")
+    @TableField(exist = false)
+    private String afterMaterialType;
+
     @ApiModelProperty(value = "交替类型 数据字典：CHANGE_MOULD_TYPE")
-//    @Excel(name = "ui.data.column.lhMouldChangePlan.changeMouldType", dictType = "CHANGE_MOULD_TYPE", width = 25)
+    @Excel(name = "ui.data.column.lhMouldChangePlan.changeMouldType", dictType = "CHANGE_MOULD_TYPE", width = 25)
     @TableField(value = "CHANGE_MOULD_TYPE")
     private String changeMouldType;
 
