@@ -42,7 +42,7 @@ public class GroupFixedInfoHandler {
                 groupInfo.setFixedCxMachineSet(hasFixedList.stream().map(CxMachineBaseInfoVo::getCxMachineCode).collect(Collectors.toSet()));
             }
             //20260427+ 因成型固定机台定义变化：固定1~固定3为选择机台的优先级；固定4位为分组能排产的机台配置
-            List<CxMachineBaseInfoVo> hasPriorityFixedList = allCxMachineInfo.stream().filter(singleMachieInfo -> singleMachieInfo.hasPriorityFixedMachine(groupInfo)).collect(Collectors.toList());
+            List<CxMachineBaseInfoVo> hasPriorityFixedList = allCxMachineInfo.stream().filter(singleMachineInfo -> singleMachineInfo.hasPriorityFixedMachine(groupInfo)).collect(Collectors.toList());
             if (CollectionUtils.isEmpty(hasPriorityFixedList)) {
                 return;
             }
