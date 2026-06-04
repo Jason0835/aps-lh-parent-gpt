@@ -55,6 +55,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "月度计划排产版本")
     private String productionVersion;
 
+    @ApiModelProperty(value = "上月月度计划排产版本")
+    private String lastProductionVersion;
+
     @ApiModelProperty(value = "需求计划版本")
     private String monthPlanVersion;
 
@@ -63,6 +66,13 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "产品品类")
     private String productType;
+
+    @ApiModelProperty(value = "实际年份")
+    private Integer currentYear;
+
+    @ApiModelProperty(value = "实际月份")
+    private Integer currentMonth;
+
     /**
      * 调整类型 01-结构内，02-结构延长，03-结构缩短，04-新增结构
      */
@@ -141,6 +151,9 @@ public class MpRollAdjustContextDTO implements Serializable {
     @ApiModelProperty(value = "月计划调整最终结果表")
     private List<FactoryMonthPlanFinalAdjustVo> factoryMonthPlanProdFinalList;
 
+    @ApiModelProperty(value = "上月月计划调整最终结果表")
+    private List<FactoryMonthPlanFinalAdjustVo> lastFactoryMonthPlanProdFinalList;
+
     @ApiModelProperty(value = "需要保存的月计划调整最终结果表")
     private List<FactoryMonthPlanFinalAdjustVo> saveMpProdFinalList;
 
@@ -182,6 +195,9 @@ public class MpRollAdjustContextDTO implements Serializable {
 
     @ApiModelProperty(value = "月度硫化监控列表")
     private List<MpMonthPlanMonitor> mpMonthPlanMonitorList;
+
+    @ApiModelProperty(value = "上月月度硫化监控列表")
+    private List<MpMonthPlanMonitor> lastMonthPlanMonitorList;
 
     @ApiModelProperty(value = "物料信息Map")
     private Map<String, MdmMaterialInfo> mdmMaterialInfoMap;
