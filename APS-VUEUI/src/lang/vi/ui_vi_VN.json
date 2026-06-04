@@ -1336,6 +1336,8 @@
   "ui.data.column.mouldingDayResult.cycleProductionQty": "Số lượng sản xuất chu kỳ",
   "ui.data.column.mouldingDayResult.conventionProductionQty": "Số lượng sản xuất thông thường",
   "ui.data.column.mpAdjustResult.hasSpecialMaterial": "Có vật liệu đặc biệt",
+  "ui.data.column.mpAdjustStructureIn.lastMonthRemainQty": "Số dư kế hoạch tháng trước",
+  "ui.data.column.mpAdjustStructureOut.lastMonthRemainQty": "Số dư kế hoạch tháng trước",
 
   "ui.frame.btn.moldingScheduleSequence": "Thứ tự sắp xếp thành hình",
 

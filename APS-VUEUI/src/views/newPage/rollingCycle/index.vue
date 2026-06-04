@@ -620,6 +620,17 @@ export default {
     isStructureAdjustPage() {
       return this.pageVariant === "structureAdjust";
     },
+    /** 上月计划余量列（结构内/结构调整列表共用） */
+    lastMonthRemainQtyColumn() {
+      const i18nKey = this.isStructureInnerPage
+        ? "ui.data.column.mpAdjustStructureIn.lastMonthRemainQty"
+        : "ui.data.column.mpAdjustStructureOut.lastMonthRemainQty";
+      return {
+        prop: "lastMonthRemainQty",
+        label: this.$t(i18nKey),
+        width: 120,
+      };
+    },
     /** 月内日序号 1～dayList */
     monthDayOptions() {
       const n = Number(this.dayList);
@@ -720,6 +731,7 @@ export default {
               return this.selectDictLabel(this.dict.type.biz_yes_no, value);
             },
           },
+          this.lastMonthRemainQtyColumn,
           {
             prop: "previousNetQty",
             label: this.$t("调整前净需求量（上周）"),
@@ -974,6 +986,7 @@ export default {
               return this.selectDictLabel(this.dict.type.biz_yes_no, value);
             },
           },
+          this.lastMonthRemainQtyColumn,
           {
             prop: "totalPlanQty",
             label: this.$t("计划量"),
@@ -1114,6 +1127,7 @@ export default {
             },
             width: 120,
           },
+          this.lastMonthRemainQtyColumn,
           {
             prop: "previousNetQty",
             label: this.$t("调整前净需求量（上周）"),

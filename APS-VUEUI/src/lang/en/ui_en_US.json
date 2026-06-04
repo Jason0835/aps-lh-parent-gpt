@@ -188,6 +188,8 @@
   "ui.data.column.mouldingDayResult.cycleProductionQty": "Cycle Production Qty",
   "ui.data.column.mouldingDayResult.conventionProductionQty": "Conventional Production Qty",
   "ui.data.column.mpAdjustResult.hasSpecialMaterial": "Has Special Material",
+  "ui.data.column.mpAdjustStructureIn.lastMonthRemainQty": "Last Month Plan Remain Qty",
+  "ui.data.column.mpAdjustStructureOut.lastMonthRemainQty": "Last Month Plan Remain Qty",
   "ui.data.column.mouldCleanWarn.modelName": "Mold Cleaning Warning",
   "ui.data.column.lhSharedMouldPat.modelName": "Shared Mold Pattern Config",
   "ui.data.column.lhSpecialMaterialBom.modelName": "Special Material BOM Config",

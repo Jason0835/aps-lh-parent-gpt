@@ -2851,6 +2851,8 @@
   "ui.data.column.demandPlanSum.cycleReserveQty": "周期储备需求",
   "ui.data.column.demandPlanSum.conventionReserveQty": "常规储备需求",
   "ui.data.column.mpAdjustResult.hasSpecialMaterial": "是否含特殊材料",
+  "ui.data.column.mpAdjustStructureIn.lastMonthRemainQty": "上月计划余量",
+  "ui.data.column.mpAdjustStructureOut.lastMonthRemainQty": "上月计划余量",
   "ui.data.column.monthPlanFinalAdjustQuery.structureType": "结构类型",
   "ui.data.column.monthPlanFinalAdjustQuery.cxMachine": "成型机台",
   "ui.data.column.monthPlanFinalAdjustQuery.productionVersion": "版本号",
