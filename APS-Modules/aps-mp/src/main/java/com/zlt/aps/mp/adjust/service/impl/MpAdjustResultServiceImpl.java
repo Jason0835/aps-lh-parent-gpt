@@ -214,49 +214,51 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         String[] params4DayResult;
         String monthPlanVersion;
         String productVersion;
+        String templateErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateError");
+        String templateTitleErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateTitleError");
         try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
             Sheet sheet = wb.getSheet(sheetName);
             if (sheet == null || sheet.getRow(0) == null) {
-                return AjaxResult.error("导入模板不匹配");
+                return AjaxResult.error(templateErrorStr);
             }
             Cell titleCell = sheet.getRow(0).getCell(0);
             if (titleCell == null) {
-                return AjaxResult.error("导入模板不匹配");
+                return AjaxResult.error(templateErrorStr);
             }
             String titleFormat = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.exportTitle");
             params = parseFormat(titleFormat, dataFormatter.formatCellValue(titleCell));
             if (params == null || params.length < 4) {
-                return AjaxResult.error("导入模板标题格式不匹配");
+                return AjaxResult.error(templateTitleErrorStr);
             }
             String monthPlanVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.monthPlanVersion") + ": ";
             Cell monthPlanVersionCell = sheet.getRow(0).getCell(27);
             if (monthPlanVersionCell == null) {
-                return AjaxResult.error("导入模板不匹配");
+                return AjaxResult.error(templateErrorStr);
             }
             monthPlanVersion = dataFormatter.formatCellValue(monthPlanVersionCell).replace(monthPlanVersionLabel, "");
             Cell productVersionCell = sheet.getRow(0).getCell(35);
             if (productVersionCell == null) {
-                return AjaxResult.error("导入模板不匹配");
+                return AjaxResult.error(templateErrorStr);
             }
             String productionVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.productionVersion") + ": ";
             productVersion = dataFormatter.formatCellValue(productVersionCell).replace(productionVersionLabel, "");
 
             Sheet sheet4DayResult = wb.getSheet(sheetName4DayResult);
             if (sheet4DayResult == null || sheet4DayResult.getRow(0) == null) {
-                return AjaxResult.error("导入模板不匹配");
+                return AjaxResult.error(templateErrorStr);
             }
             Cell titleCell4DayResult = sheet4DayResult.getRow(0).getCell(0);
             if (titleCell4DayResult == null) {
-                return AjaxResult.error("导入模板不匹配");
+                return AjaxResult.error(templateErrorStr);
             }
             String titleFormat4DayResult = I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.exportTitle");
             params4DayResult = parseFormat(titleFormat4DayResult, dataFormatter.formatCellValue(titleCell4DayResult));
             if (params4DayResult == null || params4DayResult.length < 3) {
-                return AjaxResult.error("导入模板标题格式不匹配");
+                return AjaxResult.error(templateTitleErrorStr);
             }
         } catch (Exception e) {
             log.warn("importDataStructureAllocation workbook parse failed", e);
-            return AjaxResult.error("导入文件格式不正确");
+            return AjaxResult.error(templateErrorStr);
         }
         ExcelUtil<FactoryMonthPlanMouldDayResult> util4DayResult = new ExcelUtil<>(FactoryMonthPlanMouldDayResult.class);
         
@@ -267,11 +269,11 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
             list = util.importExcel(sheetName, new ByteArrayInputStream(fileBytes), 2, 2, 13);
         } catch (Exception e) {
             log.warn("importDataStructureAllocation workbook parse failed", e);
-            return AjaxResult.error("导入文件格式不正确");
+            return AjaxResult.error(templateErrorStr);
         }
         
         // 结构转产导入
-        AjaxResult ajaxResult = mpStructureAllocationService.importDataStructureAllocation(list, true, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap);
+        AjaxResult ajaxResult = mpStructureAllocationService.importDataStructureAllocation(list, list4DayResult, true, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap);
 
         // 月计划调整排产导入
         AjaxResult ajaxResult4DayResult = mpStructureAllocationService.importDataDayResult(list4DayResult, true, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap, true);
