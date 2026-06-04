@@ -48,7 +48,7 @@
     </page-table>
     <tlt-upload-form
       ref="tltUploadForm"
-      title="导入信息数据"
+      :title="$t('common.import.title')"
       downloadUrl="/setting/type/importTemplate"
       uploadUrl="/setting/type/importData"
       @uploadSuccess="getList"
@@ -97,12 +97,12 @@ export default {
             console.log(form);
             return (
               <el-checkbox
-                label="是否更新已经存在的用户数据"
-                true-label={true}
-                false-label={false}
+                label={this.$t('common.import.updateSupport')}
+                trueLabel={true}
+                falseLabel={false}
                 v-model={form.updateSupport}
               >
-                是否更新已经存在的用户数据
+                {this.$t('common.import.updateSupport')}
               </el-checkbox>
             );
           },

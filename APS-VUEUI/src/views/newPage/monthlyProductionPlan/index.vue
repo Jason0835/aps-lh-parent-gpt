@@ -618,6 +618,13 @@ export default {
           width: 100,
         },
         {
+          prop: "originalTotalQty",
+          label: this.$t(
+            "ui.data.column.monthlyProductionPlan.originalTotalQty"
+          ),
+          width: 100,
+        },
+        {
           prop: "adjustQty1",
           label: this.$t("ui.data.column.monthlyProductionPlan.adjustQty1"),
           width: 80,

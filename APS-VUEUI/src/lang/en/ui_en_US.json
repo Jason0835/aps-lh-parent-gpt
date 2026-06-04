@@ -159,6 +159,7 @@
   "ui.data.column.monthlyProductionPlan.embryoCode": "Embryo Code",
   "ui.data.column.monthlyProductionPlan.embryoDesc": "Embryo Desc",
   "ui.data.column.monthlyProductionPlan.inch": "Inch",
+  "ui.data.column.monthlyProductionPlan.originalTotalQty": "Finalized Production Qty",
   "ui.data.column.monthlyProductionPlan.adjustQty1": "Adjust 1",
   "ui.data.column.monthlyProductionPlan.adjustQty2": "Adjust 2",
   "ui.data.column.monthlyProductionPlan.adjustQty3": "Adjust 3",
