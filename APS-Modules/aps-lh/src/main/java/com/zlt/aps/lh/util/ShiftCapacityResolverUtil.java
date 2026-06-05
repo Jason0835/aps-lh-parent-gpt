@@ -857,14 +857,7 @@ public final class ShiftCapacityResolverUtil {
 
     /**
      * 用向上取整算法计算喷砂清洗损失量。
-     * <ol>
-     *   <li>可用生产时间 = 班次总时长 - 喷砂重叠时长</li>
-     *   <li>单模可产条数 = ceil(单模班产 * 可用时间 / 班次时长)</li>
-     *   <li>ceil 条数占用时间 = ceil条数 / 单模班产 * 班次时长</li>
-     *   <li>剩余不可产时间 = 班次时长 - 占用时间</li>
-     *   <li>单模损耗 = floor(单模班产 * 剩余时间 / 班次时长)</li>
-     *   <li>最终损耗 = 单模损耗 * 模台数</li>
-     * </ol>
+     * <p>公式化简后：单模损耗 = 单模班产 - ceil(单模班产 * 可用时间 / 班次时长)</p>
      *
      * @param shiftCapacity        班产
      * @param mouldQty             模台数
@@ -886,23 +879,14 @@ public final class ShiftCapacityResolverUtil {
             return shiftCapacity;
         }
 
-        // 单模可产条数 = ceil(单模班产 * 可用时间 / 班次时长)
-        double rawItems = (double) singleMouldCapacity * (double) availableSeconds
-                / (double) shiftDurationSeconds;
-        int ceilItems = (int) Math.ceil(rawItems);
+        // 单模损耗 = 单模班产 - ceil(单模班产 * 可用时间 / 班次时长)
+        // 等价于 floor((班次时长 - ceil条数/单模班产*班次时长) / 班次时长 * 单模班产)，一步到位避免分步误差
+        BigDecimal rawItems = BigDecimal.valueOf(singleMouldCapacity)
+                .multiply(BigDecimal.valueOf(availableSeconds))
+                .divide(BigDecimal.valueOf(shiftDurationSeconds), 6, RoundingMode.UP);
+        int ceilItems = rawItems.setScale(0, RoundingMode.CEILING).intValue();
 
-        // ceil 条数占用时间（秒）
-        BigDecimal itemsTimeSec = BigDecimal.valueOf(ceilItems)
-                .multiply(BigDecimal.valueOf(shiftDurationSeconds))
-                .divide(BigDecimal.valueOf(singleMouldCapacity), 0, RoundingMode.DOWN);
-
-        long remainingSec = Math.max(shiftDurationSeconds - itemsTimeSec.longValue(), 0L);
-
-        // 单模损耗 = floor(单模班产 * 剩余时间 / 班次时长)
-        int singleLoss = BigDecimal.valueOf(singleMouldCapacity)
-                .multiply(BigDecimal.valueOf(remainingSec))
-                .divide(BigDecimal.valueOf(shiftDurationSeconds), 0, RoundingMode.DOWN)
-                .intValue();
+        int singleLoss = singleMouldCapacity - ceilItems;
 
         return singleLoss * resolvedMouldQty;
     }
