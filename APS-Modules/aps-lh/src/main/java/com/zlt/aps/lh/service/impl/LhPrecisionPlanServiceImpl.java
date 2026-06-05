@@ -999,6 +999,219 @@ public class LhPrecisionPlanServiceImpl extends AbstractDocService<LhPrecisionPl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public int generatePlansFromMesByOperYear(String versionPrefix, Integer operYear, Integer targetYear) {
+        String lockKey = "generate:precision:plan:operYear:" + versionPrefix + ":" + operYear + ":" + targetYear;
+        if (redisService.getCacheObject(lockKey) != null) {
+            throw new RuntimeException(I18nUtil.getMessage("ui.lh.precisionPlan.generate.in.progress"));
+        }
+
+        try {
+            redisService.setCacheObject(lockKey, "1");
+            log.info("开始从MES同步数据生成硫化精度计划（版本前缀={}，计划时间年份={}，目标年度={}）", versionPrefix, operYear, targetYear);
+
+            // 查询APS本地表中指定版本前缀和硫化精度类型的最大版本号
+            String maxVersion = mdmDevMaintenancePlanEntityMapper.selectMaxDataVersionByPrefix(PRECISION_TYPE_LH, versionPrefix);
+            if (maxVersion == null || maxVersion.isEmpty()) {
+                log.warn("APS本地表中无版本前缀为{}的硫化精度版本数据，跳过处理", versionPrefix);
+                return 0;
+            }
+            log.info("版本前缀={}的硫化精度最新版本号：{}", versionPrefix, maxVersion);
+
+            // 查询最新版本+硫化精度+计划时间在指定年份的数据
+            LambdaQueryWrapper<MdmDevMaintenancePlan> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(MdmDevMaintenancePlan::getPrecisionType, PRECISION_TYPE_LH)
+                   .eq(MdmDevMaintenancePlan::getIsDelete, 0)
+                   .eq(MdmDevMaintenancePlan::getDataVersion, maxVersion)
+                   .apply("YEAR(oper_time) = {0}", operYear)
+                   .and(w -> w.isNotNull(MdmDevMaintenancePlan::getFirstWashTime).or().isNotNull(MdmDevMaintenancePlan::getOperTime));
+
+            List<MdmDevMaintenancePlan> mesPlans = mdmDevMaintenancePlanEntityMapper.selectList(wrapper);
+            if (mesPlans == null || mesPlans.isEmpty()) {
+                log.warn("从MES查询版本前缀={}、计划时间在{}年的硫化精度数据为空", versionPrefix, operYear);
+                return 0;
+            }
+
+            log.info("从MES查询到版本前缀={}、计划时间在{}年的硫化精度数据{}条", versionPrefix, operYear, mesPlans.size());
+
+            int intervalYears = getIntervalYears();
+
+            List<LhPrecisionPlan> plansToSave = new ArrayList<>();
+            List<LhPrecisionPlan> plansToUpdate = new ArrayList<>();
+            Map<String, MdmDevMaintenancePlan> latestActualPlanMap = new HashMap<>();
+            Map<String, MdmDevMaintenancePlan> latestOperPlanMap = new HashMap<>();
+
+            // 按机台分组，取每个机台最新的实际时间和计划时间
+            for (MdmDevMaintenancePlan mesPlan : mesPlans) {
+                String machineCode = mesPlan.getDevCode();
+                LocalDate actualDate = parseDate(mesPlan.getFirstWashTime());
+                LocalDate operDate = parseDate(mesPlan.getOperTime());
+
+                if (actualDate != null) {
+                    MdmDevMaintenancePlan existing = latestActualPlanMap.get(machineCode);
+                    if (existing == null || actualDate.isAfter(parseDate(existing.getFirstWashTime()))) {
+                        latestActualPlanMap.put(machineCode, mesPlan);
+                    }
+                } else if (operDate != null) {
+                    MdmDevMaintenancePlan existing = latestOperPlanMap.get(machineCode);
+                    if (existing == null || operDate.isAfter(parseDate(existing.getOperTime()))) {
+                        latestOperPlanMap.put(machineCode, mesPlan);
+                    }
+                }
+            }
+
+            // 收集所有机台编码，用于批量查询已有计划
+            List<String> allMachineCodes = new ArrayList<>(latestActualPlanMap.keySet());
+            for (String code : latestOperPlanMap.keySet()) {
+                if (!allMachineCodes.contains(code)) {
+                    allMachineCodes.add(code);
+                }
+            }
+            List<String> allFactoryCodes = mesPlans.stream()
+                    .map(MdmDevMaintenancePlan::getFactoryCode)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            // 查询已有计划：实际日期为空且排程日期不为空，用于回填实际日期匹配
+            Map<String, List<LhPrecisionPlan>> pendingActualDatePlanMap = new HashMap<>();
+            if (!allMachineCodes.isEmpty() && !allFactoryCodes.isEmpty()) {
+                List<LhPrecisionPlan> pendingPlans = lhPrecisionPlanMapper.selectPendingActualDatePlans(allMachineCodes, allFactoryCodes);
+                pendingActualDatePlanMap = pendingPlans.stream()
+                        .collect(Collectors.groupingBy(p -> p.getMachineCode() + "_" + p.getFactoryCode()));
+            }
+
+            // 查询已有计划：按机台+目标年份维度，用于唯一性校验防止重复生成
+            Map<String, LhPrecisionPlan> existingPlanMap = new HashMap<>();
+            for (Integer queryYear : Arrays.asList(targetYear, targetYear + 1)) {
+                if (!allMachineCodes.isEmpty()) {
+                    List<LhPrecisionPlan> yearPlans = lhPrecisionPlanMapper.selectByMachineCodesAndYear(allMachineCodes, queryYear);
+                    for (LhPrecisionPlan p : yearPlans) {
+                        String key = p.getMachineCode() + "_" + p.getYear().intValue() + "_" + p.getFactoryCode();
+                        if (!existingPlanMap.containsKey(key)) {
+                            existingPlanMap.put(key, p);
+                        }
+                    }
+                }
+            }
+
+            // 处理有实际时间的MES数据：优先回填已有计划，再推算生成目标年度计划
+            for (Map.Entry<String, MdmDevMaintenancePlan> entry : latestActualPlanMap.entrySet()) {
+                String machineCode = entry.getKey();
+                MdmDevMaintenancePlan mesPlan = entry.getValue();
+
+                LocalDate actualDateLocal = parseDate(mesPlan.getFirstWashTime());
+                if (actualDateLocal == null) {
+                    log.warn("机台{}的实际执行时间为空，跳过", machineCode);
+                    continue;
+                }
+                Date actualDate = Date.from(actualDateLocal.atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+                // 查找该机台已有的、实际日期为空且排程日期最接近实际日期的计划，进行回填
+                LhPrecisionPlan matchedPlan = findNearestScheduleDatePlan(pendingActualDatePlanMap, machineCode, mesPlan.getFactoryCode(), actualDate);
+                if (matchedPlan != null) {
+                    // 回填实际日期到已有计划
+                    matchedPlan.setBaseVale(matchedPlan.getId());
+                    matchedPlan.setActualDate(actualDate);
+                    matchedPlan.setCompletionStatus(COMPLETION_STATUS_COMPLETED);
+                    LocalDate dueDateLocal = actualDateLocal.plusYears(intervalYears);
+                    matchedPlan.setDueDate(Date.from(dueDateLocal.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                    plansToUpdate.add(matchedPlan);
+                    log.info("回填实际日期到已有计划（计划时间年份={}，目标年度={}）：机台={}, 计划ID={}, 实际日期={}", operYear, targetYear, machineCode, matchedPlan.getId(), actualDateLocal);
+
+                    // 回填后推算生成目标年度新计划（唯一性校验）
+                    LocalDate nextPlanDateLocal = actualDateLocal.plusYears(intervalYears);
+                    int nextYear = nextPlanDateLocal.getYear();
+                    String nextKey = machineCode + "_" + nextYear + "_" + mesPlan.getFactoryCode();
+                    if (!existingPlanMap.containsKey(nextKey)) {
+                        LhPrecisionPlan newPlan = buildNextPrecisionPlan(matchedPlan, actualDateLocal, intervalYears, mesPlan.getId(), DATA_SOURCE_MES);
+                        if (newPlan != null) {
+                            plansToSave.add(newPlan);
+                            existingPlanMap.put(nextKey, newPlan);
+                            log.info("回填后推算生成硫化精度计划（计划时间年份={}，目标年度={}）：机台={}, 计划日期={}, 年度={}", operYear, targetYear, machineCode, newPlan.getPlanDate(), nextYear);
+                        }
+                    } else {
+                        log.info("机台{}在{}年分厂{}已有计划，跳过生成下一次精度计划", machineCode, nextYear, mesPlan.getFactoryCode());
+                    }
+                } else {
+                    // 没有匹配的已有计划，基于实际时间推算生成目标年度计划（唯一性校验）
+                    LocalDate planDateLocal = actualDateLocal.plusYears(intervalYears);
+                    int planYear = planDateLocal.getYear();
+                    String existKey = machineCode + "_" + planYear + "_" + mesPlan.getFactoryCode();
+                    if (existingPlanMap.containsKey(existKey)) {
+                        log.info("机台{}在{}年分厂{}已有计划，跳过新建", machineCode, planYear, mesPlan.getFactoryCode());
+                        continue;
+                    }
+
+                    LhPrecisionPlan plan = createPlanFromMes(machineCode, mesPlan, targetYear, intervalYears);
+                    if (plan != null) {
+                        plansToSave.add(plan);
+                        existingPlanMap.put(existKey, plan);
+                        log.info("准备生成硫化精度计划（基于实际时间，计划时间年份={}，目标年度={}）：机台={}, 计划日期={}", operYear, targetYear, machineCode, plan.getPlanDate());
+                    }
+                }
+            }
+
+            // 处理只有计划时间的数据，防重复校验
+            List<String> operMachineCodes = new ArrayList<>(latestOperPlanMap.keySet());
+            operMachineCodes.removeAll(latestActualPlanMap.keySet());
+            Map<String, LhPrecisionPlan> operExistingPlanMap = new HashMap<>();
+            if (!operMachineCodes.isEmpty()) {
+                List<LhPrecisionPlan> operExistingPlans = lhPrecisionPlanMapper.selectByMachineCodesAndYear(operMachineCodes, targetYear);
+                for (LhPrecisionPlan p : operExistingPlans) {
+                    operExistingPlanMap.put(p.getMachineCode() + "_" + p.getYear().intValue(), p);
+                }
+            }
+
+            for (Map.Entry<String, MdmDevMaintenancePlan> entry : latestOperPlanMap.entrySet()) {
+                String machineCode = entry.getKey();
+                if (latestActualPlanMap.containsKey(machineCode)) {
+                    continue;
+                }
+                MdmDevMaintenancePlan mesPlan = entry.getValue();
+
+                LocalDate operDateLocal = parseDate(mesPlan.getOperTime());
+                if (operDateLocal == null) {
+                    log.warn("机台{}的计划时间为空，跳过", machineCode);
+                    continue;
+                }
+
+                // 唯一性校验：机台+目标年度+分厂
+                String existKey = machineCode + "_" + targetYear + "_" + mesPlan.getFactoryCode();
+                if (existingPlanMap.containsKey(existKey)) {
+                    log.info("机台{}在{}年分厂{}已有计划，跳过新建", machineCode, targetYear, mesPlan.getFactoryCode());
+                    continue;
+                }
+
+                // 基于计划时间推算生成目标年度计划
+                LocalDate planDateLocal = operDateLocal.plusYears(intervalYears);
+                LhPrecisionPlan plan = buildPlanFromOperTime(machineCode, mesPlan, planDateLocal, targetYear);
+                if (plan != null) {
+                    plansToSave.add(plan);
+                    existingPlanMap.put(existKey, plan);
+                    log.info("准备生成硫化精度计划（基于计划时间，计划时间年份={}，目标年度={}）：机台={}, 计划日期={}", operYear, targetYear, machineCode, plan.getPlanDate());
+                }
+            }
+
+            if (!plansToUpdate.isEmpty()) {
+                baseDao.updateBatch(plansToUpdate);
+                log.info("批量回填实际执行日期{}条（计划时间年份={}，目标年度={}）", plansToUpdate.size(), operYear, targetYear);
+            }
+            if (!plansToSave.isEmpty()) {
+                baseDao.insertBatch(plansToSave);
+                log.info("从MES同步数据生成硫化精度计划完成（计划时间年份={}，目标年度={}），共生成{}条", operYear, targetYear, plansToSave.size());
+            }
+
+            return plansToUpdate.size() + plansToSave.size();
+        } catch (Exception e) {
+            log.error("从MES同步数据生成硫化精度计划失败（计划时间年份={}，目标年度={}）", operYear, targetYear, e);
+            throw e;
+        } finally {
+            redisService.deleteObject(lockKey);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public int autoGenerateYearlyPlans(Integer year) {
         log.info("开始自动生成{}年度硫化精度计划", year);
 

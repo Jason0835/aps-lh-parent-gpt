@@ -29,11 +29,7 @@ import com.zlt.aps.maindata.enums.EventModuleTypeEnum;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.enums.ReleaseStatusEnum;
 import com.zlt.aps.maindata.event.publisher.EventPublisher;
-import com.zlt.aps.maindata.mapper.MdmCycleSchStruConfEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmSkuConstructionRefEntityMapper;
-import com.zlt.aps.maindata.mapper.MdmSkuLhCapacityEntityMapper;
-import com.zlt.aps.maindata.mapper.MpTrialPlanEntityMapper;
+import com.zlt.aps.maindata.mapper.*;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.maindata.service.IRawSpecialMaterialRecordService;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
@@ -49,13 +45,10 @@ import com.zlt.aps.mp.common.utils.StringUtil;
 import com.zlt.aps.mp.common.utils.poi.WorksheetData;
 import com.zlt.aps.mp.demand.mapper.DpDemandPlanSumEntityMapper;
 import com.zlt.aps.mp.demand.mapper.MpPredictionDetailEntityMapper;
-import com.zlt.aps.mp.engine.basedata.assemble.construction.ConstructionSelector;
-import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductConstructionInfoVo;
 import com.zlt.aps.mp.engine.domain.vo.MonthPlanProductLhCapacityVo;
 import com.zlt.aps.mp.engine.enums.DayVulcanizationModeEnum;
-import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductConstructionMapper;
-import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanProductLhCapacityMapper;
 import com.zlt.aps.mp.engine.utils.DateUtils;
+import com.zlt.aps.mp.factory.dto.MpSkuAdjustInfoVo;
 import com.zlt.aps.mp.factory.event.MonthPlanFinalizedEvent;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanMouldDayResultEntityMapper;
 import com.zlt.aps.mp.factory.mapper.FactoryMonthPlanProductionFinalResultEntityMapper;
@@ -63,6 +56,7 @@ import com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.mp.factory.mapper.MpStructureAllocationEntityMapper;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
+import com.zlt.aps.mp.factory.service.MpSkuAdjustInfoService;
 import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
 import com.zlt.aps.utils.BeanCopyUtils;
@@ -159,6 +153,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
     @Autowired
     private MpAdjustStructureInEntityMapper mpAdjustStructureInEntityMapper;
 
+    private final MpSkuAdjustInfoService mpSkuAdjustInfoService;
     @Autowired
     private DataManager dataManager;
 
@@ -999,13 +994,13 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         if (StringUtils.isNotEmpty(newVersion) && !Objects.equals(newVersion, matchVersion)) {
             // 两个版本的数据统一合并至demandPlanSumMap
             Map<String, DpDemandPlanSum> dpDemandPlanSumMap = this.buildDemandPlanSumMap(condition, newVersion);
-            if (PubUtil.isNotEmpty(dpDemandPlanSumMap)){
+            if (PubUtil.isNotEmpty(dpDemandPlanSumMap)) {
                 dpDemandPlanSumMap.values().stream().forEach(plan -> {
                     demandPlanSumMap.putIfAbsent(this.buildDemandPlanSumMapKey(matchVersion, plan.getMaterialCode()), plan);
                 });
             }
         }
-        
+
         Map<String, MpAdjustResult> mpAdjustResultMap = new LinkedHashMap<>();
         if (CollectionUtils.isNotEmpty(mpAdjustResultList)) {
             for (MpAdjustResult mpAdjustResult : mpAdjustResultList) {
@@ -1029,7 +1024,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
             /*int dayVulcanizationQty = adjustVo.getDayVulcanizationQty() == null ? 0 : adjustVo.getDayVulcanizationQty();
             adjustVo.setDayVulcanizationQty(dayVulcanizationQty * 2);*/
         }
-        
+
         // 尝试把试制量试、以及有订单的SKU补充到列表中
         Map<String, FactoryMonthPlanFinalAdjustVo> copyResultMap = finalResultMap.entrySet().stream()
                 .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
@@ -1052,6 +1047,18 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         List<FactoryMonthPlanFinalAdjustVo> resultList = new ArrayList<>(finalResultMap.values());
 
         if (CollectionUtils.isNotEmpty(resultList)) {
+            //20260605+ 补充待调整量
+            Map<String, MpSkuAdjustInfoVo> skuAdjustInfoMap = mpSkuAdjustInfoService.getPendingQtyInfo(condition, matchVersion);
+            if (!org.springframework.util.CollectionUtils.isEmpty(skuAdjustInfoMap)) {
+                resultList.forEach(single -> {
+                    String groupKey = single.getPendingQtyKey();
+                    MpSkuAdjustInfoVo info = skuAdjustInfoMap.get(groupKey);
+                    if (null == info) {
+                        return;
+                    }
+                    single.setPendingQty(info.getPendingQty());
+                });
+            }
             Locale language = SecurityUtils.getUserLang();
             JsonUtils.parseJsonRemarkList(resultList, language.toString(), "reason");
         }
@@ -1060,21 +1067,23 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
     /**
      * 增加新增结构
+     *
      * @param structureAllocationMap
      */
-    private void addStructureAlloction(Map<String, String> structureAllocationMap){
+    private void addStructureAlloction(Map<String, String> structureAllocationMap) {
        /* if (PubUtil.isEmpty(structureAllocationMap)){
             return;
         }*/
         //补充新增结构的机台信息
         AdjustsCxMachineVo cxMachineVo = mpStructureAllocationService.getAdjustsCxMachineFromRedis();
-        if (cxMachineVo != null && structureAllocationMap.get(cxMachineVo.getStructureName()) == null){
+        if (cxMachineVo != null && structureAllocationMap.get(cxMachineVo.getStructureName()) == null) {
             MpStructureAllocation newStructureAlloction = new MpStructureAllocation();
             newStructureAlloction.setStructureName(cxMachineVo.getStructureName());
             newStructureAlloction.setCxMachineCode(cxMachineVo.getCxMachineCode());
-            structureAllocationMap.put(cxMachineVo.getStructureName(),cxMachineVo.getCxMachineCode());
+            structureAllocationMap.put(cxMachineVo.getStructureName(), cxMachineVo.getCxMachineCode());
         }
     }
+
     /**
      * 加载结构与成型机台的对应关系
      *
@@ -1144,7 +1153,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         Map<String, MdmSkuLhCapacity> productLhCapacityMap = mdmSkuLhCapacityEntityMapper
                 .selectList(skuLhCapacityQueryWrapper).stream().collect(Collectors
                         .toMap(MdmSkuLhCapacity::getMaterialCode, Function.identity(), (m1, m2) -> m1));
-        
+
         // 加载型腔活块数
         Map<String, Integer> cavityResults = new HashMap<>(0); // 型腔可用量（按结构+主花纹分组）
         Map<String, Integer> insertResults = new HashMap<>(0); // 活块可用量（按物料描述分组）
@@ -1221,7 +1230,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
                 capacityVo.setStandardCapacity(mdmSkuLhCapacity.getStandardCapacity());
                 capacityVo.setApsCapacity(mdmSkuLhCapacity.getApsCapacity());
                 capacityVo.calculateDayVulcanizationQty(mode);
-                if (capacityVo.getDayVulcanizationQty() != null){
+                if (capacityVo.getDayVulcanizationQty() != null) {
                     insertItem.setDayVulcanizationQty(capacityVo.getDayVulcanizationQty() / 2);
                 }
             }
@@ -1330,6 +1339,7 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
 
     /**
      * 产品状态与施工类型映射
+     *
      * @param trialStatus
      * @return
      */

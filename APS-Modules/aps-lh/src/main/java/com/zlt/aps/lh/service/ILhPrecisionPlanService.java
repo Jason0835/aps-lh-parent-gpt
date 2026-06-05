@@ -62,6 +62,18 @@ public interface ILhPrecisionPlanService extends IDocService<LhPrecisionPlan> {
     int generatePlansFromMesByVersionPrefixAllVersions(String versionPrefix, Integer year);
 
     /**
+     * 临时任务：按计划时间所在年份过滤，从MES同步数据生成硫化精度计划
+     * 取最新版本号+版本前缀匹配+计划时间在指定年份的硫化精度数据，生成目标年度的精度计划
+     * 用于MES全量版本数据中只取特定年份的数据，避免跨年数据干扰
+     *
+     * @param versionPrefix 版本号前缀（如：APS_MES_AH01）
+     * @param operYear 计划时间所在年份（如：2025，只取operTime在该年份的数据）
+     * @param targetYear 要生成的目标年份（如：2026）
+     * @return 生成数量
+     */
+    int generatePlansFromMesByOperYear(String versionPrefix, Integer operYear, Integer targetYear);
+
+    /**
      * 自动生成年度硫化精度计划
      *
      * @param year 年份

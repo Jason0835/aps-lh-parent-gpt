@@ -309,8 +309,8 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
                     result.setAdjustProductQty3(adjustProductQty3);
                     Integer adjustProductQty4 = adjustProductQty3 + intValue(result.getAdjustQty4());
                     result.setAdjustProductQty4(adjustProductQty4);
-                    // 待调整量 = 净需求量 - 剩余量
-                    result.setPendingQty(intValue(result.getProdReqPlan()) - intValue(result.getProductSurplus()));
+                    // 待调整量 = 净需求量 - 本月剩余量 - 上月剩余量
+                    result.setPendingQty(intValue(result.getProdReqPlan()) - intValue(result.getProductSurplus()) - intValue(result.getLastMonthRemainQty()));
                 }
             }
             // 2.1.2.6、重新对结构内的数据排序：主花纹分组，按型胎胚描述，最大腔数倒序、主花纹、最大活块数倒序，主花纹组内按型腔数倒序、活块数倒序排序

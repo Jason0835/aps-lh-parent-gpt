@@ -270,7 +270,7 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             log.warn("更新调整明细：调整结果列表或调整明细列表为空，直接返回");
             return;
         }
-        // 调整结果按照物料编号分组
+        // 调整结果按照物料编号+施工阶段分组
         Map<String, List<MpAdjustResult>> adjustDetailMap = buildMaterialCodeAdjustMap(adjustResultList);
         // 遍历调整明细列表匹配调整结果(更新实际调整、调整原因)
         List<MpAdjustStructureOut> adjustStructureOutList = BeanUtil.copyToList(adjustDetailList, MpAdjustStructureOut.class);
@@ -279,7 +279,8 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
             if (StringUtils.isEmpty(materialCode)) {
                 continue;
             }
-            MpAdjustResult adjustResult = getFirstAdjustResult(adjustDetailMap, materialCode);
+            String materialCodeKey = String.join(BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY, materialCode, adjustStructureOut.getConstructionStage());
+            MpAdjustResult adjustResult = getFirstAdjustResult(adjustDetailMap, materialCodeKey);
             if (adjustResult == null) {
                 log.warn("更新调整明细：物料编号:{}未查询到对应调整结果，跳过", materialCode);
                 continue;

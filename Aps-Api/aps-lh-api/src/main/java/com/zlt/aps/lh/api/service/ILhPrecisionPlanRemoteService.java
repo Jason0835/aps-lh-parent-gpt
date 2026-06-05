@@ -98,6 +98,20 @@ public interface ILhPrecisionPlanRemoteService {
                                                                @RequestParam("year") Integer year);
 
     /**
+     * 临时任务：按计划时间所在年份过滤，从MES同步数据生成硫化精度计划
+     *
+     * @param versionPrefix 版本号前缀（如：APS_MES_AH01）
+     * @param operYear 计划时间所在年份（如：2025）
+     * @param targetYear 要生成的目标年份（如：2026）
+     * @return 生成数量
+     */
+    @ApiOperation("临时任务-按计划时间年份过滤生成硫化精度计划")
+    @PostMapping("/lhPrecisionPlan/generateFromMesByOperYear")
+    AjaxResult generatePlansFromMesByOperYear(@RequestParam("versionPrefix") String versionPrefix,
+                                               @RequestParam("operYear") Integer operYear,
+                                               @RequestParam("targetYear") Integer targetYear);
+
+    /**
      * 自动生成年度硫化精度计划
      *
      * @param year 年份

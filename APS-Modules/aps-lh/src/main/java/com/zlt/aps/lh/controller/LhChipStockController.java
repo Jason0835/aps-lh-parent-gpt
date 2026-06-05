@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
@@ -93,8 +94,11 @@ public class LhChipStockController extends AbstractDocBizController<LhChipStock>
             } catch (Exception e) {
                 log.error("自动回填完成量失败：factoryCode={}, chipCode={}", billVO.getFactoryCode(), billVO.getChipCode(), e);
             }
+            // 查询回填后的最新数据返回给前端，确保完成量能正确展示
+            LhChipStock saved = lhChipStockMapper.selectById(billVO.getId());
+            return AjaxResult.success(saved);
         }
-        return result > 0 ? AjaxResult.success() : AjaxResult.error();
+        return AjaxResult.error();
     }
 
     /**
@@ -116,6 +120,12 @@ public class LhChipStockController extends AbstractDocBizController<LhChipStock>
             } catch (Exception e) {
                 log.error("自动回填完成量失败：factoryCode={}, chipCode={}", billVO.getFactoryCode(), billVO.getChipCode(), e);
             }
+            // 查询回填后的最新数据返回给前端，确保完成量能正确展示
+            LambdaQueryWrapper<LhChipStock> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(LhChipStock::getFactoryCode, billVO.getFactoryCode());
+            queryWrapper.eq(LhChipStock::getChipCode, billVO.getChipCode());
+            LhChipStock saved = lhChipStockMapper.selectOne(queryWrapper);
+            return AjaxResult.success(saved);
         }
         return mergeResult;
     }
@@ -129,13 +139,6 @@ public class LhChipStockController extends AbstractDocBizController<LhChipStock>
     @ResponseBody
     @Override
     public AjaxResult removeByIds(@RequestBody List<Long> ids ) {
-        // 检查是否有完成量，有则不允许删除
-        for (Long id : ids) {
-            LhChipStock entity = lhChipStockMapper.selectById(id);
-            if (entity != null && entity.getFinishQty() != null && entity.getFinishQty() > 0) {
-                return AjaxResult.error(com.ruoyi.common.i18n.utils.I18nUtil.getMessage("ui.data.alert.lhChipStock.hasFinishQtyCannotDelete"));
-            }
-        }
         int result = lhChipStockService.removeByIds(ids);
         return result > 0 ? AjaxResult.success() : AjaxResult.error();
     }

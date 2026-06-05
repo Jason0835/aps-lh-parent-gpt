@@ -267,6 +267,24 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
     }
 
     /**
+     * 临时任务：按计划时间所在年份过滤，从MES同步数据生成硫化精度计划
+     * 取最新版本号+版本前缀匹配+计划时间在指定年份的硫化精度数据，生成目标年度的精度计划
+     */
+    @ApiOperation("临时任务-按计划时间年份过滤生成硫化精度计划")
+    @PostMapping("/generateFromMesByOperYear")
+    public AjaxResult generatePlansFromMesByOperYear(@RequestParam("versionPrefix") String versionPrefix,
+                                                      @RequestParam("operYear") Integer operYear,
+                                                      @RequestParam("targetYear") Integer targetYear) {
+        try {
+            int count = lhPrecisionPlanService.generatePlansFromMesByOperYear(versionPrefix, operYear, targetYear);
+            return AjaxResult.success("生成成功", count);
+        } catch (Exception e) {
+            log.error("从MES同步数据生成硫化精度计划失败（版本前缀={}，计划时间年份={}，目标年度={}）", versionPrefix, operYear, targetYear, e);
+            return AjaxResult.error("生成失败：" + e.getMessage());
+        }
+    }
+
+    /**
      * 自动生成年度硫化精度计划
      */
     @ApiOperation("自动生成年度硫化精度计划")

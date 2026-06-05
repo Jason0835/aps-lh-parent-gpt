@@ -671,6 +671,11 @@ export default {
           width: 120,
         },
         {
+          prop: "pendingQty",
+          label: this.$t("ui.data.rollingCycle.pendingQty"),
+          width: 120,
+        },
+        {
           prop: "isLockSchedule",
           label: this.$t(
             "ui.data.column.monthPlanFinalAdjustQuery.isLockSchedule"
