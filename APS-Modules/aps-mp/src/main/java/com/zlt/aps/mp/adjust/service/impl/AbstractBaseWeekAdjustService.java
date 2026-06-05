@@ -30,6 +30,7 @@ import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.enums.MsgTemplateEnums;
 import com.zlt.aps.maindata.mapper.MdmMonthSurplusEntityMapper;
+import com.zlt.aps.maindata.mapper.MpMonthPlanMonitorEntityMapper;
 import com.zlt.aps.maindata.service.IBatchMpMonthPlanStatisticsService;
 import com.zlt.aps.maindata.service.IMdmSkuScheduleCategoryService;
 import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
@@ -92,6 +93,7 @@ import com.zlt.aps.mp.factory.service.impl.MoldCavityInsertMaxValueCalculatorImp
 import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
 import com.zlt.aps.utils.AppUtils;
+import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.aps.utils.IncrementService;
 import com.zlt.aps.utils.ThreadPoolUtil;
 import com.zlt.common.utils.PubUtil;
@@ -110,6 +112,7 @@ import org.springframework.util.StopWatch;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -145,6 +148,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
     protected IBatchMpProductionFinalResultService batchMpProductionFinalResultService;
     @Autowired
     protected MdmMonthSurplusEntityMapper mdmMonthSurplusEntityMapper;
+    @Autowired
+    protected MpMonthPlanMonitorEntityMapper mpMonthPlanMonitorEntityMapper;
 
     @Autowired
     protected IMesItfService mesItfService;
@@ -1044,6 +1049,9 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         allocateProductionByPriority(contextDTO);
         saveMpProductionFinalResult(contextDTO);
         updateMonthPlanVersion(contextDTO);
+
+        //12、将定稿月度生产计划合并到月度硫化监控表
+        mergeToMonthPlanSulfurizationMonitor(contextDTO);
         log.info("周程调整确认流程执行完成");
     }
 
@@ -1106,6 +1114,139 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             finalResultList = finalResultList.stream().filter(x->x.getStructureName().equals(contextDTO.getStructureName())).collect(Collectors.toList());
         }
         batchMpProductionFinalResultService.insertBatchData(finalResultList);
+    }
+
+    /**
+     * 将定稿月度生产计划合并到月度硫化监控表
+     * 合并维度：排产版本号 + 物料编码 + 产品状态
+     *
+     * @param contextDTO 滚动上下文
+     */
+    private void mergeToMonthPlanSulfurizationMonitor(MpRollAdjustContextDTO contextDTO) {
+        List<FactoryMonthPlanFinalAdjustVo> finalList = contextDTO.getFactoryMonthPlanProdFinalList();
+        if (PubUtil.isEmpty(finalList)) {
+            return;
+        }
+        String productionVersion = contextDTO.getProductionVersion();
+        if (StringUtil.isEmptyWithTrim(productionVersion)) {
+            return;
+        }
+
+        // 1. 查询当前排产版本下已有的硫化监控记录
+        LambdaQueryWrapper<MpMonthPlanMonitor> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(MpMonthPlanMonitor::getProductionVersion, productionVersion);
+        queryWrapper.eq(MpMonthPlanMonitor::getIsDelete, YesOrNoEnum.NO.getValue());
+        List<MpMonthPlanMonitor> existingMonitorList = mpMonthPlanMonitorEntityMapper.selectList(queryWrapper);
+
+        // 2. 按 排产版本号+物料编码+产品状态 构建已有监控记录Map
+        Map<String, MpMonthPlanMonitor> existingMonitorMap = new HashMap<>();
+        if (PubUtil.isNotEmpty(existingMonitorList)) {
+            existingMonitorMap = existingMonitorList.stream().collect(Collectors.toMap(
+                    item -> GenerageMapKeyUtils.createMapKey(item.getMaterialCode(), BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY,item.getProductStatus()),
+                    Function.identity(),
+                    (m1, m2) -> m1));
+        }
+
+        // 3. 遍历调整结果，更新已有或新增监控记录
+        List<MpMonthPlanMonitor> updateList = new ArrayList<>();
+        List<MpMonthPlanMonitor> insertList = new ArrayList<>();
+
+        for (FactoryMonthPlanFinalAdjustVo finalResult : finalList) {
+            String mapKey = GenerageMapKeyUtils.createMapKey(finalResult.getMaterialCode(),BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY, finalResult.getProductStatus());
+            MpMonthPlanMonitor existingMonitor = existingMonitorMap.get(mapKey);
+
+            if (existingMonitor != null) {
+                // 更新已有监控记录
+                existingMonitor.setStructureName(finalResult.getStructureName());
+                existingMonitor.setMainMaterialDesc(finalResult.getMainMaterialDesc());
+                existingMonitor.setMaterialDesc(finalResult.getMaterialDesc());
+                existingMonitor.setMesMaterialCode(finalResult.getMesMaterialCode());
+                existingMonitor.setBrand(finalResult.getBrand());
+                existingMonitor.setProSize(finalResult.getProSize());
+                existingMonitor.setSpecifications(finalResult.getSpecifications());
+                existingMonitor.setMainPattern(finalResult.getMainPattern());
+                existingMonitor.setPattern(finalResult.getPattern());
+                existingMonitor.setMouldQty(finalResult.getMouldChangeInfo());
+                if (finalResult.getBeginDay() != null && finalResult.getBeginDay() != 0){
+                    LocalDate beginLocalDate = LocalDate.of(contextDTO.getMpYear(), contextDTO.getMpMonth(), finalResult.getBeginDay());
+                    Date beginDate = Date.from(beginLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+                    existingMonitor.setOnboardDate(beginDate);
+                }
+                if (finalResult.getEndDay() != null && finalResult.getEndDay() != 0){
+                    LocalDate endLocalDate = LocalDate.of(contextDTO.getMpYear(), contextDTO.getMpMonth(), finalResult.getEndDay());
+                    Date endDate = Date.from(endLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+                    existingMonitor.setPlanCloseDate(endDate);
+                }
+                existingMonitor.setUpdateTime(DateUtils.getNowDate());
+                if (ConstructionStageEnum.FORMAL_FLAG.equals(finalResult.getProductStatus())) {
+                    existingMonitor.setNetDemandQty(finalResult.getProdReqPlan());
+                }else{
+                    existingMonitor.setNetDemandQty(finalResult.getTrialQty());
+                }
+                existingMonitor.setScheduleQty(finalResult.getTotalQty());
+                Integer productionQty = ObjectUtils.defaultIfNull(existingMonitor.getProductionQty(), 0);
+                Integer scheduleQty = ObjectUtils.defaultIfNull(finalResult.getTotalQty(), 0);
+                existingMonitor.setLhMargin(scheduleQty - productionQty);
+                existingMonitor.setFinalResultId(finalResult.getId());
+                updateList.add(existingMonitor);
+            } else {
+                // 新增监控记录
+                MpMonthPlanMonitor monitor = new MpMonthPlanMonitor();
+                monitor.setFactoryCode(finalResult.getFactoryCode());
+                monitor.setYear(finalResult.getYear());
+                monitor.setMonth(finalResult.getMonth());
+                monitor.setYearMonth(finalResult.getYearMonth());
+                monitor.setMonthPlanVersion(finalResult.getMonthPlanVersion());
+                monitor.setProductionVersion(finalResult.getProductionVersion());
+                monitor.setProductTypeCode(finalResult.getProductTypeCode());
+                monitor.setProductStatus(finalResult.getProductStatus());
+                monitor.setStructureName(finalResult.getStructureName());
+                monitor.setMainMaterialDesc(finalResult.getMainMaterialDesc());
+                monitor.setMesMaterialCode(finalResult.getMesMaterialCode());
+                monitor.setMaterialCode(finalResult.getMaterialCode());
+                monitor.setMaterialDesc(finalResult.getMaterialDesc());
+                monitor.setBrand(finalResult.getBrand());
+                monitor.setProSize(finalResult.getProSize());
+                monitor.setSpecifications(finalResult.getSpecifications());
+                monitor.setMainPattern(finalResult.getMainPattern());
+                monitor.setPattern(finalResult.getPattern());
+                monitor.setMouldQty(finalResult.getMouldChangeInfo());
+                if (finalResult.getBeginDay() != null && finalResult.getBeginDay() != 0){
+                    LocalDate beginLocalDate = LocalDate.of(contextDTO.getMpYear(), contextDTO.getMpMonth(), finalResult.getBeginDay());
+                    Date beginDate = Date.from(beginLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+                    monitor.setOnboardDate(beginDate);
+                }
+                if (finalResult.getEndDay() != null && finalResult.getEndDay() != 0){
+                    LocalDate endLocalDate = LocalDate.of(contextDTO.getMpYear(), contextDTO.getMpMonth(), finalResult.getEndDay());
+                    Date endDate = Date.from(endLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+                    monitor.setPlanCloseDate(endDate);
+                }
+                monitor.setCreateTime(DateUtils.getNowDate());
+                monitor.setUpdateTime(monitor.getCreateTime());
+                if (ConstructionStageEnum.FORMAL_FLAG.equals(finalResult.getProductStatus())) {
+                    monitor.setNetDemandQty(finalResult.getProdReqPlan());
+                }else{
+                    monitor.setNetDemandQty(finalResult.getTrialQty());
+                }
+                monitor.setScheduleQty(finalResult.getTotalQty());
+                Integer scheduleQty = ObjectUtils.defaultIfNull(finalResult.getTotalQty(), 0);
+                monitor.setLhMargin(scheduleQty);
+                monitor.setExpectedCloseDay(0);
+                monitor.setFinalResultId(finalResult.getId());
+                insertList.add(monitor);
+            }
+        }
+
+        // 4. 批量更新
+        if (PubUtil.isNotEmpty(updateList)) {
+            baseDao.updateBatch(updateList);
+        }
+        // 5. 批量新增
+        if (PubUtil.isNotEmpty(insertList)) {
+            baseDao.insertBatch(insertList);
+        }
+
+        log.info("合并到月度硫化监控表完成，更新：{}条，新增：{}条", updateList.size(), insertList.size());
     }
 
     /**
