@@ -122,7 +122,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
     /**
      * 月计划日统计量预警起始列下标
      */
-    private final static int ADJUST_HEADER_DAY_TOTAL_WARNING_START_COLUMN_INDEX = 39;
+    private final static int ADJUST_HEADER_DAY_TOTAL_WARNING_START_COLUMN_INDEX = 40;
     /**
      * 月底计划字段名称
      */
@@ -915,6 +915,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         tableMap.put("adjustProductQty4", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.adjustProductQty4"));
         tableMap.put("originalTotalQty", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.originalTotalQty"));
         tableMap.put("productSurplus", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.productSurplus"));
+        tableMap.put("lastMonthRemainQty", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.lastMonthRemainQty"));
         tableMap.put("pendingQty", I18nUtil.getMessage("ui.data.column.FactoryMonthPlanFinalResult.pendingQty"));
 
 
@@ -1026,6 +1027,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         listDataMap.put(this.getRealFieldName("restrictedNetQty", suffix), exportVo.getRestrictedNetQty());
         if (isFinal) {
             listDataMap.put(this.getRealFieldName("originalTotalQty", suffix), exportVo.getOriginalTotalQty());
+            listDataMap.put(this.getRealFieldName("lastMonthRemainQty", suffix), exportVo.getLastMonthRemainQty());
             listDataMap.put(this.getRealFieldName("productSurplus", suffix), exportVo.getProductSurplus());
             listDataMap.put(this.getRealFieldName("pendingQty", suffix), exportVo.getPendingQty());
             listDataMap.put(this.getRealFieldName("adjustQty1", suffix), exportVo.getAdjustQty1());
@@ -1163,6 +1165,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             subtotal.setAdjustProductQty4(safeAdd(subtotal.getAdjustProductQty4(), result.getAdjustProductQty4()));
             subtotal.setOriginalTotalQty(safeAdd(subtotal.getOriginalTotalQty(), result.getOriginalTotalQty()));
             subtotal.setProductSurplus(safeAdd(subtotal.getProductSurplus(), result.getProductSurplus()));
+            subtotal.setLastMonthRemainQty(safeAdd(subtotal.getLastMonthRemainQty(), result.getLastMonthRemainQty()));
             subtotal.setPendingQty(safeAdd(subtotal.getPendingQty(), result.getPendingQty()));
 
             for (int day = FactoryConstant.MONTH_START_DAY; day <= FactoryConstant.MONTH_MAX_DAY; day++) {
