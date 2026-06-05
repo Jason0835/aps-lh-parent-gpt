@@ -9,11 +9,11 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.zlt.aps.cd90</groupId>
-    <artifactId>aps-cd90-api</artifactId>
+    <groupId>com.zlt.aps.cd15</groupId>
+    <artifactId>aps-cd15-api</artifactId>
     <version>1.0.3-SNAPSHOT</version>
-    <name>cd90-api</name>
-    <description>90度裁断工序api</description>
+    <name>aps-cd15-api</name>
+    <description>15度裁断工序api</description>
 
     <properties>
         <java.version>1.8</java.version>

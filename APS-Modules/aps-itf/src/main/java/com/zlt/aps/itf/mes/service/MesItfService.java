@@ -316,6 +316,8 @@ public interface MesItfService {
      */
     AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefix(String versionPrefix, Integer year);
 
+    AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefixAllVersions(String versionPrefix, Integer year);
+
     /**
      * 清理并重新同步所有MES历史数据（含今天）
      * 执行步骤：

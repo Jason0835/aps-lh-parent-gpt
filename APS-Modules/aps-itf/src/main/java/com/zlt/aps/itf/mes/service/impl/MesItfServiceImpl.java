@@ -2300,6 +2300,69 @@ public class MesItfServiceImpl implements MesItfService {
         return AjaxResult.success(resultMsg.toString(), totalGenerated);
     }
 
+    @Override
+    public AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefixAllVersions(String versionPrefix, Integer year) {
+        log.info("开始执行同步MES数据并生成硫化精度计划（版本前缀={}，不限最大版本号，年度={}）", versionPrefix, year);
+
+        StringBuilder resultMsg = new StringBuilder();
+        int totalGenerated = 0;
+
+        // 步骤1：同步MES设备保养计划到APS（仅硫化精度），同步时按最新版本号增量同步
+        log.info("步骤1：同步MES设备保养计划到APS（仅硫化精度）");
+        try {
+            AuxReqSyncDataLogs lhSyncParam = new AuxReqSyncDataLogs();
+            lhSyncParam.setPrecisionType("硫化精度");
+            AjaxResult syncResult = syncDevMaintenancePlan(lhSyncParam);
+            log.info("同步设备保养计划结果：{}", syncResult.get("msg"));
+            resultMsg.append("同步硫化设备保养计划完成；");
+        } catch (Exception e) {
+            log.error("同步硫化设备保养计划失败", e);
+            resultMsg.append("同步硫化设备保养计划失败：").append(e.getMessage()).append("；");
+        }
+
+        // 步骤2：同步MES硫化精度计划实际执行日期回填数据（按最新版本号增量查询）
+        log.info("步骤2：同步MES硫化精度计划实际执行日期回填数据");
+        try {
+            AjaxResult actualResult = syncLhPrecisionPlanActual(new AuxReqSyncDataLogs());
+            log.info("同步实际执行日期结果：{}", actualResult.get("msg"));
+            resultMsg.append("同步实际执行日期完成；");
+        } catch (Exception e) {
+            log.error("同步实际执行日期失败", e);
+            resultMsg.append("同步实际执行日期失败：").append(e.getMessage()).append("；");
+        }
+
+        // 步骤3：按版本前缀从MES同步数据生成硫化精度计划（不限最大版本号）
+        log.info("步骤3：按版本前缀={}从MES同步数据生成硫化精度计划（不限最大版本号）", versionPrefix);
+        try {
+            AjaxResult generateResult = lhPrecisionPlanRemoteService.generatePlansFromMesByVersionPrefixAllVersions(versionPrefix, year);
+            Object data = generateResult.get("data");
+            int count = data != null ? Integer.parseInt(data.toString()) : 0;
+            totalGenerated += count;
+            log.info("按版本前缀={}从MES同步数据生成硫化精度计划{}条（不限最大版本号）", versionPrefix, count);
+            resultMsg.append("按版本前缀生成硫化精度计划（不限最大版本号）").append(count).append("条；");
+        } catch (Exception e) {
+            log.error("按版本前缀={}从MES同步数据生成硫化精度计划失败（不限最大版本号）", versionPrefix, e);
+            resultMsg.append("按版本前缀生成硫化精度计划失败（不限最大版本号）：").append(e.getMessage()).append("；");
+        }
+
+        // 步骤4：自动推算生成下一年度硫化精度计划
+        log.info("步骤4：自动推算生成下一年度硫化精度计划");
+        try {
+            AjaxResult autoResult = lhPrecisionPlanRemoteService.autoCalculateLhPrecisionPlan(year + 1);
+            Object autoData = autoResult.get("data");
+            int autoCount = autoData != null ? Integer.parseInt(autoData.toString()) : 0;
+            totalGenerated += autoCount;
+            log.info("自动推算生成下一年度硫化精度计划{}条", autoCount);
+            resultMsg.append("自动推算生成下一年度硫化精度计划").append(autoCount).append("条；");
+        } catch (Exception e) {
+            log.error("自动推算生成下一年度硫化精度计划失败", e);
+            resultMsg.append("自动推算生成下一年度硫化精度计划失败：").append(e.getMessage()).append("；");
+        }
+
+        log.info("同步MES数据并生成硫化精度计划（版本前缀={}，不限最大版本号）执行完成", versionPrefix);
+        return AjaxResult.success(resultMsg.toString(), totalGenerated);
+    }
+
     /**
      * 临时任务：清理并重新同步所有MES历史数据（含今天）
      * 执行步骤：

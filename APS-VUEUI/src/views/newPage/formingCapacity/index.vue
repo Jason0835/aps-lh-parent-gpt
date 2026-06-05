@@ -197,8 +197,8 @@ export default {
                 disabled={this.loading}
                 value={row.isActive}
                 onChange={(val) => {
-                  let text = val == "0" ? "禁用" : "启用";
-                  this.$confirm(`确认${text}吗？`, { type: "warning" }).then(
+                  let confirmMsg = val == "0" ? this.$t("ui.lhMachineInfo.confirm.disable") : this.$t("ui.lhMachineInfo.confirm.enable");
+                  this.$confirm(confirmMsg, { type: "warning" }).then(
                     async () => {
                       try {
                         this.loading = true;

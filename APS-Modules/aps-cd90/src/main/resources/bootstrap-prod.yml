@@ -1,6 +1,6 @@
 # Tomcat
 server:
-  port: 9006
+  port: 9976
 
 nacos:
   server-addr: 10.135.55.216:8848
@@ -49,7 +49,6 @@ spring:
         refresh-enabled: true
 mq:
   scheduleLog:
-    queue: prod.cd90.schedule.log.queue
-    exchange: prod.cd90.schedule.log.exchange
-    rutekey: prod.cd90.schedule.log.rutekey
-
+    queue: prod.cx.schedule.log.queue
+    exchange: prod.cx.schedule.log.exchange
+    rutekey: prod.cx.schedule.log.rutekey
