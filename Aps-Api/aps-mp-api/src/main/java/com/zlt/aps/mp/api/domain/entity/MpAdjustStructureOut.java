@@ -429,6 +429,16 @@ public class MpAdjustStructureOut extends BaseEntity {
     }
 
     /**
+     * 获取待调整量的key
+     *
+     * @return
+     */
+    public String getPendingQtyKey() {
+        String groupKeyFormat = "%s|*|%s";
+        return String.format(groupKeyFormat, materialDesc, constructionStage);
+    }
+
+    /**
      * 最大的型腔数，用于排序
      */
     @TableField(exist = false)

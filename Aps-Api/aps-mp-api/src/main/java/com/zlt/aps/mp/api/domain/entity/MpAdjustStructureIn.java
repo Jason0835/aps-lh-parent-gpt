@@ -1,14 +1,14 @@
 package com.zlt.aps.mp.api.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
 import com.zlt.common.utils.StringUtil;
-import lombok.Data;
-import com.ruoyi.common.core.annotation.Excel;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.regex.Matcher;
@@ -18,14 +18,15 @@ import java.util.regex.Pattern;
  * Copyright (c) 2022, All rights reserved。
  * 文件名称：MpAdjustStructureIn.java
  * 描    述：调整-结构内调整记录对象 t_mp_adjust_structure_in
- *@author zlt
- *@date 2025-12-19
- *@version 1.0
  *
- *  修改记录：
- *     修改时间：...
- *     修 改 人：zlt
- *     修改内容：...
+ * @author zlt
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：zlt
+ * 修改内容：...
+ * @date 2025-12-19
  */
 
 @ApiModel(value = "调整-结构内调整记录对象", description = "调整-结构内调整记录对象 ")
@@ -35,25 +36,33 @@ public class MpAdjustStructureIn extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    /** 分厂编号 */
+    /**
+     * 分厂编号
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.factoryCode", dictType = "biz_factory_name")
     @ApiModelProperty(value = "分厂编号，字典：biz_factory_name", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-     /** 年份 */
+    /**
+     * 年份
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.year")
     @ApiModelProperty(value = "年份", name = "year")
     @TableField(value = "YEAR")
     private Integer year;
 
-    /** 月份 */
+    /**
+     * 月份
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.month")
     @ApiModelProperty(value = "月份", name = "month")
     @TableField(value = "MONTH")
     private Integer month;
 
-    /** 版本规则：ADJ+年月日+3位流水号； */
+    /**
+     * 版本规则：ADJ+年月日+3位流水号；
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.version")
     @ApiModelProperty(value = "版本规则：ADJ+年月日+3位流水号；", name = "version")
     @TableField(value = "VERSION")
@@ -83,31 +92,41 @@ public class MpAdjustStructureIn extends BaseEntity {
     @TableField(value = "LAST_MONTH_PLAN_VERSION")
     private String lastMonthPlanVersion;
 
-    /** 产品结构 */
+    /**
+     * 产品结构
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.structureName")
     @ApiModelProperty(value = "产品结构", name = "structureName")
     @TableField(value = "STRUCTURE_NAME")
     private String structureName;
 
-    /** 排产机台,多个机台用逗号分隔 */
+    /**
+     * 排产机台,多个机台用逗号分隔
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.scheduledMachines")
     @ApiModelProperty(value = "排产机台,多个机台用逗号分隔", name = "scheduledMachines")
     @TableField(value = "SCHEDULED_MACHINES")
     private String scheduledMachines;
 
-    /** MES物料编码 */
+    /**
+     * MES物料编码
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.mesMaterialCode")
     @ApiModelProperty(value = "MES物料编码", name = "mesMaterialCode")
     @TableField(value = "MES_MATERIAL_CODE")
     private String mesMaterialCode;
 
-    /** 物料编码 */
+    /**
+     * 物料编码
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.materialCode")
     @ApiModelProperty(value = "物料编码", name = "materialCode")
     @TableField(value = "MATERIAL_CODE")
     private String materialCode;
 
-    /** 物料描述 */
+    /**
+     * 物料描述
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.materialDesc")
     @ApiModelProperty(value = "物料描述", name = "materialDesc")
     @TableField(value = "MATERIAL_DESC")
@@ -121,7 +140,9 @@ public class MpAdjustStructureIn extends BaseEntity {
     @TableField(value = "PRODUCTION_TYPE")
     private String productionType;
 
-    /** 是否含特殊材料            2、0-否，1-是 */
+    /**
+     * 是否含特殊材料            2、0-否，1-是
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.hasSpecialMaterial")
     @ApiModelProperty(value = "是否含特殊材料            2、0-否，1-是", name = "hasSpecialMaterial")
     @TableField(value = "HAS_SPECIAL_MATERIAL")
@@ -287,73 +308,97 @@ public class MpAdjustStructureIn extends BaseEntity {
     @TableField(value = "CURING_TIME")
     private Integer curingTime;
 
-    /** 调整前净需求量（上周） */
+    /**
+     * 调整前净需求量（上周）
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.previousNetQty", readConverterExp = "上=周")
     @ApiModelProperty(value = "调整前净需求量", name = "previousNetQty")
     @TableField(value = "PREVIOUS_NET_QTY")
     private Integer previousNetQty;
 
-    /** 当前净需求量 */
+    /**
+     * 当前净需求量
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.currentNetQty")
     @ApiModelProperty(value = "当前净需求量", name = "currentNetQty")
     @TableField(value = "CURRENT_NET_QTY")
     private Integer currentNetQty;
 
-    /** 净需求变动 */
+    /**
+     * 净需求变动
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.netQtyChange")
     @ApiModelProperty(value = "净需求变动", name = "netQtyChange")
     @TableField(value = "NET_QTY_CHANGE")
     private Integer netQtyChange;
 
-    /** 上月计划余量 */
+    /**
+     * 上月计划余量
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.lastMonthRemainQty")
     @ApiModelProperty(value = "上月计划余量", name = "lastMonthRemainQty")
     @TableField(value = "LAST_MONTH_REMAIN_QTY")
     private Integer lastMonthRemainQty;
 
-    /** 月计划已排产量 */
+    /**
+     * 月计划已排产量
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.monthScheduledQty")
     @ApiModelProperty(value = "月计划已排产量", name = "monthScheduledQty")
     @TableField(value = "MONTH_SCHEDULED_QTY")
     private Integer monthScheduledQty;
 
-    /** 待调整量 */
+    /**
+     * 待调整量
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.pendingQty")
     @ApiModelProperty(value = "待调整量", name = "pendingQty")
     @TableField(value = "PENDING_QTY")
     private Integer pendingQty;
 
-    /** 确认调整量 */
+    /**
+     * 确认调整量
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.confirmAdjustQty")
     @ApiModelProperty(value = "确认调整量", name = "confirmAdjustQty")
     @TableField(value = "CONFIRM_ADJUST_QTY")
     private Integer confirmAdjustQty;
 
-    /** 调整优先级            2、针对增量            2.1）在产SKU增量，先补；            2.2）新增SKU，按调整优先级1.2.3…            3、该列默认空，允许编辑； */
+    /**
+     * 调整优先级            2、针对增量            2.1）在产SKU增量，先补；            2.2）新增SKU，按调整优先级1.2.3…            3、该列默认空，允许编辑；
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.adjustPriority", dictType = "adjust_priority")
     @ApiModelProperty(value = "调整优先级            2、针对增量            2.1）在产SKU增量，先补；            2.2）新增SKU，按调整优先级1.2.3…            3、该列默认空，允许编辑；", name = "adjustPriority")
     @TableField(value = "ADJUST_PRIORITY")
     private Integer adjustPriority;
 
-    /** 实际调整 */
+    /**
+     * 实际调整
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.actualAdjustQty")
     @ApiModelProperty(value = "实际调整", name = "actualAdjustQty")
     @TableField(value = "ACTUAL_ADJUST_QTY")
     private Integer actualAdjustQty;
 
-    /** 调整原因 */
+    /**
+     * 调整原因
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.adjustReason")
     @ApiModelProperty(value = "调整原因", name = "adjustReason")
     @TableField(value = "ADJUST_REASON")
     private String adjustReason;
 
-    /** 已生产量 */
+    /**
+     * 已生产量
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.productionQty")
     @ApiModelProperty(value = "已生产量", name = "productionQty")
     @TableField(value = "PRODUCTION_QTY")
     private Integer productionQty;
 
-    /** 是否SKU新增 */
+    /**
+     * 是否SKU新增
+     */
     @Excel(name = "ui.data.column.mpAdjustStructureIn.isSkuAdd", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否SKU新增")
     @TableField(value = "IS_SKU_ADD")
@@ -426,11 +471,22 @@ public class MpAdjustStructureIn extends BaseEntity {
 
     /**
      * 获取分组key
+     *
      * @return
      */
     public String getGroupKey() {
         String groupKeyFormat = "%s|*|%s";
         return String.format(groupKeyFormat, structureName, materialCode);
+    }
+
+    /**
+     * 获取待调整量的key
+     *
+     * @return
+     */
+    public String getPendingQtyKey() {
+        String groupKeyFormat = "%s|*|%s";
+        return String.format(groupKeyFormat, materialDesc, constructionStage);
     }
 
     /**
