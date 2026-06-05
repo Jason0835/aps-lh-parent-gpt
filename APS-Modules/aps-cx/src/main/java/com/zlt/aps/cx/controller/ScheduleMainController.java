@@ -1787,18 +1787,18 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
-     * 下载导入模板
+     * 下载导入模板（使用CxExport.xlsx，填充yearmonthday和version）
      */
     @ApiOperation(value = "导入模板下载")
     @PostMapping("/downloadTemplate/{fileName}")
     public byte[] downloadTemplate(@RequestBody CxScheduleResult queryVO, @PathVariable("fileName") String fileName,
                                    HttpServletResponse response) throws IOException {
         queryVO = queryVO == null ? new CxScheduleResult() : queryVO;
-        return cxScheduleResultService.exportData(Collections.emptyList(), queryVO.getScheduleDate());
+        return cxScheduleResultService.exportCxRemainQty(queryVO, fileName);
     }
 
     /**
-     * 自定义导入数据（基于模板cxjhtemplate.xls）
+     * 自定义导入数据（基于CxExport.xlsx模板的成型日计划Sheet，按固定列位置解析）
      */
     @ApiOperation(value = "自定义导入数据")
     @PostMapping("/importDataByCust/{updateSupport}")
@@ -1812,15 +1812,15 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             scheduleResult = new CxScheduleResult();
         }
         byte[] fileBytes = importContext.getFileBytes();
-        String sheetName = "成型计划";
         ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(
                 importContext.getFileBytes(), importContext.getImportFilePath(),
                 importContext.getProcedureCode(), importContext.getFunctionName(),
                 importContext.getOriFileName(), 1);
         importLog = this.iImportLogService.add(importLog);
-        ExcelUtil<CxScheduleResultTemplateImportVO> util = new ExcelUtil<>(CxScheduleResultTemplateImportVO.class);
-        List<CxScheduleResultTemplateImportVO> list = util.importExcel(
-                sheetName, new ByteArrayInputStream(fileBytes), 2);
+
+        // 按固定列位置解析CxExport.xlsx的"成型日计划"Sheet
+        List<CxScheduleResultTemplateImportVO> list = parseImportExcelByColumnIndex(fileBytes);
+
         AjaxResult ajaxResult = cxScheduleResultService.importScheduleTemplate(
                 list, scheduleResult, updateSupport, importLog.getId());
         Date endTime = DateUtils.getNowDate();
@@ -1831,6 +1831,145 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
         ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
         return ajaxResult;
+    }
+
+    /**
+     * 按固定列位置解析CxExport.xlsx的"成型日计划"Sheet数据。
+     * 列布局（0-based）：
+     * 0=机台, 1=结构, 2=胎胚编码, 3=胎胚描述, 4=物料编码, 5=物料描述,
+     * 6=TD胶种(跳过), 7=TD整车条数(跳过), 8=成型余量, 9=硫化余量, 10=胎胚库存, 11=硫化班产,
+     * 12=班次1计划, 13=班次1实际, 14=班次1类型, 15=班次1备注(跳过), 16=班次1示方类型,
+     * 每班次5列，共8个班次（12~51），52=合计计划(跳过), 53=合计实际(跳过), 54=总计(跳过)
+     * 数据起始行=4（0-based），即Excel第5行
+     */
+    private List<CxScheduleResultTemplateImportVO> parseImportExcelByColumnIndex(byte[] fileBytes) throws Exception {
+        List<CxScheduleResultTemplateImportVO> list = new ArrayList<>();
+        try (org.apache.poi.ss.usermodel.Workbook wb = org.apache.poi.ss.usermodel.WorkbookFactory.create(
+                new ByteArrayInputStream(fileBytes))) {
+            org.apache.poi.ss.usermodel.Sheet sheet = wb.getSheet("成型日计划");
+            if (sheet == null && wb.getNumberOfSheets() > 1) {
+                sheet = wb.getSheetAt(1);
+            }
+            if (sheet == null) {
+                sheet = wb.getSheetAt(0);
+            }
+            int dataStartRow = 4; // 0-based，数据从第5行开始（占位符行所在行）
+            int lastRow = sheet.getLastRowNum();
+            for (int i = dataStartRow; i <= lastRow; i++) {
+                org.apache.poi.ss.usermodel.Row row = sheet.getRow(i);
+                if (row == null) {
+                    continue;
+                }
+                String machineCode = getCellStringValue(row, 0);
+                // 跳过空行和小计行
+                if (StringUtils.isBlank(machineCode) || "小计".equals(machineCode.trim())) {
+                    continue;
+                }
+                CxScheduleResultTemplateImportVO vo = new CxScheduleResultTemplateImportVO();
+                vo.setCxMachineCode(machineCode.trim());
+                vo.setStructureName(getCellStringValue(row, 1));
+                vo.setEmbryoCode(getCellStringValue(row, 2));
+                vo.setMainMaterialDesc(getCellStringValue(row, 3));
+                vo.setMaterialCode(getCellStringValue(row, 4));
+                vo.setMaterialDesc(getCellStringValue(row, 5));
+                // 列6=TD胶种, 列7=TD整车条数 跳过
+                vo.setCxRemainQty(getCellBigDecimalValue(row, 8));
+                vo.setLhRemainQty(getCellBigDecimalValue(row, 9));
+                vo.setTotalStock(getCellBigDecimalValue(row, 10));
+                vo.setLhClassQty(getCellBigDecimalValue(row, 11));
+
+                // 8个班次，每班次5列（计划、实际、类型、备注(跳过)、示方类型），从列12开始
+                vo.setClass1PlanQty(getCellBigDecimalValue(row, 12));
+                vo.setClass1FinishQty(getCellBigDecimalValue(row, 13));
+                vo.setClass1Analysis(getCellStringValue(row, 14));
+                vo.setClass1RecipeType(getCellStringValue(row, 16));
+
+                vo.setClass2PlanQty(getCellBigDecimalValue(row, 17));
+                vo.setClass2FinishQty(getCellBigDecimalValue(row, 18));
+                vo.setClass2Analysis(getCellStringValue(row, 19));
+                vo.setClass2RecipeType(getCellStringValue(row, 21));
+
+                vo.setClass3PlanQty(getCellBigDecimalValue(row, 22));
+                vo.setClass3FinishQty(getCellBigDecimalValue(row, 23));
+                vo.setClass3Analysis(getCellStringValue(row, 24));
+                vo.setClass3RecipeType(getCellStringValue(row, 26));
+
+                vo.setClass4PlanQty(getCellBigDecimalValue(row, 27));
+                vo.setClass4FinishQty(getCellBigDecimalValue(row, 28));
+                vo.setClass4Analysis(getCellStringValue(row, 29));
+                vo.setClass4RecipeType(getCellStringValue(row, 31));
+
+                vo.setClass5PlanQty(getCellBigDecimalValue(row, 32));
+                vo.setClass5FinishQty(getCellBigDecimalValue(row, 33));
+                vo.setClass5Analysis(getCellStringValue(row, 34));
+                vo.setClass5RecipeType(getCellStringValue(row, 36));
+
+                vo.setClass6PlanQty(getCellBigDecimalValue(row, 37));
+                vo.setClass6FinishQty(getCellBigDecimalValue(row, 38));
+                vo.setClass6Analysis(getCellStringValue(row, 39));
+                vo.setClass6RecipeType(getCellStringValue(row, 41));
+
+                vo.setClass7PlanQty(getCellBigDecimalValue(row, 42));
+                vo.setClass7FinishQty(getCellBigDecimalValue(row, 43));
+                vo.setClass7Analysis(getCellStringValue(row, 44));
+                vo.setClass7RecipeType(getCellStringValue(row, 46));
+
+                vo.setClass8PlanQty(getCellBigDecimalValue(row, 47));
+                vo.setClass8FinishQty(getCellBigDecimalValue(row, 48));
+                vo.setClass8Analysis(getCellStringValue(row, 49));
+                vo.setClass8RecipeType(getCellStringValue(row, 51));
+
+                list.add(vo);
+            }
+        }
+        return list;
+    }
+
+    /**
+     * 获取单元格字符串值
+     */
+    private String getCellStringValue(org.apache.poi.ss.usermodel.Row row, int colIndex) {
+        org.apache.poi.ss.usermodel.Cell cell = row.getCell(colIndex);
+        if (cell == null) {
+            return null;
+        }
+        org.apache.poi.ss.usermodel.CellType cellType = cell.getCellType();
+        if (cellType == org.apache.poi.ss.usermodel.CellType.STRING) {
+            return cell.getStringCellValue();
+        } else if (cellType == org.apache.poi.ss.usermodel.CellType.NUMERIC) {
+            double val = cell.getNumericCellValue();
+            if (val == Math.floor(val) && !Double.isInfinite(val)) {
+                return String.valueOf((long) val);
+            }
+            return String.valueOf(val);
+        } else if (cellType == org.apache.poi.ss.usermodel.CellType.BOOLEAN) {
+            return String.valueOf(cell.getBooleanCellValue());
+        }
+        return null;
+    }
+
+    /**
+     * 获取单元格BigDecimal值
+     */
+    private BigDecimal getCellBigDecimalValue(org.apache.poi.ss.usermodel.Row row, int colIndex) {
+        org.apache.poi.ss.usermodel.Cell cell = row.getCell(colIndex);
+        if (cell == null) {
+            return null;
+        }
+        org.apache.poi.ss.usermodel.CellType cellType = cell.getCellType();
+        if (cellType == org.apache.poi.ss.usermodel.CellType.NUMERIC) {
+            return BigDecimal.valueOf(cell.getNumericCellValue());
+        } else if (cellType == org.apache.poi.ss.usermodel.CellType.STRING) {
+            String val = cell.getStringCellValue();
+            if (StringUtils.isNotBlank(val)) {
+                try {
+                    return new BigDecimal(val.trim());
+                } catch (NumberFormatException e) {
+                    return null;
+                }
+            }
+        }
+        return null;
     }
 
     /**

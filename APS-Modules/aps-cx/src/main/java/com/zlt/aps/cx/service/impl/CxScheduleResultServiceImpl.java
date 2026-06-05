@@ -293,11 +293,12 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         Map<String, String> recipeTypeMap = loadRecipeTypeDictMap();
 
+        // 优先从查询结果取日期，取不到时使用queryVO传入的日期，最后兜底当前日期
         Date scheduleDate = exportList.stream()
                 .map(CxScheduleResult::getScheduleDate)
                 .filter(Objects::nonNull)
                 .max(Date::compareTo)
-                .orElse(DateUtil.date());
+                .orElse(queryVO != null && queryVO.getScheduleDate() != null ? queryVO.getScheduleDate() : DateUtil.date());
 
         Map<String, BigDecimal> totalDailyPlanQtyMap = buildTotalDailyPlanQtyMap(exportList);
         Map<String, BigDecimal> todayNightFinishQtyMap = buildTodayNightFinishQtyMap(exportList, scheduleDate);
@@ -317,6 +318,24 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
 
         // Sheet 1: 成型日计划
         Map<String, Object> planTableMap = buildCxTemplateTableMap(exportList);
+
+        // 列表为空时，确保yearmonthday仍被填入（使用外部传入的scheduleDate）
+        if (!planTableMap.containsKey("yearmonthday")) {
+            planTableMap.put("yearmonthday", cn.hutool.core.date.DateUtil.format(scheduleDate, "yyyy年MM月dd日"));
+            java.time.LocalDate baseDate = cn.hutool.core.date.DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
+            java.time.LocalDate d1 = baseDate.minusDays(2);
+            java.time.LocalDate d2 = baseDate.minusDays(1);
+            java.time.LocalDate d3 = baseDate;
+            java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("MM/dd");
+            planTableMap.put("shiftDate1", "早班 Ca sáng " + d1.format(fmt));
+            planTableMap.put("shiftDate2", "中班 Ca chiều " + d1.format(fmt));
+            planTableMap.put("shiftDate3", "夜班 Ca đêm " + d2.format(fmt));
+            planTableMap.put("shiftDate4", "早班 Ca sáng " + d2.format(fmt));
+            planTableMap.put("shiftDate5", "中班 Ca chiều " + d2.format(fmt));
+            planTableMap.put("shiftDate6", "夜班 Ca đêm " + d3.format(fmt));
+            planTableMap.put("shiftDate7", "早班 Ca sáng " + d3.format(fmt));
+            planTableMap.put("shiftDate8", "中班 Ca chiều " + d3.format(fmt));
+        }
 
         // 从月计划数据获取productionVersion
         LocalDate planLocalDate = cn.hutool.core.date.DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
@@ -1049,6 +1068,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return AjaxResult.error("导入条件中的排程日期不能为空");
         }
         if (Objects.isNull(list) || list.isEmpty()) {
+            return AjaxResult.error("导入文件未读取到有效明细行");
+        }
+
+        // 过滤小计行（导出模板中包含的汇总行，cxMachineCode为"小计"）
+        list = list.stream()
+                .filter(row -> row != null && !"小计".equals(row.getCxMachineCode()))
+                .collect(Collectors.toList());
+        if (list.isEmpty()) {
             return AjaxResult.error("导入文件未读取到有效明细行");
         }
 
