@@ -1087,10 +1087,11 @@ public class FactoryMonthPlanProductionFinalResultServiceImpl extends AbstractDo
         structureAllocationQueryWrapper.eq(MpStructureAllocation::getProductionVersion, condition.getProductionVersion());
         structureAllocationQueryWrapper.eq(StringUtils.isNotEmpty(condition.getStructureName()), MpStructureAllocation::getStructureName, condition.getStructureName());
 
-        return mpStructureAllocationEntityMapper.selectList(structureAllocationQueryWrapper).stream()
+        List<MpStructureAllocation> allocationList = mpStructureAllocationEntityMapper.selectList(structureAllocationQueryWrapper);
+        return allocationList.stream()
                 .collect(Collectors.groupingBy(MpStructureAllocation::getStructureName,
                         Collectors.collectingAndThen(Collectors.toList(),
-                                list -> list.stream().map(MpStructureAllocation::getCxMachineCode)
+                                list -> list.stream().map(MpStructureAllocation::getCxMachineCode).distinct()
                                         .sorted(String::compareTo).collect(Collectors.joining(",")))));
     }
 
