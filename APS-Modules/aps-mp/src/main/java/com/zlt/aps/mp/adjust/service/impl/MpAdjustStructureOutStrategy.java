@@ -73,9 +73,12 @@ public class MpAdjustStructureOutStrategy extends AbstractBaseWeekAdjustService 
         setAdjustDate(contextDTO);
         // 2、构建结构外调整明细
         List<MpAdjustDetailVo> adjustDetailList = buildAdjustDetailList(contextDTO);
+        // 3、构建结构内调整明细（试制量试计划）
+        List<MpAdjustDetailVo> adjustDetailByTrialList = buildAdjustDetailByTrialList(contextDTO);
         // 3、构建结构内调整明细（月度计划有，无订单）
         List<MpAdjustDetailVo> adjustDetailByMonthPlanList = buildAdjustDetailByMonthPlanList(contextDTO);
         List<MpAdjustDetailVo> resultList = new ArrayList<>();
+        resultList.addAll(adjustDetailByTrialList);
         resultList.addAll(adjustDetailList);
         resultList.addAll(adjustDetailByMonthPlanList);
         // 检查产品结构字段为空

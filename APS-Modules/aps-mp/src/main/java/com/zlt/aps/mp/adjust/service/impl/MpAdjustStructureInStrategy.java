@@ -417,43 +417,6 @@ public class MpAdjustStructureInStrategy extends AbstractBaseWeekAdjustService {
     }
 
 
-    /**
-     * 构建结构内调整明细（试制量试计划）
-     * @param contextDTO
-     * @return
-     */
-    private List<MpAdjustDetailVo> buildAdjustDetailByTrialList(MpRollAdjustContextDTO contextDTO) {
-        // 试制量试计划列表
-        List<MpTrialPlan> trialPlanList = contextDTO.getMpTrialPlanList();
-        // 月度生产计划列表
-        List<FactoryMonthPlanFinalAdjustVo> monthPlanProdList = contextDTO.getFactoryMonthPlanProdFinalList();
-        // 结果集初始化
-        List<MpAdjustDetailVo> resultList = new ArrayList<>();
-        // 列表为空则直接返回空结果
-        if (PubUtil.isEmpty(trialPlanList)) {
-            return resultList;
-        }
-        // 生产计划列表按照物料编码进行分组
-        Map<String, List<FactoryMonthPlanFinalAdjustVo>> monthPlanMap = monthPlanProdList.stream()
-                .collect(Collectors.groupingBy(e->e.getMaterialCode() + BusiConstant.WeekRollAdjust.SPLIT_GROUP_KEY+e.getConstructionStage()));
-        // 遍历试制量试计划列表，匹配生产计划
-        String constructionStage = ConstructionStageEnum.TRIAL_PRODUCTION.getStage();
-        for (MpTrialPlan trialPlan : trialPlanList) {
-            String materialCode = trialPlan.getMaterialCode();
-            // 物料编码为空则跳过
-            if (StringUtils.isEmpty(materialCode)) {
-                continue;
-            }
-
-            if (ConstructionStageEnum.MEASUREMENT_FLAG.equals(trialPlan.getTrialStatus())){
-                constructionStage = ConstructionStageEnum.MEASUREMENT.getStage();
-            }
-            matchMonthPlanList(contextDTO,resultList,materialCode,constructionStage,monthPlanMap,
-                    Convert.toInt(trialPlan.getTrialQty(),0), ApsConstant.TRUE, trialPlan.getId());
-        }
-        return resultList;
-    }
-
     @Override
     public void saveAdjustDetailList(MpRollAdjustContextDTO contextDTO) {
         if (PubUtil.isEmpty(contextDTO.getAdjustDetailList())) {
