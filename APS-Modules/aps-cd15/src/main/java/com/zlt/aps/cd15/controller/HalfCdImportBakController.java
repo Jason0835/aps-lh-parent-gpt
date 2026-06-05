@@ -27,11 +27,6 @@ import com.zlt.aps.cd15.mapper.Cd15ParamsMapper;
 import com.zlt.aps.cd15.mapper.HalfCdImportBakEntityMapper;
 import com.zlt.aps.cd15.service.Cd15ScheduleResultService;
 import com.zlt.aps.common.engine.enums.OpenMachineClassEnums;
-import com.zlt.aps.gsq.service.GsqScheduleResultService;
-import com.zlt.aps.nc.service.NcCurlRollService;
-import com.zlt.aps.nc.service.NcParamsService;
-import com.zlt.aps.nc.service.NcScheduleResultService;
-import com.zlt.aps.tq.api.service.ITqScheduleResultService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.ExcelReadUtils;
@@ -48,7 +43,6 @@ import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -873,27 +867,27 @@ public class HalfCdImportBakController extends AbstractDocBizController<HalfCdIm
         }
         return wb;
     }
-
-    @Autowired
-    private NcParamsService ncParamsService;
-
-    @Resource
-    private NcCurlRollService ncCurlRollService;
+//
+//    @Autowired
+//    private NcParamsService ncParamsService;
+//
+//    @Resource
+//    private NcCurlRollService ncCurlRollService;
 
     @Autowired
     private Cd15ScheduleResultService cd15ScheduleResultService;
 
 //    @Autowired
 //    private Cd90ScheduleResultService cd90ScheduleResultService;
-
-    @Autowired
-    private NcScheduleResultService ncScheduleResultService;
-
-    @Autowired
-    private ITqScheduleResultService iTqScheduleResultService;
-
-    @Autowired
-    private GsqScheduleResultService gsqScheduleResultService;
+//
+//    @Autowired
+//    private NcScheduleResultService ncScheduleResultService;
+//
+//    @Autowired
+//    private ITqScheduleResultService iTqScheduleResultService;
+//
+//    @Autowired
+//    private GsqScheduleResultService gsqScheduleResultService;
 
     /**
      * 导入线下模板，并覆盖原有排程数据
