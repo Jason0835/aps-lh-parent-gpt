@@ -104,13 +104,13 @@ export default {
             trigger: "change",
           },
         ],
-        mouldCode: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
+        // mouldCode: [
+        //   {
+        //     required: true,
+        //     message: this.$t("common.rule.input"),
+        //     trigger: "blur",
+        //   },
+        // ],
       },
     };
   },
@@ -246,11 +246,11 @@ export default {
           type: "date",
           valueFormat: "yyyy-MM-dd",
         },
-        {
-          prop: "mouldCode",
-          label: this.$t("ui.data.column.lhMouldChangePlan.mouldCode"),
-          maxlength: 30,
-        },
+        // {
+        //   prop: "mouldCode",
+        //   label: this.$t("ui.data.column.lhMouldChangePlan.mouldCode"),
+        //   maxlength: 30,
+        // },
         {
           prop: "isRelease",
           label: this.$t("ui.data.column.lhMouldChangePlan.isRelease"),
