@@ -67,7 +67,7 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.zlt.aps</groupId>
+            <groupId>com.zlt.aps.cd90</groupId>
             <artifactId>aps-cd90-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>
             <scope>compile</scope>
