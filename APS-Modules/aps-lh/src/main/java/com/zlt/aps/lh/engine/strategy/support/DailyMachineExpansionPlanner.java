@@ -85,26 +85,26 @@ public final class DailyMachineExpansionPlanner {
             return plan;
         }
         if (noWindowPlan) {
-            // 无窗口计划时不能按普通新增满产扩机：先计算严格补欠产目标，再根据月底是否仍有计划决定收尾/非收尾。
-            int strictTargetQty = Math.min(resolvePositiveDemandQty(sku),
-                    Math.max(historyShortageQty, quotaRemainingQty));
-            if (strictTargetQty <= 0) {
-                strictTargetQty = Math.max(0, sku.resolveTargetScheduleQty());
-            }
+            /*
+             * 窗口无日计划时必须继续看 T+3 到月底计划：
+             * 1. 月底仍有计划，说明当前窗口只是临时无 dayN，不能把后续计划提前消耗；
+             *    本轮只允许补本月 T 日前已真实发生的历史欠产，目标量必须严格等于 historyShortageQty。
+             * 2. 月底也无计划，说明本月后续没有日计划承接，可以交给已有收尾目标量口径清量。
+             */
+            int strictTargetQty = historyShortageQty;
             plan.setStrictTargetQty(strictTargetQty);
             if (Math.max(0, sku.getFutureMonthPlanQtyAfterWindow()) > 0) {
                 sku.setStrictNewSpecShortageOnly(true);
                 sku.setTargetScheduleQty(strictTargetQty);
                 sku.setWindowPlanQty(strictTargetQty);
-                sku.setWindowRemainingPlanQty(Math.max(strictTargetQty, quotaRemainingQty));
+                // 仅补欠产不能沿用已被放大的账本剩余额度，否则会提前消耗 T+3 到月底后续计划。
+                capDailyQuotaRemainingToTarget(sku, strictTargetQty);
+                sku.setWindowRemainingPlanQty(strictTargetQty);
                 log.info("{}窗口无日计划但月底仍有计划，仅补本月欠产, materialCode: {}, "
                                 + "historyShortageQty: {}, futurePlanQtyAfterWindow: {}, strictTargetQty: {}",
                         sceneName, sku.getMaterialCode(), historyShortageQty,
                         sku.getFutureMonthPlanQtyAfterWindow(), strictTargetQty);
                 return plan;
-            }
-            if (strictTargetQty > 0) {
-                sku.setTargetScheduleQty(Math.max(sku.resolveTargetScheduleQty(), strictTargetQty));
             }
             plan.setForceEndingByNoFuturePlan(true);
             log.info("{}窗口及月底均无日计划，按收尾清量处理, materialCode: {}, "
@@ -214,6 +214,46 @@ public final class DailyMachineExpansionPlanner {
             if (Math.max(0, quota.getRemainingQty()) > 0) {
                 return false;
             }
+        }
+        return true;
+    }
+
+    /**
+     * 判断当前机台数是否已满足欠产未超阈值时的逐日后看规则。
+     * <p>该口径用于 S4.4 续作补偿和换活字块回流 S4.5 前置判断：
+     * 本月前日累计欠产未超过阈值时，不要求当前窗口小额剩余全部清完，只检查后续日计划是否会被当前机台产能拖垮。</p>
+     *
+     * @param context 排程上下文
+     * @param sku SKU
+     * @param activeMachineCount 当前已承接机台数
+     * @return true-后续日计划已满足，不需要继续增机台；false-仍需按原缺口规则判断
+     */
+    public static boolean isDailyLookAheadCapacitySatisfied(LhScheduleContext context,
+                                                            SkuScheduleDTO sku,
+                                                            int activeMachineCount) {
+        if (Objects.isNull(sku) || sku.isStrictNewSpecShortageOnly()
+                || CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())
+                || Math.max(0, sku.getWindowPlanQty()) <= 0
+                || Math.max(0, activeMachineCount) <= 0
+                || Math.max(0, sku.getShiftCapacity()) <= 0) {
+            return false;
+        }
+        int threshold = Math.max(0, resolveShortageAddMachineThreshold(context));
+        int historyShortageQty = Math.max(0, sku.getMonthlyHistoryShortageQty());
+        if (threshold <= 0 || historyShortageQty > threshold) {
+            return false;
+        }
+        int threeShiftCapacityQty = Math.max(0, activeMachineCount) * Math.max(0, sku.getShiftCapacity()) * 3;
+        LocalDate previousDate = null;
+        for (LocalDate productionDate : sku.getDailyPlanQuotaMap().keySet()) {
+            if (Objects.nonNull(previousDate)) {
+                SkuDailyPlanQuotaDTO quota = sku.getDailyPlanQuotaMap().get(productionDate);
+                int dayPlanQty = quota == null ? 0 : Math.max(0, quota.getDayPlanQty());
+                if (dayPlanQty > threeShiftCapacityQty) {
+                    return false;
+                }
+            }
+            previousDate = productionDate;
         }
         return true;
     }
@@ -379,6 +419,31 @@ public final class DailyMachineExpansionPlanner {
     }
 
     /**
+     * 将窗口日计划账本剩余额度收敛到本月历史欠产目标量。
+     * <p>窗口无日计划但月底仍有计划时，账本中只允许保留本月 T 日前欠产；
+     * 如果共享账本或历史兼容数据已经带入更大剩余额度，必须在这里按目标量截断，
+     * 避免 S4.5 后续扣账时提前消耗 T+3 到月底的未来日计划。</p>
+     *
+     * @param sku SKU
+     * @param targetQty 本月历史欠产补排目标量
+     */
+    private static void capDailyQuotaRemainingToTarget(SkuScheduleDTO sku, int targetQty) {
+        if (Objects.isNull(sku) || CollectionUtils.isEmpty(sku.getDailyPlanQuotaMap())) {
+            return;
+        }
+        int remainingLimitQty = Math.max(0, targetQty);
+        for (SkuDailyPlanQuotaDTO quota : sku.getDailyPlanQuotaMap().values()) {
+            if (Objects.isNull(quota)) {
+                continue;
+            }
+            int cappedRemainingQty = Math.min(Math.max(0, quota.getRemainingQty()), remainingLimitQty);
+            quota.setRemainingQty(cappedRemainingQty);
+            remainingLimitQty -= cappedRemainingQty;
+        }
+        SkuDailyPlanQuotaUtil.refreshRollingFields(sku.getDailyPlanQuotaMap());
+    }
+
+    /**
      * 汇总窗口日计划量。
      *
      * @param sku SKU
@@ -398,21 +463,4 @@ public final class DailyMachineExpansionPlanner {
         return Math.max(0, totalQty);
     }
 
-    /**
-     * 解析正向需求量。
-     *
-     * @param sku SKU
-     * @return 正向需求量
-     */
-    private static int resolvePositiveDemandQty(SkuScheduleDTO sku) {
-        if (Objects.isNull(sku)) {
-            return 0;
-        }
-        int targetQty = Math.max(0, sku.resolveTargetScheduleQty());
-        int surplusQty = Math.max(0, sku.getSurplusQty());
-        if (surplusQty > 0) {
-            return targetQty > 0 ? Math.min(targetQty, surplusQty) : surplusQty;
-        }
-        return targetQty;
-    }
 }
