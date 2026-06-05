@@ -1071,6 +1071,14 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
             return AjaxResult.error("导入文件未读取到有效明细行");
         }
 
+        // 过滤小计行（导出模板中包含的汇总行，cxMachineCode为"小计"）
+        list = list.stream()
+                .filter(row -> row != null && !"小计".equals(row.getCxMachineCode()))
+                .collect(Collectors.toList());
+        if (list.isEmpty()) {
+            return AjaxResult.error("导入文件未读取到有效明细行");
+        }
+
         Date scheduleDate = cn.hutool.core.date.DateUtil.beginOfDay(result.getScheduleDate());
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         int successNum = 0;

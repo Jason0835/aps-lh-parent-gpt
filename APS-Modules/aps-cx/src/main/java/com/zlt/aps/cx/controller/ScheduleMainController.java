@@ -1798,7 +1798,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
-     * 自定义导入数据（基于模板cxjhtemplate.xls）
+     * 自定义导入数据（基于CxExport.xlsx模板的成型日计划Sheet）
      */
     @ApiOperation(value = "自定义导入数据")
     @PostMapping("/importDataByCust/{updateSupport}")
@@ -1812,7 +1812,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             scheduleResult = new CxScheduleResult();
         }
         byte[] fileBytes = importContext.getFileBytes();
-        String sheetName = "成型计划";
+        String sheetName = "成型日计划";
         ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(
                 importContext.getFileBytes(), importContext.getImportFilePath(),
                 importContext.getProcedureCode(), importContext.getFunctionName(),
@@ -1820,7 +1820,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         importLog = this.iImportLogService.add(importLog);
         ExcelUtil<CxScheduleResultTemplateImportVO> util = new ExcelUtil<>(CxScheduleResultTemplateImportVO.class);
         List<CxScheduleResultTemplateImportVO> list = util.importExcel(
-                sheetName, new ByteArrayInputStream(fileBytes), 2);
+                sheetName, new ByteArrayInputStream(fileBytes), 3);
         AjaxResult ajaxResult = cxScheduleResultService.importScheduleTemplate(
                 list, scheduleResult, updateSupport, importLog.getId());
         Date endTime = DateUtils.getNowDate();
