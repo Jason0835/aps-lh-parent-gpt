@@ -7,6 +7,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.zlt.aps.lh.api.constant.LhScheduleConstant;
 import com.zlt.aps.lh.api.constant.LhScheduleParamConstant;
 import com.zlt.aps.lh.api.domain.dto.MachineCleaningWindowDTO;
+import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
 import com.zlt.aps.lh.api.domain.dto.MachineMaintenanceWindowDTO;
 import com.zlt.aps.lh.api.domain.dto.MachineScheduleDTO;
 import com.zlt.aps.lh.api.domain.dto.ShiftProductionControlDTO;
@@ -104,6 +105,8 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
     private static final String NEW_SPEC_SCHEDULE_TYPE = "02";
     private static final String AUTO_DATA_SOURCE = "0";
     private static final String ZERO_PLAN_UNSCHEDULED_REASON = "新增结果裁剪为0";
+    private static final String NEW_SPEC_SAND_BLAST_MOULD_CHANGE_ANALYSIS = "喷砂清洗+换模";
+    private static final String NEW_SPEC_DRY_ICE_MOULD_CHANGE_ANALYSIS = "干冰清洗+换模";
     private static final String NEW_SPEC_CLEANING_ANALYSIS = "模具清洗+换模";
     private static final int NEW_SPEC_CHANGEOVER_PROBE_LIMIT = 16;
     @Resource
@@ -3858,12 +3861,50 @@ public class NewSpecProductionStrategy implements IProductionStrategy {
             return;
         }
         MachineScheduleDTO machine = context.getMachineScheduleMap().get(result.getLhMachineCode());
-        if (machine == null
-                || !MachineCleaningOverlapUtil.hasBlockingOverlap(
-                machine.getCleaningWindowList(), result.getMouldChangeStartTime(), firstPlannedShiftStartTime)) {
+        if (machine == null || CollectionUtils.isEmpty(machine.getCleaningWindowList())) {
             return;
         }
-        ShiftFieldUtil.setShiftAnalysis(result, firstPlannedShiftIndex, NEW_SPEC_CLEANING_ANALYSIS);
+        // 遍历清洗窗口，找到阻塞换模的清洗类型
+        for (MachineCleaningWindowDTO cleaningWindow : machine.getCleaningWindowList()) {
+            if (!isCleaningBlockingMouldChange(cleaningWindow,
+                    result.getMouldChangeStartTime(), firstPlannedShiftStartTime)) {
+                continue;
+            }
+            String cleanType = cleaningWindow.getCleanType();
+            String analysis;
+            if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)) {
+                analysis = NEW_SPEC_SAND_BLAST_MOULD_CHANGE_ANALYSIS;
+            } else if (CleaningTypeEnum.DRY_ICE.getCode().equals(cleanType)) {
+                analysis = NEW_SPEC_DRY_ICE_MOULD_CHANGE_ANALYSIS;
+            } else {
+                analysis = NEW_SPEC_CLEANING_ANALYSIS;
+            }
+            log.info("[清洗+换模分析] 机台: {}, 班次: {}, 清洗类型: {}, 分析: {}, 换模开始: {}, 清洗窗口: {}~{}",
+                    result.getLhMachineCode(), firstPlannedShiftIndex, cleanType, analysis,
+                    result.getMouldChangeStartTime(),
+                    cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime());
+            ShiftFieldUtil.setShiftAnalysis(result, firstPlannedShiftIndex, analysis);
+            return;
+        }
+    }
+
+    /**
+     * 判断换模窗口是否被清洗窗口阻塞。
+     */
+    private boolean isCleaningBlockingMouldChange(MachineCleaningWindowDTO cleaningWindow,
+                                                   Date mouldChangeStartTime,
+                                                   Date firstPlannedShiftStartTime) {
+        if (cleaningWindow == null
+                || cleaningWindow.getCleanStartTime() == null
+                || cleaningWindow.getCleanEndTime() == null
+                || mouldChangeStartTime == null
+                || firstPlannedShiftStartTime == null) {
+            return false;
+        }
+        // 换模开始时间在清洗窗口内，或被清洗窗口挡住
+        Date cleanEndTime = cleaningWindow.getCleanEndTime();
+        return mouldChangeStartTime.before(cleanEndTime)
+                && firstPlannedShiftStartTime.after(cleaningWindow.getCleanStartTime());
     }
 
     /**
