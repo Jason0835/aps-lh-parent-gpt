@@ -283,38 +283,6 @@
         >
       </span>
     </el-dialog>
-    <el-dialog
-      :title="
-        $t(
-          'ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustAlarmTitle'
-        )
-      "
-      :visible.sync="confirmAdjustAlarmDialog.visible"
-      width="640px"
-      append-to-body
-      custom-class="month-plan-confirm-adjust-alarm-dialog"
-      @close="resetConfirmAdjustAlarmDialog"
-    >
-      <div
-        class="confirm-adjust-alarm-message"
-        v-html="confirmAdjustAlarmDialog.messageHtml"
-      />
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="confirmAdjustAlarmDialog.visible = false">{{
-          $t("common.button.cancel")
-        }}</el-button>
-        <el-button
-          type="primary"
-          :loading="confirmAdjustLoading"
-          @click="handleConfirmAdjustAlarmForce"
-          >{{
-            $t(
-              "ui.data.column.monthPlanFinalAdjustQuery.confirmAdjustForceExec"
-            )
-          }}</el-button
-        >
-      </span>
-    </el-dialog>
     <tlt-upload
       ref="tltUpload"
       downloadUrl=""
@@ -392,12 +360,6 @@ export default {
       /** 调整版本号（来自 Redis） */
       currentAdjustMonthPlanVersion: "",
       confirmAdjustLoading: false,
-      /** 确认调整校验异常：展示 msg，确认后带 frontForceExecFlag=1 重试 */
-      confirmAdjustAlarmDialog: {
-        visible: false,
-        messageHtml: "",
-        basePayload: null,
-      },
       recalculateLoading: false,
       getAdjustOrderLoading: false,
       syncLoading: false,
@@ -2976,44 +2938,6 @@ export default {
       const payload = this.buildWeekRollConfirmPayload();
       return payload;
     },
-    /**
-     * 将确认调整接口返回的 msg 转为弹窗可展示的 HTML（后端分隔符为 </br>）
-     */
-    formatConfirmAdjustAlarmMessageHtml(msg) {
-      const raw = msg == null ? "" : String(msg);
-      if (!raw.trim()) {
-        return "";
-      }
-      if (/<\/?[a-z][\s\S]*>/i.test(raw)) {
-        return raw;
-      }
-      return raw
-        .split(/\r?\n|<br\s*\/?>/gi)
-        .filter((line) => line.trim() !== "")
-        .map((line) => `<div>${line}</div>`)
-        .join("");
-    },
-    resetConfirmAdjustAlarmDialog() {
-      this.confirmAdjustAlarmDialog.messageHtml = "";
-      this.confirmAdjustAlarmDialog.basePayload = null;
-    },
-    openConfirmAdjustAlarmDialog(message, basePayload) {
-      this.confirmAdjustAlarmDialog.messageHtml =
-        this.formatConfirmAdjustAlarmMessageHtml(message);
-      this.confirmAdjustAlarmDialog.basePayload = basePayload
-        ? { ...basePayload }
-        : null;
-      this.confirmAdjustAlarmDialog.visible = true;
-    },
-    resolveConfirmAdjustResponseCode(res) {
-      if (res == null) {
-        return 200;
-      }
-      if (typeof res === "object" && res.code !== undefined) {
-        return res.code;
-      }
-      return 200;
-    },
     /** 确认调整成功后的列表刷新与结构调整弹窗逻辑 */
     async afterConfirmAdjustSuccess(res) {
       this.$modal.msgSuccess(
@@ -3041,11 +2965,13 @@ export default {
         }
       }
     },
-    /**
-     * 提交确认调整
-     * @param {"0"|"1"} frontForceExecFlag 手动确认调整为 0；异常弹窗确认继续为 1
-     */
-    async submitConfirmAdjust(frontForceExecFlag) {
+    async handleConfirmAdjust() {
+      if (!this.data || !this.data.length) {
+        this.$modal.msgWarning(
+          this.$t("ui.data.column.monthPlanFinalAdjustQuery.confirmNeedListData")
+        );
+        return;
+      }
       const payload = this.buildMonthPlanConfirmAdjustPayload();
       if (!payload) {
         this.$modal.msgWarning(
@@ -3055,69 +2981,11 @@ export default {
         );
         return;
       }
-      const requestPayload = {
-        ...payload,
-        frontForceExecFlag: String(frontForceExecFlag),
-      };
       this.confirmAdjustLoading = true;
       try {
-        const res = await confirmAdjust(requestPayload, { passError: true });
-        const code = this.resolveConfirmAdjustResponseCode(res);
-        if (code === 200) {
-          this.confirmAdjustAlarmDialog.visible = false;
-          this.resetConfirmAdjustAlarmDialog();
-          await this.afterConfirmAdjustSuccess(res);
-          return;
-        }
-        if (code === 500) {
-          const { frontForceExecFlag: _omit, ...basePayload } = requestPayload;
-          this.openConfirmAdjustAlarmDialog(
-            (res && res.msg) || "",
-            basePayload
-          );
-          return;
-        }
-        if (res && res.msg) {
-          this.$modal.msgError(res.msg);
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        this.confirmAdjustLoading = false;
-      }
-    },
-    async handleConfirmAdjust() {
-      if (!this.data || !this.data.length) {
-        this.$modal.msgWarning(
-          this.$t("ui.data.column.monthPlanFinalAdjustQuery.confirmNeedListData")
-        );
-        return;
-      }
-      await this.submitConfirmAdjust("0");
-    },
-    /**
-     * 确认调整校验异常弹窗：继续执行（frontForceExecFlag=1）。
-     * 仍失败时关闭弹窗，走 request 默认 500 全局错误提示，不再二次打开校验弹窗。
-     */
-    async handleConfirmAdjustAlarmForce() {
-      const basePayload = this.confirmAdjustAlarmDialog.basePayload;
-      if (!basePayload) {
-        this.confirmAdjustAlarmDialog.visible = false;
-        return;
-      }
-      const requestPayload = {
-        ...basePayload,
-        frontForceExecFlag: "1",
-      };
-      this.confirmAdjustLoading = true;
-      try {
-        const res = await confirmAdjust(requestPayload);
-        this.confirmAdjustAlarmDialog.visible = false;
-        this.resetConfirmAdjustAlarmDialog();
+        const res = await confirmAdjust(payload);
         await this.afterConfirmAdjustSuccess(res);
       } catch (e) {
-        this.confirmAdjustAlarmDialog.visible = false;
-        this.resetConfirmAdjustAlarmDialog();
         console.error(e);
       } finally {
         this.confirmAdjustLoading = false;
@@ -3212,15 +3080,6 @@ export default {
   gap: 12px;
   padding: 8px 0 4px;
 }
-.confirm-adjust-alarm-message {
-  max-height: 420px;
-  overflow-y: auto;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #606266;
-  word-break: break-word;
-}
-
 /* 与 rollingCycle/index.vue「调整结果」表格行颜色一致（含固定列） */
 ::v-deep .el-table__fixed,
 ::v-deep .el-table__fixed-right {
