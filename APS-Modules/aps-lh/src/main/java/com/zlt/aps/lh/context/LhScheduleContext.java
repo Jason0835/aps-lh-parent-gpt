@@ -131,6 +131,8 @@ public class LhScheduleContext {
     private Map<String, LhMachineInfo> machineInfoMap = new LinkedHashMap<>();
     /** 模具清洗计划列表 */
     private List<LhMouldCleanPlan> cleaningPlanList = new ArrayList<>();
+    /** 因有可换模具而跳过的喷砂清洗计划, key=machineCode, value=计划清洗时间 */
+    private Map<String, Date> skippedSandblastCleaningMap = new HashMap<>();
     /** 月底计划余量Map, key=materialCode */
     private Map<String, MdmMonthSurplus> monthSurplusMap = new HashMap<>();
     /** 胎胚实时库存Map, key=embryoCode；S4.3 会按同胎胚 SKU 标准产能占比分摊到 SKU 维度 */

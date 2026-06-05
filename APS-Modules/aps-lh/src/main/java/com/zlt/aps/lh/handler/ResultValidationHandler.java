@@ -1605,43 +1605,102 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
             if (CollectionUtils.isEmpty(shifts)) {
                 continue;
             }
-            // 检查每个班次（1-8）是否被清洗窗口覆盖
-            for (int shiftIndex = 1; shiftIndex <= 8; shiftIndex++) {
-                LhShiftConfigVO shift = findShiftByIndex(shifts, shiftIndex);
-                if (shift == null || shift.getShiftStartDateTime() == null || shift.getShiftEndDateTime() == null) {
+            // 遍历每个清洗窗口，只标识清洗结束时间所在的班次
+            for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
+                if (cleaningWindow == null || cleaningWindow.getCleanStartTime() == null
+                        || cleaningWindow.getCleanEndTime() == null) {
                     continue;
                 }
-                // 检查该班次时段是否与清洗窗口重叠
-                for (MachineCleaningWindowDTO cleaningWindow : cleaningWindowList) {
-                    if (cleaningWindow == null || cleaningWindow.getCleanStartTime() == null
-                            || cleaningWindow.getCleanEndTime() == null) {
-                        continue;
-                    }
-                    // 判断班次与清洗窗口是否有重叠
-                    if (hasTimeOverlap(shift.getShiftStartDateTime(), shift.getShiftEndDateTime(),
-                            cleaningWindow.getCleanStartTime(), cleaningWindow.getCleanEndTime())) {
-                        // 根据清洗类型设置分析标识
-                        String cleanType = cleaningWindow.getCleanType();
-                        String analysis;
-                        if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)) {
-                            analysis = "喷砂清洗";
-                        } else if (CleaningTypeEnum.DRY_ICE.getCode().equals(cleanType)) {
-                            analysis = "干冰清洗";
-                        } else {
-                            continue;
-                        }
-                        // 设置分析标识
-                        ShiftFieldUtil.setShiftAnalysis(result, shiftIndex, analysis);
-                        log.info("[清洗分析标识] 机台: {}, 班次: {}, 原因: {}, 清洗窗��: {}~{}",
-                                machineCode, shiftIndex, analysis,
-                                LhScheduleTimeUtil.formatDateTime(cleaningWindow.getCleanStartTime()),
-                                LhScheduleTimeUtil.formatDateTime(cleaningWindow.getCleanEndTime()));
-                        // 一个班次只处理一个清洗窗口
-                        break;
-                    }
+                tagCleaningEndShift(result, cleaningWindow, shifts, machineCode);
+            }
+            // 检查因有可换模具而跳过的喷砂清洗
+            Map<String, Date> skippedMap = context.getSkippedSandblastCleaningMap();
+            if (skippedMap != null && !skippedMap.isEmpty()) {
+                Date skippedCleanTime = skippedMap.get(machineCode);
+                if (skippedCleanTime != null) {
+                    tagSkippedSandblastCleaningShift(result, skippedCleanTime, shifts, machineCode);
                 }
             }
         }
+    }
+
+    /**
+     * 标识清洗结束时间所在的班次。
+     */
+    private void tagCleaningEndShift(LhScheduleResult result, MachineCleaningWindowDTO cleaningWindow,
+                                     List<LhShiftConfigVO> shifts, String machineCode) {
+        Date cleanEndTime = cleaningWindow.getCleanEndTime();
+        for (int shiftIndex = 1; shiftIndex <= 8; shiftIndex++) {
+            LhShiftConfigVO shift = findShiftByIndex(shifts, shiftIndex);
+            if (shift == null || shift.getShiftStartDateTime() == null
+                    || shift.getShiftEndDateTime() == null) {
+                continue;
+            }
+            if (!cleanEndTime.before(shift.getShiftStartDateTime())
+                    && cleanEndTime.before(shift.getShiftEndDateTime())) {
+                String analysis = resolveEndShiftCleaningAnalysis(
+                        cleaningWindow.getCleanType(), cleaningWindow);
+                if (analysis == null) {
+                    continue;
+                }
+                ShiftFieldUtil.setShiftAnalysis(result, shiftIndex, analysis);
+                log.info("[清洗分析标识] 机台: {}, 班次: {}, 原因: {}, 清洗窗口: {}~{}, readyTime: {}",
+                        machineCode, shiftIndex, analysis,
+                        LhScheduleTimeUtil.formatDateTime(cleaningWindow.getCleanStartTime()),
+                        LhScheduleTimeUtil.formatDateTime(cleanEndTime),
+                        cleaningWindow.getReadyTime() != null
+                                ? LhScheduleTimeUtil.formatDateTime(cleaningWindow.getReadyTime()) : "无");
+                break;
+            }
+        }
+    }
+
+    /**
+     * 标识因有可换模具而跳过的喷砂清洗（按计划清洗时间定位班次）。
+     */
+    private void tagSkippedSandblastCleaningShift(LhScheduleResult result, Date plannedCleanTime,
+                                                   List<LhShiftConfigVO> shifts, String machineCode) {
+        for (int shiftIndex = 1; shiftIndex <= 8; shiftIndex++) {
+            LhShiftConfigVO shift = findShiftByIndex(shifts, shiftIndex);
+            if (shift == null || shift.getShiftStartDateTime() == null
+                    || shift.getShiftEndDateTime() == null) {
+                continue;
+            }
+            if (!plannedCleanTime.before(shift.getShiftStartDateTime())
+                    && plannedCleanTime.before(shift.getShiftEndDateTime())) {
+                ShiftFieldUtil.setShiftAnalysis(result, shiftIndex, "换模跳过喷砂清洗");
+                log.info("[清洗分析标识] 机台: {}, 班次: {}, 原因: 换模跳过喷砂清洗, 计划清洗时间: {}",
+                        machineCode, shiftIndex,
+                        LhScheduleTimeUtil.formatDateTime(plannedCleanTime));
+                break;
+            }
+        }
+    }
+
+    /**
+     * 根据清洗窗口解析结束班次的分析标识。
+     * <p>喷砂清洗区分"喷砂清洗"（readyTime之前结束）和"喷砂含首检"（readyTime之后结束），
+     * 干冰清洗标识"干冰清洗"。</p>
+     *
+     * @param cleanType      清洗类型
+     * @param cleaningWindow 清洗窗口
+     * @return 分析标识，无法确定时返回null
+     */
+    private String resolveEndShiftCleaningAnalysis(String cleanType,
+                                                   MachineCleaningWindowDTO cleaningWindow) {
+        if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleanType)) {
+            // 喷砂清洗：cleanEndTime在readyTime之后为含首检，否则为单独喷砂清洗
+            Date readyTime = cleaningWindow.getReadyTime();
+            Date cleanEndTime = cleaningWindow.getCleanEndTime();
+            if (readyTime != null && cleanEndTime != null && cleanEndTime.after(readyTime)) {
+                return "喷砂含首检";
+            }
+            return "喷砂清洗";
+        }
+        if (CleaningTypeEnum.DRY_ICE.getCode().equals(cleanType)) {
+            return "干冰清洗";
+        }
+        return null;
     }
 
     /**

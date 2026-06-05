@@ -8,9 +8,12 @@ import com.zlt.aps.lh.api.domain.entity.LhMouldCleanPlan;
 import com.zlt.aps.lh.api.enums.CleaningTypeEnum;
 import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
+import com.zlt.aps.lh.util.MouldStatusUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
+import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -151,9 +154,15 @@ public class LhCleaningScheduleService {
                 }
                 log.info("[清洗调试] 清洗窗口排入成功, 机台: {}, 类型: {}, 最终开始时间: {}",
                         cleaningPlan.getLhCode(), cleanType, LhScheduleTimeUtil.formatDateTime(adjustedStartTime));
+                MachineCleaningWindowDTO cleaningWindow = buildCleaningWindow(context, cleaningPlan,
+                        adjustedStartTime, cleanDurationHours, readyDurationHours);
+                if (cleaningWindow == null) {
+                    // 因有可换模具跳过喷砂清洗，不占用配额
+                    return null;
+                }
                 increaseCleaningCapacityUsage(context, totalDailyCountMap, dryIceDailyCountMap, dryIceMorningCountMap,
                         dryIceAfternoonCountMap, sandBlastDailyCountMap, cleanType, adjustedStartTime);
-                return buildCleaningWindow(context, cleaningPlan, adjustedStartTime, cleanDurationHours, readyDurationHours);
+                return cleaningWindow;
             }
             log.info("[清洗调试] 额度不足, 机台: {}, 类型: {}, 时间: {}, 尝试下一候选",
                     cleaningPlan.getLhCode(), cleanType, LhScheduleTimeUtil.formatDateTime(adjustedStartTime));
@@ -204,6 +213,17 @@ public class LhCleaningScheduleService {
                                                          Date adjustedCleanStartTime,
                                                          int cleanDurationHours,
                                                          int readyDurationHours) {
+        // 喷砂清洗：优先检查是否有可换模具，有则跳过清洗直接换模
+        if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleaningPlan.getCleanType())
+                && hasSpareMouldForSandblastMachine(context, cleaningPlan)) {
+            context.getSkippedSandblastCleaningMap().put(
+                    cleaningPlan.getLhCode(), cleaningPlan.getCleanTime());
+            log.info("[清洗调试] 喷砂清洗跳过-有可换模具, 机台: {}, 计划清洗时间: {}",
+                    cleaningPlan.getLhCode(),
+                    LhScheduleTimeUtil.formatDateTime(cleaningPlan.getCleanTime()));
+            return null;
+        }
+
         MachineCleaningWindowDTO cleaningWindow = new MachineCleaningWindowDTO();
         cleaningWindow.setLhCode(cleaningPlan.getLhCode());
         cleaningWindow.setCleanType(cleaningPlan.getCleanType());
@@ -502,6 +522,57 @@ public class LhCleaningScheduleService {
                 .filter(StringUtils::isNotEmpty)
                 .distinct()
                 .collect(Collectors.joining(VALUE_SEPARATOR));
+    }
+
+    /**
+     * 检查喷砂清洗机台是否有空闲模具可换，有则可跳过喷砂清洗直接换模。
+     * <p>判断依据：机台当前物料关联的启用模具数量大于机台模台数（单模/双模），
+     * 则表示有机外可用的空闲模具。</p>
+     *
+     * @param context      排程上下文
+     * @param cleaningPlan 清洗计划
+     * @return true-有空闲模具可换；false-无空闲模具
+     */
+    private boolean hasSpareMouldForSandblastMachine(LhScheduleContext context,
+                                                     LhMouldCleanPlan cleaningPlan) {
+        String machineCode = cleaningPlan.getLhCode();
+        LhMachineOnlineInfo onlineInfo = context.getMachineOnlineInfoMap().get(machineCode);
+        if (Objects.isNull(onlineInfo) || StringUtils.isEmpty(onlineInfo.getMaterialCode())) {
+            return false;
+        }
+        String materialCode = onlineInfo.getMaterialCode();
+        // 获取该物料关联的所有模具号
+        List<MdmSkuMouldRel> mouldRelList = context.getSkuMouldRelMap().get(materialCode);
+        if (CollectionUtils.isEmpty(mouldRelList)) {
+            return false;
+        }
+        // 统计启用状态的模具数量
+        Map<String, MdmModelInfo> modelInfoMap = context.getModelInfoMap();
+        long enabledMouldCount = mouldRelList.stream()
+                .map(MdmSkuMouldRel::getMouldCode)
+                .filter(StringUtils::isNotEmpty)
+                .distinct()
+                .filter(mouldCode -> {
+                    if (modelInfoMap == null) {
+                        return false;
+                    }
+                    MdmModelInfo modelInfo = modelInfoMap.get(mouldCode);
+                    return modelInfo != null && MouldStatusUtil.isEnabled(modelInfo.getMouldStatus());
+                })
+                .count();
+        // 获取机台模台数
+        LhMachineInfo machineInfo = context.getMachineInfoMap().get(machineCode);
+        int machineMouldQty = 1;
+        if (machineInfo != null && machineInfo.getMaxMoldNum() != null) {
+            machineMouldQty = machineInfo.getMaxMoldNum();
+        }
+        // 启用模具数量大于机台模台数 → 有空闲模具可换
+        boolean hasSpare = enabledMouldCount > machineMouldQty;
+        if (hasSpare) {
+            log.info("[清洗调试] 机台 {} 有空闲模具(启用{}/模台{}), 物料: {}, 跳过喷砂清洗",
+                    machineCode, enabledMouldCount, machineMouldQty, materialCode);
+        }
+        return hasSpare;
     }
 
     /**
