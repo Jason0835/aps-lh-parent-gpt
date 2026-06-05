@@ -1812,7 +1812,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             scheduleResult = new CxScheduleResult();
         }
         byte[] fileBytes = importContext.getFileBytes();
-        String sheetName = "成型日计划";
+        // 先检测Excel文件中是否存在"成型日计划"Sheet，不存在则尝试按索引1读取（兼容旧模板）
+        String sheetName = detectImportSheetName(fileBytes);
+        int headRowNum = "成型日计划".equals(sheetName) ? 3 : 2;
         ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(
                 importContext.getFileBytes(), importContext.getImportFilePath(),
                 importContext.getProcedureCode(), importContext.getFunctionName(),
@@ -1820,7 +1822,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         importLog = this.iImportLogService.add(importLog);
         ExcelUtil<CxScheduleResultTemplateImportVO> util = new ExcelUtil<>(CxScheduleResultTemplateImportVO.class);
         List<CxScheduleResultTemplateImportVO> list = util.importExcel(
-                sheetName, new ByteArrayInputStream(fileBytes), 3);
+                sheetName, new ByteArrayInputStream(fileBytes), headRowNum);
         AjaxResult ajaxResult = cxScheduleResultService.importScheduleTemplate(
                 list, scheduleResult, updateSupport, importLog.getId());
         Date endTime = DateUtils.getNowDate();
@@ -1831,6 +1833,28 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         ImportExcelUtils.updateImportLogAndFormatMsg(importLog, ajaxResult, this.iImportLogService);
         ImportExcelUtils.saveImportErrorLogs(ajaxResult, this.iImportErrorLogService);
         return ajaxResult;
+    }
+
+    /**
+     * 检测导入文件中的Sheet名称，优先查找"成型日计划"，不存在则返回null（使用默认Sheet）
+     */
+    private String detectImportSheetName(byte[] fileBytes) {
+        try (org.apache.poi.ss.usermodel.Workbook wb = org.apache.poi.ss.usermodel.WorkbookFactory.create(
+                new ByteArrayInputStream(fileBytes))) {
+            if (wb.getSheet("成型日计划") != null) {
+                return "成型日计划";
+            }
+            if (wb.getSheet("成型计划") != null) {
+                return "成型计划";
+            }
+            // 都不存在时尝试取第二个Sheet（index=1）的名称
+            if (wb.getNumberOfSheets() > 1) {
+                return wb.getSheetName(1);
+            }
+            return "";
+        } catch (Exception e) {
+            return "成型日计划";
+        }
     }
 
     /**
