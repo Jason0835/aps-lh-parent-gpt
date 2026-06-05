@@ -199,6 +199,7 @@
   "ui.data.monthlyProductionPlan.dayVulcanizationQty": "Daily Curing Qty",
   "ui.data.monthlyProductionPlan.postponeProductionQty": "Postponed Order Qty",
   "ui.data.monthlyProductionPlan.trialProductionQty": "Trial Production Qty",
+  "ui.data.rollingCycle.pendingQty": "Pending Adjustment Qty",
   "ui.data.column.demandPlanSum.netQty": "Net Demand",
   "ui.data.column.demandPlanSum.heightQty": "High Priority Net Demand",
   "ui.data.column.demandPlanSum.midQty": "Medium Priority Net Demand",
