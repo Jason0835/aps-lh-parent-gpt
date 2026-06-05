@@ -6,6 +6,7 @@ import com.zlt.aps.cx.api.domain.entity.CxMachineOnlineInfo;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.itf.vo.AuxReqSyncDataLogs;
 import com.zlt.aps.lh.api.domain.entity.LhMachineOnlineInfo;
+import com.zlt.aps.lh.api.service.ILhPrecisionPlanRemoteService;
 import com.zlt.aps.mp.api.domain.entity.*;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,9 @@ public class MesTask {
 
     @Autowired
     private IMesItfService iMesItfService;
+
+    @Autowired
+    private ILhPrecisionPlanRemoteService lhPrecisionPlanRemoteService;
 
     /**
      * 同步成品库存
@@ -270,5 +274,34 @@ public class MesTask {
             log.error("定时任务-按版本前缀APS_MES_AH01同步MES硫化精度数据并生成计划异常", e);
         }
         log.info("定时任务-按版本前缀APS_MES_AH01同步MES硫化精度数据并生成计划完成");
+    }
+
+    /**
+     * 临时任务：按计划时间年份过滤，从MES同步硫化精度数据并生成目标年度计划
+     * 取最新版本+版本前缀APS_MES_AH01+计划时间在25年的硫化精度数据，生成26年精度计划
+     * 用于MES全量版本数据中只取特定年份的数据，避免跨年数据干扰
+     * 执行步骤：
+     * 1. 同步MES设备保养计划到APS（仅硫化精度）
+     * 2. 按计划时间年份25年过滤，生成26年硫化精度计划
+     */
+    @ApiOperation("临时任务-按计划时间年份25年过滤生成26年硫化精度计划")
+    public void generateLhPrecisionPlanByOperYear2025() {
+        log.info("临时任务-开始按计划时间年份25年过滤生成26年硫化精度计划");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                // 先同步MES设备保养计划到APS
+                AuxReqSyncDataLogs lhSyncParam = new AuxReqSyncDataLogs();
+                lhSyncParam.setPrecisionType("硫化精度");
+                AjaxResult syncResult = iMesItfService.syncDevMaintenancePlan(lhSyncParam);
+                log.info("同步设备保养计划结果：{}", syncResult.get("msg"));
+
+                // 按计划时间年份25年过滤，生成26年硫化精度计划
+                AjaxResult result = lhPrecisionPlanRemoteService.generatePlansFromMesByOperYear("APS_MES_AH01", 2025, 2026);
+                log.info("临时任务执行结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-按计划时间年份25年过滤生成26年硫化精度计划异常", e);
+        }
+        log.info("临时任务-按计划时间年份25年过滤生成26年硫化精度计划完成");
     }
 }
