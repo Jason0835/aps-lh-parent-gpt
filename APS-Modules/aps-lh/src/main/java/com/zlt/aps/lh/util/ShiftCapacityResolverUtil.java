@@ -840,7 +840,7 @@ public final class ShiftCapacityResolverUtil {
                                                int mouldQty,
                                                long shiftDurationSeconds) {
         int totalLossQty = 0;
-        // 喷砂按“清洗重叠时长对应能生产多少条”来扣减，因此直接复用统一班产折算公式。
+        // 喷砂扣减算法：先算可用时间能产几条（向上取整），再反推剩余时间损耗。
         List<Date[]> sandBlastIntervals = collectMergedCleaningIntervals(
                 cleaningWindowList, CleaningTypeEnum.SAND_BLAST.getCode(), windowStartTime, windowEndTime);
         for (Date[] sandBlastInterval : sandBlastIntervals) {
@@ -849,10 +849,62 @@ public final class ShiftCapacityResolverUtil {
             if (effectiveOverlapSeconds <= 0) {
                 continue;
             }
-            totalLossQty += resolveShiftCapacity(
-                    shiftCapacity, lhTimeSeconds, mouldQty, shiftDurationSeconds, effectiveOverlapSeconds);
+            totalLossQty += resolveSandBlastLossWithCeil(
+                    shiftCapacity, mouldQty, shiftDurationSeconds, effectiveOverlapSeconds);
         }
         return totalLossQty;
+    }
+
+    /**
+     * 用向上取整算法计算喷砂清洗损失量。
+     * <ol>
+     *   <li>可用生产时间 = 班次总时长 - 喷砂重叠时长</li>
+     *   <li>单模可产条数 = ceil(单模班产 * 可用时间 / 班次时长)</li>
+     *   <li>ceil 条数占用时间 = ceil条数 / 单模班产 * 班次时长</li>
+     *   <li>剩余不可产时间 = 班次时长 - 占用时间</li>
+     *   <li>单模损耗 = floor(单模班产 * 剩余时间 / 班次时长)</li>
+     *   <li>最终损耗 = 单模损耗 * 模台数</li>
+     * </ol>
+     *
+     * @param shiftCapacity        班产
+     * @param mouldQty             模台数
+     * @param shiftDurationSeconds 班次总时长（秒）
+     * @param overlapSeconds       喷砂与班次重叠的秒数
+     * @return 损失量
+     */
+    private static int resolveSandBlastLossWithCeil(int shiftCapacity, int mouldQty,
+                                                     long shiftDurationSeconds, long overlapSeconds) {
+        int resolvedMouldQty = resolveMachineMouldQty(mouldQty);
+        int singleMouldCapacity = resolvedMouldQty > 1
+                ? shiftCapacity / resolvedMouldQty : shiftCapacity;
+        if (shiftDurationSeconds <= 0 || singleMouldCapacity <= 0) {
+            return 0;
+        }
+
+        long availableSeconds = shiftDurationSeconds - overlapSeconds;
+        if (availableSeconds <= 0) {
+            return shiftCapacity;
+        }
+
+        // 单模可产条数 = ceil(单模班产 * 可用时间 / 班次时长)
+        double rawItems = (double) singleMouldCapacity * (double) availableSeconds
+                / (double) shiftDurationSeconds;
+        int ceilItems = (int) Math.ceil(rawItems);
+
+        // ceil 条数占用时间（秒）
+        BigDecimal itemsTimeSec = BigDecimal.valueOf(ceilItems)
+                .multiply(BigDecimal.valueOf(shiftDurationSeconds))
+                .divide(BigDecimal.valueOf(singleMouldCapacity), 0, RoundingMode.DOWN);
+
+        long remainingSec = Math.max(shiftDurationSeconds - itemsTimeSec.longValue(), 0L);
+
+        // 单模损耗 = floor(单模班产 * 剩余时间 / 班次时长)
+        int singleLoss = BigDecimal.valueOf(singleMouldCapacity)
+                .multiply(BigDecimal.valueOf(remainingSec))
+                .divide(BigDecimal.valueOf(shiftDurationSeconds), 0, RoundingMode.DOWN)
+                .intValue();
+
+        return singleLoss * resolvedMouldQty;
     }
 
     private static long resolveEffectiveCleaningOverlapSeconds(Date[] cleaningInterval,
