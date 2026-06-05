@@ -401,7 +401,7 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
         //获取对应的模具产能
         Integer dayCapacityQty = structureList.stream()
                 .map(FactoryMonthPlanMouldDayResultExportVo::getDayVulcanizationQty).filter(Objects::nonNull)
-                .max(Integer::compareTo).orElse(null);
+                .max(Integer::compareTo).orElse(0);
         Integer maxProductionDays = workDaySet.size();
         Map<String, Integer> mouldAllocationMap = mouldAllocationInfoList.stream().collect(Collectors.toMap(
                 MouldAllocationInfoVo::getDuplicateKey, MouldAllocationInfoVo::getAllocationQty, (q1, q2) -> q1));
@@ -433,12 +433,12 @@ public class FactoryMonthPlanMouldDayResultServiceImpl extends AbstractDocServic
             skuCapacityInfo.setMaterialCode(result.getMaterialCode());
             skuCapacityInfo.setMaterialDesc(result.getMaterialDesc());
             skuCapacityInfo.setMainPattern(result.getMainPattern());
-            skuCapacityInfo.setDayVulcanizationQty(result.getDayVulcanizationQty());
+            skuCapacityInfo.setDayVulcanizationQty(intValue(result.getDayVulcanizationQty()));
             skuCapacityInfo.setMaxMoldCapacity(maxEnableMouldCapacityMap.getOrDefault(result.getGroupAndMainPattern(), 0));
-            skuCapacityInfo.setSumProductionQty(sumNetQty);
-            skuCapacityInfo.setSumHeightProductionQty(sumHeightQty);
-            skuCapacityInfo.setProductionQty(result.getProdReqPlan());
-            skuCapacityInfo.setHeightProductionQty(result.getHeightQty());
+            skuCapacityInfo.setSumProductionQty(intValue(sumNetQty));
+            skuCapacityInfo.setSumHeightProductionQty(intValue(sumHeightQty));
+            skuCapacityInfo.setProductionQty(intValue(result.getProdReqPlan()));
+            skuCapacityInfo.setHeightProductionQty(intValue(result.getHeightQty()));
             return skuCapacityInfo;
         }).collect(Collectors.toList());
         List<SkuMoldCapacityInfoVo> groupResultList = moldCapacityLimitAllocateHandler.moldCapacityAllocateHandler(skuList);
