@@ -208,17 +208,25 @@ public final class ShiftCapacityResolverUtil {
             effectiveAvailableSeconds = Math.min(availableSeconds, shiftDurationSeconds);
         }
 
-        // 有班产主数据时，按整班班产基准做残班折算。
-        // 这里向下取整，表示“只保留已被有效时间完全覆盖的计划量”，不把零头时间提前算成完整产出。
+        // 有班产主数据时，先用单模班产计算损耗再乘回模台数，避免双模收敛多扣。
         if (shiftCapacity > 0) {
             if (shiftDurationSeconds <= 0) {
                 return shiftCapacity;
             }
-            int resolvedQty = BigDecimal.valueOf(shiftCapacity)
-                    .multiply(BigDecimal.valueOf(effectiveAvailableSeconds))
+            int resolvedMouldQty = resolveMachineMouldQty(mouldQty);
+            // 单模班产
+            int singleMouldCapacity = resolvedMouldQty > 1
+                    ? shiftCapacity / resolvedMouldQty : shiftCapacity;
+            // 单模损耗 = floor(单模班产 * 损失时间 / 班次时长)
+            long lostSeconds = shiftDurationSeconds - effectiveAvailableSeconds;
+            int singleMouldLoss = BigDecimal.valueOf(singleMouldCapacity)
+                    .multiply(BigDecimal.valueOf(Math.max(lostSeconds, 0L)))
                     .divide(BigDecimal.valueOf(shiftDurationSeconds), 0, RoundingMode.DOWN)
                     .intValue();
-            return normalizeQtyToMouldMultiple(resolvedQty, mouldQty, effectiveAvailableSeconds < shiftDurationSeconds);
+            // 单模扣减后产出
+            int singleMouldOutput = Math.max(singleMouldCapacity - singleMouldLoss, 0);
+            // 乘回模台数
+            return singleMouldOutput * resolvedMouldQty;
         }
 
         // 无班产主数据时，按完整硫化周期数回退计算，仍然只统计可完整完成的周期。
