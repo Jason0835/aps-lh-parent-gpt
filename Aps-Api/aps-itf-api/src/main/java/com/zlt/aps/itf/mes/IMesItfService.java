@@ -382,6 +382,19 @@ public interface IMesItfService {
                                                               @RequestParam("year") Integer year);
 
     /**
+     * 同步MES数据并生成硫化精度计划（按版本号前缀过滤，不限最大版本号，综合接口）
+     * 与syncAndGenerateLhPrecisionPlanByVersionPrefix的区别：不限制最大版本号，版本前缀匹配的所有版本数据都参与生成
+     *
+     * @param versionPrefix 版本号前缀（如：APS_MES_AH01）
+     * @param year 年度
+     * @return 执行结果
+     */
+    @ApiOperation("同步MES数据并生成硫化精度计划（按版本号前缀过滤，不限最大版本号，综合接口）")
+    @PostMapping("/mesItf/syncAndGenerateLhPrecisionPlanByVersionPrefixAllVersions")
+    AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefixAllVersions(@RequestParam("versionPrefix") String versionPrefix,
+                                                                         @RequestParam("year") Integer year);
+
+    /**
      * 清理并重新同步所有MES历史数据
      * 执行步骤：
      * 1. 逻辑删除APS库中今天之前的所有数据（6张表）

@@ -250,6 +250,23 @@ public class LhPrecisionPlanController extends AbstractDocBizController<LhPrecis
     }
 
     /**
+     * 从MES同步数据生成硫化精度初版计划（按版本号前缀过滤，不限最大版本号）
+     * 与generateFromMesByVersionPrefix的区别：不限制最大版本号，版本前缀匹配的所有版本数据都参与生成
+     */
+    @ApiOperation("从MES同步数据生成硫化精度初版计划（按版本号前缀过滤，不限最大版本号）")
+    @PostMapping("/generateFromMesByVersionPrefixAllVersions")
+    public AjaxResult generatePlansFromMesByVersionPrefixAllVersions(@RequestParam("versionPrefix") String versionPrefix,
+                                                                      @RequestParam("year") Integer year) {
+        try {
+            int count = lhPrecisionPlanService.generatePlansFromMesByVersionPrefixAllVersions(versionPrefix, year);
+            return AjaxResult.success("生成成功", count);
+        } catch (Exception e) {
+            log.error("从MES同步数据生成硫化精度计划失败（版本前缀={}，不限最大版本号）", versionPrefix, e);
+            return AjaxResult.error("生成失败：" + e.getMessage());
+        }
+    }
+
+    /**
      * 自动生成年度硫化精度计划
      */
     @ApiOperation("自动生成年度硫化精度计划")

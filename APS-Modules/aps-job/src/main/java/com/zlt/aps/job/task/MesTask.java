@@ -246,4 +246,29 @@ public class MesTask {
         }
         log.info("硫化日完成量回填芯片库存-定时任务执行完成");
     }
+
+    /**
+     * 定时任务：从MES同步版本前缀为APS_MES_AH01的硫化精度数据并生成硫化精度计划
+     * 与临时任务syncAndGenerateLhPrecisionPlanByVersionPrefix的区别：
+     * 不限制最大版本号，版本前缀为APS_MES_AH01的所有版本数据都参与生成
+     * 执行步骤：
+     * 1. 同步MES设备保养计划到APS（仅硫化精度）
+     * 2. 同步MES硫化精度计划实际执行日期回填数据
+     * 3. 按版本前缀APS_MES_AH01过滤，不限最大版本号，生成硫化精度计划
+     * 4. 自动推算下一年度硫化精度计划
+     */
+    @ApiOperation("定时任务-按版本前缀APS_MES_AH01同步MES硫化精度数据并生成计划（不限最大版本号）")
+    public void syncAndGenerateLhPrecisionPlanByAh01() {
+        log.info("定时任务-开始按版本前缀APS_MES_AH01同步MES硫化精度数据并生成计划（不限最大版本号）");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                Integer currentYear = LocalDate.now().getYear();
+                AjaxResult result = iMesItfService.syncAndGenerateLhPrecisionPlanByVersionPrefixAllVersions("APS_MES_AH01", currentYear);
+                log.info("定时任务执行结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("定时任务-按版本前缀APS_MES_AH01同步MES硫化精度数据并生成计划异常", e);
+        }
+        log.info("定时任务-按版本前缀APS_MES_AH01同步MES硫化精度数据并生成计划完成");
+    }
 }
