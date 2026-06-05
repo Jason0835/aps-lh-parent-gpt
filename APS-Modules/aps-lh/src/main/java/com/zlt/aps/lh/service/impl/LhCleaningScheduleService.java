@@ -213,23 +213,8 @@ public class LhCleaningScheduleService {
         cleaningWindow.setCleanEndTime(LhScheduleTimeUtil.addHours(adjustedCleanStartTime, cleanDurationHours));
         cleaningWindow.setReadyTime(LhScheduleTimeUtil.addHours(adjustedCleanStartTime, readyDurationHours));
 
-        // 喷砂清洗不能跨越夜班：如果结束时间在夜班时段，则整体顺延到次日早班
-        if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleaningPlan.getCleanType())) {
-            Date cleanEndTime = cleaningWindow.getCleanEndTime();
-            if (cleanEndTime != null && LhScheduleTimeUtil.isNoMouldChangeTime(context, cleanEndTime)) {
-                Date morningStart = LhScheduleTimeUtil.resolveNextMorningAfterNoMouldChangeWindow(
-                        context, adjustedCleanStartTime);
-                log.info("喷砂清洗窗口跨越夜班，顺延到早班, 机台: {}, 原开始: {}, 原结束: {}, 调整后开始: {}",
-                        cleaningPlan.getLhCode(),
-                        LhScheduleTimeUtil.formatDateTime(adjustedCleanStartTime),
-                        LhScheduleTimeUtil.formatDateTime(cleanEndTime),
-                        LhScheduleTimeUtil.formatDateTime(morningStart));
-                // 重新计算结束时间和ready时间
-                cleaningWindow.setCleanStartTime(morningStart);
-                cleaningWindow.setCleanEndTime(LhScheduleTimeUtil.addHours(morningStart, cleanDurationHours));
-                cleaningWindow.setReadyTime(LhScheduleTimeUtil.addHours(morningStart, readyDurationHours));
-            }
-        }
+        // 喷砂清洗：夜班不能"开始"喷砂，但已开始的喷砂可以延续到夜班
+        // （开始时间在夜班的顺延已在 normalizeCleaningStartTime 中处理，此处不再额外调整）
 
         cleaningWindow.setDataSource(cleaningPlan.getDataSource());
         cleaningWindow.setRemark(cleaningPlan.getRemark());
