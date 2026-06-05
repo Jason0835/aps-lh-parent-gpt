@@ -1645,7 +1645,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         private final int shortageQty;
         private final int ignoredOverProductionQty;
 
-        private MonthlyShortageSummary(int shortageQty, int ignoredOverProductionQty) {
+        MonthlyShortageSummary(int shortageQty, int ignoredOverProductionQty) {
             this.shortageQty = Math.max(0, shortageQty);
             this.ignoredOverProductionQty = Math.max(0, ignoredOverProductionQty);
         }
