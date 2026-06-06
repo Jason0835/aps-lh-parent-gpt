@@ -1,5 +1,6 @@
 package com.zlt.aps.lh.service.impl;
 
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
@@ -9,8 +10,8 @@ import com.ruoyi.common.core.web.domain.RowStateEnum;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.redis.service.RedisService;
 import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.itf.mes.IMesItfService;
 import com.zlt.aps.lh.api.domain.entity.LhMouldChangePlan;
 import com.zlt.aps.lh.component.OrderNoGenerator;
@@ -18,8 +19,8 @@ import com.zlt.aps.lh.mapper.LhMouldChangePlanEntityMapper;
 import com.zlt.aps.lh.service.ILhMouldChangePlanService;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
 import com.zlt.aps.maindata.mapper.MdmMaterialInfoEntityMapper;
-import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
+import com.zlt.aps.mdm.api.domain.entity.MdmMoldAlterPlan;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
@@ -32,8 +33,6 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import cn.hutool.core.date.DateUtil;
 
 import javax.annotation.Resource;
 import java.util.*;
@@ -305,7 +304,9 @@ public class LhMouldChangePlanServiceImpl extends AbstractDocService<LhMouldChan
                 LhMouldChangePlan::getId, docEntityVO.getFieldValueByFieldName("id"));
         queryWrapper.eq(LhMouldChangePlan::getFactoryCode, docEntityVO.getFactoryCode());
         queryWrapper.eq(LhMouldChangePlan::getLhMachineCode, docEntityVO.getLhMachineCode());
-        queryWrapper.eq(LhMouldChangePlan::getPlanDate, docEntityVO.getPlanDate());
+        Date planDate = DateUtil.beginOfDay(docEntityVO.getPlanDate());
+        queryWrapper.ge(LhMouldChangePlan::getPlanDate, planDate);
+        queryWrapper.lt(LhMouldChangePlan::getPlanDate, DateUtil.offsetDay(planDate, 1));
         queryWrapper.eq(LhMouldChangePlan::getScheduleDate, docEntityVO.getScheduleDate());
 
         if (lhMouldChangePlanMapper.selectCount(queryWrapper) > 0) {

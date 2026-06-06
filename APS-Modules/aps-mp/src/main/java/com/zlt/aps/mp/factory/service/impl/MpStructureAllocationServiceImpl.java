@@ -1228,6 +1228,11 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             }
             lhMachineStatisticsMap.put(entry.getKey(), dayLhMachinesMap);
         }
+        // 1.3.3、加载周期结构
+        LambdaQueryWrapper<MdmCycleSchStruConf> mdmCycleSchStruConfQueryWrapper = new LambdaQueryWrapper<>();
+        mdmCycleSchStruConfQueryWrapper.eq(MdmCycleSchStruConf::getFactoryCode, param.getFactoryCode());
+        Set<String> cycleSchStruSet = mdmCycleSchStruConfEntityMapper.selectList(mdmCycleSchStruConfQueryWrapper).stream().map(MdmCycleSchStruConf::getStructureName).distinct().collect(Collectors.toSet());
+        
         // 1.4、加载月计划排产明细，根据参数决定加载月计划还是定稿版本
         Map<String, List<FactoryMonthPlanMouldDayResult>> mouldingDayResultMap;
         if (isFinal) { // 定稿
@@ -1368,7 +1373,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 // 3.2.3.2、统计结构排产汇总数据
                 FactoryMonthPlanMouldDayResult mouldingDayResultAggregated = structureDayResultMap.get(structureName);
                 if (mouldingDayResultAggregated != null) {
-                    machineRecord.setStructureType(mouldingDayResultAggregated.getStructureType()); // 结构类型
                     machineRecord.setTotalQty(mouldingDayResultAggregated.getTotalQty()); // 结构总排产量
                     Integer netQty = Optional.ofNullable(machineRecord.getNetQty()).orElse(0); // 净需求
                     Integer differenceQty = Optional.ofNullable(mouldingDayResultAggregated.getTotalQty()).orElse(0); // 未排量 = 净需求 - 总排产量
@@ -1376,6 +1380,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     machineRecord.setProductTypeCode(mouldingDayResultAggregated.getProductTypeCode());
                     machineRecord.setProSize(mouldingDayResultAggregated.getProSize());
                 }
+                // 3.2.3.3、处理结构类型
+                String structureType;
+                if (!CollectionUtils.isEmpty(cycleSchStruSet) && cycleSchStruSet.contains(structureName)) {
+                    structureType = ProductionGroupTypeEnum.CYCLE.getGroupType();
+                } else {
+                    structureType = ProductionGroupTypeEnum.CONVENTION.getGroupType();
+                }
+                machineRecord.setStructureType(structureType); // 结构类型
                 machineRecord.setChangeRank(changeRank ++); // 设置序号
                 machineRecord.setBeginDay(beginDay);
                 machineRecord.setEndDay(endDay);
