@@ -2751,7 +2751,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                     if (resultBegingDay < structureBegingDay || resultEndDay > structureEndDay) { // 超范围则记录错误信息
                         item.setId(errorImportId);
                         failureNum++;
-                        String errorMsg = String.format(outOfRangeStr, item.getMaterialDesc(), structureBegingDay, structureEndDay);
+                        String errorMsg = String.format(outOfRangeStr, item.getMaterialDesc() + item.getMaterialCode(), structureBegingDay, structureEndDay);
                         addImportErrorLog(importLogId, errorNum, errorMsg, importErrorLogs);
                         continue;
                     }
@@ -3069,14 +3069,14 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             MdmMaterialInfo materialInfo = materialInfoMap.get(materialCode);
             if (materialInfo == null) {
                 insertItem.setId(errorImportId);
-                String errorMsg = String.format(notMaterialStr, materialDesc);
+                String errorMsg = String.format(notMaterialStr, materialDesc + materialCode);
                 addImportErrorLog(importLogId, insertItem.getImportRowNum(), errorMsg, importErrorLogs);
                 continue;
             }
             // 2.2、模具校验
             if (!materialHasMoldSet.contains(materialDesc)) {
                 insertItem.setId(errorImportId);
-                String errorMsg = String.format(notSkuMoldRelStr, materialDesc);
+                String errorMsg = String.format(notSkuMoldRelStr, materialDesc + materialCode);
                 addImportErrorLog(importLogId, insertItem.getImportRowNum(), errorMsg, importErrorLogs);
                 continue;
             }
@@ -3172,7 +3172,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             }
             if (insertItem.getDayVulcanizationQty() == null) {
                 insertItem.setId(errorImportId);
-                String errorMsg = String.format(notDayVulcanizationQtyStr, materialDesc);
+                String errorMsg = String.format(notDayVulcanizationQtyStr, materialDesc + materialCode);
                 addImportErrorLog(importLogId, insertItem.getImportRowNum(), errorMsg, importErrorLogs);
                 continue;
             }
