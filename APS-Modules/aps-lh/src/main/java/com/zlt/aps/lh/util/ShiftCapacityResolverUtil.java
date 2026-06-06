@@ -850,7 +850,7 @@ public final class ShiftCapacityResolverUtil {
                 continue;
             }
             totalLossQty += resolveSandBlastLossWithCeil(
-                    shiftCapacity, mouldQty, shiftDurationSeconds, effectiveOverlapSeconds);
+                    shiftCapacity, lhTimeSeconds, mouldQty, shiftDurationSeconds, effectiveOverlapSeconds);
         }
         return totalLossQty;
     }
@@ -860,12 +860,13 @@ public final class ShiftCapacityResolverUtil {
      * <p>公式化简后：单模损耗 = 单模班产 - ceil(单模班产 * 可用时间 / 班次时长)</p>
      *
      * @param shiftCapacity        班产
+     * @param lhTimeSeconds        硫化周期（秒）
      * @param mouldQty             模台数
      * @param shiftDurationSeconds 班次总时长（秒）
      * @param overlapSeconds       喷砂与班次重叠的秒数
      * @return 损失量
      */
-    private static int resolveSandBlastLossWithCeil(int shiftCapacity, int mouldQty,
+    private static int resolveSandBlastLossWithCeil(int shiftCapacity, int lhTimeSeconds, int mouldQty,
                                                      long shiftDurationSeconds, long overlapSeconds) {
         int resolvedMouldQty = resolveMachineMouldQty(mouldQty);
         int singleMouldCapacity = resolvedMouldQty > 1
@@ -885,6 +886,10 @@ public final class ShiftCapacityResolverUtil {
                 .multiply(BigDecimal.valueOf(availableSeconds))
                 .divide(BigDecimal.valueOf(shiftDurationSeconds), 6, RoundingMode.UP);
         int ceilItems = rawItems.setScale(0, RoundingMode.CEILING).intValue();
+        // 额外校验：若单模ceil出的条数所需生产时间超过可用时间（硫化周期不容切割），则退回floor取整
+        if (lhTimeSeconds > 0 && (long) ceilItems * lhTimeSeconds > availableSeconds) {
+            ceilItems = (int) Math.min(ceilItems, availableSeconds / lhTimeSeconds);
+        }
 
         int singleLoss = singleMouldCapacity - ceilItems;
 
