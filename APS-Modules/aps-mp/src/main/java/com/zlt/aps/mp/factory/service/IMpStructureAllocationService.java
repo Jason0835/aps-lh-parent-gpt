@@ -120,15 +120,17 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
 
     /**
      * 导入
-     * @param list 列表数据
-     * @param updateSupport 覆盖
-     * @param importLogId 导入日志ID
-     * @param params 表头参数
+     * 
+     * @param list             结构转产表列表数据
+     * @param list4DayResult   月计划列表数据
+     * @param updateSupport    覆盖
+     * @param importLogId      导入日志ID
+     * @param params           表头参数
      * @param monthPlanVersion 月计划版本
-     * @param productVersion 生产版本
-     * @param isAdjust 是否调整
+     * @param productVersion   生产版本
+     * @param isAdjust         是否调整
      * @return 结果
      */
-    AjaxResult importDataDayResult(List<FactoryMonthPlanMouldDayResult> list, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
+    AjaxResult importDataDayResult(List<MpStructureAllocationExportVo> list, List<FactoryMonthPlanMouldDayResult> list4DayResult, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
                                    Map<String, String> factoryMap, Map<String, String> productTypeMap, boolean isAdjust);
 }
