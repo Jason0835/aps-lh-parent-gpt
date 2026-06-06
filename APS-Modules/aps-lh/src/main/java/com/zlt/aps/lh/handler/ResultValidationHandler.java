@@ -1636,7 +1636,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     || shift.getShiftEndDateTime() == null) {
                 continue;
             }
-            if (cleanEndTime.after(shift.getShiftStartDateTime())
+            // [start, end] 两端闭区间，顺序遍历时边界值优先命中前一个班次
+            if (!cleanEndTime.before(shift.getShiftStartDateTime())
                     && !cleanEndTime.after(shift.getShiftEndDateTime())) {
                 String analysis = resolveEndShiftCleaningAnalysis(
                         cleaningWindow.getCleanType(), cleaningWindow);
