@@ -37,10 +37,10 @@ public class ApsCxApplication {
         String port = env.getProperty("server.port");
 
         log.info("\n----------------------------------------------------------\n\t" +
-                "Application SCM-UI is running!\n\t" +
-                "APS成型硫化接口文档 URLs:\n\t" +
-                "外销UI接口文档1: \thttp://" + ip + ":" + port + "/swagger-ui/index.html\n\t" +
-                "外销UI接口文档1: \thttp://" + ip + ":" + port + "/doc.html\n" +
+                "Application APS-CX is running!\n\t" +
+                "APS成型接口文档 URLs:\n\t" +
+                "APS-CX接口文档1: \thttp://" + ip + ":" + port + "/swagger-ui/index.html\n\t" +
+                "APS-CX接口文档1: \thttp://" + ip + ":" + port + "/doc.html\n" +
                 "----------------------------------------------------------\n\t"
         );
     }
