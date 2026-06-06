@@ -316,6 +316,8 @@ public interface MesItfService {
      */
     AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefix(String versionPrefix, Integer year);
 
+    public AjaxResult syncAndFillActualDateByOperYear(String versionPrefix, Integer operYear);
+
     AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefixAllVersions(String versionPrefix, Integer year);
 
     /**
