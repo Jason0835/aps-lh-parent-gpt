@@ -82,13 +82,13 @@ public class MpMonthPlanMonitorController extends AbstractDocBizController<MpMon
             List<FactoryMonthPlanProductionFinalResult> finalResultList = finalResultEntityMapper.selectList(queryWrapper);
             if (CollectionUtils.isNotEmpty(finalResultList)) {
                 finalResultMap = finalResultList.stream().collect(Collectors
-                        .toMap(item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getYearMonth(), item.getMaterialCode()), Function.identity()));
+                        .toMap(item -> GenerageMapKeyUtils.createMapKey(item.getMaterialCode(),item.getProductStatus()), Function.identity(), (existing, replacement) -> replacement));
             }
         }
 
         for (MpMonthPlanMonitor monitor : list) {
             Integer lhMargin = monitor.getLhMargin();
-            String mapKey = GenerageMapKeyUtils.createMapKey(monitor.getFactoryCode(), monitor.getYearMonth(), monitor.getMaterialCode());
+            String mapKey = GenerageMapKeyUtils.createMapKey(monitor.getMaterialCode(), monitor.getProductStatus());
             if (finalResultMap.containsKey(mapKey)) {
                 FactoryMonthPlanProductionFinalResult result = finalResultMap.get(mapKey);
                 int dayVulcanizationQty = ObjectUtils.defaultIfNull(result.getDayVulcanizationQty(), 0) * 2;
