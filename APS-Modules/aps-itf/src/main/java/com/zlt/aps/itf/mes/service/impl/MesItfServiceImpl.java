@@ -2407,26 +2407,24 @@ public class MesItfServiceImpl implements MesItfService {
         log.info("查到版本前缀={}、计划时间在{}年且有实际执行时间的硫化精度数据{}条", versionPrefix, operYear, mesPlans.size());
 
         // 步骤3：构建回填数据列表，调用batchFillActualDateAndGenerateNext回填+生成
+        // 注意：MdmDevMaintenancePlan.firstWashTime是Date类型（APS本地表），不需要字符串解析
         List<java.util.Map<String, Object>> fillList = new ArrayList<>();
         for (MdmDevMaintenancePlan mesPlan : mesPlans) {
-            if (StringUtils.isBlank(mesPlan.getFirstWashTime()) || StringUtils.isBlank(mesPlan.getDevCode())) {
+            if (mesPlan.getFirstWashTime() == null || StringUtils.isBlank(mesPlan.getDevCode())) {
                 continue;
             }
-            try {
-                java.util.Date actualDate = DateUtils.parseDate(mesPlan.getFirstWashTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd");
-                java.util.Map<String, Object> item = new java.util.HashMap<>();
-                item.put("machineCode", mesPlan.getDevCode());
-                item.put("factoryCode", mesPlan.getFactoryCode());
-                item.put("actualDate", actualDate);
-                fillList.add(item);
-            } catch (Exception e) {
-                log.error("解析实际执行日期失败：机台={}, 日期={}", mesPlan.getDevCode(), mesPlan.getFirstWashTime(), e);
-            }
+            java.util.Map<String, Object> item = new java.util.HashMap<>();
+            item.put("machineCode", mesPlan.getDevCode());
+            item.put("factoryCode", mesPlan.getFactoryCode());
+            item.put("actualDate", mesPlan.getFirstWashTime());
+            fillList.add(item);
         }
 
         if (!fillList.isEmpty()) {
             try {
-                int count = lhPrecisionPlanRemoteService.batchFillActualDateAndGenerateNext(fillList);
+                AjaxResult fillResult = lhPrecisionPlanRemoteService.batchFillActualDateAndGenerateNext(fillList);
+                Object data = fillResult != null ? fillResult.get("data") : null;
+                int count = data != null ? Integer.parseInt(data.toString()) : 0;
                 log.info("回填实际执行日期并生成下一年度计划{}条", count);
                 resultMsg.append("回填实际执行日期并生成下一年度计划").append(count).append("条；");
             } catch (Exception e) {
