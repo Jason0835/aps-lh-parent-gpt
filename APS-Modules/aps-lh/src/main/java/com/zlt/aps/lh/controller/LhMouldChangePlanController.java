@@ -26,6 +26,7 @@ import com.ruoyi.common.log.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.ExcelStyleVo;
+import com.zlt.aps.common.core.utils.ApsCommonUtil;
 import com.zlt.aps.common.core.utils.ExcelUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ConstructionStageEnum;
@@ -56,6 +57,10 @@ import io.swagger.annotations.ApiOperation;
 import jodd.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -213,13 +218,34 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
     @PostMapping("/importData")
     public AjaxResult importData(@RequestBody LhScheduleImportDTO lhImportContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         ImportContext importContext = lhImportContext.getImportContext();
-        Date scheduleDate = lhImportContext.getScheduleResult().getScheduleDate();
         Date beginTime = DateUtils.getNowDate();
         ImportLog importLog = ImportExcelUtils.getImportLogAndUploadFile(importContext.getFileBytes(), importContext.getImportFilePath(), importContext.getProcedureCode(), importContext.getFunctionName(), importContext.getOriFileName(), 1);
         importLog = this.iImportLogService.add(importLog);
         byte[] fileBytes = importContext.getFileBytes();
         ExcelUtil<LhMouldChangePlanVo> util = new ExcelUtil<>(LhMouldChangePlanVo.class);
         String sheetName = I18nUtil.getMessage("ui.data.column.lhMouldChangePlan.import.modelName");
+        String titleFormat = I18nUtil.getMessage("mouldChangePlan.export.title");
+        String templateErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateError");
+        String[] params = new String[]{};
+        Date scheduleDate = null;
+        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
+            Sheet sheet = wb.getSheet(sheetName);
+            if (sheet == null || sheet.getRow(0) == null) {
+                return AjaxResult.error(templateErrorStr);
+            }
+            Cell titleCell = sheet.getRow(1).getCell(6);
+            if (titleCell == null) {
+                return AjaxResult.error(templateErrorStr);
+            }
+            params = ApsCommonUtil.parseFormat(titleFormat, titleCell.getStringCellValue());
+            if (params == null || params.length < 3) {
+                return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateTitleError"));
+            }
+            scheduleDate = DateUtil.parse(params[0], "yyyy年MM月dd日");
+        } catch (Exception e) {
+            log.warn("importDataStructureAllocation workbook parse failed", e);
+            return AjaxResult.error(templateErrorStr);
+        }
         List<LhMouldChangePlanVo> list = util.importExcel(
                 sheetName, new ByteArrayInputStream(fileBytes), 0, 4, -1);
         List<LhMouldChangePlan> mouldChangePlanList = buildLhMouldChangePlanList(list, scheduleDate);
@@ -333,13 +359,12 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
      */
     public Map<String, Object> buildExportTableMap(List<LhMouldChangePlanVo> list, Date scheduleDate) {
         Map<String, Object> tableMap = new HashMap<>(16);
+        String titleFormat = I18nUtil.getMessage("mouldChangePlan.export.title");
         String cnFormatDate = DateUtil.format(scheduleDate, "yyyy年MM月dd日");
         String vnFormatDate = DateUtil.format(scheduleDate, "dd/MM/yyyy");
-        String titleFormat = cnFormatDate + "全钢硫化工程模具交替计划\n" +
-                "KẾ HOẠCH THAY KHUÔN TOÀN THÉP NGÀY " + vnFormatDate;
-        String version = "版本phiên bản：" + DateUtils.parseDateToStr("yyyyMMddHHmmss", new Date());
-        tableMap.put("title", titleFormat + "                                                                       "
-                + version);
+        String versionDate = DateUtils.parseDateToStr("yyyyMMddHHmmss", new Date());
+        String version = "版本phiên bản：" + versionDate;
+        tableMap.put("title", String.format(titleFormat, cnFormatDate, vnFormatDate, versionDate));
         tableMap.put("version", version);
 
         ExcelUtil<LhMouldChangePlanVo> util = new ExcelUtil<>(LhMouldChangePlanVo.class);
