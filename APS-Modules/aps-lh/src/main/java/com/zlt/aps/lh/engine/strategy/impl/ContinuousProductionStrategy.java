@@ -2983,7 +2983,9 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
                     shiftMaxQty);
             setShiftPlanQty(result, shift.getShiftIndex(), shiftQty, effectiveStartTime, shiftPlanEndTime);
             remaining -= shiftQty;
-            cursorStartTime = effectiveEndTime;
+            // 2026-06-06 修复：使用实际做完计划量的结束时间，而不是班次配置的固定结束时间
+            // 否则会导致班次时间与清洗时间重叠计算不准确
+            cursorStartTime = shiftPlanEndTime;
         }
         refreshResultSummary(context, result, shifts);
     }
