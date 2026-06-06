@@ -3070,5 +3070,18 @@
   "ui.data.column.originalStructure": "原结构",
   "ui.data.column.originalSpecification": "原规格",
   "ui.data.column.adjustedTireCount": "调整的轮胎条数",
-  "ui.data.column.formingMachine": "成型机台"
+  "ui.data.column.formingMachine": "成型机台",
+  "ui.data.column.cd90MachineInfo.modelName": "直裁机台管理",
+  "ui.data.column.cd90MachineInfo.factoryCode": "工厂",
+  "ui.data.column.cd90MachineInfo.machineCode": "机台编号",
+  "ui.data.column.cd90MachineInfo.machineName": "机台名称",
+  "ui.data.column.cd90MachineInfo.isStickFilm": "是否支持贴胶片",
+  "ui.data.column.cd90MachineInfo.clothWidthMax": "帘布宽度上限",
+  "ui.data.column.cd90MachineInfo.clothWidthMin": "帘布宽度下限",
+  "ui.data.column.cd90MachineInfo.quota": "生产定额（米/班）",
+  "ui.data.column.cd90MachineInfo.classShift": "班制",
+  "ui.data.column.cd90MachineInfo.openMachineClass": "开机班次",
+  "ui.data.column.cd90MachineInfo.status": "机台状态",
+  "ui.data.column.cd90MachineInfo.checkUnique": "同一工厂下已存在相同机台编号",
+  "ui.data.alert.cd90MachineInfo.quotaPositive": "生产定额必须大于0"
 }

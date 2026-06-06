@@ -1525,5 +1525,18 @@
   "ui.data.column.originalStructure": "Cấu trúc ban đầu",
   "ui.data.column.originalSpecification": "Quy cách ban đầu",
   "ui.data.column.adjustedTireCount": "Số lượng lốp đã điều chỉnh",
-  "ui.data.column.formingMachine": "Máy tạo hình"
+  "ui.data.column.formingMachine": "Máy tạo hình",
+  "ui.data.column.cd90MachineInfo.modelName": "Máy cắt 90 độ",
+  "ui.data.column.cd90MachineInfo.factoryCode": "Nhà máy",
+  "ui.data.column.cd90MachineInfo.machineCode": "Mã máy",
+  "ui.data.column.cd90MachineInfo.machineName": "Tên máy",
+  "ui.data.column.cd90MachineInfo.isStickFilm": "Hỗ trợ dán film",
+  "ui.data.column.cd90MachineInfo.clothWidthMax": "Khổ vải tối đa",
+  "ui.data.column.cd90MachineInfo.clothWidthMin": "Khổ vải tối thiểu",
+  "ui.data.column.cd90MachineInfo.quota": "Định mức (m/ca)",
+  "ui.data.column.cd90MachineInfo.classShift": "Chế độ ca",
+  "ui.data.column.cd90MachineInfo.openMachineClass": "Ca mở máy",
+  "ui.data.column.cd90MachineInfo.status": "Trạng thái máy",
+  "ui.data.column.cd90MachineInfo.checkUnique": "Mã máy này đã tồn tại trong cùng nhà máy",
+  "ui.data.alert.cd90MachineInfo.quotaPositive": "Định mức phải lớn hơn 0"
 }
