@@ -1915,7 +1915,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         String[] params = helper.getParams();
         String[] params4DayResult = helper.getParams4DayResult();
         String monthPlanVersion = helper.getMonthPlanVersion();
-        String productVersion = helper.getProductVersion();
+        String productVersion = "I" + com.ruoyi.common.core.utils.DateUtils.dateTimeNow();
         int year = helper.getYear();
         int month = helper.getMonth();
         ExcelUtil<FactoryMonthPlanMouldDayResult> util4DayResult = new ExcelUtil<>(FactoryMonthPlanMouldDayResult.class);
@@ -2024,7 +2024,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         String templateErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateError");
         String templateTitleErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateTitleError");
         String monthPlanVersionNotMatchErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.monthPlanVersionNotMatch");
-        String productionVersionNotMatchErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.productionVersionNotMatch");
         ClassLoader classLoader = this.getClass().getClassLoader();
         DataFormatter dataFormatter = new DataFormatter();
 
@@ -2107,18 +2106,6 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
             // 校验如果两个页签的需求版本号不一致，报失败
             if (!Objects.equals(monthPlanVersion4Day, helper.getMonthPlanVersion())) {
                 helper.setAjaxResult(AjaxResult.error(monthPlanVersionNotMatchErrorStr));
-                return helper;
-            }
-            // 解析生产版本
-            Cell productVersionCell4Day = sheet4DayResult.getRow(0).getCell(68);
-            if (productVersionCell4Day == null) {
-                helper.setAjaxResult(AjaxResult.error(templateErrorStr));
-                return helper;
-            }
-            String productVersion4Day = dataFormatter.formatCellValue(productVersionCell4Day).replace(productionVersionLabel, "").trim();
-            // 校验如果两个页签的需求版本号不一致，报失败
-            if (!Objects.equals(productVersion4Day, helper.getProductVersion())) {
-                helper.setAjaxResult(AjaxResult.error(productionVersionNotMatchErrorStr));
                 return helper;
             }
             try {
