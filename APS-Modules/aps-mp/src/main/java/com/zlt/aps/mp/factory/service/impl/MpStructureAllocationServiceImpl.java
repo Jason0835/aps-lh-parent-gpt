@@ -2097,7 +2097,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
                 return helper;
             }
             // 解析需求计划版本
-            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(63);
+            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(64);
             if (monthPlanVersionCell4DayResult == null) {
                 helper.setAjaxResult(AjaxResult.error(templateErrorStr));
                 return helper;
