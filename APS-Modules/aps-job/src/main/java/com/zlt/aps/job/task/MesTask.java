@@ -289,10 +289,10 @@ public class MesTask {
         log.info("临时任务-开始按计划时间年份25年过滤生成26年硫化精度计划");
         try {
             FeignTokenHelper.runWithToken(() -> {
-                // 先同步MES设备保养计划到APS
+                // 先同步MES设备保养计划到APS（仅同步，不触发生成精度计划）
                 AuxReqSyncDataLogs lhSyncParam = new AuxReqSyncDataLogs();
                 lhSyncParam.setPrecisionType("硫化精度");
-                AjaxResult syncResult = iMesItfService.syncDevMaintenancePlan(lhSyncParam);
+                AjaxResult syncResult = iMesItfService.syncDevMaintenancePlanOnly(lhSyncParam);
                 log.info("同步设备保养计划结果：{}", syncResult.get("msg"));
 
                 // 按计划时间年份25年过滤，生成26年硫化精度计划

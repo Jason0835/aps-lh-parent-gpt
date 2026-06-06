@@ -165,6 +165,14 @@ public interface MesItfService {
     AjaxResult syncDevMaintenancePlan(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 仅同步设备保养计划数据，不触发自动生成精度计划逻辑
+     *
+     * @param syncDataLogs 同步参数（可指定精度类型）
+     * @return 同步结果
+     */
+    AjaxResult syncDevMaintenancePlanOnly(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步胶囊已使用次数
      *
      * @param syncDataLogs 同步参数
