@@ -395,6 +395,19 @@ public interface IMesItfService {
                                                                          @RequestParam("year") Integer year);
 
     /**
+     * 临时任务：同步MES设备保养计划并按计划时间年份回填实际执行日期+生成下一年度精度计划
+     * 只取指定年份有实际执行时间的数据来回填对应年份的精度计划，并推算生成下一年度计划
+     *
+     * @param versionPrefix 版本号前缀（如：APS_MES_AH01）
+     * @param operYear 计划时间所在年份（如：2026，只取operTime在该年份的数据）
+     * @return 执行结果
+     */
+    @ApiOperation("临时任务-按计划时间年份同步回填实际日期并生成下一年度精度计划")
+    @PostMapping("/mesItf/syncAndFillActualDateByOperYear")
+    AjaxResult syncAndFillActualDateByOperYear(@RequestParam("versionPrefix") String versionPrefix,
+                                                @RequestParam("operYear") Integer operYear);
+
+    /**
      * 清理并重新同步所有MES历史数据
      * 执行步骤：
      * 1. 逻辑删除APS库中今天之前的所有数据（6张表）

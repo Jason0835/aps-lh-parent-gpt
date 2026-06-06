@@ -683,6 +683,13 @@ public class MesItfController {
         return mesItfService.syncAndGenerateLhPrecisionPlanByVersionPrefixAllVersions(versionPrefix, year);
     }
 
+    @ApiOperation("临时任务-按计划时间年份同步回填实际日期并生成下一年度精度计划")
+    @PostMapping("/syncAndFillActualDateByOperYear")
+    public AjaxResult syncAndFillActualDateByOperYear(@RequestParam("versionPrefix") String versionPrefix,
+                                                       @RequestParam("operYear") Integer operYear) {
+        return mesItfService.syncAndFillActualDateByOperYear(versionPrefix, operYear);
+    }
+
     /**
      * 清理并重新同步所有MES历史数据（含今天）
      * 执行步骤：

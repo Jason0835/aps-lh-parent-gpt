@@ -2363,6 +2363,84 @@ public class MesItfServiceImpl implements MesItfService {
         return AjaxResult.success(resultMsg.toString(), totalGenerated);
     }
 
+    @Override
+    public AjaxResult syncAndFillActualDateByOperYear(String versionPrefix, Integer operYear) {
+        log.info("开始执行临时任务：按计划时间年份同步回填实际日期并生成下一年度精度计划（版本前缀={}，计划时间年份={}）", versionPrefix, operYear);
+
+        StringBuilder resultMsg = new StringBuilder();
+
+        // 步骤1：同步MES设备保养计划到APS（仅硫化精度），确保目标年份数据在本地表中
+        log.info("步骤1：同步MES设备保养计划到APS（仅硫化精度）");
+        try {
+            AuxReqSyncDataLogs lhSyncParam = new AuxReqSyncDataLogs();
+            lhSyncParam.setPrecisionType("硫化精度");
+            AjaxResult syncResult = syncDevMaintenancePlan(lhSyncParam);
+            log.info("同步设备保养计划结果：{}", syncResult.get("msg"));
+            resultMsg.append("同步硫化设备保养计划完成；");
+        } catch (Exception e) {
+            log.error("同步硫化设备保养计划失败", e);
+            resultMsg.append("同步硫化设备保养计划失败：").append(e.getMessage()).append("；");
+        }
+
+        // 步骤2：从APS本地表查指定版本前缀+硫化精度+计划时间在指定年份且有实际执行时间的数据
+        log.info("步骤2：从APS本地表查版本前缀={}、计划时间在{}年且有实际执行时间的硫化精度数据", versionPrefix, operYear);
+        String maxVersion = devMaintenancePlanEntityMapper.selectMaxDataVersionByPrefix("硫化精度", versionPrefix);
+        if (maxVersion == null || maxVersion.isEmpty()) {
+            log.warn("APS本地表中无版本前缀为{}的硫化精度版本数据，跳过回填", versionPrefix);
+            return AjaxResult.error("APS本地表中无版本前缀为" + versionPrefix + "的硫化精度版本数据");
+        }
+        log.info("版本前缀={}的硫化精度最新版本号：{}", versionPrefix, maxVersion);
+
+        LambdaQueryWrapper<MdmDevMaintenancePlan> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmDevMaintenancePlan::getPrecisionType, "硫化精度")
+               .eq(MdmDevMaintenancePlan::getIsDelete, 0)
+               .eq(MdmDevMaintenancePlan::getDataVersion, maxVersion)
+               .isNotNull(MdmDevMaintenancePlan::getFirstWashTime)
+               .apply("YEAR(oper_time) = {0}", operYear);
+
+        List<MdmDevMaintenancePlan> mesPlans = devMaintenancePlanEntityMapper.selectList(wrapper);
+        if (mesPlans == null || mesPlans.isEmpty()) {
+            log.warn("APS本地表中无版本前缀={}、计划时间在{}年且有实际执行时间的硫化精度数据", versionPrefix, operYear);
+            return AjaxResult.success("无符合条件的回填数据");
+        }
+
+        log.info("查到版本前缀={}、计划时间在{}年且有实际执行时间的硫化精度数据{}条", versionPrefix, operYear, mesPlans.size());
+
+        // 步骤3：构建回填数据列表，调用batchFillActualDateAndGenerateNext回填+生成
+        List<java.util.Map<String, Object>> fillList = new ArrayList<>();
+        for (MdmDevMaintenancePlan mesPlan : mesPlans) {
+            if (StringUtils.isBlank(mesPlan.getFirstWashTime()) || StringUtils.isBlank(mesPlan.getDevCode())) {
+                continue;
+            }
+            try {
+                java.util.Date actualDate = DateUtils.parseDate(mesPlan.getFirstWashTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd");
+                java.util.Map<String, Object> item = new java.util.HashMap<>();
+                item.put("machineCode", mesPlan.getDevCode());
+                item.put("factoryCode", mesPlan.getFactoryCode());
+                item.put("actualDate", actualDate);
+                fillList.add(item);
+            } catch (Exception e) {
+                log.error("解析实际执行日期失败：机台={}, 日期={}", mesPlan.getDevCode(), mesPlan.getFirstWashTime(), e);
+            }
+        }
+
+        if (!fillList.isEmpty()) {
+            try {
+                int count = lhPrecisionPlanRemoteService.batchFillActualDateAndGenerateNext(fillList);
+                log.info("回填实际执行日期并生成下一年度计划{}条", count);
+                resultMsg.append("回填实际执行日期并生成下一年度计划").append(count).append("条；");
+            } catch (Exception e) {
+                log.error("批量回填硫化精度计划实际执行日期失败", e);
+                resultMsg.append("批量回填失败：").append(e.getMessage()).append("；");
+            }
+        } else {
+            resultMsg.append("无有效的实际执行日期数据可回填；");
+        }
+
+        log.info("临时任务：按计划时间年份同步回填实际日期并生成下一年度精度计划执行完成（版本前缀={}，计划时间年份={}）", versionPrefix, operYear);
+        return AjaxResult.success(resultMsg.toString());
+    }
+
     /**
      * 临时任务：清理并重新同步所有MES历史数据（含今天）
      * 执行步骤：
