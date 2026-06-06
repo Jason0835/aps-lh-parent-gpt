@@ -1219,4 +1219,11 @@ public class LhScheduleResultTemplateImportVO extends BaseEntity {
     @ApiModelProperty(value = "硫化产量今天夜班", name = "todayNightFinishQty")
     @TableField(value = "TODAY_NIGHT_FINISH_QTY")
     private BigDecimal todayNightFinishQty;
+
+
+    @Excel(name = "ui.data.column.lhScheduleResultTemplateImportVO.remark")
+    @ApiModelProperty(value = "备注", name = "remark")
+    @TableField(value = "REMARK")
+    private String remark;
+
 }
