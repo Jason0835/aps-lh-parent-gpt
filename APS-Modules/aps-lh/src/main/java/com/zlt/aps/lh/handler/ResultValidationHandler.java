@@ -1636,8 +1636,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                     || shift.getShiftEndDateTime() == null) {
                 continue;
             }
-            if (!cleanEndTime.before(shift.getShiftStartDateTime())
-                    && cleanEndTime.before(shift.getShiftEndDateTime())) {
+            if (cleanEndTime.after(shift.getShiftStartDateTime())
+                    && !cleanEndTime.after(shift.getShiftEndDateTime())) {
                 String analysis = resolveEndShiftCleaningAnalysis(
                         cleaningWindow.getCleanType(), cleaningWindow);
                 if (analysis == null) {
