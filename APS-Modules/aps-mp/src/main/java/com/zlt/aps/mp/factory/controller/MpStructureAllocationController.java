@@ -301,10 +301,16 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         AjaxResult ajaxResult = mpStructureAllocationService.importData(fileBytes, importLog);
         // 处理返回结果
         Map<String, Object> returnData = (Map<String, Object>)(ajaxResult.get(AjaxResult.DATA_TAG));
-        Integer rowCount = (Integer)returnData.getOrDefault("rowCount", 0);
-        Integer errorNum = (Integer)returnData.getOrDefault("errorNum", 0);
-        Integer successNum = (Integer)returnData.getOrDefault("successNum", 0);
-        List<Object> importErrorLogs = (List<Object>)returnData.get("importErrorLogs");
+        Integer rowCount = 0;
+        Integer errorNum = 0;
+        Integer successNum = 0;
+        List<Object> importErrorLogs = Collections.EMPTY_LIST;
+        if (returnData != null) {
+            rowCount = (Integer)returnData.getOrDefault("rowCount", 0);
+            errorNum = (Integer)returnData.getOrDefault("errorNum", 0);
+            successNum = (Integer)returnData.getOrDefault("successNum", 0);
+            importErrorLogs = (List<Object>)returnData.get("importErrorLogs");
+        }
         
         AjaxResult logResult; // 日志消息，用于更新日志
         AjaxResult finalResult;

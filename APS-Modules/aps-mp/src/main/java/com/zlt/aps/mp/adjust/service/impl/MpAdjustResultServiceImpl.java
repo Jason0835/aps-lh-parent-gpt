@@ -18,6 +18,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.common.core.utils.AjaxResultUtils;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.mp.adjust.mapper.MpAdjustResultEntityMapper;
@@ -26,6 +27,7 @@ import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanMouldDayResult;
 import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
 import com.zlt.aps.mp.engine.adjust.MpWeekRollAdjustEngine;
 import com.zlt.aps.mp.factory.dto.MpStructureAllocationExportVo;
+import com.zlt.aps.mp.factory.dto.MpStructureAllocationImportHelper;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
@@ -38,11 +40,13 @@ import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -85,6 +89,11 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     
     @Autowired
     private IMpStructureAllocationService mpStructureAllocationService;
+    /**
+     * 导入页签名称，仅加载一次
+     */
+    private static String sheetName = null;
+    private static String sheetName4DayResult= null;
 
     @Override
     protected String getDocTypeCode() {
@@ -194,7 +203,7 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
     @Override
     public AjaxResult importData(byte[] fileBytes, ImportLog importLog) {
         ExcelUtil<MpStructureAllocationExportVo> util = new ExcelUtil<>(MpStructureAllocationExportVo.class);
-        DataFormatter dataFormatter = new DataFormatter();
+        ExcelUtil<FactoryMonthPlanMouldDayResult> util4DayResult = new ExcelUtil<>(FactoryMonthPlanMouldDayResult.class);
         // 工厂名称字典
         List<SysDictData> factoryDatas = Optional.ofNullable(sysDictDataCacheService.getType("biz_factory_name")).orElse(Collections.emptyList());
         Map<String, String> factoryMap = factoryDatas.stream()
@@ -207,60 +216,16 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
                 .filter(Objects::nonNull)
                 .filter(v -> v.getDictLabel() != null && v.getDictValue() != null)
                 .collect(Collectors.toMap(SysDictData::getDictLabel, SysDictData::getDictValue, (a, b) -> a));
-
-        String sheetName = "结构转产表";
-        String sheetName4DayResult = "月计划";
-        String[] params;
-        String[] params4DayResult;
-        String monthPlanVersion;
-        String productVersion;
-        String templateErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateError");
-        String templateTitleErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateTitleError");
-        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
-            Sheet sheet = wb.getSheet(sheetName);
-            if (sheet == null || sheet.getRow(0) == null) {
-                return AjaxResult.error(templateErrorStr);
-            }
-            Cell titleCell = sheet.getRow(0).getCell(0);
-            if (titleCell == null) {
-                return AjaxResult.error(templateErrorStr);
-            }
-            String titleFormat = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.exportTitle");
-            params = parseFormat(titleFormat, dataFormatter.formatCellValue(titleCell));
-            if (params == null || params.length < 4) {
-                return AjaxResult.error(templateTitleErrorStr);
-            }
-            String monthPlanVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.monthPlanVersion") + ": ";
-            Cell monthPlanVersionCell = sheet.getRow(0).getCell(27);
-            if (monthPlanVersionCell == null) {
-                return AjaxResult.error(templateErrorStr);
-            }
-            monthPlanVersion = dataFormatter.formatCellValue(monthPlanVersionCell).replace(monthPlanVersionLabel, "");
-            Cell productVersionCell = sheet.getRow(0).getCell(35);
-            if (productVersionCell == null) {
-                return AjaxResult.error(templateErrorStr);
-            }
-            String productionVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.productionVersion") + ": ";
-            productVersion = dataFormatter.formatCellValue(productVersionCell).replace(productionVersionLabel, "");
-
-            Sheet sheet4DayResult = wb.getSheet(sheetName4DayResult);
-            if (sheet4DayResult == null || sheet4DayResult.getRow(0) == null) {
-                return AjaxResult.error(templateErrorStr);
-            }
-            Cell titleCell4DayResult = sheet4DayResult.getRow(0).getCell(0);
-            if (titleCell4DayResult == null) {
-                return AjaxResult.error(templateErrorStr);
-            }
-            String titleFormat4DayResult = I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.exportTitle");
-            params4DayResult = parseFormat(titleFormat4DayResult, dataFormatter.formatCellValue(titleCell4DayResult));
-            if (params4DayResult == null || params4DayResult.length < 3) {
-                return AjaxResult.error(templateTitleErrorStr);
-            }
-        } catch (Exception e) {
-            log.warn("importDataStructureAllocation workbook parse failed", e);
-            return AjaxResult.error(templateErrorStr);
+        
+        // 解析Excel文件
+        MpStructureAllocationImportHelper helper = this.parseExcel(fileBytes);
+        if (AjaxResultUtils.checkAjaxError(helper.getAjaxResult())) {
+            return helper.getAjaxResult();
         }
-        ExcelUtil<FactoryMonthPlanMouldDayResult> util4DayResult = new ExcelUtil<>(FactoryMonthPlanMouldDayResult.class);
+        String[] params = helper.getParams();
+        String[] params4DayResult = helper.getParams4DayResult();
+        String monthPlanVersion = helper.getMonthPlanVersion();
+        String productVersion = helper.getProductVersion();
         
         List<FactoryMonthPlanMouldDayResult> list4DayResult;
         List<MpStructureAllocationExportVo> list;
@@ -269,14 +234,14 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
             list = util.importExcel(sheetName, new ByteArrayInputStream(fileBytes), 2, 2, 13);
         } catch (Exception e) {
             log.warn("importDataStructureAllocation workbook parse failed", e);
-            return AjaxResult.error(templateErrorStr);
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateError"));
         }
         
         // 结构转产导入
         AjaxResult ajaxResult = mpStructureAllocationService.importDataStructureAllocation(list, list4DayResult, true, importLog.getId(), params, monthPlanVersion, productVersion, factoryMap, productTypeMap);
 
         // 月计划调整排产导入
-        AjaxResult ajaxResult4DayResult = mpStructureAllocationService.importDataDayResult(list4DayResult, true, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap, true);
+        AjaxResult ajaxResult4DayResult = mpStructureAllocationService.importDataDayResult(list, list4DayResult, true, importLog.getId(), params4DayResult, monthPlanVersion, productVersion, factoryMap, productTypeMap, true);
 
         // 处理返回结果，统一
         int errorNum = 0;
@@ -312,6 +277,126 @@ public class MpAdjustResultServiceImpl extends AbstractDocService<MpAdjustResult
         return AjaxResult.success(returnData);
     }
     
+    /**
+     * 解析导入Excel文件
+     * @param fileBytes 导入文件字节数组
+     * @return
+     */
+    private MpStructureAllocationImportHelper parseExcel(byte[] fileBytes) {
+        MpStructureAllocationImportHelper helper = new MpStructureAllocationImportHelper();
+        helper.setAjaxResult(AjaxResult.success());
+        String templateErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateError");
+        String templateTitleErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.templateTitleError");
+        String monthPlanVersionNotMatchErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.monthPlanVersionNotMatch");
+        String productionVersionNotMatchErrorStr = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.import.productionVersionNotMatch");
+        ClassLoader classLoader = this.getClass().getClassLoader();
+        DataFormatter dataFormatter = new DataFormatter();
+        
+        // 加载月计划调整与结构转产表导出模板，用于获取页签名称
+        if (StringUtils.isEmpty(sheetName) || StringUtils.isEmpty(sheetName4DayResult)) {
+            try (InputStream inputStream = classLoader.getResourceAsStream("excelModel/mpStructureAllocationExportTemp.xlsx");
+                    InputStream dayInputStream = classLoader.getResourceAsStream("excelModel/factoryMonthPlanMouldFinalResultExportTemp.xlsx");
+                    XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
+                    XSSFWorkbook dayWorkbook = new XSSFWorkbook(dayInputStream);) {
+                sheetName = workbook.getSheetName(0);
+                sheetName4DayResult = dayWorkbook.getSheetName(0);
+            } catch (Exception e) {
+                log.warn("importDataStructureAllocation workbook parse failed", e);
+                helper.setAjaxResult(AjaxResult.error(templateErrorStr));
+                return helper;
+            }
+        }
+        
+        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(fileBytes))) {
+            Sheet sheet = wb.getSheet(sheetName);
+            if (sheet == null || sheet.getRow(0) == null) {
+                helper.setAjaxResult(AjaxResult.error(templateErrorStr));
+                return helper;
+            }
+            Cell titleCell = sheet.getRow(0).getCell(0);
+            if (titleCell == null) {
+                helper.setAjaxResult(AjaxResult.error(templateErrorStr));
+                return helper;
+            }
+            // 解析结构转产表页签
+            // 解析标题
+            String titleFormat = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.exportTitle");
+            helper.setParams(parseFormat(titleFormat, dataFormatter.formatCellValue(titleCell)));
+            if (helper.getParams() == null || helper.getParams().length < 4) {
+                helper.setAjaxResult(AjaxResult.error(templateTitleErrorStr));
+                return helper;
+            }
+            // 解析需求计划版本
+            String monthPlanVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.monthPlanVersion") + ":";
+            Cell monthPlanVersionCell = sheet.getRow(0).getCell(27);
+            if (monthPlanVersionCell == null) {
+                helper.setAjaxResult(AjaxResult.error(templateErrorStr));
+                return helper;
+            }
+            helper.setMonthPlanVersion(dataFormatter.formatCellValue(monthPlanVersionCell).replace(monthPlanVersionLabel, "").trim());
+            // 解析生产版本
+            Cell productVersionCell = sheet.getRow(0).getCell(35);
+            if (productVersionCell == null) {
+                helper.setAjaxResult(AjaxResult.error(templateErrorStr));
+                return helper;
+            }
+            String productionVersionLabel = I18nUtil.getMessage("ui.data.column.mpStructureAllocation.productionVersion") + ":";
+            helper.setProductVersion(dataFormatter.formatCellValue(productVersionCell).replace(productionVersionLabel, "").trim());
+            
+            // 解析月计划页签
+            // 解析标题
+            Sheet sheet4DayResult = wb.getSheet(sheetName4DayResult);
+            if (sheet4DayResult == null || sheet4DayResult.getRow(0) == null) {
+                helper.setAjaxResult(AjaxResult.error(templateErrorStr));
+                return helper;
+            }
+            Cell titleCell4DayResult = sheet4DayResult.getRow(0).getCell(0);
+            if (titleCell4DayResult == null) {
+                helper.setAjaxResult(AjaxResult.error(templateErrorStr));
+                return helper;
+            }
+            String titleFormat4DayResult = I18nUtil.getMessage("ui.data.column.factoryMonthPlanMouldDayResult.exportTitle");
+            helper.setParams4DayResult(parseFormat(titleFormat4DayResult, dataFormatter.formatCellValue(titleCell4DayResult)));
+            if (helper.getParams4DayResult() == null || helper.getParams4DayResult().length < 3) {
+                helper.setAjaxResult(AjaxResult.error(templateTitleErrorStr));
+                return helper;
+            }
+            // 解析需求计划版本
+            Cell monthPlanVersionCell4DayResult = sheet4DayResult.getRow(0).getCell(63);
+            if (monthPlanVersionCell4DayResult == null) {
+                helper.setAjaxResult(AjaxResult.error(templateErrorStr));
+                return helper;
+            }
+            String monthPlanVersion4Day = dataFormatter.formatCellValue(monthPlanVersionCell4DayResult).replace(monthPlanVersionLabel, "").trim();
+            // 校验如果两个页签的需求版本号不一致，报失败
+            if (!Objects.equals(monthPlanVersion4Day, helper.getMonthPlanVersion())) {
+                helper.setAjaxResult(AjaxResult.error(monthPlanVersionNotMatchErrorStr));
+                return helper;
+            }
+            // 解析生产版本
+            Cell productVersionCell4Day = sheet4DayResult.getRow(0).getCell(68);
+            if (productVersionCell4Day == null) {
+                helper.setAjaxResult(AjaxResult.error(templateErrorStr));
+                return helper;
+            }
+            String productVersion4Day = dataFormatter.formatCellValue(productVersionCell4Day).replace(productionVersionLabel, "").trim();
+            // 校验如果两个页签的需求版本号不一致，报失败
+            if (!Objects.equals(productVersion4Day, helper.getProductVersion())) {
+                helper.setAjaxResult(AjaxResult.error(productionVersionNotMatchErrorStr));
+                return helper;
+            }
+        } catch (Exception e) {
+            log.warn("importDataStructureAllocation workbook parse failed", e);
+            helper.setAjaxResult(AjaxResult.error(templateErrorStr));
+        }
+        return helper;
+    }
+    
+    /**
+     * 解析导入结果文本
+     * @param ajaxResult
+     * @return
+     */
     private int[] parseImportMsg(AjaxResult ajaxResult) {
         int[] result = new int[]{0, 0, 0};
         if (ajaxResult == null) {
