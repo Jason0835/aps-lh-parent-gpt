@@ -10,6 +10,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MouldStatusUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
@@ -25,9 +26,11 @@ import java.util.Calendar;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -526,8 +529,10 @@ public class LhCleaningScheduleService {
 
     /**
      * 检查喷砂清洗机台是否有空闲模具可换，有则可跳过喷砂清洗直接换模。
-     * <p>判断依据：机台当前物料关联的启用模具数量大于机台模台数（单模/双模），
-     * 则表示有机外可用的空闲模具。</p>
+     * <p>判断依据：
+     * 1. 优先检查机台当前物料关联的启用模具数量是否大于机台模台数；
+     * 2. 若当前物料模具不够，进一步检查与当前物料同胶囊组（同规格组或同英寸组）的所有物料的
+     *    去重启用模具总数是否大于机台模台数，同胶囊组的模具可以互用。</p>
      *
      * @param context      排程上下文
      * @param cleaningPlan 清洗计划
@@ -541,14 +546,81 @@ public class LhCleaningScheduleService {
             return false;
         }
         String materialCode = onlineInfo.getMaterialCode();
-        // 获取该物料关联的所有模具号
+        // 获取机台模台数
+        LhMachineInfo machineInfo = context.getMachineInfoMap().get(machineCode);
+        int machineMouldQty = 1;
+        if (machineInfo != null && machineInfo.getMaxMoldNum() != null) {
+            machineMouldQty = machineInfo.getMaxMoldNum();
+        }
+        Map<String, MdmModelInfo> modelInfoMap = context.getModelInfoMap();
+
+        // 第一步：检查当前在机物料的启用模具数量
         List<MdmSkuMouldRel> mouldRelList = context.getSkuMouldRelMap().get(materialCode);
-        if (CollectionUtils.isEmpty(mouldRelList)) {
+        if (!CollectionUtils.isEmpty(mouldRelList)) {
+            long enabledMouldCount = countEnabledMould(mouldRelList, modelInfoMap);
+            if (enabledMouldCount > machineMouldQty) {
+                log.info("[清洗调试] 机台 {} 有空闲模具(启用{}/模台{}), 物料: {}, 跳过喷砂清洗",
+                        machineCode, enabledMouldCount, machineMouldQty, materialCode);
+                return true;
+            }
+            log.info("[清洗调试] 机台 {} 当前物料模具不足(启用{}/模台{}), 物料: {}, 继续检查同胶囊组模具",
+                    machineCode, enabledMouldCount, machineMouldQty, materialCode);
+        }
+
+        // 第二步：检查与当前在机物料同胶囊组（同规格组或同英寸组）的所有物料的去重启用模具
+        MdmMaterialInfo currentMaterialInfo = context.getMaterialInfoMap().get(materialCode);
+        if (Objects.isNull(currentMaterialInfo)) {
             return false;
         }
-        // 统计启用状态的模具数量
-        Map<String, MdmModelInfo> modelInfoMap = context.getModelInfoMap();
-        long enabledMouldCount = mouldRelList.stream()
+        // 收集同胶囊组的所有物料编码
+        Set<String> capsulePeerMaterialCodes = resolveCapsulePeerMaterialCodes(
+                context, currentMaterialInfo);
+        if (capsulePeerMaterialCodes.isEmpty()) {
+            return false;
+        }
+        // 统计同胶囊组所有物料的去重启用模具总数
+        Set<String> allEnabledMouldCodes = new LinkedHashSet<>();
+        for (String peerMaterialCode : capsulePeerMaterialCodes) {
+            List<MdmSkuMouldRel> peerMouldRelList = context.getSkuMouldRelMap().get(peerMaterialCode);
+            if (CollectionUtils.isEmpty(peerMouldRelList)) {
+                continue;
+            }
+            for (MdmSkuMouldRel rel : peerMouldRelList) {
+                String mouldCode = rel.getMouldCode();
+                if (StringUtils.isEmpty(mouldCode) || allEnabledMouldCodes.contains(mouldCode)) {
+                    continue;
+                }
+                if (modelInfoMap == null) {
+                    continue;
+                }
+                MdmModelInfo modelInfo = modelInfoMap.get(mouldCode);
+                if (modelInfo != null && MouldStatusUtil.isEnabled(modelInfo.getMouldStatus())) {
+                    allEnabledMouldCodes.add(mouldCode);
+                }
+            }
+        }
+        boolean hasSpare = allEnabledMouldCodes.size() > machineMouldQty;
+        if (hasSpare) {
+            log.info("[清洗调试] 机台 {} 同胶囊组有空闲模具(去重启用{}/模台{}), 物料: {}, 同组物料数: {}, 跳过喷砂清洗",
+                    machineCode, allEnabledMouldCodes.size(), machineMouldQty, materialCode,
+                    capsulePeerMaterialCodes.size());
+        } else {
+            log.info("[清洗调试] 机台 {} 同胶囊组模具也不足(去重启用{}/模台{}), 物料: {}, 同组物料数: {}",
+                    machineCode, allEnabledMouldCodes.size(), machineMouldQty, materialCode,
+                    capsulePeerMaterialCodes.size());
+        }
+        return hasSpare;
+    }
+
+    /**
+     * 统计物料关联的启用模具数量。
+     *
+     * @param mouldRelList 物料模具关系列表
+     * @param modelInfoMap 模具台账Map
+     * @return 启用模具数量
+     */
+    private long countEnabledMould(List<MdmSkuMouldRel> mouldRelList, Map<String, MdmModelInfo> modelInfoMap) {
+        return mouldRelList.stream()
                 .map(MdmSkuMouldRel::getMouldCode)
                 .filter(StringUtils::isNotEmpty)
                 .distinct()
@@ -560,19 +632,48 @@ public class LhCleaningScheduleService {
                     return modelInfo != null && MouldStatusUtil.isEnabled(modelInfo.getMouldStatus());
                 })
                 .count();
-        // 获取机台模台数
-        LhMachineInfo machineInfo = context.getMachineInfoMap().get(machineCode);
-        int machineMouldQty = 1;
-        if (machineInfo != null && machineInfo.getMaxMoldNum() != null) {
-            machineMouldQty = machineInfo.getMaxMoldNum();
+    }
+
+    /**
+     * 获取与指定物料同胶囊组（同规格组或同英寸组）的所有物料编码。
+     *
+     * @param context     排程上下文
+     * @param targetInfo  目标物料信息
+     * @return 同胶囊组的物料编码集合（不含目标物料自身）
+     */
+    private Set<String> resolveCapsulePeerMaterialCodes(LhScheduleContext context,
+                                                          MdmMaterialInfo targetInfo) {
+        Set<String> peerMaterialCodes = new LinkedHashSet<>();
+        String targetSpec = targetInfo.getSpecifications();
+        String targetProSize = targetInfo.getProSize();
+        Map<String, String> capsuleSpecPeerMap = context.getCapsuleSpecPeerMap();
+        Map<String, String> capsuleProSizePeerMap = context.getCapsuleProSizePeerMap();
+        // 获取目标物料的规格分组编码和英寸分组编码
+        String specGroup = StringUtils.isNotEmpty(targetSpec) ? capsuleSpecPeerMap.get(targetSpec) : null;
+        String proSizeGroup = StringUtils.isNotEmpty(targetProSize) ? capsuleProSizePeerMap.get(targetProSize) : null;
+        if (StringUtils.isEmpty(specGroup) && StringUtils.isEmpty(proSizeGroup)) {
+            return peerMaterialCodes;
         }
-        // 启用模具数量大于机台模台数 → 有空闲模具可换
-        boolean hasSpare = enabledMouldCount > machineMouldQty;
-        if (hasSpare) {
-            log.info("[清洗调试] 机台 {} 有空闲模具(启用{}/模台{}), 物料: {}, 跳过喷砂清洗",
-                    machineCode, enabledMouldCount, machineMouldQty, materialCode);
+        // 遍历所有物料，找出同组的物料
+        for (Map.Entry<String, MdmMaterialInfo> entry : context.getMaterialInfoMap().entrySet()) {
+            MdmMaterialInfo materialInfo = entry.getValue();
+            if (Objects.isNull(materialInfo) || StringUtils.equals(entry.getKey(), targetInfo.getMaterialCode())) {
+                continue;
+            }
+            boolean sameSpecGroup = false;
+            boolean sameProSizeGroup = false;
+            if (StringUtils.isNotEmpty(specGroup) && StringUtils.isNotEmpty(materialInfo.getSpecifications())) {
+                sameSpecGroup = StringUtils.equals(specGroup, capsuleSpecPeerMap.get(materialInfo.getSpecifications()));
+            }
+            if (StringUtils.isNotEmpty(proSizeGroup) && StringUtils.isNotEmpty(materialInfo.getProSize())) {
+                sameProSizeGroup = StringUtils.equals(proSizeGroup, capsuleProSizePeerMap.get(materialInfo.getProSize()));
+            }
+            // 同规格组或同英寸组都算同胶囊组
+            if (sameSpecGroup || sameProSizeGroup) {
+                peerMaterialCodes.add(entry.getKey());
+            }
         }
-        return hasSpare;
+        return peerMaterialCodes;
     }
 
     /**
