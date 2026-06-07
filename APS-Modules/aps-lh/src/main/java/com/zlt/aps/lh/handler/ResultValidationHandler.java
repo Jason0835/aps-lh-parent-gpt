@@ -1626,10 +1626,59 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     /**
      * 标识清洗结束时间所在的班次。
+     * <p>实际清洗开始时间取 max(计划清洗开始时间, 清洗前最后一个有计划量班次的实际完工时间)，
+     * 再加上清洗时长得到实际清洗结束时间，用于定位标识班次。</p>
+     * <p>注意：排产结果中班次endTime可能被清洗窗口截断（如class4EndTime=清洗开始时间），
+     * 不能直接使用。需要按 planQty×lhTime 从班次startTime推算实际完工时间。</p>
      */
     private void tagCleaningEndShift(LhScheduleResult result, MachineCleaningWindowDTO cleaningWindow,
                                      List<LhShiftConfigVO> shifts, String machineCode) {
-        Date cleanEndTime = cleaningWindow.getCleanEndTime();
+        Date cleanStartTime = cleaningWindow.getCleanStartTime();
+        // 查找清洗窗口开始时仍在生产或刚结束的班次的实际完工时间
+        // 排产结果的endTime可能被清洗窗口截断（endTime等于清洗开始时间），需按 planQty×lhTime 推算
+        Date lastShiftActualEndTime = null;
+        for (int si = 1; si <= 8; si++) {
+            Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, si);
+            if (planQty != null && planQty > 0) {
+                Date shiftStart = ShiftFieldUtil.getShiftStartTime(result, si);
+                Date shiftEnd = ShiftFieldUtil.getShiftEndTime(result, si);
+                // 只考虑清洗开始时间之前或同时开始的班次（清洗期间新开始的班次不算）
+                if (shiftStart == null || shiftStart.after(cleanStartTime)) {
+                    continue;
+                }
+                // 若endTime等于清洗开始时间，说明该班次被清洗窗口截断，需按实际生产时间推算
+                Date actualEnd = shiftEnd;
+                if (shiftEnd != null
+                        && shiftEnd.equals(cleanStartTime)
+                        && result.getLhTime() != null && result.getLhTime() > 0) {
+                    long productionMs = (long) planQty * result.getLhTime() * 1000L;
+                    actualEnd = new Date(shiftStart.getTime() + productionMs);
+                }
+                if (actualEnd != null) {
+                    lastShiftActualEndTime = later(lastShiftActualEndTime, actualEnd);
+                }
+            }
+        }
+        // 实际清洗开始时间 = max(计划清洗开始时间, 前一班次实际完工时间)
+        Date actualCleanStartTime = cleanStartTime;
+        if (lastShiftActualEndTime != null && lastShiftActualEndTime.after(cleanStartTime)) {
+            actualCleanStartTime = lastShiftActualEndTime;
+        }
+        // 实际清洗结束时间 = 实际清洗开始时间 + 清洗时长
+        long cleaningDurationMs = cleaningWindow.getCleanEndTime().getTime() - cleaningWindow.getCleanStartTime().getTime();
+        Date actualCleanEndTime = new Date(actualCleanStartTime.getTime() + cleaningDurationMs);
+
+        if (!actualCleanEndTime.equals(cleaningWindow.getCleanEndTime())) {
+            log.info("[清洗分析标识] 清洗窗口顺延, 机台: {}, 计划清洗窗口: {}~{}, 前班次完工时间: {}, 顺延后: {}~{}",
+                    machineCode,
+                    LhScheduleTimeUtil.formatDateTime(cleaningWindow.getCleanStartTime()),
+                    LhScheduleTimeUtil.formatDateTime(cleaningWindow.getCleanEndTime()),
+                    lastShiftActualEndTime != null ? LhScheduleTimeUtil.formatDateTime(lastShiftActualEndTime) : "无",
+                    LhScheduleTimeUtil.formatDateTime(actualCleanStartTime),
+                    LhScheduleTimeUtil.formatDateTime(actualCleanEndTime));
+        }
+
+        Date cleanEndTime = actualCleanEndTime;
         for (int shiftIndex = 1; shiftIndex <= 8; shiftIndex++) {
             LhShiftConfigVO shift = findShiftByIndex(shifts, shiftIndex);
             if (shift == null || shift.getShiftStartDateTime() == null
