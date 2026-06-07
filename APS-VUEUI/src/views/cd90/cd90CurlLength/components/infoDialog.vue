@@ -26,7 +26,7 @@
 </template>
 
 <script>
-import { addCd90MachineInfo, updateCd90MachineInfo } from "@/api/cd90/cd90MachineInfo";
+import { addCd90CurlLength, updateCd90CurlLength } from "@/api/cd90/cd90CurlLength";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
@@ -50,13 +50,13 @@ export default {
       form: {},
       rules: {
         factoryCode: [requiredSelect],
-        machineCode: [requiredInput],
-        quota: [
+        clothCode: [requiredInput],
+        curlLength: [
           requiredInput,
           {
             validator: (rule, value, callback) => {
               if (value === undefined || value === null || value === "" || Number(value) <= 0) {
-                callback(new Error(this.$t("ui.data.alert.cd90MachineInfo.quotaPositive")));
+                callback(new Error(this.$t("ui.data.alert.cd90CurlLength.curlLengthPositive")));
               } else {
                 callback();
               }
@@ -64,7 +64,6 @@ export default {
             trigger: "blur",
           },
         ],
-        openMachineClass: [requiredSelect],
       },
     };
   },
@@ -76,51 +75,20 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.cd90MachineInfo.factoryCode"),
+          label: this.$t("ui.data.column.cd90CurlLength.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           filterable: true,
         },
         {
-          prop: "machineCode",
-          label: this.$t("ui.data.column.cd90MachineInfo.machineCode"),
-          maxlength: 30,
+          prop: "clothCode",
+          label: this.$t("ui.data.column.cd90CurlLength.clothCode"),
+          maxlength: 20,
         },
         {
-          prop: "isStickFilm",
-          label: this.$t("ui.data.column.cd90MachineInfo.isStickFilm"),
-          type: "select",
-          dictData: this.parentDict.type.biz_yes_no,
-          filterable: true,
-        },
-        {
-          prop: "clothWidthMax",
-          label: this.$t("ui.data.column.cd90MachineInfo.clothWidthMax"),
+          prop: "curlLength",
+          label: this.$t("ui.data.column.cd90CurlLength.curlLength"),
           type: "number",
-        },
-        {
-          prop: "clothWidthMin",
-          label: this.$t("ui.data.column.cd90MachineInfo.clothWidthMin"),
-          type: "number",
-        },
-        {
-          prop: "quota",
-          label: this.$t("ui.data.column.cd90MachineInfo.quota"),
-          type: "number",
-        },
-        {
-          prop: "openMachineClass",
-          label: this.$t("ui.data.column.cd90MachineInfo.openMachineClass"),
-          type: "select",
-          dictData: this.parentDict.type.class_num_three_plan,
-          filterable: true,
-        },
-        {
-          prop: "status",
-          label: this.$t("ui.data.column.cd90MachineInfo.status"),
-          type: "switch",
-          activeValue: "1",
-          inactiveValue: "0",
         },
         {
           prop: "remark",
@@ -137,8 +105,8 @@ export default {
       this.loading = true;
       try {
         const res = this.isEdit
-          ? await updateCd90MachineInfo(params)
-          : await addCd90MachineInfo(params);
+          ? await updateCd90CurlLength(params)
+          : await addCd90CurlLength(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -154,8 +122,6 @@ export default {
       } else {
         this.form = {
           factoryCode: "116",
-          isStickFilm: "0",
-          status: "1",
         };
       }
     },

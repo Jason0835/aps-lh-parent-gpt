@@ -26,7 +26,8 @@
 </template>
 
 <script>
-import { addCd90MachineInfo, updateCd90MachineInfo } from "@/api/cd90/cd90MachineInfo";
+import { addSpecifyMachine, editSpecifyMachine } from "@/api/cd90/specifyMachine";
+import { getCd90MachineEnableOptions } from "@/api/cd90/cd90MachineInfo";
 import infoForm from "@/views/components/infoForm.vue";
 
 export default {
@@ -48,23 +49,12 @@ export default {
       visible: false,
       isEdit: false,
       form: {},
+      machineOptions: [],
       rules: {
         factoryCode: [requiredSelect],
-        machineCode: [requiredInput],
-        quota: [
-          requiredInput,
-          {
-            validator: (rule, value, callback) => {
-              if (value === undefined || value === null || value === "" || Number(value) <= 0) {
-                callback(new Error(this.$t("ui.data.alert.cd90MachineInfo.quotaPositive")));
-              } else {
-                callback();
-              }
-            },
-            trigger: "blur",
-          },
-        ],
-        openMachineClass: [requiredSelect],
+        clothCode: [requiredInput],
+        machineCode: [requiredSelect],
+        jobType: [requiredSelect],
       },
     };
   },
@@ -76,69 +66,57 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.cd90MachineInfo.factoryCode"),
+          label: this.$t("ui.data.column.cd90SpecifyMachine.factoryCode"),
           type: "select",
           dictData: this.parentDict.type.biz_factory_name,
           filterable: true,
+          change: () => this.loadMachineOptions(),
+        },
+        {
+          prop: "clothCode",
+          label: this.$t("ui.data.column.cd90SpecifyMachine.clothCode"),
+          maxlength: 20,
         },
         {
           prop: "machineCode",
-          label: this.$t("ui.data.column.cd90MachineInfo.machineCode"),
-          maxlength: 30,
-        },
-        {
-          prop: "isStickFilm",
-          label: this.$t("ui.data.column.cd90MachineInfo.isStickFilm"),
+          label: this.$t("ui.data.column.cd90SpecifyMachine.machineCode"),
           type: "select",
-          dictData: this.parentDict.type.biz_yes_no,
+          dictData: this.machineOptions,
           filterable: true,
         },
         {
-          prop: "clothWidthMax",
-          label: this.$t("ui.data.column.cd90MachineInfo.clothWidthMax"),
-          type: "number",
-        },
-        {
-          prop: "clothWidthMin",
-          label: this.$t("ui.data.column.cd90MachineInfo.clothWidthMin"),
-          type: "number",
-        },
-        {
-          prop: "quota",
-          label: this.$t("ui.data.column.cd90MachineInfo.quota"),
-          type: "number",
-        },
-        {
-          prop: "openMachineClass",
-          label: this.$t("ui.data.column.cd90MachineInfo.openMachineClass"),
+          prop: "jobType",
+          label: this.$t("ui.data.column.cd90SpecifyMachine.jobType"),
           type: "select",
-          dictData: this.parentDict.type.class_num_three_plan,
+          dictData: this.parentDict.type.JOB_TYPE,
           filterable: true,
-        },
-        {
-          prop: "status",
-          label: this.$t("ui.data.column.cd90MachineInfo.status"),
-          type: "switch",
-          activeValue: "1",
-          inactiveValue: "0",
         },
         {
           prop: "remark",
           label: this.$t("ui.common.column.remark"),
           type: "textarea",
           rows: 3,
-          maxlength: 300,
+          maxlength: 900,
         },
       ];
     },
   },
   methods: {
+    async loadMachineOptions() {
+      const res = await getCd90MachineEnableOptions({ factoryCode: this.form.factoryCode });
+      const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
+      this.machineOptions = rows.map((item) => ({
+        label: item.machineCode,
+        value: item.machineCode,
+      }));
+    },
     async save(params) {
       this.loading = true;
       try {
+        const payload = { ...params };
         const res = this.isEdit
-          ? await updateCd90MachineInfo(params)
-          : await addCd90MachineInfo(params);
+          ? await editSpecifyMachine(payload)
+          : await addSpecifyMachine(payload);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
@@ -154,13 +132,14 @@ export default {
       } else {
         this.form = {
           factoryCode: "116",
-          isStickFilm: "0",
-          status: "1",
+          jobType: "",
         };
       }
+      this.loadMachineOptions();
     },
     hide() {
       this.form = {};
+      this.machineOptions = [];
       this.$refs.form && this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;

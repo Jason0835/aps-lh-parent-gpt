@@ -1,6 +1,7 @@
 package com.zlt.aps.cd90.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
@@ -91,6 +92,18 @@ public class Cd90MachineInfoController extends AbstractDocBizController<Cd90Mach
     public AjaxResult enableOptions(@RequestBody Cd90MachineInfo queryVO) {
         queryVO.setStatus(ApsConstant.APS_STRING_1);
         return AjaxResult.success(getList(queryVO));
+    }
+
+    /** 修改机台状态 */
+    @Log(title = "ui.data.column.cd90MachineInfo.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("修改机台状态")
+    @PostMapping("/changeStatus")
+    public AjaxResult changeStatus(@RequestBody Cd90MachineInfo machineInfo) {
+        LambdaUpdateWrapper<Cd90MachineInfo> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(Cd90MachineInfo::getId, machineInfo.getId())
+               .set(Cd90MachineInfo::getStatus, machineInfo.getStatus());
+        cd90MachineInfoMapper.update(null, wrapper);
+        return AjaxResult.success();
     }
 
     /** 导入直裁机台 */

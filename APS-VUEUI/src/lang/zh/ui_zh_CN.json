@@ -95,7 +95,7 @@
   "ui.tq.machineChuck.column.modalName": "胎圈机台寸口对应",
   "ui.tq.machineChuck.confirm.export": "确定导出所有机台寸口对应信息？",
   "ui.tq.machineChuck.column.conflict": "机台编码 + 寸口编码已存在，请确认",
-  "ui.tq.toolingCartCapacity.column.modalName": "工装车容量管理",
+  "ui.tq.toolingCartCapacity.column.modalName": "胎圈工装车容量管理",
   "ui.tq.tooling.column.toolingCode": "工装编码",
   "ui.tq.tooling.column.toolingName": "工装名称",
   "ui.tq.tooling.column.totalQty": "工装总数",
@@ -106,7 +106,6 @@
   "ui.tq.toolingCartCapacity.column.cartCode": "工装车编码",
   "ui.tq.toolingCartCapacity.column.materialCode": "胎圈编码",
   "ui.tq.toolingCartCapacity.column.cartCapacity": "整车容量",
-  "ui.tq.toolingCartCapacity.column.modalName": "胎圈工装车容量管理",
   "ui.tq.toolingCartCapacity.confirm.export": "确定导出所有工装车容量信息？",
   "ui.tq.toolingCartCapacity.column.conflict": "工装车编码 + 胎圈编码已存在，请确认",
   "ui.tq.toolingCartCapacity.column.updateTime": "更新日期",
@@ -780,11 +779,9 @@
   "ui.data.column.scheduleResult.model": "型号",
   "ui.data.column.scheduleResult.lhMachineName": "硫化机台名称",
   "ui.data.column.scheduleResult.leftRightMold": "左右模",
-  "ui.data.column.scheduleResult.lhMachineCode": "硫化机台",
   "ui.data.column.scheduleResult.stockArea": "库区信息",
   "ui.data.column.scheduleResult.sapCode": "SAP代码",
   "ui.data.column.scheduleResult.embryoCode": "胎胚代码",
-  "ui.data.column.scheduleResult.embryoStock": "胎胚库存",
   "ui.data.column.scheduleResult.lhTime": "硫化时长",
   "ui.data.column.scheduleResult.singleMoldShiftLhQty": "单班硫化量",
   "ui.data.column.scheduleResult.dailyPlanQty": "日计划数量",
@@ -797,10 +794,8 @@
   "ui.data.column.scheduleResult.class3PlanQty": "三班计划量",
   "ui.data.column.scheduleResult.class3Analysis": "三班原因分析",
   "ui.data.column.scheduleResult.class3FinishQty": "三班完成量",
-  "ui.data.column.scheduleResult.class4PlanQty": "四班计划量",
   "ui.data.column.scheduleResult.class4Analysis": "四班原因分析",
   "ui.data.column.scheduleResult.class4FinishQty": "四班完成量",
-  "ui.data.column.scheduleResult.class5PlanQty": "五班计划量",
   "ui.data.column.scheduleResult.class5Analysis": "五班原因分析",
   "ui.data.column.scheduleResult.class5FinishQty": "五班完成量",
   "ui.data.column.scheduleResult.class6PlanQty": "六班计划量",
@@ -2768,7 +2763,6 @@
   "ui.lh.precision.plan.auto.generate.confirm": "是否自动生成{year}年度的硫化精度计划？",
   "ui.lh.precision.plan.factoryCodeRequired": "第{0}行：分厂编码必填",
   "ui.lh.precision.plan.excelDuplicate": "第{0}行：Excel内部存在重复数据（工厂+硫化机台+计划日期）",
-  "ui.data.alert.cxPrecisionPlan.dueDateBeforePlanDate": "到期日期需大于计划日期",
   "ui.data.btn.lhMouldChangePlan.issueSchedule": "模具交替计划发布",
   "ui.data.btn.lhMouldChangePlan.generateTextPlan": "文字示方更新",
   "ui.data.btn.lhScheduleResult.increaseMouldStartPlan": "计划更新",
@@ -2964,7 +2958,6 @@
   "ui.data.column.monthlyProductionPlan.total": "合计",
   "ui.data.column.monthlyProductionPlan.fillHandleTitle.doubleClick": "双击向下填充空格；拖动可覆盖后续日期",
   "ui.data.column.monthlyProductionPlan.fillHandleTitle.drag": "拖动可覆盖后续日期",
-
   "ui.data.column.cxScheduleResult.tripNo": "车次号",
   "ui.data.column.cxScheduleResult.tripNoPrefix": "车",
   "ui.data.column.cxScheduleResult.tripCapacity": "整车条数",
@@ -2979,11 +2972,8 @@
   "ui.data.column.cxScheduleResult.itemsLabel": "项",
   "ui.data.column.cxScheduleResult.gotIt": "知道了",
   "ui.data.column.cxScheduleResult.scheduleTimeout": "排程请求超时或服务异常，如排程正在执行中，请稍后刷新页面查看结果",
-
   "ui.cx.cxScheduleResult.exportCxDayPlanFileName": "成型日计划",
-
   "ui.construction.carcassRawMaterialList": "胎胚原材料清单",
-
   "ui.data.column.planAdjust.adjustNumber": "调整量",
   "ui.data.column.planAdjust.reduceNumber": "调减量",
   "ui.data.column.planAdjust.leftOverQty": "空余产能量",
@@ -2992,19 +2982,14 @@
   "ui.data.column.specCode": "规格代码",
   "ui.data.column.materialDesc": "物料描述",
   "ui.data.column.id": "主键ID",
-
   "ui.title.needSubtractPlan": "需要调减计划",
   "ui.title.failureReason": "失败原因",
   "ui.title.adjust": "调整",
   "ui.title.subtract": "调减",
-
   "ui.button.checkConstruction": "检测施工",
   "ui.button.adjustSuggestion": "调整建议",
-
   "ui.placeholder.selectTableRow": "请选择表格行数据",
-
   "ui.message.confirmCheckConstruction": "确认要检测 {month} 的施工？",
-
   "common.button.apply": "应用",
   "common.button.confirm": "确认",
   "common.button.cancel": "取消",
@@ -3012,7 +2997,6 @@
   "common.message.needContinueAdjust": "调整数量不满足，需要继续调整",
   "common.yes": "是",
   "common.no": "否",
-
   "ui.upload.dataNotice": "数据注意事项",
   "ui.upload.insertNewSpec": "当您需要插入新规格时",
   "ui.upload.leaveEmptyProductionNo": "请将「排产制造单号」字段留空",
@@ -3020,35 +3004,27 @@
   "ui.upload.adjustExistingSpec": "当您需要对现有规格进行调整时",
   "ui.upload.keepProductionNoUnchanged": "请保持原有「排产制造单号」不变",
   "ui.upload.systemWillRecognizeAsAdjust": "系统将识别为规格调整而非新增",
-
   "ui.title.importInfoData": "导入信息数据",
   "ui.title.importScheduleResult": "导入排程结果数据",
   "ui.title.relatedUser": "关联用户",
-
   "ui.checkbox.updateExistingData": "是否更新已经存在的用户数据",
-
   "ui.data.column.drugInventory.glueName": "药品名称",
   "ui.data.column.drugInventory.stockNum": "库存量(包)",
   "ui.data.column.drugScheduling.weighingStation": "称重工位",
   "ui.data.column.drugScheduling.estimatedStartTime": "预计开始时间",
   "ui.data.column.drugScheduling.estimatedEndTime": "预计完成时间",
-
   "ui.tab.netDemandPlan": "净需求计划",
   "ui.tab.supplyChainOrder": "供应链订单",
   "ui.tab.productionPlan": "排产计划",
   "ui.tab.unscheduledPlan": "未排产计划",
-
   "ui.placeholder.pleaseSelect": "请选择",
-
   "ui.form.label.adjustStartDate": "调整开始日期",
   "ui.form.label.adjustEndDate": "调整结束日期",
   "ui.button.next": "下一个",
-
   "ui.title.structureAdjust": "结构调整",
   "ui.title.specialMaterialProduction": "特殊材料生产情况",
   "ui.title.adjustResult": "调整结果",
   "ui.title.addStructure": "新增结构",
-
   "ui.data.column.productStructure": "产品结构",
   "ui.data.column.schedulingMachine": "排产机台",
   "ui.data.column.ncMaterialCode": "NC物料编码",
@@ -3083,5 +3059,18 @@
   "ui.data.column.cd90MachineInfo.openMachineClass": "开机班次",
   "ui.data.column.cd90MachineInfo.status": "机台状态",
   "ui.data.column.cd90MachineInfo.checkUnique": "同一工厂下已存在相同机台编号",
-  "ui.data.alert.cd90MachineInfo.quotaPositive": "生产定额必须大于0"
+  "ui.data.alert.cd90MachineInfo.quotaPositive": "生产定额必须大于0",
+  "ui.data.column.cd90SpecifyMachine.modelName": "直裁定点机台管理",
+  "ui.data.column.cd90SpecifyMachine.factoryCode": "工厂",
+  "ui.data.column.cd90SpecifyMachine.clothCode": "帘布代号",
+  "ui.data.column.cd90SpecifyMachine.machineCode": "机台编码",
+  "ui.data.column.cd90SpecifyMachine.jobType": "作业类型",
+  "ui.data.column.cd90SpecifyMachine.checkUnique": "同一工厂下已存在相同帘布、机台和作业类型配置",
+  "ui.data.column.cd90SpecifyMachine.machineInvalid": "机台编码不存在或未启用",
+  "ui.data.column.cd90CurlLength.modelName": "直裁卷曲长度",
+  "ui.data.column.cd90CurlLength.factoryCode": "工厂",
+  "ui.data.column.cd90CurlLength.clothCode": "帘布代号",
+  "ui.data.column.cd90CurlLength.curlLength": "标准卷曲长度",
+  "ui.data.column.cd90CurlLength.checkUnique": "同一工厂下已存在相同帘布代号",
+  "ui.data.alert.cd90CurlLength.curlLengthPositive": "卷曲长度必须大于0"
 }

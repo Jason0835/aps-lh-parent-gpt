@@ -56,3 +56,11 @@ export function getCd90MachineEnableOptions(query) {
     data: query
   })
 }
+
+export function changeCd90MachineStatus(data) {
+  return request({
+    url: '/cd90/cd90MachineInfo/changeStatus',
+    method: 'post',
+    data
+  })
+}

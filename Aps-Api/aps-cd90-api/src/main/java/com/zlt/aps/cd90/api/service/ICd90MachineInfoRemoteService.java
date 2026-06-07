@@ -61,4 +61,9 @@ public interface ICd90MachineInfoRemoteService {
     @ApiOperation("启用直裁机台下拉")
     @PostMapping("/cd90MachineInfo/enableOptions")
     AjaxResult enableOptions(@RequestBody Cd90MachineInfo queryVO);
+
+    /** 修改机台状态 */
+    @ApiOperation("修改机台状态")
+    @PostMapping("/cd90MachineInfo/changeStatus")
+    AjaxResult changeStatus(@RequestBody Cd90MachineInfo machineInfo);
 }

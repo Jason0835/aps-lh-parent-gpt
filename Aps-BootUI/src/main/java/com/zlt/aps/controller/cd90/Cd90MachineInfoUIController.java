@@ -95,6 +95,15 @@ public class Cd90MachineInfoUIController extends BaseUIController<Cd90MachineInf
         return cd90MachineInfoRemoteService.enableOptions(queryVO);
     }
 
+    /** 修改机台状态 */
+    @ApiOperation("修改机台状态")
+    @RequiresPermissions("cd90:machineInfo:edit")
+    @PostMapping("/changeStatus")
+    @ResponseBody
+    public AjaxResult changeStatus(@RequestBody Cd90MachineInfo machineInfo) {
+        return cd90MachineInfoRemoteService.changeStatus(machineInfo);
+    }
+
     @Override
     public String getExportTemplateFileName() {
         return getFunctionName();
