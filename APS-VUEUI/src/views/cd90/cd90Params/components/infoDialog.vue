@@ -30,12 +30,12 @@ export default {
     title() { return this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add"); },
     columns() {
       return [
-        { prop: "factoryCode", label: this.$t("ui.data.column.params.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
-        { prop: "paramCode", label: this.$t("ui.data.column.params.paramCode"), maxlength: 50 },
-        { prop: "paramName", label: this.$t("ui.data.column.params.paramName"), maxlength: 50 },
-        { prop: "paramValue", label: this.$t("ui.data.column.params.paramValue"), maxlength: 50 },
-        { prop: "regularExpression", label: this.$t("ui.data.column.params.regularExpression"), maxlength: 100 },
-        { prop: "errorTips", label: this.$t("ui.data.column.params.errorTips"), maxlength: 200 },
+        { prop: "factoryCode", label: this.$t("ui.data.column.cd90Params.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
+        { prop: "paramCode", label: this.$t("ui.data.column.cd90Params.paramCode"), maxlength: 50 },
+        { prop: "paramName", label: this.$t("ui.data.column.cd90Params.paramName"), maxlength: 50 },
+        { prop: "paramValue", label: this.$t("ui.data.column.cd90Params.paramValue"), maxlength: 50 },
+        { prop: "regularExpression", label: this.$t("ui.data.column.cd90Params.regularExpression"), maxlength: 100 },
+        { prop: "errorTips", label: this.$t("ui.data.column.cd90Params.errorTips"), maxlength: 200 },
         { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 300 },
       ];
     },

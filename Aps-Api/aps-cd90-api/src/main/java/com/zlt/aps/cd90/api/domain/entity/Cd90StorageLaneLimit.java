@@ -22,55 +22,55 @@ public class Cd90StorageLaneLimit extends BaseEntity implements Serializable {
     @ApiModelProperty("工厂编码")
     @ImportExcelValidated(required = true, maxLength = 50)
     @TableField("FACTORY_CODE")
-    @Excel(name = "ui.data.column.storageLaneLimit.factoryCode", dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.cd90StorageLaneLimit.factoryCode", dictType = "biz_factory_name")
     private String factoryCode;
     /** 日期 */
     @ApiModelProperty("日期")
     @ImportExcelValidated(required = true, maxLength = 10)
     @TableField("LANE_DATE")
-    @Excel(name = "ui.data.column.storageLaneLimit.laneDate")
+    @Excel(name = "ui.data.column.cd90StorageLaneLimit.laneDate")
     private Date laneDate;
     /** 班次 */
     @ApiModelProperty("班次")
     @ImportExcelValidated(required = true, maxLength = 20)
     @TableField("SHIFT_CODE")
-    @Excel(name = "ui.data.column.storageLaneLimit.shiftCode")
+    @Excel(name = "ui.data.column.cd90StorageLaneLimit.shiftCode")
     private String shiftCode;
     /** 库排号 */
     @ApiModelProperty("库排号")
     @ImportExcelValidated(required = true, maxLength = 50)
     @TableField("STORAGE_LANE_CODE")
-    @Excel(name = "ui.data.column.storageLaneLimit.storageLaneCode")
+    @Excel(name = "ui.data.column.cd90StorageLaneLimit.storageLaneCode")
     private String storageLaneCode;
     /** 胎体代码/规格 */
     @ApiModelProperty("胎体代码/规格")
     @ImportExcelValidated(maxLength = 60)
     @TableField("MATERIAL_CODE")
-    @Excel(name = "ui.data.column.storageLaneLimit.materialCode")
+    @Excel(name = "ui.data.column.cd90StorageLaneLimit.materialCode")
     private String materialCode;
     /** 当前车数 */
     @ApiModelProperty("当前车数")
     @TableField("CAR_NUM")
-    @Excel(name = "ui.data.column.storageLaneLimit.carNum")
+    @Excel(name = "ui.data.column.cd90StorageLaneLimit.carNum")
     private Integer carNum;
     /** 最大车数 */
     @ApiModelProperty("最大车数")
     @TableField("MAX_CAR_NUM")
-    @Excel(name = "ui.data.column.storageLaneLimit.maxCarNum")
+    @Excel(name = "ui.data.column.cd90StorageLaneLimit.maxCarNum")
     private Integer maxCarNum;
     /** 剩余可用车数 */
     @ApiModelProperty("剩余可用车数")
     @TableField("AVAILABLE_CAR_NUM")
-    @Excel(name = "ui.data.column.storageLaneLimit.availableCarNum")
+    @Excel(name = "ui.data.column.cd90StorageLaneLimit.availableCarNum")
     private Integer availableCarNum;
     /** 数据来源 */
     @ApiModelProperty("数据来源")
     @TableField("DATA_SOURCE")
-    @Excel(name = "ui.data.column.storageLaneLimit.dataSource")
+    @Excel(name = "ui.data.column.cd90StorageLaneLimit.dataSource")
     private String dataSource;
     /** MES同步时间 */
     @ApiModelProperty("MES同步时间")
     @TableField("MES_SYNC_TIME")
-    @Excel(name = "ui.data.column.storageLaneLimit.mesSyncTime")
+    @Excel(name = "ui.data.column.cd90StorageLaneLimit.mesSyncTime")
     private Date mesSyncTime;
 }

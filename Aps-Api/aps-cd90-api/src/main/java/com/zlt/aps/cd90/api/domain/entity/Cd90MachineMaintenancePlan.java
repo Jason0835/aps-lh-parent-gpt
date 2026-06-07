@@ -27,38 +27,38 @@ public class Cd90MachineMaintenancePlan extends BaseEntity implements Serializab
 
     @ImportExcelValidated(required = true, maxLength = 50)
     @TableField("FACTORY_CODE")
-    @Excel(name = "ui.data.column.machineMaintenancePlan.factoryCode", dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.cd90MachineMaintenancePlan.factoryCode", dictType = "biz_factory_name")
     private String factoryCode;
 
     /** 机台编码 */
 
     @ImportExcelValidated(required = true, maxLength = 30)
     @TableField("MACHINE_CODE")
-    @Excel(name = "ui.data.column.machineMaintenancePlan.machineCode")
+    @Excel(name = "ui.data.column.cd90MachineMaintenancePlan.machineCode")
     private String machineCode;
 
     /** 停机日期 */
 
     @ImportExcelValidated(required = true, maxLength = 10)
     @TableField("DOWNTIME_DATE")
-    @Excel(name = "ui.data.column.machineMaintenancePlan.downtimeDate")
+    @Excel(name = "ui.data.column.cd90MachineMaintenancePlan.downtimeDate")
     private Date downtimeDate;
 
     /** 停机开始时间 */
 
     @ImportExcelValidated(required = true, maxLength = 20)
     @TableField("DOWNTIME_START_TIME")
-    @Excel(name = "ui.data.column.machineMaintenancePlan.downtimeStartTime")
+    @Excel(name = "ui.data.column.cd90MachineMaintenancePlan.downtimeStartTime")
     private Date downtimeStartTime;
 
     /** 停机结束时间 */
     @ImportExcelValidated(required = true, maxLength = 20)
     @TableField("DOWNTIME_END_TIME")
-    @Excel(name = "ui.data.column.machineMaintenancePlan.downtimeEndTime")
+    @Excel(name = "ui.data.column.cd90MachineMaintenancePlan.downtimeEndTime")
     private Date downtimeEndTime;
 
     /** 停机时长(小时) */
     @TableField("DOWNTIME_HOURS")
-    @Excel(name = "ui.data.column.machineMaintenancePlan.downtimeHours")
+    @Excel(name = "ui.data.column.cd90MachineMaintenancePlan.downtimeHours")
     private BigDecimal downtimeHours;
 }

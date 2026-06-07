@@ -36,10 +36,10 @@ export default {
     columns() {
       return [
         { type: "selection", fixed: "left" },
-        { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.machineRollMapping.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
-        { prop: "bigRollCode", align: "center", halign: "center", label: this.$t("ui.data.column.machineRollMapping.bigRollCode"), minWidth: 140 },
-        { prop: "cordFabricCode", align: "center", halign: "center", label: this.$t("ui.data.column.machineRollMapping.cordFabricCode"), minWidth: 140 },
-        { prop: "machineCode", align: "center", halign: "center", label: this.$t("ui.data.column.machineRollMapping.machineCode"), minWidth: 140 },
+        { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90MachineRollMapping.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
+        { prop: "bigRollCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90MachineRollMapping.bigRollCode"), minWidth: 140 },
+        { prop: "cordFabricCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90MachineRollMapping.cordFabricCode"), minWidth: 140 },
+        { prop: "machineCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90MachineRollMapping.machineCode"), minWidth: 140 },
         { prop: "remark", halign: "center", label: this.$t("ui.common.column.remark"), minWidth: 120 },
         { prop: "createBy", align: "center", halign: "center", label: this.$t("ui.common.column.createBy"), minWidth: 110 },
         { prop: "createTime", align: "center", halign: "center", label: this.$t("ui.common.column.createTime"), minWidth: 160 },
@@ -49,9 +49,9 @@ export default {
     },
     searchColumns() {
       return [
-        { label: this.$t("ui.data.column.machineRollMapping.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
-        { label: this.$t("ui.data.column.machineRollMapping.bigRollCode"), prop: "bigRollCode" },
-        { label: this.$t("ui.data.column.machineRollMapping.machineCode"), prop: "machineCode" },
+        { label: this.$t("ui.data.column.cd90MachineRollMapping.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
+        { label: this.$t("ui.data.column.cd90MachineRollMapping.bigRollCode"), prop: "bigRollCode" },
+        { label: this.$t("ui.data.column.cd90MachineRollMapping.machineCode"), prop: "machineCode" },
       ];
     },
   },

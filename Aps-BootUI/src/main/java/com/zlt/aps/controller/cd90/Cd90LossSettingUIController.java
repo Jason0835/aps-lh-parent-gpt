@@ -57,7 +57,7 @@ public class Cd90LossSettingUIController extends BaseUIController<Cd90LossSettin
     @ResponseBody
     public AjaxResult add(@RequestBody Cd90LossSetting entity) {
         if (UserConstants.NOT_UNIQUE.equals(cd90LossSettingRemoteService.checkUnique(entity))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.lossSetting.checkUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90LossSetting.checkUnique"));
         }
         return cd90LossSettingRemoteService.add(entity);
     }
@@ -68,7 +68,7 @@ public class Cd90LossSettingUIController extends BaseUIController<Cd90LossSettin
     @ResponseBody
     public AjaxResult edit(@RequestBody Cd90LossSetting entity) {
         if (UserConstants.NOT_UNIQUE.equals(cd90LossSettingRemoteService.checkUnique(entity))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.lossSetting.checkUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90LossSetting.checkUnique"));
         }
         return cd90LossSettingRemoteService.edit(entity);
     }
@@ -94,7 +94,7 @@ public class Cd90LossSettingUIController extends BaseUIController<Cd90LossSettin
 
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.lossSetting.modelName");
+        return I18nUtil.getMessage("ui.data.column.cd90LossSetting.modelName");
     }
 
     @ApiOperation("下载直裁损耗率导入模板")

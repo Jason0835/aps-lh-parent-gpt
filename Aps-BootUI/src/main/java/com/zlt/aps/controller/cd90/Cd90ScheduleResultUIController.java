@@ -42,7 +42,7 @@ public class Cd90ScheduleResultUIController extends BaseUIController<Cd90Schedul
 
     @Override public String getExportTemplateFileName() { return getFunctionName(); }
     @Override public String getProcedureCode() { return "CD90_SCHEDULE_RESULT"; }
-    @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.scheduleResult.modelName"); }
+    @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.cd90ScheduleResult.modelName"); }
 
     @ApiOperation("下载导入模板") @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {

@@ -52,10 +52,10 @@ export default {
     columns() {
       return [
         { type: "selection", fixed: "left" },
-        { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.lossSetting.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
-        { prop: "clothCode", align: "center", halign: "center", label: this.$t("ui.data.column.lossSetting.clothCode"), minWidth: 140 },
-        { prop: "machineCode", align: "center", halign: "center", label: this.$t("ui.data.column.lossSetting.machineCode"), minWidth: 140 },
-        { prop: "lossRate", align: "center", halign: "center", label: this.$t("ui.data.column.lossSetting.lossRate"), minWidth: 130 },
+        { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90LossSetting.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
+        { prop: "clothCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90LossSetting.clothCode"), minWidth: 140 },
+        { prop: "machineCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90LossSetting.machineCode"), minWidth: 140 },
+        { prop: "lossRate", align: "center", halign: "center", label: this.$t("ui.data.column.cd90LossSetting.lossRate"), minWidth: 130 },
         { prop: "remark", halign: "center", label: this.$t("ui.common.column.remark"), minWidth: 120 },
         { prop: "createBy", align: "center", halign: "center", label: this.$t("ui.common.column.createBy"), minWidth: 110 },
         { prop: "createTime", align: "center", halign: "center", label: this.$t("ui.common.column.createTime"), minWidth: 160 },
@@ -65,9 +65,9 @@ export default {
     },
     searchColumns() {
       return [
-        { label: this.$t("ui.data.column.lossSetting.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
-        { label: this.$t("ui.data.column.lossSetting.clothCode"), prop: "clothCode" },
-        { label: this.$t("ui.data.column.lossSetting.machineCode"), prop: "machineCode" },
+        { label: this.$t("ui.data.column.cd90LossSetting.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
+        { label: this.$t("ui.data.column.cd90LossSetting.clothCode"), prop: "clothCode" },
+        { label: this.$t("ui.data.column.cd90LossSetting.machineCode"), prop: "machineCode" },
       ];
     },
   },

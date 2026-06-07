@@ -22,39 +22,39 @@ public class Cd90Stock extends BaseEntity implements Serializable {
     @ApiModelProperty("工厂编码")
     @ImportExcelValidated(required = true, maxLength = 50)
     @TableField("FACTORY_CODE")
-    @Excel(name = "ui.data.column.stock.factoryCode", dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.cd90Stock.factoryCode", dictType = "biz_factory_name")
     private String factoryCode;
     /** 库存日期 */
     @ApiModelProperty("库存日期")
     @ImportExcelValidated(required = true, maxLength = 20)
     @TableField("STOCK_DATE")
-    @Excel(name = "ui.data.column.stock.stockDate")
+    @Excel(name = "ui.data.column.cd90Stock.stockDate")
     private Date stockDate;
     /** 胎体代码 */
     @ApiModelProperty("胎体代码")
     @ImportExcelValidated(required = true, maxLength = 60)
     @TableField("MATERIAL_CODE")
-    @Excel(name = "ui.data.column.stock.materialCode")
+    @Excel(name = "ui.data.column.cd90Stock.materialCode")
     private String materialCode;
     /** 库存量(米) */
     @ApiModelProperty("库存量(米)")
     @ImportExcelValidated(required = true, maxLength = 10)
     @TableField("STOCK_NUM")
-    @Excel(name = "ui.data.column.stock.stockNum")
+    @Excel(name = "ui.data.column.cd90Stock.stockNum")
     private Double stockNum;
     /** 修正数量(米) */
     @ApiModelProperty("修正数量(米)")
     @TableField("MODIFY_NUM")
-    @Excel(name = "ui.data.column.stock.modifyNum")
+    @Excel(name = "ui.data.column.cd90Stock.modifyNum")
     private Double modifyNum;
     /** 不良数量(米) */
     @ApiModelProperty("不良数量(米)")
     @TableField("BAD_NUM")
-    @Excel(name = "ui.data.column.stock.badNum")
+    @Excel(name = "ui.data.column.cd90Stock.badNum")
     private Double badNum;
     /** 层数 */
     @ApiModelProperty("层数")
     @TableField("LAYERS")
-    @Excel(name = "ui.data.column.stock.layers")
+    @Excel(name = "ui.data.column.cd90Stock.layers")
     private Integer layers;
 }

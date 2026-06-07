@@ -32,13 +32,13 @@ export default {
     title() { return this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add"); },
     columns() {
       return [
-        { prop: "factoryCode", label: this.$t("ui.data.column.stock.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
-        { prop: "stockDate", label: this.$t("ui.data.column.stock.stockDate"), type: "date" },
-        { prop: "materialCode", label: this.$t("ui.data.column.stock.materialCode"), maxlength: 60 },
-        { prop: "stockNum", label: this.$t("ui.data.column.stock.stockNum"), type: "number" },
-        { prop: "modifyNum", label: this.$t("ui.data.column.stock.modifyNum"), type: "number" },
-        { prop: "badNum", label: this.$t("ui.data.column.stock.badNum"), type: "number" },
-        { prop: "layers", label: this.$t("ui.data.column.stock.layers"), type: "number" },
+        { prop: "factoryCode", label: this.$t("ui.data.column.cd90Stock.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
+        { prop: "stockDate", label: this.$t("ui.data.column.cd90Stock.stockDate"), type: "date" },
+        { prop: "materialCode", label: this.$t("ui.data.column.cd90Stock.materialCode"), maxlength: 60 },
+        { prop: "stockNum", label: this.$t("ui.data.column.cd90Stock.stockNum"), type: "number" },
+        { prop: "modifyNum", label: this.$t("ui.data.column.cd90Stock.modifyNum"), type: "number" },
+        { prop: "badNum", label: this.$t("ui.data.column.cd90Stock.badNum"), type: "number" },
+        { prop: "layers", label: this.$t("ui.data.column.cd90Stock.layers"), type: "number" },
         { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 300 },
       ];
     },

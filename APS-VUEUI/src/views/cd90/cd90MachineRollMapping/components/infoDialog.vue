@@ -31,10 +31,10 @@ export default {
     title() { return this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add"); },
     columns() {
       return [
-        { prop: "factoryCode", label: this.$t("ui.data.column.machineRollMapping.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
-        { prop: "bigRollCode", label: this.$t("ui.data.column.machineRollMapping.bigRollCode"), maxlength: 30 },
-        { prop: "cordFabricCode", label: this.$t("ui.data.column.machineRollMapping.cordFabricCode"), maxlength: 30 },
-        { prop: "machineCode", label: this.$t("ui.data.column.machineRollMapping.machineCode"), maxlength: 30 },
+        { prop: "factoryCode", label: this.$t("ui.data.column.cd90MachineRollMapping.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
+        { prop: "bigRollCode", label: this.$t("ui.data.column.cd90MachineRollMapping.bigRollCode"), maxlength: 30 },
+        { prop: "cordFabricCode", label: this.$t("ui.data.column.cd90MachineRollMapping.cordFabricCode"), maxlength: 30 },
+        { prop: "machineCode", label: this.$t("ui.data.column.cd90MachineRollMapping.machineCode"), maxlength: 30 },
         { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 300 },
       ];
     },

@@ -86,17 +86,20 @@
   "新卡盘": "Đĩa mới",
   "物料名称": "Tên vật liệu",
   "部件名称": "Tên bộ phận",
+
   "ui.frame.btn.add": "Thêm",
   "ui.frame.btn.update": "Chỉnh sửa",
   "ui.frame.btn.edit": "Chỉnh sửa",
   "ui.frame.btn.delete": "Xóa",
   "ui.frame.btn.import": "Nhập",
   "ui.frame.btn.export": "Xuất",
+
   "ui.data.btn.option": "Thao tác",
   "ui.data.btn.scheduleResult.unscheduledResult": "Kết quả chưa sắp xếp",
   "ui.data.btn.lhMouldChangePlan.issueSchedule": "Xuất bản kế hoạch thay đổi khuôn",
   "ui.data.btn.lhMouldChangePlan.generateTextPlan": "Cập nhật phương pháp văn bản",
   "ui.data.btn.lhScheduleResult.increaseMouldStartPlan": "Cập nhật kế hoạch",
+
   "ui.data.alert.lhScheduleResult.increaseMouldStartPlanConfirm": "Có xác nhận thực hiện cập nhật kế hoạch không?",
   "ui.data.alert.lhScheduleResult.increaseMouldStartPlanSuccess": "Cập nhật kế hoạch thành công",
   "ui.data.alert.lhScheduleResult.insertOrder.materialCodeBlank": "Mã vật liệu không được để trống",
@@ -116,6 +119,7 @@
   "ui.data.alert.lhScheduleResult.insertOrder.skuNotInMonthPlan": "SKU [{}] không trong kế hoạch tháng hiện tại, không thể chèn đơn",
   "ui.data.alert.lhScheduleResult.insertOrder.skuAlreadyInProduction": "SKU [{}] đang sản xuất trong tháng hiện tại, không thể chèn đơn trùng lặp",
   "ui.data.alert.lhScheduleResult.insertOrder.monthPlanVersionNotFound": "Kế hoạch tháng sắp xếp hiện tại [{}] chưa tìm thấy phiên bản sắp xếp đã định, không thể kiểm tra kế hoạch tháng",
+
   "ui.data.alert.lhMouldChangePlan.issueConfirm": "Xác nhận xuất bản?",
   "ui.data.alert.lhMouldChangePlan.noData": "Chưa chọn dữ liệu",
   "ui.data.alert.lhMouldChangePlan.hasReleasedData": "Kế hoạch thay đổi khuôn có dữ liệu đã xuất bản, không cho phép thao tác này",
@@ -129,13 +133,16 @@
   "ui.data.alert.lhMouldChangePlan.noSelection": "Vui lòng chọn bản ghi kế hoạch thay đổi khuôn cần xuất bản",
   "ui.data.alert.lhMouldChangePlan.hasHistoryData": "Bản ghi đã chọn chứa bản ghi lịch sử (ngày sắp xếp trước hôm nay), không cho phép xuất bản",
   "ui.data.alert.lhMouldChangePlan.hasHistoryDataByQuery": "Ngày sắp xếp trước hôm nay, là bản ghi lịch sử, không cho phép xuất bản",
+
   "ui.data.alert.lhPrecisionPlan.notUnique": "Kết hợp máy lưu hóa + loại độ chính xác + ngày kế hoạch đã tồn tại, không thể trùng lặp",
+
   "ui.data.column.remark": "Ghi chú",
   "ui.data.column.updateTime": "Thời gian cập nhật",
   "ui.data.column.factoryCode": "Nhà máy",
   "ui.data.column.paramsCode": "Mã tham số",
   "ui.data.column.paramsName": "Tên tham số",
   "ui.data.column.paramsValue": "Giá trị tham số",
+
   "ui.data.column.unscheduleResult.scheduleDate": "Ngày sắp xếp",
   "ui.data.column.unscheduleResult.factoryCode": "Nhà máy",
   "ui.data.column.unscheduleResult.batchNo": "Số lô sắp xếp",
@@ -149,14 +156,17 @@
   "ui.data.column.unscheduleResult.specDesc": "Mô tả quy cách",
   "ui.data.column.unscheduleResult.unscheduledQty": "SL chưa sắp xếp",
   "ui.data.column.unscheduleResult.unscheduledReason": "Nguyên nhân chưa sắp xếp",
+
   "ui.common.column.remark": "Ghi chú",
   "ui.common.column.remark2": "\\u0020Ghi chú\\u0020",
   "ui.common.column.remark3": "\\u0020\\u0020Ghi chú\\u0020\\u0020",
   "ui.common.column.updateTime": "Thời gian cập nhật",
   "ui.common.unit": "Đơn vị",
+
   "ui.data.column.lhParams.updateBy": "Người sửa đổi",
   "ui.data.column.lhParams.updateTime": "Thời gian sửa đổi",
   "ui.data.column.lhParams.remark": "Ghi chú",
+
   "ui.data.column.machine.manufacturer": "Nhà sản xuất",
   "ui.data.column.machine.dimensionSize": "Kích thước",
   "ui.data.column.machine.hotPlateDiameter": "Đường kính bản nhiệt",
@@ -172,6 +182,7 @@
   "ui.data.column.machine.singleDoubleMode": "Đơn/đôi khuôn",
   "ui.data.column.machine.quata": "Định mức sản xuất",
   "ui.data.column.machine.machineOrder": "Thứ tự máy",
+
   "ui.data.column.lhMachineInfo.dimensionMinimum": "Giới hạn dưới inch phù hợp",
   "ui.data.column.lhMachineInfo.dimensionMaximum": "Giới hạn trên inch phù hợp",
   "ui.data.column.lhMachineInfo.maxMoldNum": "Đơn/đôi khuôn",
@@ -184,18 +195,22 @@
   "ui.lhMachineInfo.validate.chineseMax": "Ký tự Trung Quốc không được vượt quá 10",
   "ui.lhMachineInfo.validate.asciiMax": "Chữ cái/số không được vượt quá 30 ký tự",
   "ui.lhMachineInfo.validate.retry": "Xác minh thất bại, vui lòng thử lại sau",
+
   "ui.data.column.info.support225WideBase": "Hỗ trợ đế rộng 22.5 inch",
   "ui.data.column.info.singleDoubleMode": "Đơn/đôi khuôn",
+
   "ui.tq.specifyMachine.column.materialCode": "Mã vành tai",
   "ui.specifyMachine.column.machineName": "Dây chuyền sản xuất",
   "ui.specifyMachine.column.lineType": "Loại đường dây",
   "ui.specifyMachine.column.jobType": "Loại công việc",
   "ui.data.column.specifyMachine.lineType": "Loại đường dây",
   "ui.data.column.specifyMachine.jobType": "Loại công việc",
+
   "ui.data.column.lhSpecifyMachine.specCode": "Mã vật liệu",
   "ui.data.column.lhSpecifyMachine.materialDesc": "Mô tả vật liệu",
   "ui.data.column.lhSpecifyMachine.machineCode": "Mã máy",
   "ui.data.column.lhSpecifyMachine.jobType": "Loại công việc",
+
   "ui.data.column.lhChipStock.modelName": "Tồn kho chip",
   "ui.data.column.lhChipStock.factoryCode": "Nhà máy",
   "ui.data.column.lhChipStock.chipCode": "Mã chip",
@@ -205,6 +220,7 @@
   "ui.data.column.lhChipStock.remainStockNum": "Số lượng tồn còn lại",
   "ui.data.column.lhChipStock.updateTime": "Thời gian cập nhật",
   "ui.data.column.lhChipStock.remark": "Ghi chú",
+
   "ui.data.column.lhMachineOnlineInfo.modelName": "Thông tin máy lưu hóa đang chạy",
   "ui.data.column.lhMachineOnlineInfo.factoryCode": "Nhà máy",
   "ui.data.column.lhMachineOnlineInfo.onlineDate": "Ngày trực tuyến",
@@ -214,6 +230,7 @@
   "ui.data.column.lhMachineOnlineInfo.specDesc": "Mô tả quy cách",
   "ui.data.column.lhMachineOnlineInfo.lrMolds": "Khuôn LR",
   "ui.data.column.lhMachineOnlineInfo.inMachineMouldCode": "Mã khuôn trong máy",
+
   "ui.data.column.lhSpecialMaterialBom.modelName": "Cấu hình danh mục vật liệu đặc biệt",
   "ui.data.column.lhSpecialMaterialBom.structureName": "Tên cấu trúc",
   "ui.data.column.lhSpecialMaterialBom.materialCode": "Mã vật liệu",
@@ -221,6 +238,7 @@
   "ui.data.column.lhSpecialMaterialBom.category": "Phân loại",
   "ui.data.column.reportClassAccuracy.materialCode": "Quy cách",
   "ui.data.column.defectiveStock.mesMaterialCode": "Mã vật liệu",
+
   "ui.data.column.capsuleChuck.specifications": "Quy cách",
   "ui.data.column.capsuleChuck.proSize": "Kích thước sản phẩm",
   "ui.data.column.capsuleChuck.internalQty": "Số lượng đĩa cũ",
@@ -228,12 +246,15 @@
   "ui.data.column.capsuleChuck.isZeroRack": "Có giá đỡ cung cấp độ không",
   "ui.data.column.capsuleChuck.lhMachineMaxQty": "Giới hạn trên máy lưu hóa",
   "ui.data.column.capsuleChuck.maxDayCapacity": "Sản lượng tối đa thiết bị/ngày",
+
   "ui.data.column.masterdata.materialType": "Loại vật liệu",
   "ui.data.specialMaterial.materialCode": "Mã vật liệu",
   "ui.data.specialMaterial.rubberSpec": "Quy cách cao su",
   "ui.data.column.quota.quota": "Hạn ngạch",
+
   "ui.data.column.shareMoldInfo.groupName": "Tên nhóm",
   "ui.data.column.shareMoldInfo.shareMoldNum": "Số lượng khuôn dùng chung",
+
   "ui.data.column.lhSharedMouldPat.modelName": "Cấu hình hoa văn khuôn chung",
   "ui.data.column.lhSharedMouldPat.materialCode": "Mã vật liệu",
   "ui.data.column.lhSharedMouldPat.materialDesc": "Mô tả vật liệu",
@@ -243,6 +264,7 @@
   "ui.data.column.lhSharedMouldPat.mouldNo": "Mã khuôn",
   "ui.data.column.lhSharedMouldPat.patternBlock": "Khối hoa văn",
   "ui.data.column.lhSharedMouldPat.remark": "Ghi chú",
+
   "ui.data.column.mouldCleanWarn.lhCode": "Mã máy lưu hóa",
   "ui.data.column.mouldCleanWarn.operTime": "Thời gian vận hành",
   "ui.data.column.mouldCleanWarn.firstWashTime": "Thời gian rửa lần 1",
@@ -251,6 +273,7 @@
   "ui.data.column.mouldCleanWarn.updateTime": "Thời gian cập nhật",
   "ui.data.column.mouldCleanWarn.modelName": "Cảnh báo vệ sinh khuôn",
   "ui.data.column.mouldCleanWarn.factoryCode": "Nhà máy",
+
   "setting.machine.machineCode": "Mã máy",
   "ui.data.column.curingPlan.cxMachineTypeCode": "Loại máy",
   "ui.data.column.docMoldingMachine.moldingMachineClassName": "Loại máy thành hình",
@@ -260,6 +283,7 @@
   "ui.data.column.scheduleAdjust.proSize": "Kích thước",
   "ui.data.column.scheduleAdjust.productCodeDesc": "Mô tả vật liệu",
   "ui.data.column.confMinProd.pattern": "Hoa văn",
+
   "ui.data.column.lhRepairCapsule.modelName": "Số lần đã sử dụng bao lưu hóa",
   "ui.data.column.lhRepairCapsule.obtainTime": "Ngày lấy dữ liệu",
   "ui.data.column.lhRepairCapsule.lhCode": "Máy lưu hóa",
@@ -267,6 +291,7 @@
   "ui.data.column.lhRepairCapsule.materialDesc": "Mô tả vật liệu",
   "ui.data.column.lhRepairCapsule.replaceCapsuleCount": "Số lần đã sử dụng bao lưu hóa (trái)",
   "ui.data.column.lhRepairCapsule.replaceCapsuleCount2": "Số lần đã sử dụng bao lưu hóa (phải)",
+
   "ui.data.column.cxStructureTreadConfig.modelName": "Cấu hình lốp xe nguyên chiếc",
   "ui.data.column.cxStructureTreadConfig.stockDate": "Ngày tồn kho",
   "ui.data.column.cxStructureTreadConfig.structureCode": "Cấu trúc",
@@ -285,6 +310,7 @@
   "ui.data.alert.cxStructureTreadConfig.sameStructureTreadCount.required": "Nhà máy, cấu trúc, số lốp xe nguyên chiếc cùng cấu trúc không được để trống",
   "ui.data.alert.cxStructureTreadConfig.sameStructureTreadCount.success": "Cập nhật số lốp xe nguyên chiếc cùng cấu trúc thành công, đã cập nhật %s bản ghi",
   "ui.data.alert.cxStructureTreadConfig.structureCodeNotUnique": "Nhà máy + Cấu trúc + Mã phôi đã tồn tại trong cơ sở dữ liệu, không thể trùng lặp",
+
   "ui.data.column.cxKeyProduct.modelName": "Cấu hình sản phẩm chủ yếu",
   "ui.data.column.cxKeyProduct.embryoCode": "Mã phôi",
   "ui.data.column.cxKeyProduct.embryoDesc": "Mô tả phôi",
@@ -297,6 +323,7 @@
   "ui.data.alert.cxKeyProduct.notUnique.withRow": "Dòng {0}: Kết hợp cấu trúc và mã phôi đã tồn tại trong cơ sở dữ liệu",
   "ui.data.alert.cxKeyProduct.isActiveRequired": "Dòng {0}: Có kích hoạt bắt buộc nhập",
   "ui.data.alert.cxKeyProduct.isActiveNotDict": "Dòng {0}: Có kích hoạt chỉ có thể nhập '0' hoặc '1'",
+
   "ui.data.column.cxMachineOnlineInfo.modelName": "Thông tin máy thành hình trực tuyến",
   "ui.data.column.cxMachineOnlineInfo.factoryCode": "Nhà máy",
   "ui.data.column.cxMachineOnlineInfo.onlineDate": "Ngày",
@@ -308,6 +335,7 @@
   "ui.data.column.cxMachineOnlineInfo.updateDay": "Thời gian cập nhật",
   "ui.data.column.cxMachineOnlineInfo.dataVersion": "Phiên bản",
   "ui.data.column.cxMachineOnlineInfo.checkUnique": "Thông tin máy thành hình trực tuyến đã tồn tại",
+
   "ui.data.column.cxStock.modelName": "Tồn kho thành hình",
   "ui.data.column.cxStock.stockDate": "Ngày tồn kho",
   "ui.data.column.cxStock.embryoCode": "Mã phôi",
@@ -322,6 +350,7 @@
   "cxStock.embryoCodeNotUnique": "Mã phôi đã tồn tại, không thể trùng lặp",
   "ui.data.column.cxStock.isEndingSku": "Có phải SKU kết thúc không",
   "ui.data.column.cxStock.dataSource": "Nguồn dữ liệu",
+
   "ui.data.column.cxPrecisionPlan.modelName": "Kế hoạch độ chính xác thành hình",
   "ui.data.column.cxPrecisionPlan.factoryCode": "Nhà máy",
   "ui.data.column.cxPrecisionPlan.accuracyType": "Loại độ chính xác",
@@ -351,6 +380,7 @@
   "ui.data.column.lhPrecisionPlan.dataSource": "Nguồn dữ liệu",
   "ui.cx.precision.plan.sync.from.mes": "Tạo kế hoạch độ chính xác máy thành hình",
   "ui.cx.precision.plan.sync.confirm": "Có đồng bộ dữ liệu kế hoạch độ chính xác thành hình từ MES không?",
+
   "ui.data.column.cxDayFinishQty.modelName": "Sản lượng hoàn thành ngày lập lịch thành hình",
   "ui.data.column.cxDayFinishQty.factoryCode": "Nhà máy",
   "ui.data.column.cxDayFinishQty.finishDate": "Ngày hoàn thành",
@@ -359,6 +389,7 @@
   "ui.data.column.cxDayFinishQty.exampleType": "Loại quy cách",
   "ui.data.column.cxDayFinishQty.bomDataVersion": "Phiên bản thi công phôi",
   "ui.data.column.cxDayFinishQty.dataVersion": "Phiên bản",
+
   "ui.data.column.scheduleResult.scheduleDate": "Ngày sắp xếp",
   "ui.data.column.scheduleResult.isRelease": "Đã xuất bản",
   "ui.data.column.scheduleResult.materialCode": "Mã vật liệu",
@@ -529,6 +560,14 @@
   "ui.data.column.scheduleResult.productionStatus": "Trạng thái sản xuất",
   "ui.data.column.scheduleResult.factoryCode": "Nhà máy",
   "ui.data.column.scheduleResult.updateTime": "Thời gian cập nhật",
+  "ui.data.column.scheduleResult.isRelease": "Đã xuất bản",
+  "ui.data.column.scheduleResult.scheduleType": "Loại sắp xếp sản xuất",
+  "ui.data.column.scheduleResult.batchNo": "Số lô",
+  "ui.data.column.scheduleResult.completeDate": "Ngày hoàn thành",
+  "ui.data.column.scheduleResult.orderNo": "Số lệnh sản xuất",
+  "ui.data.column.scheduleResult.sapCode": "Mã SAP",
+  "ui.data.column.scheduleResult.lhMachineName": "Tên máy lưu hóa",
+  "ui.data.column.scheduleResult.mouldMethod": "Loại phương pháp",
   "ui.data.column.scheduleResult.specNotExist": "Quy cách không tồn tại, vui lòng nhập mã quy cách đầy đủ",
   "ui.data.column.scheduleResult.unschedule": "Chưa sắp xếp",
   "ui.data.column.scheduleResult.onlyUnreleasedEditable": "Chỉ dữ liệu chưa xuất bản mới được phép sửa",
@@ -544,6 +583,7 @@
   "ui.data.column.scheduleResult.reason": "Nguyên nhân lỗi",
   "ui.data.column.scheduleResult.status": "Trạng thái",
   "ui.data.column.scheduleResult.adjustType": "Loại điều chỉnh",
+
   "ui.data.column.cxScheduleResult.cxMachineCode": "Máy thành hình",
   "ui.data.column.cxScheduleResult.lhMachineCode": "Máy lưu hóa",
   "ui.data.column.cxScheduleResult.embryoCode": "Mã phôi",
@@ -559,6 +599,7 @@
   "ui.data.column.cxScheduleResult.lhAutoPlan": "Sắp xếp lưu hóa tự động",
   "ui.data.btn.ajax.code.msg": "Thao tác thành công",
   "ui.common.msg.ajax.operation.success": "Thao tác thành công",
+
   "ui.data.column.lhMouldChangePlan.modelName": "Kế hoạch thay đổi khuôn",
   "ui.data.column.lhMouldChangePlan.factoryCode": "Nhà máy",
   "ui.data.column.lhMouldChangePlan.lhResultBatchNo": "Số lô kết quả lưu hóa",
@@ -585,6 +626,7 @@
   "lhMouldChangePlan.checkUnique": "Đã tồn tại bản ghi cùng nhà máy, mã máy lưu hóa, ngày kế hoạch, ngày sắp xếp.",
   "lhMouldChangePlan.batchEditNotOpen": "Chức năng chỉnh sửa hàng loạt chưa mở",
   "ui.data.column.lhMouldChangePlan.generateTextPlanRemark": "Cập nhật phương pháp văn bản",
+
   "ui.data.column.mouldCleanPlan.modelName": "Kế hoạch vệ sinh khuôn",
   "ui.data.column.mouldCleanPlan.brand": "Thương hiệu",
   "ui.data.column.mouldCleanPlan.lhCode": "Máy lưu hóa",
@@ -597,12 +639,13 @@
   "ui.data.column.mouldCleanPlan.remark": "Ghi chú",
   "ui.data.column.mouldCleanPlan.dataVersion": "Phiên bản",
   "ui.data.column.mouldCleanPlan.leftRightMould": "Khuôn trái/phải",
-  "ui.data.column.mouldCleanPlan.finishStatus": "Trạng thái hoàn thành",
-  "ui.data.column.mouldCleanPlan.updateTime": "Thời gian cập nhật",
+  "ui.data.column.mouldCleanPlan.finishStatus": "Tr\u1EA1ng th\u00E1i ho\u00E0n th\u00E0nh",
+  "ui.data.column.mouldCleanPlan.updateTime": "Th\u1EDDi gian c\u1EADp nh\u1EADt",
   "ui.mould.clean.plan.sync.from.warn": "Đồng bộ từ cảnh báo",
   "ui.mould.clean.plan.view.warn": "Xem cảnh báo",
   "ui.mould.clean.plan.sync.confirm": "Có đồng bộ tạo kế hoạch từ cảnh báo vệ sinh khuôn không?",
   "ui.mould.clean.plan.sync.success": "Đã tạo thành công {0} kế hoạch vệ sinh khuôn",
+
   "ui.data.column.lhPrecisionPlan.modelName": "Kế hoạch độ chính xác lưu hóa",
   "ui.data.column.lhPrecisionPlan.factoryCode": "Nhà máy",
   "ui.data.column.lhPrecisionPlan.machineCode": "Mã máy",
@@ -617,6 +660,7 @@
   "ui.data.column.lhPrecisionPlan.warningStatus": "Trạng thái cảnh báo",
   "ui.data.column.lhPrecisionPlan.warningDate": "Ngày cảnh báo",
   "ui.data.column.lhPrecisionPlan.isWarningSent": "Đã gửi cảnh báo chưa",
+  "ui.data.column.lhPrecisionPlan.dataSource": "Nguồn dữ liệu",
   "ui.data.column.lhPrecisionPlan.scheduleDate": "Ngày sắp xếp",
   "ui.lh.precision.plan.model.name": "Kế hoạch độ chính xác lưu hóa",
   "ui.lh.precision.plan.machine.code": "Máy lưu hóa",
@@ -638,6 +682,7 @@
   "ui.lh.precision.plan.auto.generate.confirm": "Có tự động tạo kế hoạch độ chính xác lưu hóa năm {year} không?",
   "ui.lh.precision.plan.factoryCodeRequired": "Dòng {0}: Mã nhà máy bắt buộc nhập",
   "ui.lh.precision.plan.excelDuplicate": "Dòng {0}: Dữ liệu trùng lặp trong Excel (nhà máy + máy lưu hóa + ngày kế hoạch)",
+
   "ui.data.page.curingDailyCompletion.title": "Sản lượng hoàn thành lưu hóa ngày",
   "ui.tq.machineSpecSpeed.column.machineCode": "Mã máy",
   "ui.tq.machineSpecSpeed.column.materialCode": "Mã vòng lốp",
@@ -1315,7 +1360,9 @@
   "ui.data.column.mpAdjustResult.hasSpecialMaterial": "Có vật liệu đặc biệt",
   "ui.data.column.mpAdjustStructureIn.lastMonthRemainQty": "Số dư kế hoạch tháng trước",
   "ui.data.column.mpAdjustStructureOut.lastMonthRemainQty": "Số dư kế hoạch tháng trước",
+
   "ui.frame.btn.moldingScheduleSequence": "Thứ tự sắp xếp thành hình",
+
   "ui.data.column.cxScheduleResult.tripNo": "Số chuyến",
   "ui.data.column.cxScheduleResult.tripNoPrefix": "Chuyến ",
   "ui.data.column.cxScheduleResult.tripCapacity": "SL chuyến xe",
@@ -1330,10 +1377,13 @@
   "ui.data.column.cxScheduleResult.itemsLabel": "mục",
   "ui.data.column.cxScheduleResult.gotIt": "Đã hiểu",
   "ui.data.column.cxScheduleResult.scheduleTimeout": "Yêu cầu lập lịch hết thời gian hoặc dịch vụ bất thường, nếu lịch trình đang thực thi, vui lòng làm mới trang sau để xem kết quả",
+
   "ui.cx.cxScheduleResult.export.fileName": "Kết quả lập kế hoạch thành hình",
   "ui.cx.cxScheduleResult.export.fileName4FinishedList": "Danh sách kế hoạch thành hình kết thúc",
-  "ui.cx.cxScheduleResult.exportCxDayPlanFileName": "Kế hoạch ngày thành hình",
+ "ui.cx.cxScheduleResult.exportCxDayPlanFileName": "Kế hoạch ngày thành hình",
+
   "ui.construction.carcassRawMaterialList": "Danh sách nguyên vật liệu thân lốp",
+
   "ui.data.column.cx.machine.no": "Số thứ tự",
   "ui.data.column.cx.machine.machineCode": "Mã máy thành hình",
   "ui.data.column.cx.machine.machineName": "Tên máy thành hình",
@@ -1369,11 +1419,13 @@
   "ui.data.column.quota.liningCode": "mã lót",
   "ui.data.column.quota.paddingCode": "mã đệm cao su",
 
+
   "ui.cx.cxStock.export.fileName": "Đồng bộ tồn kho thành hình",
   "ui.cx.cxDayFinishQty.export.fileName": "Sản lượng hoàn thành ngày thành hình",
   "ui.cx.cxMachineOnlineInfo.export.fileName": "Đồng bộ máy thành hình trực tuyến",
   "ui.cx.cxKeyProduct.export.fileName": "Cấu hình sản phẩm chủ yếu",
   "ui.cx.cxStructureTreadConfig.export.fileName": "Cấu hình lốp xe nguyên chiếc",
+
   "ui.data.column.mdmMonthProdPlan.importTitle": "Nhập dữ liệu kế hoạch sản xuất hàng tháng",
   "ui.data.column.mdmMonthProdPlan.dailyProduction": "Sản lượng sản xuất",
   "ui.data.column.mdmMonthProdPlan.dailyOutput": "Sản lượng ngày",
@@ -1387,6 +1439,7 @@
   "ui.data.column.mdmMonthProdPlan.isFinalized": "Đã hoàn thiện",
   "ui.data.column.mdmMonthProdPlan.constructionCode": "Mã thi công",
   "ui.data.column.mdmMonthProdPlan.stage": "Giai đoạn",
+
   "ui.data.column.planAdjust.adjustNumber": "Số lượng điều chỉnh",
   "ui.data.column.planAdjust.reduceNumber": "Số lượng giảm",
   "ui.data.column.planAdjust.leftOverQty": "Sản lượng còn trống",
@@ -1395,19 +1448,27 @@
   "ui.data.column.specCode": "Mã quy cách",
   "ui.data.column.materialDesc": "Mô tả vật liệu",
   "ui.data.column.id": "ID",
+
   "ui.title.needSubtractPlan": "Cần giảm kế hoạch",
   "ui.title.failureReason": "Lý do thất bại",
   "ui.title.adjust": "Điều chỉnh",
   "ui.title.subtract": "Giảm",
+
   "ui.button.checkConstruction": "Kiểm tra thi công",
   "ui.button.adjustSuggestion": "Đề xuất điều chỉnh",
+
   "ui.placeholder.selectTableRow": "Vui lòng chọn dòng dữ liệu",
+
   "ui.message.confirmCheckConstruction": "Xác nhận kiểm tra thi công cho {month}?",
+
   "common.button.apply": "Áp dụng",
+  "common.button.confirm": "Xác nhận",
+  "common.button.cancel": "Hủy bỏ",
   "common.message.operationSuccess": "Thao tác thành công",
   "common.message.needContinueAdjust": "Số lượng điều chỉnh không đủ, cần tiếp tục điều chỉnh",
   "common.yes": "Có",
   "common.no": "Không",
+
   "ui.upload.dataNotice": "Lưu ý về dữ liệu",
   "ui.upload.insertNewSpec": "Khi bạn cần chèn quy cách mới",
   "ui.upload.leaveEmptyProductionNo": "Vui lòng để trống trường 'Mã sản xuất'",
@@ -1415,27 +1476,35 @@
   "ui.upload.adjustExistingSpec": "Khi bạn cần điều chỉnh quy cách hiện có",
   "ui.upload.keepProductionNoUnchanged": "Vui lòng giữ nguyên 'Mã sản xuất' ban đầu",
   "ui.upload.systemWillRecognizeAsAdjust": "Hệ thống sẽ nhận diện là điều chỉnh thay vì thêm mới",
+
   "ui.title.importInfoData": "Nhập dữ liệu thông tin",
   "ui.title.importScheduleResult": "Nhập kết quả lập lịch",
   "ui.title.relatedUser": "Người dùng liên quan",
+
   "ui.checkbox.updateExistingData": "Có cập nhật dữ liệu người dùng đã tồn tại không",
+
   "ui.data.column.drugInventory.glueName": "Tên thuốc",
   "ui.data.column.drugInventory.stockNum": "Số lượng tồn kho (gói)",
   "ui.data.column.drugScheduling.weighingStation": "Trạm cân",
   "ui.data.column.drugScheduling.estimatedStartTime": "Thời gian bắt đầu dự kiến",
   "ui.data.column.drugScheduling.estimatedEndTime": "Thời gian hoàn thành dự kiến",
+
   "ui.tab.netDemandPlan": "Kế hoạch nhu cầu ròng",
   "ui.tab.supplyChainOrder": "Đơn hàng chuỗi cung ứng",
   "ui.tab.productionPlan": "Kế hoạch sản xuất",
   "ui.tab.unscheduledPlan": "Kế hoạch chưa lên lịch",
+
   "ui.placeholder.pleaseSelect": "Vui lòng chọn",
+
   "ui.form.label.adjustStartDate": "Ngày bắt đầu điều chỉnh",
   "ui.form.label.adjustEndDate": "Ngày kết thúc điều chỉnh",
   "ui.button.next": "Tiếp theo",
+
   "ui.title.structureAdjust": "Điều chỉnh cấu trúc",
   "ui.title.specialMaterialProduction": "Sản xuất vật liệu đặc biệt",
   "ui.title.adjustResult": "Kết quả điều chỉnh",
   "ui.title.addStructure": "Thêm cấu trúc mới",
+
   "ui.data.column.productStructure": "Cấu trúc sản phẩm",
   "ui.data.column.schedulingMachine": "Máy lập lịch",
   "ui.data.column.ncMaterialCode": "Mã vật liệu NC",
@@ -1470,80 +1539,5 @@
   "ui.data.column.cd90MachineInfo.openMachineClass": "Ca mở máy",
   "ui.data.column.cd90MachineInfo.status": "Trạng thái máy",
   "ui.data.column.cd90MachineInfo.checkUnique": "Mã máy này đã tồn tại trong cùng nhà máy",
-  "ui.data.alert.cd90MachineInfo.quotaPositive": "Định mức phải lớn hơn 0",
-  "ui.data.column.cd90SpecifyMachine.modelName": "Máy chỉ định cắt 90 độ",
-  "ui.data.column.cd90SpecifyMachine.factoryCode": "Nhà máy",
-  "ui.data.column.cd90SpecifyMachine.clothCode": "Mã vải",
-  "ui.data.column.cd90SpecifyMachine.machineCode": "Mã máy",
-  "ui.data.column.cd90SpecifyMachine.jobType": "Loại công việc",
-  "ui.data.column.cd90SpecifyMachine.checkUnique": "Cấu hình vải, máy và loại công việc này đã tồn tại trong cùng nhà máy",
-  "ui.data.column.cd90SpecifyMachine.machineInvalid": "Mã máy không tồn tại hoặc chưa được kích hoạt",
-  "ui.data.column.cd90CurlLength.modelName": "Chiều dài cuộn cắt 90 độ",
-  "ui.data.column.cd90CurlLength.factoryCode": "Nhà máy",
-  "ui.data.column.cd90CurlLength.clothCode": "Mã vải",
-  "ui.data.column.cd90CurlLength.curlLength": "Chiều dài cuộn chuẩn",
-  "ui.data.column.cd90CurlLength.checkUnique": "Mã vải này đã tồn tại trong cùng nhà máy",
-  "ui.data.alert.cd90CurlLength.curlLengthPositive": "Chiều dài cuộn phải lớn hơn 0",
-  "ui.data.column.lossSetting.modelName": "Tỷ lệ hao hụt cắt 90 độ",
-  "ui.data.column.lossSetting.factoryCode": "Nhà máy",
-  "ui.data.column.lossSetting.clothCode": "Mã vải",
-  "ui.data.column.lossSetting.machineCode": "Mã máy",
-  "ui.data.column.lossSetting.lossRate": "Tỷ lệ hao hụt(%)",
-  "ui.data.column.lossSetting.checkUnique": "Cấu hình tỷ lệ hao hụt cho mã vải và mã máy này đã tồn tại",
-  "ui.data.column.machineMaintenancePlan.modelName": "Kế hoạch bảo trì máy cắt 90 độ",
-  "ui.data.column.machineMaintenancePlan.factoryCode": "Nhà máy",
-  "ui.data.column.machineMaintenancePlan.machineCode": "Mã máy",
-  "ui.data.column.machineMaintenancePlan.downtimeDate": "Ngày dừng máy",
-  "ui.data.column.machineMaintenancePlan.downtimeStartTime": "Thời gian bắt đầu dừng",
-  "ui.data.column.machineMaintenancePlan.downtimeEndTime": "Thời gian kết thúc dừng",
-  "ui.data.column.machineMaintenancePlan.downtimeHours": "Thời gian dừng (giờ)",
-  "ui.data.column.machineMaintenancePlan.checkUnique": "Kế hoạch bảo trì cho máy và khoảng thời gian này đã tồn tại",
-  "ui.data.column.machineRollMapping.modelName": "Ánh xạ cuộn-máy cắt 90 độ",
-  "ui.data.column.machineRollMapping.factoryCode": "Nhà máy",
-  "ui.data.column.machineRollMapping.bigRollCode": "Mã cuộn lớn",
-  "ui.data.column.machineRollMapping.cordFabricCode": "Mã vải mành",
-  "ui.data.column.machineRollMapping.machineCode": "Mã máy",
-  "ui.data.column.machineRollMapping.checkUnique": "Ánh xạ cuộn và máy này đã tồn tại",
-  "ui.data.column.params.modelName": "Tham số cắt 90 độ",
-  "ui.data.column.params.factoryCode": "Nhà máy",
-  "ui.data.column.params.paramCode": "Mã tham số",
-  "ui.data.column.params.paramName": "Tên tham số",
-  "ui.data.column.params.paramValue": "Giá trị tham số",
-  "ui.data.column.params.regularExpression": "Biểu thức chính quy",
-  "ui.data.column.params.errorTips": "Mẹo lỗi",
-  "ui.data.column.params.checkUnique": "Mã tham số này đã tồn tại",
-  "ui.data.column.scheduleResult.modelName": "Kết quả lập lịch cắt 90 độ",
-  "ui.data.column.scheduleResult.clothCode": "Mã vải",
-  "ui.data.column.scheduleResult.machineCode": "Mã máy",
-  "ui.data.column.scheduleResult.bigRollCode": "Mã cuộn lớn",
-  "ui.data.column.scheduleResult.cxBatchNo": "Số lô lưu hóa",
-  "ui.data.column.scheduleResult.storageLaneCode": "Mã làn lưu kho",
-  "ui.data.column.scheduleResultLog.modelName": "Nhật ký lập lịch cắt 90 độ",
-  "ui.data.column.scheduleResultLog.factoryCode": "Nhà máy",
-  "ui.data.column.scheduleResultLog.scheduleDate": "Ngày lập lịch",
-  "ui.data.column.scheduleResultLog.batchNo": "Số lô",
-  "ui.data.column.scheduleResultLog.clothCode": "Mã vải",
-  "ui.data.column.scheduleResultLog.machineCode": "Mã máy",
-  "ui.data.column.scheduleResultLog.logType": "Loại nhật ký",
-  "ui.data.column.scheduleResultLog.logBy": "Người ghi",
-  "ui.data.column.scheduleResultLog.logTime": "Thời gian ghi",
-  "ui.data.column.stock.modelName": "Tồn kho cắt 90 độ",
-  "ui.data.column.stock.factoryCode": "Nhà máy",
-  "ui.data.column.stock.materialCode": "Mã vật liệu",
-  "ui.data.column.stock.layers": "Số lớp",
-  "ui.data.column.stock.checkUnique": "Bản ghi tồn kho này đã tồn tại",
-  "ui.data.column.storageLaneLimit.modelName": "Giới hạn làn lưu kho cắt 90 độ",
-  "ui.data.column.storageLaneLimit.factoryCode": "Nhà máy",
-  "ui.data.column.storageLaneLimit.laneDate": "Ngày",
-  "ui.data.column.storageLaneLimit.shiftCode": "Mã ca",
-  "ui.data.column.storageLaneLimit.storageLaneCode": "Mã làn lưu kho",
-  "ui.data.column.storageLaneLimit.materialCode": "Mã vật liệu",
-  "ui.data.column.storageLaneLimit.carNum": "Số xe hiện tại",
-  "ui.data.column.storageLaneLimit.maxCarNum": "Số xe tối đa",
-  "ui.data.column.storageLaneLimit.availableCarNum": "Số xe khả dụng",
-  "ui.data.column.storageLaneLimit.dataSource": "Nguồn dữ liệu",
-  "ui.data.column.storageLaneLimit.mesSyncTime": "Thời gian đồng bộ MES",
-  "ui.data.column.storageLaneLimit.checkUnique": "Làn lưu kho này đã tồn tại",
-  "ui.data.alert.lossSetting.lossRateInvalid": "Tỷ lệ hao hụt phải >= 0",
-  "ui.data.alert.stock.stockNumPositive": "SL tồn kho phải > 0"
+  "ui.data.alert.cd90MachineInfo.quotaPositive": "Định mức phải lớn hơn 0"
 }

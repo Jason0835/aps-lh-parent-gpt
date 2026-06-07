@@ -44,7 +44,7 @@ public class Cd90MachineRollMappingUIController extends BaseUIController<Cd90Mac
     @PostMapping("/add") @ResponseBody
     public AjaxResult add(@RequestBody Cd90MachineRollMapping entity) {
         if (UserConstants.NOT_UNIQUE.equals(remoteService.checkUnique(entity)))
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.machineRollMapping.checkUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90MachineRollMapping.checkUnique"));
         return remoteService.add(entity);
     }
 
@@ -52,7 +52,7 @@ public class Cd90MachineRollMappingUIController extends BaseUIController<Cd90Mac
     @PostMapping("/edit") @ResponseBody
     public AjaxResult edit(@RequestBody Cd90MachineRollMapping entity) {
         if (UserConstants.NOT_UNIQUE.equals(remoteService.checkUnique(entity)))
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.machineRollMapping.checkUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90MachineRollMapping.checkUnique"));
         return remoteService.edit(entity);
     }
 
@@ -62,7 +62,7 @@ public class Cd90MachineRollMappingUIController extends BaseUIController<Cd90Mac
 
     @Override public String getExportTemplateFileName() { return getFunctionName(); }
     @Override public String getProcedureCode() { return "CD90_MACHINE_ROLL_MAPPING"; }
-    @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.machineRollMapping.modelName"); }
+    @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.cd90MachineRollMapping.modelName"); }
 
     @ApiOperation("下载导入模板") @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {

@@ -54,7 +54,7 @@ public class Cd90ParamsUIController extends BaseUIController<Cd90Params> {
     @ResponseBody
     public AjaxResult add(@RequestBody Cd90Params entity) {
         if (UserConstants.NOT_UNIQUE.equals(remoteService.checkUnique(entity)))
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.params.checkUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90Params.checkUnique"));
         return remoteService.add(entity);
     }
 
@@ -64,7 +64,7 @@ public class Cd90ParamsUIController extends BaseUIController<Cd90Params> {
     @ResponseBody
     public AjaxResult edit(@RequestBody Cd90Params entity) {
         if (UserConstants.NOT_UNIQUE.equals(remoteService.checkUnique(entity)))
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.params.checkUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90Params.checkUnique"));
         return remoteService.edit(entity);
     }
 
@@ -88,7 +88,7 @@ public class Cd90ParamsUIController extends BaseUIController<Cd90Params> {
 
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.params.modelName");
+        return I18nUtil.getMessage("ui.data.column.cd90Params.modelName");
     }
 
     @ApiOperation("下载导入模板")

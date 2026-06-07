@@ -50,7 +50,7 @@ public class Cd90MachineMaintenancePlanUIController extends BaseUIController<Cd9
     @ResponseBody
     public AjaxResult add(@RequestBody Cd90MachineMaintenancePlan entity) {
         if (UserConstants.NOT_UNIQUE.equals(remoteService.checkUnique(entity))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.machineMaintenancePlan.checkUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90MachineMaintenancePlan.checkUnique"));
         }
         return remoteService.add(entity);
     }
@@ -61,7 +61,7 @@ public class Cd90MachineMaintenancePlanUIController extends BaseUIController<Cd9
     @ResponseBody
     public AjaxResult edit(@RequestBody Cd90MachineMaintenancePlan entity) {
         if (UserConstants.NOT_UNIQUE.equals(remoteService.checkUnique(entity))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.machineMaintenancePlan.checkUnique"));
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90MachineMaintenancePlan.checkUnique"));
         }
         return remoteService.edit(entity);
     }
@@ -77,7 +77,7 @@ public class Cd90MachineMaintenancePlanUIController extends BaseUIController<Cd9
 
     @Override public String getExportTemplateFileName() { return getFunctionName(); }
     @Override public String getProcedureCode() { return "CD90_MACHINE_MAINTENANCE_PLAN"; }
-    @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.machineMaintenancePlan.modelName"); }
+    @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.cd90MachineMaintenancePlan.modelName"); }
 
     @ApiOperation("下载导入模板")
     @Override

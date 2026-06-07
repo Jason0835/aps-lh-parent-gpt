@@ -20,62 +20,62 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     /** 工厂编码 */
     @ApiModelProperty("工厂编码")
     @TableField("FACTORY_CODE")
-    @Excel(name = "ui.data.column.scheduleResult.factoryCode", dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.factoryCode", dictType = "biz_factory_name")
     private String factoryCode;
     /** 排程日期 */
     @ApiModelProperty("排程日期")
     @TableField("SCHEDULE_DATE")
-    @Excel(name = "ui.data.column.scheduleResult.scheduleDate")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.scheduleDate")
     private Date scheduleDate;
     /** 成型批次号 */
     @ApiModelProperty("成型批次号")
     @TableField("CX_BATCH_NO")
-    @Excel(name = "ui.data.column.scheduleResult.cxBatchNo")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.cxBatchNo")
     private String cxBatchNo;
     /** 批次号 */
     @ApiModelProperty("批次号")
     @TableField("BATCH_NO")
-    @Excel(name = "ui.data.column.scheduleResult.batchNo")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.batchNo")
     private String batchNo;
     /** 工单号 */
     @ApiModelProperty("工单号")
     @TableField("ORDER_NO")
-    @Excel(name = "ui.data.column.scheduleResult.orderNo")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.orderNo")
     private String orderNo;
     /** 帘布大卷编号 */
     @ApiModelProperty("帘布大卷编号")
     @TableField("BIG_ROLL_CODE")
-    @Excel(name = "ui.data.column.scheduleResult.bigRollCode")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.bigRollCode")
     private String bigRollCode;
     /** 帘布代号 */
     @ApiModelProperty("帘布代号")
     @TableField("CLOTH_CODE")
-    @Excel(name = "ui.data.column.scheduleResult.clothCode")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.clothCode")
     private String clothCode;
     /** 单耗 */
     @ApiModelProperty("单耗")
     @TableField("UNIT_CONSUME")
-    @Excel(name = "ui.data.column.scheduleResult.unitConsume")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.unitConsume")
     private Double unitConsume;
     /** 机台编码 */
     @ApiModelProperty("机台编码")
     @TableField("MACHINE_CODE")
-    @Excel(name = "ui.data.column.scheduleResult.machineCode")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.machineCode")
     private String machineCode;
     /** 库排号 */
     @ApiModelProperty("库排号")
     @TableField("STORAGE_LANE_CODE")
-    @Excel(name = "ui.data.column.scheduleResult.storageLaneCode")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.storageLaneCode")
     private String storageLaneCode;
     /** 库存数量 */
     @ApiModelProperty("库存数量")
     @TableField("STOCK_QTY")
-    @Excel(name = "ui.data.column.scheduleResult.stockQty")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.stockQty")
     private Double stockQty;
     /** 供应时长 */
     @ApiModelProperty("供应时长")
     @TableField("SUPPLY_TIME")
-    @Excel(name = "ui.data.column.scheduleResult.supplyTime")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.supplyTime")
     private Double supplyTime;
 
     // CLASS1
@@ -84,7 +84,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     @TableField("CLASS1_CX_PLAN_QTY")
     private Double class1CxPlanQty;
     @TableField("CLASS1_PLAN_QTY")
-    @Excel(name = "ui.data.column.scheduleResult.class1PlanQty")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.class1PlanQty")
     private Double class1PlanQty;
     @TableField("CLASS1_FINISH_QTY")
     private Double class1FinishQty;
@@ -103,7 +103,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     @TableField("CLASS2_CX_PLAN_QTY")
     private Double class2CxPlanQty;
     @TableField("CLASS2_PLAN_QTY")
-    @Excel(name = "ui.data.column.scheduleResult.class2PlanQty")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.class2PlanQty")
     private Double class2PlanQty;
     @TableField("CLASS2_FINISH_QTY")
     private Double class2FinishQty;
@@ -122,7 +122,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     @TableField("CLASS3_CX_PLAN_QTY")
     private Double class3CxPlanQty;
     @TableField("CLASS3_PLAN_QTY")
-    @Excel(name = "ui.data.column.scheduleResult.class3PlanQty")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.class3PlanQty")
     private Double class3PlanQty;
     @TableField("CLASS3_FINISH_QTY")
     private Double class3FinishQty;
@@ -138,7 +138,7 @@ public class Cd90ScheduleResult extends BaseEntity implements Serializable {
     /** 发布状态 */
     @ApiModelProperty("发布状态")
     @TableField("IS_RELEASE")
-    @Excel(name = "ui.data.column.scheduleResult.isRelease", dictType = "IS_RELEASE")
+    @Excel(name = "ui.data.column.cd90ScheduleResult.isRelease", dictType = "IS_RELEASE")
     private String isRelease;
     /** 收尾提示标识 */
     @ApiModelProperty("收尾提示标识")

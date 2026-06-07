@@ -35,7 +35,7 @@ public class Cd90ScheduleResultLogUIController extends BaseUIController<Cd90Sche
     public AjaxResult remove(String ids) { return remote.removeByIds(Arrays.asList(Convert.toLongArray(ids))); }
     @Override public String getExportTemplateFileName() { return getFunctionName(); }
     @Override public String getProcedureCode() { return "CD90_SCHEDULE_RESULT_LOG"; }
-    @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.scheduleResultLog.modelName"); }
+    @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.cd90ScheduleResultLog.modelName"); }
     @ApiOperation("导出") @RequiresPermissions("cd90:scheduleResultLog:export") @GetMapping("/export") @ResponseBody @Override
     public void export(HttpServletResponse response, Cd90ScheduleResultLog entity) throws IOException {
         byte[] excelBytes = remote.exportData(entity, getExportTemplateFileName());

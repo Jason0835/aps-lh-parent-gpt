@@ -25,27 +25,27 @@ public class Cd90LossSetting extends BaseEntity implements Serializable {
     @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     @ImportExcelValidated(required = true, maxLength = 50)
     @TableField("FACTORY_CODE")
-    @Excel(name = "ui.data.column.lossSetting.factoryCode", dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.cd90LossSetting.factoryCode", dictType = "biz_factory_name")
     private String factoryCode;
 
     /** 帘布代号 */
     @ApiModelProperty(value = "帘布代号", name = "clothCode")
     @ImportExcelValidated(maxLength = 20)
     @TableField("CLOTH_CODE")
-    @Excel(name = "ui.data.column.lossSetting.clothCode")
+    @Excel(name = "ui.data.column.cd90LossSetting.clothCode")
     private String clothCode;
 
     /** 机台编码 */
     @ApiModelProperty(value = "机台编码", name = "machineCode")
     @ImportExcelValidated(maxLength = 30)
     @TableField("MACHINE_CODE")
-    @Excel(name = "ui.data.column.lossSetting.machineCode")
+    @Excel(name = "ui.data.column.cd90LossSetting.machineCode")
     private String machineCode;
 
     /** 损耗率(百分比) */
     @ApiModelProperty(value = "损耗率(百分比)", name = "lossRate")
     @ImportExcelValidated(required = true, maxLength = 10)
     @TableField("LOSS_RATE")
-    @Excel(name = "ui.data.column.lossSetting.lossRate")
+    @Excel(name = "ui.data.column.cd90LossSetting.lossRate")
     private Double lossRate;
 }

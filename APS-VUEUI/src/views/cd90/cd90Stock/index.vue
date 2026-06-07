@@ -36,13 +36,13 @@ export default {
     columns() {
       return [
         { type: "selection", fixed: "left" },
-        { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.stock.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
-        { prop: "stockDate", align: "center", halign: "center", label: this.$t("ui.data.column.stock.stockDate"), minWidth: 120 },
-        { prop: "materialCode", align: "center", halign: "center", label: this.$t("ui.data.column.stock.materialCode"), minWidth: 160 },
-        { prop: "stockNum", align: "center", halign: "center", label: this.$t("ui.data.column.stock.stockNum"), minWidth: 130 },
-        { prop: "modifyNum", align: "center", halign: "center", label: this.$t("ui.data.column.stock.modifyNum"), minWidth: 130 },
-        { prop: "badNum", align: "center", halign: "center", label: this.$t("ui.data.column.stock.badNum"), minWidth: 130 },
-        { prop: "layers", align: "center", halign: "center", label: this.$t("ui.data.column.stock.layers"), minWidth: 80 },
+        { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
+        { prop: "stockDate", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.stockDate"), minWidth: 120 },
+        { prop: "materialCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.materialCode"), minWidth: 160 },
+        { prop: "stockNum", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.stockNum"), minWidth: 130 },
+        { prop: "modifyNum", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.modifyNum"), minWidth: 130 },
+        { prop: "badNum", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.badNum"), minWidth: 130 },
+        { prop: "layers", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.layers"), minWidth: 80 },
         { prop: "remark", halign: "center", label: this.$t("ui.common.column.remark"), minWidth: 120 },
         { prop: "createBy", align: "center", halign: "center", label: this.$t("ui.common.column.createBy"), minWidth: 110 },
         { prop: "createTime", align: "center", halign: "center", label: this.$t("ui.common.column.createTime"), minWidth: 160 },
@@ -52,9 +52,9 @@ export default {
     },
     searchColumns() {
       return [
-        { label: this.$t("ui.data.column.stock.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
-        { label: this.$t("ui.data.column.stock.stockDate"), prop: "stockDate" },
-        { label: this.$t("ui.data.column.stock.materialCode"), prop: "materialCode" },
+        { label: this.$t("ui.data.column.cd90Stock.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
+        { label: this.$t("ui.data.column.cd90Stock.stockDate"), prop: "stockDate" },
+        { label: this.$t("ui.data.column.cd90Stock.materialCode"), prop: "materialCode" },
       ];
     },
   },

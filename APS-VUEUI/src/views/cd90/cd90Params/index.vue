@@ -36,12 +36,12 @@ export default {
     columns() {
       return [
         { type: "selection", fixed: "left" },
-        { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.params.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
-        { prop: "paramCode", align: "center", halign: "center", label: this.$t("ui.data.column.params.paramCode"), minWidth: 140 },
-        { prop: "paramName", align: "center", halign: "center", label: this.$t("ui.data.column.params.paramName"), minWidth: 140 },
-        { prop: "paramValue", align: "center", halign: "center", label: this.$t("ui.data.column.params.paramValue"), minWidth: 130 },
-        { prop: "regularExpression", align: "center", halign: "center", label: this.$t("ui.data.column.params.regularExpression"), minWidth: 160 },
-        { prop: "errorTips", align: "center", halign: "center", label: this.$t("ui.data.column.params.errorTips"), minWidth: 180 },
+        { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Params.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
+        { prop: "paramCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Params.paramCode"), minWidth: 140 },
+        { prop: "paramName", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Params.paramName"), minWidth: 140 },
+        { prop: "paramValue", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Params.paramValue"), minWidth: 130 },
+        { prop: "regularExpression", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Params.regularExpression"), minWidth: 160 },
+        { prop: "errorTips", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Params.errorTips"), minWidth: 180 },
         { prop: "remark", halign: "center", label: this.$t("ui.common.column.remark"), minWidth: 120 },
         { prop: "createBy", align: "center", halign: "center", label: this.$t("ui.common.column.createBy"), minWidth: 110 },
         { prop: "createTime", align: "center", halign: "center", label: this.$t("ui.common.column.createTime"), minWidth: 160 },
@@ -51,9 +51,9 @@ export default {
     },
     searchColumns() {
       return [
-        { label: this.$t("ui.data.column.params.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
-        { label: this.$t("ui.data.column.params.paramCode"), prop: "paramCode" },
-        { label: this.$t("ui.data.column.params.paramName"), prop: "paramName" },
+        { label: this.$t("ui.data.column.cd90Params.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
+        { label: this.$t("ui.data.column.cd90Params.paramCode"), prop: "paramCode" },
+        { label: this.$t("ui.data.column.cd90Params.paramName"), prop: "paramName" },
       ];
     },
   },

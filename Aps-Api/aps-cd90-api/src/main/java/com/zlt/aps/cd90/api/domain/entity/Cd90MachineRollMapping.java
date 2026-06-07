@@ -21,27 +21,27 @@ public class Cd90MachineRollMapping extends BaseEntity implements Serializable {
 
     @ImportExcelValidated(required = true, maxLength = 50)
     @TableField("FACTORY_CODE")
-    @Excel(name = "ui.data.column.machineRollMapping.factoryCode", dictType = "biz_factory_name")
+    @Excel(name = "ui.data.column.cd90MachineRollMapping.factoryCode", dictType = "biz_factory_name")
     private String factoryCode;
 
     /** 钢压大卷代码 */
 
     @ImportExcelValidated(required = true, maxLength = 30)
     @TableField("BIG_ROLL_CODE")
-    @Excel(name = "ui.data.column.machineRollMapping.bigRollCode")
+    @Excel(name = "ui.data.column.cd90MachineRollMapping.bigRollCode")
     private String bigRollCode;
 
     /** 帘布代码 */
 
     @ImportExcelValidated(maxLength = 30)
     @TableField("CORD_FABRIC_CODE")
-    @Excel(name = "ui.data.column.machineRollMapping.cordFabricCode")
+    @Excel(name = "ui.data.column.cd90MachineRollMapping.cordFabricCode")
     private String cordFabricCode;
 
     /** 机台编码 */
 
     @ImportExcelValidated(required = true, maxLength = 30)
     @TableField("MACHINE_CODE")
-    @Excel(name = "ui.data.column.machineRollMapping.machineCode")
+    @Excel(name = "ui.data.column.cd90MachineRollMapping.machineCode")
     private String machineCode;
 }

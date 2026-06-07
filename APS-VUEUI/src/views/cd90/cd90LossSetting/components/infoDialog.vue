@@ -22,7 +22,7 @@ export default {
       loading: false, visible: false, isEdit: false, form: {},
       rules: {
         factoryCode: [requiredSelect],
-        lossRate: [requiredInput, { validator: (rule, value, callback) => { if (value === undefined || value === null || value === "" || Number(value) < 0) { callback(new Error(this.$t("ui.data.alert.lossSetting.lossRateInvalid"))); } else { callback(); } }, trigger: "blur" }],
+        lossRate: [requiredInput, { validator: (rule, value, callback) => { if (value === undefined || value === null || value === "" || Number(value) < 0) { callback(new Error(this.$t("ui.data.alert.cd90LossSetting.lossRateInvalid"))); } else { callback(); } }, trigger: "blur" }],
       },
     };
   },
@@ -30,10 +30,10 @@ export default {
     title() { return this.isEdit ? this.$t("common.button.edit") : this.$t("common.button.add"); },
     columns() {
       return [
-        { prop: "factoryCode", label: this.$t("ui.data.column.lossSetting.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
-        { prop: "clothCode", label: this.$t("ui.data.column.lossSetting.clothCode"), maxlength: 20 },
-        { prop: "machineCode", label: this.$t("ui.data.column.lossSetting.machineCode"), maxlength: 30 },
-        { prop: "lossRate", label: this.$t("ui.data.column.lossSetting.lossRate"), type: "number" },
+        { prop: "factoryCode", label: this.$t("ui.data.column.cd90LossSetting.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
+        { prop: "clothCode", label: this.$t("ui.data.column.cd90LossSetting.clothCode"), maxlength: 20 },
+        { prop: "machineCode", label: this.$t("ui.data.column.cd90LossSetting.machineCode"), maxlength: 30 },
+        { prop: "lossRate", label: this.$t("ui.data.column.cd90LossSetting.lossRate"), type: "number" },
         { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 300 },
       ];
     },
