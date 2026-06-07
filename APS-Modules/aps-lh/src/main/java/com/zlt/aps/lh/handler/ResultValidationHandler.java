@@ -35,6 +35,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -1636,15 +1638,16 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
         Date cleanStartTime = cleaningWindow.getCleanStartTime();
         Date cleanEndTimeOrig = cleaningWindow.getCleanEndTime();
         // 查找清洗窗口开始时仍在生产的班次的实际完工时间
-        // 排产结果的endTime可能被清洗窗口截断，统一按 planQty×lhTime 从startTime推算实际完工时间
+        // 向上取整导致实际生产时间可能超过班次可用时间，需用比例方式推算
         Date lastShiftActualEndTime = null;
         Integer lhTime = result.getLhTime();
         Integer mouldQty = result.getMouldQty();
-        log.debug("[清洗分析标识-调试] 机台: {}, lhTime: {}, mouldQty: {}, 清洗窗口: {}~{}",
-                machineCode, lhTime, mouldQty,
+        Integer singleMouldShiftQty = result.getSingleMouldShiftQty();
+        log.debug("[清洗分析标识-调试] 机台: {}, lhTime: {}, mouldQty: {}, singleMouldShiftQty: {}, 清洗窗口: {}~{}",
+                machineCode, lhTime, mouldQty, singleMouldShiftQty,
                 LhScheduleTimeUtil.formatDateTime(cleanStartTime),
                 LhScheduleTimeUtil.formatDateTime(cleanEndTimeOrig));
-        if (lhTime != null && lhTime > 0) {
+        if (lhTime != null && lhTime > 0 && singleMouldShiftQty != null && singleMouldShiftQty > 0) {
             int resolvedMouldQty = (mouldQty != null && mouldQty > 0) ? mouldQty : 1;
             for (int si = 1; si <= 8; si++) {
                 Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, si);
@@ -1657,12 +1660,30 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                                 shiftStart != null ? LhScheduleTimeUtil.formatDateTime(shiftStart) : "null");
                         continue;
                     }
-                    // 按向上取整的周期数 × 硫化周期时间 推算实际完工时间
-                    int cycles = (planQty + resolvedMouldQty - 1) / resolvedMouldQty;
-                    long productionMs = (long) cycles * lhTime * 1000L;
+                    // 用满班次时长推算实际完工时间
+                    // 单模排产周期数 = ceil(planQty / mouldQty)
+                    // 单模满班周期数 = singleMouldShiftQty / mouldQty（班产/模台数）
+                    // 满班次时长从班次配置获取
+                    LhShiftConfigVO shiftConfig = findShiftByIndex(shifts, si);
+                    long fullShiftSeconds = 0;
+                    if (shiftConfig != null && shiftConfig.getShiftStartDateTime() != null
+                            && shiftConfig.getShiftEndDateTime() != null) {
+                        fullShiftSeconds = (shiftConfig.getShiftEndDateTime().getTime()
+                                - shiftConfig.getShiftStartDateTime().getTime()) / 1000L;
+                    }
+                    if (fullShiftSeconds <= 0) {
+                        fullShiftSeconds = 8 * 3600L; // 默认8小时
+                    }
+                    int singleMouldQty = (planQty + resolvedMouldQty - 1) / resolvedMouldQty;
+                    int singleMouldFullShift = singleMouldShiftQty / resolvedMouldQty;
+                    // 实际生产秒数 = 单模排产数 / 单模满班产 × 满班次时长
+                    long productionMs = BigDecimal.valueOf(singleMouldQty)
+                            .multiply(BigDecimal.valueOf(fullShiftSeconds * 1000L))
+                            .divide(BigDecimal.valueOf(singleMouldFullShift), 0, RoundingMode.UP)
+                            .longValue();
                     Date actualEnd = new Date(shiftStart.getTime() + productionMs);
-                    log.debug("[清洗分析标识-调试] 机台: {}, 班次: {}, planQty: {}, cycles: {}, productionMs: {}ms, shiftStart: {}, actualEnd: {}",
-                            machineCode, si, planQty, cycles, productionMs,
+                    log.debug("[清洗分析标识-调试] 机台: {}, 班次: {}, planQty: {}, singleMouldQty: {}, fullShiftSeconds: {}, productionMs: {}ms, shiftStart: {}, actualEnd: {}",
+                            machineCode, si, planQty, singleMouldQty, fullShiftSeconds, productionMs,
                             LhScheduleTimeUtil.formatDateTime(shiftStart),
                             LhScheduleTimeUtil.formatDateTime(actualEnd));
                     lastShiftActualEndTime = (lastShiftActualEndTime == null || actualEnd.after(lastShiftActualEndTime))
