@@ -1665,7 +1665,8 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
                             machineCode, si, planQty, cycles, productionMs,
                             LhScheduleTimeUtil.formatDateTime(shiftStart),
                             LhScheduleTimeUtil.formatDateTime(actualEnd));
-                    lastShiftActualEndTime = later(lastShiftActualEndTime, actualEnd);
+                    lastShiftActualEndTime = (lastShiftActualEndTime == null || actualEnd.after(lastShiftActualEndTime))
+                            ? actualEnd : lastShiftActualEndTime;
                 }
             }
         }
