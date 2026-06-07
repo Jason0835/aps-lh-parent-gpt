@@ -10,6 +10,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MouldStatusUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
@@ -537,8 +538,10 @@ public class LhCleaningScheduleService {
 
     /**
      * 检查喷砂清洗机台是否有空闲模具可换，有则可将喷砂清洗转为换模。
-     * <p>判断依据：机台当前物料关联的启用模具数量大于机台模台数（单模/双模），
-     * 则表示有机外可用的空闲模具，可将当前模具换下直接换模。</p>
+     * <p>判断依据：
+     * 1. 优先检查机台当前在机物料关联的启用模具数量是否大于机台模台数；
+     * 2. 若当前在机物料无SKU模具关系或模具不足，进一步遍历该机台可排的SKU物料
+     *    （同英寸且在排程窗口内有需排量的物料），检查其启用模具数量。</p>
      *
      * @param context      排程上下文
      * @param cleaningPlan 清洗计划
@@ -559,19 +562,58 @@ public class LhCleaningScheduleService {
         if (machineInfo != null && machineInfo.getMaxMoldNum() != null) {
             machineMouldQty = machineInfo.getMaxMoldNum();
         }
-        // 获取该物料关联的所有模具号
+        Map<String, MdmModelInfo> modelInfoMap = context.getModelInfoMap();
+
+        // 第一步：检查当前在机物料的启用模具数量
         List<MdmSkuMouldRel> mouldRelList = context.getSkuMouldRelMap().get(materialCode);
-        if (CollectionUtils.isEmpty(mouldRelList)) {
-            log.info("[清洗调试] 机台 {} 在机物料 {} 无SKU模具关系, 无法判断模具可用性", machineCode, materialCode);
+        if (!CollectionUtils.isEmpty(mouldRelList)) {
+            long enabledMouldCount = countEnabledMould(mouldRelList, modelInfoMap);
+            if (enabledMouldCount > machineMouldQty) {
+                log.info("[清洗调试] 机台 {} 当前在机物料有空闲模具: 在机物料={}, 启用模具数={}, 模台数={}",
+                        machineCode, materialCode, enabledMouldCount, machineMouldQty);
+                return true;
+            }
+            log.info("[清洗调试] 机台 {} 当前在机物料模具不足: 在机物料={}, 启用模具数={}, 模台数={}, 继续检查可排SKU物料",
+                    machineCode, materialCode, enabledMouldCount, machineMouldQty);
+        } else {
+            log.info("[清洗调试] 机台 {} 在机物料 {} 无SKU模具关系, 继续检查可排SKU物料",
+                    machineCode, materialCode);
+        }
+
+        // 第二步：当前在机物料模具不足或无模具关系时，
+        // 遍历排程中所有SKU物料，找到该机台可排的SKU（基于英寸匹配），检查其模具可用性
+        MdmMaterialInfo currentMaterialInfo = context.getMaterialInfoMap().get(materialCode);
+        if (Objects.isNull(currentMaterialInfo)) {
+            log.info("[清洗调试] 机台 {} 在机物料 {} 无物料主数据信息", machineCode, materialCode);
             return false;
         }
-        // 统计启用状态的模具数量
-        Map<String, MdmModelInfo> modelInfoMap = context.getModelInfoMap();
-        long enabledMouldCount = countEnabledMould(mouldRelList, modelInfoMap);
-        // 启用模具数量大于机台模台数 → 有空闲模具可换
-        boolean hasSpare = enabledMouldCount > machineMouldQty;
-        log.info("[清洗调试] 机台 {} 模具检查: 在机物料={}, 启用模具数={}, 模台数={}, 有空闲模具={}",
-                machineCode, materialCode, enabledMouldCount, machineMouldQty, hasSpare);
+        String machineProSize = currentMaterialInfo.getProSize();
+        // 遍历所有有模具关系的物料，找到同英寸的物料，检查其模具数量
+        long maxEnabledMouldCount = 0;
+        String bestMaterialCode = null;
+        for (Map.Entry<String, List<MdmSkuMouldRel>> entry : context.getSkuMouldRelMap().entrySet()) {
+            String candidateMaterialCode = entry.getKey();
+            List<MdmSkuMouldRel> candidateMouldRelList = entry.getValue();
+            if (CollectionUtils.isEmpty(candidateMouldRelList)) {
+                continue;
+            }
+            // 检查候选物料是否与当前在机物料同英寸
+            MdmMaterialInfo candidateMaterialInfo = context.getMaterialInfoMap().get(candidateMaterialCode);
+            if (Objects.isNull(candidateMaterialInfo)) {
+                continue;
+            }
+            if (!StringUtils.equals(machineProSize, candidateMaterialInfo.getProSize())) {
+                continue;
+            }
+            long enabledMouldCount = countEnabledMould(candidateMouldRelList, modelInfoMap);
+            if (enabledMouldCount > maxEnabledMouldCount) {
+                maxEnabledMouldCount = enabledMouldCount;
+                bestMaterialCode = candidateMaterialCode;
+            }
+        }
+        boolean hasSpare = maxEnabledMouldCount > machineMouldQty;
+        log.info("[清洗调试] 机台 {} 同英寸可排SKU模具检查: 在机物料={}, 在机英寸={}, 同英寸最多模具物料={}, 启用模具数={}, 模台数={}, 有空闲模具={}",
+                machineCode, materialCode, machineProSize, bestMaterialCode, maxEnabledMouldCount, machineMouldQty, hasSpare);
         return hasSpare;
     }
 
