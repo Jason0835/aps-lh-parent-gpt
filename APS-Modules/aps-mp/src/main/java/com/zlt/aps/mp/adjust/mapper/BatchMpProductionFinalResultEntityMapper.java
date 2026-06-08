@@ -17,4 +17,11 @@ public interface BatchMpProductionFinalResultEntityMapper extends IBaseMapper<Fa
      * @return 插入数量
      */
     int insert(FactoryMonthPlanProductionFinalResult record);
+
+    /**
+     * 更新单条记录
+     * @param record 调整结果实体
+      * @return 更新数量
+     */
+    int update(FactoryMonthPlanProductionFinalResult record);
 }
