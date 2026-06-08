@@ -6,7 +6,7 @@
         <artifactId>aps-api</artifactId>
         <version>1.0.3-SNAPSHOT</version>
     </parent>
-
+    <!--不需要额外的group，与com.zlt.aps一致就好-->
     <groupId>com.zlt.aps.dp</groupId>
     <artifactId>aps-dp-api</artifactId>
     <version>1.0.3-SNAPSHOT</version>

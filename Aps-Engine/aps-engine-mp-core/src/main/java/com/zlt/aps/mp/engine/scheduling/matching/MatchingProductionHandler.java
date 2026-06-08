@@ -10,7 +10,6 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.constant.StringConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
 import com.zlt.aps.mp.api.domain.entity.*;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
@@ -29,10 +28,7 @@ import com.zlt.aps.mp.engine.handler.CxLhMouldProductionCalculator;
 import com.zlt.aps.mp.engine.handler.GroupPlanDeductionDayHandler;
 import com.zlt.aps.mp.engine.handler.MouldProductionResultHandler;
 import com.zlt.aps.mp.engine.logrecorder.TbrBeforeProductionGroupLogRecorder;
-import com.zlt.aps.mp.engine.mapper.FactoryMonthPlanMouldDayDetailMapper;
-import com.zlt.aps.mp.engine.mapper.FactoryMouldingDayResultMapper;
-import com.zlt.aps.mp.engine.mapper.MonthPlanRequireMapper;
-import com.zlt.aps.mp.engine.mapper.MpStructureAllocationMapper;
+import com.zlt.aps.mp.engine.mapper.*;
 import com.zlt.aps.mp.engine.scheduling.AbstractDataLoaderService;
 import com.zlt.aps.mp.engine.scheduling.BaseDataContainer;
 import com.zlt.aps.mp.engine.scheduling.TbrProductionContext;
@@ -97,7 +93,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
     @Autowired
     private MpStructureAllocationMapper mpStructureAllocationMapper;
     @Autowired
-    private MpMonthPlanStatisticsEntityMapper mpMonthPlanStatisticsEntityMapper;
+    private FactoryMpMonthPlanStatisticsEntityMapper factoryMpMonthPlanStatisticsEntityMapper;
     @Autowired
     private BaseDao baseDao;
 
@@ -2051,7 +2047,7 @@ public class MatchingProductionHandler extends AbstractDataLoaderService {
         queryWrapper.eq(MpMonthPlanStatistics::getFactoryCode, productionContext.getFactoryCode());
         queryWrapper.eq(MpMonthPlanStatistics::getIsDelete, YesOrNoEnum.NO.getValue());
         queryWrapper.eq(MpMonthPlanStatistics::getProductionVersion, productionContext.getProductionVersion());
-        List<MpMonthPlanStatistics> oldProductionStatisticsList = mpMonthPlanStatisticsEntityMapper
+        List<MpMonthPlanStatistics> oldProductionStatisticsList = factoryMpMonthPlanStatisticsEntityMapper
                 .selectList(queryWrapper);
         Map<String, MpMonthPlanStatistics> oldProductionStatisticsMap = oldProductionStatisticsList.stream()
                 .filter(s -> StringUtils.isNoneEmpty(s.getStructureName())).collect(
