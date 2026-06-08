@@ -82,7 +82,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
         queryVO.setTempFlag(null);
         TableDataInfo tableDataInfo;
         //20260608+ 月计划调整入口
-        if (YesOrNoEnum.YES.getValue().equals(queryVO)) {
+        if (YesOrNoEnum.YES.getValue().equals(queryVO.getIsFinalAdjust())) {
             tableDataInfo = super.list(queryVO);
         } else {
             //定稿版本-非月计划调整入口
@@ -355,7 +355,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
             resultData = BeanCopyUtils.copyBeanList(list, MpMonthPlanStatistics.class);
         }
         clearPage();
-        return getDataTable(list);
+        return getDataTable(resultData);
     }
 
     /**
