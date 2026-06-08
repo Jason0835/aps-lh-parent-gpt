@@ -1,5 +1,6 @@
 package com.zlt.aps.cx.service.impl;
 
+import com.ruoyi.common.text.Convert;
 import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.api.domain.entity.CxStock;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
@@ -1740,7 +1741,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
                 if (task != null) {
                     // 每个班次都从当班合并后的task中获取，覆盖之前的值
-                    tracker.setVulcanizeMachineCount(task.getVulcanizeMachineCount());
+                    tracker.setVulcanizeMachineCount(Convert.toInt(task.getVulcanizeMachineCount(),0));
                     tracker.setVulcanizeMoldCount(task.getVulcanizeMoldCount());
                     // 每个班次开始时，更新beginStock为上一班次结束时的库存（currentStock），
                     // 并重置累计值，使stockHours反映当前班次的实时库存水位
