@@ -1,10 +1,8 @@
 package com.zlt.aps.tm.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.zlt.aps.tm.api.domain.entity.TmParams;
 import com.zlt.bill.common.service.IDocService;
 
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,11 +20,6 @@ import java.util.Map;
  * @date 2025-12-12
  */
 public interface ITmParamsService extends IDocService<TmParams> {
-
-    List<TmParams> selectList(QueryWrapper<TmParams> queryWrapper);
-
-    String checkUnique(TmParams query);
-
     TmParams selectOneByParamCode(String paramCode, String factoryCode);
 
     Map<String, String> listTmParams(String factoryCode);

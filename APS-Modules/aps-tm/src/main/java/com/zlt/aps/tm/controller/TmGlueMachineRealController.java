@@ -7,9 +7,9 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.constant.FactoryConstant;
-import com.zlt.aps.tm.api.domain.entity.TmParams;
-import com.zlt.aps.tm.mapper.TmParamsMapper;
-import com.zlt.aps.tm.service.ITmParamsService;
+import com.zlt.aps.tm.api.domain.entity.TmGlueMachineReal;
+import com.zlt.aps.tm.mapper.TmGlueMachineRealMapper;
+import com.zlt.aps.tm.service.ITmGlueMachineRealService;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
@@ -25,51 +25,37 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * Copyright (c) 2022, All rights reserved。
- * 文件名称：TmParamsController.java
- * 描    述：胎面排程参数配置 控制层类
- *
- * @author zlt
- * @version 1.0
- * <p>
- * 修改记录：
- * 修改时间：...
- * 修 改 人：zlt
- * 修改内容：...
- * @date 2025-12-12
- */
 @Slf4j
-@Api(tags = "胎面排程参数配置")
+@Api(tags = "胎面胶料与机台关系")
 @RestController
-@RequestMapping("/tmParams")
-public class TmParamsController extends AbstractDocBizController<TmParams> {
+@RequestMapping("/tmGlueMachineReal")
+public class TmGlueMachineRealController extends AbstractDocBizController<TmGlueMachineReal> {
 
     @Autowired
-    private ITmParamsService tmParamsService;
-    
+    private ITmGlueMachineRealService tmGlueMachineRealService;
+
     @Resource
-    private TmParamsMapper tmParamsMapper;
+    private TmGlueMachineRealMapper tmGlueMachineRealMapper;
 
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
-    public TableDataInfo list(@RequestBody TmParams queryVO) {
+    public TableDataInfo list(@RequestBody TmGlueMachineReal queryVO) {
         return super.list(queryVO);
     }
 
-    @Log(title = "ui.data.column.tmParams.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @Log(title = "ui.data.column.tmGlueMachineReal.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
-    public AjaxResult save(@RequestBody TmParams billVO) {
+    public AjaxResult save(@RequestBody TmGlueMachineReal billVO) {
         if (StringUtil.isBlank(billVO.getFactoryCode())) {
             billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
         return super.save(billVO);
     }
 
-    @Log(title = "ui.data.column.tmParams.modelName", businessType = BusinessType.DELETE)
+    @Log(title = "ui.data.column.tmGlueMachineReal.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -80,17 +66,17 @@ public class TmParamsController extends AbstractDocBizController<TmParams> {
     @ApiOperation("获取详细信息")
     @GetMapping(value = "/{id}")
     @Override
-    public TmParams getInfo(@PathVariable("id") Long id) {
+    public TmGlueMachineReal getInfo(@PathVariable("id") Long id) {
         return super.getInfo(id);
     }
 
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
-    public String checkUnique(@RequestBody TmParams query) {
-        return tmParamsService.checkUnique(query);
+    public String checkUnique(@RequestBody TmGlueMachineReal query) {
+        return tmGlueMachineRealService.checkUnique(query);
     }
 
-    @Log(title = "ui.data.column.tmParams.modelName", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.tmGlueMachineReal.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData/{updateSupport}")
     @Override
@@ -98,40 +84,39 @@ public class TmParamsController extends AbstractDocBizController<TmParams> {
         return super.importData(importContext, updateSupport);
     }
 
-    @Log(title = "ui.data.column.tmParams.modelName", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.tmGlueMachineReal.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override
-    public byte[] exportData(@RequestBody TmParams queryVO, @PathVariable("fileName") String fileName,
+    public byte[] exportData(@RequestBody TmGlueMachineReal queryVO, @PathVariable("fileName") String fileName,
                              HttpServletResponse response) throws IOException {
         return super.exportData(queryVO, fileName, response);
     }
 
     @Override
-    protected List<TmParams> listExportData(TmParams obj) {
-        QueryWrapper<TmParams> wrapper = new QueryWrapper<>();
+    protected List<TmGlueMachineReal> listExportData(TmGlueMachineReal obj) {
+        QueryWrapper<TmGlueMachineReal> wrapper = new QueryWrapper<>();
         this.builderCondition(wrapper, obj);
-        return tmParamsMapper.selectList(wrapper);
+        return tmGlueMachineRealMapper.selectList(wrapper);
     }
 
     @Override
     protected IDocService getDocService() {
-        return tmParamsService;
+        return tmGlueMachineRealService;
     }
 
     @Override
-    protected void builderCondition(QueryWrapper<TmParams> queryWrapper, TmParams queryVO) {
+    protected void builderCondition(QueryWrapper<TmGlueMachineReal> queryWrapper, TmGlueMachineReal queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("paramCode")), "PARAM_CODE", queryVO.getFieldValueByFieldName("paramCode"));
-        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("paramName")), "PARAM_NAME", queryVO.getFieldValueByFieldName("paramName"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("paramGroup")), "PARAM_GROUP", queryVO.getFieldValueByFieldName("paramGroup"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("valueType")), "VALUE_TYPE", queryVO.getFieldValueByFieldName("valueType"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("glueCode")), "GLUE_CODE", queryVO.getFieldValueByFieldName("glueCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("shiftCode")), "SHIFT_CODE", queryVO.getFieldValueByFieldName("shiftCode"));
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("enableStatus")), "ENABLE_STATUS", queryVO.getFieldValueByFieldName("enableStatus"));
     }
 
     @Override
     protected String getTypeCode() {
-        return "TM0801";
+        return "TM0802";
     }
 
     @Override

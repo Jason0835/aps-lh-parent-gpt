@@ -466,5 +466,16 @@
   "ui.data.column.tmParams.paramGroup": "Parameter Group",
   "ui.data.column.tmParams.valueType": "Value Type",
   "ui.data.column.tmParams.enableStatus": "Enable Status",
+  "ui.data.column.tmGlueMachineReal.factoryCode": "Factory",
+  "ui.data.column.tmGlueMachineReal.glueCode": "Glue Code",
+  "ui.data.column.tmGlueMachineReal.baseGlueCode": "Base Glue Code",
+  "ui.data.column.tmGlueMachineReal.machineCode": "Machine Code",
+  "ui.data.column.tmGlueMachineReal.machineName": "Machine Name",
+  "ui.data.column.tmGlueMachineReal.shiftCode": "Shift Code",
+  "ui.data.column.tmGlueMachineReal.machineClass": "Machine Class",
+  "ui.data.column.tmGlueMachineReal.priority": "Priority",
+  "ui.data.column.tmGlueMachineReal.allowFlag": "Allow",
+  "ui.data.column.tmGlueMachineReal.enableStatus": "Enable Status",
+  "ui.data.column.tmGlueMachineReal.modelName": "Glue Machine Relationship",
   "ui.data.column.tm.params.modelName": "TM Parameter Info"
 }

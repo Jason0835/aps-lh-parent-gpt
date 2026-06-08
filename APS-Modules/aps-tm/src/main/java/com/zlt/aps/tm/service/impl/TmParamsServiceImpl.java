@@ -5,19 +5,20 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.tm.api.domain.entity.TmParams;
 import com.zlt.aps.tm.mapper.TmParamsMapper;
 import com.zlt.aps.tm.service.ITmParamsService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.PubUtil;
+import com.zlt.sysdef.domain.SysDocType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -43,38 +44,29 @@ public class TmParamsServiceImpl extends AbstractDocService<TmParams> implements
 
     @Override
     protected String getDocTypeCode() {
-        return "0101";
+        return "TM0801";
     }
 
     @Override
-    public int save(TmParams entity) {
-        if (entity.getId() != null) {
-            entity.setBaseVale(entity.getId());
-        } else {
-            entity.setBaseVale(null);
-        }
-        return super.save(entity);
-    }
-
-    @Override
-    public List<TmParams> selectList(QueryWrapper<TmParams> queryWrapper) {
-        return tmParamsMapper.selectList(queryWrapper);
+    protected SysDocType getSysDocType() {
+        SysDocType sysDocType = new SysDocType();
+        sysDocType.setDocTypeCode("TM0801");
+        return sysDocType;
     }
 
     @Override
     public String checkUnique(TmParams query) {
-        if (query == null) {
-            return UserConstants.NOT_UNIQUE;
+        String unique = super.checkUnique(query);
+        if (UserConstants.NOT_UNIQUE.equals(unique)) {
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tmParams.notUnique"));
         }
-        LambdaQueryWrapper<TmParams> wrapper = Wrappers.lambdaQuery();
-        wrapper.ne(query.getId() != null, TmParams::getId, query.getId());
-        wrapper.eq(query.getFactoryCode() != null, TmParams::getFactoryCode, query.getFactoryCode());
-        wrapper.eq(query.getParamCode() != null, TmParams::getParamCode, query.getParamCode());
-        Long count = tmParamsMapper.selectCount(wrapper);
-        if (count > 0) {
-            return UserConstants.NOT_UNIQUE;
-        }
-        return UserConstants.UNIQUE;
+        return unique;
+    }
+
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        // 唯一校验字段
+        return new ArrayList<>(Arrays.asList("factoryCode", "paramCode"));
     }
 
     @Override
