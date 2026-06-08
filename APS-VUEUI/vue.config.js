@@ -35,7 +35,7 @@ module.exports = {
     proxy: {
       // detail: https://cli.vuejs.org/config/#devserver-proxy
       [process.env.VUE_APP_BASE_API]: {
-        target: `http://192.168.2.64:9066`,
+        target: `http://192.168.10.130:9066`,
         // target: `http://192.168.2.71:9066`,
         changeOrigin: true,
         pathRewrite: {
@@ -131,10 +131,10 @@ module.exports = {
       });
 
       config.optimization.runtimeChunk("single"),
-      {
-        from: path.resolve(__dirname, "./public/robots.txt"), //防爬虫文件
-        to: "./", //到根目录下
-      };
+        {
+          from: path.resolve(__dirname, "./public/robots.txt"), //防爬虫文件
+          to: "./", //到根目录下
+        };
     });
   },
 };
