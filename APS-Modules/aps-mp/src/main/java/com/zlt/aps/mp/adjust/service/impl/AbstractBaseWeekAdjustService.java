@@ -1072,7 +1072,8 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
         int maxAlarmLimit = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.DAY_MAX_ALARM_LIMIT.getCode());
         int minAlarmLimit = (Integer) contextDTO.getParamMap().get(MonthPlanEnums.DAY_MIN_ALARM_LIMIT.getCode());
         StringBuilder sbError = new StringBuilder();
-        for (int iDay = FactoryConstant.MONTH_START_DAY; iDay <= FactoryConstant.MONTH_MAX_DAY; iDay++){
+        int maxDays = com.zlt.aps.mp.engine.utils.DateUtils.getDaysByYearMonth(contextDTO.getMpYear(), contextDTO.getMpMonth());
+        for (int iDay = FactoryConstant.MONTH_START_DAY; iDay <= maxDays; iDay++){
             dayTotalQty = 0;
             for (Map.Entry<String, MpMonthPlanStatistics> entry1 : structureStatisticMap.entrySet()){
                 dayFieldName = FactoryConstant.DAY_FIELD + iDay;
