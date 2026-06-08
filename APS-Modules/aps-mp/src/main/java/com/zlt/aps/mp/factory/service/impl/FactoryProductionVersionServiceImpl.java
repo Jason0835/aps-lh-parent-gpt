@@ -6,12 +6,12 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
-import com.zlt.aps.mp.demand.service.IDpDemandPlanSumService;
-import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.maindata.service.IFactoryParamService;
+import com.zlt.aps.mp.api.domain.entity.DpDemandPlanSum;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
 import com.zlt.aps.mp.api.domain.vo.FactoryProductionPlanVo;
+import com.zlt.aps.mp.demand.service.IDpDemandPlanSumService;
+import com.zlt.aps.mp.engine.utils.DateUtils;
 import com.zlt.aps.mp.factory.mapper.MpFactoryProductionVersionMapper;
 import com.zlt.aps.mp.factory.service.IFactoryProductionVersionService;
 import com.zlt.core.dao.basedao.BaseDao;
@@ -157,9 +157,9 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
         queryWrapper.eq("MONTH_PLAN_VERSION", monthPlanVersion);
         queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         List<MpFactoryProductionVersion> factoryProductionVersions = this.factoryProductionVersionMapper.selectList(queryWrapper);
-        if(CollectionUtils.isEmpty(factoryProductionVersions)) {
-            DpDemandPlanSum demandPlanSum =  this.dpDemandPlanSumService.getDpDemandPlanSumByParam(selectedRequireVersion);
-            if(null != demandPlanSum) {
+        if (CollectionUtils.isEmpty(factoryProductionVersions)) {
+            DpDemandPlanSum demandPlanSum = this.dpDemandPlanSumService.getDpDemandPlanSumByParam(selectedRequireVersion);
+            if (null != demandPlanSum) {
                 MpFactoryProductionVersion version = new MpFactoryProductionVersion();
                 version.setFactoryCode(factoryCode);
                 version.setYear(year);
@@ -175,7 +175,7 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
             return AjaxResult.success();
         }
         int size = factoryProductionVersions.size();
-        if(size == 1) {
+        if (size == 1) {
             MpFactoryProductionVersion factoryProductionVersion = factoryProductionVersions.get(0);
             //已经加入列表
             if (YesOrNoEnum.YES.getCode().equals(factoryProductionVersion.getIsSelectedDemand())) {
@@ -185,16 +185,31 @@ public class FactoryProductionVersionServiceImpl implements IFactoryProductionVe
             factoryProductionVersionMapper.updateById(factoryProductionVersion);
             return AjaxResult.success();
         }
-        List<MpFactoryProductionVersion>  selectedDemandProductionVersions  = factoryProductionVersions.stream().filter(item -> StringUtils.isBlank(item.getProductionInitVersion()) && YesOrNoEnum.YES.getCode().equals(item.getIsSelectedDemand())).collect(Collectors.toList());
-        if(!CollectionUtils.isEmpty(selectedDemandProductionVersions)) {
+        List<MpFactoryProductionVersion> selectedDemandProductionVersions = factoryProductionVersions.stream().filter(item -> StringUtils.isBlank(item.getProductionInitVersion()) && YesOrNoEnum.YES.getCode().equals(item.getIsSelectedDemand())).collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(selectedDemandProductionVersions)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.param.factoryRequireVersionIsSelected"));
         }
-        List<MpFactoryProductionVersion>  notSelectedDemandProductionVersions  = factoryProductionVersions.stream().filter(item -> StringUtils.isBlank(item.getProductionInitVersion())).collect(Collectors.toList());
-        if(!CollectionUtils.isEmpty(notSelectedDemandProductionVersions)) {
+        List<MpFactoryProductionVersion> notSelectedDemandProductionVersions = factoryProductionVersions.stream().filter(item -> StringUtils.isBlank(item.getProductionInitVersion())).collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(notSelectedDemandProductionVersions)) {
             notSelectedDemandProductionVersions.forEach(notSelectedDemandProductionVersion -> notSelectedDemandProductionVersion.setIsSelectedDemand(YesOrNoEnum.YES.getCode()));
             this.baseDao.updateBatch(notSelectedDemandProductionVersions);
         }
         return AjaxResult.success();
+    }
+
+    @Override
+    public boolean isFinalVersion(String factoryCode, Integer year, Integer month, String productionVersion) {
+        if (StringUtils.isBlank(productionVersion)) {
+            return false;
+        }
+        QueryWrapper<MpFactoryProductionVersion> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("FACTORY_CODE", factoryCode);
+        queryWrapper.eq("YEAR", year);
+        queryWrapper.eq("MONTH", month);
+        queryWrapper.eq("IS_FINAL", YesOrNoEnum.YES.getCode());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        queryWrapper.eq("PRODUCTION_VERSION", productionVersion);
+        return factoryProductionVersionMapper.exists(queryWrapper);
     }
 
     /**

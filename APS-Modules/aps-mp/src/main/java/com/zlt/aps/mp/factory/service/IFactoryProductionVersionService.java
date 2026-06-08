@@ -21,7 +21,7 @@ import java.util.Date;
  * 修改内容：...
  * @date 2025-05-26
  */
-public interface IFactoryProductionVersionService {
+public interface  IFactoryProductionVersionService {
 
     /**
      * 设置分厂排产版本的周期
@@ -70,4 +70,15 @@ public interface IFactoryProductionVersionService {
      * @return
      */
     AjaxResult flagProductionRequireVersion(FactoryProductionPlanVo selectedRequireVersion);
+
+    /**
+     * 判定是否定稿版本
+     *
+     * @param factoryCode       工厂编码
+     * @param year              年份
+     * @param month             月份
+     * @param productionVersion 排产版本号
+     * @return
+     */
+    boolean isFinalVersion(String factoryCode, Integer year, Integer month, String productionVersion);
 }

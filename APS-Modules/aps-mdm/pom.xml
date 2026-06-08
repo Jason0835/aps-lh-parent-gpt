@@ -69,22 +69,25 @@
                 </exclusion>
             </exclusions>
         </dependency>
-      <dependency>
-        <groupId>com.zlt.aps.dp</groupId>
-        <artifactId>aps-dp-api</artifactId>
-        <version>1.0.3-SNAPSHOT</version>
-        <scope>compile</scope>
-      </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.dp</groupId>
+            <artifactId>aps-dp-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <!--不需要引入aps-dp模块，最多只需要mp的api就好-->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-mp-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
       <dependency>
         <groupId>cn.hutool</groupId>
         <artifactId>hutool-all</artifactId>
       </dependency>
-      <dependency>
-        <groupId>com.zlt.aps</groupId>
-        <artifactId>aps-dp</artifactId>
-        <version>1.0.3-SNAPSHOT</version>
-        <scope>compile</scope>
-      </dependency>
+
     </dependencies>
 
     <build>

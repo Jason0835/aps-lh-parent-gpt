@@ -1,81 +1,72 @@
-package com.zlt.aps.mp.setting.controller;
+package com.zlt.aps.mp.factory.controller;
 
-import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.google.common.collect.Lists;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.log.annotation.Log;
+import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.common.core.constant.BusiConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
-import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
-import com.zlt.aps.maindata.service.IMpMonthPlanStatisticsService;
-import com.zlt.aps.mp.api.domain.capacity.MpDailyCapacityLimitVo;
-import com.zlt.aps.mp.api.domain.entity.MpAdjustResult;
+import com.zlt.aps.mp.api.domain.entity.MpFinalVersionStatisticsLog;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.api.domain.vo.MpDayProductionStatisticsDetailVo;
 import com.zlt.aps.mp.engine.constant.ProductionConstant;
+import com.zlt.aps.mp.factory.mapper.MpFinalVersionStatisticsLogEntityMapper;
+import com.zlt.aps.mp.factory.mapper.MpMonthPlanStatisticsEntityMapper;
+import com.zlt.aps.mp.factory.service.IFactoryProductionVersionService;
+import com.zlt.aps.mp.factory.service.IMpMonthPlanStatisticsService;
+import com.zlt.aps.utils.BeanCopyUtils;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
 import com.zlt.common.utils.PubUtil;
-import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-import lombok.extern.slf4j.Slf4j;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.log.annotation.Log;
-import com.ruoyi.common.log.enums.BusinessType;
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
-
-import com.ruoyi.common.core.web.page.TableDataInfo;
-
-import com.zlt.bill.common.controller.AbstractDocBizController;
-import com.zlt.bill.common.service.IDocService ;
-
 /**
-* Copyright (c) 2022, All rights reserved。
-* 文件名称：MpMonthPlanStatisticsController.java
-* 描    述：S2-0612.最终排产计划统计 控制层类：....
-*@author zlt
-*@date 2026-02-05
-*@version 1.0
-*
- *  修改记录：
-*     修改时间：...
-*     修 改 人：zlt
-*     修改内容：...
-*/
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：MpMonthPlanStatisticsController.java
+ * 描    述：S2-0612.最终排产计划统计 控制层类：....
+ *
+ * @author zlt
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：zlt
+ * 修改内容：...
+ * @date 2026-02-05
+ */
 @Slf4j
 @Api(tags = "S2-0612.最终排产计划统计")
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/mpMonthPlanStatistics")
 public class MpMonthPlanStatisticsController extends AbstractDocBizController<MpMonthPlanStatistics> {
 
-    @Autowired
-    private IMpMonthPlanStatisticsService mpMonthPlanStatisticsService;
+    private final IMpMonthPlanStatisticsService mpMonthPlanStatisticsService;
 
-    @Autowired
-    private MpMonthPlanStatisticsEntityMapper entityMapper;
+    private final IFactoryProductionVersionService factoryProductionVersionService;
+
+    private final MpMonthPlanStatisticsEntityMapper entityMapper;
+
+    private final MpFinalVersionStatisticsLogEntityMapper finalVersionStatisticsLogEntityMapper;
 
     /**
      * 查询S2-0612.最终排产计划统计列表
@@ -84,14 +75,28 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
     @PostMapping("/list")
     @Override
     public TableDataInfo list(@RequestBody MpMonthPlanStatistics queryVO) {
+        if (null == queryVO.getIsFinalAdjust()) {
+            queryVO.setIsFinalAdjust(YesOrNoEnum.NO.getValue());
+        }
         String tempFlag = queryVO.getTempFlag();
         queryVO.setTempFlag(null);
-        TableDataInfo tableDataInfo = super.list(queryVO);
+        TableDataInfo tableDataInfo;
+        //20260608+ 月计划调整入口
+        if (YesOrNoEnum.YES.getValue().equals(queryVO)) {
+            tableDataInfo = super.list(queryVO);
+        } else {
+            //定稿版本-非月计划调整入口
+            if (factoryProductionVersionService.isFinalVersion(queryVO.getFactoryCode(), queryVO.getYear(), queryVO.getMonth(), queryVO.getProductionVersion())) {
+                tableDataInfo = queryFinalVersionStatisticsInfo(queryVO);
+            } else {
+                tableDataInfo = super.list(queryVO);
+            }
+        }
+
         filterByGroup(tableDataInfo, tempFlag);
         handleZeroToNull(tableDataInfo.getRows());
         return tableDataInfo;
     }
-
 
 
     /**
@@ -99,8 +104,9 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
      * 分组：产品结构 + 结构类型
      * 临时标识有值：按照临时标识过滤，组内去最新的数据
      * 临时标识无值：组内去最新的数据
+     *
      * @param tableDataInfo 原始数据集合
-     * @param tempFlag 临时标识
+     * @param tempFlag      临时标识
      * @return
      */
     public void filterByGroup(TableDataInfo tableDataInfo, String tempFlag) {
@@ -155,6 +161,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
 
     /**
      * 将字段中值为0的字段设为null
+     *
      * @param rows
      */
     private void handleZeroToNull(List<?> rows) {
@@ -162,7 +169,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
             return;
         }
         List<MpMonthPlanStatistics> monthPlanStatisticsList = (List<MpMonthPlanStatistics>) rows;
-        for (MpMonthPlanStatistics statistics: monthPlanStatisticsList) {
+        for (MpMonthPlanStatistics statistics : monthPlanStatisticsList) {
             for (int day = ProductionConstant.MONTH_START_DAY; day <= ProductionConstant.MONTH_MAX_DAY; day++) {
                 setDayField(statistics, day);
             }
@@ -171,6 +178,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
 
     /**
      * 设置时间相关字段
+     *
      * @param statistics
      * @param day
      */
@@ -193,7 +201,6 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
     }
 
 
-
     @Override
     protected String getOrderBy() {
         return "create_time desc";
@@ -206,7 +213,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
-    public AjaxResult save(@RequestBody MpMonthPlanStatistics billVO){
+    public AjaxResult save(@RequestBody MpMonthPlanStatistics billVO) {
         return super.save(billVO);
     }
 
@@ -217,7 +224,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
-    public AjaxResult removeByIds(@RequestBody List<Long> ids){
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
         return super.removeByIds(ids);
     }
 
@@ -235,6 +242,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
 
     /**
      * 根据集合导入S2-0612.最终排产计划统计数据
+     *
      * @param importContext 导入上下文
      * @param updateSupport 已存在记录是否更新
      * @return 结果
@@ -244,7 +252,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
     @PostMapping("/importData")
     @Override
     public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
-        return super.importData(importContext,updateSupport);
+        return super.importData(importContext, updateSupport);
     }
 
     /**
@@ -267,7 +275,7 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
     }
 
     @Override
-    protected IDocService getDocService(){
+    protected IDocService getDocService() {
         return mpMonthPlanStatisticsService;
     }
 
@@ -324,11 +332,51 @@ public class MpMonthPlanStatisticsController extends AbstractDocBizController<Mp
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("day31")), "DAY_31", queryVO.getFieldValueByFieldName("day31"));
     }
 
-
     @Override
-    protected String getTypeCode(){
+    protected String getTypeCode() {
         return "s2-0612";
     }
 
+    /**
+     * 定稿版本非调整入口，使用定稿备份数据
+     *
+     * @param queryCondition
+     * @return
+     */
+    private TableDataInfo queryFinalVersionStatisticsInfo(MpMonthPlanStatistics queryCondition) {
+        QueryWrapper<MpFinalVersionStatisticsLog> queryWrapper = new QueryWrapper();
+        builderQueryWrapper(queryWrapper, queryCondition);
+        startPage(getOrderBy(queryCondition));
+        List<MpMonthPlanStatistics> resultData;
+        List<MpFinalVersionStatisticsLog> list = finalVersionStatisticsLogEntityMapper.selectList(queryWrapper);
+        if (CollectionUtils.isEmpty(list)) {
+            resultData = Lists.newArrayList();
+        } else {
+            resultData = BeanCopyUtils.copyBeanList(list, MpMonthPlanStatistics.class);
+        }
+        clearPage();
+        return getDataTable(list);
+    }
 
+    /**
+     * 构建查询条件
+     *
+     * @param queryWrapper
+     * @param queryVO
+     */
+    private void builderQueryWrapper(QueryWrapper<MpFinalVersionStatisticsLog> queryWrapper, MpMonthPlanStatistics queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("year")), "YEAR", queryVO.getFieldValueByFieldName("year"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("month")), "MONTH", queryVO.getFieldValueByFieldName("month"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("yearMonth")), "`YEAR_MONTH`", queryVO.getFieldValueByFieldName("yearMonth"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("monthPlanVersion")), "MONTH_PLAN_VERSION", queryVO.getFieldValueByFieldName("monthPlanVersion"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("lastMonthPlanVersion")), "LAST_MONTH_PLAN_VERSION", queryVO.getFieldValueByFieldName("lastMonthPlanVersion"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productionVersion")), "PRODUCTION_VERSION", queryVO.getFieldValueByFieldName("productionVersion"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("productTypeCode")), "PRODUCT_TYPE_CODE", queryVO.getFieldValueByFieldName("productTypeCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", queryVO.getFieldValueByFieldName("structureName"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("tempFlag")), "TEMP_FLAG", queryVO.getFieldValueByFieldName("tempFlag"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("proSize")), "PRO_SIZE", queryVO.getFieldValueByFieldName("proSize"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("structureType")), "STRUCTURE_TYPE", queryVO.getFieldValueByFieldName("structureType"));
+
+    }
 }

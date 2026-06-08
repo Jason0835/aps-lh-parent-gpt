@@ -285,6 +285,11 @@ public class MpMonthPlanStatistics extends BaseEntity {
     @ApiModelProperty(value = "DAY_31", name = "day31")
     @TableField(value = "DAY_31")
     private String day31;
-
+    /**
+     * 是否定稿调整使用 0 不是 1 是
+     */
+    @ApiModelProperty(value = "是否定稿调整使用", name = "isAdjust")
+    @TableField(exist = false)
+    private Integer isFinalAdjust;
 
 }
