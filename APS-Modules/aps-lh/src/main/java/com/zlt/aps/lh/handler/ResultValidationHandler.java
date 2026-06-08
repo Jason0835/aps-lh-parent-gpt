@@ -35,6 +35,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -1626,10 +1628,89 @@ public class ResultValidationHandler extends AbsScheduleStepHandler {
 
     /**
      * 标识清洗结束时间所在的班次。
+     * <p>实际清洗开始时间取 max(计划清洗开始时间, 清洗前最后一个有计划量班次的实际完工时间)，
+     * 再加上清洗时长得到实际清洗结束时间，用于定位标识班次。</p>
+     * <p>注意：排产结果中班次endTime可能被清洗窗口截断（如class4EndTime=清洗开始时间），
+     * 不能直接使用。需要按 planQty×lhTime 从班次startTime推算实际完工时间。</p>
      */
     private void tagCleaningEndShift(LhScheduleResult result, MachineCleaningWindowDTO cleaningWindow,
                                      List<LhShiftConfigVO> shifts, String machineCode) {
-        Date cleanEndTime = cleaningWindow.getCleanEndTime();
+        Date cleanStartTime = cleaningWindow.getCleanStartTime();
+        Date cleanEndTimeOrig = cleaningWindow.getCleanEndTime();
+        // 查找清洗窗口开始时仍在生产的班次的实际完工时间
+        // 向上取整导致实际生产时间可能超过班次可用时间，需用比例方式推算
+        Date lastShiftActualEndTime = null;
+        Integer lhTime = result.getLhTime();
+        Integer mouldQty = result.getMouldQty();
+        Integer singleMouldShiftQty = result.getSingleMouldShiftQty();
+        log.debug("[清洗分析标识-调试] 机台: {}, lhTime: {}, mouldQty: {}, singleMouldShiftQty: {}, 清洗窗口: {}~{}",
+                machineCode, lhTime, mouldQty, singleMouldShiftQty,
+                LhScheduleTimeUtil.formatDateTime(cleanStartTime),
+                LhScheduleTimeUtil.formatDateTime(cleanEndTimeOrig));
+        if (lhTime != null && lhTime > 0 && singleMouldShiftQty != null && singleMouldShiftQty > 0) {
+            int resolvedMouldQty = (mouldQty != null && mouldQty > 0) ? mouldQty : 1;
+            for (int si = 1; si <= 8; si++) {
+                Integer planQty = ShiftFieldUtil.getShiftPlanQty(result, si);
+                if (planQty != null && planQty > 0) {
+                    Date shiftStart = ShiftFieldUtil.getShiftStartTime(result, si);
+                    // 只考虑清洗开始时间之前或同时开始的班次（清洗期间新开始的班次不算）
+                    if (shiftStart == null || shiftStart.after(cleanStartTime)) {
+                        log.debug("[清洗分析标识-调试] 机台: {}, 班次: {} 跳过, shiftStart: {}",
+                                machineCode, si,
+                                shiftStart != null ? LhScheduleTimeUtil.formatDateTime(shiftStart) : "null");
+                        continue;
+                    }
+                    // 用满班次时长推算实际完工时间
+                    // 单模排产周期数 = ceil(planQty / mouldQty)
+                    // 单模满班周期数 = singleMouldShiftQty / mouldQty（班产/模台数）
+                    // 满班次时长从班次配置获取
+                    LhShiftConfigVO shiftConfig = findShiftByIndex(shifts, si);
+                    long fullShiftSeconds = 0;
+                    if (shiftConfig != null && shiftConfig.getShiftStartDateTime() != null
+                            && shiftConfig.getShiftEndDateTime() != null) {
+                        fullShiftSeconds = (shiftConfig.getShiftEndDateTime().getTime()
+                                - shiftConfig.getShiftStartDateTime().getTime()) / 1000L;
+                    }
+                    if (fullShiftSeconds <= 0) {
+                        fullShiftSeconds = 8 * 3600L; // 默认8小时
+                    }
+                    int singleMouldQty = (planQty + resolvedMouldQty - 1) / resolvedMouldQty;
+                    int singleMouldFullShift = singleMouldShiftQty / resolvedMouldQty;
+                    // 实际生产秒数 = 单模排产数 / 单模满班产 × 满班次时长
+                    long productionMs = BigDecimal.valueOf(singleMouldQty)
+                            .multiply(BigDecimal.valueOf(fullShiftSeconds * 1000L))
+                            .divide(BigDecimal.valueOf(singleMouldFullShift), 0, RoundingMode.UP)
+                            .longValue();
+                    Date actualEnd = new Date(shiftStart.getTime() + productionMs);
+                    log.debug("[清洗分析标识-调试] 机台: {}, 班次: {}, planQty: {}, singleMouldQty: {}, fullShiftSeconds: {}, productionMs: {}ms, shiftStart: {}, actualEnd: {}",
+                            machineCode, si, planQty, singleMouldQty, fullShiftSeconds, productionMs,
+                            LhScheduleTimeUtil.formatDateTime(shiftStart),
+                            LhScheduleTimeUtil.formatDateTime(actualEnd));
+                    lastShiftActualEndTime = (lastShiftActualEndTime == null || actualEnd.after(lastShiftActualEndTime))
+                            ? actualEnd : lastShiftActualEndTime;
+                }
+            }
+        }
+        // 实际清洗开始时间 = max(计划清洗开始时间, 前一班次实际完工时间)
+        Date actualCleanStartTime = cleanStartTime;
+        if (lastShiftActualEndTime != null && lastShiftActualEndTime.after(cleanStartTime)) {
+            actualCleanStartTime = lastShiftActualEndTime;
+        }
+        // 实际清洗结束时间 = 实际清洗开始时间 + 清洗时长
+        long cleaningDurationMs = cleanEndTimeOrig.getTime() - cleanStartTime.getTime();
+        Date actualCleanEndTime = new Date(actualCleanStartTime.getTime() + cleaningDurationMs);
+
+        if (!actualCleanEndTime.equals(cleanEndTimeOrig)) {
+            log.info("[清洗分析标识] 清洗窗口顺延, 机台: {}, 计划清洗窗口: {}~{}, 前班次完工时间: {}, 顺延后: {}~{}",
+                    machineCode,
+                    LhScheduleTimeUtil.formatDateTime(cleanStartTime),
+                    LhScheduleTimeUtil.formatDateTime(cleanEndTimeOrig),
+                    lastShiftActualEndTime != null ? LhScheduleTimeUtil.formatDateTime(lastShiftActualEndTime) : "无",
+                    LhScheduleTimeUtil.formatDateTime(actualCleanStartTime),
+                    LhScheduleTimeUtil.formatDateTime(actualCleanEndTime));
+        }
+
+        Date cleanEndTime = actualCleanEndTime;
         for (int shiftIndex = 1; shiftIndex <= 8; shiftIndex++) {
             LhShiftConfigVO shift = findShiftByIndex(shifts, shiftIndex);
             if (shift == null || shift.getShiftStartDateTime() == null

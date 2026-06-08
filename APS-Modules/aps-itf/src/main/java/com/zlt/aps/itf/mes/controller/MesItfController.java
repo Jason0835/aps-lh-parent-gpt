@@ -392,6 +392,17 @@ public class MesItfController {
         return mesItfService.syncDevMaintenancePlan(syncDataLogs);
     }
 
+    @ApiOperation("仅同步设备保养计划数据（不触发生成精度计划）")
+    @PostMapping("/syncDevMaintenancePlanOnly")
+    @AutoLoginLog
+    public AjaxResult syncDevMaintenancePlanOnly(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncDevMaintenancePlanOnly(syncDataLogs);
+    }
+
     /**
      * 同步胶囊已使用次数
      * @param syncDataLogs 参数

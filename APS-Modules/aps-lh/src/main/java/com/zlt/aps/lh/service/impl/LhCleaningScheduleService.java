@@ -10,6 +10,7 @@ import com.zlt.aps.lh.context.LhScheduleContext;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.MouldStatusUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
+import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmSkuMouldRel;
 import com.zlt.aps.mdm.api.domain.entity.MdmWorkCalendar;
@@ -213,15 +214,26 @@ public class LhCleaningScheduleService {
                                                          Date adjustedCleanStartTime,
                                                          int cleanDurationHours,
                                                          int readyDurationHours) {
-        // 喷砂清洗：优先检查是否有可换模具，有则跳过清洗直接换模
-        if (CleaningTypeEnum.SAND_BLAST.getCode().equals(cleaningPlan.getCleanType())
-                && hasSpareMouldForSandblastMachine(context, cleaningPlan)) {
+        // 喷砂清洗：检查是否有可换模具，有则将清洗窗口转为"喷砂含首检+换模"模式
+        // 不再完全删除清洗窗口，而是用换模时长替代喷砂时长，保留班次产能扣减
+        boolean hasSpareMould = CleaningTypeEnum.SAND_BLAST.getCode().equals(cleaningPlan.getCleanType())
+                && hasSpareMouldForSandblastMachine(context, cleaningPlan);
+        int actualCleanDurationHours = cleanDurationHours;
+        int actualReadyDurationHours = readyDurationHours;
+        String remark = cleaningPlan.getRemark();
+
+        if (hasSpareMould) {
             context.getSkippedSandblastCleaningMap().put(
                     cleaningPlan.getLhCode(), cleaningPlan.getCleanTime());
-            log.info("[清洗调试] 喷砂清洗跳过-有可换模具, 机台: {}, 计划清洗时间: {}",
+            // 有可用模具时，喷砂清洗转为换模，时长使用换模总时长（已含首检）
+            int mouldChangeTotalHours = LhScheduleTimeUtil.getMouldChangeTotalHours(context);
+            actualCleanDurationHours = mouldChangeTotalHours;
+            actualReadyDurationHours = mouldChangeTotalHours;
+            remark = "喷砂含首检+换模";
+            log.info("[清洗调试] 喷砂清洗转换模-有可换模具, 机台: {}, 计划清洗时间: {}, 换模时长: {}h",
                     cleaningPlan.getLhCode(),
-                    LhScheduleTimeUtil.formatDateTime(cleaningPlan.getCleanTime()));
-            return null;
+                    LhScheduleTimeUtil.formatDateTime(cleaningPlan.getCleanTime()),
+                    mouldChangeTotalHours);
         }
 
         MachineCleaningWindowDTO cleaningWindow = new MachineCleaningWindowDTO();
@@ -230,14 +242,14 @@ public class LhCleaningScheduleService {
         cleaningWindow.setLeftRightMould(cleaningPlan.getLeftRightMould());
         cleaningWindow.setMouldCode(resolveCleaningMouldCode(context, cleaningPlan.getLhCode()));
         cleaningWindow.setCleanStartTime(adjustedCleanStartTime);
-        cleaningWindow.setCleanEndTime(LhScheduleTimeUtil.addHours(adjustedCleanStartTime, cleanDurationHours));
-        cleaningWindow.setReadyTime(LhScheduleTimeUtil.addHours(adjustedCleanStartTime, readyDurationHours));
+        cleaningWindow.setCleanEndTime(LhScheduleTimeUtil.addHours(adjustedCleanStartTime, actualCleanDurationHours));
+        cleaningWindow.setReadyTime(LhScheduleTimeUtil.addHours(adjustedCleanStartTime, actualReadyDurationHours));
 
         // 喷砂清洗：夜班不能"开始"喷砂，但已开始的喷砂可以延续到夜班
         // （开始时间在夜班的顺延已在 normalizeCleaningStartTime 中处理，此处不再额外调整）
 
         cleaningWindow.setDataSource(cleaningPlan.getDataSource());
-        cleaningWindow.setRemark(cleaningPlan.getRemark());
+        cleaningWindow.setRemark(remark);
         return cleaningWindow;
     }
 
@@ -525,9 +537,11 @@ public class LhCleaningScheduleService {
     }
 
     /**
-     * 检查喷砂清洗机台是否有空闲模具可换，有则可跳过喷砂清洗直接换模。
-     * <p>判断依据：机台当前物料关联的启用模具数量大于机台模台数（单模/双模），
-     * 则表示有机外可用的空闲模具。</p>
+     * 检查喷砂清洗机台是否有空闲模具可换，有则可将喷砂清洗转为换模。
+     * <p>判断依据：
+     * 1. 优先检查机台当前在机物料关联的启用模具数量是否大于机台模台数；
+     * 2. 若当前在机物料无SKU模具关系或模具不足，进一步遍历该机台可排的SKU物料
+     *    （同英寸且在排程窗口内有需排量的物料），检查其启用模具数量。</p>
      *
      * @param context      排程上下文
      * @param cleaningPlan 清洗计划
@@ -538,17 +552,80 @@ public class LhCleaningScheduleService {
         String machineCode = cleaningPlan.getLhCode();
         LhMachineOnlineInfo onlineInfo = context.getMachineOnlineInfoMap().get(machineCode);
         if (Objects.isNull(onlineInfo) || StringUtils.isEmpty(onlineInfo.getMaterialCode())) {
+            log.info("[清洗调试] 机台 {} 无在机信息或在机物料为空, 无法判断模具可用性", machineCode);
             return false;
         }
         String materialCode = onlineInfo.getMaterialCode();
-        // 获取该物料关联的所有模具号
+        // 获取机台模台数
+        LhMachineInfo machineInfo = context.getMachineInfoMap().get(machineCode);
+        int machineMouldQty = 1;
+        if (machineInfo != null && machineInfo.getMaxMoldNum() != null) {
+            machineMouldQty = machineInfo.getMaxMoldNum();
+        }
+        Map<String, MdmModelInfo> modelInfoMap = context.getModelInfoMap();
+
+        // 第一步：检查当前在机物料的启用模具数量
         List<MdmSkuMouldRel> mouldRelList = context.getSkuMouldRelMap().get(materialCode);
-        if (CollectionUtils.isEmpty(mouldRelList)) {
+        if (!CollectionUtils.isEmpty(mouldRelList)) {
+            long enabledMouldCount = countEnabledMould(mouldRelList, modelInfoMap);
+            if (enabledMouldCount > machineMouldQty) {
+                log.info("[清洗调试] 机台 {} 当前在机物料有空闲模具: 在机物料={}, 启用模具数={}, 模台数={}",
+                        machineCode, materialCode, enabledMouldCount, machineMouldQty);
+                return true;
+            }
+            log.info("[清洗调试] 机台 {} 当前在机物料模具不足: 在机物料={}, 启用模具数={}, 模台数={}, 继续检查可排SKU物料",
+                    machineCode, materialCode, enabledMouldCount, machineMouldQty);
+        } else {
+            log.info("[清洗调试] 机台 {} 在机物料 {} 无SKU模具关系, 继续检查可排SKU物料",
+                    machineCode, materialCode);
+        }
+
+        // 第二步：当前在机物料模具不足或无模具关系时，
+        // 遍历排程中所有SKU物料，找到该机台可排的SKU（基于英寸匹配），检查其模具可用性
+        MdmMaterialInfo currentMaterialInfo = context.getMaterialInfoMap().get(materialCode);
+        if (Objects.isNull(currentMaterialInfo)) {
+            log.info("[清洗调试] 机台 {} 在机物料 {} 无物料主数据信息", machineCode, materialCode);
             return false;
         }
-        // 统计启用状态的模具数量
-        Map<String, MdmModelInfo> modelInfoMap = context.getModelInfoMap();
-        long enabledMouldCount = mouldRelList.stream()
+        String machineProSize = currentMaterialInfo.getProSize();
+        // 遍历所有有模具关系的物料，找到同英寸的物料，检查其模具数量
+        long maxEnabledMouldCount = 0;
+        String bestMaterialCode = null;
+        for (Map.Entry<String, List<MdmSkuMouldRel>> entry : context.getSkuMouldRelMap().entrySet()) {
+            String candidateMaterialCode = entry.getKey();
+            List<MdmSkuMouldRel> candidateMouldRelList = entry.getValue();
+            if (CollectionUtils.isEmpty(candidateMouldRelList)) {
+                continue;
+            }
+            // 检查候选物料是否与当前在机物料同英寸
+            MdmMaterialInfo candidateMaterialInfo = context.getMaterialInfoMap().get(candidateMaterialCode);
+            if (Objects.isNull(candidateMaterialInfo)) {
+                continue;
+            }
+            if (!StringUtils.equals(machineProSize, candidateMaterialInfo.getProSize())) {
+                continue;
+            }
+            long enabledMouldCount = countEnabledMould(candidateMouldRelList, modelInfoMap);
+            if (enabledMouldCount > maxEnabledMouldCount) {
+                maxEnabledMouldCount = enabledMouldCount;
+                bestMaterialCode = candidateMaterialCode;
+            }
+        }
+        boolean hasSpare = maxEnabledMouldCount > machineMouldQty;
+        log.info("[清洗调试] 机台 {} 同英寸可排SKU模具检查: 在机物料={}, 在机英寸={}, 同英寸最多模具物料={}, 启用模具数={}, 模台数={}, 有空闲模具={}",
+                machineCode, materialCode, machineProSize, bestMaterialCode, maxEnabledMouldCount, machineMouldQty, hasSpare);
+        return hasSpare;
+    }
+
+    /**
+     * 统计物料关联的启用模具数量。
+     *
+     * @param mouldRelList 物料模具关系列表
+     * @param modelInfoMap 模具台账Map
+     * @return 启用模具数量
+     */
+    private long countEnabledMould(List<MdmSkuMouldRel> mouldRelList, Map<String, MdmModelInfo> modelInfoMap) {
+        return mouldRelList.stream()
                 .map(MdmSkuMouldRel::getMouldCode)
                 .filter(StringUtils::isNotEmpty)
                 .distinct()
@@ -560,19 +637,6 @@ public class LhCleaningScheduleService {
                     return modelInfo != null && MouldStatusUtil.isEnabled(modelInfo.getMouldStatus());
                 })
                 .count();
-        // 获取机台模台数
-        LhMachineInfo machineInfo = context.getMachineInfoMap().get(machineCode);
-        int machineMouldQty = 1;
-        if (machineInfo != null && machineInfo.getMaxMoldNum() != null) {
-            machineMouldQty = machineInfo.getMaxMoldNum();
-        }
-        // 启用模具数量大于机台模台数 → 有空闲模具可换
-        boolean hasSpare = enabledMouldCount > machineMouldQty;
-        if (hasSpare) {
-            log.info("[清洗调试] 机台 {} 有空闲模具(启用{}/模台{}), 物料: {}, 跳过喷砂清洗",
-                    machineCode, enabledMouldCount, machineMouldQty, materialCode);
-        }
-        return hasSpare;
     }
 
     /**

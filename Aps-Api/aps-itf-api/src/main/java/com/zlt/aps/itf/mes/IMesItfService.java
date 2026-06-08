@@ -182,6 +182,17 @@ public interface IMesItfService {
     public AjaxResult syncDevMaintenancePlan(@RequestBody AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 仅同步设备保养计划数据，不触发自动生成精度计划逻辑
+     * 用于临时任务场景：先同步数据，再按自定义逻辑生成精度计划
+     *
+     * @param syncDataLogs 同步参数（可指定精度类型）
+     * @return 同步结果
+     */
+    @ApiOperation("仅同步设备保养计划数据（不触发生成精度计划）")
+    @PostMapping("/mesItf/syncDevMaintenancePlanOnly")
+    public AjaxResult syncDevMaintenancePlanOnly(@RequestBody AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步胶囊已使用次数
      * @param syncDataLogs 参数
      * @return 结果

@@ -962,9 +962,9 @@ export default {
     },
     shiftAnalysisFormatter(row, column, value, shiftIndex) {
       if (this.isShiftAfterEnding(row, shiftIndex)) return '';
-      const planQty = row['class' + shiftIndex + 'PlanQty'];
-      if (planQty == null || planQty <= 0) return '';
-      return value;
+      // 原因分析有值时直接展示（即使计划量为0，如喷砂清洗班次也需标识原因）
+      if (value != null && value !== '') return value;
+      return '';
     },
     decodeRemark(remark) {
       if (!remark) return remark;
