@@ -13,6 +13,7 @@
         <module>mps-api</module>
         <module>tc-api</module>
         <module>nc-api</module>
+        <module>dj-api</module>
         <module>aps-cd15-api</module>
         <module>aps-cd90-api</module>
         <module>gdyy-api</module>

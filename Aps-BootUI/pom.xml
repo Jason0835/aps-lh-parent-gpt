@@ -126,6 +126,11 @@
             <artifactId>aps-cx-lh-api</artifactId>
             <version>${aps-api.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.zlt.aps.dj</groupId>
+            <artifactId>aps-dj-api</artifactId>
+            <version>${aps-api.version}</version>
+        </dependency>
         <!-- 导入文件解密 -->
       <!--  <dependency>
             <groupId>com.zlt</groupId>
