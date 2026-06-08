@@ -464,8 +464,11 @@ export default {
   watch: {
     $route: {
       immediate: false,
-      handler() {
-        this.initByRouteAndLoad();
+      handler(to) {
+        // keep-alive 下组件未销毁，切换其他页面时 $route 仍会变化，需限定本页路由
+        if (to.name === "MouldingDayResult") {
+          this.initByRouteAndLoad();
+        }
       },
     },
   },
@@ -758,6 +761,10 @@ export default {
       return lastDay.getDate();
     },
     initByRouteAndLoad() {
+      // keep-alive 缓存时，切到其他页面也会触发 activated/$route，避免用空 query 覆盖并误请求
+      if (this.$route.name !== "MouldingDayResult") {
+        return;
+      }
       const routeQuery = this.$route.query || {};
       const routePath = this.$route.path || "";
       const routeKey = `${routePath}?${JSON.stringify(routeQuery)}`;
