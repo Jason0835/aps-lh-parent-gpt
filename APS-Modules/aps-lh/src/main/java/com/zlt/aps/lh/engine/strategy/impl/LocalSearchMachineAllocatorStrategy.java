@@ -314,7 +314,13 @@ public class LocalSearchMachineAllocatorStrategy {
                 context, machineReadyTime);
         int maxDelayRetryCount = resolveMaxSwitchDelayRetryCount(machine);
         for (int retry = 0; retry < maxDelayRetryCount; retry++) {
-            mouldChangeStartTime = mouldChangeBalance.allocateMouldChange(context, machineCode, candidateSwitchStartTime);
+            mouldChangeStartTime = mouldChangeBalance.allocateMouldChange(
+                    context,
+                    machineCode,
+                    candidateSwitchStartTime,
+                    LhScheduleTimeUtil.getMouldChangeTotalHours(context),
+                    sku,
+                    IMouldChangeBalanceStrategy.ACTION_NEW_SPEC_MOULD_CHANGE);
             if (mouldChangeStartTime == null) {
                 return null;
             }
@@ -481,8 +487,9 @@ public class LocalSearchMachineAllocatorStrategy {
                     effectiveEndTime,
                     allocationQty,
                     shiftMaxQty);
-            // 当前班次结束后再推进到下一班次，避免跨班次重叠计算
-            cursorStartTime = effectiveEndTime;
+            // 2026-06-06 修复：使用实际做完计划量的结束时间，而不是班次配置的固定结束时间
+            // 否则会导致班次时间与清洗时间重叠计算不准确
+            cursorStartTime = specEndTime;
         }
 
         if (totalQty <= 0 || specEndTime == null) {

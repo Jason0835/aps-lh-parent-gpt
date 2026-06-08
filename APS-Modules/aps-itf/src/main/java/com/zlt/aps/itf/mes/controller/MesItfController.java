@@ -392,6 +392,17 @@ public class MesItfController {
         return mesItfService.syncDevMaintenancePlan(syncDataLogs);
     }
 
+    @ApiOperation("仅同步设备保养计划数据（不触发生成精度计划）")
+    @PostMapping("/syncDevMaintenancePlanOnly")
+    @AutoLoginLog
+    public AjaxResult syncDevMaintenancePlanOnly(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncDevMaintenancePlanOnly(syncDataLogs);
+    }
+
     /**
      * 同步胶囊已使用次数
      * @param syncDataLogs 参数
@@ -681,6 +692,13 @@ public class MesItfController {
             year = java.time.LocalDate.now().getYear();
         }
         return mesItfService.syncAndGenerateLhPrecisionPlanByVersionPrefixAllVersions(versionPrefix, year);
+    }
+
+    @ApiOperation("临时任务-按计划时间年份同步回填实际日期并生成下一年度精度计划")
+    @PostMapping("/syncAndFillActualDateByOperYear")
+    public AjaxResult syncAndFillActualDateByOperYear(@RequestParam("versionPrefix") String versionPrefix,
+                                                       @RequestParam("operYear") Integer operYear) {
+        return mesItfService.syncAndFillActualDateByOperYear(versionPrefix, operYear);
     }
 
     /**

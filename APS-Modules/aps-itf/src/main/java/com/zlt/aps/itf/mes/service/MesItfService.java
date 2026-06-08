@@ -165,6 +165,14 @@ public interface MesItfService {
     AjaxResult syncDevMaintenancePlan(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 仅同步设备保养计划数据，不触发自动生成精度计划逻辑
+     *
+     * @param syncDataLogs 同步参数（可指定精度类型）
+     * @return 同步结果
+     */
+    AjaxResult syncDevMaintenancePlanOnly(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步胶囊已使用次数
      *
      * @param syncDataLogs 同步参数
@@ -315,6 +323,8 @@ public interface MesItfService {
      * @return 执行结果
      */
     AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefix(String versionPrefix, Integer year);
+
+    public AjaxResult syncAndFillActualDateByOperYear(String versionPrefix, Integer operYear);
 
     AjaxResult syncAndGenerateLhPrecisionPlanByVersionPrefixAllVersions(String versionPrefix, Integer year);
 

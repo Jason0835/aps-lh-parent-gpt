@@ -36,10 +36,12 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * S4.3 排程调整与SKU归集处理器。
@@ -173,6 +175,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         // 按结构归集SKU（key=结构名称，value=该结构下的SKU排程DTO列表）
         Map<String, List<SkuScheduleDTO>> structureSkuMap = new LinkedHashMap<>();
         Map<String, Integer> embryoStandardCapacitySumMap = buildEmbryoStandardCapacitySumMap(context);
+        List<SkuScheduleDTO> validScheduleSkuList = new ArrayList<>(monthPlanList.size());
 
         for (FactoryMonthPlanProductionFinalResult plan : monthPlanList) {
             // 计算硫化余量：当前代码统一使用月计划总量减完成量，不再读取月余量表作为兜底。
@@ -204,11 +207,45 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             }
 
             structureSkuMap.computeIfAbsent(plan.getStructureName(), k -> new ArrayList<>()).add(dto);
+            validScheduleSkuList.add(dto);
         }
 
+        context.setMaterialSharedEmbryoMap(buildMaterialSharedEmbryoMap(validScheduleSkuList));
         context.setStructureSkuMap(structureSkuMap);
         int totalSkuCount = structureSkuMap.values().stream().mapToInt(List::size).sum();
         log.info("SKU按结构归集完成, 结构数量: {}, SKU总数: {}", structureSkuMap.size(), totalSkuCount);
+    }
+
+    /**
+     * 构建本月待排物料胎胚共用关系。
+     * <p>只统计已具备排产目标量且进入结构分组的SKU，避免无目标量或基础字段异常物料影响换模均衡判断。</p>
+     *
+     * @param skuList 有效待排SKU列表
+     * @return 物料胎胚共用关系Map
+     */
+    private Map<String, Boolean> buildMaterialSharedEmbryoMap(List<SkuScheduleDTO> skuList) {
+        Map<String, Set<String>> embryoMaterialSetMap = new LinkedHashMap<>();
+        if (CollectionUtils.isEmpty(skuList)) {
+            return new LinkedHashMap<>(0);
+        }
+        for (SkuScheduleDTO sku : skuList) {
+            if (sku == null || StringUtils.isEmpty(sku.getMaterialCode())
+                    || StringUtils.isEmpty(sku.getEmbryoCode())) {
+                continue;
+            }
+            embryoMaterialSetMap.computeIfAbsent(sku.getEmbryoCode(), key -> new HashSet<String>(4))
+                    .add(sku.getMaterialCode());
+        }
+        Map<String, Boolean> materialSharedEmbryoMap = new LinkedHashMap<>(skuList.size());
+        for (SkuScheduleDTO sku : skuList) {
+            if (sku == null || StringUtils.isEmpty(sku.getMaterialCode())) {
+                continue;
+            }
+            Set<String> materialSet = embryoMaterialSetMap.get(sku.getEmbryoCode());
+            materialSharedEmbryoMap.put(sku.getMaterialCode(),
+                    !CollectionUtils.isEmpty(materialSet) && materialSet.size() > 1);
+        }
+        return materialSharedEmbryoMap;
     }
 
     /**
@@ -1237,22 +1274,34 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 基于月计划开始日期（BEGIN_DAY）计算延迟上机天数。
+     * 基于月计划 day1～day31 中最早有计划量的日期计算延迟上机天数。
      * <p>
-     * 计算公式：月计划开始日期（year+month+beginDay构建完整日期）- T日（scheduleDate），
+     * beginDay 取值口径：不再直接使用月计划的 beginDay 字段，而是遍历 day1～day31，
+     * 取第一个计划量 > 0 的 dayN 作为 beginDay。
+     * 若 day1～day31 全部为 0 或 null，则返回 null，不参与延期排序。
+     * </p>
+     * <p>
+     * 计算公式：beginDate（year+month+beginDay构建完整日期）- T日（scheduleDate），
      * 负数表示已过开始日（延误），正数表示尚未到开始日（富余），null表示无法计算。
      * </p>
      *
      * @param context 排程上下文
      * @param plan    月生产计划
-     * @return 延迟天数=月计划开始日距T日的天数差（beginDate - scheduleDate），无法计算时返回null
+     * @return 延迟天数=最早有计划量日期距T日的天数差（beginDate - scheduleDate），无法计算时返回null
      */
     private Integer resolveDelayDays(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
         if (context.getScheduleDate() == null) {
             return null;
         }
-        Integer beginDay = plan != null ? plan.getBeginDay() : null;
-        if (beginDay == null || beginDay < MIN_DAY_OF_MONTH || beginDay > MAX_DAY_OF_MONTH) {
+        if (plan == null) {
+            return null;
+        }
+        // 从 day1～day31 中查找最早有计划量的日期，替代原 beginDay 字段
+        int firstPlannedDay = MonthPlanDayQtyUtil.resolveFirstPlannedDay(plan);
+        if (firstPlannedDay < MIN_DAY_OF_MONTH) {
+            // day1～day31 全部为 0 或 null，无法确定起产日，不参与延期排序
+            log.info("延期天数计算跳过, 物料: {}, 原因: day1~day31均无计划量",
+                    plan.getMaterialCode());
             return null;
         }
         Integer year = plan.getYear();
@@ -1260,9 +1309,9 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         if (year == null || month == null) {
             return null;
         }
-        // 构建月计划开始日期（清零时分秒毫秒）
+        // 使用最早有计划量的日期构建起产日（清零时分秒毫秒）
         Calendar beginCal = Calendar.getInstance();
-        beginCal.set(year, month - 1, beginDay, 0, 0, 0);
+        beginCal.set(year, month - 1, firstPlannedDay, 0, 0, 0);
         beginCal.set(Calendar.MILLISECOND, 0);
         // 构建T日日期（清零时分秒毫秒）
         Calendar scheduleCal = Calendar.getInstance();
@@ -1273,7 +1322,10 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         scheduleCal.set(Calendar.MILLISECOND, 0);
         // 计算天数差：beginDate - scheduleDate
         long diffMillis = beginCal.getTimeInMillis() - scheduleCal.getTimeInMillis();
-        return (int) (diffMillis / (24 * 60 * 60 * 1000));
+        int delayDays = (int) (diffMillis / (24 * 60 * 60 * 1000));
+        log.info("延期天数计算, 物料: {}, 原beginDay: {}, 最早有计划量dayN: {}, 延期天数: {}",
+                plan.getMaterialCode(), plan.getBeginDay(), firstPlannedDay, delayDays);
+        return delayDays;
     }
 
     /**

@@ -67,6 +67,9 @@ public final class ResultDowntimeSummaryUtil {
         result.setCleaningEndTime(null);
     }
 
+    /** 精度保养原因分析标识 */
+    private static final String MAINTENANCE_ANALYSIS = "精度保养";
+
     private static void fillMaintenanceSummary(LhScheduleResult result,
                                                List<MachineMaintenanceWindowDTO> maintenanceWindowList,
                                                Date productionStartTime,
@@ -86,9 +89,47 @@ public final class ResultDowntimeSummaryUtil {
             }
             earliestStartTime = earlier(earliestStartTime, maintenanceWindow.getMaintenanceStartTime());
             latestEndTime = later(latestEndTime, maintenanceWindow.getMaintenanceEndTime());
+            // 对与保养窗口重叠的班次写入原因分析
+            applyMaintenanceShiftAnalysis(result, maintenanceWindow);
         }
         result.setMaintenanceStartTime(earliestStartTime);
         result.setMaintenanceEndTime(latestEndTime);
+    }
+
+    /**
+     * 对与保养窗口时间重叠的班次写入原因分析。
+     *
+     * @param result 排程结果
+     * @param maintenanceWindow 保养窗口
+     */
+    private static void applyMaintenanceShiftAnalysis(LhScheduleResult result,
+                                                      MachineMaintenanceWindowDTO maintenanceWindow) {
+        if (Objects.isNull(result) || Objects.isNull(maintenanceWindow)
+                || Objects.isNull(maintenanceWindow.getMaintenanceStartTime())
+                || Objects.isNull(maintenanceWindow.getMaintenanceEndTime())) {
+            return;
+        }
+        for (int shiftIndex = 1; shiftIndex <= LhScheduleConstant.MAX_SHIFT_SLOT_COUNT; shiftIndex++) {
+            Integer shiftPlanQty = ShiftFieldUtil.getShiftPlanQty(result, shiftIndex);
+            if (Objects.isNull(shiftPlanQty) || shiftPlanQty <= 0) {
+                continue;
+            }
+            Date shiftStartTime = ShiftFieldUtil.getShiftStartTime(result, shiftIndex);
+            Date shiftEndTime = ShiftFieldUtil.getShiftEndTime(result, shiftIndex);
+            if (Objects.isNull(shiftStartTime) || Objects.isNull(shiftEndTime)) {
+                continue;
+            }
+            if (isWindowOverlap(maintenanceWindow.getMaintenanceStartTime(),
+                    maintenanceWindow.getMaintenanceEndTime(), shiftStartTime, shiftEndTime)) {
+                // 保留已有原因分析，追加保养标识
+                String existingAnalysis = ShiftFieldUtil.getShiftAnalysis(result, shiftIndex);
+                if (Objects.isNull(existingAnalysis) || existingAnalysis.isEmpty()) {
+                    ShiftFieldUtil.setShiftAnalysis(result, shiftIndex, MAINTENANCE_ANALYSIS);
+                } else if (!existingAnalysis.contains(MAINTENANCE_ANALYSIS)) {
+                    ShiftFieldUtil.setShiftAnalysis(result, shiftIndex, existingAnalysis + "+" + MAINTENANCE_ANALYSIS);
+                }
+            }
+        }
     }
 
     private static void fillCleaningSummary(LhScheduleResult result,

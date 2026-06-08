@@ -1120,6 +1120,111 @@ public class MesItfServiceImpl implements MesItfService {
         return AjaxResult.success();
     }
 
+    @Override
+    public AjaxResult syncDevMaintenancePlanOnly(AuxReqSyncDataLogs syncDataLogs) {
+        // 查询MES中间表指定精度类型的最大版本号，只同步最新版本的数据
+        String precisionType = syncDataLogs != null ? syncDataLogs.getPrecisionType() : null;
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        String maxVersion = mesItfMapper.selectMaxDataVersionFromMes(precisionType);
+        DynamicDataSourceContextHolder.poll();
+
+        if (maxVersion != null && !maxVersion.isEmpty()) {
+            if (syncDataLogs == null) {
+                syncDataLogs = new AuxReqSyncDataLogs();
+            }
+            syncDataLogs.setDataVersion(maxVersion);
+            log.info("仅同步设备保养计划（不触发生成），精度类型={}，最新版本号={}", precisionType, maxVersion);
+        } else {
+            log.info("MES中间表无设备保养计划版本数据，精度类型={}", precisionType);
+        }
+
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<DevMaintenancePlan> syncList = mesItfMapper.selectDevMaintenancePlanList(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        Map<String, DevMaintenancePlan> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getDevCode() + "|" + item.getPrecisionType(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        try {
+            DynamicDataSourceContextHolder.push(DataSource.APS);
+
+            List<List<DevMaintenancePlan>> splitList = ScmListUtils.getSplitList(syncList, 1000);
+            for (List<DevMaintenancePlan> saveList : splitList) {
+                List<MdmDevMaintenancePlan> existsList = devMaintenancePlanEntityMapper.selectByUniqueKeyList(
+                        saveList.stream().map(item -> {
+                            MdmDevMaintenancePlan plan = new MdmDevMaintenancePlan();
+                            plan.setDevCode(item.getDevCode());
+                            plan.setPrecisionType(item.getPrecisionType());
+                            plan.setFactoryCode(item.getFactoryCode());
+                            return plan;
+                        }).collect(Collectors.toList())
+                );
+
+                Map<String, MdmDevMaintenancePlan> existsMap = new HashMap<>(16);
+                if (CollectionUtils.isNotEmpty(existsList)) {
+                    existsMap = existsList.stream()
+                            .collect(Collectors.toMap(
+                                    item -> GenerageMapKeyUtils.createMapKey(item.getFactoryCode(), item.getDevCode(), item.getPrecisionType()),
+                                    Function.identity(),
+                                    (v1, v2) -> v1
+                            ));
+                }
+
+                List<MdmDevMaintenancePlan> insertOrUpdateList = new ArrayList<>();
+                for (DevMaintenancePlan item : saveList) {
+                    MdmDevMaintenancePlan entity = new MdmDevMaintenancePlan();
+                    entity.setDevCode(item.getDevCode());
+                    entity.setPrecisionType(item.getPrecisionType());
+                    entity.setFactoryCode(item.getFactoryCode());
+                    entity.setCompanyCode(item.getCompanyCode());
+                    entity.setDataVersion(item.getDataVersion());
+                    entity.setCreateBy("MES");
+                    entity.setUpdateBy("MES");
+
+                    if (StringUtils.isNotBlank(item.getOperTime())) {
+                        try {
+                            entity.setOperTime(DateUtils.parseDate(item.getOperTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"));
+                        } catch (Exception e) {
+                            log.error("解析计划时间失败：{}", item.getOperTime(), e);
+                        }
+                    }
+                    if (StringUtils.isNotBlank(item.getFirstWashTime())) {
+                        try {
+                            entity.setFirstWashTime(DateUtils.parseDate(item.getFirstWashTime(), "yyyy-MM-dd HH:mm:ss.SSS", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"));
+                        } catch (Exception e) {
+                            log.error("解析实际时间失败：{}", item.getFirstWashTime(), e);
+                        }
+                    }
+
+                    if (StringUtils.isNotBlank(item.getDelFlag())) {
+                        entity.setIsDelete(Integer.valueOf(item.getDelFlag()));
+                    } else {
+                        entity.setIsDelete(0);
+                    }
+
+                    String mapKey = GenerageMapKeyUtils.createMapKey(entity.getFactoryCode(), entity.getDevCode(), entity.getPrecisionType());
+                    if (existsMap.containsKey(mapKey)) {
+                        MdmDevMaintenancePlan existsData = existsMap.get(mapKey);
+                        entity.setId(existsData.getId());
+                    }
+                    insertOrUpdateList.add(entity);
+                }
+
+                baseDao.saveBatch(insertOrUpdateList);
+            }
+
+            log.info("仅同步设备保养计划完成（不触发生成精度计划），精度类型={}，同步{}条", precisionType, syncList.size());
+        } finally {
+            DynamicDataSourceContextHolder.poll();
+        }
+        return AjaxResult.success();
+    }
+
 
     /**
      * 同步模具清洗预警计划
@@ -2361,6 +2466,82 @@ public class MesItfServiceImpl implements MesItfService {
 
         log.info("同步MES数据并生成硫化精度计划（版本前缀={}，不限最大版本号）执行完成", versionPrefix);
         return AjaxResult.success(resultMsg.toString(), totalGenerated);
+    }
+
+    @Override
+    public AjaxResult syncAndFillActualDateByOperYear(String versionPrefix, Integer operYear) {
+        log.info("开始执行临时任务：按计划时间年份同步回填实际日期并生成下一年度精度计划（版本前缀={}，计划时间年份={}）", versionPrefix, operYear);
+
+        StringBuilder resultMsg = new StringBuilder();
+
+        // 步骤1：同步MES设备保养计划到APS（仅硫化精度，不触发生成精度计划），确保目标年份数据在本地表中
+        log.info("步骤1：同步MES设备保养计划到APS（仅硫化精度，不触发生成精度计划）");
+        try {
+            AuxReqSyncDataLogs lhSyncParam = new AuxReqSyncDataLogs();
+            lhSyncParam.setPrecisionType("硫化精度");
+            AjaxResult syncResult = syncDevMaintenancePlanOnly(lhSyncParam);
+            log.info("同步设备保养计划结果：{}", syncResult.get("msg"));
+            resultMsg.append("同步硫化设备保养计划完成；");
+        } catch (Exception e) {
+            log.error("同步硫化设备保养计划失败", e);
+            resultMsg.append("同步硫化设备保养计划失败：").append(e.getMessage()).append("；");
+        }
+
+        // 步骤2：从APS本地表查指定版本前缀+硫化精度+计划时间在指定年份且有实际执行时间的数据
+        log.info("步骤2：从APS本地表查版本前缀={}、计划时间在{}年且有实际执行时间的硫化精度数据", versionPrefix, operYear);
+        String maxVersion = devMaintenancePlanEntityMapper.selectMaxDataVersionByPrefix("硫化精度", versionPrefix);
+        if (maxVersion == null || maxVersion.isEmpty()) {
+            log.warn("APS本地表中无版本前缀为{}的硫化精度版本数据，跳过回填", versionPrefix);
+            return AjaxResult.error("APS本地表中无版本前缀为" + versionPrefix + "的硫化精度版本数据");
+        }
+        log.info("版本前缀={}的硫化精度最新版本号：{}", versionPrefix, maxVersion);
+
+        LambdaQueryWrapper<MdmDevMaintenancePlan> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdmDevMaintenancePlan::getPrecisionType, "硫化精度")
+               .eq(MdmDevMaintenancePlan::getIsDelete, 0)
+               .eq(MdmDevMaintenancePlan::getDataVersion, maxVersion)
+               .isNotNull(MdmDevMaintenancePlan::getFirstWashTime)
+               .apply("YEAR(oper_time) = {0}", operYear);
+
+        List<MdmDevMaintenancePlan> mesPlans = devMaintenancePlanEntityMapper.selectList(wrapper);
+        if (mesPlans == null || mesPlans.isEmpty()) {
+            log.warn("APS本地表中无版本前缀={}、计划时间在{}年且有实际执行时间的硫化精度数据", versionPrefix, operYear);
+            return AjaxResult.success("无符合条件的回填数据");
+        }
+
+        log.info("查到版本前缀={}、计划时间在{}年且有实际执行时间的硫化精度数据{}条", versionPrefix, operYear, mesPlans.size());
+
+        // 步骤3：构建回填数据列表，调用batchFillActualDateAndGenerateNext回填+生成
+        // 注意：MdmDevMaintenancePlan.firstWashTime是Date类型（APS本地表），不需要字符串解析
+        List<java.util.Map<String, Object>> fillList = new ArrayList<>();
+        for (MdmDevMaintenancePlan mesPlan : mesPlans) {
+            if (mesPlan.getFirstWashTime() == null || StringUtils.isBlank(mesPlan.getDevCode())) {
+                continue;
+            }
+            java.util.Map<String, Object> item = new java.util.HashMap<>();
+            item.put("machineCode", mesPlan.getDevCode());
+            item.put("factoryCode", mesPlan.getFactoryCode());
+            item.put("actualDate", mesPlan.getFirstWashTime());
+            fillList.add(item);
+        }
+
+        if (!fillList.isEmpty()) {
+            try {
+                AjaxResult fillResult = lhPrecisionPlanRemoteService.batchFillActualDateAndGenerateNext(fillList);
+                Object data = fillResult != null ? fillResult.get("data") : null;
+                int count = data != null ? Integer.parseInt(data.toString()) : 0;
+                log.info("回填实际执行日期并生成下一年度计划{}条", count);
+                resultMsg.append("回填实际执行日期并生成下一年度计划").append(count).append("条；");
+            } catch (Exception e) {
+                log.error("批量回填硫化精度计划实际执行日期失败", e);
+                resultMsg.append("批量回填失败：").append(e.getMessage()).append("；");
+            }
+        } else {
+            resultMsg.append("无有效的实际执行日期数据可回填；");
+        }
+
+        log.info("临时任务：按计划时间年份同步回填实际日期并生成下一年度精度计划执行完成（版本前缀={}，计划时间年份={}）", versionPrefix, operYear);
+        return AjaxResult.success(resultMsg.toString());
     }
 
     /**

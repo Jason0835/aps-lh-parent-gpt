@@ -192,6 +192,46 @@ public class ApsCommonUtil {
         return new BigDecimal(String.valueOf(value)).stripTrailingZeros().toPlainString();
     }
 
+    /**
+     * 从格式化后的字符串中，反向解析出原始参数
+     * @param format String.format 使用的模板（如 "年份:%d 月份:%d 工厂:%s 产品:%s"）
+     * @param formattedStr 格式化后的最终字符串
+     * @return 解析出的参数数组，null=解析失败
+     */
+    public static String[] parseFormat(String format, String formattedStr) {
+        if (format == null || formattedStr == null) {
+            return null;
+        }
+
+        // 1. 把 format 模板 转成 正则表达式（核心步骤）
+        // 转义正则特殊字符 . * + ? | ( ) [ ] { } \ ^ $
+        String regex = format.replaceAll("([.*+?|()\\[\\]{}^$\\\\])", "\\\\$1");
+
+        // 2. 替换所有占位符为 正则捕获组
+        // 支持：%d %s %f %tY 等所有常用占位符
+        regex = regex.replaceAll("%(?:\\d+\\$)?[+-]?(?:\\d+)?(?:\\.\\d+)?[a-zA-Z]", "(.*?)");
+
+        // 3. 首尾加锚定，确保完全匹配整个字符串
+        regex = "^" + regex + "$";
+
+        // 4. 匹配
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(formattedStr);
+
+        if (!matcher.matches()) {
+            // 不匹配，解析失败
+            return null;
+        }
+
+        // 5. 提取所有捕获组（group 0 是整个字符串，从 1 开始）
+        String[] params = new String[matcher.groupCount()];
+        for (int i = 0; i < params.length; i++) {
+            params[i] = matcher.group(i + 1);
+        }
+
+        return params;
+    }
+
     public static void main(String[] arags) {
         System.out.println(isNumber("300"));
         System.out.println(humpToLine("aseSpec"));

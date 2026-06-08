@@ -289,10 +289,10 @@ public class MesTask {
         log.info("临时任务-开始按计划时间年份25年过滤生成26年硫化精度计划");
         try {
             FeignTokenHelper.runWithToken(() -> {
-                // 先同步MES设备保养计划到APS
+                // 先同步MES设备保养计划到APS（仅同步，不触发生成精度计划）
                 AuxReqSyncDataLogs lhSyncParam = new AuxReqSyncDataLogs();
                 lhSyncParam.setPrecisionType("硫化精度");
-                AjaxResult syncResult = iMesItfService.syncDevMaintenancePlan(lhSyncParam);
+                AjaxResult syncResult = iMesItfService.syncDevMaintenancePlanOnly(lhSyncParam);
                 log.info("同步设备保养计划结果：{}", syncResult.get("msg"));
 
                 // 按计划时间年份25年过滤，生成26年硫化精度计划
@@ -303,5 +303,27 @@ public class MesTask {
             log.error("临时任务-按计划时间年份25年过滤生成26年硫化精度计划异常", e);
         }
         log.info("临时任务-按计划时间年份25年过滤生成26年硫化精度计划完成");
+    }
+
+    /**
+     * 临时任务：同步MES 26年硫化精度数据，回填26年精度计划的实际执行日期，并生成27年精度计划
+     * 执行步骤：
+     * 1. 同步MES设备保养计划到APS（仅硫化精度），确保26年数据在本地表中
+     * 2. 从APS本地表查版本前缀APS_MES_AH01+计划时间在26年+有实际执行时间的硫化精度数据
+     * 3. 用查到的数据回填26年精度计划的实际执行日期
+     * 4. 基于实际执行日期推算生成27年精度计划
+     */
+    @ApiOperation("临时任务-同步26年数据回填26年精度计划实际日期并生成27年计划")
+    public void syncAndFillActualDateByOperYear2026() {
+        log.info("临时任务-开始同步26年数据回填26年精度计划实际日期并生成27年计划");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = iMesItfService.syncAndFillActualDateByOperYear("APS_MES_AH01", 2026);
+                log.info("临时任务执行结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-同步26年数据回填26年精度计划实际日期并生成27年计划异常", e);
+        }
+        log.info("临时任务-同步26年数据回填26年精度计划实际日期并生成27年计划完成");
     }
 }

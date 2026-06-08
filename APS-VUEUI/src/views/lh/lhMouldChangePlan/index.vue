@@ -55,12 +55,12 @@
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-      :title="$t('ui.data.column.scheduleResult.importLhScheduleResultData')"
-      downloadUrl="/lh/lhMouldChangePlan/importTemplate"
+      downloadUrl="/lh/lhMouldChangePlan/export"
+      :download-url-formatter="(form) => handleTemplateDownload('/lh/lhMouldChangePlan/export', form)"
       uploadUrl="/lh/lhMouldChangePlan/importDataCust"
       @uploadSuccess="getList"
+      labelWidth="0"
       :columns="importColumns"
-      :rules="importRules"
     />
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
@@ -70,7 +70,6 @@ import {downloadLink} from "@/utils/request";
 import {issueSchedule, listLhMouldChangePlan, removeLhMouldChangePlan} from "@/api/lh/lhMouldChangePlan";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
-import moment from "moment/moment";
 
 const formatDate = (date) => {
   const year = date.getFullYear();
@@ -98,11 +97,7 @@ export default {
     };
   },
   data() {
-    let defaultDate = moment().add(1, "days").format("YYYY-MM-DD"); //明天
     return {
-      importDefaultValue: {
-        scheduleDate: defaultDate,
-      },
       importColumns: [
         {
           label: "",
@@ -118,24 +113,7 @@ export default {
             );
           },
         },
-        {
-          label: this.$t("ui.data.column.scheduleResult.scheduleDate"),
-          prop: "scheduleDate",
-          type: "date",
-          dateType: "date",
-          valueFormat: "yyyy-MM-dd",
-          clearable: false,
-        },
       ],
-      importRules: {
-        scheduleDate: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "blur",
-          },
-        ],
-      },
       loading: false,
       data: [],
       selection: [],
@@ -491,6 +469,14 @@ export default {
     },
     handleExport() {
       downloadLink("/lh/lhMouldChangePlan/export", this.formatParams(false));
+    },
+    handleTemplateDownload(url, formValues) {
+      const params = this.formatParams(false);
+      const paramsStr = Object.keys(params)
+        .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== '')
+        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+        .join('&');
+      return `${url}${paramsStr ? '?' + paramsStr : ''}`;
     },
     formatParams(hasPage = true) {
       const params = {
