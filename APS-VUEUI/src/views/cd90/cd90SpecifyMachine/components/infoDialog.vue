@@ -33,16 +33,17 @@ import infoForm from "@/views/components/infoForm.vue";
 export default {
   components: { infoForm },
   inject: ["parentDict"],
+  props: {
+    clothOptions: {
+      type: Array,
+      default: () => [],
+    },
+  },
   data() {
     const requiredSelect = {
       required: true,
       message: this.$t("common.rule.select"),
       trigger: "change",
-    };
-    const requiredInput = {
-      required: true,
-      message: this.$t("common.rule.input"),
-      trigger: "blur",
     };
     return {
       loading: false,
@@ -52,7 +53,7 @@ export default {
       machineOptions: [],
       rules: {
         factoryCode: [requiredSelect],
-        clothCode: [requiredInput],
+        clothCode: [requiredSelect],
         machineCode: [requiredSelect],
         jobType: [requiredSelect],
       },
@@ -75,7 +76,9 @@ export default {
         {
           prop: "clothCode",
           label: this.$t("ui.data.column.cd90SpecifyMachine.clothCode"),
-          maxlength: 20,
+          type: "select",
+          dictData: this.clothOptions,
+          filterable: true,
         },
         {
           prop: "machineCode",

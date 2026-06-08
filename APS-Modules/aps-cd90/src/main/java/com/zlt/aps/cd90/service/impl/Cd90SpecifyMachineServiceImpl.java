@@ -12,6 +12,7 @@ import com.zlt.aps.cd90.mapper.Cd90MachineInfoMapper;
 import com.zlt.aps.cd90.mapper.Cd90SpecifyMachineMapper;
 import com.zlt.aps.cd90.service.ICd90SpecifyMachineService;
 import com.zlt.aps.common.core.constant.ApsConstant;
+import com.zlt.aps.maindata.service.IMdmConstructionInfoService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -25,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 直裁定点机台业务实现。
@@ -39,6 +42,9 @@ public class Cd90SpecifyMachineServiceImpl extends AbstractDocService<Cd90Specif
 
     @Resource
     private Cd90MachineInfoMapper cd90MachineInfoMapper;
+
+    @Resource
+    private IMdmConstructionInfoService mdmConstructionInfoService;
 
     @Override
     protected String getDocTypeCode() {
@@ -74,6 +80,10 @@ public class Cd90SpecifyMachineServiceImpl extends AbstractDocService<Cd90Specif
         int failureNum = 0;
         List<Cd90SpecifyMachine> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
+        List<String> tireFabricCodeList = mdmConstructionInfoService.listTireFabricCodes();
+        Set<String> tireFabricCodes = CollectionUtils.isEmpty(tireFabricCodeList)
+                ? new HashSet<>()
+                : new HashSet<>(tireFabricCodeList);
         String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
 
         for (int i = 0; i < list.size(); i++) {
@@ -86,6 +96,10 @@ public class Cd90SpecifyMachineServiceImpl extends AbstractDocService<Cd90Specif
             if (!isMachineEnabled(docEntity)) {
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                         errorNum, I18nUtil.getMessage("ui.data.column.cd90SpecifyMachine.machineInvalid"), validated);
+            }
+            if (!isTireFabricCodeExists(docEntity, tireFabricCodes)) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, I18nUtil.getMessage("ui.data.column.cd90SpecifyMachine.clothInvalid"), validated);
             }
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
@@ -146,10 +160,20 @@ public class Cd90SpecifyMachineServiceImpl extends AbstractDocService<Cd90Specif
         return cd90MachineInfoMapper.selectCount(wrapper) > 0;
     }
 
+    private boolean isTireFabricCodeExists(Cd90SpecifyMachine specifyMachine, Set<String> tireFabricCodes) {
+        if (StringUtils.isBlank(specifyMachine.getClothCode())) {
+            return true;
+        }
+        return tireFabricCodes.contains(specifyMachine.getClothCode());
+    }
+
     private void normalize(Cd90SpecifyMachine specifyMachine) {
         if (specifyMachine == null) {
             return;
         }
+        specifyMachine.setFactoryCode(StringUtils.trimToEmpty(specifyMachine.getFactoryCode()));
+        specifyMachine.setClothCode(StringUtils.trimToEmpty(specifyMachine.getClothCode()));
+        specifyMachine.setMachineCode(StringUtils.trimToEmpty(specifyMachine.getMachineCode()));
         specifyMachine.setLineType(StringUtils.defaultString(specifyMachine.getLineType()));
         specifyMachine.setJobType(StringUtils.defaultString(specifyMachine.getJobType()));
     }

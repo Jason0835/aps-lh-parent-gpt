@@ -15,6 +15,12 @@ import infoForm from "@/views/components/infoForm.vue";
 export default {
   components: { infoForm },
   inject: ["parentDict"],
+  props: {
+    clothOptions: {
+      type: Array,
+      default: () => [],
+    },
+  },
   data() {
     const requiredSelect = { required: true, message: this.$t("common.rule.select"), trigger: "change" };
     const requiredInput = { required: true, message: this.$t("common.rule.input"), trigger: "blur" };
@@ -36,12 +42,12 @@ export default {
         { prop: "laneDate", label: this.$t("ui.data.column.cd90StorageLaneLimit.laneDate"), type: "date" },
         { prop: "shiftCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.shiftCode"), maxlength: 20 },
         { prop: "storageLaneCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.storageLaneCode"), maxlength: 50 },
-        { prop: "materialCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.materialCode"), maxlength: 60 },
+        { prop: "materialCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.materialCode"), type: "select", dictData: this.clothOptions, filterable: true },
         { prop: "carNum", label: this.$t("ui.data.column.cd90StorageLaneLimit.carNum"), type: "number" },
         { prop: "maxCarNum", label: this.$t("ui.data.column.cd90StorageLaneLimit.maxCarNum"), type: "number" },
         { prop: "availableCarNum", label: this.$t("ui.data.column.cd90StorageLaneLimit.availableCarNum"), type: "number" },
         { prop: "dataSource", label: this.$t("ui.data.column.cd90StorageLaneLimit.dataSource"), maxlength: 20 },
-        { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 300 },
+        { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 900 },
       ];
     },
   },

@@ -32,6 +32,12 @@ import infoForm from "@/views/components/infoForm.vue";
 export default {
   components: { infoForm },
   inject: ["parentDict"],
+  props: {
+    clothOptions: {
+      type: Array,
+      default: () => [],
+    },
+  },
   data() {
     const requiredSelect = {
       required: true,
@@ -50,7 +56,7 @@ export default {
       form: {},
       rules: {
         factoryCode: [requiredSelect],
-        clothCode: [requiredInput],
+        clothCode: [requiredSelect],
         curlLength: [
           requiredInput,
           {
@@ -83,7 +89,9 @@ export default {
         {
           prop: "clothCode",
           label: this.$t("ui.data.column.cd90CurlLength.clothCode"),
-          maxlength: 20,
+          type: "select",
+          dictData: this.clothOptions,
+          filterable: true,
         },
         {
           prop: "curlLength",
@@ -95,7 +103,7 @@ export default {
           label: this.$t("ui.common.column.remark"),
           type: "textarea",
           rows: 3,
-          maxlength: 300,
+          maxlength: 900,
         },
       ];
     },

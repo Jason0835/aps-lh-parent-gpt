@@ -58,13 +58,18 @@
       labelWidth="0"
       :columns="importColumns"
     />
-    <info-dialog ref="infoRef" @success="getList" />
+    <info-dialog
+      ref="infoRef"
+      :cloth-options="clothOptions"
+      @success="getList"
+    />
   </basic-container>
 </template>
 
 <script>
 import {
   exportSpecifyMachine,
+  listTireFabricCodes,
   listSpecifyMachine,
   removeAllSpecifyMachine,
   removeSpecifyMachine,
@@ -106,6 +111,7 @@ export default {
       loading: false,
       data: [],
       selection: [],
+      clothOptions: [],
       machineOptions: [],
       page: {
         current: 1,
@@ -205,6 +211,10 @@ export default {
         {
           label: this.$t("ui.data.column.cd90SpecifyMachine.clothCode"),
           prop: "clothCode",
+          type: "select",
+          dictData: this.clothOptions,
+          filterable: true,
+          clearable: true,
         },
         {
           label: this.$t("ui.data.column.cd90SpecifyMachine.machineCode"),
@@ -225,6 +235,14 @@ export default {
     },
   },
   methods: {
+    async loadClothOptions() {
+      const res = await listTireFabricCodes();
+      const rows = Array.isArray(res) ? res : (res.data || []);
+      this.clothOptions = rows.map((code) => ({
+        label: code,
+        value: code,
+      }));
+    },
     async loadMachineOptions() {
       const res = await getCd90MachineEnableOptions({ factoryCode: this.query.factoryCode });
       const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
@@ -322,6 +340,7 @@ export default {
   },
   created() {
     this.getList();
+    this.loadClothOptions();
     this.loadMachineOptions();
   },
 };

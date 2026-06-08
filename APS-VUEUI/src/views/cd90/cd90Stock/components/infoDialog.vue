@@ -39,7 +39,7 @@ export default {
         { prop: "modifyNum", label: this.$t("ui.data.column.cd90Stock.modifyNum"), type: "number" },
         { prop: "badNum", label: this.$t("ui.data.column.cd90Stock.badNum"), type: "number" },
         { prop: "layers", label: this.$t("ui.data.column.cd90Stock.layers"), type: "number" },
-        { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 300 },
+        { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 900 },
       ];
     },
   },

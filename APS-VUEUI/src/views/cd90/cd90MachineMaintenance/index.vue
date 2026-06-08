@@ -16,6 +16,7 @@
 
 <script>
 import { listMachineMaintenancePlan, delMachineMaintenancePlan, exportMachineMaintenancePlan } from "@/api/cd90/machineMaintenancePlan";
+import { getCd90MachineEnableOptions } from "@/api/cd90/cd90MachineInfo";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -27,7 +28,7 @@ export default {
   data() {
     return {
       importColumns: [{ label: "", prop: "updateSupport", render: (form) => (<el-checkbox label={this.$t("common.rule.updateSupport")} v-model={form.updateSupport}>{this.$t("common.rule.updateSupport")}</el-checkbox>) }],
-      loading: false, data: [], selection: [],
+      loading: false, data: [], selection: [], machineOptions: [],
       page: { current: 1, pageSize: 20, total: 0 }, sort: {},
       search: { factoryCode: "116" }, query: { factoryCode: "116" },
     };
@@ -51,7 +52,7 @@ export default {
     searchColumns() {
       return [
         { label: this.$t("ui.data.column.cd90MachineMaintenancePlan.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
-        { label: this.$t("ui.data.column.cd90MachineMaintenancePlan.machineCode"), prop: "machineCode" },
+        { label: this.$t("ui.data.column.cd90MachineMaintenancePlan.machineCode"), prop: "machineCode", type: "select", dictData: this.machineOptions, filterable: true, clearable: true },
         { label: this.$t("ui.data.column.cd90MachineMaintenancePlan.downtimeDate"), prop: "downtimeDate" },
       ];
     },
@@ -68,7 +69,12 @@ export default {
     handleSortChange(sort) { this.sort = sort; this.getList(); },
     handleSelectionChange(selection) { this.selection = selection || []; },
     async getList() { this.loading = true; try { const params = { ...this.query, pageNum: this.page.current, pageSize: this.page.pageSize, orderByColumn: this.sort.prop, isAsc: this.sort.order }; const res = await listMachineMaintenancePlan(params); this.data = res.rows || []; this.page.total = res.total || 0; } finally { this.loading = false; } },
+    async loadMachineOptions() {
+      const res = await getCd90MachineEnableOptions({ factoryCode: this.query.factoryCode });
+      const rows = Array.isArray(res) ? res : (res.rows || res.data || []);
+      this.machineOptions = rows.map((item) => ({ label: item.machineCode, value: item.machineCode }));
+    },
   },
-  created() { this.getList(); },
+  created() { this.getList(); this.loadMachineOptions(); },
 };
 </script>

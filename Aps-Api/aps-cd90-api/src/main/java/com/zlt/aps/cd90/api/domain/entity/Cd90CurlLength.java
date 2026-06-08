@@ -37,7 +37,7 @@ public class Cd90CurlLength extends BaseEntity implements Serializable {
 
     /** 标准卷曲长度 */
     @ApiModelProperty(value = "标准卷曲长度", name = "curlLength")
-    @ImportExcelValidated(required = true, maxLength = 10)
+    @ImportExcelValidated(required = true, maxLength = 10,number = true)
     @TableField("CURL_LENGTH")
     @Excel(name = "ui.data.column.cd90CurlLength.curlLength")
     private Double curlLength;

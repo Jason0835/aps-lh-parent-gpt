@@ -36,7 +36,7 @@ export default {
         { prop: "paramValue", label: this.$t("ui.data.column.cd90Params.paramValue"), maxlength: 50 },
         { prop: "regularExpression", label: this.$t("ui.data.column.cd90Params.regularExpression"), maxlength: 100 },
         { prop: "errorTips", label: this.$t("ui.data.column.cd90Params.errorTips"), maxlength: 200 },
-        { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 300 },
+        { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 900 },
       ];
     },
   },

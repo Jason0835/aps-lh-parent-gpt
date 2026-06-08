@@ -127,7 +127,7 @@ export default {
           label: this.$t("ui.common.column.remark"),
           type: "textarea",
           rows: 3,
-          maxlength: 300,
+          maxlength: 900,
         },
       ];
     },

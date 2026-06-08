@@ -9,19 +9,23 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength;
 import com.zlt.aps.cd90.mapper.Cd90CurlLengthMapper;
 import com.zlt.aps.cd90.service.ICd90CurlLengthService;
+import com.zlt.aps.maindata.service.IMdmConstructionInfoService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
 import com.zlt.common.utils.PubUtil;
 import com.zlt.sysdef.domain.SysDocType;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 直裁卷曲长度业务实现。
@@ -32,6 +36,9 @@ public class Cd90CurlLengthServiceImpl extends AbstractDocService<Cd90CurlLength
 
     @Resource
     private Cd90CurlLengthMapper cd90CurlLengthMapper;
+
+    @Resource
+    private IMdmConstructionInfoService mdmConstructionInfoService;
 
     @Override
     protected String getDocTypeCode() {
@@ -67,14 +74,23 @@ public class Cd90CurlLengthServiceImpl extends AbstractDocService<Cd90CurlLength
         int failureNum = 0;
         List<Cd90CurlLength> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
+        List<String> tireFabricCodeList = mdmConstructionInfoService.listTireFabricCodes();
+        Set<String> tireFabricCodes = CollectionUtils.isEmpty(tireFabricCodeList)
+                ? new HashSet<>()
+                : new HashSet<>(tireFabricCodeList);
         String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
 
-        // 第一轮：基本校验（必填、重复行）
+        // 第一轮：基本校验（必填、重复行、帘布代号合法性）
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             Cd90CurlLength docEntity = list.get(i);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated);
+            // 校验帘布代号是否存在
+            if (!isTireFabricCodeExists(docEntity, tireFabricCodes)) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, I18nUtil.getMessage("ui.data.column.cd90SpecifyMachine.clothInvalid"), validated);
+            }
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
                 docEntity.setId(-999L);
@@ -142,5 +158,15 @@ public class Cd90CurlLengthServiceImpl extends AbstractDocService<Cd90CurlLength
     @Override
     protected List<String> getCheckUniqueFields() {
         return Arrays.asList("factoryCode", "clothCode");
+    }
+
+    /**
+     * 校验帘布代号是否存在。
+     */
+    private boolean isTireFabricCodeExists(Cd90CurlLength curlLength, Set<String> tireFabricCodes) {
+        if (curlLength == null || StringUtils.isBlank(curlLength.getClothCode())) {
+            return false;
+        }
+        return tireFabricCodes.contains(curlLength.getClothCode());
     }
 }

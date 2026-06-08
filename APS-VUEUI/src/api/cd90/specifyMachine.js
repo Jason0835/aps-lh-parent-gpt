@@ -8,6 +8,13 @@ export function listSpecifyMachine(query) {
   })
 }
 
+export function listTireFabricCodes() {
+  return request({
+    url: '/cd90/common/tireFabricCodes',
+    method: 'post'
+  })
+}
+
 export function getSpecifyMachine(id) {
   return request({
     url: `/cd90/specifyMachine/getInfo/${id}`,

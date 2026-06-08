@@ -54,12 +54,13 @@
       labelWidth="0"
       :columns="importColumns"
     />
-    <info-dialog ref="infoRef" @success="getList" />
+    <info-dialog ref="infoRef" :cloth-options="clothOptions" @success="getList" />
   </basic-container>
 </template>
 
 <script>
 import { listCd90CurlLength, delCd90CurlLength, exportCd90CurlLength } from "@/api/cd90/cd90CurlLength";
+import { listTireFabricCodes } from "@/api/cd90/specifyMachine";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -96,6 +97,7 @@ export default {
       loading: false,
       data: [],
       selection: [],
+      clothOptions: [],
       page: {
         current: 1,
         pageSize: 20,
@@ -193,11 +195,23 @@ export default {
         {
           label: this.$t("ui.data.column.cd90CurlLength.clothCode"),
           prop: "clothCode",
+          type: "select",
+          dictData: this.clothOptions,
+          filterable: true,
+          clearable: true,
         },
       ];
     },
   },
   methods: {
+    async loadClothOptions() {
+      const res = await listTireFabricCodes();
+      const rows = Array.isArray(res) ? res : (res.data || []);
+      this.clothOptions = rows.map((code) => ({
+        label: code,
+        value: code,
+      }));
+    },
     handleAdd() {
       this.$refs.infoRef && this.$refs.infoRef.show();
     },
@@ -276,6 +290,7 @@ export default {
   },
   created() {
     this.getList();
+    this.loadClothOptions();
   },
 };
 </script>

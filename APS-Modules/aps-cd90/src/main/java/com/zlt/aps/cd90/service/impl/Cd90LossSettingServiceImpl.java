@@ -9,6 +9,7 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90LossSetting;
 import com.zlt.aps.cd90.mapper.Cd90LossSettingMapper;
 import com.zlt.aps.cd90.service.ICd90LossSettingService;
+import com.zlt.aps.maindata.service.IMdmConstructionInfoService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -22,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 直裁损耗率设定业务实现。
@@ -34,6 +37,9 @@ public class Cd90LossSettingServiceImpl extends AbstractDocService<Cd90LossSetti
     @Resource
     private Cd90LossSettingMapper cd90LossSettingMapper;
 
+    @Resource
+    private IMdmConstructionInfoService mdmConstructionInfoService;
+
     @Override
     protected String getDocTypeCode() {
         return "CD90_LOSS_SETTING";
@@ -41,10 +47,25 @@ public class Cd90LossSettingServiceImpl extends AbstractDocService<Cd90LossSetti
 
     @Override
     public String checkUnique(Cd90LossSetting entity) {
+        if (StringUtils.isBlank(entity.getClothCode()) && StringUtils.isBlank(entity.getMachineCode())) {
+            return UserConstants.NOT_UNIQUE;
+        }
         LambdaQueryWrapper<Cd90LossSetting> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Cd90LossSetting::getFactoryCode, entity.getFactoryCode());
-        wrapper.eq(Cd90LossSetting::getClothCode, StringUtils.defaultString(entity.getClothCode()));
-        wrapper.eq(Cd90LossSetting::getMachineCode, StringUtils.defaultString(entity.getMachineCode()));
+        wrapper.and(w -> {
+            if (StringUtils.isNotBlank(entity.getClothCode())) {
+                w.eq(Cd90LossSetting::getClothCode, entity.getClothCode());
+            } else {
+                w.and(wa -> wa.eq(Cd90LossSetting::getClothCode, "").or().isNull(Cd90LossSetting::getClothCode));
+            }
+        });
+        wrapper.and(w -> {
+            if (StringUtils.isNotBlank(entity.getMachineCode())) {
+                w.eq(Cd90LossSetting::getMachineCode, entity.getMachineCode());
+            } else {
+                w.and(wa -> wa.eq(Cd90LossSetting::getMachineCode, "").or().isNull(Cd90LossSetting::getMachineCode));
+            }
+        });
         wrapper.ne(entity.getId() != null, Cd90LossSetting::getId, entity.getId());
         return cd90LossSettingMapper.selectCount(wrapper) > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
     }
@@ -56,12 +77,24 @@ public class Cd90LossSettingServiceImpl extends AbstractDocService<Cd90LossSetti
         List<Cd90LossSetting> importList = new ArrayList<>();
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         String uniqueMsg = I18nUtil.getMessage("import.validated.unique");
+        List<String> tireFabricCodeList = mdmConstructionInfoService.listTireFabricCodes();
+        Set<String> tireFabricCodes = CollectionUtils.isEmpty(tireFabricCodeList)
+                ? new HashSet<>()
+                : new HashSet<>(tireFabricCodeList);
 
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
             Cd90LossSetting docEntity = list.get(i);
             List<ImportErrorLog> validated = ImportExcelValidatedUtils.validated(importLogId, errorNum, docEntity);
+            if (StringUtils.isBlank(docEntity.getClothCode()) && StringUtils.isBlank(docEntity.getMachineCode())) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, I18nUtil.getMessage("ui.data.alert.lossSetting.clothOrMachineRequired"), validated);
+            }
             ImportExcelValidatedUtils.validatedRepeat(list, docEntity, i, 2, importLogId, validated);
+            if (!isTireFabricCodeExists(docEntity, tireFabricCodes)) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, I18nUtil.getMessage("ui.data.column.cd90SpecifyMachine.clothInvalid"), validated);
+            }
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
                 docEntity.setId(-999L);
@@ -113,8 +146,20 @@ public class Cd90LossSettingServiceImpl extends AbstractDocService<Cd90LossSetti
     private Cd90LossSetting getExistLossSetting(Cd90LossSetting entity) {
         LambdaQueryWrapper<Cd90LossSetting> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Cd90LossSetting::getFactoryCode, entity.getFactoryCode());
-        wrapper.eq(Cd90LossSetting::getClothCode, StringUtils.defaultString(entity.getClothCode()));
-        wrapper.eq(Cd90LossSetting::getMachineCode, StringUtils.defaultString(entity.getMachineCode()));
+        wrapper.and(w -> {
+            if (StringUtils.isNotBlank(entity.getClothCode())) {
+                w.eq(Cd90LossSetting::getClothCode, entity.getClothCode());
+            } else {
+                w.and(wa -> wa.eq(Cd90LossSetting::getClothCode, "").or().isNull(Cd90LossSetting::getClothCode));
+            }
+        });
+        wrapper.and(w -> {
+            if (StringUtils.isNotBlank(entity.getMachineCode())) {
+                w.eq(Cd90LossSetting::getMachineCode, entity.getMachineCode());
+            } else {
+                w.and(wa -> wa.eq(Cd90LossSetting::getMachineCode, "").or().isNull(Cd90LossSetting::getMachineCode));
+            }
+        });
         return cd90LossSettingMapper.selectOne(wrapper);
     }
 
@@ -128,5 +173,12 @@ public class Cd90LossSettingServiceImpl extends AbstractDocService<Cd90LossSetti
     @Override
     protected List<String> getCheckUniqueFields() {
         return Arrays.asList("factoryCode", "clothCode", "machineCode");
+    }
+
+    private boolean isTireFabricCodeExists(Cd90LossSetting entity, Set<String> tireFabricCodes) {
+        if (StringUtils.isBlank(entity.getClothCode())) {
+            return true;
+        }
+        return tireFabricCodes.contains(entity.getClothCode());
     }
 }
