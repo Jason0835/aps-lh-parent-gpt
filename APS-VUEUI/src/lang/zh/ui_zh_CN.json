@@ -1130,7 +1130,6 @@
   "ui.data.column.quota.paddingCode": "垫胶代码",
   "ui.data.column.quota.treadCode": "胎面代码",
   "ui.data.column.quota.clothCode": "帘布代码",
-  "ui.data.column.quota.paddingCode": "代码",
   "ui.data.column.quota.machineId": "机台id",
   "ui.data.column.quota.quota": "定额",
   "ui.data.column.quota.uniqueError": "已存在对应定额配置信息",
