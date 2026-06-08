@@ -143,17 +143,10 @@ export default {
           minWidth: 120,
         },
         {
-          prop: "createBy",
+          prop: "updateTime",
           align: "center",
           halign: "center",
-          label: this.$t("ui.common.column.createBy"),
-          minWidth: 110,
-        },
-        {
-          prop: "createTime",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.common.column.createTime"),
+          label: this.$t("common.updateTime"),
           minWidth: 160,
         },
         {

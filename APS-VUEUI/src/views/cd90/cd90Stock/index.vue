@@ -44,8 +44,7 @@ export default {
         { prop: "badNum", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.badNum"), minWidth: 130 },
         { prop: "layers", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Stock.layers"), minWidth: 80 },
         { prop: "remark", halign: "center", label: this.$t("ui.common.column.remark"), minWidth: 120 },
-        { prop: "createBy", align: "center", halign: "center", label: this.$t("ui.common.column.createBy"), minWidth: 110 },
-        { prop: "createTime", align: "center", halign: "center", label: this.$t("ui.common.column.createTime"), minWidth: 160 },
+        { prop: "updateTime", align: "center", halign: "center", label: this.$t("common.updateTime"), minWidth: 160 },
         { align: "center", halign: "center", label: this.$t("ui.data.btn.option"), prop: "option", minWidth: 150, fixed: "right",
           render: ({ row }) => (<div><el-button v-hasPermi={["cd90:stock:edit"]} class="minus" type="success" onClick={() => this.handleEdit(row)}>{this.$t("ui.frame.btn.update")}</el-button><el-button v-hasPermi={["cd90:stock:remove"]} class="minus" type="danger" onClick={() => this.handleDelete(row)}>{this.$t("ui.frame.btn.delete")}</el-button></div>) },
       ];
