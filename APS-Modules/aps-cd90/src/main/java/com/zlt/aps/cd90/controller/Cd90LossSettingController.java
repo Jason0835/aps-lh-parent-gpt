@@ -123,6 +123,6 @@ public class Cd90LossSettingController extends AbstractDocBizController<Cd90Loss
 
     @Override
     protected String getOrderBy() {
-        return "CLOTH_CODE asc, MACHINE_CODE asc, UPDATE_TIME desc";
+        return "MACHINE_CODE asc, CLOTH_CODE asc, UPDATE_TIME desc";
     }
 }

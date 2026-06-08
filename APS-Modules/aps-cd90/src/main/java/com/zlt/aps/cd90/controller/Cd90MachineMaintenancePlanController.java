@@ -120,6 +120,6 @@ public class Cd90MachineMaintenancePlanController extends AbstractDocBizControll
 
     @Override
     protected String getOrderBy() {
-        return "DOWNTIME_DATE desc, DOWNTIME_START_TIME asc";
+        return "MACHINE_CODE asc, DOWNTIME_DATE desc, DOWNTIME_START_TIME asc";
     }
 }

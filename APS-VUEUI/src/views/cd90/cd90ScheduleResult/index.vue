@@ -33,7 +33,7 @@ export default {
         { type: "selection", fixed: "left" },
         { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90ScheduleResult.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
         { prop: "scheduleDate", align: "center", halign: "center", label: this.$t("ui.data.column.cd90ScheduleResult.scheduleDate"), minWidth: 120 },
-        { prop: "batchNo", align: "center", halign: "center", label: this.$t("ui.data.column.cd90ScheduleResult.batchNo"), minWidth: 140 },
+        { prop: "batchNo", align: "left", halign: "center", label: this.$t("ui.data.column.cd90ScheduleResult.batchNo"), minWidth: 160 },
         { prop: "clothCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90ScheduleResult.clothCode"), minWidth: 120 },
         { prop: "machineCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90ScheduleResult.machineCode"), minWidth: 130 },
         { prop: "bigRollCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90ScheduleResult.bigRollCode"), minWidth: 140 },

@@ -73,5 +73,5 @@ public class Cd90MachineRollMappingController extends AbstractDocBizController<C
         qw.eq(PubUtil.isNotEmpty(vo.getMachineCode()), "MACHINE_CODE", vo.getMachineCode());
     }
     @Override protected String getTypeCode() { return "CD90_MACHINE_ROLL_MAPPING"; }
-    @Override protected String getOrderBy() { return "BIG_ROLL_CODE asc, MACHINE_CODE asc, UPDATE_TIME desc"; }
+    @Override protected String getOrderBy() { return "MACHINE_CODE asc, BIG_ROLL_CODE asc, UPDATE_TIME desc"; }
 }
