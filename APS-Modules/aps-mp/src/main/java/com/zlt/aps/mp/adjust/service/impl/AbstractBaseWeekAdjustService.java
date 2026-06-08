@@ -2630,7 +2630,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
             }
 
             // 相同业务Key时以调整结果为准；调整独有数据转换为同一VO后追加返回。
-            BeanUtil.copyProperties(adjustResult, monthPlan, "ID");
+            BeanUtil.copyProperties(adjustResult, monthPlan, "id");
             //monthPlan.setId(null);
 
             // 设置最新需求计划版本
