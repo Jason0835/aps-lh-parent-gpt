@@ -25,6 +25,7 @@
         <module>aps-engine-gdyy-core</module>
         <module>aps-engine-gsq-core</module>
         <module>aps-engine-nc-core</module>
+        <module>aps-engine-dj-core</module>
         <module>aps-engine-tc-core</module>
         <module>aps-engine-tq-core</module>
         <module>aps-engine-xwyy-core</module>
@@ -32,6 +33,7 @@
 <!--        <module>aps-engine-cx</module>-->
         <module>aps-engine-tc</module>
         <module>aps-engine-nc</module>
+        <module>aps-engine-dj</module>
         <module>aps-engine-cd15</module>
         <module>aps-engine-cd90</module>
         <module>aps-engine-gdyy</module>

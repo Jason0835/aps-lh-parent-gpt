@@ -1,0 +1,33 @@
+package com.zlt.aps.dj.api.domain.dto;
+
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.common.core.annotation.ImportValidated;
+
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper = true)
+@ApiModel(value = "垫胶卷曲信息维护导入模板", description = "垫胶卷曲信息维护导入模板")
+public class DjCurlRollDto extends BaseEntity {
+	
+    private static final long serialVersionUID = 1L;
+
+    @ApiModelProperty(value = "垫胶代码")
+    @Excel(name = "ui.data.column.quota.liningCode")
+    @ImportValidated(name = "ui.data.column.quota.liningCode", required = true, isCode = true, maxLength = 30)
+    private String liningCode;
+
+    @ApiModelProperty(value = "卷曲长度。垫胶一卷的最大长度，单位：米。")
+    @Excel(name = "ui.curlRoll.column.length")
+    @ImportValidated(name = "ui.curlRoll.column.length", required = true)
+    private String curlLength;
+
+    @ApiModelProperty(value = "备注", position = 500)
+    @Excel(name = "ui.common.column.remark")
+    @ImportValidated(name = "ui.common.column.remark", maxLength = 300)
+    private String remark;
+}
