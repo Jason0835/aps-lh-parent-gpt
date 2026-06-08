@@ -1417,7 +1417,7 @@
   "ui.data.column.cx.machine.sectionWidthMin": "Chiều rộng mặt cắt tối thiểu",
 
   "ui.data.column.quota.liningCode": "mã lót",
-  "ui.data.column.quota.paddingCode": mã đệm cao su,
+  "ui.data.column.quota.paddingCode": "mã đệm cao su",
 
   "ui.cx.cxStock.export.fileName": "Đồng bộ tồn kho thành hình",
   "ui.cx.cxDayFinishQty.export.fileName": "Sản lượng hoàn thành ngày thành hình",
