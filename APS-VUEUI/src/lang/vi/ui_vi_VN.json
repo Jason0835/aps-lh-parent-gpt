@@ -142,6 +142,12 @@
   "ui.data.column.paramsCode": "Mã tham số",
   "ui.data.column.paramsName": "Tên tham số",
   "ui.data.column.paramsValue": "Giá trị tham số",
+  "ui.data.column.tmParams.defaultValue": "Giá trị mặc định",
+  "ui.data.column.tmParams.regularExpression": "Biểu thức chính quy",
+  "ui.data.column.tmParams.errorTips": "Lời nhắc lỗi",
+  "ui.data.column.tmParams.paramGroup": "Nhóm tham số",
+  "ui.data.column.tmParams.valueType": "Loại giá trị",
+  "ui.data.column.tmParams.enableStatus": "Kích hoạt",
 
   "ui.data.column.unscheduleResult.scheduleDate": "Ngày sắp xếp",
   "ui.data.column.unscheduleResult.factoryCode": "Nhà máy",

@@ -3,23 +3,29 @@ import request from '@/utils/request'
 // =
 export function listParams(query) {
   return request({
-    url: '/tm/params/list',
+    url: '/tm/tmParams/list',
     method: 'post',
     data: query
   })
 }
-export function editParams(query) {
+export function saveParams(data) {
   return request({
-    url: '/tm/params/edit',
+    url: '/tm/tmParams/save',
     method: 'post',
-    data: query
+    data: data
   })
 }
 export function removeParams(query) {
   return request({
-    url: '/tm/params/remove',
+    url: '/tm/tmParams/remove',
     method: 'post',
     data: query
+  })
+}
+export function getInfo(id) {
+  return request({
+    url: '/tm/tmParams/' + id,
+    method: 'get'
   })
 }
 

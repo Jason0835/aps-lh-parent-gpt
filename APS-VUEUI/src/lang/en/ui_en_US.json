@@ -456,5 +456,15 @@
   "ui.data.column.originalStructure": "Original Structure",
   "ui.data.column.originalSpecification": "Original Specification",
   "ui.data.column.adjustedTireCount": "Adjusted Tire Count",
-  "ui.data.column.formingMachine": "Forming Machine"
+  "ui.data.column.formingMachine": "Forming Machine",
+  "ui.data.column.paramsCode": "Parameter Code",
+  "ui.data.column.paramsName": "Parameter Name",
+  "ui.data.column.paramsValue": "Parameter Value",
+  "ui.data.column.tmParams.defaultValue": "Default Value",
+  "ui.data.column.tmParams.regularExpression": "Regular Expression",
+  "ui.data.column.tmParams.errorTips": "Error Tips",
+  "ui.data.column.tmParams.paramGroup": "Parameter Group",
+  "ui.data.column.tmParams.valueType": "Value Type",
+  "ui.data.column.tmParams.enableStatus": "Enable Status",
+  "ui.data.column.tm.params.modelName": "TM Parameter Info"
 }
