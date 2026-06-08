@@ -1742,7 +1742,7 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 if (task != null) {
                     // 每个班次都从当班合并后的task中获取，覆盖之前的值
                     tracker.setVulcanizeMachineCount(Convert.toInt(task.getVulcanizeMachineCount(),0));
-                    tracker.setVulcanizeMoldCount(task.getVulcanizeMoldCount());
+                    tracker.setVulcanizeMoldCount(Convert.toInt(task.getVulcanizeMoldCount(),0));
                     // 每个班次开始时，更新beginStock为上一班次结束时的库存（currentStock），
                     // 并重置累计值，使stockHours反映当前班次的实时库存水位
                     if (tracker.getBeginStock() != null) {
