@@ -1734,7 +1734,9 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
 
                 EmbryoTripTracker tracker = embryoTrackers.computeIfAbsent(embryoKey,
                         k -> new EmbryoTripTracker(embryoCode, materialCode));
-
+                if (tracker == null){
+                    continue;
+                }
                 CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
                 if (task != null) {
                     // 每个班次都从当班合并后的task中获取，覆盖之前的值
