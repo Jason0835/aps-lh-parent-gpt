@@ -19,7 +19,7 @@ import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.maindata.enums.MonthPlanEnums;
 import com.zlt.aps.maindata.mapper.MdmWorkCalendarEntityMapper;
-import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
+import com.zlt.aps.mp.factory.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialRecordEntityMapper;
 import com.zlt.aps.maindata.mapper.RawSpecialMaterialStockEntityMapper;
 import com.zlt.aps.maindata.service.IFactoryParamService;

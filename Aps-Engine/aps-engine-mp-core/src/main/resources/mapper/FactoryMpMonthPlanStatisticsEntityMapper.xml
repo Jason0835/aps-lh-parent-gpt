@@ -2,7 +2,7 @@
 <!DOCTYPE mapper
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper">
+<mapper namespace="com.zlt.aps.mp.engine.mapper.FactoryMpMonthPlanStatisticsEntityMapper">
 
     <insert id="insertBatch" parameterType="java.util.List">
         INSERT INTO T_MP_MONTH_PLAN_STATISTICS (
@@ -32,21 +32,5 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             )
         </foreach>
     </insert>
-
-    <delete id="deleteMonthPlanStatisticsByCondition">
-        DELETE FROM T_MP_MONTH_PLAN_STATISTICS
-        WHERE FACTORY_CODE = #{factoryCode}
-                  AND YEAR= #{year}
-                  AND MONTH= #{month}
-          AND PRODUCTION_VERSION= #{productionVersion}
-        <if test="tempFlag != null  and tempFlag != ''">and temp_flag = #{tempFlag}</if>
-        <if test="structureList != null and structureList.size() > 0">
-            and structure_name in
-            <foreach item="structureName" collection="structureList" open="(" separator="," close=")">
-                #{structureName}
-            </foreach>
-        </if>
-
-    </delete>
 
 </mapper>

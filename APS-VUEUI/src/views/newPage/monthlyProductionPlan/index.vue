@@ -2410,6 +2410,7 @@ export default {
             ? Number(first.month)
             : ym.month,
         productionVersion,
+        isFinalAdjust: 1,
       };
       if (!params.productionVersion) {
         this.data = [...resultList];
