@@ -164,6 +164,7 @@ public class MpMonthPlanMonitorServiceImpl extends AbstractDocService<MpMonthPla
             monitor.setSpecifications(finalResult.getSpecifications());
             monitor.setMainPattern(finalResult.getMainPattern());
             monitor.setPattern(finalResult.getPattern());
+            monitor.setConstructionStage(finalResult.getConstructionStage());
             Integer beginDay = finalResult.getBeginDay();
             Date onboardDate = DateUtils.addDays(productionStartDate, beginDay - 1);
             monitor.setOnboardDate(onboardDate);
