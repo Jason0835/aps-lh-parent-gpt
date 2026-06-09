@@ -296,7 +296,8 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
             log.warn("listScheduleShiftDates: scheduleDate 为空");
             return new ArrayList<>();
         }
-        Date end = DateUtil.beginOfDay(scheduleDate);
+        // 前端传递 T+1 日期，向前偏移一天使排程窗口覆盖 T、T+1、T+2
+        Date end = DateUtil.beginOfDay(DateUtil.offsetDay(scheduleDate, 1));
         Date start = DateUtil.offsetDay(end, -(LhScheduleConstant.SCHEDULE_DAYS - 1));
         List<LhScheduleShiftDateVO> result = new ArrayList<>(LhScheduleConstant.MAX_SHIFT_SLOT_COUNT);
         int shiftNo = 1;
