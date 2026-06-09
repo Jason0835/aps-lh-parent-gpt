@@ -15,6 +15,9 @@ export function updateMachineRollMapping(data) {
 export function delMachineRollMapping(data) {
   return request({ url: '/cd90/cd90MachineRollMapping/remove', method: 'post', data })
 }
+export function importMachineRollMapping(data) {
+  return request({ url: '/cd90/cd90MachineRollMapping/importData', method: 'post', data })
+}
 export function exportMachineRollMapping(query) {
   return downloadLink('/cd90/cd90MachineRollMapping/export', query)
 }

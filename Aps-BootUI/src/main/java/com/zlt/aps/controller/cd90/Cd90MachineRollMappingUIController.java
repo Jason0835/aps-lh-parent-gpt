@@ -25,69 +25,139 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
+/**
+ * 直裁大卷与机台映射 UI 控制层。
+ */
 @Api(tags = "直裁大卷与机台映射")
 @Controller
 @RequestMapping("/cd90/cd90MachineRollMapping")
 public class Cd90MachineRollMappingUIController extends BaseUIController<Cd90MachineRollMapping> {
 
     @Resource
-    private ICd90MachineRollMappingRemoteService remoteService;
+    private ICd90MachineRollMappingRemoteService cd90MachineRollMappingRemoteService;
 
-    @ApiOperation("查询列表") @RequiresPermissions("cd90:machineRollMapping:list")
-    @PostMapping("/list") @ResponseBody
-    public TableDataInfo list(Cd90MachineRollMapping queryVO) { return remoteService.list(queryVO); }
+    /** 查询直裁大卷与机台映射列表 */
+    @ApiOperation("查询直裁大卷与机台映射列表")
+    @RequiresPermissions("cd90:machineRollMapping:list")
+    @PostMapping("/list")
+    @ResponseBody
+    public TableDataInfo list(Cd90MachineRollMapping queryVO) {
+        return cd90MachineRollMappingRemoteService.list(queryVO);
+    }
 
-    @ApiOperation("获取详情") @GetMapping("/getInfo/{id}") @ResponseBody
-    public Cd90MachineRollMapping getInfo(@PathVariable("id") Long id) { return remoteService.getInfo(id); }
+    /** 获取直裁大卷与机台映射详情 */
+    @ApiOperation("获取直裁大卷与机台映射详情")
+    @GetMapping("/getInfo/{id}")
+    @ResponseBody
+    public Cd90MachineRollMapping getInfo(@PathVariable("id") Long id) {
+        return cd90MachineRollMappingRemoteService.getInfo(id);
+    }
 
-    @ApiOperation("新增") @RequiresPermissions("cd90:machineRollMapping:add")
-    @PostMapping("/add") @ResponseBody
+    /** 新增直裁大卷与机台映射 */
+    @ApiOperation("新增直裁大卷与机台映射")
+    @RequiresPermissions("cd90:machineRollMapping:add")
+    @PostMapping("/add")
+    @ResponseBody
     public AjaxResult add(@RequestBody Cd90MachineRollMapping entity) {
-        if (UserConstants.NOT_UNIQUE.equals(remoteService.checkUnique(entity)))
+        if (UserConstants.NOT_UNIQUE.equals(cd90MachineRollMappingRemoteService.checkUnique(entity))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90MachineRollMapping.checkUnique"));
-        return remoteService.add(entity);
+        }
+        return cd90MachineRollMappingRemoteService.add(entity);
     }
 
-    @ApiOperation("编辑") @RequiresPermissions("cd90:machineRollMapping:edit")
-    @PostMapping("/edit") @ResponseBody
+    /** 编辑直裁大卷与机台映射 */
+    @ApiOperation("编辑直裁大卷与机台映射")
+    @RequiresPermissions("cd90:machineRollMapping:edit")
+    @PostMapping("/edit")
+    @ResponseBody
     public AjaxResult edit(@RequestBody Cd90MachineRollMapping entity) {
-        if (UserConstants.NOT_UNIQUE.equals(remoteService.checkUnique(entity)))
+        if (UserConstants.NOT_UNIQUE.equals(cd90MachineRollMappingRemoteService.checkUnique(entity))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90MachineRollMapping.checkUnique"));
-        return remoteService.edit(entity);
+        }
+        return cd90MachineRollMappingRemoteService.edit(entity);
     }
 
-    @ApiOperation("删除") @RequiresPermissions("cd90:machineRollMapping:remove")
-    @PostMapping("/remove") @ResponseBody
-    public AjaxResult remove(String ids) { return remoteService.removeByIds(Arrays.asList(Convert.toLongArray(ids))); }
+    /** 校验直裁大卷与机台映射唯一性 */
+    @ApiOperation("校验直裁大卷与机台映射唯一性")
+    @PostMapping("/checkUnique")
+    @ResponseBody
+    public String checkUnique(@RequestBody Cd90MachineRollMapping entity) {
+        return cd90MachineRollMappingRemoteService.checkUnique(entity);
+    }
 
-    @Override public String getExportTemplateFileName() { return getFunctionName(); }
-    @Override public String getProcedureCode() { return "CD90_MACHINE_ROLL_MAPPING"; }
-    @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.cd90MachineRollMapping.modelName"); }
+    /** 删除直裁大卷与机台映射 */
+    @ApiOperation("删除直裁大卷与机台映射")
+    @RequiresPermissions("cd90:machineRollMapping:remove")
+    @PostMapping("/remove")
+    @ResponseBody
+    public AjaxResult remove(String ids) {
+        Long[] arr = Convert.toLongArray(ids);
+        return cd90MachineRollMappingRemoteService.removeByIds(Arrays.asList(arr));
+    }
 
-    @ApiOperation("下载导入模板") @Override
+    /** 清空直裁大卷与机台映射 */
+    @ApiOperation("清空直裁大卷与机台映射")
+    @RequiresPermissions("cd90:machineRollMapping:removeAll")
+    @PostMapping("/removeAll")
+    @ResponseBody
+    public AjaxResult removeAll(Cd90MachineRollMapping queryVO) {
+        return cd90MachineRollMappingRemoteService.removeAll(queryVO);
+    }
+
+    @Override
+    public String getExportTemplateFileName() {
+        return getFunctionName();
+    }
+
+    @Override
+    public String getProcedureCode() {
+        return "CD90_MACHINE_ROLL_MAPPING";
+    }
+
+    @Override
+    public String getFunctionName() {
+        return I18nUtil.getMessage("ui.data.column.cd90MachineRollMapping.modelName");
+    }
+
+    /** 下载导入模板 */
+    @ApiOperation("下载直裁大卷与机台映射导入模板")
+    @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+        String fileName = getExportTemplateFileName();
         ExcelUtil<Cd90MachineRollMapping> util = new ExcelUtil<>(Cd90MachineRollMapping.class);
-        util.exportExcel(response, null, getExportTemplateFileName(), getExportTemplateFileName());
+        util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
 
-    @ApiOperation("导出") @RequiresPermissions("cd90:machineRollMapping:export")
-    @GetMapping("/export") @ResponseBody @Override
+    /** 导出直裁大卷与机台映射 */
+    @ApiOperation("导出直裁大卷与机台映射")
+    @RequiresPermissions("cd90:machineRollMapping:export")
+    @GetMapping("/export")
+    @ResponseBody
+    @Override
     public void export(HttpServletResponse response, Cd90MachineRollMapping entity) throws IOException {
-        byte[] excelBytes = remoteService.exportData(entity, getExportTemplateFileName());
-        ExcelUtil.setResponseHeader(response, getExportTemplateFileName(), ".xlsx");
-        IOUtils.copy(new ByteArrayInputStream(excelBytes), response.getOutputStream());
+        String fileName = getExportTemplateFileName();
+        byte[] excelBytes = cd90MachineRollMappingRemoteService.exportData(entity, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
     }
 
-    @ApiOperation("导入") @RequiresPermissions("cd90:machineRollMapping:import")
-    @PostMapping("/importData") @ResponseBody @Override
+    /** 导入直裁大卷与机台映射 */
+    @ApiOperation("导入直裁大卷与机台映射")
+    @RequiresPermissions("cd90:machineRollMapping:import")
+    @PostMapping("/importData")
+    @ResponseBody
+    @Override
     public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
         ImportContext context = new ImportContext();
-        context.setImportFilePath(this.importFilePath); context.setFunctionName(getFunctionName());
-        context.setProcedureCode(getProcedureCode()); context.setOriFileName(file.getOriginalFilename());
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(getFunctionName());
+        context.setProcedureCode(getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        return remoteService.importData(context, updateSupport);
+        return cd90MachineRollMappingRemoteService.importData(context, updateSupport);
     }
 }

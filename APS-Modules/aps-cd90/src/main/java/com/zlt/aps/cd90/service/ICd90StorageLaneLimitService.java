@@ -8,5 +8,6 @@ import java.util.List;
 
 public interface ICd90StorageLaneLimitService extends IDocService<Cd90StorageLaneLimit> {
     String checkUnique(Cd90StorageLaneLimit entity);
+
     AjaxResult importData(List<Cd90StorageLaneLimit> list, boolean updateSupport, Long importLogId);
 }

@@ -15,6 +15,12 @@ import infoForm from "@/views/components/infoForm.vue";
 export default {
   components: { infoForm },
   inject: ["parentDict"],
+  props: {
+    clothOptions: {
+      type: Array,
+      default: () => [],
+    },
+  },
   data() {
     const requiredSelect = { required: true, message: this.$t("common.rule.select"), trigger: "change" };
     const requiredInput = { required: true, message: this.$t("common.rule.input"), trigger: "blur" };
@@ -23,7 +29,7 @@ export default {
       rules: {
         factoryCode: [requiredSelect],
         stockDate: [requiredInput],
-        materialCode: [requiredInput],
+        materialCode: [requiredSelect],
         stockNum: [requiredInput, { validator: (rule, value, callback) => { if (value === undefined || value === null || value === "") { callback(new Error(this.$t("common.rule.input"))); } else { callback(); } }, trigger: "blur" }],
       },
     };
@@ -34,7 +40,7 @@ export default {
       return [
         { prop: "factoryCode", label: this.$t("ui.data.column.cd90Stock.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
         { prop: "stockDate", label: this.$t("ui.data.column.cd90Stock.stockDate"), type: "date" },
-        { prop: "materialCode", label: this.$t("ui.data.column.cd90Stock.materialCode"), maxlength: 60 },
+        { prop: "materialCode", label: this.$t("ui.data.column.cd90Stock.materialCode"), type: "select", dictData: this.clothOptions, filterable: true },
         { prop: "stockNum", label: this.$t("ui.data.column.cd90Stock.stockNum"), type: "number" },
         { prop: "modifyNum", label: this.$t("ui.data.column.cd90Stock.modifyNum"), type: "number" },
         { prop: "badNum", label: this.$t("ui.data.column.cd90Stock.badNum"), type: "number" },

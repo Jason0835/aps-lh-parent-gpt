@@ -2,12 +2,14 @@ package com.zlt.aps.cd90.api.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
 import com.zlt.common.annotation.ImportExcelValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.io.Serializable;
 import java.util.Date;
@@ -26,9 +28,10 @@ public class Cd90Stock extends BaseEntity implements Serializable {
     private String factoryCode;
     /** 库存日期 */
     @ApiModelProperty("库存日期")
-    @ImportExcelValidated(required = true, maxLength = 20)
+    @ImportExcelValidated(required = true)
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField("STOCK_DATE")
-    @Excel(name = "ui.data.column.cd90Stock.stockDate")
+    @Excel(name = "ui.data.column.cd90Stock.stockDate", width = 30, dateFormat = "yyyy-MM-dd")
     private Date stockDate;
     /** 胎体代码 */
     @ApiModelProperty("胎体代码")

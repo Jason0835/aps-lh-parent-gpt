@@ -10,12 +10,13 @@
       </template>
     </page-table>
     <tlt-upload-form ref="tltUpload" :updateSupport="true" downloadUrl="/cd90/cd90Stock/importTemplate" uploadUrl="/cd90/cd90Stock/importData" @uploadSuccess="getList" labelWidth="0" :columns="importColumns" />
-    <info-dialog ref="infoRef" @success="getList" />
+    <info-dialog ref="infoRef" :cloth-options="clothOptions" @success="getList" />
   </basic-container>
 </template>
 
 <script>
 import { listStock, delStock, exportStock } from "@/api/cd90/stock";
+import { listTireFabricCodes } from "@/api/cd90/specifyMachine";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
@@ -27,9 +28,9 @@ export default {
   data() {
     return {
       importColumns: [{ label: "", prop: "updateSupport", render: (form) => (<el-checkbox label={this.$t("common.rule.updateSupport")} v-model={form.updateSupport}>{this.$t("common.rule.updateSupport")}</el-checkbox>) }],
-      loading: false, data: [], selection: [],
+      loading: false, data: [], selection: [], clothOptions: [],
       page: { current: 1, pageSize: 20, total: 0 }, sort: {},
-      search: { factoryCode: "116" }, query: { factoryCode: "116" },
+      search: { factoryCode: "116", stockDate: new Date().toISOString().slice(0, 10) }, query: { factoryCode: "116", stockDate: new Date().toISOString().slice(0, 10) },
     };
   },
   computed: {
@@ -52,8 +53,8 @@ export default {
     searchColumns() {
       return [
         { label: this.$t("ui.data.column.cd90Stock.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
-        { label: this.$t("ui.data.column.cd90Stock.stockDate"), prop: "stockDate" },
-        { label: this.$t("ui.data.column.cd90Stock.materialCode"), prop: "materialCode" },
+        { label: this.$t("ui.data.column.cd90Stock.stockDate"), prop: "stockDate", type: "date", valueFormat: "yyyy-MM-dd" },
+        { label: this.$t("ui.data.column.cd90Stock.materialCode"), prop: "materialCode", type: "select", dictData: this.clothOptions, filterable: true, clearable: true },
       ];
     },
   },
@@ -69,7 +70,12 @@ export default {
     handleSortChange(sort) { this.sort = sort; this.getList(); },
     handleSelectionChange(selection) { this.selection = selection || []; },
     async getList() { this.loading = true; try { const params = { ...this.query, pageNum: this.page.current, pageSize: this.page.pageSize, orderByColumn: this.sort.prop, isAsc: this.sort.order }; const res = await listStock(params); this.data = res.rows || []; this.page.total = res.total || 0; } finally { this.loading = false; } },
+    async loadClothOptions() {
+      const res = await listTireFabricCodes();
+      const rows = Array.isArray(res) ? res : (res.data || []);
+      this.clothOptions = rows.map((code) => ({ label: code, value: code }));
+    },
   },
-  created() { this.getList(); },
+  created() { this.getList(); this.loadClothOptions(); },
 };
 </script>

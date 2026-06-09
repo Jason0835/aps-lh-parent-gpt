@@ -6,7 +6,11 @@ import com.zlt.bill.common.service.IDocService;
 
 import java.util.List;
 
+/**
+ * 直裁大卷与机台映射业务接口。
+ */
 public interface ICd90MachineRollMappingService extends IDocService<Cd90MachineRollMapping> {
+
     String checkUnique(Cd90MachineRollMapping entity);
 
     AjaxResult importData(List<Cd90MachineRollMapping> list, boolean updateSupport, Long importLogId);
