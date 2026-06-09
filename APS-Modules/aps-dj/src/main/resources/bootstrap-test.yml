@@ -44,9 +44,6 @@ spring:
         shared-configs[5]:
           data-id: sync-data-aps-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
           group: ${nacos.cfg-group}
-        shared-configs[6]:
-          data-id: seata-client-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
-          group: ${nacos.cfg-group}
         refresh-enabled: true
 mq:
   scheduleLog:

@@ -1,8 +1,7 @@
-
 <template>
   <basic-container>
     <page-table
-      tableRef="insideLinerStockMainTable"
+      tableRef="djStockMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -19,7 +18,7 @@
       :selectArea="false"
     >
       <template slot="header">
-        <el-button
+        <!-- <el-button
           type="primary"
           plain
           v-hasPermi="['dj:stock:add']"
@@ -33,20 +32,20 @@
           @click="handleEdit(selection[0])"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         >
-        <!-- <el-button
+        <el-button
           type="warning"
           v-hasPermi="['dj:stock:stockRevise']"
           :disabled="selection.length !== 1"
           @click="() => handleModifyStock(selection[0])"
           >{{ $t("ui.frame.btn.stock.modify2") }}</el-button
-        > -->
+        >
         <el-button
           type="danger"
           plain
           v-hasPermi="['dj:stock:remove']"
           @click="handleBatchDelete"
           >{{ $t("ui.frame.btn.delete") }}</el-button
-        >
+        > -->
         <el-button
           v-hasPermi="['dj:stock:import']"
           @click="$refs.tltUpload.handleImport()"
@@ -79,7 +78,7 @@ import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "InsideLinerStock",
+  name: "djStock",
   components: {
     tltUpload,
     infoDialog,

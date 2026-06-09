@@ -127,4 +127,9 @@ public class DjStockController extends AbstractDocBizController<DjStock> {
     protected String getTypeCode() {
         return "0";
     }
+
+    @Override
+    protected String getOrderBy() {
+        return "STOCK_DATE DESC, MATERIAL_CODE";
+    }
 }
