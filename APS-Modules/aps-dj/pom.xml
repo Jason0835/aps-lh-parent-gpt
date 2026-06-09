@@ -19,16 +19,16 @@
     </properties>
 
     <dependencies>
-<!--        <dependency>-->
-<!--            <groupId>com.zlt</groupId>-->
-<!--            <artifactId>zlt-module-starter</artifactId>-->
-<!--        </dependency>-->
-<!--        &lt;!&ndash; 使用第三方swagger的ui  范围地址：http://localhost:8080/doc.html &ndash;&gt;-->
-<!--        <dependency>-->
-<!--            <groupId>com.github.xiaoymin</groupId>-->
-<!--            <artifactId>swagger-bootstrap-ui</artifactId>-->
-<!--            <version>1.9.6</version>-->
-<!--        </dependency>-->
+        <dependency>
+            <groupId>com.zlt</groupId>
+            <artifactId>zlt-module-starter</artifactId>
+        </dependency>
+        <!-- 使用第三方swagger的ui  范围地址：http://localhost:8080/doc.html &ndash;&gt;-->
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>swagger-bootstrap-ui</artifactId>
+            <version>1.9.6</version>
+        </dependency>
         <dependency>
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-base</artifactId>
