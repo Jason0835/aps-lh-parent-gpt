@@ -49,22 +49,22 @@ public class DjStockController extends AbstractDocBizController<DjStock> {
     private DjStockService stockService;
 
     @Resource
-    private DjStockMapper cxStockMapper;
+    private DjStockMapper djStockMapper;
 
     /**
-     * 查询垫胶库存信息列表
+     * 查询信息列表
      */
     @PostMapping("/list")
-    @ApiOperation("根据条件查询库存列表信息")
+    @ApiOperation("根据条件列表信息")
     public TableDataInfo list(@RequestBody DjStock queryVO) {
         return super.list(queryVO);
     }
 
     /**
-     * 新增垫胶库存信息
+     * 新增信息
      */
     @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.INSERT)
-    @ApiOperation("新增垫胶库存信息（id不为空）")
+    @ApiOperation("新增信息（id不为空）")
     @PostMapping
     public AjaxResult save(@RequestBody DjStock stock) {
         if (UserConstants.NOT_UNIQUE.equals(stockService.checkUnique(stock))) {
@@ -74,10 +74,10 @@ public class DjStockController extends AbstractDocBizController<DjStock> {
     }
 
     /**
-     * 删除垫胶库存信息
+     * 删除信息
      */
     @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.DELETE)
-    @ApiOperation("根据id批量删除垫胶库存信息")
+    @ApiOperation("根据id批量删除信息")
     @ApiImplicitParams({ @ApiImplicitParam(name = "ids", dataType = "Long[]", value = "主键ids") })
     @DeleteMapping("/{ids}")
     public AjaxResult removeByIds(@RequestBody List<Long> ids) {
@@ -85,7 +85,7 @@ public class DjStockController extends AbstractDocBizController<DjStock> {
     }
 
     /**
-     * 导出成型库存列表
+     * 导出列表
      */
     @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
@@ -101,14 +101,14 @@ public class DjStockController extends AbstractDocBizController<DjStock> {
         QueryWrapper<DjStock> wrapper = new QueryWrapper<>();
         startPage("update_time desc");
         this.builderCondition(wrapper, obj);
-        List<DjStock> list = cxStockMapper.selectList(wrapper);
+        List<DjStock> list = djStockMapper.selectList(wrapper);
         AppUtils.formatData(list, getQueryFormulas());
         return list;
     }
 
     @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
-    @ApiOperation("导入垫胶库存信息")
+    @ApiOperation("导入信息")
     public AjaxResult importData(@RequestBody List<DjStock> list, @RequestParam("updateSupport") boolean updateSupport,
             @RequestParam("importLogId") Long importLogId) {
         if (StringUtils.isNull(list) || list.size() == 0) {

@@ -24,7 +24,7 @@ import com.zlt.aps.dj.api.domain.entity.DjStock;
 public interface IDjStockService {
 
     /**
-     * 获取垫胶库存信息列表
+     * 获取信息列表
      *
      * @param stock
      * @return
@@ -33,7 +33,7 @@ public interface IDjStockService {
     TableDataInfo list(@RequestBody DjStock stock);
 
     /**
-     * 保存垫胶库存信息
+     * 保存信息
      *
      * @param stock
      * @return
@@ -42,7 +42,7 @@ public interface IDjStockService {
     AjaxResult save(@Validated @RequestBody DjStock stock);
 
     /**
-     * 删除垫胶库存信息
+     * 删除信息
      *
      * @param ids
      * @return
@@ -75,7 +75,7 @@ public interface IDjStockService {
     String checkUnique(@RequestBody DjStock cxStock);
 
     /**
-     * 导出垫胶库存信息
+     * 导出信息
      * 
      * @param stock
      * @return
@@ -84,7 +84,7 @@ public interface IDjStockService {
     byte[] exportData(@RequestBody DjStock queryVO, @PathVariable("fileName") String fileName);
 
     /**
-     * 导如垫胶库存信息
+     * 导如信息
      * 
      * @param stock
      * @return
