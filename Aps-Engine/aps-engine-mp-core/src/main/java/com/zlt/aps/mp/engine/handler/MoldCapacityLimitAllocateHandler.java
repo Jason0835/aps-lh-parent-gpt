@@ -17,10 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -102,6 +99,7 @@ public class MoldCapacityLimitAllocateHandler {
             if (CollectionUtils.isEmpty(skuList)) {
                 return;
             }
+            //计算模具受限产能
             List<SkuMoldCapacityInfoVo> groupResultList = moldCapacityAllocateHandler(skuList);
             if (CollectionUtils.isEmpty(groupResultList)) {
                 return;
@@ -121,7 +119,68 @@ public class MoldCapacityLimitAllocateHandler {
             return Collections.emptyList();
         }
         return logList;
+    }
 
+    /**
+     * 模具产能受限计算
+     * 采用等比例分摊：先看总净需求，再看高优先级量需求
+     *
+     * @param skuList
+     */
+    public List<SkuMoldCapacityInfoVo> moldCapacityAllocateHandler(List<SkuMoldCapacityInfoVo> skuList) {
+        if (CollectionUtils.isEmpty(skuList)) {
+            return Collections.emptyList();
+        }
+        //同一结构+主花纹
+        Set<String> groupKeySet = skuList.stream().map(SkuMoldCapacityInfoVo::getGroupAndMainPattern).collect(Collectors.toSet());
+        if (CollectionUtils.isEmpty(groupKeySet) || groupKeySet.size() != BigDecimal.ONE.intValue()) {
+            return Collections.emptyList();
+        }
+        //等比分摊
+        skuList.forEach(singleSku -> singleSku.allocateHandler());
+        Integer maxMoldCapacity = skuList.get(BigDecimal.ZERO.intValue()).getMaxMoldCapacity();
+        Integer allocateSumQty = skuList.stream().mapToInt(SkuMoldCapacityInfoVo::getAllocateNetQty).sum();
+        if (allocateSumQty <= maxMoldCapacity) {
+            return skuList;
+        }
+        //按量排序，最后一个不超:高优先级量多 -> 净需求量多
+        Comparator sort = Comparator.comparing(SkuMoldCapacityInfoVo::getAllocateHeightQty, Comparator.reverseOrder())
+                .thenComparing(SkuMoldCapacityInfoVo::getAllocateNetQty, Comparator.reverseOrder());
+        skuList.sort(sort);
+        List<SkuMoldCapacityInfoVo> keepList = Lists.newArrayList();
+        Integer accumulateQty = BigDecimal.ZERO.intValue();
+        for (SkuMoldCapacityInfoVo singleSku : skuList) {
+            accumulateQty = accumulateQty + singleSku.getAllocateNetQty();
+            //小于
+            if (accumulateQty < maxMoldCapacity) {
+                keepList.add(singleSku);
+                continue;
+            }
+            //等于
+            if (accumulateQty.equals(maxMoldCapacity)) {
+                keepList.add(singleSku);
+                break;
+            }
+            //大于
+            Integer diffValue = accumulateQty - maxMoldCapacity;
+            Integer allocateNetQty = singleSku.getAllocateNetQty();
+            Integer allocateHeightQty = singleSku.getAllocateHeightQty();
+            Integer allocateDiffValue = allocateNetQty - allocateHeightQty;
+            Integer deductHeight = diffValue - allocateDiffValue;
+            if (deductHeight > BigDecimal.ZERO.intValue()) {
+                singleSku.setAllocateHeightQty(allocateHeightQty - deductHeight);
+            }
+            singleSku.setAllocateNetQty(allocateNetQty - diffValue);
+            if (singleSku.getAllocateHeightQty() < BigDecimal.ZERO.intValue()) {
+                singleSku.setAllocateHeightQty(BigDecimal.ZERO.intValue());
+            }
+            if (singleSku.getAllocateNetQty() < BigDecimal.ZERO.intValue()) {
+                singleSku.setAllocateNetQty(BigDecimal.ZERO.intValue());
+            }
+            keepList.add(singleSku);
+            break;
+        }
+        return keepList;
     }
 
     /**
@@ -177,63 +236,6 @@ public class MoldCapacityLimitAllocateHandler {
         }
         Integer dayCapacityQty = singleMainPatternList.get(BigDecimal.ZERO.intValue()).getDayVulcanizationQty();
         return dayCapacityQty * lhMachineCount * ProductionConstant.DOUBLE_MOULD_PRODUCTION * productionContext.getMaxProductionDays();
-    }
-
-    /**
-     * 模具产能受限计算
-     * 采用等比例分摊：先看总净需求，再看高优先级量需求
-     *
-     * @param skuList
-     */
-    public List<SkuMoldCapacityInfoVo> moldCapacityAllocateHandler(List<SkuMoldCapacityInfoVo> skuList) {
-        if (CollectionUtils.isEmpty(skuList)) {
-            return Collections.emptyList();
-        }
-        //等比分摊
-        skuList.forEach(singleSku -> singleSku.allocateHandler());
-        Integer maxMoldCapacity = skuList.get(BigDecimal.ZERO.intValue()).getMaxMoldCapacity();
-        Integer allocateSumQty = skuList.stream().mapToInt(SkuMoldCapacityInfoVo::getAllocateNetQty).sum();
-        if (allocateSumQty <= maxMoldCapacity) {
-            return skuList;
-        }
-        //按量排序，最后一个不超:高优先级量多 -> 净需求量多
-        Comparator sort = Comparator.comparing(SkuMoldCapacityInfoVo::getAllocateHeightQty, Comparator.reverseOrder())
-                .thenComparing(SkuMoldCapacityInfoVo::getAllocateNetQty, Comparator.reverseOrder());
-        skuList.sort(sort);
-        List<SkuMoldCapacityInfoVo> keepList = Lists.newArrayList();
-        Integer accumulateQty = BigDecimal.ZERO.intValue();
-        for (SkuMoldCapacityInfoVo singleSku : skuList) {
-            accumulateQty = accumulateQty + singleSku.getAllocateNetQty();
-            //小于
-            if (accumulateQty < maxMoldCapacity) {
-                keepList.add(singleSku);
-                continue;
-            }
-            //等于
-            if (accumulateQty.equals(maxMoldCapacity)) {
-                keepList.add(singleSku);
-                break;
-            }
-            //大于
-            Integer diffValue = accumulateQty - maxMoldCapacity;
-            Integer allocateNetQty = singleSku.getAllocateNetQty();
-            Integer allocateHeightQty = singleSku.getAllocateHeightQty();
-            Integer allocateDiffValue = allocateNetQty - allocateHeightQty;
-            Integer deductHeight = diffValue - allocateDiffValue;
-            if (deductHeight > BigDecimal.ZERO.intValue()) {
-                singleSku.setAllocateHeightQty(allocateHeightQty - deductHeight);
-            }
-            singleSku.setAllocateNetQty(allocateNetQty - diffValue);
-            if (singleSku.getAllocateHeightQty() < BigDecimal.ZERO.intValue()) {
-                singleSku.setAllocateHeightQty(BigDecimal.ZERO.intValue());
-            }
-            if (singleSku.getAllocateNetQty() < BigDecimal.ZERO.intValue()) {
-                singleSku.setAllocateNetQty(BigDecimal.ZERO.intValue());
-            }
-            keepList.add(singleSku);
-            break;
-        }
-        return keepList;
     }
 
 }
