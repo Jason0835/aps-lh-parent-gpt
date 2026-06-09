@@ -29,4 +29,11 @@ public interface TqEngineStockMapper {
      * @return
      */
     List<TqStockVo> listTqStock(@Param("stockDate") String stockDate);
+
+    /**
+     * 查询昨日早班半制品计划量（昨日排程的CLASS1_PLAN_QTY对应昨日早班生产量）
+     * @param scheduleDate 排程日期，格式：yyyy-mm-dd
+     * @return 昨日早班半制品计划量列表
+     */
+    List<TqStockConsumeVo> listLastDayMidPlan(@Param("scheduleDate") String scheduleDate);
 }

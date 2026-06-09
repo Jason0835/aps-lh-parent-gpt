@@ -256,14 +256,15 @@ public class TqEngineServiceImpl implements TqEngineService {
                 BeanUtils.copyProperties(baseInfoVo, schedule);
             }
 
-            Double midPlanQty = schedule.getMidPlanQty();  //中班计划量
-            schedule.setMidPlanQty(midPlanQty == null ? 0D : midPlanQty);
-            Double nightPlanQty = schedule.getNightPlanQty();  //夜班计划量
-            schedule.setNightPlanQty(nightPlanQty == null ? 0D : nightPlanQty);
-            Double dayPlanQty = schedule.getDayPlanQty();  //白班计划量
-            schedule.setDayPlanQty(dayPlanQty == null ? 0D : dayPlanQty);
-            Double nextMidPlanQty = schedule.getNextMidPlanQty();  //次日中班计划量
-            schedule.setNextMidPlanQty(nextMidPlanQty == null ? 0D : nextMidPlanQty);
+            // TODO 旧班次字段已移除(midPlanQty/nightPlanQty/dayPlanQty/nextMidPlanQty)，待适配6班次字段
+//            Double midPlanQty = schedule.getMidPlanQty();  //中班计划量
+//            schedule.setMidPlanQty(midPlanQty == null ? 0D : midPlanQty);
+//            Double nightPlanQty = schedule.getNightPlanQty();  //夜班计划量
+//            schedule.setNightPlanQty(nightPlanQty == null ? 0D : nightPlanQty);
+//            Double dayPlanQty = schedule.getDayPlanQty();  //白班计划量
+//            schedule.setDayPlanQty(dayPlanQty == null ? 0D : dayPlanQty);
+//            Double nextMidPlanQty = schedule.getNextMidPlanQty();  //次日中班计划量
+//            schedule.setNextMidPlanQty(nextMidPlanQty == null ? 0D : nextMidPlanQty);
 
             schedule.setStockQty(planStockMap.getOrDefault(schedule.getBeadCode(), 0D));  //16点预计库存
             this.newComputeSupplyTime(schedule, schedule.getStockQty());  //库存供应时长
@@ -385,6 +386,8 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @param totalPlanQtyVo 胎圈中班和夜班总计划量Vo
      */
     private void equilibriumDay1(List<TqScheduleResultVo> scheduleList, TqTotalPlanQtyVo totalPlanQtyVo, TqScheduleParams params) {
+        // TODO 旧班次字段已移除(midPlanQty/nightPlanQty/dayPlanQty/nextMidPlanQty及TqTotalPlanQtyVo对应字段)，待适配6班次字段
+/*
         BigDecimal toolCapacity = BigDecimalUtils.valueOf(params.getToolCapacity());
         double totalMidPlanQty = totalPlanQtyVo.getTotalMidPlanQty(); // 夜班总计划量
         double totalNightPlanQty = totalPlanQtyVo.getTotalNightPlanQty(); // 早班总计划量
@@ -480,6 +483,7 @@ public class TqEngineServiceImpl implements TqEngineService {
         totalPlanQtyVo.setTotalMidPlanQty(totalMidPlanQty); // 早班总计划里量
         totalPlanQtyVo.setTotalNightPlanQty(totalNightPlanQty); // 早班总计划里量
         totalPlanQtyVo.setTotalDayPlanQty(totalDayPlanQty); // 次日夜班总计划量
+*/
     }
 
     /**
@@ -488,9 +492,13 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @return
      */
     private Double getClassStock(TqScheduleResultVo scheduleVo) {
+        // TODO 旧班次字段已移除(midPlanQty)，待适配6班次字段
+/*
         BigDecimal planQty = BigDecimalUtils.add(scheduleVo.getStockQty(), scheduleVo.getTodayMorningPlanQty(), scheduleVo.getMidPlanQty());
         BigDecimal cxPlanQty = BigDecimalUtils.add(scheduleVo.getCxClass1Plan(), scheduleVo.getCxClass2Plan());
         return planQty.subtract(cxPlanQty).doubleValue();
+*/
+        return 0D;
     }
 
     /**
@@ -502,6 +510,8 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @param bisectThreshold 中夜班平分阈值，超过该数值的计划中夜班平分
      */
     private void equilibriumDay2(List<TqScheduleResultVo> scheduleList, TqTotalPlanQtyVo totalPlanQtyVo, TqScheduleParams params) {
+        // TODO 旧班次字段已移除(nightPlanQty/dayPlanQty及TqTotalPlanQtyVo对应字段)，待适配6班次字段
+/*
         this.equalShare(scheduleList, params); // 中夜班计划量均分
         refreshTotalPlanQtyVo(scheduleList, totalPlanQtyVo);
         double totalNightPlanQty = totalPlanQtyVo.getTotalNightPlanQty(); // 早班总计划量
@@ -570,6 +580,7 @@ public class TqEngineServiceImpl implements TqEngineService {
         }
         totalPlanQtyVo.setTotalNightPlanQty(totalNightPlanQty); // 早班总计划里量
         totalPlanQtyVo.setTotalDayPlanQty(totalDayPlanQty); // 次日夜班总计划量
+*/
     }
 
     /**
@@ -578,6 +589,8 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @param totalPlanQtyVo
      */
     private void refreshTotalPlanQtyVo(List<TqScheduleResultVo> scheduleList, TqTotalPlanQtyVo totalPlanQtyVo) {
+        // TODO 旧班次字段已移除(midPlanQty/dayPlanQty/nightPlanQty及TqTotalPlanQtyVo对应字段)，待适配6班次字段
+/*
         Double totalMidPlanQty = scheduleList.stream().mapToDouble(TqScheduleResultVo::getMidPlanQty).sum();
         Double totalDayPlanQty = scheduleList.stream().mapToDouble(TqScheduleResultVo::getDayPlanQty).sum();
         Double totalNightPlanQty = scheduleList.stream().mapToDouble(TqScheduleResultVo::getNightPlanQty).sum();
@@ -585,6 +598,7 @@ public class TqEngineServiceImpl implements TqEngineService {
         totalPlanQtyVo.setTotalDayPlanQty(totalDayPlanQty);
         totalPlanQtyVo.setTotalNightPlanQty(totalNightPlanQty);
         totalPlanQtyVo.setTotalPlanQty(BigDecimalUtil.add(totalDayPlanQty, totalNightPlanQty, totalMidPlanQty));
+*/
     }
 
     /**
@@ -593,6 +607,8 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @param params  排产参数
      */
     private void equalShare(List<TqScheduleResultVo> scheduleList, TqScheduleParams params) {
+        // TODO 旧班次字段已移除(nightPlanQty/dayPlanQty)，待适配6班次字段
+/*
         BigDecimal bisectThreshold = params.getEqualShareThreshold(); // 各班计划量均分阈值
         BigDecimal toolCapacity = BigDecimalUtils.valueOf(params.getToolCapacity()); // 满工装长度
         // 次日早夜班总计划量超过阈值的平分中夜班计划量
@@ -615,6 +631,7 @@ public class TqEngineServiceImpl implements TqEngineService {
                 scheduleVo.setDayPlanQty(newDayPlanQty.doubleValue());
             }
         }
+*/
     }
 
     /**
@@ -651,6 +668,8 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @param totalPlanQtyVo 胎圈中班和夜班总计划量Vo
      */
     private void equilibrium(String batchNo, List<TqScheduleResultVo> scheduleList, Map<String, String> paramsMap, TqTotalPlanQtyVo totalPlanQtyVo, double toolCapacity) {
+        // TODO 旧班次字段已移除(midPlanQty/nightPlanQty及TqTotalPlanQtyVo对应字段)，待适配6班次字段
+/*
         BigDecimal hardSpecSize = new BigDecimal("35"); // 难做尺寸，超过的话不要合并
         String oldScheduleList = toJSONString(scheduleList);
         double difRate = getDoubleOrDefault(paramsMap.get(EngineConstants.PLAN_DIFFERENCE_RATE), 0D) ;  //参数配置：夜班总量和早班总量差额百分比
@@ -725,6 +744,7 @@ public class TqEngineServiceImpl implements TqEngineService {
             }
         }
         this.equilibriumLog(batchNo, oldScheduleList, scheduleList, paramsMap, totalPlanQtyVo);  //添加日志
+*/
     }
 
     /**
@@ -749,6 +769,8 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @param scheduleList
      */
     private void setProduceOrder(List<TqScheduleResultVo> scheduleList) {
+        // TODO 旧班次字段已移除(midPlanQty/nightPlanQty/dayPlanQty/nextMidPlanQty)，待适配6班次字段
+/*
         int midProduceOrder = 1;  //中班产顺序
         int nightProduceOrder = 1;  //夜班生产顺序
         int dayProduceOrder = 1; //白班生产顺序
@@ -777,6 +799,7 @@ public class TqEngineServiceImpl implements TqEngineService {
             autoScheduleLogService.insertTqScheduleLog(scheduleVo.getBatchNo(), scheduleVo.getOrderNo(), "设置生产顺序字段",
                     logSplit("根据库存供应时长(从小到大)，设置中班和夜班的生产顺序（有计划量的才设置生产顺序）", "设置后的排程数据：" + toJSONString(scheduleVo)));  //添加日志
         }
+*/
     }
 
     /**
@@ -848,8 +871,10 @@ public class TqEngineServiceImpl implements TqEngineService {
                 mergeList.add(autoSchedule);
             } else if(existScheduleGroupList != null && existScheduleGroupList.size() > 1) {
                 //对应规格重排前已经发布，并且此规格重排前只有多条排程记录（对应了多个机台）。那需要保留重排之前的排产，并且要把此规格重排后的各班的计划量，拼接到备注中
-                String remarkTip = I18nUtil.getMessage("reschedule.double.spec.remark2");
-                remarkTip = StringUtils.format(remarkTip, stripZeros(autoSchedule.getMidPlanQty()), stripZeros(autoSchedule.getNightPlanQty()), stripZeros(autoSchedule.getDayPlanQty()), stripZeros(autoSchedule.getNextMidPlanQty()));
+                // TODO 旧班次字段已移除(midPlanQty/nightPlanQty/dayPlanQty/nextMidPlanQty)，待适配6班次字段
+//                String remarkTip = I18nUtil.getMessage("reschedule.double.spec.remark2");
+//                remarkTip = StringUtils.format(remarkTip, stripZeros(autoSchedule.getMidPlanQty()), stripZeros(autoSchedule.getNightPlanQty()), stripZeros(autoSchedule.getDayPlanQty()), stripZeros(autoSchedule.getNextMidPlanQty()));
+                String remarkTip = "";
                 for(TqScheduleResultVo existSchedule : existScheduleGroupList) {
                     existSchedule.setBatchNo(batchNo);
                     existSchedule.setRemark(remarkTip);
@@ -909,6 +934,8 @@ public class TqEngineServiceImpl implements TqEngineService {
     private void chooseMachine(List<TqScheduleResultVo> scheduleList, List<TqMachineInfo> allMachineList,
             Map<String, String> specifyCanMachineMap, Map<String, String> specifyNotMachineMap,
             Map<String, String> mouthPlateMachineMap) {
+        // TODO 旧班次字段已移除(midPlanQty/nightPlanQty)，待适配6班次字段
+/*
         if (CollectionUtil.isEmpty(scheduleList)) {
             return;
         }
@@ -1010,6 +1037,7 @@ public class TqEngineServiceImpl implements TqEngineService {
             this.putMachineId(scheduleVo.getMouthPlateCode(), machineId, mouthPlatMap);
             chooseMachineLog(scheduleVo, specifyCanMachineMap, specifyNotMachineMap, mouthPlateMachineMap); // 添加日志
         }
+*/
     }
 
     /**
@@ -1342,6 +1370,8 @@ public class TqEngineServiceImpl implements TqEngineService {
      */
     private void computeTqPlanQty(TqScheduleResultVo scheduleVo, TqTotalPlanQtyVo totalPlanQtyVo,
             Map<String, Double> lossMap, TqScheduleParams params) {
+        // TODO 旧班次字段已移除(midPlanQty/nightPlanQty/dayPlanQty/nextMidPlanQty及TqTotalPlanQtyVo对应字段)，待适配6班次字段
+/*
         scheduleVo.setCloseOutSpecFlag(ApsConstant.STATUS_ENABLE); // 收尾标记默认非收尾
         double paramLossRate = params.getLossRate();
         double productStockDay = params.getProductStockDay();
@@ -1354,8 +1384,6 @@ public class TqEngineServiceImpl implements TqEngineService {
         Double todayMorningPlanQty = scheduleVo.getTodayMorningPlanQty(); // 当天早班计划量
         double supplyClass = productStockDay; // 预生产库存天数
         Double totalConsumeQty = scheduleVo.getSurplusQty(); // 剩余量
-//        Double totalConsumeQty = this.getCxClassPlanCumulative(scheduleVo, OpenMachineClassEnums.CLASS_FOUR); // 总需求量，前四个班
-//        totalConsumeQty = BigDecimalUtils.greatest(totalConsumeQty, scheduleVo.getSurplusQty()).doubleValue(); // 取四个半的消耗量与剩余量的最大值
 
         // 每个早班计算交接班库存 = 上一天交接班库存 + 上一天胎圈计划量总量 - 上一天成型两个班的消耗量
         // 交接班库存要按生产几个小时库存算，例如预生产12小时库存，则交接班库存要 > 当天成型需求量 / 2，最多超过一车（110个）
@@ -1370,7 +1398,6 @@ public class TqEngineServiceImpl implements TqEngineService {
         tqPlanQty1 = tqPlanQty1 > 0? tqPlanQty1: 0D; // 上一天交接班库存过多会计算成负数，需要处理成0
         double tqClass1PlanQty1 = todayMorningPlanQty;// 第一天早班计划 = 当天早班计划
         double tqClass2PlanQty1 = BigDecimalUtil.sub(tqPlanQty1, tqClass1PlanQty1);// 第一天夜班计划 = 等于第一天胎圈计划 - 第一天早班计划
-//        tqClass2PlanQty1 = this.limitProductQty(tqClass2PlanQty1, oneProductQty); // 控制计划量不要低于最低生产量
         tqClass2PlanQty1 = this.planQtyRounding(scheduleVo, tqClass2PlanQty1, toolCapacity, totalConsumeQty,
                 OpenMachineClassEnums.CLASS_TWO); // 整车取整
         double midPlanQty = tqClass2PlanQty1; // 夜班计划
@@ -1385,11 +1412,6 @@ public class TqEngineServiceImpl implements TqEngineService {
         double classStock3 = BigDecimalUtil.roundDown(BigDecimalUtil.mul(cxPlanQty3, supplyClass), 0); // 第三天交接班库存，第三天成型两个班的消耗量 * 预生产天数
         double tqPlanQty2 = BigDecimalUtil.add(BigDecimalUtil.sub(classStock3, classStock2), cxPlanQty2);// 第二天胎圈计划量 = 第三天交接班库存 - 第二天交接班库存 + 第二天成型两个班的消耗量
         tqPlanQty2 = tqPlanQty2 > 0? tqPlanQty2: 0D; // 上一天交接班库存过多会计算成负数，需要处理成0
-//        if (!isCloseOutSpec && classStock2 >= cxPlanQty2 && tqPlanQty2 <= toolCapacity.doubleValue()) {
-//            tqPlanQty2 = 0D; // 非收尾、交接班库存满足一天需求，且需求量少于一车，则今天暂不生产
-//        } else if (!isCloseOutSpec && classStock2 < cxPlanQty2 && tqPlanQty2 <= toolCapacity.doubleValue()) {
-//            tqPlanQty2 = oneProductQty.doubleValue(); // 非收尾、交接班库存不足，且需求量少于一车的，计划量补够最低生产量
-//        }
         double tqClass1PlanQty2 = BigDecimalUtil.sub(cxPlanQty2, classStock2); // 早班先补交接班库存缺口
         double class3lackPlanQty = BigDecimalUtil.sub(scheduleVo.getCxClass3Plan(), classStock2); // 早班库存缺口
         if (cxPlanQty3 >= largeDemand) { // 如果计划量是大需求量，则直接早夜班计划量对半分
@@ -1401,68 +1423,16 @@ public class TqEngineServiceImpl implements TqEngineService {
         if (tqClass1PlanQty2 <= toolCapacity.doubleValue() || BigDecimalUtil.sub(tqPlanQty2, tqClass1PlanQty2) <= toolCapacity.doubleValue()) {
             tqClass1PlanQty2 = tqPlanQty2;
         }
-//        tqClass1PlanQty2 = this.limitProductQty(tqClass1PlanQty2, oneProductQty); // 控制计划量不要低于最低生产量
         tqClass1PlanQty2 = this.planQtyRounding(scheduleVo, tqClass1PlanQty2, toolCapacity, totalConsumeQty,
                 OpenMachineClassEnums.CLASS_THREE); // 整车取整
         double nightPlanQty = tqClass1PlanQty2; // 早班计划
         scheduleVo.setNightPlanQty(nightPlanQty);
         double tqClass2PlanQty2 = BigDecimalUtil.sub(tqPlanQty2, tqClass1PlanQty2);// 第二天夜班计划 = 等于第二天胎圈计划 - 第二天早班计划
-//        tqClass2PlanQty2 = this.limitProductQty(tqClass2PlanQty2, oneProductQty); // 控制计划量不要低于最低生产量
         double dayPlanQty = this.planQtyRounding(scheduleVo, tqClass2PlanQty2, toolCapacity, totalConsumeQty,
                 OpenMachineClassEnums.CLASS_FOUR); // 次日夜班计划 = 第二天夜班计划整车取整
         scheduleVo.setDayPlanQty(dayPlanQty);
 
-        double nextMidPlanQty = 0;        /*
-        // 计算夜班计划量 = 成型前三个班累计消耗量 - 早班胎圈计划 - 胎圈库存
-        double midPlanQty = BigDecimalUtil.sub(BigDecimalUtil
-                .sub(this.getCxClassPlanCumulative(scheduleVo, OpenMachineClassEnums.CLASS_THREE), todayMorningPlanQty),
-                stockQty);
-        midPlanQty = this.planQtyRounding(scheduleVo, midPlanQty, toolCapacity, totalConsumeQty, isCloseOutSpec,
-                OpenMachineClassEnums.CLASS_TWO); // 整车取整
-        scheduleVo.setMidPlanQty(midPlanQty); // 先设置进对象，后续计算要使用
-
-        // 计算早班计划量 = 成型前四个班累计消耗量 - 胎圈前2个班的累计已排计划量 - 胎圈库存
-        double nightPlanQty = BigDecimalUtil
-                .sub(BigDecimalUtil.sub(this.getCxClassPlanCumulative(scheduleVo, OpenMachineClassEnums.CLASS_FOUR),
-                        this.getTqClassPlanCumulative(scheduleVo, OpenMachineClassEnums.CLASS_TWO)), stockQty);
-        nightPlanQty = this.planQtyRounding(scheduleVo, nightPlanQty, toolCapacity, totalConsumeQty, isCloseOutSpec,
-                OpenMachineClassEnums.CLASS_THREE); // 整车取整
-        scheduleVo.setNightPlanQty(nightPlanQty);
-
-        // 次日夜班计划量 = 成型五个班累计消耗量 - 胎圈前3个班的累计已排计划量 - 胎圈库存
-        double dayPlanQty = BigDecimalUtil.sub(BigDecimalUtil.sub(totalConsumeQty,
-                this.getTqClassPlanCumulative(scheduleVo, OpenMachineClassEnums.CLASS_THREE)), stockQty);
-        dayPlanQty = this.planQtyRounding(scheduleVo, dayPlanQty, toolCapacity, totalConsumeQty, isCloseOutSpec,
-                OpenMachineClassEnums.CLASS_FOUR); // 整车取整
-        scheduleVo.setDayPlanQty(dayPlanQty);
-        // 次日中班(16点-24点)计划量 = 成型次日2班消耗胎圈的计划量
-        */
-
-        /*
-        //根据库存重新计算中班计划量：（原中班计划量>库存） ？（ 原中班计划量-库存） ： 0
-        midPlanQty = (initMidPlanQty > stockQty) ? BigDecimalUtil.sub(midPlanQty, stockQty) : 0;
-        //根据库存重新计算夜班计划量：（原中班计划量>库存） ？原夜班计划量 ： （原中班计划量+原夜班计划量 - 库存）
-        nightPlanQty = (initMidPlanQty > stockQty) ? nightPlanQty : BigDecimalUtil.sub(BigDecimalUtil.add(initMidPlanQty, nightPlanQty), stockQty);
-        nightPlanQty = (nightPlanQty < 0) ? 0D : nightPlanQty;
-        //根据库存重新计算次日夜班计划量：（原夜班计划量+早班计划量 > 库存） ？原次日夜班计划量 ： （原夜班计划量+原早班计划量+原白班计划量 - 库存）
-        dayPlanQty = (BigDecimalUtil.add(initMidPlanQty, initNightPlanQty) > stockQty) ? dayPlanQty : BigDecimalUtil.sub(BigDecimalUtil.add(initMidPlanQty, initNightPlanQty, dayPlanQty), stockQty);
-        dayPlanQty = (dayPlanQty < 0) ? 0D : dayPlanQty;
-        //根据库存重新计算次日中班计划量：（原中班计划量+原夜班计划量+原白班计划量 > 库存） ？次日中班计划量 ： （原中班计划量+原夜班计划量+原白班计划量+次日中班计划量 - 库存）
-        nextMidPlanQty = (BigDecimalUtil.add(initMidPlanQty, initNightPlanQty, initDayPlanQty) > stockQty) ? nextMidPlanQty : BigDecimalUtil.sub(BigDecimalUtil.add(initMidPlanQty, initNightPlanQty, dayPlanQty, initDayPlanQty), stockQty);
-        nextMidPlanQty = (nextMidPlanQty < 0) ? 0D : nextMidPlanQty;
-        */
-
-        /*//为了防止二次投产，把后面一班的计划量往前面一班合并（这块暂时注释掉，待确定）
-        //如果夜班计划量>0并且夜班的计划量没有超过参数配置的阈值，那么中班计划量=中班计划量+夜班计划量，夜班计划量=0（为了让相同的胶在同一个班生产，而且又不能延误生产）
-        if(nightPlanQty > 0 && dayPlanQty <= mergeThreshold) {
-            nightPlanQty = BigDecimalUtil.add(nightPlanQty, dayPlanQty);
-            dayPlanQty = 0D;
-        }
-        //如果中班计划量>0并且夜班的计划量没有超过参数配置的阈值，那么中班计划量=中班计划量+夜班计划量，夜班计划量=0（为了让相同的胶在同一个班生产，而且又不能延误生产）
-        if (midPlanQty > 0 && nightPlanQty <= mergeThreshold) {
-            midPlanQty = BigDecimalUtil.add(midPlanQty, nightPlanQty);
-            nightPlanQty = 0D;
-        } */
+        double nextMidPlanQty = 0;
 
         String machineId = scheduleVo.getMachineId();  //机台id
         double lossRate = 0;
@@ -1481,7 +1451,6 @@ public class TqEngineServiceImpl implements TqEngineService {
         scheduleVo.setDayPlanQty(BigDecimalUtil.roundUp(dayPlanQty,0));
         scheduleVo.setNextMidPlanQty(BigDecimalUtil.roundUp(nextMidPlanQty,0));
 
-        //计算中班总计划量 和 夜班总计划量
         //计算各班总计划量
         totalPlanQtyVo.setTotalMidPlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalMidPlanQty(), midPlanQty));
         totalPlanQtyVo.setTotalNightPlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalNightPlanQty(), nightPlanQty));
@@ -1489,6 +1458,7 @@ public class TqEngineServiceImpl implements TqEngineService {
         totalPlanQtyVo.setTotalNextMidPlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalNextMidPlanQty(), nextMidPlanQty));
         totalPlanQtyVo.setTotalPlanQty(BigDecimalUtil.add(totalPlanQtyVo.getTotalMidPlanQty(), totalPlanQtyVo.getTotalNightPlanQty(), totalPlanQtyVo.getTotalDayPlanQty(), totalPlanQtyVo.getTotalNextMidPlanQty()));
         this.computeTqPlanQtyLog(oldScheduleResult, scheduleVo, lossMap, paramLossRate, lossRate);  //添加日志
+*/
     }
 
     /**
@@ -1549,6 +1519,8 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @return
      */
     private Double getTqClassPlanCumulative(TqScheduleResultVo scheduleVo, OpenMachineClassEnums classNum) {
+        // TODO 旧班次字段已移除(midPlanQty/nightPlanQty/dayPlanQty)，待适配6班次字段
+/*
         Double planQty = 0D;
         if (classNum == null) {
             return planQty;
@@ -1566,6 +1538,8 @@ public class TqEngineServiceImpl implements TqEngineService {
             return planQty;
         }
         return BigDecimalUtil.add(planQty, scheduleVo.getDayPlanQty());
+*/
+        return 0D;
     }
 
     /**
