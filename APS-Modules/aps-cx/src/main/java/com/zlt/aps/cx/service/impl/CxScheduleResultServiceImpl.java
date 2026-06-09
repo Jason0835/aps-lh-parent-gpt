@@ -2117,6 +2117,19 @@ public class CxScheduleResultServiceImpl extends AbstractDocService<CxScheduleRe
     }
 
     @Override
+    public void batchUpdateReleaseStatus(List<CxScheduleResult> items) {
+        if (CollectionUtils.isEmpty(items)) {
+            return;
+        }
+        for (CxScheduleResult item : items) {
+            CxScheduleResult updateEntity = new CxScheduleResult();
+            updateEntity.setId(item.getId());
+            updateEntity.setIsRelease(item.getIsRelease());
+            cxScheduleResultMapper.updateById(updateEntity);
+        }
+    }
+
+    @Override
     public List<CxScheduleResult> listByScheduleDateAndFactory(Date scheduleDate, String factoryCode) {
         LambdaQueryWrapper<CxScheduleResult> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CxScheduleResult::getScheduleDate, scheduleDate);

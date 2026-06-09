@@ -168,6 +168,19 @@ public class LhScheduleResultServiceImpl implements ILhScheduleResultService {
     }
 
     @Override
+    public void batchUpdateReleaseStatus(List<LhScheduleResult> items) {
+        if (CollectionUtils.isEmpty(items)) {
+            return;
+        }
+        for (LhScheduleResult item : items) {
+            LhScheduleResult updateEntity = new LhScheduleResult();
+            updateEntity.setId(item.getId());
+            updateEntity.setIsRelease(item.getIsRelease());
+            mapper.updateById(updateEntity);
+        }
+    }
+
+    @Override
     public List<LhScheduleResult> getCxLhScheduleResultList(Date scheduleDate) {
         LambdaQueryWrapper<LhScheduleResult> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(LhScheduleResult::getScheduleDate, scheduleDate);

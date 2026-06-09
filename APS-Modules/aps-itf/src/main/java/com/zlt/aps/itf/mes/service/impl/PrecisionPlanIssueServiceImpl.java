@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 精度计划下发服务实现
@@ -56,12 +58,24 @@ public class PrecisionPlanIssueServiceImpl implements IPrecisionPlanIssueService
         }
 
         List<MesPrecisionPlan> insertList = new ArrayList<>();
+        List<MesPrecisionPlan> updateList = new ArrayList<>();
         // 中间表MES_PRECISION_PLAN建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
+        // 先批量查询已有记录，按机台编码+精度类型+分厂匹配
+        List<MesPrecisionPlan> existingRecords = precisionPlanIssueMapper.selectExistingRecords(mesList);
+        Set<String> existingKeys = existingRecords.stream()
+                .map(r -> r.getMachineCode() + "|" + r.getPrecisionType() + "|" + r.getFactoryCode())
+                .collect(Collectors.toSet());
+        // 根据查询结果分组：已有记录走批量更新，不存在记录走批量新增
         for (MesPrecisionPlan mesItem : mesList) {
-            int updateCount = precisionPlanIssueMapper.updateByMachineCodeAndPrecisionType(mesItem);
-            if (updateCount == 0) {
+            String key = mesItem.getMachineCode() + "|" + mesItem.getPrecisionType() + "|" + mesItem.getFactoryCode();
+            if (existingKeys.contains(key)) {
+                updateList.add(mesItem);
+            } else {
                 insertList.add(mesItem);
             }
+        }
+        if (CollectionUtils.isNotEmpty(updateList)) {
+            precisionPlanIssueMapper.batchUpdateByMachineCodeAndPrecisionType(updateList);
         }
         if (CollectionUtils.isNotEmpty(insertList)) {
             precisionPlanIssueMapper.batchInsertPrecisionPlan(insertList);

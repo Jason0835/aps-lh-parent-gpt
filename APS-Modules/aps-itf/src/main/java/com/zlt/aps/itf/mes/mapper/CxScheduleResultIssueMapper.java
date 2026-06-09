@@ -71,4 +71,20 @@ public interface CxScheduleResultIssueMapper {
      * @return 影响行数
      */
     int updateByScheduleDateAndMachine(@Param("item") MesCxScheduleResult mesCxScheduleResult);
+
+    /**
+     * 批量根据排程日期和机台编码更新数据
+     *
+     * @param list 数据列表
+     * @return 影响行数
+     */
+    int batchUpdateByScheduleDateAndMachine(@Param("list") List<MesCxScheduleResult> list);
+
+    /**
+     * 批量查询中间表中已存在的记录（按排程日期+机台编码+版本号匹配）
+     *
+     * @param list 数据列表
+     * @return 已存在的记录列表（仅包含SCHEDULE_DATE, MACHINE_CODE, DATA_VERSION）
+     */
+    List<MesCxScheduleResult> selectExistingByScheduleDateAndMachine(@Param("list") List<MesCxScheduleResult> list);
 }

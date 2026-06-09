@@ -24,8 +24,10 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Api(tags = "成型精度计划管理")
@@ -205,15 +207,25 @@ public class CxPrecisionPlanController extends AbstractDocBizController<CxPrecis
         }
     }
 
-    @ApiOperation("MES回传实际完成时间")
+    @ApiOperation("批量MES回传实际完成时间")
     @PostMapping("/updateActualDate")
-    public AjaxResult updateActualDate(@RequestParam("mesSourceId") Long mesSourceId,
-                                       @RequestParam("actualDate") String actualDate) {
+    public AjaxResult updateActualDate(@RequestBody List<Map<String, Object>> params) {
         try {
-            boolean result = cxPrecisionPlanService.updateActualDate(mesSourceId, actualDate);
-            return result ? AjaxResult.success("更新成功") : AjaxResult.error("更新失败");
+            List<String> errorMessages = new ArrayList<>();
+            for (Map<String, Object> param : params) {
+                Long mesSourceId = Long.valueOf(param.get("mesSourceId").toString());
+                String actualDate = param.get("actualDate").toString();
+                boolean result = cxPrecisionPlanService.updateActualDate(mesSourceId, actualDate);
+                if (!result) {
+                    errorMessages.add("mesSourceId=" + mesSourceId + " 更新失败");
+                }
+            }
+            if (!errorMessages.isEmpty()) {
+                return AjaxResult.error("部分更新失败：" + String.join("; ", errorMessages));
+            }
+            return AjaxResult.success("批量更新成功");
         } catch (Exception e) {
-            log.error("MES回传实际完成时间失败", e);
+            log.error("批量MES回传实际完成时间失败", e);
             return AjaxResult.error("更新失败：" + e.getMessage());
         }
     }

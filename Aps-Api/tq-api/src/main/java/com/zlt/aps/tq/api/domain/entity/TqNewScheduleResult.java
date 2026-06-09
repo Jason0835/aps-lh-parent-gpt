@@ -231,6 +231,12 @@ public class TqNewScheduleResult extends BaseEntity implements Serializable {
     @TableField(value = "CLASS6_ANALYSIS")
     private String class6Analysis;
 
+    /** 数据来源：0-自动排程，1-插单，2-导入 */
+    @Excel(name = "ui.data.column.tqNewScheduleResult.dataSource", dictType = "TQ_DATA_SOURCE")
+    @ApiModelProperty(value = "数据来源：0-自动排程，1-插单，2-导入", name = "dataSource")
+    @TableField(value = "DATA_SOURCE")
+    private String dataSource;
+
     /** 是否发布 */
     @Excel(name = "ui.data.column.tqNewScheduleResult.isRelease", dictType = "IS_RELEASE")
     @ApiModelProperty(value = "是否发布", name = "isRelease")

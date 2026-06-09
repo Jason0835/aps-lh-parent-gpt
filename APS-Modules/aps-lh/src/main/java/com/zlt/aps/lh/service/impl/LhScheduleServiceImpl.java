@@ -568,6 +568,17 @@ public class LhScheduleServiceImpl extends AbstractDocService<LhScheduleResult> 
     }
 
     /**
+     * 批量计划更新。
+     *
+     * @param scheduleResultList 硫化排程结果列表
+     * @return 处理结果
+     */
+    @Override
+    public AjaxResult batchIncreaseMouldStartPlan(List<LhScheduleResult> scheduleResultList) {
+        return increaseMouldStartPlanService.batchIncrease(scheduleResultList);
+    }
+
+    /**
      * 获取指定班次的调量计划值。
      *
      * @param dto        调量参数

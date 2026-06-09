@@ -269,6 +269,7 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
         if (completedList.isEmpty()) {
             return AjaxResult.success();
         }
+        // 批量更新模具交替计划完成状态
         for (LhMoldAlterPlanFinish finishItem : completedList) {
             LambdaUpdateWrapper<LhMouldChangePlan> updateWrapper = new LambdaUpdateWrapper<>();
             updateWrapper.set(LhMouldChangePlan::getMouldStatus, "1");
@@ -281,7 +282,10 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
                 updateWrapper.eq(LhMouldChangePlan::getLeftRightMould, finishItem.getLeftRightMold());
             }
             lhMouldChangePlanEntityMapper.update(null, updateWrapper);
-            // 执行硫化排程自动更新
+        }
+        // 批量执行硫化排程自动更新
+        List<LhScheduleResult> allScheduleResults = new ArrayList<>();
+        for (LhMoldAlterPlanFinish finishItem : completedList) {
             LambdaQueryWrapper<LhScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.eq(LhScheduleResult::getFactoryCode, finishItem.getFactoryCode());
             queryWrapper.eq(LhScheduleResult::getScheduleDate, finishItem.getScheduleDate());
@@ -289,8 +293,11 @@ public class LhMesSyncController implements ILhMesSyncRemoteService {
             queryWrapper.eq(LhScheduleResult::getIsDelete, YesOrNoEnum.NO.getCode());
             List<LhScheduleResult> lhScheduleResultList = scheduleResultMapper.selectList(queryWrapper);
             if (CollectionUtils.isNotEmpty(lhScheduleResultList)) {
-                lhScheduleService.increaseMouldStartPlan(lhScheduleResultList.get(0));
+                allScheduleResults.add(lhScheduleResultList.get(0));
             }
+        }
+        if (CollectionUtils.isNotEmpty(allScheduleResults)) {
+            lhScheduleService.batchIncreaseMouldStartPlan(allScheduleResults);
         }
         return AjaxResult.success();
     }

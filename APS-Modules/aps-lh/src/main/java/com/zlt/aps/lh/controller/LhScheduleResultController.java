@@ -214,6 +214,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
 
     /**
+     * 批量编辑
+     */
+    /**
      * 编辑
      */
     @Log(title = "ui.data.column.outDn.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
@@ -713,15 +716,15 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
     /**
-     * 计划更新。
+     * 批量计划更新。
      *
-     * @param scheduleResult 当前硫化排程结果
+     * @param scheduleResultList 硫化排程结果列表
      * @return 处理结果
      */
     @PostMapping("/increaseMouldStartPlan")
-    @ApiOperation("计划更新")
-    public AjaxResult increaseMouldStartPlan(@RequestBody LhScheduleResult scheduleResult) {
-        return lhScheduleService.increaseMouldStartPlan(scheduleResult);
+    @ApiOperation("批量计划更新")
+    public AjaxResult increaseMouldStartPlan(@RequestBody List<LhScheduleResult> scheduleResultList) {
+        return lhScheduleService.batchIncreaseMouldStartPlan(scheduleResultList);
     }
 
     /**
@@ -803,10 +806,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
                     if (issueResult != null && Objects.equals(HttpStatus.SUCCESS, issueResult.get(AjaxResult.CODE_TAG))) {
                         log.info("硫化排程发布成功, 耗时={}ms, 记录数={}", costTime, filteredList.size());
-                        for (LhScheduleResult item : filteredList) {
-                            item.setIsRelease(ApsConstant.IS_RELEASE);
-                            lhScheduleResultService.updateReleaseStatus(item);
-                        }
+                        filteredList.forEach(item -> item.setIsRelease(ApsConstant.IS_RELEASE));
+                        lhScheduleResultService.batchUpdateReleaseStatus(filteredList);
                         return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
                     } else {
                         log.warn("第{}次硫化排程发布失败, 耗时={}ms, 原因: {}", retryCount + 1, costTime, issueResult);
@@ -826,10 +827,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         }
 
         log.error("硫化排程发布最终失败，已重试{}次", maxRetries);
-        for (LhScheduleResult item : filteredList) {
-            item.setIsRelease(ApsConstant.FAILURE_RELEASE);
-            lhScheduleResultService.updateReleaseStatus(item);
-        }
+        filteredList.forEach(item -> item.setIsRelease(ApsConstant.FAILURE_RELEASE));
+        lhScheduleResultService.batchUpdateReleaseStatus(filteredList);
         return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
     }
 

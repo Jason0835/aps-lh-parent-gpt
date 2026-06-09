@@ -4,6 +4,7 @@ import cn.hutool.core.date.DateTime;
 import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.common.core.constant.ApsConstant;
@@ -31,8 +32,10 @@ import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * 计划更新服务。
@@ -112,6 +115,33 @@ public class LhIncreaseMouldStartPlanService {
         int updateCount = scheduleResultMapper.updateById(currentResult);
         if (updateCount <= 0) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.increaseMouldStartPlan.fail"));
+        }
+        return AjaxResult.success(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.increaseMouldStartPlan.success"));
+    }
+
+    /**
+     * 批量计划更新。
+     *
+     * @param scheduleResultList 硫化排程结果列表
+     * @return 处理结果
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public AjaxResult batchIncrease(List<LhScheduleResult> scheduleResultList) {
+        if (scheduleResultList == null || scheduleResultList.isEmpty()) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.increaseMouldStartPlan.chooseRecord"));
+        }
+        List<String> errorMessages = scheduleResultList.stream()
+                .map(item -> {
+                    AjaxResult result = increase(item);
+                    if (!Objects.equals(HttpStatus.SUCCESS, result.get(AjaxResult.CODE_TAG))) {
+                        return String.valueOf(result.get(AjaxResult.MSG_TAG));
+                    }
+                    return null;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        if (!errorMessages.isEmpty()) {
+            return AjaxResult.error(String.join("; ", errorMessages));
         }
         return AjaxResult.success(I18nUtil.getMessage("ui.data.alert.lhScheduleResult.increaseMouldStartPlan.success"));
     }

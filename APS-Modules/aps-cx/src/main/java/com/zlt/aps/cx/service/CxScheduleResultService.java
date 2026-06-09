@@ -80,6 +80,13 @@ public interface CxScheduleResultService extends IDocService<CxScheduleResult> {
     void updateReleaseStatus(CxScheduleResult item);
 
     /**
+     * 批量更新发布状态
+     *
+     * @param items 排程结果列表（每项需包含id和isRelease）
+     */
+    void batchUpdateReleaseStatus(List<CxScheduleResult> items);
+
+    /**
      * 根据排程日期和工厂查询排程结果
      *
      * @param scheduleDate 排程日期

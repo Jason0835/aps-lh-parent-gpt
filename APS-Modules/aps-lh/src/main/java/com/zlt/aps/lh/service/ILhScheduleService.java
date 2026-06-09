@@ -90,6 +90,14 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
     AjaxResult increaseMouldStartPlan(LhScheduleResult scheduleResult);
 
     /**
+     * 批量计划更新。
+     *
+     * @param scheduleResultList 硫化排程结果列表
+     * @return 处理结果
+     */
+    AjaxResult batchIncreaseMouldStartPlan(List<LhScheduleResult> scheduleResultList);
+
+    /**
      * 导出数据
      *
      @param list 数据列表

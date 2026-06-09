@@ -41,6 +41,29 @@
           AND FACTORY_CODE = #{factoryCode}
     </update>
 
+    <update id="batchUpdateByMachineCodeAndPrecisionType" parameterType="list">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE MES_PRECISION_PLAN SET
+                SCHEDULE_DATE = #{item.scheduleDate},
+                PLAN_DATE = #{item.planDate},
+                DATA_VERSION = #{item.dataVersion}
+            WHERE MACHINE_CODE = #{item.machineCode}
+              AND PRECISION_TYPE = #{item.precisionType}
+              AND FACTORY_CODE = #{item.factoryCode}
+        </foreach>
+    </update>
+
+    <select id="selectExistingRecords" parameterType="list" resultType="com.zlt.aps.itf.vo.MesPrecisionPlan">
+        SELECT MACHINE_CODE, PRECISION_TYPE, FACTORY_CODE
+        FROM MES_PRECISION_PLAN
+        WHERE
+        <foreach collection="list" item="item" separator=" OR ">
+            (MACHINE_CODE = #{item.machineCode}
+             AND PRECISION_TYPE = #{item.precisionType}
+             AND FACTORY_CODE = #{item.factoryCode})
+        </foreach>
+    </select>
+
     <delete id="deleteByFactoryCodeAndPrecisionType">
         DELETE FROM MES_PRECISION_PLAN
         WHERE FACTORY_CODE = #{factoryCode}

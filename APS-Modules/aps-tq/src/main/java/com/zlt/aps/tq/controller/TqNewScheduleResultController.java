@@ -8,6 +8,8 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
+import com.zlt.aps.tq.api.domain.dto.TqChangeMachineDTO;
+import com.zlt.aps.tq.api.domain.dto.TqInsertOrderDTO;
 import com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult;
 import com.zlt.aps.tq.api.domain.vo.TqScheduleShiftDateVO;
 import com.zlt.aps.tq.engine.service.TqEngineService;
@@ -147,14 +149,31 @@ public class TqNewScheduleResultController extends AbstractDocBizController<TqNe
     }
 
     /**
-     * 插单（id为空则新增排程记录）
+     * 插单前校验
+     */
+    @ApiOperation("插单前校验")
+    @PostMapping("/validateInsertOrder")
+    public AjaxResult validateInsertOrder(@RequestBody TqInsertOrderDTO dto) {
+        return tqNewScheduleResultService.validateInsertOrder(dto);
+    }
+
+    /**
+     * 插单
      */
     @Log(title = "胎圈排程结果(新)", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("插单")
     @PostMapping("/insertOrder")
-    public AjaxResult insertOrder(@RequestBody TqNewScheduleResult entity) {
-        // TODO 插单业务逻辑待实现：规格校验、唯一性校验等
-        return tqNewScheduleResultService.insertOrder(entity);
+    public AjaxResult insertOrder(@RequestBody TqInsertOrderDTO dto) {
+        return tqNewScheduleResultService.insertOrder(dto);
+    }
+
+    /**
+     * 转机台前校验
+     */
+    @ApiOperation("转机台前校验")
+    @PostMapping("/validateChangeMachine")
+    public AjaxResult validateChangeMachine(@RequestBody TqChangeMachineDTO dto) {
+        return tqNewScheduleResultService.validateChangeMachine(dto);
     }
 
     /**
@@ -163,9 +182,8 @@ public class TqNewScheduleResultController extends AbstractDocBizController<TqNe
     @Log(title = "胎圈排程结果(新)", businessType = BusinessType.CHANGE_MACHINE)
     @ApiOperation("转机台")
     @PostMapping("/changeMachine")
-    public AjaxResult changeMachine(@RequestBody TqNewScheduleResult entity) {
-        // TODO 转机台业务逻辑待实现：发布状态校验、唯一性校验、调度日志等
-        return tqNewScheduleResultService.changeMachine(entity);
+    public AjaxResult changeMachine(@RequestBody TqChangeMachineDTO dto) {
+        return tqNewScheduleResultService.changeMachine(dto);
     }
 
     /**
@@ -177,6 +195,17 @@ public class TqNewScheduleResultController extends AbstractDocBizController<TqNe
     public AjaxResult changeQty(@RequestBody TqNewScheduleResult entity) {
         // TODO 调量业务逻辑待实现：发布状态校验、调度日志等
         return tqNewScheduleResultService.changeQty(entity);
+    }
+
+    /**
+     * 逻辑删除排程记录
+     * 只能删除发布成功次数等于0的计划
+     */
+    @Log(title = "胎圈排程结果(新)", businessType = BusinessType.DELETE)
+    @ApiOperation("逻辑删除排程记录")
+    @PostMapping("/logicDelete")
+    public AjaxResult logicDelete(@RequestBody List<Long> ids) {
+        return tqNewScheduleResultService.logicDeleteByIds(ids);
     }
 
     /**
@@ -200,20 +229,11 @@ public class TqNewScheduleResultController extends AbstractDocBizController<TqNe
     }
 
     /**
-     * 根据排程日期、胎圈代码、机台编号校验唯一性
-     */
-//    @ApiOperation("唯一性校验")
-//    @PostMapping("/checkUnique")
-//    public String checkUnique(@RequestBody TqNewScheduleResult entity) {
-//        return tqNewScheduleResultService.checkUnique(entity);
-//    }
-
-    /**
      * 根据排程日期构建6个班次的日期展示列表
      * 胎圈排程6个班次覆盖D日中班、D+1日夜早中、D+2日夜早（D=排程日期-2，即今天）：
      * 班次1：D日中班，班次2~4：D+1日夜早中，班次5~6：D+2日夜早
      *
-     * @param queryVO
+     * @param queryVO 查询条件
      * @return 班次日期列表
      */
     @ApiOperation("获取胎圈排程班次日期列表")

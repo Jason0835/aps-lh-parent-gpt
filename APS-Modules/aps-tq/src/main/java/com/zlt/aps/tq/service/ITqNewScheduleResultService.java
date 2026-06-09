@@ -1,10 +1,13 @@
 package com.zlt.aps.tq.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.zlt.aps.tq.api.domain.dto.TqChangeMachineDTO;
+import com.zlt.aps.tq.api.domain.dto.TqInsertOrderDTO;
 import com.zlt.aps.tq.api.domain.entity.TqNewScheduleResult;
 import com.zlt.bill.common.service.IDocService;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 胎圈排程结果Service接口（新版）
@@ -14,20 +17,36 @@ import java.util.Date;
 public interface ITqNewScheduleResultService extends IDocService<TqNewScheduleResult> {
 
     /**
+     * 插单前校验
+     *
+     * @param dto 插单数据
+     * @return 校验结果
+     */
+    AjaxResult validateInsertOrder(TqInsertOrderDTO dto);
+
+    /**
      * 插单
      *
-     * @param entity 插单数据
+     * @param dto 插单数据
      * @return 结果
      */
-    AjaxResult insertOrder(TqNewScheduleResult entity);
+    AjaxResult insertOrder(TqInsertOrderDTO dto);
+
+    /**
+     * 转机台前校验
+     *
+     * @param dto 转机台数据
+     * @return 校验结果
+     */
+    AjaxResult validateChangeMachine(TqChangeMachineDTO dto);
 
     /**
      * 转机台
      *
-     * @param entity 转机台数据
+     * @param dto 转机台数据
      * @return 结果
      */
-    AjaxResult changeMachine(TqNewScheduleResult entity);
+    AjaxResult changeMachine(TqChangeMachineDTO dto);
 
     /**
      * 调量
@@ -36,6 +55,14 @@ public interface ITqNewScheduleResultService extends IDocService<TqNewScheduleRe
      * @return 结果
      */
     AjaxResult changeQty(TqNewScheduleResult entity);
+
+    /**
+     * 逻辑删除排程记录
+     *
+     * @param ids 需要删除的记录ID列表
+     * @return 结果
+     */
+    AjaxResult logicDeleteByIds(List<Long> ids);
 
     /**
      * 发布排程到MES
@@ -52,12 +79,4 @@ public interface ITqNewScheduleResultService extends IDocService<TqNewScheduleRe
      * @return 是否已发布
      */
     Boolean isPublish(Date scheduleDate);
-
-    /**
-     * 唯一性校验（排程日期+胎圈代码+机台编号）
-     *
-     * @param entity 校验数据
-     * @return 是否唯一
-     */
-//    Boolean checkUnique(TqNewScheduleResult entity);
 }
