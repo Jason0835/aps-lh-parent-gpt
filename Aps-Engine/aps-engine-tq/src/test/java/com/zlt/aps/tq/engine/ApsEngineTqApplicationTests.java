@@ -37,8 +37,9 @@ class ApsEngineTqApplicationTests {
         TqScheduleResultVo scheduleVo = new TqScheduleResultVo();
         scheduleVo.setScheduleDate(DateUtils.parseDate("2021-06-29","yyyy-MM-dd"));
         scheduleVo.setBeadCode("HC1913");
-        scheduleVo.setNightPlanQty(200D);
-        scheduleVo.setDayPlanQty(300D);
+        // TODO 旧班次字段已移除(nightPlanQty/dayPlanQty)，待适配6班次字段
+//        scheduleVo.setNightPlanQty(200D);
+//        scheduleVo.setDayPlanQty(300D);
         tqEngineService.inertTqOrder(scheduleVo);
     }
 }
