@@ -45,6 +45,7 @@ public class Cd90MachineRollMappingServiceImpl extends AbstractDocService<Cd90Ma
         LambdaQueryWrapper<Cd90MachineRollMapping> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Cd90MachineRollMapping::getFactoryCode, entity.getFactoryCode());
         wrapper.eq(Cd90MachineRollMapping::getBigRollCode, entity.getBigRollCode());
+        wrapper.eq(Cd90MachineRollMapping::getCordFabricCode, entity.getCordFabricCode());
         wrapper.eq(Cd90MachineRollMapping::getMachineCode, entity.getMachineCode());
         wrapper.ne(entity.getId() != null, Cd90MachineRollMapping::getId, entity.getId());
         return cd90MachineRollMappingMapper.selectCount(wrapper) > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
@@ -91,6 +92,7 @@ public class Cd90MachineRollMappingServiceImpl extends AbstractDocService<Cd90Ma
         LambdaQueryWrapper<Cd90MachineRollMapping> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Cd90MachineRollMapping::getFactoryCode, entity.getFactoryCode());
         wrapper.eq(Cd90MachineRollMapping::getBigRollCode, entity.getBigRollCode());
+        wrapper.eq(Cd90MachineRollMapping::getCordFabricCode, entity.getCordFabricCode());
         wrapper.eq(Cd90MachineRollMapping::getMachineCode, entity.getMachineCode());
         return cd90MachineRollMappingMapper.selectOne(wrapper);
     }
@@ -103,11 +105,11 @@ public class Cd90MachineRollMappingServiceImpl extends AbstractDocService<Cd90Ma
     }
 
     @Override
-    protected List<String> getCheckUniqueFields() { return Arrays.asList("factoryCode", "bigRollCode", "machineCode"); }
+    protected List<String> getCheckUniqueFields() { return Arrays.asList("factoryCode", "bigRollCode", "cordFabricCode", "machineCode"); }
 
     private boolean isTireFabricCodeExists(Cd90MachineRollMapping entity, Set<String> tireFabricCodes) {
         if (StringUtils.isBlank(entity.getCordFabricCode())) {
-            return true;
+            return false;
         }
         return tireFabricCodes.contains(entity.getCordFabricCode());
     }

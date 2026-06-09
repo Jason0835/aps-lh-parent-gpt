@@ -8,5 +8,6 @@ import java.util.List;
 
 public interface ICd90MachineRollMappingService extends IDocService<Cd90MachineRollMapping> {
     String checkUnique(Cd90MachineRollMapping entity);
+
     AjaxResult importData(List<Cd90MachineRollMapping> list, boolean updateSupport, Long importLogId);
 }

@@ -33,7 +33,7 @@ public class Cd90MachineRollMapping extends BaseEntity implements Serializable {
 
     /** 帘布代码 */
 
-    @ImportExcelValidated(maxLength = 30)
+    @ImportExcelValidated(required = true, maxLength = 30)
     @TableField("CORD_FABRIC_CODE")
     @Excel(name = "ui.data.column.cd90MachineRollMapping.cordFabricCode")
     private String cordFabricCode;
