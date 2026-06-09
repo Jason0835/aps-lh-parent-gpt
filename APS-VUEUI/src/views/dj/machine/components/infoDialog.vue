@@ -29,7 +29,7 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-import { editMachine, checkMachineCodeUnique } from "@/api/nc/machine";
+import { editMachine, checkMachineCodeUnique } from "@/api/dj/machine";
 export default {
   components: { infoForm },
   inject: ["parentDict"],

@@ -28,35 +28,35 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.dj.api.domain.entity.DjStock;
-import com.zlt.aps.dj.api.service.IDjStockService;
+import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
+import com.zlt.aps.dj.api.service.IDjMachineInfoService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 
 /**
- * 垫胶库存信息Controller
+ * 垫胶机台信息Controller
  *
  * @author zlt
  */
 @Controller
-@RequestMapping("/dj/stock")
-@Api(tags = { "垫胶库存信息维护接口" })
-public class DjStockUIController extends BaseUIController<DjStock> {
+@RequestMapping("/dj/machine")
+@Api(tags = { "垫胶机台信息维护接口" })
+public class DjMachineUIController extends BaseUIController<DjMachineInfo> {
 
     @Autowired
-    private IDjStockService iDjStockService;
+    private IDjMachineInfoService iDjMachineInfoService;
 
-    private final String prefix = "aps/dj/djStock";
+    private final String prefix = "aps/dj/machine";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("dj:djStock:view")
+    @RequiresPermissions("dj:machine:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/djStock";
+        return prefix + "/djMachine";
     }
 
     /**
@@ -64,7 +64,7 @@ public class DjStockUIController extends BaseUIController<DjStock> {
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("djStock", new DjStock());
+        mmap.put("djMachine", new DjMachineInfo());
         return prefix + "/add";
     }
 
@@ -73,7 +73,7 @@ public class DjStockUIController extends BaseUIController<DjStock> {
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("djStock", iDjStockService.getInfo(id));
+        mmap.put("djMachine", iDjMachineInfoService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -81,38 +81,38 @@ public class DjStockUIController extends BaseUIController<DjStock> {
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("dj:djStock:list")
+    @RequiresPermissions("dj:djMachine:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(DjStock djStock) {
-        return iDjStockService.list(djStock);
+    public TableDataInfo list(DjMachineInfo djMachine) {
+        return iDjMachineInfoService.list(djMachine);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("dj:djStock:edit")
+    @RequiresPermissions("dj:djMachine:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(DjStock djStock) {
-        if (UserConstants.NOT_UNIQUE.equals(iDjStockService.checkUnique(djStock))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djStock.embryoCodeNotUnique"));
+    public AjaxResult save(DjMachineInfo djMachine) {
+        if (UserConstants.NOT_UNIQUE.equals(iDjMachineInfoService.checkUnique(djMachine))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djMachine.embryoCodeNotUnique"));
         }
 
-        return iDjStockService.save(djStock);
+        return iDjMachineInfoService.save(djMachine);
     }
 
     /**
      * 删除
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("dj:djStock:remove")
+    @RequiresPermissions("dj:djMachine:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(@RequestParam String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iDjStockService.removeByIds(Arrays.asList(arr));
+        return iDjMachineInfoService.removeByIds(Arrays.asList(arr));
     }
 
     /**
@@ -121,8 +121,8 @@ public class DjStockUIController extends BaseUIController<DjStock> {
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(DjStock djStock) {
-        return iDjStockService.checkUnique(djStock);
+    public String checkUnique(DjMachineInfo djMachine) {
+        return iDjMachineInfoService.checkUnique(djMachine);
     }
 
     /**
@@ -151,7 +151,7 @@ public class DjStockUIController extends BaseUIController<DjStock> {
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.djStock.modelName");
+        return I18nUtil.getMessage("ui.data.column.djMachine.modelName");
     }
 
     /**
@@ -161,7 +161,7 @@ public class DjStockUIController extends BaseUIController<DjStock> {
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<DjStock> util = new ExcelUtil<>(DjStock.class);
+        ExcelUtil<DjMachineInfo> util = new ExcelUtil<>(DjMachineInfo.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
@@ -170,9 +170,9 @@ public class DjStockUIController extends BaseUIController<DjStock> {
     @GetMapping({"/export"})
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, DjStock entity) throws IOException {
+    public void export(HttpServletResponse response, DjMachineInfo entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iDjStockService.exportData(entity,fileName);
+        byte[] excelBytes = iDjMachineInfoService.exportData(entity,fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
@@ -192,7 +192,7 @@ public class DjStockUIController extends BaseUIController<DjStock> {
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iDjStockService.importData(context, updateSupport);
+        AjaxResult ajaxResult = iDjMachineInfoService.importData(context, updateSupport);
         return ajaxResult;
     }
 }

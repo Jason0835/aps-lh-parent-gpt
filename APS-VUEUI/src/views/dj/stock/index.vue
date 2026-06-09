@@ -138,27 +138,6 @@ export default {
           // sortable: "custom",
         },
         {
-          prop: "rollStockNum",
-          align: "right",
-          halign: "center",
-          label: this.$t("ui.data.column.stock.stockNum.roll"),
-          // sortable: "custom",
-        },
-        {
-          prop: "rollModifyNum",
-          align: "right",
-          halign: "center",
-          label: this.$t("ui.data.column.stock.modifyNum.roll"),
-          // sortable: "custom",
-        },
-        {
-          prop: "rollBadNum",
-          align: "right",
-          halign: "center",
-          label: this.$t("ui.data.column.stock.badNum.roll"),
-          // sortable: "custom",
-        },
-        {
           prop: "stockNum",
           align: "right",
           halign: "center",

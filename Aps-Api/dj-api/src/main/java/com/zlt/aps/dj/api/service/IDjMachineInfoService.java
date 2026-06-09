@@ -1,49 +1,63 @@
 package com.zlt.aps.dj.api.service;
 
+import java.util.List;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 
-import io.swagger.annotations.ApiOperation;
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-
 /**
  * 垫胶机台信息对外暴露接口
  */
-@FeignClient(contextId = "iNcMachineInfoService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:nc}")
+@FeignClient(contextId = "iDjMachineInfoService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
 public interface IDjMachineInfoService {
 
     /**
-     * 获取垫胶机台信息列表
+     * 获取信息列表
      *
-     * @param machineInfo
+     * @param stock
      * @return
      */
     @PostMapping("/dj/machine/list")
-    TableDataInfo list(@RequestBody DjMachineInfo machineInfo);
+    TableDataInfo list(@RequestBody DjMachineInfo machine);
 
     /**
-     * 删除垫胶机台信息
+     * 保存信息
+     *
+     * @param stock
+     * @return
+     */
+    @PostMapping("/dj/machine/save")
+    AjaxResult save(@Validated @RequestBody DjMachineInfo machine);
+
+    /**
+     * 删除信息
      *
      * @param ids
      * @return
      */
     @DeleteMapping("/dj/machine/{ids}")
-    AjaxResult remove(@PathVariable("ids") Long[] ids);
+    AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**
-     * 新增垫胶机台信息
+     * 根据ID获取详细信息
      *
-     * @param machineInfo
+     * @param id
      * @return
      */
-    @PostMapping("/dj/machine")
-    AjaxResult add(@Validated @RequestBody DjMachineInfo machineInfo);
+    @GetMapping(value = "/dj/machine/selectStockById/{id}")
+    DjMachineInfo selectStockById(@PathVariable("id") Long id);
 
     /**
      * 根据ID获取详细信息
@@ -52,45 +66,30 @@ public interface IDjMachineInfoService {
      * @return
      */
     @GetMapping(value = "/dj/machine/{id}")
-    DjMachineInfo getInfo(@PathVariable("id") Long id);
+    AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
-     * 修改垫胶机台信息
-     *
-     * @param machineInfo
-     * @return
+     * 校验唯一性
      */
-    @PutMapping("/dj/machine")
-    AjaxResult edit(@Validated @RequestBody DjMachineInfo machineInfo);
+    @PostMapping("/dj/machine/checkUnique")
+    String checkUnique(@RequestBody DjMachineInfo machine);
 
     /**
-     * 校验垫胶机台唯一性
-     *
-     * @param machineInfo
-     * @return
-     */
-    @PostMapping("/dj/machine/checkMachineCodeUnique")
-    String checkMachineCodeUnique(@Validated @RequestBody DjMachineInfo machineInfo);
-
-    /**
-     * 导出垫胶机台列表
-     *
+     * 导出信息
+     * 
      * @param stock
      * @return
      */
-    @PostMapping("/dj/machine/exportList")
-    List<DjMachineInfo> exportList(@RequestBody DjMachineInfo machineInfo);
+    @PostMapping("/dj/machine/exportData/{fileName}")
+    byte[] exportData(@RequestBody DjMachineInfo queryVO, @PathVariable("fileName") String fileName);
 
     /**
-     * 根据垫胶和口型板获取对应机台信息
-     * @param machineInfo
+     * 导入信息
+     * 
+     * @param stock
      * @return
      */
-    @PostMapping("/dj/machine/list2")
-    List<DjMachineInfo> list2(@RequestBody DjMachineInfo machineInfo);
-
     @PostMapping("/dj/machine/importData")
-    @ApiOperation("导入垫胶机台信息")
-    public AjaxResult importData(@RequestBody List<DjMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
-
+    AjaxResult importData(@RequestBody ImportContext importContext,
+            @RequestParam("updateSupport") boolean updateSupport);
 }

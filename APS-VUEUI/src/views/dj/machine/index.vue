@@ -1,4 +1,3 @@
-
 <template>
   <basic-container>
     <page-table
@@ -20,14 +19,14 @@
     >
       <template slot="header">
         <el-button
-          v-hasPermi="['nc:machine:add']"
+          v-hasPermi="['dj:machine:add']"
           type="primary"
           plain
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <el-button
-          v-hasPermi="['nc:machine:edit']"
+          v-hasPermi="['dj:machine:edit']"
           type="primary"
           plain
           @click="handleEdit(selection[0])"
@@ -41,11 +40,11 @@
           >{{ $t("ui.frame.btn.delete") }}</el-button
         > -->
         <el-button
-          v-hasPermi="['nc:machine:import']"
+          v-hasPermi="['dj:machine:import']"
           @click="() => $refs.tltUploadForm.handleImport(importDefaultValue)"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
-        <el-button v-hasPermi="['nc:machine:export']" @click="handleExport">{{
+        <el-button v-hasPermi="['dj:machine:export']" @click="handleExport">{{
           $t("ui.frame.btn.export")
         }}</el-button>
       </template>
@@ -53,8 +52,8 @@
     <tlt-upload-form
       ref="tltUploadForm"
       title="导入机台信息数据"
-      downloadUrl="/nc/machine/importTemplate"
-      uploadUrl="/nc/machine/importData"
+      downloadUrl="/dj/machine/importTemplate"
+      uploadUrl="/dj/machine/importData"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
@@ -72,7 +71,7 @@ import {
   editMachine,
   publishApsMoldAdjustPlan,
   removeApsMoldAdjustPlan,
-} from "@/api/nc/machine";
+} from "@/api/dj/machine";
 import InfoDialog from "./components/infoDialog.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
@@ -408,7 +407,6 @@ export default {
       try {
         this.loading = true;
         const data = await listMachine(this.formatParams());
-        // const data = await this.$axios.get("monthPlan/apsMoldAdjustPlan/list");
 
         this.data = data.rows.map((el) => {
           return {

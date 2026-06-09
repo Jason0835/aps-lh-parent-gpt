@@ -89,7 +89,4 @@ public class DjMachineInfo extends BaseEntity {
     @Excel(name = "ui.data.column.machine.status",dictType="STATUS")
     @ImportValidated(name = "ui.data.column.machine.status", maxLength = 6 ,required = true)
     private String status;
-    
-    @TableField(exist = false)
-    private String orderStr;
 }
