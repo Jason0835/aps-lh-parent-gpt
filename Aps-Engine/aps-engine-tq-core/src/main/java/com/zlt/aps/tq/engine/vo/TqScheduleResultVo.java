@@ -10,6 +10,23 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.util.Date;
 
+/**
+ * 胎圈排程结果VO（6班次）
+ *
+ * <p>班次与实际时间对应关系（D=排程日期-2，即今天）：</p>
+ * <ul>
+ *   <li>1班：D日中班(14:00-22:00)    → 供应成型3班(D+1日夜班)</li>
+ *   <li>2班：D+1日夜班(22:00-6:00)   → 供应成型4班(D+1日早班)</li>
+ *   <li>3班：D+1日早班(6:00-14:00)   → 供应成型5班(D+1日中班)</li>
+ *   <li>4班：D+1日中班(14:00-22:00)  → 供应成型6班(D+2日夜班)</li>
+ *   <li>5班：D+2日夜班(22:00-6:00)   → 供应成型7班(D+2日早班)</li>
+ *   <li>6班：D+2日早班(6:00-14:00)   → 供应成型8班(D+2日中班)，滚动排程</li>
+ * </ul>
+ *
+ * <p>成型8班覆盖：D日早班、D日中班、D+1日夜早中、D+2日夜早中</p>
+ * <p>胎圈6班覆盖：D日中班、D+1日夜早中、D+2日夜早</p>
+ * <p>映射规律：胎圈N班 → 供应成型(N+2)班</p>
+ */
 @Data
 public class TqScheduleResultVo extends ApsBaseDto {
 
@@ -58,74 +75,113 @@ public class TqScheduleResultVo extends ApsBaseDto {
     @ApiModelProperty(value = "库存供应成型时长，单位：小时")
     private Double supplyTime;
 
-    @ApiModelProperty(value = "中班(16点-24点)计划量(条)")
-    private Double midPlanQty;
+    // ==================== 胎圈6班次字段 ====================
 
-    @ApiModelProperty(value = "中班(16点-24点)生产顺序")
-    private Integer midProduceOrder;
+    @ApiModelProperty(value = "1班(D日中班)计划量(条)")
+    private Double class1PlanQty;
 
-    @ApiModelProperty(value = "中班(16点-24点)系统原因分析")
-    private String midSysAnalysis;
+    @ApiModelProperty(value = "1班(D日中班)生产顺序")
+    private Integer class1ProduceOrder;
 
-    @ApiModelProperty(value = "中班(16点-24点)手动输入原因分析")
-    private String midHandAnalysis;
+    @ApiModelProperty(value = "1班(D日中班)系统原因分析")
+    private String class1SysAnalysis;
 
-    @ApiModelProperty(value = "夜班(0点-8点)计划量(条)")
-    private Double nightPlanQty;
+    @ApiModelProperty(value = "1班(D日中班)手动输入原因分析")
+    private String class1HandAnalysis;
 
-    @ApiModelProperty(value = "夜班(0点-8点)生产顺序")
-    private Integer nightProduceOrder;
+    @ApiModelProperty(value = "2班(D+1日夜班)计划量(条)")
+    private Double class2PlanQty;
 
-    @ApiModelProperty(value = "夜班(0点-8点)系统原因分析")
-    private String nightSysAnalysis;
+    @ApiModelProperty(value = "2班(D+1日夜班)生产顺序")
+    private Integer class2ProduceOrder;
 
-    @ApiModelProperty(value = "夜班(0点-8点)手动输入原因分析")
-    private String nightHandAnalysis;
+    @ApiModelProperty(value = "2班(D+1日夜班)系统原因分析")
+    private String class2SysAnalysis;
 
-    @ApiModelProperty(value = "白班(8点-16点)计划量(条)")
-    private Double dayPlanQty;
+    @ApiModelProperty(value = "2班(D+1日夜班)手动输入原因分析")
+    private String class2HandAnalysis;
 
-    @ApiModelProperty(value = "白班(8点-16点)生产顺序")
-    private Integer dayProduceOrder;
+    @ApiModelProperty(value = "3班(D+1日早班)计划量(条)")
+    private Double class3PlanQty;
 
-    @ApiModelProperty(value = "白班(8点-16点)系统原因分析")
-    private String daySysAnalysis;
+    @ApiModelProperty(value = "3班(D+1日早班)生产顺序")
+    private Integer class3ProduceOrder;
 
-    @ApiModelProperty(value = "白班(8点-16点)手动输入原因分析")
-    private String dayHandAnalysis;
+    @ApiModelProperty(value = "3班(D+1日早班)系统原因分析")
+    private String class3SysAnalysis;
 
-    @ApiModelProperty(value = "次日中班(16点-24点)计划量(条)")
-    private Double nextMidPlanQty;
+    @ApiModelProperty(value = "3班(D+1日早班)手动输入原因分析")
+    private String class3HandAnalysis;
 
-    @ApiModelProperty(value = "次日中班(16点-24点)生产顺序")
-    private Integer nextMidProduceOrder;
+    @ApiModelProperty(value = "4班(D+1日中班)计划量(条)")
+    private Double class4PlanQty;
 
-    @ApiModelProperty(value = "次日中班(16点-24点)系统原因分析")
-    private String nextMidSysAnalysis;
+    @ApiModelProperty(value = "4班(D+1日中班)生产顺序")
+    private Integer class4ProduceOrder;
 
-    @ApiModelProperty(value = "次日中班(16点-24点)手动输入原因分析")
-    private String nextMidHandAnalysis;
+    @ApiModelProperty(value = "4班(D+1日中班)系统原因分析")
+    private String class4SysAnalysis;
 
-    @ApiModelProperty(value = "对应成型一班的计划量")
+    @ApiModelProperty(value = "4班(D+1日中班)手动输入原因分析")
+    private String class4HandAnalysis;
+
+    @ApiModelProperty(value = "5班(D+2日夜班)计划量(条)")
+    private Double class5PlanQty;
+
+    @ApiModelProperty(value = "5班(D+2日夜班)生产顺序")
+    private Integer class5ProduceOrder;
+
+    @ApiModelProperty(value = "5班(D+2日夜班)系统原因分析")
+    private String class5SysAnalysis;
+
+    @ApiModelProperty(value = "5班(D+2日夜班)手动输入原因分析")
+    private String class5HandAnalysis;
+
+    @ApiModelProperty(value = "6班(D+2日早班)计划量(条)")
+    private Double class6PlanQty;
+
+    @ApiModelProperty(value = "6班(D+2日早班)生产顺序")
+    private Integer class6ProduceOrder;
+
+    @ApiModelProperty(value = "6班(D+2日早班)系统原因分析")
+    private String class6SysAnalysis;
+
+    @ApiModelProperty(value = "6班(D+2日早班)手动输入原因分析")
+    private String class6HandAnalysis;
+
+    // ==================== 成型消耗量字段（对应成型CLASS1~CLASS8） ====================
+
+    @ApiModelProperty(value = "对应成型1班(D日早班)的计划量，库存直接供应")
     private Double cxClass1Plan;
 
-    @ApiModelProperty(value = "对应成型二班的计划量")
+    @ApiModelProperty(value = "对应成型2班(D日中班)的计划量，库存+当天早班产出供应")
     private Double cxClass2Plan;
 
-    @ApiModelProperty(value = "对应成型三班的计划量")
+    @ApiModelProperty(value = "对应成型3班(D+1日夜班)的计划量，胎圈1班供应")
     private Double cxClass3Plan;
 
-    @ApiModelProperty(value = "对应成型次一班的计划量")
+    @ApiModelProperty(value = "对应成型4班(D+1日早班)的计划量，胎圈2班供应")
     private Double cxClass4Plan;
 
-    @ApiModelProperty(value = "对应成型次二班的计划量")
+    @ApiModelProperty(value = "对应成型5班(D+1日中班)的计划量，胎圈3班供应")
     private Double cxClass5Plan;
+
+    @ApiModelProperty(value = "对应成型6班(D+2日夜班)的计划量，胎圈4班供应")
+    private Double cxClass6Plan;
+
+    @ApiModelProperty(value = "对应成型7班(D+2日早班)的计划量，胎圈5班供应")
+    private Double cxClass7Plan;
+
+    @ApiModelProperty(value = "对应成型8班(D+2日中班)的计划量，胎圈6班供应")
+    private Double cxClass8Plan;
+
+    // ==================== 其他业务字段 ====================
 
     /**
      * 剩余量
      */
     private double surplusQty;
-    
+
     /**
      * 发布成功计数器，每点击一次发布并成功的话，计数器累加
      */
@@ -144,34 +200,37 @@ public class TqScheduleResultVo extends ApsBaseDto {
 
     @ApiModelProperty(value = "生产状态")
     private String productionStatus;
-    
+
     /**
      * 寸口
      */
     private BigDecimal dimension;
+
     /**
-     * 上一天早班计划
+     * 当天早班(D日早班)计划量，用于滚动衔接（昨天已排的、属于今天早班的胎圈计划量）
      */
-    private Double lastMidPlanQty;
+    private Double todayMorningPlanQty;
+
     /**
      * 预计库存，晚班（19点）的剩余库存，仅用于计算可供时长
      */
     private Double planStockQty;
+
     /**
-     * 机台code$胎胚代码，多个逗号分割， 用来计算成型平均定额使用
+     * 机台code$胎胚代码，多个逗号分割，用来计算成型平均定额使用
      */
     private String quotaKeys;
-    
+
     /**
-     * 夜班与早班的交接班库存
+     * 交接班库存（6班滚动计算后的最终库存结余）
      */
     private double classStock;
-    
+
     /**
      * 库存供需比例，交接班库存/成型一天需求量
      */
     private double supplyDemandRatio;
-    
+
     /**
      * 收尾规格标记，0：收尾1：非收尾
      */

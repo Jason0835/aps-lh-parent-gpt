@@ -405,8 +405,8 @@ public class TqEngineServiceImpl implements TqEngineService {
         boolean isNightClassPass = difStock > 0; // 夜班是否超量
         scheduleList = scheduleList.stream().sorted((r1, r2) -> {
             if (isNightClassPass) {
-                BigDecimal initStock1 = BigDecimalUtils.add(r1.getStockQty(), r1.getLastMidPlanQty());
-                BigDecimal initStock2 = BigDecimalUtils.add(r2.getStockQty(), r2.getLastMidPlanQty());
+                BigDecimal initStock1 = BigDecimalUtils.add(r1.getStockQty(), r1.getTodayMorningPlanQty());
+                BigDecimal initStock2 = BigDecimalUtils.add(r2.getStockQty(), r2.getTodayMorningPlanQty());
                 BigDecimal cxClassPlan1 = BigDecimalUtils.add(r1.getCxClass1Plan(), r1.getCxClass2Plan());
                 BigDecimal cxClassPlan2 = BigDecimalUtils.add(r2.getCxClass1Plan(), r2.getCxClass2Plan());
                 BigDecimal classStock1 = BigDecimalUtils.sub(initStock1, cxClassPlan1);
@@ -438,7 +438,7 @@ public class TqEngineServiceImpl implements TqEngineService {
                     continue;
                 }
                 // 计算夜班不生产的交接班库存
-                BigDecimal initStock = BigDecimalUtils.add(scheduleVo.getStockQty(), scheduleVo.getLastMidPlanQty());
+                BigDecimal initStock = BigDecimalUtils.add(scheduleVo.getStockQty(), scheduleVo.getTodayMorningPlanQty());
                 BigDecimal cxClassPlan1 = BigDecimalUtils.add(scheduleVo.getCxClass1Plan(), scheduleVo.getCxClass2Plan());
                 BigDecimal classStock1 = BigDecimalUtils.sub(initStock, cxClassPlan1);
                 if (classStock1.doubleValue() <= scheduleVo.getCxClass3Plan()) { // 交接班库存不够早班需求的不处理
@@ -488,7 +488,7 @@ public class TqEngineServiceImpl implements TqEngineService {
      * @return
      */
     private Double getClassStock(TqScheduleResultVo scheduleVo) {
-        BigDecimal planQty = BigDecimalUtils.add(scheduleVo.getStockQty(), scheduleVo.getLastMidPlanQty(), scheduleVo.getMidPlanQty());
+        BigDecimal planQty = BigDecimalUtils.add(scheduleVo.getStockQty(), scheduleVo.getTodayMorningPlanQty(), scheduleVo.getMidPlanQty());
         BigDecimal cxPlanQty = BigDecimalUtils.add(scheduleVo.getCxClass1Plan(), scheduleVo.getCxClass2Plan());
         return planQty.subtract(cxPlanQty).doubleValue();
     }
@@ -1351,7 +1351,7 @@ public class TqEngineServiceImpl implements TqEngineService {
 
         String oldScheduleResult = toJSONString(scheduleVo); // 没看是计算前的排程数据json字符串（日志使用）
         Double stockQty = scheduleVo.getStockQty(); // 库存
-        Double lastMidPlanQty = scheduleVo.getLastMidPlanQty(); // 前日白班计划
+        Double todayMorningPlanQty = scheduleVo.getTodayMorningPlanQty(); // 当天早班计划量
         double supplyClass = productStockDay; // 预生产库存天数
         Double totalConsumeQty = scheduleVo.getSurplusQty(); // 剩余量
 //        Double totalConsumeQty = this.getCxClassPlanCumulative(scheduleVo, OpenMachineClassEnums.CLASS_FOUR); // 总需求量，前四个班
@@ -1368,7 +1368,7 @@ public class TqEngineServiceImpl implements TqEngineService {
         // 计算第一天相关数值
         double tqPlanQty1 = BigDecimalUtil.add(BigDecimalUtil.sub(classStock2, classStock1), cxPlanQty1);// 第一天胎圈计划量 = 第二天交接班库存 - 第一天交接班库存 + 第一天成型两个班的消耗量
         tqPlanQty1 = tqPlanQty1 > 0? tqPlanQty1: 0D; // 上一天交接班库存过多会计算成负数，需要处理成0
-        double tqClass1PlanQty1 = lastMidPlanQty;// 第一天早班计划 = 前日早班计划
+        double tqClass1PlanQty1 = todayMorningPlanQty;// 第一天早班计划 = 当天早班计划
         double tqClass2PlanQty1 = BigDecimalUtil.sub(tqPlanQty1, tqClass1PlanQty1);// 第一天夜班计划 = 等于第一天胎圈计划 - 第一天早班计划
 //        tqClass2PlanQty1 = this.limitProductQty(tqClass2PlanQty1, oneProductQty); // 控制计划量不要低于最低生产量
         tqClass2PlanQty1 = this.planQtyRounding(scheduleVo, tqClass2PlanQty1, toolCapacity, totalConsumeQty,
@@ -1415,7 +1415,7 @@ public class TqEngineServiceImpl implements TqEngineService {
         double nextMidPlanQty = 0;        /*
         // 计算夜班计划量 = 成型前三个班累计消耗量 - 早班胎圈计划 - 胎圈库存
         double midPlanQty = BigDecimalUtil.sub(BigDecimalUtil
-                .sub(this.getCxClassPlanCumulative(scheduleVo, OpenMachineClassEnums.CLASS_THREE), lastMidPlanQty),
+                .sub(this.getCxClassPlanCumulative(scheduleVo, OpenMachineClassEnums.CLASS_THREE), todayMorningPlanQty),
                 stockQty);
         midPlanQty = this.planQtyRounding(scheduleVo, midPlanQty, toolCapacity, totalConsumeQty, isCloseOutSpec,
                 OpenMachineClassEnums.CLASS_TWO); // 整车取整
@@ -1553,7 +1553,7 @@ public class TqEngineServiceImpl implements TqEngineService {
         if (classNum == null) {
             return planQty;
         }
-        planQty = BigDecimalUtil.add(planQty, scheduleVo.getLastMidPlanQty());
+        planQty = BigDecimalUtil.add(planQty, scheduleVo.getTodayMorningPlanQty());
         if (classNum == OpenMachineClassEnums.CLASS_ONE) {
             return planQty;
         }
