@@ -11,6 +11,7 @@
     <groupId>com.zlt.aps.cd90</groupId>
     <artifactId>aps-cd90-api</artifactId>
     <name>aps-cd90-api</name>
+    <version>1.0.3-SNAPSHOT</version>
     <description>cd90直裁-接口</description>
 
     <properties>
@@ -28,10 +29,25 @@
             <artifactId>ruoyi-common-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.zlt.aps.mdm</groupId>
             <artifactId>aps-mdm-api</artifactId>
             <version>1.0.3-SNAPSHOT</version>
             <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-common-core</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.zlt</groupId>
+                    <artifactId>zlt-module-starter</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 

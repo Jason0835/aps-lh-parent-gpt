@@ -29,8 +29,20 @@
         GROUP BY MATERIAL_CODE 
     </select>
 
+    <select id="listTodayMorningPlan" resultType="com.zlt.aps.tq.engine.vo.TqStockConsumeVo">
+    <!-- 查询当天早班(D日早班)计划量：昨天排程的CLASS3_PLAN_QTY对应今天早班 -->
+    <!-- 昨天排程日期 = 排程日期 - 1天，昨天排程的CLASS3 = D日早班(今天早班) -->
+    SELECT BEAD_CODE, IFNULL(SUM(CLASS3_PLAN_QTY), 0) consume
+    FROM T_TQ_SCHEDULE_RESULT
+    WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 day)
+      AND DEL_FLAG = '0'
+    GROUP BY BEAD_CODE
+</select>
+
     <select id="listLastDayMidPlan" resultType="com.zlt.aps.tq.engine.vo.TqStockConsumeVo">
-    SELECT BEAD_CODE, IFNULL(SUM(night_plan_qty), 0) consume
+    <!-- 查询昨日早班半制品计划量：昨天排程的CLASS1_PLAN_QTY对应昨日早班生产量 -->
+    <!-- 昨天排程日期 = 排程日期 - 1天，昨天排程的CLASS1_PLAN_QTY = 昨日早班半制品生产量 -->
+    SELECT BEAD_CODE, IFNULL(SUM(CLASS1_PLAN_QTY), 0) consume
     FROM T_TQ_SCHEDULE_RESULT
     WHERE SCHEDULE_DATE = DATE_ADD(#{scheduleDate}, INTERVAL -1 day)
       AND DEL_FLAG = '0'

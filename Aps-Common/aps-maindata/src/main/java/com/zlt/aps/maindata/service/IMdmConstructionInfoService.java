@@ -26,4 +26,11 @@ public interface IMdmConstructionInfoService  extends IDocService<MdmConstructio
 
     void importDataAsync(List<MdmConstructionInfo> list, boolean updateSupport, long importLogId, ImportLog importLog, Date beginTime, ServletRequestAttributes attributes);
 
+    /**
+     * 查询投产胎胚施工中的胎体布代号下拉数据。
+     *
+     * @return 去重后的胎体布代号列表
+     */
+    List<String> listTireFabricCodes();
+
 }

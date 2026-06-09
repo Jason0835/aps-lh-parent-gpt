@@ -1,0 +1,25 @@
+package com.zlt.aps.dj.engine.vo;
+
+import lombok.Data;
+
+/**
+ * 垫胶月度汇总VO
+ */
+@Data
+public class DjMonthSurplusVo {
+
+    /**
+     * 物料代码
+     */
+    private String materialCode;
+
+    /**
+     * 月度计划完成量
+     */
+    private Double monthFinishQty;
+
+    /**
+     * 月度剩余量
+     */
+    private Double monthRemainQty;
+}

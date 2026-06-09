@@ -1168,6 +1168,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 existingMonitor.setMainPattern(finalResult.getMainPattern());
                 existingMonitor.setPattern(finalResult.getPattern());
                 existingMonitor.setMouldQty(finalResult.getMouldChangeInfo());
+                existingMonitor.setConstructionStage(finalResult.getConstructionStage());
                 if (finalResult.getBeginDay() != null && finalResult.getBeginDay() != 0) {
                     LocalDate beginLocalDate = LocalDate.of(contextDTO.getMpYear(), contextDTO.getMpMonth(), finalResult.getBeginDay());
                     Date beginDate = Date.from(beginLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
@@ -1212,6 +1213,7 @@ public abstract class AbstractBaseWeekAdjustService implements IMpWeekAdjustServ
                 monitor.setMainPattern(finalResult.getMainPattern());
                 monitor.setPattern(finalResult.getPattern());
                 monitor.setMouldQty(finalResult.getMouldChangeInfo());
+                monitor.setConstructionStage(finalResult.getConstructionStage());
                 if (finalResult.getBeginDay() != null && finalResult.getBeginDay() != 0) {
                     LocalDate beginLocalDate = LocalDate.of(contextDTO.getMpYear(), contextDTO.getMpMonth(), finalResult.getBeginDay());
                     Date beginDate = Date.from(beginLocalDate.atStartOfDay(ZoneId.systemDefault()).toInstant());

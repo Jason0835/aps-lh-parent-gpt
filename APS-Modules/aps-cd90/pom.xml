@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.zlt.aps</groupId>
@@ -12,91 +11,82 @@
     <groupId>com.zlt.aps</groupId>
     <artifactId>aps-cd90</artifactId>
     <name>aps-cd90</name>
-    <description>直裁服务模块</description>
+    <description>直裁排程服务模块</description>
 
     <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <java.version>1.8</java.version>
     </properties>
 
     <dependencies>
-        <!-- 框架启动包 -->
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-base</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.zlt</groupId>
             <artifactId>zlt-module-starter</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+        </dependency>
+
         <!-- 使用第三方swagger的ui  范围地址：http://localhost:8080/doc.html -->
         <dependency>
             <groupId>com.github.xiaoymin</groupId>
             <artifactId>swagger-bootstrap-ui</artifactId>
             <version>1.9.6</version>
         </dependency>
-        <dependency>
-            <groupId>com.zlt</groupId>
-            <artifactId>zlt-bill-common</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.zlt</groupId>
-            <artifactId>zlt-busi-common</artifactId>
-        </dependency>
-        <!-- 月度计划主数据包 -->
+
         <dependency>
             <groupId>com.zlt.aps</groupId>
             <artifactId>aps-maindata</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>com.zlt.aps.cx</groupId>
+            <artifactId>aps-cx-api</artifactId>
+            <version>1.0.3-SNAPSHOT</version>
+        </dependency>
+
         <!-- 操作日志jar -->
         <dependency>
             <groupId>com.ruoyi</groupId>
             <artifactId>ruoyi-common-log</artifactId>
         </dependency>
-        <!-- 硫化API模块 -->
-        <dependency>
-            <groupId>com.zlt.aps.lh</groupId>
-            <artifactId>aps-lh-api</artifactId>
-            <version>1.0.3-SNAPSHOT</version>
-        </dependency>
-        <!-- 成型硫化API模块（包含8班数据的LhScheduleResult实体，以及CxScheduleResult/CxPrecisionPlan/CxStock/CxParamConfig等成型实体） -->
-        <dependency>
-            <groupId>com.zlt.aps</groupId>
-            <artifactId>aps-cx-lh-api</artifactId>
-        </dependency>
-        <!-- ITF API模块 -->
-        <dependency>
-            <groupId>com.zlt.aps.itf</groupId>
-            <artifactId>aps-itf-api</artifactId>
-        </dependency>
-        <!-- 月度计划API模块 -->
-        <dependency>
-            <groupId>com.zlt.aps</groupId>
-            <artifactId>aps-mp-api</artifactId>
-        </dependency>
-<!--        <dependency>-->
-<!--            <groupId>com.zlt.aps</groupId>-->
-<!--            <artifactId>ap</artifactId>-->
-<!--        </dependency>-->
+
         <!-- Hutool工具库 -->
         <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
         </dependency>
-        <!-- 轻量级分布式日志链路追踪 -->
+
+        <!-- APS接口模块 -->
         <dependency>
-            <groupId>com.yomahub</groupId>
-            <artifactId>tlog-all-spring-boot-starter</artifactId>
+            <groupId>com.zlt.aps.itf</groupId>
+            <artifactId>aps-itf-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.zlt.aps</groupId>
+            <artifactId>aps-mp-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zlt.aps.cd90</groupId>
             <artifactId>aps-cd90-api</artifactId>
-            <version>1.0.3-SNAPSHOT</version>
-            <scope>compile</scope>
         </dependency>
     </dependencies>
+
     <build>
         <finalName>${project.artifactId}</finalName>
         <plugins>
@@ -149,6 +139,7 @@
             <id>local-release</id>
             <url>http://192.168.2.95:8081/nexus/content/repositories/releases/</url>
         </repository>
+
     </distributionManagement>
 
     <repositories>

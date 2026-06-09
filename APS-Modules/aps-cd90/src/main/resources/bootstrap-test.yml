@@ -1,10 +1,14 @@
 # Tomcat
 server:
-  port: 9006
+  port: 9976
 
 nacos:
-  server-addr: 192.168.2.93:8848
-#  server-addr: 127.0.0.1:8848
+  server-addr: 192.168.10.145:8848
+  #server-addr: 172.21.7.131:8848
+  run-group: APS_TEST_GROUP
+  cfg-group: APS_TEST_GROUP
+  run-namespace: jytest
+  cfg-namespace: jytest
 
 ## Spring
 spring:
@@ -44,9 +48,12 @@ spring:
           data-id: seata-client-${spring.profiles.active}.${spring.cloud.nacos.config.file-extension}
           group: ${nacos.cfg-group}
         refresh-enabled: true
-mq:
-  scheduleLog:
-    queue: test.cd90.schedule.log.queue
-    exchange: test.cd90.schedule.log.exchange
-    rutekey: test.cd90.schedule.log.rutekey
 
+cache:
+  caffeine:
+    # 开启缓存
+    cache-enabled: true
+
+#debug:
+#  ignorSkip:
+#    matching: true

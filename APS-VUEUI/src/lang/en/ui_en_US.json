@@ -219,7 +219,6 @@
   "ui.data.column.lhMachineOnlineInfo.modelName": "Curing Machine Online Info",
   "ui.data.column.lhChipStock.modelName": "Chip Stock",
   "ui.data.column.lhRepairCapsule.modelName": "Capsule Usage Count",
-
   "ui.data.column.machine.machineCode": "Machine Code",
   "ui.data.column.machine.machineName": "Machine Name",
   "ui.data.column.machine.status": "Machine Status",
@@ -234,7 +233,6 @@
   "ui.data.column.mdmMoldingMachine.isZeroRack": "Zero Degree Rack",
   "ui.data.column.mdmMoldingMachine.lhMachineMaxQty": "Curing Machine Upper Limit",
   "ui.data.column.mdmMoldingMachine.maxDayCapacity": "Max Daily Capacity",
-
   "ui.data.column.cx.machine.no": "No.",
   "ui.data.column.cx.machine.machineCode": "Molding Machine Code",
   "ui.data.column.cx.machine.machineName": "Molding Machine Name",
@@ -266,12 +264,9 @@
   "ui.data.column.cx.machine.moldingDrumMin": "Aspect Ratio Minimum",
   "ui.data.column.cx.machine.sectionWidthMax": "Section Width Maximum",
   "ui.data.column.cx.machine.sectionWidthMin": "Section Width Minimum",
-
   "ui.biz.alter.isOpen": "Confirm to enable?",
   "ui.biz.alter.isStop": "Confirm to disable?",
-
   "ui.frame.btn.moldingScheduleSequence": "Molding Schedule Sequence",
-
   "ui.data.column.cxScheduleResult.tripNo": "Trip No.",
   "ui.data.column.cxScheduleResult.tripNoPrefix": "Trip ",
   "ui.data.column.cxScheduleResult.tripCapacity": "Trip Capacity",
@@ -287,7 +282,6 @@
   "ui.data.column.cxScheduleResult.itemsLabel": "items",
   "ui.data.column.cxScheduleResult.gotIt": "Got it",
   "ui.data.column.cxScheduleResult.scheduleTimeout": "Schedule request timeout or service error, if schedule is running, please refresh the page later to view results",
-
   "ui.cx.cxScheduleResult.export.fileName": "Molding scheduling results",
   "ui.cx.cxScheduleResult.export.fileName4FinishedList": "Closing list of molding schedule",
   "ui.cx.cxScheduleResult.exportCxDayPlanFileName": "Molding Day Plan",
@@ -346,10 +340,7 @@
   "ui.data.column.cxDayFinishQty.exampleType": "Recipe Type",
   "ui.data.column.cxDayFinishQty.bomDataVersion": "BOM Version",
   "ui.data.column.cxDayFinishQty.dataVersion": "Data Version",
-  "ui.cx.cxScheduleResult.exportCxDayPlanFileName": "Molding Day Plan",
-
   "ui.construction.carcassRawMaterialList": "Carcass Raw Material List",
-
   "common.yes": "Yes",
   "common.no": "No",
   "common.show": "Show",
@@ -357,7 +348,6 @@
   "common.day": "Day",
   "common.search": "Search",
   "common.dailyData": "Daily Data",
-
   "ui.data.column.mdmMonthProdPlan.importTitle": "Import Monthly Production Plan Data",
   "ui.data.column.mdmMonthProdPlan.dailyProduction": "Production Qty",
   "ui.data.column.mdmMonthProdPlan.dailyOutput": "Daily Output",
@@ -371,7 +361,6 @@
   "ui.data.column.mdmMonthProdPlan.isFinalized": "Is Finalized",
   "ui.data.column.mdmMonthProdPlan.constructionCode": "Construction Code",
   "ui.data.column.mdmMonthProdPlan.stage": "Stage",
-
   "ui.data.column.planAdjust.adjustNumber": "Adjust Number",
   "ui.data.column.planAdjust.reduceNumber": "Reduce Number",
   "ui.data.column.planAdjust.leftOverQty": "Left Over Qty",
@@ -380,25 +369,19 @@
   "ui.data.column.specCode": "Spec Code",
   "ui.data.column.materialDesc": "Material Desc",
   "ui.data.column.id": "ID",
-
   "ui.title.needSubtractPlan": "Need Subtract Plan",
   "ui.title.failureReason": "Failure Reason",
   "ui.title.adjust": "Adjust",
   "ui.title.subtract": "Subtract",
-
   "ui.button.checkConstruction": "Check Construction",
   "ui.button.adjustSuggestion": "Adjust Suggestion",
-
   "ui.placeholder.selectTableRow": "Please select table row",
-
   "ui.message.confirmCheckConstruction": "Confirm to check construction for {month}?",
-
   "common.button.apply": "Apply",
   "common.button.confirm": "Confirm",
   "common.button.cancel": "Cancel",
   "common.message.operationSuccess": "Operation Success",
   "common.message.needContinueAdjust": "Adjustment quantity is insufficient, need to continue adjusting",
-
   "ui.upload.dataNotice": "Data Notice",
   "ui.upload.insertNewSpec": "When you need to insert a new specification",
   "ui.upload.leaveEmptyProductionNo": "Please leave the 'Production Order No.' field empty",
@@ -406,35 +389,27 @@
   "ui.upload.adjustExistingSpec": "When you need to adjust an existing specification",
   "ui.upload.keepProductionNoUnchanged": "Please keep the original 'Production Order No.' unchanged",
   "ui.upload.systemWillRecognizeAsAdjust": "The system will recognize it as an adjustment rather than a new addition",
-
   "ui.title.importInfoData": "Import Information Data",
   "ui.title.importScheduleResult": "Import Schedule Result",
   "ui.title.relatedUser": "Related User",
-
   "ui.checkbox.updateExistingData": "Whether to update existing user data",
-
   "ui.data.column.drugInventory.glueName": "Drug Name",
   "ui.data.column.drugInventory.stockNum": "Stock Qty (Pack)",
   "ui.data.column.drugScheduling.weighingStation": "Weighing Station",
   "ui.data.column.drugScheduling.estimatedStartTime": "Estimated Start Time",
   "ui.data.column.drugScheduling.estimatedEndTime": "Estimated End Time",
-
   "ui.tab.netDemandPlan": "Net Demand Plan",
   "ui.tab.supplyChainOrder": "Supply Chain Order",
   "ui.tab.productionPlan": "Production Plan",
   "ui.tab.unscheduledPlan": "Unscheduled Plan",
-
   "ui.placeholder.pleaseSelect": "Please select",
-
   "ui.form.label.adjustStartDate": "Adjust Start Date",
   "ui.form.label.adjustEndDate": "Adjust End Date",
   "ui.button.next": "Next",
-
   "ui.title.structureAdjust": "Structure Adjust",
   "ui.title.specialMaterialProduction": "Special Material Production",
   "ui.title.adjustResult": "Adjust Result",
   "ui.title.addStructure": "Add Structure",
-
   "ui.data.column.productStructure": "Product Structure",
   "ui.data.column.schedulingMachine": "Scheduling Machine",
   "ui.data.column.ncMaterialCode": "NC Material Code",
@@ -457,6 +432,19 @@
   "ui.data.column.originalSpecification": "Original Specification",
   "ui.data.column.adjustedTireCount": "Adjusted Tire Count",
   "ui.data.column.formingMachine": "Forming Machine",
+  "ui.data.column.cd90MachineInfo.modelName": "90 Degree Cutting Machine",
+  "ui.data.column.cd90MachineInfo.factoryCode": "Factory",
+  "ui.data.column.cd90MachineInfo.machineCode": "Machine Code",
+  "ui.data.column.cd90MachineInfo.machineName": "Machine Name",
+  "ui.data.column.cd90MachineInfo.isStickFilm": "Supports Film",
+  "ui.data.column.cd90MachineInfo.clothWidthMax": "Cloth Width Max",
+  "ui.data.column.cd90MachineInfo.clothWidthMin": "Cloth Width Min",
+  "ui.data.column.cd90MachineInfo.quota": "Quota (m/shift)",
+  "ui.data.column.cd90MachineInfo.classShift": "Shift System",
+  "ui.data.column.cd90MachineInfo.openMachineClass": "Open Shift",
+  "ui.data.column.cd90MachineInfo.status": "Machine Status",
+  "ui.data.column.cd90MachineInfo.checkUnique": "The same machine code already exists in this factory",
+  "ui.data.alert.cd90MachineInfo.quotaPositive": "Quota must be greater than 0"
   "ui.data.column.paramsCode": "Parameter Code",
   "ui.data.column.paramsName": "Parameter Name",
   "ui.data.column.paramsValue": "Parameter Value",

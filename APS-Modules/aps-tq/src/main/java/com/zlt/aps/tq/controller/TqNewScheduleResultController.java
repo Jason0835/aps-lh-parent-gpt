@@ -210,8 +210,8 @@ public class TqNewScheduleResultController extends AbstractDocBizController<TqNe
 
     /**
      * 根据排程日期构建6个班次的日期展示列表
-     * 胎圈排程6个班次覆盖排程日期的前一天和当天：
-     * 班次1~3属于T-1日（夜班→早班→中班），班次4~6属于T日（夜班→早班→中班）
+     * 胎圈排程6个班次覆盖D日中班、D+1日夜早中、D+2日夜早（D=排程日期-2，即今天）：
+     * 班次1：D日中班，班次2~4：D+1日夜早中，班次5~6：D+2日夜早
      *
      * @param queryVO
      * @return 班次日期列表
@@ -223,17 +223,21 @@ public class TqNewScheduleResultController extends AbstractDocBizController<TqNe
         if (scheduleDate == null) {
             scheduleDate = DateUtil.offsetDay(new Date(), 2);
         }
-        Date tMinus1Day = DateUtil.offsetDay(scheduleDate, -1);
-        String tMinus1DateStr = DateUtil.format(tMinus1Day, "MM/dd");
-        String tDateStr = DateUtil.format(scheduleDate, "MM/dd");
+        // D = 排程日期 - 2（即今天）
+        Date dDay = DateUtil.offsetDay(scheduleDate, -2);
+        Date dPlus1Day = DateUtil.offsetDay(dDay, 1);
+        Date dPlus2Day = DateUtil.offsetDay(dDay, 2);
+        String dDateStr = DateUtil.format(dDay, "MM/dd");
+        String dPlus1DateStr = DateUtil.format(dPlus1Day, "MM/dd");
+        String dPlus2DateStr = DateUtil.format(dPlus2Day, "MM/dd");
 
         List<TqScheduleShiftDateVO> result = new ArrayList<>(6);
-        result.add(buildShiftDateVO(1, "night", tMinus1DateStr));
-        result.add(buildShiftDateVO(2, "morning", tMinus1DateStr));
-        result.add(buildShiftDateVO(3, "afternoon", tMinus1DateStr));
-        result.add(buildShiftDateVO(4, "night", tDateStr));
-        result.add(buildShiftDateVO(5, "morning", tDateStr));
-        result.add(buildShiftDateVO(6, "afternoon", tDateStr));
+        result.add(buildShiftDateVO(1, "afternoon", dDateStr));       // D日中班
+        result.add(buildShiftDateVO(2, "night", dPlus1DateStr));      // D+1日夜班
+        result.add(buildShiftDateVO(3, "morning", dPlus1DateStr));    // D+1日早班
+        result.add(buildShiftDateVO(4, "afternoon", dPlus1DateStr));  // D+1日中班
+        result.add(buildShiftDateVO(5, "night", dPlus2DateStr));      // D+2日夜班
+        result.add(buildShiftDateVO(6, "morning", dPlus2DateStr));    // D+2日早班
         return result;
     }
 

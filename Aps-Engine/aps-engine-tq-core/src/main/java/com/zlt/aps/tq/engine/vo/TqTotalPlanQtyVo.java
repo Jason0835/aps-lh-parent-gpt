@@ -3,38 +3,50 @@ package com.zlt.aps.tq.engine.vo;
 import lombok.Data;
 
 /**
- * 胎圈中班和夜班总计划量Vo
+ * 胎圈6个班次总计划量Vo
  */
 @Data
 public class TqTotalPlanQtyVo {
 
     public TqTotalPlanQtyVo() {
-        this.totalDayPlanQty = 0D;
-        this.totalMidPlanQty = 0D;
-        this.totalNightPlanQty = 0D;
-        this.totalNextMidPlanQty = 0D;
+        this.totalClass1PlanQty = 0D;
+        this.totalClass2PlanQty = 0D;
+        this.totalClass3PlanQty = 0D;
+        this.totalClass4PlanQty = 0D;
+        this.totalClass5PlanQty = 0D;
+        this.totalClass6PlanQty = 0D;
         this.totalPlanQty = 0D;
     }
 
     /**
-     * 中班总计划量
+     * 1班(T-1日夜班)总计划量
      */
-    private Double totalMidPlanQty;
+    private Double totalClass1PlanQty;
 
     /**
-     * 夜班总计划量
+     * 2班(T-1日早班)总计划量
      */
-    private Double totalNightPlanQty;
+    private Double totalClass2PlanQty;
 
     /**
-     * 白班总计划量
+     * 3班(T-1日中班)总计划量
      */
-    private Double totalDayPlanQty;
+    private Double totalClass3PlanQty;
 
     /**
-     * 次日中班总计划量
+     * 4班(T日夜班)总计划量
      */
-    private Double totalNextMidPlanQty;
+    private Double totalClass4PlanQty;
+
+    /**
+     * 5班(T日早班)总计划量
+     */
+    private Double totalClass5PlanQty;
+
+    /**
+     * 6班(T日中班)总计划量
+     */
+    private Double totalClass6PlanQty;
 
     /**
      * 总计划量

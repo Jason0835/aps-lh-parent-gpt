@@ -7,6 +7,7 @@ import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.zlt.aps.maindata.mapper.MdmConstructionInfoEntityMapper;
 import com.zlt.aps.maindata.service.IMdmConstructionInfoService;
 import com.zlt.aps.maindata.utils.RemoteImportExcelUtils;
 import com.zlt.aps.mp.api.domain.entity.MdmConstructionInfo;
@@ -22,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.lang.reflect.Method;
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Copyright (c) 2022, All rights reserved。
@@ -42,11 +45,16 @@ import java.util.*;
 @Transactional(rollbackFor = Exception.class)
 public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstructionInfo>  implements IMdmConstructionInfoService {
 
+    private static final Pattern TIRE_FABRIC_CODE_GETTER = Pattern.compile("getTireFabricCode\\d+");
+
     @Autowired
     private IRemoteImportLogService iRemoteImportLogService;
 
     @Autowired
     private IRemoteImportErrorLogService iRemoteImportErrorLogService;
+
+    @Autowired
+    private MdmConstructionInfoEntityMapper mdmConstructionInfoEntityMapper;
 
     @Override
     protected String getDocTypeCode() {
@@ -81,6 +89,44 @@ public class MdmConstructionInfoServiceImpl extends AbstractDocService<MdmConstr
         importDocEntity.setMaterialCode(importDocEntity.getSpecCode());
         importDocEntity.setMesMaterialCode(importDocEntity.getSpecCode());
         return result;
+    }
+
+    @Override
+    public List<String> listTireFabricCodes() {
+        List<MdmConstructionInfo> constructionInfos = mdmConstructionInfoEntityMapper.selectList(null);
+        return collectTireFabricCodes(constructionInfos);
+    }
+
+    List<String> collectTireFabricCodes(List<MdmConstructionInfo> constructionInfos) {
+        if (constructionInfos == null || constructionInfos.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Set<String> codeSet = new TreeSet<>();
+        Method[] methods = MdmConstructionInfo.class.getMethods();
+        for (MdmConstructionInfo constructionInfo : constructionInfos) {
+            for (Method method : methods) {
+                if (!TIRE_FABRIC_CODE_GETTER.matcher(method.getName()).matches()) {
+                    continue;
+                }
+                collectTireFabricCode(codeSet, constructionInfo, method);
+            }
+        }
+        return new ArrayList<>(codeSet);
+    }
+
+    private void collectTireFabricCode(Set<String> codeSet, MdmConstructionInfo constructionInfo, Method method) {
+        try {
+            Object value = method.invoke(constructionInfo);
+            if (value == null) {
+                return;
+            }
+            String code = value.toString().trim();
+            if (!code.isEmpty()) {
+                codeSet.add(code);
+            }
+        } catch (ReflectiveOperationException e) {
+            log.warn("读取投产胎胚施工胎体布代号失败，方法：{}", method.getName(), e);
+        }
     }
 
     @Async

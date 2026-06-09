@@ -15,7 +15,7 @@ utf-8 no bom
 - 遇到字段反显、导出补反显字段、非数据库字段需要反显时，必须先阅读并遵循@字段反显.md
 - 使用LambdaQueryWrapper、LambdaUpdateWrapper
 - 尽可能使用Lambda写法（例如：LambdaQueryWrapper、LambdaUpdateWrapper、LambdaQueryChainWrapper、LambdaUpdateChainWrapper），减少字符串字段名硬编码
-- 框架已通过注解自动处理逻辑删除（isDelete字段），查询时不要手动拼接 `.and(w -> w.eq(::getIsDelete, ...).or().isNull(::getIsDelete))` 条件，直接使用简单的 LambdaQueryWrapper 即可，由框架自动过滤已删除数据
+- 强制规则：框架已通过注解自动处理逻辑删除（`isDelete`/`delFlag` 字段），生成或修改查询代码时，除非用户特别说明，禁止手动追加逻辑删除条件。不要写 `wrapper.eq(Entity::getIsDelete, ApsConstant.DEL_FLAG_NORMAL)`、`wrapper.eq(Entity::getDelFlag, ApsConstant.DEL_FLAG_NORMAL)`、`.eq(BaseEntity::getIsDelete, 0)` 或 `.and(w -> w.eq(::getIsDelete, ...).or().isNull(::getIsDelete))` 这类条件；直接使用业务查询条件，由框架自动过滤已删除数据。
 ### 注释规范
 - 优先重要,主要逻辑方法需加注释
 - 注释用中文，尽可能的详细

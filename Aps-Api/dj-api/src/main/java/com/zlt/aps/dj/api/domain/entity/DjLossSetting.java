@@ -1,0 +1,43 @@
+package com.zlt.aps.dj.api.domain.entity;
+
+import com.baomidou.mybatisplus.annotation.*;
+import com.zlt.aps.common.core.domain.ApsBaseEntity;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+/**
+ * <p>
+ * 垫胶损耗率设定表
+ * </p>
+ *
+ * @author chen
+ * @since 2021-07-13
+ */
+@Data
+@EqualsAndHashCode(callSuper = false)
+@TableName("T_NC_LOSS_SETTING")
+@ApiModel(value = "NcLossSetting对象", description = "垫胶损耗率设定表")
+//@KeySequence(value = "SEQ_LOSS_SETTING",dbType = DbType.ORACLE)
+public class DjLossSetting extends ApsBaseEntity {
+
+    private static final long serialVersionUID = 1L;
+
+    @ApiModelProperty(value = "主键ID，对应自增序列为：SEQ_LOSS_SETTING")
+    @TableId(value = "ID", type = IdType.AUTO)
+    private Long id;
+
+    @ApiModelProperty(value = "垫胶代码")
+    @TableField("LINING_CODE")
+    private String liningCode;
+
+    @ApiModelProperty(value = "机台id（对应T_NC_MACHINE_INFO表id）")
+    @TableField("MACHINE_ID")
+    private Long machineId;
+
+    @ApiModelProperty(value = "损耗率(百分比)")
+    @TableField("LOSS_RATE")
+    private Double lossRate;
+
+}

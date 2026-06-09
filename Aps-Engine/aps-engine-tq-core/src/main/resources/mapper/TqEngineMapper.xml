@@ -2,6 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zlt.aps.tq.engine.mapper.TqEngineMapper">
 
+    <!-- 查询成型排程基础数据，获取胎圈需求对应的成型各班次消耗量 -->
     <select id="statTqScheduleBase" resultType="com.zlt.aps.tq.engine.vo.TqScheduleResultVo" parameterType="string">
         select
                max(cxr.SCHEDULE_DATE) SCHEDULE_DATE, /*排程日期*/
@@ -14,11 +15,14 @@
                max(ci.HEXAGON_MOUTH_PLATE) MOUTH_PLATE_CODE,  /*口型板代码*/
                min(ci.HEXAGON_RUBBER_DIMENSION) SPEC_SIZE,  /*尺寸*/
                1 UNIT_CONSUME, /*单耗(胎圈长)*/
-               IFNULL(sum(cxr.CLASS3_PLANNED_QTY),0) CX_CLASS1_PLAN,  /*对应成型昨日三班的胎圈胶计划量*/
-               IFNULL(sum(cxr.CLASS2_PLAN_QTY),0) CX_CLASS2_PLAN,  /*对应成型二班的胎圈胶计划量*/
-               IFNULL(sum(cxr.CLASS3_PLAN_QTY),0) CX_CLASS3_PLAN,  /*对应成型三班的胎圈胶计划量*/
-               IFNULL(sum(cxr.CLASS4_PLAN_QTY),0) CX_CLASS4_PLAN,  /*对应成型次一班的胎圈胶计划量*/
-               IFNULL(sum(cxr.CLASS5_PLAN_QTY),0) CX_CLASS5_PLAN,  /*对应成型次二班的胎圈胶计划量*/
+               IFNULL(sum(cxr.CLASS1_PLAN_QTY),0) CX_CLASS1_PLAN,  /*对应成型1班(D日早班)的消耗量，库存直接供应*/
+               IFNULL(sum(cxr.CLASS2_PLAN_QTY),0) CX_CLASS2_PLAN,  /*对应成型2班(D日中班)的消耗量，库存+当天早班产出供应*/
+               IFNULL(sum(cxr.CLASS3_PLAN_QTY),0) CX_CLASS3_PLAN,  /*对应成型3班(D+1日夜班)的消耗量，胎圈1班供应*/
+               IFNULL(sum(cxr.CLASS4_PLAN_QTY),0) CX_CLASS4_PLAN,  /*对应成型4班(D+1日早班)的消耗量，胎圈2班供应*/
+               IFNULL(sum(cxr.CLASS5_PLAN_QTY),0) CX_CLASS5_PLAN,  /*对应成型5班(D+1日中班)的消耗量，胎圈3班供应*/
+               IFNULL(sum(cxr.CLASS6_PLAN_QTY),0) CX_CLASS6_PLAN,  /*对应成型6班(D+2日夜班)的消耗量，胎圈4班供应*/
+               IFNULL(sum(cxr.CLASS7_PLAN_QTY),0) CX_CLASS7_PLAN,  /*对应成型7班(D+2日早班)的消耗量，胎圈5班供应*/
+               IFNULL(sum(cxr.CLASS8_PLAN_QTY),0) CX_CLASS8_PLAN,  /*对应成型8班(D+2日中班)的消耗量，胎圈6班供应*/
                GROUP_CONCAT(DISTINCT concat(cxr.CX_MACHINE_CODE,'$',cxr.EMBRYO_CODE,'$',cxr.BOM_DATA_VERSION) order by cxr.CX_MACHINE_CODE,cxr.EMBRYO_CODE,cxr.BOM_DATA_VERSION SEPARATOR ',') as quotaKeys /*机台code$胎胚代码*/
         from T_CX_SCHEDULE_RESULT cxr /*成型排程结果表*/
         inner join T_PRODUCT_CONSTRUCTION_INFO ci on cxr.EMBRYO_CODE = ci.embryo_code and cxr.BOM_DATA_VERSION = ci.EMBRYO_VERSION  /*施工信息表*/
@@ -31,9 +35,26 @@
         group by ci.TIRE_RING_CODE
     </select>
 
+    <!-- 同步胎圈排程结果到日志表 -->
     <insert id="syncTqScheduleToLog">
-        insert into T_TQ_SCHEDULE_RESULT_LOG (ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME, MID_PLAN_QTY, MID_FINISH_QTY, MID_PRODUCE_ORDER, MID_FINISH_RATE, MID_SYS_ANALYSIS, MID_HAND_ANALYSIS, NIGHT_PLAN_QTY, NIGHT_FINISH_QTY, NIGHT_PRODUCE_ORDER, NIGHT_FINISH_RATE, NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS, DAY_PLAN_QTY, DAY_FINISH_QTY, DAY_PRODUCE_ORDER, DAY_FINISH_RATE, DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS, NEXT_MID_PLAN_QTY, NEXT_MID_FINISH_QTY, NEXT_MID_PRODUCE_ORDER, NEXT_MID_FINISH_RATE, NEXT_MID_SYS_ANALYSIS, NEXT_MID_HAND_ANALYSIS, CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,data_source,PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME)
-        select ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME, MID_PLAN_QTY, MID_FINISH_QTY, MID_PRODUCE_ORDER, MID_FINISH_RATE, MID_SYS_ANALYSIS, MID_HAND_ANALYSIS, NIGHT_PLAN_QTY, NIGHT_FINISH_QTY, NIGHT_PRODUCE_ORDER, NIGHT_FINISH_RATE, NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS, DAY_PLAN_QTY, DAY_FINISH_QTY, DAY_PRODUCE_ORDER, DAY_FINISH_RATE, DAY_SYS_ANALYSIS, DAY_HAND_ANALYSIS, NEXT_MID_PLAN_QTY, NEXT_MID_FINISH_QTY, NEXT_MID_PRODUCE_ORDER, NEXT_MID_FINISH_RATE, NEXT_MID_SYS_ANALYSIS, NEXT_MID_HAND_ANALYSIS, CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME,data_source,PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME
+        insert into T_TQ_SCHEDULE_RESULT_LOG (ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+                                              CLASS1_PLAN_QTY, CLASS1_FINISH_QTY, CLASS1_SEQUENCE, CLASS1_FINISH_RATE, CLASS1_ANALYSIS,
+                                              CLASS2_PLAN_QTY, CLASS2_FINISH_QTY, CLASS2_SEQUENCE, CLASS2_FINISH_RATE, CLASS2_ANALYSIS,
+                                              CLASS3_PLAN_QTY, CLASS3_FINISH_QTY, CLASS3_SEQUENCE, CLASS3_FINISH_RATE, CLASS3_ANALYSIS,
+                                              CLASS4_PLAN_QTY, CLASS4_FINISH_QTY, CLASS4_SEQUENCE, CLASS4_FINISH_RATE, CLASS4_ANALYSIS,
+                                              CLASS5_PLAN_QTY, CLASS5_FINISH_QTY, CLASS5_SEQUENCE, CLASS5_FINISH_RATE, CLASS5_ANALYSIS,
+                                              CLASS6_PLAN_QTY, CLASS6_FINISH_QTY, CLASS6_SEQUENCE, CLASS6_FINISH_RATE, CLASS6_ANALYSIS,
+                                              CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
+                                              IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, DATA_SOURCE, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME)
+        select ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
+               CLASS1_PLAN_QTY, CLASS1_FINISH_QTY, CLASS1_SEQUENCE, CLASS1_FINISH_RATE, CLASS1_ANALYSIS,
+               CLASS2_PLAN_QTY, CLASS2_FINISH_QTY, CLASS2_SEQUENCE, CLASS2_FINISH_RATE, CLASS2_ANALYSIS,
+               CLASS3_PLAN_QTY, CLASS3_FINISH_QTY, CLASS3_SEQUENCE, CLASS3_FINISH_RATE, CLASS3_ANALYSIS,
+               CLASS4_PLAN_QTY, CLASS4_FINISH_QTY, CLASS4_SEQUENCE, CLASS4_FINISH_RATE, CLASS4_ANALYSIS,
+               CLASS5_PLAN_QTY, CLASS5_FINISH_QTY, CLASS5_SEQUENCE, CLASS5_FINISH_RATE, CLASS5_ANALYSIS,
+               CLASS6_PLAN_QTY, CLASS6_FINISH_QTY, CLASS6_SEQUENCE, CLASS6_FINISH_RATE, CLASS6_ANALYSIS,
+               CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
+               IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY, UPDATE_TIME, DATA_SOURCE, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME
         from T_TQ_SCHEDULE_RESULT
         where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </insert>
@@ -51,51 +72,61 @@
         values (NULL, #{cxBatchNo}, #{batchNo}, '0', STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d'), #{userName}, NOW(),  '0')
     </insert>
 
+    <!-- 批量插入胎圈排程结果（6班次） -->
     <insert id="batchCreateScheduleResult" parameterType="list">
         insert into T_TQ_SCHEDULE_RESULT (ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE,
                                           GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
-                                          MID_PLAN_QTY, MID_PRODUCE_ORDER, MID_SYS_ANALYSIS, MID_HAND_ANALYSIS,
-                                          NIGHT_PLAN_QTY, NIGHT_PRODUCE_ORDER, NIGHT_SYS_ANALYSIS,
-                                          NIGHT_HAND_ANALYSIS, DAY_PLAN_QTY, DAY_PRODUCE_ORDER, DAY_SYS_ANALYSIS,
-                                          DAY_HAND_ANALYSIS, NEXT_MID_PLAN_QTY, NEXT_MID_PRODUCE_ORDER,
-                                          NEXT_MID_SYS_ANALYSIS, NEXT_MID_HAND_ANALYSIS, CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN,
-        IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY,
-        CREATE_TIME,PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME, CLOSE_OUT_SPEC_FLAG, last_mid_plan_qty)
+                                          CLASS1_PLAN_QTY, CLASS1_SEQUENCE, CLASS1_ANALYSIS,
+                                          CLASS2_PLAN_QTY, CLASS2_SEQUENCE, CLASS2_ANALYSIS,
+                                          CLASS3_PLAN_QTY, CLASS3_SEQUENCE, CLASS3_ANALYSIS,
+                                          CLASS4_PLAN_QTY, CLASS4_SEQUENCE, CLASS4_ANALYSIS,
+                                          CLASS5_PLAN_QTY, CLASS5_SEQUENCE, CLASS5_ANALYSIS,
+                                          CLASS6_PLAN_QTY, CLASS6_SEQUENCE, CLASS6_ANALYSIS,
+                                          CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
+                                          IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY,
+                                          CREATE_TIME, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME, CLOSE_OUT_SPEC_FLAG, TODAY_MORNING_PLAN_QTY)
         values
             <foreach collection="scheduleResultList" item="schedule" separator=",">
                   (NULL,
                           #{schedule.scheduleDate},#{schedule.cxBatchNo,jdbcType=VARCHAR},#{schedule.batchNo},#{schedule.orderNo},#{schedule.beadCode},#{schedule.steelRingCode,jdbcType=VARCHAR},#{schedule.triangleGlueCode,jdbcType=VARCHAR},
                           #{schedule.glueCode,jdbcType=VARCHAR},#{schedule.mouthPlateCode,jdbcType=VARCHAR},#{schedule.specSize,jdbcType=VARCHAR},#{schedule.machineId,jdbcType=VARCHAR},#{schedule.unitConsume,jdbcType=DOUBLE},#{schedule.stockQty,jdbcType=DOUBLE},#{schedule.supplyTime,jdbcType=DOUBLE},
-                          #{schedule.midPlanQty,jdbcType=DOUBLE},#{schedule.midProduceOrder,jdbcType=DOUBLE},#{schedule.midSysAnalysis,jdbcType=VARCHAR},#{schedule.midHandAnalysis,jdbcType=VARCHAR},
-                          #{schedule.nightPlanQty,jdbcType=DOUBLE},#{schedule.nightProduceOrder,jdbcType=DOUBLE},#{schedule.nightSysAnalysis,jdbcType=VARCHAR},
-                          #{schedule.nightHandAnalysis,jdbcType=VARCHAR},#{schedule.dayPlanQty,jdbcType=DOUBLE},#{schedule.dayProduceOrder,jdbcType=DOUBLE},#{schedule.daySysAnalysis,jdbcType=VARCHAR},
-                          #{schedule.dayHandAnalysis,jdbcType=VARCHAR},#{schedule.nextMidPlanQty,jdbcType=DOUBLE},#{schedule.nextMidProduceOrder,jdbcType=DOUBLE},
-                          #{schedule.nextMidSysAnalysis,jdbcType=VARCHAR},#{schedule.nextMidHandAnalysis,jdbcType=VARCHAR},#{schedule.cxClass1Plan,jdbcType=DOUBLE},#{schedule.cxClass2Plan,jdbcType=DOUBLE},#{schedule.cxClass3Plan,jdbcType=DOUBLE},#{schedule.cxClass4Plan,jdbcType=DOUBLE},#{schedule.cxClass5Plan,jdbcType=DOUBLE},
+                          #{schedule.class1PlanQty,jdbcType=DOUBLE},#{schedule.class1ProduceOrder,jdbcType=INTEGER},#{schedule.class1SysAnalysis,jdbcType=VARCHAR},
+                          #{schedule.class2PlanQty,jdbcType=DOUBLE},#{schedule.class2ProduceOrder,jdbcType=INTEGER},#{schedule.class2SysAnalysis,jdbcType=VARCHAR},
+                          #{schedule.class3PlanQty,jdbcType=DOUBLE},#{schedule.class3ProduceOrder,jdbcType=INTEGER},#{schedule.class3SysAnalysis,jdbcType=VARCHAR},
+                          #{schedule.class4PlanQty,jdbcType=DOUBLE},#{schedule.class4ProduceOrder,jdbcType=INTEGER},#{schedule.class4SysAnalysis,jdbcType=VARCHAR},
+                          #{schedule.class5PlanQty,jdbcType=DOUBLE},#{schedule.class5ProduceOrder,jdbcType=INTEGER},#{schedule.class5SysAnalysis,jdbcType=VARCHAR},
+                          #{schedule.class6PlanQty,jdbcType=DOUBLE},#{schedule.class6ProduceOrder,jdbcType=INTEGER},#{schedule.class6SysAnalysis,jdbcType=VARCHAR},
+                          #{schedule.cxClass1Plan,jdbcType=DOUBLE},#{schedule.cxClass2Plan,jdbcType=DOUBLE},#{schedule.cxClass3Plan,jdbcType=DOUBLE},#{schedule.cxClass4Plan,jdbcType=DOUBLE},#{schedule.cxClass5Plan,jdbcType=DOUBLE},#{schedule.cxClass6Plan,jdbcType=DOUBLE},#{schedule.cxClass7Plan,jdbcType=DOUBLE},#{schedule.cxClass8Plan,jdbcType=DOUBLE},
                           #{schedule.isRelease,jdbcType=VARCHAR},#{schedule.markCloseOutTip,jdbcType=VARCHAR},#{schedule.productionStatus,jdbcType=VARCHAR},#{schedule.remark,jdbcType=VARCHAR},#{schedule.delFlag,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime},IFNULL(#{schedule.publishSuccessCount,jdbcType=DOUBLE},0),#{schedule.newestPublishTime,jdbcType=DATE},
-                #{schedule.closeOutSpecFlag,jdbcType=VARCHAR}, #{schedule.lastMidPlanQty,jdbcType=DOUBLE}
+                          #{schedule.closeOutSpecFlag,jdbcType=VARCHAR}, #{schedule.todayMorningPlanQty,jdbcType=DOUBLE}
                   )
             </foreach>
     </insert>
 
+    <!-- 批量插入胎圈辅助排程结果（6班次） -->
     <insert id="batchCreateAssistScheduleResult" parameterType="list">
         insert into T_TQ_ASSIST_SCHEDULE (ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE,
                                           GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_ID, UNIT_CONSUME, STOCK_QTY, SUPPLY_TIME,
-                                          MID_PLAN_QTY, MID_PRODUCE_ORDER, MID_SYS_ANALYSIS, MID_HAND_ANALYSIS,
-                                          NIGHT_PLAN_QTY, NIGHT_PRODUCE_ORDER, NIGHT_SYS_ANALYSIS,
-                                          NIGHT_HAND_ANALYSIS, DAY_PLAN_QTY, DAY_PRODUCE_ORDER, DAY_SYS_ANALYSIS,
-                                          DAY_HAND_ANALYSIS, NEXT_MID_PLAN_QTY, NEXT_MID_PRODUCE_ORDER,
-                                          NEXT_MID_SYS_ANALYSIS, NEXT_MID_HAND_ANALYSIS, CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN,
+                                          CLASS1_PLAN_QTY, CLASS1_SEQUENCE, CLASS1_ANALYSIS,
+                                          CLASS2_PLAN_QTY, CLASS2_SEQUENCE, CLASS2_ANALYSIS,
+                                          CLASS3_PLAN_QTY, CLASS3_SEQUENCE, CLASS3_ANALYSIS,
+                                          CLASS4_PLAN_QTY, CLASS4_SEQUENCE, CLASS4_ANALYSIS,
+                                          CLASS5_PLAN_QTY, CLASS5_SEQUENCE, CLASS5_ANALYSIS,
+                                          CLASS6_PLAN_QTY, CLASS6_SEQUENCE, CLASS6_ANALYSIS,
+                                          CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
                                           IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME)
         values
               <foreach collection="scheduleResultList" item="schedule" separator=",">
                    (NULL,
                           #{schedule.scheduleDate},#{schedule.cxBatchNo,jdbcType=VARCHAR},#{schedule.batchNo},#{schedule.orderNo},#{schedule.beadCode},#{schedule.steelRingCode,jdbcType=VARCHAR},#{schedule.triangleGlueCode,jdbcType=VARCHAR},
                           #{schedule.glueCode,jdbcType=VARCHAR},#{schedule.mouthPlateCode,jdbcType=VARCHAR},#{schedule.specSize,jdbcType=VARCHAR},#{schedule.machineId,jdbcType=VARCHAR},#{schedule.unitConsume,jdbcType=DOUBLE},#{schedule.stockQty,jdbcType=DOUBLE},#{schedule.supplyTime,jdbcType=DOUBLE},
-                          #{schedule.midPlanQty,jdbcType=DOUBLE},#{schedule.midProduceOrder,jdbcType=DOUBLE},#{schedule.midSysAnalysis,jdbcType=VARCHAR},#{schedule.midHandAnalysis,jdbcType=VARCHAR},
-                          #{schedule.nightPlanQty,jdbcType=DOUBLE},#{schedule.nightProduceOrder,jdbcType=DOUBLE},#{schedule.nightSysAnalysis,jdbcType=VARCHAR},
-                          #{schedule.nightHandAnalysis,jdbcType=VARCHAR},#{schedule.dayPlanQty,jdbcType=DOUBLE},#{schedule.dayProduceOrder,jdbcType=DOUBLE},#{schedule.daySysAnalysis,jdbcType=VARCHAR},
-                          #{schedule.dayHandAnalysis,jdbcType=VARCHAR},#{schedule.nextMidPlanQty,jdbcType=DOUBLE},#{schedule.nextMidProduceOrder,jdbcType=DOUBLE},
-                          #{schedule.nextMidSysAnalysis,jdbcType=VARCHAR},#{schedule.nextMidHandAnalysis,jdbcType=VARCHAR},#{schedule.cxClass1Plan,jdbcType=DOUBLE},#{schedule.cxClass2Plan,jdbcType=DOUBLE},#{schedule.cxClass3Plan,jdbcType=DOUBLE},#{schedule.cxClass4Plan,jdbcType=DOUBLE},#{schedule.cxClass5Plan,jdbcType=DOUBLE},
+                          #{schedule.class1PlanQty,jdbcType=DOUBLE},#{schedule.class1ProduceOrder,jdbcType=INTEGER},#{schedule.class1SysAnalysis,jdbcType=VARCHAR},
+                          #{schedule.class2PlanQty,jdbcType=DOUBLE},#{schedule.class2ProduceOrder,jdbcType=INTEGER},#{schedule.class2SysAnalysis,jdbcType=VARCHAR},
+                          #{schedule.class3PlanQty,jdbcType=DOUBLE},#{schedule.class3ProduceOrder,jdbcType=INTEGER},#{schedule.class3SysAnalysis,jdbcType=VARCHAR},
+                          #{schedule.class4PlanQty,jdbcType=DOUBLE},#{schedule.class4ProduceOrder,jdbcType=INTEGER},#{schedule.class4SysAnalysis,jdbcType=VARCHAR},
+                          #{schedule.class5PlanQty,jdbcType=DOUBLE},#{schedule.class5ProduceOrder,jdbcType=INTEGER},#{schedule.class5SysAnalysis,jdbcType=VARCHAR},
+                          #{schedule.class6PlanQty,jdbcType=DOUBLE},#{schedule.class6ProduceOrder,jdbcType=INTEGER},#{schedule.class6SysAnalysis,jdbcType=VARCHAR},
+                          #{schedule.cxClass1Plan,jdbcType=DOUBLE},#{schedule.cxClass2Plan,jdbcType=DOUBLE},#{schedule.cxClass3Plan,jdbcType=DOUBLE},#{schedule.cxClass4Plan,jdbcType=DOUBLE},#{schedule.cxClass5Plan,jdbcType=DOUBLE},#{schedule.cxClass6Plan,jdbcType=DOUBLE},#{schedule.cxClass7Plan,jdbcType=DOUBLE},#{schedule.cxClass8Plan,jdbcType=DOUBLE},
                           #{schedule.isRelease,jdbcType=VARCHAR},#{schedule.markCloseOutTip,jdbcType=VARCHAR},#{schedule.productionStatus,jdbcType=VARCHAR},#{schedule.remark,jdbcType=VARCHAR},#{schedule.delFlag,jdbcType=VARCHAR},#{schedule.createBy,jdbcType=VARCHAR},#{schedule.createTime}
                   )
               </foreach>
@@ -113,13 +144,19 @@
         where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
     </select>
 
+    <!-- 查询胎圈排程结果列表（6班次） -->
     <select id="listTqEnginSchedule" resultType="com.zlt.aps.tq.engine.vo.TqScheduleResultVo">
         select ID, SCHEDULE_DATE, CX_BATCH_NO, BATCH_NO, ORDER_NO, BEAD_CODE, STEEL_RING_CODE, TRIANGLE_GLUE_CODE, GLUE_CODE, MOUTH_PLATE_CODE, SPEC_SIZE, MACHINE_ID, UNIT_CONSUME,
-               STOCK_QTY, SUPPLY_TIME, IFNULL(MID_PLAN_QTY,0) MID_PLAN_QTY, MID_FINISH_QTY, MID_PRODUCE_ORDER, MID_FINISH_RATE, MID_SYS_ANALYSIS, MID_HAND_ANALYSIS, IFNULL(NIGHT_PLAN_QTY, 0) NIGHT_PLAN_QTY, NIGHT_FINISH_QTY,
-               NIGHT_PRODUCE_ORDER, NIGHT_FINISH_RATE, NIGHT_SYS_ANALYSIS, NIGHT_HAND_ANALYSIS, IFNULL(DAY_PLAN_QTY,0) DAY_PLAN_QTY, DAY_FINISH_QTY, DAY_PRODUCE_ORDER, DAY_FINISH_RATE, DAY_SYS_ANALYSIS,
-               DAY_HAND_ANALYSIS, IFNULL(NEXT_MID_PLAN_QTY,0) NEXT_MID_PLAN_QTY, NEXT_MID_FINISH_QTY, NEXT_MID_PRODUCE_ORDER, NEXT_MID_FINISH_RATE, NEXT_MID_SYS_ANALYSIS, NEXT_MID_HAND_ANALYSIS, CX_CLASS1_PLAN,
-               CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY,
-               UPDATE_TIME, DATA_SOURCE, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME
+               STOCK_QTY, SUPPLY_TIME,
+               IFNULL(CLASS1_PLAN_QTY,0) CLASS1_PLAN_QTY, CLASS1_FINISH_QTY, CLASS1_SEQUENCE, CLASS1_FINISH_RATE, CLASS1_ANALYSIS,
+               IFNULL(CLASS2_PLAN_QTY,0) CLASS2_PLAN_QTY, CLASS2_FINISH_QTY, CLASS2_SEQUENCE, CLASS2_FINISH_RATE, CLASS2_ANALYSIS,
+               IFNULL(CLASS3_PLAN_QTY,0) CLASS3_PLAN_QTY, CLASS3_FINISH_QTY, CLASS3_SEQUENCE, CLASS3_FINISH_RATE, CLASS3_ANALYSIS,
+               IFNULL(CLASS4_PLAN_QTY,0) CLASS4_PLAN_QTY, CLASS4_FINISH_QTY, CLASS4_SEQUENCE, CLASS4_FINISH_RATE, CLASS4_ANALYSIS,
+               IFNULL(CLASS5_PLAN_QTY,0) CLASS5_PLAN_QTY, CLASS5_FINISH_QTY, CLASS5_SEQUENCE, CLASS5_FINISH_RATE, CLASS5_ANALYSIS,
+               IFNULL(CLASS6_PLAN_QTY,0) CLASS6_PLAN_QTY, CLASS6_FINISH_QTY, CLASS6_SEQUENCE, CLASS6_FINISH_RATE, CLASS6_ANALYSIS,
+               CX_CLASS1_PLAN, CX_CLASS2_PLAN, CX_CLASS3_PLAN, CX_CLASS4_PLAN, CX_CLASS5_PLAN, CX_CLASS6_PLAN, CX_CLASS7_PLAN, CX_CLASS8_PLAN,
+               IS_RELEASE, MARK_CLOSE_OUT_TIP, PRODUCTION_STATUS, REMARK, DEL_FLAG, CREATE_BY, CREATE_TIME, UPDATE_BY,
+               UPDATE_TIME, DATA_SOURCE, PUBLISH_SUCCESS_COUNT, NEWEST_PUBLISH_TIME, TODAY_MORNING_PLAN_QTY
         from t_tq_schedule_result r
         where schedule_date = STR_TO_DATE(#{scheduleDate}, '%Y-%m-%d')
         and DEL_FLAG = 0
@@ -142,9 +179,18 @@
         group by ci.TIRE_RING_CODE
     </select>
 
+    <!-- 合并胎圈排程结果（6班次），用于插单等场景 -->
     <insert id="mergeTqScheduleResult">
         INSERT INTO t_tq_schedule_result (
-        schedule_date, cx_batch_no, batch_no, order_no, bead_code, steel_ring_code, triangle_glue_code, glue_code, mouth_plate_code, spec_size, machine_id, unit_consume, stock_qty, supply_time, mid_plan_qty, mid_produce_order, mid_sys_analysis, mid_hand_analysis, night_plan_qty, night_produce_order, night_sys_analysis, night_hand_analysis, day_plan_qty, day_produce_order, day_sys_analysis, day_hand_analysis, next_mid_plan_qty, next_mid_produce_order, next_mid_sys_analysis, next_mid_hand_analysis, cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan, is_release, mark_close_out_tip, production_status, remark, del_flag, create_by, create_time, data_Source, CLOSE_OUT_SPEC_FLAG
+        schedule_date, cx_batch_no, batch_no, order_no, bead_code, steel_ring_code, triangle_glue_code, glue_code, mouth_plate_code, spec_size, machine_id, unit_consume, stock_qty, supply_time,
+        class1_plan_qty, class1_sequence, class1_analysis,
+        class2_plan_qty, class2_sequence, class2_analysis,
+        class3_plan_qty, class3_sequence, class3_analysis,
+        class4_plan_qty, class4_sequence, class4_analysis,
+        class5_plan_qty, class5_sequence, class5_analysis,
+        class6_plan_qty, class6_sequence, class6_analysis,
+        cx_class1_plan, cx_class2_plan, cx_class3_plan, cx_class4_plan, cx_class5_plan, cx_class6_plan, cx_class7_plan, cx_class8_plan,
+        is_release, mark_close_out_tip, production_status, remark, del_flag, create_by, create_time, data_Source, CLOSE_OUT_SPEC_FLAG
         )
         VALUES
         <foreach collection="scheduleResultList" item="schedule" separator=",">
@@ -163,27 +209,32 @@
             #{schedule.unitConsume,jdbcType=DOUBLE},
             #{schedule.stockQty,jdbcType=DOUBLE},
             #{schedule.supplyTime,jdbcType=DOUBLE},
-            #{schedule.midPlanQty,jdbcType=DOUBLE},
-            #{schedule.midProduceOrder,jdbcType=DOUBLE},
-            #{schedule.midSysAnalysis,jdbcType=VARCHAR},
-            #{schedule.midHandAnalysis,jdbcType=VARCHAR},
-            #{schedule.nightPlanQty,jdbcType=DOUBLE},
-            #{schedule.nightProduceOrder,jdbcType=DOUBLE},
-            #{schedule.nightSysAnalysis,jdbcType=VARCHAR},
-            #{schedule.nightHandAnalysis,jdbcType=VARCHAR},
-            #{schedule.dayPlanQty,jdbcType=DOUBLE},
-            #{schedule.dayProduceOrder,jdbcType=DOUBLE},
-            #{schedule.daySysAnalysis,jdbcType=VARCHAR},
-            #{schedule.dayHandAnalysis,jdbcType=VARCHAR},
-            #{schedule.nextMidPlanQty,jdbcType=DOUBLE},
-            #{schedule.nextMidProduceOrder,jdbcType=DOUBLE},
-            #{schedule.nextMidSysAnalysis,jdbcType=VARCHAR},
-            #{schedule.nextMidHandAnalysis,jdbcType=VARCHAR},
+            #{schedule.class1PlanQty,jdbcType=DOUBLE},
+            #{schedule.class1ProduceOrder,jdbcType=INTEGER},
+            #{schedule.class1SysAnalysis,jdbcType=VARCHAR},
+            #{schedule.class2PlanQty,jdbcType=DOUBLE},
+            #{schedule.class2ProduceOrder,jdbcType=INTEGER},
+            #{schedule.class2SysAnalysis,jdbcType=VARCHAR},
+            #{schedule.class3PlanQty,jdbcType=DOUBLE},
+            #{schedule.class3ProduceOrder,jdbcType=INTEGER},
+            #{schedule.class3SysAnalysis,jdbcType=VARCHAR},
+            #{schedule.class4PlanQty,jdbcType=DOUBLE},
+            #{schedule.class4ProduceOrder,jdbcType=INTEGER},
+            #{schedule.class4SysAnalysis,jdbcType=VARCHAR},
+            #{schedule.class5PlanQty,jdbcType=DOUBLE},
+            #{schedule.class5ProduceOrder,jdbcType=INTEGER},
+            #{schedule.class5SysAnalysis,jdbcType=VARCHAR},
+            #{schedule.class6PlanQty,jdbcType=DOUBLE},
+            #{schedule.class6ProduceOrder,jdbcType=INTEGER},
+            #{schedule.class6SysAnalysis,jdbcType=VARCHAR},
             #{schedule.cxClass1Plan,jdbcType=DOUBLE},
             #{schedule.cxClass2Plan,jdbcType=DOUBLE},
             #{schedule.cxClass3Plan,jdbcType=DOUBLE},
             #{schedule.cxClass4Plan,jdbcType=DOUBLE},
             #{schedule.cxClass5Plan,jdbcType=DOUBLE},
+            #{schedule.cxClass6Plan,jdbcType=DOUBLE},
+            #{schedule.cxClass7Plan,jdbcType=DOUBLE},
+            #{schedule.cxClass8Plan,jdbcType=DOUBLE},
             #{schedule.isRelease,jdbcType=VARCHAR},
             #{schedule.markCloseOutTip,jdbcType=VARCHAR},
             #{schedule.productionStatus,jdbcType=VARCHAR},
@@ -196,14 +247,18 @@
             )
         </foreach>
         ON DUPLICATE KEY UPDATE
-        mid_plan_qty = VALUES(mid_plan_qty),
-        mid_hand_analysis = VALUES(mid_hand_analysis),
-        night_plan_qty = VALUES(night_plan_qty),
-        night_hand_analysis = VALUES(night_hand_analysis),
-        day_plan_qty = VALUES(day_plan_qty),
-        day_hand_analysis = VALUES(day_hand_analysis),
-        next_mid_plan_qty = VALUES(next_mid_plan_qty),
-        next_mid_hand_analysis = VALUES(next_mid_hand_analysis),
+        class1_plan_qty = VALUES(class1_plan_qty),
+        class1_analysis = VALUES(class1_analysis),
+        class2_plan_qty = VALUES(class2_plan_qty),
+        class2_analysis = VALUES(class2_analysis),
+        class3_plan_qty = VALUES(class3_plan_qty),
+        class3_analysis = VALUES(class3_analysis),
+        class4_plan_qty = VALUES(class4_plan_qty),
+        class4_analysis = VALUES(class4_analysis),
+        class5_plan_qty = VALUES(class5_plan_qty),
+        class5_analysis = VALUES(class5_analysis),
+        class6_plan_qty = VALUES(class6_plan_qty),
+        class6_analysis = VALUES(class6_analysis),
         update_by = VALUES(create_by),
         update_time = NOW(),
         remark = VALUES(remark),
@@ -212,8 +267,11 @@
         cx_class2_plan = VALUES(cx_class2_plan),
         cx_class3_plan = VALUES(cx_class3_plan),
         cx_class4_plan = VALUES(cx_class4_plan),
-        cx_class5_plan = VALUES(cx_class5_plan)
-        </insert>
+        cx_class5_plan = VALUES(cx_class5_plan),
+        cx_class6_plan = VALUES(cx_class6_plan),
+        cx_class7_plan = VALUES(cx_class7_plan),
+        cx_class8_plan = VALUES(cx_class8_plan)
+    </insert>
 
     <select id="listTqNeedConstruction" resultType="com.zlt.aps.common.engine.domain.EngineConstructionInfo">
         select concat(cxr.EMBRYO_CODE , ',' ,ci.EMBRYO_CODE) EMBRYO_CODE,  /*成型排程胎胚代码，施工表的胎胚代码*/

@@ -456,4 +456,14 @@ public class EngineConstants {
      * 胎面：成型时长小于参数的排产顺序优先
      */
     public static String LESS_SUPPLY_TIME = "LESS_SUPPLY_TIME";
+
+    /**
+     * 参数code：胎圈备库班数（保证成型的班次排产数），默认1
+     */
+    public static String BACKUP_SHIFT_COUNT = "SYS0301001";
+
+    /**
+     * 参数code：胎圈需求系数（胎圈消耗量=成型需求量×系数），默认2
+     */
+    public static String DEMAND_COEFFICIENT = "SYS0301002";
 }
