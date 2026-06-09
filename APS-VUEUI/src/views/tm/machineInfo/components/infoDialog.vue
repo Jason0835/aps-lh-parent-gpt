@@ -116,7 +116,9 @@ export default {
           prop: "machineStatus",
           label: this.$t("ui.data.column.tm.machineInfo.machineStatus"),
           span: 12,
-          maxlength: 50,
+          type: "switch",
+          activeValue: "1",
+          inactiveValue: "0",
         },
         {
           prop: "shiftCode",
@@ -157,10 +159,12 @@ export default {
         this.isEdit = true;
         this.form = {
           ...data,
+          machineStatus: data.machineStatus || "0",
         };
       } else {
         this.form = {
           factoryCode: "116",
+          machineStatus: "1",
         };
       }
     },

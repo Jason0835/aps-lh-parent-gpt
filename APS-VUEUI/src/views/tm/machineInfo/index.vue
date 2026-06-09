@@ -60,7 +60,7 @@
 //utils
 import {downloadLink} from "@/utils/request";
 //interface
-import {listTmMachineInfo, removeTmMachineInfo} from "@/api/tm/machineInfo";
+import {listTmMachineInfo, removeTmMachineInfo, saveTmMachineInfo} from "@/api/tm/machineInfo";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
@@ -73,7 +73,7 @@ export default {
     infoDialog,
     TltUploadForm,
   },
-  dicts: ["biz_factory_name"],
+  dicts: ["biz_factory_name", "biz_available_status"],
   provide() {
     return {
       parentDict: this.dict,
@@ -148,7 +148,40 @@ export default {
         {
           prop: "machineStatus",
           halign: "center",
+          align: "center",
           label: this.$t("ui.data.column.tm.machineInfo.machineStatus"),
+          render: ({ row }) => {
+            return (
+              <el-switch
+                active-value="1"
+                inactive-value="0"
+                disabled={this.loading}
+                value={row.machineStatus}
+                onChange={(val) => {
+                  let confirmMsg = val == "0"
+                    ? this.$t("ui.lhMachineInfo.confirm.disable")
+                    : this.$t("ui.lhMachineInfo.confirm.enable");
+                  this.$confirm(confirmMsg, { type: "warning" }).then(
+                    async () => {
+                      try {
+                        this.loading = true;
+                        const data = await saveTmMachineInfo({
+                          ...row,
+                          machineStatus: val,
+                        });
+                        this.$modal.msgSuccess(data.msg);
+                        this.getList();
+                      } catch (error) {
+                        console.error(error);
+                      } finally {
+                        this.loading = false;
+                      }
+                    }
+                  );
+                }}
+              ></el-switch>
+            );
+          },
         },
         {
           prop: "shiftCode",
@@ -218,6 +251,14 @@ export default {
         {
           prop: "machineStatus",
           label: this.$t("ui.data.column.tm.machineInfo.machineStatus"),
+          render: (form) => {
+            return (
+              <dict-select
+                v-model={form.machineStatus}
+                options={this.dict.type.biz_available_status}
+              />
+            );
+          },
         },
       ];
     },
