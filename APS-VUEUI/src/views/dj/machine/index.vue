@@ -76,7 +76,7 @@ import InfoDialog from "./components/infoDialog.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 
 export default {
- name: "InsideLinerMachine",
+ name: "djMachine",
   components: { InfoDialog, TltUploadForm },
   dicts: ["STATUS", "CLASS_SHIFT", "CLASS_NUM_THREE", "CLASS_NUM"],
 

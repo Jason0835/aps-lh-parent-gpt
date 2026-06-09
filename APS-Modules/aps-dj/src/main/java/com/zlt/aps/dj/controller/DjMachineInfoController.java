@@ -66,11 +66,11 @@ public class DjMachineInfoController extends AbstractDocBizController<DjMachineI
     @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.INSERT)
     @ApiOperation("新增信息（id不为空）")
     @PostMapping
-    public AjaxResult save(@RequestBody DjMachineInfo stock) {
-        if (UserConstants.NOT_UNIQUE.equals(machineService.checkUnique(stock))) {
+    public AjaxResult save(@RequestBody DjMachineInfo machine) {
+        if (UserConstants.NOT_UNIQUE.equals(machineService.checkUnique(machine))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.error.message.quota.unique"));
         }
-        return super.save(stock);
+        return super.save(machine);
     }
 
     /**
@@ -87,7 +87,6 @@ public class DjMachineInfoController extends AbstractDocBizController<DjMachineI
     /**
      * 导出列表
      */
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override

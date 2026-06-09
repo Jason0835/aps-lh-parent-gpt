@@ -33,7 +33,7 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { editSpecifyMachine } from "@/api/nc/specifyMachine";
+import { editSpecifyMachine } from "@/api/dj/specifyMachine";
 
 export default {
   components: { infoForm },

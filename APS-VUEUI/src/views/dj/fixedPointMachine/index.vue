@@ -22,24 +22,24 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['nc:specifyMachine:add']"
+          v-hasPermi="['dj:specifyMachine:add']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <!-- <el-button
           type="warning"
-          v-hasPermi="['nc:specifyMachine:edit']"
+          v-hasPermi="['dj:specifyMachine:edit']"
           @click="handleEdit(selection[0])"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         > -->
         <el-button
-          v-hasPermi="['nc:specifyMachine:import']"
+          v-hasPermi="['dj:specifyMachine:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
         <el-button
           @click="handleExport"
-          v-hasPermi="['nc:specifyMachine:export']"
+          v-hasPermi="['dj:specifyMachine:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
@@ -47,8 +47,8 @@
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/nc/specifyMachine/importTemplate"
-      uploadUrl="/nc/specifyMachine/importData"
+      downloadUrl="/dj/specifyMachine/importTemplate"
+      uploadUrl="/dj/specifyMachine/importData"
       @uploadSuccess="getList"
     />
     <infoDialog ref="infoRef" @success="getList" />
@@ -64,14 +64,14 @@ import {
   listSpecifyMachine,
   removeSpecifyMachine,
   removeAllSpecifyMachine,
-} from "@/api/nc/specifyMachine";
+} from "@/api/dj/specifyMachine";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "InsideLinerFixedPointMachine",
+  name: "djFixedPointMachine",
   components: {
     tltUpload,
     infoDialog,
@@ -156,7 +156,7 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["nc:specifyMachine:edit"]}
+                  v-hasPermi={["dj:specifyMachine:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
@@ -164,7 +164,7 @@ export default {
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["nc:specifyMachine:remove"]}
+                  v-hasPermi={["dj:specifyMachine:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -261,7 +261,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/nc/specifyMachine/export", this.formatParams(false));
+      downloadLink("/dj/specifyMachine/export", this.formatParams(false));
     },
 
     formatParams(hasPage = true) {
