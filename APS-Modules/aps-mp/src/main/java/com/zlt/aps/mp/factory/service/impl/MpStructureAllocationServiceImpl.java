@@ -69,6 +69,7 @@ import com.zlt.aps.mp.factory.service.IMpMonthPlanStatisticsService;
 import com.zlt.aps.mp.factory.service.IMpStructureAllocationService;
 import com.zlt.aps.mp.mdm.dto.DataDTO;
 import com.zlt.aps.mp.mdm.handler.DataManager;
+import com.zlt.aps.utils.BeanCopyUtils;
 import com.zlt.aps.utils.GenerageMapKeyUtils;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.utils.ImportExcelValidatedUtils;
@@ -209,11 +210,8 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
 
 
     @Override
-    public List<MpStructureAllocation> getDataList(MpStructureAllocation param) {
-        QueryWrapper<MpStructureAllocation> queryWrapper = new QueryWrapper<>();
-        builderCondition(queryWrapper, param);
-        queryWrapper.orderByAsc("BEGIN_DAY");
-        return this.entityMapper.selectList(queryWrapper);
+    public List<MpStructureAllocation> getDataList(MpStructureAllocation param, boolean isFinalAdjust) {
+        return getStructureAllocationData(param, isFinalAdjust);
     }
 
 
@@ -227,10 +225,10 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         queryWrapper.eq("FACTORY_CODE", param.getFactoryCode());
         queryWrapper.eq("YEAR", param.getYear());
         queryWrapper.eq("MONTH", param.getMonth());
+        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         queryWrapper.eq(PubUtil.isNotEmpty(param.getFieldValueByFieldName("monthPlanVersion")), "MONTH_PLAN_VERSION", param.getMonthPlanVersion());
         queryWrapper.eq(PubUtil.isNotEmpty(param.getFieldValueByFieldName("productionVersion")), "PRODUCTION_VERSION", param.getProductionVersion());
 
-        queryWrapper.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
         queryWrapper.like(PubUtil.isNotEmpty(param.getFieldValueByFieldName("structureName")), "STRUCTURE_NAME", param.getFieldValueByFieldName("structureName"));
         queryWrapper.like(PubUtil.isNotEmpty(param.getFieldValueByFieldName("cxMachineCode")), "CX_MACHINE_CODE", param.getFieldValueByFieldName("cxMachineCode"));
     }
@@ -797,7 +795,7 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         queryParam.setYear(mpStructureAllocation.getYear());
         queryParam.setMonth(mpStructureAllocation.getMonth());
         queryParam.setProductionVersion(mpStructureAllocation.getProductionVersion());
-        return getDataList(queryParam);
+        return getDataList(queryParam, true);
     }
 
     /**
@@ -1517,6 +1515,55 @@ public class MpStructureAllocationServiceImpl extends AbstractDocService<MpStruc
         }
         exportVo.setHeadList(Collections.singletonList(totalProductRecord));
         return exportVo;
+    }
+
+    /**
+     * 获取结构排产分配信息
+     * 如果isFinalAdjust = true，直接从t_mp_structure_allocation表获取
+     * 否则，先从
+     *
+     * @param param         查询条件
+     * @param isFinalAdjust 是否月计划调整入口
+     * @return
+     */
+    private List<MpStructureAllocation> getStructureAllocationData(MpStructureAllocation param, boolean isFinalAdjust) {
+        String productionVersion = param.getProductionVersion();
+        if (StringUtils.isBlank(productionVersion)) {
+            return Collections.emptyList();
+        }
+        if (isFinalAdjust) {
+            QueryWrapper<MpStructureAllocation> queryWrapper = new QueryWrapper<>();
+            builderCondition(queryWrapper, param);
+            queryWrapper.orderByAsc("BEGIN_DAY");
+            return entityMapper.selectList(queryWrapper);
+        }
+        QueryWrapper<MpFinalStructureAllocationLog> logQuery = new QueryWrapper<>();
+        logQuery.eq("FACTORY_CODE", param.getFactoryCode());
+        logQuery.eq("YEAR", param.getYear());
+        logQuery.eq("MONTH", param.getMonth());
+        logQuery.eq("PRODUCTION_VERSION", productionVersion);
+        logQuery.eq("IS_DELETE", YesOrNoEnum.NO.getValue());
+        String monthPlanVersion = param.getMonthPlanVersion();
+        logQuery.eq(StringUtils.isNotBlank(monthPlanVersion), "MONTH_PLAN_VERSION", monthPlanVersion);
+        List<MpFinalStructureAllocationLog> backUpList = finalStructureAllocationLogEntityMapper.selectList(logQuery);
+        if (!CollectionUtils.isEmpty(backUpList)) {
+            String structureName = param.getStructureName();
+            String cxMachineCode = param.getCxMachineCode();
+            if (StringUtils.isBlank(structureName) && StringUtils.isBlank(cxMachineCode)) {
+                return BeanCopyUtils.copyBeanList(backUpList, MpStructureAllocation.class);
+            }
+            logQuery.like(StringUtils.isNotBlank(structureName), "STRUCTURE_NAME", structureName);
+            logQuery.like(StringUtils.isNotBlank(cxMachineCode), "CX_MACHINE_CODE", cxMachineCode);
+            List<MpFinalStructureAllocationLog> realDataList = finalStructureAllocationLogEntityMapper.selectList(logQuery);
+            if (CollectionUtils.isEmpty(realDataList)) {
+                return Collections.emptyList();
+            }
+            return BeanCopyUtils.copyBeanList(realDataList, MpStructureAllocation.class);
+        }
+        QueryWrapper<MpStructureAllocation> queryWrapper = new QueryWrapper<>();
+        builderCondition(queryWrapper, param);
+        queryWrapper.orderByAsc("BEGIN_DAY");
+        return entityMapper.selectList(queryWrapper);
     }
 
     /**

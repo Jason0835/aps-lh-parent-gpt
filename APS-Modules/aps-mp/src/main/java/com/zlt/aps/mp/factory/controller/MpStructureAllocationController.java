@@ -38,7 +38,10 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.*;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -83,14 +86,14 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
      *
      * @param queryCondition 查询条件
      */
+    @Override
     @ApiOperation("查询列表")
     @PostMapping("/list")
-    @Override
     public TableDataInfo list(@RequestBody MpStructureAllocation queryCondition) {
         try {
             startPage();
             setProductionVersion(queryCondition);
-            List<MpStructureAllocation> list = mpStructureAllocationService.getDataList(queryCondition);
+            List<MpStructureAllocation> list = mpStructureAllocationService.getDataList(queryCondition, false);
             return getDataTable(list);
         } finally {
             PageUtils.clearPage();
@@ -110,7 +113,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
             startPage();
             queryCondition.setCxMachineCode(queryCondition.getScheduledMachines());
             setProductionVersion(queryCondition);
-            List<MpStructureAllocation> list = mpStructureAllocationService.getDataList(queryCondition);
+            List<MpStructureAllocation> list = mpStructureAllocationService.getDataList(queryCondition, true);
             // 集合逗号分隔字段升序排序
             CommaFieldSortUtil.sortAndUpdateCommaField(list, MpStructureAllocation::getCxMachineCode, MpStructureAllocation::setCxMachineCode);
             return getDataTable(list);
@@ -123,6 +126,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
     /**
      * 设置排产版本
      * 排产版本为空，默认查询当前年月最新的排产版本
+     *
      * @param queryCondition
      */
     private void setProductionVersion(MpStructureAllocation queryCondition) {
@@ -143,6 +147,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
 
     /**
      * 获取定稿版本的月度计划
+     *
      * @param queryCondition
      */
     private List<FactoryMonthPlanProductionFinalResult> listMonthProdFinalPlans(MpStructureAllocation queryCondition) {
@@ -152,7 +157,6 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         param.setMonth(queryCondition.getMonth());
         return monthPlanProductionFinalResultService.listMonthProdFinalPlans(param);
     }
-
 
 
     @Override
@@ -166,7 +170,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         if (StringUtils.isBlank(condition.getMonthPlanVersion()) || StringUtils.isBlank(condition.getProductionVersion())) {
             return Collections.emptyList();
         }
-        return mpStructureAllocationService.getDataList(condition);
+        return mpStructureAllocationService.getDataList(condition, false);
     }
 
     /**
@@ -216,6 +220,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
 
     /**
      * 获取日期最接近的下一个结构
+     *
      * @param queryCondition 查询条件
      */
     @ApiOperation("获取日期最接近的下一个结构")
@@ -226,6 +231,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
 
     /**
      * 获取日期最接近的上一个结构
+     *
      * @param queryCondition 查询条件
      */
     @ApiOperation("获取日期最接近的上一个结构")
@@ -245,6 +251,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
 
     /**
      * 调整机台设置到缓存
+     *
      * @param adjustsCxMachineVo
      */
     @ApiOperation("调整机台设置到缓存")
@@ -256,6 +263,7 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
     /**
      * 导出列表
      */
+    @Override
     @Log(title = "排产过程_结构排产", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
@@ -300,18 +308,18 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         // 执行导入逻辑
         AjaxResult ajaxResult = mpStructureAllocationService.importData(fileBytes, importLog);
         // 处理返回结果
-        Map<String, Object> returnData = (Map<String, Object>)(ajaxResult.get(AjaxResult.DATA_TAG));
+        Map<String, Object> returnData = (Map<String, Object>) (ajaxResult.get(AjaxResult.DATA_TAG));
         Integer rowCount = 0;
         Integer errorNum = 0;
         Integer successNum = 0;
         List<Object> importErrorLogs = Collections.EMPTY_LIST;
         if (returnData != null) {
-            rowCount = (Integer)returnData.getOrDefault("rowCount", 0);
-            errorNum = (Integer)returnData.getOrDefault("errorNum", 0);
-            successNum = (Integer)returnData.getOrDefault("successNum", 0);
-            importErrorLogs = (List<Object>)returnData.get("importErrorLogs");
+            rowCount = (Integer) returnData.getOrDefault("rowCount", 0);
+            errorNum = (Integer) returnData.getOrDefault("errorNum", 0);
+            successNum = (Integer) returnData.getOrDefault("successNum", 0);
+            importErrorLogs = (List<Object>) returnData.get("importErrorLogs");
         }
-        
+
         AjaxResult logResult; // 日志消息，用于更新日志
         AjaxResult finalResult;
         if (errorNum > 0) {
@@ -333,10 +341,11 @@ public class MpStructureAllocationController extends AbstractDocBizController<Mp
         ImportExcelUtils.saveImportErrorLogs(logResult, this.iImportErrorLogService);
         return finalResult;
     }
-    
+
     /**
      * 从格式化后的字符串中，反向解析出原始参数
-     * @param format String.format 使用的模板（如 "年份:%d 月份:%d 工厂:%s 产品:%s"）
+     *
+     * @param format       String.format 使用的模板（如 "年份:%d 月份:%d 工厂:%s 产品:%s"）
      * @param formattedStr 格式化后的最终字符串
      * @return 解析出的参数数组，null=解析失败
      */
