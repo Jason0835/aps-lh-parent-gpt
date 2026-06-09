@@ -1,30 +1,29 @@
 import request from '@/utils/request'
 
-export function listCurlRoll(query) {
+export function listTmCurlRoll(query) {
   return request({
-    url: 'tm/curlRoll/list',
+    url: '/tm/tmCurlRoll/list',
     method: 'post',
     data: query
   })
 }
-export function removeCurlRoll(query) {
+export function saveTmCurlRoll(data) {
   return request({
-    url: 'tm/curlRoll/remove',
+    url: '/tm/tmCurlRoll/save',
+    method: 'post',
+    data: data
+  })
+}
+export function removeTmCurlRoll(query) {
+  return request({
+    url: '/tm/tmCurlRoll/remove',
     method: 'post',
     data: query
   })
 }
-export function saveCurlRoll(query) {
+export function getTmCurlRoll(id) {
   return request({
-    url: 'tm/curlRoll/save',
-    method: 'post',
-    data: query
-  })
-}
-export function checkCurlRollCodeUnique(query) {
-  return request({
-    url: 'tm/curlRoll/checkCurlRollCodeUnique',
-    method: 'post',
-    data: query
+    url: '/tm/tmCurlRoll/' + id,
+    method: 'get'
   })
 }

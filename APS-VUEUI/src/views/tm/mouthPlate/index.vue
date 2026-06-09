@@ -1,8 +1,7 @@
-
 <template>
   <basic-container>
     <page-table
-      tableRef="treadMouthPlateMainTable"
+      tableRef="tmMouthPlateMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -22,34 +21,34 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['tm:mouthPlate:add']"
+          v-hasPermi="['tm:tmMouthPlate:edit']"
           @click="handleAdd"
-          >{{ $t("ui.frame.btn.add") }}</el-button
-        >
-        <!-- <el-button
-          v-hasPermi="['tm:mouthPlate:edit']"
-          @click="handleEdit(selection[0])"
-          >{{ $t("ui.frame.btn.modify") }}</el-button
-        > -->
+        >{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button
-          v-hasPermi="['tm:mouthPlate:import']"
+          type="danger"
+          v-hasPermi="['tm:tmMouthPlate:remove']"
+          :disabled="selection.length == 0"
+          @click="handleDeleteAll"
+        >{{ $t("ui.frame.btn.delete") }}</el-button>
+        <el-button
+          v-hasPermi="['tm:tmMouthPlate:import']"
           @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        >
+        >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
           @click="handleExport"
-          v-hasPermi="['tm:mouthPlate:export']"
-          >{{ $t("ui.frame.btn.export") }}</el-button
-        >
+          v-hasPermi="['tm:tmMouthPlate:export']"
+        >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
-    <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <tlt-upload-form
       ref="tltUpload"
-      downloadUrl="/tm/mouthPlate/importTemplate"
-      uploadUrl="/tm/mouthPlate/importData"
+      :updateSupport="true"
+      downloadUrl="/tm/tmMouthPlate/importTemplate"
+      uploadUrl="/tm/tmMouthPlate/importData"
       @uploadSuccess="getList"
-    />
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
@@ -59,19 +58,20 @@ import {mapState} from "vuex";
 //utils
 import {downloadLink} from "@/utils/request";
 //interface
-import {editMouthPlate, listMouthPlate, removeMouthPlate,} from "@/api/tm/mouthPlate";
+import {listTmMouthPlate, removeTmMouthPlate} from "@/api/tm/mouthPlate";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TreadMouthPlate",
+  name: "TmMouthPlate",
   components: {
     tltUpload,
     infoDialog,
+    TltUploadForm,
   },
-  dicts: ["STATUS"],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -79,6 +79,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -96,59 +112,57 @@ export default {
   },
   computed: {
     ...mapState({
-      machines: (state) => state.tread.machines,
+      machines: (state) => state.tm.machines,
     }),
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          prop: "mouthPlateCode",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.mouthPlateCode"),
-          // sortable: "custom",
-        },
-        {
-          prop: "machineName",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.specifyMachine.column.machineName"),
-          // sortable: "custom",
-        },
-        {
-          prop: "status",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.mouthPlateStatus"),
-          // sortable: "custom",
-          render: ({ row }) => {
-            return (
-              <el-switch
-                value={row.status}
-                active-value="0"
-                inactive-value="1"
-                onChange={(value) => this.handleChangeStatus(value, row)}
-              />
-            );
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.mouthPlate.factoryCode"),
+          type: "select",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
+        },
+        {
+          prop: "mouthPlateCode",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.mouthPlate.mouthPlateCode"),
+        },
+        {
+          prop: "machineCode",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.mouthPlate.machineCode"),
+        },
+        {
+          prop: "plateStatus",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.mouthPlate.plateStatus"),
         },
         {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
-          // sortable: "custom",
+        },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.updateTime"),
+          width: 180,
         },
         {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          prop: "option",
+          minWidth: 180,
+          width: 200,
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["tm:mouthPlate:edit"]}
+                  v-hasPermi={["tm:tmMouthPlate:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
@@ -156,7 +170,7 @@ export default {
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["tm:mouthPlate:remove"]}
+                  v-hasPermi={["tm:tmMouthPlate:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -168,28 +182,32 @@ export default {
           },
         },
       ];
-
       return columns;
     },
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.mouthPlateCode"),
-          prop: "mouthPlateCode",
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.mouthPlate.factoryCode"),
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
         },
         {
-          label: this.$t("ui.specifyMachine.column.machineName"),
-          prop: "machineId",
+          prop: "mouthPlateCode",
+          label: this.$t("ui.data.column.tm.mouthPlate.mouthPlateCode"),
+        },
+        {
+          prop: "machineCode",
+          label: this.$t("ui.data.column.tm.mouthPlate.machineCode"),
           type: "select",
           dictData: this.machines,
-          valueKey: "id",
-          labelKey: "machineName",
+          labelKey: "machineCode",
+          valueKey: "machineCode",
+          filterable: true,
         },
         {
-          label: this.$t("ui.data.column.mouthPlateStatus"),
-          prop: "status",
-          type: "select",
-          dictData: this.dict.type.STATUS, // "STATUS",
+          prop: "plateStatus",
+          label: this.$t("ui.data.column.tm.mouthPlate.plateStatus"),
         },
       ];
     },
@@ -210,14 +228,32 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeMouthPlate({ ids }).then((data) => {
+        removeTmMouthPlate({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
         });
       });
     },
-
+    handleDeleteAll() {
+      let ids = "";
+      for (let i = 0; i < this.selection.length; i++) {
+        if (i == this.selection.length - 1) {
+          ids = ids + this.selection[i].id;
+        } else {
+          ids = ids + this.selection[i].id + ",";
+        }
+      }
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        removeTmMouthPlate({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
+      });
+    },
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
@@ -238,7 +274,6 @@ export default {
           isAsc: order == "ascending" ? "asc" : "desc",
         };
       } else {
-        //默认排序
         this.sort = {};
       }
       this.getList();
@@ -247,33 +282,10 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/tm/mouthPlate/export", this.formatParams(false));
-    },
-    handleChangeStatus(status, row) {
-      console.log(status);
-      let title =
-        status === "0"
-          ? this.$t("ui.biz.alter.isOpen")
-          : this.$t("ui.biz.alter.isStop");
-
-      this.$confirm(title, {
-        type: "warning",
-      }).then(async () => {
-        try {
-          this.loading = true;
-          const res = await editMouthPlate({
-            id: row.id,
-            mouthPlateCode: row.mouthPlateCode,
-            status,
-          });
-          this.$modal.msgSuccess(res.msg);
-          this.getList();
-        } catch (error) {
-          this.loading = false;
-        }
-      });
+      downloadLink("/tm/tmMouthPlate/export", this.formatParams(false));
     },
 
+    // utils
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
@@ -297,7 +309,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listMouthPlate(this.formatParams());
+        const data = await listTmMouthPlate(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -308,10 +320,20 @@ export default {
     },
   },
   created() {
-    this.$store.dispatch("tread/getMachineList");
+    this.$store.dispatch("tm/getMachineList");
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
+    this.getList();
   },
   activated() {
-    this.getList();
+    // this.getList();
   },
 };
 </script>

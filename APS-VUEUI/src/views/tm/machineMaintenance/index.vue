@@ -1,8 +1,7 @@
-
 <template>
   <basic-container>
     <page-table
-      tableRef="treadTmMachineMaintenanceMainTable"
+      tableRef="tmMachineMaintenanceMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -20,211 +19,148 @@
     >
       <template slot="header">
         <el-button
-          v-hasPermi="['tm:tmMachineMaintenance:add']"
           type="primary"
           plain
-          @click="handleAdd"
-          >{{ $t("ui.frame.btn.add") }}</el-button
-        >
-        <!-- <el-button
           v-hasPermi="['tm:tmMachineMaintenance:edit']"
-          type="primary"
-          plain
-          @click="handleEdit(selection[0])"
-          :disabled="selection.length != 1"
-          >{{ $t("ui.frame.btn.modify") }}</el-button
-        > -->
+          @click="handleAdd"
+        >{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button
-          v-hasPermi="['tm:tmMachineMaintenance:remove']"
           type="danger"
-          @click="handleDelete(selection)"
+          v-hasPermi="['tm:tmMachineMaintenance:remove']"
           :disabled="selection.length == 0"
-          >{{ $t("ui.frame.btn.delete") }}</el-button
-        >
+          @click="handleDeleteAll"
+        >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
           v-hasPermi="['tm:tmMachineMaintenance:import']"
-          @click="() => $refs.tltUploadForm.handleImport(importDefaultValue)"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        >
+          @click="$refs.tltUpload.handleImport()"
+        >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
-          v-hasPermi="['tm:tmMachineMaintenance:export']"
           @click="handleExport"
-          >{{ $t("ui.frame.btn.export") }}</el-button
-        >
-        <el-button
-          type="primary"
-          @click="handleLeave"
-          >{{ $t("操作工请假") }}</el-button
-        >
+          v-hasPermi="['tm:tmMachineMaintenance:export']"
+        >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
     <tlt-upload-form
-      ref="tltUploadForm"
-      title="导入"
+      ref="tltUpload"
+      :updateSupport="true"
       downloadUrl="/tm/tmMachineMaintenance/importTemplate"
       uploadUrl="/tm/tmMachineMaintenance/importData"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
-      :rules="importRules"
-    />
-    <InfoDialog ref="infoDialogRef" @success="handelSuccess" />
-    <leave-dialog ref="leaveRef" @success="getList" />
+    ></tlt-upload-form>
+    <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 <script>
 import {mapState} from "vuex";
-import moment from "moment";
-
-// import {
-//   listTmMachineMaintenance,
-//   editTmMachineMaintenance,
-//   removeTmMachineMaintenance,
-// } from "@/api/tm/tmMachineMaintenance";
-import InfoDialog from "./components/infoDialog.vue";
-import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import {downloadLink} from "@/utils/request";
-import leaveDialog from "./components/leaveDialog.vue";
+import {listTmMachineMaintenance, removeTmMachineMaintenance} from "@/api/tm/machineMaintenance";
+import tltUpload from "@/components/tltUpload/tltUpload.vue";
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
+import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TreadMachineMaintenance",
-  components: { InfoDialog, TltUploadForm ,leaveDialog},
-  dicts: [
-    // "sys_yes_no",
-    // "MOLD_CHANGE_TYPE",
-    // "IS_RELEASE"
-    "STATUS",
-    "CLASS_SHIFT",
-    "CLASS_NUM",
-    "CLASS_NUM_THREE",
-    "IS_SUPPORTED",
-  ],
+  name: "TmMachineMaintenance",
+  components: {
+    tltUpload,
+    infoDialog,
+    TltUploadForm,
+  },
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
     };
   },
   data() {
-    let tomorrow = moment().add(1, "days").format("YYYY-MM-DD");
     return {
-      importDefaultValue: {
-        updateSupport: false,
-      },
       importColumns: [
         {
           label: "",
           prop: "updateSupport",
           render: (form) => {
-            console.log(form);
             return (
               <el-checkbox
-                label="是否更新已经存在的用户数据"
-                true-label={true}
-                false-label={false}
+                label={this.$t("common.rule.updateSupport")}
                 v-model={form.updateSupport}
               >
-                是否更新已经存在的用户数据
+                {this.$t("common.rule.updateSupport")}
               </el-checkbox>
             );
           },
         },
       ],
-      importRules: {},
-
       loading: false,
       data: [],
+      selection: [],
       page: {
         current: 1,
         pageSize: 20,
         total: 0,
       },
       sort: {},
-      search: {
-        planDate: tomorrow,
-      },
-      query: {
-        planDate: tomorrow,
-      },
-      selection: [],
+      search: {},
+      query: {},
+      importDefaultValue: {},
+      importRules: {},
     };
   },
   computed: {
     ...mapState({
-      machines: (state) => state.tread.machines,
+      machines: (state) => state.tm.machines,
     }),
     columns() {
       return [
         { type: "selection", fixed: "left" },
         {
-          label: this.$t("停机日期"),
-          prop: "stopDate",
-          minWidth: 100,
-          // sortable: "custom",
-        },
-        {
-          label: this.$t("机台名称"),
-          prop: "machineName",
-          minWidth: 100,
-          // sortable: "custom",
-        },
-        {
-          label: this.$t("预计开始时间"),
-          prop: "machineName",
-          minWidth: 100,
-          // sortable: "custom",
-        },
-        {
-          label: this.$t("预计结束时间"),
-          prop: "machineName",
-          minWidth: 100,
-          // sortable: "custom",
-        },
-        {
-          label: this.$t("时间类型"),
-          prop: "machineName",
-          minWidth: 100,
-          // sortable: "custom",
-        },
-
-        {
-          label: this.$t("停机班次"),
-          prop: "stopShift",
-          minWidth: 100,
-          // sortable: "custom", //CLASS_NUM
-          render: ({ row }) => {
-            let value = row.stopShift;
-            if (this.isEmpty(value)) {
-              return "";
-            }
-            return this.selectDictLabels(this.dict.type.CLASS_NUM, value);
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.machineMaintenance.factoryCode"),
+          type: "select",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
-          label: this.$t("停机时间(H)"),
-          prop: "stopTime",
-          minWidth: 100,
-          // sortable: "custom",
-          type: "number",
+          prop: "machineCode",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.machineMaintenance.machineCode"),
         },
         {
-          label: this.$t("ui.common.column.remark"),
+          prop: "stopStartTime",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.machineMaintenance.stopStartTime"),
+          width: 180,
+        },
+        {
+          prop: "stopEndTime",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.machineMaintenance.stopEndTime"),
+          width: 180,
+        },
+        {
           prop: "remark",
+          halign: "center",
+          label: this.$t("ui.common.column.remark"),
           minWidth: 100,
-          // sortable: "custom",
-          formatter: (row) => {
-            return row.remark || "-";
-          },
+        },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.updateTime"),
+          width: 180,
         },
         {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
-          prop: "option",
+          minWidth: 180,
+          width: 200,
+          fixed: "right",
           render: ({ row }) => {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["tm:mouthPlate:edit"]}
+                  v-hasPermi={["tm:tmMachineMaintenance:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
@@ -232,10 +168,10 @@ export default {
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["tm:mouthPlate:remove"]}
+                  v-hasPermi={["tm:tmMachineMaintenance:remove"]}
                   class="minus"
                   type="danger"
-                  onClick={() => this.handleDelete([row])}
+                  onClick={() => this.handleDelete(row)}
                 >
                   {this.$t("ui.frame.btn.delete")}
                 </el-button>
@@ -248,81 +184,65 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("停机日期"),
-          prop: "stopDate",
-          type: "date",
-          dateType: "date",
-          valueFormat: "yyyy-MM-dd",
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.machineMaintenance.factoryCode"),
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
         },
         {
-          label: this.$t("机台"),
-          prop: "machineId",
+          prop: "machineCode",
+          label: this.$t("ui.data.column.tm.machineMaintenance.machineCode"),
           type: "select",
           dictData: this.machines,
-          valueKey: "id",
-          labelKey: "machineName",
+          labelKey: "machineCode",
+          valueKey: "machineCode",
+          filterable: true,
         },
       ];
     },
   },
   methods: {
-    handleLeave(){
-      if (this.$refs.leaveRef) {
-        this.$refs.leaveRef.show();
-      }
-    },
-    handleChangeStatus(status, row) {
-      console.log(status);
-      let title =
-        status === "0"
-          ? this.$t("ui.biz.alter.isOpen")
-          : this.$t("ui.biz.alter.isStop");
-
-      this.$confirm(title, {
-        type: "warning",
-      }).then(async () => {
-        try {
-          this.loading = true;
-          // const res = await editTmMachineMaintenance({
-          //   ...row,
-          //   status,
-          // });
-          this.$modal.msgSuccess(res.msg);
-          this.getList();
-        } catch (error) {
-          this.loading = false;
-        }
-      });
-    },
     handleAdd() {
-      if (this.$refs.infoDialogRef) {
-        this.$refs.infoDialogRef.show();
+      if (this.$refs.infoRef) {
+        this.$refs.infoRef.show();
       }
     },
     handleEdit(row) {
-      if (this.$refs.infoDialogRef) {
-        this.$refs.infoDialogRef.show(row);
+      if (this.$refs.infoRef) {
+        this.$refs.infoRef.show(row);
       }
     },
-
-    handleDelete(rows) {
+    handleDelete(row) {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        const ids = rows.map((row) => row.id).join(",");
-        // removeTmMachineMaintenance({ ids }).then((data) => {
-        //   this.$modal.msgSuccess(data.msg);
-        //   this.$set(this.page, "current", 1);
-        //   this.getList();
-        // });
+        const ids = row.id;
+        removeTmMachineMaintenance({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
       });
     },
-    handleExport() {
-      downloadLink("/tm/tmMachineMaintenance/export", this.formatParams(false));
+    handleDeleteAll() {
+      let ids = "";
+      for (let i = 0; i < this.selection.length; i++) {
+        if (i == this.selection.length - 1) {
+          ids = ids + this.selection[i].id;
+        } else {
+          ids = ids + this.selection[i].id + ",";
+        }
+      }
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        removeTmMachineMaintenance({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
+      });
     },
-    handleQuery() {},
-    handleHistoryQuery() {},
-
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
@@ -336,11 +256,6 @@ export default {
     handelSuccess() {
       this.getList();
     },
-    handleSelectionChange(rows) {
-      this.selection = rows;
-    },
-
-    //util
     handleSortChange({ column, prop, order }) {
       if (order) {
         this.sort = {
@@ -348,16 +263,17 @@ export default {
           isAsc: order == "ascending" ? "asc" : "desc",
         };
       } else {
-        //默认排序
         this.sort = {};
       }
       this.getList();
     },
-    /**
-     * 获得列表参数
-     * @param {boolean} hasPage
-     * @returns {object}
-     */
+    handleSelectionChange(rows) {
+      this.selection = rows;
+    },
+    handleExport() {
+      downloadLink("/tm/tmMachineMaintenance/export", this.formatParams(false));
+    },
+
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
@@ -369,42 +285,42 @@ export default {
         params.pageNum = this.page.current;
       }
 
-      if (params.createTime && params.createTime[0]) {
-        params.createTimeStart = params.createTime[0];
-        params.createTimeEnd = params.createTime[1];
-        params.createTime = undefined;
-      }
-
       return params;
     },
-    // a
-
-    //
     async getList() {
-      // try {
-      //   this.loading = true;
-      //   const data = await listTmMachineMaintenance(this.formatParams());
-
-      //   this.data = data.rows.map((el) => {
-      //     return {
-      //       ...el,
-      //       tempStatus: el.status,
-      //     };
-      //   });
-      //   this.page.total = data.total;
-      // } catch (error) {
-      //   console.error(error);
-      // } finally {
-      //   this.loading = false;
-      // }
+      try {
+        this.loading = true;
+        const data = await listTmMachineMaintenance(this.formatParams());
+        this.data = data.rows;
+        this.page.total = data.total;
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.loading = false;
+      }
     },
   },
-  mounted() {},
   created() {
-    this.$store.dispatch("tread/getMachineList");
+    this.$store.dispatch("tm/getMachineList");
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
+    this.getList();
   },
   activated() {
-    this.getList();
+    // this.getList();
   },
 };
 </script>
+<style lang="scss" scoped>
+.more-btn {
+  margin: 2px 0;
+  width: 100%;
+}
+</style>

@@ -29,11 +29,11 @@
 </template>
 
 <script>
-import { mapState } from "vuex";
+import {mapState} from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { saveCurlRoll,checkCurlRollCodeUnique } from "@/api/cd15/curlRoll";
+import {checkCurlRollCodeUnique, saveCurlRoll} from "@/api/cd15/curlRoll";
 
 export default {
   components: { infoForm },
@@ -64,7 +64,7 @@ export default {
   },
   computed: {
     ...mapState({
-      machines: (state) => state.tread.machines,
+      machines: (state) => state.tm.machines,
     }),
     title: function () {
       return this.isEdit

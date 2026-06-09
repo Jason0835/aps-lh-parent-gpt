@@ -29,14 +29,12 @@
 </template>
 
 <script>
-import {mapState} from "vuex";
-
 import infoForm from "@/views/components/infoForm.vue";
-
-import {editMouthPlate} from "@/api/tm/mouthPlate";
+import {saveTmMouthPlate} from "@/api/tm/mouthPlate";
 
 export default {
   components: { infoForm },
+  inject: ["parentDict"],
   data() {
     return {
       loading: false,
@@ -45,7 +43,21 @@ export default {
       editType: null,
       form: {},
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
         mouthPlateCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.input"),
+            trigger: "blur",
+          },
+        ],
+        machineCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -56,9 +68,9 @@ export default {
     };
   },
   computed: {
-    ...mapState({
-      machines: (state) => state.tread.machines,
-    }),
+    machines() {
+      return this.$store.state.tm.machines;
+    },
     title: function () {
       return (
         (this.isEdit
@@ -70,32 +82,43 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.mouthPlateCode"),
-          prop: "mouthPlateCode",
-          span: 24,
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.mouthPlate.factoryCode"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          span: 12,
           required: true,
         },
         {
-          label: this.$t("ui.specifyMachine.column.machineName"),
-          prop: "machineId",
-          span: 24,
+          prop: "mouthPlateCode",
+          label: this.$t("ui.data.column.tm.mouthPlate.mouthPlateCode"),
+          span: 12,
+          maxlength: 50,
+          required: true,
+          disabled: this.isEdit,
+        },
+        {
+          prop: "machineCode",
+          label: this.$t("ui.data.column.tm.mouthPlate.machineCode"),
+          span: 12,
           required: true,
           type: "select",
           dictData: this.machines,
-          labelKey: "machineName",
-          valueKey: "id",
+          props: { label: "machineCode", value: "machineCode" },
+          filterable: true,
         },
         {
-          label: this.$t("ui.data.column.mouthPlateStatus"),
-          prop: "status",
-          span: 24,
-          type: "switch",
+          prop: "plateStatus",
+          label: this.$t("ui.data.column.tm.mouthPlate.plateStatus"),
+          span: 12,
+          maxlength: 50,
         },
         {
-          label: this.$t("ui.common.column.remark"),
           prop: "remark",
+          label: this.$t("ui.common.column.remark"),
           span: 24,
           type: "textarea",
+          maxlength: 900,
         },
       ];
     },
@@ -105,12 +128,10 @@ export default {
     async save(params) {
       try {
         this.loading = true;
-
-        const res = await editMouthPlate(params);
+        const res = await saveTmMouthPlate(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
-
         this.loading = false;
       } catch (error) {
         console.log(error);
@@ -126,12 +147,15 @@ export default {
         this.form = {
           ...data,
         };
+      } else {
+        this.form = {
+          factoryCode: "116",
+        };
       }
     },
     hide() {
       this.form = {};
       this.$refs.form.triggerResetForm();
-      // this.resetForm("infoForm");
       this.isEdit = false;
       this.visible = false;
     },

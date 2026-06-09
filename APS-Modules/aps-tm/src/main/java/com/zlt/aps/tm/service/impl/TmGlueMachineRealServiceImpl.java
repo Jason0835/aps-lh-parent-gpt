@@ -41,7 +41,7 @@ public class TmGlueMachineRealServiceImpl extends AbstractDocService<TmGlueMachi
     public String checkUnique(TmGlueMachineReal query) {
         String unique = super.checkUnique(query);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            String msg = I18nUtil.getMessage("ui.data.alert.tmGlueMachineReal.notUnique");
+            String msg = I18nUtil.getMessage("ui.data.alert.tm.GlueMachineReal.notUnique");
             throw new ServiceException(com.ruoyi.common.utils.StringUtils.format(msg,
                     query.getFactoryCode(), query.getGlueCode(), query.getMachineCode()));
         }

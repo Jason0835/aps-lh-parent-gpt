@@ -29,27 +29,27 @@ public class TmParams extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.data.column.tmParams.factoryCode")
+    @Excel(name = "ui.data.column.tm.Params.factoryCode")
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    @Excel(name = "ui.data.column.tmParams.paramCode")
+    @Excel(name = "ui.data.column.tm.Params.paramCode")
     @ApiModelProperty(value = "参数编码", name = "paramCode")
     @TableField(value = "PARAM_CODE")
     private String paramCode;
 
-    @Excel(name = "ui.data.column.tmParams.paramName")
+    @Excel(name = "ui.data.column.tm.Params.paramName")
     @ApiModelProperty(value = "参数名称", name = "paramName")
     @TableField(value = "PARAM_NAME")
     private String paramName;
 
-    @Excel(name = "ui.data.column.tmParams.paramValue")
+    @Excel(name = "ui.data.column.tm.Params.paramValue")
     @ApiModelProperty(value = "参数值", name = "paramValue")
     @TableField(value = "PARAM_VALUE")
     private String paramValue;
 
-    @Excel(name = "ui.data.column.tmParams.defaultValue")
+    @Excel(name = "ui.data.column.tm.Params.defaultValue")
     @ApiModelProperty(value = "默认值", name = "defaultValue")
     @TableField(value = "DEFAULT_VALUE")
     private String defaultValue;
@@ -62,17 +62,17 @@ public class TmParams extends BaseEntity {
     @TableField(value = "ERROR_TIPS")
     private String errorTips;
 
-    @Excel(name = "ui.data.column.tmParams.paramGroup")
+    @Excel(name = "ui.data.column.tm.Params.paramGroup")
     @ApiModelProperty(value = "参数分组", name = "paramGroup")
     @TableField(value = "PARAM_GROUP")
     private String paramGroup;
 
-    @Excel(name = "ui.data.column.tmParams.valueType")
+    @Excel(name = "ui.data.column.tm.Params.valueType")
     @ApiModelProperty(value = "参数值类型", name = "valueType")
     @TableField(value = "VALUE_TYPE")
     private String valueType;
 
-    @Excel(name = "ui.data.column.tmParams.enableStatus", dictType = "biz_yes_no")
+    @Excel(name = "ui.data.column.tm.Params.enableStatus", dictType = "biz_yes_no")
     @ApiModelProperty(value = "是否启用", name = "enableStatus")
     @TableField(value = "ENABLE_STATUS")
     private String enableStatus;

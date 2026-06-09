@@ -97,7 +97,7 @@ public class TmParamsUIController extends BaseUIController<TmParams> {
     @GetMapping("/export")
     @RequiresPermissions("tm:tmParams:export")
     public void export(HttpServletResponse response, TmParams entity) throws IOException {
-        String fileName = I18nUtil.getMessage("ui.data.column.tm.tmParams.modelName");
+        String fileName = I18nUtil.getMessage("ui.data.column.tm.params.modelName");
         byte[] excelBytes = iTmParamsService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
@@ -111,8 +111,8 @@ public class TmParamsUIController extends BaseUIController<TmParams> {
     public AjaxResult importData(@RequestParam("file") MultipartFile file, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
         ImportContext context = new ImportContext();
-        context.setFunctionName(I18nUtil.getMessage("ui.data.column.tm.tmParams.modelName"));
-        context.setProcedureCode(I18nUtil.getMessage("ui.data.column.tm.tmParams.modelName"));
+        context.setFunctionName(I18nUtil.getMessage("ui.data.column.tm.params.modelName"));
+        context.setProcedureCode(I18nUtil.getMessage("ui.data.column.tm.params.modelName"));
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
         AjaxResult ajaxResult = iTmParamsService.importData(context, updateSupport);
@@ -123,7 +123,7 @@ public class TmParamsUIController extends BaseUIController<TmParams> {
     @GetMapping("/importTemplate")
     @ResponseBody
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
-        String fileName = I18nUtil.getMessage("ui.data.column.tm.tmParams.modelName");
+        String fileName = I18nUtil.getMessage("ui.data.column.tm.params.modelName");
         ExcelUtil<TmParams> util = new ExcelUtil<>(TmParams.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();

@@ -1,8 +1,7 @@
-
 <template>
   <basic-container>
     <page-table
-      tableRef="treadGlueGroupOrderMainTable"
+      tableRef="tmGlueGroupOrderMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -21,55 +20,53 @@
       <template slot="header">
         <el-button
           type="primary"
-          v-hasPermi="['tm:glueGroupOrder:add']"
+          plain
+          v-hasPermi="['tm:tmGlueGroupOrder:edit']"
           @click="handleAdd"
-          >{{ $t("ui.frame.btn.add") }}</el-button
-        >
-        <!-- <el-button
-          type="warning"
-          v-hasPermi="['tm:glueGroupOrder:edit']"
-          @click="handleEdit(selection[0])"
-          >{{ $t("ui.frame.btn.modify") }}</el-button
-        > -->
+        >{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button
-          v-hasPermi="['tm:glueGroupOrder:import']"
+          type="danger"
+          v-hasPermi="['tm:tmGlueGroupOrder:remove']"
+          :disabled="selection.length == 0"
+          @click="handleDeleteAll"
+        >{{ $t("ui.frame.btn.delete") }}</el-button>
+        <el-button
+          v-hasPermi="['tm:tmGlueGroupOrder:import']"
           @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        >
-        <el-button @click="handleExport" v-hasPermi="['tm:glueGroupOrder:export']">{{
-          $t("ui.frame.btn.export")
-        }}</el-button>
+        >{{ $t("ui.frame.btn.import") }}</el-button>
+        <el-button
+          @click="handleExport"
+          v-hasPermi="['tm:tmGlueGroupOrder:export']"
+        >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
-    <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <tlt-upload-form
       ref="tltUpload"
-      downloadUrl="/tm/glueGroupOrder/importTemplate"
-      uploadUrl="/tm/glueGroupOrder/importData"
+      :updateSupport="true"
+      downloadUrl="/tm/tmGlueGroupOrder/importTemplate"
+      uploadUrl="/tm/tmGlueGroupOrder/importData"
       @uploadSuccess="getList"
-    />
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 <script>
-//lib
-// import moment from "moment";
-//utils
 import {downloadLink} from "@/utils/request";
-//interface
-import {listGlueGroupOrder, removeGlueGroupOrder} from "@/api/tm/glueGroupOrder";
-//components
+import {listTmGlueGroupOrder, removeTmGlueGroupOrder} from "@/api/tm/glueGroupOrder";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TreadGlueGroupOrder",
+  name: "TmGlueGroupOrder",
   components: {
     tltUpload,
     infoDialog,
+    TltUploadForm,
   },
-  dicts: [],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -77,14 +74,20 @@ export default {
   },
   data() {
     return {
-      searchColumns: [
+      importColumns: [
         {
-          label: this.$t("ui.glueGroup.column.glueGroupCode"),
-          prop: "glueGroupCode",
-        },
-        {
-          label: this.$t("ui.glueGroup.column.glueGroupName"),
-          prop: "glueGroupName",
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
         },
       ],
       loading: false,
@@ -96,60 +99,62 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {
-        mainPlanMonth: "",
-      },
-      query: {
-        mainPlanMonth: "",
-      },
+      search: {},
+      query: {},
       importDefaultValue: {},
       importRules: {},
     };
   },
   computed: {
     columns() {
-      let columns = [
+      return [
         { type: "selection", fixed: "left" },
         {
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.glueGroupOrder.factoryCode"),
+          type: "select",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
           prop: "glueGroupCode",
-          label: this.$t("ui.glueGroup.column.glueGroupCode"),
           halign: "center",
-          align: "center",
-          // sortable: "custom",
+          label: this.$t("ui.data.column.tm.glueGroupOrder.glueGroupCode"),
         },
         {
           prop: "glueGroupName",
-          label: this.$t("ui.glueGroup.column.glueGroupName"),
           halign: "center",
-          align: "center",
-          // sortable: "custom",
+          label: this.$t("ui.data.column.tm.glueGroupOrder.glueGroupName"),
         },
         {
           prop: "orderNum",
-          label: this.$t("ui.glueGroup.column.orderNum"),
           halign: "center",
-          align: "center",
-          // sortable: "custom",
+          label: this.$t("ui.data.column.tm.glueGroupOrder.orderNum"),
         },
-
         {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
-          // sortable: "custom",
+        },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.updateTime"),
+          width: 180,
         },
         {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
           minWidth: 180,
-          width: 180,
+          width: 200,
           fixed: "right",
           render: ({ row }) => {
             return (
               <div>
                 <el-button
+                  v-hasPermi={["tm:tmGlueGroupOrder:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
@@ -157,6 +162,7 @@ export default {
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
+                  v-hasPermi={["tm:tmGlueGroupOrder:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -168,8 +174,24 @@ export default {
           },
         },
       ];
-
-      return columns;
+    },
+    searchColumns() {
+      return [
+        {
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.glueGroupOrder.factoryCode"),
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+        },
+        {
+          prop: "glueGroupCode",
+          label: this.$t("ui.data.column.tm.glueGroupOrder.glueGroupCode"),
+        },
+        {
+          prop: "glueGroupName",
+          label: this.$t("ui.data.column.tm.glueGroupOrder.glueGroupName"),
+        },
+      ];
     },
   },
   methods: {
@@ -188,20 +210,32 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        this.loading = true;
-        removeGlueGroupOrder({ ids })
-          .then((data) => {
-            this.$modal.msgSuccess(data.msg);
-            this.$set(this.page, "current", 1);
-            this.getList();
-          })
-          .catch((error) => {
-            console.log(error);
-            this.loading = false;
-          });
+        removeTmGlueGroupOrder({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
       });
     },
-
+    handleDeleteAll() {
+      let ids = "";
+      for (let i = 0; i < this.selection.length; i++) {
+        if (i == this.selection.length - 1) {
+          ids = ids + this.selection[i].id;
+        } else {
+          ids = ids + this.selection[i].id + ",";
+        }
+      }
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        removeTmGlueGroupOrder({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
+      });
+    },
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
@@ -222,7 +256,6 @@ export default {
           isAsc: order == "ascending" ? "asc" : "desc",
         };
       } else {
-        //默认排序
         this.sort = {};
       }
       this.getList();
@@ -231,10 +264,9 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/tm/glueGroupOrder/export", this.formatParams(false));
+      downloadLink("/tm/tmGlueGroupOrder/export", this.formatParams(false));
     },
 
-    // utils
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
@@ -254,11 +286,10 @@ export default {
 
       return params;
     },
-    // api
     async getList() {
       try {
         this.loading = true;
-        const data = await listGlueGroupOrder(this.formatParams());
+        const data = await listTmGlueGroupOrder(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -268,9 +299,20 @@ export default {
       }
     },
   },
-  created() {},
-  activated() {
+  created() {
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
     this.getList();
+  },
+  activated() {
+    // this.getList();
   },
 };
 </script>

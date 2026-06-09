@@ -2,10 +2,11 @@
   <el-dialog
     :title="title"
     :visible="visible"
-    width="600px"
+    width="800px"
     @close="hide"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
+    :append-to-body="true"
   >
     <info-form
       class="form-item-height"
@@ -14,7 +15,7 @@
       :rules="rules"
       :columns="columns"
       label-position="right"
-      label-width="150px"
+      label-width="160px"
       v-loading="loading"
     >
     </info-form>
@@ -28,10 +29,9 @@
 </template>
 
 <script>
-import {mapState} from "vuex";
-
 import infoForm from "@/views/components/infoForm.vue";
-// import { editTmMachineMaintenance } from "@/api/tm/tmMachineMaintenance";
+import {saveTmMachineMaintenance} from "@/api/tm/machineMaintenance";
+
 export default {
   components: { infoForm },
   inject: ["parentDict"],
@@ -42,121 +42,160 @@ export default {
       isEdit: false,
       form: {},
       rules: {
-        stopDate: [
+        factoryCode: [
           {
             required: true,
             message: this.$t("common.rule.select"),
-            trigger: "blur",
+            trigger: "change",
           },
         ],
-        machineId: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "blur",
-          },
-        ],
-        stopShift: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "blur",
-          },
-        ],
-        stopTime: [
+        machineCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
         ],
+        stopStartTime: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+          {
+            validator: (rule, value, callback) => {
+              if (value && this.form.stopEndTime) {
+                if (new Date(value).getTime() > new Date(this.form.stopEndTime).getTime()) {
+                  callback(new Error("开始时间不能大于结束时间"));
+                } else {
+                  this.$refs.form.$refs.infoForm.validateField("stopEndTime");
+                  callback();
+                }
+              } else {
+                callback();
+              }
+            },
+            trigger: "change",
+          },
+        ],
+        stopEndTime: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+          {
+            validator: (rule, value, callback) => {
+              if (value && this.form.stopStartTime) {
+                if (new Date(value).getTime() < new Date(this.form.stopStartTime).getTime()) {
+                  callback(new Error("结束时间不能小于开始时间"));
+                } else {
+                  this.$refs.form.$refs.infoForm.validateField("stopStartTime");
+                  callback();
+                }
+              } else {
+                callback();
+              }
+            },
+            trigger: "change",
+          },
+        ],
       },
     };
   },
   computed: {
-    ...mapState({
-      machines: (state) => state.tread.machines,
-    }),
+    machines() {
+      return this.$store.state.tm.machines;
+    },
     title: function () {
       return (
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.data.column.machine.info")
+        this.$t("ui.data.column.tm.machineMaintenance.modelName")
       );
     },
     columns() {
       return [
         {
-          label: this.$t("停机日期"),
-          prop: "stopDate",
-          type: "date",
-          dateType: "date",
-          valueFormat: "yyyy-MM-dd",
-        },
-        {
-          label: this.$t("预计开始时间"),
-          prop: "预计开始时间",
-          type: "date",
-          dateType: "date",
-          valueFormat: "yyyy-MM-dd",
-        },
-        {
-          label: this.$t("预计结束时间"),
-          prop: "预计结束时间",
-          type: "date",
-          dateType: "date",
-          valueFormat: "yyyy-MM-dd",
-        },
-        {
-          label: this.$t("时间类型"),
-          prop: "stopDate",
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.machineMaintenance.factoryCode"),
           type: "select",
+          span: 12,
+          required: true,
+          dictData: this.parentDict.type.biz_factory_name,
         },
         {
-          label: this.$t("机台名称"),
-          prop: "machineId",
+          prop: "machineCode",
+          label: this.$t("ui.data.column.tm.machineMaintenance.machineCode"),
+          span: 12,
+          required: true,
           type: "select",
           dictData: this.machines,
-          valueKey: "id",
-          labelKey: "machineName",
+          props: { label: "machineCode", value: "machineCode" },
+          filterable: true,
         },
         {
-          label: this.$t("停机时间(H)"),
-          prop: "stopTime",
+          prop: "stopStartTime",
+          label: this.$t("ui.data.column.tm.machineMaintenance.stopStartTime"),
+          span: 12,
+          type: "date",
+          dateType: "datetime",
+          valueFormat: "yyyy-MM-dd HH:mm:ss",
+          pickerOptions: {
+            disabledDate: (time) => {
+              if (this.form.stopEndTime) {
+                const end = new Date(this.form.stopEndTime);
+                end.setHours(0, 0, 0, 0);
+                return time.getTime() > end.getTime();
+              }
+              return false;
+            },
+          },
         },
         {
-          label: this.$t("停机班次"),
-          prop: "stopShift",
-          type: "select",
-          dictData: this.parentDict.type.CLASS_NUM,
+          prop: "stopEndTime",
+          label: this.$t("ui.data.column.tm.machineMaintenance.stopEndTime"),
+          span: 12,
+          type: "date",
+          dateType: "datetime",
+          valueFormat: "yyyy-MM-dd HH:mm:ss",
+          pickerOptions: {
+            disabledDate: (time) => {
+              if (this.form.stopStartTime) {
+                const start = new Date(this.form.stopStartTime);
+                start.setHours(0, 0, 0, 0);
+                return time.getTime() < start.getTime();
+              }
+              return false;
+            },
+          },
         },
         {
-          label: this.$t("ui.common.column.remark"),
           prop: "remark",
+          label: this.$t("ui.common.column.remark"),
+          span: 24,
           type: "textarea",
-          maxlength: "100",
+          maxlength: 900,
         },
       ];
     },
   },
   methods: {
-    // api
     async save(params) {
-      // try {
-      //   this.loading = true;
-      //   const data = await editTmMachineMaintenance(params);
-      //   this.$modal.msgSuccess(data.msg);
-      //   this.$emit("success");
-      //   this.hide();
-      // } catch (error) {
-      //   console.log(error);
-      // } finally {
-      //   this.loading = false;
-      // }
+      try {
+        this.loading = true;
+        const res = await saveTmMachineMaintenance(params);
+        this.$modal.msgSuccess(res.msg);
+        this.$emit("success");
+        this.hide();
+        this.loading = false;
+      } catch (error) {
+        console.log(error);
+        this.loading = false;
+      }
     },
 
-    //utils
     show(data) {
       this.visible = true;
       if (data) {
@@ -164,27 +203,20 @@ export default {
         this.form = {
           ...data,
         };
+      } else {
+        this.form = {
+          factoryCode: "116",
+        };
       }
     },
     hide() {
-      this.$refs.form.triggerResetForm();
       this.form = {};
-
-      // this.resetForm("infoForm");
+      this.$refs.form.triggerResetForm();
       this.isEdit = false;
       this.visible = false;
     },
-
     handleConfirm() {
-      this.$refs.form.triggerConfirm((params) => {
-        Object.keys(params).forEach((key) => {
-          if (this.isEmpty(params[key])) {
-            params[key] = "";
-          }
-        });
-
-        this.save(params);
-      });
+      this.$refs.form.triggerConfirm(this.save);
     },
   },
 };

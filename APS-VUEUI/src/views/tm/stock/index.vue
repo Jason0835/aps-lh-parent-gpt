@@ -1,8 +1,7 @@
-
 <template>
   <basic-container>
     <page-table
-      tableRef="treadStockMainTable"
+      tableRef="tmStockMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -22,70 +21,52 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['tm:stock:add']"
+          v-hasPermi="['tm:tmStock:edit']"
           @click="handleAdd"
-          >{{ $t("ui.frame.btn.add") }}</el-button
-        >
-        <el-button
-          type="primary"
-          plain
-          v-hasPermi="['tm:stock:edit']"
-          :disabled="selection.length !== 1"
-          @click="() => handleEdit(selection[0])"
-          >{{ $t("ui.frame.btn.modify") }}</el-button
-        >
-        <!-- <el-button
-          type="warning"
-          v-hasPermi="['tm:stock:stockRevise']"
-          :disabled="selection.length !== 1"
-          @click="() => handleModifyStock(selection[0])"
-          >{{ $t("ui.frame.btn.stock.modify2") }}</el-button
-        > -->
+        >{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button
           type="danger"
-          plain
-          v-hasPermi="['tm:stock:remove']"
-          @click="handleBatchDelete"
-          >{{ $t("ui.frame.btn.delete") }}</el-button
-        >
+          v-hasPermi="['tm:tmStock:remove']"
+          :disabled="selection.length == 0"
+          @click="handleDeleteAll"
+        >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
-          v-hasPermi="['tm:stock:import']"
+          v-hasPermi="['tm:tmStock:import']"
           @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        >
-        <el-button @click="handleExport" v-hasPermi="['tm:stock:export']">{{
-          $t("ui.frame.btn.export")
-        }}</el-button>
+        >{{ $t("ui.frame.btn.import") }}</el-button>
+        <el-button
+          @click="handleExport"
+          v-hasPermi="['tm:tmStock:export']"
+        >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
-    <tlt-upload
+    <tlt-upload-form
       ref="tltUpload"
-      downloadUrl="/tm/stock/importTemplate"
-      uploadUrl="/tm/stock/importData"
+      :updateSupport="true"
+      downloadUrl="/tm/tmStock/importTemplate"
+      uploadUrl="/tm/tmStock/importData"
       @uploadSuccess="getList"
-    />
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 <script>
-//lib
-// import moment from "moment";
-//utils
 import {downloadLink} from "@/utils/request";
-//interface
-import {listStock, releaseStock, removeStock} from "@/api/tm/stock";
-//components
+import {listTmStock, removeTmStock} from "@/api/tm/stock";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TreadStock",
+  name: "TmStock",
   components: {
     tltUpload,
     infoDialog,
+    TltUploadForm,
   },
-  dicts: [],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -93,17 +74,20 @@ export default {
   },
   data() {
     return {
-      searchColumns: [
+      importColumns: [
         {
-          label: this.$t("ui.data.column.stock.stockDate"),
-          prop: "stockDate",
-          type: "date",
-          dateType: "daterange",
-          valueFormat: "yyyy-MM-dd",
-        },
-        {
-          label: this.$t("ui.data.column.quota.treadCode"),
-          prop: "materialCode",
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
         },
       ],
       loading: false,
@@ -117,98 +101,78 @@ export default {
       sort: {},
       search: {},
       query: {},
+      importDefaultValue: {},
+      importRules: {},
     };
   },
   computed: {
     columns() {
-      let columns = [
+      return [
         { type: "selection", fixed: "left" },
         {
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.stock.factoryCode"),
+          type: "select",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
           prop: "stockDate",
-          align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.stock.stockDate"),
-          width: 160,
-          // sortable: "custom",
-        },
-
-        {
-          prop: "materialCode",
-          align: "center",
-          halign: "center",
-          label: this.$t("ui.data.column.quota.treadCode"),
-          // sortable: "custom",
+          label: this.$t("ui.data.column.tm.stock.stockDate"),
         },
         {
-          prop: "rollStockNum",
-          align: "right",
+          prop: "treadCode",
           halign: "center",
-          label: this.$t("ui.data.column.stock.stockNum.roll"),
-          // sortable: "custom",
+          label: this.$t("ui.data.column.tm.stock.treadCode"),
         },
         {
-          prop: "rollModifyNum",
-          align: "right",
+          prop: "stockQty",
           halign: "center",
-          label: this.$t("ui.data.column.stock.modifyNum.roll"),
-          // sortable: "custom",
+          label: this.$t("ui.data.column.tm.stock.stockQty"),
         },
         {
-          prop: "rollBadNum",
-          align: "right",
+          prop: "badQty",
           halign: "center",
-          label: this.$t("ui.data.column.stock.badNum.roll"),
-          // sortable: "custom",
+          label: this.$t("ui.data.column.tm.stock.badQty"),
         },
         {
-          prop: "stockNum",
-          align: "right",
+          prop: "adjustQty",
           halign: "center",
-          label: this.$t("ui.data.column.stock.stockNum.meter"),
-          // sortable: "custom",
-        },
-
-        {
-          prop: "modifyNum",
-          align: "right",
-          halign: "center",
-          label: this.$t("ui.data.column.stock.modifyNum.meter"),
-          // sortable: "custom",
-        },
-        {
-          prop: "badNum",
-          align: "right",
-          halign: "center",
-          label: this.$t("ui.data.column.stock.badNum.meter"),
-          // sortable: "custom",
+          label: this.$t("ui.data.column.tm.stock.adjustQty"),
         },
         {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
-          // sortable: "custom",
+        },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.updateTime"),
+          width: 180,
         },
         {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
           minWidth: 180,
-          width: 180,
+          width: 200,
           fixed: "right",
           render: ({ row }) => {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["tm:stock:stockRevise"]}
+                  v-hasPermi={["tm:tmStock:edit"]}
                   class="minus"
                   type="success"
-                  onClick={() => this.handleModifyStock(row)}
+                  onClick={() => this.handleEdit(row)}
                 >
-                  {this.$t("ui.frame.btn.stock.modify2")}
+                  {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["tm:stock:remove"]}
+                  v-hasPermi={["tm:tmStock:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -220,19 +184,36 @@ export default {
           },
         },
       ];
-
-      return columns;
+    },
+    searchColumns() {
+      return [
+        {
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.stock.factoryCode"),
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+        },
+        {
+          prop: "stockDate",
+          label: this.$t("ui.data.column.tm.stock.stockDate"),
+          type: "date",
+        },
+        {
+          prop: "treadCode",
+          label: this.$t("ui.data.column.tm.stock.treadCode"),
+        },
+      ];
     },
   },
   methods: {
     handleAdd() {
       if (this.$refs.infoRef) {
-        this.$refs.infoRef.show(null, "0");
+        this.$refs.infoRef.show();
       }
     },
     handleEdit(row) {
       if (this.$refs.infoRef) {
-        this.$refs.infoRef.show(row, "1");
+        this.$refs.infoRef.show(row);
       }
     },
     handleDelete(row) {
@@ -240,38 +221,32 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        this.loading = true;
-        removeStock({ ids })
-          .then((data) => {
-            this.$modal.msgSuccess(data.msg);
-            this.$set(this.page, "current", 1);
-            this.getList();
-          })
-          .catch((error) => {
-            console.log(error);
-            this.loading = false;
-          });
+        removeTmStock({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
       });
     },
-    handleBatchDelete(row) {
+    handleDeleteAll() {
+      let ids = "";
+      for (let i = 0; i < this.selection.length; i++) {
+        if (i == this.selection.length - 1) {
+          ids = ids + this.selection[i].id;
+        } else {
+          ids = ids + this.selection[i].id + ",";
+        }
+      }
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        const ids = this.selection.map((row) => row.id).join(",");
-        this.loading = true;
-        removeStock({ ids })
-          .then((data) => {
-            this.$modal.msgSuccess(data.msg);
-            this.$set(this.page, "current", 1);
-            this.getList();
-          })
-          .catch((error) => {
-            console.log(error);
-            this.loading = false;
-          });
+        removeTmStock({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
       });
     },
-
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
@@ -292,7 +267,6 @@ export default {
           isAsc: order == "ascending" ? "asc" : "desc",
         };
       } else {
-        //默认排序
         this.sort = {};
       }
       this.getList();
@@ -301,31 +275,9 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/tm/stock/export", this.formatParams(false));
-    },
-    handleModifyStock(row) {
-      if (this.$refs.infoRef) {
-        this.$refs.infoRef.show(row, "2");
-      }
-    },
-    handleReleaseStock() {
-      this.$confirm(this.$t("ui.biz.alter.makeSureReleaseStock")).then(
-        async () => {
-          try {
-            this.loading = true;
-            const ids = this.selection.map((row) => row.is).join(",");
-            const res = await releaseStock({ ids });
-            this.$modal.msgSuccess(res.msg);
-            this.getList();
-          } catch (error) {
-            console.error(error);
-            this.loading = false;
-          }
-        }
-      );
+      downloadLink("/tm/tmStock/export", this.formatParams(false));
     },
 
-    // utils
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
@@ -342,19 +294,13 @@ export default {
         params.createTimeEnd = params.createTime[1];
         params.createTime = undefined;
       }
-      if (params.stockDate && params.stockDate[0]) {
-        params.startTime = params.stockDate[0];
-        params.endTime = params.stockDate[1];
-        params.stockDate = undefined;
-      }
 
       return params;
     },
-    // api
     async getList() {
       try {
         this.loading = true;
-        const data = await listStock(this.formatParams());
+        const data = await listTmStock(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -364,9 +310,20 @@ export default {
       }
     },
   },
-  created() {},
-  activated() {
+  created() {
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
     this.getList();
+  },
+  activated() {
+    // this.getList();
   },
 };
 </script>

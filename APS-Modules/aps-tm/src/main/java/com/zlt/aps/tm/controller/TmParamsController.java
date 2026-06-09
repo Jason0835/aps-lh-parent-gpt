@@ -58,7 +58,7 @@ public class TmParamsController extends AbstractDocBizController<TmParams> {
         return super.list(queryVO);
     }
 
-    @Log(title = "ui.data.column.tmParams.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @Log(title = "ui.data.column.tm.Params.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -69,7 +69,7 @@ public class TmParamsController extends AbstractDocBizController<TmParams> {
         return super.save(billVO);
     }
 
-    @Log(title = "ui.data.column.tmParams.modelName", businessType = BusinessType.DELETE)
+    @Log(title = "ui.data.column.tm.Params.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -90,7 +90,7 @@ public class TmParamsController extends AbstractDocBizController<TmParams> {
         return tmParamsService.checkUnique(query);
     }
 
-    @Log(title = "ui.data.column.tmParams.modelName", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.tm.Params.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData/{updateSupport}")
     @Override
@@ -98,7 +98,7 @@ public class TmParamsController extends AbstractDocBizController<TmParams> {
         return super.importData(importContext, updateSupport);
     }
 
-    @Log(title = "ui.data.column.tmParams.modelName", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.tm.Params.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override

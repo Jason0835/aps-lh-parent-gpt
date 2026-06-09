@@ -44,7 +44,7 @@ public class TmGlueMachineRealController extends AbstractDocBizController<TmGlue
         return super.list(queryVO);
     }
 
-    @Log(title = "ui.data.column.tmGlueMachineReal.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @Log(title = "ui.data.column.tm.GlueMachineReal.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
     @ApiOperation("保存")
     @PostMapping("/save")
     @Override
@@ -55,7 +55,7 @@ public class TmGlueMachineRealController extends AbstractDocBizController<TmGlue
         return super.save(billVO);
     }
 
-    @Log(title = "ui.data.column.tmGlueMachineReal.modelName", businessType = BusinessType.DELETE)
+    @Log(title = "ui.data.column.tm.GlueMachineReal.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除")
     @DeleteMapping("/remove")
     @Override
@@ -76,7 +76,7 @@ public class TmGlueMachineRealController extends AbstractDocBizController<TmGlue
         return tmGlueMachineRealService.checkUnique(query);
     }
 
-    @Log(title = "ui.data.column.tmGlueMachineReal.modelName", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.data.column.tm.GlueMachineReal.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
     @PostMapping("/importData/{updateSupport}")
     @Override
@@ -84,7 +84,7 @@ public class TmGlueMachineRealController extends AbstractDocBizController<TmGlue
         return super.importData(importContext, updateSupport);
     }
 
-    @Log(title = "ui.data.column.tmGlueMachineReal.modelName", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.data.column.tm.GlueMachineReal.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override

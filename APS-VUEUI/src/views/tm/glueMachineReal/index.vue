@@ -1,6 +1,8 @@
 <template>
   <basic-container>
     <page-table
+      tableRef="tmGlueMachineRealMainTable"
+      :calcHeight="true"
       v-loading="loading"
       :columns="columns"
       :searchColumns="searchColumns"
@@ -12,6 +14,8 @@
       @pageChange="handlePageChange"
       @sort-change="handleSortChange"
       @selection-change="handleSelectionChange"
+      :showSummary="false"
+      :selectArea="false"
     >
       <template slot="header">
         <el-button
@@ -49,6 +53,7 @@
   </basic-container>
 </template>
 <script>
+import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
 import {listGlueMachineReal, removeGlueMachineReal} from "@/api/tm/glueMachineReal";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
@@ -102,6 +107,9 @@ export default {
     };
   },
   computed: {
+    ...mapState({
+      machines: (state) => state.tm.machines,
+    }),
     columns() {
       return [
         { type: "selection", fixed: "left" },
@@ -212,6 +220,11 @@ export default {
         {
           prop: "machineCode",
           label: this.$t("ui.data.column.tmGlueMachineReal.machineCode"),
+          type: "select",
+          dictData: this.machines,
+          labelKey: "machineCode",
+          valueKey: "machineCode",
+          filterable: true,
         },
         {
           prop: "enableStatus",
@@ -328,6 +341,7 @@ export default {
     },
   },
   created() {
+    this.$store.dispatch("tm/getMachineList");
     let defaultParams = {
       factoryCode: "116",
     };

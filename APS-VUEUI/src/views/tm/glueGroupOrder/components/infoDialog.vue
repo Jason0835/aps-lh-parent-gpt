@@ -30,19 +30,25 @@
 
 <script>
 import infoForm from "@/views/components/infoForm.vue";
-
-import {checkGlueGroupCodeUnique, saveGlueGroupOrder,} from "@/api/tm/glueGroupOrder";
+import {saveTmGlueGroupOrder} from "@/api/tm/glueGroupOrder";
 
 export default {
   components: { infoForm },
+  inject: ["parentDict"],
   data() {
     return {
       loading: false,
       visible: false,
       isEdit: false,
-      editType: null,
       form: {},
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
         glueGroupCode: [
           {
             required: true,
@@ -50,7 +56,6 @@ export default {
             trigger: "blur",
           },
         ],
-
         glueGroupName: [
           {
             required: true,
@@ -58,55 +63,7 @@ export default {
             trigger: "blur",
           },
         ],
-        maxAvgShift: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
-        shiftParams: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
       },
-      columns: [
-        {
-          label: this.$t("ui.glueGroup.column.glueGroupCode"),
-          prop: "glueGroupCode",
-          span: 24,
-          maxlength: "30",
-          required: true,
-        },
-        {
-          label: this.$t("ui.glueGroup.column.glueGroupName"),
-          prop: "glueGroupName",
-          span: 24,
-          maxlength: "15",
-          required: true,
-        },
-        {
-          label: this.$t("ui.glueGroup.column.orderNum"),
-          prop: "orderNum",
-          span: 24,
-          type: "number",
-          min: 0,
-          max: 999,
-          precision: 0,
-          required: true,
-        },
-
-        {
-          label: this.$t("ui.common.column.remark"),
-          prop: "remark",
-          span: 24,
-          type: "textarea",
-          maxlength: "300",
-        },
-      ],
     };
   },
   computed: {
@@ -115,21 +72,58 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.tm.glueGroup.column.modalName")
+        this.$t("ui.data.column.tm.glueGroupOrder.modelName")
       );
+    },
+    columns() {
+      return [
+        {
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.glueGroupOrder.factoryCode"),
+          type: "select",
+          span: 12,
+          required: true,
+          dictData: this.parentDict.type.biz_factory_name,
+        },
+        {
+          prop: "glueGroupCode",
+          label: this.$t("ui.data.column.tm.glueGroupOrder.glueGroupCode"),
+          span: 12,
+          maxlength: 30,
+          required: true,
+          disabled: this.isEdit,
+        },
+        {
+          prop: "glueGroupName",
+          label: this.$t("ui.data.column.tm.glueGroupOrder.glueGroupName"),
+          span: 12,
+          maxlength: 100,
+          required: true,
+        },
+        {
+          prop: "orderNum",
+          label: this.$t("ui.data.column.tm.glueGroupOrder.orderNum"),
+          span: 12,
+          type: "number",
+        },
+        {
+          prop: "remark",
+          label: this.$t("ui.common.column.remark"),
+          span: 24,
+          type: "textarea",
+          maxlength: 900,
+        },
+      ];
     },
   },
   methods: {
-    // api
     async save(params) {
       try {
         this.loading = true;
-
-        const res = await saveGlueGroupOrder(params);
+        const res = await saveTmGlueGroupOrder(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
-
         this.loading = false;
       } catch (error) {
         console.log(error);
@@ -137,27 +131,6 @@ export default {
       }
     },
 
-    checkGlueGroupCode(rule, value, callback) {
-      return new Promise((resolve, reject) => {
-        checkGlueGroupCodeUnique({
-          id: this.form.id,
-          glueGroupCode: this.form.glueGroupCode,
-        })
-          .then((res) => {
-            if (res === 0) {
-              resolve();
-            } else {
-              reject(new Error(this.$t("ui.glueGroup.alter.isGlueGroupExist")));
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-            reject(new Error("验证失败，请稍后再试"));
-          });
-      });
-    },
-
-    //utils
     show(data) {
       this.visible = true;
       if (data) {
@@ -165,26 +138,20 @@ export default {
         this.form = {
           ...data,
         };
+      } else {
+        this.form = {
+          factoryCode: "116",
+        };
       }
     },
     hide() {
       this.form = {};
       this.$refs.form.triggerResetForm();
-      // this.resetForm("infoForm");
       this.isEdit = false;
       this.visible = false;
     },
     handleConfirm() {
-      this.$refs.form.triggerConfirm(async (params) => {
-        try {
-          this.loading = true;
-          await this.checkGlueGroupCode();
-          this.save(params);
-        } catch (error) {
-          this.$modal.msgError(error.message);
-          this.loading = false;
-        }
-      });
+      this.$refs.form.triggerConfirm(this.save);
     },
   },
 };

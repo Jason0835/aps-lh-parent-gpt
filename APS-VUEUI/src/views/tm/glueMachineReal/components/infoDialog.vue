@@ -74,6 +74,9 @@ export default {
     };
   },
   computed: {
+    machines() {
+      return this.$store.state.tm.machines;
+    },
     title: function () {
       return (
         (this.isEdit
@@ -110,9 +113,12 @@ export default {
           prop: "machineCode",
           label: this.$t("ui.data.column.tmGlueMachineReal.machineCode"),
           span: 12,
-          maxlength: 50,
           required: true,
           disabled: this.isEdit,
+          type: "select",
+          dictData: this.machines,
+          props: { label: "machineCode", value: "machineCode" },
+          filterable: true,
         },
         {
           prop: "shiftCode",

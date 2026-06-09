@@ -1,8 +1,7 @@
-
 <template>
   <basic-container>
     <page-table
-      tableRef="treadCurlRollMainTable"
+      tableRef="tmCurlRollMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -21,55 +20,53 @@
       <template slot="header">
         <el-button
           type="primary"
-          v-hasPermi="['tm:curlRoll:add']"
+          plain
+          v-hasPermi="['tm:tmCurlRoll:edit']"
           @click="handleAdd"
-          >{{ $t("ui.frame.btn.add") }}</el-button
-        >
-        <!-- <el-button
-          type="warning"
-          v-hasPermi="['tm:curlRoll:edit']"
-          @click="handleEdit(selection[0])"
-          >{{ $t("ui.frame.btn.modify") }}</el-button
-        > -->
+        >{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button
-          v-hasPermi="['tm:curlRoll:import']"
+          type="danger"
+          v-hasPermi="['tm:tmCurlRoll:remove']"
+          :disabled="selection.length == 0"
+          @click="handleDeleteAll"
+        >{{ $t("ui.frame.btn.delete") }}</el-button>
+        <el-button
+          v-hasPermi="['tm:tmCurlRoll:import']"
           @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        >
-        <el-button @click="handleExport" v-hasPermi="['tm:curlRoll:export']">{{
-          $t("ui.frame.btn.export")
-        }}</el-button>
+        >{{ $t("ui.frame.btn.import") }}</el-button>
+        <el-button
+          @click="handleExport"
+          v-hasPermi="['tm:tmCurlRoll:export']"
+        >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
-    <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <tlt-upload
+    <tlt-upload-form
       ref="tltUpload"
-      downloadUrl="/tm/curlRoll/importTemplate"
-      uploadUrl="/tm/curlRoll/importData"
+      :updateSupport="true"
+      downloadUrl="/tm/tmCurlRoll/importTemplate"
+      uploadUrl="/tm/tmCurlRoll/importData"
       @uploadSuccess="getList"
-    />
+      labelWidth="0"
+      :columns="importColumns"
+    ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 <script>
-//lib
-import {mapState} from "vuex";
-//utils
 import {downloadLink} from "@/utils/request";
-//interface
-import {listCurlRoll, removeCurlRoll} from "@/api/tm/curlRoll";
-//components
+import {listTmCurlRoll, removeTmCurlRoll} from "@/api/tm/curlRoll";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "TreadCurlRoll",
+  name: "TmCurlRoll",
   components: {
     tltUpload,
     infoDialog,
+    TltUploadForm,
   },
-  dicts: [],
+  dicts: ["biz_factory_name"],
   provide() {
     return {
       parentDict: this.dict,
@@ -77,6 +74,22 @@ export default {
   },
   data() {
     return {
+      importColumns: [
+        {
+          label: "",
+          prop: "updateSupport",
+          render: (form) => {
+            return (
+              <el-checkbox
+                label={this.$t("common.rule.updateSupport")}
+                v-model={form.updateSupport}
+              >
+                {this.$t("common.rule.updateSupport")}
+              </el-checkbox>
+            );
+          },
+        },
+      ],
       loading: false,
       data: [],
       selection: [],
@@ -86,56 +99,57 @@ export default {
         total: 0,
       },
       sort: {},
-      search: {
-        mainPlanMonth: "",
-      },
-      query: {
-        mainPlanMonth: "",
-      },
+      search: {},
+      query: {},
       importDefaultValue: {},
       importRules: {},
     };
   },
   computed: {
-    ...mapState({
-      machines: (state) => state.tread.machines,
-    }),
     columns() {
-      let columns = [
+      return [
         { type: "selection", fixed: "left" },
         {
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.curlRoll.factoryCode"),
+          type: "select",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_factory_name, value);
+          },
+        },
+        {
           prop: "treadCode",
-          align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.quota.treadCode"),
-          width: 150,
-          sortable: true,
+          label: this.$t("ui.data.column.tm.curlRoll.treadCode"),
         },
         {
           prop: "curlLength",
-          align: "center",
           halign: "center",
-          label: this.$t("ui.curlRoll.column.length"),
-          sortable: true,
-          type: "number",
+          label: this.$t("ui.data.column.tm.curlRoll.curlLength"),
         },
         {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
-          sortable: true,
+          minWidth: 100,
+        },
+        {
+          prop: "updateTime",
+          label: this.$t("ui.data.column.updateTime"),
+          width: 180,
         },
         {
           align: "center",
           halign: "center",
           label: this.$t("ui.data.btn.option"),
           minWidth: 180,
-          width: 180,
+          width: 200,
           fixed: "right",
           render: ({ row }) => {
             return (
               <div>
                 <el-button
+                  v-hasPermi={["tm:tmCurlRoll:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
@@ -143,6 +157,7 @@ export default {
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
                 <el-button
+                  v-hasPermi={["tm:tmCurlRoll:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -154,14 +169,18 @@ export default {
           },
         },
       ];
-
-      return columns;
     },
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.quota.treadCode"),
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.curlRoll.factoryCode"),
+          type: "select",
+          dictData: this.dict.type.biz_factory_name,
+        },
+        {
           prop: "treadCode",
+          label: this.$t("ui.data.column.tm.curlRoll.treadCode"),
         },
       ];
     },
@@ -182,20 +201,32 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        this.loading = true;
-        removeCurlRoll({ ids })
-          .then((data) => {
-            this.$modal.msgSuccess(data.msg);
-            this.$set(this.page, "current", 1);
-            this.getList();
-          })
-          .catch((error) => {
-            console.log(error);
-            this.loading = false;
-          });
+        removeTmCurlRoll({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
       });
     },
-
+    handleDeleteAll() {
+      let ids = "";
+      for (let i = 0; i < this.selection.length; i++) {
+        if (i == this.selection.length - 1) {
+          ids = ids + this.selection[i].id;
+        } else {
+          ids = ids + this.selection[i].id + ",";
+        }
+      }
+      this.$confirm(this.$t("common.confirm.delete"), {
+        type: "warning",
+      }).then(() => {
+        removeTmCurlRoll({ ids }).then((data) => {
+          this.$modal.msgSuccess(data.msg);
+          this.$set(this.page, "current", 1);
+          this.getList();
+        });
+      });
+    },
     handleSearch(data) {
       this.query = data;
       this.$set(this.page, "current", 1);
@@ -216,7 +247,6 @@ export default {
           isAsc: order == "ascending" ? "asc" : "desc",
         };
       } else {
-        //默认排序
         this.sort = {};
       }
       this.getList();
@@ -225,10 +255,9 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/tm/curlRoll/export", this.formatParams(false));
+      downloadLink("/tm/tmCurlRoll/export", this.formatParams(false));
     },
 
-    // utils
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
@@ -248,11 +277,10 @@ export default {
 
       return params;
     },
-    // api
     async getList() {
       try {
         this.loading = true;
-        const data = await listCurlRoll(this.formatParams());
+        const data = await listTmCurlRoll(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -263,10 +291,19 @@ export default {
     },
   },
   created() {
-    this.$store.dispatch("tread/getMachineList");
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
+    this.getList();
   },
   activated() {
-    this.getList();
+    // this.getList();
   },
 };
 </script>

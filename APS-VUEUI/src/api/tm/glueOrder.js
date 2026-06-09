@@ -1,30 +1,29 @@
 import request from '@/utils/request'
 
-export function listGlueOrder(query) {
+export function listTmGlueOrder(query) {
   return request({
-    url: 'tm/glueOrder/list',
+    url: '/tm/tmGlueOrder/list',
     method: 'post',
     data: query
   })
 }
-export function removeGlueOrder(query) {
+export function saveTmGlueOrder(data) {
   return request({
-    url: 'tm/glueOrder/remove',
+    url: '/tm/tmGlueOrder/save',
+    method: 'post',
+    data: data
+  })
+}
+export function removeTmGlueOrder(query) {
+  return request({
+    url: '/tm/tmGlueOrder/remove',
     method: 'post',
     data: query
   })
 }
-export function saveGlueOrder(query) {
+export function getTmGlueOrder(id) {
   return request({
-    url: 'tm/glueOrder/save',
-    method: 'post',
-    data: query
-  })
-}
-export function checkGlueCodeUnique(query) {
-  return request({
-    url: 'tm/glueOrder/checkGlueCodeUnique',
-    method: 'post',
-    data: query
+    url: '/tm/tmGlueOrder/' + id,
+    method: 'get'
   })
 }

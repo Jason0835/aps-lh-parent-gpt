@@ -29,22 +29,26 @@
 </template>
 
 <script>
-import {mapState} from "vuex";
-
 import infoForm from "@/views/components/infoForm.vue";
-
-import {checkCurlRollCodeUnique, saveCurlRoll} from "@/api/tm/curlRoll";
+import {saveTmCurlRoll} from "@/api/tm/curlRoll";
 
 export default {
   components: { infoForm },
+  inject: ["parentDict"],
   data() {
     return {
       loading: false,
       visible: false,
       isEdit: false,
-      editType: null,
       form: {},
       rules: {
+        factoryCode: [
+          {
+            required: true,
+            message: this.$t("common.rule.select"),
+            trigger: "change",
+          },
+        ],
         treadCode: [
           {
             required: true,
@@ -63,52 +67,57 @@ export default {
     };
   },
   computed: {
-    ...mapState({
-      machines: (state) => state.tread.machines,
-    }),
     title: function () {
-      return this.isEdit
-        ? this.$t("common.button.edit")
-        : this.$t("common.button.add");
+      return (
+        (this.isEdit
+          ? this.$t("common.button.edit")
+          : this.$t("common.button.add")) +
+        this.$t("ui.data.column.tm.curlRoll.modelName")
+      );
     },
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.quota.treadCode"),
-          prop: "treadCode",
-          span: 24,
-        },
-        {
-          label: this.$t("ui.curlRoll.column.length"),
-          prop: "curlLength",
-          span: 24,
+          prop: "factoryCode",
+          label: this.$t("ui.data.column.tm.curlRoll.factoryCode"),
+          type: "select",
+          dictData: this.parentDict.type.biz_factory_name,
+          span: 12,
           required: true,
-          type: "number",
-          min: 0,
-          max: 999999,
-          precision: 0,
         },
         {
-          label: this.$t("ui.common.column.remark"),
+          prop: "treadCode",
+          label: this.$t("ui.data.column.tm.curlRoll.treadCode"),
+          span: 12,
+          maxlength: 50,
+          required: true,
+          disabled: this.isEdit,
+        },
+        {
+          prop: "curlLength",
+          label: this.$t("ui.data.column.tm.curlRoll.curlLength"),
+          span: 12,
+          type: "number",
+          required: true,
+        },
+        {
           prop: "remark",
+          label: this.$t("ui.common.column.remark"),
           span: 24,
           type: "textarea",
-          maxlength: "300",
+          maxlength: 900,
         },
       ];
     },
   },
   methods: {
-    // api
     async save(params) {
       try {
         this.loading = true;
-
-        const res = await saveCurlRoll(params);
+        const res = await saveTmCurlRoll(params);
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
-
         this.loading = false;
       } catch (error) {
         console.log(error);
@@ -116,7 +125,6 @@ export default {
       }
     },
 
-    //utils
     show(data) {
       this.visible = true;
       if (data) {
@@ -124,46 +132,20 @@ export default {
         this.form = {
           ...data,
         };
+      } else {
+        this.form = {
+          factoryCode: "116",
+        };
       }
     },
     hide() {
       this.form = {};
       this.$refs.form.triggerResetForm();
-      // this.resetForm("infoForm");
       this.isEdit = false;
       this.visible = false;
     },
-    checkCurlRollCodeUnique(rule, value, callback) {
-      return new Promise((resolve, reject) => {
-        checkCurlRollCodeUnique({
-          id: this.form.id,
-          treadCode: this.form.treadCode,
-        })
-          .then((res) => {
-            if (res === 0) {
-              resolve();
-            } else {
-              reject(new Error(this.$t("ui.curlRoll.alter.isSpecExist")));
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-            reject(new Error("验证失败，请稍后再试"));
-          });
-      });
-    },
-
-   handleConfirm() {
-      this.$refs.form.triggerConfirm(async (params) => {
-        try {
-          this.loading = true;
-          await this.checkCurlRollCodeUnique();
-          this.save(params);
-        } catch (error) {
-          this.$modal.msgError(error.message);
-          this.loading = false;
-        }
-      });
+    handleConfirm() {
+      this.$refs.form.triggerConfirm(this.save);
     },
   },
 };

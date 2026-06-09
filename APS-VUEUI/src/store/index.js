@@ -13,7 +13,7 @@ import curing from './modules/curing'
 import tqBead from './modules/tqBead'
 import mix from './modules/mix'
 
-import tread from './modules/semifinished/tread'
+import tm from './modules/semifinished/tm'
 import bead from './modules/semifinished/bead'
 import beadRing from './modules/semifinished/beadRing'
 import cut15 from './modules/semifinished/cut15'
@@ -46,7 +46,7 @@ const store = new Vuex.Store({
     //胎圈
     tqBead,
     // 半部件
-    tread,
+    tm,
     bead,
     beadRing,
     sidewall,

@@ -97,7 +97,7 @@ public class TmGlueMachineRealUIController extends BaseUIController<TmGlueMachin
     @GetMapping("/export")
     @RequiresPermissions("tm:tmGlueMachineReal:export")
     public void export(HttpServletResponse response, TmGlueMachineReal entity) throws IOException {
-        String fileName = I18nUtil.getMessage("ui.data.column.tmGlueMachineReal.modelName");
+        String fileName = I18nUtil.getMessage("ui.data.column.tm.glueMachineReal.modelName");
         byte[] excelBytes = iTmGlueMachineRealService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
@@ -111,8 +111,8 @@ public class TmGlueMachineRealUIController extends BaseUIController<TmGlueMachin
     public AjaxResult importData(@RequestParam("file") MultipartFile file, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
         ImportContext context = new ImportContext();
-        context.setFunctionName(I18nUtil.getMessage("ui.data.column.tmGlueMachineReal.modelName"));
-        context.setProcedureCode(I18nUtil.getMessage("ui.data.column.tmGlueMachineReal.modelName"));
+        context.setFunctionName(I18nUtil.getMessage("ui.data.column.tm.glueMachineReal.modelName"));
+        context.setProcedureCode(I18nUtil.getMessage("ui.data.column.tm.glueMachineReal.modelName"));
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
         AjaxResult ajaxResult = iTmGlueMachineRealService.importData(context, updateSupport);
@@ -123,7 +123,7 @@ public class TmGlueMachineRealUIController extends BaseUIController<TmGlueMachin
     @GetMapping("/importTemplate")
     @ResponseBody
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
-        String fileName = I18nUtil.getMessage("ui.data.column.tmGlueMachineReal.modelName");
+        String fileName = I18nUtil.getMessage("ui.data.column.tm.glueMachineReal.modelName");
         ExcelUtil<TmGlueMachineReal> util = new ExcelUtil<>(TmGlueMachineReal.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
