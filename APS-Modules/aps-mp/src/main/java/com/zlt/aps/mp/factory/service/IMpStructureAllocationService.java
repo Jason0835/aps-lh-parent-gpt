@@ -33,13 +33,15 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
     /**
      * 根据查询条件，获取结构排产信息
      *
-     * @param param
+     * @param param         查询条件
+     * @param isFinalAdjust 是否计划调整入口
      * @return
      */
-    List<MpStructureAllocation> getDataList(MpStructureAllocation param);
+    List<MpStructureAllocation> getDataList(MpStructureAllocation param, boolean isFinalAdjust);
 
     /**
      * 获取日期最接近的下一个结构
+     *
      * @param param
      * @return
      */
@@ -47,6 +49,7 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
 
     /**
      * 获取日期最接近的上一个结构
+     *
      * @param param
      * @return
      */
@@ -54,12 +57,14 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
 
     /**
      * 从缓存中获取调整机台
+     *
      * @return
      */
     AdjustsCxMachineVo getAdjustsCxMachineFromRedis();
 
     /**
      * 调整机台设置到缓存
+     *
      * @param adjustsCxMachineVo
      * @return
      */
@@ -67,7 +72,8 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
 
 
     /**
-     *  根据调整参数获取分配结构
+     * 根据调整参数获取分配结构
+     *
      * @param createCondition 调整参数
      * @return 分配结构
      */
@@ -75,6 +81,7 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
 
     /**
      * 获取结构转产表导出数据
+     *
      * @param param
      * @param isFinal
      * @return
@@ -84,6 +91,7 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
 
     /**
      * 导出结构转产表数据
+     *
      * @param list
      * @return
      */
@@ -91,28 +99,31 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
 
     /**
      * 查询结构的比例配比
+     *
      * @param mpStructureAllocation
      * @return
      */
     List<MdmStructureLhRatio> queryMdmStructureLhRatio(MpStructureAllocation mpStructureAllocation);
-    
+
     /**
      * 数据导入
+     *
      * @param fileBytes
      * @param importLog
      * @return
      */
     AjaxResult importData(byte[] fileBytes, ImportLog importLog);
-    
+
     /**
      * 导入
-     * @param list 列表数据
-     * @param list4DayResult 月计划列表数据
-     * @param updateSupport 覆盖
-     * @param importLogId 导入日志ID
-     * @param params 表头参数
+     *
+     * @param list             列表数据
+     * @param list4DayResult   月计划列表数据
+     * @param updateSupport    覆盖
+     * @param importLogId      导入日志ID
+     * @param params           表头参数
      * @param monthPlanVersion 月计划版本
-     * @param productVersion 生产版本
+     * @param productVersion   生产版本
      * @return 结果
      */
     AjaxResult importDataStructureAllocation(List<MpStructureAllocationExportVo> list, List<FactoryMonthPlanMouldDayResult> list4DayResult, boolean updateSupport, Long importLogId, String[] params, String monthPlanVersion, String productVersion,
@@ -120,7 +131,7 @@ public interface IMpStructureAllocationService extends IDocService<MpStructureAl
 
     /**
      * 导入
-     * 
+     *
      * @param list             结构转产表列表数据
      * @param list4DayResult   月计划列表数据
      * @param updateSupport    覆盖
