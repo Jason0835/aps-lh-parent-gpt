@@ -1312,7 +1312,7 @@ export default {
   },
   created() {
     //设置默认排程时间
-    let date = moment().add(2, "days").format("YYYY-MM-DD");
+    let date = moment().add(1, "days").format("YYYY-MM-DD");
 
     // date = "2023-06-01"; //test
     this.query.scheduleDate = date;
