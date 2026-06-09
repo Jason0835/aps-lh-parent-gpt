@@ -137,4 +137,15 @@ public class SkuMoldCapacityInfoVo implements Serializable {
         allocateNetQty = allocateHeightQty + otherAllocateQty;
     }
 
+    /**
+     * 分组|*|主花纹
+     * TBR 为结构
+     *
+     * @return
+     */
+    public String getGroupAndMainPattern() {
+        String keyFormat = "%s|*|%s";
+        return String.format(keyFormat, groupName, mainPattern);
+    }
+
 }

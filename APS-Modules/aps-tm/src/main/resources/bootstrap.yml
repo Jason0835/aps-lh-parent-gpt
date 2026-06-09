@@ -2,7 +2,7 @@ server:
   port: 9002
 
 nacos:
-  server-addr: 127.0.0.1:8848
+  server-addr: 192.168.10.123:8848
 
 # Spring
 spring:
@@ -15,7 +15,7 @@ spring:
     name: aps-tm
   profiles:
     # 环境配置
-    active: prod
+    active: test
   main:
     allow-bean-definition-overriding: true
   cloud:
