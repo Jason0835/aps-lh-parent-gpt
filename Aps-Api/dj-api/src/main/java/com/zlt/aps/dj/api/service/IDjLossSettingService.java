@@ -1,76 +1,99 @@
 package com.zlt.aps.dj.api.service;
 
+import java.util.List;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.dj.api.domain.dto.DjLossSettingDto;
-
-import io.swagger.annotations.ApiOperation;
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import com.zlt.aps.dj.api.domain.entity.DjLossSetting;
 
 
 /**
  * 垫胶损耗率设定Service接口
  *
- * @author chen
- * @date 2021-07-13
+ * @author zlt
+ * @date 2026-06-10
  */
-@FeignClient(contextId = "INcLossSettingService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:nc}")
+@FeignClient(contextId = "IDjLossSettingService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
 public interface IDjLossSettingService {
 
     /**
-     * 查询垫胶损耗率设定列表
+     * 获取信息列表
+     *
+     * @param stock
+     * @return
      */
-    @PostMapping("/dj/loss/list")
-    TableDataInfo list(@RequestBody DjLossSettingDto dto);
+    @PostMapping("/dj/lossSetting/list")
+    TableDataInfo list(@RequestBody DjLossSetting lossSetting);
 
     /**
-     * 新增垫胶损耗率设定
+     * 保存信息
+     *
+     * @param stock
+     * @return
      */
-    @PostMapping("/dj/loss/add")
-    AjaxResult add(@RequestBody DjLossSettingDto dto);
+    @PostMapping("/dj/lossSetting/save")
+    AjaxResult save(@Validated @RequestBody DjLossSetting lossSetting);
 
     /**
-     * 修改垫胶损耗率设定
+     * 删除信息
+     *
+     * @param ids
+     * @return
      */
-    @PostMapping("/dj/loss/edit")
-    AjaxResult edit(@RequestBody DjLossSettingDto dto);
-
-    /**
-     * 删除垫胶损耗率设定
-     */
-    @DeleteMapping("/dj/loss/{ids}")
-    AjaxResult remove(@PathVariable("ids") Long[] ids);
+    @DeleteMapping("/dj/lossSetting/{ids}")
+    AjaxResult removeByIds(@RequestBody List<Long> ids);
 
     /**
      * 根据ID获取详细信息
+     *
+     * @param id
+     * @return
      */
-    @GetMapping(value = "/dj/loss/{id}")
-    DjLossSettingDto getInfo(@PathVariable("id") Long id);
+    @GetMapping(value = "/dj/lossSetting/selectStockById/{id}")
+    DjLossSetting selectStockById(@PathVariable("id") Long id);
 
     /**
-     * 校验垫胶损耗率设定唯一性
+     * 根据ID获取详细信息
+     *
+     * @param id
+     * @return
      */
-    @PostMapping("/dj/loss/checkNcLossSettingUnique")
-    String checkNcLossSettingUnique(@RequestBody DjLossSettingDto dto);
+    @GetMapping(value = "/dj/lossSetting/{id}")
+    AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
-     * 导出垫胶损耗率设定列表
+     * 校验唯一性
      */
-    @PostMapping("/dj/loss/getList")
-    List<DjLossSettingDto> getList(@RequestBody DjLossSettingDto dto);
-
-    @PostMapping("/dj/loss/importData")
-    @ApiOperation("导入垫胶损耗率信息")
-    public AjaxResult importData(@RequestBody List<DjLossSettingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
-
+    @PostMapping("/dj/lossSetting/checkUnique")
+    String checkUnique(@RequestBody DjLossSetting lossSetting);
 
     /**
-     * 删除全部(逻辑删)
+     * 导出信息
+     * 
+     * @param stock
+     * @return
      */
-    @PostMapping("/dj/loss/deleteAll")
-    AjaxResult deleteAll();
+    @PostMapping("/dj/lossSetting/exportData/{fileName}")
+    byte[] exportData(@RequestBody DjLossSetting queryVO, @PathVariable("fileName") String fileName);
+
+    /**
+     * 导入信息
+     * 
+     * @param stock
+     * @return
+     */
+    @PostMapping("/dj/lossSetting/importData")
+    AjaxResult importData(@RequestBody ImportContext importContext,
+            @RequestParam("updateSupport") boolean updateSupport);
 }

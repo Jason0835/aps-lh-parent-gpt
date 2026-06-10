@@ -78,9 +78,9 @@ public class TmGlueOrderController extends AbstractDocBizController<TmGlueOrder>
 
     @Log(title = "ui.data.column.tm.GlueOrder.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
-    @PostMapping("/importData/{updateSupport}")
+    @PostMapping("/importData")
     @Override
-    public AjaxResult importData(@RequestBody ImportContext importContext, @PathVariable("updateSupport") boolean updateSupport) throws Exception {
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         return super.importData(importContext, updateSupport);
     }
 
@@ -108,7 +108,7 @@ public class TmGlueOrderController extends AbstractDocBizController<TmGlueOrder>
     @Override
     protected void builderCondition(QueryWrapper<TmGlueOrder> queryWrapper, TmGlueOrder queryVO) {
         queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
-        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("glueGroupId")), "GLUE_GROUP_ID", queryVO.getFieldValueByFieldName("glueGroupId"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("glueGroupCode")), "GLUE_GROUP_CODE", queryVO.getFieldValueByFieldName("glueGroupCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("glueCode")), "GLUE_CODE", queryVO.getFieldValueByFieldName("glueCode"));
         queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
     }

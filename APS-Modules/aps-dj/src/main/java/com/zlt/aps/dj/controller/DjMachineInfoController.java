@@ -39,7 +39,7 @@ import io.swagger.annotations.ApiOperation;
  * 垫胶机台信息Controller
  *
  * @author zlt
- * @date 2021-05-28
+ * @date 2026-05-28
  */
 @Api(tags = "垫胶机台信息维护接口")
 @RestController
@@ -63,7 +63,7 @@ public class DjMachineInfoController extends AbstractDocBizController<DjMachineI
     /**
      * 新增信息
      */
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.INSERT)
+    @Log(title = "ui.dj.machine.column.modalName", businessType = BusinessType.INSERT)
     @ApiOperation("新增信息（id不为空）")
     @PostMapping
     public AjaxResult save(@RequestBody DjMachineInfo machine) {
@@ -76,7 +76,7 @@ public class DjMachineInfoController extends AbstractDocBizController<DjMachineI
     /**
      * 删除信息
      */
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.DELETE)
+    @Log(title = "ui.dj.machine.column.modalName", businessType = BusinessType.DELETE)
     @ApiOperation("根据id批量删除信息")
     @ApiImplicitParams({ @ApiImplicitParam(name = "ids", dataType = "Long[]", value = "主键ids") })
     @DeleteMapping("/{ids}")
@@ -105,7 +105,7 @@ public class DjMachineInfoController extends AbstractDocBizController<DjMachineI
         return list;
     }
 
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.dj.machine.column.modalName", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
     @ApiOperation("导入信息")
     public AjaxResult importData(@RequestBody List<DjMachineInfo> list, @RequestParam("updateSupport") boolean updateSupport,

@@ -41,7 +41,7 @@ public class TmMachineMaintenanceServiceImpl extends AbstractDocService<TmMachin
     public String checkUnique(TmMachineMaintenance query) {
         String unique = super.checkUnique(query);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            String msg = I18nUtil.getMessage("ui.data.alert.tm.MachineMaintenance.notUnique");
+            String msg = I18nUtil.getMessage("ui.data.alert.tm.machineMaintenance.notUnique");
             throw new ServiceException(com.ruoyi.common.utils.StringUtils.format(msg,
                     query.getFactoryCode()));
         }

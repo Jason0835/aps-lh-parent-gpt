@@ -41,7 +41,7 @@ public class TmMouthPlateServiceImpl extends AbstractDocService<TmMouthPlate> im
     public String checkUnique(TmMouthPlate query) {
         String unique = super.checkUnique(query);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.MouthPlate.notUnique"));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.mouthPlate.notUnique"));
         }
         return unique;
     }

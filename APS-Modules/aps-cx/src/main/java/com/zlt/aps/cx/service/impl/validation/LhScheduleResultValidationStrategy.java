@@ -1,7 +1,7 @@
 package com.zlt.aps.cx.service.impl.validation;
 
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.ScheduleContextVo;

@@ -91,12 +91,12 @@ export default {
           dictData: this.parentDict.type.biz_factory_name,
         },
         {
-          prop: "glueGroupId",
-          label: this.$t("ui.data.column.tm.glueOrder.glueGroupId"),
+          prop: "glueGroupCode",
+          label: this.$t("ui.data.column.tm.glueOrder.glueGroupCode"),
           span: 12,
           type: "select",
           dictData: this.glueGroupList,
-          props: { label: "glueGroupName", value: "id" },
+          props: { label: "glueGroupName", value: "glueGroupCode" },
           filterable: true,
         },
         {

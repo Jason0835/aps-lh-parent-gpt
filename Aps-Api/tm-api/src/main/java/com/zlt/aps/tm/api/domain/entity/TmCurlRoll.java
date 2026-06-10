@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.common.core.annotation.ImportValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -17,17 +18,20 @@ public class TmCurlRoll extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.data.column.tm.CurlRoll.factoryCode")
+    @Excel(name = "ui.data.column.tm.curlRoll.factoryCode")
+    @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    @Excel(name = "ui.data.column.tm.CurlRoll.treadCode")
+    @Excel(name = "ui.data.column.tm.curlRoll.treadCode")
+    @ImportValidated(required = true, isCode = true, maxLength = 20)
     @ApiModelProperty(value = "胎面编码", name = "treadCode")
     @TableField(value = "TREAD_CODE")
     private String treadCode;
 
-    @Excel(name = "ui.data.column.tm.CurlRoll.curlLength")
+    @Excel(name = "ui.data.column.tm.curlRoll.curlLength")
+    @ImportValidated(required = true, number = true, min = 0, max = 999999)
     @ApiModelProperty(value = "卷曲长度", name = "curlLength")
     @TableField(value = "CURL_LENGTH")
     private BigDecimal curlLength;

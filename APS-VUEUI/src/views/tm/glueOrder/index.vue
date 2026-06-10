@@ -122,9 +122,9 @@ export default {
           },
         },
         {
-          prop: "glueGroupId",
+          prop: "glueGroupCode",
           halign: "center",
-          label: this.$t("ui.data.column.tm.glueOrder.glueGroupId"),
+          label: this.$t("ui.data.column.tm.glueOrder.glueGroupCode"),
         },
         {
           prop: "glueCode",

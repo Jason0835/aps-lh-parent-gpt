@@ -73,19 +73,19 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.nc.specifyMachine.column.liningCode"),
-          prop: "liningCode",
+          label: this.$t("ui.dj.specifyMachine.column.paddingCode"),
+          prop: "paddingCode",
           span: 24,
           required: true,
         },
         {
           label: this.$t("ui.specifyMachine.column.machineName"),
-          prop: "machineId",
+          prop: "machineCode",
           span: 24,
           required: true,
           type: "select",
           dictData: this.machines,
-          valueKey: "id",
+          valueKey: "machineCode",
           labelKey: "machineName",
         },
         {

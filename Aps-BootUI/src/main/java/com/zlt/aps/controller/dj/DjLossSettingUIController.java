@@ -28,32 +28,33 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
 import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
-import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
-import com.zlt.aps.dj.api.service.IDjMachineInfoService;
+import com.zlt.aps.dj.api.domain.entity.DjLossSetting;
+import com.zlt.aps.dj.api.service.IDjLossSettingService;
 import com.zlt.file.encryptbyll.FileEncryptUtils;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 
 /**
- * 垫胶机台信息Controller
+ * 内衬损耗率设定Controller
  *
  * @author zlt
+ * @date 2026-06-10
  */
+@Api(tags = "垫胶损耗率设定")
 @Controller
-@RequestMapping("/dj/machine")
-@Api(tags = { "垫胶机台信息维护接口" })
-public class DjMachineUIController extends BaseUIController<DjMachineInfo> {
+@RequestMapping("/dj/loss")
+public class DjLossSettingUIController extends BaseUIController<DjLossSetting> {
 
     @Autowired
-    private IDjMachineInfoService iDjMachineInfoService;
+    private IDjLossSettingService iDjLossSettingService;
 
-    private final String prefix = "aps/dj/machine";
+    private final String prefix = "aps/dj/lossSetting";
 
     /**
      * 跳转至主页面
      */
-    @RequiresPermissions("dj:machine:view")
+    @RequiresPermissions("dj:lossSetting:view")
     @GetMapping()
     public String toIndex() {
         return prefix + "/djMachine";
@@ -64,7 +65,7 @@ public class DjMachineUIController extends BaseUIController<DjMachineInfo> {
      */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
-        mmap.put("djMachine", new DjMachineInfo());
+        mmap.put("djMachine", new DjLossSetting());
         return prefix + "/add";
     }
 
@@ -73,7 +74,7 @@ public class DjMachineUIController extends BaseUIController<DjMachineInfo> {
      */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-        mmap.put("djMachine", iDjMachineInfoService.getInfo(id));
+        mmap.put("djMachine", iDjLossSettingService.getInfo(id));
         return prefix + "/edit";
     }
 
@@ -81,38 +82,38 @@ public class DjMachineUIController extends BaseUIController<DjMachineInfo> {
      * 根据条件查询主表数据
      */
     @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("dj:djMachine:list")
+    @RequiresPermissions("dj:lossSetting:list")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(DjMachineInfo djMachine) {
-        return iDjMachineInfoService.list(djMachine);
+    public TableDataInfo list(DjLossSetting djMachine) {
+        return iDjLossSettingService.list(djMachine);
     }
 
     /**
      * 修改或新增
      */
     @ApiOperation("修改或新增")
-    @RequiresPermissions("dj:djMachine:edit")
+    @RequiresPermissions("dj:lossSetting:edit")
     @PostMapping("/save")
     @ResponseBody
-    public AjaxResult save(DjMachineInfo djMachine) {
-        if (UserConstants.NOT_UNIQUE.equals(iDjMachineInfoService.checkUnique(djMachine))) {
+    public AjaxResult save(DjLossSetting djMachine) {
+        if (UserConstants.NOT_UNIQUE.equals(iDjLossSettingService.checkUnique(djMachine))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.alert.djMachine.embryoCodeNotUnique"));
         }
 
-        return iDjMachineInfoService.save(djMachine);
+        return iDjLossSettingService.save(djMachine);
     }
 
     /**
      * 删除
      */
     @ApiOperation("删除,id不为空")
-    @RequiresPermissions("dj:djMachine:remove")
+    @RequiresPermissions("dj:lossSetting:remove")
     @PostMapping("/remove")
     @ResponseBody
     public AjaxResult remove(@RequestParam String ids) {
         Long[] arr = Convert.toLongArray(ids);
-        return iDjMachineInfoService.removeByIds(Arrays.asList(arr));
+        return iDjLossSettingService.removeByIds(Arrays.asList(arr));
     }
 
     /**
@@ -121,16 +122,17 @@ public class DjMachineUIController extends BaseUIController<DjMachineInfo> {
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(DjMachineInfo djMachine) {
-        return iDjMachineInfoService.checkUnique(djMachine);
+    public String checkUnique(DjLossSetting djMachine) {
+        return iDjLossSettingService.checkUnique(djMachine);
     }
 
     /**
      * 导出模板文件的文件名，派生类重写名称。
+     * 
      * @return
      */
     @Override
-    public String getExportTemplateFileName(){
+    public String getExportTemplateFileName() {
         return this.getFunctionName();
     }
 
@@ -151,7 +153,7 @@ public class DjMachineUIController extends BaseUIController<DjMachineInfo> {
      */
     @Override
     public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.djMachine.modelName");
+        return I18nUtil.getMessage("ui.dj.lossSetting.column.modalName");
     }
 
     /**
@@ -161,25 +163,25 @@ public class DjMachineUIController extends BaseUIController<DjMachineInfo> {
     @Override
     public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        ExcelUtil<DjMachineInfo> util = new ExcelUtil<>(DjMachineInfo.class);
+        ExcelUtil<DjLossSetting> util = new ExcelUtil<>(DjLossSetting.class);
         util.exportExcel(response, null, fileName, fileName);
         return AjaxResult.success();
     }
 
     @ApiOperation("数据导出")
-    @GetMapping({"/export"})
+    @GetMapping({ "/export" })
     @ResponseBody
     @Override
-    public void export(HttpServletResponse response, DjMachineInfo entity) throws IOException {
+    public void export(HttpServletResponse response, DjLossSetting entity) throws IOException {
         String fileName = this.getExportTemplateFileName();
-        byte[] excelBytes = iDjMachineInfoService.exportData(entity,fileName);
+        byte[] excelBytes = iDjLossSettingService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
         IOUtils.copy(in, response.getOutputStream());
         response.flushBuffer();
     }
 
-    @PostMapping({"/importData"})
+    @PostMapping({ "/importData" })
     @ResponseBody
     @ApiOperation("数据导入")
     @Override
@@ -192,7 +194,7 @@ public class DjMachineUIController extends BaseUIController<DjMachineInfo> {
         context.setProcedureCode(this.getProcedureCode());
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iDjMachineInfoService.importData(context, updateSupport);
+        AjaxResult ajaxResult = iDjLossSettingService.importData(context, updateSupport);
         return ajaxResult;
     }
 }
