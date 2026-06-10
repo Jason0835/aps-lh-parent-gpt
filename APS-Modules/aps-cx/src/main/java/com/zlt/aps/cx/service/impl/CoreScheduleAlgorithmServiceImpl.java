@@ -1470,12 +1470,17 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             String machineCode = parts[0];
             String embryoCode = parts.length > 1 ? parts[1] : null;
             String constructionStage = parts.length > 2 && !parts[2].isEmpty() ? parts[2] : null;
-            // materialCode 不再作为 taskKey 的一部分，需要从 classSprMap 中获取第一个spr的materialCode
+            // materialCode 不再作为 taskKey 的一部分，需要从 classSprMap 中收集所有唯一的materialCode，用逗号拼接
             String materialCode = null;
             if (classSprMap != null && !classSprMap.isEmpty()) {
-                ShiftScheduleService.ShiftProductionResult firstSpr = classSprMap.values().iterator().next();
-                if (firstSpr != null && firstSpr.getMaterialCode() != null) {
-                    materialCode = firstSpr.getMaterialCode();
+                Set<String> materialCodeSet = new LinkedHashSet<>();
+                for (ShiftScheduleService.ShiftProductionResult spr : classSprMap.values()) {
+                    if (spr != null && spr.getMaterialCode() != null && !spr.getMaterialCode().isEmpty()) {
+                        materialCodeSet.add(spr.getMaterialCode());
+                    }
+                }
+                if (!materialCodeSet.isEmpty()) {
+                    materialCode = String.join(",", materialCodeSet);
                 }
             }
             String structureName = taskStructureMap.get(taskKey);
