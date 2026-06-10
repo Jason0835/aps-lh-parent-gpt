@@ -125,6 +125,6 @@ public class DjSpecifyMachineController extends AbstractDocBizController<DjSpeci
 
     @Override
     protected String getOrderBy() {
-        return "MACHINE_CODE";
+        return "MACHINE_CODE, PADDING_CODE";
     }
 }

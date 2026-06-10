@@ -1,5 +1,7 @@
 {
   "ui.data.column.factoryCode": "Factory",
+  "ui.dj.lossSetting.column.paddingCode": "Padding code",
+  "ui.dj.lossSetting.column.modalName": "Padding rubber loss rate management",
   "ui.data.column.monthPlanFinalAdjustQuery.modelName": "Monthly Plan Query",
   "ui.data.column.monthPlanFinalAdjustQuery.currentAdjustMachine": "Current Adjust Machine",
   "ui.data.column.monthPlanFinalAdjustQuery.structureInnerAdjust": "Structure Inner Adjust",

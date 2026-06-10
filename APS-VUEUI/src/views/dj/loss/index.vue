@@ -21,22 +21,22 @@
       <template slot="header">
         <el-button
           type="primary"
-          v-hasPermi="['nc:loss:add']"
+          v-hasPermi="['dj:loss:add']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <!-- <el-button
           type="warning"
-          v-hasPermi="['nc:machine:edit']"
+          v-hasPermi="['dj:machine:edit']"
           @click="handleEdit(selection[0])"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         > -->
         <el-button
-          v-hasPermi="['nc:loss:import']"
+          v-hasPermi="['dj:loss:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
-        <el-button @click="handleExport" v-hasPermi="['nc:loss:export']">{{
+        <el-button @click="handleExport" v-hasPermi="['dj:loss:export']">{{
           $t("ui.frame.btn.export")
         }}</el-button>
       </template>
@@ -44,8 +44,8 @@
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/nc/loss/importTemplate"
-      uploadUrl="/nc/loss/importData"
+      downloadUrl="/dj/loss/importTemplate"
+      uploadUrl="/dj/loss/importData"
       @uploadSuccess="getList"
     />
     <infoDialog ref="infoRef" @success="getList" />
@@ -57,14 +57,14 @@ import { mapState } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 //interface
-import { listLoss, removeLoss } from "@/api/nc/loss";
+import { listLoss, removeLoss } from "@/api/dj/loss";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
- name: "InsideLinerLoss",
+ name: "djLoss",
   components: {
     tltUpload,
     infoDialog,
@@ -98,16 +98,16 @@ export default {
   },
   computed: {
     ...mapState({
-      machines: (state) => state.insideLiner.machines,
+      machines: (state) => state.dj.machines,
     }),
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          prop: "liningCode",
+          prop: "paddingCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.quota.liningCode"),
+          label: this.$t("ui.dj.lossSetting.column.paddingCode"),
           sortable: true,
         },
         {
@@ -247,7 +247,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/nc/loss/export", this.formatParams(false));
+      downloadLink("/dj/loss/export", this.formatParams(false));
     },
 
     // utils
@@ -285,9 +285,15 @@ export default {
     },
   },
   created() {
-    this.$store.dispatch("insideLiner/getMachineList");
-  },
-  activated() {
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
     this.getList();
   },
 };

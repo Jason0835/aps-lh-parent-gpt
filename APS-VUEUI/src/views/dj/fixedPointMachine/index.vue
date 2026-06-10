@@ -183,14 +183,14 @@ export default {
       return [
         {
           label: this.$t("ui.dj.specifyMachine.column.paddingCode"),
-          prop: "liningCode",
+          prop: "paddingCode",
         },
         {
           label: this.$t("ui.specifyMachine.column.machineName"),
-          prop: "machineId",
+          prop: "machineCode",
           type: "select",
           dictData: this.machines,
-          valueKey: "id",
+          valueKey: "machineCode",
           labelKey: "machineName",
         },
         {

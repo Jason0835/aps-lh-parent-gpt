@@ -1,5 +1,7 @@
 {
   "ui.tq.machineSpecSpeed.column.machineCode": "机台编号",
+  "ui.dj.lossSetting.column.paddingCode": "垫胶代码",
+  "ui.dj.lossSetting.column.modalName": "垫胶损耗率管理",
   "ui.tq.machineSpecSpeed.column.materialCode": "胎圈代码",
   "ui.tq.machineSpecSpeed.column.standardSpeed": "生产速度(个/s)",
   "ui.tq.machineSpecSpeed.column.quota": "生产定额",
