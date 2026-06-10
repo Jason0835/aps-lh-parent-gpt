@@ -110,7 +110,7 @@ export default {
           prop: "liningCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.nc.specifyMachine.column.liningCode"),
+          label: this.$t("ui.dj.specifyMachine.column.paddingCode"),
           // sortable: "custom",
         },
         {
@@ -124,7 +124,7 @@ export default {
           prop: "lineType",
           align: "center",
           halign: "center",
-          label: this.$t("ui.specifyMachine.column.lineType"),
+          label: this.$t("ui.dj.specifyMachine.column.paddingCode"),
           // sortable: "custom",
           formatter: (row, column, value, index) => {
             return this.selectDictLabel(this.dict.type.LINE_TYPE, value);
@@ -182,7 +182,7 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.nc.specifyMachine.column.liningCode"),
+          label: this.$t("ui.dj.specifyMachine.column.paddingCode"),
           prop: "liningCode",
         },
         {
@@ -298,9 +298,15 @@ export default {
     },
   },
   created() {
-    this.$store.dispatch("insideLiner/getMachineList");
-  },
-  activated() {
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
     this.getList();
   },
 };

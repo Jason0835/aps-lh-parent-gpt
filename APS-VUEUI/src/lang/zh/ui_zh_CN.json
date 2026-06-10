@@ -100,6 +100,8 @@
   "ui.tc.specifyMachine.column.modalName": "胎侧定点机台",
   "ui.nc.specifyMachine.column.liningCode": "内衬代码",
   "ui.nc.specifyMachine.column.modalName": "内衬定点机台",
+  "ui.dj.specifyMachine.column.paddingCode": "垫胶代码",
+  "ui.dj.specifyMachine.column.modalName": "内衬定点机台",
   "ui.cd15.specifyMachine.column.modalName": "钢丝斜裁定点机台",
   "ui.cd90.specifyMachine.column.modalName": "纤维直裁定点机台",
   "ui.tq.specifyMachine.column.beadCode": "胎圈代码",

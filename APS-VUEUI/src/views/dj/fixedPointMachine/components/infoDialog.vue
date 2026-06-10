@@ -73,7 +73,7 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.nc.specifyMachine.column.liningCode"),
+          label: this.$t("ui.dj.specifyMachine.column.paddingCode"),
           prop: "liningCode",
           span: 24,
           required: true,
