@@ -1,7 +1,7 @@
 package com.zlt.aps.cx.service.impl.validation;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import cn.hutool.core.util.StrUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import lombok.extern.slf4j.Slf4j;
@@ -53,28 +53,28 @@ public class ParamConfigValidationStrategy extends BaseValidationStrategy {
 
             if (config == null) {
                 addWarn(result,
-                        StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramMissing"), paramCode),
-                        StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramMissing.suggestion"), defaultValue, description));
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramMissing"), paramCode),
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramMissing.suggestion"), defaultValue, description));
             } else if (config.getParamValue() == null || config.getParamValue().trim().isEmpty()) {
                 addWarn(result,
-                        StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramValueEmpty"), paramCode),
-                        StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramValueEmpty.suggestion"), defaultValue));
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramValueEmpty"), paramCode),
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramValueEmpty.suggestion"), defaultValue));
             } else {
                 try {
                     new BigDecimal(config.getParamValue());
                     addInfo(result,
-                            StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramConfigured"), paramCode, config.getParamValue()),
+                            StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramConfigured"), paramCode, config.getParamValue()),
                             null);
                 } catch (NumberFormatException e) {
                     addWarn(result,
-                            StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramValueInvalid"), paramCode, config.getParamValue()),
-                            StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramValueInvalid.suggestion"), defaultValue));
+                            StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramValueInvalid"), paramCode, config.getParamValue()),
+                            StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.paramValueInvalid.suggestion"), defaultValue));
                 }
             }
         }
 
         addInfo(result,
-                StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.summary"), paramConfigMap.size()),
+                StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.paramConfig.summary"), paramConfigMap.size()),
                 null);
     }
 }

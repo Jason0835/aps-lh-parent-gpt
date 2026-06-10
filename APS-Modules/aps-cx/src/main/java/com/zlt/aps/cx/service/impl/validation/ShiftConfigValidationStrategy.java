@@ -1,7 +1,7 @@
 package com.zlt.aps.cx.service.impl.validation;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import cn.hutool.core.util.StrUtil;
+import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.cx.entity.config.CxShiftConfig;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import lombok.extern.slf4j.Slf4j;
@@ -31,13 +31,13 @@ public class ShiftConfigValidationStrategy extends BaseValidationStrategy {
         if (isEmpty(shiftConfigs)) {
             addError(result,
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.empty"),
-                    StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.empty.suggestion"), factoryCode));
+                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.empty.suggestion"), factoryCode));
             return;
         }
 
         if (scheduleDays == null || scheduleDays < 1) {
             addError(result,
-                    StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.scheduleDaysInvalid"), scheduleDays),
+                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.scheduleDaysInvalid"), scheduleDays),
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.scheduleDaysInvalid.suggestion"));
             return;
         }
@@ -50,17 +50,17 @@ public class ShiftConfigValidationStrategy extends BaseValidationStrategy {
             Long count = dayShiftCount.get(day);
             if (count == null || count == 0) {
                 addWarn(result,
-                        StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.dayMissing"), day),
-                        StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.dayMissing.suggestion"), day));
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.dayMissing"), day),
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.dayMissing.suggestion"), day));
             } else if (count < 2) {
                 addInfo(result,
-                        StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.dayShiftFew"), day, count),
+                        StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.dayShiftFew"), day, count),
                         I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.dayShiftFew.suggestion"));
             }
         }
 
         addInfo(result,
-                StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.summary"), shiftConfigs.size(), scheduleDays),
+                StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.shiftConfig.summary"), shiftConfigs.size(), scheduleDays),
                 null);
     }
 }
