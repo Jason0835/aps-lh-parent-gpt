@@ -37,7 +37,9 @@ public class Cd90SpecifyMachineController extends AbstractDocBizController<Cd90S
     @Resource
     private Cd90SpecifyMachineMapper cd90SpecifyMachineMapper;
 
-    /** 查询直裁定点机台列表 */
+    /**
+     * 查询直裁定点机台列表
+     */
     @ApiOperation("查询直裁定点机台列表")
     @PostMapping("/list")
     @Override
@@ -45,7 +47,9 @@ public class Cd90SpecifyMachineController extends AbstractDocBizController<Cd90S
         return super.list(queryVO);
     }
 
-    /** 新增直裁定点机台 */
+    /**
+     * 新增直裁定点机台
+     */
     @Log(title = "ui.data.column.cd90SpecifyMachine.modelName", businessType = BusinessType.INSERT)
     @ApiOperation("新增直裁定点机台")
     @PostMapping("/add")
@@ -53,7 +57,9 @@ public class Cd90SpecifyMachineController extends AbstractDocBizController<Cd90S
         return super.save(specifyMachine);
     }
 
-    /** 编辑直裁定点机台 */
+    /**
+     * 编辑直裁定点机台
+     */
     @Log(title = "ui.data.column.cd90SpecifyMachine.modelName", businessType = BusinessType.UPDATE)
     @ApiOperation("编辑直裁定点机台")
     @PostMapping("/edit")
@@ -61,7 +67,9 @@ public class Cd90SpecifyMachineController extends AbstractDocBizController<Cd90S
         return super.save(specifyMachine);
     }
 
-    /** 删除直裁定点机台 */
+    /**
+     * 删除直裁定点机台
+     */
     @Log(title = "ui.data.column.cd90SpecifyMachine.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("删除直裁定点机台")
     @PostMapping("/remove")
@@ -70,7 +78,9 @@ public class Cd90SpecifyMachineController extends AbstractDocBizController<Cd90S
         return super.removeByIds(ids);
     }
 
-    /** 清空直裁定点机台 */
+    /**
+     * 清空直裁定点机台
+     */
     @Log(title = "ui.data.column.cd90SpecifyMachine.modelName", businessType = BusinessType.DELETE)
     @ApiOperation("清空直裁定点机台")
     @PostMapping("/removeAll")
@@ -86,7 +96,9 @@ public class Cd90SpecifyMachineController extends AbstractDocBizController<Cd90S
         return super.removeByIds(ids);
     }
 
-    /** 获取直裁定点机台详情 */
+    /**
+     * 获取直裁定点机台详情
+     */
     @ApiOperation("获取直裁定点机台详情")
     @GetMapping("/getInfo/{id}")
     @Override
@@ -94,14 +106,18 @@ public class Cd90SpecifyMachineController extends AbstractDocBizController<Cd90S
         return super.getInfo(id);
     }
 
-    /** 校验直裁定点机台唯一性 */
+    /**
+     * 校验直裁定点机台唯一性
+     */
     @ApiOperation("校验直裁定点机台唯一性")
     @PostMapping("/checkUnique")
     public String checkUnique(@RequestBody Cd90SpecifyMachine specifyMachine) {
         return cd90SpecifyMachineService.checkUnique(specifyMachine);
     }
 
-    /** 导入直裁定点机台 */
+    /**
+     * 导入直裁定点机台
+     */
     @Log(title = "ui.data.column.cd90SpecifyMachine.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入直裁定点机台")
     @PostMapping("/importData")
@@ -110,7 +126,9 @@ public class Cd90SpecifyMachineController extends AbstractDocBizController<Cd90S
         return super.importData(importContext, updateSupport);
     }
 
-    /** 导出直裁定点机台 */
+    /**
+     * 导出直裁定点机台
+     */
     @Log(title = "ui.data.column.cd90SpecifyMachine.modelName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出直裁定点机台")
     @PostMapping("/exportData/{fileName}")

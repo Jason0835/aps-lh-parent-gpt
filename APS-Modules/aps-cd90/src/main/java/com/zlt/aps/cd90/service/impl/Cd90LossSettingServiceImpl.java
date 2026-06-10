@@ -7,8 +7,11 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.domain.RowStateEnum;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cd90.api.domain.entity.Cd90LossSetting;
+import com.zlt.aps.cd90.api.domain.entity.Cd90MachineInfo;
 import com.zlt.aps.cd90.mapper.Cd90LossSettingMapper;
+import com.zlt.aps.cd90.mapper.Cd90MachineInfoMapper;
 import com.zlt.aps.cd90.service.ICd90LossSettingService;
+import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.service.IMdmConstructionInfoService;
 import com.zlt.bill.common.service.AbstractDocService;
 import com.zlt.common.enums.ImportErrorTypeEnums;
@@ -36,6 +39,9 @@ public class Cd90LossSettingServiceImpl extends AbstractDocService<Cd90LossSetti
 
     @Resource
     private Cd90LossSettingMapper cd90LossSettingMapper;
+
+    @Resource
+    private Cd90MachineInfoMapper cd90MachineInfoMapper;
 
     @Resource
     private IMdmConstructionInfoService mdmConstructionInfoService;
@@ -81,6 +87,7 @@ public class Cd90LossSettingServiceImpl extends AbstractDocService<Cd90LossSetti
         Set<String> tireFabricCodes = CollectionUtils.isEmpty(tireFabricCodeList)
                 ? new HashSet<>()
                 : new HashSet<>(tireFabricCodeList);
+        Set<String> enabledMachineKeys = loadEnabledMachineKeys();
 
         for (int i = 0; i < list.size(); i++) {
             int errorNum = i + 2;
@@ -94,6 +101,10 @@ public class Cd90LossSettingServiceImpl extends AbstractDocService<Cd90LossSetti
             if (!isTireFabricCodeExists(docEntity, tireFabricCodes)) {
                 ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
                         errorNum, I18nUtil.getMessage("ui.data.column.cd90SpecifyMachine.clothInvalid"), validated);
+            }
+            if (!isMachineCodeValid(docEntity, enabledMachineKeys)) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(),
+                        errorNum, I18nUtil.getMessage("ui.data.column.cd90SpecifyMachine.machineInvalid"), validated);
             }
             if (CollectionUtils.isNotEmpty(validated)) {
                 failureNum++;
@@ -180,5 +191,34 @@ public class Cd90LossSettingServiceImpl extends AbstractDocService<Cd90LossSetti
             return true;
         }
         return tireFabricCodes.contains(entity.getClothCode());
+    }
+
+    /**
+     * 校验机台编码是否存在于启用机台中（机台编码为空时跳过）。
+     */
+    private boolean isMachineCodeValid(Cd90LossSetting entity, Set<String> enabledMachineKeys) {
+        if (StringUtils.isBlank(entity.getMachineCode())) {
+            return true;
+        }
+        String key = entity.getFactoryCode() + ":" + entity.getMachineCode();
+        return enabledMachineKeys.contains(key);
+    }
+
+    /**
+     * 预加载所有启用状态的机台，构建 factoryCode:machineCode 的 Set 用于导入时 O(1) 校验。
+     */
+    private Set<String> loadEnabledMachineKeys() {
+        LambdaQueryWrapper<Cd90MachineInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Cd90MachineInfo::getStatus, ApsConstant.APS_STRING_1);
+        wrapper.select(Cd90MachineInfo::getFactoryCode, Cd90MachineInfo::getMachineCode);
+        List<Cd90MachineInfo> machines = cd90MachineInfoMapper.selectList(wrapper);
+        if (CollectionUtils.isEmpty(machines)) {
+            return new HashSet<>();
+        }
+        Set<String> keys = new HashSet<>(machines.size());
+        for (Cd90MachineInfo m : machines) {
+            keys.add(m.getFactoryCode() + ":" + m.getMachineCode());
+        }
+        return keys;
     }
 }

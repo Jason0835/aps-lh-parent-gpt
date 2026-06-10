@@ -111,7 +111,7 @@ public class Cd90SpecifyMachineUIController extends BaseUIController<Cd90Specify
 
     @Override
     public String getProcedureCode() {
-        return "CD90_SPECIFY_MACHINE";
+        return "CD90";
     }
 
     @Override

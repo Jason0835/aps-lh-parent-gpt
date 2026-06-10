@@ -83,7 +83,7 @@ public class Cd90ParamsUIController extends BaseUIController<Cd90Params> {
 
     @Override
     public String getProcedureCode() {
-        return "CD90_PARAMS";
+        return "CD90";
     }
 
     @Override

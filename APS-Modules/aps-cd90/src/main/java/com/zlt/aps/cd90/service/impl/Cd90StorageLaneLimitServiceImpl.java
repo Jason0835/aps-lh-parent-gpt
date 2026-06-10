@@ -35,37 +35,97 @@ public class Cd90StorageLaneLimitServiceImpl extends AbstractDocService<Cd90Stor
     private Cd90StorageLaneLimitMapper mapper;
     @Resource
     private IMdmConstructionInfoService mdmConstructionInfoService;
-    @Override protected String getDocTypeCode() { return "CD90_STORAGE_LANE_LIMIT"; }
 
     @Override
-    public String checkUnique(Cd90StorageLaneLimit e) {
+    protected String getDocTypeCode() {
+        return "CD90_STORAGE_LANE_LIMIT";
+    }
+
+    @Override
+    public String checkUnique(Cd90StorageLaneLimit entity) {
         LambdaQueryWrapper<Cd90StorageLaneLimit> w = new LambdaQueryWrapper<>();
-        w.eq(Cd90StorageLaneLimit::getFactoryCode, e.getFactoryCode());
-        w.eq(Cd90StorageLaneLimit::getLaneDate, e.getLaneDate());
-        w.eq(Cd90StorageLaneLimit::getShiftCode, e.getShiftCode());
-        w.eq(Cd90StorageLaneLimit::getStorageLaneCode, e.getStorageLaneCode());
-        w.ne(e.getId() != null, Cd90StorageLaneLimit::getId, e.getId());
+        w.eq(Cd90StorageLaneLimit::getFactoryCode, entity.getFactoryCode());
+        w.eq(Cd90StorageLaneLimit::getLaneDate, entity.getLaneDate());
+        w.eq(Cd90StorageLaneLimit::getShiftCode, entity.getShiftCode());
+        w.eq(Cd90StorageLaneLimit::getStorageLaneCode, entity.getStorageLaneCode());
+        w.eq(Cd90StorageLaneLimit::getMaterialCode, entity.getMaterialCode());
+        w.ne(entity.getId() != null, Cd90StorageLaneLimit::getId, entity.getId());
         return mapper.selectCount(w) > 0 ? UserConstants.NOT_UNIQUE : UserConstants.UNIQUE;
     }
 
     @Override
     public AjaxResult importData(List<Cd90StorageLaneLimit> list, boolean updateSupport, Long importLogId) {
-        int sn = 0, fn = 0; List<Cd90StorageLaneLimit> il = new ArrayList<>(); List<ImportErrorLog> el = new ArrayList<>(); String um = I18nUtil.getMessage("import.validated.unique");
+        int sn = 0, fn = 0;
+        List<Cd90StorageLaneLimit> il = new ArrayList<>();
+        List<ImportErrorLog> el = new ArrayList<>();
+        String um = I18nUtil.getMessage("import.validated.unique");
         List<String> tireFabricCodeList = mdmConstructionInfoService.listTireFabricCodes();
         Set<String> tireFabricCodes = CollectionUtils.isEmpty(tireFabricCodeList)
                 ? new HashSet<>()
                 : new HashSet<>(tireFabricCodeList);
-        for (int i = 0; i < list.size(); i++) { int en = i + 2; Cd90StorageLaneLimit de = list.get(i); List<ImportErrorLog> v = ImportExcelValidatedUtils.validated(importLogId, en, de); ImportExcelValidatedUtils.validatedRepeat(list, de, i, 2, importLogId, v); if (!isTireFabricCodeExists(de, tireFabricCodes)) { ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), en, I18nUtil.getMessage("ui.data.column.cd90SpecifyMachine.clothInvalid"), v); } if (CollectionUtils.isNotEmpty(v)) { fn++; de.setId(-999L); el.addAll(v); } }
-        for (int i = 0; i < list.size(); i++) { int en = i + 2; Cd90StorageLaneLimit de = list.get(i); if (de.getId() != null && de.getId() == -999L) continue; Cd90StorageLaneLimit ex = getExist(de); if (ex == null) { de.setRowState(RowStateEnum.ADDED); il.add(de); } else if (updateSupport) { ex.setMaterialCode(de.getMaterialCode()); ex.setCarNum(de.getCarNum()); ex.setMaxCarNum(de.getMaxCarNum()); ex.setAvailableCarNum(de.getAvailableCarNum()); ex.setRemark(de.getRemark()); mapper.updateById(ex); sn++; } else { fn++; ImportExcelValidatedUtils.addImportErrorLog(importLogId, en, String.format(um, en), el); } }
-        if (PubUtil.isEmpty(il) && sn == 0) return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + sn + "," + fn, el);
+        for (int i = 0; i < list.size(); i++) {
+            int en = i + 2;
+            Cd90StorageLaneLimit de = list.get(i);
+            List<ImportErrorLog> v = ImportExcelValidatedUtils.validated(importLogId, en, de);
+            ImportExcelValidatedUtils.validatedRepeat(list, de, i, 2, importLogId, v);
+            if (!isTireFabricCodeExists(de, tireFabricCodes)) {
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, ImportErrorTypeEnums.OTHERS.getCode(), en, I18nUtil.getMessage("ui.data.column.cd90SpecifyMachine.clothInvalid"), v);
+            }
+            if (CollectionUtils.isNotEmpty(v)) {
+                fn++;
+                de.setId(-999L);
+                el.addAll(v);
+            }
+        }
+        for (int i = 0; i < list.size(); i++) {
+            int en = i + 2;
+            Cd90StorageLaneLimit de = list.get(i);
+            if (de.getId() != null && de.getId() == -999L) continue;
+            Cd90StorageLaneLimit ex = getExist(de);
+            if (ex == null) {
+                de.setRowState(RowStateEnum.ADDED);
+                il.add(de);
+            } else if (updateSupport) {
+                ex.setMaterialCode(de.getMaterialCode());
+                ex.setCarNum(de.getCarNum());
+                ex.setMaxCarNum(de.getMaxCarNum());
+                ex.setAvailableCarNum(de.getAvailableCarNum());
+                ex.setRemark(de.getRemark());
+                mapper.updateById(ex);
+                sn++;
+            } else {
+                fn++;
+                ImportExcelValidatedUtils.addImportErrorLog(importLogId, en, String.format(um, en), el);
+            }
+        }
+        if (PubUtil.isEmpty(il) && sn == 0)
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + sn + "," + fn, el);
         if (CollectionUtils.isNotEmpty(il)) sn += baseDao.saveBatch(il);
         if (fn > 0) return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + sn + "," + fn, el);
         return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + sn);
     }
 
-    private Cd90StorageLaneLimit getExist(Cd90StorageLaneLimit e) { LambdaQueryWrapper<Cd90StorageLaneLimit> w = new LambdaQueryWrapper<>(); w.eq(Cd90StorageLaneLimit::getFactoryCode, e.getFactoryCode()); w.eq(Cd90StorageLaneLimit::getLaneDate, e.getLaneDate()); w.eq(Cd90StorageLaneLimit::getShiftCode, e.getShiftCode()); w.eq(Cd90StorageLaneLimit::getStorageLaneCode, e.getStorageLaneCode()); return mapper.selectOne(w); }
-    @Override protected SysDocType getSysDocType() { SysDocType t = new SysDocType(); t.setDocTypeCode("CD90_STORAGE_LANE_LIMIT"); return t; }
-    @Override protected List<String> getCheckUniqueFields() { return Arrays.asList("factoryCode", "laneDate", "shiftCode", "storageLaneCode"); }
+    private Cd90StorageLaneLimit getExist(Cd90StorageLaneLimit entity) {
+        LambdaQueryWrapper<Cd90StorageLaneLimit> w = new LambdaQueryWrapper<>();
+        w.eq(Cd90StorageLaneLimit::getFactoryCode, entity.getFactoryCode());
+        w.eq(Cd90StorageLaneLimit::getLaneDate, entity.getLaneDate());
+        w.eq(Cd90StorageLaneLimit::getShiftCode, entity.getShiftCode());
+        w.eq(Cd90StorageLaneLimit::getStorageLaneCode, entity.getStorageLaneCode());
+        w.eq(Cd90StorageLaneLimit::getMaterialCode, entity.getMaterialCode());
+        return mapper.selectOne(w);
+    }
+
+    @Override
+    protected SysDocType getSysDocType() {
+        SysDocType t = new SysDocType();
+        t.setDocTypeCode("CD90_STORAGE_LANE_LIMIT");
+        return t;
+    }
+
+    @Override
+    protected List<String> getCheckUniqueFields() {
+        return Arrays.asList("factoryCode", "laneDate", "shiftCode", "storageLaneCode", "materialCode");
+    }
 
     private boolean isTireFabricCodeExists(Cd90StorageLaneLimit entity, Set<String> tireFabricCodes) {
         if (StringUtils.isBlank(entity.getMaterialCode())) {
