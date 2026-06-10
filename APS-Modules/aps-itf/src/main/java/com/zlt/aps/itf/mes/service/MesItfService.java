@@ -232,6 +232,16 @@ public interface MesItfService {
     AjaxResult syncLhClassShiftFinishQty(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 按指定版本号同步硫化排程完成量（临时任务）
+     * 与原syncLhClassShiftFinishQty的区别：不限日期，按指定版本号查询MES中间表所有日期数据
+     * 同步后同样回填排程结果
+     *
+     * @param dataVersion 指定版本号
+     * @return 结果
+     */
+    AjaxResult syncLhClassShiftFinishQtyByVersion(String dataVersion);
+
+    /**
      * 同步成型排程日完成量
      * 采用更新删除标识模式，而不是先删后插
      *
@@ -247,6 +257,14 @@ public interface MesItfService {
      * @return
      */
     public AjaxResult syncLhScheDayFinishQty(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
+     * 按最新版本号同步硫化排程日完成量（临时任务）
+     * 与原syncLhScheDayFinishQty的区别：不限日期（去掉前一天日期条件），取MES中间表最新版本号查询所有日期数据
+     *
+     * @return 结果
+     */
+    AjaxResult syncLhScheDayFinishQtyByLatestVersion();
 
     /**
      * 模具交替计划下发到MES

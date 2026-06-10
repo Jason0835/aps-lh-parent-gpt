@@ -451,4 +451,16 @@ public interface IMesItfService {
     @ApiOperation("硫化日完成量回填芯片库存")
     @PostMapping("/mesItf/syncDayFinishQtyToChipStock")
     AjaxResult syncDayFinishQtyToChipStock();
+
+    @ApiOperation("按指定版本号同步硫化排程完成量（临时任务）")
+    @PostMapping("/mesItf/syncLhClassShiftFinishQtyByVersion")
+    public AjaxResult syncLhClassShiftFinishQtyByVersion(@RequestParam("dataVersion") String dataVersion);
+
+    /**
+     * 按最新版本号同步硫化排程日完成量（临时任务，不限日期）
+     * @return 结果
+     */
+    @ApiOperation("按最新版本号同步硫化排程日完成量（临时任务，不限日期）")
+    @PostMapping("/mesItf/syncLhScheDayFinishQtyByLatestVersion")
+    public AjaxResult syncLhScheDayFinishQtyByLatestVersion();
 }

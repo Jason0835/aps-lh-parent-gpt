@@ -148,6 +148,14 @@ public interface MesItfMapper {
     List<LhScheFinishQty> selectLhClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 按指定版本号查询硫化排程完成量同步数据（不限日期），用于临时任务
+     *
+     * @param syncDataLogs 参数（dataVersion必传）
+     * @return 列表
+     */
+    List<LhScheFinishQty> selectLhClassShiftFinishQtyByVersion(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 查询成型排程日完成量同步数据
      *
      * @param syncDataLogs 参数
@@ -199,6 +207,14 @@ public interface MesItfMapper {
      * @return 最大版本号，无数据时返回null
      */
     String selectMaxDataVersionFromMouldCleanPlan(@Param("factoryCode") String factoryCode);
+
+    /**
+     * 查询MES硫化排程日完成量中间表的最大版本号，用于临时任务
+     *
+     * @param factoryCode 分厂编码（可选）
+     * @return 最大版本号，无数据时返回null
+     */
+    String selectMaxDataVersionFromLhDayFinishQty(@Param("factoryCode") String factoryCode);
 
     /**
      * 查询成型在机历史同步数据（今天之前每天最新版本）

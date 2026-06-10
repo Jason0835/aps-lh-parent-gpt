@@ -326,4 +326,49 @@ public class MesTask {
         }
         log.info("临时任务-同步26年数据回填26年精度计划实际日期并生成27年计划完成");
     }
+
+    /**
+     * 临时任务：按指定版本号APS_MES_AH01_20260610174500002抓取硫化排程完成量回报数据
+     * 执行步骤：
+     * 1. 从MES中间表按指定版本号查询硫化排程完成量数据（不限日期）
+     * 2. 按排程日期分组，逐组逻辑删除APS旧数据并插入新数据
+     * 3. 回填硫化排程结果表各班次完成量
+     */
+    @ApiOperation("临时任务-按版本号APS_MES_AH01_20260610174500002抓取硫化排程完成量回报")
+    public void syncLhClassShiftFinishQtyByVersion() {
+        String dataVersion = "APS_MES_AH01_20260610174500002";
+        log.info("临时任务-开始按版本号{}抓取硫化排程完成量回报数据", dataVersion);
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = iMesItfService.syncLhClassShiftFinishQtyByVersion(dataVersion);
+                log.info("临时任务-按版本号{}抓取硫化排程完成量回报结果：{}", dataVersion, result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-按版本号{}抓取硫化排程完成量回报异常", dataVersion, e);
+        }
+        log.info("临时任务-按版本号{}抓取硫化排程完成量回报完成", dataVersion);
+    }
+
+    /**
+     * 临时任务：按最新版本号抓取硫化排程日完成量回报数据（不限日期）
+     * 执行步骤：
+     * 1. 从MES中间表查询硫化排程日完成量的最大版本号
+     * 2. 按最新版本号查询所有日期的日完成量数据（不限日期，去掉原逻辑的前一天日期条件）
+     * 3. 按完成日期分组，逐组逻辑删除APS旧数据并插入新数据
+     * 4. 更新月计划监控表
+     * 5. 增量更新芯片库存完成量
+     */
+    @ApiOperation("临时任务-按最新版本号抓取硫化排程日完成量回报（不限日期）")
+    public void syncLhScheDayFinishQtyByLatestVersion() {
+        log.info("临时任务-开始按最新版本号抓取硫化排程日完成量回报（不限日期）");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = iMesItfService.syncLhScheDayFinishQtyByLatestVersion();
+                log.info("临时任务-按最新版本号抓取硫化排程日完成量回报结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-按最新版本号抓取硫化排程日完成量回报异常", e);
+        }
+        log.info("临时任务-按最新版本号抓取硫化排程日完成量回报完成");
+    }
 }

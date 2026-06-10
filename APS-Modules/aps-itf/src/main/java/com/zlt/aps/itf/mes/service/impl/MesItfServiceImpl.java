@@ -1667,6 +1667,82 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
+     * 按指定版本号同步硫化排程完成量（临时任务）
+     * 与原syncLhClassShiftFinishQty的区别：不限日期，按指定版本号查询MES中间表所有日期数据
+     * 同步后同样回填排程结果
+     * 由于指定版本可能包含多个排程日期的数据，按排程日期分组后逐组调用逻辑删除+插入
+     *
+     * @param dataVersion 指定版本号
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncLhClassShiftFinishQtyByVersion(String dataVersion) {
+        AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
+        syncDataLogs.setDataVersion(dataVersion);
+
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<LhScheFinishQty> syncList = mesItfMapper.selectLhClassShiftFinishQtyByVersion(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("硫化排程完成量按版本号同步：MES中间表查询结果为空，dataVersion={}", dataVersion);
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        List<LhScheFinishQty> insertList = new ArrayList<>();
+        for (LhScheFinishQty item : syncList) {
+            LhScheFinishQty entity = new LhScheFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+
+        // 按排程日期分组，逐组同步（原逻辑按单个排程日期做逻辑删除+插入）
+        Map<String, List<LhScheFinishQty>> groupByScheduleDate = insertList.stream()
+                .collect(Collectors.groupingBy(item -> {
+                    Date scheduleDate = item.getScheduleDate();
+                    return scheduleDate != null ? DateUtil.formatDate(scheduleDate) : "unknown";
+                }));
+
+        for (Map.Entry<String, List<LhScheFinishQty>> entry : groupByScheduleDate.entrySet()) {
+            String scheduleDateStr = entry.getKey();
+            List<LhScheFinishQty> groupList = entry.getValue();
+            String factoryCode = groupList.get(0).getFactoryCode();
+
+            try {
+                log.info("硫化排程完成量按版本号同步：开始同步，dataVersion={}, factoryCode={}, scheduleDate={}, 待插入数量={}",
+                        dataVersion, factoryCode, scheduleDateStr, groupList.size());
+
+                String finalFactoryCode = factoryCode;
+                FeignTokenHelper.runWithToken(() -> {
+                    lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(finalFactoryCode, scheduleDateStr, "MES", groupList);
+                });
+
+                log.info("硫化排程完成量按版本号同步：同步完成，dataVersion={}, factoryCode={}, scheduleDate={}, 插入数量={}",
+                        dataVersion, factoryCode, scheduleDateStr, groupList.size());
+            } catch (Exception e) {
+                log.error("硫化排程完成量按版本号同步：Feign调用异常，dataVersion={}, factoryCode={}, scheduleDate={}",
+                        dataVersion, factoryCode, scheduleDateStr, e);
+                return AjaxResult.error("硫化排程完成量按版本号同步失败：" + e.getMessage());
+            }
+        }
+
+        // 回填排程结果
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList);
+            });
+        } catch (Exception e) {
+            log.error("【硫化排程完成量按版本号回写】回写硫化排程结果表完成量异常，dataVersion={}", dataVersion, e);
+        }
+        return AjaxResult.success();
+    }
+
+    /**
      * 同步成型排程日完成量
      * 采用逻辑删除后插入模式
      * @param syncDataLogs 同步参数
@@ -1791,6 +1867,118 @@ public class MesItfServiceImpl implements MesItfService {
         }
 
         updateChipStockFinishQty(syncDataLogs.getFactoryCode(), syncList);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 按最新版本号同步硫化排程日完成量（临时任务）
+     * 与原syncLhScheDayFinishQty的区别：
+     * 1. 不限日期（去掉前一天日期条件），取MES中间表最新版本号查询所有日期数据
+     * 2. 按完成日期分组后逐组调用逻辑删除+插入
+     * 3. 月计划监控按各日期的年月分别更新
+     *
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncLhScheDayFinishQtyByLatestVersion() {
+        // 先查询MES中间表硫化排程日完成量的最大版本号
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        String maxVersion = mesItfMapper.selectMaxDataVersionFromLhDayFinishQty(null);
+        DynamicDataSourceContextHolder.poll();
+
+        if (maxVersion == null || maxVersion.isEmpty()) {
+            log.warn("硫化排程日完成量按最新版本号同步：MES中间表无版本数据");
+            return AjaxResult.success("MES中间表无版本数据");
+        }
+        log.info("硫化排程日完成量按最新版本号同步：MES中间表最新版本号={}", maxVersion);
+
+        AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
+        syncDataLogs.setDataVersion(maxVersion);
+        // 不设置queryParams.finishDate，即不限日期
+
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<LhDayFinishQty> syncList = mesItfMapper.selectLhScheDayFinishQtyList(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("硫化排程日完成量按最新版本号同步：MES中间表查询结果为空，dataVersion={}", maxVersion);
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        Map<String, LhDayFinishQty> groupMap = syncList.stream()
+                .collect(Collectors.toMap(
+                        item -> item.getFactoryCode() + "|" + item.getFinishDate() + "|" + item.getMaterialCode() + "|" + item.getMesMaterialCode(),
+                        Function.identity(),
+                        (v1, v2) -> v1
+                ));
+        syncList = new ArrayList<>(groupMap.values());
+
+        List<LhDayFinishQty> insertList = new ArrayList<>();
+        for (LhDayFinishQty item : syncList) {
+            LhDayFinishQty entity = new LhDayFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+
+        // 按完成日期分组，逐组同步（原逻辑按单个完成日期做逻辑删除+插入）
+        Map<String, List<LhDayFinishQty>> groupByFinishDate = insertList.stream()
+                .collect(Collectors.groupingBy(item -> {
+                    Date finishDate = item.getFinishDate();
+                    return finishDate != null ? DateUtil.formatDate(finishDate) : "unknown";
+                }));
+
+        for (Map.Entry<String, List<LhDayFinishQty>> entry : groupByFinishDate.entrySet()) {
+            String finishDateStr = entry.getKey();
+            List<LhDayFinishQty> groupList = entry.getValue();
+            String factoryCode = groupList.get(0).getFactoryCode();
+
+            try {
+                log.info("硫化排程日完成量按最新版本号同步：开始同步，dataVersion={}, factoryCode={}, finishDate={}, 待插入数量={}",
+                        maxVersion, factoryCode, finishDateStr, groupList.size());
+
+                String finalFactoryCode = factoryCode;
+                FeignTokenHelper.runWithToken(() -> {
+                    lhMesSyncRemoteService.logicDeleteAndSaveDayFinishQty(finalFactoryCode, finishDateStr, "MES", groupList);
+                });
+
+                log.info("硫化排程日完成量按最新版本号同步：同步完成，dataVersion={}, factoryCode={}, finishDate={}, 插入数量={}",
+                        maxVersion, factoryCode, finishDateStr, groupList.size());
+            } catch (Exception e) {
+                log.error("硫化排程日完成量按最新版本号同步：Feign调用异常，dataVersion={}, factoryCode={}, finishDate={}",
+                        maxVersion, factoryCode, finishDateStr, e);
+                return AjaxResult.error("硫化排程日完成量按最新版本号同步失败：" + e.getMessage());
+            }
+        }
+
+        // 月计划监控更新：按各完成日期的年月分别更新
+        Set<String> yearMonthSet = new HashSet<>();
+        for (LhDayFinishQty item : insertList) {
+            if (item.getFinishDate() != null) {
+                String yearMonth = DateUtils.getYear(item.getFinishDate()) + "-" + DateUtils.getMonth(item.getFinishDate());
+                yearMonthSet.add(yearMonth);
+            }
+        }
+        for (String yearMonth : yearMonthSet) {
+            try {
+                String[] parts = yearMonth.split("-");
+                MpMonthPlanMonitor paramVo = new MpMonthPlanMonitor();
+                paramVo.setFactoryCode(insertList.get(0).getFactoryCode());
+                paramVo.setYear(Integer.parseInt(parts[0]));
+                paramVo.setMonth(Integer.parseInt(parts[1]));
+                DynamicDataSourceContextHolder.push(DataSource.APS);
+                mpMonthPlanMonitorEntityMapper.updateByDayFinish(paramVo);
+            } finally {
+                DynamicDataSourceContextHolder.poll();
+            }
+        }
+
+        // 增量更新芯片库存完成量
+        updateChipStockFinishQty(insertList.get(0).getFactoryCode(), syncList);
         return AjaxResult.success();
     }
 
