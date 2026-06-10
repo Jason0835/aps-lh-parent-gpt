@@ -36,12 +36,10 @@ public interface ILhScheduleService extends IDocService<LhScheduleResult> {
     LhScheduleResponseDTO publishSchedule(String batchNo);
 
     /**
-     * 根据排程日期构建窗口内 8 个班次的日期展示列表。
+     * 根据排程结束日构建窗口内 8 个班次的日期展示列表
      *
-     * <p>前端传递 T+1 日期，内部向前偏移一天使窗口覆盖 T、T+1、T+2 三天。</p>
-     *
-     * @param scheduleDate 前端传递的排程日期（T+1），取日期部分；为 null 时返回空列表
-     * @return 班次 1～8 与对应 MM/dd，顺序与默认 8 班模板日历日一致（T、T+1、T+2）
+     * @param scheduleDate 排程日期（窗口结束日，取日期部分）；为 null 时返回空列表
+     * @return 班次 1～8 与对应 MM/dd，顺序与默认 8 班模板日历日一致
      */
     List<LhScheduleShiftDateVO> listScheduleShiftDates(Date scheduleDate);
 
