@@ -18,6 +18,7 @@ import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.api.enums.ScheduleTypeEnum;
 import com.zlt.aps.lh.api.enums.ShiftEnum;
+import com.zlt.aps.lh.api.enums.SkuTagEnum;
 import com.zlt.aps.lh.component.OrderNoGenerator;
 import com.zlt.aps.lh.component.TargetScheduleQtyResolver;
 import com.zlt.aps.lh.context.LhScheduleContext;
@@ -278,7 +279,8 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
         String appliedRule = "沿用原规则";
         if (isSingleMachine && isEnding) {
             getTargetScheduleQtyResolver().upsizeEndingTargetQty(context, sku);
-            appliedRule = "单机台收尾MAX(余量,胎胚库存)";
+            appliedRule = getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)
+                    ? "单机台收尾共用胎胚仅按余量" : "单机台收尾MAX(余量,胎胚库存)";
         } else if (isSingleMachine && sku.isStrictNewSpecShortageOnly()) {
             appliedRule = "窗口无计划仅补本月欠产";
         } else if (isSingleMachine && getTargetScheduleQtyResolver().isFullCapacityMode(context)) {
@@ -2027,7 +2029,13 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
      * @return 剩余可补量
      */
     private int resolveRemainingEndingQtyForContinuationGroup(LhScheduleContext context, SkuScheduleDTO sourceSku) {
-        int endingDemandQty = Math.max(Math.max(0, sourceSku.getSurplusQty()), Math.max(0, sourceSku.getEmbryoStock()));
+        // 共用胎胚收尾只按硫化余量，不按胎胚库存
+        int endingDemandQty;
+        if (getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sourceSku)) {
+            endingDemandQty = Math.max(0, sourceSku.getSurplusQty());
+        } else {
+            endingDemandQty = Math.max(Math.max(0, sourceSku.getSurplusQty()), Math.max(0, sourceSku.getEmbryoStock()));
+        }
         int scheduledQty = resolveEffectiveContinuousPhaseScheduledQty(context, buildContinuationGroupKey(sourceSku));
         return Math.max(0, endingDemandQty - scheduledQty);
     }
@@ -3237,15 +3245,23 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
 
     /**
      * 计算结果行收尾比较量（从SKU DTO取全量值，避免多机台分摊后偏小）。
+     * <p>仅收尾SKU才按共用胎胚规则（仅取硫化余量）；非收尾SKU继续按 MAX(余量, 胎胚库存)，
+     * 避免共用胎胚导致非收尾SKU的 isEnd 被误翻转为 "1"。</p>
      *
      * @param context 排程上下文
      * @param result 排程结果
-     * @return max(硫化余量, 胎胚库存)
+     * @return 收尾比较量
      */
     private int resolveEndingDemandQty(LhScheduleContext context, LhScheduleResult result) {
         SkuScheduleDTO sku = resolveResultSourceSku(context, result);
         int surplusQty = sku != null ? Math.max(0, sku.getSurplusQty()) : 0;
         int embryoStock = sku != null ? Math.max(0, sku.getEmbryoStock()) : 0;
+        // 仅收尾SKU才按共用胎胚规则（仅取硫化余量），非收尾SKU保持原口径
+        if (sku != null
+                && SkuTagEnum.ENDING.getCode().equals(sku.getSkuTag())
+                && getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)) {
+            return surplusQty;
+        }
         return Math.max(surplusQty, embryoStock);
     }
 
@@ -4060,14 +4076,19 @@ public class ContinuousProductionStrategy implements IProductionStrategy {
             if (overQty <= 0) {
                 continue;
             }
-            boolean endingResult = "1".equals(result.getIsEnd());
-            // 续作链路与新增链路保持一致：
-            // 收尾结果必须严格截断且不记超排；试制等严格目标量场景回裁后仍保留超排账本。
-            if (endingResult || (sku != null && sku.isStrictTargetQty())) {
-                trimShiftPlanQty(result, shift.getShiftIndex(), consumedQty);
-                if (endingResult) {
-                    continue;
+            // 通过 SKU 标记判断收尾，不受 refreshContinuousEndingFlagByResult 翻转 isEnd 影响
+            boolean endingSku = sku != null && StringUtils.equals(SkuTagEnum.ENDING.getCode(), sku.getSkuTag());
+            if (endingSku) {
+                // 收尾SKU的结果保留完整计划量不截断，超排部分记入 shiftFillOverQty 保持账本可追溯
+                if (overQty > 0) {
+                    quota.setShiftFillOverQty(quota.getShiftFillOverQty() + overQty);
+                    totalShiftFillOverQty += overQty;
                 }
+                continue;
+            }
+            // 非收尾的试制严格目标量：仍保持 dayN 额度截断
+            if (sku != null && sku.isStrictTargetQty()) {
+                trimShiftPlanQty(result, shift.getShiftIndex(), consumedQty);
             }
             quota.setShiftFillOverQty(quota.getShiftFillOverQty() + overQty);
             totalShiftFillOverQty += overQty;
