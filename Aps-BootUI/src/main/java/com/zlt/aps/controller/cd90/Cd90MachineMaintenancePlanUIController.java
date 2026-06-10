@@ -76,7 +76,7 @@ public class Cd90MachineMaintenancePlanUIController extends BaseUIController<Cd9
     }
 
     @Override public String getExportTemplateFileName() { return getFunctionName(); }
-    @Override public String getProcedureCode() { return "CD90_MACHINE_MAINTENANCE_PLAN"; }
+    @Override public String getProcedureCode() { return "CD90"; }
     @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.cd90MachineMaintenancePlan.modelName"); }
 
     @ApiOperation("下载导入模板")

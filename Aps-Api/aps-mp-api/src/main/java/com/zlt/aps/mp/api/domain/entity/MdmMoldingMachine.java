@@ -106,6 +106,7 @@ public class MdmMoldingMachine extends BaseEntity {
     @ApiModelProperty(value = "最近12个月结构名称", name = "monthStructureNameMap")
     @TableField(exist = false)
     private Map<String, String> monthStructureNameMap;
+
     /**
      * 机台状态：0-禁用 1-启用
      */

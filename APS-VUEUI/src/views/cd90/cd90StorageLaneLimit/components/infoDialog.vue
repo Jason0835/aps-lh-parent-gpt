@@ -28,9 +28,11 @@ export default {
       loading: false, visible: false, isEdit: false, form: {},
       rules: {
         factoryCode: [requiredSelect],
+        materialCode: [requiredSelect],
         laneDate: [requiredInput],
         shiftCode: [requiredInput],
         storageLaneCode: [requiredInput],
+        carNum: [requiredInput],
       },
     };
   },
@@ -39,14 +41,12 @@ export default {
     columns() {
       return [
         { prop: "factoryCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true },
-        { prop: "laneDate", label: this.$t("ui.data.column.cd90StorageLaneLimit.laneDate"), type: "date" },
-        { prop: "shiftCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.shiftCode"), maxlength: 20 },
-        { prop: "storageLaneCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.storageLaneCode"), maxlength: 50 },
         { prop: "materialCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.materialCode"), type: "select", dictData: this.clothOptions, filterable: true },
-        { prop: "carNum", label: this.$t("ui.data.column.cd90StorageLaneLimit.carNum"), type: "number" },
+        { prop: "laneDate", label: this.$t("ui.data.column.cd90StorageLaneLimit.laneDate"), type: "date" },
+        { prop: "shiftCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.shiftCode"), type: "select", dictData: this.parentDict.type.class_num_three_plan, filterable: true },
+        { prop: "storageLaneCode", label: this.$t("ui.data.column.cd90StorageLaneLimit.storageLaneCode"), maxlength: 50 },
+        { prop: "carNum", label: this.$t("ui.data.column.cd90StorageLaneLimit.carNum"), type: "number", required: true },
         { prop: "maxCarNum", label: this.$t("ui.data.column.cd90StorageLaneLimit.maxCarNum"), type: "number" },
-        { prop: "availableCarNum", label: this.$t("ui.data.column.cd90StorageLaneLimit.availableCarNum"), type: "number" },
-        { prop: "dataSource", label: this.$t("ui.data.column.cd90StorageLaneLimit.dataSource"), maxlength: 20 },
         { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 900 },
       ];
     },

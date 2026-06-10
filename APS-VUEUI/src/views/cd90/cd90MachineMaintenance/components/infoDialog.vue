@@ -36,8 +36,9 @@ export default {
       return [
         { prop: "factoryCode", label: this.$t("ui.data.column.cd90MachineMaintenancePlan.factoryCode"), type: "select", dictData: this.parentDict.type.biz_factory_name, filterable: true, change: () => this.loadMachineOptions() },
         { prop: "machineCode", label: this.$t("ui.data.column.cd90MachineMaintenancePlan.machineCode"), type: "select", dictData: this.machineOptions, filterable: true },
-        { prop: "downtimeDate", label: this.$t("ui.data.column.cd90MachineMaintenancePlan.downtimeDate"), type: "date", disabled: true },
+        { prop: "downtimeDate", label: this.$t("ui.data.column.cd90MachineMaintenancePlan.downtimeDate"), type: "date", valueFormat: "yyyy-MM-dd", change: () => this.onDateChange() },
         { prop: "downtimeStartTime", label: this.$t("ui.data.column.cd90MachineMaintenancePlan.downtimeStartTime"), type: "time", valueFormat: "HH:mm", change: () => this.onTimeChange() },
+        { prop: "downtimeEndDate", label: this.$t("ui.data.column.cd90MachineMaintenancePlan.downtimeEndDate"), type: "date", valueFormat: "yyyy-MM-dd", change: () => this.onDateChange() },
         { prop: "downtimeEndTime", label: this.$t("ui.data.column.cd90MachineMaintenancePlan.downtimeEndTime"), type: "time", valueFormat: "HH:mm", change: () => this.onTimeChange() },
         { prop: "downtimeHours", label: this.$t("ui.data.column.cd90MachineMaintenancePlan.downtimeHours"), type: "number", disabled: true, precision: 2 },
         { prop: "remark", label: this.$t("ui.common.column.remark"), type: "textarea", rows: 3, maxlength: 900 },
@@ -46,16 +47,17 @@ export default {
   },
   methods: {
     onTimeChange() {
-      if (this.form.downtimeStartTime) {
+      if (this.form.downtimeStartTime && !this.form.downtimeDate) {
         const today = moment().format("YYYY-MM-DD");
         this.$set(this.form, "downtimeDate", today);
       }
-      if (this.form.downtimeStartTime && this.form.downtimeEndTime) {
-        const startParts = this.form.downtimeStartTime.split(":");
-        const endParts = this.form.downtimeEndTime.split(":");
-        const startMinutes = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
-        const endMinutes = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
-        const diffMinutes = endMinutes - startMinutes;
+      if (this.form.downtimeEndTime && !this.form.downtimeEndDate) {
+        this.$set(this.form, "downtimeEndDate", this.form.downtimeDate || moment().format("YYYY-MM-DD"));
+      }
+      if (this.form.downtimeDate && this.form.downtimeStartTime && this.form.downtimeEndDate && this.form.downtimeEndTime) {
+        const startDateTime = moment(this.form.downtimeDate + " " + this.form.downtimeStartTime, "YYYY-MM-DD HH:mm");
+        const endDateTime = moment(this.form.downtimeEndDate + " " + this.form.downtimeEndTime, "YYYY-MM-DD HH:mm");
+        const diffMinutes = endDateTime.diff(startDateTime, "minutes");
         if (diffMinutes > 0) {
           this.$set(this.form, "downtimeHours", Number((diffMinutes / 60).toFixed(2)));
         } else {
@@ -66,18 +68,30 @@ export default {
       }
     },
     onDateChange() {
-      this.$set(this.form, "downtimeStartTime", null);
-      this.$set(this.form, "downtimeEndTime", null);
-      this.$set(this.form, "downtimeHours", null);
+      if (this.form.downtimeStartTime) {
+        if (!this.form.downtimeDate) {
+          const today = moment().format("YYYY-MM-DD");
+          this.$set(this.form, "downtimeDate", today);
+        }
+      }
+      if (this.form.downtimeEndTime && !this.form.downtimeEndDate) {
+        this.$set(this.form, "downtimeEndDate", this.form.downtimeDate || moment().format("YYYY-MM-DD"));
+      }
+      if (!this.form.downtimeEndDate && this.form.downtimeDate) {
+        this.$set(this.form, "downtimeEndDate", this.form.downtimeDate);
+      }
+      this.onTimeChange();
     },
     async save(params) {
       this.loading = true;
       try {
-        if (params.downtimeDate && params.downtimeStartTime) {
-          params.downtimeStartTime = moment(params.downtimeDate).format("YYYY-MM-DD") + " " + params.downtimeStartTime + ":00";
+        const downtimeDate = params.downtimeDate || moment().format("YYYY-MM-DD");
+        const downtimeEndDate = params.downtimeEndDate || downtimeDate;
+        if (params.downtimeStartTime) {
+          params.downtimeStartTime = moment(downtimeDate).format("YYYY-MM-DD") + " " + params.downtimeStartTime + ":00";
         }
-        if (params.downtimeDate && params.downtimeEndTime) {
-          params.downtimeEndTime = moment(params.downtimeDate).format("YYYY-MM-DD") + " " + params.downtimeEndTime + ":00";
+        if (params.downtimeEndTime) {
+          params.downtimeEndTime = moment(downtimeEndDate).format("YYYY-MM-DD") + " " + params.downtimeEndTime + ":00";
         }
         const res = this.isEdit ? await updateMachineMaintenancePlan(params) : await addMachineMaintenancePlan(params);
         this.$modal.msgSuccess(res.msg);
@@ -105,6 +119,7 @@ export default {
         if (this.form.downtimeEndTime) {
           const dt = moment(this.form.downtimeEndTime);
           this.form.downtimeEndTime = dt.format("HH:mm");
+          this.form.downtimeEndDate = dt.format("YYYY-MM-DD");
         }
       } else {
         this.form = { factoryCode: "116" };

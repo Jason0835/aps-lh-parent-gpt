@@ -754,6 +754,8 @@
   "ui.tc.specifyMachine.column.modalName": "Máy cố định bên lốp",
   "ui.nc.specifyMachine.column.liningCode": "Mã lót trong",
   "ui.nc.specifyMachine.column.modalName": "Máy cố định lót trong",
+  "ui.dj.specifyMachine.column.paddingCode": "Mã đệm cao su",
+  "ui.dj.specifyMachine.column.modalName": "Bàn máy định vị đệm cao su",
   "ui.cd15.specifyMachine.column.modalName": "Máy cố định cắt xiên thép",
   "ui.cd90.specifyMachine.column.modalName": "Máy cố định cắt thẳng sợi",
   "ui.tq.specifyMachine.column.beadCode": "Mã vòng lốp",

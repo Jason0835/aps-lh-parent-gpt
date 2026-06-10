@@ -11,35 +11,34 @@ import lombok.Data;
 
 import java.io.Serializable;
 
+/**
+ * 直裁大卷与机台映射实体。
+ */
 @Data
 @ApiModel(value = "直裁大卷与机台映射", description = "直裁大卷与机台映射")
 @TableName("t_cd90_machine_roll_mapping")
 public class Cd90MachineRollMapping extends BaseEntity implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    /** 工厂编码 */
-
+    @ApiModelProperty(value = "工厂编码", name = "factoryCode")
     @ImportExcelValidated(required = true, maxLength = 50)
     @TableField("FACTORY_CODE")
     @Excel(name = "ui.data.column.cd90MachineRollMapping.factoryCode", dictType = "biz_factory_name")
     private String factoryCode;
 
-    /** 钢压大卷代码 */
-
+    @ApiModelProperty(value = "钢压大卷代码", name = "bigRollCode")
     @ImportExcelValidated(required = true, maxLength = 30)
     @TableField("BIG_ROLL_CODE")
     @Excel(name = "ui.data.column.cd90MachineRollMapping.bigRollCode")
     private String bigRollCode;
 
-    /** 帘布代码 */
-
-    @ImportExcelValidated(maxLength = 30)
+    @ApiModelProperty(value = "帘布代码", name = "cordFabricCode")
+    @ImportExcelValidated(required = true, maxLength = 30)
     @TableField("CORD_FABRIC_CODE")
     @Excel(name = "ui.data.column.cd90MachineRollMapping.cordFabricCode")
     private String cordFabricCode;
 
-    /** 机台编码 */
-
+    @ApiModelProperty(value = "机台编码", name = "machineCode")
     @ImportExcelValidated(required = true, maxLength = 30)
     @TableField("MACHINE_CODE")
     @Excel(name = "ui.data.column.cd90MachineRollMapping.machineCode")

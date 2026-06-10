@@ -2,54 +2,25 @@ package com.zlt.aps.dj.service;
 
 import java.util.List;
 
-import com.baomidou.mybatisplus.extension.service.IService;
-import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.dj.api.domain.dto.DjSpecifyMachineDto;
+import com.zlt.aps.dj.api.domain.entity.DjMachineInfo;
 import com.zlt.aps.dj.api.domain.entity.DjSpecifyMachine;
+import com.zlt.bill.common.service.IDocService;
 
 /**
  * <p>
  * 垫胶定点机台表 服务类
  * </p>
  *
- * @author zhangbinglin
- * @since 2021-06-04
+ * @author zlt
+ * @since 2026-06-04
  */
-public interface DjSpecifyMachineService extends IService<DjSpecifyMachine> {
+public interface DjSpecifyMachineService extends IDocService<DjSpecifyMachine>  {
 
     /**
      * 根据条件查询定点机台列表
      *
      * @return
      */
-    List<DjSpecifyMachineDto> listSpecifyMachine(DjSpecifyMachineDto dto);
-
-    /**
-     * 保存定点机台信息（id为空则新增，id不为空则修改）
-     *
-     * @param entity
-     */
-    void saveSpecifyMachine(DjSpecifyMachine entity);
-
-    /**
-     * 批量删除(逻辑删)
-     *
-     * @param ids 多个id逗号分割
-     */
-    void deleteSpecifyMachine(Long[] ids);
-
-    /**
-     * 导入数据，并保存记录
-     *
-     * @param list          要导入数据
-     * @param updateSupport 已存在是否更新
-     * @param importLogId   导入日志id
-     * @return 导入后提示信息
-     */
-    AjaxResult importData(List<DjSpecifyMachineDto> list, boolean updateSupport, Long importLogId);
-
-    /**
-     * 删除全部定点机台数据
-     */
-    void deleteAllSpecifyMachine();
+//    List<DjSpecifyMachineDto> listSpecifyMachine(DjSpecifyMachineDto dto);
 }

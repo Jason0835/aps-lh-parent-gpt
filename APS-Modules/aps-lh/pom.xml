@@ -80,6 +80,13 @@
         <dependency>
             <groupId>com.yomahub</groupId>
             <artifactId>tlog-all-spring-boot-starter</artifactId>
+            <exclusions>
+                <!-- 排除低版本hutool-core，避免与hutool-all 5.8.40的DateUtil.offsetYear等方法冲突 -->
+                <exclusion>
+                    <groupId>cn.hutool</groupId>
+                    <artifactId>hutool-core</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

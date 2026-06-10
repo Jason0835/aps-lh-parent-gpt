@@ -33,7 +33,7 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { editSpecifyMachine } from "@/api/nc/specifyMachine";
+import { editSpecifyMachine } from "@/api/dj/specifyMachine";
 
 export default {
   components: { infoForm },
@@ -73,7 +73,7 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.nc.specifyMachine.column.liningCode"),
+          label: this.$t("ui.dj.specifyMachine.column.paddingCode"),
           prop: "liningCode",
           span: 24,
           required: true,

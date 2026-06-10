@@ -360,7 +360,6 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         }
 
         ScheduleRequestVo request = new ScheduleRequestVo();
-        // 最后一天日期，后端按 scheduleDate - days + 1 反推起始日期
         request.setScheduleDate(dto.getScheduleDate());
         request.setOverwrite(dto.getOverwrite() != null ? dto.getOverwrite() : false);
         request.setFactoryCode(dto.getFactoryCode());

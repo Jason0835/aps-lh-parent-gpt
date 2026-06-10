@@ -23,14 +23,14 @@ import infoDialog from "./components/infoDialog.vue";
 export default {
   name: "StorageLaneLimit",
   components: { TltUploadForm, infoDialog },
-  dicts: ["biz_factory_name"],
+  dicts: ["biz_factory_name", "class_num_three_plan"],
   provide() { return { parentDict: this.dict }; },
   data() {
     return {
       importColumns: [{ label: "", prop: "updateSupport", render: (form) => (<el-checkbox label={this.$t("common.rule.updateSupport")} v-model={form.updateSupport}>{this.$t("common.rule.updateSupport")}</el-checkbox>) }],
       loading: false, data: [], selection: [], clothOptions: [],
       page: { current: 1, pageSize: 20, total: 0 }, sort: {},
-      search: { factoryCode: "116" }, query: { factoryCode: "116" },
+      search: { factoryCode: "116", laneDate: new Date().toISOString().slice(0, 10) }, query: { factoryCode: "116", laneDate: new Date().toISOString().slice(0, 10) },
     };
   },
   computed: {
@@ -39,13 +39,11 @@ export default {
         { type: "selection", fixed: "left" },
         { prop: "factoryCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.factoryCode"), minWidth: 120, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.biz_factory_name, value) },
         { prop: "laneDate", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.laneDate"), minWidth: 110 },
-        { prop: "shiftCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.shiftCode"), minWidth: 90 },
-        { prop: "storageLaneCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.storageLaneCode"), minWidth: 130 },
         { prop: "materialCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.materialCode"), minWidth: 150 },
+        { prop: "shiftCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.shiftCode"), minWidth: 90, formatter: (row, column, value) => this.selectDictLabel(this.dict.type.class_num_three_plan, value) },
+        { prop: "storageLaneCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.storageLaneCode"), minWidth: 130 },
         { prop: "carNum", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.carNum"), minWidth: 90 },
         { prop: "maxCarNum", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.maxCarNum"), minWidth: 90 },
-        { prop: "availableCarNum", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.availableCarNum"), minWidth: 110 },
-        { prop: "dataSource", align: "center", halign: "center", label: this.$t("ui.data.column.cd90StorageLaneLimit.dataSource"), minWidth: 100 },
         { prop: "remark", halign: "center", label: this.$t("ui.common.column.remark"), minWidth: 120 },
         { prop: "updateTime", align: "center", halign: "center", label: this.$t("common.updateTime"), minWidth: 160 },
         { align: "center", halign: "center", label: this.$t("ui.data.btn.option"), prop: "option", minWidth: 150, fixed: "right",
@@ -55,10 +53,10 @@ export default {
     searchColumns() {
       return [
         { label: this.$t("ui.data.column.cd90StorageLaneLimit.factoryCode"), prop: "factoryCode", type: "select", dictData: this.dict.type.biz_factory_name, filterable: true },
-        { label: this.$t("ui.data.column.cd90StorageLaneLimit.laneDate"), prop: "laneDate" },
-        { label: this.$t("ui.data.column.cd90StorageLaneLimit.shiftCode"), prop: "shiftCode" },
-        { label: this.$t("ui.data.column.cd90StorageLaneLimit.storageLaneCode"), prop: "storageLaneCode" },
         { label: this.$t("ui.data.column.cd90StorageLaneLimit.materialCode"), prop: "materialCode", type: "select", dictData: this.clothOptions, filterable: true, clearable: true },
+        { label: this.$t("ui.data.column.cd90StorageLaneLimit.laneDate"), prop: "laneDate", type: "date", valueFormat: "yyyy-MM-dd" },
+        { label: this.$t("ui.data.column.cd90StorageLaneLimit.shiftCode"), prop: "shiftCode", type: "select", dictData: this.dict.type.class_num_three_plan, filterable: true },
+        { label: this.$t("ui.data.column.cd90StorageLaneLimit.storageLaneCode"), prop: "storageLaneCode" },
       ];
     },
   },

@@ -41,7 +41,7 @@ public class Cd90ScheduleResultUIController extends BaseUIController<Cd90Schedul
     public AjaxResult remove(String ids) { return remoteService.removeByIds(Arrays.asList(Convert.toLongArray(ids))); }
 
     @Override public String getExportTemplateFileName() { return getFunctionName(); }
-    @Override public String getProcedureCode() { return "CD90_SCHEDULE_RESULT"; }
+    @Override public String getProcedureCode() { return "CD90"; }
     @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.cd90ScheduleResult.modelName"); }
 
     @ApiOperation("下载导入模板") @Override

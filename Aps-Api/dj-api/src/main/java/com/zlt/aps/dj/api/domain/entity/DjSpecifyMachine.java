@@ -1,48 +1,54 @@
 package com.zlt.aps.dj.api.domain.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
-import com.zlt.aps.common.core.domain.ApsBaseEntity;
-import io.swagger.annotations.ApiModel;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.ruoyi.common.core.annotation.Excel;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.common.core.annotation.ImportValidated;
+
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.io.Serializable;
-
 /**
  * <p>
- * 定点机台表
+ * 垫胶定点机台表
  * </p>
  *
- * @author zhangbinglin
- * @since 2021-06-04
+ * @author zlt
+ * @since 2026-06-04
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
-@TableName("T_NC_SPECIFY_MACHINE")
-@ApiModel(value = "NcSpecifyMachine对象", description = "定点机台表")
-//@KeySequence(value = "SEQ_PUBLIC",dbType = DbType.ORACLE)
-public class DjSpecifyMachine extends ApsBaseEntity implements Serializable {
+@TableName("T_DJ_SPECIFY_MACHINE")
+public class DjSpecifyMachine extends BaseEntity{
 
     private static final long serialVersionUID = 1L;
 
-    @ApiModelProperty(value = "主键ID")
-    @TableId(value = "ID", type = IdType.AUTO)
-    private Long id;
+    @ApiModelProperty(value = "工厂编码")
+    @TableField(value = "FACTORY_CODE")
+    private String factoryCode;
 
     @ApiModelProperty(value = "垫胶代码")
-    @TableField("LINING_CODE")
-    private String liningCode;
+    @Excel(name="ui.dj.specifyMachine.column.paddingCode")
+    @ImportValidated(name = "ui.dj.specifyMachine.column.paddingCode", required = true, isCode = true, maxLength = 20)
+    @TableField("PADDING_CODE")
+    private String paddingCode;
 
-    @ApiModelProperty(value = "机台id（对应T_NC_MACHINE_INFO表id）")
-    @TableField("MACHINE_ID")
-    private Long machineId;
+    @ApiModelProperty(value = "机台编码")
+    @Excel(name="ui.specifyMachine.column.machineName")
+    @TableField("MACHINE_CODE")
+    private Long machineCode;
 
     @ApiModelProperty(value = "线路，数据维护在数据字典：0-生产线、1-备用线")
+    @Excel(name="ui.specifyMachine.column.lineType" ,dictType="LINE_TYPE")
+    @ImportValidated(name = "ui.specifyMachine.column.lineType",required = true, maxLength = 9)
     @TableField("LINE_TYPE")
     private String lineType;
 
     @ApiModelProperty(value = "作业类型，数据维护在数据字典：0-限制作业；1-不可作业")
+    @Excel(name="ui.specifyMachine.column.jobType",dictType="JOB_TYPE")
+    @ImportValidated(name = "ui.specifyMachine.column.jobType",required = true, maxLength = 12)
     @TableField("JOB_TYPE")
     private String jobType;
 }

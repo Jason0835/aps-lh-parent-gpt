@@ -412,9 +412,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         try {
             ScheduleContextVo context = new ScheduleContextVo();
             LocalDate scheduleDate = request.getScheduleDate();
-            // 前端传入的是最后一天，排产起始日期需要往前推2天
-            LocalDate scheduleStartDate = scheduleDate.minusDays(2);
-            log.info("开始构建排程上下文，排产起始日期：{}，最后一天：{}，工厂：{}",
+            // 前端传入的是中间天，排产起始日期需要往前推1天
+            LocalDate scheduleStartDate = scheduleDate.minusDays(1);
+            log.info("开始构建排程上下文，排产起始日期：{}，中间天：{}，工厂：{}",
                     scheduleStartDate, scheduleDate, request.getFactoryCode());
 
             // 1. 加载班次配置
@@ -1801,17 +1801,11 @@ public class ScheduleServiceImpl implements ScheduleService {
         // 1. 尝试从数据库加载已存在的收尾信息
         List<CxMaterialEnding> existingEndings = materialEndingMapper.selectByStatDate(scheduleDate);
 
-        // 2. 获取月计划数据，同一物料多个版本时只保留ID最大（最新）的一条
+        // 2. 获取月计划数据
         List<FactoryMonthPlanProductionFinalResult> monthPlans = monthPlanMapper.selectByYearAndMonth(year, month);
         Map<String, List<FactoryMonthPlanProductionFinalResult>> materialPlanMap = monthPlans.stream()
                 .filter(p -> p.getMaterialCode() != null)
-                .collect(Collectors.groupingBy(
-                        FactoryMonthPlanProductionFinalResult::getMaterialCode,
-                        Collectors.collectingAndThen(
-                                Collectors.maxBy(Comparator.comparingLong(FactoryMonthPlanProductionFinalResult::getId)),
-                                opt -> opt.map(Collections::singletonList).orElse(Collections.emptyList())
-                        )
-                ));
+                .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
 
         // 3. 获取物料信息和库存
         Map<String, MdmMaterialInfo> materialMap = context.getMaterials() != null
