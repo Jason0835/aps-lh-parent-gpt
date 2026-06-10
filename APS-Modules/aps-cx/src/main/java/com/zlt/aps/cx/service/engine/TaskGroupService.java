@@ -2483,8 +2483,8 @@ public class TaskGroupService {
         if (scheduleDate == null) {
             return null;
         }
-        // 排程起始日期：前端传入最后一天，往前推2天
-        LocalDate scheduleStartDate = scheduleDate.minusDays(2);
+        // 排程起始日期：前端传入中间天，往前推1天
+        LocalDate scheduleStartDate = scheduleDate.minusDays(1);
 
         List<CxShiftConfig> allShifts = context.getShiftConfigList();
         if (allShifts == null || allShifts.isEmpty()) {

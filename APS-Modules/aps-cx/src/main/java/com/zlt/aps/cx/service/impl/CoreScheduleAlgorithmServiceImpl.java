@@ -110,8 +110,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     /** 秒转小时的除数 */
     private static final int SECONDS_PER_HOUR = 3600;
 
-    /** 排程起始偏移天数：前端传入最后一天，需要往前推2天开始排产 */
-    private static final int SCHEDULE_START_OFFSET_DAYS = 2;
+    /** 排程起始偏移天数：前端传入中间天，需要往前推1天开始排产 */
+    private static final int SCHEDULE_START_OFFSET_DAYS = 1;
 
     private static final int DEFAULT_MAX_TRIAL_SKU_PER_DAY = 2;
 
@@ -1738,8 +1738,12 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 CoreScheduleAlgorithmService.DailyEmbryoTask task = spr.getSourceTask();
                 if (task != null) {
                     // 每个班次都从当班合并后的task中获取，覆盖之前的值
-                    tracker.setVulcanizeMachineCount(task.getVulcanizeMachineCount());
-                    tracker.setVulcanizeMoldCount(task.getVulcanizeMoldCount());
+                    if (task.getVulcanizeMachineCount() != null) {
+                        tracker.setVulcanizeMachineCount(task.getVulcanizeMachineCount());
+                    }
+                    if (task.getVulcanizeMoldCount() != null) {
+                        tracker.setVulcanizeMoldCount(task.getVulcanizeMoldCount());
+                    }
                     // 每个班次开始时，更新beginStock为上一班次结束时的库存（currentStock），
                     // 并重置累计值，使stockHours反映当前班次的实时库存水位
                     if (tracker.getBeginStock() != null) {

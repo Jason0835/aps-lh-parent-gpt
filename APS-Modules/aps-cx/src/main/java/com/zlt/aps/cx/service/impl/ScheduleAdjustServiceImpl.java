@@ -1236,7 +1236,7 @@ public class ScheduleAdjustServiceImpl implements ScheduleAdjustService {
     }
 
     private void loadLhScheduleResults(RescheduleContext ctx) {
-        LocalDate startDate = ctx.scheduleDate.minusDays(2);
+        LocalDate startDate = ctx.scheduleDate.minusDays(1);
         LocalDate endDate = ctx.scheduleDate;
         ctx.lhScheduleResults = lhScheduleResultMapper.selectList(
                 new LambdaQueryWrapper<LhScheduleResult>()
