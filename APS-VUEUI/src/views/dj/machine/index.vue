@@ -423,7 +423,16 @@ export default {
     },
   },
   mounted() {},
-  activated() {
+  created() {
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
     this.getList();
   },
 };

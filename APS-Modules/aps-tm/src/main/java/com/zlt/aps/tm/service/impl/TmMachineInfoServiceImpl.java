@@ -55,7 +55,7 @@ public class TmMachineInfoServiceImpl extends AbstractDocService<TmMachineInfo> 
     public String checkUnique(TmMachineInfo query) {
         String unique = super.checkUnique(query);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.MachineInfo.notUnique"));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.machineInfo.notUnique"));
         }
         return unique;
     }

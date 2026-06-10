@@ -1,8 +1,7 @@
-
 <template>
   <basic-container>
     <page-table
-      tableRef="treadParamsMainTable"
+      tableRef="tmScheduleResultMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -22,60 +21,62 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['tm:tmParams:edit']"
+          v-hasPermi="['tm:tmScheduleResult:edit']"
           @click="handleAdd"
-          >{{ $t("ui.frame.btn.add") }}</el-button
-        >
+        >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button>
         <el-button
           type="danger"
-          v-hasPermi="['tm:tmParams:remove']"
+          v-hasPermi="['tm:tmScheduleResult:remove']"
           :disabled="selection.length == 0"
           @click="handleDeleteAll"
-          >{{ $t("ui.frame.btn.delete") }}</el-button
-        >
+        >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
-          v-hasPermi="['tm:tmParams:import']"
+          v-hasPermi="['tm:tmScheduleResult:import']"
           @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        >
+        >{{ $t("ui.frame.btn.import") }}</el-button>
+        <el-button
+          type="primary"
+          :disabled="selection.length === 0"
+          v-hasPermi="['tm:tmScheduleResult:changeMachine']"
+          @click="handleChangeMachine"
+        >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button>
         <el-button
           @click="handleExport"
-          v-hasPermi="['tm:tmParams:export']"
-          >{{ $t("ui.frame.btn.export") }}</el-button
-        >
+          v-hasPermi="['tm:tmScheduleResult:export']"
+        >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-      downloadUrl="/tm/tmParams/importTemplate"
-      uploadUrl="/tm/tmParams/importData"
+      downloadUrl="/tm/tmScheduleResult/importTemplate"
+      uploadUrl="/tm/tmScheduleResult/importData"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
     ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
+    <changeMachineDialog ref="changeMachineRef" @success="getList" />
   </basic-container>
 </template>
 <script>
-//lib
-//utils
+import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
-//interface
-import {listParams, removeParams} from "@/api/tm/params";
-//components
+import {listTmScheduleResult, removeTmScheduleResult,} from "@/api/tm/scheduleResult";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
+import changeMachineDialog from "./components/changeMachineDialog.vue";
 
 export default {
-  name: "TreadParams",
+  name: "TmScheduleResult",
   components: {
     tltUpload,
     infoDialog,
     TltUploadForm,
+    changeMachineDialog,
   },
-  dicts: ["biz_factory_name", "biz_yes_no"],
+  dicts: ["biz_factory_name", "biz_yes_no", "tm_release_status", "tm_data_source"],
   provide() {
     return {
       parentDict: this.dict,
@@ -115,64 +116,63 @@ export default {
     };
   },
   computed: {
+    ...mapState({
+      machines: (state) => state.tm.machines,
+    }),
     columns() {
-      let columns = [
+      return [
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
-          prop: "paramCode",
-          halign: "center",
-          label: this.$t("ui.data.column.paramsCode"),
+          prop: "batchNo",
+          align: "left",
+          minWidth: 160,
+          label: this.$t("ui.data.column.tm.scheduleResult.batchNo"),
         },
         {
-          prop: "paramName",
-          halign: "center",
-          label: this.$t("ui.data.column.paramsName"),
-          titleTooltip: true,
+          prop: "scheduleDate",
+          align: "center",
+          minWidth: 120,
+          label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
         },
         {
-          prop: "paramValue",
+          prop: "machineCode",
           halign: "center",
-          label: this.$t("ui.data.column.paramsValue"),
+          label: this.$t("ui.data.column.tm.scheduleResult.machineCode"),
         },
         {
-          prop: "paramGroup",
+          prop: "treadCode",
           halign: "center",
-          label: this.$t("ui.data.column.tm.params.paramGroup"),
+          label: this.$t("ui.data.column.tm.scheduleResult.treadCode"),
+        },
+        {
+          prop: "glueCode",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.scheduleResult.glueCode"),
+        },
+        {
+          prop: "releaseStatus",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.scheduleResult.releaseStatus"),
           formatter: (row, column, value) => {
-            const map = { GLOBAL: "全局参数", SHIFT: "班次参数", MACHINE: "机台参数", TREAD: "胎面参数" };
-            return map[value] || value;
+            return this.selectDictLabel(this.dict.type.tm_release_status, value);
           },
         },
         {
-          prop: "valueType",
+          prop: "tailFlag",
           halign: "center",
-          label: this.$t("ui.data.column.tm.params.valueType"),
-          formatter: (row, column, value) => {
-            const map = { STRING: "字符串", NUMBER: "数值", BOOLEAN: "布尔", JSON: "结构化对象" };
-            return map[value] || value;
-          },
-        },
-        {
-          prop: "enableStatus",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.params.enableStatus"),
+          label: this.$t("ui.data.column.tm.scheduleResult.tailFlag"),
+          type: "select",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
-        },
-        {
-          prop: "remark",
-          halign: "center",
-          label: this.$t("ui.common.column.remark"),
-          minWidth: 100,
         },
         {
           prop: "updateTime",
@@ -190,15 +190,15 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["tm:tmParams:edit"]}
+                  v-hasPermi={["tm:tmScheduleResult:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
                 >
-                  {this.$t("ui.frame.btn.update")}
+                  {this.$t("ui.data.column.scheduleResult.changePlan")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["tm:tmParams:remove"]}
+                  v-hasPermi={["tm:tmScheduleResult:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -210,51 +210,44 @@ export default {
           },
         },
       ];
-      return columns;
     },
     searchColumns() {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.factoryCode"),
+          label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
-          prop: "paramCode",
-          label: this.$t("ui.data.column.paramsCode"),
+          prop: "batchNo",
+          label: this.$t("ui.data.column.tm.scheduleResult.batchNo"),
         },
         {
-          prop: "paramName",
-          label: this.$t("ui.data.column.paramsName"),
+          prop: "scheduleDate",
+          label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
+          type: "daterange",
+          valueFormat: "yyyy-MM-dd",
         },
         {
-          prop: "paramGroup",
-          label: this.$t("ui.data.column.tm.params.paramGroup"),
+          prop: "treadCode",
+          label: this.$t("ui.data.column.tm.scheduleResult.treadCode"),
+        },
+        {
+          prop: "machineCode",
+          label: this.$t("ui.data.column.tm.scheduleResult.machineCode"),
           type: "select",
-          options: [
-            { label: "全局参数", value: "GLOBAL" },
-            { label: "班次参数", value: "SHIFT" },
-            { label: "机台参数", value: "MACHINE" },
-            { label: "胎面参数", value: "TREAD" },
-          ],
+          dictData: this.machines,
+          labelKey: "machineCode",
+          valueKey: "machineCode",
+          filterable: true,
         },
         {
-          prop: "valueType",
-          label: this.$t("ui.data.column.tm.params.valueType"),
+          prop: "releaseStatus",
+          label: this.$t("ui.data.column.tm.scheduleResult.releaseStatus"),
           type: "select",
-          options: [
-            { label: "字符串", value: "STRING" },
-            { label: "数值", value: "NUMBER" },
-            { label: "布尔", value: "BOOLEAN" },
-            { label: "结构化对象", value: "JSON" },
-          ],
-        },
-        {
-          prop: "enableStatus",
-          label: this.$t("ui.data.column.tm.params.enableStatus"),
-          type: "select",
-          dictData: this.dict.type.biz_yes_no,
+          dictData: this.dict.type.tm_release_status,
+          filterable: true,
         },
       ];
     },
@@ -263,6 +256,13 @@ export default {
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
+      }
+    },
+    // 转机台弹窗
+    handleChangeMachine() {
+      if (this.$refs.changeMachineRef) {
+        let row = this.selection;
+        this.$refs.changeMachineRef.show(row);
       }
     },
     handleEdit(row) {
@@ -275,7 +275,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeParams({ ids }).then((data) => {
+        removeTmScheduleResult({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -294,7 +294,7 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeParams({ ids }).then((data) => {
+        removeTmScheduleResult({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -329,10 +329,9 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/tm/tmParams/export", this.formatParams(false));
+      downloadLink("/tm/tmScheduleResult/export", this.formatParams(false));
     },
 
-    // utils
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
@@ -352,11 +351,10 @@ export default {
 
       return params;
     },
-    // api
     async getList() {
       try {
         this.loading = true;
-        const data = await listParams(this.formatParams());
+        const data = await listTmScheduleResult(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {
@@ -367,6 +365,7 @@ export default {
     },
   },
   created() {
+    this.$store.dispatch("tm/getMachineList");
     let defaultParams = {
       factoryCode: "116",
     };

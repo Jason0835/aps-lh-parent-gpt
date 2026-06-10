@@ -36,7 +36,7 @@ public class TmStockServiceImpl extends AbstractDocService<TmStock> implements I
     public String checkUnique(TmStock query) {
         String unique = super.checkUnique(query);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.Stock.notUnique"));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.stock.notUnique"));
         }
         return unique;
     }

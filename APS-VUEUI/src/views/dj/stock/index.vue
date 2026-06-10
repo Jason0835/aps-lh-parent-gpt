@@ -341,10 +341,17 @@ export default {
       }
     },
   },
-  created() {},
-  activated() {
-    this.getList();
-  },
+  created() {
+    let defaultParams = {
+      factoryCode: "116",
+    };
+    this.search = {
+      ...defaultParams,
+    };
+    this.query = {
+      ...defaultParams,
+    };
+    this.getList();},
 };
 </script>
 <style lang="scss" scoped>

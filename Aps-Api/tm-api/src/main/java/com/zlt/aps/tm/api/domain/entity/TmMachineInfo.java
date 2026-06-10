@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.common.core.annotation.ImportValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -31,37 +32,44 @@ public class TmMachineInfo extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.data.column.tm.MachineInfo.factoryCode")
+    @Excel(name = "ui.data.column.tm.machineInfo.factoryCode")
+    @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    @Excel(name = "ui.data.column.tm.MachineInfo.machineCode")
+    @Excel(name = "ui.data.column.tm.machineInfo.machineCode")
+    @ImportValidated(isCode = true, maxLength = 30)
     @ApiModelProperty(value = "机台编码", name = "machineCode")
     @TableField(value = "MACHINE_CODE")
     private String machineCode;
 
-    @Excel(name = "ui.data.column.tm.MachineInfo.machineName")
+    @Excel(name = "ui.data.column.tm.machineInfo.machineName")
+    @ImportValidated(maxLength = 50)
     @ApiModelProperty(value = "机台名称", name = "machineName")
     @TableField(value = "MACHINE_NAME")
     private String machineName;
 
-    @Excel(name = "ui.data.column.tm.MachineInfo.maxCapacity")
+    @Excel(name = "ui.data.column.tm.machineInfo.maxCapacity")
+    @ImportValidated(number = true, min = 0, max = 999999)
     @ApiModelProperty(value = "最大班产", name = "maxCapacity")
     @TableField(value = "MAX_CAPACITY")
     private BigDecimal maxCapacity;
 
-    @Excel(name = "ui.data.column.tm.MachineInfo.openShiftCode")
+    @Excel(name = "ui.data.column.tm.machineInfo.openShiftCode")
+    @ImportValidated(maxLength = 10)
     @ApiModelProperty(value = "开放班次编码", name = "openShiftCode")
     @TableField(value = "OPEN_SHIFT_CODE")
     private String openShiftCode;
 
-    @Excel(name = "ui.data.column.tm.MachineInfo.machineStatus")
+    @Excel(name = "ui.data.column.tm.machineInfo.machineStatus")
+    @ImportValidated(maxLength = 50)
     @ApiModelProperty(value = "机台状态", name = "machineStatus")
     @TableField(value = "MACHINE_STATUS")
     private String machineStatus;
 
-    @Excel(name = "ui.data.column.tm.MachineInfo.shiftCode")
+    @Excel(name = "ui.data.column.tm.machineInfo.shiftCode")
+    @ImportValidated(maxLength = 10)
     @ApiModelProperty(value = "班次编码", name = "shiftCode")
     @TableField(value = "SHIFT_CODE")
     private String shiftCode;

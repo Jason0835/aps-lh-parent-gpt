@@ -78,9 +78,9 @@ public class TmShiftConfigController extends AbstractDocBizController<TmShiftCon
 
     @Log(title = "ui.data.column.tm.ShiftConfig.modelName", businessType = BusinessType.IMPORT)
     @ApiOperation("导入数据")
-    @PostMapping("/importData/{updateSupport}")
+    @PostMapping("/importData")
     @Override
-    public AjaxResult importData(@RequestBody ImportContext importContext, @PathVariable("updateSupport") boolean updateSupport) throws Exception {
+    public AjaxResult importData(@RequestBody ImportContext importContext, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         return super.importData(importContext, updateSupport);
     }
 

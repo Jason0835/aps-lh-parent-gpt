@@ -43,7 +43,7 @@ import io.swagger.annotations.ApiOperation;
 @Controller
 @RequestMapping("/dj/machine")
 @Api(tags = { "垫胶机台信息维护接口" })
-public class DjMachineUIController extends BaseUIController<DjMachineInfo> {
+public class DjMachineInfoUIController extends BaseUIController<DjMachineInfo> {
 
     @Autowired
     private IDjMachineInfoService iDjMachineInfoService;

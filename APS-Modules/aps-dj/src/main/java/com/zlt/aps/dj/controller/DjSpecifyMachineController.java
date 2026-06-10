@@ -58,7 +58,7 @@ public class DjSpecifyMachineController extends AbstractDocBizController<DjSpeci
     /**
      * 新增信息
      */
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.INSERT)
+    @Log(title = "ui.dj.specifyMachine.column.modalName", businessType = BusinessType.INSERT)
     @ApiOperation("新增信息（id不为空）")
     @PostMapping
     public AjaxResult save(@RequestBody DjSpecifyMachine stock) {
@@ -71,7 +71,7 @@ public class DjSpecifyMachineController extends AbstractDocBizController<DjSpeci
     /**
      * 删除信息
      */
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.DELETE)
+    @Log(title = "ui.dj.specifyMachine.column.modalName", businessType = BusinessType.DELETE)
     @ApiOperation("根据id批量删除信息")
     @ApiImplicitParams({ @ApiImplicitParam(name = "ids", dataType = "Long[]", value = "主键ids") })
     @DeleteMapping("/{ids}")
@@ -82,7 +82,7 @@ public class DjSpecifyMachineController extends AbstractDocBizController<DjSpeci
     /**
      * 导出列表
      */
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.EXPORT)
+    @Log(title = "ui.dj.specifyMachine.column.modalName", businessType = BusinessType.EXPORT)
     @ApiOperation("导出数据")
     @PostMapping("/exportData/{fileName}")
     @Override
@@ -101,7 +101,7 @@ public class DjSpecifyMachineController extends AbstractDocBizController<DjSpeci
         return list;
     }
 
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.IMPORT)
+    @Log(title = "ui.dj.specifyMachine.column.modalName", businessType = BusinessType.IMPORT)
     @PostMapping("/importData")
     @ApiOperation("导入信息")
     public AjaxResult importData(@RequestBody List<DjSpecifyMachine> list, @RequestParam("updateSupport") boolean updateSupport,

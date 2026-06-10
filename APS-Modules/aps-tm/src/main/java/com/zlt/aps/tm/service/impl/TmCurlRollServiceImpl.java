@@ -36,7 +36,7 @@ public class TmCurlRollServiceImpl extends AbstractDocService<TmCurlRoll> implem
     public String checkUnique(TmCurlRoll query) {
         String unique = super.checkUnique(query);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
-            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.CurlRoll.notUnique"));
+            throw new ServiceException(I18nUtil.getMessage("ui.data.alert.tm.curlRoll.notUnique"));
         }
         return unique;
     }
