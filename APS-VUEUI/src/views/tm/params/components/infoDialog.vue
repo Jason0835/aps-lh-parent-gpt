@@ -138,13 +138,13 @@ export default {
         },
         {
           prop: "defaultValue",
-          label: this.$t("ui.data.column.tmParams.defaultValue"),
+          label: this.$t("ui.data.column.tm.params.defaultValue"),
           span: 12,
           maxlength: 200,
         },
         {
           prop: "paramGroup",
-          label: this.$t("ui.data.column.tmParams.paramGroup"),
+          label: this.$t("ui.data.column.tm.params.paramGroup"),
           type: "select",
           span: 12,
           required: true,
@@ -157,7 +157,7 @@ export default {
         },
         {
           prop: "valueType",
-          label: this.$t("ui.data.column.tmParams.valueType"),
+          label: this.$t("ui.data.column.tm.params.valueType"),
           type: "select",
           span: 12,
           required: true,
@@ -170,7 +170,7 @@ export default {
         },
         {
           prop: "enableStatus",
-          label: this.$t("ui.data.column.tmParams.enableStatus"),
+          label: this.$t("ui.data.column.tm.params.enableStatus"),
           type: "select",
           span: 12,
           required: true,
@@ -178,13 +178,13 @@ export default {
         },
         {
           prop: "regularExpression",
-          label: this.$t("ui.data.column.tmParams.regularExpression"),
+          label: this.$t("ui.data.column.tm.params.regularExpression"),
           span: 12,
           maxlength: 200,
         },
         {
           prop: "errorTips",
-          label: this.$t("ui.data.column.tmParams.errorTips"),
+          label: this.$t("ui.data.column.tm.params.errorTips"),
           span: 12,
           maxlength: 200,
         },

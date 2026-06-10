@@ -145,7 +145,7 @@ export default {
         {
           prop: "paramGroup",
           halign: "center",
-          label: this.$t("ui.data.column.tmParams.paramGroup"),
+          label: this.$t("ui.data.column.tm.params.paramGroup"),
           formatter: (row, column, value) => {
             const map = { GLOBAL: "全局参数", SHIFT: "班次参数", MACHINE: "机台参数", TREAD: "胎面参数" };
             return map[value] || value;
@@ -154,7 +154,7 @@ export default {
         {
           prop: "valueType",
           halign: "center",
-          label: this.$t("ui.data.column.tmParams.valueType"),
+          label: this.$t("ui.data.column.tm.params.valueType"),
           formatter: (row, column, value) => {
             const map = { STRING: "字符串", NUMBER: "数值", BOOLEAN: "布尔", JSON: "结构化对象" };
             return map[value] || value;
@@ -163,7 +163,7 @@ export default {
         {
           prop: "enableStatus",
           halign: "center",
-          label: this.$t("ui.data.column.tmParams.enableStatus"),
+          label: this.$t("ui.data.column.tm.params.enableStatus"),
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_yes_no, value);
           },
@@ -230,7 +230,7 @@ export default {
         },
         {
           prop: "paramGroup",
-          label: this.$t("ui.data.column.tmParams.paramGroup"),
+          label: this.$t("ui.data.column.tm.params.paramGroup"),
           type: "select",
           options: [
             { label: "全局参数", value: "GLOBAL" },
@@ -241,7 +241,7 @@ export default {
         },
         {
           prop: "valueType",
-          label: this.$t("ui.data.column.tmParams.valueType"),
+          label: this.$t("ui.data.column.tm.params.valueType"),
           type: "select",
           options: [
             { label: "字符串", value: "STRING" },
@@ -252,7 +252,7 @@ export default {
         },
         {
           prop: "enableStatus",
-          label: this.$t("ui.data.column.tmParams.enableStatus"),
+          label: this.$t("ui.data.column.tm.params.enableStatus"),
           type: "select",
           dictData: this.dict.type.biz_yes_no,
         },
