@@ -3165,6 +3165,7 @@
   "ui.data.column.cd90ScheduleResult.class2PlanQty": "二班计划量",
   "ui.data.column.cd90ScheduleResult.class3PlanQty": "三班计划量",
   "ui.data.column.cd90ScheduleResult.isRelease": "发布状态",
+  "ui.data.column.cd90ScheduleResult.remark": "备注",
   "ui.data.column.cd90ScheduleResultLog.modelName": "直裁排程结果日志",
   "ui.data.column.cd90ScheduleResultLog.factoryCode": "工厂",
   "ui.data.column.cd90ScheduleResultLog.scheduleDate": "排程日期",

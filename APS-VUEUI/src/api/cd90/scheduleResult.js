@@ -9,6 +9,12 @@ export function getScheduleResult(id) {
 export function delScheduleResult(data) {
   return request({ url: '/cd90/cd90ScheduleResult/remove', method: 'post', data })
 }
+export function autoScheduleResult(data) {
+  return request({ url: '/cd90/cd90ScheduleResult/autoSchedule', method: 'post', data })
+}
+export function publishScheduleResult(data) {
+  return request({ url: '/cd90/cd90ScheduleResult/publish', method: 'post', data })
+}
 export function exportScheduleResult(query) {
   return downloadLink('/cd90/cd90ScheduleResult/export', query)
 }

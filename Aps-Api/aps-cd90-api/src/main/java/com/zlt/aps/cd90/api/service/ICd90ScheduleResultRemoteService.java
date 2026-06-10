@@ -25,6 +25,10 @@ public interface ICd90ScheduleResultRemoteService {
     @PostMapping("/cd90ScheduleResult/remove")
     AjaxResult removeByIds(@RequestBody List<Long> ids);
 
+    @ApiOperation("自动排程")
+    @PostMapping("/cd90ScheduleResult/autoSchedule")
+    AjaxResult autoSchedule(@RequestBody Cd90ScheduleResult scheduleResult);
+
     @ApiOperation("导出")
     @PostMapping("/cd90ScheduleResult/exportData/{fileName}")
     byte[] exportData(@RequestBody Cd90ScheduleResult queryVO, @PathVariable("fileName") String fileName);
