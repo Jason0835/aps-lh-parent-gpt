@@ -1,126 +1,127 @@
 package com.zlt.aps.tm.controller;
 
-import com.ruoyi.common.core.web.controller.BaseController;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.utils.StringUtils;
+import com.zlt.aps.constant.FactoryConstant;
 import com.zlt.aps.tm.api.domain.entity.TmStock;
-import com.zlt.aps.tm.service.TmStockService;
+import com.zlt.aps.tm.mapper.TmStockMapper;
+import com.zlt.aps.tm.service.ITmStockService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiImplicitParam;
-import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
-import org.apache.commons.collections4.CollectionUtils;
+import jodd.util.StringUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 
-/**
- * 胎面库存信息Controller
- *
- * @author zlt
- * @date 2021-05-25
- */
-@Api(tags = "胎面库存信息维护接口")
+@Slf4j
+@Api(tags = "胎面库存")
 @RestController
-@RequestMapping("/tm/stock")
-public class TmStockController extends BaseController {
+@RequestMapping("/tmStock")
+public class TmStockController extends AbstractDocBizController<TmStock> {
+
     @Autowired
-    private TmStockService tTmStockService;
+    private ITmStockService tmStockService;
 
-    /**
-     * 查询胎面库存信息列表
-     */
-    @ApiOperation("根据条件查询库存列表信息")
+    @Resource
+    private TmStockMapper tmStockMapper;
+
+    @ApiOperation("查询列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody TmStock tTmStock) {
-        startPage();
-        tTmStock.setOrderStr(orderStr());
-        List<TmStock> list = tTmStockService.selectTmStockList(tTmStock);
-        return getDataTable(list);
+    @Override
+    public TableDataInfo list(@RequestBody TmStock queryVO) {
+        return super.list(queryVO);
     }
 
-    /**
-     * 获取胎面库存信息详细信息
-     */
-    @ApiOperation("根据id查询胎面库存信息")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "id", dataType = "int", value = "主键id", paramType = "query")
-    })
-    @GetMapping(value = "/selectTmStockById/{id}")
-    public TmStock selectTmStockById(@PathVariable("id") Long id) {
-        return tTmStockService.selectTmStockById(id);
-    }
-
-
-    /**
-     * 新增胎面库存信息
-     */
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.INSERT)
-    @ApiOperation("新增胎面库存信息（id不为空）")
-    @PostMapping
-    public AjaxResult add(@RequestBody TmStock tTmStock) {
-        //唯一性校验（使用库存日期+物料编号为逻辑主键）
-        List<TmStock> list = tTmStockService.checkTmStockListUnic(tTmStock);
-        if (CollectionUtils.isNotEmpty(list)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.stock.message.unique"));
-        } else {
-            return toAjax(tTmStockService.insertTmStock(tTmStock));
+    @Log(title = "ui.data.column.tm.Stock.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody TmStock billVO) {
+        if (StringUtil.isBlank(billVO.getFactoryCode())) {
+            billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
+        return super.save(billVO);
     }
 
-    /**
-     * 修改胎面库存信息
-     */
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.UPDATE)
-    @ApiOperation("修改胎面库存信息（id不为空）")
-    @PutMapping
-    public AjaxResult edit(@RequestBody TmStock tTmStock) {
-        //唯一性校验（使用库存日期+物料编号为逻辑主键）
-        List<TmStock> list = tTmStockService.checkTmStockListUnic(tTmStock);
-        if (CollectionUtils.isNotEmpty(list)) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.stock.message.unique"));
-        } else {
-            return toAjax(tTmStockService.updateTmStock(tTmStock));
-        }
+    @Log(title = "ui.data.column.tm.Stock.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
     }
 
-    /**
-     * 删除胎面库存信息
-     */
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.DELETE)
-    @ApiOperation("根据id批量删除胎面库存信息")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "ids", dataType = "Long[]", value = "主键ids", paramType = "body")
-    })
-    @DeleteMapping("/{ids}")
-    public AjaxResult remove(@PathVariable Long[] ids) {
-
-        return toAjax(tTmStockService.deleteTmStockByIds(ids));
+    @ApiOperation("获取详细信息")
+    @GetMapping(value = "/{id}")
+    @Override
+    public TmStock getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
     }
 
-    /**
-     * 查询列表
-     */
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.EXPORT)
-    @PostMapping("/exportList")
-    public List<TmStock> exportList(@RequestBody TmStock stock) {
-        startPage();
-        stock.setOrderStr(orderStr());
-        List<TmStock> list = tTmStockService.selectTmStockList(stock);
-        return list;
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody TmStock query) {
+        return tmStockService.checkUnique(query);
     }
 
-    @Log(title = "ui.frame.page.stock.title", businessType = BusinessType.IMPORT)
-    @PostMapping("/importData")
-    public AjaxResult importData(@RequestBody List<TmStock> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
-        }
-        return tTmStockService.importData(list, updateSupport, importLogId);
+    @Log(title = "ui.data.column.tm.Stock.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importData/{updateSupport}")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @PathVariable("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
+    }
+
+    @Log(title = "ui.data.column.tm.Stock.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody TmStock queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
+    @Override
+    protected List<TmStock> listExportData(TmStock obj) {
+        QueryWrapper<TmStock> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return tmStockMapper.selectList(wrapper);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return tmStockService;
+    }
+
+    @Override
+    protected void builderCondition(QueryWrapper<TmStock> queryWrapper, TmStock queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("stockDate")), "STOCK_DATE", queryVO.getFieldValueByFieldName("stockDate"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("treadCode")), "TREAD_CODE", queryVO.getFieldValueByFieldName("treadCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("stockQty")), "STOCK_QTY", queryVO.getFieldValueByFieldName("stockQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("badQty")), "BAD_QTY", queryVO.getFieldValueByFieldName("badQty"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("adjustQty")), "ADJUST_QTY", queryVO.getFieldValueByFieldName("adjustQty"));
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "TM0812";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "create_time desc";
     }
 }

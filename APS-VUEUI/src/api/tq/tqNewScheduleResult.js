@@ -62,10 +62,28 @@ export function insertOrder(data) {
   })
 }
 
+/** 插单前校验 */
+export function validateInsertOrder(data) {
+  return request({
+    url: '/tq/newScheduleResult/validateInsertOrder',
+    method: 'post',
+    data: data
+  })
+}
+
 /** 转机台 */
 export function changeMachine(data) {
   return request({
     url: '/tq/newScheduleResult/changeMachine',
+    method: 'post',
+    data: data
+  })
+}
+
+/** 转机台前校验 */
+export function validateChangeMachine(data) {
+  return request({
+    url: '/tq/newScheduleResult/validateChangeMachine',
     method: 'post',
     data: data
   })
@@ -104,5 +122,14 @@ export function checkUnique(data) {
     url: '/tq/newScheduleResult/checkUnique',
     method: 'post',
     data: data
+  })
+}
+
+/** 逻辑删除排程记录 */
+export function logicDeleteNewScheduleResult(ids) {
+  return request({
+    url: '/tq/newScheduleResult/logicDelete',
+    method: 'post',
+    data: ids
   })
 }

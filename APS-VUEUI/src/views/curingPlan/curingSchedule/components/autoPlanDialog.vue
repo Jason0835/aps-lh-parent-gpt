@@ -141,7 +141,7 @@ export default {
     //utils
     show(data) {
       this.visible = true;
-       // 与硫化排程管理列表查询条件一致：当前日期 + 2 天
+       // 与硫化排程管理列表查询条件一致：当前日期 + 1 天
       const raw = data && data.scheduleDate;
       const scheduleDate =
         raw != null && String(raw).trim() !== ""

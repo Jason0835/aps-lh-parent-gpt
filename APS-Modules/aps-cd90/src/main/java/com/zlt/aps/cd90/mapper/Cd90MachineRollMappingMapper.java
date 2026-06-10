@@ -1,0 +1,12 @@
+package com.zlt.aps.cd90.mapper;
+
+import com.zlt.aps.cd90.api.domain.entity.Cd90MachineRollMapping;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
+import org.apache.ibatis.annotations.Mapper;
+
+/**
+ * 直裁大卷与机台映射 Mapper。
+ */
+@Mapper
+public interface Cd90MachineRollMappingMapper extends CommBaseMapper<Cd90MachineRollMapping> {
+}

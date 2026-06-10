@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
-import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.tm.api.domain.entity.TmGlueMachineReal;
 import com.zlt.aps.tm.api.service.ITmGlueMachineRealRemoteService;
@@ -27,155 +26,78 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
-/**
- * Copyright (c) 2022, All rights reserved。
- * 文件名称：TmGlueMachineRealUIController.java
- * 描    述：胎面胶料与机台关系 UI控制层类：....
- *
- * @author zlt
- * @version 1.0
- * <p>
- * 修改记录：
- * 修改时间：...
- * 修 改 人：zlt
- * 修改内容：...
- * @date 2025-07-08
- */
 @Slf4j
 @Api(tags = "胎面胶料与机台关系")
 @Controller
 @RequestMapping("/tm/tmGlueMachineReal")
 public class TmGlueMachineRealUIController extends BaseUIController<TmGlueMachineReal> {
 
-    private final String prefix = "aps/tm/tmGlueMachineReal";
+    private final String prefix = "aps/tm/glueMachineReal";
+
     @Autowired
     private ITmGlueMachineRealRemoteService iTmGlueMachineRealService;
 
-    /**
-     * 跳转至主页面
-     */
     @RequiresPermissions("tm:tmGlueMachineReal:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/tmGlueMachineReal";
+        return prefix + "/glueMachineReal";
     }
 
-    /**
-     * 跳转至新增页面
-     */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
         mmap.put("tmGlueMachineReal", new TmGlueMachineReal());
         return prefix + "/add";
     }
 
-    /**
-     * 跳转至修改页面
-     */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
         mmap.put("tmGlueMachineReal", iTmGlueMachineRealService.getInfo(id));
         return prefix + "/edit";
     }
 
-    /**
-     * 根据条件查询主表数据
-     */
-    @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("tm:tmGlueMachineReal:list")
+    @ApiOperation("查询列表")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(TmGlueMachineReal tmGlueMachineReal) {
-        return iTmGlueMachineRealService.list(tmGlueMachineReal);
+    public TableDataInfo list(TmGlueMachineReal query) {
+        return iTmGlueMachineRealService.list(query);
     }
 
-    /**
-     * 修改或新增
-     */
-    @ApiOperation("修改或新增")
-    @RequiresPermissions("tm:tmGlueMachineReal:edit")
+    @ApiOperation("获取详细信息")
+    @GetMapping("/{id}")
+    @ResponseBody
+    public AjaxResult getInfo(@PathVariable("id") Long id) {
+        return AjaxResult.success(iTmGlueMachineRealService.getInfo(id));
+    }
+
+    @ApiOperation("保存")
     @PostMapping("/save")
+    @RequiresPermissions("tm:tmGlueMachineReal:edit")
     @ResponseBody
     public AjaxResult save(TmGlueMachineReal tmGlueMachineReal) {
-        if (UserConstants.NOT_UNIQUE.equals(iTmGlueMachineRealService.checkUnique(tmGlueMachineReal))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.tmGlueMachineReal.checkUnique"));
-        }
-
         return iTmGlueMachineRealService.save(tmGlueMachineReal);
     }
 
-    /**
-     * 删除胎面胶料与机台关系
-     */
-    @ApiOperation("删除,id不为空")
-    @RequiresPermissions("tm:tmGlueMachineReal:remove")
+    @ApiOperation("删除")
     @PostMapping("/remove")
+    @RequiresPermissions("tm:tmGlueMachineReal:remove")
     @ResponseBody
-    public AjaxResult remove(String ids) {
+    public AjaxResult remove(@RequestParam String ids) {
         Long[] arr = Convert.toLongArray(ids);
         return iTmGlueMachineRealService.removeByIds(Arrays.asList(arr));
     }
 
-    /**
-     * 校验胎面胶料与机台关系唯一性
-     */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(TmGlueMachineReal tmGlueMachineReal) {
-        return iTmGlueMachineRealService.checkUnique(tmGlueMachineReal);
+    public String checkUnique(@RequestBody TmGlueMachineReal query) {
+        return iTmGlueMachineRealService.checkUnique(query);
     }
 
-    /**
-     * 导出模板文件的文件名，派生类重写名称。
-     * 示例：支持多语言写法： String fileName = I18nUtil.getMessage("ui.cd90.machine.export.fileName");
-     *
-     * @return
-     */
-    @Override
-    public String getExportTemplateFileName() {
-        return this.getFunctionName();
-    }
-
-
-    /**
-     * 继承时重写方法。
-     *
-     * @return
-     */
-    @Override
-    public String getProcedureCode() {
-        return "0";
-    }
-
-    /**
-     * 继承时重写方法。
-     *
-     * @return
-     */
-    @Override
-    public String getFunctionName() {
-        return I18nUtil.getMessage("ui.glueMachine.column.modelName");
-    }
-
-    /**
-     * 重写导入模板的生成逻辑
-     */
-    @ApiOperation("下载导入模板")
-    @Override
-    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
-        String fileName = this.getExportTemplateFileName();
-        ExcelUtil<TmGlueMachineReal> util = new ExcelUtil<>(TmGlueMachineReal.class);
-        util.exportExcel(response, null, fileName, fileName);
-        return AjaxResult.success();
-    }
-
-    @ApiOperation("数据导出")
-    @GetMapping({"/export"})
-    @ResponseBody
-    @Override
+    @ApiOperation("导出数据")
+    @GetMapping("/export")
+    @RequiresPermissions("tm:tmGlueMachineReal:export")
     public void export(HttpServletResponse response, TmGlueMachineReal entity) throws IOException {
-        String fileName = this.getExportTemplateFileName();
+        String fileName = I18nUtil.getMessage("ui.data.column.tm.glueMachineReal.modelName");
         byte[] excelBytes = iTmGlueMachineRealService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
@@ -183,20 +105,27 @@ public class TmGlueMachineRealUIController extends BaseUIController<TmGlueMachin
         response.flushBuffer();
     }
 
-    @PostMapping({"/importData"})
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
     @ResponseBody
-    @ApiOperation("数据导入")
-    @Override
-    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
+    public AjaxResult importData(@RequestParam("file") MultipartFile file, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
-
         ImportContext context = new ImportContext();
-        context.setImportFilePath(this.importFilePath);
-        context.setFunctionName(this.getFunctionName());
-        context.setProcedureCode(this.getProcedureCode());
+        context.setFunctionName(I18nUtil.getMessage("ui.data.column.tm.glueMachineReal.modelName"));
+        context.setProcedureCode(I18nUtil.getMessage("ui.data.column.tm.glueMachineReal.modelName"));
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iTmGlueMachineRealService.importData(context, false);
+        AjaxResult ajaxResult = iTmGlueMachineRealService.importData(context, updateSupport);
         return ajaxResult;
+    }
+
+    @ApiOperation("下载导入模板")
+    @GetMapping("/importTemplate")
+    @ResponseBody
+    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+        String fileName = I18nUtil.getMessage("ui.data.column.tm.glueMachineReal.modelName");
+        ExcelUtil<TmGlueMachineReal> util = new ExcelUtil<>(TmGlueMachineReal.class);
+        util.exportExcel(response, null, fileName, fileName);
+        return AjaxResult.success();
     }
 }

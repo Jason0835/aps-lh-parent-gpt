@@ -63,4 +63,14 @@ public class TqScheduleParams {
      * 最低排产量
      */
     private BigDecimal oneRollNum;
+
+    /**
+     * 备库班数（保证成型的班次排产数），默认1
+     */
+    private Double backupShiftCount;
+
+    /**
+     * 胎圈需求系数（胎圈消耗量=成型需求量×系数），默认2
+     */
+    private Double demandCoefficient;
 }

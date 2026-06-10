@@ -468,7 +468,7 @@ public class LhMouldChangePlanController extends AbstractDocBizController<LhMoul
             row.put("afterMaterialType", lhTrialStatusDictDictMap.getOrDefault(markFlag, ""));
             // 按时间下机
             String endType = item.getEndType();
-            if (YesOrNoEnum.NO.getCode().equals(endType)) {
+            if (YesOrNoEnum.YES.getCode().equals(endType)) {
                 row.put("endType", "是Có");
             } else {
                 row.put("endType", "");

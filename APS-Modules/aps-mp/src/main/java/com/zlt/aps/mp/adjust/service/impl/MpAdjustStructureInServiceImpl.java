@@ -11,7 +11,7 @@ import com.zlt.aps.enums.YesOrNoEnum;
 import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.maindata.mapper.LhMachineInfoEntityMapper;
-import com.zlt.aps.maindata.mapper.MpMonthPlanStatisticsEntityMapper;
+import com.zlt.aps.mp.factory.mapper.MpMonthPlanStatisticsEntityMapper;
 import com.zlt.aps.mdm.api.domain.entity.LhMachineInfo;
 import com.zlt.aps.mp.api.domain.entity.MpMonthPlanStatistics;
 import com.zlt.aps.mp.engine.domain.Context;

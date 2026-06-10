@@ -209,6 +209,11 @@ public class MpMonthPlanMonitor extends BaseEntity {
     @TableField(value = "DIFF_DAY")
     private Integer diffDay;
 
+    /** 施工阶段 0 无工艺 1 试制 2 量试 3 正式 */
+    @ApiModelProperty(value = "施工阶段 0 无工艺 1 试制 2 量试 3 正式", name = "constructionStage")
+    @TableField(value = "CONSTRUCTION_STAGE")
+    private String constructionStage;
+
     /**
      * 定稿ID
      */

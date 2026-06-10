@@ -1,33 +1,20 @@
-import request from '@/utils/request'
+import request, { downloadLink } from '@/utils/request'
 
-//
 export function listStock(query) {
-  return request({
-    url: '/cd90/stock/list',
-    method: 'post',
-    data: query
-  })
+  return request({ url: '/cd90/cd90Stock/list', method: 'post', data: query })
 }
-export function editStock(query) {
-  return request({
-    url: '/cd90/stock/edit',
-    method: 'post',
-    data: query
-  })
+export function getStock(id) {
+  return request({ url: `/cd90/cd90Stock/getInfo/${id}`, method: 'get' })
 }
-export function removeStock(query) {
-  return request({
-    url: '/cd90/stock/remove',
-    method: 'post',
-    data: query
-  })
+export function addStock(data) {
+  return request({ url: '/cd90/cd90Stock/add', method: 'post', headers: { 'Content-Type': 'application/json;charset=UTF-8' }, data })
 }
-export function releaseStock(query) {
-  return request({
-    url: '/cd90/stock/releaseStock',
-    method: 'post',
-    data: query
-  })
+export function updateStock(data) {
+  return request({ url: '/cd90/cd90Stock/edit', method: 'post', headers: { 'Content-Type': 'application/json;charset=UTF-8' }, data })
 }
-
-
+export function delStock(data) {
+  return request({ url: '/cd90/cd90Stock/remove', method: 'post', data })
+}
+export function exportStock(query) {
+  return downloadLink('/cd90/cd90Stock/export', query)
+}

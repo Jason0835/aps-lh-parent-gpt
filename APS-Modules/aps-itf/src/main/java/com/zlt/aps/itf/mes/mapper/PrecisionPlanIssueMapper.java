@@ -36,6 +36,22 @@ public interface PrecisionPlanIssueMapper {
     int updateByMachineCodeAndPrecisionType(MesPrecisionPlan mesItem);
 
     /**
+     * 批量根据机台编码和精度类型更新数据
+     *
+     * @param list 数据列表
+     * @return 影响行数
+     */
+    int batchUpdateByMachineCodeAndPrecisionType(@Param("list") List<MesPrecisionPlan> list);
+
+    /**
+     * 批量查询中间表中已存在的记录（按机台编码+精度类型+分厂匹配）
+     *
+     * @param list 数据列表
+     * @return 已存在的记录列表
+     */
+    List<MesPrecisionPlan> selectExistingRecords(@Param("list") List<MesPrecisionPlan> list);
+
+    /**
      * 根据分厂和精度类型删除数据
      *
      * @param factoryCode 分厂编码

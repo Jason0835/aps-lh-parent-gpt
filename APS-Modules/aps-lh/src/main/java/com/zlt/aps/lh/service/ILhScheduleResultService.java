@@ -84,6 +84,13 @@ public interface ILhScheduleResultService {
     void updateReleaseStatus(LhScheduleResult item);
 
     /**
+     * 批量更新排程结果发布状态
+     *
+     * @param items 排程结果列表（每项需包含id和isRelease）
+     */
+    void batchUpdateReleaseStatus(List<LhScheduleResult> items);
+
+    /**
      * 根据排程日期查询硫化排程结果（aps-lh-api实体，包含8班数据）
      *
      * @param scheduleDate 排程日期

@@ -18,6 +18,7 @@ import com.zlt.aps.lh.api.domain.entity.LhSpecifyMachine;
 import com.zlt.aps.lh.api.domain.entity.LhUnscheduledResult;
 import com.zlt.aps.lh.api.domain.vo.LhShiftConfigVO;
 import com.zlt.aps.lh.engine.strategy.support.MouldResourceContext;
+import com.zlt.aps.lh.util.SkuConstructionRefResolverUtil;
 import com.zlt.aps.mdm.api.domain.entity.MdmDevicePlanShut;
 import com.zlt.aps.mdm.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mdm.api.domain.entity.MdmModelInfo;
@@ -71,14 +72,21 @@ public class LhScheduleContext {
     private String factoryCode;
     /** 分厂名称 */
     private String factoryName;
-    /** 排程目标日（与请求体日期一致，如业务上的 T+2） */
+    /** 排程目标日/业务保存日期（与请求体日期一致，业务口径为 T+1），仅用于结果保存、查询、日志等业务归属 */
     private Date scheduleTargetDate;
     /**
-     * 排程窗口起点 T 日：由 {@link #scheduleTargetDate} 减去 (排程天数 - 1) 得到，
+     * 排程窗口起点 T 日：由 {@link #scheduleTargetDate} 减去 (排程天数 - 2) 得到，
      * 排程天数来自硫化参数 {@code SCHEDULE_DAYS}（默认见 {@link com.zlt.aps.lh.api.constant.LhScheduleConstant#SCHEDULE_DAYS}），
      * 供班次计算、基础数据加载等引擎时间轴使用
      */
     private Date scheduleDate;
+    /**
+     * 排程窗口结束日期 T+2 日：由 {@link #scheduleDate} + 2 得到，
+     * 用于 day1/day2/day3 月计划映射、产能计算、加机台、收尾、欠产追补、换模日上限、
+     * 跨月检测、滚动续作追加起点、班次日期反推等排程核心逻辑，
+     * 与仅用于业务保存/查询的 {@link #scheduleTargetDate}（T+1）分离。
+     */
+    private Date windowEndDate;
     /** 批次号 */
     private String batchNo;
     /** 月计划需求版本 */
@@ -470,20 +478,18 @@ public class LhScheduleContext {
     }
 
     /**
-     * 按物料编码 + 产品状态从SKU与示方书关系中精确查找。
+     * 按物料编码 + 产品状态从SKU与示方书关系中查找（支持降级匹配）。
+     * <p>降级规则：正规(S)→量试(T)→试制(X)；量试(T)→试制(X)；试制(X)不降级。</p>
      * <p>用于排产结果写入前回写文字/硫化/制造示方书号，未命中时返回 null，
      * 由调用方决定是否回退到其他来源或置空。</p>
      *
      * @param materialCode 物料编码
-     * @param productStatus 产品状态
+     * @param productStatus 产品状态（S-正规、T-量试、X-试制）
      * @return SKU与示方书关系，未命中返回 null
      */
     public MdmSkuConstructionRef findSkuConstructionRef(String materialCode, String productStatus) {
-        if (StringUtils.isEmpty(materialCode) || StringUtils.isEmpty(productStatus)
-                || CollectionUtils.isEmpty(skuConstructionRefCompositeKeyMap)) {
-            return null;
-        }
-        return skuConstructionRefCompositeKeyMap.get(materialCode + "::" + productStatus);
+        return SkuConstructionRefResolverUtil.resolveCuringRecipeRef(
+                materialCode, productStatus, skuConstructionRefCompositeKeyMap);
     }
 
 }

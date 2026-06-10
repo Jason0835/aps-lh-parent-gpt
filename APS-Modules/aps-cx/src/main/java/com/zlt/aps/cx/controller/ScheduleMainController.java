@@ -260,6 +260,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
+     * 批量保存
+     */
+    /**
      * 保存
      */
     @Log(title = "ui.data.column.cxScheduleResult.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
@@ -464,16 +467,12 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             try {
                 AjaxResult issueResult = doIssueCxScheduleResultToMes(dto.getScheduleDate(), selectedIds);
                 if (issueResult != null && Objects.equals(HttpStatus.SUCCESS, issueResult.get(AjaxResult.CODE_TAG))) {
-                    for (CxScheduleResult item : filteredList) {
-                        item.setIsRelease(ApsConstant.IS_RELEASE);
-                        cxScheduleResultService.updateReleaseStatus(item);
-                    }
+                    filteredList.forEach(item -> item.setIsRelease(ApsConstant.IS_RELEASE));
+                    cxScheduleResultService.batchUpdateReleaseStatus(filteredList);
                     return AjaxResult.success(I18nUtil.getMessage("ui.data.column.scheduleResult.successPublish"));
                 } else {
-                    for (CxScheduleResult item : filteredList) {
-                        item.setIsRelease(ApsConstant.FAILURE_RELEASE);
-                        cxScheduleResultService.updateReleaseStatus(item);
-                    }
+                    filteredList.forEach(item -> item.setIsRelease(ApsConstant.FAILURE_RELEASE));
+                    cxScheduleResultService.batchUpdateReleaseStatus(filteredList);
                     return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
                 }
             } finally {
@@ -481,10 +480,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             }
         } catch (Exception e) {
             log.error("成型排程发布失败", e);
-            for (CxScheduleResult item : filteredList) {
-                item.setIsRelease(ApsConstant.FAILURE_RELEASE);
-                cxScheduleResultService.updateReleaseStatus(item);
-            }
+            filteredList.forEach(item -> item.setIsRelease(ApsConstant.FAILURE_RELEASE));
+            cxScheduleResultService.batchUpdateReleaseStatus(filteredList);
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.failedPublish"));
         }
     }

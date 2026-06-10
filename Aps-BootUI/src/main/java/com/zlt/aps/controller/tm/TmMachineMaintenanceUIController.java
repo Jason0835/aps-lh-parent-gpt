@@ -6,7 +6,6 @@ import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.text.Convert;
-import com.ruoyi.common4ui.constant.UserConstants;
 import com.ruoyi.common4ui.core.controller.BaseUIController;
 import com.zlt.aps.tm.api.domain.entity.TmMachineMaintenance;
 import com.zlt.aps.tm.api.service.ITmMachineMaintenanceRemoteService;
@@ -27,155 +26,78 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
-/**
- * Copyright (c) 2022, All rights reserved。
- * 文件名称：TmMachineMaintenanceUIController.java
- * 描    述：胎面机台维修计划 UI控制层类：....
- *
- * @author zlt
- * @version 1.0
- * <p>
- * 修改记录：
- * 修改时间：...
- * 修 改 人：zlt
- * 修改内容：...
- * @date 2025-09-15
- */
 @Slf4j
 @Api(tags = "胎面机台维修计划")
 @Controller
 @RequestMapping("/tm/tmMachineMaintenance")
 public class TmMachineMaintenanceUIController extends BaseUIController<TmMachineMaintenance> {
 
-    private final String prefix = "aps/tm/tmMachineMaintenance";
+    private final String prefix = "aps/tm/machineMaintenance";
+
     @Autowired
     private ITmMachineMaintenanceRemoteService iTmMachineMaintenanceService;
 
-    /**
-     * 跳转至主页面
-     */
     @RequiresPermissions("tm:tmMachineMaintenance:view")
     @GetMapping()
     public String toIndex() {
-        return prefix + "/tmMachineMaintenance";
+        return prefix + "/machineMaintenance";
     }
 
-    /**
-     * 跳转至新增页面
-     */
     @GetMapping("/add")
     public String add(ModelMap mmap) {
         mmap.put("tmMachineMaintenance", new TmMachineMaintenance());
         return prefix + "/add";
     }
 
-    /**
-     * 跳转至修改页面
-     */
     @GetMapping("/edit/{id}")
     public String edit(@PathVariable("id") Long id, ModelMap mmap) {
         mmap.put("tmMachineMaintenance", iTmMachineMaintenanceService.getInfo(id));
         return prefix + "/edit";
     }
 
-    /**
-     * 根据条件查询主表数据
-     */
-    @ApiOperation("根据条件查询主表数据")
-    @RequiresPermissions("tm:tmMachineMaintenance:list")
+    @ApiOperation("查询列表")
     @PostMapping("/list")
     @ResponseBody
-    public TableDataInfo list(TmMachineMaintenance tmMachineMaintenance) {
-        return iTmMachineMaintenanceService.list(tmMachineMaintenance);
+    public TableDataInfo list(TmMachineMaintenance query) {
+        return iTmMachineMaintenanceService.list(query);
     }
 
-    /**
-     * 修改或新增
-     */
-    @ApiOperation("修改或新增")
-    @RequiresPermissions("tm:tmMachineMaintenance:edit")
+    @ApiOperation("获取详细信息")
+    @GetMapping("/{id}")
+    @ResponseBody
+    public AjaxResult getInfo(@PathVariable("id") Long id) {
+        return AjaxResult.success(iTmMachineMaintenanceService.getInfo(id));
+    }
+
+    @ApiOperation("保存")
     @PostMapping("/save")
+    @RequiresPermissions("tm:tmMachineMaintenance:edit")
     @ResponseBody
     public AjaxResult save(TmMachineMaintenance tmMachineMaintenance) {
-        if (UserConstants.NOT_UNIQUE.equals(iTmMachineMaintenanceService.checkUnique(tmMachineMaintenance))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.tmMachineMaintenance.checkUnique"));
-        }
-
         return iTmMachineMaintenanceService.save(tmMachineMaintenance);
     }
 
-    /**
-     * 删除胎面机台维修计划
-     */
-    @ApiOperation("删除,id不为空")
-    @RequiresPermissions("tm:tmMachineMaintenance:remove")
+    @ApiOperation("删除")
     @PostMapping("/remove")
+    @RequiresPermissions("tm:tmMachineMaintenance:remove")
     @ResponseBody
-    public AjaxResult remove(String ids) {
+    public AjaxResult remove(@RequestParam String ids) {
         Long[] arr = Convert.toLongArray(ids);
         return iTmMachineMaintenanceService.removeByIds(Arrays.asList(arr));
     }
 
-    /**
-     * 校验胎面机台维修计划唯一性
-     */
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
     @ResponseBody
-    public String checkUnique(TmMachineMaintenance tmMachineMaintenance) {
-        return iTmMachineMaintenanceService.checkUnique(tmMachineMaintenance);
+    public String checkUnique(@RequestBody TmMachineMaintenance query) {
+        return iTmMachineMaintenanceService.checkUnique(query);
     }
 
-    /**
-     * 导出模板文件的文件名，派生类重写名称。
-     * 示例：支持多语言写法： String fileName = I18nUtil.getMessage("ui.cd90.machine.export.fileName");
-     *
-     * @return
-     */
-    @Override
-    public String getExportTemplateFileName() {
-        return this.getFunctionName();
-    }
-
-
-    /**
-     * 继承时重写方法。
-     *
-     * @return
-     */
-    @Override
-    public String getProcedureCode() {
-        return "0";
-    }
-
-    /**
-     * 继承时重写方法。
-     *
-     * @return
-     */
-    @Override
-    public String getFunctionName() {
-        return I18nUtil.getMessage("ui.data.column.tmMachineMaintenance.modelName");
-    }
-
-    /**
-     * 重写导入模板的生成逻辑
-     */
-    @ApiOperation("下载导入模板")
-    @Override
-    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
-        String fileName = this.getExportTemplateFileName();
-        ExcelUtil<TmMachineMaintenance> util = new ExcelUtil<>(TmMachineMaintenance.class);
-        util.exportExcel(response, null, fileName, fileName);
-        return AjaxResult.success();
-    }
-
-    @ApiOperation("数据导出")
-    @GetMapping({"/export"})
-    @ResponseBody
-    @Override
+    @ApiOperation("导出数据")
+    @GetMapping("/export")
+    @RequiresPermissions("tm:tmMachineMaintenance:export")
     public void export(HttpServletResponse response, TmMachineMaintenance entity) throws IOException {
-        String fileName = this.getExportTemplateFileName();
+        String fileName = I18nUtil.getMessage("ui.data.column.tm.machineMaintenance.modelName");
         byte[] excelBytes = iTmMachineMaintenanceService.exportData(entity, fileName);
         ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
         ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
@@ -183,20 +105,27 @@ public class TmMachineMaintenanceUIController extends BaseUIController<TmMachine
         response.flushBuffer();
     }
 
-    @PostMapping({"/importData"})
+    @ApiOperation("导入数据")
+    @PostMapping("/importData")
     @ResponseBody
-    @ApiOperation("数据导入")
-    @Override
-    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
+    public AjaxResult importData(@RequestParam("file") MultipartFile file, @RequestParam("updateSupport") boolean updateSupport) throws Exception {
         byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
-
         ImportContext context = new ImportContext();
-        context.setImportFilePath(this.importFilePath);
-        context.setFunctionName(this.getFunctionName());
-        context.setProcedureCode(this.getProcedureCode());
+        context.setFunctionName(I18nUtil.getMessage("ui.data.column.tm.machineMaintenance.modelName"));
+        context.setProcedureCode(I18nUtil.getMessage("ui.data.column.tm.machineMaintenance.modelName"));
         context.setOriFileName(file.getOriginalFilename());
         context.setFileBytes(data);
-        AjaxResult ajaxResult = iTmMachineMaintenanceService.importData(context, false);
+        AjaxResult ajaxResult = iTmMachineMaintenanceService.importData(context, updateSupport);
         return ajaxResult;
+    }
+
+    @ApiOperation("下载导入模板")
+    @GetMapping("/importTemplate")
+    @ResponseBody
+    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+        String fileName = I18nUtil.getMessage("ui.data.column.tm.machineMaintenance.modelName");
+        ExcelUtil<TmMachineMaintenance> util = new ExcelUtil<>(TmMachineMaintenance.class);
+        util.exportExcel(response, null, fileName, fileName);
+        return AjaxResult.success();
     }
 }

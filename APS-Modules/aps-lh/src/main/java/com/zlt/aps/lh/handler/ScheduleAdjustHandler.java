@@ -251,18 +251,20 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     /**
      * 计算SKU的硫化余量
      * <p>
-     * 统一按 月度计划总量 - 已完成量 计算，不再读取月余量表（T_MDM_MONTH_SURPLUS）
+     * 硫化余量 = Max(月度计划总量 - 已完成量, 0)，已完成量超过月计划总量时余量为0。
+     * 不再将逐日超产量加回剩余需求，避免月累计完成量已超月计划时余量被虚增。
      * </p>
      *
      * @param context 排程上下文
      * @param plan    月生产计划记录
-     * @return 硫化余量
+     * @return 硫化余量计算结果
      */
     private SurplusCalculation calculateSurplusQty(LhScheduleContext context, FactoryMonthPlanProductionFinalResult plan) {
         int totalPlanQty = plan.getTotalQty() != null ? plan.getTotalQty() : 0;
         int actualFinishedQty = calculateFinishedQty(context, plan);
+        int remainingDemandQty = Math.max(0, totalPlanQty - actualFinishedQty);
+        // 保留逐日超产统计用于诊断日志，不参与余量计算
         int ignoredOverProductionQty = calculateIgnoredOverProductionQty(context, plan);
-        int remainingDemandQty = Math.max(0, totalPlanQty - actualFinishedQty + ignoredOverProductionQty);
         return new SurplusCalculation(remainingDemandQty, actualFinishedQty, ignoredOverProductionQty);
     }
 
@@ -301,8 +303,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     }
 
     /**
-     * 计算本月已发生日期和 T 日晚班中的被忽略超产量。
-     * <p>超产不允许抵扣后续计划，因此需要把“超过当日计划量”的部分加回本月剩余需求。</p>
+     * 统计本月已发生日期和 T 日晚班中的逐日超产量（仅用于诊断日志，不参与硫化余量计算）。
      *
      * @param context 排程上下文
      * @param plan 月生产计划记录
@@ -396,7 +397,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         int carryForwardQty = resolveEffectiveCarryForwardQty(context, plan.getMaterialCode(), rawCarryForwardQty);
         int scheDayFinishQty = resolveScheDayFinishQty(context, plan.getMaterialCode());
         int windowPlanQty = MonthPlanDayQtyUtil.resolveWindowPlanQty(
-                plan, context.getScheduleDate(), context.getScheduleTargetDate());
+                plan, context.getScheduleDate(), context.getWindowEndDate());
         // 继承量已由滚动衔接占用，需从窗口待排量中扣减，防止重复排产
         int inheritedPlanQty = Math.max(0, context.getInheritedPlanQtyMap().getOrDefault(plan.getMaterialCode(), 0));
         dto.setWindowPlanQty(windowPlanQty);
@@ -404,6 +405,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         dto.setEffectiveCarryForwardQty(Math.max(0, carryForwardQty));
         dto.setScheduleDayFinishQty(Math.max(0, scheDayFinishQty));
         dto.setFutureMonthPlanQtyAfterWindow(resolveFutureMonthPlanQtyAfterWindow(context, plan));
+        dto.setNextDayPlanQtyAfterWindow(resolveNextDayPlanQtyAfterWindow(context, plan));
 
         // 初始化日计划额度账本：按排程窗口日期读取月计划 dayN，扣减继承量。
         // day1/day2/day3 的业务日期由窗口 T日～目标日决定，不能按字段名固定绑定自然日。
@@ -422,8 +424,8 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
         dto.setSurplusQty(surplus.getSurplusQty());
         dto.setEmbryoStock(resolveAllocatedEmbryoStock(context, plan, embryoStandardCapacitySumMap));
-        // 待排量保持“需求口径”：使用已忽略超产抵扣后的本月剩余需求，再扣减滚动继承量。
-        // 本月历史欠产已经体现在剩余需求和首日日计划账本中，不能再次重复叠加。
+        // 待排量保持"需求口径"：使用月计划余量扣减滚动继承量，再与胎胚库存取大。
+        // 本月历史欠产已体现在首日日计划账本中，不能再次重复叠加。
         int basePendingQty = resolveBasePendingQty(surplus.getSurplusQty(), inheritedPlanQty, dto.getEmbryoStock());
         if (context.isStopProductionMode()) {
             // 停产收尾按"停产日含损耗计划量"和"胎胚库存"取大，优先把停锅前可收的量拉齐。
@@ -625,18 +627,18 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
                                                                         FactoryMonthPlanProductionFinalResult plan,
                                                                         String materialCode) {
         Map<LocalDate, SkuDailyPlanQuotaDTO> quotaMap = new LinkedHashMap<>();
-        if (Objects.isNull(context.getScheduleDate()) || Objects.isNull(context.getScheduleTargetDate())) {
+        if (Objects.isNull(context.getScheduleDate()) || Objects.isNull(context.getWindowEndDate())) {
             return quotaMap;
         }
-        if (MonthPlanDayQtyUtil.isCrossMonthWindow(context.getScheduleDate(), context.getScheduleTargetDate())) {
-            log.warn("排程窗口跨月，无法构建日计划额度账本, materialCode: {}, scheduleDate: {}, targetDate: {}",
+        if (MonthPlanDayQtyUtil.isCrossMonthWindow(context.getScheduleDate(), context.getWindowEndDate())) {
+            log.warn("排程窗口跨月，无法构建日计划额度账本, materialCode: {}, scheduleDate: {}, windowEndDate: {}",
                     materialCode,
                     LhScheduleTimeUtil.formatDate(context.getScheduleDate()),
-                    LhScheduleTimeUtil.formatDate(context.getScheduleTargetDate()));
+                    LhScheduleTimeUtil.formatDate(context.getWindowEndDate()));
             return quotaMap;
         }
         Date startDate = LhScheduleTimeUtil.clearTime(context.getScheduleDate());
-        Date endDate = LhScheduleTimeUtil.clearTime(context.getScheduleTargetDate());
+        Date endDate = LhScheduleTimeUtil.clearTime(context.getWindowEndDate());
         if (startDate.after(endDate)) {
             return quotaMap;
         }
@@ -839,7 +841,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
 
     /**
      * 解析常规待排需求量。
-     * <p>待排需求 = 已按“只处理本月欠产、不处理超产抵扣”修正后的月计划余量 - 已继承量。</p>
+     * <p>待排需求 = Max(月计划余量 - 已继承量, 0) 与胎胚库存取大。</p>
      *
      * @param surplusQty 月计划余量
      * @param inheritedPlanQty 已继承量
@@ -881,11 +883,11 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
     private int resolveFutureMonthPlanQtyAfterWindow(LhScheduleContext context,
                                                      FactoryMonthPlanProductionFinalResult plan) {
         if (Objects.isNull(context) || Objects.isNull(plan)
-                || Objects.isNull(context.getScheduleDate()) || Objects.isNull(context.getScheduleTargetDate())) {
+                || Objects.isNull(context.getScheduleDate()) || Objects.isNull(context.getWindowEndDate())) {
             return 0;
         }
         LocalDate scheduleDate = toLocalDate(context.getScheduleDate());
-        LocalDate targetDate = toLocalDate(context.getScheduleTargetDate());
+        LocalDate targetDate = toLocalDate(context.getWindowEndDate());
         LocalDate monthEndDate = scheduleDate.withDayOfMonth(scheduleDate.lengthOfMonth());
         LocalDate effectiveWindowEndDate = targetDate.isAfter(monthEndDate) ? monthEndDate : targetDate;
         if (!effectiveWindowEndDate.isBefore(monthEndDate)) {
@@ -897,6 +899,34 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
             futurePlanQty += MonthPlanDayQtyUtil.resolveDayQty(plan, dayOfMonth);
         }
         return Math.max(0, futurePlanQty);
+    }
+
+    /**
+     * 解析排程窗口结束后第一天的月计划日量。
+     * <p>用于新增排产欠产未超阈值时的 T+2 后看 T+3 判断；
+     * 只作为增机台和窗口内满班保留依据，不写入 T～T+2 日计划扣账账本。</p>
+     *
+     * @param context 排程上下文
+     * @param plan 月计划记录
+     * @return 窗口后第一天日计划量
+     */
+    private int resolveNextDayPlanQtyAfterWindow(LhScheduleContext context,
+                                                 FactoryMonthPlanProductionFinalResult plan) {
+        if (Objects.isNull(context) || Objects.isNull(plan)
+                || Objects.isNull(context.getScheduleDate()) || Objects.isNull(context.getWindowEndDate())) {
+            return 0;
+        }
+        LocalDate scheduleDate = toLocalDate(context.getScheduleDate());
+        LocalDate targetDate = toLocalDate(context.getWindowEndDate());
+        LocalDate monthEndDate = scheduleDate.withDayOfMonth(scheduleDate.lengthOfMonth());
+        if (!targetDate.isBefore(monthEndDate)) {
+            return 0;
+        }
+        LocalDate nextDate = targetDate.plusDays(1);
+        if (!scheduleDate.getMonth().equals(nextDate.getMonth())) {
+            return 0;
+        }
+        return Math.max(0, MonthPlanDayQtyUtil.resolveDayQty(plan, nextDate.getDayOfMonth()));
     }
 
     /**
@@ -1558,6 +1588,7 @@ public class ScheduleAdjustHandler extends AbsScheduleStepHandler {
         copy.setEffectiveCarryForwardQty(source.getEffectiveCarryForwardQty());
         copy.setScheduleDayFinishQty(source.getScheduleDayFinishQty());
         copy.setFutureMonthPlanQtyAfterWindow(source.getFutureMonthPlanQtyAfterWindow());
+        copy.setNextDayPlanQtyAfterWindow(source.getNextDayPlanQtyAfterWindow());
         // 收尾信息
         copy.setEndingDaysRemaining(source.getEndingDaysRemaining());
         // 新增排产目标量控制

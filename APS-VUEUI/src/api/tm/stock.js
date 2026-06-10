@@ -1,33 +1,29 @@
 import request from '@/utils/request'
 
-//
-export function listStock(query) {
+export function listTmStock(query) {
   return request({
-    url: '/tm/stock/list',
+    url: '/tm/tmStock/list',
     method: 'post',
     data: query
   })
 }
-export function editStock(query) {
+export function saveTmStock(data) {
   return request({
-    url: '/tm/stock/edit',
+    url: '/tm/tmStock/save',
+    method: 'post',
+    data: data
+  })
+}
+export function removeTmStock(query) {
+  return request({
+    url: '/tm/tmStock/remove',
     method: 'post',
     data: query
   })
 }
-export function removeStock(query) {
+export function getTmStock(id) {
   return request({
-    url: '/tm/stock/remove',
-    method: 'post',
-    data: query
+    url: '/tm/tmStock/' + id,
+    method: 'get'
   })
 }
-export function releaseStock(query) {
-  return request({
-    url: '/tm/stock/releaseStock',
-    method: 'post',
-    data: query
-  })
-}
-
-

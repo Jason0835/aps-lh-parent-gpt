@@ -53,11 +53,11 @@
 </template>
 <script>
 //lib
-import { mapState } from "vuex";
+import {mapState} from "vuex";
 //utils
-import { downloadLink } from "@/utils/request";
+import {downloadLink} from "@/utils/request";
 //interface
-import { listCurlRoll, removeCurlRoll } from "@/api/cd90/curlRoll";
+import {listCurlRoll, removeCurlRoll} from "@/api/cd90/curlRoll";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
@@ -98,7 +98,7 @@ export default {
   },
   computed: {
     ...mapState({
-      machines: (state) => state.tread.machines,
+      machines: (state) => state.tm.machines,
     }),
     columns() {
       let columns = [
@@ -263,7 +263,7 @@ export default {
     },
   },
   created() {
-    this.$store.dispatch("tread/getMachineList");
+    this.$store.dispatch("tm/getMachineList");
   },
   activated() {
     this.getList();

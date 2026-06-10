@@ -286,7 +286,10 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
 
     /**
      * 解析共用胎胚本次应落定的均衡班次。
-     * <p>只能在不早于当前可切换时间的候选班次内均衡；如果当前已进入中班，则不回退到早班。</p>
+     * <p>只能在不早于当前可切换时间的候选班次内均衡。
+     * 单胎胚不会进入本方法（调用方已通过 isSharedEmbryo 过滤）。
+     * 共用胎胚均衡规则：只有原本落早班且早班次数已达阈值（再落会超过）时，才挪到中班；
+     * 原本落中班的不因中班次数多而强制挪动。</p>
      *
      * @param context 排程上下文
      * @param candidateTime 当前候选切换时间
@@ -297,8 +300,11 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
         if (candidateTime == null || counts == null || counts.length < 2) {
             return candidateTime;
         }
+        // 共用胎胚换模均衡：只有原本落早班且早班次数已超过阈值时，才挪到中班
+        // 中班不强制挪动，单胎胚不进入此方法
+        int morningLimit = getMorningLimit(context);
         if (LhScheduleTimeUtil.isMorningShift(context, candidateTime)
-                && counts[IDX_MORNING] > counts[IDX_AFTERNOON]) {
+                && counts[IDX_MORNING] >= morningLimit) {
             return LhScheduleTimeUtil.getAfternoonShiftStart(context, candidateTime);
         }
         return candidateTime;
@@ -333,14 +339,14 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
      *
      * @param context 排程上下文
      * @param candidateTime 候选切换时间
-     * @return true-已到T+2或更晚；false-仍可顺延
+     * @return true-已到窗口结束日(T+2)或更晚；false-仍可顺延
      */
     private boolean isOnOrAfterScheduleTargetDate(LhScheduleContext context, Date candidateTime) {
-        if (context == null || context.getScheduleTargetDate() == null || candidateTime == null) {
+        if (context == null || context.getWindowEndDate() == null || candidateTime == null) {
             return false;
         }
         Date candidateDate = LhScheduleTimeUtil.clearTime(candidateTime);
-        Date targetDate = LhScheduleTimeUtil.clearTime(context.getScheduleTargetDate());
+        Date targetDate = LhScheduleTimeUtil.clearTime(context.getWindowEndDate());
         return !candidateDate.before(targetDate);
     }
 
@@ -356,7 +362,7 @@ public class DefaultMouldChangeBalanceStrategy implements IMouldChangeBalanceStr
             return;
         }
         context.getMouldChangeLimitBlockedReasonMap().put(sku.getMaterialCode(),
-                "T+2 换模/换活字块次数超过每日" + dailyLimit + "次上限");
+                "窗口结束日 换模/换活字块次数超过每日" + dailyLimit + "次上限");
     }
 
     /**

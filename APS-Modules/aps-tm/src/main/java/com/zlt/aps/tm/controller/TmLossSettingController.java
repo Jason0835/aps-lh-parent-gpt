@@ -1,133 +1,126 @@
 package com.zlt.aps.tm.controller;
 
-import com.ruoyi.common.core.web.controller.BaseController;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.ruoyi.common.utils.StringUtils;
-import com.zlt.aps.tm.api.domain.dto.TmLossSettingDto;
-import com.zlt.aps.tm.entity.TmLossSetting;
-import com.zlt.aps.tm.service.TmLossSettingService;
+import com.zlt.aps.constant.FactoryConstant;
+import com.zlt.aps.tm.api.domain.entity.TmLossSetting;
+import com.zlt.aps.tm.mapper.TmLossSettingMapper;
+import com.zlt.aps.tm.service.ITmLossSettingService;
+import com.zlt.bill.common.controller.AbstractDocBizController;
+import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.PubUtil;
+import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.springframework.beans.BeanUtils;
+import jodd.util.StringUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 
-/**
- * 胎面损耗率设定Controller
- *
- * @author chen
- * @date 2021-07-12
- */
+@Slf4j
+@Api(tags = "胎面损耗率设定")
 @RestController
-@RequestMapping("/tm/loss")
-public class TmLossSettingController extends BaseController {
+@RequestMapping("/tmLossSetting")
+public class TmLossSettingController extends AbstractDocBizController<TmLossSetting> {
+
     @Autowired
-    private TmLossSettingService tmLossSettingService;
+    private ITmLossSettingService tmLossSettingService;
 
-    /**
-     * 查询胎面损耗率设定列表
-     */
-    //@PreAuthorize(hasPermi = "tm:loss:list")
+    @Resource
+    private TmLossSettingMapper tmLossSettingMapper;
+
+    @ApiOperation("查询列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody TmLossSettingDto dto) {
-        startPage();
-        dto.setOrderStr(orderStr());
-        TmLossSetting tmLossSetting = new TmLossSetting();
-        BeanUtils.copyProperties(dto, tmLossSetting);
-        List<TmLossSettingDto> list = tmLossSettingService.selectTmLossSettingList(tmLossSetting);
-        return getDataTable(list);
+    @Override
+    public TableDataInfo list(@RequestBody TmLossSetting queryVO) {
+        return super.list(queryVO);
     }
 
-    /**
-     * 获取胎面损耗率设定详细信息
-     */
-    //@PreAuthorize(hasPermi = "tm:loss:query")
-    @GetMapping(value = "/{id}")
-    public TmLossSettingDto getInfo(@PathVariable("id") Long id) {
-        return tmLossSettingService.selectTmLossSettingById(id);
-    }
-
-    /**
-     * 新增胎面损耗率设定
-     */
-    @Log(title = "ui.data.column.tm.loss.modelName", businessType = BusinessType.INSERT)
-    //@PreAuthorize(hasPermi = "tm:loss:add")
-    @PostMapping("/add")
-    public AjaxResult add(@RequestBody TmLossSettingDto dto) {
-        TmLossSetting tmLossSetting = new TmLossSetting();
-        BeanUtils.copyProperties(dto, tmLossSetting);
-        return toAjax(tmLossSettingService.insertTmLossSetting(tmLossSetting));
-    }
-
-    /**
-     * 修改胎面损耗率设定
-     */
-    @Log(title = "ui.data.column.tm.loss.modelName", businessType = BusinessType.UPDATE)
-    //@PreAuthorize(hasPermi = "tm:loss:edit")
-    @PostMapping("/edit")
-    public AjaxResult edit(@RequestBody TmLossSettingDto dto) {
-        TmLossSetting tmLossSetting = new TmLossSetting();
-        BeanUtils.copyProperties(dto, tmLossSetting);
-        return toAjax(tmLossSettingService.updateTmLossSetting(tmLossSetting));
-    }
-
-    /**
-     * 删除胎面损耗率设定
-     */
-    @Log(title = "ui.data.column.tm.loss.modelName", businessType = BusinessType.DELETE)
-    //@PreAuthorize(hasPermi = "tm:loss:remove")
-    @DeleteMapping("/{ids}")
-    public AjaxResult remove(@PathVariable Long[] ids) {
-        return toAjax(tmLossSettingService.deleteTmLossSettingByIds(ids));
-    }
-
-
-    @Log(title = "ui.data.column.tm.loss.modelName", businessType = BusinessType.DELETE)
-    @ApiOperation("删除全部(逻辑删)")
-    @PostMapping("/deleteAll")
-    public AjaxResult deleteAll() {
-        tmLossSettingService.deleteAll();
-        return AjaxResult.success();
-    }
-
-
-    /**
-     * 导出胎面损耗率设定列表
-     */
-    @Log(title = "ui.data.column.tm.loss.modelName", businessType = BusinessType.EXPORT)
-    //@PreAuthorize(hasPermi = "tm:loss:export")
-    @PostMapping("/getList")
-    public List<TmLossSettingDto> getList(@RequestBody TmLossSettingDto dto) {
-        startPage();
-        dto.setOrderStr(orderStr());
-        TmLossSetting tmLossSetting = new TmLossSetting();
-        BeanUtils.copyProperties(dto, tmLossSetting);
-        return tmLossSettingService.selectTmLossSettingList(tmLossSetting);
-    }
-
-    /**
-     * 校验胎面损耗率设定唯一性
-     */
-    @ApiOperation("校验胎面损耗率设定唯一性")
-    @PostMapping("/checkTmLossSettingUnique")
-    public String checkTmLossSettingUnique(@RequestBody TmLossSettingDto dto) {
-        TmLossSetting tmLossSetting = new TmLossSetting();
-        BeanUtils.copyProperties(dto, tmLossSetting);
-        return tmLossSettingService.checkTmLossSettingUnique(tmLossSetting);
-    }
-
-    @Log(title = "ui.data.column.tm.loss.modelName", businessType = BusinessType.IMPORT)
-    @PostMapping("/importData")
-    @ApiOperation("导入胎面损耗率信息")
-    public AjaxResult importData(@RequestBody List<TmLossSettingDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId) {
-        if (StringUtils.isNull(list) || list.size() == 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.import.nodata"));
+    @Log(title = "ui.data.column.tm.LossSetting.modelName", businessType = BusinessType.INSERT_OR_UPDATE)
+    @ApiOperation("保存")
+    @PostMapping("/save")
+    @Override
+    public AjaxResult save(@RequestBody TmLossSetting billVO) {
+        if (StringUtil.isBlank(billVO.getFactoryCode())) {
+            billVO.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
         }
-        return tmLossSettingService.importData(list, updateSupport, importLogId);
+        return super.save(billVO);
+    }
+
+    @Log(title = "ui.data.column.tm.LossSetting.modelName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除")
+    @DeleteMapping("/remove")
+    @Override
+    public AjaxResult removeByIds(@RequestBody List<Long> ids) {
+        return super.removeByIds(ids);
+    }
+
+    @ApiOperation("获取详细信息")
+    @GetMapping(value = "/{id}")
+    @Override
+    public TmLossSetting getInfo(@PathVariable("id") Long id) {
+        return super.getInfo(id);
+    }
+
+    @ApiOperation("校验唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody TmLossSetting query) {
+        return tmLossSettingService.checkUnique(query);
+    }
+
+    @Log(title = "ui.data.column.tm.LossSetting.modelName", businessType = BusinessType.IMPORT)
+    @ApiOperation("导入数据")
+    @PostMapping("/importData/{updateSupport}")
+    @Override
+    public AjaxResult importData(@RequestBody ImportContext importContext, @PathVariable("updateSupport") boolean updateSupport) throws Exception {
+        return super.importData(importContext, updateSupport);
+    }
+
+    @Log(title = "ui.data.column.tm.LossSetting.modelName", businessType = BusinessType.EXPORT)
+    @ApiOperation("导出数据")
+    @PostMapping("/exportData/{fileName}")
+    @Override
+    public byte[] exportData(@RequestBody TmLossSetting queryVO, @PathVariable("fileName") String fileName,
+                             HttpServletResponse response) throws IOException {
+        return super.exportData(queryVO, fileName, response);
+    }
+
+    @Override
+    protected List<TmLossSetting> listExportData(TmLossSetting obj) {
+        QueryWrapper<TmLossSetting> wrapper = new QueryWrapper<>();
+        this.builderCondition(wrapper, obj);
+        return tmLossSettingMapper.selectList(wrapper);
+    }
+
+    @Override
+    protected IDocService getDocService() {
+        return tmLossSettingService;
+    }
+
+    @Override
+    protected void builderCondition(QueryWrapper<TmLossSetting> queryWrapper, TmLossSetting queryVO) {
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("factoryCode")), "FACTORY_CODE", queryVO.getFieldValueByFieldName("factoryCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("treadCode")), "TREAD_CODE", queryVO.getFieldValueByFieldName("treadCode"));
+        queryWrapper.like(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("machineCode")), "MACHINE_CODE", queryVO.getFieldValueByFieldName("machineCode"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("settingLevel")), "SETTING_LEVEL", queryVO.getFieldValueByFieldName("settingLevel"));
+        queryWrapper.eq(PubUtil.isNotEmpty(queryVO.getFieldValueByFieldName("enableStatus")), "ENABLE_STATUS", queryVO.getFieldValueByFieldName("enableStatus"));
+    }
+
+    @Override
+    protected String getTypeCode() {
+        return "TM0810";
+    }
+
+    @Override
+    protected String getOrderBy() {
+        return "priority asc";
     }
 }

@@ -1,33 +1,24 @@
 package com.zlt.aps.tm.mapper;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.zlt.aps.tm.api.domain.dto.TmParamsDto;
-import com.zlt.aps.tm.entity.TmParams;
-import org.apache.ibatis.annotations.Param;
-
-import java.util.List;
+import com.zlt.aps.tm.api.domain.entity.TmParams;
+import com.zlt.core.dao.basemapper.CommBaseMapper;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 胎面参数信息Mapper接口
+ * Copyright (c) 2022, All rights reserved。
+ * 文件名称：TmParamsMapper.java
+ * 描    述：胎面排程参数配置 Mapper接口
  *
  * @author zlt
- * @date 2021-05-25
+ * @version 1.0
+ * <p>
+ * 修改记录：
+ * 修改时间：...
+ * 修 改 人：zlt
+ * 修改内容：...
+ * @date 2025-12-12
  */
-public interface TmParamsMapper extends BaseMapper<TmParams> {
-    /**
-     * 查询参数集合
-     *
-     * @param tmParams 查询条件
-     * @return 查询到的结果
-     */
-    public List<TmParamsDto> listParams(TmParams tmParams);
+@Mapper
+public interface TmParamsMapper extends CommBaseMapper<TmParams> {
 
-    /**
-     * 检查胎面参数代码唯一
-     *
-     * @param paramCode 参数代码
-     * @param id        胎面参数信息 id
-     * @return 查询到的结果
-     */
-    public TmParams checkParamsCodeUnique(@Param("paramCode") String paramCode, @Param("id") Long id);
 }

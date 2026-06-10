@@ -1,214 +1,146 @@
-//package com.zlt.aps.controller.cd90;
-//
-//import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
-//import com.ruoyi.common.core.utils.poi.ExcelUtil;
-//import com.ruoyi.common.core.web.domain.AjaxResult;
-//import com.ruoyi.common.core.web.page.TableDataInfo;
-//import com.ruoyi.common.i18n.utils.I18nUtil;
-//import com.ruoyi.common.text.Convert;
-//import com.ruoyi.common4ui.constant.UserConstants;
-//import com.ruoyi.common4ui.core.controller.BaseUIController;
-//import com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength;
-//import com.zlt.aps.cd90.api.service.ICd90CurlLengthRemoteService;
-//import com.zlt.file.encryptbyll.FileEncryptUtils;
-//import io.swagger.annotations.Api;
-//import io.swagger.annotations.ApiOperation;
-//import lombok.extern.slf4j.Slf4j;
-//import org.apache.commons.io.IOUtils;
-//import org.apache.shiro.authz.annotation.RequiresPermissions;
-//import org.springframework.beans.factory.annotation.Autowired;
-//import org.springframework.stereotype.Controller;
-//import org.springframework.ui.ModelMap;
-//import org.springframework.web.bind.annotation.*;
-//import org.springframework.web.multipart.MultipartFile;
-//
-//import javax.servlet.http.HttpServletResponse;
-//import java.io.ByteArrayInputStream;
-//import java.io.IOException;
-//import java.util.Arrays;
-//
-///**
-// * Copyright (c) 2022, All rights reserved。
-// * 文件名称：Cd90CurlLengthUIController.java
-// * 描    述：纤维直裁卷曲长度 UI控制层类：....
-// *@author zlt
-// *@date 2025-03-11
-// *@version 1.0
-// *
-// *  修改记录：
-// *     修改时间：...
-// *     修 改 人：zlt
-// *     修改内容：...
-// */
-//@Slf4j
-//@Api(tags = "纤维直裁卷曲长度")
-//@Controller
-//@RequestMapping("/cd90/cd90CurlLength")
-//public class Cd90CurlLengthUIController extends BaseUIController<Cd90CurlLength> {
-//
-//    @Autowired
-//    private ICd90CurlLengthRemoteService iCd90CurlLengthService;
-//
-//    private final String prefix = "aps/cd90/cd90CurlLength";
-//
-//    /**
-//     * 跳转至主页面
-//     */
-//    @RequiresPermissions("cd90:cd90CurlLength:view")
-//    @GetMapping()
-//    public String toIndex() {
-//        return prefix + "/cd90CurlLength";
-//    }
-//
-//    /**
-//     * 跳转至新增页面
-//     */
-//    @GetMapping("/add")
-//    public String add(ModelMap mmap) {
-//        mmap.put("cd90CurlLength", new Cd90CurlLength());
-//        return prefix + "/add";
-//    }
-//
-//    /**
-//     * 跳转至修改页面
-//     */
-//    @GetMapping("/edit/{id}")
-//    public String edit(@PathVariable("id") Long id, ModelMap mmap) {
-//        mmap.put("cd90CurlLength", iCd90CurlLengthService.getInfo(id));
-//        return prefix + "/edit";
-//    }
-//
-//    /**
-//     * 根据条件查询主表数据
-//     */
-//    @ApiOperation("根据条件查询主表数据")
-//    @RequiresPermissions("cd90:cd90CurlLength:list")
-//    @PostMapping("/list")
-//    @ResponseBody
-//    public TableDataInfo list(Cd90CurlLength cd90CurlLength) {
-//        return iCd90CurlLengthService.list(cd90CurlLength);
-//    }
-//
-//    /**
-//     * 修改或新增
-//     */
-//    @ApiOperation("修改或新增")
-//    @RequiresPermissions("cd90:cd90CurlLength:edit")
-//    @PostMapping("/save")
-//    @ResponseBody
-//    public AjaxResult save(Cd90CurlLength cd90CurlLength) {
-//        if (UserConstants.NOT_UNIQUE.equals(iCd90CurlLengthService.checkUnique(cd90CurlLength))) {
-//            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90CurlLength.checkUnique"));
-//        }
-//
-//        return iCd90CurlLengthService.save(cd90CurlLength);
-//    }
-//
-//    /**
-//     * 删除纤维直裁卷曲长度
-//     */
-//    @ApiOperation("删除,id不为空")
-//    @RequiresPermissions("cd90:cd90CurlLength:remove")
-//    @PostMapping("/remove")
-//    @ResponseBody
-//    public AjaxResult remove(String ids) {
-//        Long[] arr = Convert.toLongArray(ids);
-//        return iCd90CurlLengthService.removeByIds(Arrays.asList(arr));
-//    }
-//
-//    /**
-//     * 校验纤维直裁卷曲长度唯一性
-//     */
-//    @ApiOperation("校验唯一性")
-//    @PostMapping("/checkUnique")
-//    @ResponseBody
-//    public String checkUnique(Cd90CurlLength cd90CurlLength) {
-//        return iCd90CurlLengthService.checkUnique(cd90CurlLength);
-//    }
-//
-//    /**
-//     * 导出模板文件的文件名，派生类重写名称。
-//     * 示例：支持多语言写法： String fileName = I18nUtil.getMessage("ui.cd90.machine.export.fileName");
-//     * @return
-//     */
-//    @Override
-//    public String getExportTemplateFileName(){
-//        return this.getFunctionName();
-//    }
-//
-//
-//    /**
-//     * 继承时重写方法。
-//     *
-//     * @return
-//     */
-//    @Override
-//    public String getProcedureCode() {
-//        return "0";
-//    }
-//
-//    /**
-//     * 继承时重写方法。
-//     *
-//     * @return
-//     */
-//    @Override
-//    public String getFunctionName() {
-//        return I18nUtil.getMessage("ui.data.column.cd90CurlLength.modelName");
-//    }
-//
-//    /**
-//     * 重写导入模板的生成逻辑
-//     */
-//    @ApiOperation("下载导入模板")
-//    @Override
-//    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
-//        String fileName = this.getExportTemplateFileName();
-//        ExcelUtil<Cd90CurlLength> util = new ExcelUtil<>(Cd90CurlLength.class);
-//        util.exportExcel(response, null, fileName, fileName);
-//        return AjaxResult.success();
-//    }
-//
-//    @ApiOperation("数据导出")
-//    @GetMapping({"/export"})
-//    @ResponseBody
-//    @Override
-//    public void export(HttpServletResponse response, Cd90CurlLength entity) throws IOException {
-//        String fileName = this.getExportTemplateFileName();
-//        byte[] excelBytes = iCd90CurlLengthService.exportData(entity,fileName);
-//        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
-//        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
-//        IOUtils.copy(in, response.getOutputStream());
-//        response.flushBuffer();
-//    }
-//
-//    @PostMapping({"/importData"})
-//    @ResponseBody
-//    @ApiOperation("数据导入")
-//    @Override
-//    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
-//        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
-//
-//        ImportContext context = new ImportContext();
-//        context.setImportFilePath(this.importFilePath);
-//        context.setFunctionName(this.getFunctionName());
-//        context.setProcedureCode(this.getProcedureCode());
-//        context.setOriFileName(file.getOriginalFilename());
-//        context.setFileBytes(data);
-//        AjaxResult ajaxResult = iCd90CurlLengthService.importData(context,false);
-//        return ajaxResult;
-//    }
-//
-//    /**
-//     * 根据编号查询卷曲长度
-//     *
-//     * @param curlLength 查询条件
-//     * @return 结果
-//     */
-//    @ApiOperation("根据编号查询卷曲长度")
-//    @PostMapping("/selectCurlLengthByCode")
-//    @ResponseBody
-//    public AjaxResult selectCurlLengthByCode(Cd90CurlLength curlLength) {
-//        return iCd90CurlLengthService.selectCurlLengthByCode(curlLength);
-//    }
-//}
+package com.zlt.aps.controller.cd90;
+
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.text.Convert;
+import com.ruoyi.common4ui.constant.UserConstants;
+import com.ruoyi.common4ui.core.controller.BaseUIController;
+import com.zlt.aps.cd90.api.domain.entity.Cd90CurlLength;
+import com.zlt.aps.cd90.api.service.ICd90CurlLengthRemoteService;
+import com.zlt.file.encryptbyll.FileEncryptUtils;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import org.apache.commons.io.IOUtils;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.Arrays;
+
+/**
+ * 直裁卷曲长度 UI 控制层。
+ */
+@Api(tags = "直裁卷曲长度")
+@Controller
+@RequestMapping("/cd90/cd90CurlLength")
+public class Cd90CurlLengthUIController extends BaseUIController<Cd90CurlLength> {
+
+    @Resource
+    private ICd90CurlLengthRemoteService cd90CurlLengthRemoteService;
+
+    /** 查询直裁卷曲长度列表 */
+    @ApiOperation("查询直裁卷曲长度列表")
+    @RequiresPermissions("cd90:cd90CurlLength:list")
+    @PostMapping("/list")
+    @ResponseBody
+    public TableDataInfo list(Cd90CurlLength queryVO) {
+        return cd90CurlLengthRemoteService.list(queryVO);
+    }
+
+    /** 获取直裁卷曲长度详情 */
+    @ApiOperation("获取直裁卷曲长度详情")
+    @GetMapping("/getInfo/{id}")
+    @ResponseBody
+    public Cd90CurlLength getInfo(@PathVariable("id") Long id) {
+        return cd90CurlLengthRemoteService.getInfo(id);
+    }
+
+    /** 新增直裁卷曲长度 */
+    @ApiOperation("新增直裁卷曲长度")
+    @RequiresPermissions("cd90:cd90CurlLength:add")
+    @PostMapping("/add")
+    @ResponseBody
+    public AjaxResult add(@RequestBody Cd90CurlLength entity) {
+        if (UserConstants.NOT_UNIQUE.equals(cd90CurlLengthRemoteService.checkUnique(entity))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90CurlLength.checkUnique"));
+        }
+        return cd90CurlLengthRemoteService.add(entity);
+    }
+
+    /** 编辑直裁卷曲长度 */
+    @ApiOperation("编辑直裁卷曲长度")
+    @RequiresPermissions("cd90:cd90CurlLength:edit")
+    @PostMapping("/edit")
+    @ResponseBody
+    public AjaxResult edit(@RequestBody Cd90CurlLength entity) {
+        if (UserConstants.NOT_UNIQUE.equals(cd90CurlLengthRemoteService.checkUnique(entity))) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.column.cd90CurlLength.checkUnique"));
+        }
+        return cd90CurlLengthRemoteService.edit(entity);
+    }
+
+    /** 删除直裁卷曲长度 */
+    @ApiOperation("删除直裁卷曲长度")
+    @RequiresPermissions("cd90:cd90CurlLength:remove")
+    @PostMapping("/remove")
+    @ResponseBody
+    public AjaxResult remove(String ids) {
+        Long[] arr = Convert.toLongArray(ids);
+        return cd90CurlLengthRemoteService.removeByIds(Arrays.asList(arr));
+    }
+
+    @Override
+    public String getExportTemplateFileName() {
+        return getFunctionName();
+    }
+
+    @Override
+    public String getProcedureCode() {
+        return "CD90";
+    }
+
+    @Override
+    public String getFunctionName() {
+        return I18nUtil.getMessage("ui.data.column.cd90CurlLength.modelName");
+    }
+
+    /** 下载导入模板 */
+    @ApiOperation("下载直裁卷曲长度导入模板")
+    @Override
+    public AjaxResult importTemplate(HttpServletResponse response) throws IOException {
+        String fileName = getExportTemplateFileName();
+        ExcelUtil<Cd90CurlLength> util = new ExcelUtil<>(Cd90CurlLength.class);
+        util.exportExcel(response, null, fileName, fileName);
+        return AjaxResult.success();
+    }
+
+    /** 导出直裁卷曲长度 */
+    @ApiOperation("导出直裁卷曲长度")
+    @RequiresPermissions("cd90:cd90CurlLength:export")
+    @GetMapping("/export")
+    @ResponseBody
+    @Override
+    public void export(HttpServletResponse response, Cd90CurlLength entity) throws IOException {
+        String fileName = getExportTemplateFileName();
+        byte[] excelBytes = cd90CurlLengthRemoteService.exportData(entity, fileName);
+        ByteArrayInputStream in = new ByteArrayInputStream(excelBytes);
+        ExcelUtil.setResponseHeader(response, fileName, ".xlsx");
+        IOUtils.copy(in, response.getOutputStream());
+        response.flushBuffer();
+    }
+
+    /** 导入直裁卷曲长度 */
+    @ApiOperation("导入直裁卷曲长度")
+    @RequiresPermissions("cd90:cd90CurlLength:import")
+    @PostMapping("/importData")
+    @ResponseBody
+    @Override
+    public AjaxResult importData(@RequestPart("file") MultipartFile file, boolean updateSupport) throws Exception {
+        byte[] data = this.useFileEncrypt ? FileEncryptUtils.DecodeFile(file) : file.getBytes();
+        ImportContext context = new ImportContext();
+        context.setImportFilePath(this.importFilePath);
+        context.setFunctionName(getFunctionName());
+        context.setProcedureCode(getProcedureCode());
+        context.setOriFileName(file.getOriginalFilename());
+        context.setFileBytes(data);
+        return cd90CurlLengthRemoteService.importData(context, updateSupport);
+    }
+}

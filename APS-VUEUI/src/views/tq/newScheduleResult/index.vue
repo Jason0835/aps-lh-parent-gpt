@@ -76,13 +76,19 @@
       labelWidth="0"
       :columns="importColumns"
     ></tlt-upload-form>
+    <!-- 插单弹窗 -->
+    <insert-order-dialog ref="insertOrderDialog" @success="getList" />
+    <!-- 转机台弹窗 -->
+    <change-machine-dialog ref="changeMachineDialog" @success="getList" />
   </basic-container>
 </template>
 <script>
 import { downloadLink } from "@/utils/request";
-import { listNewScheduleResult, removeNewScheduleResult, listScheduleShiftDates, autoPlan, insertOrder, changeMachine, changeQty, publishSchedule } from "@/api/tq/tqNewScheduleResult";
+import { listNewScheduleResult, logicDeleteNewScheduleResult, listScheduleShiftDates, autoPlan, insertOrder, changeMachine, changeQty, publishSchedule } from "@/api/tq/tqNewScheduleResult";
 import { mapState } from "vuex";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
+import InsertOrderDialog from "./components/insertOrderDialog.vue";
+import ChangeMachineDialog from "./components/changeMachineDialog.vue";
 
 const formatDate = (date) => {
   const year = date.getFullYear();
@@ -101,6 +107,8 @@ export default {
   name: "TqNewScheduleResult",
   components: {
     TltUploadForm,
+    InsertOrderDialog,
+    ChangeMachineDialog,
   },
   dicts: ["IS_RELEASE"],
   data() {
@@ -468,16 +476,14 @@ export default {
       }).catch(() => {});
     },
     handleInsertOrder() {
-      // TODO 插单弹窗待实现，目前先调用接口
-      this.$message.info("插单弹窗待实现");
+      this.$refs.insertOrderDialog.show();
     },
     handleChangeMachine() {
       if (this.selection.length !== 1) {
         this.$modal.msgWarning(this.$t("common.tip.selectOne"));
         return;
       }
-      // TODO 转机台弹窗待实现，目前先调用接口
-      this.$message.info("转机台弹窗待实现");
+      this.$refs.changeMachineDialog.show(this.selection[0]);
     },
     handleAdjustQty() {
       if (this.selection.length !== 1) {
@@ -506,11 +512,11 @@ export default {
         this.$modal.msgWarning(this.$t("common.tip.selectOne"));
         return;
       }
-      const ids = this.selection.map(item => item.id).join(',');
+      const ids = this.selection.map(item => item.id);
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeNewScheduleResult(ids).then((data) => {
+        logicDeleteNewScheduleResult(ids).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();

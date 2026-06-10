@@ -27,6 +27,7 @@ import com.zlt.aps.lh.engine.strategy.support.DailyMachineExpansionPlanner;
 import com.zlt.aps.lh.service.impl.LhMaintenanceScheduleService;
 import com.zlt.aps.lh.util.LeftRightMouldUtil;
 import com.zlt.aps.lh.util.LhMachineHardMatchUtil;
+import com.zlt.aps.lh.util.LhMouldCodeUtil;
 import com.zlt.aps.lh.util.LhScheduleTimeUtil;
 import com.zlt.aps.lh.util.LhSpecialMaterialUtil;
 import com.zlt.aps.lh.util.LhSpecifyMachineUtil;
@@ -1109,7 +1110,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         result.setScheduleType(ScheduleTypeEnum.TYPE_BLOCK.getCode());
         result.setIsChangeMould(YES_FLAG);
         result.setIsTypeBlock(YES_FLAG);
-        result.setMouldCode(resolveMouldCode(context, sku.getMaterialCode(), machine.getCurrentMaterialCode()));
+        result.setMouldCode(resolveTypeBlockActualMouldCode(context, machine, sku));
         // 换活字块虽然不是新增规格换模，但下游换模计划仍按真实切换开始时间生成。
         result.setMouldChangeStartTime(switchStartTime);
         result.setIsEnd(isEnding ? YES_FLAG : NO_FLAG);
@@ -2180,6 +2181,7 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
         result.setDailyPlanQty(0);
         result.setTotalDailyPlanQty(sku.getMonthPlanQty());
         result.setMouldSurplusQty(sku.getSurplusQty());
+        result.setTotalFinishQty(sku.getFinishedQty());
         result.setIsEnd(isEnding ? YES_FLAG : NO_FLAG);
         result.setIsDelivery(sku.isDeliveryLocked() ? YES_FLAG : NO_FLAG);
         result.setIsRelease(NO_FLAG);
@@ -2868,31 +2870,35 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
     }
 
     /**
-     * 解析模具编码。
+     * 解析换活字块结果实际使用的模具号。
+     * <p>换活字块不是更换整副模具，因此不释放在机模具，也不按新SKU重新分配模具；
+     * 结果字段沿用当前机台硫化在机信息中的实际模具号。</p>
      *
      * @param context 排程上下文
-     * @param materialCodes 物料编码
-     * @return 模具编码
+     * @param machine 当前机台
+     * @param sku 候选SKU
+     * @return 实际使用模具号，多个逗号分隔
      */
-    private String resolveMouldCode(LhScheduleContext context, String... materialCodes) {
-        if (context == null || materialCodes == null) {
+    private String resolveTypeBlockActualMouldCode(LhScheduleContext context,
+                                                   MachineScheduleDTO machine,
+                                                   SkuScheduleDTO sku) {
+        if (context == null || machine == null) {
             return null;
         }
-        for (String materialCode : materialCodes) {
-            if (StringUtils.isEmpty(materialCode) || !context.getSkuMouldRelMap().containsKey(materialCode)) {
-                continue;
-            }
-            String mouldCode = context.getSkuMouldRelMap().get(materialCode).stream()
-                .map(MdmSkuMouldRel::getMouldCode)
-                    .map(this::normalizeCompareToken)
-                    .filter(StringUtils::isNotEmpty)
-                    .distinct()
-                    .collect(Collectors.joining(","));
-            if (StringUtils.isNotEmpty(mouldCode)) {
-                return mouldCode;
-            }
+        int requiredMouldQty = ShiftCapacityResolverUtil.resolveMachineMouldQty(machine);
+        String mouldCode = LhMouldCodeUtil.resolveInMachineMouldCode(context, machine.getMachineCode());
+        if (StringUtils.isEmpty(mouldCode)) {
+            log.info("换活字块结果在机实际模具号为空, machineCode: {}, currentMaterialCode: {}, materialCode: {}, "
+                            + "requiredMouldQty: {}",
+                    machine.getMachineCode(), machine.getCurrentMaterialCode(),
+                    sku == null ? null : sku.getMaterialCode(), requiredMouldQty);
+            return null;
         }
-        return null;
+        log.debug("换活字块沿用在机实际模具号, machineCode: {}, currentMaterialCode: {}, materialCode: {}, "
+                        + "requiredMouldQty: {}, actualMouldCode: {}",
+                machine.getMachineCode(), machine.getCurrentMaterialCode(),
+                sku == null ? null : sku.getMaterialCode(), requiredMouldQty, mouldCode);
+        return mouldCode;
     }
 
     /**
@@ -3154,10 +3160,10 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
                 }
             }
         }
-        if (context.getScheduleTargetDate() == null) {
+        if (context.getWindowEndDate() == null) {
             return null;
         }
-        return context.getScheduleTargetDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        return context.getWindowEndDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
     }
 
     /**

@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -113,18 +114,34 @@ public class CxScheduleResultIssueServiceImpl implements ICxScheduleResultIssueS
     }
 
     /**
-     * 更新或插入数据（存在则更新，不存在则插入）
+     * 批量更新或插入数据（存在则更新，不存在则插入）
      * 中间表MES_CX_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
      */
     private void upsertCxScheduleResult(List<MesCxScheduleResult> mesList, String dataVersion) {
         if (CollectionUtils.isEmpty(mesList)) {
             return;
         }
+        // 批量查询已有记录，按排程日期+机台编码+版本号匹配
+        List<MesCxScheduleResult> existingRecords = cxScheduleResultIssueMapper.selectExistingByScheduleDateAndMachine(mesList);
+        Set<String> existingKeys = existingRecords.stream()
+                .map(r -> r.getScheduleDate() + "|" + r.getMachineCode() + "|" + r.getDataVersion())
+                .collect(Collectors.toSet());
+        // 根据查询结果分组：已有记录走批量更新，不存在记录走批量新增
+        List<MesCxScheduleResult> updateList = new ArrayList<>();
+        List<MesCxScheduleResult> insertList = new ArrayList<>();
         for (MesCxScheduleResult mesItem : mesList) {
-            int updateCount = cxScheduleResultIssueMapper.updateByScheduleDateAndMachine(mesItem);
-            if (updateCount == 0) {
-                cxScheduleResultIssueMapper.insertCxScheduleResult(mesItem);
+            String key = mesItem.getScheduleDate() + "|" + mesItem.getMachineCode() + "|" + mesItem.getDataVersion();
+            if (existingKeys.contains(key)) {
+                updateList.add(mesItem);
+            } else {
+                insertList.add(mesItem);
             }
+        }
+        if (CollectionUtils.isNotEmpty(updateList)) {
+            cxScheduleResultIssueMapper.batchUpdateByScheduleDateAndMachine(updateList);
+        }
+        if (CollectionUtils.isNotEmpty(insertList)) {
+            cxScheduleResultIssueMapper.batchInsertCxScheduleResult(insertList);
         }
     }
 

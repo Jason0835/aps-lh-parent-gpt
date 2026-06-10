@@ -25,13 +25,6 @@ public class MesCxScheduleResult implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 主键ID
-     */
-    @ApiModelProperty(value = "主键ID", name = "id")
-    @TableField(value = "ID")
-    private Long id;
-
-    /**
      * 成型批次号
      */
     @ApiModelProperty(value = "成型批次号", name = "cxBatchNo")

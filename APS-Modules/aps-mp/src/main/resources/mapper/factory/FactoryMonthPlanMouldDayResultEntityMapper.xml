@@ -90,7 +90,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             r.ADJUST_QTY3,
             r.ADJUST_QTY4,
             r.ORIGINAL_TOTAL_QTY,
-            ifnull(r.total_qty, 0) - ifnull(si.PRODUCTION_QTY,0) PRODUCT_SURPLUS,
+            ifnull(r.total_qty, 0) - ifnull(pm.PRODUCTION_QTY,0) PRODUCT_SURPLUS,
             si.LAST_MONTH_REMAIN_QTY,
             </when>
             <otherwise>
@@ -133,6 +133,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             AND C.IS_DELETE = 0
         <choose>
             <when test="isFinal">
+            LEFT JOIN T_MP_MONTH_PLAN_MONITOR pm ON r.material_code = pm.material_code
+            AND m.FACTORY_CODE = pm.FACTORY_CODE 
+            AND r.PRODUCTION_VERSION = pm.PRODUCTION_VERSION
+            AND r.CONSTRUCTION_STAGE = pm.CONSTRUCTION_STAGE
+            AND pm.IS_DELETE = 0 
             LEFT JOIN T_MP_ADJUST_STRUCTURE_IN si ON si.version = #{dayResult.monthPlanVersion}
             AND si.FACTORY_CODE = r.factory_code
             AND si.MATERIAL_CODE = r.MATERIAL_CODE
@@ -246,7 +251,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             r.ADJUST_QTY3,
             r.ADJUST_QTY4,
             r.ORIGINAL_TOTAL_QTY,
-            si.PRODUCTION_QTY,
+            pm.PRODUCTION_QTY,
             si.LAST_MONTH_REMAIN_QTY,
             </when>
             <otherwise>
