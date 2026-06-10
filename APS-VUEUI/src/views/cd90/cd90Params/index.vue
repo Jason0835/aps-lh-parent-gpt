@@ -2,10 +2,7 @@
   <basic-container>
     <page-table tableRef="paramsMainTable" :calcHeight="true" v-loading="loading" :columns="columns" :searchColumns="searchColumns" :data="data" :page="page" :search="search" @refresh="getList" @search="handleSearch" @pageChange="handlePageChange" @sort-change="handleSortChange" @selection-change="handleSelectionChange" :showSummary="false" :selectArea="false">
       <template slot="header">
-        <el-button type="primary" plain v-hasPermi="['cd90:params:add']" @click="handleAdd">{{ $t("ui.frame.btn.add") }}</el-button>
         <el-button v-hasPermi="['cd90:params:edit']" @click="handleBatchEdit" :disabled="selection.length !== 1">{{ $t("ui.frame.btn.update") }}</el-button>
-        <el-button type="danger" v-hasPermi="['cd90:params:remove']" :disabled="selection.length === 0" @click="handleBatchDelete">{{ $t("ui.frame.btn.delete") }}</el-button>
-        <el-button v-hasPermi="['cd90:params:import']" @click="$refs.tltUpload.handleImport()">{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button @click="handleExport" v-hasPermi="['cd90:params:export']">{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
@@ -40,12 +37,10 @@ export default {
         { prop: "paramCode", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Params.paramCode"), minWidth: 140 },
         { prop: "paramName", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Params.paramName"), minWidth: 140 },
         { prop: "paramValue", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Params.paramValue"), minWidth: 130 },
-        { prop: "regularExpression", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Params.regularExpression"), minWidth: 160 },
-        { prop: "errorTips", align: "center", halign: "center", label: this.$t("ui.data.column.cd90Params.errorTips"), minWidth: 180 },
         { prop: "remark", halign: "center", label: this.$t("ui.common.column.remark"), minWidth: 120 },
         { prop: "updateTime", align: "center", halign: "center", label: this.$t("common.updateTime"), minWidth: 160 },
         { align: "center", halign: "center", label: this.$t("ui.data.btn.option"), prop: "option", minWidth: 150, fixed: "right",
-          render: ({ row }) => (<div><el-button v-hasPermi={["cd90:params:edit"]} class="minus" type="success" onClick={() => this.handleEdit(row)}>{this.$t("ui.frame.btn.update")}</el-button><el-button v-hasPermi={["cd90:params:remove"]} class="minus" type="danger" onClick={() => this.handleDelete(row)}>{this.$t("ui.frame.btn.delete")}</el-button></div>) },
+          render: ({ row }) => (<div><el-button v-hasPermi={["cd90:params:edit"]} class="minus" type="success" onClick={() => this.handleEdit(row)}>{this.$t("ui.frame.btn.update")}</el-button></div>) },
       ];
     },
     searchColumns() {
