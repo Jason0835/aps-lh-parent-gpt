@@ -1,7 +1,7 @@
 <template>
   <basic-container>
     <page-table
-      tableRef="tmGlueOrderMainTable"
+      tableRef="tmScheduleResultMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -21,53 +21,62 @@
         <el-button
           type="primary"
           plain
-          v-hasPermi="['tm:tmGlueOrder:edit']"
+          v-hasPermi="['tm:tmScheduleResult:edit']"
           @click="handleAdd"
-        >{{ $t("ui.frame.btn.add") }}</el-button>
+        >{{ $t("ui.data.column.scheduleResult.insertOrder") }}</el-button>
         <el-button
           type="danger"
-          v-hasPermi="['tm:tmGlueOrder:remove']"
+          v-hasPermi="['tm:tmScheduleResult:remove']"
           :disabled="selection.length == 0"
           @click="handleDeleteAll"
         >{{ $t("ui.frame.btn.delete") }}</el-button>
         <el-button
-          v-hasPermi="['tm:tmGlueOrder:import']"
+          v-hasPermi="['tm:tmScheduleResult:import']"
           @click="$refs.tltUpload.handleImport()"
         >{{ $t("ui.frame.btn.import") }}</el-button>
         <el-button
+          type="primary"
+          :disabled="selection.length === 0"
+          v-hasPermi="['tm:tmScheduleResult:changeMachine']"
+          @click="handleChangeMachine"
+        >{{ $t("ui.data.column.scheduleResult.changeMachine") }}</el-button>
+        <el-button
           @click="handleExport"
-          v-hasPermi="['tm:tmGlueOrder:export']"
+          v-hasPermi="['tm:tmScheduleResult:export']"
         >{{ $t("ui.frame.btn.export") }}</el-button>
       </template>
     </page-table>
     <tlt-upload-form
       ref="tltUpload"
       :updateSupport="true"
-      downloadUrl="/tm/tmGlueOrder/importTemplate"
-      uploadUrl="/tm/tmGlueOrder/importData"
+      downloadUrl="/tm/tmScheduleResult/importTemplate"
+      uploadUrl="/tm/tmScheduleResult/importData"
       @uploadSuccess="getList"
       labelWidth="0"
       :columns="importColumns"
     ></tlt-upload-form>
     <infoDialog ref="infoRef" @success="getList" />
+    <changeMachineDialog ref="changeMachineRef" @success="getList" />
   </basic-container>
 </template>
 <script>
 import {mapState} from "vuex";
 import {downloadLink} from "@/utils/request";
-import {listTmGlueOrder, removeTmGlueOrder} from "@/api/tm/glueOrder";
+import {listTmScheduleResult, removeTmScheduleResult,} from "@/api/tm/scheduleResult";
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 import TltUploadForm from "@/views/components/tltUploadForm.vue";
 import infoDialog from "./components/infoDialog.vue";
+import changeMachineDialog from "./components/changeMachineDialog.vue";
 
 export default {
-  name: "TmGlueOrder",
+  name: "TmScheduleResult",
   components: {
     tltUpload,
     infoDialog,
     TltUploadForm,
+    changeMachineDialog,
   },
-  dicts: ["biz_factory_name"],
+  dicts: ["biz_factory_name", "biz_yes_no", "tm_release_status", "tm_data_source"],
   provide() {
     return {
       parentDict: this.dict,
@@ -115,37 +124,55 @@ export default {
         { type: "selection", fixed: "left" },
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.tm.glueOrder.factoryCode"),
+          label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
           type: "select",
           formatter: (row, column, value) => {
             return this.selectDictLabel(this.dict.type.biz_factory_name, value);
           },
         },
         {
-          prop: "glueGroupCode",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.glueOrder.glueGroupCode"),
+          prop: "batchNo",
+          align: "left",
+          minWidth: 160,
+          label: this.$t("ui.data.column.tm.scheduleResult.batchNo"),
         },
         {
-          prop: "glueCode",
-          halign: "center",
-          label: this.$t("ui.data.column.tm.glueOrder.glueCode"),
+          prop: "scheduleDate",
+          align: "center",
+          minWidth: 120,
+          label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
         },
         {
           prop: "machineCode",
           halign: "center",
-          label: this.$t("ui.data.column.tm.glueOrder.machineCode"),
+          label: this.$t("ui.data.column.tm.scheduleResult.machineCode"),
         },
         {
-          prop: "orderNum",
+          prop: "treadCode",
           halign: "center",
-          label: this.$t("ui.data.column.tm.glueOrder.orderNum"),
+          label: this.$t("ui.data.column.tm.scheduleResult.treadCode"),
         },
         {
-          prop: "remark",
+          prop: "glueCode",
           halign: "center",
-          label: this.$t("ui.common.column.remark"),
-          minWidth: 100,
+          label: this.$t("ui.data.column.tm.scheduleResult.glueCode"),
+        },
+        {
+          prop: "releaseStatus",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.scheduleResult.releaseStatus"),
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.tm_release_status, value);
+          },
+        },
+        {
+          prop: "tailFlag",
+          halign: "center",
+          label: this.$t("ui.data.column.tm.scheduleResult.tailFlag"),
+          type: "select",
+          formatter: (row, column, value) => {
+            return this.selectDictLabel(this.dict.type.biz_yes_no, value);
+          },
         },
         {
           prop: "updateTime",
@@ -163,15 +190,15 @@ export default {
             return (
               <div>
                 <el-button
-                  v-hasPermi={["tm:tmGlueOrder:edit"]}
+                  v-hasPermi={["tm:tmScheduleResult:edit"]}
                   class="minus"
                   type="success"
                   onClick={() => this.handleEdit(row)}
                 >
-                  {this.$t("ui.frame.btn.update")}
+                  {this.$t("ui.data.column.scheduleResult.changePlan")}
                 </el-button>
                 <el-button
-                  v-hasPermi={["tm:tmGlueOrder:remove"]}
+                  v-hasPermi={["tm:tmScheduleResult:remove"]}
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
@@ -188,21 +215,38 @@ export default {
       return [
         {
           prop: "factoryCode",
-          label: this.$t("ui.data.column.tm.glueOrder.factoryCode"),
+          label: this.$t("ui.data.column.tm.scheduleResult.factoryCode"),
           type: "select",
           dictData: this.dict.type.biz_factory_name,
         },
         {
-          prop: "glueCode",
-          label: this.$t("ui.data.column.tm.glueOrder.glueCode"),
+          prop: "batchNo",
+          label: this.$t("ui.data.column.tm.scheduleResult.batchNo"),
+        },
+        {
+          prop: "scheduleDate",
+          label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
+          type: "daterange",
+          valueFormat: "yyyy-MM-dd",
+        },
+        {
+          prop: "treadCode",
+          label: this.$t("ui.data.column.tm.scheduleResult.treadCode"),
         },
         {
           prop: "machineCode",
-          label: this.$t("ui.data.column.tm.glueOrder.machineCode"),
+          label: this.$t("ui.data.column.tm.scheduleResult.machineCode"),
           type: "select",
           dictData: this.machines,
           labelKey: "machineCode",
           valueKey: "machineCode",
+          filterable: true,
+        },
+        {
+          prop: "releaseStatus",
+          label: this.$t("ui.data.column.tm.scheduleResult.releaseStatus"),
+          type: "select",
+          dictData: this.dict.type.tm_release_status,
           filterable: true,
         },
       ];
@@ -212,6 +256,13 @@ export default {
     handleAdd() {
       if (this.$refs.infoRef) {
         this.$refs.infoRef.show();
+      }
+    },
+    // 转机台弹窗
+    handleChangeMachine() {
+      if (this.$refs.changeMachineRef) {
+        let row = this.selection;
+        this.$refs.changeMachineRef.show(row);
       }
     },
     handleEdit(row) {
@@ -224,7 +275,7 @@ export default {
         type: "warning",
       }).then(() => {
         const ids = row.id;
-        removeTmGlueOrder({ ids }).then((data) => {
+        removeTmScheduleResult({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -243,7 +294,7 @@ export default {
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        removeTmGlueOrder({ ids }).then((data) => {
+        removeTmScheduleResult({ ids }).then((data) => {
           this.$modal.msgSuccess(data.msg);
           this.$set(this.page, "current", 1);
           this.getList();
@@ -278,7 +329,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/tm/tmGlueOrder/export", this.formatParams(false));
+      downloadLink("/tm/tmScheduleResult/export", this.formatParams(false));
     },
 
     formatParams(hasPage = true) {
@@ -303,7 +354,7 @@ export default {
     async getList() {
       try {
         this.loading = true;
-        const data = await listTmGlueOrder(this.formatParams());
+        const data = await listTmScheduleResult(this.formatParams());
         this.data = data.rows;
         this.page.total = data.total;
       } catch (error) {

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.ruoyi.common.core.annotation.Excel;
 import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.zlt.aps.common.core.annotation.ImportValidated;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -15,22 +16,26 @@ public class TmGlueGroupOrder extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "ui.data.column.tm.GlueGroupOrder.factoryCode")
+    @Excel(name = "ui.data.column.tm.glueGroupOrder.factoryCode")
+    @ImportValidated(required = true, isCode = true, maxLength = 50)
     @ApiModelProperty(value = "工厂编号", name = "factoryCode")
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    @Excel(name = "ui.data.column.tm.GlueGroupOrder.glueGroupCode")
+    @Excel(name = "ui.data.column.tm.glueGroupOrder.glueGroupCode")
+    @ImportValidated(required = true, isCode = true, maxLength = 30)
     @ApiModelProperty(value = "胶料组编码", name = "glueGroupCode")
     @TableField(value = "GLUE_GROUP_CODE")
     private String glueGroupCode;
 
-    @Excel(name = "ui.data.column.tm.GlueGroupOrder.glueGroupName")
+    @Excel(name = "ui.data.column.tm.glueGroupOrder.glueGroupName")
+    @ImportValidated(required = true, maxLength = 50)
     @ApiModelProperty(value = "胶料组名称", name = "glueGroupName")
     @TableField(value = "GLUE_GROUP_NAME")
     private String glueGroupName;
 
-    @Excel(name = "ui.data.column.tm.GlueGroupOrder.orderNum")
+    @Excel(name = "ui.data.column.tm.glueGroupOrder.orderNum")
+    @ImportValidated(required = true, digits = true, min = 0, max = 999)
     @ApiModelProperty(value = "排序号", name = "orderNum")
     @TableField(value = "ORDER_NUM")
     private Integer orderNum;
