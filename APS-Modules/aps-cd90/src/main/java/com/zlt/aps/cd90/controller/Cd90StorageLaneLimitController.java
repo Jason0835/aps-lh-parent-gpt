@@ -1,7 +1,12 @@
 package com.zlt.aps.cd90.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.ruoyi.api.gateway.system.domain.ImportLog;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
+import com.ruoyi.api.gateway.system.service.IImportErrorLogService;
+import com.ruoyi.api.gateway.system.service.IImportLogService;
+import com.ruoyi.common.core.utils.DateUtils;
+import com.ruoyi.common.core.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
@@ -12,14 +17,19 @@ import com.zlt.aps.cd90.service.ICd90StorageLaneLimitService;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
+import com.zlt.common.utils.ImportExcelUtils;
 import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Date;
 import java.util.List;
 
 @Api(tags = "直裁库排限制")
@@ -31,25 +41,27 @@ public class Cd90StorageLaneLimitController extends AbstractDocBizController<Cd9
     @Resource
     private Cd90StorageLaneLimitMapper mapper;
 
+
+
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
-    public TableDataInfo list(@RequestBody Cd90StorageLaneLimit q) {
-        return super.list(q);
+    public TableDataInfo list(@RequestBody Cd90StorageLaneLimit query) {
+        return super.list(query);
     }
 
     @Log(title = "ui.data.column.storageLaneLimit.modelName", businessType = BusinessType.INSERT)
     @ApiOperation("新增")
     @PostMapping("/add")
-    public AjaxResult add(@RequestBody Cd90StorageLaneLimit e) {
-        return super.save(e);
+    public AjaxResult add(@RequestBody Cd90StorageLaneLimit entity) {
+        return super.save(entity);
     }
 
     @Log(title = "ui.data.column.storageLaneLimit.modelName", businessType = BusinessType.UPDATE)
     @ApiOperation("编辑")
     @PostMapping("/edit")
-    public AjaxResult edit(@RequestBody Cd90StorageLaneLimit e) {
-        return super.save(e);
+    public AjaxResult edit(@RequestBody Cd90StorageLaneLimit entity) {
+        return super.save(entity);
     }
 
     @Log(title = "ui.data.column.storageLaneLimit.modelName", businessType = BusinessType.DELETE)
@@ -69,8 +81,8 @@ public class Cd90StorageLaneLimitController extends AbstractDocBizController<Cd9
 
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
-    public String checkUnique(@RequestBody Cd90StorageLaneLimit e) {
-        return service.checkUnique(e);
+    public String checkUnique(@RequestBody Cd90StorageLaneLimit entity) {
+        return service.checkUnique(entity);
     }
 
     @Log(title = "ui.data.column.storageLaneLimit.modelName", businessType = BusinessType.IMPORT)
@@ -85,23 +97,28 @@ public class Cd90StorageLaneLimitController extends AbstractDocBizController<Cd9
     @ApiOperation("导出")
     @PostMapping("/exportData/{fileName}")
     @Override
-    public byte[] exportData(@RequestBody Cd90StorageLaneLimit q, @PathVariable("fileName") String n, HttpServletResponse r) throws IOException {
-        return super.exportData(q, n, r);
+    public byte[] exportData(@RequestBody Cd90StorageLaneLimit query, @PathVariable("fileName") String fileName, HttpServletResponse r) throws IOException {
+        return super.exportData(query, fileName, r);
     }
 
     @Override
-    protected List<Cd90StorageLaneLimit> listExportData(Cd90StorageLaneLimit o) {
+    protected List<Cd90StorageLaneLimit> listExportData(Cd90StorageLaneLimit output) {
         QueryWrapper<Cd90StorageLaneLimit> w = new QueryWrapper<>();
-        builderCondition(w, o);
+        builderCondition(w, output);
         List<Cd90StorageLaneLimit> l = mapper.selectList(w);
         AppUtils.formatData(l, getQueryFormulas());
         return l;
     }
 
+
     @Override
-    protected IDocService getDocService() {
+    public IDocService getDocService() {
         return service;
     }
+
+
+
+
 
     @Override
     protected void builderCondition(QueryWrapper<Cd90StorageLaneLimit> qw, Cd90StorageLaneLimit vo) {

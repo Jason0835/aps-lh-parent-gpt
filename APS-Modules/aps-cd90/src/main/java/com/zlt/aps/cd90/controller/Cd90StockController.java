@@ -34,22 +34,22 @@ public class Cd90StockController extends AbstractDocBizController<Cd90Stock> {
     @ApiOperation("查询列表")
     @PostMapping("/list")
     @Override
-    public TableDataInfo list(@RequestBody Cd90Stock q) {
-        return super.list(q);
+    public TableDataInfo list(@RequestBody Cd90Stock query) {
+        return super.list(query);
     }
 
     @Log(title = "ui.data.column.stock.modelName", businessType = BusinessType.INSERT)
     @ApiOperation("新增")
     @PostMapping("/add")
-    public AjaxResult add(@RequestBody Cd90Stock e) {
-        return super.save(e);
+    public AjaxResult add(@RequestBody Cd90Stock entity) {
+        return super.save(entity);
     }
 
     @Log(title = "ui.data.column.stock.modelName", businessType = BusinessType.UPDATE)
     @ApiOperation("编辑")
     @PostMapping("/edit")
-    public AjaxResult edit(@RequestBody Cd90Stock e) {
-        return super.save(e);
+    public AjaxResult edit(@RequestBody Cd90Stock entity) {
+        return super.save(entity);
     }
 
     @Log(title = "ui.data.column.stock.modelName", businessType = BusinessType.DELETE)
@@ -69,8 +69,8 @@ public class Cd90StockController extends AbstractDocBizController<Cd90Stock> {
 
     @ApiOperation("校验唯一性")
     @PostMapping("/checkUnique")
-    public String checkUnique(@RequestBody Cd90Stock e) {
-        return service.checkUnique(e);
+    public String checkUnique(@RequestBody Cd90Stock entity) {
+        return service.checkUnique(entity);
     }
 
     @Log(title = "ui.data.column.stock.modelName", businessType = BusinessType.IMPORT)
@@ -85,14 +85,14 @@ public class Cd90StockController extends AbstractDocBizController<Cd90Stock> {
     @ApiOperation("导出")
     @PostMapping("/exportData/{fileName}")
     @Override
-    public byte[] exportData(@RequestBody Cd90Stock q, @PathVariable("fileName") String n, HttpServletResponse r) throws IOException {
-        return super.exportData(q, n, r);
+    public byte[] exportData(@RequestBody Cd90Stock query, @PathVariable("fileName") String fileName, HttpServletResponse r) throws IOException {
+        return super.exportData(query, fileName, r);
     }
 
     @Override
-    protected List<Cd90Stock> listExportData(Cd90Stock o) {
+    protected List<Cd90Stock> listExportData(Cd90Stock output) {
         QueryWrapper<Cd90Stock> w = new QueryWrapper<>();
-        builderCondition(w, o);
+        builderCondition(w, output);
         List<Cd90Stock> l = mapper.selectList(w);
         AppUtils.formatData(l, getQueryFormulas());
         return l;

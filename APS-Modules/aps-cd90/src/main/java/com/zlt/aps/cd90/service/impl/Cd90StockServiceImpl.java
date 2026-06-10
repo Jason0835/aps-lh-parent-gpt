@@ -112,11 +112,11 @@ public class Cd90StockServiceImpl extends AbstractDocService<Cd90Stock> implemen
         return tireFabricCodes.contains(entity.getMaterialCode());
     }
 
-    private Cd90Stock getExist(Cd90Stock e) {
+    private Cd90Stock getExist(Cd90Stock entity) {
         LambdaQueryWrapper<Cd90Stock> w = new LambdaQueryWrapper<>();
-        w.eq(Cd90Stock::getFactoryCode, e.getFactoryCode());
-        w.eq(Cd90Stock::getStockDate, e.getStockDate());
-        w.eq(Cd90Stock::getMaterialCode, e.getMaterialCode());
+        w.eq(Cd90Stock::getFactoryCode, entity.getFactoryCode());
+        w.eq(Cd90Stock::getStockDate, entity.getStockDate());
+        w.eq(Cd90Stock::getMaterialCode, entity.getMaterialCode());
         return cd90StockMapper.selectOne(w);
     }
 

@@ -89,7 +89,7 @@ public class Cd90LossSettingUIController extends BaseUIController<Cd90LossSettin
 
     @Override
     public String getProcedureCode() {
-        return "CD90_LOSS_SETTING";
+        return "CD90";
     }
 
     @Override

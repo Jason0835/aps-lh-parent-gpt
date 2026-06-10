@@ -111,7 +111,7 @@ public class Cd90MachineRollMappingUIController extends BaseUIController<Cd90Mac
 
     @Override
     public String getProcedureCode() {
-        return "CD90_MACHINE_ROLL_MAPPING";
+        return "CD90";
     }
 
     @Override

@@ -82,7 +82,7 @@ public class Cd90StockUIController extends BaseUIController<Cd90Stock> {
 
     @Override
     public String getProcedureCode() {
-        return "CD90_STOCK";
+        return "CD90";
     }
 
     @Override

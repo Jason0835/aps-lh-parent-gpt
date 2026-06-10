@@ -94,7 +94,7 @@ public class Cd90CurlLengthUIController extends BaseUIController<Cd90CurlLength>
 
     @Override
     public String getProcedureCode() {
-        return "CD90_CURL_LENGTH";
+        return "CD90";
     }
 
     @Override
