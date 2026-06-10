@@ -101,20 +101,20 @@ export default {
   },
   computed: {
     ...mapState({
-      machines: (state) => state.insideLiner.machines,
+      machines: (state) => state.dj.machines,
     }),
     columns() {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          prop: "liningCode",
+          prop: "paddingCode",
           align: "center",
           halign: "center",
           label: this.$t("ui.dj.specifyMachine.column.paddingCode"),
           // sortable: "custom",
         },
         {
-          prop: "machineName",
+          prop: "machineCode",
           align: "center",
           halign: "center",
           label: this.$t("ui.specifyMachine.column.machineName"),

@@ -111,7 +111,7 @@ export default {
           sortable: true,
         },
         {
-          prop: "machineName",
+          prop: "machineCode",
           align: "center",
           halign: "center",
           label: this.$t("ui.data.column.loss.line"),
@@ -174,16 +174,16 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.quota.liningCode"),
-          prop: "liningCode",
+          label: this.$t("ui.data.column.quota.paddingCode"),
+          prop: "paddingCode",
         },
         {
           label: this.$t("ui.data.column.loss.line"),
-          prop: "machineId",
+          prop: "machineCode",
           type: "select",
           dictData: this.machines,
           labelKey: "machineName",
-          valueKey: "id",
+          valueKey: "machineCode",
         },
       ];
     },
