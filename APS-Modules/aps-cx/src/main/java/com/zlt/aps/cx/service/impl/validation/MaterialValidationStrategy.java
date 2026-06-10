@@ -1,7 +1,7 @@
 package com.zlt.aps.cx.service.impl.validation;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.utils.StringUtils;
+import cn.hutool.core.util.StrUtil;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
@@ -83,9 +83,9 @@ public class MaterialValidationStrategy extends BaseValidationStrategy {
                         ? Arrays.asList(allMissing.iterator().next() + "...")
                         : allMissing);
             addError(result,
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.material.materialMissing"),
+                    StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.material.materialMissing"),
                             allMissing.size(), missingByMaterialCode.size(), missingByEmbryoCode.size()),
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.material.materialMissing.suggestion"), missingList));
+                    StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.material.materialMissing.suggestion"), missingList));
         }
 
         Set<String> materialsWithoutCode = materials.stream()
@@ -95,13 +95,13 @@ public class MaterialValidationStrategy extends BaseValidationStrategy {
 
         if (!materialsWithoutCode.isEmpty()) {
             addWarn(result,
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.material.codeMissing"), materialsWithoutCode.size()),
+                    StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.material.codeMissing"), materialsWithoutCode.size()),
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.material.codeMissing.suggestion"));
         }
 
         int coveredCount = requiredMaterials.size() - missingByMaterialCode.size() + requiredEmbryoCodes.size() - missingByEmbryoCode.size();
         addInfo(result,
-                StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.material.summary"), materials.size(), coveredCount),
+                StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.material.summary"), materials.size(), coveredCount),
                 null);
     }
 }

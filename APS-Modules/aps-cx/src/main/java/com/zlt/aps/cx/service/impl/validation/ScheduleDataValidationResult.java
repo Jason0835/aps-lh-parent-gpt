@@ -1,7 +1,7 @@
 package com.zlt.aps.cx.service.impl.validation;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.utils.StringUtils;
+import cn.hutool.core.util.StrUtil;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -70,13 +70,13 @@ public class ScheduleDataValidationResult implements Serializable {
             sb.append(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.summary.notPassed"));
         }
         if (errorCount > 0) {
-            sb.append(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.summary.errorCount"), errorCount));
+            sb.append(StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.summary.errorCount"), errorCount));
         }
         if (warnCount > 0) {
-            sb.append(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.summary.warnCount"), warnCount));
+            sb.append(StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.summary.warnCount"), warnCount));
         }
         if (infoCount > 0) {
-            sb.append(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.summary.infoCount"), infoCount));
+            sb.append(StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.summary.infoCount"), infoCount));
         }
         this.summary = sb.toString();
         return this.summary;

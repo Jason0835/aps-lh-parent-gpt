@@ -1,7 +1,7 @@
 package com.zlt.aps.cx.service.impl.validation;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.utils.StringUtils;
+import cn.hutool.core.util.StrUtil;
 import com.zlt.aps.cx.entity.config.CxParamConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
@@ -81,19 +81,19 @@ public class MaterialLhCapacityValidationStrategy extends BaseValidationStrategy
 
         if (!missingFromMap.isEmpty()) {
             addError(result,
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhCapacity.materialNotFound"), missingFromMap.size()),
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhCapacity.materialNotFound.suggestion"), String.join(", ", truncateList(missingFromMap))));
+                    StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhCapacity.materialNotFound"), missingFromMap.size()),
+                    StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhCapacity.materialNotFound.suggestion"), String.join(", ", truncateList(missingFromMap))));
         }
 
         if (!fieldNullOrZero.isEmpty()) {
             String list = String.join(", ", truncateList(fieldNullOrZero));
             addError(result,
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhCapacity.fieldNullOrZero"), fieldNullOrZero.size(), mode.getFieldName(), mode.getCode()),
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhCapacity.fieldNullOrZero.suggestion"), list, mode.getDesc(), mode.getFieldName()));
+                    StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhCapacity.fieldNullOrZero"), fieldNullOrZero.size(), mode.getFieldName(), mode.getCode()),
+                    StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhCapacity.fieldNullOrZero.suggestion"), list, mode.getDesc(), mode.getFieldName()));
         }
 
         addInfo(result,
-                StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhCapacity.summary"),
+                StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhCapacity.summary"),
                         requiredMaterials.size(), mode.getDesc(), mode.getCode(), validCount, missingFromMap.size() + fieldNullOrZero.size()),
                 null);
     }

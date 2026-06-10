@@ -1,6 +1,7 @@
 package com.zlt.aps.cx.controller;
 
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
@@ -382,7 +383,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             summary.setErrors(result.getValidationErrors());
             summary.setWarnings(result.getValidationWarnings());
             return AjaxResult.error(
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.scheduleFailedSummary"),
+                    StrUtil.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.scheduleFailedSummary"),
                             dto.getScheduleDate(), summary.getErrorCount(), summary.getWarningCount()),
                     summary);
         }
