@@ -56,6 +56,7 @@ const store = new Vuex.Store({
     cut90,
     fiberPress,
     steelPress,
+    dj,
     //密炼
     mix,
   },

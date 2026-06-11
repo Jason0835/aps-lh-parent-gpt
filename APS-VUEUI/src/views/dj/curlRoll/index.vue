@@ -21,22 +21,22 @@
       <template slot="header">
         <el-button
           type="primary"
-          v-hasPermi="['nc:curlRoll:add']"
+          v-hasPermi="['dj:curlRoll:add']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
         >
         <!-- <el-button
           type="warning"
-          v-hasPermi="['nc:curlRoll:edit']"
+          v-hasPermi="['dj:curlRoll:edit']"
           @click="handleEdit(selection[0])"
           >{{ $t("ui.frame.btn.modify") }}</el-button
         > -->
         <el-button
-          v-hasPermi="['nc:curlRoll:import']"
+          v-hasPermi="['dj:curlRoll:import']"
           @click="$refs.tltUpload.handleImport()"
           >{{ $t("ui.frame.btn.import") }}</el-button
         >
-        <el-button @click="handleExport" v-hasPermi="['nc:curlRoll:export']">{{
+        <el-button @click="handleExport" v-hasPermi="['dj:curlRoll:export']">{{
           $t("ui.frame.btn.export")
         }}</el-button>
       </template>
@@ -44,8 +44,8 @@
     <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
     <tlt-upload
       ref="tltUpload"
-      downloadUrl="/nc/curlRoll/importTemplate"
-      uploadUrl="/nc/curlRoll/importData"
+      downloadUrl="/dj/curlRoll/importTemplate"
+      uploadUrl="/dj/curlRoll/importData"
       @uploadSuccess="getList"
     />
     <infoDialog ref="infoRef" @success="getList" />
@@ -57,14 +57,14 @@ import { mapState } from "vuex";
 //utils
 import { downloadLink } from "@/utils/request";
 //interface
-import { listCurlRoll, removeCurlRoll } from "@/api/nc/curlRoll";
+import { listCurlRoll, removeCurlRoll } from "@/api/dj/curlRoll";
 //components
 import tltUpload from "@/components/tltUpload/tltUpload.vue";
 
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
-  name: "InsideLinerCurlRoll",
+  name: "djCurlRoll",
   components: {
     tltUpload,
     infoDialog,
@@ -104,17 +104,17 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
-          prop: "liningCode",
+          prop: "paddingCode",
           align: "center",
           halign: "center",
-          label: this.$t("ui.data.column.quota.liningCode"),
+          label: this.$t("ui.dj.curlRoll.column.paddingCode"),
           sortable: true,
         },
         {
           prop: "curlLength",
           align: "center",
           halign: "center",
-          label: this.$t("ui.curlRoll.column.length"),
+          label: this.$t("ui.dj.curlRoll.column.curlLength"),
           sortable: true,
           type: "number",
         },
@@ -160,8 +160,8 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.quota.liningCode"),
-          prop: "liningCode",
+          label: this.$t("ui.dj.curlRoll.column.paddingCode"),
+          prop: "paddingCode",
         },
       ];
     },
@@ -225,7 +225,7 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/nc/curlRoll/export", this.formatParams(false));
+      downloadLink("/dj/curlRoll/export", this.formatParams(false));
     },
 
     // utils
@@ -263,9 +263,6 @@ export default {
     },
   },
   created() {
-    this.$store.dispatch("tread/getMachineList");
-  },
-  activated() {
     this.getList();
   },
 };
