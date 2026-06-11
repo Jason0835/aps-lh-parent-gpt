@@ -58,6 +58,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
@@ -161,6 +162,15 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     public LhScheduleResponseDTO executeSchedule(@RequestBody LhScheduleRequestDTO request) {
         log.info("收到排程请求, 工厂: {}, 日期: {}", request.getFactoryCode(), LhScheduleTimeUtil.formatDate(request.getScheduleDate()));
         return lhScheduleService.executeSchedule(request);
+    }
+
+    /**
+     * 处理分布式锁获取失败的异常，返回前端可识别的 LhScheduleResponseDTO 格式
+     */
+    @ExceptionHandler(RuntimeException.class)
+    public LhScheduleResponseDTO handleDistributedLockException(RuntimeException e) {
+        log.warn("分布式锁获取失败: {}", e.getMessage());
+        return LhScheduleResponseDTO.fail(e.getMessage());
     }
 
     /**
