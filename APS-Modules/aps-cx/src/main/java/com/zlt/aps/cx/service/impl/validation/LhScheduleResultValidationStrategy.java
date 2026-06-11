@@ -1,6 +1,5 @@
 package com.zlt.aps.cx.service.impl.validation;
 
-import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.zlt.aps.cx.api.domain.entity.CxStructureTreadConfig;
 import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
@@ -100,7 +99,7 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
                 hasError = true;
                 List<String> samples = missingSampleMap.get(field);
                 String sampleList = samples.isEmpty() ? "无" : String.join(", ", samples);
-                String message = StringUtils.format(
+                String message = String.format(
                         I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.fieldMissing"),
                         missingCount, fieldName, field, sampleList);
                 errorMessages.add(message);
@@ -110,13 +109,13 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
 
         if (!hasError) {
             addInfo(result,
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.complete"), totalCount),
+                    String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.complete"), totalCount),
                     null);
         } else {
             long missingFields = errorMessages.size();
             long totalMissing = missingCountMap.values().stream().mapToInt(Integer::intValue).sum();
             addInfo(result,
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.summary"), missingFields, totalMissing),
+                    String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.summary"), missingFields, totalMissing),
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.summary.suggestion"));
         }
 
@@ -156,14 +155,14 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
         }
 
         if (!missingMaterials.isEmpty()) {
-            String message = StringUtils.format(
+            String message = String.format(
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.materialMissing"),
                     missingMaterials.size(), String.join(", ", missingMaterials));
             addError(result, message,
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.materialMissing.suggestion"));
         } else {
             addInfo(result,
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.materialInfoComplete"),
+                    String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.materialInfoComplete"),
                             configuredMaterialCodes.size(), lhMaterialCodes.size()),
                     null);
         }
@@ -197,14 +196,14 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
         }
 
         if (!missingStructures.isEmpty()) {
-            String message = StringUtils.format(
+            String message = String.format(
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureMissing"),
                     missingStructures.size(), String.join(", ", missingStructures));
             addError(result, message,
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureMissing.suggestion"));
         } else {
             addInfo(result,
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureAllocationComplete"),
+                    String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureAllocationComplete"),
                             structureAllocationMap.size(), lhStructures.size()),
                     null);
         }
@@ -248,14 +247,14 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
         }
 
         if (!missingStructures.isEmpty()) {
-            String message = StringUtils.format(
+            String message = String.format(
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureTreadMissing"),
                     missingStructures.size(), String.join(", ", missingStructures));
             addError(result, message,
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureTreadMissing.suggestion"));
         } else {
             addInfo(result,
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureTreadConfigComplete"),
+                    String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.structureTreadConfigComplete"),
                             configuredStructures.size(), lhStructures.size()),
                     null);
         }

@@ -1,7 +1,6 @@
 package com.zlt.aps.cx.service.impl.validation;
 
 import com.ruoyi.common.i18n.utils.I18nUtil;
-import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.cx.vo.ScheduleContextVo;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
@@ -43,7 +42,7 @@ public class MoldingMachineValidationStrategy extends BaseValidationStrategy {
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.noActive.suggestion"));
         } else if (activeCount < machines.size()) {
             addWarn(result,
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.partialInactive"), activeCount, machines.size()),
+                    String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.partialInactive"), activeCount, machines.size()),
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.partialInactive.suggestion"));
         }
 
@@ -53,12 +52,12 @@ public class MoldingMachineValidationStrategy extends BaseValidationStrategy {
 
         if (validCount < machines.size()) {
             addWarn(result,
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.missingCode"), validCount, machines.size()),
+                    String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.missingCode"), validCount, machines.size()),
                     I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.missingCode.suggestion"));
         }
 
         addInfo(result,
-                StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.summary"), machines.size(), activeCount),
+                String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.machine.summary"), machines.size(), activeCount),
                 null);
     }
 }

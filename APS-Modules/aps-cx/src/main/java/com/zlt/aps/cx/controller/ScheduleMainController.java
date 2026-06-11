@@ -382,7 +382,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             summary.setErrors(result.getValidationErrors());
             summary.setWarnings(result.getValidationWarnings());
             return AjaxResult.error(
-                    StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.scheduleFailedSummary"),
+                    String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.scheduleFailedSummary"),
                             dto.getScheduleDate(), summary.getErrorCount(), summary.getWarningCount()),
                     summary);
         }
@@ -1061,7 +1061,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                 BigDecimal newTime = newPlanQtys[i].multiply(singleTireTime);
                 BigDecimal adjustedTotal = existingTime[i].subtract(oldTime).add(newTime);
                 if (adjustedTotal.compareTo(shiftTotalSeconds) > 0) {
-                    return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.failed.timeExceeded"),
+                    return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.failed.timeExceeded"),
                             shiftNames[i], formatSeconds(adjustedTotal), formatSeconds(shiftTotalSeconds)));
                 }
             }
@@ -1151,11 +1151,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             }
 
             if (isShiftPast(i, scheduleLocalDate, now, configMap)) {
-                return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.shiftNotAdjustable"), shiftNames[i]));
+                return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.shiftNotAdjustable"), shiftNames[i]));
             }
 
             if (finishQtys[i] != null && planQtys[i].compareTo(finishQtys[i]) < 0) {
-                return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.belowFinishQty"), shiftNames[i], finishQtys[i]));
+                return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.adjustQuantity.belowFinishQty"), shiftNames[i], finishQtys[i]));
             }
         }
 
@@ -1295,11 +1295,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             // 检查不可作业结构
             if (vo.getStructureName() != null
                     && machineFixed.getSplitDisableStructure().contains(vo.getStructureName())) {
-                return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.specNotMatchMachine"), vo.getCxMachineCode()));
+                return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.specNotMatchMachine"), vo.getCxMachineCode()));
             }
             if (vo.getMaterialCode() != null
                     && machineFixed.getSplitDisableMaterialCode().contains(vo.getMaterialCode())) {
-                return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.specNotMatchMachine"), vo.getCxMachineCode()));
+                return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.insertOrder.specNotMatchMachine"), vo.getCxMachineCode()));
             }
         }
 
@@ -1598,7 +1598,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             if (scheduleLocalDate.isBefore(now.toLocalDate())) {
                 return AjaxResult.error("<b>" + I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.failed") + "</b><br/>"
                         + record.getEmbryoCode() + " / " + (record.getMaterialCode() != null ? record.getMaterialCode() : "")
-                        + " - " + StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.failed.historyDate"), DateUtil.formatDate(record.getScheduleDate())));
+                        + " - " + String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.failed.historyDate"), DateUtil.formatDate(record.getScheduleDate())));
             }
 
             boolean hasTransferableShift = false;
@@ -1611,7 +1611,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             if (!hasTransferableShift) {
                 return AjaxResult.error("<b>" + I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.failed") + "</b><br/>"
                         + record.getEmbryoCode() + " / " + (record.getMaterialCode() != null ? record.getMaterialCode() : "")
-                        + " - " + StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.failed.noTransferableShift"), DateUtil.formatDate(record.getScheduleDate())));
+                        + " - " + String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.failed.noTransferableShift"), DateUtil.formatDate(record.getScheduleDate())));
             }
 
             // 校验新机台唯一性（排程日期 + 新机台 + 胎胚 + 物料）
@@ -1641,7 +1641,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                         .eq("CX_MACHINE_CODE", vo.getNewMachineCode())
                         .eq("IS_ACTIVE", 1));
         if (newMachine == null) {
-            return AjaxResult.error(StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.newMachineNotFound"), vo.getNewMachineCode()));
+            return AjaxResult.error(String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.newMachineNotFound"), vo.getNewMachineCode()));
         }
 
         // 产能校验（未确认时返回提示不强制拦截，已确认时跳过直接执行）
@@ -1741,7 +1741,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             for (int i = 1; i <= 8; i++) {
                 BigDecimal totalTime = existingTime[i].add(transferTime[i]);
                 if (totalTime.compareTo(shiftTotalSeconds) > 0) {
-                    return StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.capacityWarning"),
+                    return String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.transferMachine.capacityWarning"),
                             newMachineCode, DateUtil.formatDate(scheduleDate) + shiftNames[i], "",
                             formatSeconds(existingTime[i]), formatSeconds(transferTime[i]), formatSeconds(totalTime));
                 }
@@ -2136,7 +2136,7 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
                 maxInsertQty = remainingSeconds.divide(insertSingleTireTime, 0, RoundingMode.FLOOR);
             }
             if (planQtys[i].compareTo(maxInsertQty) > 0) {
-                return StringUtils.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.capacityExceeded"),
+                return String.format(I18nUtil.getMessage("ui.data.column.cxScheduleResult.capacityExceeded"),
                         shiftNames[i], formatSeconds(existingTimeSeconds[i]),
                         formatSeconds(remainingSeconds), maxInsertQty, planQtys[i]);
             }
