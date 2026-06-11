@@ -56,14 +56,14 @@ public class CxScheFinishQtyServiceImpl extends AbstractDocService<CxScheFinishQ
      * 成型排程完成量回写成型排程结果表各班次完成量
      * <p>
      * 业务规则（同硫化排程完成量回写逻辑）：
-     * 1. 完成量回报表(T_CX_SCHE_FINISH_QTY)按机台+物料+排程日期汇总夜早中完成量
+     * 1. 完成量回报表(T_CX_SCHE_FINISH_QTY)按工厂+机台+胎胚+排程日期汇总夜早中完成量
      * 2. 排程结果表(T_CX_SCHEDULE_RESULT)的8班对应3天窗口：
      *    1~2班对应D-2的早中，3~5班对应D-1的夜早中，6~8班对应D的夜早中
      * 3. 回报日期D的完成量需要更新排程日期为D、D+1、D+2的排程结果：
      *    - 排程日期D：6班(夜)=MES1班，7班(早)=MES2班，8班(中)=MES3班
      *    - 排程日期D+1：3班(夜)=MES1班，4班(早)=MES2班，5班(中)=MES3班
      *    - 排程日期D+2：1班(早)=MES2班，2班(中)=MES3班
-     * 4. 排程结果维度：工厂+机台编码+物料编码+排程日期
+     * 4. 排程结果维度：工厂+机台编码+胎胚编码+排程日期
      * </p>
      *
      * @param finishQtyList 完成量回报数据列表
@@ -87,7 +87,7 @@ public class CxScheFinishQtyServiceImpl extends AbstractDocService<CxScheFinishQ
             CxScheFinishQty summary = entry.getValue();
             Date scheduleDate = summary.getScheduleDate();
             if (scheduleDate == null) {
-                log.warn("【成型完成量回写】排程日期为空，跳过，机台：{}，物料：{}", summary.getCxMachineCode(), summary.getMaterialCode());
+                log.warn("【成型完成量回写】排程日期为空，跳过，机台：{}，胎胚：{}", summary.getCxMachineCode(), summary.getEmbryoCode());
                 continue;
             }
 
@@ -104,13 +104,12 @@ public class CxScheFinishQtyServiceImpl extends AbstractDocService<CxScheFinishQ
             queryWrapper.eq(CxScheduleResult::getFactoryCode, summary.getFactoryCode());
             queryWrapper.eq(CxScheduleResult::getCxMachineCode, summary.getCxMachineCode());
             queryWrapper.eq(CxScheduleResult::getEmbryoCode, summary.getEmbryoCode());
-            queryWrapper.eq(CxScheduleResult::getMaterialCode, summary.getMaterialCode());
             queryWrapper.in(CxScheduleResult::getScheduleDate, Arrays.asList(dateD, dateD1, dateD2));
             List<CxScheduleResult> resultList = cxScheduleResultMapper.selectList(queryWrapper);
 
             if (CollectionUtils.isEmpty(resultList)) {
-                log.info("【成型完成量回写】未找到排程结果数据，工厂：{}，机台：{}，物料：{}，日期范围：{}~{}",
-                        summary.getFactoryCode(), summary.getCxMachineCode(), summary.getMaterialCode(),
+                log.info("【成型完成量回写】未找到排程结果数据，工厂：{}，机台：{}，胎胚：{}，日期范围：{}~{}",
+                        summary.getFactoryCode(), summary.getCxMachineCode(), summary.getEmbryoCode(),
                         DateUtil.formatDate(dateD), DateUtil.formatDate(dateD2));
                 continue;
             }
@@ -158,11 +157,11 @@ public class CxScheFinishQtyServiceImpl extends AbstractDocService<CxScheFinishQ
     }
 
     /**
-     * 按工厂+机台+物料+排程日期汇总完成量
+     * 按工厂+机台+胎胚+排程日期汇总完成量
      * 将同一维度下的多条夜早中记录合并成一条
      *
      * @param finishQtyList 完成量原始列表
-     * @return 汇总后的Map，key=工厂|机台|物料|排程日期
+     * @return 汇总后的Map，key=工厂|机台|胎胚|排程日期
      */
     private Map<String, CxScheFinishQty> summarizeFinishQty(List<CxScheFinishQty> finishQtyList) {
         Map<String, CxScheFinishQty> summaryMap = new LinkedHashMap<>();
@@ -182,10 +181,10 @@ public class CxScheFinishQtyServiceImpl extends AbstractDocService<CxScheFinishQ
     }
 
     /**
-     * 构建汇总Key：工厂|机台|物料|排程日期
+     * 构建汇总Key：工厂|机台|胎胚|排程日期
      */
     private String buildSummaryKey(CxScheFinishQty item) {
-        return item.getFactoryCode() + "|" + item.getCxMachineCode() + "|" + item.getMaterialCode() + "|" + DateUtil.formatDate(item.getScheduleDate());
+        return item.getFactoryCode() + "|" + item.getCxMachineCode() + "|" + item.getEmbryoCode() + "|" + DateUtil.formatDate(item.getScheduleDate());
     }
 
     /**

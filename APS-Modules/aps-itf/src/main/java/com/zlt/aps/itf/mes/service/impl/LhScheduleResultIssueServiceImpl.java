@@ -53,10 +53,10 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
     /**
      * 下发硫化排程结果到MES
      * 业务规则：
-     * 每条硫化排程结果自带8班数据，覆盖排程日期前2天到排程日期当天：
-     * 1. T-2日（窗口首日）数据：更新（仅更新早中班，不覆盖夜班），不存在则插入
-     * 2. T-1日（窗口次日）数据：更新（存在则更新，不存在则插入），包含夜早中3班
-     * 3. T日（排程日期当天）数据：先删除后插入，包含夜早中3班
+     * 每条硫化排程结果自带8班数据，覆盖排程窗口T日到T+2日三天（排程日期为T+1日）：
+     * 1. 窗口首日（T日，排程日期前一天）数据：更新（仅更新早中班，不覆盖夜班），不存在则插入
+     * 2. 窗口次日（T+1日，排程日期当天）数据：更新（存在则更新，不存在则插入），包含夜早中3班
+     * 3. 窗口第三日（T+2日，排程日期后一天）数据：先删除后插入，包含夜早中3班
      * 日期从下发数据中推导，不再依赖LocalDate.now()
      *
      * @param lhScheduleResultIssueList 硫化排程结果列表
@@ -193,9 +193,9 @@ public class LhScheduleResultIssueServiceImpl implements ILhScheduleResultIssueS
     }
 
     /**
-     * T-2日（窗口首日）更新或插入数据
+     * 窗口首日（T日，排程日期前一天）更新或插入数据
      * 仅更新早中班（class2、class3），不覆盖夜班（class1）数据
-     * T-2日无夜班排产数据，避免将MES已有的夜班数据覆盖为空
+     * 窗口首日无夜班排产数据，避免将MES已有的夜班数据覆盖为空
      * 中间表MES_LH_SCHEDULE_RESULT建在MES分库，Mapper已通过@DS(DataSource.MES)指定数据源
      */
     private void upsertDay1LhScheduleResult(List<MesLhScheduleResult> mesList, String dataVersion) {

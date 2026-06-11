@@ -890,9 +890,11 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         LocalDate scheduleLocalDate = scheduleDate instanceof java.sql.Date
                 ? ((java.sql.Date) scheduleDate).toLocalDate()
                 : scheduleDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
-        LocalDate day1 = scheduleLocalDate.minusDays(LhScheduleConstant.SCHEDULE_DAYS - 1);
-        LocalDate day2 = scheduleLocalDate.minusDays(LhScheduleConstant.SCHEDULE_DAYS - 2);
-        LocalDate day3 = scheduleLocalDate;
+        // 排程日期为T+1日，排程窗口为T、T+1、T+2三天
+        // day1=窗口首日(T日)=scheduleDate-1，day2=窗口次日(T+1日)=scheduleDate，day3=窗口第三日(T+2日)=scheduleDate+1
+        LocalDate day1 = scheduleLocalDate.minusDays(LhScheduleConstant.SCHEDULE_DAYS - 2);
+        LocalDate day2 = scheduleLocalDate;
+        LocalDate day3 = scheduleLocalDate.plusDays(1);
 
         List<LhScheduleResult> scheduleResultList;
         if (CollectionUtils.isNotEmpty(selectedIds)) {
@@ -1095,9 +1097,9 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
     /**
-     * 转换为T-2日（窗口首日）的下发实体
+     * 转换为窗口首日（T日，scheduleDate-1）的下发实体
      * 8班数据（2+3+3映射）：1班(早)、2班(中) -> 中间表：2班(早)=1班, 3班(中)=2班
-     * 业务规则：T-2日无夜班，只下发早中2班数据
+     * 业务规则：窗口首日无夜班，只下发早中2班数据
      * 使用aps-lh-api实体（有8班数据）
      */
     private LhScheduleResultIssue convertToDay1IssueEntity(LhScheduleResult source, LocalDate scheduleDate) {
@@ -1121,11 +1123,11 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setMesMaterialCode(null);
         target.setSpecCode(source.getSpecCode());
         target.setSpecDesc(source.getSpecDesc());
-        // T-2日日计划量 = 1班(早) + 2班(中)
+        // 窗口首日日计划量 = 1班(早) + 2班(中)
         int day1DailyPlanQty = safeAdd(source.getClass1PlanQty(), source.getClass2PlanQty());
         target.setDailyPlanQty(day1DailyPlanQty);
 
-        // T-2日无夜班，中间表1班(夜)不赋值
+        // 窗口首日无夜班，中间表1班(夜)不赋值
 
         // 示方类型：将施工阶段编码(01/02/03)转换为MES字典值(X/T/S)
         String exampleTypeMarkFlag = ConstructionStageEnum.getInstance(source.getConstructionStage()).getMarkFlag();
@@ -1156,7 +1158,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
     /**
-     * 转换为T-1日（窗口次日）的下发实体
+     * 转换为窗口次日（T+1日，排程日期当天）的下发实体
      * 8班数据（2+3+3映射）：3班(夜)、4班(早)、5班(中) -> 中间表：1班(夜)=3班, 2班(早)=4班, 3班(中)=5班
      * 业务规则：更新夜早中3班数据（存在则更新，不存在则插入）
      * 使用aps-lh-api实体（有8班数据）
@@ -1182,7 +1184,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setMesMaterialCode(null);
         target.setSpecCode(source.getSpecCode());
         target.setSpecDesc(source.getSpecDesc());
-        // T-1日日计划量 = 3班(夜) + 4班(早) + 5班(中)
+        // 窗口次日日计划量 = 3班(夜) + 4班(早) + 5班(中)
         int day2DailyPlanQty = safeAdd(source.getClass3PlanQty(), source.getClass4PlanQty(), source.getClass5PlanQty());
         target.setDailyPlanQty(day2DailyPlanQty);
 
@@ -1223,7 +1225,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
     /**
-     * 转换为T日（排程日期当天）的下发实体
+     * 转换为窗口第三日（T+2日，scheduleDate+1）的下发实体
      * 8班数据（2+3+3映射）：6班(夜)、7班(早)、8班(中) -> 中间表：1班(夜)=6班, 2班(早)=7班, 3班(中)=8班
      * 业务规则：更新夜早中3班数据（存在则更新，不存在则插入）
      * 使用aps-lh-api实体（有8班数据）
@@ -1249,7 +1251,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
         target.setMesMaterialCode(null);
         target.setSpecCode(source.getSpecCode());
         target.setSpecDesc(source.getSpecDesc());
-        // T日日计划量 = 6班(夜) + 7班(早) + 8班(中)
+        // 窗口第三日日计划量 = 6班(夜) + 7班(早) + 8班(中)
         int day3DailyPlanQty = safeAdd(source.getClass6PlanQty(), source.getClass7PlanQty(), source.getClass8PlanQty());
         target.setDailyPlanQty(day3DailyPlanQty);
 
