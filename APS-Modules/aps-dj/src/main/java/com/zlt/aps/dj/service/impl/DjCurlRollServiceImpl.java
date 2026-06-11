@@ -45,9 +45,7 @@ public class DjCurlRollServiceImpl extends AbstractDocService<DjCurlRoll> implem
                 entity.getFieldValueByFieldName("id"));
         queryWrapper.eq("FACTORY_CODE", entity.getFactoryCode());
         queryWrapper.eq("PADDING_CODE", entity.getPaddingCode());
-        List<DjCurlRoll> list = curlRollMapper.selectList(queryWrapper);
-
-        if (CollectionUtils.isNotEmpty(list)) {
+        if (curlRollMapper.exists(queryWrapper)) {
             return UserConstants.NOT_UNIQUE;
         }
         return UserConstants.UNIQUE;

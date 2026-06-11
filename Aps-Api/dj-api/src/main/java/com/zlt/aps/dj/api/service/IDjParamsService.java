@@ -1,48 +1,75 @@
 package com.zlt.aps.dj.api.service;
 
-import com.ruoyi.common.constant.ServiceNameConstants;
-import com.ruoyi.common.core.web.domain.AjaxResult;
-import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.dj.api.domain.dto.DjParamsDto;
+import java.util.List;
 
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-import java.util.List;
+import com.ruoyi.common.constant.ServiceNameConstants;
+import com.ruoyi.common.core.web.domain.AjaxResult;
+import com.ruoyi.common.core.web.page.TableDataInfo;
+import com.zlt.aps.dj.api.domain.entity.DjParams;
+
 
 /**
- * 垫胶参数对外暴露接口
- * @author 89875
+ * 垫胶参数信息Service接口
+ *
+ * @author zlt
+ * @date 2026-06-11
  */
-@FeignClient(contextId = "INcParamsService", value = ServiceNameConstants.GATEWAY_SERVICE, path="${api.path.dj:nc}")
-public interface IDjParamsService
-{
+@FeignClient(contextId = "IDjParamsService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
+public interface IDjParamsService {
 
     /**
-     * 查询垫胶参数信息列表
+     * 获取垫胶参数信息列表
+     *
+     * @param params
+     * @return
      */
     @PostMapping("/dj/params/list")
-    public TableDataInfo list(@RequestBody DjParamsDto dto);
+    TableDataInfo list(@RequestBody DjParams params);
 
     /**
-     * 获取垫胶参数信息详细信息
+     * 根据ID获取详细信息
+     *
+     * @param id
+     * @return
      */
-    @GetMapping("/dj/params/{id}")
-    public DjParamsDto getInfo(@PathVariable("id") Long id);
+    @GetMapping(value = "/dj/params/{id}")
+    AjaxResult getInfo(@PathVariable("id") Long id);
 
     /**
      * 修改垫胶参数信息
+     *
+     * @param params
+     * @return
      */
     @PostMapping("/dj/params/edit")
-    public AjaxResult edit(@RequestBody DjParamsDto dto);
+    AjaxResult edit(@Validated @RequestBody DjParams params);
 
     /**
-     * 导出接口
-     * @param dto
+     * 删除垫胶参数信息
+     *
+     * @param ids
+     * @return
      */
-    @PostMapping("/dj/params/exportData")
-    List<DjParamsDto> exportData(@RequestBody DjParamsDto dto);
+    @DeleteMapping("/dj/params/{ids}")
+    AjaxResult remove(@RequestBody List<Long> ids);
+
+    /**
+     * 校验唯一性
+     */
+    @PostMapping("/dj/params/checkUnique")
+    String checkUnique(@RequestBody DjParams params);
+
+    /**
+     * 根据参数编码查询垫胶参数信息
+     */
+    @PostMapping("/dj/params/getByParamCode")
+    DjParams getByParamCode(@RequestBody DjParams entity);
 }

@@ -1,34 +1,34 @@
 package com.zlt.aps.dj.service.impl;
 
 import java.util.List;
-import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
-import com.zlt.aps.dj.api.domain.dto.DjParamsDto;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.mapper.DjParamsMapper;
 import com.zlt.aps.dj.service.DjParamsService;
+import com.zlt.common.utils.PubUtil;
 
 /**
  * 垫胶参数信息Service业务层处理
  *
  * @author zlt
- * @date 2026-05-25
+ * @date 2026-06-11
  */
 @Service
 public class DjParamsServiceImpl extends ServiceImpl<DjParamsMapper, DjParams> implements DjParamsService {
     @Autowired
-    private DjParamsMapper ncParamsMapper;
+    private DjParamsMapper paramsMapper;
 
     /**
      * 查询垫胶参数信息
@@ -39,9 +39,8 @@ public class DjParamsServiceImpl extends ServiceImpl<DjParamsMapper, DjParams> i
     @Override
     public DjParams selectParamsById(Long id) {
         LambdaQueryWrapper<DjParams> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(DjParams::getDelFlag, ApsConstant.DEL_FLAG_NORMAL);
         wrapper.eq(DjParams::getId, id);
-        return ncParamsMapper.selectOne(wrapper);
+        return paramsMapper.selectOne(wrapper);
     }
 
     /**
@@ -51,8 +50,14 @@ public class DjParamsServiceImpl extends ServiceImpl<DjParamsMapper, DjParams> i
      * @return 垫胶参数信息
      */
     @Override
-    public List<DjParamsDto> selectParamsList(DjParams params) {
-        return ncParamsMapper.listParams(params);
+    public List<DjParams> selectParamsList(DjParams params) {
+        QueryWrapper<DjParams> wrapper = new QueryWrapper<>();
+        wrapper.eq(StringUtils.isNotBlank(params.getFactoryCode()), "FACTORY_CODE", params.getFactoryCode());
+        wrapper.eq(StringUtils.isNotBlank(params.getProductTypeCode()), "PRODUCT_TYPE_CODE",
+                params.getProductTypeCode());
+        wrapper.eq(StringUtils.isNotBlank(params.getParamCode()), "PARAM_CODE", params.getParamCode());
+        wrapper.eq("IS_DELETE", ApsConstant.DEL_FLAG_NORMAL);
+        return paramsMapper.selectList(wrapper);
     }
 
     /**
@@ -63,26 +68,16 @@ public class DjParamsServiceImpl extends ServiceImpl<DjParamsMapper, DjParams> i
      */
     @Override
     public AjaxResult updateParams(DjParams params) {
-        //基本参数校验
-        if (!ObjectUtils.allNotNull(params.getId(), params.getParamCode(), params.getParamName(), params.getParamValue())) {
+        if (!ObjectUtils.allNotNull(params.getId(), params.getParamCode(), params.getParamName(),
+                params.getParamValue())) {
             return AjaxResult.error(I18nUtil.getMessage("ui.params.message.invalidParameter"));
         }
         String unique = checkParamsCodeUnique(params);
         if (UserConstants.NOT_UNIQUE.equals(unique)) {
             return AjaxResult.error(I18nUtil.getMessage("ui.params.message.unique"));
         }
-        //校验正则表达式
-        boolean regularResult = true;
-        String regularExpression = params.getRegularExpression();
-        if (StringUtils.isNotEmpty(regularExpression)) {
-            Pattern pattern = Pattern.compile(regularExpression);
-            regularResult = pattern.matcher(params.getParamValue()).matches();
-        }
-        if (regularResult) {
-            params.setBaseVale(params.getId());
-            ncParamsMapper.updateById(params);
-        }
-        return regularResult ? AjaxResult.success() : AjaxResult.error(params.getErrorTips());
+        paramsMapper.updateById(params);
+        return AjaxResult.success();
     }
 
     /**
@@ -93,12 +88,35 @@ public class DjParamsServiceImpl extends ServiceImpl<DjParamsMapper, DjParams> i
      */
     @Override
     public String checkParamsCodeUnique(DjParams params) {
-        //校验参数代码字段唯一性
         Long paramsId = StringUtils.isNull(params.getId()) ? -1L : params.getId();
-        DjParams info = ncParamsMapper.checkParamsCodeUnique(params.getParamCode(), paramsId);
-        if (StringUtils.isNotNull(info) && info.getId().longValue() != paramsId.longValue()) {
+
+        QueryWrapper<DjParams> queryWrapper = new QueryWrapper<>();
+        queryWrapper.ne(PubUtil.isNotEmpty(params.getFieldValueByFieldName("id")), "ID",
+                params.getFieldValueByFieldName("id"));
+        queryWrapper.eq("FACTORY_CODE", params.getFactoryCode());
+        queryWrapper.eq("PARAM_CODE", params.getParamCode());
+        if (paramsMapper.exists(queryWrapper)) {
             return UserConstants.NOT_UNIQUE;
         }
         return UserConstants.UNIQUE;
+    }
+
+    /**
+     * 根据条件查询垫胶参数
+     *
+     * @param factoryCode     工厂编码
+     * @param productTypeCode 产品品类
+     * @param paramCode       参数编码
+     * @return 垫胶参数信息
+     */
+    @Override
+    public DjParams getParamsByCondition(String factoryCode, String productTypeCode, String paramCode) {
+        LambdaQueryWrapper<DjParams> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DjParams::getFactoryCode, factoryCode);
+        wrapper.eq(DjParams::getProductTypeCode, productTypeCode);
+        wrapper.eq(DjParams::getParamCode, paramCode);
+        wrapper.eq(DjParams::getIsDelete, ApsConstant.DEL_FLAG_NORMAL);
+        List<DjParams> list = paramsMapper.selectList(wrapper);
+        return list.isEmpty() ? null : list.get(0);
     }
 }
