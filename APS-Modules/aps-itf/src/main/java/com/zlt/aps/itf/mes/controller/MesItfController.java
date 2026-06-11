@@ -604,8 +604,8 @@ public class MesItfController {
     @ApiOperation("按最新版本号同步硫化排程日完成量（临时任务，不限日期）")
     @PostMapping("/syncLhScheDayFinishQtyByLatestVersion")
     @AutoLoginLog
-    public AjaxResult syncLhScheDayFinishQtyByLatestVersion() {
-        return mesItfService.syncLhScheDayFinishQtyByLatestVersion();
+    public AjaxResult syncLhScheDayFinishQtyByLatestVersion(@RequestParam("dataVersion") String dataVersion) {
+        return mesItfService.syncLhScheDayFinishQtyByLatestVersion(dataVersion);
     }
 
     /**

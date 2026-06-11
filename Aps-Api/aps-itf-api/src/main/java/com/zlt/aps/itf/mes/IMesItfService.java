@@ -462,7 +462,7 @@ public interface IMesItfService {
      */
     @ApiOperation("按最新版本号同步硫化排程日完成量（临时任务，不限日期）")
     @PostMapping("/mesItf/syncLhScheDayFinishQtyByLatestVersion")
-    public AjaxResult syncLhScheDayFinishQtyByLatestVersion();
+    public AjaxResult syncLhScheDayFinishQtyByLatestVersion(@RequestParam("dataVersion") String dataVersion);
 
     @ApiOperation("按上一天最新版本号同步硫化排程完成量（临时任务）")
     @PostMapping("/mesItf/syncLhClassShiftFinishQtyByYesterday")

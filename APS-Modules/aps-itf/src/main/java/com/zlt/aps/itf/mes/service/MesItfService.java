@@ -273,7 +273,7 @@ public interface MesItfService {
      *
      * @return 结果
      */
-    AjaxResult syncLhScheDayFinishQtyByLatestVersion();
+    AjaxResult syncLhScheDayFinishQtyByLatestVersion(String dataVersion);
 
     /**
      * 模具交替计划下发到MES
