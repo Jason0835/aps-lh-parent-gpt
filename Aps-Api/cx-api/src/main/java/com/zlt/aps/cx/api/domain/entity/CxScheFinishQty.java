@@ -38,14 +38,6 @@ public class CxScheFinishQty extends BaseEntity implements Serializable {
     @TableField(value = "CX_MACHINE_CODE")
     private String cxMachineCode;
 
-    @ApiModelProperty(value = "物料编码（NC）")
-    @TableField(value = "MATERIAL_CODE")
-    private String materialCode;
-
-    @ApiModelProperty(value = "物料编码（MES）")
-    @TableField(value = "MES_MATERIAL_CODE")
-    private String mesMaterialCode;
-
     @ApiModelProperty(value = "一班(夜班)完成量")
     @TableField(value = "CLASS1_FINISH_QTY")
     private BigDecimal class1FinishQty;

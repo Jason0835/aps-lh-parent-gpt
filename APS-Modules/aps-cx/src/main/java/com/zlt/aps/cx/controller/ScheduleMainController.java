@@ -34,7 +34,6 @@ import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.entity.MdmCxMachineFixed;
 import com.zlt.aps.mp.api.domain.entity.MdmMoldingMachine;
 import com.zlt.aps.mp.api.domain.entity.MdmStructureLhRatio;
-import com.zlt.aps.mp.api.domain.entity.MdmMaterialInfo;
 import com.zlt.aps.mp.api.domain.entity.MdmSkuConstructionRef;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.cx.component.ScheduleExecutionGuard;
@@ -109,9 +108,6 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
 
     @Autowired
     private ScheduleExecutionGuard scheduleExecutionGuard;
-
-    @Resource
-    private MdmMaterialInfoMapper mdmMaterialInfoMapper;
 
     @Autowired
     private IImportLogService iImportLogService;
@@ -408,9 +404,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
      *   - T 日（排程日期）：下发夜早中3班（CLASS6→1班, CLASS7→2班, CLASS8→3班）
      *
      * 下发前数据补全（enrichMaterialAndExampleInfo）：
-     *   - MES物料编码：通过物料编码关联MdmMaterialInfo获取mesMaterialCode
-     *   - 成型示方号：通过物料编码关联MdmSkuConstructionRef获取embryoNo作为示方号，
+     *   - 成型示方号：通过胎胚编码+产品状态(trial_status字典)关联MdmSkuConstructionRef获取embryoNo作为示方号，
      *     同一个示方号回填到3个班
+     *   - 维度从机台+胎胚+物料改为机台+胎胚后，不再查询/设置MES物料编码
      *
      * @param dto 排程结果查询条件（含scheduleDate、factoryCode）
      * @param ids 选中的记录ID，多个以逗号分隔，为空时全量发布该日期下所有可发布记录
@@ -553,10 +549,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
-     * 补全MES物料编码和示方号
-     * 1. 通过物料编码关联物料信息表(MdmMaterialInfo)获取MES物料编码
-     * 2. 通过物料编码关联SKU与示方书关系表(MdmSkuConstructionRef)获取制造示方书号(embryoNo)作为成型示方号
+     * 补全示方号
+     * 通过胎胚编码关联SKU与示方书关系表(MdmSkuConstructionRef)，
+     * 按胎胚编码+产品状态(trial_status字典)匹配，取其中一条的制造示方书号(embryoNo)作为成型示方号
      * 3个班的示方号都取同一个值
+     * 注意：维度从机台+胎胚+物料改为机台+胎胚后，不再查询/设置MES物料编码
      *
      * @param issueList 成型排程结果下发列表
      */
@@ -565,28 +562,24 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             return;
         }
 
-        List<String> materialCodeList = issueList.stream()
-                .map(CxScheduleResultIssue::getMaterialCode)
+        // 收集胎胚编码，用于查询示方号
+        List<String> embryoCodeList = issueList.stream()
+                .map(CxScheduleResultIssue::getEmbryoCode)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .collect(Collectors.toList());
 
-        if (CollectionUtils.isEmpty(materialCodeList)) {
+        if (CollectionUtils.isEmpty(embryoCodeList)) {
             return;
         }
 
-        Map<String, String> materialCodeToMesCodeMap = getMaterialCodeToMesCodeMap(materialCodeList);
-        Map<String, String> materialCodeToCxNoMap = getMaterialCodeToCxNoMap(materialCodeList);
+        // 通过胎胚编码+产品状态查询制造示方书号
+        Map<String, String> embryoCodeToCxNoMap = getEmbryoCodeToCxNoMap(embryoCodeList);
 
         for (CxScheduleResultIssue item : issueList) {
-            String materialCode = item.getMaterialCode();
-            if (StringUtils.isNotBlank(materialCode)) {
-                String mesMaterialCode = materialCodeToMesCodeMap.get(materialCode);
-                if (StringUtils.isNotBlank(mesMaterialCode)) {
-                    item.setMesMaterialCode(mesMaterialCode);
-                }
-
-                String cxNo = materialCodeToCxNoMap.get(materialCode);
+            String embryoCode = item.getEmbryoCode();
+            if (StringUtils.isNotBlank(embryoCode)) {
+                String cxNo = embryoCodeToCxNoMap.get(embryoCode);
                 if (StringUtils.isNotBlank(cxNo)) {
                     item.setClass1ExampleNo(cxNo);
                     item.setClass2ExampleNo(cxNo);
@@ -597,50 +590,23 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
     }
 
     /**
-     * 获取物料编码到MES物料编码的映射
+     * 获取胎胚编码到成型示方号的映射
+     * 通过胎胚编码关联SKU与示方书关系表(MdmSkuConstructionRef)，
+     * 按胎胚编码+产品状态(trial_status字典)匹配，取其中一条的制造示方书号(embryoNo)作为成型示方号
      *
-     * @param materialCodeList 物料编码列表
-     * @return 物料编码 -> MES物料编码的映射
+     * @param embryoCodeList 胎胚编码列表
+     * @return 胎胚编码 -> 成型示方号的映射
      */
-    private Map<String, String> getMaterialCodeToMesCodeMap(List<String> materialCodeList) {
-        if (CollectionUtils.isEmpty(materialCodeList)) {
-            return new HashMap<>();
-        }
-
-        LambdaQueryWrapper<MdmMaterialInfo> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.in(MdmMaterialInfo::getMaterialCode, materialCodeList)
-                .select(MdmMaterialInfo::getMaterialCode, MdmMaterialInfo::getMesMaterialCode);
-
-        List<MdmMaterialInfo> materialInfoList = mdmMaterialInfoMapper.selectList(queryWrapper);
-
-        if (CollectionUtils.isEmpty(materialInfoList)) {
-            return new HashMap<>();
-        }
-
-        return materialInfoList.stream()
-                .filter(item -> StringUtils.isNotBlank(item.getMesMaterialCode()))
-                .collect(Collectors.toMap(
-                        MdmMaterialInfo::getMaterialCode,
-                        MdmMaterialInfo::getMesMaterialCode,
-                        (v1, v2) -> v1
-                ));
-    }
-
-    /**
-     * 获取物料编码到成型示方号的映射
-     * 通过物料编码关联SKU与示方书关系表(MdmSkuConstructionRef)获取制造示方书号(embryoNo)作为成型示方号
-     *
-     * @param materialCodeList 物料编码列表
-     * @return 物料编码 -> 成型示方号的映射
-     */
-    private Map<String, String> getMaterialCodeToCxNoMap(List<String> materialCodeList) {
-        if (CollectionUtils.isEmpty(materialCodeList)) {
+    private Map<String, String> getEmbryoCodeToCxNoMap(List<String> embryoCodeList) {
+        if (CollectionUtils.isEmpty(embryoCodeList)) {
             return new HashMap<>();
         }
 
         LambdaQueryWrapper<MdmSkuConstructionRef> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.in(MdmSkuConstructionRef::getMaterialCode, materialCodeList)
-                .select(MdmSkuConstructionRef::getMaterialCode, MdmSkuConstructionRef::getEmbryoNo);
+        queryWrapper.in(MdmSkuConstructionRef::getEmbryoCode, embryoCodeList)
+                .isNotNull(MdmSkuConstructionRef::getEmbryoNo)
+                .select(MdmSkuConstructionRef::getEmbryoCode, MdmSkuConstructionRef::getEmbryoNo,
+                        MdmSkuConstructionRef::getTrialStatus);
 
         List<MdmSkuConstructionRef> constructionRefList = mdmSkuConstructionRefMapper.selectList(queryWrapper);
 
@@ -648,10 +614,11 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
             return new HashMap<>();
         }
 
+        // 按胎胚编码分组，每组取产品状态(trialStatus)匹配trial_status字典的第一条记录的示方号
         return constructionRefList.stream()
                 .filter(item -> StringUtils.isNotBlank(item.getEmbryoNo()))
                 .collect(Collectors.toMap(
-                        MdmSkuConstructionRef::getMaterialCode,
+                        MdmSkuConstructionRef::getEmbryoCode,
                         MdmSkuConstructionRef::getEmbryoNo,
                         (v1, v2) -> v1
                 ));
@@ -755,9 +722,9 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         target.setLhMachineName(source.getLhMachineName());
         target.setAvailableMoldQty(source.getLhMachineQty());
 
-        // 物料信息
-        target.setMaterialCode(source.getMaterialCode());
-        target.setMesMaterialCode(null); // MES物料编码需要另外查询
+        // 物料信息（维度从机台+胎胚+物料改为机台+胎胚后，不再传物料编码和MES物料编码）
+        target.setMaterialCode(null);
+        target.setMesMaterialCode(null);
         target.setSpecDesc(source.getMaterialDesc());
         target.setEmbryoCode(source.getEmbryoCode());
         target.setEmbryoSpecDesc(null); // 胎胚物料描述需要另外查询
@@ -814,8 +781,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         target.setLhMachineName(source.getLhMachineName());
         target.setAvailableMoldQty(source.getLhMachineQty());
 
-        // 物料信息
-        target.setMaterialCode(source.getMaterialCode());
+        // 物料信息（维度从机台+胎胚+物料改为机台+胎胚后，不再传物料编码和MES物料编码）
+        target.setMaterialCode(null);
         target.setMesMaterialCode(null);
         target.setSpecDesc(source.getMaterialDesc());
         target.setEmbryoCode(source.getEmbryoCode());
@@ -873,8 +840,8 @@ public class ScheduleMainController extends AbstractDocBizController<CxScheduleR
         target.setLhMachineName(source.getLhMachineName());
         target.setAvailableMoldQty(source.getLhMachineQty());
 
-        // 物料信息
-        target.setMaterialCode(source.getMaterialCode());
+        // 物料信息（维度从机台+胎胚+物料改为机台+胎胚后，不再传物料编码和MES物料编码）
+        target.setMaterialCode(null);
         target.setMesMaterialCode(null);
         target.setSpecDesc(source.getMaterialDesc());
         target.setEmbryoCode(source.getEmbryoCode());

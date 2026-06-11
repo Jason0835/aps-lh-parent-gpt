@@ -29,11 +29,8 @@
 </template>
 
 <script>
-import moment from "moment";
-
 import infoForm from "@/views/components/infoForm.vue";
-
-import { editParams } from "@/api/nc/params";
+import { addParams, editParams } from "@/api/dj/params";
 
 export default {
   components: { infoForm },
@@ -42,31 +39,16 @@ export default {
       loading: false,
       visible: false,
       isEdit: false,
-      editType: null,
       form: {},
       rules: {
-        rangeName: [
+        paramCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
             trigger: "blur",
           },
         ],
-        closeOutRangeMinimum: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
-        closeOutRangeMaximum: [
-          {
-            required: true,
-            message: this.$t("common.rule.input"),
-            trigger: "blur",
-          },
-        ],
-        rangeValue: [
+        paramName: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -76,39 +58,56 @@ export default {
       },
       columns: [
         {
-          label: this.$t("ui.data.column.paramsCode"),
+          label: this.$t("ui.dj.params.column.factoryCode"),
+          prop: "factoryCode",
+          span: 12,
+          maxlength: "50",
+          required: true,
+          disabled: false,
+        },
+        {
+          label: this.$t("ui.dj.params.column.productTypeCode"),
+          prop: "productTypeCode",
+          span: 12,
+          maxlength: "50",
+          required: false,
+        },
+        {
+          label: this.$t("ui.dj.params.column.paramCode"),
           prop: "paramCode",
-          span: 24,
+          span: 12,
           maxlength: "100",
           required: true,
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.paramsName"),
+          label: this.$t("ui.dj.params.column.paramName"),
           prop: "paramName",
-          span: 24,
+          span: 12,
           maxlength: "100",
           required: true,
           disabled: true,
         },
         {
-          label: this.$t("ui.data.column.paramsValue"),
+          label: this.$t("ui.dj.params.column.dataType"),
+          prop: "dataType",
+          span: 12,
+          required: false,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.dj.params.column.defauleValue"),
+          prop: "defauleValue",
+          span: 12,
+          required: false,
+          disabled: true,
+        },
+        {
+          label: this.$t("ui.dj.params.column.paramValue"),
           prop: "paramValue",
           span: 24,
           required: false,
         },
-        // {
-        //   label: this.$t("ui.data.column.errorTips"),
-        //   prop: "errorTips",
-        //   span: 24,
-        //   required: false,
-        // },
-        // {
-        //   label: this.$t("ui.data.column.regular"),
-        //   prop: "regular",
-        //   span: 24,
-        //   required: true,
-        // },
         {
           label: this.$t("ui.common.column.remark"),
           prop: "remark",
@@ -125,21 +124,23 @@ export default {
         (this.isEdit
           ? this.$t("common.button.edit")
           : this.$t("common.button.add")) +
-        this.$t("ui.data.column.nc.params.modelName")
+        this.$t("ui.dj.params.column.modalName")
       );
     },
   },
   methods: {
-    // api
     async save(params) {
       try {
         this.loading = true;
-
-        const res = await editParams(params);
+        let res;
+        if (this.isEdit) {
+          res = await editParams(params);
+        } else {
+          res = await addParams(params);
+        }
         this.$modal.msgSuccess(res.msg);
         this.$emit("success");
         this.hide();
-
         this.loading = false;
       } catch (error) {
         console.log(error);
@@ -147,7 +148,6 @@ export default {
       }
     },
 
-    //utils
     show(data) {
       this.visible = true;
       if (data) {
@@ -160,7 +160,6 @@ export default {
     hide() {
       this.form = {};
       this.$refs.form.triggerResetForm();
-      // this.resetForm("infoForm");
       this.isEdit = false;
       this.visible = false;
     },

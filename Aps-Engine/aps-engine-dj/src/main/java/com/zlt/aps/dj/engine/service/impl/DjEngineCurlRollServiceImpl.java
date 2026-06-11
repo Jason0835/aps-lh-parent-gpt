@@ -26,7 +26,7 @@ public class DjEngineCurlRollServiceImpl implements DjEngineCurlRollService {
 	public Map<String, BigDecimal> getNcCurlLengthMap() {
 		List<DjCurlRoll> curlRollList = ncEngineCurlRollMapper.getNcCurlRollList();
 		Map<String, BigDecimal> curlLengthMap = curlRollList.stream().filter(item -> item.getCurlLength() != null)
-				.collect(Collectors.toMap(DjCurlRoll::getLiningCode, DjCurlRoll::getCurlLength, (m1, m2) -> m1));
+				.collect(Collectors.toMap(DjCurlRoll::getPaddingCode, DjCurlRoll::getCurlLength, (m1, m2) -> m1));
 		return curlLengthMap;
 	}
 }

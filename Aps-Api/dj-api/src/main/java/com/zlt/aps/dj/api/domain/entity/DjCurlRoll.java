@@ -39,23 +39,15 @@ public class DjCurlRoll extends BaseEntity implements Serializable {
     @TableField(value = "FACTORY_CODE")
     private String factoryCode;
 
-    @ApiModelProperty(value = "垫胶编号")
-    @TableField("LINING_CODE")
-    private String liningCode;
+    @ApiModelProperty(value = "垫胶代码")
+    @Excel(name="ui.dj.curlRoll.column.paddingCode")
+    @ImportValidated(name = "ui.dj.curlRoll.column.paddingCode", required = true, isCode = true, maxLength = 20)
+    @TableField("PADDING_CODE")
+    private String paddingCode;
 
-    @ApiModelProperty(value = "卷曲长度。此垫胶一卷的最大长度，单位：米。")
+    @ApiModelProperty(value = "卷曲长度")
     @TableField(value = "CURL_LENGTH", updateStrategy = FieldStrategy.IGNORED, jdbcType = JdbcType.DOUBLE)
     @Excel(name = "ui.curlRoll.column.length")
     @ImportValidated(name = "ui.curlRoll.column.length", required = true, max = 999999, min = 0)
     private BigDecimal curlLength;
-
-    /**
-     * 查询编号，用于精确查询
-     */
-    @ApiModelProperty(value = "查询编号，用于精确查询")
-    @TableField(exist = false)
-    private String queryCode;
-    
-    @TableField(exist = false)
-    private String orderStr;
 }

@@ -1,8 +1,7 @@
-
 <template>
   <basic-container>
     <page-table
-      tableRef="insideLinerParamsMainTable"
+      tableRef="djParamsMainTable"
       :calcHeight="true"
       v-loading="loading"
       :columns="columns"
@@ -19,62 +18,44 @@
       :selectArea="false"
     >
       <template slot="header">
-        <!-- <el-button
+        <el-button
           type="primary"
-          v-hasPermi="['nc:params:add']"
+          v-hasPermi="['dj:params:add']"
           @click="handleAdd"
           >{{ $t("ui.frame.btn.add") }}</el-button
-        > -->
-        <!-- <el-button
+        >
+        <el-button
           type="warning"
-          v-hasPermi="['nc:params:edit']"
+          v-hasPermi="['dj:params:edit']"
           @click="handleEdit(selection[0])"
+          :disabled="selection.length !== 1"
           >{{ $t("ui.frame.btn.modify") }}</el-button
-        > -->
-        <!-- <el-button
+        >
+        <el-button
           type="danger"
-          v-hasPermi="['nc:params:remove']"
+          v-hasPermi="['dj:params:remove']"
           @click="handleDelete(selection)"
+          :disabled="selection.length === 0"
           >{{ $t("ui.frame.btn.delete") }}</el-button
-        > -->
-        <!-- <el-button
-          v-hasPermi="['nc:params:import']"
-          @click="$refs.tltUpload.handleImport()"
-          >{{ $t("ui.frame.btn.import") }}</el-button
-        > -->
+        >
         <el-button
           @click="handleExport"
-          v-hasPermi="['nc:params:export']"
+          v-hasPermi="['dj:params:export']"
           >{{ $t("ui.frame.btn.export") }}</el-button
         >
       </template>
     </page-table>
-    <!-- <el-button style="display: none" ref="hidePopoverBtnRef"></el-button> -->
-    <!-- <tlt-upload
-      ref="tltUpload"
-      downloadUrl="/nc/params/importTemplate"
-      uploadUrl="/nc/params/importData"
-      @uploadSuccess="getList"
-    /> -->
     <infoDialog ref="infoRef" @success="getList" />
   </basic-container>
 </template>
 <script>
-//lib
-// import moment from "moment";
-//utils
 import { downloadLink } from "@/utils/request";
-//interface
-import { listParams, removeParams } from "@/api/nc/params";
-//components
-// import tltUpload from "@/components/tltUpload/tltUpload.vue";
-
+import { listParams, removeParams } from "@/api/dj/params";
 import infoDialog from "./components/infoDialog.vue";
 
 export default {
- name: "InsideLinerParams",
+  name: "DjParams",
   components: {
-    // tltUpload,
     infoDialog,
   },
   dicts: [],
@@ -87,11 +68,11 @@ export default {
     return {
       searchColumns: [
         {
-          label: this.$t("ui.data.column.paramsCode"),
+          label: this.$t("ui.dj.params.column.paramCode"),
           prop: "paramCode",
         },
         {
-          label: this.$t("ui.data.column.paramsName"),
+          label: this.$t("ui.dj.params.column.paramName"),
           prop: "paramName",
         },
       ],
@@ -106,8 +87,6 @@ export default {
       sort: {},
       search: {},
       query: {},
-      importDefaultValue: {},
-      importRules: {},
     };
   },
   computed: {
@@ -115,30 +94,46 @@ export default {
       let columns = [
         { type: "selection", fixed: "left" },
         {
+          prop: "factoryCode",
+          halign: "center",
+          label: this.$t("ui.dj.params.column.factoryCode"),
+        },
+        {
+          prop: "productTypeCode",
+          halign: "center",
+          label: this.$t("ui.dj.params.column.productTypeCode"),
+        },
+        {
           prop: "paramCode",
           halign: "center",
-          label: this.$t("ui.data.column.paramsCode"),
-          // sortable: "custom",
+          label: this.$t("ui.dj.params.column.paramCode"),
         },
         {
           prop: "paramName",
           halign: "center",
-          label: this.$t("ui.data.column.paramsName"),
+          label: this.$t("ui.dj.params.column.paramName"),
           titleTooltip: true,
-          // sortable: "custom",
+        },
+        {
+          prop: "dataType",
+          halign: "center",
+          label: this.$t("ui.dj.params.column.dataType"),
+        },
+        {
+          prop: "defauleValue",
+          halign: "center",
+          label: this.$t("ui.dj.params.column.defauleValue"),
         },
         {
           prop: "paramValue",
           halign: "center",
-          label: this.$t("ui.data.column.paramsValue"),
-          // sortable: "custom",
+          label: this.$t("ui.dj.params.column.paramValue"),
         },
         {
           prop: "remark",
           halign: "center",
           label: this.$t("ui.common.column.remark"),
           minWidth: 100,
-          // sortable: "custom",
         },
         {
           align: "center",
@@ -157,13 +152,13 @@ export default {
                 >
                   {this.$t("ui.frame.btn.update")}
                 </el-button>
-               { /* <el-button
+                <el-button
                   class="minus"
                   type="danger"
                   onClick={() => this.handleDelete(row)}
                 >
                   {this.$t("ui.frame.btn.delete")}
-                </el-button> */}
+                </el-button>
               </div>
             );
           },
@@ -185,12 +180,12 @@ export default {
       }
     },
     handleDelete(row) {
+      const ids = Array.isArray(row) ? row.map((item) => item.id) : [row.id];
       this.$confirm(this.$t("common.confirm.delete"), {
         type: "warning",
       }).then(() => {
-        const ids = row.id;
         this.loading = true;
-        removeParams({ ids })
+        removeParams(ids)
           .then((data) => {
             this.$modal.msgSuccess(data.msg);
             this.$set(this.page, "current", 1);
@@ -213,9 +208,6 @@ export default {
       this.$set(this.page, "pageSize", pageSize);
       this.getList();
     },
-    handelSuccess() {
-      this.getList();
-    },
     handleSortChange({ column, prop, order }) {
       if (order) {
         this.sort = {
@@ -223,7 +215,6 @@ export default {
           isAsc: order == "ascending" ? "asc" : "desc",
         };
       } else {
-        //默认排序
         this.sort = {};
       }
       this.getList();
@@ -232,10 +223,9 @@ export default {
       this.selection = rows;
     },
     handleExport() {
-      downloadLink("/nc/params/export", this.formatParams(false));
+      downloadLink("/dj/params/export", this.formatParams(false));
     },
 
-    // utils
     formatParams(hasPage = true) {
       const params = {
         ...this.query,
@@ -247,15 +237,8 @@ export default {
         params.pageNum = this.page.current;
       }
 
-      if (params.createTime && params.createTime[0]) {
-        params.createTimeStart = params.createTime[0];
-        params.createTimeEnd = params.createTime[1];
-        params.createTime = undefined;
-      }
-
       return params;
     },
-    // api
     async getList() {
       try {
         this.loading = true;
@@ -269,8 +252,7 @@ export default {
       }
     },
   },
-  created() {},
-  activated() {
+  created() {
     this.getList();
   },
 };

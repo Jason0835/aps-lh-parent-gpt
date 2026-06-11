@@ -33,7 +33,7 @@ import { mapState } from "vuex";
 
 import infoForm from "@/views/components/infoForm.vue";
 
-import { saveCurlRoll,checkCurlRollCodeUnique } from "@/api/nc/curlRoll";
+import { saveCurlRoll,checkCurlRollCodeUnique } from "@/api/dj/curlRoll";
 
 export default {
   components: { infoForm },
@@ -45,7 +45,7 @@ export default {
       editType: null,
       form: {},
       rules: {
-        liningCode: [
+        paddingCode: [
           {
             required: true,
             message: this.$t("common.rule.input"),
@@ -74,12 +74,12 @@ export default {
     columns() {
       return [
         {
-          label: this.$t("ui.data.column.quota.liningCode"),
-          prop: "liningCode",
+          label: this.$t("ui.dj.curlRoll.column.paddingCode"),
+          prop: "paddingCode",
           span: 24,
         },
         {
-          label: this.$t("ui.curlRoll.column.length"),
+          label: this.$t("ui.dj.curlRoll.column.curlLength"),
           prop: "curlLength",
           span: 24,
           required: true,
@@ -137,7 +137,7 @@ export default {
       return new Promise((resolve, reject) => {
         checkCurlRollCodeUnique({
           id: this.form.id,
-          liningCode: this.form.liningCode,
+          paddingCode: this.form.paddingCode,
         })
           .then((res) => {
             if (res === 0) {

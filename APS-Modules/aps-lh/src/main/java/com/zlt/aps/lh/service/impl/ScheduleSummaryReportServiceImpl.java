@@ -165,15 +165,14 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         scheduleDate = LhScheduleTimeUtil.clearTime(scheduleDate);
         factoryCode = StringUtils.defaultString(factoryCode, FactoryConstant.DEFAULT_FACTORY_CODE);
 
-        // 排产小结导出查询排程日期的前一天数据
-        Date previousDate = LhScheduleTimeUtil.addDays(scheduleDate, -1);
-        log.info("构建排产小结导出数据, 排程日期: {}, 实际查询日期(前一天): {}, 分厂: {}",
-                DateUtil.formatDate(scheduleDate), DateUtil.formatDate(previousDate), factoryCode);
+        // 排产小结导出直接按排程日期查询数据（排程日期为T+1日，class3/4/5班次即为排程日期当天的夜/早/中班）
+        log.info("构建排产小结导出数据, 排程日期(报告日期): {}, 分厂: {}",
+                DateUtil.formatDate(scheduleDate), factoryCode);
 
         List<LhShiftConfig> shiftConfigs = loadShiftConfigs(factoryCode);
         Map<Integer, String> classShiftTypeMap = buildClassShiftTypeMap(shiftConfigs);
 
-        Map<String, Object> tableMap = buildTableMap(previousDate, scheduleDate, factoryCode, classShiftTypeMap);
+        Map<String, Object> tableMap = buildTableMap(scheduleDate, scheduleDate, factoryCode, classShiftTypeMap);
         // TD胶种列表使用排程日期查询成型日计划数据，过滤3/4/5班次有排计划量的胎胚，再取TD胶种
         List<List<Map<String, Object>>> dataList = buildDataList(scheduleDate, factoryCode);
 
@@ -205,8 +204,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 构建模板参数映射表（普通占位符）
      *
-     * @param reportDate         报告日期（排程日期的前一天，如排程5/3则报告日期为5/2）
-     * @param actualScheduleDate 实际排程日期（如5/3）
+     * @param reportDate         报告日期（即排程日期，如6/12，T+1日）
+     * @param actualScheduleDate 实际排程日期（如6/12，T+1日，与reportDate相同）
      * @param factoryCode        分厂编码
      * @param classShiftTypeMap  班次类型映射
      * @return 模板参数映射
@@ -220,7 +219,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
         // 成型排程结果：查询排程日期（actualScheduleDate）的数据，
         // 取3/4/5班次汇总作为报告日期（reportDate）的夜/早/中班产量
-        // 排程日期5/3的数据中，3/4/5班次对应5/2的夜/早/中班
+        // 排程日期为T+1日，class3/4/5班次即为排程日期当天的夜/早/中班
         List<CxScheduleResult> cxResults = cxScheduleResultMapper.selectList(
                 new LambdaQueryWrapper<CxScheduleResult>()
                         .eq(CxScheduleResult::getScheduleDate, actualScheduleDate)
@@ -328,9 +327,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         map.put("mouldCleanDate", DateUtil.format(reportDate, "MM月dd日"));
         map.put("mouldCleanInfo", buildMouldCleanInfo(reportDate, actualScheduleDate, factoryCode));
 
-        // 成型备注：取成型精度计划的排程日期在报告日期（前一天）时间范围内要做的机台，成型精度做的时间固定在6:00~14:00
+        // 成型备注：取成型精度计划的排程日期在报告日期时间范围内要做的机台，成型精度做的时间固定在6:00~14:00
         map.put("cxRemark", buildCxRemark(reportDate, factoryCode));
-        // 硫化备注：取硫化精度计划的排程日期在报告日期（前一天）时间范围内要做的机台，时间及开产时间根据参数计算
+        // 硫化备注：取硫化精度计划的排程日期在报告日期时间范围内要做的机台，时间及开产时间根据参数计算
         map.put("lhRemark", buildLhRemark(reportDate, factoryCode));
 
         return map;
@@ -431,11 +430,11 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 构建模具交替信息
      *
-     * <p>查询计划日期区间=reportDate当天（00:00:00~23:59:59）、排程日期=actualScheduleDate、更换类型为01或02的模具交替计划，
+     * <p>查询计划日期区间=planDate当天（00:00:00~23:59:59）、排程日期=actualScheduleDate、更换类型为01或02的模具交替计划，
      * 取出去重的硫化机台编码，用"；"隔开，上限15台</p>
      *
-     * @param planDate           计划日期（报告日期，如5月2日）
-     * @param actualScheduleDate 排程日期（如5月3日）
+     * @param planDate           计划日期（报告日期，即排程日期，如6月12日）
+     * @param actualScheduleDate 排程日期（如6月12日，与planDate相同）
      * @param factoryCode        分厂编码
      * @return 去重机台编码字符串，用"；"隔开，上限15台
      */
@@ -473,8 +472,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * <p>查询计划日期区间=planDate当天（00:00:00~23:59:59）、排程日期=actualScheduleDate、更换类型为03或04的模具交替计划，
      * 取出去重的硫化机台编码，用"；"隔开</p>
      *
-     * @param planDate           计划日期（报告日期，如5月2日）
-     * @param actualScheduleDate 排程日期（如5月3日）
+     * @param planDate           计划日期（报告日期，即排程日期，如6月12日）
+     * @param actualScheduleDate 排程日期（如6月12日，与planDate相同）
      * @param factoryCode        分厂编码
      * @return 去重机台编码字符串，用"；"隔开
      */
@@ -962,10 +961,10 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 构建成型备注信息
      *
-     * <p>取成型精度计划的排程日期在报告日期（前一天）时间范围内要做的机台，
+     * <p>取成型精度计划的排程日期在报告日期时间范围内要做的机台，
      * 成型精度做的时间固定在6:00~14:00</p>
      *
-     * @param reportDate  报告日期（排程日期的前一天）
+     * @param reportDate  报告日期（即排程日期）
      * @param factoryCode 分厂编码
      * @return 成型备注字符串，格式如："机台A、机台B 做精度 6:00-14:00"
      */
@@ -1012,7 +1011,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
      * <p>开产为保养完后胶囊预热完后开产。
      * 例如：保养8:00开始，保养7小时到15:00结束，胶囊预热2.5小时，开产时间17:30</p>
      *
-     * @param reportDate  报告日期（排程日期的前一天）
+     * @param reportDate  报告日期（即排程日期）
      * @param factoryCode 分厂编码
      * @return 硫化备注字符串，格式如："机台A、机台B 做精度 8:00-15:00，开产17:30"
      */
@@ -1116,28 +1115,26 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
     /**
      * 构建成型规格切换信息。
      * 从T_MP_STRUCTURE_ALLOCATION表获取结构排产数据，按成型机台分组，
-     * 找到结束日等于前一天日号的前结构，以及开始日等于前一天日号或排程日期日号的后结构，
+     * 找到结束日等于排程日期日号的前结构，以及开始日等于排程日期日号或后一天日号的后结构，
      * 只展示第二天切换的数据，展示格式为"前结构 换 后结构"，多个切换用"；"隔开。
      *
      * <p>两种场景：</p>
      * <ul>
-     *   <li>非跨月场景：排程日期21号，取5月转产数据，找endDay=20的前结构，
-     *       后结构先查beginDay=20，20号没有再查beginDay=21</li>
+     *   <li>非跨月场景：排程日期12号，取当月转产数据，找endDay=12的前结构，
+     *       后结构先查beginDay=12，12号没有再查beginDay=13</li>
      *   <li>跨月场景：排程日期6月1号，取6月转产数据，找endDay=1且后结构beginDay=1</li>
      * </ul>
      *
-     * @param reportDate   报告日期（排程日期的前一天）
-     * @param scheduleDate 排程日期
+     * @param reportDate   报告日期（即排程日期）
+     * @param scheduleDate 排程日期（与reportDate相同）
      * @param factoryCode  分厂编码
      * @return 规格切换信息字符串，如"结构A 换 结构B；结构C 换 结构D"
      */
     private String buildCxSpecSwitch(Date reportDate, Date scheduleDate, String factoryCode) {
-        LocalDate localReportDate = DateUtil.toLocalDateTime(reportDate).toLocalDate();
         LocalDate localScheduleDate = DateUtil.toLocalDateTime(scheduleDate).toLocalDate();
 
-        // 跨月场景：排程日期是1号时，直接取排程日期所在月的转产数据；否则取前一天所在月的数据
-        LocalDate queryMonthBase = localScheduleDate.getDayOfMonth() == 1
-                ? localScheduleDate : localReportDate;
+        // 跨月场景：排程日期是1号时，直接取排程日期所在月的转产数据；否则取排程日期所在月的数据
+        LocalDate queryMonthBase = localScheduleDate;
 
         MpStructureAllocation structureQuery = new MpStructureAllocation();
         structureQuery.setFactoryCode(factoryCode);
@@ -1160,7 +1157,6 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                         Collectors.toList()));
 
         List<String> switchList = new ArrayList<>();
-        int reportDayOfMonth = localReportDate.getDayOfMonth();
         int scheduleDayOfMonth = localScheduleDate.getDayOfMonth();
 
         for (Map.Entry<String, List<MpStructureAllocation>> entry : machineGroupMap.entrySet()) {
@@ -1173,9 +1169,8 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 continue;
             }
 
-            // 查找前结构：结束日等于前一天日号（跨月场景下为排程日期日号1号）
-            int prevEndDay = localScheduleDate.getDayOfMonth() == 1
-                    ? scheduleDayOfMonth : reportDayOfMonth;
+            // 查找前结构：结束日等于排程日期日号
+            int prevEndDay = scheduleDayOfMonth;
             MpStructureAllocation prevStructure = null;
             for (MpStructureAllocation s : structures) {
                 if (s.getEndDay() != null && s.getEndDay() == prevEndDay) {
@@ -1187,9 +1182,9 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
                 continue;
             }
 
-            // 查找后结构：先查开始日等于前一天日号，没有再查开始日等于排程日期日号
+            // 查找后结构：先查开始日等于排程日期日号，没有再查开始日等于排程日期后一天日号
             MpStructureAllocation nextStructure = findNextStructure(structures, prevStructure,
-                    reportDayOfMonth, scheduleDayOfMonth);
+                    scheduleDayOfMonth, scheduleDayOfMonth + 1);
             if (nextStructure == null) {
                 continue;
             }
@@ -1209,33 +1204,33 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
 
     /**
      * 查找下一个结构切换数据。
-     * 优先查找开始日等于前一天日号的结构，若没有则查找开始日等于排程日期日号的结构。
+     * 优先查找开始日等于排程日期日号的结构，若没有则查找开始日等于排程日期后一天日号的结构。
      *
-     * @param structures       按beginDay排序的转产数据列表
-     * @param prevStructure    前结构（已确定结束日的前结构）
-     * @param reportDayOfMonth 前一天的日号
-     * @param scheduleDayOfMonth 排程日期的日号
+     * @param structures            按beginDay排序的转产数据列表
+     * @param prevStructure         前结构（已确定结束日的前结构）
+     * @param scheduleDayOfMonth    排程日期的日号
+     * @param nextDayOfMonth        排程日期后一天的日号
      * @return 下一个结构切换数据，未找到返回null
      */
     private MpStructureAllocation findNextStructure(List<MpStructureAllocation> structures,
                                                     MpStructureAllocation prevStructure,
-                                                    int reportDayOfMonth,
-                                                    int scheduleDayOfMonth) {
-        // 优先查找开始日等于前一天日号的结构
-        for (MpStructureAllocation s : structures) {
-            if (s == prevStructure) {
-                continue;
-            }
-            if (s.getBeginDay() != null && s.getBeginDay() == reportDayOfMonth) {
-                return s;
-            }
-        }
-        // 前一天日号没有匹配，再查找开始日等于排程日期日号的结构
+                                                    int scheduleDayOfMonth,
+                                                    int nextDayOfMonth) {
+        // 优先查找开始日等于排程日期日号的结构
         for (MpStructureAllocation s : structures) {
             if (s == prevStructure) {
                 continue;
             }
             if (s.getBeginDay() != null && s.getBeginDay() == scheduleDayOfMonth) {
+                return s;
+            }
+        }
+        // 排程日期日号没有匹配，再查找开始日等于排程日期后一天日号的结构
+        for (MpStructureAllocation s : structures) {
+            if (s == prevStructure) {
+                continue;
+            }
+            if (s.getBeginDay() != null && s.getBeginDay() == nextDayOfMonth) {
                 return s;
             }
         }

@@ -144,12 +144,12 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
             if (CollectionUtils.isNotEmpty(cxConsumeList)) {
                 cxConsumeMap = cxConsumeList.stream().collect(Collectors.toMap(DjScheduleResult::getLiningCode, DjScheduleResult::getCxConsumeQty));
             }
-            DjCurlRoll curlRoll = new DjCurlRoll();
-            curlRoll.getParams().put("codeList", codeList);
-            List<DjCurlRoll> curlRollList = curlRollMapper.listCurlRoll(curlRoll);
+            LambdaQueryWrapper<DjCurlRoll> curlRollQueryWrapper = new LambdaQueryWrapper<>();
+            curlRollQueryWrapper.in(DjCurlRoll::getPaddingCode, codeList);
+            List<DjCurlRoll> curlRollList = curlRollMapper.selectList(curlRollQueryWrapper);
             Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
             if (CollectionUtils.isNotEmpty(curlRollList)) {
-                curlRollMap = curlRollList.stream().collect(Collectors.toMap(DjCurlRoll::getLiningCode, DjCurlRoll::getCurlLength));
+                curlRollMap = curlRollList.stream().collect(Collectors.toMap(DjCurlRoll::getPaddingCode, DjCurlRoll::getCurlLength));
             }
             LambdaQueryWrapper<DjParams> paramWrapper = new LambdaQueryWrapper<>();
             paramWrapper.eq(DjParams::getParamCode, EngineConstants.STANDARD_CRIMP_LENGTH);
@@ -636,12 +636,12 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         List<String> resultCodeList = tmScheduleResultList.stream().map(DjScheduleResult::getLiningCode).collect(Collectors.toList());
         List<String> notExistCodeList = lastDayPlanQty4List.stream().map(DjScheduleResult::getLiningCode)
                 .filter(item -> !resultCodeList.contains(item)).collect(Collectors.toList());
-        DjCurlRoll curlRoll = new DjCurlRoll();
-        curlRoll.getParams().put("codeList", notExistCodeList);
-        List<DjCurlRoll> curlRollList = curlRollMapper.listCurlRoll(curlRoll);
+        LambdaQueryWrapper<DjCurlRoll> curlRollQueryWrapper = new LambdaQueryWrapper<>();
+        curlRollQueryWrapper.in(DjCurlRoll::getPaddingCode, notExistCodeList);
+        List<DjCurlRoll> curlRollList = curlRollMapper.selectList(curlRollQueryWrapper);
         Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(curlRollList)) {
-            curlRollMap = curlRollList.stream().collect(Collectors.toMap(DjCurlRoll::getLiningCode, DjCurlRoll::getCurlLength));
+            curlRollMap = curlRollList.stream().collect(Collectors.toMap(DjCurlRoll::getPaddingCode, DjCurlRoll::getCurlLength));
         }
 
         LambdaQueryWrapper<DjParams> paramWrapper = new LambdaQueryWrapper<>();

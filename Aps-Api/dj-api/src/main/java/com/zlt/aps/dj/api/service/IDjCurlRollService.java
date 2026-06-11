@@ -1,76 +1,99 @@
 package com.zlt.aps.dj.api.service;
 
+import java.util.List;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import com.ruoyi.api.gateway.system.domain.vo.ImportContext;
 import com.ruoyi.common.constant.ServiceNameConstants;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.zlt.aps.dj.api.domain.dto.DjCurlRollDto;
 import com.zlt.aps.dj.api.domain.entity.DjCurlRoll;
 
-import io.swagger.annotations.ApiOperation;
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /**
- * 垫胶卷曲信息对外暴露接口
+ * 垫胶卷曲信息维护Service接口
+ *
+ * @author zlt
+ * @date 2026-06-10
  */
-@FeignClient(contextId = "iNcCurlRollService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:nc}")
+@FeignClient(contextId = "IDjCurlRollService", value = ServiceNameConstants.GATEWAY_SERVICE, path = "${api.path.dj:dj}")
 public interface IDjCurlRollService {
 
     /**
-     * 根据条件查询帘布大卷信息列表
-     */
-    @PostMapping("/dj/curlRoll/listCurlRoll")
-    TableDataInfo listCurlRoll(@RequestBody DjCurlRoll dto);
-
-    /**
-     * 根据id查询帘布大卷信息信息
-     */
-    @GetMapping("/dj/curlRoll/getCurlRoll/{id}")
-    DjCurlRoll getCurlRoll(@PathVariable("id") Long id);
-
-    /**
-     * 保存帘布大卷信息信息（id为空则新增，id不为空则修改）
-     */
-    @PostMapping("/dj/curlRoll/saveCurlRoll")
-    AjaxResult saveCurlRoll(@RequestBody DjCurlRoll dto);
-
-    /**
-     * 根据code判断纤维大卷代号是否已经存在
-     */
-    @PostMapping("/dj/curlRoll/checkCurlRollCodeUnique")
-    String checkCurlRollCodeUnique(@RequestBody DjCurlRoll dto);
-
-    /**
-     * 批量删除帘布大卷信息信息(逻辑删)
+     * 获取信息列表
      *
-     * @param ids 多个id逗号分割
+     * @param stock
+     * @return
      */
-    @PostMapping("/dj/curlRoll/deleteCurlRoll/{ids}")
-    AjaxResult deleteCurlRoll(@PathVariable("ids") Long[] ids);
+    @PostMapping("/dj/curlRoll/list")
+    TableDataInfo list(@RequestBody DjCurlRoll curlRoll);
 
     /**
-     * 导出接口
+     * 保存信息
      *
-     * @param dto
+     * @param stock
+     * @return
      */
-    @PostMapping("/dj/curlRoll/exportData")
-    List<DjCurlRoll> exportData(@RequestBody DjCurlRoll dto);
+    @PostMapping("/dj/curlRoll/save")
+    AjaxResult save(@Validated @RequestBody DjCurlRoll curlRoll);
 
     /**
-     * 导入数据
+     * 删除信息
+     *
+     * @param ids
+     * @return
+     */
+    @DeleteMapping("/dj/curlRoll/{ids}")
+    AjaxResult removeByIds(@RequestBody List<Long> ids);
+
+    /**
+     * 根据ID获取详细信息
+     *
+     * @param id
+     * @return
+     */
+    @GetMapping(value = "/dj/curlRoll/selectStockById/{id}")
+    DjCurlRoll selectStockById(@PathVariable("id") Long id);
+
+    /**
+     * 根据ID获取详细信息
+     *
+     * @param id
+     * @return
+     */
+    @GetMapping(value = "/dj/curlRoll/{id}")
+    AjaxResult getInfo(@PathVariable("id") Long id);
+
+    /**
+     * 校验唯一性
+     */
+    @PostMapping("/dj/curlRoll/checkUnique")
+    String checkUnique(@RequestBody DjCurlRoll curlRoll);
+
+    /**
+     * 导出信息
+     *
+     * @param stock
+     * @return
+     */
+    @PostMapping("/dj/curlRoll/exportData/{fileName}")
+    byte[] exportData(@RequestBody DjCurlRoll queryVO, @PathVariable("fileName") String fileName);
+
+    /**
+     * 导入信息
+     *
+     * @param stock
+     * @return
      */
     @PostMapping("/dj/curlRoll/importData")
-    public AjaxResult importData(@RequestBody List<DjCurlRollDto> list, @RequestParam("updateSupport") boolean updateSupport, @RequestParam("importLogId") Long importLogId);
-
-    /**
-     * 根据编号查询卷曲长度
-     *
-     * @param curlRoll 查询条件
-     * @return 结果
-     */
-    @ApiOperation("根据编号查询卷曲长度")
-    @PostMapping("/dj/curlRoll/selectCurlLengthByCode")
-    public AjaxResult selectCurlLengthByCode(@RequestBody DjCurlRoll curlRoll);
+    AjaxResult importData(@RequestBody ImportContext importContext,
+            @RequestParam("updateSupport") boolean updateSupport);
 }

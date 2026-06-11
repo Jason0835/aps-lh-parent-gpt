@@ -1,102 +1,92 @@
 package com.zlt.aps.dj.controller;
 
-import java.util.List;
-
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
-import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.dj.api.domain.dto.DjParamsDto;
 import com.zlt.aps.dj.api.domain.entity.DjParams;
 import com.zlt.aps.dj.service.DjParamsService;
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 垫胶参数信息Controller
  *
  * @author zlt
- * @date 2021-05-25
+ * @date 2026-06-11
  */
+@Slf4j
+@Api(tags = "垫胶参数信息维护")
 @RestController
 @RequestMapping("/dj/params")
-@Api(tags = {"垫胶参数信息维护接口"})
-public class DjParamsController extends BaseController {
-    @Autowired
-    private DjParamsService ncParamsService;
+public class DjParamsController extends BaseController<DjParams> {
+
+    private final DjParamsService paramsService;
+
+    public DjParamsController(DjParamsService paramsService) {
+        this.paramsService = paramsService;
+    }
 
     /**
      * 查询垫胶参数信息列表
-     *
-     * @return
      */
     @ApiOperation("查询垫胶参数信息列表")
     @PostMapping("/list")
-    public TableDataInfo list(@RequestBody DjParamsDto dto) {
-        DjParams params = new DjParams();
-        BeanUtils.copyProperties(dto, params);
-        startPage();
-        params.setOrderStr(orderStr());
-        List<DjParamsDto> list = ncParamsService.selectParamsList(params);
+    public TableDataInfo list(@RequestBody DjParams entity) {
+        startPage("FACTORY_CODE,BUSINESS_GROUP,PARAM_CODE asc");
+        List<DjParams> list = paramsService.selectParamsList(entity);
         return getDataTable(list);
     }
 
     /**
      * 获取垫胶参数信息详细信息
-     *
-     * @return 结果
      */
     @ApiOperation("获取垫胶参数信息详细信息")
     @GetMapping(value = "/{id}")
-    public DjParams getInfo(@PathVariable("id") Long id) {
-        return ncParamsService.selectParamsById(id);
+    public AjaxResult getInfo(@PathVariable("id") Long id) {
+        return AjaxResult.success(paramsService.selectParamsById(id));
     }
 
     /**
      * 修改垫胶参数信息
-     *
-     * @return 结果
      */
-    @Log(title = "ui.data.column.nc.params.modelName", businessType = BusinessType.UPDATE)
+    @Log(title = "ui.dj.params.column.modalName", businessType = BusinessType.UPDATE)
     @ApiOperation("修改垫胶参数信息")
     @PostMapping("/edit")
-    public AjaxResult edit(@Validated @RequestBody DjParamsDto dto) {
-        DjParams params = new DjParams();
-        BeanUtils.copyProperties(dto, params);
-        if (UserConstants.NOT_UNIQUE.equals(ncParamsService.checkParamsCodeUnique(params))) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.params.message.unique"));
-        }
-        return ncParamsService.updateParams(params);
+    public AjaxResult edit(@RequestBody DjParams entity) {
+        return paramsService.updateParams(entity);
     }
 
     /**
-     * 导出垫胶参数信息
-     *
-     * @param dto 查询条件
-     * @return 查询到的集合
+     * 删除垫胶参数信息
      */
-    @Log(title = "ui.data.column.nc.params.modelName", businessType = BusinessType.EXPORT)
-    @ApiOperation("导出垫胶参数信息")
-    @PostMapping("/exportData")
-    public List<DjParamsDto> export(@RequestBody DjParamsDto dto) {
-        DjParams params = new DjParams();
-        BeanUtils.copyProperties(dto, params);
-        startPage();
-        params.setOrderStr(orderStr());
-        return ncParamsService.selectParamsList(params);
+    @Log(title = "ui.dj.params.column.modalName", businessType = BusinessType.DELETE)
+    @ApiOperation("删除垫胶参数信息")
+    @DeleteMapping("/{ids}")
+    public AjaxResult remove(@RequestBody List<Long> ids) {
+        return toAjax(paramsService.removeByIds(ids) ? 1 : 0);
+    }
+
+    /**
+     * 校验参数代码唯一性
+     */
+    @ApiOperation("校验参数代码唯一性")
+    @PostMapping("/checkUnique")
+    public String checkUnique(@RequestBody DjParams params) {
+        return paramsService.checkParamsCodeUnique(params);
+    }
+
+    /**
+     * 根据参数编码查询垫胶参数信息
+     */
+    @ApiOperation("根据参数编码查询垫胶参数信息")
+    @PostMapping("/getByParamCode")
+    public DjParams getByParamCode(@RequestBody DjParams entity) {
+        return paramsService.getParamsByCondition(entity.getFactoryCode(), entity.getProductTypeCode(), entity.getParamCode());
     }
 }
