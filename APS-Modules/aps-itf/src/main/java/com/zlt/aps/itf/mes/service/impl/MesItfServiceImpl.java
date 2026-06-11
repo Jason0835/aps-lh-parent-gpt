@@ -1938,28 +1938,16 @@ public class MesItfServiceImpl implements MesItfService {
      * @return 结果
      */
     @Override
-    public AjaxResult syncLhScheDayFinishQtyByLatestVersion() {
-        // 先查询MES中间表硫化排程日完成量的最大版本号
-        DynamicDataSourceContextHolder.push(DataSource.MES);
-        String maxVersion = mesItfMapper.selectMaxDataVersionFromLhDayFinishQty(null);
-        DynamicDataSourceContextHolder.poll();
-
-        if (maxVersion == null || maxVersion.isEmpty()) {
-            log.warn("硫化排程日完成量按最新版本号同步：MES中间表无版本数据");
-            return AjaxResult.success("MES中间表无版本数据");
-        }
-        log.info("硫化排程日完成量按最新版本号同步：MES中间表最新版本号={}", maxVersion);
-
+    public AjaxResult syncLhScheDayFinishQtyByLatestVersion(String dataVersion) {
         AuxReqSyncDataLogs syncDataLogs = new AuxReqSyncDataLogs();
-        syncDataLogs.setDataVersion(maxVersion);
+        syncDataLogs.setDataVersion(dataVersion);
         // 不设置queryParams.finishDate，即不限日期
-
         DynamicDataSourceContextHolder.push(DataSource.MES);
         List<LhDayFinishQty> syncList = mesItfMapper.selectLhScheDayFinishQtyList(syncDataLogs);
         DynamicDataSourceContextHolder.poll();
 
         if (CollectionUtils.isEmpty(syncList)) {
-            log.warn("硫化排程日完成量按最新版本号同步：MES中间表查询结果为空，dataVersion={}", maxVersion);
+            log.warn("硫化排程日完成量按最新版本号同步：MES中间表查询结果为空，dataVersion={}", dataVersion);
             return AjaxResult.success("MES中间表无数据可同步");
         }
 
@@ -1997,7 +1985,7 @@ public class MesItfServiceImpl implements MesItfService {
 
             try {
                 log.info("硫化排程日完成量按最新版本号同步：开始同步，dataVersion={}, factoryCode={}, finishDate={}, 待插入数量={}",
-                        maxVersion, factoryCode, finishDateStr, groupList.size());
+                        dataVersion, factoryCode, finishDateStr, groupList.size());
 
                 String finalFactoryCode = factoryCode;
                 FeignTokenHelper.runWithToken(() -> {
@@ -2005,10 +1993,10 @@ public class MesItfServiceImpl implements MesItfService {
                 });
 
                 log.info("硫化排程日完成量按最新版本号同步：同步完成，dataVersion={}, factoryCode={}, finishDate={}, 插入数量={}",
-                        maxVersion, factoryCode, finishDateStr, groupList.size());
+                        dataVersion, factoryCode, finishDateStr, groupList.size());
             } catch (Exception e) {
                 log.error("硫化排程日完成量按最新版本号同步：Feign调用异常，dataVersion={}, factoryCode={}, finishDate={}",
-                        maxVersion, factoryCode, finishDateStr, e);
+                        dataVersion, factoryCode, finishDateStr, e);
                 return AjaxResult.error("硫化排程日完成量按最新版本号同步失败：" + e.getMessage());
             }
         }
