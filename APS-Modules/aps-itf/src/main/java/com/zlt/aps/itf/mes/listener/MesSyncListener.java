@@ -57,6 +57,7 @@ public class MesSyncListener {
             }
             //加锁，防止消息短时间内重复：业务类型 + 来源系统 + 数据版本 + 目标系统
             String lockKey = String.format("%s||%s||%s||%s", syncKey, syncDataLogs.getDataSys(), syncDataLogs.getDataVersion(), syncDataLogs.getDockSys());
+            log.info(String.format("Redis Key:%s", lockKey));
             RLock lock = redissonClient.getLock(lockKey);
             boolean isLocked = false;
             try {
@@ -68,6 +69,7 @@ public class MesSyncListener {
                     log.warn(failMessage);
                     throw new RuntimeException(failMessage);
                 }
+                log.info(String.format("获取到业务:%s 执行锁", lockKey));
                 // 执行业务-从接口配置枚举获取处理类
                 Object beanObj = SpringUtils.getBean(mesInterfaceCodeEnum.getServiceName());
                 // 从接口配置枚举获取处理方法
