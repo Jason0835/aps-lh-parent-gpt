@@ -88,8 +88,6 @@ public class DjParamsServiceImpl extends ServiceImpl<DjParamsMapper, DjParams> i
      */
     @Override
     public String checkParamsCodeUnique(DjParams params) {
-        Long paramsId = StringUtils.isNull(params.getId()) ? -1L : params.getId();
-
         QueryWrapper<DjParams> queryWrapper = new QueryWrapper<>();
         queryWrapper.ne(PubUtil.isNotEmpty(params.getFieldValueByFieldName("id")), "ID",
                 params.getFieldValueByFieldName("id"));

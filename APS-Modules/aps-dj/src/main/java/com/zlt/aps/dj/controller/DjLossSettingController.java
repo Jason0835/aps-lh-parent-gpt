@@ -41,7 +41,7 @@ import io.swagger.annotations.ApiOperation;
  * @date 2026-06-10
  */
 @RestController
-@RequestMapping("/dj/loss")
+@RequestMapping("/dj/lossSetting")
 public class DjLossSettingController extends AbstractDocBizController<DjLossSetting> {
     @Autowired
     private DjLossSettingService lossSettingService;
