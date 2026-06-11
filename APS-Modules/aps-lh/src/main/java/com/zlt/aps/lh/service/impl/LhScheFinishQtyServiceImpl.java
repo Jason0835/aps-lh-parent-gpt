@@ -55,14 +55,14 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
     /**
      * 硫化排程完成量回写硫化排程结果表各班次完成量
      * <p>
-     * 业务规则：
+     * 业务规则（T+1排程窗口）：
      * 1. 完成量回报表(T_LH_SCHE_FINISH_QTY)按机台+物料+排程日期汇总夜早中完成量
-     * 2. 排程结果表(T_LH_SCHEDULE_RESULT)的8班对应3天窗口：
-     *    1~2班对应D-2的早中，3~5班对应D-1的夜早中，6~8班对应D的夜早中
-     * 3. 回报日期D的完成量需要更新排程日期为D、D+1、D+2的排程结果：
-     *    - 排程日期D：6班(夜)=MES1班，7班(早)=MES2班，8班(中)=MES3班
-     *    - 排程日期D+1：3班(夜)=MES1班，4班(早)=MES2班，5班(中)=MES3班
-     *    - 排程日期D+2：1班(早)=MES2班，2班(中)=MES3班
+     * 2. 排程结果表(T_LH_SCHEDULE_RESULT)的8班对应3天窗口（排程日期=T+1日）：
+     *    1~2班对应T-1日的早中，3~5班对应T日的夜早中，6~8班对应T+1日的夜早中
+     * 3. 回报日期D的完成量需要更新排程日期为D-1、D、D+1的排程结果：
+     *    - 排程日期D-1：6班(夜)=MES1班，7班(早)=MES2班，8班(中)=MES3班
+     *    - 排程日期D：3班(夜)=MES1班，4班(早)=MES2班，5班(中)=MES3班
+     *    - 排程日期D+1：1班(早)=MES2班，2班(中)=MES3班
      * 4. 排程结果维度：工厂+机台编码+物料编码+左右模+排程日期
      * </p>
      *
@@ -96,10 +96,11 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
             BigDecimal morningQty = summary.getClass2FinishQty() != null ? summary.getClass2FinishQty() : BigDecimal.ZERO;
             BigDecimal middleQty = summary.getClass3FinishQty() != null ? summary.getClass3FinishQty() : BigDecimal.ZERO;
 
-            // Step2：计算需要查询的排程结果日期：D、D+1、D+2（标准化为当天零点）
+            // Step2：计算需要查询的排程结果日期：D-1、D、D+1（标准化为当天零点）
+            // T+1排程窗口下，回报日期D的夜早中班次分布在排程日期D-1的6/7/8班、D的3/4/5班、D+1的1/2班
             Date dateD = DateUtil.beginOfDay(scheduleDate);
-            Date dateD1 = DateUtil.offsetDay(dateD, 1);
-            Date dateD2 = DateUtil.offsetDay(dateD, 2);
+            Date dateDMinus1 = DateUtil.offsetDay(dateD, -1);
+            Date dateDPlus1 = DateUtil.offsetDay(dateD, 1);
 
             // Step3：查询排程结果表
             LambdaQueryWrapper<LhScheduleResult> queryWrapper = new LambdaQueryWrapper<>();
@@ -107,13 +108,13 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
             queryWrapper.eq(LhScheduleResult::getFactoryCode, summary.getFactoryCode());
             queryWrapper.eq(LhScheduleResult::getLhMachineCode, summary.getLhMachineCode());
             queryWrapper.eq(LhScheduleResult::getMaterialCode, summary.getMaterialCode());
-            queryWrapper.in(LhScheduleResult::getScheduleDate, Arrays.asList(dateD, dateD1, dateD2));
+            queryWrapper.in(LhScheduleResult::getScheduleDate, Arrays.asList(dateDMinus1, dateD, dateDPlus1));
             List<LhScheduleResult> resultList = lhScheduleResultMapper.selectList(queryWrapper);
 
             if (CollectionUtils.isEmpty(resultList)) {
                 log.info("【完成量回写】未找到排程结果数据，工厂：{}，机台：{}，物料：{}，日期范围：{}~{}",
                         summary.getFactoryCode(), summary.getLhMachineCode(), summary.getMaterialCode(),
-                        DateUtil.formatDate(dateD), DateUtil.formatDate(dateD2));
+                        DateUtil.formatDate(dateDMinus1), DateUtil.formatDate(dateDPlus1));
                 continue;
             }
 
@@ -123,15 +124,15 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
                 int dayOffset = daysBetween(dateD, resultScheduleDate);
 
                 int updateCount = 0;
-                if (dayOffset == 0) {
-                    // 排程日期D：6班(夜)=MES1班，7班(早)=MES2班，8班(中)=MES3班
+                if (dayOffset == -1) {
+                    // 排程日期D-1：6班(夜)=MES1班，7班(早)=MES2班，8班(中)=MES3班
+                    updateCount = updateDayMinus1FinishQty(result, nightQty, morningQty, middleQty);
+                } else if (dayOffset == 0) {
+                    // 排程日期D：3班(夜)=MES1班，4班(早)=MES2班，5班(中)=MES3班
                     updateCount = updateDay0FinishQty(result, nightQty, morningQty, middleQty);
                 } else if (dayOffset == 1) {
-                    // 排程日期D+1：3班(夜)=MES1班，4班(早)=MES2班，5班(中)=MES3班
-                    updateCount = updateDay1FinishQty(result, nightQty, morningQty, middleQty);
-                } else if (dayOffset == 2) {
-                    // 排程日期D+2：1班(早)=MES2班，2班(中)=MES3班
-                    updateCount = updateDay2FinishQty(result, morningQty, middleQty);
+                    // 排程日期D+1：1班(早)=MES2班，2班(中)=MES3班
+                    updateCount = updateDay1FinishQty(result, morningQty, middleQty);
                 } else {
                     log.warn("【完成量回写】排程日期偏移量不在预期范围内，偏移：{}天，排程日期：{}", dayOffset, DateUtil.formatDate(resultScheduleDate));
                     continue;
@@ -217,8 +218,31 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
     }
 
     /**
-     * 更新排程日期D（当天）的完成量
+     * 更新排程日期D-1（前一天）的完成量
      * 6班(夜)=MES1班，7班(早)=MES2班，8班(中)=MES3班
+     *
+     * @param result    排程结果
+     * @param nightQty  夜班完成量
+     * @param morningQty 早班完成量
+     * @param middleQty 中班完成量
+     * @return 更新记录数
+     */
+    private int updateDayMinus1FinishQty(LhScheduleResult result, BigDecimal nightQty, BigDecimal morningQty, BigDecimal middleQty) {
+        LambdaUpdateWrapper<LhScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(LhScheduleResult::getId, result.getId());
+        updateWrapper.eq(LhScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
+        updateWrapper.set(LhScheduleResult::getClass6FinishQty, nightQty.intValue());
+        updateWrapper.set(LhScheduleResult::getClass7FinishQty, morningQty.intValue());
+        updateWrapper.set(LhScheduleResult::getClass8FinishQty, middleQty.intValue());
+        int count = lhScheduleResultMapper.update(null, updateWrapper);
+        log.info("【完成量回写】排程日期D-1更新，ID：{}，6班(夜)={}，7班(早)={}，8班(中)={}，更新行数：{}",
+                result.getId(), nightQty, morningQty, middleQty, count);
+        return count;
+    }
+
+    /**
+     * 更新排程日期D（当天）的完成量
+     * 3班(夜)=MES1班，4班(早)=MES2班，5班(中)=MES3班
      *
      * @param result    排程结果
      * @param nightQty  夜班完成量
@@ -230,56 +254,33 @@ public class LhScheFinishQtyServiceImpl extends AbstractDocService<LhScheFinishQ
         LambdaUpdateWrapper<LhScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(LhScheduleResult::getId, result.getId());
         updateWrapper.eq(LhScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        updateWrapper.set(LhScheduleResult::getClass6FinishQty, nightQty.intValue());
-        updateWrapper.set(LhScheduleResult::getClass7FinishQty, morningQty.intValue());
-        updateWrapper.set(LhScheduleResult::getClass8FinishQty, middleQty.intValue());
+        updateWrapper.set(LhScheduleResult::getClass3FinishQty, nightQty.intValue());
+        updateWrapper.set(LhScheduleResult::getClass4FinishQty, morningQty.intValue());
+        updateWrapper.set(LhScheduleResult::getClass5FinishQty, middleQty.intValue());
         int count = lhScheduleResultMapper.update(null, updateWrapper);
-        log.info("【完成量回写】排程日期D更新，ID：{}，6班(夜)={}，7班(早)={}，8班(中)={}，更新行数：{}",
+        log.info("【完成量回写】排程日期D更新，ID：{}，3班(夜)={}，4班(早)={}，5班(中)={}，更新行数：{}",
                 result.getId(), nightQty, morningQty, middleQty, count);
         return count;
     }
 
     /**
      * 更新排程日期D+1（次日）的完成量
-     * 3班(夜)=MES1班，4班(早)=MES2班，5班(中)=MES3班
-     *
-     * @param result    排程结果
-     * @param nightQty  夜班完成量
-     * @param morningQty 早班完成量
-     * @param middleQty 中班完成量
-     * @return 更新记录数
-     */
-    private int updateDay1FinishQty(LhScheduleResult result, BigDecimal nightQty, BigDecimal morningQty, BigDecimal middleQty) {
-        LambdaUpdateWrapper<LhScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper.eq(LhScheduleResult::getId, result.getId());
-        updateWrapper.eq(LhScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
-        updateWrapper.set(LhScheduleResult::getClass3FinishQty, nightQty.intValue());
-        updateWrapper.set(LhScheduleResult::getClass4FinishQty, morningQty.intValue());
-        updateWrapper.set(LhScheduleResult::getClass5FinishQty, middleQty.intValue());
-        int count = lhScheduleResultMapper.update(null, updateWrapper);
-        log.info("【完成量回写】排程日期D+1更新，ID：{}，3班(夜)={}，4班(早)={}，5班(中)={}，更新行数：{}",
-                result.getId(), nightQty, morningQty, middleQty, count);
-        return count;
-    }
-
-    /**
-     * 更新排程日期D+2（后天）的完成量
      * 1班(早)=MES2班，2班(中)=MES3班
-     * 注意：D+2没有夜班（D的夜班不在D+2的窗口内）
+     * 注意：D+1没有夜班（D的夜班不在D+1的窗口内）
      *
      * @param result    排程结果
      * @param morningQty 早班完成量
      * @param middleQty 中班完成量
      * @return 更新记录数
      */
-    private int updateDay2FinishQty(LhScheduleResult result, BigDecimal morningQty, BigDecimal middleQty) {
+    private int updateDay1FinishQty(LhScheduleResult result, BigDecimal morningQty, BigDecimal middleQty) {
         LambdaUpdateWrapper<LhScheduleResult> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(LhScheduleResult::getId, result.getId());
         updateWrapper.eq(LhScheduleResult::getIsDelete, ApsConstant.APS_YES_NO_0);
         updateWrapper.set(LhScheduleResult::getClass1FinishQty, morningQty.intValue());
         updateWrapper.set(LhScheduleResult::getClass2FinishQty, middleQty.intValue());
         int count = lhScheduleResultMapper.update(null, updateWrapper);
-        log.info("【完成量回写】排程日期D+2更新，ID：{}，1班(早)={}，2班(中)={}，更新行数：{}",
+        log.info("【完成量回写】排程日期D+1更新，ID：{}，1班(早)={}，2班(中)={}，更新行数：{}",
                 result.getId(), morningQty, middleQty, count);
         return count;
     }

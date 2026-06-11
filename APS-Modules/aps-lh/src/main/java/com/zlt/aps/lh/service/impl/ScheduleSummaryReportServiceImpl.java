@@ -165,7 +165,7 @@ public class ScheduleSummaryReportServiceImpl implements IScheduleSummaryReportS
         scheduleDate = LhScheduleTimeUtil.clearTime(scheduleDate);
         factoryCode = StringUtils.defaultString(factoryCode, FactoryConstant.DEFAULT_FACTORY_CODE);
 
-        // 排产小结导出直接按排程日期查询数据（排程日期为T+1日，class3/4/5班次即为排程日期当天的夜/早/中班）
+        // 排产小结导出直接按排程日期查询数据（排程日期为T+1日，class3/4/5班次即为T日的夜/早/中班）
         log.info("构建排产小结导出数据, 排程日期(报告日期): {}, 分厂: {}",
                 DateUtil.formatDate(scheduleDate), factoryCode);
 
