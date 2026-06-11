@@ -538,6 +538,22 @@ public class MesItfController {
     }
 
     /**
+     * 按上一天最新版本号同步硫化排程完成量（临时任务）
+     * @param syncDataLogs 参数
+     * @return 结果
+     */
+    @ApiOperation("按上一天最新版本号同步硫化排程完成量（临时任务）")
+    @PostMapping("/syncLhClassShiftFinishQtyByYesterday")
+    @AutoLoginLog
+    public AjaxResult syncLhClassShiftFinishQtyByYesterday(@RequestBody AuxReqSyncDataLogs syncDataLogs) {
+        String factoryCode = syncDataLogs.getFactoryCode();
+        if (StringUtils.isBlank(factoryCode)) {
+            syncDataLogs.setFactoryCode(FactoryConstant.DEFAULT_FACTORY_CODE);
+        }
+        return mesItfService.syncLhClassShiftFinishQtyByYesterday(syncDataLogs);
+    }
+
+    /**
      * 按指定版本号同步硫化排程完成量（临时任务）
      * @param dataVersion 指定版本号
      * @return 结果

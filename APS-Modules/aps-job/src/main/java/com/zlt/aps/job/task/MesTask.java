@@ -328,6 +328,29 @@ public class MesTask {
     }
 
     /**
+     * 临时任务：按上一天最新版本号抓取硫化排程完成量回报数据
+     * 逻辑同抓当天最新版本（syncLhClassShiftFinishQty），但日期条件改为上一天
+     * 执行步骤：
+     * 1. 从MES中间表查询上一天（SCHEDULE_DATE = DATEADD(DAY, -1, GETDATE())）的硫化排程完成量数据
+     * 2. 按排程日期+硫化机台+订单号分组取MAX(DATA_VERSION)，获取上一天最新版本数据
+     * 3. 逻辑删除APS旧数据并插入新数据
+     * 4. 回填硫化排程结果表各班次完成量
+     */
+    @ApiOperation("临时任务-按上一天最新版本号抓取硫化排程完成量回报")
+    public void syncLhClassShiftFinishQtyByYesterday() {
+        log.info("临时任务-开始按上一天最新版本号抓取硫化排程完成量回报数据");
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                AjaxResult result = iMesItfService.syncLhClassShiftFinishQtyByYesterday(new AuxReqSyncDataLogs());
+                log.info("临时任务-按上一天最新版本号抓取硫化排程完成量回报结果：{}", result);
+            });
+        } catch (Exception e) {
+            log.error("临时任务-按上一天最新版本号抓取硫化排程完成量回报异常", e);
+        }
+        log.info("临时任务-按上一天最新版本号抓取硫化排程完成量回报完成");
+    }
+
+    /**
      * 临时任务：按指定版本号APS_MES_AH01_20260610174500002抓取硫化排程完成量回报数据
      * 执行步骤：
      * 1. 从MES中间表按指定版本号查询硫化排程完成量数据（不限日期）

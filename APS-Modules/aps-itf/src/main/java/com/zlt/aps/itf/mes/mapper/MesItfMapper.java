@@ -148,6 +148,15 @@ public interface MesItfMapper {
     List<LhScheFinishQty> selectLhClassShiftFinishQtyList(AuxReqSyncDataLogs syncDataLogs);
 
     /**
+     * 按上一天最新版本号查询硫化排程完成量同步数据，用于临时任务
+     * 逻辑同selectLhClassShiftFinishQtyList，但日期条件改为上一天（DATEADD(DAY, -1, GETDATE())）
+     *
+     * @param syncDataLogs 参数
+     * @return 列表
+     */
+    List<LhScheFinishQty> selectLhClassShiftFinishQtyByYesterday(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 按指定版本号查询硫化排程完成量同步数据（不限日期），用于临时任务
      *
      * @param syncDataLogs 参数（dataVersion必传）

@@ -1268,7 +1268,8 @@ public class TypeBlockProductionStrategy implements ITypeBlockProductionStrategy
             appliedRule = "多机台续排剩余目标量";
         } else if (isSingleMachine && isEnding) {
             getTargetScheduleQtyResolver().upsizeEndingTargetQty(context, sku);
-            appliedRule = "单机台收尾MAX(余量,胎胚库存)";
+            appliedRule = getTargetScheduleQtyResolver().isSharedEmbryoInWindow(context, sku)
+                    ? "单机台收尾共用胎胚仅按余量" : "单机台收尾MAX(余量,胎胚库存)";
         } else if (isSingleMachine && getTargetScheduleQtyResolver().isFullCapacityMode(context)) {
             boolean newSpecExpansionAvailable = !DailyMachineExpansionPlanner.isDailyLookAheadCapacitySatisfied(
                     context, sku, 1) && hasSchedulableNewSpecExpansionMachine(context, machine, sku, shifts);

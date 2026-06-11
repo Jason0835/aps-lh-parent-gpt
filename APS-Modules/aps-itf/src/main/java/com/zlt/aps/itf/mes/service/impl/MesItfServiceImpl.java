@@ -1667,6 +1667,64 @@ public class MesItfServiceImpl implements MesItfService {
     }
 
     /**
+     * 按上一天最新版本号同步硫化排程完成量（临时任务）
+     * 逻辑同syncLhClassShiftFinishQty（抓当天最新版本），但日期条件改为上一天
+     * 从MES中间表查询上一天（SCHEDULE_DATE = DATEADD(DAY, -1, GETDATE())）的硫化排程完成量数据，
+     * 按排程日期+硫化机台+订单号分组取MAX(DATA_VERSION)，然后逻辑删除APS旧数据并插入新数据，最后回填排程结果
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    @Override
+    public AjaxResult syncLhClassShiftFinishQtyByYesterday(AuxReqSyncDataLogs syncDataLogs) {
+        DynamicDataSourceContextHolder.push(DataSource.MES);
+        List<LhScheFinishQty> syncList = mesItfMapper.selectLhClassShiftFinishQtyByYesterday(syncDataLogs);
+        DynamicDataSourceContextHolder.poll();
+
+        if (CollectionUtils.isEmpty(syncList)) {
+            log.warn("硫化排程完成量按上一天最新版本同步：MES中间表查询结果为空，factoryCode={}", syncDataLogs.getFactoryCode());
+            return AjaxResult.success("MES中间表无数据可同步");
+        }
+
+        List<LhScheFinishQty> insertList = new ArrayList<>();
+        for (LhScheFinishQty item : syncList) {
+            LhScheFinishQty entity = new LhScheFinishQty();
+            BeanUtils.copyProperties(item, entity);
+            entity.setCreateBy("MES");
+            entity.setUpdateBy("MES");
+            entity.setCreateTime(DateUtils.getNowDate());
+            entity.setUpdateTime(DateUtils.getNowDate());
+            entity.setIsDelete(0);
+            insertList.add(entity);
+        }
+
+        try {
+            String factoryCode = syncDataLogs.getFactoryCode();
+            Date scheduleDate = insertList.stream().map(LhScheFinishQty::getScheduleDate).filter(Objects::nonNull).findFirst().orElse(DateUtils.getNowDate());
+            String scheduleDateStr = DateUtil.formatDate(scheduleDate);
+            log.info("硫化排程完成量按上一天最新版本同步：开始同步，factoryCode={}, scheduleDate={}, 待插入数量={}", factoryCode, scheduleDateStr, insertList.size());
+
+            FeignTokenHelper.runWithToken(() -> {
+                lhMesSyncRemoteService.logicDeleteAndSaveScheFinishQty(factoryCode, scheduleDateStr, "MES", insertList);
+            });
+
+            log.info("硫化排程完成量按上一天最新版本同步：同步完成，factoryCode={}, 插入数量={}", factoryCode, insertList.size());
+        } catch (Exception e) {
+            log.error("硫化排程完成量按上一天最新版本同步：Feign调用异常，factoryCode={}, 待插入数量={}", syncDataLogs.getFactoryCode(), insertList.size(), e);
+            return AjaxResult.error("硫化排程完成量按上一天最新版本同步失败：" + e.getMessage());
+        }
+
+        try {
+            FeignTokenHelper.runWithToken(() -> {
+                lhMesSyncRemoteService.writeBackScheduleResultFinishQty(insertList);
+            });
+        } catch (Exception e) {
+            log.error("【硫化排程完成量按上一天最新版本回写】回写硫化排程结果表完成量异常", e);
+        }
+        return AjaxResult.success();
+    }
+
+    /**
      * 按指定版本号同步硫化排程完成量（临时任务）
      * 与原syncLhClassShiftFinishQty的区别：不限日期，按指定版本号查询MES中间表所有日期数据
      * 同步后同样回填排程结果
