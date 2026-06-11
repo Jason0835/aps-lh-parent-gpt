@@ -1470,10 +1470,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             String machineCode = parts[0];
             String embryoCode = parts.length > 1 ? parts[1] : null;
             String constructionStage = parts.length > 2 && !parts[2].isEmpty() ? parts[2] : null;
-            // materialCode 不再作为 taskKey 的一部分，需要从 classSprMap 中收集所有唯一的materialCode，用逗号拼接
+            // materialCode 不再作为 taskKey 的一部分，需要从 classSprMap 中收集所有唯一的materialCode
+            Set<String> materialCodeSet = new LinkedHashSet<>();
             String materialCode = null;
             if (classSprMap != null && !classSprMap.isEmpty()) {
-                Set<String> materialCodeSet = new LinkedHashSet<>();
                 for (ShiftScheduleService.ShiftProductionResult spr : classSprMap.values()) {
                     if (spr != null && spr.getMaterialCode() != null && !spr.getMaterialCode().isEmpty()) {
                         materialCodeSet.add(spr.getMaterialCode());
@@ -1606,29 +1606,46 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     result.setLhClassQty(new BigDecimal(primaryLh.getSingleMouldShiftQty()));
                 }
 
-                // lhRemainQty: 使用初始快照（排程开始前的硫化余量）
+                // lhRemainQty: 对合并后的所有materialCode求和（剔除维度后可能多个物料合并）使用初始快照
                 Map<String, BigDecimal> initialMonthSurplusMap = context.getInitialMonthSurplusMap();
-                if (initialMonthSurplusMap != null && primaryLh != null) {
-                    String surplusKey = materialCode != null ? materialCode : embryoCode;
-                    BigDecimal surplus = initialMonthSurplusMap.get(surplusKey);
-                    if (surplus != null) {
-                        result.setLhRemainQty(surplus);
+                BigDecimal totalLhRemain = null;
+                if (initialMonthSurplusMap != null) {
+                    for (String mc : materialCodeSet) {
+                        BigDecimal surplus = initialMonthSurplusMap.get(mc);
+                        if (surplus != null) {
+                            totalLhRemain = (totalLhRemain == null)
+                                    ? surplus : totalLhRemain.add(surplus);
+                        }
                     }
+                }
+                if (totalLhRemain == null && embryoCode != null) {
+                    // 兜底：按胎胚编码查找
+                    BigDecimal surplus = initialMonthSurplusMap != null ? initialMonthSurplusMap.get(embryoCode) : null;
+                    if (surplus != null) {
+                        totalLhRemain = surplus;
+                    }
+                }
+                if (totalLhRemain != null) {
+                    result.setLhRemainQty(totalLhRemain);
                 }
             }
 
-            // ---- 成型余量（重新计算 = lhRemainQty - totalStock） ----
+            // ---- 成型余量（重新计算 = lhRemainQty - totalStock，多物料求和 - 总库存） ----
             BigDecimal lhRemainQty = result.getLhRemainQty();
             if (lhRemainQty != null) {
                 result.setCxRemainQty(lhRemainQty.subtract(result.getTotalStock()));
             } else {
-                // 如果没有lhRemainQty，尝试从initialFormingRemainderMap获取
+                // 如果没有lhRemainQty，对合并后的所有materialCode求和
                 Map<String, Integer> initialFormingRemainderMap = context.getInitialFormingRemainderMap();
-                if (initialFormingRemainderMap != null && materialCode != null) {
-                    Integer cxRemain = initialFormingRemainderMap.get(materialCode);
-                    if (cxRemain != null) {
-                        result.setCxRemainQty(new BigDecimal(cxRemain));
+                if (initialFormingRemainderMap != null && !materialCodeSet.isEmpty()) {
+                    int totalCxRemain = 0;
+                    for (String mc : materialCodeSet) {
+                        Integer cxRemain = initialFormingRemainderMap.get(mc);
+                        if (cxRemain != null) {
+                            totalCxRemain += cxRemain;
+                        }
                     }
+                    result.setCxRemainQty(new BigDecimal(totalCxRemain));
                 }
             }
 
