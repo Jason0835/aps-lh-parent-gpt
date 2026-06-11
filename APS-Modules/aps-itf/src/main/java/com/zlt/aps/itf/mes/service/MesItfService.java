@@ -242,6 +242,15 @@ public interface MesItfService {
     AjaxResult syncLhClassShiftFinishQtyByVersion(String dataVersion);
 
     /**
+     * 按上一天最新版本号同步硫化排程完成量（临时任务）
+     * 逻辑同syncLhClassShiftFinishQty（抓当天最新版本），但日期条件改为上一天
+     *
+     * @param syncDataLogs 同步参数
+     * @return 结果
+     */
+    AjaxResult syncLhClassShiftFinishQtyByYesterday(AuxReqSyncDataLogs syncDataLogs);
+
+    /**
      * 同步成型排程日完成量
      * 采用更新删除标识模式，而不是先删后插
      *
