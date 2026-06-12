@@ -2,6 +2,7 @@ package com.zlt.aps.mp.factory.service;
 
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.ProductionModeParam;
 import com.zlt.aps.mp.api.domain.vo.*;
 import com.zlt.aps.mp.factory.dto.FactoryProductionPlanVersionDto;
 
@@ -21,6 +22,46 @@ public interface IFactoryConsoleService {
      * @return
      */
     List<FactoryProductionPlanVersionDto> getProductionVersionList(FactoryProductionPlanVo queryCondition);
+
+    /**
+     * 获取当前的排产模式
+     *
+     * @param queryCondition 查询条件
+     * @return
+     */
+    MpProductionModeInfoVo getCurrentProductionMode(FactoryProductionPlanVo queryCondition);
+
+    /**
+     * 获取所有的排产模式
+     *
+     * @param queryCondition 查询条件
+     * @return
+     */
+    List<MpProductionModeInfoVo> getAllProductionModeInfo(FactoryProductionPlanVo queryCondition);
+
+    /**
+     * 获取对应的排产模式配置项信息
+     *
+     * @param productionModeInfo 排产模式查询条件
+     * @return
+     */
+    List<ProductionModeParam> getProductionModeList(MpProductionModeInfoVo productionModeInfo);
+
+    /**
+     * 更新排产模式配置项参数值
+     *
+     * @param saveParam 排产模式配置项信息
+     * @return
+     */
+    boolean updateProductionModeInfo(ProductionModeParam saveParam);
+
+    /**
+     * 应用排产模式的排产配置值
+     *
+     * @param param
+     * @return
+     */
+    AjaxResult applyProductionModeConfiguration(MpProductionModeInfoVo param);
 
     /**
      * 根据条件，获取对应工厂的还未选择的销售需求计划版本信息
@@ -56,6 +97,7 @@ public interface IFactoryConsoleService {
      * @return
      */
     AjaxResult groupPlanCapacityResetAllocationProduction(FactoryProductionParamVo factoryProductionParam);
+
     /**
      * 重新进行模具排产
      *
@@ -105,6 +147,7 @@ public interface IFactoryConsoleService {
 
     /**
      * 检测
+     *
      * @param factoryProductionParam
      * @return
      */

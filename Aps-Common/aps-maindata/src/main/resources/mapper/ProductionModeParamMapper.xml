@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zlt.aps.maindata.mapper.ProductionModeParamMapper">
+
+    <update id="updateFactoryParamByProductionMode" parameterType="com.zlt.aps.mp.api.domain.vo.MpProductionModeInfoVo">
+        UPDATE t_mp_factory_param mfp
+          JOIN t_mp_production_mode_param pmp
+            ON mfp.PARAM_CODE = pmp.PARAM_CODE
+           AND mfp.FACTORY_CODE = pmp.FACTORY_CODE
+           AND mfp.PRODUCT_TYPE_CODE = pmp.PRODUCT_TYPE_CODE
+           SET mfp.PARAM_VALUE = pmp.PARAM_VALUE
+         WHERE mfp.IS_DELETE = 0
+           AND mfp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND mfp.PRODUCT_TYPE_CODE = #{productTypeCode,jdbcType=VARCHAR}
+    </update>
+
+    <update id="changeProductionMode" parameterType="com.zlt.aps.mp.api.domain.vo.MpProductionModeInfoVo">
+        UPDATE t_mp_factory_param mfp
+           SET mfp.PARAM_VALUE = #{productionMode}
+         WHERE mfp.PARAM_CODE = #{productionModeParamCode,jdbcType=VARCHAR}
+           AND mfp.FACTORY_CODE = #{factoryCode,jdbcType=VARCHAR}
+           AND mfp.PRODUCT_TYPE_CODE = #{productTypeCode,jdbcType=VARCHAR}
+    </update>
+</mapper>

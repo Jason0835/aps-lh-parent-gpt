@@ -4,22 +4,27 @@ import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.i18n.utils.I18nUtil;
+import com.ruoyi.common.log.annotation.Log;
+import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.enums.ProductTypeEnum;
 import com.zlt.aps.enums.YesOrNoEnum;
+import com.zlt.aps.mp.api.domain.dto.FactoryFinalVersionQueryDto;
+import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
+import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.ProductionModeParam;
+import com.zlt.aps.mp.api.domain.vo.*;
+import com.zlt.aps.mp.common.utils.ParamDataTypeUtils;
+import com.zlt.aps.mp.factory.dto.FactoryProductionPlanVersionDto;
 import com.zlt.aps.mp.factory.service.IFactoryConsoleService;
 import com.zlt.aps.mp.factory.service.IFactoryMonthPlanProductionFinalResultService;
 import com.zlt.aps.mp.factory.service.IFactoryProductionVersionService;
 import com.zlt.aps.redissonLock.annotation.DistributedLock;
 import com.zlt.aps.redissonLock.annotation.RedissonLockAnno;
-import com.zlt.aps.mp.api.domain.dto.FactoryFinalVersionQueryDto;
-import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
-import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
-import com.zlt.aps.mp.api.domain.vo.*;
-import com.zlt.aps.mp.factory.dto.FactoryProductionPlanVersionDto;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.aspectj.weaver.loadtime.Aj;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
@@ -105,6 +110,70 @@ public class FactoryConsoleController extends BaseController {
     }
 
     /**
+     * 获取当前排产模式信息
+     *
+     * @param queryCondition 查询条件
+     * @return
+     */
+    @ApiOperation("查询工厂当前的排产模式")
+    @PostMapping("/currentProductionMode")
+    public MpProductionModeInfoVo getCurrentProductionMode(@RequestBody FactoryProductionPlanVo queryCondition) {
+        return factoryConsoleService.getCurrentProductionMode(queryCondition);
+    }
+
+    /**
+     * 获取所有的排产模式
+     *
+     * @param queryCondition 查询条件
+     * @return
+     */
+    @ApiOperation("获取所有的排产模式")
+    @PostMapping("/allProductionMode")
+    public List<MpProductionModeInfoVo> getAllProductionMode(@RequestBody FactoryProductionPlanVo queryCondition) {
+        return factoryConsoleService.getAllProductionModeInfo(queryCondition);
+    }
+
+    /**
+     * 获取对应排产模式的配置项信息
+     *
+     * @param query 查询条件
+     * @return
+     */
+    @ApiOperation("获取排产模式的配置项信息")
+    @PostMapping("/getProductionModeParamInfo")
+    public TableDataInfo getProductionModeConfigurationInfo(@RequestBody MpProductionModeInfoVo query) {
+        startPage("FACTORY_CODE,BUSINESS_GROUP,PARAM_CODE asc");
+        List<ProductionModeParam> list = factoryConsoleService.getProductionModeList(query);
+        return getDataTable(list);
+    }
+
+    /**
+     * 修改排产模式配置项
+     */
+    @Log(title = "ui.data.column.production.mode.param.modelName", businessType = BusinessType.UPDATE)
+    @ApiOperation("修改工厂的排产模式配置项")
+    @PostMapping("/editProductionMode")
+    public AjaxResult edit(@RequestBody ProductionModeParam entity) {
+        ParamDataTypeUtils.checkValidParams(entity.getParamCode(), entity.getParamName(), entity.getDataType(), entity.getParamValue());
+        return toAjax(factoryConsoleService.updateProductionModeInfo(entity));
+    }
+
+    /**
+     * 应用排产模式配置信息项
+     */
+    @ApiOperation("应用排产模式配置信息项")
+    @PostMapping("/applyProductionMode")
+    public AjaxResult applyProductionModeConfiguration(@RequestBody MpProductionModeInfoVo param){
+        if (null == param) {
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.condition.noEmpty"));
+        }
+        Integer productionMode = param.getProductionMode();
+        if(null == productionMode || StringUtils.isBlank(param.getFactoryCode())){
+            return AjaxResult.error(I18nUtil.getMessage("ui.data.query.param.checkFactoryNoEmpty"));
+        }
+        return factoryConsoleService.applyProductionModeConfiguration(param);
+    }
+    /**
      * 查询工厂可选择的月份需求计划
      *
      * @param queryCondition 查询条件
@@ -128,10 +197,10 @@ public class FactoryConsoleController extends BaseController {
      */
     @ApiOperation("确认对工厂 + 年月 + 需求计划版本进行工厂排产")
     @RedissonLockAnno(uniqueMark = "redissonLock:demandPlan:confirmSubmit:",
-        expressions = {"#confirmParam.factoryCode", "#confirmParam.year", "#confirmParam.month"},
-        msgKey = "ui.data.alert.confirmSubmit.run",
-        waitTime = 5,
-        leaseTime = 300
+            expressions = {"#confirmParam.factoryCode", "#confirmParam.year", "#confirmParam.month"},
+            msgKey = "ui.data.alert.confirmSubmit.run",
+            waitTime = 5,
+            leaseTime = 300
     )
     @PostMapping("/confirmProductionRequireVersion")
     public AjaxResult confirmProductionRequireVersion(@RequestBody FactoryProductionPlanVo confirmParam) {
@@ -289,10 +358,10 @@ public class FactoryConsoleController extends BaseController {
     @ResponseBody
     @ApiOperation("按分厂 + 年月 + 需求版本的方式删除需求计划版本及对应的排产版本")
     @RedissonLockAnno(uniqueMark = "redissonLock:demandPlan:cancelSubmit:",
-        expressions = {"#factoryProductionParam.factoryCode", "#factoryProductionParam.year", "#factoryProductionParam.month"},
-        msgKey = "ui.data.alert.cancelSubmit.run",
-        waitTime = 5,
-        leaseTime = 300
+            expressions = {"#factoryProductionParam.factoryCode", "#factoryProductionParam.year", "#factoryProductionParam.month"},
+            msgKey = "ui.data.alert.cancelSubmit.run",
+            waitTime = 5,
+            leaseTime = 300
     )
     @PostMapping("/deleteMonthPlanRequire")
     public AjaxResult deleteMonthPlanRequire(@RequestBody FactoryProductionParamVo factoryProductionParam) {
