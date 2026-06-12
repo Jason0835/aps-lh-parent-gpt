@@ -382,11 +382,26 @@ export default {
 };
 </script>
 
-<style scoped>
-/* 自动排程错误/警告弹窗，内容过多时可滚动 */
-.molding-auto-plan-error >>> .el-message-box__message {
-  max-height: 60vh;
+<style>
+/* 自动排程错误/警告弹窗，内容过多时可滚动（非scoped，因为 $alert 挂载在 body 级别） */
+.molding-auto-plan-error {
+  max-width: 600px;
+}
+.molding-auto-plan-error .el-message-box {
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.molding-auto-plan-error .el-message-box__content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.molding-auto-plan-error .el-message-box__message {
+  flex: 1;
   overflow-y: auto;
+  max-height: calc(85vh - 130px);
   padding-right: 8px;
 }
 </style>
