@@ -112,11 +112,11 @@ export default {
         { type: "selection", fixed: "left" },
         {
           align: "center",
-          label: this.$t("ui.data.column.cd90ScheduleResultLog.baseInfo"),
+          label: this.$t("ui.data.column.scheduleResult.baseInfo"),
           children: [
             {
               prop: "operType",
-              label: this.$t("ui.data.column.cd90ScheduleResultLog.operType"),
+              label: this.$t("ui.data.column.dispatcherlog.operType"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -130,7 +130,7 @@ export default {
             },
             {
               prop: "scheduleDate",
-              label: this.$t("ui.data.column.cd90ScheduleResultLog.scheduleDate"),
+              label: this.$t("ui.data.column.dispatcherlog.scheduleDate"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -139,7 +139,7 @@ export default {
             },
             {
               prop: "materialCode",
-              label: this.$t("ui.data.column.cd90ScheduleResultLog.clothCode"),
+              label: this.$t("ui.data.column.cd90.dispatcherlog.materialCode"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -147,7 +147,7 @@ export default {
             },
             {
               prop: "createBy",
-              label: this.$t("ui.data.column.cd90ScheduleResultLog.createBy"),
+              label: this.$t("ui.data.column.dispatcherlog.createBy"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -156,7 +156,7 @@ export default {
             },
             {
               prop: "createTime",
-              label: this.$t("ui.data.column.cd90ScheduleResultLog.createTime"),
+              label: this.$t("ui.data.column.dispatcherlog.createTime"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -167,11 +167,11 @@ export default {
         },
         {
           align: "center",
-          label: this.$t("ui.data.column.cd90ScheduleResultLog.beforeOper"),
+          label: this.$t("ui.data.column.dispatcherlog.beforeOper"),
           children: [
             {
               prop: "beforeMachineId",
-              label: this.$t("ui.data.column.cd90ScheduleResultLog.line"),
+              label: this.$t("ui.data.column.dispatcherlog.line"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -186,7 +186,7 @@ export default {
             },
             {
               prop: "beforeDayPlan",
-              label: this.$t("ui.data.column.cd90ScheduleResultLog.nightPlan"),
+              label: this.$t("ui.data.column.dispatcherlog.nightPlan"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -194,7 +194,7 @@ export default {
             },
             {
               prop: "beforeNightPlan",
-              label: this.$t("ui.data.column.cd90ScheduleResultLog.midPlan"),
+              label: this.$t("ui.data.column.dispatcherlog.midPlan"),
               valign: "middle",
               align: "left",
               halign: "center",
@@ -204,11 +204,11 @@ export default {
         },
         {
           align: "center",
-          label: this.$t("ui.data.column.cd90ScheduleResultLog.AfterOper"),
+          label: this.$t("ui.data.column.dispatcherlog.AfterOper"),
           children: [
             {
               prop: "afterMachineId",
-              label: this.$t("ui.data.column.cd90ScheduleResultLog.line"),
+              label: this.$t("ui.data.column.dispatcherlog.line"),
               valign: "middle",
               align: "center",
               halign: "center",
@@ -223,7 +223,7 @@ export default {
             },
             {
               prop: "afterDayPlan",
-              label: this.$t("ui.data.column.cd90ScheduleResultLog.nightPlan"),
+              label: this.$t("ui.data.column.dispatcherlog.nightPlan"),
               valign: "middle",
               align: "left",
               halign: "center",
@@ -231,7 +231,7 @@ export default {
             },
             {
               prop: "afterNightPlan",
-              label: this.$t("ui.data.column.cd90ScheduleResultLog.midPlan"),
+              label: this.$t("ui.data.column.dispatcherlog.midPlan"),
               valign: "middle",
               align: "left",
               halign: "center",
@@ -246,23 +246,23 @@ export default {
     searchColumns() {
       return [
         {
-          label: this.$t("ui.data.column.cd90ScheduleResultLog.operType"),
+          label: this.$t("ui.data.column.dispatcherlog.operType"),
           prop: "operType",
           type: "select", //DISPATCHER_OPER_TYPE
           dictData: this.dict.type.DISPATCHER_OPER_TYPE,
         },
         {
-          label: this.$t("ui.data.column.cd90ScheduleResultLog.scheduleDate"),
+          label: this.$t("ui.data.column.dispatcherlog.scheduleDate"),
           prop: "scheduleDate",
           type: "date",
           valueFormat: "yyyy-MM-dd",
         },
         {
-          label: this.$t("ui.data.column.cd90ScheduleResultLog.createBy"),
+          label: this.$t("ui.data.column.dispatcherlog.createBy"),
           prop: "createBy",
         },
         {
-          label: this.$t("ui.data.column.cd90ScheduleResultLog.createTime"),
+          label: this.$t("ui.data.column.maintenance.log.createTime"),
           prop: "createTime",
           type: "date",
           dateType: "daterange",
