@@ -83,7 +83,6 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
             checkNumericField(r.getMouldQty(), "MOULD_QTY", materialCode, missingCountMap, missingSampleMap);
             checkNumericField(r.getSingleMouldShiftQty(), "SINGLE_MOULD_SHIFT_QTY", materialCode, missingCountMap, missingSampleMap);
             checkField(r.getConstructionStage(), "CONSTRUCTION_STAGE", materialCode, missingCountMap, missingSampleMap);
-            checkField(r.getEmbryoNo(), "EMBRYO_NO", materialCode, missingCountMap, missingSampleMap);
             checkField(r.getProductionVersion(), "PRODUCTION_VERSION", materialCode, missingCountMap, missingSampleMap);
         }
 
@@ -293,5 +292,35 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
             return suggestion;
         }
         return I18nUtil.getMessage("ui.data.column.cxScheduleResult.validation.lhResult.suggestion.DEFAULT");
+    }
+
+    /**
+     * 校验单条硫化排程记录是否有效（所有必填字段均有值）
+     * 用于判断历史记录是否为人工导入的无效数据
+     *
+     * @param record 硫化排程记录
+     * @return true=有效, false=无效（存在必填字段缺失）
+     */
+    public static boolean isValidRecord(LhScheduleResult record) {
+        if (record == null) {
+            return false;
+        }
+        // 字符串字段：null或空串视为无效
+        if (isBlank(record.getMaterialCode())) return false;
+        if (isBlank(record.getEmbryoCode())) return false;
+        if (isBlank(record.getStructureName())) return false;
+        if (isBlank(record.getMaterialDesc())) return false;
+        if (isBlank(record.getMainMaterialDesc())) return false;
+        if (isBlank(record.getConstructionStage())) return false;
+        if (isBlank(record.getProductionVersion())) return false;
+        // 数值字段：null或<=0视为无效
+        if (record.getLhTime() == null || record.getLhTime() <= 0) return false;
+        if (record.getMouldQty() == null || record.getMouldQty() <= 0) return false;
+        if (record.getSingleMouldShiftQty() == null || record.getSingleMouldShiftQty() <= 0) return false;
+        return true;
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
     }
 }

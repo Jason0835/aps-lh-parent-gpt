@@ -11,9 +11,11 @@ import com.zlt.aps.mp.api.domain.dto.FactoryFinalVersionQueryDto;
 import com.zlt.aps.mp.api.domain.dto.FactoryMonthPlanProdResultDto;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.ProductionModeParam;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanTypeVo;
 import com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.mp.api.domain.vo.FactoryProductionPlanVo;
+import com.zlt.aps.mp.api.domain.vo.MpProductionModeInfoVo;
 import com.zlt.aps.mp.api.service.IFactoryConsoleRemoteService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -54,6 +56,71 @@ public class FactoryConsoleUIController extends BaseController {
     @ApiOperation(value = "查询分厂需要排产及已经排产的销售生产需求计划列表", notes = "根据条件查询查询分厂需要排产及已经排产的销售生产需求计划列表")
     public TableDataInfo getProductionVersionList(FactoryProductionPlanVo queryCondition) {
         return factoryConsoleService.getProductionVersionList(queryCondition);
+    }
+
+    /**
+     * 获取当前排产模式信息
+     *
+     * @param queryCondition 查询条件
+     * @return
+     */
+    @ResponseBody
+    @PostMapping("/currentProductionMode")
+    @ApiOperation(value = "查询工厂当前的排产模式", notes = "查询工厂当前的排产模式")
+    public MpProductionModeInfoVo getCurrentProductionMode(@RequestBody FactoryProductionPlanVo queryCondition) {
+        return factoryConsoleService.getCurrentProductionMode(queryCondition);
+    }
+
+    /**
+     * 获取所有的排产模式
+     *
+     * @param queryCondition 查询条件
+     * @return
+     */
+    @ResponseBody
+    @PostMapping("/allProductionMode")
+    @ApiOperation(value = "获取所有的排产模式", notes = "获取所有的排产模式")
+    public List<MpProductionModeInfoVo> getAllProductionMode(@RequestBody FactoryProductionPlanVo queryCondition) {
+        return factoryConsoleService.getAllProductionMode(queryCondition);
+    }
+
+    /**
+     * 获取对应排产模式的配置项信息
+     *
+     * @param query 查询条件
+     * @return
+     */
+    @ResponseBody
+    @PostMapping("/getProductionModeParamInfo")
+    @ApiOperation(value = "获取排产模式的配置项信息", notes = "获取排产模式的配置项信息")
+    public TableDataInfo getProductionModeConfigurationInfo(@RequestBody MpProductionModeInfoVo query) {
+        return factoryConsoleService.getProductionModeConfigurationInfo(query);
+    }
+
+    /**
+     * 修改排产模式配置项
+     *
+     * @param entity 排产模式配置项对象
+     * @return
+     */
+    @ResponseBody
+    @PostMapping("/editProductionMode")
+    @ApiOperation(value = "修改工厂的排产模式配置项", notes = "修改工厂的排产模式配置项")
+    public AjaxResult edit(@RequestBody ProductionModeParam entity) {
+        return factoryConsoleService.edit(entity);
+    }
+
+    /**
+     * 应用排产模式配置信息项
+     *
+     * @param param 排产模式条件
+     * @return
+     */
+    @ResponseBody
+    @PostMapping("/applyProductionMode")
+    @ApiOperation(value = "应用排产模式配置信息项", notes = "应用排产模式配置信息项")
+    public AjaxResult applyProductionModeConfiguration(@RequestBody MpProductionModeInfoVo param) {
+        return factoryConsoleService.applyProductionModeConfiguration(param);
     }
 
     /**
@@ -210,7 +277,6 @@ public class FactoryConsoleUIController extends BaseController {
      * @param factoryProductionParam
      * @return
      */
-//    @RequiresPermissions("monthplan:console:deleteMonthPlanProductionVersion")
     @ResponseBody
     @PostMapping("/deleteMonthPlanProductionVersion")
     @ApiOperation("按分厂 + 年月 + 排产版本的方式删除排产计划版本")

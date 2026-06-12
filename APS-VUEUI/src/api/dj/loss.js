@@ -3,14 +3,14 @@ import request from '@/utils/request'
 // =
 export function listLoss(query) {
   return request({
-    url: 'dj/loss/list',
+    url: 'dj/lossSetting/list',
     method: 'post',
     data: query
   })
 }
 export function editLoss(query) {
   return request({
-    url: 'dj/loss/edit',
+    url: 'dj/lossSetting/edit',
     method: 'post',
     data: query
   })
@@ -18,7 +18,7 @@ export function editLoss(query) {
 
 export function removeLoss(query) {
   return request({
-    url: 'dj/loss/remove',
+    url: 'dj/lossSetting/remove',
     method: 'post',
     data: query
   })

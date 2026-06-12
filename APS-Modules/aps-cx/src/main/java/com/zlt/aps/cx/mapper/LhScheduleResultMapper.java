@@ -31,13 +31,14 @@ public interface LhScheduleResultMapper extends BaseMapper<LhScheduleResult> {
     List<LhScheduleResult> selectAll();
 
     /**
-     * 查询指定物料在给定日期之前最近的一条硫化排程记录
+     * 查询指定物料在给定日期之前最近的一条硫化排程记录（仅限当月范围内）
      * 用于补充延误物料的历史任务信息
      *
      * @param materialCode 物料编码
      * @param beforeDate   排程日期（查询此日期之前的记录）
+     * @param firstDayOfMonth 当月1号（查询下限，不早于此日期）
      * @return 最近一条硫化排程记录，不存在则返回null
      */
-    @Select("SELECT * FROM t_lh_schedule_result WHERE MATERIAL_CODE = #{materialCode} AND SCHEDULE_DATE < #{beforeDate} AND IS_DELETE = '0' ORDER BY SCHEDULE_DATE DESC LIMIT 1")
-    LhScheduleResult selectLatestBeforeDate(@Param("materialCode") String materialCode, @Param("beforeDate") LocalDate beforeDate);
+    @Select("SELECT * FROM t_lh_schedule_result WHERE MATERIAL_CODE = #{materialCode} AND SCHEDULE_DATE >= #{firstDayOfMonth} AND SCHEDULE_DATE < #{beforeDate} AND IS_DELETE = '0' ORDER BY SCHEDULE_DATE DESC LIMIT 1")
+    LhScheduleResult selectLatestBeforeDate(@Param("materialCode") String materialCode, @Param("beforeDate") LocalDate beforeDate, @Param("firstDayOfMonth") LocalDate firstDayOfMonth);
 }

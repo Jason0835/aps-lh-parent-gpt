@@ -43,7 +43,7 @@ import io.swagger.annotations.ApiOperation;
  */
 @Api(tags = "垫胶损耗率设定")
 @Controller
-@RequestMapping("/dj/loss")
+@RequestMapping("/dj/lossSetting")
 public class DjLossSettingUIController extends BaseUIController<DjLossSetting> {
 
     @Autowired
