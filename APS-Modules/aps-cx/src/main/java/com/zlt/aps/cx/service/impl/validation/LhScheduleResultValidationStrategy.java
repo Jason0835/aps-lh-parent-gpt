@@ -83,7 +83,6 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
             checkNumericField(r.getMouldQty(), "MOULD_QTY", materialCode, missingCountMap, missingSampleMap);
             checkNumericField(r.getSingleMouldShiftQty(), "SINGLE_MOULD_SHIFT_QTY", materialCode, missingCountMap, missingSampleMap);
             checkField(r.getConstructionStage(), "CONSTRUCTION_STAGE", materialCode, missingCountMap, missingSampleMap);
-            checkField(r.getEmbryoNo(), "EMBRYO_NO", materialCode, missingCountMap, missingSampleMap);
             checkField(r.getProductionVersion(), "PRODUCTION_VERSION", materialCode, missingCountMap, missingSampleMap);
         }
 
