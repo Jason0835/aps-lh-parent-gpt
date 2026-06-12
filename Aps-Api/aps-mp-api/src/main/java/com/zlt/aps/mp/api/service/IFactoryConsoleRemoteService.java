@@ -6,13 +6,17 @@ import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.zlt.aps.mp.api.domain.dto.FactoryFinalVersionQueryDto;
 import com.zlt.aps.mp.api.domain.entity.FactoryMonthPlanProductionFinalResult;
 import com.zlt.aps.mp.api.domain.entity.MpFactoryProductionVersion;
+import com.zlt.aps.mp.api.domain.entity.ProductionModeParam;
 import com.zlt.aps.mp.api.domain.vo.FactoryMonthPlanTypeVo;
 import com.zlt.aps.mp.api.domain.vo.FactoryProductionParamVo;
 import com.zlt.aps.mp.api.domain.vo.FactoryProductionPlanVo;
+import com.zlt.aps.mp.api.domain.vo.MpProductionModeInfoVo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+
+import java.util.List;
 
 /**
  * 工厂月度计划
@@ -33,6 +37,56 @@ public interface IFactoryConsoleRemoteService {
     @ApiOperation("查询工厂的月份排产计划----工厂同一计划可写入多个版本")
     @PostMapping("/factoryConsole/productionVersionList")
     TableDataInfo getProductionVersionList(@RequestBody FactoryProductionPlanVo queryCondition);
+
+    /**
+     * 获取当前排产模式信息
+     *
+     * @param queryCondition 查询条件
+     * @return
+     */
+    @ApiOperation("查询工厂当前的排产模式")
+    @PostMapping("/currentProductionMode")
+    MpProductionModeInfoVo getCurrentProductionMode(@RequestBody FactoryProductionPlanVo queryCondition);
+
+    /**
+     * 获取所有的排产模式
+     *
+     * @param queryCondition 查询条件
+     * @return
+     */
+    @ApiOperation("获取所有的排产模式")
+    @PostMapping("/allProductionMode")
+    List<MpProductionModeInfoVo> getAllProductionMode(@RequestBody FactoryProductionPlanVo queryCondition);
+
+    /**
+     * 获取对应排产模式的配置项信息
+     *
+     * @param query 查询条件
+     * @return
+     */
+    @ApiOperation("获取排产模式的配置项信息")
+    @PostMapping("/getProductionModeParamInfo")
+    TableDataInfo getProductionModeConfigurationInfo(@RequestBody MpProductionModeInfoVo query);
+
+    /**
+     * 修改排产模式配置项
+     *
+     * @param entity 排产模式配置项对象
+     * @return
+     */
+    @ApiOperation("修改工厂的排产模式配置项")
+    @PostMapping("/editProductionMode")
+    AjaxResult edit(@RequestBody ProductionModeParam entity);
+
+    /**
+     * 应用排产模式配置信息项
+     *
+     * @param param 排产模式条件
+     * @return
+     */
+    @ApiOperation("应用排产模式配置信息项")
+    @PostMapping("/applyProductionMode")
+    AjaxResult applyProductionModeConfiguration(@RequestBody MpProductionModeInfoVo param);
 
     /**
      * 查询工厂月份对应还没选择的需求计划版本列表
