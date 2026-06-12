@@ -1097,8 +1097,9 @@ public class ScheduleServiceImpl implements ScheduleService {
         int month = scheduleDate.getMonthValue();
         String factoryCode = context.getFactoryCode();
 
-        // 1. 获取月计划数据，按物料汇总月计划总量
-        List<FactoryMonthPlanProductionFinalResult> monthPlans = monthPlanMapper.selectByYearAndMonth(year, month);
+        // 1. 获取月计划数据，按物料汇总月计划总量（按工厂过滤）
+        int yearMonth = year * 100 + month;
+        List<FactoryMonthPlanProductionFinalResult> monthPlans = monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, yearMonth);
         Map<String, Integer> materialTotalPlanQtyMap = monthPlans.stream()
                 .filter(p -> p.getMaterialCode() != null && p.getTotalQty() != null)
                 .collect(Collectors.groupingBy(
@@ -1872,8 +1873,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         // 1. 尝试从数据库加载已存在的收尾信息
         List<CxMaterialEnding> existingEndings = materialEndingMapper.selectByStatDate(scheduleDate);
 
-        // 2. 获取月计划数据
-        List<FactoryMonthPlanProductionFinalResult> monthPlans = monthPlanMapper.selectByYearAndMonth(year, month);
+        // 2. 获取月计划数据（按工厂过滤）
+        List<FactoryMonthPlanProductionFinalResult> monthPlans = monthPlanMapper.selectByFactoryAndYearMonth(context.getFactoryCode(), yearMonth);
         Map<String, List<FactoryMonthPlanProductionFinalResult>> materialPlanMap = monthPlans.stream()
                 .filter(p -> p.getMaterialCode() != null)
                 .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
