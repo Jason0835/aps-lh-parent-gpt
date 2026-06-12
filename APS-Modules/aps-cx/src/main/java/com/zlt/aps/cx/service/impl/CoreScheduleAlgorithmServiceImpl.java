@@ -1714,8 +1714,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 result.setColorTag("yellow");
             }
 
-            // ---- 示方书类型从SKU与示方书关系获取（materialCode+constructionStage匹配），查不到则降级匹配 ----
-            String recipeType = resolveRecipeType(skuRecipeTypeMap, materialCode, constructionStage);
+            // ---- 示方书类型从SKU与示方书关系获取（按物料编码匹配，忽略试制状态维度） ----
+            String recipeType = resolveRecipeType(skuRecipeTypeMap, materialCode);
 
             // ---- 映射班次排量到 CLASS1~8 ----
             for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
@@ -2287,52 +2287,42 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
     }
 
     /**
-     * 解析示方书类型：优先从SKU关系映射匹配，匹配不上则按施工阶段降级匹配，最终兜底使用constructionStage
+     * 解析示方书类型：按物料编码匹配SKU关系映射，忽略试制状态维度
      *
-     * <p>降级规则：
+     * <p>匹配规则：
      * <ul>
-     *   <li>constructionStage=03（正式）：依次尝试 03 → 02 → 01</li>
-     *   <li>constructionStage=02（量试）：依次尝试 02 → 01</li>
-     *   <li>constructionStage=01（试制）：仅尝试 01，匹配不上即返回 01</li>
+     *   <li>多物料合并（含逗号）时，仅取第一个物料编码匹配</li>
+     *   <li>按 materialCode + "|" 前缀匹配，忽略 trialStatus 差异</li>
+     *   <li>匹配不上返回 null</li>
      * </ul>
      *
-     * @param skuRecipeTypeMap  SKU关系映射（materialCode|constructionStage → embryoType）
-     * @param materialCode      物料编码
-     * @param constructionStage 施工阶段（01/02/03）
-     * @return 示方书类型，匹配不上则返回constructionStage本身
+     * @param skuRecipeTypeMap  SKU关系映射（materialCode|trialStatus → embryoType）
+     * @param materialCode      物料编码（多个逗号分隔时仅取第一个）
+     * @return 示方书类型，匹配不上则返回 null
      */
-    private String resolveRecipeType(Map<String, String> skuRecipeTypeMap, String materialCode, String constructionStage) {
-        if (materialCode == null || constructionStage == null) {
-            return constructionStage;
+    private String resolveRecipeType(Map<String, String> skuRecipeTypeMap, String materialCode) {
+        if (materialCode == null || materialCode.isEmpty()) {
+            return null;
         }
 
-        // 定义降级顺序
-        String[] stagesToTry;
-        if ("03".equals(constructionStage)) {
-            stagesToTry = new String[]{"03", "02", "01"};
-        } else if ("02".equals(constructionStage)) {
-            stagesToTry = new String[]{"02", "01"};
-        } else {
-            stagesToTry = new String[]{constructionStage};
+        // 多物料合并时仅取第一个
+        String firstMaterial = materialCode;
+        int commaIdx = materialCode.indexOf(',');
+        if (commaIdx > 0) {
+            firstMaterial = materialCode.substring(0, commaIdx);
         }
 
-        for (String stage : stagesToTry) {
-            String skuKey = materialCode + "|" + stage;
-            String embryoType = skuRecipeTypeMap.get(skuKey);
-            if (embryoType != null) {
-                if (stage.equals(constructionStage)) {
-                    log.debug("物料{}施工阶段{}从SKU关系获取示方书类型: {}", materialCode, constructionStage, embryoType);
-                } else {
-                    log.info("物料{}施工阶段{}未匹配到（productStatus={}），降级为{}匹配成功，示方书类型: {}",
-                            materialCode, constructionStage, stage, embryoType);
-                }
-                return embryoType;
+        // 按 materialCode + "|" 前缀匹配，忽略 trialStatus 差异
+        String prefix = firstMaterial + "|";
+        for (Map.Entry<String, String> entry : skuRecipeTypeMap.entrySet()) {
+            if (entry.getKey().startsWith(prefix)) {
+                log.debug("物料{}从SKU关系获取示方书类型: {}", firstMaterial, entry.getValue());
+                return entry.getValue();
             }
         }
 
-        log.debug("物料{}施工阶段{}经降级匹配仍未在SKU关系中找到，回退使用constructionStage作为recipeType: {}",
-                materialCode, constructionStage, constructionStage);
-        return constructionStage;
+        log.debug("物料{}未在SKU关系中找到，recipeType留空", firstMaterial);
+        return null;
     }
 
     /**
