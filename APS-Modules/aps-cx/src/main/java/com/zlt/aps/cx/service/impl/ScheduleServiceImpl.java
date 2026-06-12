@@ -16,6 +16,7 @@ import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.cx.mapper.*;
+import com.zlt.aps.cx.service.impl.validation.LhScheduleResultValidationStrategy;
 import com.zlt.aps.lh.api.domain.entity.LhParams;
 import com.zlt.aps.cx.mapper.LhParamsMapper;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
@@ -2046,10 +2047,17 @@ public class ScheduleServiceImpl implements ScheduleService {
         int notFound = 0;
         for (CxMaterialEnding ending : delayEndings) {
             String materialCode = ending.getMaterialCode();
-            LhScheduleResult historicalRecord = lhScheduleResultMapper.selectLatestBeforeDate(materialCode, scheduleDate);
+            LhScheduleResult historicalRecord = lhScheduleResultMapper.selectLatestBeforeDate(materialCode, scheduleDate, scheduleDate.withDayOfMonth(1));
 
             if (historicalRecord == null) {
                 log.warn("延误物料 {} 在历史硫化排程中未找到记录，无法补充", materialCode);
+                notFound++;
+                continue;
+            }
+
+            // 校验历史记录必填字段是否完整，缺失则为人工导入无效数据，不纳入
+            if (!LhScheduleResultValidationStrategy.isValidRecord(historicalRecord)) {
+                log.warn("延误物料 {} 的历史记录必填字段不完整（人工导入无效数据），跳过补充", materialCode);
                 notFound++;
                 continue;
             }
