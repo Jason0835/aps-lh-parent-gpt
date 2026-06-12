@@ -1432,20 +1432,20 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
 
-        // ---- SKU与示方书关系映射（materialCode+embryoNo -> embryoType） ----
+        // ---- SKU与示方书关系映射（materialCode+constructionStage -> embryoType） ----
         Map<String, String> skuRecipeTypeMap = new HashMap<>();
         try {
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MdmSkuConstructionRef> skuQueryWrapper =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
             skuQueryWrapper.select(MdmSkuConstructionRef::getMaterialCode,
-                    MdmSkuConstructionRef::getEmbryoNo,
+                    MdmSkuConstructionRef::getTrialStatus,
                     MdmSkuConstructionRef::getEmbryoType);
             skuQueryWrapper.eq(MdmSkuConstructionRef::getIsDelete, 0);
             List<MdmSkuConstructionRef> skuRefList = skuConstructionRefMapper.selectList(skuQueryWrapper);
             if (skuRefList != null) {
                 for (MdmSkuConstructionRef ref : skuRefList) {
-                    if (ref.getMaterialCode() != null && ref.getEmbryoNo() != null && ref.getEmbryoType() != null) {
-                        String mapKey = ref.getMaterialCode() + "|" + ref.getEmbryoNo();
+                    if (ref.getMaterialCode() != null && ref.getTrialStatus() != null && ref.getEmbryoType() != null) {
+                        String mapKey = ref.getMaterialCode() + "|" + ref.getTrialStatus();
                         skuRecipeTypeMap.putIfAbsent(mapKey, ref.getEmbryoType());
                     }
                 }
@@ -1714,25 +1714,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 result.setColorTag("yellow");
             }
 
-            // ---- 示方书类型从SKU与示方书关系获取，查不到则回退constructionStage ----
-            String recipeType = constructionStage;
-            String embryoNo = (primaryLh != null) ? primaryLh.getEmbryoNo() : null;
-            if (embryoNo == null && materialCode != null) {
-                MdmMaterialInfo matInfo = materialByCodeMap.get(materialCode);
-                if (matInfo != null) {
-                    embryoNo = matInfo.getEmbryoNo();
-                }
-            }
-            if (materialCode != null && embryoNo != null) {
-                String skuKey = materialCode + "|" + embryoNo;
-                String skuEmbryoType = skuRecipeTypeMap.get(skuKey);
-                if (skuEmbryoType != null) {
-                    recipeType = skuEmbryoType;
-                    log.debug("物料{}制造示方书号{}从SKU关系获取示方书类型: {}", materialCode, embryoNo, skuEmbryoType);
-                } else {
-                    log.debug("物料{}制造示方书号{}未在SKU关系中找到示方书类型，回退使用constructionStage: {}", materialCode, embryoNo, constructionStage);
-                }
-            }
+            // ---- 示方书类型从SKU与示方书关系获取（materialCode+constructionStage匹配），查不到则降级匹配 ----
+            String recipeType = resolveRecipeType(skuRecipeTypeMap, materialCode, constructionStage);
 
             // ---- 映射班次排量到 CLASS1~8 ----
             for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
@@ -2301,6 +2284,55 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         public void setVulcanizeMachineCount(int vulcanizeMachineCount) { this.vulcanizeMachineCount = vulcanizeMachineCount; }
         public int getSequence() { return sequence; }
         public void setSequence(int sequence) { this.sequence = sequence; }
+    }
+
+    /**
+     * 解析示方书类型：优先从SKU关系映射匹配，匹配不上则按施工阶段降级匹配，最终兜底使用constructionStage
+     *
+     * <p>降级规则：
+     * <ul>
+     *   <li>constructionStage=03（正式）：依次尝试 03 → 02 → 01</li>
+     *   <li>constructionStage=02（量试）：依次尝试 02 → 01</li>
+     *   <li>constructionStage=01（试制）：仅尝试 01，匹配不上即返回 01</li>
+     * </ul>
+     *
+     * @param skuRecipeTypeMap  SKU关系映射（materialCode|constructionStage → embryoType）
+     * @param materialCode      物料编码
+     * @param constructionStage 施工阶段（01/02/03）
+     * @return 示方书类型，匹配不上则返回constructionStage本身
+     */
+    private String resolveRecipeType(Map<String, String> skuRecipeTypeMap, String materialCode, String constructionStage) {
+        if (materialCode == null || constructionStage == null) {
+            return constructionStage;
+        }
+
+        // 定义降级顺序
+        String[] stagesToTry;
+        if ("03".equals(constructionStage)) {
+            stagesToTry = new String[]{"03", "02", "01"};
+        } else if ("02".equals(constructionStage)) {
+            stagesToTry = new String[]{"02", "01"};
+        } else {
+            stagesToTry = new String[]{constructionStage};
+        }
+
+        for (String stage : stagesToTry) {
+            String skuKey = materialCode + "|" + stage;
+            String embryoType = skuRecipeTypeMap.get(skuKey);
+            if (embryoType != null) {
+                if (stage.equals(constructionStage)) {
+                    log.debug("物料{}施工阶段{}从SKU关系获取示方书类型: {}", materialCode, constructionStage, embryoType);
+                } else {
+                    log.info("物料{}施工阶段{}未匹配到（productStatus={}），降级为{}匹配成功，示方书类型: {}",
+                            materialCode, constructionStage, stage, embryoType);
+                }
+                return embryoType;
+            }
+        }
+
+        log.debug("物料{}施工阶段{}经降级匹配仍未在SKU关系中找到，回退使用constructionStage作为recipeType: {}",
+                materialCode, constructionStage, constructionStage);
+        return constructionStage;
     }
 
     /**
