@@ -3307,6 +3307,13 @@
   "ui.data.column.tm.scheduleResult.class6Analysis": "6班原因分析",
   "ui.data.column.tm.scheduleResult.releaseStatus": "发布状态",
   "ui.data.column.tm.scheduleResult.dataSource": "数据来源",
-  "ui.data.column.tm.scheduleResult.tailFlag": "是否收尾任务"
+  "ui.data.column.tm.scheduleResult.tailFlag": "是否收尾任务",
+  "ui.data.column.dj.machineMaintenance.modelName": "垫胶机台维修计划",
+  "ui.data.column.dj.machineMaintenance.factoryCode": "工厂编码",
+  "ui.data.column.dj.machineMaintenance.machineCode": "机台编码",
+  "ui.data.column.dj.machineMaintenance.machineName": "机台名称",
+  "ui.data.column.dj.machineMaintenance.stopStartTime": "停机开始时间",
+  "ui.data.column.dj.machineMaintenance.stopEndTime": "停机结束时间",
+  "ui.data.column.dj.machineMaintenance.stopShift": "停机班次"
 
 }

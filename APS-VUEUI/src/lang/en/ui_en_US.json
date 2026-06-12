@@ -603,6 +603,13 @@
   "ui.data.column.tm.scheduleResult.class6Analysis": "Shift 6 Analysis",
   "ui.data.column.tm.scheduleResult.releaseStatus": "Release Status",
   "ui.data.column.tm.scheduleResult.dataSource": "Data Source",
-  "ui.data.column.tm.scheduleResult.tailFlag": "Tail Flag"
+  "ui.data.column.tm.scheduleResult.tailFlag": "Tail Flag",
+  "ui.data.column.dj.machineMaintenance.modelName": "DJ Machine Maintenance Plan",
+  "ui.data.column.dj.machineMaintenance.factoryCode": "Factory Code",
+  "ui.data.column.dj.machineMaintenance.machineCode": "Machine Code",
+  "ui.data.column.dj.machineMaintenance.machineName": "Machine Name",
+  "ui.data.column.dj.machineMaintenance.stopStartTime": "Stop Start Time",
+  "ui.data.column.dj.machineMaintenance.stopEndTime": "Stop End Time",
+  "ui.data.column.dj.machineMaintenance.stopShift": "Stop Shift"
 
 }

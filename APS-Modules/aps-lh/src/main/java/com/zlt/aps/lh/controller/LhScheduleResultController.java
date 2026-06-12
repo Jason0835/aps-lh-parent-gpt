@@ -845,17 +845,17 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
 
     /**
      * 硫化排程结果下发到MES
-     * 背景逻辑：
-     * 1. 每条硫化排程结果自带8班数据，覆盖排程日期前2天到排程日期当天
+     * 背景逻辑（排程日期=T+1日，排程窗口T、T+1、T+2）：
+     * 1. 每条硫化排程结果自带8班数据，覆盖排程窗口T、T+1、T+2三天
      * 2. 8班对应关系（使用aps-cx-lh-api实体）：
-     * - 1-3班：T-2日的夜、早、中班（窗口首日，更新）
-     * - 4-6班：T-1日的夜、早、中班（窗口次日，更新）
-     * - 7-8班：T日的早、中班（排程日期当天，下发，夜班尚未排产不下发）
+     * - 1-2班：T日的早、中班（窗口首日，更新）
+     * - 3-5班：T+1日的夜、早、中班（排程日期当天，更新）
+     * - 6-8班：T+2日的夜、早、中班（窗口第三日，下发）
      * 3. 中间表映射：1班=夜班，2班=早班，3班=中班
-     * 4. T-2日、T-1日数据更新（存在则更新，不存在则插入）
-     * 5. T日数据下发（先删除后插入）
+     * 4. T日、T+1日数据更新（存在则更新，不存在则插入）
+     * 5. T+2日数据下发（先删除后插入）
      *
-     * @param scheduleDate 排程日期（窗口最后一天）
+     * @param scheduleDate 排程日期（T+1日）
      * @return 下发结果
      */
     @ApiOperation(value = "硫化排程结果下发到MES", notes = "将硫化排程结果下发到MES中间表，8班数据对应3天班次")
@@ -891,8 +891,8 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
                 ? ((java.sql.Date) scheduleDate).toLocalDate()
                 : scheduleDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
         // 排程日期为T+1日，排程窗口为T、T+1、T+2三天
-        // day1=窗口首日(T日)=scheduleDate-1，day2=窗口次日(T+1日)=scheduleDate，day3=窗口第三日(T+2日)=scheduleDate+1
-        LocalDate day1 = scheduleLocalDate.minusDays(LhScheduleConstant.SCHEDULE_DAYS - 2);
+        // day1=窗口首日(T日)=scheduleDate-1，day2=排程日期(T+1日)=scheduleDate，day3=窗口第三日(T+2日)=scheduleDate+1
+        LocalDate day1 = scheduleLocalDate.minusDays(1);
         LocalDate day2 = scheduleLocalDate;
         LocalDate day3 = scheduleLocalDate.plusDays(1);
 
@@ -1158,7 +1158,7 @@ public class LhScheduleResultController extends AbstractDocBizController<LhSched
     }
 
     /**
-     * 转换为窗口次日（T+1日，排程日期当天）的下发实体
+     * 转换为排程日期当天（T+1日，scheduleDate）的下发实体
      * 8班数据（2+3+3映射）：3班(夜)、4班(早)、5班(中) -> 中间表：1班(夜)=3班, 2班(早)=4班, 3班(中)=5班
      * 业务规则：更新夜早中3班数据（存在则更新，不存在则插入）
      * 使用aps-lh-api实体（有8班数据）

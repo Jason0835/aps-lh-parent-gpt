@@ -1628,6 +1628,13 @@
   "ui.data.column.tm.scheduleResult.class6Analysis": "Phân tích ca 6",
   "ui.data.column.tm.scheduleResult.releaseStatus": "Trạng thái phát hành",
   "ui.data.column.tm.scheduleResult.dataSource": "Nguồn dữ liệu",
-  "ui.data.column.tm.scheduleResult.tailFlag": "Nhiệm vụ kết thúc"
+  "ui.data.column.tm.scheduleResult.tailFlag": "Nhiệm vụ kết thúc",
+  "ui.data.column.dj.machineMaintenance.modelName": "Kế hoạch bảo trì máy DJ",
+  "ui.data.column.dj.machineMaintenance.factoryCode": "Mã nhà máy",
+  "ui.data.column.dj.machineMaintenance.machineCode": "Mã máy",
+  "ui.data.column.dj.machineMaintenance.machineName": "Tên máy",
+  "ui.data.column.dj.machineMaintenance.stopStartTime": "Thời gian bắt đầu dừng",
+  "ui.data.column.dj.machineMaintenance.stopEndTime": "Thời gian kết thúc dừng",
+  "ui.data.column.dj.machineMaintenance.stopShift": "Ca dừng"
 
 }
