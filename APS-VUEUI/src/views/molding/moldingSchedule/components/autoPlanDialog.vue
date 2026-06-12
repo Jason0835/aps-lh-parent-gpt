@@ -381,3 +381,12 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+/* 自动排程错误/警告弹窗，内容过多时可滚动 */
+.molding-auto-plan-error >>> .el-message-box__message {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+</style>
