@@ -125,11 +125,11 @@ export default {
       sort: {},
       search: {
         factoryCode: "116",
-        scheduleDate: getOffsetDate(2),
+        scheduleDate: getOffsetDate(1),
       },
       query: {
         factoryCode: "116",
-        scheduleDate: getOffsetDate(2),
+        scheduleDate: getOffsetDate(1),
       },
     };
   },

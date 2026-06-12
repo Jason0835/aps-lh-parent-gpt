@@ -27,7 +27,6 @@ public class LhScheduleResultValidationStrategy extends BaseValidationStrategy {
             "MOULD_QTY",
             "SINGLE_MOULD_SHIFT_QTY",
             "CONSTRUCTION_STAGE",
-            "EMBRYO_NO",
             "PRODUCTION_VERSION"
     ));
 
