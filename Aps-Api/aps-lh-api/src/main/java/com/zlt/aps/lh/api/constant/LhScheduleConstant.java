@@ -81,7 +81,7 @@ public final class LhScheduleConstant {
     public static final int FIRST_INSPECTION_HOURS = 1;
 
     /** 首检数量 */
-    public static final int FIRST_INSPECTION_QTY = 2;
+    public static final int FIRST_INSPECTION_QTY = 4;
 
     /** 每班最大首检次数（-1 表示不限制） */
     public static final int MAX_FIRST_INSPECTION_PER_SHIFT = -1;
@@ -332,6 +332,12 @@ public final class LhScheduleConstant {
 
     /** 新增排产欠产增机台阈值默认值 */
     public static final int NEW_SPEC_SHORTAGE_ADD_MACHINE_THRESHOLD = 200;
+
+    /** 续作收尾小余量允许欠产偏差值默认值 */
+    public static final int CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY = 2;
+
+    /** 奇数班产计划量加一班别默认值，空值表示不启用 */
+    public static final String ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE = "";
 
     /** 新增排产换模均衡开关默认值（0-关闭，1-开启） */
     public static final int ENABLE_CHANGEOVER_BALANCE = 1;
