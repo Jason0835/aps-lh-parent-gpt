@@ -69,6 +69,7 @@ public class Cd90StorageLaneConsumptionCalculator {
                 .laneCode(source.getLaneCode())
                 .clothCode(source.getClothCode())
                 .vehicleCount(source.getVehicleCount())
+                .maxVehicleCount(source.getMaxVehicleCount())
                 .build();
     }
 }

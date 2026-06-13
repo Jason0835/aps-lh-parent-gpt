@@ -33,11 +33,13 @@ public class Cd90ResourceSnapshotBuilderTest {
 
         assertEquals(1, original.getVehicleCount());
         assertEquals(2, result.getLanes().get(0).getVehicleCount());
+        assertEquals(7, result.getLanes().get(0).getMaxVehicleCount());
         assertEquals(2, result.getOccupiedVehicleCount());
     }
 
     private Cd90StorageLaneState lane(String code, int vehicles) {
         return Cd90StorageLaneState.builder()
-                .laneCode(code).clothCode("C1").vehicleCount(vehicles).build();
+                .laneCode(code).clothCode("C1").vehicleCount(vehicles)
+                .maxVehicleCount(7).build();
     }
 }

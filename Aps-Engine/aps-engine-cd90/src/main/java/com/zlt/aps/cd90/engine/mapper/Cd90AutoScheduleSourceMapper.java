@@ -68,10 +68,14 @@ public class Cd90AutoScheduleSourceMapper {
      */
     public Cd90StorageLaneState mapStorageLane(Cd90StorageLaneLimit source) {
         int vehicleCount = source.getCarNum() == null ? 0 : source.getCarNum();
+        int maxVehicleCount = source.getMaxCarNum() == null
+                ? vehicleCount + (source.getAvailableCarNum() == null ? 0 : source.getAvailableCarNum())
+                : source.getMaxCarNum();
         return Cd90StorageLaneState.builder()
                 .laneCode(source.getStorageLaneCode())
                 .clothCode(vehicleCount > 0 ? source.getMaterialCode() : null)
                 .vehicleCount(vehicleCount)
+                .maxVehicleCount(maxVehicleCount)
                 .build();
     }
 

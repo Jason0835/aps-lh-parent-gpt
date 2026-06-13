@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 单次直裁自动排程的内存计算上下文。
@@ -23,4 +24,6 @@ public class Cd90AutoScheduleContext {
     private String currentStage;
     /** 启动时固定的参数快照。 */
     private Cd90AutoScheduleParameters parameters;
+    /** 本次输出窗口内按时间排序的班次描述。 */
+    private List<Cd90ShiftDescriptor> shifts;
 }

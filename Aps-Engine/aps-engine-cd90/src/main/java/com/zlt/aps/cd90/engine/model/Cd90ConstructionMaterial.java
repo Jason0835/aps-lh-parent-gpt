@@ -16,6 +16,10 @@ public class Cd90ConstructionMaterial {
     private String constructionCode;
     /** 帘布代码。 */
     private String clothCode;
+    /** 钢压大卷代码，沿用施工CORD_SPEC口径。 */
+    private String bigRollCode;
+    /** 帘线规格，用于机台任务链规格切换判断。 */
+    private String cordSpec;
     /** 施工层位，取1至3。 */
     private int layerNo;
     /** 帘布单耗，单位毫米/条。 */

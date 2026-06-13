@@ -3,6 +3,8 @@ package com.zlt.aps.cd90.engine.model;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 /**
  * 班次开始前已形成或预计形成的直裁入库记录。
  */
@@ -20,4 +22,6 @@ public class Cd90InboundRecord {
     private String laneCode;
     /** 入库车辆数。 */
     private int vehicleCount;
+    /** 实际或预计入库时间，用于判断能否进入当前班次资源快照。 */
+    private LocalDateTime inboundTime;
 }

@@ -53,14 +53,17 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
      *
      * @param factoryCode 工厂编码
      * @param scheduleDate 排程日期
-     * @param classField 直裁班次字段，同时用于匹配库排班次
+     * @param classField 直裁结果班次字段
+     * @param shiftCode 业务班次编码，用于匹配库排班次
      * @return 标准化输入数据
      */
     @Override
-    public Cd90AutoScheduleInput load(String factoryCode, LocalDate scheduleDate, String classField) {
+    public Cd90AutoScheduleInput load(String factoryCode, LocalDate scheduleDate,
+                                      String classField, String shiftCode) {
         Assert.hasText(factoryCode, "工厂编码不能为空");
         Assert.notNull(scheduleDate, "排程日期不能为空");
         Assert.hasText(classField, "班次字段不能为空");
+        Assert.hasText(shiftCode, "班次编码不能为空");
 
         LocalDate formingStartDate = scheduleDate.minusDays(1);
         LocalDate formingEndDate = scheduleDate.plusDays(3);
@@ -91,16 +94,16 @@ public class Cd90AutoScheduleInputServiceImpl implements Cd90AutoScheduleInputSe
                         Wrappers.<Cd90StorageLaneLimit>lambdaQuery()
                                 .eq(Cd90StorageLaneLimit::getFactoryCode, factoryCode)
                                 .eq(Cd90StorageLaneLimit::getLaneDate, Date.valueOf(scheduleDate))
-                                .eq(Cd90StorageLaneLimit::getShiftCode, classField)
+                                .eq(Cd90StorageLaneLimit::getShiftCode, shiftCode)
                                 .orderByAsc(Cd90StorageLaneLimit::getStorageLaneCode))
                 .stream()
                 .map(sourceMapper::mapStorageLane)
                 .collect(Collectors.toList());
 
-        log.info("[直裁自动排程] 输入数据加载完成, factoryCode={}, scheduleDate={}, classField={}, "
+        log.info("[直裁自动排程] 输入数据加载完成, factoryCode={}, scheduleDate={}, classField={}, shiftCode={}, "
                         + "formingRange={}~{}, formingCount={}, constructionMaterialCount={}, "
                         + "demandShiftCount={}, stockCount={}, storageLaneCount={}",
-                factoryCode, scheduleDate, classField, formingStartDate, formingEndDate,
+                factoryCode, scheduleDate, classField, shiftCode, formingStartDate, formingEndDate,
                 formingSchedules.size(), constructionMaterials.size(), demandShifts.size(), stocksAtSix.size(),
                 storageLanesAtSix.size());
 

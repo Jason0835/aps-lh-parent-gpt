@@ -16,4 +16,6 @@ public class Cd90StorageLaneState {
     private String clothCode;
     /** 当前占用车数。 */
     private int vehicleCount;
+    /** 最大可容纳车数。 */
+    private int maxVehicleCount;
 }

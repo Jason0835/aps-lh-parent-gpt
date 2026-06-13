@@ -27,17 +27,18 @@ public class Cd90ConstructionMaterialMapper {
             return Collections.emptyList();
         }
         List<Cd90ConstructionMaterial> result = new ArrayList<>();
-        add(result, construction.getConstructionCode(), 1,
+        add(result, construction.getConstructionCode(), construction.getCordSpec(), 1,
                 construction.getTireFabricCode1(), construction.getTireFabricLength1());
-        add(result, construction.getConstructionCode(), 2,
+        add(result, construction.getConstructionCode(), construction.getCordSpec(), 2,
                 construction.getTireFabricCode2(), construction.getTireFabricLength2());
-        add(result, construction.getConstructionCode(), 3,
+        add(result, construction.getConstructionCode(), construction.getCordSpec(), 3,
                 construction.getTireFabricCode3(), construction.getTireFabricLength3());
         return result;
     }
 
     private void add(List<Cd90ConstructionMaterial> result,
                      String constructionCode,
+                     String cordSpec,
                      int layerNo,
                      String clothCode,
                      BigDecimal unitConsumeMillimeter) {
@@ -51,6 +52,8 @@ public class Cd90ConstructionMaterialMapper {
         result.add(Cd90ConstructionMaterial.builder()
                 .constructionCode(constructionCode)
                 .clothCode(clothCode)
+                .bigRollCode(cordSpec)
+                .cordSpec(cordSpec)
                 .layerNo(layerNo)
                 .unitConsumeMillimeter(unitConsumeMillimeter)
                 .build());

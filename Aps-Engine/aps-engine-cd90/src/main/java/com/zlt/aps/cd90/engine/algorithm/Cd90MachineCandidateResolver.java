@@ -1,0 +1,99 @@
+package com.zlt.aps.cd90.engine.algorithm;
+
+import com.zlt.aps.cd90.engine.model.Cd90MachineCandidate;
+import com.zlt.aps.cd90.engine.model.Cd90MachineResource;
+import com.zlt.aps.cd90.engine.model.Cd90MachineRestriction;
+import com.zlt.aps.cd90.engine.model.Cd90MachineRollBinding;
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * 候选机台硬约束过滤器。
+ */
+@Component
+public class Cd90MachineCandidateResolver {
+
+    /**
+     * 按大卷绑定、机台状态、开机班次、不可作业和检修约束生成候选机台。
+     *
+     * @param clothCode 帘布代码
+     * @param bigRollCode 钢压大卷代码
+     * @param shiftCode 当前班次编码
+     * @param shiftStart 班次开始时间
+     * @param shiftEnd 班次结束时间
+     * @param machines 机台资源
+     * @param bindings 大卷机台绑定
+     * @param restrictions 定点及不可作业配置
+     * @param machinePriority 参数机台优先顺序
+     * @return 已过滤并排序的候选机台
+     */
+    public List<Cd90MachineCandidate> resolve(String clothCode,
+                                              String bigRollCode,
+                                              String shiftCode,
+                                              LocalDateTime shiftStart,
+                                              LocalDateTime shiftEnd,
+                                              List<Cd90MachineResource> machines,
+                                              List<Cd90MachineRollBinding> bindings,
+                                              List<Cd90MachineRestriction> restrictions,
+                                              List<String> machinePriority) {
+        Set<String> boundMachines = safe(bindings).stream()
+                .filter(item -> bigRollCode != null && bigRollCode.equals(item.getBigRollCode()))
+                .filter(item -> item.getClothCode() == null || item.getClothCode().isEmpty()
+                        || item.getClothCode().equals(clothCode))
+                .map(Cd90MachineRollBinding::getMachineCode)
+                .collect(Collectors.toSet());
+        Set<String> prohibited = safe(restrictions).stream()
+                .filter(item -> clothCode != null && clothCode.equals(item.getClothCode()))
+                .filter(item -> "1".equals(item.getJobType()))
+                .map(Cd90MachineRestriction::getMachineCode)
+                .collect(Collectors.toSet());
+        Set<String> preferred = safe(restrictions).stream()
+                .filter(item -> clothCode != null && clothCode.equals(item.getClothCode()))
+                .filter(item -> "0".equals(item.getJobType()))
+                .map(Cd90MachineRestriction::getMachineCode)
+                .collect(Collectors.toSet());
+
+        List<String> priority = machinePriority == null ? Collections.emptyList() : machinePriority;
+        return safe(machines).stream()
+                .filter(item -> boundMachines.contains(item.getMachineCode()))
+                .filter(item -> "0".equals(item.getStatus()))
+                .filter(item -> shiftCode != null && shiftCode.equals(item.getOpenMachineClass()))
+                .filter(item -> !prohibited.contains(item.getMachineCode()))
+                .filter(item -> !overlaps(item, shiftStart, shiftEnd))
+                .map(item -> Cd90MachineCandidate.builder()
+                        .machineCode(item.getMachineCode())
+                        .quota(item.getQuota())
+                        .preferredMachine(preferred.contains(item.getMachineCode()))
+                        .priorityOrder(priorityIndex(priority, item.getMachineCode()))
+                        .build())
+                .sorted(Comparator.comparing(Cd90MachineCandidate::isPreferredMachine).reversed()
+                        .thenComparingInt(Cd90MachineCandidate::getPriorityOrder)
+                        .thenComparing(Cd90MachineCandidate::getMachineCode))
+                .collect(Collectors.toList());
+    }
+
+    private boolean overlaps(Cd90MachineResource machine,
+                             LocalDateTime shiftStart,
+                             LocalDateTime shiftEnd) {
+        if (machine.getMaintenanceStart() == null || machine.getMaintenanceEnd() == null) {
+            return false;
+        }
+        return machine.getMaintenanceStart().isBefore(shiftEnd)
+                && machine.getMaintenanceEnd().isAfter(shiftStart);
+    }
+
+    private int priorityIndex(List<String> priorities, String machineCode) {
+        int index = priorities.indexOf(machineCode);
+        return index < 0 ? Integer.MAX_VALUE : index;
+    }
+
+    private <T> List<T> safe(List<T> values) {
+        return values == null ? Collections.emptyList() : values;
+    }
+}

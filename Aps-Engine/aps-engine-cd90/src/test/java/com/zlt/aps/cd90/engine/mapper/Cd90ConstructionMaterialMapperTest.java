@@ -53,4 +53,21 @@ public class Cd90ConstructionMaterialMapperTest {
 
         assertEquals(1, result.size());
     }
+
+    /**
+     * 旧Engine既有口径使用施工CORD_SPEC作为直裁钢压大卷代码和帘线规格。
+     */
+    @Test
+    public void shouldMapCordSpecAsBigRollCode() {
+        MdmConstructionInfo construction = new MdmConstructionInfo();
+        construction.setConstructionCode("EM001");
+        construction.setCordSpec("BR001");
+        construction.setTireFabricCode1("CF001");
+        construction.setTireFabricLength1(new BigDecimal("500"));
+
+        Cd90ConstructionMaterial result = mapper.map(construction).get(0);
+
+        assertEquals("BR001", result.getBigRollCode());
+        assertEquals("BR001", result.getCordSpec());
+    }
 }

@@ -58,11 +58,13 @@ class Cd90AutoScheduleSourceMapperTest {
         source.setStorageLaneCode("L01");
         source.setMaterialCode("CF001");
         source.setCarNum(0);
+        source.setMaxCarNum(7);
 
         Cd90StorageLaneState result = mapper.mapStorageLane(source);
 
         assertEquals("L01", result.getLaneCode());
         assertEquals(0, result.getVehicleCount());
+        assertEquals(7, result.getMaxVehicleCount());
         assertNull(result.getClothCode());
     }
 }

@@ -15,8 +15,10 @@ public interface Cd90AutoScheduleInputService {
      *
      * @param factoryCode 工厂编码
      * @param scheduleDate 排程日期
-     * @param classField 直裁班次字段
+     * @param classField 直裁结果班次字段
+     * @param shiftCode 业务班次编码，用于读取班次基础数据
      * @return 标准化输入数据
      */
-    Cd90AutoScheduleInput load(String factoryCode, LocalDate scheduleDate, String classField);
+    Cd90AutoScheduleInput load(String factoryCode, LocalDate scheduleDate,
+                               String classField, String shiftCode);
 }

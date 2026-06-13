@@ -49,7 +49,8 @@ public class Cd90ResourceSnapshotBuilder {
             Cd90StorageLaneState lane = laneMap.get(inbound.getLaneCode());
             if (lane == null) {
                 lane = Cd90StorageLaneState.builder()
-                        .laneCode(inbound.getLaneCode()).vehicleCount(0).build();
+                        .laneCode(inbound.getLaneCode()).vehicleCount(0)
+                        .maxVehicleCount(inbound.getVehicleCount()).build();
                 lanes.add(lane);
                 laneMap.put(lane.getLaneCode(), lane);
             }
@@ -59,6 +60,7 @@ public class Cd90ResourceSnapshotBuilder {
             }
             lane.setClothCode(inbound.getClothCode());
             lane.setVehicleCount(lane.getVehicleCount() + inbound.getVehicleCount());
+            lane.setMaxVehicleCount(Math.max(lane.getMaxVehicleCount(), lane.getVehicleCount()));
         });
         int occupied = lanes.stream().mapToInt(Cd90StorageLaneState::getVehicleCount).sum();
         log.debug("[直裁自动排程] 当前班次资源快照重建完成, releasedVehicles={}, occupiedVehicles={}, remainder={}",
