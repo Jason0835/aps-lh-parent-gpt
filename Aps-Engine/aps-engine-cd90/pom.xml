@@ -30,12 +30,6 @@
             <optional>true</optional>
         </dependency>
 
-        <!--orcale 驱动-->
-        <dependency>
-            <groupId>com.oracle.database.jdbc</groupId>
-            <artifactId>ojdbc8</artifactId>
-            <optional>true</optional>
-        </dependency>
 
         <dependency>
             <groupId>com.ruoyi</groupId>
