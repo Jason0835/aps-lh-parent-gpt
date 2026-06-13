@@ -1,0 +1,130 @@
+package com.zlt.aps.cd90.engine.algorithm;
+
+import com.zlt.aps.cd90.engine.model.Cd90ConstructionMaterial;
+import com.zlt.aps.cd90.engine.model.Cd90DemandShift;
+import com.zlt.aps.cd90.engine.model.Cd90FormingScheduleSource;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * 将成型排程宽表和施工层位转换为帘布逐自然班次需求明细。
+ */
+@Component
+public class Cd90FormingDemandExpander {
+
+    private static final BigDecimal MILLIMETERS_PER_METER = new BigDecimal("1000");
+    private static final BigDecimal SHIFT_HOURS = new BigDecimal("8");
+    private static final LocalTime FIRST_SHIFT_TIME = LocalTime.of(6, 0);
+
+    /**
+     * 按帘布代码和自然班次汇总成型条数及帘布需求米数。
+     * 成型排程的CLASS1对应排程日前一天早班，之后每个CLASS字段递增8小时。
+     *
+     * @param schedules 成型排程窄模型
+     * @param materials 施工层位帘布单耗
+     * @return 按帘布代码、班次开始时间排序的需求明细
+     */
+    public List<Cd90DemandShift> expand(List<Cd90FormingScheduleSource> schedules,
+                                        List<Cd90ConstructionMaterial> materials) {
+        Map<String, Map<String, BigDecimal>> consumeByConstruction = groupUnitConsume(materials);
+        Map<String, DemandAccumulator> demandByClothAndShift = new LinkedHashMap<>();
+
+        for (Cd90FormingScheduleSource schedule : safe(schedules)) {
+            if (schedule == null || schedule.getScheduleDate() == null) {
+                continue;
+            }
+            Map<String, BigDecimal> clothConsumes = consumeByConstruction.get(schedule.getEmbryoCode());
+            if (clothConsumes == null || clothConsumes.isEmpty()) {
+                continue;
+            }
+            List<BigDecimal> quantities = safe(schedule.getClassPlanQuantities());
+            for (int classIndex = 0; classIndex < Math.min(8, quantities.size()); classIndex++) {
+                BigDecimal formingQuantity = value(quantities.get(classIndex));
+                LocalDateTime startTime = schedule.getScheduleDate().minusDays(1)
+                        .atTime(FIRST_SHIFT_TIME).plusHours(classIndex * 8L);
+                String classField = "CLASS" + (classIndex + 1);
+                for (Map.Entry<String, BigDecimal> entry : clothConsumes.entrySet()) {
+                    String key = entry.getKey() + "|" + startTime;
+                    DemandAccumulator accumulator = demandByClothAndShift.computeIfAbsent(key,
+                            ignored -> new DemandAccumulator(entry.getKey(), classField, startTime));
+                    accumulator.add(formingQuantity, entry.getValue());
+                }
+            }
+        }
+
+        return demandByClothAndShift.values().stream()
+                .map(DemandAccumulator::toDemandShift)
+                .sorted(Comparator.comparing(Cd90DemandShift::getClothCode)
+                        .thenComparing(Cd90DemandShift::getStartTime))
+                .collect(Collectors.toList());
+    }
+
+    private Map<String, Map<String, BigDecimal>> groupUnitConsume(List<Cd90ConstructionMaterial> materials) {
+        Map<String, Map<String, BigDecimal>> result = new LinkedHashMap<>();
+        for (Cd90ConstructionMaterial material : safe(materials)) {
+            if (material == null || material.getConstructionCode() == null || material.getClothCode() == null) {
+                continue;
+            }
+            result.computeIfAbsent(material.getConstructionCode(), ignored -> new LinkedHashMap<>())
+                    .merge(material.getClothCode(), value(material.getUnitConsumeMillimeter()), BigDecimal::add);
+        }
+        return result;
+    }
+
+    private <T> List<T> safe(List<T> values) {
+        return values == null ? Collections.emptyList() : values;
+    }
+
+    private BigDecimal value(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private static class DemandAccumulator {
+        private final String clothCode;
+        private final String classField;
+        private final LocalDateTime startTime;
+        private BigDecimal formingQuantity = BigDecimal.ZERO;
+        private BigDecimal clothDemandQuantity = BigDecimal.ZERO;
+
+        private DemandAccumulator(String clothCode, String classField, LocalDateTime startTime) {
+            this.clothCode = clothCode;
+            this.classField = classField;
+            this.startTime = startTime;
+        }
+
+        private void add(BigDecimal quantity, BigDecimal unitConsumeMillimeter) {
+            formingQuantity = formingQuantity.add(quantity);
+            clothDemandQuantity = clothDemandQuantity.add(quantity.multiply(unitConsumeMillimeter)
+                    .divide(MILLIMETERS_PER_METER, 10, RoundingMode.HALF_UP));
+        }
+
+        private Cd90DemandShift toDemandShift() {
+            return Cd90DemandShift.builder()
+                    .clothCode(clothCode)
+                    .classField(classField)
+                    .shiftKey(clothCode + "|" + startTime)
+                    .startTime(startTime)
+                    .formingQuantity(normalize(formingQuantity))
+                    .clothDemandQuantity(normalize(clothDemandQuantity))
+                    .shiftHours(SHIFT_HOURS)
+                    .included(true)
+                    .stopped(formingQuantity.signum() <= 0)
+                    .build();
+        }
+
+        private BigDecimal normalize(BigDecimal value) {
+            BigDecimal normalized = value.stripTrailingZeros();
+            return normalized.scale() < 0 ? normalized.setScale(0) : normalized;
+        }
+    }
+}

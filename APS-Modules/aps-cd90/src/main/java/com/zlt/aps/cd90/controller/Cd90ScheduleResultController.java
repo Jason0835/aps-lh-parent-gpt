@@ -9,6 +9,8 @@ import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
 import com.zlt.aps.cd90.api.domain.entity.Cd90ScheduleResult;
+import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
+import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleResultMapper;
 import com.zlt.aps.cd90.service.ICd90ScheduleResultService;
 import com.zlt.aps.utils.AppUtils;
@@ -18,10 +20,12 @@ import com.zlt.common.utils.PubUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 
 @Api(tags = "直裁排程结果")
@@ -33,6 +37,8 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
     private ICd90ScheduleResultService cd90ScheduleResultService;
     @Resource
     private Cd90ScheduleResultMapper cd90ScheduleResultMapper;
+    @Resource
+    private Cd90ScheduleTaskService cd90ScheduleTaskService;
 
     @ApiOperation("查询列表")
     @PostMapping("/list")
@@ -67,6 +73,35 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
     @PostMapping("/autoSchedule")
     public AjaxResult autoSchedule(@RequestBody Cd90ScheduleResult scheduleResult) {
         return cd90ScheduleResultService.autoSchedule(scheduleResult);
+    }
+
+    /**
+     * 查询自动排程任务状态。
+     *
+     * @param taskId 对外任务ID
+     * @return 任务状态
+     */
+    @ApiOperation("查询自动排程任务状态")
+    @GetMapping("/autoSchedule/task/{taskId}")
+    public AjaxResult getAutoScheduleTask(@PathVariable("taskId") String taskId) {
+        Cd90ScheduleTask task = cd90ScheduleTaskService.findByTaskId(taskId);
+        return task == null ? AjaxResult.error("未找到自动排程任务") : AjaxResult.success(task);
+    }
+
+    /**
+     * 查询指定工厂和排程日期的最近自动排程任务。
+     *
+     * @param factoryCode 工厂编码
+     * @param scheduleDate 排程日期
+     * @return 最近任务
+     */
+    @ApiOperation("查询最近自动排程任务")
+    @GetMapping("/autoSchedule/task/latest")
+    public AjaxResult getLatestAutoScheduleTask(@RequestParam("factoryCode") String factoryCode,
+                                                @RequestParam("scheduleDate")
+                                                @DateTimeFormat(pattern = "yyyy-MM-dd") Date scheduleDate) {
+        Cd90ScheduleTask task = cd90ScheduleTaskService.findLatest(factoryCode, scheduleDate);
+        return AjaxResult.success(task);
     }
 
     @ApiOperation("获取详情")

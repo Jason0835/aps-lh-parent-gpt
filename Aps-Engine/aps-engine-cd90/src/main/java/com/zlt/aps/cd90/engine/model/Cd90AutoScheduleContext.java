@@ -1,0 +1,26 @@
+package com.zlt.aps.cd90.engine.model;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+/**
+ * 单次直裁自动排程的内存计算上下文。
+ */
+@Data
+@Builder
+public class Cd90AutoScheduleContext {
+
+    /** 工厂编码。 */
+    private String factoryCode;
+    /** 排程日期。 */
+    private LocalDate scheduleDate;
+    /** 本次计算启动时间。 */
+    private LocalDateTime startTime;
+    /** 当前执行阶段。 */
+    private String currentStage;
+    /** 启动时固定的参数快照。 */
+    private Cd90AutoScheduleParameters parameters;
+}
