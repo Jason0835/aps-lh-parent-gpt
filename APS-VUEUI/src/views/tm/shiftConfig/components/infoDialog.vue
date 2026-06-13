@@ -49,13 +49,7 @@ export default {
             trigger: "change",
           },
         ],
-        scheduleDate: [
-          {
-            required: true,
-            message: this.$t("common.rule.select"),
-            trigger: "change",
-          },
-        ],
+
         shiftCode: [
           {
             required: true,
@@ -157,13 +151,7 @@ export default {
           span: 12,
           required: true,
         },
-        {
-          prop: "scheduleDate",
-          label: this.$t("ui.data.column.tm.shiftConfig.scheduleDate"),
-          type: "date",
-          span: 12,
-          required: true,
-        },
+
         {
           prop: "shiftCode",
           label: this.$t("ui.data.column.tm.shiftConfig.shiftCode"),
