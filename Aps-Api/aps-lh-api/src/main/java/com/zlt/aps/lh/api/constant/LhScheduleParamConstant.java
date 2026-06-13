@@ -56,6 +56,8 @@ public final class LhScheduleParamConstant {
     public static final String FIRST_INSPECTION_HOURS = "SYS0303001";
     /** 每班最大首检次数 */
     public static final String MAX_FIRST_INSPECTION_PER_SHIFT = "SYS0303002";
+    /** 首检数量 */
+    public static final String FIRST_INSPECTION_QTY = "SYS0303003";
     /** 收尾判定天数 */
     public static final String ENDING_DETECT_DAYS = "SYS0304001";
     /** 结构收尾判定天数 */
@@ -198,6 +200,10 @@ public final class LhScheduleParamConstant {
     public static final String MOULD_CLEAN_DAYS = "SYS0308004";
     /** 新增排产欠产增机台阈值 */
     public static final String NEW_SPEC_SHORTAGE_ADD_MACHINE_THRESHOLD = "SYS0304022";
+    /** 续作收尾小余量允许欠产偏差值 */
+    public static final String CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY = "SYS0304023";
+    /** 奇数班产计划量加一班别（1-晚班，2-早班，3-中班；空值不启用） */
+    public static final String ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE = "SYS0304024";
     /** 是否开启换模均衡（0-关闭，1-开启） */
     public static final String ENABLE_CHANGEOVER_BALANCE = "SYS0304021";
     /** 续作欠产追补判断天数 */

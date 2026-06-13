@@ -203,6 +203,11 @@ public class LhScheduleConfig {
         return getParamIntValue(LhScheduleParamConstant.MAX_FIRST_INSPECTION_PER_SHIFT, LhScheduleConstant.MAX_FIRST_INSPECTION_PER_SHIFT);
     }
 
+    public int getFirstInspectionQty() {
+        return Math.max(0, getParamIntValue(LhScheduleParamConstant.FIRST_INSPECTION_QTY,
+                LhScheduleConstant.FIRST_INSPECTION_QTY));
+    }
+
     public int getEndingDetectDays() {
         return getParamIntValue(LhScheduleParamConstant.ENDING_DETECT_DAYS, LhScheduleConstant.DEFAULT_ENDING_DAYS);
     }
@@ -494,6 +499,46 @@ public class LhScheduleConfig {
                     LhScheduleConstant.NEW_SPEC_SHORTAGE_ADD_MACHINE_THRESHOLD);
             return LhScheduleConstant.NEW_SPEC_SHORTAGE_ADD_MACHINE_THRESHOLD;
         }
+    }
+
+    /**
+     * 获取续作收尾小余量允许欠产偏差值。
+     *
+     * <p>该参数仅用于 S4.4 续作收尾小余量场景，未配置、负数或非数字时按默认值处理。</p>
+     *
+     * @return 允许不排产的最大收尾余量
+     */
+    public int getContinuousEndingSurplusToleranceQty() {
+        String value = resolvedParamMap.get(LhScheduleParamConstant.CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY);
+        if (StringUtils.isEmpty(value)) {
+            return LhScheduleConstant.CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY;
+        }
+        try {
+            int toleranceQty = Integer.parseInt(value.trim());
+            if (toleranceQty >= 0) {
+                return toleranceQty;
+            }
+            log.warn("续作收尾小余量允许欠产偏差值配置异常, paramCode: {}, value: {}, 使用默认值: {}",
+                    LhScheduleParamConstant.CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY, value,
+                    LhScheduleConstant.CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY);
+            return LhScheduleConstant.CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY;
+        } catch (NumberFormatException e) {
+            log.warn("续作收尾小余量允许欠产偏差值解析失败, paramCode: {}, value: {}, 使用默认值: {}",
+                    LhScheduleParamConstant.CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY, value,
+                    LhScheduleConstant.CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY);
+            return LhScheduleConstant.CONTINUOUS_ENDING_SURPLUS_TOLERANCE_QTY;
+        }
+    }
+
+    /**
+     * 获取奇数班产计划量加一班别配置。
+     * <p>空值表示不启用；合法性由产能计算入口按 1/2/3 判断，非法值保持原班产口径。</p>
+     *
+     * @return 班别配置值
+     */
+    public String getOddShiftCapacityPlusShiftType() {
+        return getParamValue(LhScheduleParamConstant.ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE,
+                LhScheduleConstant.ODD_SHIFT_CAPACITY_PLUS_SHIFT_TYPE);
     }
 
     /**
