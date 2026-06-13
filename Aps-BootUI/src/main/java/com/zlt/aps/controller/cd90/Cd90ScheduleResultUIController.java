@@ -40,6 +40,20 @@ public class Cd90ScheduleResultUIController extends BaseUIController<Cd90Schedul
     @ApiOperation("删除") @RequiresPermissions("cd90:scheduleResult:remove") @PostMapping("/remove") @ResponseBody
     public AjaxResult remove(String ids) { return remoteService.removeByIds(Arrays.asList(Convert.toLongArray(ids))); }
 
+    /**
+     * 自动生成直裁排程结果。
+     *
+     * @param scheduleResult 自动排程条件，当前使用工厂编码和排程日期
+     * @return 自动排程调用结果
+     */
+    @ApiOperation("自动排程")
+    @RequiresPermissions("cd90:scheduleResult:autoSchedule")
+    @PostMapping("/autoSchedule")
+    @ResponseBody
+    public AjaxResult autoSchedule(Cd90ScheduleResult scheduleResult) {
+        return remoteService.autoSchedule(scheduleResult);
+    }
+
     @Override public String getExportTemplateFileName() { return getFunctionName(); }
     @Override public String getProcedureCode() { return "CD90"; }
     @Override public String getFunctionName() { return I18nUtil.getMessage("ui.data.column.cd90ScheduleResult.modelName"); }

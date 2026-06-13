@@ -326,18 +326,18 @@ export default {
           prop: "mainMaterialDesc",
           minWidth: 350,
         },
-        {
-          label: this.$t("ui.data.column.scheduleResult.materialCode"),
-          prop: "materialCode",
-          minWidth: 100,
-          align: "center",
-        },
-        {
-          label: this.$t("ui.data.column.scheduleResult.materialDesc"),
-          align: "left",
-          prop: "materialDesc",
-          minWidth: 350,
-        },
+        // {
+        //   label: this.$t("ui.data.column.scheduleResult.materialCode"),
+        //   prop: "materialCode",
+        //   minWidth: 100,
+        //   align: "center",
+        // },
+        // {
+        //   label: this.$t("ui.data.column.scheduleResult.materialDesc"),
+        //   align: "left",
+        //   prop: "materialDesc",
+        //   minWidth: 350,
+        // },
         {
           label: this.$t("ui.data.column.cxScheduleResult.cxRemainQty"),
           prop: "cxRemainQty",

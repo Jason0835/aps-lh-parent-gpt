@@ -169,6 +169,11 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "TIRE_FABRIC_CRAFT1")
     private String tireFabricCraft1;
 
+    /** 1#胎体布长度 */
+    @ApiModelProperty(value = "1#胎体布长度", name = "tireFabricCraft1")
+    @TableField(value = "TIRE_FABRIC_LENGTH1")
+    private String tireFabricLength1;
+
     /** 2#胎体布代号 */
 //    @Excel(name = "ui.data.column.mdmConstructionInfo.tireFabricCode2")
     @ApiModelProperty(value = "2#胎体布代号", name = "tireFabricCode2")
@@ -187,6 +192,11 @@ public class MdmConstructionInfo extends BaseEntity {
     @TableField(value = "TIRE_FABRIC_CRAFT2")
     private String tireFabricCraft2;
 
+    /** 2#胎体布长度 */
+    @ApiModelProperty(value = "2#胎体布长度", name = "tireFabricCraft2")
+    @TableField(value = "TIRE_FABRIC_LENGTH2")
+    private String tireFabricLength2;
+
     /** 3#胎体布代号 */
 //    @Excel(name = "ui.data.column.mdmConstructionInfo.tireFabricCode3")
     @ApiModelProperty(value = "3#胎体布代号", name = "tireFabricCode3")
@@ -204,6 +214,11 @@ public class MdmConstructionInfo extends BaseEntity {
     @ApiModelProperty(value = "3#胎体布工艺", name = "tireFabricCraft3")
     @TableField(value = "TIRE_FABRIC_CRAFT3")
     private String tireFabricCraft3;
+
+    /** 3#胎体布长度 */
+    @ApiModelProperty(value = "3#胎体布长度", name = "tireFabricCraft3")
+    @TableField(value = "TIRE_FABRIC_LENGTH3")
+    private String tireFabricLength3;
 
     /** 原线代码 */
 //    @Excel(name = "ui.data.column.mdmConstructionInfo.originalLineCode")

@@ -1,24 +1,19 @@
 package com.zlt.aps.mp.mdm.controller;
 
-import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.web.controller.BaseController;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.core.web.page.TableDataInfo;
 import com.ruoyi.common.log.annotation.Log;
 import com.ruoyi.common.log.enums.BusinessType;
-import com.zlt.aps.enums.SysParamDataTypeEnum;
-import com.zlt.aps.exception.BusinessException;
 import com.zlt.aps.maindata.service.IFactoryParamService;
 import com.zlt.aps.mp.api.domain.entity.FactoryParam;
 import com.zlt.aps.mp.api.domain.vo.FactoryParamVo;
-import com.zlt.common.utils.PubUtil;
+import com.zlt.aps.mp.common.utils.ParamDataTypeUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
-import java.text.ParseException;
 import java.util.List;
 
 /**
@@ -63,11 +58,10 @@ public class FactoryParamController extends BaseController<FactoryParam> {
      * 修改分厂排产设定
      */
     @Log(title = "ui.data.column.docFactoryParam.modelName", businessType = BusinessType.UPDATE)
-//    @PreAuthorize(hasPermi = "fac:docFactoryParam:edit")
     @ApiOperation("修改分厂排产设定")
     @PostMapping("/edit")
     public AjaxResult edit(@RequestBody FactoryParam entity) {
-        this.checkValidParams(entity);
+        ParamDataTypeUtils.checkValidParams(entity.getParamCode(), entity.getParamName(), entity.getDataType(), entity.getParamValue());
         return toAjax(factoryParamService.updateById(entity));
     }
 
@@ -76,7 +70,6 @@ public class FactoryParamController extends BaseController<FactoryParam> {
      */
     @Log(title = "ui.data.column.docFactoryParam.modelName", businessType = BusinessType.OTHER)
     @ApiOperation("复制分厂排产设定")
-//    @PreAuthorize(hasPermi = "fac:docFactoryParam:copy")
     @PostMapping("/copy")
     @ResponseBody
     public AjaxResult copy(@RequestBody FactoryParamVo factoryParamVo) {
@@ -95,46 +88,5 @@ public class FactoryParamController extends BaseController<FactoryParam> {
     public FactoryParam getByParamCode(@RequestBody FactoryParam entity) {
         return factoryParamService.getFacParamSingle(entity);
     }
-
-    private void checkValidParams(@RequestBody FactoryParam entity) {
-        SysParamDataTypeEnum sysParamDataTypeEnum = SysParamDataTypeEnum.getEnumByValue(entity.getDataType().intValue());
-        if (SysParamDataTypeEnum.NUMBER.equals(sysParamDataTypeEnum)) {
-            try {
-                new BigDecimal(entity.getParamValue());
-            } catch (NumberFormatException e) {
-                throw new BusinessException(String.format("系统参数【1$s %2$s】解析参数值错误.", entity.getParamValue(), entity.getParamName()));
-            }
-        } else if (SysParamDataTypeEnum.INTEGER.equals(sysParamDataTypeEnum)) {
-
-            try {
-                Integer.parseInt(entity.getParamValue());
-            } catch (NumberFormatException e) {
-                throw new BusinessException(String.format("系统参数【1$s %2$s】解析参数值错误.", entity.getParamValue(), entity.getParamName()));
-            }
-        } else if (SysParamDataTypeEnum.BOOLEAN.equals(sysParamDataTypeEnum)) {
-            try {
-                PubUtil.isTrue(entity.getParamValue());
-            } catch (NumberFormatException e) {
-                throw new BusinessException(String.format("系统参数【1$s %2$s】解析参数值错误.", entity.getParamValue(), entity.getParamName()));
-            }
-        } else if (SysParamDataTypeEnum.DATE.equals(sysParamDataTypeEnum)) {
-            try {
-                DateUtils.parseDate(entity.getParamValue(), DateUtils.YYYY_MM_DD);
-            } catch (NumberFormatException | ParseException e) {
-                throw new BusinessException(String.format("系统参数【1$s %2$s】解析参数值错误.", entity.getParamValue(), entity.getParamName()));
-            }
-        } else if (SysParamDataTypeEnum.CUSTOM.equals(sysParamDataTypeEnum)) {
-            if (!entity.getParamValue().matches("^\\w+:\\w+$")) {
-                throw new BusinessException(String.format("系统参数【%s %s】格式应为x:y.", entity.getParamValue(), entity.getParamName()));
-            }
-        } else if (SysParamDataTypeEnum.STRING.equals(sysParamDataTypeEnum)) {
-            //20251021 ZLT 字符类型允许为空
-            return ;
-        } else {
-            throw new BusinessException(String.format("系统参数【%1$s %2$s】数据类型不对.", entity.getParamCode(), entity.getParamName()));
-        }
-    }
-
-
 
 }

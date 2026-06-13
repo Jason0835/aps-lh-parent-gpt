@@ -1432,20 +1432,20 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             }
         }
 
-        // ---- SKU与示方书关系映射（materialCode+embryoNo -> embryoType） ----
+        // ---- SKU与示方书关系映射（materialCode+constructionStage -> embryoType） ----
         Map<String, String> skuRecipeTypeMap = new HashMap<>();
         try {
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MdmSkuConstructionRef> skuQueryWrapper =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
             skuQueryWrapper.select(MdmSkuConstructionRef::getMaterialCode,
-                    MdmSkuConstructionRef::getEmbryoNo,
+                    MdmSkuConstructionRef::getTrialStatus,
                     MdmSkuConstructionRef::getEmbryoType);
             skuQueryWrapper.eq(MdmSkuConstructionRef::getIsDelete, 0);
             List<MdmSkuConstructionRef> skuRefList = skuConstructionRefMapper.selectList(skuQueryWrapper);
             if (skuRefList != null) {
                 for (MdmSkuConstructionRef ref : skuRefList) {
-                    if (ref.getMaterialCode() != null && ref.getEmbryoNo() != null && ref.getEmbryoType() != null) {
-                        String mapKey = ref.getMaterialCode() + "|" + ref.getEmbryoNo();
+                    if (ref.getMaterialCode() != null && ref.getTrialStatus() != null && ref.getEmbryoType() != null) {
+                        String mapKey = ref.getMaterialCode() + "|" + ref.getTrialStatus();
                         skuRecipeTypeMap.putIfAbsent(mapKey, ref.getEmbryoType());
                     }
                 }
@@ -1470,10 +1470,10 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
             String machineCode = parts[0];
             String embryoCode = parts.length > 1 ? parts[1] : null;
             String constructionStage = parts.length > 2 && !parts[2].isEmpty() ? parts[2] : null;
-            // materialCode 不再作为 taskKey 的一部分，需要从 classSprMap 中收集所有唯一的materialCode，用逗号拼接
+            // materialCode 不再作为 taskKey 的一部分，需要从 classSprMap 中收集所有唯一的materialCode
+            Set<String> materialCodeSet = new LinkedHashSet<>();
             String materialCode = null;
             if (classSprMap != null && !classSprMap.isEmpty()) {
-                Set<String> materialCodeSet = new LinkedHashSet<>();
                 for (ShiftScheduleService.ShiftProductionResult spr : classSprMap.values()) {
                     if (spr != null && spr.getMaterialCode() != null && !spr.getMaterialCode().isEmpty()) {
                         materialCodeSet.add(spr.getMaterialCode());
@@ -1606,29 +1606,46 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                     result.setLhClassQty(new BigDecimal(primaryLh.getSingleMouldShiftQty()));
                 }
 
-                // lhRemainQty: 使用初始快照（排程开始前的硫化余量）
+                // lhRemainQty: 对合并后的所有materialCode求和（剔除维度后可能多个物料合并）使用初始快照
                 Map<String, BigDecimal> initialMonthSurplusMap = context.getInitialMonthSurplusMap();
-                if (initialMonthSurplusMap != null && primaryLh != null) {
-                    String surplusKey = materialCode != null ? materialCode : embryoCode;
-                    BigDecimal surplus = initialMonthSurplusMap.get(surplusKey);
-                    if (surplus != null) {
-                        result.setLhRemainQty(surplus);
+                BigDecimal totalLhRemain = null;
+                if (initialMonthSurplusMap != null) {
+                    for (String mc : materialCodeSet) {
+                        BigDecimal surplus = initialMonthSurplusMap.get(mc);
+                        if (surplus != null) {
+                            totalLhRemain = (totalLhRemain == null)
+                                    ? surplus : totalLhRemain.add(surplus);
+                        }
                     }
+                }
+                if (totalLhRemain == null && embryoCode != null) {
+                    // 兜底：按胎胚编码查找
+                    BigDecimal surplus = initialMonthSurplusMap != null ? initialMonthSurplusMap.get(embryoCode) : null;
+                    if (surplus != null) {
+                        totalLhRemain = surplus;
+                    }
+                }
+                if (totalLhRemain != null) {
+                    result.setLhRemainQty(totalLhRemain);
                 }
             }
 
-            // ---- 成型余量（重新计算 = lhRemainQty - totalStock） ----
+            // ---- 成型余量（重新计算 = lhRemainQty - totalStock，多物料求和 - 总库存） ----
             BigDecimal lhRemainQty = result.getLhRemainQty();
             if (lhRemainQty != null) {
                 result.setCxRemainQty(lhRemainQty.subtract(result.getTotalStock()));
             } else {
-                // 如果没有lhRemainQty，尝试从initialFormingRemainderMap获取
+                // 如果没有lhRemainQty，对合并后的所有materialCode求和
                 Map<String, Integer> initialFormingRemainderMap = context.getInitialFormingRemainderMap();
-                if (initialFormingRemainderMap != null && materialCode != null) {
-                    Integer cxRemain = initialFormingRemainderMap.get(materialCode);
-                    if (cxRemain != null) {
-                        result.setCxRemainQty(new BigDecimal(cxRemain));
+                if (initialFormingRemainderMap != null && !materialCodeSet.isEmpty()) {
+                    int totalCxRemain = 0;
+                    for (String mc : materialCodeSet) {
+                        Integer cxRemain = initialFormingRemainderMap.get(mc);
+                        if (cxRemain != null) {
+                            totalCxRemain += cxRemain;
+                        }
                     }
+                    result.setCxRemainQty(new BigDecimal(totalCxRemain));
                 }
             }
 
@@ -1697,25 +1714,8 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
                 result.setColorTag("yellow");
             }
 
-            // ---- 示方书类型从SKU与示方书关系获取，查不到则回退constructionStage ----
-            String recipeType = constructionStage;
-            String embryoNo = (primaryLh != null) ? primaryLh.getEmbryoNo() : null;
-            if (embryoNo == null && materialCode != null) {
-                MdmMaterialInfo matInfo = materialByCodeMap.get(materialCode);
-                if (matInfo != null) {
-                    embryoNo = matInfo.getEmbryoNo();
-                }
-            }
-            if (materialCode != null && embryoNo != null) {
-                String skuKey = materialCode + "|" + embryoNo;
-                String skuEmbryoType = skuRecipeTypeMap.get(skuKey);
-                if (skuEmbryoType != null) {
-                    recipeType = skuEmbryoType;
-                    log.debug("物料{}制造示方书号{}从SKU关系获取示方书类型: {}", materialCode, embryoNo, skuEmbryoType);
-                } else {
-                    log.debug("物料{}制造示方书号{}未在SKU关系中找到示方书类型，回退使用constructionStage: {}", materialCode, embryoNo, constructionStage);
-                }
-            }
+            // ---- 示方书类型从SKU与示方书关系获取（constructionStage映射为trialStatus后匹配） ----
+            String recipeType = resolveRecipeType(skuRecipeTypeMap, materialCode, constructionStage);
 
             // ---- 映射班次排量到 CLASS1~8 ----
             for (Map.Entry<String, ShiftScheduleService.ShiftProductionResult> classEntry : classSprMap.entrySet()) {
@@ -2284,6 +2284,75 @@ public class CoreScheduleAlgorithmServiceImpl implements CoreScheduleAlgorithmSe
         public void setVulcanizeMachineCount(int vulcanizeMachineCount) { this.vulcanizeMachineCount = vulcanizeMachineCount; }
         public int getSequence() { return sequence; }
         public void setSequence(int sequence) { this.sequence = sequence; }
+    }
+
+    /**
+     * 解析示方书类型：将 constructionStage 映射为 trialStatus 后从SKU关系匹配
+     *
+     * <p>constructionStage → trialStatus 映射：
+     * <ul>
+     *   <li>01（试制） → X</li>
+     *   <li>02（量试） → T</li>
+     *   <li>03（正式） → S</li>
+     * </ul>
+     *
+     * <p>降级规则（匹配不到时降级重试）：
+     * <ul>
+     *   <li>S（正式）：依次尝试 S → T → X</li>
+     *   <li>T（量试）：依次尝试 T → X</li>
+     *   <li>X（试制）：仅尝试 X</li>
+     * </ul>
+     *
+     * <p>多物料合并（含逗号）时，仅取第一个物料编码匹配。
+     *
+     * @param skuRecipeTypeMap  SKU关系映射（materialCode|trialStatus → embryoType）
+     * @param materialCode      物料编码（多个逗号分隔时仅取第一个）
+     * @param constructionStage 施工阶段（01/02/03）
+     * @return 示方书类型，匹配不上则返回 null
+     */
+    private String resolveRecipeType(Map<String, String> skuRecipeTypeMap, String materialCode, String constructionStage) {
+        if (materialCode == null || materialCode.isEmpty()) {
+            return null;
+        }
+
+        // constructionStage → trialStatus 映射
+        String trialStatus;
+        if ("01".equals(constructionStage)) {
+            trialStatus = "X";
+        } else if ("02".equals(constructionStage)) {
+            trialStatus = "T";
+        } else {
+            trialStatus = "S";
+        }
+
+        // 定义降级顺序
+        String[] stagesToTry;
+        if ("S".equals(trialStatus)) {
+            stagesToTry = new String[]{"S", "T", "X"};
+        } else if ("T".equals(trialStatus)) {
+            stagesToTry = new String[]{"T", "X"};
+        } else {
+            stagesToTry = new String[]{"X"};
+        }
+
+        // 多物料合并时仅取第一个
+        String firstMaterial = materialCode;
+        int commaIdx = materialCode.indexOf(',');
+        if (commaIdx > 0) {
+            firstMaterial = materialCode.substring(0, commaIdx);
+        }
+
+        for (String stage : stagesToTry) {
+            String skuKey = firstMaterial + "|" + stage;
+            String embryoType = skuRecipeTypeMap.get(skuKey);
+            if (embryoType != null) {
+                log.debug("物料{}施工阶段{}→trialStatus={}匹配示方书类型: {}", firstMaterial, constructionStage, stage, embryoType);
+                return embryoType;
+            }
+        }
+
+        log.debug("物料{}施工阶段{}→trialStatus={}经降级匹配仍未找到，recipeType留空", firstMaterial, constructionStage, trialStatus);
+        return null;
     }
 
     /**

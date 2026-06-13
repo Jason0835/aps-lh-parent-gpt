@@ -16,6 +16,7 @@ import com.zlt.aps.cx.entity.schedule.LhScheduleResult;
 import com.zlt.aps.cx.api.domain.entity.CxPrecisionPlan;
 import com.zlt.aps.cx.enums.DayVulcanizationModeEnum;
 import com.zlt.aps.cx.mapper.*;
+import com.zlt.aps.cx.service.impl.validation.LhScheduleResultValidationStrategy;
 import com.zlt.aps.lh.api.domain.entity.LhParams;
 import com.zlt.aps.cx.mapper.LhParamsMapper;
 import com.zlt.aps.maindata.mapper.FactoryParamMapper;
@@ -167,6 +168,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     private final MpCxCapacityConfigurationMapper capacityConfigurationMapper;
     private final MdmWorkCalendarMapper workCalendarMapper;
     private final CxPrecisionPlanMapper precisionPlanMapper;
+    private final LhFinishQtyMapper lhFinishQtyMapper;
 
     // ==================== 公共方法 ====================
 
@@ -642,7 +644,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     private void loadMoldingMachines(ScheduleContextVo context) {
         List<MdmMoldingMachine> machines = moldingMachineMapper.selectList(
                 new LambdaQueryWrapper<MdmMoldingMachine>()
-                        .eq(MdmMoldingMachine::getIsActive, 1)
+                        .eq(MdmMoldingMachine::getIsActive, "1")
                         .eq(MdmMoldingMachine::getIsDelete, "0"));
         context.setAvailableMachines(machines);
         log.info("加载成型机台 {} 台（已过滤禁用和已删除）", machines.size());
@@ -1084,12 +1086,82 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     /**
      * 加载月度计划余量并计算成型余量
+     * <p>
+     * 硫化余量计算逻辑参考 ScheduleAdjustHandler#calculateSurplusQty：
+     * 硫化余量 = Max(月度计划总量 - (月累计完成量 + T日班次完成量), 0)
+     * 不再从 T_MDM_MONTH_SURPLUS 表读取，改为从月计划表 + 日完成量表 + 班次完成量表动态计算。
+     * </p>
      */
     private void loadMonthSurplusAndCalculateFormingRemainder(ScheduleContextVo context, LocalDate scheduleDate) {
         int year = scheduleDate.getYear();
         int month = scheduleDate.getMonthValue();
+        String factoryCode = context.getFactoryCode();
 
-        List<MdmMonthSurplus> monthSurplusList = monthSurplusMapper.selectByYearMonth(year, month);
+        // 1. 获取月计划数据，按物料汇总月计划总量（按工厂过滤）
+        int yearMonth = year * 100 + month;
+        List<FactoryMonthPlanProductionFinalResult> monthPlans = monthPlanMapper.selectByFactoryAndYearMonth(factoryCode, yearMonth);
+        Map<String, Integer> materialTotalPlanQtyMap = monthPlans.stream()
+                .filter(p -> p.getMaterialCode() != null && p.getTotalQty() != null)
+                .collect(Collectors.groupingBy(
+                        FactoryMonthPlanProductionFinalResult::getMaterialCode,
+                        Collectors.summingInt(FactoryMonthPlanProductionFinalResult::getTotalQty)));
+
+        // 2. 收集所有物料编码（月计划中的 + 硫化排程中的）
+        Set<String> allMaterialCodes = new HashSet<>(materialTotalPlanQtyMap.keySet());
+        if (context.getLhScheduleResults() != null) {
+            context.getLhScheduleResults().stream()
+                    .filter(r -> r.getMaterialCode() != null)
+                    .map(LhScheduleResult::getMaterialCode)
+                    .forEach(allMaterialCodes::add);
+        }
+        List<String> materialCodeList = new ArrayList<>(allMaterialCodes);
+        List<String> factoryCodeList = Collections.singletonList(factoryCode);
+
+        // 3. 查询月累计完成量（本月1日 ~ T-1日，不含T日）
+        Date monthStart = Date.from(scheduleDate.withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date scheduleDateStart = Date.from(scheduleDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date nextDayStart = Date.from(scheduleDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+        Map<String, Integer> materialDayFinishedQtyMap = new HashMap<>();
+        if (!materialCodeList.isEmpty()) {
+            List<Map<String, Object>> dayFinishList = lhFinishQtyMapper.sumDayFinishQty(
+                    factoryCodeList, materialCodeList, monthStart, scheduleDateStart);
+            for (Map<String, Object> row : dayFinishList) {
+                String mc = (String) row.get("MATERIAL_CODE");
+                Object qtyObj = row.get("TOTAL_FINISH_QTY");
+                int qty = qtyObj != null ? ((Number) qtyObj).intValue() : 0;
+                materialDayFinishedQtyMap.merge(mc, qty, Integer::sum);
+            }
+        }
+
+        // 4. 查询T日排程班次完成量（T_LH_SCHE_FINISH_QTY 的 CLASS1_FINISH_QTY）
+        Map<String, Integer> materialScheFinishedQtyMap = new HashMap<>();
+        if (!materialCodeList.isEmpty()) {
+            List<Map<String, Object>> scheFinishList = lhFinishQtyMapper.sumScheFinishQty(
+                    factoryCodeList, materialCodeList, scheduleDateStart, nextDayStart);
+            for (Map<String, Object> row : scheFinishList) {
+                String mc = (String) row.get("MATERIAL_CODE");
+                Object qtyObj = row.get("TOTAL_FINISH_QTY");
+                int qty = qtyObj != null ? ((Number) qtyObj).intValue() : 0;
+                materialScheFinishedQtyMap.merge(mc, qty, Integer::sum);
+            }
+        }
+
+        // 5. 计算每个物料的硫化余量并构建 MdmMonthSurplus 列表
+        // 硫化余量 = Max(月度计划总量 - (月累计完成量 + T日班次完成量), 0)
+        List<MdmMonthSurplus> monthSurplusList = new ArrayList<>();
+        for (String materialCode : materialCodeList) {
+            int totalPlanQty = materialTotalPlanQtyMap.getOrDefault(materialCode, 0);
+            int dayFinishedQty = materialDayFinishedQtyMap.getOrDefault(materialCode, 0);
+            int scheFinishedQty = materialScheFinishedQtyMap.getOrDefault(materialCode, 0);
+            int surplusQty = Math.max(0, totalPlanQty - (dayFinishedQty + scheFinishedQty));
+
+            MdmMonthSurplus surplus = new MdmMonthSurplus();
+            surplus.setMaterialCode(materialCode);
+            surplus.setPlanSurplusQty(BigDecimal.valueOf(surplusQty));
+            monthSurplusList.add(surplus);
+        }
+
         context.setMonthSurplusList(monthSurplusList);
 
         Map<String, MdmMonthSurplus> monthSurplusMap = monthSurplusList.stream()
@@ -1098,7 +1170,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         context.setInitialMonthSurplusMap(monthSurplusList.stream()
                 .filter(s -> s.getMaterialCode() != null && s.getPlanSurplusQty() != null)
                 .collect(Collectors.toMap(MdmMonthSurplus::getMaterialCode, MdmMonthSurplus::getPlanSurplusQty, (a, b) -> a)));
-        log.info("加载月度计划余量 {} 条", monthSurplusList.size());
+        log.info("加载月度计划余量 {} 条（根据月计划总量-完成量动态计算）", monthSurplusList.size());
 
         // 获取当前天的班次配置（用于获取硫化任务的班次计划量）
         List<CxShiftConfig> currentDayShifts = getCurrentDayShifts(context);
@@ -1801,8 +1873,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         // 1. 尝试从数据库加载已存在的收尾信息
         List<CxMaterialEnding> existingEndings = materialEndingMapper.selectByStatDate(scheduleDate);
 
-        // 2. 获取月计划数据
-        List<FactoryMonthPlanProductionFinalResult> monthPlans = monthPlanMapper.selectByYearAndMonth(year, month);
+        // 2. 获取月计划数据（按工厂过滤）
+        List<FactoryMonthPlanProductionFinalResult> monthPlans = monthPlanMapper.selectByFactoryAndYearMonth(context.getFactoryCode(), yearMonth);
         Map<String, List<FactoryMonthPlanProductionFinalResult>> materialPlanMap = monthPlans.stream()
                 .filter(p -> p.getMaterialCode() != null)
                 .collect(Collectors.groupingBy(FactoryMonthPlanProductionFinalResult::getMaterialCode));
@@ -1976,10 +2048,17 @@ public class ScheduleServiceImpl implements ScheduleService {
         int notFound = 0;
         for (CxMaterialEnding ending : delayEndings) {
             String materialCode = ending.getMaterialCode();
-            LhScheduleResult historicalRecord = lhScheduleResultMapper.selectLatestBeforeDate(materialCode, scheduleDate);
+            LhScheduleResult historicalRecord = lhScheduleResultMapper.selectLatestBeforeDate(materialCode, scheduleDate, scheduleDate.withDayOfMonth(1));
 
             if (historicalRecord == null) {
                 log.warn("延误物料 {} 在历史硫化排程中未找到记录，无法补充", materialCode);
+                notFound++;
+                continue;
+            }
+
+            // 校验历史记录必填字段是否完整，缺失则为人工导入无效数据，不纳入
+            if (!LhScheduleResultValidationStrategy.isValidRecord(historicalRecord)) {
+                log.warn("延误物料 {} 的历史记录必填字段不完整（人工导入无效数据），跳过补充", materialCode);
                 notFound++;
                 continue;
             }

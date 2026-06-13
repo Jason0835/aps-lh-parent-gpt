@@ -624,6 +624,13 @@
   "ui.data.column.tm.scheduleUnplanned.glueCode": "Main Glue Code",
   "ui.data.column.tm.scheduleUnplanned.mouthPlateCode": "Mouth Plate Code",
   "ui.data.column.tm.scheduleUnplanned.unplannedReasonCode": "Unplanned Reason Code",
-  "ui.data.column.tm.scheduleUnplanned.unplannedReasonDesc": "Unplanned Reason Desc"
+  "ui.data.column.tm.scheduleUnplanned.unplannedReasonDesc": "Unplanned Reason Desc",
+  "ui.data.column.dj.machineMaintenance.modelName": "DJ Machine Maintenance Plan",
+  "ui.data.column.dj.machineMaintenance.factoryCode": "Factory Code",
+  "ui.data.column.dj.machineMaintenance.machineCode": "Machine Code",
+  "ui.data.column.dj.machineMaintenance.machineName": "Machine Name",
+  "ui.data.column.dj.machineMaintenance.stopStartTime": "Stop Start Time",
+  "ui.data.column.dj.machineMaintenance.stopEndTime": "Stop End Time",
+  "ui.data.column.dj.machineMaintenance.stopShift": "Stop Shift"
 
 }

@@ -1649,6 +1649,13 @@
   "ui.data.column.tm.scheduleUnplanned.glueCode": "Mã keo chính",
   "ui.data.column.tm.scheduleUnplanned.mouthPlateCode": "Mã khuôn miệng",
   "ui.data.column.tm.scheduleUnplanned.unplannedReasonCode": "Mã nguyên nhân chưa xếp",
-  "ui.data.column.tm.scheduleUnplanned.unplannedReasonDesc": "Mô tả nguyên nhân chưa xếp"
+  "ui.data.column.tm.scheduleUnplanned.unplannedReasonDesc": "Mô tả nguyên nhân chưa xếp",
+  "ui.data.column.dj.machineMaintenance.modelName": "Kế hoạch bảo trì máy DJ",
+  "ui.data.column.dj.machineMaintenance.factoryCode": "Mã nhà máy",
+  "ui.data.column.dj.machineMaintenance.machineCode": "Mã máy",
+  "ui.data.column.dj.machineMaintenance.machineName": "Tên máy",
+  "ui.data.column.dj.machineMaintenance.stopStartTime": "Thời gian bắt đầu dừng",
+  "ui.data.column.dj.machineMaintenance.stopEndTime": "Thời gian kết thúc dừng",
+  "ui.data.column.dj.machineMaintenance.stopShift": "Ca dừng"
 
 }

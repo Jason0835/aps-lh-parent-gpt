@@ -3165,6 +3165,7 @@
   "ui.data.column.cd90ScheduleResult.class2PlanQty": "二班计划量",
   "ui.data.column.cd90ScheduleResult.class3PlanQty": "三班计划量",
   "ui.data.column.cd90ScheduleResult.isRelease": "发布状态",
+  "ui.data.column.cd90ScheduleResult.remark": "备注",
   "ui.data.column.cd90ScheduleResultLog.modelName": "直裁排程结果日志",
   "ui.data.column.cd90ScheduleResultLog.factoryCode": "工厂",
   "ui.data.column.cd90ScheduleResultLog.scheduleDate": "排程日期",
@@ -3328,6 +3329,13 @@
   "ui.data.column.tm.scheduleUnplanned.glueCode": "主胶料编码",
   "ui.data.column.tm.scheduleUnplanned.mouthPlateCode": "口型板编码",
   "ui.data.column.tm.scheduleUnplanned.unplannedReasonCode": "未排原因编码",
-  "ui.data.column.tm.scheduleUnplanned.unplannedReasonDesc": "未排原因说明"
+  "ui.data.column.tm.scheduleUnplanned.unplannedReasonDesc": "未排原因说明",
+  "ui.data.column.dj.machineMaintenance.modelName": "垫胶机台维修计划",
+  "ui.data.column.dj.machineMaintenance.factoryCode": "工厂编码",
+  "ui.data.column.dj.machineMaintenance.machineCode": "机台编码",
+  "ui.data.column.dj.machineMaintenance.machineName": "机台名称",
+  "ui.data.column.dj.machineMaintenance.stopStartTime": "停机开始时间",
+  "ui.data.column.dj.machineMaintenance.stopEndTime": "停机结束时间",
+  "ui.data.column.dj.machineMaintenance.stopShift": "停机班次"
 
 }
