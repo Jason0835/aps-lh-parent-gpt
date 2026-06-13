@@ -76,7 +76,7 @@ export default {
     TltUploadForm,
     changeMachineDialog,
   },
-  dicts: ["biz_factory_name", "biz_yes_no", "tm_release_status", "tm_data_source"],
+  dicts: ["biz_factory_name", "biz_yes_no", "IS_RELEASE", "tm_data_source"],
   provide() {
     return {
       parentDict: this.dict,
@@ -137,6 +137,12 @@ export default {
           label: this.$t("ui.data.column.tm.scheduleResult.batchNo"),
         },
         {
+          prop: "orderNo",
+          align: "left",
+          minWidth: 160,
+          label: this.$t("ui.data.column.tm.scheduleResult.orderNo"),
+        },
+        {
           prop: "scheduleDate",
           align: "center",
           minWidth: 120,
@@ -162,7 +168,7 @@ export default {
           halign: "center",
           label: this.$t("ui.data.column.tm.scheduleResult.releaseStatus"),
           formatter: (row, column, value) => {
-            return this.selectDictLabel(this.dict.type.tm_release_status, value);
+            return this.selectDictLabel(this.dict.type.IS_RELEASE, value);
           },
         },
         {
@@ -224,6 +230,10 @@ export default {
           label: this.$t("ui.data.column.tm.scheduleResult.batchNo"),
         },
         {
+          prop: "orderNo",
+          label: this.$t("ui.data.column.tm.scheduleResult.orderNo"),
+        },
+        {
           prop: "scheduleDate",
           label: this.$t("ui.data.column.tm.scheduleResult.scheduleDate"),
           type: "daterange",
@@ -246,7 +256,7 @@ export default {
           prop: "releaseStatus",
           label: this.$t("ui.data.column.tm.scheduleResult.releaseStatus"),
           type: "select",
-          dictData: this.dict.type.tm_release_status,
+          dictData: this.dict.type.IS_RELEASE,
           filterable: true,
         },
       ];

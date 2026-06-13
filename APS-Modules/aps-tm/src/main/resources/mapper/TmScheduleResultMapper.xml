@@ -13,4 +13,13 @@
         </foreach>
     </select>
 
+    <update id="logicDeleteByFactoryCodeAndScheduleDate">
+        update T_TM_SCHEDULE_RESULT
+        set IS_DELETE = 1,
+            UPDATE_TIME = now()
+        where IS_DELETE = 0
+          and FACTORY_CODE = #{factoryCode}
+          and SCHEDULE_DATE = #{scheduleDate}
+    </update>
+
 </mapper>
