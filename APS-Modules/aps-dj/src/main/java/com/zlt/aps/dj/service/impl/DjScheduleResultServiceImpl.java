@@ -10,7 +10,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -24,17 +24,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ruoyi.api.gateway.system.domain.ImportErrorLog;
 import com.ruoyi.common.core.utils.DateUtils;
 import com.ruoyi.common.core.utils.bean.BeanUtils;
-import com.ruoyi.common.core.utils.reflect.ReflectUtils;
 import com.ruoyi.common.core.web.domain.AjaxResult;
 import com.ruoyi.common.i18n.utils.I18nUtil;
 import com.ruoyi.common.security.aspect.PreAuthorizeAspect;
 import com.ruoyi.common.utils.StringUtils;
 import com.zlt.aps.common.core.constant.ApsConstant;
 import com.zlt.aps.common.core.domain.SchedulePublishRecord;
-import com.zlt.aps.common.core.enums.BillTypeCodeEnums;
 import com.zlt.aps.common.core.enums.HalfComponentFinishTableEnum;
 import com.zlt.aps.common.core.utils.BigDecimalUtils;
 import com.zlt.aps.common.core.utils.ImportUtil;
@@ -55,7 +54,6 @@ import com.zlt.aps.dj.mapper.DjScheduleResultMapper;
 import com.zlt.aps.dj.service.DjDispatcherLogService;
 import com.zlt.aps.dj.service.DjMachineInfoService;
 import com.zlt.aps.dj.service.DjScheduleResultService;
-import com.zlt.bill.common.service.AbstractBillService;
 
 /**
  * 垫胶胶排程结果Service业务层处理
@@ -64,12 +62,13 @@ import com.zlt.bill.common.service.AbstractBillService;
  * @date 2026-06-24
  */
 @Service
-public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleResult> implements DjScheduleResultService {
+public class DjScheduleResultServiceImpl extends ServiceImpl<DjScheduleResultMapper, DjScheduleResult>
+        implements DjScheduleResultService {
     @Resource
-    private DjScheduleResultMapper ncScheduleResultMapper;
+    private DjScheduleResultMapper djScheduleResultMapper;
 
     @Resource
-    private DjEngineService ncEngineService;
+    private DjEngineService djEngineService;
 
     @Autowired
     private DjMachineInfoService machineInfoService;
@@ -78,7 +77,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     private PreAuthorizeAspect preAuthorizeAspect;
 
     @Resource
-    private DjDispatcherLogService ncDispatcherLogService;
+    private DjDispatcherLogService djDispatcherLogService;
 
     /**
      * 默认标准长度
@@ -96,65 +95,26 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      * @return 垫胶排程结果
      */
     @Override
-    public DjScheduleResult selectNcScheduleResultById(Long id) {
-        return ncScheduleResultMapper.selectNcScheduleResultById(id);
-    }
-
-    /**
-     * 赋值成型消耗量(成型昨日早班消耗量+成型夜班消耗量)、卷曲长度、交接班库存、计划量对应卷数
-     *
-     * @param scheduleResult 排程结果
-     * @param cxConsumeMap   成型消耗量map
-     * @param curlRollMap    卷曲长度map
-     */
-    private static void setLastDayAndCalculate(DjScheduleResult scheduleResult, Map<String, Double> cxConsumeMap,
-                                               Map<String, BigDecimal> curlRollMap, BigDecimal standardLength) {
-        String code = scheduleResult.getLiningCode();
-        if (cxConsumeMap.containsKey(code)) {
-            Double cxConsumeQty = cxConsumeMap.get(code);
-            scheduleResult.setCxConsumeQty(cxConsumeQty);
-        }
-        BigDecimal curlRollLength = curlRollMap.getOrDefault(code, standardLength);
-        scheduleResult.setCurlLength(curlRollLength.doubleValue());
-        ReflectUtils.invokeMethodByName(scheduleResult, "calculateTheoreticClassLastDayPlanQty", new Object[]{});
-        // 执行计算卷数方法
-        ReflectUtils.invokeMethodByName(scheduleResult, "calculatePlanQty", new Object[]{});
+    public DjScheduleResult selectDjScheduleResultById(Long id) {
+        return djScheduleResultMapper.selectDjScheduleResultById(id);
     }
 
     /**
      * 查询垫胶排程结果列表
      *
-     * @param ncScheduleResult 垫胶排程结果
+     * @param djScheduleResult 垫胶排程结果
      * @return 垫胶排程结果
      */
     @Override
-    public List<DjScheduleResult> selectNcScheduleResultList(DjScheduleResult ncScheduleResult) {
-        List<DjScheduleResult> list = ncScheduleResultMapper.selectNcScheduleResultList(ncScheduleResult);
+    public List<DjScheduleResult> selectDjScheduleResultList(DjScheduleResult djScheduleResult) {
+        List<DjScheduleResult> list = djScheduleResultMapper.selectDjScheduleResultList(djScheduleResult);
         if (CollectionUtils.isEmpty(list)) {
             return new ArrayList<>();
         }
         List<DjMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(new DjMachineInfo());
-        Map<Long, DjMachineInfo> machineInfoMap = machineInfoList.stream().collect(Collectors.toMap(DjMachineInfo::getId, Function.identity(), (s1, s2) -> s1));
+        Map<Long, DjMachineInfo> machineInfoMap = machineInfoList.stream()
+                .collect(Collectors.toMap(DjMachineInfo::getId, Function.identity(), (s1, s2) -> s1));
         if (CollectionUtils.isNotEmpty(list)) {
-
-            List<String> codeList = list.stream().map(DjScheduleResult::getLiningCode).collect(Collectors.toList());
-            ncScheduleResult.getParams().put("codeList", codeList);
-            Map<String, Double> cxConsumeMap = new HashMap<>(16);
-            List<DjScheduleResult> cxConsumeList = ncScheduleResultMapper.getCxConsume4List(ncScheduleResult);
-            if (CollectionUtils.isNotEmpty(cxConsumeList)) {
-                cxConsumeMap = cxConsumeList.stream().collect(Collectors.toMap(DjScheduleResult::getLiningCode, DjScheduleResult::getCxConsumeQty));
-            }
-            LambdaQueryWrapper<DjCurlRoll> curlRollQueryWrapper = new LambdaQueryWrapper<>();
-            curlRollQueryWrapper.in(DjCurlRoll::getPaddingCode, codeList);
-            List<DjCurlRoll> curlRollList = curlRollMapper.selectList(curlRollQueryWrapper);
-            Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
-            if (CollectionUtils.isNotEmpty(curlRollList)) {
-                curlRollMap = curlRollList.stream().collect(Collectors.toMap(DjCurlRoll::getPaddingCode, DjCurlRoll::getCurlLength));
-            }
-            LambdaQueryWrapper<DjParams> paramWrapper = new LambdaQueryWrapper<>();
-            paramWrapper.eq(DjParams::getParamCode, EngineConstants.STANDARD_CRIMP_LENGTH);
-            DjParams standardLength = paramsMapper.selectOne(paramWrapper);
-
             for (DjScheduleResult scheduleResult : list) {
                 String machineIdStr = scheduleResult.getMachineCode();
                 if (StringUtils.isNotBlank(machineIdStr)) {
@@ -173,10 +133,6 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
                             machineNameList.add(machineInfo.getMachineName());
                         }
                     }
-                    scheduleResult.setMachineName(String.join(",", machineNameList));
-                    // 赋值卷曲长度、计算计划量对应卷数
-                    setLastDayAndCalculate(scheduleResult, cxConsumeMap, curlRollMap,
-                            standardLength == null ? new BigDecimal(DEFAULT_STANDARD_LENGTH) : new BigDecimal(standardLength.getParamValue()));
                 }
             }
         }
@@ -186,15 +142,15 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     /**
      * 新增垫胶排程结果
      *
-     * @param ncScheduleResult 垫胶排程结果
+     * @param djScheduleResult 垫胶排程结果
      * @return 结果
      */
     @Override
-    public int insertNcScheduleResult(DjScheduleResult ncScheduleResult) {
-        ncScheduleResult.setBaseVale(null);
+    public int insertDjScheduleResult(DjScheduleResult djScheduleResult) {
+        djScheduleResult.setBaseVale(null);
         DjScheduleResultVo scheduleVo = new DjScheduleResultVo();
-        BeanUtils.copyProperties(ncScheduleResult, scheduleVo);
-        return ncEngineService.inertNcOrder(scheduleVo);
+        BeanUtils.copyProperties(djScheduleResult, scheduleVo);
+        return djEngineService.insertDjOrder(scheduleVo);
     }
 
     /**
@@ -204,100 +160,106 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      * @return 结果
      */
     @Override
-    public int updateNcScheduleResult(DjScheduleResult scheduleResult) {
+    public int updateDjScheduleResult(DjScheduleResult scheduleResult) {
         scheduleResult.setBaseVale(scheduleResult.getId());
         // 校验字段是否修改，修改则改状态为未发布
-        if (!ApsConstant.RELEASING.equals(scheduleResult.getIsRelease()) || !ApsConstant.TIMEOUT_FAILURE.equals(scheduleResult.getIsRelease()) || StringUtils.isEmpty(scheduleResult.getIsRelease())) {
-            DjScheduleResult scheduleResult2 = ncScheduleResultMapper.selectNcScheduleResultById(scheduleResult.getId());
+        if (!ApsConstant.RELEASING.equals(scheduleResult.getReleaseStatus())
+                || !ApsConstant.TIMEOUT_FAILURE.equals(scheduleResult.getReleaseStatus())
+                || StringUtils.isEmpty(scheduleResult.getReleaseStatus())) {
+            DjScheduleResult scheduleResult2 = djScheduleResultMapper
+                    .selectDjScheduleResultById(scheduleResult.getId());
             boolean flag = compare(scheduleResult2.getMachineCode(), scheduleResult.getMachineCode());
-            flag = flag && compare(scheduleResult2.getDayPlanQty(), scheduleResult.getDayPlanQty());
-            flag = flag && compare(scheduleResult2.getNightPlanQty(), scheduleResult.getNightPlanQty());
-            flag = flag && compare(scheduleResult2.getDayProduceOrder(), scheduleResult.getDayProduceOrder());
-            flag = flag && compare(scheduleResult2.getNightProduceOrder(), scheduleResult.getNightProduceOrder());
-            flag = flag && compare(scheduleResult2.getDayHandAnalysis(), scheduleResult.getDayHandAnalysis());
-            flag = flag && compare(scheduleResult2.getNightHandAnalysis(), scheduleResult.getNightHandAnalysis());
+            flag = flag && Objects.compare(scheduleResult2.getClass1PlanQty(), scheduleResult.getClass1PlanQty(),
+                    BigDecimal::compareTo) != 0;
+            flag = flag && Objects.compare(scheduleResult2.getClass2PlanQty(), scheduleResult.getClass2PlanQty(),
+                    BigDecimal::compareTo) != 0;
+            flag = flag && Objects.compare(scheduleResult2.getClass3PlanQty(), scheduleResult.getClass3PlanQty(),
+                    BigDecimal::compareTo) != 0;
+            flag = flag && compare(scheduleResult2.getClass1Analysis(), scheduleResult.getClass1Analysis());
+            flag = flag && compare(scheduleResult2.getClass2Analysis(), scheduleResult.getClass2Analysis());
+            flag = flag && compare(scheduleResult2.getClass3Analysis(), scheduleResult.getClass1Analysis());
             flag = flag && compare(scheduleResult2.getRemark(), scheduleResult.getRemark());
             if (!flag) {
-                scheduleResult.setIsRelease(scheduleResult.getPublishSuccessCount() == 0 ? ApsConstant.NO_RELEASE : ApsConstant.WAIT_RELEASING);
+                scheduleResult.setReleaseStatus(scheduleResult.getPublishSuccessCount() == 0 ? ApsConstant.NO_RELEASE
+                        : ApsConstant.WAIT_RELEASING);
             }
         }
-        return ncScheduleResultMapper.updateNcScheduleResult(scheduleResult);
+        return djScheduleResultMapper.updateDjScheduleResult(scheduleResult);
     }
 
     /**
      * 判断是否是“调度员”，如果调度员，则需要需要记录操作日志
-     * @param operType 操作类型：0--转机台、1--调量
+     * 
+     * @param operType    操作类型：0--转机台、1--调量
      * @param newSchedule
      */
     @Override
-    public void insetDispatcherLog(String operType, DjScheduleResult newSchedule) {
+    public void insertDispatcherLog(String operType, DjScheduleResult newSchedule) {
         // 20231018 需求确认单各个工序中，调度员操作日志，改成排程操作日志，统计全部人员的操作记录，调度员字段改为“操作人员”字段
-        //        if(!preAuthorizeAspect.hasRole(ApsConstant.DISPATCHER_ROLE)) {
-        //            return;
-        //        }
-        DjScheduleResult oldSchedule = this.ncScheduleResultMapper.selectNcScheduleResultById(newSchedule.getId());  //操作前的排程数据
-        DjDispatcherLog log = new DjDispatcherLog();
-        //基础信息赋值
-        log.setScheduleId(newSchedule.getId());
-        log.setOperType(operType);
-        log.setScheduleDate(newSchedule.getScheduleDate());  //排程日期
-        log.setMaterialCode(newSchedule.getLiningCode());    //垫胶代码
-        //操作前的信息赋值
-        log.setBeforeMachineId(oldSchedule.getMachineCode());
-        log.setBeforeDayPlan(oldSchedule.getDayPlanQty());
-        log.setBeforeNightPlan(oldSchedule.getNightPlanQty());
-        //操作后的信息赋值
-        log.setAfterMachineId(newSchedule.getMachineCode());
-        log.setAfterDayPlan(newSchedule.getDayPlanQty());
-        log.setAfterNightPlan(newSchedule.getNightPlanQty());
-        /** 调用插入日志方法 **/
-        ncDispatcherLogService.insertNcDispatcherLog(log);
+        // if(!preAuthorizeAspect.hasRole(ApsConstant.DISPATCHER_ROLE)) {
+        // return;
+        // }
+        DjScheduleResult oldSchedule = this.djScheduleResultMapper.selectDjScheduleResultById(newSchedule.getId()); // 操作前的排程数据
+        // 构建日志并保存
+        djDispatcherLogService.saveBill(this.buildDispatcherLog(operType, newSchedule, oldSchedule));
     }
 
     /**
      * 判断是否是“调度员”，如果调度员，则需要需要记录操作日志
      *
-     * @param operType        操作类型：0--转机台、1--调量、2--插单
+     * @param operType 操作类型：0--转机台、1--调量、2--插单
      */
     @Override
-    public void insetDispatcherLogInsertOrder(String operType, List<DjScheduleResult> scheduleResults, DjScheduleResult newSchedule) {
-        // 20231018 需求确认单各个工序中，调度员操作日志，改成排程操作日志，统计全部人员的操作记录，调度员字段改为“操作人员”字段
-        //        if(!preAuthorizeAspect.hasRole(ApsConstant.DISPATCHER_ROLE)) {
-        //            return;
-        //        }
+    public void insertDispatcherLogInsertOrder(String operType, List<DjScheduleResult> scheduleResults,
+            DjScheduleResult newSchedule) {
         List<DjScheduleResult> scheduleResultList = this.selectByScheduleDateAndCode(newSchedule);
-        DjDispatcherLog log = new DjDispatcherLog();
-        //基础信息赋值
-        log.setScheduleId(scheduleResultList.get(0).getId());
-        log.setOperType(operType);
-        log.setScheduleDate(newSchedule.getScheduleDate());  //排程日期
-        log.setMaterialCode(newSchedule.getLiningCode());
+        // 基础信息赋值
+        newSchedule.setId(scheduleResultList.get(0).getId());
         // 操作前的信息赋值，取创建时间最大的记录为操作前信息
+        DjScheduleResult oldSchedule = null;
         if (CollectionUtils.isNotEmpty(scheduleResults)) {
-            Optional<DjScheduleResult> max = scheduleResults.stream().max(Comparator.comparing(DjScheduleResult::getCreateTime));
-            if (max.isPresent()) {
-                DjScheduleResult scheduleResult = max.get();
-                log.setBeforeMachineId(scheduleResult.getMachineCode());
-                log.setBeforeDayPlan(scheduleResult.getDayPlanQty());
-                log.setBeforeNightPlan(scheduleResult.getNightPlanQty());
-            }
+            oldSchedule = scheduleResults.stream().max(Comparator.comparing(DjScheduleResult::getCreateTime))
+                    .orElse(null);
         }
-        //操作后的信息赋值
-        log.setAfterMachineId(newSchedule.getMachineCode());
-        log.setAfterDayPlan(newSchedule.getDayPlanQty());
-        log.setAfterNightPlan(newSchedule.getNightPlanQty());
-        /* 调用插入日志方法 **/
-        ncDispatcherLogService.insertNcDispatcherLog(log);
+        // 构建日志并保存
+        djDispatcherLogService.saveBill(this.buildDispatcherLog(operType, newSchedule, oldSchedule));
+    }
+
+    /*
+     * 构建排产操作操作日志
+     */
+    private DjDispatcherLog buildDispatcherLog(String operType, DjScheduleResult newSchedule,
+            DjScheduleResult oldSchedule) {
+        DjDispatcherLog log = new DjDispatcherLog();
+        // 基础信息赋值
+        log.setScheduleId(newSchedule.getId());
+        log.setOperType(operType);
+        log.setScheduleDate(newSchedule.getScheduleDate()); // 排程日期
+        log.setMaterialCode(newSchedule.getPaddingCode()); // 垫胶代码
+        // 操作前的信息赋值
+        if (oldSchedule != null) {
+            log.setBeforeMachineCode(oldSchedule.getMachineCode());
+            log.setBeforeClass1PlanQty(oldSchedule.getClass1PlanQty());
+            log.setBeforeClass2PlanQty(oldSchedule.getClass2PlanQty());
+            log.setBeforeClass3PlanQty(oldSchedule.getClass3PlanQty());
+        }
+        // 操作后的信息赋值
+        log.setBeforeMachineCode(newSchedule.getMachineCode());
+        log.setBeforeClass1PlanQty(newSchedule.getClass1PlanQty());
+        log.setBeforeClass2PlanQty(newSchedule.getClass2PlanQty());
+        log.setBeforeClass3PlanQty(newSchedule.getClass3PlanQty());
+        return log;
     }
 
     /**
      * 根据排程日期和代码查询排程结果
+     * 
      * @param scheduleResult 排程日期、代码
      * @return 查询到的数据
      */
     @Override
     public List<DjScheduleResult> selectByScheduleDateAndCode(DjScheduleResult scheduleResult) {
-        return ncScheduleResultMapper.selectByScheduleDateAndCode(scheduleResult);
+        return djScheduleResultMapper.selectByScheduleDateAndCode(scheduleResult);
     }
 
     public boolean compare(String str1, String str2) {
@@ -321,8 +283,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      * @return 结果
      */
     @Override
-    public int deleteNcScheduleResultByIds(Long[] ids) {
-        return ncScheduleResultMapper.deleteNcScheduleResultByIds(ids);
+    public int deleteDjScheduleResultByIds(Long[] ids) {
+        return djScheduleResultMapper.deleteDjScheduleResultByIds(ids);
     }
 
     /**
@@ -332,8 +294,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      * @return 结果
      */
     @Override
-    public int deleteNcScheduleResultById(Long id) {
-        return ncScheduleResultMapper.deleteNcScheduleResultById(id);
+    public int deleteDjScheduleResultById(Long id) {
+        return djScheduleResultMapper.deleteDjScheduleResultById(id);
     }
 
     /**
@@ -346,28 +308,27 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     public int batchUpdate(long[] ids, Date scheduleDate, String dataVersion, String factoryCode, String companyCode) {
         SchedulePublishRecord record = new SchedulePublishRecord();
         record.setBaseVale(null);
-        record.setProcedureCode(ApsConstant.PROCEDURE_CODE_NC);
+        record.setProcedureCode(ApsConstant.PROCEDURE_CODE_DJ);
         record.setScheduleDate(scheduleDate);
         record.setPublishStatus(ApsConstant.RELEASING);
         record.setDataVersion(dataVersion);
-        this.deployNcScheduleToMid(ids, dataVersion, factoryCode, companyCode);   //把排程数据发布到中间库，并通知MES
-        ncScheduleResultMapper.insertPublishRecord(record);
-        return ncScheduleResultMapper.batchUpdate(Arrays.stream(ids)
-                .boxed().collect(Collectors.toList()), ApsConstant.RELEASING);
+        this.deployDjScheduleToMid(ids, dataVersion, factoryCode, companyCode); // 把排程数据发布到中间库，并通知MES
+        djScheduleResultMapper.insertPublishRecord(record);
+        return djScheduleResultMapper.batchUpdate(Arrays.stream(ids).boxed().collect(Collectors.toList()),
+                ApsConstant.RELEASING);
     }
 
-	/**
-	 * 更新指定相关数据记录的发布状态
-	 *
-	 * @param dataVersion 数据版本
-	 * @param ids         排程ID列表
-	 * @param status      更新的状态
-	 */
+    /**
+     * 更新指定相关数据记录的发布状态
+     *
+     * @param dataVersion 数据版本
+     * @param ids         排程ID列表
+     * @param status      更新的状态
+     */
     @Override
     public void updateRelaseStatus(String dataVersion, long[] ids, String status) {
-    	ncScheduleResultMapper.batchUpdate(Arrays.stream(ids)
-                .boxed().collect(Collectors.toList()), status);
-        ncScheduleResultMapper.updatePublishRecordVersion(dataVersion, status);
+        djScheduleResultMapper.batchUpdate(Arrays.stream(ids).boxed().collect(Collectors.toList()), status);
+        djScheduleResultMapper.updatePublishRecordVersion(dataVersion, status);
     }
 
     /**
@@ -375,11 +336,11 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      *
      * @param ids 排程id
      */
-    private void deployNcScheduleToMid(long[] ids, String dataVersion, String factoryCode, String companyCode) {
+    private void deployDjScheduleToMid(long[] ids, String dataVersion, String factoryCode, String companyCode) {
         if (ids == null) {
             return;
         }
-        ncScheduleResultMapper.deployNcScheduleToMid(dataVersion, ids, factoryCode, companyCode);   //把排程数据同步到接口中间库中
+        djScheduleResultMapper.deployDjScheduleToMid(dataVersion, ids, factoryCode, companyCode); // 把排程数据同步到接口中间库中
     }
 
     /**
@@ -391,9 +352,9 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     @Override
     public Boolean isPublish(Date scheduleDate) {
         SchedulePublishRecord record = new SchedulePublishRecord();
-        record.setProcedureCode(ApsConstant.PROCEDURE_CODE_NC);
+        record.setProcedureCode(ApsConstant.PROCEDURE_CODE_DJ);
         record.setScheduleDate(scheduleDate);
-        return ncScheduleResultMapper.isPublish(record) > 0;
+        return djScheduleResultMapper.isPublish(record) > 0;
     }
 
     /**
@@ -401,9 +362,8 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public List<DjScheduleResult> checkUnique(DjScheduleResult entity) {
-        return ncScheduleResultMapper.checkUnique(entity);
+        return djScheduleResultMapper.checkUnique(entity);
     }
-
 
     /**
      * 导入数据，并保存记录
@@ -416,16 +376,16 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         int failureNum = 0;
         List<ImportErrorLog> importErrorLogs = new ArrayList<>();
         List<DjScheduleResult> importList = new ArrayList<>();
-        DjMachineInfo ncMachineInfo=new DjMachineInfo();
-        ncMachineInfo.setStatus("0");
-        List<DjMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(ncMachineInfo);
+        DjMachineInfo djMachineInfo = new DjMachineInfo();
+        djMachineInfo.setStatus("0");
+        List<DjMachineInfo> machineInfoList = machineInfoService.selectMachineInfoList(djMachineInfo);
         if (CollectionUtils.isEmpty(machineInfoList)) {
             String message = I18nUtil.getMessage("ui.error.message.column.machineIsNull");
             addImportErrorLog(importLogId, null, message, importErrorLogs);
             return AjaxResult.error(message, importErrorLogs);
         }
 
-        //根据机台名称去重
+        // 根据机台名称去重
         TreeSet<DjMachineInfo> treeSet = new TreeSet<DjMachineInfo>(new Comparator<DjMachineInfo>() {
             @Override
             public int compare(DjMachineInfo o1, DjMachineInfo o2) {
@@ -435,36 +395,39 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         treeSet.addAll(machineInfoList);
         machineInfoList = new ArrayList<>(treeSet);
 
-        Map<String, Long> machineCodeMap = machineInfoList.stream().collect(Collectors.toMap(DjMachineInfo::getMachineName, DjMachineInfo::getId));
-        //按业务主键分组
-        Map<String, Long> groupMap = list.stream().collect(Collectors.groupingBy(a -> (a.getLiningCode() + a.getMachineCode()), Collectors.counting()));
+        Map<String, Long> machineCodeMap = machineInfoList.stream()
+                .collect(Collectors.toMap(DjMachineInfo::getMachineName, DjMachineInfo::getId));
+        // 按业务主键分组
+        Map<String, Long> groupMap = list.stream()
+                .collect(Collectors.groupingBy(a -> (a.getPaddingCode() + a.getMachineCode()), Collectors.counting()));
 
-        //遍历校验
+        // 遍历校验
         for (int i = 0; i < list.size(); i++) {
             DjScheduleResult entity = list.get(i);
             entity.setDataSource("2");
             entity.setScheduleDate(DateUtils.dateTime("yyyy-MM-dd", scheduleDate));
 
-            //重复记录校验
-            Long hasValue = groupMap.get(entity.getLiningCode() + entity.getMachineCode());
+            // 重复记录校验
+            Long hasValue = groupMap.get(entity.getPaddingCode() + entity.getMachineCode());
             if (hasValue > 1) {
                 failureNum++;
                 String message = I18nUtil.getMessage("ui.data.column.all.conflictRecord");
                 String columnName = I18nUtil.getMessage("ui.data.column.quota.liningCode");
                 String columnName2 = I18nUtil.getMessage("ui.data.column.scheduleResult.produceLine");
-                message=String.format(message,columnName+"+"+columnName2);
-                addImportErrorLog(importLogId, i + 3,message, importErrorLogs);
+                message = String.format(message, columnName + "+" + columnName2);
+                addImportErrorLog(importLogId, i + 3, message, importErrorLogs);
                 continue;
             }
 
             List<ImportErrorLog> validated = ImportUtil.validated(importLogId, i + 3, entity);
             // 机台code 转为机台id
-            if(entity.getMachineCode()!=null && entity.getMachineCode().indexOf(",")>0){
+            if (entity.getMachineCode() != null && entity.getMachineCode().indexOf(",") > 0) {
                 String message = I18nUtil.getMessage("ui.data.column.machine.produceLineValidate");
-                message=String.format(message, i + 3, I18nUtil.getMessage("ui.data.column.scheduleResult.produceLine"));
-                addImportErrorLog(importLogId, i + 3,message, validated);
+                message = String.format(message, i + 3,
+                        I18nUtil.getMessage("ui.data.column.scheduleResult.produceLine"));
+                addImportErrorLog(importLogId, i + 3, message, validated);
             }
-            if (machineCodeMap.get(entity.getMachineCode())==null) {
+            if (machineCodeMap.get(entity.getMachineCode()) == null) {
                 addImportErrorLog(importLogId, i + 3,
                         I18nUtil.getMessage("ui.error.message.column.produceLineNotExist"), validated);
             }
@@ -473,17 +436,17 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
                 failureNum++;
                 importErrorLogs.addAll(validated);
             } else {
-                entity.setMachineCode(machineCodeMap.get(entity.getMachineCode())+"");
+                entity.setMachineCode(machineCodeMap.get(entity.getMachineCode()) + "");
                 successNum++;
                 entity.setBaseVale(null);
                 importList.add(entity);
             }
         }
-        this.batchSaveNcSchedule(scheduleDate, importList);  //把验证成功的记录进行导入
-
+        this.batchSaveDjSchedule(scheduleDate, importList); // 把验证成功的记录进行导入
 
         if (failureNum > 0) {
-            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum, importErrorLogs);
+            return AjaxResult.error(I18nUtil.getMessage("ui.message.import.fail") + "," + successNum + "," + failureNum,
+                    importErrorLogs);
         } else {
             return AjaxResult.success(I18nUtil.getMessage("ui.message.import.success") + "," + successNum);
         }
@@ -495,21 +458,15 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      * @param scheduleDate 排程日志，格式：yyyy-MM-dd
      * @param importList   导入数据
      */
-    private void batchSaveNcSchedule(String scheduleDate, List<DjScheduleResult> importList) {
+    private void batchSaveDjSchedule(String scheduleDate, List<DjScheduleResult> importList) {
         List<DjScheduleResultVo> scheduleList = new ArrayList<>();
         for (DjScheduleResult result : importList) {
             DjScheduleResultVo vo = new DjScheduleResultVo();
             BeanUtils.copyProperties(result, vo);
-            if(result.getDayProduceOrder() != null) {
-                vo.setDayProduceOrder(result.getDayProduceOrder().intValue());
-            }
-            if(result.getNightProduceOrder() != null) {
-                vo.setNightProduceOrder(result.getNightProduceOrder().intValue());
-            }
             scheduleList.add(vo);
         }
         if (!scheduleList.isEmpty()) {
-            this.ncEngineService.batchSaveNcSchedule(scheduleDate, scheduleList);
+            this.djEngineService.batchSaveDjSchedule(scheduleDate, scheduleList);
         }
     }
 
@@ -518,15 +475,15 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public AjaxResult chooseMachine(DjScheduleResult scheduleResult) {
-        if (CollectionUtils.isNotEmpty(ncScheduleResultMapper.checkUnique(scheduleResult))) {
+        if (CollectionUtils.isNotEmpty(djScheduleResultMapper.checkUnique(scheduleResult))) {
             return AjaxResult.error(I18nUtil.getMessage("ui.data.column.scheduleResult.already.exists"));
         }
-        this.ncEngineService.confirmNcMachine(scheduleResult);  //确认自动排程机台
-        scheduleResult.setIsRelease(scheduleResult.getPublishSuccessCount() == 0 ? ApsConstant.NO_RELEASE : ApsConstant.WAIT_RELEASING);
-        ncScheduleResultMapper.updateNcScheduleResult(scheduleResult);
+        this.djEngineService.confirmDjMachine(scheduleResult); // 确认自动排程机台
+        scheduleResult.setReleaseStatus(
+                scheduleResult.getPublishSuccessCount() == 0 ? ApsConstant.NO_RELEASE : ApsConstant.WAIT_RELEASING);
+        djScheduleResultMapper.updateDjScheduleResult(scheduleResult);
         return AjaxResult.success();
     }
-
 
     /**
      * 根据排程日期查询当前日期发布状态为"发布中"或"超时失败"的记录
@@ -536,7 +493,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public int isReleasingOrTimeoutByDate(Date scheduleDate) {
-        return ncScheduleResultMapper.isReleasingOrTimeoutByDate(scheduleDate);
+        return djScheduleResultMapper.isReleasingOrTimeoutByDate(scheduleDate);
     }
 
     /**
@@ -547,7 +504,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public int isReleasingOrTimeoutByIds(Long[] ids) {
-        return ncScheduleResultMapper.isReleasingOrTimeoutByIds(ids);
+        return djScheduleResultMapper.isReleasingOrTimeoutByIds(ids);
     }
 
     /**
@@ -560,11 +517,11 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
     public int changeReleaseStatus(DjScheduleResult entity) {
         SchedulePublishRecord record = new SchedulePublishRecord();
         record.setBaseVale(1L);
-        record.setProcedureCode(ApsConstant.PROCEDURE_CODE_NC);
+        record.setProcedureCode(ApsConstant.PROCEDURE_CODE_DJ);
         record.setScheduleDate(entity.getScheduleDate());
-        record.setPublishStatus(entity.getIsRelease());
-        ncScheduleResultMapper.updatePublishRecord(record);
-        return ncScheduleResultMapper.changeReleaseStatus(entity);
+        record.setPublishStatus(entity.getReleaseStatus());
+        djScheduleResultMapper.updatePublishRecord(record);
+        return djScheduleResultMapper.changeReleaseStatus(entity);
     }
 
     /**
@@ -579,32 +536,22 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         Map<String, Object> map = new HashMap<>();
         map.put("classifiedShift", classifiedShift);
         map.put("ids", ids);
-        return ncScheduleResultMapper.combinationMiddleAndNight(map);
+        return djScheduleResultMapper.combinationMiddleAndNight(map);
     }
 
     @Override
-    public int checkNcCodeExist(DjScheduleResult ncScheduleResult) {
-        return ncScheduleResultMapper.checkNcCodeExist(ncScheduleResult);
+    public int checkDjCodeExist(DjScheduleResult djScheduleResult) {
+        return djScheduleResultMapper.checkDjCodeExist(djScheduleResult);
     }
 
     @Override
     public int isPublishByIds(Long[] ids) {
-        return ncScheduleResultMapper.isPublishByIds(ids);
+        return djScheduleResultMapper.isPublishByIds(ids);
     }
 
     @Override
     public List<DjScheduleResult> selectByIds(List<Long> ids2) {
-        return ncScheduleResultMapper.selectByIds(ids2);
-    }
-
-    @Override
-    protected String getBillTypeCode() {
-        return BillTypeCodeEnums.NC_SCHEDULE_RESULT.getBillTypeCode();
-    }
-
-    @Override
-    public int importData(List<DjScheduleResult> list, boolean b, long l) {
-        return 0;
+        return djScheduleResultMapper.selectByIds(ids2);
     }
 
     @Autowired
@@ -619,7 +566,7 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public AjaxResult importFinishQty(List<DjDayFinishQty> list, Long importLogId) {
-        return baseFinishQtyImportService.importFinishQty(list, importLogId, HalfComponentFinishTableEnum.NC);
+        return baseFinishQtyImportService.importFinishQty(list, importLogId, HalfComponentFinishTableEnum.DJ);
     }
 
     /**
@@ -630,18 +577,20 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
      */
     @Override
     public AjaxResult getSummaryVo(DjScheduleResult scheduleResult) {
-        List<DjScheduleResult> tmScheduleResultList = selectNcScheduleResultList(scheduleResult);
-        List<DjScheduleResult> lastDayPlanQty4List = ncScheduleResultMapper.getLastDayPlanQty4List(scheduleResult);
+        List<DjScheduleResult> djScheduleResultList = selectDjScheduleResultList(scheduleResult);
+        List<DjScheduleResult> lastDayPlanQty4List = djScheduleResultMapper.getLastDayPlanQty4List(scheduleResult);
         // 添加昨日排程有，今日排程没有的物料对象，用于后续计算理论交接班库存合计
-        List<String> resultCodeList = tmScheduleResultList.stream().map(DjScheduleResult::getLiningCode).collect(Collectors.toList());
-        List<String> notExistCodeList = lastDayPlanQty4List.stream().map(DjScheduleResult::getLiningCode)
+        List<String> resultCodeList = djScheduleResultList.stream().map(DjScheduleResult::getPaddingCode)
+                .collect(Collectors.toList());
+        List<String> notExistCodeList = lastDayPlanQty4List.stream().map(DjScheduleResult::getPaddingCode)
                 .filter(item -> !resultCodeList.contains(item)).collect(Collectors.toList());
         LambdaQueryWrapper<DjCurlRoll> curlRollQueryWrapper = new LambdaQueryWrapper<>();
         curlRollQueryWrapper.in(DjCurlRoll::getPaddingCode, notExistCodeList);
         List<DjCurlRoll> curlRollList = curlRollMapper.selectList(curlRollQueryWrapper);
         Map<String, BigDecimal> curlRollMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(curlRollList)) {
-            curlRollMap = curlRollList.stream().collect(Collectors.toMap(DjCurlRoll::getPaddingCode, DjCurlRoll::getCurlLength));
+            curlRollMap = curlRollList.stream()
+                    .collect(Collectors.toMap(DjCurlRoll::getPaddingCode, DjCurlRoll::getCurlLength));
         }
 
         LambdaQueryWrapper<DjParams> paramWrapper = new LambdaQueryWrapper<>();
@@ -649,19 +598,21 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         DjParams standardLengthParams = paramsMapper.selectOne(paramWrapper);
         for (String code : notExistCodeList) {
             DjScheduleResult result = new DjScheduleResult();
-            result.setLiningCode(code);
-            BigDecimal standardLength = standardLengthParams == null ? new BigDecimal(DEFAULT_STANDARD_LENGTH) : new BigDecimal(standardLengthParams.getParamValue());
-            scheduleResult.setCurlLength(curlRollMap.getOrDefault(code, standardLength).doubleValue());
-            tmScheduleResultList.add(result);
+            result.setPaddingCode(code);
+            BigDecimal standardLength = standardLengthParams == null ? new BigDecimal(DEFAULT_STANDARD_LENGTH)
+                    : new BigDecimal(standardLengthParams.getParamValue());
+            djScheduleResultList.add(result);
         }
         Map<String, DjScheduleResult> lastDayPlanMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(lastDayPlanQty4List)) {
-            lastDayPlanMap = lastDayPlanQty4List.stream().collect(Collectors.toMap(DjScheduleResult::getLiningCode, Function.identity()));
+            lastDayPlanMap = lastDayPlanQty4List.stream()
+                    .collect(Collectors.toMap(DjScheduleResult::getPaddingCode, Function.identity()));
         }
-        List<DjScheduleResult> cxConsume4List = ncScheduleResultMapper.getCxConsume4List(scheduleResult);
+        List<DjScheduleResult> cxConsume4List = djScheduleResultMapper.getCxConsume4List(scheduleResult);
         Map<String, DjScheduleResult> cxConsumeMap = new HashMap<>(16);
         if (CollectionUtils.isNotEmpty(cxConsume4List)) {
-            cxConsumeMap = cxConsume4List.stream().collect(Collectors.toMap(DjScheduleResult::getLiningCode, Function.identity()));
+            cxConsumeMap = cxConsume4List.stream()
+                    .collect(Collectors.toMap(DjScheduleResult::getPaddingCode, Function.identity()));
         }
         BigDecimal totalDayPlanQty = BigDecimal.ZERO;
         BigDecimal totalNightPlanQty = BigDecimal.ZERO;
@@ -670,31 +621,36 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         BigDecimal totalLastDayPlanQty = BigDecimal.ZERO;
         BigDecimal totalTheoreticClassStockQty = BigDecimal.ZERO;
 
-        for (DjScheduleResult result : tmScheduleResultList) {
-            Double nightPlanQty = ObjectUtils.defaultIfNull(result.getNightPlanQty(), 0D);
-            Double stockQty = ObjectUtils.defaultIfNull(result.getStockQty(), 0D);
-            String code = result.getLiningCode();
-            if (lastDayPlanMap.containsKey(code)) {
-                DjScheduleResult lastDayResult = lastDayPlanMap.get(code);
-                result.setLastMidPlanQty(lastDayResult.getLastMidPlanQty());
-            }
-            if (cxConsumeMap.containsKey(code)) {
-                DjScheduleResult cxConsumeResult = cxConsumeMap.get(code);
-                result.setCxConsumeQty(cxConsumeResult.getCxConsumeQty());
-            }
-            Double lastMidPlanQty = result.getLastMidPlanQty();
-            Double cxConsumeQty = result.getCxConsumeQty();
-            // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 成型消耗量
-            if (lastMidPlanQty != null && cxConsumeQty != null) {
-                result.setTheoreticClassStockQty(stockQty + lastMidPlanQty + nightPlanQty - cxConsumeQty);
-            }
-
-            totalDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getDayPlanQty(), 0D), totalDayPlanQty);
-            totalNightPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getNightPlanQty(), 0D), totalNightPlanQty);
-            totalNextDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getNextDayPlanQty(), 0D), totalNightPlanQty);
-            totalStockQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getStockQty(), 0D), totalStockQty);
-            totalLastDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getLastMidPlanQty(), 0D), totalLastDayPlanQty);
-            totalTheoreticClassStockQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getTheoreticClassStockQty(), 0D), totalTheoreticClassStockQty);
+        for (DjScheduleResult result : djScheduleResultList) {
+//            Double stockQty = ObjectUtils.defaultIfNull(result.getStockQty(), 0D);
+//            BigDecimal nightPlanQty = BigDecimalUtils.valueOf(result.getClass1PlanQty());
+//            String code = result.getPaddingCode();
+//            if (lastDayPlanMap.containsKey(code)) {
+//                DjScheduleResult lastDayResult = lastDayPlanMap.get(code);
+//                result.setLastMidPlanQty(lastDayResult.getLastMidPlanQty());
+//            }
+//            if (cxConsumeMap.containsKey(code)) {
+//                DjScheduleResult cxConsumeResult = cxConsumeMap.get(code);
+//                result.setCxConsumeQty(cxConsumeResult.getCxConsumeQty());
+//            }
+//            Double lastMidPlanQty = result.getLastMidPlanQty();
+//            Double cxConsumeQty = result.getCxConsumeQty();
+//            // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 成型消耗量
+//            if (lastMidPlanQty != null && cxConsumeQty != null) {
+//                result.setTheoreticClassStockQty(stockQty + lastMidPlanQty + nightPlanQty - cxConsumeQty);
+//            }
+//
+//            totalDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getDayPlanQty(), 0D),
+//                    totalDayPlanQty);
+//            totalNightPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getNightPlanQty(), 0D),
+//                    totalNightPlanQty);
+//            totalNextDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getNextDayPlanQty(), 0D),
+//                    totalNightPlanQty);
+//            totalStockQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getStockQty(), 0D), totalStockQty);
+//            totalLastDayPlanQty = BigDecimalUtils.add(ObjectUtils.defaultIfNull(result.getLastMidPlanQty(), 0D),
+//                    totalLastDayPlanQty);
+//            totalTheoreticClassStockQty = BigDecimalUtils.add(
+//                    ObjectUtils.defaultIfNull(result.getTheoreticClassStockQty(), 0D), totalTheoreticClassStockQty);
         }
         ScheduleSummaryVo scheduleSummaryVo = new ScheduleSummaryVo();
         scheduleSummaryVo.setDayPlanQty(totalDayPlanQty.doubleValue());
@@ -703,32 +659,6 @@ public class DjScheduleResultServiceImpl extends AbstractBillService<DjScheduleR
         scheduleSummaryVo.setStockQty(totalStockQty.doubleValue());
         scheduleSummaryVo.setLastDayPlanQty(totalLastDayPlanQty.doubleValue());
         scheduleSummaryVo.setTheoreticClassStockQty(totalTheoreticClassStockQty.doubleValue());
-        /*ScheduleSummaryVo summaryVo = ncScheduleResultMapper.getSummaryVo(scheduleResult);
-        if (summaryVo == null) {
-            summaryVo = new ScheduleSummaryVo();
-            summaryVo.setScheduleDate(scheduleResult.getScheduleDate());
-        }
-        ScheduleSummaryVo lastDayPlanQtySummaryVo = ncScheduleResultMapper.getLastDayPlanQty(scheduleResult);
-        Double lastDayPlanQty = null;
-        if (lastDayPlanQtySummaryVo != null) {
-            lastDayPlanQty = lastDayPlanQtySummaryVo.getNightPlanQty();
-            summaryVo.setLastDayPlanQty(lastDayPlanQty);
-        }
-        ScheduleSummaryVo cxConsumeSummaryVo = null;
-        Double cxConsumeQty = null;
-        if (StringUtils.isBlank(scheduleResult.getIsRelease()) && StringUtils.isBlank(scheduleResult.getMachineId())) {
-            cxConsumeSummaryVo = ncScheduleResultMapper.getCxConsume(scheduleResult);
-        }
-        if (cxConsumeSummaryVo != null) {
-            cxConsumeQty = cxConsumeSummaryVo.getCxConsumeQty();
-            summaryVo.setCxConsumeQty(cxConsumeQty);
-        }
-        // 理论交班库存计算,理论交班库存 = 库存 + 昨日早班 + 夜班 - 成型消耗量
-        Double stockQty = ObjectUtils.defaultIfNull(summaryVo.getStockQty(), 0D);
-        Double nightPlanQty = ObjectUtils.defaultIfNull(summaryVo.getNightPlanQty(), 0D);
-        if (lastDayPlanQty != null && cxConsumeQty != null) {
-            summaryVo.setTheoreticClassStockQty(stockQty + lastDayPlanQty + nightPlanQty - cxConsumeQty);
-        }*/
         return AjaxResult.success(scheduleSummaryVo);
     }
 }

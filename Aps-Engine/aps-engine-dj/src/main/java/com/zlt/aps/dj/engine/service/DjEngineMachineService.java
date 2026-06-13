@@ -19,5 +19,5 @@ public interface DjEngineMachineService {
      *
      * @return 结果
      */
-    List<DjMachineInfo> listNcMachine();
+    List<DjMachineInfo> listDjMachine();
 }

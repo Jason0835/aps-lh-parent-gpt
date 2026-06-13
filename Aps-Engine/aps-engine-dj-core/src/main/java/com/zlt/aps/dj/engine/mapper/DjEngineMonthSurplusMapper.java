@@ -16,5 +16,5 @@ public interface DjEngineMonthSurplusMapper {
      * @param month 月
      * @return
      */
-    List<DjMonthSurplusVo> listNcMonthPlanSurplus(@Param("year") String year, @Param("month") String month);
+    List<DjMonthSurplusVo> listDjMonthPlanSurplus(@Param("year") String year, @Param("month") String month);
 }

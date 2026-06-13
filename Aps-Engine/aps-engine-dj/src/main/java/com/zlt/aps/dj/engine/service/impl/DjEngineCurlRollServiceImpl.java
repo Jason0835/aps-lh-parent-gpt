@@ -15,7 +15,7 @@ import com.zlt.aps.dj.engine.service.DjEngineCurlRollService;
 @Service
 public class DjEngineCurlRollServiceImpl implements DjEngineCurlRollService {
 	@Autowired
-	private DjEngineCurlRollMapper ncEngineCurlRollMapper;
+	private DjEngineCurlRollMapper djEngineCurlRollMapper;
 
 	/**
 	 * 获得垫胶卷曲长度，key：胎面
@@ -23,8 +23,8 @@ public class DjEngineCurlRollServiceImpl implements DjEngineCurlRollService {
 	 * @return
 	 */
 	@Override
-	public Map<String, BigDecimal> getNcCurlLengthMap() {
-		List<DjCurlRoll> curlRollList = ncEngineCurlRollMapper.getNcCurlRollList();
+	public Map<String, BigDecimal> getDjCurlLengthMap() {
+		List<DjCurlRoll> curlRollList = djEngineCurlRollMapper.getDjCurlRollList();
 		Map<String, BigDecimal> curlLengthMap = curlRollList.stream().filter(item -> item.getCurlLength() != null)
 				.collect(Collectors.toMap(DjCurlRoll::getPaddingCode, DjCurlRoll::getCurlLength, (m1, m2) -> m1));
 		return curlLengthMap;

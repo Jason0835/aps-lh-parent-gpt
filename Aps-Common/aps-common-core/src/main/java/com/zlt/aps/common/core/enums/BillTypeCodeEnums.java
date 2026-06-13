@@ -59,6 +59,11 @@ public enum BillTypeCodeEnums {
      */
     CD90_SCHEDULE_RESULT("CD90001","90度裁断排程结果"),
 
+    /**
+     * 垫胶排程结果
+     */
+    DJ_SCHEDULE_RESULT("DJ001","垫胶排程结果"),
+
 
 
 

@@ -11,7 +11,7 @@ public class DjStockVo {
     /**
      * 垫胶代码
      */
-    private String liningCode;
+    private String paddingCode;
 
     /**
      * 库存量

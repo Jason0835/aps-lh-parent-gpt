@@ -14,5 +14,5 @@ public interface DjEngineCurlRollMapper {
 	 * 
 	 * @return
 	 */
-	List<DjCurlRoll> getNcCurlRollList();
+	List<DjCurlRoll> getDjCurlRollList();
 }
