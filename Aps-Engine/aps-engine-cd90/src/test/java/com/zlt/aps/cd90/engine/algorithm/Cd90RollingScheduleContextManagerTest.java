@@ -44,6 +44,8 @@ public class Cd90RollingScheduleContextManagerTest {
         assertEquals(Integer.valueOf(28800), second.getRemainingSecondsByMachine().get("M1"));
         assertEquals("SPEC-A", second.getTailSpecByMachine().get("M1"));
         assertEquals(1, context.getPlannedInboundRecords().size());
+        assertEquals(new BigDecimal("174"),
+                context.getPlannedInboundRecords().get(0).getInboundQuantity());
         assertEquals(1, context.getCommittedTasks().size());
     }
 

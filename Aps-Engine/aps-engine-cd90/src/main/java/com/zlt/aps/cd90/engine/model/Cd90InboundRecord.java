@@ -3,6 +3,7 @@ package com.zlt.aps.cd90.engine.model;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -22,6 +23,8 @@ public class Cd90InboundRecord {
     private String laneCode;
     /** 入库车辆数。 */
     private int vehicleCount;
+    /** 精确入库数量，单位米；为空时资源计算仍可按车辆数处理。 */
+    private BigDecimal inboundQuantity;
     /** 实际或预计入库时间，用于判断能否进入当前班次资源快照。 */
     private LocalDateTime inboundTime;
 }

@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -128,12 +129,35 @@ public class Cd90RollingScheduleContextManager {
             return;
         }
         String taskKey = task.getClassField() + "-" + task.getMachineCode() + "-" + taskSequence;
-        for (Cd90StorageLaneAllocation allocation : task.getLaneAllocations()) {
+        int totalVehicles = task.getLaneAllocations().stream()
+                .mapToInt(Cd90StorageLaneAllocation::getVehicleCount).sum();
+        BigDecimal remainingQuantity = task.getPlanQuantity() == null
+                ? BigDecimal.ZERO : task.getPlanQuantity();
+        for (int index = 0; index < task.getLaneAllocations().size(); index++) {
+            Cd90StorageLaneAllocation allocation = task.getLaneAllocations().get(index);
+            BigDecimal allocationQuantity = index == task.getLaneAllocations().size() - 1
+                    ? remainingQuantity : proportionalQuantity(
+                            task.getPlanQuantity(), allocation.getVehicleCount(), totalVehicles);
+            remainingQuantity = remainingQuantity.subtract(allocationQuantity);
             context.getPlannedInboundRecords().add(Cd90InboundRecord.builder()
                     .taskKey(taskKey).actual(false).clothCode(task.getClothCode())
                     .laneCode(allocation.getLaneCode()).vehicleCount(allocation.getVehicleCount())
+                    .inboundQuantity(allocationQuantity)
                     .inboundTime(task.getExpectedEndTime()).build());
         }
+    }
+
+    /**
+     * 多库排拆分时按车数比例分配精确计划量，最后一个库排承接舍入余量。
+     */
+    private BigDecimal proportionalQuantity(BigDecimal totalQuantity,
+                                            int allocationVehicles,
+                                            int totalVehicles) {
+        if (totalQuantity == null || totalVehicles <= 0 || allocationVehicles <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return totalQuantity.multiply(BigDecimal.valueOf(allocationVehicles))
+                .divide(BigDecimal.valueOf(totalVehicles), 10, RoundingMode.HALF_UP);
     }
 
     private List<Cd90InboundRecord> beforeShift(List<Cd90InboundRecord> records,
