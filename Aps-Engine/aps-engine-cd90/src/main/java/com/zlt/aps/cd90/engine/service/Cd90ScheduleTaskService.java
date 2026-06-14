@@ -3,6 +3,7 @@ package com.zlt.aps.cd90.engine.service;
 import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 直裁自动排程任务状态服务。
@@ -28,4 +29,10 @@ public interface Cd90ScheduleTaskService {
     boolean markSuccessInCurrentTransaction(String taskId, String batchNo);
 
     boolean markFailed(String taskId, String errorMessage);
+
+    /** 查询待补偿检查的运行中任务，逻辑删除由框架处理。 */
+    List<Cd90ScheduleTask> findRunningTasks(int limit);
+
+    /** 仅将仍为RUNNING的指定任务标记为超时失败。 */
+    boolean markTimeoutFailed(String taskId, String errorMessage);
 }

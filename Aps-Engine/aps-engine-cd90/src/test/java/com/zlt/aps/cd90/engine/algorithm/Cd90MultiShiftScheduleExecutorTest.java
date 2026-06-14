@@ -19,6 +19,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
@@ -70,9 +72,12 @@ public class Cd90MultiShiftScheduleExecutorTest {
                 inputService, singleShift, demandProvider,
                 new Cd90RollingScheduleContextManager(new Cd90ResourceSnapshotBuilder(
                         new Cd90StorageLaneConsumptionCalculator(), new Cd90InboundResolver())),
-                new Cd90UnscheduledResultAggregator(new Cd90UnscheduledReasonResolver()));
+                new Cd90UnscheduledResultAggregator(new Cd90UnscheduledReasonResolver()),
+                new Cd90AutoScheduleRuntimeGuard());
+        List<Integer> progressValues = new ArrayList<>();
 
-        Cd90MultiShiftExecutionResult result = executor.execute(context());
+        Cd90MultiShiftExecutionResult result = executor.execute(context(),
+                (progress, stage, stageName, shift) -> progressValues.add(progress));
 
         assertEquals(2, loadCount.get());
         assertEquals(2, executeCount.get());
@@ -81,13 +86,16 @@ public class Cd90MultiShiftScheduleExecutorTest {
         assertEquals(2, result.getUnscheduledResults().size());
         assertEquals(new BigDecimal("60"),
                 result.getUnscheduledResults().get(0).getUnscheduledQuantity());
+        assertEquals(Arrays.asList(20, 52, 52, 85), progressValues);
     }
 
     private Cd90AutoScheduleContext context() {
         return Cd90AutoScheduleContext.builder().factoryCode("116")
                 .scheduleDate(LocalDate.of(2026, 6, 13))
+                .startTime(LocalDateTime.now())
                 .parameters(Cd90AutoScheduleParameters.builder()
-                        .rollCoilMeter(new BigDecimal("100")).rollTotalCount(10).build())
+                        .rollCoilMeter(new BigDecimal("100")).rollTotalCount(10)
+                        .taskTimeoutMinutes(30).build())
                 .shifts(Arrays.asList(shift("CLASS1", "S1", 14),
                         shift("CLASS2", "S2", 22))).build();
     }

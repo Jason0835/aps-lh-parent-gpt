@@ -5,6 +5,9 @@ import com.zlt.aps.cd90.engine.model.Cd90AutoScheduleOutputDraft;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleEngineService;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleLockService;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
+import com.zlt.aps.cd90.engine.constant.Cd90ScheduleTaskStatus;
+import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
+import com.zlt.aps.cd90.engine.service.Cd90ScheduleProgressListener;
 import com.zlt.aps.cd90.service.Cd90AutoScheduleAsyncExecutor;
 import com.zlt.aps.cd90.service.Cd90AutoSchedulePersistService;
 import lombok.RequiredArgsConstructor;
@@ -44,9 +47,11 @@ public class Cd90AutoScheduleAsyncExecutorImpl implements Cd90AutoScheduleAsyncE
                 return;
             }
             Cd90AutoScheduleContext context = engineService.prepare(factoryCode, scheduleDate);
-            taskService.updateProgress(taskId, 20, "CALCULATE", "执行多班自动排程");
-            Cd90AutoScheduleOutputDraft output = engineService.execute(context);
-            taskService.updateProgress(taskId, 95, "PERSIST", "保存自动排程结果");
+            updateProgress(taskId, 15, "PREPARE", "自动排程上下文准备完成");
+            Cd90ScheduleProgressListener listener = (progress, stage, stageName, shift) ->
+                    updateProgress(taskId, progress, stage, stageName);
+            Cd90AutoScheduleOutputDraft output = engineService.execute(context, listener);
+            updateProgress(taskId, 95, "PERSIST", "保存自动排程结果");
             persistService.persist(taskId, context, output, lock);
         } catch (Exception exception) {
             log.error("[直裁自动排程] 异步任务执行失败, taskId={}, factoryCode={}, scheduleDate={}",
@@ -56,6 +61,17 @@ public class Cd90AutoScheduleAsyncExecutorImpl implements Cd90AutoScheduleAsyncE
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
             }
+        }
+    }
+
+    private void updateProgress(String taskId, int progress, String stage, String stageName) {
+        Cd90ScheduleTask task = taskService.findByTaskId(taskId);
+        if (task == null || !Cd90ScheduleTaskStatus.RUNNING.equals(task.getTaskStatus())) {
+            throw new IllegalStateException("自动排程任务状态已变化，停止当前执行");
+        }
+        if (!taskService.updateProgress(taskId, progress, stage, stageName)) {
+            log.warn("[直裁自动排程] 任务心跳更新失败但继续执行, taskId={}, progress={}, stage={}",
+                    taskId, progress, stage);
         }
     }
 }

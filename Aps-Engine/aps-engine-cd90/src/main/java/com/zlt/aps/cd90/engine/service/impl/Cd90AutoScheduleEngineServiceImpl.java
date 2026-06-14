@@ -14,6 +14,8 @@ import com.zlt.aps.cd90.engine.model.Cd90ShiftDescriptor;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleEngineService;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleParameterService;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleInputVersionService;
+import com.zlt.aps.cd90.engine.service.Cd90ScheduleProgressListener;
+import com.zlt.aps.cd90.engine.algorithm.Cd90AutoScheduleRuntimeGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,7 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
     private final Cd90MultiShiftScheduleExecutor multiShiftScheduleExecutor;
     private final Cd90AutoScheduleOutputDraftBuilder outputDraftBuilder;
     private final Cd90AutoScheduleInputVersionService inputVersionService;
+    private final Cd90AutoScheduleRuntimeGuard runtimeGuard;
 
     @Override
     public Cd90AutoScheduleContext prepare(String factoryCode, Date scheduleDate) {
@@ -78,13 +81,23 @@ public class Cd90AutoScheduleEngineServiceImpl implements Cd90AutoScheduleEngine
 
     @Override
     public Cd90AutoScheduleOutputDraft execute(Cd90AutoScheduleContext context) {
+        return execute(context, Cd90ScheduleProgressListener.NO_OP);
+    }
+
+    @Override
+    public Cd90AutoScheduleOutputDraft execute(Cd90AutoScheduleContext context,
+                                               Cd90ScheduleProgressListener listener) {
         if (context == null) {
             throw new IllegalArgumentException("自动排程计算上下文不能为空");
         }
         log.info("[直裁自动排程] Engine开始执行多班排程, factoryCode={}, scheduleDate={}",
                 context.getFactoryCode(), context.getScheduleDate());
-        Cd90MultiShiftExecutionResult execution = multiShiftScheduleExecutor.execute(context);
+        runtimeGuard.checkNotTimedOut(context, "多班排程开始");
+        Cd90MultiShiftExecutionResult execution = multiShiftScheduleExecutor.execute(context, listener);
+        runtimeGuard.checkNotTimedOut(context, "输出草稿构建前");
         Cd90AutoScheduleOutputDraft output = outputDraftBuilder.build(context, execution);
+        runtimeGuard.checkNotTimedOut(context, "输出草稿构建完成");
+        if (listener != null) listener.onProgress(90, "BUILD_OUTPUT", "输出草稿构建完成", null);
         log.info("[直裁自动排程] Engine输出草稿构建完成, resultCount={}, unscheduledCount={}",
                 output.getScheduleResults().size(), output.getUnscheduledResults().size());
         return output;

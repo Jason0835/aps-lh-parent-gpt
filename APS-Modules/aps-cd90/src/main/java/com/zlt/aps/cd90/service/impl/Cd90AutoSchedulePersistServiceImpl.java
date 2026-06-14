@@ -31,6 +31,7 @@ import com.zlt.aps.cd90.service.Cd90AutoSchedulePersistService;
 import com.zlt.aps.cd90.service.Cd90AutoScheduleVersionVerifier;
 import com.zlt.aps.cd90.service.Cd90ScheduleNumberService;
 import com.zlt.aps.cd90.service.Cd90ScheduleOverwriteValidator;
+import com.zlt.aps.cd90.engine.algorithm.Cd90AutoScheduleRuntimeGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -63,12 +64,14 @@ public class Cd90AutoSchedulePersistServiceImpl implements Cd90AutoSchedulePersi
     private final Cd90ScheduleNumberService numberService;
     private final Cd90AutoScheduleDraftMapper draftMapper;
     private final ObjectMapper objectMapper;
+    private final Cd90AutoScheduleRuntimeGuard runtimeGuard;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String persist(String taskId, Cd90AutoScheduleContext context,
                           Cd90AutoScheduleOutputDraft output, RLock lock) {
         validateCommitState(taskId, lock);
+        runtimeGuard.checkNotTimedOut(context, "最终事务开始");
         versionVerifier.verify(context);
         Date scheduleDate = date(context.getScheduleDate());
         List<Cd90ScheduleResult> oldResults = resultMapper.selectList(

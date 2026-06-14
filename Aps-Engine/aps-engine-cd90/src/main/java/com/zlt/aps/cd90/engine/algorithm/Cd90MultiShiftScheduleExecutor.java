@@ -11,6 +11,7 @@ import com.zlt.aps.cd90.engine.model.Cd90ShiftResourceState;
 import com.zlt.aps.cd90.engine.service.Cd90AutoScheduleInputService;
 import com.zlt.aps.cd90.engine.service.Cd90ShiftDemandProvider;
 import com.zlt.aps.cd90.engine.service.Cd90SingleShiftScheduleService;
+import com.zlt.aps.cd90.engine.service.Cd90ScheduleProgressListener;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -33,11 +34,18 @@ public class Cd90MultiShiftScheduleExecutor {
     private final Cd90ShiftDemandProvider demandProvider;
     private final Cd90RollingScheduleContextManager rollingContextManager;
     private final Cd90UnscheduledResultAggregator unscheduledResultAggregator;
+    private final Cd90AutoScheduleRuntimeGuard runtimeGuard;
 
     /**
      * 每个班次重新加载输入、生成候选和提交任务，当前阶段不写数据库。
      */
     public Cd90MultiShiftExecutionResult execute(Cd90AutoScheduleContext context) {
+        return execute(context, Cd90ScheduleProgressListener.NO_OP);
+    }
+
+    /** 每班开始和结束均执行超时检查并通知任务进度。 */
+    public Cd90MultiShiftExecutionResult execute(Cd90AutoScheduleContext context,
+                                                 Cd90ScheduleProgressListener listener) {
         if (context == null || context.getParameters() == null
                 || context.getShifts() == null || context.getShifts().isEmpty()) {
             throw new IllegalArgumentException("多班排程上下文、参数和班次窗口不能为空");
@@ -48,7 +56,14 @@ public class Cd90MultiShiftScheduleExecutor {
 
         log.info("[直裁自动排程] 多班循环执行开始, factoryCode={}, scheduleDate={}, shiftCount={}",
                 context.getFactoryCode(), context.getScheduleDate(), context.getShifts().size());
-        for (Cd90ShiftDescriptor shift : context.getShifts()) {
+        Cd90ScheduleProgressListener progressListener = listener == null
+                ? Cd90ScheduleProgressListener.NO_OP : listener;
+        int shiftCount = context.getShifts().size();
+        for (int index = 0; index < shiftCount; index++) {
+            Cd90ShiftDescriptor shift = context.getShifts().get(index);
+            runtimeGuard.checkNotTimedOut(context, shift.getClassField() + "班次开始");
+            progressListener.onProgress(progress(index, shiftCount), "SHIFT_EXECUTION",
+                    shift.getClassField() + "班次开始", shift);
             Cd90AutoScheduleInput input = inputService.load(
                     context.getFactoryCode(), context.getScheduleDate(),
                     shift.getClassField(), shift.getShiftCode());
@@ -71,6 +86,9 @@ public class Cd90MultiShiftScheduleExecutor {
                     attemptTraces.add(trace);
                 }
             }
+            runtimeGuard.checkNotTimedOut(context, shift.getClassField() + "班次完成");
+            progressListener.onProgress(progress(index + 1, shiftCount), "SHIFT_EXECUTION",
+                    shift.getClassField() + "班次完成", shift);
         }
         log.info("[直裁自动排程] 多班循环执行完成, factoryCode={}, scheduleDate={}, "
                         + "shiftCount={}, taskCount={}",
@@ -81,5 +99,9 @@ public class Cd90MultiShiftScheduleExecutor {
                 .attemptTraces(attemptTraces)
                 .unscheduledResults(unscheduledResultAggregator.aggregate(attemptTraces))
                 .build();
+    }
+
+    private int progress(int completedShiftCount, int shiftCount) {
+        return 20 + (completedShiftCount * 65 / shiftCount);
     }
 }

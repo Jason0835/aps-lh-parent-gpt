@@ -38,6 +38,11 @@ public interface ICd90ScheduleResultRemoteService {
     AjaxResult getLatestAutoScheduleTask(@RequestParam("factoryCode") String factoryCode,
                                          @RequestParam("scheduleDate") String scheduleDate);
 
+    @ApiOperation("补偿自动排程超时任务")
+    @PostMapping("/cd90ScheduleResult/autoSchedule/recoverTimeoutTasks")
+    AjaxResult recoverAutoScheduleTimeoutTasks(
+            @RequestParam(value = "timeoutMinutes", required = false) Integer timeoutMinutes);
+
     @ApiOperation("导出")
     @PostMapping("/cd90ScheduleResult/exportData/{fileName}")
     byte[] exportData(@RequestBody Cd90ScheduleResult queryVO, @PathVariable("fileName") String fileName);

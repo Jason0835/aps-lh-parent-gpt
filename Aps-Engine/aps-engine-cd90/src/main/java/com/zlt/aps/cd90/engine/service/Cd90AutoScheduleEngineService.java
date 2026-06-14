@@ -29,4 +29,8 @@ public interface Cd90AutoScheduleEngineService {
      * @return 自动排程输出草稿
      */
     Cd90AutoScheduleOutputDraft execute(Cd90AutoScheduleContext context);
+
+    /** 使用进度监听器执行完整多班排程。 */
+    Cd90AutoScheduleOutputDraft execute(Cd90AutoScheduleContext context,
+                                        Cd90ScheduleProgressListener listener);
 }

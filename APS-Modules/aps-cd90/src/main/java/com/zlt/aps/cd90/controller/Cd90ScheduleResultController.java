@@ -13,6 +13,7 @@ import com.zlt.aps.cd90.engine.domain.Cd90ScheduleTask;
 import com.zlt.aps.cd90.engine.service.Cd90ScheduleTaskService;
 import com.zlt.aps.cd90.mapper.Cd90ScheduleResultMapper;
 import com.zlt.aps.cd90.service.ICd90ScheduleResultService;
+import com.zlt.aps.cd90.service.Cd90ScheduleTaskRecoveryService;
 import com.zlt.aps.utils.AppUtils;
 import com.zlt.bill.common.controller.AbstractDocBizController;
 import com.zlt.bill.common.service.IDocService;
@@ -39,6 +40,8 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
     private Cd90ScheduleResultMapper cd90ScheduleResultMapper;
     @Resource
     private Cd90ScheduleTaskService cd90ScheduleTaskService;
+    @Resource
+    private Cd90ScheduleTaskRecoveryService cd90ScheduleTaskRecoveryService;
 
     @ApiOperation("查询列表")
     @PostMapping("/list")
@@ -102,6 +105,19 @@ public class Cd90ScheduleResultController extends AbstractDocBizController<Cd90S
                                                 @DateTimeFormat(pattern = "yyyy-MM-dd") Date scheduleDate) {
         Cd90ScheduleTask task = cd90ScheduleTaskService.findLatest(factoryCode, scheduleDate);
         return AjaxResult.success(task);
+    }
+
+    /**
+     * 供外部Job服务补偿心跳超时且执行锁已不存在的自动排程任务。
+     *
+     * @param timeoutMinutes 可选覆盖超时分钟数
+     * @return 补偿汇总
+     */
+    @ApiOperation("补偿自动排程超时任务")
+    @PostMapping("/autoSchedule/recoverTimeoutTasks")
+    public AjaxResult recoverAutoScheduleTimeoutTasks(
+            @RequestParam(value = "timeoutMinutes", required = false) Integer timeoutMinutes) {
+        return AjaxResult.success(cd90ScheduleTaskRecoveryService.recover(timeoutMinutes));
     }
 
     @ApiOperation("获取详情")

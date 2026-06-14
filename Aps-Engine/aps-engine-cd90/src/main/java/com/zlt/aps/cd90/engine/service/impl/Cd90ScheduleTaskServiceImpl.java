@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.UUID;
+import java.util.List;
 
 /**
  * 直裁自动排程任务状态服务实现。
@@ -155,5 +156,28 @@ public class Cd90ScheduleTaskServiceImpl implements Cd90ScheduleTaskService {
                 .set(Cd90ScheduleTask::getErrorMessage, summary)
                 .set(Cd90ScheduleTask::getEndTime, new Date())
                 .set(Cd90ScheduleTask::getLastHeartbeatTime, new Date())) == 1;
+    }
+
+    @Override
+    public List<Cd90ScheduleTask> findRunningTasks(int limit) {
+        int queryLimit = limit <= 0 ? 500 : Math.min(limit, 1000);
+        return taskMapper.selectList(new LambdaQueryWrapper<Cd90ScheduleTask>()
+                .eq(Cd90ScheduleTask::getTaskStatus, Cd90ScheduleTaskStatus.RUNNING)
+                .orderByAsc(Cd90ScheduleTask::getLastHeartbeatTime)
+                .last("limit " + queryLimit));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public boolean markTimeoutFailed(String taskId, String errorMessage) {
+        String summary = errorMessage == null ? "自动排程任务心跳超时" : errorMessage;
+        if (summary.length() > MAX_ERROR_LENGTH) summary = summary.substring(0, MAX_ERROR_LENGTH);
+        return taskMapper.update(null, new LambdaUpdateWrapper<Cd90ScheduleTask>()
+                .eq(Cd90ScheduleTask::getTaskId, taskId)
+                .eq(Cd90ScheduleTask::getTaskStatus, Cd90ScheduleTaskStatus.RUNNING)
+                .set(Cd90ScheduleTask::getTaskStatus, Cd90ScheduleTaskStatus.FAILED)
+                .set(Cd90ScheduleTask::getCurrentStageName, "心跳超时补偿失败")
+                .set(Cd90ScheduleTask::getErrorMessage, summary)
+                .set(Cd90ScheduleTask::getEndTime, new Date())) == 1;
     }
 }
